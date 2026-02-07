@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
+:root {
+  /* Color Palette - Vibrant & Premium */
+  --primary-h: 230;
+  --primary-s: 85%;
+  --primary-l: 60%;
+  --primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
+  --primary-dark: hsl(var(--primary-h), var(--primary-s), 45%);
+  --primary-light: hsl(var(--primary-h), var(--primary-s), 85%);
+  
+  --secondary: #ff9f43;
+  --accent: #ff6b6b;
+  --success: #1dd1a1;
+  --surface: #ffffff;
+  --background: #f8faff;
+  --text: #2d3436;
+  --text-muted: #636e72;
+  
+  /* Glassmorphism Effect */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  --blur: 10px;
+
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color: var(--text);
+  background-color: var(--background);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+#root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Base Styles */
+h1, h2, h3 {
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 0.8rem 1.6rem;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.4);
+}
+
+button:active {
+  transform: translateY(-1px);
+}
+
+/* Utility Classes */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 20px;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}

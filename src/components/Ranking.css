@@ -1,0 +1,131 @@
+.dashboard-view, .ranking-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 1rem;
+}
+
+.dashboard-header, .hall-of-fame-header {
+  padding: 2rem;
+  text-align: center;
+}
+
+.dashboard-header h2, .hall-of-fame-header h2 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: white;
+}
+
+.stat-icon {
+  font-size: 2.5rem;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.history-section {
+  padding: 2rem;
+  background: white;
+}
+
+.history-section h3 {
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid rgba(0,0,0,0.05);
+  padding-bottom: 0.5rem;
+}
+
+.history-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+  align-items: center;
+}
+
+.history-row.header {
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(0,0,0,0.02);
+  border-radius: 8px;
+}
+
+.score.perfect {
+  color: var(--success);
+  font-weight: 800;
+}
+
+/* Ranking styles */
+.ranking-list {
+  background: white;
+  padding: 1rem;
+}
+
+.ranking-item {
+  display: grid;
+  grid-template-columns: 80px 1fr 100px 100px;
+  padding: 1.2rem;
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+  align-items: center;
+}
+
+.ranking-item.header {
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(0,0,0,0.02);
+}
+
+.ranking-item.me {
+  background: rgba(74, 144, 226, 0.05);
+  border: 2px solid var(--primary);
+  border-radius: 12px;
+}
+
+.rank {
+  font-weight: 900;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.name {
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .ranking-item {
+    grid-template-columns: 50px 1fr 80px;
+  }
+  .ranking-item .avg {
+    display: none;
+  }
+}

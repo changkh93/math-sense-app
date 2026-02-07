@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && 
+             (request.auth.token.admin == true || 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // Helper to check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Regions, Chapters, Units, Quizzes: Public Read, Admin Write
+    match /regions/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /chapters/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /units/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /quizzes/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Users: User can read/write their own data. Admin can read all.
+    match /users/{userId} {
+      allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuth() && (request.auth.uid == userId || isAdmin());
+      
+      // Allow subcollections (like 'history')
+      match /{document=**} {
+        allow read, write: if isAuth() && (request.auth.uid == userId || isAdmin());
+      }
+    }
+  }
+}

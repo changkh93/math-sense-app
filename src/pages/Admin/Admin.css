@@ -1,0 +1,382 @@
+.admin-container {
+  display: flex;
+  min-height: 100vh;
+  background: #0f172a; /* Darker Slate */
+  color: #f8fafc;
+}
+
+.admin-sidebar, .admin-content {
+  background: transparent;
+}
+
+.content-wrapper.glass {
+  background: rgba(30, 41, 59, 0.7); /* Darker Slate Transparent */
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.admin-nav .nav-link {
+  color: #94a3b8;
+}
+
+.admin-nav .nav-link:hover {
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+}
+
+
+.admin-sidebar {
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-header {
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.badge {
+  background: #ff5e57;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.8rem 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.nav-link:hover, .nav-link.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.admin-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1rem;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #ff5e57;
+  cursor: pointer;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 94, 87, 0.1);
+  border-radius: 8px;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.content-wrapper {
+  min-height: 100%;
+  padding: 2rem;
+}
+
+/* Content Manager & Tree Nodes */
+.hierarchy-tree {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tree-node {
+  border-radius: 8px;
+  overflow: hidden;
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.node-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+}
+
+.node-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.node-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.node-content:hover .node-actions {
+  opacity: 1;
+}
+
+.node-content:hover {
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateX(4px);
+}
+
+.icon-btn.quiz-btn {
+  background: rgba(72, 52, 212, 0.2);
+  color: #4834d4;
+}
+
+.icon-btn.quiz-btn:hover {
+  background: #4834d4;
+  color: white;
+}
+
+.node-title {
+  flex: 1;
+  font-weight: 500;
+}
+
+.icon {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.add-btn:hover { color: #1dd1a1; }
+.delete-btn:hover { color: #ff5e57; }
+.edit-btn:hover { color: #4834d4; }
+
+.node-children {
+  padding-left: 2rem;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.loading {
+  padding: 10px;
+  color: #ff9f43;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.region-node { border-left-color: #f0932b; }
+.chapter-node { border-left-color: #1dd1a1; }
+.unit-node { border-left-color: #4834d4; }
+
+.section-header h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.section-header p {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.node-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Quiz Editor & Forms */
+.quiz-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1.2rem;
+}
+
+.quiz-id {
+  font-family: monospace;
+  color: #f0932b;
+  font-size: 0.8rem;
+}
+
+.quiz-text {
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.quiz-meta {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.primary-btn {
+  background: #4834d4;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.primary-btn:hover {
+  background: #3c2bb0;
+}
+
+.primary-btn:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+}
+
+.quiz-form {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.form-group input, .form-group textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.8rem;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.form-group textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.image-upload-area {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.img-preview {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.option-item input[type="text"] {
+  flex: 1;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.flex-1 { flex: 1; }
+.flex-2 { flex: 2; }
+
+.text-btn {
+  background: none;
+  border: none;
+  color: #1dd1a1;
+  cursor: pointer;
+  padding: 0.5rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
