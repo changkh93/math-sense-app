@@ -24,7 +24,30 @@ export const regions = [
     icon: '⛰️',
     color: '#eb4d4b',
     image: '/assets/regions/division.png',
-    pdf: '수학감각_나눗셈.pdf'
+    pdf: '수학감각_나눗셈.pdf',
+    chapters: [
+      {
+        id: 'div_chap1',
+        title: '나눗셈 (Division)',
+        units: [
+          { id: 'unit1', title: '1. 나누기란?' },
+          { id: 'unit2', title: '2. 나누기의 수학적 표현' },
+          { id: 'unit3', title: '3. 나누어진 결과로 나눗셈 표현하기' },
+          { id: 'unit4', title: '4. 묶음(그룹)으로 생각하기' },
+          { id: 'unit5', title: '5. 몇 층으로 쌓아 올리면 될까?' },
+          { id: 'unit6', title: '6. 구성하는 것을 한 묶음으로...' },
+          { id: 'unit7', title: '7. 곱셈구구와 나눗셈' },
+          { id: 'unit8', title: '8. 등분제와 포함제' },
+          { id: 'unit9', title: '9. 돈으로 나누기' },
+          { id: 'unit10', title: '10. 세로셈으로 표현하기' },
+          { id: 'unit11', title: '11. 자릿수 맞추기' },
+          { id: 'unit12', title: '12. 나머지(Remainder)' },
+          { id: 'unit13', title: '13. 검산' },
+          { id: 'unit14', title: '14. 세로셈 원리' },
+          { id: 'unit15', title: '15. 큰 수 나눗셈' }
+        ]
+      }
+    ]
   },
   {
     id: 'fractions',
@@ -151,6 +174,60 @@ export const regions = [
     icon: '🏰',
     color: '#f9ca24',
     image: '/assets/regions/ratios.png',
-    pdf: '비와 비례식1-230210.pdf'
+    pdf: '비와 비례식1-230210.pdf',
+    chapters: [
+      {
+        id: 'ratio_chap1',
+        title: '제1장: 비(ratio)란?',
+        units: [
+          { id: 'unit1', title: '1. 비의 뜻' },
+          { id: 'unit2', title: '2. 비교량과 기준량' },
+          { id: 'unit3', title: '3. 비를 읽는 여러가지 방법' },
+          { id: 'unit4', title: '4. 개별과 전체 개수의 비' },
+          { id: 'unit5', title: '5. 길이의 비' },
+          { id: 'unit6', title: '6. 비를 간단하고 분명하게 표현하기' },
+          { id: 'unit7', title: '7. 비(ratio)의 크기 비교' },
+          { id: 'unit8', title: '8. 유비(analogy)' }
+        ]
+      },
+      {
+        id: 'ratio_chap2',
+        title: '제2장: 비례식 기초',
+        units: [
+          { id: 'unit1', title: '1. 비례식(Proportion)의 성질' },
+          { id: 'unit2', title: '2. 길이의 비와 비례식' },
+          { id: 'unit3', title: '3. 미지수 x (엑스)' },
+          { id: 'unit4', title: '4. 비례식의 성질을 이용한 x값 구하기' },
+          { id: 'unit5', title: '5. 닮은꼴' },
+          { id: 'unit6', title: '6. 퍼센트 (%)' }
+        ]
+      },
+      {
+        id: 'ratio_chap3',
+        title: '비(ratio) 응용',
+        desc: '비와 비례식2 - Chapter 1',
+        units: [
+          { id: 'unit1', title: '1. 연비(three term ratios)' },
+          { id: 'unit2', title: '2. 비례배분' },
+          { id: 'unit3', title: '3. 증가율' },
+          { id: 'unit4', title: '4. 할인율' },
+          { id: 'unit5', title: '5. 길이 단위 변환' },
+          { id: 'unit6', title: '6. 축척과 실제 길이' },
+          { id: 'unit7', title: '7. 시간 단위 변환' }
+        ]
+      },
+      {
+        id: 'ratio_chap4',
+        title: 'rate(비율) 개념과 응용',
+        desc: '비와 비례식2 - Chapter 2',
+        units: [
+          { id: 'unit1', title: '1. rate(비율)란?' },
+          { id: 'unit2', title: '2. 속력(speed)' },
+          { id: 'unit3', title: '3. 비례식을 활용한 rate 문제 풀이' },
+          { id: 'unit4', title: '4. 진하기(농도)' },
+          { id: 'unit5', title: '5. unitary method(single unit를 활용한 방법)' }
+        ]
+      }
+    ]
   }
 ];

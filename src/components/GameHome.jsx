@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import '../App.css'
+import './QuizView.css'
 import QuizView from './QuizView'
 import Dashboard from './Dashboard'
 import Ranking from './Ranking'
@@ -32,6 +33,13 @@ function GameHome() {
 
   // Fetch quizzes only when unit is selected
   const { data: unitQuizzes, isLoading: loadingQuizzes } = useQuizzes(selectedUnitDocId)
+
+  // Auto-skip chapter selection for single-chapter regions (e.g., 나눗셈)
+  useEffect(() => {
+    if (chapters && chapters.length === 1 && !selectedChapterDocId) {
+      setSelectedChapterDocId(chapters[0].docId)
+    }
+  }, [chapters, selectedChapterDocId])
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -140,7 +148,11 @@ function GameHome() {
 
   if (selectedUnitDocId && unitQuizzes) {
     return (
-      <div className="app-container">
+      <div className="quiz-page-wrapper">
+        {/* Dynamic Background Elements */}
+        <div className="cloud" style={{ top: '10%', width: '300px', height: '100px', animationDelay: '0s' }}></div>
+        <div className="cloud" style={{ top: '30%', width: '400px', height: '120px', animationDelay: '-5s' }}></div>
+        <div className="cloud" style={{ top: '60%', width: '250px', height: '80px', animationDelay: '-12s' }}></div>
         <QuizView 
           region={activeRegion} 
           quizData={{ title: activeUnit.title, questions: unitQuizzes }}
@@ -208,8 +220,15 @@ function GameHome() {
               </div>
             ) : (
               <div className="selection-view fadeIn">
-                <button className="back-btn" onClick={() => setSelectedChapterDocId(null)}>← 장 선택으로 돌아가기</button>
-                <h2 className="selection-title">{activeChapter?.title}</h2>
+                <button className="back-btn" onClick={() => {
+                  if (chapters?.length === 1) {
+                    setSelectedChapterDocId(null)
+                    setSelectedRegionId(null)
+                  } else {
+                    setSelectedChapterDocId(null)
+                  }
+                }}>← {chapters?.length === 1 ? '지역 선택으로 돌아가기' : '장 선택으로 돌아가기'}</button>
+                <h2 className="selection-title">{chapters?.length === 1 ? activeRegion?.title : activeChapter?.title}</h2>
                 <div className="units-list">
                   {loadingUnits ? <div>Loading Units...</div> : 
                    units?.map(unit => (

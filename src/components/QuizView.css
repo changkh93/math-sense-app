@@ -1,11 +1,43 @@
+/* Full-width background wrapper for quiz page */
+.quiz-page-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--map-sky);
+  padding: 2rem;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Atmospheric Elements for Quiz Page */
+.quiz-page-wrapper .cloud {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.6;
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: 0;
+  animation: floatCloud 20s linear infinite;
+}
+
+@keyframes floatCloud {
+  from { transform: translateX(-200px); }
+  to { transform: translateX(calc(100vw + 200px)); }
+}
+
 .quiz-view-container {
-  max-width: 800px;
-  margin: 2rem auto;
+  max-width: 1000px;
+  margin: 0 auto;
   padding: 3rem;
   position: relative;
   min-height: 500px;
   display: flex;
   flex-direction: column;
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border-radius: 30px;
+  box-shadow: var(--card-shadow);
+  z-index: 1;
 }
 
 .exit-btn {

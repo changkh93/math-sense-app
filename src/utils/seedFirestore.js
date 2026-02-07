@@ -8,6 +8,12 @@ import { chapter4Quizzes } from '../data/chapter4Quizzes.js';
 import { chapter5Quizzes } from '../data/chapter5Quizzes.js';
 import { decimalChapter2Quizzes } from '../data/decimalChapter2Quizzes.js';
 
+import { ratioChapter1Quizzes } from '../data/ratioChapter1Quizzes.js';
+import { ratioChapter2Quizzes } from '../data/ratioChapter2Quizzes.js';
+import { ratioChapter3Quizzes } from '../data/ratioChapter3Quizzes.js';
+import { ratioChapter4Quizzes } from '../data/ratioChapter4Quizzes.js';
+import { divisionQuizzes } from '../data/divisionQuizzes.js';
+
 // Mapping chapters to their quiz data files
 const quizDataMapping = {
   'chap1': chapter1Quizzes,
@@ -15,7 +21,12 @@ const quizDataMapping = {
   'chap3': chapter3Quizzes,
   'chap4': chapter4Quizzes,
   'chap5': chapter5Quizzes,
-  'chap6': decimalChapter2Quizzes
+  'chap6': decimalChapter2Quizzes,
+  'ratio_chap1': ratioChapter1Quizzes,
+  'ratio_chap2': ratioChapter2Quizzes,
+  'ratio_chap3': ratioChapter3Quizzes,
+  'ratio_chap4': ratioChapter4Quizzes,
+  'div_chap1': divisionQuizzes,
 };
 
 export const seedFirestore = async () => {
@@ -118,7 +129,7 @@ export const seedFirestore = async () => {
                 const quizDocId = question.id;
                 
                 // Convert options to [{text, isCorrect}]
-                const newOptions = question.options.map(opt => ({
+                const newOptions = (question.options || []).map(opt => ({
                   text: opt,
                   isCorrect: opt === question.answer
                 }));
@@ -131,10 +142,11 @@ export const seedFirestore = async () => {
                     question: question.question,
                     options: newOptions,
                     answer: question.answer, // Keep legacy just in case
-                    hint: question.hint || '',
+                    hint: question.hint || question.explanation || '',
                     imageUrl: question.imageUrl || '',
-                    type: question.imageUrl ? 'image' : 'single',
-                    layout: question.imageUrl ? 'image-top' : 'text',
+                    type: question.type || (question.imageUrl ? 'image' : 'single'),
+                    layout: question.imageUrl ? 'image-top' : 'text', // Keep layout default if not specified
+
                     points: 1,
                     order: q
                   }
