@@ -165,7 +165,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
             <img src={currentQuestion.imageUrl} alt="Question" className="question-image" />
           </div>
         )}
-        <h2 className="question-text">{formatText(currentQuestion.question)}</h2>
+        <h2 className="question-text center-aligned">{formatText(currentQuestion.question)}</h2>
         
         <div className="options-grid">
           {shuffledOptions.map((option, idx) => (

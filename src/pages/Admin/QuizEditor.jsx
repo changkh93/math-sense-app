@@ -158,7 +158,7 @@ const QuizEditor = () => {
                       setEditingQuiz({ ...editingQuiz, options: newOpts });
                     }}
                   >
-                    $\frac{n}{d}$
+                    {'$\\frac{n}{d}$'}
                   </button>
                   {editingQuiz.options.length > 2 && (
                     <button type="button" className="icon-btn delete-btn" onClick={() => {

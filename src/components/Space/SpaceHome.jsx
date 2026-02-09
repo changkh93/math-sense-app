@@ -110,8 +110,15 @@ function SpaceHome() {
     }
   }, [])
 
-  // Interaction State
+  // Interaction & UI State
   const [isBoosting, setIsBoosting] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
   
   // Equipment Logic
   const equipment = {
@@ -297,8 +304,8 @@ function SpaceHome() {
   // Memoized Scatter Positions to prevent recalculation during animation
   const scatterPositions = useMemo(() => {
     return Array.from({ length: 25 }).map(() => ({
-      x: (Math.random() - 0.5) * 1500,
-      y: (Math.random() - 0.5) * 1000,
+      x: (Math.random() - 0.5) * 600, // Reduced from 1500
+      y: (Math.random() - 0.5) * 400, // Reduced from 1000
       rotate: Math.random() * 720 - 360,
       scale: Math.random() * 0.5
     }))
@@ -372,6 +379,7 @@ function SpaceHome() {
       scale: 1,
       y: 0,
       filter: "blur(0px)",
+      textShadow: "0 0 20px #00f3ff, 0 0 40px rgba(0, 243, 255, 0.4)",
       transition: { 
         delay: 0.1 + i * 0.04,
         type: "spring", 
@@ -380,15 +388,14 @@ function SpaceHome() {
       }
     }),
     scatter: (i) => ({
-      x: scatterPositions[i % 25].x,
-      y: scatterPositions[i % 25].y,
-      opacity: 0,
-      scale: 0.1,
-      rotate: scatterPositions[i % 25].rotate,
-      filter: "blur(40px) brightness(2)",
+      opacity: 1, // Keep visible
+      scale: 1,
+      filter: "blur(0px)",
+      textShadow: "0 0 30px #00f3ff, 0 0 60px #00f3ff",
       transition: { 
-        duration: 3, 
-        ease: [0.22, 1, 0.36, 1] // cubic-bezier(0.22, 1, 0.36, 1)
+        duration: 2,
+        repeat: Infinity,
+        repeatType: "reverse"
       }
     })
   }
@@ -428,127 +435,161 @@ function SpaceHome() {
     return (
       <div className="space-bg">
         <StarField count={200} />
-        {/* Scan line removed */}
-        <div className="space-container" style={{ 
-          height: '100vh', 
+        <div className="nebula-bg" />
+        
+        <div className="space-container login-layout" style={{ 
+          height: '100dvh', 
           display: 'flex', 
           flexDirection: 'column',
           alignItems: 'center', 
-          justifyContent: 'center',
+          justifyContent: 'center', // 화면 중앙 정렬
           textAlign: 'center',
           position: 'relative',
-          zIndex: 10
+          zIndex: 10,
+          padding: isMobile ? '2rem 1.5rem' : '2rem'
         }}>
-          <motion.div 
-            initial="hidden"
-            animate={isScattering ? "scatter" : "visible"}
-            className="font-title"
-            style={{ 
-              marginBottom: '2rem',
-              display: 'flex',
-              gap: '0.6rem',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              position: 'relative',
-              zIndex: 100
-            }}
-          >
-            {titleText.split(" ").map((word, i) => (
-              <div key={i} style={{ display: 'flex' }}>
-                 {word.split("").map((char, j) => {
-                   const index = i * 10 + j
-                   return (
-                     <motion.span
-                       key={j}
-                       custom={index}
-                       variants={letterVariants}
-                       id={`letter-${i}-${j}`}
-                       onAnimationStart={(variant) => {
-                         if (variant === 'scatter') {
-                           const el = document.getElementById(`letter-${i}-${j}`)
-                           if (el) {
-                             const rect = el.getBoundingClientRect()
-                             createParticleBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, 'crystal')
-                           }
-                         }
-                       }}
-                       style={{ 
-                         fontSize: '4.5rem', 
-                         color: '#ffffff',
-                         textShadow: '0 0 20px #00f3ff, 0 0 40px #00f3ff',
-                         display: 'inline-block',
-                         fontWeight: 900
-                       }}
-                     >
-                       {char}
-                     </motion.span>
-                   )
-                 })}
-                 <span style={{ width: '1.5rem' }}></span>
-              </div>
-            ))}
-          </motion.div>
-          
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="font-tech"
-            style={{ 
-              color: 'var(--text-muted)', 
-              fontSize: '1.3rem',
-              marginBottom: '3rem'
-            }}
-          >
-            SYSTEM ONLINE. WAITING FOR PILOT.
-          </motion.p>
-          
-          <div style={{ position: 'relative', width: '100%', maxWidth: '500px', height: '400px', margin: '0 auto' }}>
-            <Suspense fallback={<div className="font-tech" style={{ color: 'var(--crystal-cyan)' }}>초공간 행성 렌더링 중...</div>}>
+          {/* 왼쪽 행성 장식 */}
+          <div style={{ 
+            position: 'absolute',
+            top: '30%',
+            left: isMobile ? '15px' : '40px',
+            transform: 'translateY(-50%)',
+            width: isMobile ? '120px' : '180px',
+            height: isMobile ? '120px' : '180px',
+            pointerEvents: 'none',
+            zIndex: 5
+          }}>
+            <Suspense fallback={null}>
               <Planet3D 
                 color="#4a90e2" 
-                size={1.5} 
-                showSpaceship={true} 
+                size={isMobile ? 0.5 : 0.7} 
+                height={isMobile ? '100px' : '160px'}
+                showSpaceship={false} 
                 interactive={false} 
                 equipment={equipment} 
-                isBoosting={isBoosting}
+                isBoosting={false}
               />
             </Suspense>
-            {/* Fail-safe circle behind WebGL in case context is lost */}
+            {/* Fail-safe circle */}
             <div style={{
               position: 'absolute',
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              width: '240px',
-              height: '240px',
+              width: isMobile ? '60px' : '100px',
+              height: isMobile ? '60px' : '100px',
               borderRadius: '50%',
               background: 'radial-gradient(circle, #1e3a5f 0%, #0a0a1a 70%)',
-              boxShadow: '0 0 40px rgba(0, 212, 255, 0.2)',
+              boxShadow: '0 0 30px rgba(0, 212, 255, 0.3)',
               zIndex: -1
             }} />
           </div>
-          
-          <motion.button 
-            whileHover={{ scale: 1.05, boxShadow: "0 0 20px var(--neon-blue)" }}
-            whileTap={{ scale: 0.95 }}
-            className="glass-card font-title"
-            onClick={handleLogin}
-            style={{
-              marginTop: '2rem',
-              padding: '1rem 3rem',
-              fontSize: '1.2rem',
-              color: 'var(--text-bright)',
-              cursor: 'pointer',
-              border: '1px solid var(--crystal-cyan)',
-              background: 'rgba(0, 212, 255, 0.1)'
-            }}
-          >
-            시스템 접속 (LOGIN)
-          </motion.button>
 
-          <div style={{ marginTop: '2rem' }}>
-            <PerformanceToggle />
+          {/* 중앙 컨텐츠 */}
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            gap: isMobile ? '1.5rem' : '2rem',
+            maxWidth: '800px',
+            width: '100%'
+          }}>
+            {/* 타이틀 섹션 */}
+            <div className="login-header" style={{ width: '100%', pointerEvents: 'none' }}>
+              <motion.div 
+                initial="hidden"
+                animate="visible"
+                className="font-title"
+                style={{ 
+                  marginBottom: '0.8rem',
+                  display: 'flex',
+                  gap: isMobile ? '0.3rem' : '0.6rem',
+                  flexWrap: 'wrap',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  zIndex: 100
+                }}
+              >
+                {titleText.split(" ").map((word, i) => (
+                  <div key={i} style={{ display: 'flex' }}>
+                     {word.split("").map((char, j) => {
+                       const index = i * 10 + j
+                       return (
+                         <motion.span
+                           key={j}
+                           custom={index}
+                           variants={letterVariants}
+                           id={`letter-${i}-${j}`}
+                           style={{ 
+                             fontSize: isMobile ? '2.2rem' : '4rem', 
+                             color: '#ffffff',
+                             textShadow: '0 0 20px #00f3ff, 0 0 40px #00f3ff',
+                             display: 'inline-block',
+                             fontWeight: 900
+                           }}
+                         >
+                           {char}
+                         </motion.span>
+                       )
+                     })}
+                     <span style={{ width: isMobile ? '0.6rem' : '1.2rem' }}></span>
+                  </div>
+                ))}
+              </motion.div>
+              
+              <motion.p 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1 }}
+                className="font-tech"
+                style={{ 
+                  color: 'var(--crystal-cyan)', 
+                  fontSize: isMobile ? '0.95rem' : '1.2rem',
+                  letterSpacing: '3px',
+                  textShadow: '0 0 10px var(--crystal-glow)',
+                  margin: 0
+                }}
+              >
+                SYSTEM ONLINE. WAITING FOR PILOT.
+              </motion.p>
+            </div>
+            
+            {/* 컨트롤 섹션: 버튼 + 토글 가로 배치 */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+              className="login-controls"
+              style={{ 
+                display: 'flex', 
+                flexDirection: isMobile ? 'column' : 'row',
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: isMobile ? '1rem' : '1.5rem',
+                marginTop: '1rem'
+              }}
+            >
+              <motion.button 
+                whileHover={{ scale: 1.05, boxShadow: "0 0 30px var(--neon-blue)" }}
+                whileTap={{ scale: 0.95 }}
+                className="glass-card font-title"
+                onClick={handleLogin}
+                style={{
+                  padding: isMobile ? '1rem 2.5rem' : '1.2rem 3.5rem',
+                  fontSize: isMobile ? '1rem' : '1.3rem',
+                  color: 'var(--text-bright)',
+                  cursor: 'pointer',
+                  border: '2px solid var(--crystal-cyan)',
+                  background: 'rgba(0, 212, 255, 0.15)',
+                  boxShadow: '0 0 15px rgba(0, 212, 255, 0.2)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                시스템 접속 (LOGIN)
+              </motion.button>
+
+              <PerformanceToggle />
+            </motion.div>
           </div>
         </div>
       </div>

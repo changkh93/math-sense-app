@@ -15,10 +15,11 @@ export default function Planet3D({
   showStars = true,
   interactive = true,
   equipment = {},
-  isBoosting = false
+  isBoosting = false,
+  height = '400px'
 }) {
   return (
-    <div style={{ width: '100%', height: '400px', position: 'relative' }}>
+    <div style={{ width: '100%', height: height, position: 'relative' }}>
       <Canvas
         camera={{ position: [0, 2, 7], fov: 45 }}
         style={{ background: 'transparent' }}

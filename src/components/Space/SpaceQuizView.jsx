@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import 'katex/dist/katex.min.css'
 import { InlineMath } from 'react-katex'
 import StarField from './StarField'
@@ -14,6 +15,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete }) 
   const [shuffledOptions, setShuffledOptions] = useState([])
   const [reSolveMode, setReSolveMode] = useState(false)
   const [showFeedback, setShowFeedback] = useState(null) // 'correct' | 'wrong' | null
+  const isMobile = window.innerWidth <= 768
 
   // 초기 문제 설정
   useEffect(() => {
@@ -354,15 +356,44 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete }) 
             </span>
           </div>
 
-          {/* 문제 */}
-          <h2 style={{ 
-            fontSize: '1.6rem', 
-            color: 'var(--text-bright)',
-            marginBottom: '2rem',
-            lineHeight: 1.4
-          }}>
-            {formatText(currentQuestion.question)}
-          </h2>
+          {/* 문제 및 이미지 섹션 */}
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            {currentQuestion.imageUrl && (
+              <motion.div 
+                className="space-image-card-wrapper"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ rotateY: 10, rotateX: -5, scale: 1.02 }}
+                style={{ 
+                  perspective: '1000px',
+                  marginBottom: '2.5rem',
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}
+              >
+                <div className="space-image-card glass-card">
+                  {/* Neon Glow behind image */}
+                  <div className="image-neon-glow"></div>
+                  <motion.img 
+                    src={currentQuestion.imageUrl} 
+                    alt="Question" 
+                    className="space-question-image"
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                </div>
+              </motion.div>
+            )}
+            
+            <h2 className="font-title" style={{ 
+              fontSize: isMobile ? '1.4rem' : '1.8rem', 
+              color: 'var(--text-bright)',
+              lineHeight: 1.4,
+              wordBreak: 'keep-all'
+            }}>
+              {formatText(currentQuestion.question)}
+            </h2>
+          </div>
 
           {/* 보기 */}
           <div style={{
