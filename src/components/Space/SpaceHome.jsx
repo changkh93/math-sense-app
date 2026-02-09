@@ -32,7 +32,7 @@ function SpaceHome() {
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
 
   // Data Hooks
-  const { data: regions, isLoading: loadingRegions } = useRegions()
+  const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions()
   const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
   const { data: units, isLoading: loadingUnits } = useUnits(selectedChapterDocId)
   const { data: unitQuizzes, isLoading: loadingQuizzes } = useQuizzes(selectedUnitDocId || quickQuizUnitId)
@@ -49,12 +49,22 @@ function SpaceHome() {
     }
   }, [chapters, selectedChapterDocId])
 
-  // Auth listener
+  // Auth listener & Loading Timeout
+  const [loadingTimeout, setLoadingTimeout] = useState(false)
+
   useEffect(() => {
+    let timeoutId = setTimeout(() => {
+      if (authLoading || loadingRegions) {
+        console.warn("⏳ Loading timeout reached. Force-releasing screen.")
+        setLoadingTimeout(true)
+      }
+    }, 5000)
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setUser(user)
       if (user) {
         const userDocRef = doc(db, 'users', user.uid)
+        // Correctly handle internal listener
         const unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data()
@@ -78,13 +88,26 @@ function SpaceHome() {
             setUserData(initialData)
           }
           setAuthLoading(false)
+        }, (err) => {
+          console.error("User doc snapshot error:", err)
+          setAuthLoading(false) // Proceed anyway
         })
+        
+        // We need to return the cleanup for the inner listener if we want to stop it
+        // But since this is inside onAuthStateChanged, we should store it or use a separate effect.
+        // Actually, simplest is to just ensure it's cleaned up when auth changes.
         return () => unsubscribeDoc()
       } else {
+        setUser(null)
+        setUserData(null)
         setAuthLoading(false)
       }
     })
-    return () => unsubscribeAuth()
+
+    return () => {
+      clearTimeout(timeoutId)
+      unsubscribeAuth()
+    }
   }, [])
 
   // Interaction State
@@ -370,8 +393,10 @@ function SpaceHome() {
     })
   }
 
-  // Loading
-  if (authLoading || loadingRegions) {
+  // Loading State with Timeout & Error handling
+  const isLoading = (authLoading || loadingRegions) && !loadingTimeout && !errorRegions
+
+  if (isLoading) {
     return (
       <div className="space-bg">
         <StarField count={150} />

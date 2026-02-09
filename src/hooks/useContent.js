@@ -22,7 +22,9 @@ export function useRegions() {
       const q = query(collection(db, 'regions'), orderBy('order', 'asc'));
       const snap = await getDocs(q);
       return snap.docs.map(doc => doc.data());
-    }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 2
   });
 }
 
