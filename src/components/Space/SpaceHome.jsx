@@ -1,6 +1,6 @@
 import { useState, useEffect, Suspense, useMemo, useRef } from 'react'
 import { auth, googleProvider, db } from '../../firebase'
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
+import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth'
 import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../../hooks/useContent'
 import { motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
@@ -104,6 +104,17 @@ function SpaceHome() {
       }
     })
 
+    // Check for redirect result on load
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          console.log("Logged in via redirect");
+        }
+      })
+      .catch((error) => {
+        console.error("Redirect login error:", error);
+      });
+
     return () => {
       clearTimeout(timeoutId)
       unsubscribeAuth()
@@ -169,10 +180,15 @@ function SpaceHome() {
   const handleLogin = async () => {
     try {
       soundManager.playClick()
-      await signInWithPopup(auth, googleProvider)
+      if (isMobile) {
+        // Mobile browsers often block popups, use redirect instead
+        await signInWithRedirect(auth, googleProvider)
+      } else {
+        await signInWithPopup(auth, googleProvider)
+      }
     } catch (error) {
       console.error("Login failed:", error)
-      alert("로그인에 실패했습니다.")
+      alert("로그인에 실패했습니다. (팝업 차단 여부를 확인하거나 msense.me가 인증된 도메인지 확인해주세요)")
     }
   }
 
@@ -575,14 +591,15 @@ function SpaceHome() {
                 className="glass-card font-title"
                 onClick={handleLogin}
                 style={{
-                  padding: isMobile ? '1rem 2.5rem' : '1.2rem 3.5rem',
-                  fontSize: isMobile ? '1rem' : '1.3rem',
+                  padding: isMobile ? '1.2rem 3rem' : '1.2rem 3.5rem',
+                  fontSize: isMobile ? '1.2rem' : '1.3rem',
                   color: 'var(--text-bright)',
                   cursor: 'pointer',
                   border: '2px solid var(--crystal-cyan)',
                   background: 'rgba(0, 212, 255, 0.15)',
                   boxShadow: '0 0 15px rgba(0, 212, 255, 0.2)',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  width: isMobile ? '100%' : 'auto'
                 }}
               >
                 시스템 접속 (LOGIN)
