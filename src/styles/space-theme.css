@@ -1,0 +1,367 @@
+/* ========================================
+   🚀 SPACE THEME - 수학 행성 우주 테마
+   ======================================== */
+
+:root {
+  /* Space Colors */
+  --space-dark: #0a0a1a;
+  --space-purple: #1a1a3e;
+  --space-blue: #0d1b2a;
+  --space-gradient: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 50%, #0d1b2a 100%);
+  
+  /* Accent Colors */
+  --star-gold: #ffd700;
+  --crystal-cyan: #00d4ff;
+  --crystal-glow: rgba(0, 212, 255, 0.4);
+  --planet-green: #4ade80;
+  --planet-orange: #fb923c;
+  --planet-pink: #f472b6;
+  --planet-purple: #a855f7;
+  
+  /* UI Colors */
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-hover: rgba(255, 255, 255, 0.12);
+  --text-bright: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.6);
+  
+  /* Effects */
+  --glow-cyan: 0 0 20px rgba(0, 212, 255, 0.5);
+  --glow-gold: 0 0 20px rgba(255, 215, 0, 0.5);
+  --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  
+  /* Animation */
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* New Sci-Fi Theme Variables */
+  --neon-blue: #00f3ff;
+  --neon-purple: #bc13fe;
+  --void-black: #050510;
+  --hologram-grid: rgba(0, 243, 255, 0.1);
+  --hud-border: 1px solid rgba(0, 243, 255, 0.3);
+  
+  /* Fonts */
+  --font-title: 'Orbitron', 'Black Han Sans', sans-serif;
+  --font-tech: 'Rajdhani', sans-serif;
+}
+
+/* ========================================
+   Sci-Fi Utilities
+   ======================================== */
+.font-title { font-family: var(--font-title); }
+.font-tech { font-family: var(--font-tech); }
+
+.glitch-text {
+  position: relative;
+  font-family: var(--font-title);
+  letter-spacing: 2px;
+}
+
+.scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--neon-blue);
+  opacity: 0.5;
+  animation: scan 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes scan {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 0.5; }
+  90% { opacity: 0.5; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.hud-border {
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+  background: rgba(5, 5, 16, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+/* ========================================
+   Space Background Base
+   ======================================== */
+.space-bg {
+  background: var(--space-gradient);
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ========================================
+   Stars Layer
+   ======================================== */
+.stars-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  animation: twinkle var(--duration, 3s) ease-in-out infinite;
+  opacity: 0;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ========================================
+   Glass Card Style
+   ======================================== */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  transition: var(--transition-smooth);
+}
+
+.glass-card:hover {
+  background: var(--glass-hover);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* ========================================
+   Crystal Counter (자원 표시)
+   ======================================== */
+.crystal-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid var(--crystal-cyan);
+  border-radius: 30px;
+  color: var(--crystal-cyan);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.crystal-icon {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, var(--crystal-cyan), #00a6cc);
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  animation: crystal-pulse 2s ease-in-out infinite;
+  box-shadow: var(--glow-cyan);
+}
+
+@keyframes crystal-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.1); filter: brightness(1.3); }
+}
+
+/* ========================================
+   Universe Map (유기적 지도 배치)
+   ======================================== */
+.planet-node {
+  z-index: 10;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.planet-node:hover {
+  z-index: 20;
+}
+
+.planet-node:hover .planet-wrapper {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 30px rgba(0,212,255,0.4));
+}
+
+.planet-wrapper {
+  transition: all 0.5s ease;
+  animation: float-planet 6s ease-in-out infinite;
+}
+
+@keyframes float-planet {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33% { transform: translateY(-8px) rotate(1deg); }
+  66% { transform: translateY(4px) rotate(-1deg); }
+}
+
+.planet-card-label {
+  margin-top: 0.5rem;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(10px);
+  padding: 0.4rem 1.2rem;
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  color: var(--text-bright);
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  transition: all 0.3s ease;
+}
+
+.planet-node:hover .planet-card-label {
+  background: var(--crystal-cyan);
+  color: #000;
+  border-color: var(--text-bright);
+  transform: translateY(5px);
+}
+
+/* ========================================
+   Navigation Bar
+   ======================================== */
+.space-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  position: relative;
+  z-index: 100;
+}
+
+.space-nav-links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.space-nav-link {
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  transition: var(--transition-smooth);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.space-nav-link:hover,
+.space-nav-link.active {
+  color: var(--text-bright);
+  background: var(--glass-bg);
+}
+
+/* ========================================
+   Main Content Container
+   ======================================== */
+.space-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+/* ========================================
+   Quiz View (Space Theme)
+   ======================================== */
+.space-quiz-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.space-quiz-card {
+  padding: 2.5rem;
+}
+
+.space-option-btn {
+  background: var(--glass-bg);
+  border: 2px solid var(--glass-border);
+  color: var(--text-bright);
+  padding: 1.2rem 1.5rem;
+  border-radius: 15px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.space-option-btn:hover {
+  background: var(--glass-hover);
+  border-color: var(--crystal-cyan);
+  transform: scale(1.02);
+}
+
+.space-option-btn.correct {
+  background: rgba(74, 222, 128, 0.3);
+  border-color: var(--planet-green);
+  animation: correct-pulse 0.5s ease;
+}
+
+.space-option-btn.wrong {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+  animation: wrong-shake 0.5s ease;
+}
+
+@keyframes correct-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes wrong-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+/* ========================================
+   Animations & Effects
+   ======================================== */
+.fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.scale-in {
+  animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Particle burst for correct answer */
+.particle-burst {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* ========================================
+   Responsive
+   ======================================== */
+@media (max-width: 768px) {
+  .space-container {
+    padding: 1rem;
+  }
+  
+  .planet-orb {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .space-quiz-container {
+    padding: 1rem;
+  }
+}

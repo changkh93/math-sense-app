@@ -13,6 +13,8 @@ import { ratioChapter2Quizzes } from '../data/ratioChapter2Quizzes.js';
 import { ratioChapter3Quizzes } from '../data/ratioChapter3Quizzes.js';
 import { ratioChapter4Quizzes } from '../data/ratioChapter4Quizzes.js';
 import { divisionQuizzes } from '../data/divisionQuizzes.js';
+import { multiplicationQuizzes } from '../data/multiplicationQuizzes.js';
+import { additionQuizzes } from '../data/additionQuizzes.js';
 
 // Mapping chapters to their quiz data files
 const quizDataMapping = {
@@ -27,10 +29,20 @@ const quizDataMapping = {
   'ratio_chap3': ratioChapter3Quizzes,
   'ratio_chap4': ratioChapter4Quizzes,
   'div_chap1': divisionQuizzes,
+  'mul_chap1': multiplicationQuizzes.mul_chap1,
+  'mul_chap2': multiplicationQuizzes.mul_chap2,
+  'mul_chap3': multiplicationQuizzes.mul_chap3,
+  'add_chap1': additionQuizzes.add_chap1,
+  'add_chap2': additionQuizzes.add_chap2,
+  'add_chap3': additionQuizzes.add_chap3,
 };
 
-export const seedFirestore = async () => {
-  console.log("Starting Seeding Process...");
+export const seedFirestore = async (targetRegionId = null) => {
+  if (targetRegionId) {
+    console.log(`Starting Seeding Process for Region: ${targetRegionId}...`);
+  } else {
+    console.log("Starting Seeding Process for ALL Regions...");
+  }
   const batch = writeBatch(db);
   let operationCount = 0;
   const BATCH_LIMIT = 450; // Firestore batch limit is 500
@@ -63,6 +75,9 @@ export const seedFirestore = async () => {
   for (let i = 0; i < regions.length; i++) {
     const region = regions[i];
     const regionId = region.id;
+    
+    // Skip if targetRegionId is provided and doesn't match
+    if (targetRegionId && regionId !== targetRegionId) continue;
     
     // Region Doc
     allOperations.push({

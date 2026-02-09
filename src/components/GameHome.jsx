@@ -9,6 +9,7 @@ import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../hooks/useContent'
 import RegionCard from './RegionCard'
+import PerformanceToggle from './PerformanceToggle'
 
 function GameHome() {
   const [user, setUser] = useState(null)
@@ -141,6 +142,9 @@ function GameHome() {
           <button className="login-btn" onClick={handleLogin}>
             Google 계정으로 시작하기
           </button>
+          <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
+            <PerformanceToggle />
+          </div>
         </div>
       </div>
     )
@@ -176,6 +180,9 @@ function GameHome() {
           <button className={`nav-item ${currentView === 'map' ? 'active' : ''}`} onClick={() => { setCurrentView('map'); setSelectedRegionId(null); setSelectedChapterDocId(null); }}>🗺️ 지도</button>
           <button className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentView('dashboard')}>📈 성장 기록</button>
           <button className={`nav-item ${currentView === 'ranking' ? 'active' : ''}`} onClick={() => setCurrentView('ranking')}>🏆 명예의 전당</button>
+          <div style={{ marginLeft: '1rem', display: 'flex', alignItems: 'center' }}>
+            <PerformanceToggle />
+          </div>
         </nav>
         <div className="user-meta">
           <div className="orb-counter glass">

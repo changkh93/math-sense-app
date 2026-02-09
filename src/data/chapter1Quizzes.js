@@ -129,7 +129,7 @@ export const chapter1Quizzes = {
       { id: '1-5-12', question: '도토리 9알의 $\\frac{2}{3}$는?', options: ['6알', '3알', '9알', '2알'], answer: '6알', hint: '9를 3으로 나누면 3알, 그게 2묶음이면?' },
       { id: '1-5-13', question: '사과 5개의 $\\frac{1}{5}$는 1개입니다. (O/X)', options: ['O', 'X'], answer: 'O', hint: '5개를 5명이 나누어 가지면 1개씩이죠.' },
       { id: '1-5-14', question: '전체 개수가 늘어나면 같은 분수라도 해당하는 개수가 늘어납니다. (O/X)', options: ['O', 'X'], answer: 'O', hint: '10의 절반과 20의 절반을 비교해보세요.' },
-      { id: '1-5-15', question: '개수를 구할 때 하는 계산 순서는? (전체 $\\square$, 분모 $b$, 분자 $a$)', options: ['$\\square \\div b \\times a$', '$\\square \times b \div a$', '$\\square + b - a$', '$\\square \div a \times b$'], answer: '$\\square \\div b \\times a$', hint: '먼저 묶음으로 나누고(분모), 그 중 몇 개(분자)인지 곱해요.' },
+      { id: '1-5-15', question: '개수를 구할 때 하는 계산 순서는? (전체 $\\square$, 분모 $b$, 분자 $a$)', options: ['$\\square \\div b \\times a$', '$\\square \\times b \\div a$', '$\\square + b - a$', '$\\square \\div a \\times b$'], answer: '$\\square \\div b \\times a$', hint: '먼저 묶음으로 나누고(분모), 그 중 몇 개(분자)인지 곱해요.' },
       { id: '1-5-16', question: '구슬 24개의 $\\frac{1}{3}$은 몇 개인가요?', options: ['8개', '3개', '24개', '6개'], answer: '8개', hint: '24를 3으로 나누어보세요.' },
       { id: '1-5-17', question: '장미 100송이 중 $\\frac{1}{10}$이 시들었습니다. 시든 장미는 몇 송이인가요?', options: ['10송이', '100송이', '1송이', '90송이'], answer: '10송이', hint: '100 나누기 10입니다.' },
       { id: '1-5-18', question: '친구 8명 중 $\\frac{1}{2}$이 여학생입니다. 여학생은 몇 명인가요?', options: ['4명', '2명', '8명', '1명'], answer: '4명', hint: '8의 절반은 4입니다.' },

@@ -1,26 +1,105 @@
 export const regions = [
   {
     id: 'addition',
-    title: '연산의 숲',
-    description: '더하기와 빼기의 기초를 탄탄하게!',
+    title: '아디테라 (Additera)',
+    description: '덧셈과 뺄셈의 생명이 숨 쉬는 숲의 행성',
     icon: '🌲',
     color: '#1dd1a1',
     image: '/assets/regions/addition.png',
-    pdf: '덧뺄셈-230210.pdf'
+    pdf: '덧뺄셈-230210.pdf',
+    chapters: [
+      {
+        id: 'add_chap1',
+        title: '제1장: 더하기, 빼기 의미',
+        units: [
+          { id: 'unit1', title: '1. 더하기 의미 (p9)' },
+          { id: 'unit2', title: '2. 빼기 의미 (p21)' },
+          { id: 'unit3', title: '3. 같다, 같지 않다, 크다, 작다 (p31)' }
+        ]
+      },
+      {
+        id: 'add_chap2',
+        title: '제2장: 덧셈',
+        units: [
+          { id: 'unit1', title: '1. 작은 수 덧셈 (p41)' },
+          { id: 'unit2', title: '2. 합이 10 이상인 덧셈 (p47)' },
+          { id: 'unit3', title: '3. 로마숫자 덧셈 (p55)' },
+          { id: 'unit4', title: '4. 자릿값 (p59)' },
+          { id: 'unit5', title: '5. 덧셈의 특징 (p67)' },
+          { id: 'unit6', title: '6. 받아 올림 (p75)' },
+          { id: 'unit7', title: '7. 문자식 덧셈 (p83)' }
+        ]
+      },
+      {
+        id: 'add_chap3',
+        title: '제3장: 뺄셈',
+        units: [
+          { id: 'unit1', title: '1. 작은 수 뺄셈 (p89)' },
+          { id: 'unit2', title: '2. 연속 빼기 (p97)' },
+          { id: 'unit3', title: '3. 세로셈과 자릿값 (p100)' },
+          { id: 'unit4', title: '4. 받아 내림 (p107)' },
+          { id: 'unit5', title: '5. 뺄셈의 특징 (p115)' },
+          { id: 'unit6', title: '6. 문자식 뺄셈 (p123)' }
+        ]
+      }
+    ]
   },
   {
     id: 'multiplication',
-    title: '곱셈의 바다',
-    description: '묶어 세기의 마법을 배워봐요.',
+    title: '멀티플루비아 (Multipluvia)',
+    description: '무한한 곱셈의 파도가 치는 신비로운 바다 행성',
     icon: '🌊',
     color: '#4834d4',
     image: '/assets/regions/multiplication.png',
-    pdf: '곱셈-230210.pdf'
+    pdf: '곱셈-230210.pdf',
+    chapters: [
+      {
+        id: 'mul_chap1',
+        title: '제1장: 곱셈의 의미',
+        units: [
+          { id: 'unit1', title: '1. 반복해서 더하기 (p9)' },
+          { id: 'unit2', title: '2. 무엇을 몇 번 반복 (p14)' },
+          { id: 'unit3', title: '3. 같은 크기의 묶음 (p20)' },
+          { id: 'unit4', title: '4. 배(倍) (p32)' },
+          { id: 'unit5', title: '5. 반복해서 쌓아 올리기 (p36)' },
+          { id: 'unit6', title: '6. 같은 방향으로 반복해서 붙이기 (p41)' },
+          { id: 'unit7', title: '7. 더하기의 반복 (p44)' }
+        ]
+      },
+      {
+        id: 'mul_chap2',
+        title: '제2장: 곱셈 구구',
+        units: [
+          { id: 'unit1', title: '1. 2단 (p51)' },
+          { id: 'unit2', title: '2. 3단 (p55)' },
+          { id: 'unit3', title: '3. 4단 (p59)' },
+          { id: 'unit4', title: '4. 5단 (p63)' },
+          { id: 'unit5', title: '5. 6단 (p67)' },
+          { id: 'unit6', title: '6. 7단 (p71)' },
+          { id: 'unit7', title: '7. 8단 (p75)' },
+          { id: 'unit8', title: '8. 9단 (p79)' }
+        ]
+      },
+      {
+        id: 'mul_chap3',
+        title: '제3장: 곱셈의 성질과 큰 수 곱셈',
+        units: [
+          { id: 'unit1', title: '1. 더하기와 곱하기의 차이 (p85)' },
+          { id: 'unit2', title: '2. 곱셈의 성질 (p91)' },
+          { id: 'unit3', title: '3. 마이너스 곱셈 (p96)' },
+          { id: 'unit4', title: '4. 덧셈과 곱셈의 혼합 계산 (p106)' },
+          { id: 'unit5', title: '5. 묶음표, ( ) (p110)' },
+          { id: 'unit6', title: '6. 10 곱하기 (p122)' },
+          { id: 'unit7', title: '7. 세로셈 (p128)' },
+          { id: 'unit8', title: '8. 큰 수끼리의 곱셈 (p139)' }
+        ]
+      }
+    ]
   },
   {
     id: 'division',
-    title: '나눗셈의 계곡',
-    description: '똑같이 나누어 보는 신기한 탐험!',
+    title: '디비디아 (Dividia)',
+    description: '나눗셈의 균형을 찾아가는 날카로운 계곡의 행성',
     icon: '⛰️',
     color: '#eb4d4b',
     image: '/assets/regions/division.png',
@@ -51,8 +130,8 @@ export const regions = [
   },
   {
     id: 'fractions',
-    title: '분수의 섬',
-    description: '조각난 조각들이 모여 하나가 돼요.',
+    title: '프락토니스 (Fractonis)',
+    description: '조각난 진실이 모여 하나가 되는 분수의 섬 행성',
     icon: '🏝️',
     color: '#f0932b',
     image: '/assets/regions/fractions.png',
@@ -160,8 +239,8 @@ export const regions = [
   },
   {
     id: 'decimals',
-    title: '소수의 들판',
-    description: '0.1의 작은 세상이 펼쳐집니다.',
+    title: '데시멜라 (Decimella)',
+    description: '0.1의 작은 기적이 소용돌이치는 가스 행성',
     icon: '🌾',
     color: '#6ab04c',
     image: '/assets/regions/decimals.png',
@@ -169,8 +248,8 @@ export const regions = [
   },
   {
     id: 'ratios',
-    title: '비와 비례식의 성',
-    description: '서로의 관계를 숫자로 표현해봐요.',
+    title: '라티오카스 (Ratiocast)',
+    description: '비와 비례식의 황금 법칙이 다스리는 성의 행성',
     icon: '🏰',
     color: '#f9ca24',
     image: '/assets/regions/ratios.png',

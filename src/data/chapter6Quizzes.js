@@ -218,10 +218,10 @@ export const chapter6Quizzes = {
       { id: '6-9-14', question: '$3 \\div 8 = ?$', options: ['0.375', '0.38', '0.365'], answer: '0.375', hint: '3.000 나누기 8.' },
       { id: '6-9-15', question: '$1 \\div 10 = 0.1$. (O/X)', options: ['O', 'X'], answer: 'O', hint: '맞습니다.' },
       { id: '6-9-16', question: '빵 3개를 4명이 나눠 먹으려면 한 사람당 얼만큼?', options: ['0.75개', '0.8개', '1.3개'], answer: '0.75개', hint: '$3 \\div 4$.' },
-      { id: '6-9-17', question: '$9 \div 5 = 1.8$. (O/X)', options: ['O', 'X'], answer: 'O', hint: '$90 \div 5 = 18$.' },
+      { id: '6-9-17', question: '$9 \\div 5 = 1.8$. (O/X)', options: ['O', 'X'], answer: 'O', hint: '$90 \\div 5 = 18$.' },
       { id: '6-9-18', question: '자연수 나누기 자연수의 몫이 자연수가 아닐 때 소수점이 등장합니다. (O/X)', options: ['O', 'X'], answer: 'O', hint: '나머지가 생길 때.' },
-      { id: '6-9-19', question: '$2 \div 100 = ?$', options: ['0.02', '0.2', '200'], answer: '0.02', hint: '두 칸 이동.' },
-      { id: '6-9-20', question: '$11 \div 2 = ?$', options: ['5.5', '5.2', '1.1'], answer: '5.5', hint: '11의 절반.' }
+      { id: '6-9-19', question: '$2 \\div 100 = ?$', options: ['0.02', '0.2', '200'], answer: '0.02', hint: '두 칸 이동.' },
+      { id: '6-9-20', question: '$11 \\div 2 = ?$', options: ['5.5', '5.2', '1.1'], answer: '5.5', hint: '11의 절반.' }
     ]
   },
   'unit10': {
