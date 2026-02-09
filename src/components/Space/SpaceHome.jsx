@@ -1,6 +1,6 @@
 import { useState, useEffect, Suspense, useMemo, useRef } from 'react'
 import { auth, googleProvider, db } from '../../firebase'
-import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth'
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../../hooks/useContent'
 import { motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
@@ -104,17 +104,6 @@ function SpaceHome() {
       }
     })
 
-    // Check for redirect result on load
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          console.log("Logged in via redirect");
-        }
-      })
-      .catch((error) => {
-        console.error("Redirect login error:", error);
-      });
-
     return () => {
       clearTimeout(timeoutId)
       unsubscribeAuth()
@@ -180,15 +169,14 @@ function SpaceHome() {
   const handleLogin = async () => {
     try {
       soundManager.playClick()
-      if (isMobile) {
-        // Mobile browsers often block popups, use redirect instead
-        await signInWithRedirect(auth, googleProvider)
-      } else {
-        await signInWithPopup(auth, googleProvider)
-      }
+      // Use popup for all platforms to avoid state loss in redirects
+      await signInWithPopup(auth, googleProvider)
     } catch (error) {
       console.error("Login failed:", error)
-      alert("로그인에 실패했습니다. (팝업 차단 여부를 확인하거나 msense.me가 인증된 도메인지 확인해주세요)")
+      const errorMsg = error.code === 'auth/popup-blocked' 
+        ? "팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요." 
+        : "로그인에 실패했습니다. msense.me가 Firebase 인증 도메인에 등록되어 있는지 확인해주세요.";
+      alert(errorMsg)
     }
   }
 
