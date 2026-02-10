@@ -3,6 +3,7 @@ import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../../hooks/useContent'
+import { regions as localRegions } from '../../data/regions'
 import { motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
 
 // Space Components
@@ -213,6 +214,7 @@ function SpaceHome() {
 
   const [history, setHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
+  const [completionResult, setCompletionResult] = useState(null)
 
   // Fetch history for status calculation
   useEffect(() => {
@@ -228,56 +230,78 @@ function SpaceHome() {
   }, [user])
 
   // Calculate Exploration Status and Recent Region
-  const { explorationStatus, recentRegionId } = useMemo(() => {
+  const { explorationStatus, recentRegionId, bestScores } = useMemo(() => {
     const statusMap = {}
+    const scores = {}
     let lastRegionId = null
 
-    if (!regions || history.length === 0) {
-      regions?.forEach(r => statusMap[r.id] = 'not_started')
-      return { explorationStatus: statusMap, recentRegionId: null }
+    if (!regions) {
+      return { explorationStatus: {}, recentRegionId: null, bestScores: {} }
     }
 
-    // Identify recent region from the latest history item
-    const latestHistory = history[0]
-    // We need to map unitId back to regionId. 
-    // This is tricky because regions are hierarchical. 
-    // For now, let's assume we can find it by searching through regions.
+    history.forEach(h => {
+      if (!scores[h.unitId] || h.score > scores[h.unitId]) {
+        scores[h.unitId] = h.score
+      }
+    })
+
+    if (history.length === 0) {
+      regions?.forEach(r => statusMap[r.id] = 'not_started')
+      return { explorationStatus: statusMap, recentRegionId: null, bestScores: {} }
+    }
     
     const solvedUnitIds = new Set(history.map(h => h.unitId))
     
     regions.forEach(region => {
-      let totalUnits = 0
-      let solvedCount = 0
-
-      // This part is async in hooks but we might have regions data already.
-      // However, chapters/units are fetched per selection.
-      // TO DO: Efficiently determine status. 
-      // Option: If we can't get all units at once, we might need a better data structure or fetch them.
-      // For now, let's use a simpler heuristic or just check if ANY unit in that region is in the history.
-      
       const isAnySolved = history.some(h => {
-        // Find if this history item belongs to this region
-        // We'll trust the unitTitle or just record regionId in history later.
-        // For existing items, we'll try a rough match or check the first one.
         return h.unitId?.startsWith(region.id) || h.regionId === region.id
       })
 
       if (isAnySolved) {
-        // Check if the latest one is this region
         if (!lastRegionId) {
           const latest = history[0]
           if (latest.unitId?.startsWith(region.id) || latest.regionId === region.id) {
             lastRegionId = region.id
           }
         }
-        statusMap[region.id] = 'in_progress' // Default to in_progress if any solved
+        statusMap[region.id] = 'in_progress'
       } else {
         statusMap[region.id] = 'not_started'
       }
     })
 
-    return { explorationStatus: statusMap, recentRegionId: lastRegionId }
+    return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores }
   }, [regions, history])
+
+  // Calculate chapter progress
+  const chapterProgress = useMemo(() => {
+    const progress = {}
+    if (!chapters || !bestScores) return progress
+
+    chapters.forEach(chapter => {
+      const localRegion = localRegions.find(r => r.id === selectedRegionId)
+      const localChapter = localRegion?.chapters?.find(c => c.id === chapter.id)
+      
+      if (localChapter) {
+        const totalUnits = localChapter.units?.length || 0
+        let completedUnits = 0
+        
+        localChapter.units?.forEach(unit => {
+          const unitDocId = `${chapter.docId}_${unit.id}`
+          if (bestScores[unitDocId] !== undefined) {
+            completedUnits++
+          }
+        })
+        
+        progress[chapter.docDocId || chapter.docId] = {
+          completed: completedUnits,
+          total: totalUnits,
+          isFinished: totalUnits > 0 && completedUnits === totalUnits
+        }
+      }
+    })
+    return progress
+  }, [chapters, bestScores, selectedRegionId])
 
   const handleLogout = () => {
     soundManager.playClick()
@@ -337,10 +361,14 @@ function SpaceHome() {
         soundManager.playLevelUp()
       }
 
-      setSelectedUnitDocId(null)
-      setSelectedChapterDocId(null)
-      setSelectedRegionId(null)
-      setCurrentView('dashboard') // Navigate to dashboard after completion
+      setCompletionResult({
+        crystalsEarned: crystalsEarned || 0,
+        isPerfect
+      })
+      // setSelectedUnitDocId(null)
+      // setSelectedChapterDocId(null)
+      // setSelectedRegionId(null)
+      // setCurrentView('dashboard') // No regular navigation, the modal will handle it
     } catch (error) {
       console.error("Error saving quiz result:", error)
     }
@@ -839,9 +867,19 @@ function SpaceHome() {
                         <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.5rem' }}>
                           {chapter.title}
                         </h3>
-                        <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                          탐험 경로 설정
-                        </p>
+                        {chapterProgress[chapter.docId] ? (
+                          chapterProgress[chapter.docId].isFinished ? (
+                            <p className="font-tech" style={{ color: '#50c878', fontSize: '0.9rem', fontWeight: 800 }}>완료 🏆</p>
+                          ) : chapterProgress[chapter.docId].completed > 0 ? (
+                            <p className="font-tech" style={{ color: 'var(--neon-blue)', fontSize: '0.9rem', fontWeight: 700 }}>
+                              진행 중 ({chapterProgress[chapter.docId].completed}/{chapterProgress[chapter.docId].total})
+                            </p>
+                          ) : (
+                            <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>탐험 전</p>
+                          )
+                        ) : (
+                          <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>스캔 중...</p>
+                        )}
                       </motion.div>
                     ))}
                   </div>
@@ -914,27 +952,43 @@ function SpaceHome() {
                   }}>
                     {loadingUnits ? (
                       <div className="font-tech" style={{ color: 'var(--text-muted)' }}>LOADING MISSION DATA...</div>
-                    ) : units?.map((unit, idx) => (
-                      <motion.button
-                        key={unit.docId}
-                        whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
-                        className="glass-card hud-border"
-                        onClick={() => { setSelectedUnitDocId(unit.docId); soundManager.playClick() }}
-                        style={{
-                          padding: '1.2rem 1.5rem',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          color: 'var(--text-bright)',
-                          fontSize: '1.1rem',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <span className="font-title"><span style={{ color: 'var(--neon-blue)', marginRight: '1rem' }}>{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>{unit.title}</span>
-                        <span style={{ color: 'var(--crystal-cyan)' }}>🚀 START</span>
-                      </motion.button>
-                    ))}
+                    ) : units?.map((unit, idx) => {
+                      const bestScore = bestScores[unit.docId]
+                      const isCompleted = bestScore !== undefined
+                      return (
+                        <motion.button
+                          key={unit.docId}
+                          whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
+                          className={`glass-card hud-border ${isCompleted ? 'completed' : ''}`}
+                          onClick={() => { setSelectedUnitDocId(unit.docId); soundManager.playClick() }}
+                          style={{
+                            padding: '1.2rem 1.5rem',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            color: 'var(--text-bright)',
+                            fontSize: '1.1rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            borderLeft: isCompleted ? '4px solid var(--secondary)' : '1px solid var(--neon-blue)'
+                          }}
+                        >
+                          <span className="font-title">
+                            <span style={{ color: 'var(--neon-blue)', marginRight: '1rem' }}>{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>
+                            {isCompleted && <span style={{ marginRight: '0.5rem' }}>✅</span>}
+                            {unit.title}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            {isCompleted && (
+                              <span className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.9rem' }}>
+                                BEST: {bestScore}
+                              </span>
+                            )}
+                            <span style={{ color: 'var(--crystal-cyan)' }}>{isCompleted ? 'REPLAY' : '🚀 START'}</span>
+                          </div>
+                        </motion.button>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
@@ -1005,6 +1059,112 @@ function SpaceHome() {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* 우주 테마 학습 완료 모달 */}
+      <AnimatePresence>
+        {completionResult && (
+          <motion.div 
+            className="modal-overlay space-hud"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ 
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              zIndex: 3000,
+              background: 'rgba(0, 0, 0, 0.7)',
+              backdropFilter: 'blur(5px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <motion.div 
+              className="glass-card hud-border completion-modal-space"
+              initial={{ scale: 0.8, y: 50, rotateX: 20 }}
+              animate={{ scale: 1, y: 0, rotateX: 0 }}
+              exit={{ scale: 0.8, y: 50, opacity: 0 }}
+              style={{
+                padding: '3rem',
+                textAlign: 'center',
+                maxWidth: '500px',
+                background: 'rgba(0, 15, 30, 0.95)',
+                boxShadow: completionResult.isPerfect ? 'var(--glow-gold)' : 'var(--glow-cyan)'
+              }}
+            >
+              <div className="hud-line mb-4"></div>
+              <h2 className="font-title gradient-text-space" style={{ 
+                fontSize: '2.5rem', 
+                marginBottom: '1.5rem',
+                background: 'linear-gradient(to right, #00f3ff, #00ff88)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>
+                {completionResult.isPerfect ? '🌟 MISSION PERFECT' : '🚀 MISSION COMPLETE'}
+              </h2>
+              
+              <div style={{ margin: '2rem 0' }}>
+                <div className="crystal-icon large" style={{ width: '60px', height: '60px', margin: '0 auto 1.5rem' }}></div>
+                <p className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--text-bright)' }}>
+                  획득한 수학 광석: <span style={{ color: 'var(--crystal-cyan)', fontWeight: 900 }}>{completionResult.crystalsEarned}개</span>
+                </p>
+              </div>
+
+              <p className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '2.5rem' }}>
+                행성 탐사가 성공적으로 종료되었습니다.<br/>다음 경로를 선택하십시오.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <button 
+                  className="hud-btn primary glass"
+                  style={{
+                    padding: '1rem',
+                    background: 'rgba(0, 243, 255, 0.2)',
+                    border: '1px solid var(--neon-blue)',
+                    color: 'var(--text-bright)',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    fontWeight: 700
+                  }}
+                  onClick={() => {
+                    setCompletionResult(null)
+                    setSelectedUnitDocId(null)
+                    setSelectedChapterDocId(null)
+                    setSelectedRegionId(null)
+                    setCurrentView('dashboard')
+                    soundManager.playClick()
+                  }}
+                >
+                  📊 성장 기록 분석 (DASHBOARD)
+                </button>
+                <button 
+                  className="hud-btn secondary glass"
+                  style={{
+                    padding: '1rem',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    color: 'var(--text-muted)',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    fontWeight: 700
+                  }}
+                  onClick={() => {
+                    setCompletionResult(null)
+                    setSelectedUnitDocId(null)
+                    soundManager.playClick()
+                  }}
+                >
+                  🛰️ 연속 탐사 진행 (CONTINUE)
+                </button>
+              </div>
+              <div className="hud-line mt-4"></div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

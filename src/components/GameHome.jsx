@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import '../App.css'
 import './QuizView.css'
 import QuizView from './QuizView'
@@ -8,6 +9,7 @@ import { auth, googleProvider, db } from '../firebase'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../hooks/useContent'
+import { regions as localRegions } from '../data/regions'
 import RegionCard from './RegionCard'
 import PerformanceToggle from './PerformanceToggle'
 
@@ -21,6 +23,9 @@ function GameHome() {
   const [selectedRegionId, setSelectedRegionId] = useState(null)
   const [selectedChapterDocId, setSelectedChapterDocId] = useState(null)
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
+  const [history, setHistory] = useState([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [completionResult, setCompletionResult] = useState(null)
 
   // Fetch Data using Hooks
   const { data: regions, isLoading: loadingRegions } = useRegions()
@@ -72,6 +77,65 @@ function GameHome() {
     return () => unsubscribeAuth()
   }, [])
 
+  // Fetch history for status calculation
+  useEffect(() => {
+    if (!user) {
+      setHistory([])
+      setLoadingHistory(false)
+      return
+    }
+    const historyRef = collection(db, 'users', user.uid, 'history')
+    const q = query(historyRef, orderBy('timestamp', 'desc'))
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const historyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      setHistory(historyData)
+      setLoadingHistory(false)
+    })
+    return () => unsubscribe()
+  }, [user])
+
+  // Calculate best scores per unit
+  const bestScores = useMemo(() => {
+    const scores = {}
+    history.forEach(h => {
+      if (!scores[h.unitId] || h.score > scores[h.unitId]) {
+        scores[h.unitId] = h.score
+      }
+    })
+    return scores
+  }, [history])
+
+  // Calculate chapter progress
+  const chapterProgress = useMemo(() => {
+    const progress = {}
+    if (!chapters || !bestScores) return progress
+
+    chapters.forEach(chapter => {
+      // Find chapter in local data to get total units
+      const localRegion = localRegions.find(r => r.id === selectedRegionId)
+      const localChapter = localRegion?.chapters?.find(c => c.id === chapter.id)
+      
+      if (localChapter) {
+        const totalUnits = localChapter.units?.length || 0
+        let completedUnits = 0
+        
+        localChapter.units?.forEach(unit => {
+          const unitDocId = `${chapter.docId}_${unit.id}`
+          if (bestScores[unitDocId] !== undefined) {
+            completedUnits++
+          }
+        })
+        
+        progress[chapter.docId] = {
+          completed: completedUnits,
+          total: totalUnits,
+          isFinished: totalUnits > 0 && completedUnits === totalUnits
+        }
+      }
+    })
+    return progress
+  }, [chapters, bestScores, selectedRegionId])
+
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider)
@@ -114,13 +178,20 @@ function GameHome() {
       await addDoc(collection(db, 'users', user.uid, 'history'), {
         unitId: selectedUnitDocId,
         unitTitle: activeUnit.title,
+        regionId: selectedRegionId,
+        regionTitle: activeRegion?.title || "Unknown Galaxy",
+        chapterId: selectedChapterDocId,
         score: Math.round((score / total) * 100),
+        crystalsEarned: crystalsEarned || 0,
         timestamp: serverTimestamp()
       });
 
-      alert(`학습 완료! ${crystalsEarned || 0}개의 수학 광석을 획득했습니다.`);
-      setSelectedUnitDocId(null);
-      setCurrentView('dashboard');
+      setCompletionResult({
+        crystalsEarned: crystalsEarned || 0,
+        isPerfect
+      });
+      // setSelectedUnitDocId(null); // Don't null immediately to allow "Continue" logic
+      // setCurrentView('dashboard'); // Don't navigate automatically
     } catch (error) {
       console.error("Error saving quiz result:", error);
       alert("결과 저장 중 오류가 발생했습니다: " + error.message);
@@ -216,12 +287,27 @@ function GameHome() {
                 <h2 className="selection-title">{activeRegion?.title} 탐험 코스</h2>
                 <div className="chapters-grid">
                   {loadingChapters ? <div>Loading Chapters...</div> : 
-                   chapters?.map(chapter => (
-                    <div key={chapter.docId} className="chapter-card glass" onClick={() => setSelectedChapterDocId(chapter.docId)}>
-                      <h3>{chapter.title}</h3>
-                      <p>단원을 탐험해보세요.</p>
-                    </div>
-                  ))}
+                   chapters?.map(chapter => {
+                     const prog = chapterProgress[chapter.docId]
+                     return (
+                       <div key={chapter.docId} className={`chapter-card glass ${prog?.isFinished ? 'finished' : ''}`} onClick={() => setSelectedChapterDocId(chapter.docId)}>
+                         <h3>{chapter.title}</h3>
+                         <div className="chapter-status">
+                           {prog ? (
+                             prog.isFinished ? (
+                               <span style={{ color: '#50c878', fontWeight: 800 }}>완료 🏆</span>
+                             ) : prog.completed > 0 ? (
+                               <span style={{ color: 'var(--primary)', fontWeight: 700 }}>진행 중 ({prog.completed}/{prog.total})</span>
+                             ) : (
+                               <span style={{ color: 'var(--text-muted)' }}>탐험 전</span>
+                             )
+                           ) : (
+                             <span style={{ color: 'var(--text-muted)' }}>준비 중...</span>
+                           )}
+                         </div>
+                       </div>
+                     )
+                   })}
                 </div>
               </div>
             ) : (
@@ -237,11 +323,30 @@ function GameHome() {
                 <h2 className="selection-title">{chapters?.length === 1 ? activeRegion?.title : activeChapter?.title}</h2>
                 <div className="units-list">
                   {loadingUnits ? <div>Loading Units...</div> : 
-                   units?.map(unit => (
-                    <button key={unit.docId} className="unit-btn glass" onClick={() => setSelectedUnitDocId(unit.docId)}>
-                      {unit.title}
-                    </button>
-                  ))}
+                   units?.map(unit => {
+                     const bestScore = bestScores[unit.docId]
+                     const isCompleted = bestScore !== undefined
+                     return (
+                       <button key={unit.docId} className={`unit-btn glass ${isCompleted ? 'completed' : ''}`} onClick={() => setSelectedUnitDocId(unit.docId)}>
+                         <span>
+                           {isCompleted && <span style={{ marginRight: '0.8rem', color: '#50c878' }}>✅</span>}
+                           {unit.title}
+                         </span>
+                         {isCompleted && (
+                           <span className="unit-score-badge" style={{ 
+                             fontSize: '0.9rem', 
+                             padding: '0.3rem 0.6rem', 
+                             background: 'rgba(74, 144, 226, 0.1)', 
+                             borderRadius: '12px',
+                             color: 'var(--primary)',
+                             fontWeight: 800
+                           }}>
+                             {bestScore}점
+                           </span>
+                         )}
+                       </button>
+                     )
+                   })}
                 </div>
               </div>
             )}
@@ -251,6 +356,60 @@ function GameHome() {
         {currentView === 'dashboard' && <Dashboard user={user} userData={userData} />}
         {currentView === 'ranking' && <Ranking user={user} />}
       </main>
+
+      {/* 학습 완료 모달 */}
+      <AnimatePresence>
+        {completionResult && (
+          <motion.div 
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ zIndex: 2000 }}
+          >
+            <motion.div 
+              className="completion-modal glass"
+              initial={{ scale: 0.8, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 20 }}
+            >
+              <div className="modal-header">
+                <h2 className="gradient-text">{completionResult.isPerfect ? '🎊 퍼펙트! 학습 완료' : '✅ 학습 완료!'}</h2>
+              </div>
+              <div className="modal-body">
+                <div className="crystal-reward-display">
+                  <div className="crystal-icon large" style={{ width: '40px', height: '40px', margin: '0 auto 1rem' }}></div>
+                  <p className="reward-text"><strong>{completionResult.crystalsEarned}개</strong>의 수학 광석을 획득했습니다!</p>
+                </div>
+                <p className="modal-message">정말 잘하셨어요! 다음은 무엇을 할까요?</p>
+              </div>
+              <div className="modal-actions-grid">
+                <button 
+                  className="modal-btn secondary-btn glass" 
+                  onClick={() => {
+                    setCompletionResult(null)
+                    setSelectedUnitDocId(null)
+                    setCurrentView('dashboard')
+                    soundManager.playClick()
+                  }}
+                >
+                  📈 성장 기록 보기
+                </button>
+                <button 
+                  className="modal-btn primary-btn" 
+                  onClick={() => {
+                    setCompletionResult(null)
+                    setSelectedUnitDocId(null)
+                    soundManager.playClick()
+                  }}
+                >
+                  🚀 퀴즈 연속해서 풀기
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
