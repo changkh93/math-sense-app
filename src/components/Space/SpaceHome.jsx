@@ -398,7 +398,7 @@ function SpaceHome() {
 
       await addDoc(collection(db, 'users', user.uid, 'history'), {
         unitId: selectedUnitDocId,
-        unitTitle: activeUnit.title,
+        unitTitle: activeUnit?.title || "탐사 퀴즈",
         regionId: selectedRegionId,
         regionTitle: activeRegion?.title || "Unknown Galaxy",
         chapterId: selectedChapterDocId,
@@ -662,7 +662,7 @@ function SpaceHome() {
       <SpaceQuizView
         key={selectedUnitDocId}
         region={activeRegion}
-        quizData={{ title: activeUnit.title, questions: unitQuizzes }}
+        quizData={{ title: activeUnit?.title || "탐사 퀴즈", questions: unitQuizzes }}
         onExit={() => setSelectedUnitDocId(null)}
         onComplete={handleComplete}
         hasShield={equipment.shield}

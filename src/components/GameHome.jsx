@@ -151,6 +151,8 @@ function GameHome() {
     if (!user) return;
     
     try {
+      const { score, total, isPerfect, crystalsEarned } = result;
+      
       // Anti-grinding logic
       const previousBest = bestScores[selectedUnitDocId] || 0;
       const currentScorePct = Math.round((score / total) * 100);
