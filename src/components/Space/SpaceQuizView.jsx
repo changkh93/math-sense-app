@@ -207,21 +207,57 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     })
   }
 
-  if (!currentQuestion && !isResultMode) {
-    return (
-      <div className="space-bg">
-        <StarField count={100} />
-        <div style={{ 
-          height: '100vh', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          color: 'var(--crystal-cyan)'
-        }}>
-          🚀 문제를 불러오는 중...
+  if (!isResultMode) {
+    if (!quizData) {
+      return (
+        <div className="space-bg">
+          <StarField count={100} />
+          <div style={{ 
+            height: '100vh', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            color: 'var(--crystal-cyan)'
+          }}>
+            🚀 문제를 불러오는 중...
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
+
+    if (currentQuestions.length === 0) {
+      return (
+        <div className="space-bg">
+          <StarField count={100} />
+          <div style={{ 
+            height: '100vh', 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center',
+            color: 'var(--text-muted)',
+            gap: '2rem'
+          }}>
+            <div style={{ fontSize: '1.5rem', textAlign: 'center' }}>
+              ⚠️ 이 유닛에는 아직 문제가 등록되지 않았습니다.<br/>
+              <span style={{ fontSize: '1rem', opacity: 0.7 }}>관리자에게 문의해 주세요.</span>
+            </div>
+            <button 
+              onClick={onExit}
+              className="glass-card"
+              style={{
+                padding: '1rem 2rem',
+                border: 'none',
+                color: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              나가기
+            </button>
+          </div>
+        </div>
+      )
+    }
   }
 
   // 결과 화면

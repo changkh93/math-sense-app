@@ -156,7 +156,12 @@ function TrajectoryChart({ history, onItemClick, colorScale }) {
     <div style={{ width: '100%', overflowX: 'auto', padding: '1rem 0' }} className="custom-scrollbar">
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         <defs>
-          <linearGradient id="orbit-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient 
+            id="orbit-grad" 
+            x1={padding} y1="0" 
+            x2={width - padding} y2="0" 
+            gradientUnits="userSpaceOnUse"
+          >
             <stop offset="0%" stopColor={colorScale[0]} stopOpacity="0.3" />
             <stop offset="50%" stopColor={colorScale[1]} />
             <stop offset="100%" stopColor={colorScale[2]} />
