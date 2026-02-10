@@ -12,7 +12,6 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [currentIdx, setCurrentIdx] = useState(0)
   const [userAnswers, setUserAnswers] = useState({})
   const [isResultMode, setIsResultMode] = useState(false)
-  const [shuffledOptions, setShuffledOptions] = useState([])
   const [reSolveMode, setReSolveMode] = useState(false)
   const [showFeedback, setShowFeedback] = useState(null) // 'correct' | 'wrong' | null
   const [isRebooting, setIsRebooting] = useState(false)
@@ -22,13 +21,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [floatingMarkers, setFloatingMarkers] = useState([]) // { id, text, type, x, y }
   const [originalTotal, setOriginalTotal] = useState(0)
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 유지
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFirstPassPerfect, setIsFirstPassPerfect] = useState(false)
   const isMobile = window.innerWidth <= 768
 
   // 초기 문제 설정
   useEffect(() => {
     if (quizData?.questions) {
-      const allQ = [...quizData.questions]
+      const allQ = [...quizData.questions].map(q => ({
+        ...q,
+        shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
+      }));
       const shuffled = allQ.sort(() => Math.random() - 0.5)
       const selected = shuffled.slice(0, 20)
       setCurrentQuestions(selected)
@@ -37,17 +40,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }
   }, [quizData])
 
-  // 옵션 셔플
-  useEffect(() => {
-    const currentQuestion = currentQuestions[currentIdx]
-    if (currentQuestion?.options) {
-      const shuffled = [...currentQuestion.options].sort(() => Math.random() - 0.5)
-      setShuffledOptions(shuffled)
-    }
-  }, [currentIdx, currentQuestions])
 
   const formatText = (text) => {
-    if (!text) return ""
+    if (!text || typeof text !== 'string') return ""
     const parts = text.split('$')
     return parts.map((part, i) => {
       if (i % 2 === 1) {
@@ -163,7 +158,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const handleReSolveWrong = () => {
     soundManager.playClick()
     // 현재 세션의 전체 문제 중 틀린 문제만 필터링
-    const wrongQuestions = currentQuestions.filter(q => !userAnswers[q.id]?.isCorrect)
+    const wrongQuestions = currentQuestions.filter(q => !userAnswers[q.id]?.isCorrect).map(q => ({
+      ...q,
+      shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
+    }))
     const newUserAnswers = { ...userAnswers }
     
     // 틀린 문제의 답안 기록 삭제 (다시 풀 수 있게)
@@ -179,6 +177,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   const handleFinish = () => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    
     soundManager.playClick()
     // 점수 계산: 최초 전체 세션 문항(allSessionQuestions) 기준
     const correctCount = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
@@ -362,18 +363,20 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               )}
               <button
                 onClick={handleFinish}
+                disabled={isSubmitting}
                 style={{
                   padding: '1rem',
-                  background: 'linear-gradient(135deg, var(--planet-green), #22c55e)',
+                  background: isSubmitting ? '#9ca3af' : 'linear-gradient(135deg, var(--planet-green), #22c55e)',
                   border: 'none',
                   borderRadius: '15px',
                   color: 'white',
                   fontSize: '1.1rem',
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.7 : 1
                 }}
               >
-                {canGetPerfectBonus ? '🌟 만점 보상 받기' : '📤 결과 저장하기'}
+                {isSubmitting ? '제출 중...' : (canGetPerfectBonus ? '🌟 만점 보상 받기' : '📤 결과 저장하기')}
               </button>
             </div>
           </div>
@@ -495,7 +498,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             gridTemplateColumns: '1fr 1fr',
             gap: '1rem'
           }}>
-            {shuffledOptions.map((option, idx) => {
+            {(currentQuestion?.shuffledOptions || []).map((option, idx) => {
               let btnClass = 'space-option-btn'
               if (showFeedback && userAnswers[currentQuestion.id] === option) {
                 btnClass += option.isCorrect ? ' correct' : ' wrong'

@@ -11,7 +11,6 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   const [currentIdx, setCurrentIdx] = useState(0)
   const [userAnswers, setUserAnswers] = useState({}) // { questionId: selectedOption }
   const [isResultMode, setIsResultMode] = useState(false)
-  const [shuffledOptions, setShuffledOptions] = useState([])
   const [reSolveMode, setReSolveMode] = useState(false)
   const [showFeedback, setShowFeedback] = useState(null) // 'correct' | 'wrong' | null
   const [isRebooting, setIsRebooting] = useState(false)
@@ -20,11 +19,15 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   const [floatingMarkers, setFloatingMarkers] = useState([]) // { id, text, type, x, y }
   const [originalTotal, setOriginalTotal] = useState(0)
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 저장
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // 초기 문제 데이터 설정 (20문항 랜덤 샘플링 적용)
   useEffect(() => {
     if (quizData?.questions) {
-      const allQ = [...quizData.questions];
+      const allQ = [...quizData.questions].map(q => ({
+        ...q,
+        shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
+      }));
       const shuffled = allQ.sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, 20);
       setCurrentQuestions(selected);
@@ -33,17 +36,9 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
     }
   }, [quizData])
 
-  // 문제 바뀔 때마다 옵션 셔플
-  useEffect(() => {
-    const currentQuestion = currentQuestions[currentIdx]
-    if (currentQuestion?.options) {
-      const shuffled = [...currentQuestion.options].sort(() => Math.random() - 0.5)
-      setShuffledOptions(shuffled)
-    }
-  }, [currentIdx, currentQuestions])
 
   const formatText = (text) => {
-    if (!text) return "";
+    if (!text || typeof text !== 'string') return "";
     const parts = text.split('$');
     return parts.map((part, i) => {
       if (i % 2 === 1) {
@@ -145,7 +140,10 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   }
 
   const handleReSolveWrong = () => {
-    const wrongQuestions = currentQuestions.filter(q => !userAnswers[q.id]?.isCorrect)
+    const wrongQuestions = currentQuestions.filter(q => !userAnswers[q.id]?.isCorrect).map(q => ({
+      ...q,
+      shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
+    }))
     const newUserAnswers = { ...userAnswers }
     wrongQuestions.forEach(q => {
       delete newUserAnswers[q.id]
@@ -159,6 +157,9 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   }
 
   const handleFinish = () => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    
     soundManager.playClick()
     // 점수 계산: 최초 세션 전체 문항(allSessionQuestions) 기준
     const correctCount = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
@@ -238,8 +239,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
           {!isPerfect && (
             <button className="re-solve-btn" onClick={handleReSolveWrong}>❌ 틀린 문제만 다시 풀기</button>
           )}
-          <button className="finish-btn" onClick={handleFinish}>
-            {canGetPerfectBonus ? '🌟 만점 보상 받기' : '📤 결과 제출하고 종료'}
+          <button className="finish-btn" onClick={handleFinish} disabled={isSubmitting}>
+            {isSubmitting ? '제출 중...' : (canGetPerfectBonus ? '🌟 만점 보상 받기' : '📤 결과 제출하고 종료')}
           </button>
           <button className="exit-link-btn" onClick={() => { soundManager.playClick(); onExit(); }}>선택 화면으로 이동</button>
         </div>
@@ -274,7 +275,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         <h2 className="question-text center-aligned">{formatText(currentQuestion.question)}</h2>
         
         <div className="options-grid">
-          {shuffledOptions.map((option, idx) => {
+          {(currentQuestion?.shuffledOptions || []).map((option, idx) => {
             let btnClass = 'option-btn'
             if (showFeedback && userAnswers[currentQuestion.id] === option) {
               btnClass += option.isCorrect ? ' correct' : ' wrong'

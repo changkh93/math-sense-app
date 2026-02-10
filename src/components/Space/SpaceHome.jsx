@@ -365,7 +365,7 @@ function SpaceHome() {
         crystalsEarned: crystalsEarned || 0,
         isPerfect
       })
-      // setSelectedUnitDocId(null)
+      setSelectedUnitDocId(null)
       // setSelectedChapterDocId(null)
       // setSelectedRegionId(null)
       // setCurrentView('dashboard') // No regular navigation, the modal will handle it
@@ -678,6 +678,7 @@ function SpaceHome() {
   if (selectedUnitDocId && unitQuizzes) {
     return (
       <SpaceQuizView
+        key={selectedUnitDocId}
         region={activeRegion}
         quizData={{ title: activeUnit.title, questions: unitQuizzes }}
         onExit={() => setSelectedUnitDocId(null)}
@@ -1042,6 +1043,7 @@ function SpaceHome() {
               >
                 <div style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
                   <SpaceQuizView
+                    key={quickQuizUnitId}
                     region={regions?.find(r => r.id === history.find(h => h.unitId === quickQuizUnitId)?.regionId)}
                     quizData={{ 
                       title: history.find(h => h.unitId === quickQuizUnitId)?.unitTitle || '탐사 퀴즈', 

@@ -228,6 +228,7 @@ function GameHome() {
         <div className="cloud" style={{ top: '30%', width: '400px', height: '120px', animationDelay: '-5s' }}></div>
         <div className="cloud" style={{ top: '60%', width: '250px', height: '80px', animationDelay: '-12s' }}></div>
         <QuizView 
+          key={selectedUnitDocId}
           region={activeRegion} 
           quizData={{ title: activeUnit?.title || "제목 없음", questions: unitQuizzes }}
           onExit={() => setSelectedUnitDocId(null)}
