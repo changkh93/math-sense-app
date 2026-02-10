@@ -325,7 +325,9 @@ function SpaceHome() {
       await addDoc(collection(db, 'users', user.uid, 'history'), {
         unitId: selectedUnitDocId,
         unitTitle: activeUnit.title,
-        regionId: selectedRegionId, // Add regionId for easier tracking
+        regionId: selectedRegionId,
+        regionTitle: activeRegion?.title || "Unknown Galaxy",
+        chapterId: selectedChapterDocId,
         score: score,
         crystalsEarned: crystalsEarned || 0,
         timestamp: serverTimestamp()
@@ -951,6 +953,7 @@ function SpaceHome() {
                   soundManager.playClick()
                 }
               }} 
+              regions={regions}
             />
           )}
           {currentView === 'collection' && <SpaceCollection userData={userData} />}
@@ -958,9 +961,7 @@ function SpaceHome() {
             <SpaceStore user={user} userData={userData} />
           )}
           
-          {currentView === 'ranking' && (
-            <SpaceRanking user={user} userData={userData} />
-          )}
+          {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}
 
           {/* Quick Quiz Modal Overlay */}
           <AnimatePresence>
