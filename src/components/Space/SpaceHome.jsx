@@ -425,59 +425,7 @@ function SpaceHome() {
     }
   }
 
-  const [isScattering, setIsScattering] = useState(false)
-  const [animationSequence, setAnimationSequence] = useState(0) // 0: idle, 1: typing, 2: reading, 3: scattering
   const hasStartedRef = useRef(false)
-
-  // Memoized Scatter Positions to prevent recalculation during animation
-  const scatterPositions = useMemo(() => {
-    return Array.from({ length: 25 }).map(() => ({
-      x: (Math.random() - 0.5) * 600, // Reduced from 1500
-      y: (Math.random() - 0.5) * 400, // Reduced from 1000
-      rotate: Math.random() * 720 - 360,
-      scale: Math.random() * 0.5
-    }))
-  }, [])
-
-  // Sequence Controller
-  useEffect(() => {
-    if (authLoading || loadingRegions) return
-    
-    // If logged in, ensure sequence is ready for next logout and return
-    if (user) {
-      hasStartedRef.current = false
-      setAnimationSequence(0)
-      setIsScattering(false)
-      return
-    }
-
-    if (hasStartedRef.current) return
-    
-    // Slight delay to ensure loading screen is fully gone
-    const startTimer = setTimeout(() => {
-      hasStartedRef.current = true
-      setIsScattering(false)
-      setAnimationSequence(1)
-      console.log("🚀 SpaceHome: Starting landing sequence (Typing)")
-
-      const timer2 = setTimeout(() => {
-        setAnimationSequence(2)
-      }, 2500)
-
-      const timer3 = setTimeout(() => {
-        setAnimationSequence(3)
-        setIsScattering(true)
-        console.log("✨ SpaceHome: Scattering title")
-      }, 5000)
-
-      return () => {
-        clearTimeout(timer2)
-        clearTimeout(timer3)
-      }
-    }, 500)
-
-    return () => clearTimeout(startTimer)
-  }, [authLoading, loadingRegions, user])
 
   // No sound engine sync needed for typing anymore
 
@@ -489,13 +437,6 @@ function SpaceHome() {
       transition: {
         staggerChildren: 0.08,
         delayChildren: 0.5
-      }
-    },
-    scatter: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.05,
-        staggerDirection: 1
       }
     }
   }
@@ -513,17 +454,6 @@ function SpaceHome() {
         type: "spring", 
         stiffness: 100, 
         damping: 15
-      }
-    }),
-    scatter: (i) => ({
-      opacity: 1, // Keep visible
-      scale: 1,
-      filter: "blur(0px)",
-      textShadow: "0 0 30px #00f3ff, 0 0 60px #00f3ff",
-      transition: { 
-        duration: 2,
-        repeat: Infinity,
-        repeatType: "reverse"
       }
     })
   }
@@ -594,6 +524,7 @@ function SpaceHome() {
                 height={isMobile ? '100px' : '160px'}
                 showSpaceship={false} 
                 interactive={false} 
+                showFormulas={false}
                 equipment={equipment} 
                 isBoosting={false}
               />

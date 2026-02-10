@@ -232,6 +232,7 @@ export default function PlanetMesh({
   speed = 0.002, 
   planetType = 'default',
   showSpaceship = false, 
+  showFormulas = true,
   status = 'not_started',
   equipment = {}, 
   isBoosting = false,
@@ -400,7 +401,7 @@ export default function PlanetMesh({
       {hovered && !isLocked && (
         <>
           <HologramRing size={size} color={color} />
-          <FloatingFormulas size={size} color={color} />
+          {showFormulas && <FloatingFormulas size={size} color={color} />}
         </>
       )}
       

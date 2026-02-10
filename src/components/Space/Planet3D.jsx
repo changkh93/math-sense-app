@@ -12,6 +12,7 @@ export default function Planet3D({
   size = 2,
   planetType = 'default',
   showSpaceship = true,
+  showFormulas = true,
   showStars = true,
   interactive = true,
   equipment = {},
@@ -47,6 +48,7 @@ export default function Planet3D({
             size={size} 
             planetType={planetType} 
             showSpaceship={showSpaceship}
+            showFormulas={showFormulas}
             equipment={equipment}
             isBoosting={isBoosting}
           />
