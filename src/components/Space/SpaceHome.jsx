@@ -113,6 +113,40 @@ function SpaceHome() {
     }
   }, [])
 
+  // --- Daily Snapshot Logic (Added for Daily Growth) ---
+  useEffect(() => {
+    if (!user || !userData) return
+
+    const checkDailySnapshot = async () => {
+      // Use KST (UTC+9) for daily reset to match user's local time
+      const now = new Date()
+      const kstOffset = 9 * 60 * 60 * 1000
+      const kstDate = new Date(now.getTime() + kstOffset)
+      const snapshotKey = kstDate.toISOString().split('T')[0]
+
+      if (userData.lastDailySnapshotDate !== snapshotKey || !userData.hasOwnProperty('dailyBaseline')) {
+        console.log("🌅 New day or missing baseline. Updating daily baseline in background.")
+        try {
+          const userDocRef = doc(db, 'users', user.uid)
+          const updates = {
+            dailyBaseline: userData.crystals || 0,
+            lastDailySnapshotDate: snapshotKey
+          }
+          // Initialization: If weeklyBaseline is missing, set it too
+          if (!userData.lastSnapshotDate) {
+            updates.weeklyBaseline = userData.crystals || 0;
+            updates.lastSnapshotDate = snapshotKey; // Temporary key until next Monday
+          }
+          await setDoc(userDocRef, updates, { merge: true })
+        } catch (err) {
+          console.error("Failed to update daily baseline:", err)
+        }
+      }
+    }
+
+    checkDailySnapshot()
+  }, [user, userData?.lastDailySnapshotDate])
+
   // --- Weekly Snapshot Logic (Safe Effect) ---
   useEffect(() => {
     if (!user || !userData) return
@@ -315,6 +349,22 @@ function SpaceHome() {
       const { score, total, correctCount, totalCount, crystalsEarned, isPerfect, shieldUsed } = result
       if (totalCount === 0) return
 
+      // Anti-grinding logic
+      const previousBest = bestScores[selectedUnitDocId] || 0
+      let actualCrystalsEarned = 0
+      let rewardMessage = ""
+
+      if (score > previousBest) {
+        actualCrystalsEarned = crystalsEarned || 0
+        // if user already achieved 100 before, don't give perfect bonus (10) again
+        if (isPerfect && previousBest === 100) {
+          actualCrystalsEarned = Math.max(0, actualCrystalsEarned - 10)
+        }
+      } else {
+        actualCrystalsEarned = 0
+        rewardMessage = "이미 달성한 최고 점수입니다. 새로운 도전을 통해 보상을 얻으세요!"
+      }
+
       soundManager.playCrystal()
       
       const prevCrystals = userData.crystals || 0
@@ -329,7 +379,7 @@ function SpaceHome() {
       const lastQuizDate = userData.lastQuizDate || ""
       const dailyQuizCount = (lastQuizDate === today) ? (userData.dailyQuizCount || 0) + 1 : 1
 
-      const newCrystals = prevCrystals + (crystalsEarned || 0)
+      const newCrystals = prevCrystals + actualCrystalsEarned
       const newTotalQuizzes = prevTotalQuizzes + 1
       const newTotalScore = prevTotalScore + score
 
@@ -338,7 +388,7 @@ function SpaceHome() {
         totalQuizzes: newTotalQuizzes,
         totalScore: newTotalScore,
         averageScore: newTotalScore / newTotalQuizzes,
-        perfectCount: isPerfect ? prevPerfectCount + 1 : prevPerfectCount,
+        perfectCount: (isPerfect && previousBest < 100) ? prevPerfectCount + 1 : prevPerfectCount,
         consecutiveGood: prevConsecutiveGood,
         shieldDefended: prevShieldDefended,
         dailyQuizCount: dailyQuizCount,
@@ -353,17 +403,18 @@ function SpaceHome() {
         regionTitle: activeRegion?.title || "Unknown Galaxy",
         chapterId: selectedChapterDocId,
         score: score,
-        crystalsEarned: crystalsEarned || 0,
+        crystalsEarned: actualCrystalsEarned,
         timestamp: serverTimestamp()
       })
 
-      if (isPerfect) {
+      if (isPerfect && previousBest < 100) {
         soundManager.playLevelUp()
       }
 
       setCompletionResult({
-        crystalsEarned: crystalsEarned || 0,
-        isPerfect
+        crystalsEarned: actualCrystalsEarned,
+        isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
+        rewardMessage
       })
       setSelectedUnitDocId(null)
       // setSelectedChapterDocId(null)
@@ -1113,6 +1164,11 @@ function SpaceHome() {
                 <p className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--text-bright)' }}>
                   획득한 수학 광석: <span style={{ color: 'var(--crystal-cyan)', fontWeight: 900 }}>{completionResult.crystalsEarned}개</span>
                 </p>
+                {completionResult.rewardMessage && (
+                  <p className="font-tech" style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.8rem' }}>
+                    {completionResult.rewardMessage}
+                  </p>
+                )}
               </div>
 
               <p className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '2.5rem' }}>

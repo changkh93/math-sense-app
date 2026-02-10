@@ -151,15 +151,30 @@ function GameHome() {
     if (!user) return;
     
     try {
-      const { score, total, correctCount, totalCount, crystalsEarned, isPerfect } = result;
-      if (total === 0) return;
+      // Anti-grinding logic
+      const previousBest = bestScores[selectedUnitDocId] || 0;
+      const currentScorePct = Math.round((score / total) * 100);
+      
+      let actualCrystalsEarned = 0;
+      let rewardMessage = "";
+      
+      if (currentScorePct > previousBest) {
+        actualCrystalsEarned = crystalsEarned || 0;
+        // if user already achieved 100 before, don't give perfect bonus (10) again
+        if (isPerfect && previousBest === 100) {
+          actualCrystalsEarned = Math.max(0, actualCrystalsEarned - 10);
+        }
+      } else {
+        actualCrystalsEarned = 0;
+        rewardMessage = "이미 달성한 최고 점수입니다. 새로운 도전을 통해 보상을 얻으세요!";
+      }
 
       const prevCrystals = userData.crystals || 0;
       const prevTotalQuizzes = userData.totalQuizzes || 0;
       const prevTotalScore = userData.totalScore || 0;
       const prevPerfectCount = userData.perfectCount || 0;
 
-      const newCrystals = prevCrystals + (crystalsEarned || 0);
+      const newCrystals = prevCrystals + actualCrystalsEarned;
       const newTotalQuizzes = prevTotalQuizzes + 1;
       const newTotalScore = prevTotalScore + score;
       const newAverageScore = newTotalScore / newTotalQuizzes;
@@ -170,7 +185,7 @@ function GameHome() {
         totalQuizzes: newTotalQuizzes,
         totalScore: newTotalScore,
         averageScore: newAverageScore,
-        perfectCount: isPerfect ? prevPerfectCount + 1 : prevPerfectCount,
+        perfectCount: (isPerfect && previousBest < 100) ? prevPerfectCount + 1 : prevPerfectCount,
         lastActive: serverTimestamp()
       }, { merge: true });
 
@@ -181,14 +196,15 @@ function GameHome() {
         regionId: selectedRegionId,
         regionTitle: activeRegion?.title || "알 수 없는 지역",
         chapterId: selectedChapterDocId,
-        score: Math.round((score / total) * 100),
-        crystalsEarned: crystalsEarned || 0,
+        score: currentScorePct,
+        crystalsEarned: actualCrystalsEarned,
         timestamp: serverTimestamp()
       });
 
       setCompletionResult({
-        crystalsEarned: crystalsEarned || 0,
-        isPerfect
+        crystalsEarned: actualCrystalsEarned,
+        isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
+        rewardMessage
       });
       setSelectedUnitDocId(null); // Close quiz view to show modal
       // setCurrentView('dashboard'); // Don't navigate automatically
@@ -380,9 +396,14 @@ function GameHome() {
               <div className="modal-body">
                 <div className="crystal-reward-display">
                   <div className="crystal-icon large" style={{ width: '40px', height: '40px', margin: '0 auto 1rem' }}></div>
-                  <p className="reward-text"><strong>{completionResult.crystalsEarned}개</strong>의 수학 광석을 획득했습니다!</p>
-                </div>
-                <p className="modal-message">정말 잘하셨어요! 다음은 무엇을 할까요?</p>
+                <p className="reward-text"><strong>{completionResult.crystalsEarned}개</strong>의 수학 광석을 획득했습니다!</p>
+                {completionResult.rewardMessage && (
+                  <p className="reward-subtext" style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                    {completionResult.rewardMessage}
+                  </p>
+                )}
+              </div>
+              <p className="modal-message">정말 잘하셨어요! 다음은 무엇을 할까요?</p>
               </div>
               <div className="modal-actions-grid">
                 <button 

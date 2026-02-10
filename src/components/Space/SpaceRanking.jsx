@@ -29,7 +29,10 @@ export default function SpaceRanking({ user, userData }) {
         return {
           id: doc.id,
           ...data,
-          weeklyGain: (data.crystals || 0) - (data.weeklyBaseline || 0)
+          // Use weeklyBaseline as fallback for dailyBaseline if missing
+          // This ensures Daily Gain <= Weekly Gain logic holds
+          dailyGain: (data.crystals || 0) - (data.dailyBaseline || data.weeklyBaseline || data.crystals || 0),
+          weeklyGain: (data.crystals || 0) - (data.weeklyBaseline || data.crystals || 0)
         }
       })
 
@@ -152,7 +155,7 @@ export default function SpaceRanking({ user, userData }) {
           ) : (
             topUsers.map((u, index) => {
               const isMe = u.id === user?.uid
-              const growth = u.weeklyGain || 0
+              const growth = rankMode === 'weekly' ? (u.weeklyGain || 0) : (u.dailyGain || 0)
 
               return (
                 <div
@@ -223,7 +226,7 @@ export default function SpaceRanking({ user, userData }) {
                       {growth > 0 ? `▲ ${growth}` : growth < 0 ? `▼ ${Math.abs(growth)}` : '─'}
                     </span>
                     <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
-                      WEEKLY
+                      {rankMode === 'weekly' ? 'WEEKLY' : 'DAILY'}
                     </span>
                   </div>
                 </div>
