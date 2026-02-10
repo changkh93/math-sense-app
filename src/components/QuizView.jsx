@@ -105,6 +105,11 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         if (currentIdx < currentQuestions.length - 1) {
           setCurrentIdx(prev => prev + 1)
         } else {
+          // 마지막 문제이고 전체 정답률 100% 인 경우 보너스 알림
+          const totalCorrectSoFar = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect || q.id === currentQuestion.id).length
+          if (totalCorrectSoFar === originalTotal) {
+            setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
+          }
           setIsResultMode(true)
         }
       }, 800)
@@ -160,7 +165,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
     const score100 = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0;
     
     // 만점 보너스 조건
-    const canGetPerfectBonus = !reSolveMode && (correctCount === originalTotal);
+    const canGetPerfectBonus = (correctCount === originalTotal);
     const crystalsEarned = sessionCrystals + (canGetPerfectBonus ? 10 : 0);
     
     onComplete({ 
@@ -182,7 +187,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
     const correctCount = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
     const score100 = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0;
     const isPerfect = correctCount === originalTotal;
-    const canGetPerfectBonus = !reSolveMode && isPerfect;
+    const canGetPerfectBonus = isPerfect;
     const crystalsEarnedDisplay = sessionCrystals + (canGetPerfectBonus ? 10 : 0);
 
     return (

@@ -113,6 +113,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         if (currentIdx < currentQuestions.length - 1) {
           setCurrentIdx(prev => prev + 1)
         } else {
+          // 마지막 문제이고 전체 정답률 100% 인 경우 보너스 알림
+          const totalCorrectSoFar = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect || q.id === currentQuestion.id).length
+          if (totalCorrectSoFar === originalTotal) {
+            setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
+          }
           setIsResultMode(true)
         }
       }, 800)
@@ -185,7 +190,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     // 1. 재도전 모드가 아닐 때 100% 달성 
     // 2. 또는 재도전 후 모든 문제를 맞혔더라도, 보너스는 최초 100%일 때만 강력 부여 (혹은 정책에 따라 차등)
     // 여기서는 '최초 만점' 또는 '재도전 포함 최종 만점' 중 '최초 만점'에만 보너스를 주는 것이 일관성을 높임
-    const canGetPerfectBonus = !reSolveMode && (correctCount === originalTotal)
+    const canGetPerfectBonus = (correctCount === originalTotal)
     
     const crystalsEarned = sessionCrystals + (canGetPerfectBonus ? 10 : 0)
     
@@ -226,7 +231,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     const isPerfect = (correctCount === originalTotal)
     
     // 만점 보너스 가시성 (저장 로직과 동일하게 유지)
-    const canGetPerfectBonus = !reSolveMode && isPerfect
+    const canGetPerfectBonus = isPerfect
     const crystalsEarnedDisplay = sessionCrystals + (canGetPerfectBonus ? 10 : 0)
 
     return (
