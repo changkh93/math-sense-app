@@ -85,7 +85,7 @@ class SoundManager {
     this.play('click')
   }
 
-  // 결정 획득 효과음
+  // 광석 획득 효과음
   playCrystal() {
     this.play('crystal')
   }

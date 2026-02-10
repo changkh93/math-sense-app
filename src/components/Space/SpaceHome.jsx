@@ -12,6 +12,8 @@ import SpaceScene from './SpaceScene' // New 3D Scene
 import SpaceQuizView from './SpaceQuizView'
 import SpaceDashboard from './SpaceDashboard'
 import SpaceCollection from './SpaceCollection'
+import SpaceStore from './SpaceStore'
+import SpaceRanking from './SpaceRanking'
 import { useParticles, createParticleBurst } from './ParticleEffects'
 import soundManager from '../../utils/SoundManager'
 import PerformanceToggle from '../PerformanceToggle'
@@ -109,6 +111,35 @@ function SpaceHome() {
       unsubscribeAuth()
     }
   }, [])
+
+  // --- Weekly Snapshot Logic (Safe Effect) ---
+  useEffect(() => {
+    if (!user || !userData) return
+
+    const checkWeeklySnapshot = async () => {
+      const now = new Date()
+      const lastMonday = new Date(now)
+      lastMonday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
+      lastMonday.setHours(0, 0, 0, 0)
+      const snapshotKey = lastMonday.toISOString().split('T')[0]
+
+      if (userData.lastSnapshotDate !== snapshotKey) {
+        console.log("📅 New week detected. Updating weekly baseline in background.")
+        try {
+          const userDocRef = doc(db, 'users', user.uid)
+          await setDoc(userDocRef, {
+            weeklyBaseline: userData.crystals || 0,
+            lastSnapshotDate: snapshotKey
+          }, { merge: true })
+        } catch (err) {
+          console.error("Failed to update weekly baseline:", err)
+        }
+      }
+    }
+
+    checkWeeklySnapshot()
+  }, [user, userData?.lastSnapshotDate])
+  // --------------------------------------------
 
   // Interaction & UI State
   const [isBoosting, setIsBoosting] = useState(false)
@@ -257,17 +288,24 @@ function SpaceHome() {
     if (!user) return
     
     try {
-      const { score, total, correctCount, totalCount } = result
+      const { score, total, correctCount, totalCount, crystalsEarned, isPerfect, shieldUsed } = result
       if (totalCount === 0) return
 
-      const crystalBonus = correctCount * 5
       soundManager.playCrystal()
       
       const prevCrystals = userData.crystals || 0
       const prevTotalQuizzes = userData.totalQuizzes || 0
       const prevTotalScore = userData.totalScore || 0
+      const prevPerfectCount = userData.perfectCount || 0
+      const prevConsecutiveGood = score >= 90 ? (userData.consecutiveGood || 0) + 1 : 0
+      const prevShieldDefended = (userData.shieldDefended || 0) + (shieldUsed ? 2 : 0)
 
-      const newCrystals = prevCrystals + crystalBonus
+      // Daily Task Reset Logic
+      const today = new Date().toISOString().split('T')[0]
+      const lastQuizDate = userData.lastQuizDate || ""
+      const dailyQuizCount = (lastQuizDate === today) ? (userData.dailyQuizCount || 0) + 1 : 1
+
+      const newCrystals = prevCrystals + (crystalsEarned || 0)
       const newTotalQuizzes = prevTotalQuizzes + 1
       const newTotalScore = prevTotalScore + score
 
@@ -276,6 +314,11 @@ function SpaceHome() {
         totalQuizzes: newTotalQuizzes,
         totalScore: newTotalScore,
         averageScore: newTotalScore / newTotalQuizzes,
+        perfectCount: isPerfect ? prevPerfectCount + 1 : prevPerfectCount,
+        consecutiveGood: prevConsecutiveGood,
+        shieldDefended: prevShieldDefended,
+        dailyQuizCount: dailyQuizCount,
+        lastQuizDate: today,
         lastActive: serverTimestamp()
       }, { merge: true })
 
@@ -284,11 +327,11 @@ function SpaceHome() {
         unitTitle: activeUnit.title,
         regionId: selectedRegionId, // Add regionId for easier tracking
         score: score,
-        crystalsEarned: crystalBonus,
+        crystalsEarned: crystalsEarned || 0,
         timestamp: serverTimestamp()
       })
 
-      if (correctCount === totalCount) {
+      if (isPerfect) {
         soundManager.playLevelUp()
       }
 
@@ -609,6 +652,7 @@ function SpaceHome() {
         quizData={{ title: activeUnit.title, questions: unitQuizzes }}
         onExit={() => setSelectedUnitDocId(null)}
         onComplete={handleComplete}
+        hasShield={equipment.shield}
       />
     )
   }
@@ -665,6 +709,18 @@ function SpaceHome() {
           >
             🏆 DATABASE
           </button>
+          <button 
+            className={`space-nav-link ${currentView === 'ranking' ? 'active' : ''}`}
+            onClick={() => setCurrentView('ranking')}
+          >
+            🏆 RANKING
+          </button>
+          <button 
+            className={`space-nav-link ${currentView === 'store' ? 'active' : ''}`}
+            onClick={() => setCurrentView('store')}
+          >
+            🎨 STORE
+          </button>
           <div style={{ marginLeft: '1rem' }}>
             <PerformanceToggle />
           </div>
@@ -673,7 +729,7 @@ function SpaceHome() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div className="crystal-counter font-tech">
             <div className="crystal-icon"></div>
-            <span>{userData?.crystals || 0}</span>
+            <span>{userData?.crystals || 0} (광석)</span>
           </div>
           <button 
             className="space-nav-link font-tech"
@@ -898,48 +954,55 @@ function SpaceHome() {
             />
           )}
           {currentView === 'collection' && <SpaceCollection userData={userData} />}
-        </div>
-
-        {/* Quick Quiz Modal Overlay */}
-        <AnimatePresence>
-          {quickQuizUnitId && unitQuizzes && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100vw',
-                height: '100vh',
-                zIndex: 2000,
-                background: 'rgba(0,0,0,0.85)',
-                backdropFilter: 'blur(10px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '2rem',
-                pointerEvents: 'auto'
-              }}
-            >
-              <div style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
-                <SpaceQuizView
-                  region={regions?.find(r => r.id === history.find(h => h.unitId === quickQuizUnitId)?.regionId)}
-                  quizData={{ 
-                    title: history.find(h => h.unitId === quickQuizUnitId)?.unitTitle || '탐사 퀴즈', 
-                    questions: unitQuizzes 
-                  }}
-                  onExit={() => setQuickQuizUnitId(null)}
-                  onComplete={async (result) => {
-                    await handleComplete(result)
-                    setQuickQuizUnitId(null)
-                  }}
-                />
-              </div>
-            </motion.div>
+          {currentView === 'store' && (
+            <SpaceStore user={user} userData={userData} />
           )}
-        </AnimatePresence>
+          
+          {currentView === 'ranking' && (
+            <SpaceRanking user={user} userData={userData} />
+          )}
+
+          {/* Quick Quiz Modal Overlay */}
+          <AnimatePresence>
+            {quickQuizUnitId && unitQuizzes && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  zIndex: 2000,
+                  background: 'rgba(0,0,0,0.85)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '2rem',
+                  pointerEvents: 'auto'
+                }}
+              >
+                <div style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
+                  <SpaceQuizView
+                    region={regions?.find(r => r.id === history.find(h => h.unitId === quickQuizUnitId)?.regionId)}
+                    quizData={{ 
+                      title: history.find(h => h.unitId === quickQuizUnitId)?.unitTitle || '탐사 퀴즈', 
+                      questions: unitQuizzes 
+                    }}
+                    onExit={() => setQuickQuizUnitId(null)}
+                    onComplete={async (result) => {
+                      await handleComplete(result)
+                      setQuickQuizUnitId(null)
+                    }}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </main>
     </div>
   )

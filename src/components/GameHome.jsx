@@ -51,14 +51,14 @@ function GameHome() {
           if (docSnap.exists()) {
             const data = docSnap.data()
             setUserData({
-              orbs: 0,
+              crystals: 0,
               totalQuizzes: 0,
               totalScore: 0,
               averageScore: 0,
               ...data
             })
           } else {
-            const initialData = { orbs: 0, totalQuizzes: 0, totalScore: 0, averageScore: 0, email: user.email, name: user.displayName }
+            const initialData = { crystals: 0, totalQuizzes: 0, totalScore: 0, averageScore: 0, email: user.email, name: user.displayName }
             setDoc(userDocRef, initialData)
             setUserData(initialData)
           }
@@ -87,27 +87,26 @@ function GameHome() {
     if (!user) return;
     
     try {
-      const { score, total } = result;
+      const { score, total, correctCount, totalCount, crystalsEarned, isPerfect } = result;
       if (total === 0) return;
 
-      const pointPerQuestion = 1;
-      const bonus = score * pointPerQuestion;
-      
-      const prevOrbs = userData.orbs || 0;
+      const prevCrystals = userData.crystals || 0;
       const prevTotalQuizzes = userData.totalQuizzes || 0;
       const prevTotalScore = userData.totalScore || 0;
+      const prevPerfectCount = userData.perfectCount || 0;
 
-      const newOrbs = prevOrbs + bonus;
+      const newCrystals = prevCrystals + (crystalsEarned || 0);
       const newTotalQuizzes = prevTotalQuizzes + 1;
-      const newTotalScore = prevTotalScore + ((score / total) * 100);
+      const newTotalScore = prevTotalScore + score;
       const newAverageScore = newTotalScore / newTotalQuizzes;
 
       // 1. 사용자 통계 업데이트
       await setDoc(doc(db, 'users', user.uid), {
-        orbs: newOrbs,
+        crystals: newCrystals,
         totalQuizzes: newTotalQuizzes,
         totalScore: newTotalScore,
         averageScore: newAverageScore,
+        perfectCount: isPerfect ? prevPerfectCount + 1 : prevPerfectCount,
         lastActive: serverTimestamp()
       }, { merge: true });
 
@@ -119,7 +118,7 @@ function GameHome() {
         timestamp: serverTimestamp()
       });
 
-      alert(`학습 완료! ${bonus}개의 감각 구슬을 획득했습니다.`);
+      alert(`학습 완료! ${crystalsEarned || 0}개의 수학 광석을 획득했습니다.`);
       setSelectedUnitDocId(null);
       setCurrentView('dashboard');
     } catch (error) {
@@ -185,9 +184,9 @@ function GameHome() {
           </div>
         </nav>
         <div className="user-meta">
-          <div className="orb-counter glass">
-            <div className="orb-icon"></div>
-            <span>{userData?.orbs || 0}</span>
+          <div className="orb-counter glass" title="보유 광석">
+            <div className="crystal-icon" style={{ width: '20px', height: '20px' }}></div>
+            <span>{userData?.crystals || 0}</span>
           </div>
           <button className="logout-link" onClick={handleLogout}>로그아웃</button>
         </div>

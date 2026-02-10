@@ -2,13 +2,13 @@ import { useCallback } from 'react'
 
 /**
  * ParticleEffect - 파티클 버스트 효과
- * 정답 시 별/결정 파티클이 터지는 효과
+ * 정답 시 별/광석 파티클이 터지는 효과
  */
 export function createParticleBurst(x, y, type = 'star') {
   const colors = {
     star: ['#ffd700', '#ffec8b', '#fff8dc'],
-    crystal: ['#00d4ff', '#00a6cc', '#87ceeb'],
-    wrong: ['#ff6b6b', '#ff8787', '#ffa8a8'],
+    ore: ['#50C878', '#FFD700', '#00FA9A'], // Emerald, Gold, Medium Spring Green
+    wrong: ['#FF8C00', '#9932CC', '#4B0082'], // Dark Orange, Dark Orchid, Indigo
   }
 
   const particleColors = colors[type] || colors.star
@@ -30,13 +30,13 @@ export function createParticleBurst(x, y, type = 'star') {
       width: ${size}px;
       height: ${size}px;
       background: ${color};
-      border-radius: ${type === 'crystal' ? '2px' : '50%'};
+      border-radius: ${type === 'ore' ? '2px' : '50%'};
       pointer-events: none;
       z-index: 10000;
       box-shadow: 0 0 ${size}px ${color};
     `
     
-    if (type === 'crystal') {
+    if (type === 'ore') {
       particle.style.transform = 'rotate(45deg)'
     }
     
@@ -60,7 +60,7 @@ export function createParticleBurst(x, y, type = 'star') {
       const scale = 1 - progress
       const opacity = 1 - progress
       
-      particle.style.transform = `translate(${dx}px, ${dy}px) scale(${scale}) ${type === 'crystal' ? 'rotate(45deg)' : ''}`
+      particle.style.transform = `translate(${dx}px, ${dy}px) scale(${scale}) ${type === 'ore' ? 'rotate(45deg)' : ''}`
       particle.style.opacity = opacity
       
       requestAnimationFrame(animate)
@@ -90,7 +90,7 @@ export function useParticles() {
     const x = rect.left + rect.width / 2
     const y = rect.top + rect.height / 2
     createParticleBurst(x, y, 'star')
-    createParticleBurst(x, y, 'crystal')
+    createParticleBurst(x, y, 'ore')
   }, [])
 
   const triggerWrong = useCallback((event) => {

@@ -5,19 +5,27 @@ import React from 'react'
  */
 export default function SpaceCollection({ userData }) {
   const badges = [
+    // --- 기존 배지 (기준 상향) ---
     { title: '코스모스 입문', icon: '🌌', unlocked: (userData?.totalQuizzes || 0) > 0, desc: '첫 번째 수학 탐사를 성공적으로 마쳤습니다.' },
-    { title: '결정 수집가', icon: '💎', unlocked: (userData?.crystals || 0) >= 100, desc: '수학 결정을 100개 이상 모았습니다.' },
-    { title: '은하 학자', icon: '📜', unlocked: (userData?.averageScore || 0) >= 90, desc: '평균 정답률 90% 이상을 유지 중인 엘리트 대원입니다.' },
-    { title: '우주 비행사', icon: '👨‍🚀', unlocked: (userData?.totalQuizzes || 0) >= 10, desc: '탐험을 10번 이상 완료한 숙련된 비행사입니다.' },
-    { title: '행성 개척자', icon: '🚩', unlocked: (userData?.totalQuizzes || 0) >= 30, desc: '수많은 행성을 개척한 위대한 탐험가입니다.' },
-    { title: '태양계 마스터', icon: '☀️', unlocked: (userData?.averageScore || 0) === 100 && (userData?.totalQuizzes || 0) > 0, desc: '완벽한 정답률로 태양계를 정복했습니다.' },
+    { title: '광석 수집가', icon: '💎', unlocked: (userData?.crystals || 0) >= 500, desc: '수학 광석을 500개 이상 모았습니다. (중급 대원)' },
+    { title: '은하 학자', icon: '📜', unlocked: (userData?.averageScore || 0) >= 95, desc: '평균 정답률 95% 이상을 유지 중인 엘리트 대원입니다.' },
+    { title: '우주 비행사', icon: '👨‍🚀', unlocked: (userData?.totalQuizzes || 0) >= 30, desc: '탐험을 30번 이상 완료한 숙련된 비행사입니다.' },
+    { title: '행성 개척자', icon: '🚩', unlocked: (userData?.totalQuizzes || 0) >= 70, desc: '수많은 행성을 개척한 위대한 탐험가입니다.' },
+    { title: '태양계 마스터', icon: '☀️', unlocked: (userData?.totalQuizzes || 0) >= 132 && (userData?.averageScore || 0) >= 99, desc: '132개 모든 세트의 탐사를 마친 전설의 마스터입니다.' },
+    
+    // --- 신규 배지 (태도 중심) ---
+    { title: '무결점 궤도', icon: '🛰️', unlocked: (userData?.consecutiveGood || 0) >= 10, desc: '연속 10세트 동안 정답률 90% 이상을 유지했습니다.' },
+    { title: '슈퍼노바', icon: '💥', unlocked: (userData?.dailyQuizCount || 0) >= 5, desc: '하루에 5세트 이상의 탐사를 완수했습니다.' },
+    { title: '심우주 항해사', icon: '🌠', unlocked: (userData?.totalQuizzes || 0) >= 100, desc: '누적 퀴즈 100세트를 돌파한 베테랑 항해사입니다.' },
+    { title: '수학의 수호자', icon: '🛡️', unlocked: (userData?.shieldDefended || 0) >= 200, desc: '광자 쉴드로 에너지(광석) 손실을 200회 이상 방어했습니다.' },
+    { title: '완벽한 도약', icon: '⚡', unlocked: (userData?.perfectCount || 0) >= 20, desc: '백점 보너스(+10)를 20회 달성한 완벽주의 대원입니다.' },
   ]
 
   const items = [
     { name: '기본 우주선', icon: '🚀', owned: true, cost: '기본 지급', desc: '모든 대원에게 지급되는 표준 탐사선입니다.' },
-    { name: '수정 레이더', icon: '📡', owned: (userData?.crystals || 0) >= 100, cost: '100 결정', desc: '주변의 수학 결정을 더 잘 찾아냅니다.' },
-    { name: '중력 엔진', icon: '⚙️', owned: (userData?.crystals || 0) >= 500, cost: '500 결정', desc: '더 먼 행성까지 빠르게 이동할 수 있습니다.' },
-    { name: '광자 쉴드', icon: '🛡️', owned: (userData?.crystals || 0) >= 1000, cost: '1000 결정', desc: '강력한 수치 오류로부터 우주선을 보호합니다.' },
+    { name: '광석 레이더', icon: '📡', owned: (userData?.crystals || 0) >= 100, cost: '100 광석', desc: '주변의 수학 광석을 더 잘 찾아냅니다.' },
+    { name: '중력 엔진', icon: '⚙️', owned: (userData?.crystals || 0) >= 500, cost: '500 광석', desc: '더 먼 행성까지 빠르게 이동할 수 있습니다.' },
+    { name: '광자 쉴드', icon: '🛡️', owned: (userData?.crystals || 0) >= 1000, cost: '1000 광석', desc: '강력한 수치 오류로부터 우주선을 보호합니다.' },
   ]
 
   return (
@@ -38,7 +46,7 @@ export default function SpaceCollection({ userData }) {
           <p style={{ color: 'var(--text-bright)', marginBottom: '0.5rem', fontWeight: 700 }}>💡 도감 이용 가이드</p>
           <ul style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingLeft: '1.2rem' }}>
             <li><strong style={{ color: 'var(--star-gold)' }}>탐사 배지</strong>: 특정 목표를 달성하면 자동으로 수여되는 <strong>명예의 상징</strong>입니다.</li>
-            <li><strong style={{ color: 'var(--crystal-cyan)' }}>보유 장비</strong>: 수학 탐사로 모은 결정(Crystal)에 따라 해제되는 <strong>업그레이드 아이템</strong>입니다.</li>
+            <li><strong style={{ color: 'var(--crystal-cyan)' }}>보유 장비</strong>: 수학 탐사로 모은 광석(Ore)에 따라 해제되는 <strong>업그레이드 아이템</strong>입니다.</li>
           </ul>
         </div>
       </div>
@@ -81,7 +89,7 @@ export default function SpaceCollection({ userData }) {
 
       <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <span>🚢 보유 장비</span>
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>(결정 수집량에 따라 해제)</span>
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>(광석 수집량에 따라 해제)</span>
       </h3>
       <div style={{
         display: 'grid',

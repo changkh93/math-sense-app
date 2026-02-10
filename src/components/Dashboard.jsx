@@ -33,14 +33,14 @@ export default function Dashboard({ user, userData }) {
   const stats = [
     { label: '전체 평균', value: `${userData?.averageScore?.toFixed(1) || '0.0'}점`, icon: '📈' },
     { label: '총 응시 퀴즈', value: `${userData?.totalQuizzes || 0}개`, icon: '📚' },
-    { label: '보유 구슬', value: `${userData?.orbs || 0}개`, icon: '✨' },
+    { label: '보유 광석', value: `${userData?.crystals || 0}개`, icon: '💎' },
   ]
 
   return (
     <div className="dashboard-view fadeIn">
       <div className="dashboard-header glass">
         <h2>🧑‍🎓 {user.displayName} 학생의 성장 기록</h2>
-        <p>지금까지의 노력이 구슬처럼 차곡차곡 쌓이고 있어요!</p>
+        <p>지금까지의 노력이 광석처럼 차곡차곡 쌓이고 있어요!</p>
       </div>
 
       <div className="stats-grid">
