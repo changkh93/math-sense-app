@@ -177,9 +177,9 @@ function GameHome() {
       // 2. 학습 이력 저장
       await addDoc(collection(db, 'users', user.uid, 'history'), {
         unitId: selectedUnitDocId,
-        unitTitle: activeUnit.title,
+        unitTitle: activeUnit?.title || "알 수 없는 단원",
         regionId: selectedRegionId,
-        regionTitle: activeRegion?.title || "Unknown Galaxy",
+        regionTitle: activeRegion?.title || "알 수 없는 지역",
         chapterId: selectedChapterDocId,
         score: Math.round((score / total) * 100),
         crystalsEarned: crystalsEarned || 0,
@@ -190,7 +190,7 @@ function GameHome() {
         crystalsEarned: crystalsEarned || 0,
         isPerfect
       });
-      // setSelectedUnitDocId(null); // Don't null immediately to allow "Continue" logic
+      setSelectedUnitDocId(null); // Close quiz view to show modal
       // setCurrentView('dashboard'); // Don't navigate automatically
     } catch (error) {
       console.error("Error saving quiz result:", error);
@@ -229,7 +229,7 @@ function GameHome() {
         <div className="cloud" style={{ top: '60%', width: '250px', height: '80px', animationDelay: '-12s' }}></div>
         <QuizView 
           region={activeRegion} 
-          quizData={{ title: activeUnit.title, questions: unitQuizzes }}
+          quizData={{ title: activeUnit?.title || "제목 없음", questions: unitQuizzes }}
           onExit={() => setSelectedUnitDocId(null)}
           onComplete={handleComplete}
         />
@@ -247,7 +247,7 @@ function GameHome() {
 
       <div className="top-bar" style={{ position: 'relative', zIndex: 10 }}>
         <nav className="main-nav">
-          <button className={`nav-item ${currentView === 'map' ? 'active' : ''}`} onClick={() => { setCurrentView('map'); setSelectedRegionId(null); setSelectedChapterDocId(null); }}>🗺️ 지도</button>
+          <button className={`nav-item ${currentView === 'map' ? 'active' : ''}`} onClick={() => { setCurrentView('map'); setSelectedRegionId(null); setSelectedChapterDocId(null); setSelectedUnitDocId(null); }}>🗺️ 지도</button>
           <button className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentView('dashboard')}>📈 성장 기록</button>
           <button className={`nav-item ${currentView === 'ranking' ? 'active' : ''}`} onClick={() => setCurrentView('ranking')}>🏆 명예의 전당</button>
           <div style={{ marginLeft: '1rem', display: 'flex', alignItems: 'center' }}>
@@ -320,7 +320,7 @@ function GameHome() {
                     setSelectedChapterDocId(null)
                   }
                 }}>← {chapters?.length === 1 ? '지역 선택으로 돌아가기' : '장 선택으로 돌아가기'}</button>
-                <h2 className="selection-title">{chapters?.length === 1 ? activeRegion?.title : activeChapter?.title}</h2>
+                <h2 className="selection-title">{chapters?.length === 1 ? activeRegion?.title : (activeChapter?.title || "단원 선택")}</h2>
                 <div className="units-list">
                   {loadingUnits ? <div>Loading Units...</div> : 
                    units?.map(unit => {

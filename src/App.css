@@ -375,7 +375,8 @@ header {
 }
 
 .completion-modal {
-  background: rgba(255, 255, 255, 0.9);
+  background: white;
+  color: var(--text);
   padding: 3rem;
   border-radius: 24px;
   max-width: 500px;
@@ -388,6 +389,7 @@ header {
 .modal-header h2 {
   font-size: 2rem;
   margin-bottom: 1.5rem;
+  color: inherit;
 }
 
 .crystal-reward-display {
@@ -395,16 +397,19 @@ header {
   padding: 2rem;
   border-radius: 20px;
   margin-bottom: 1.5rem;
+  color: var(--primary);
 }
 
 .reward-text {
   font-size: 1.2rem;
   margin: 0;
+  color: inherit;
 }
 
 .modal-message {
   color: var(--text-muted);
   margin-bottom: 2rem;
+  opacity: 0.8;
 }
 
 .modal-actions-grid {
@@ -435,7 +440,7 @@ header {
 
 .secondary-btn {
   background: rgba(0,0,0,0.05);
-  color: var(--text-main);
+  color: var(--text);
 }
 
 .secondary-btn:hover {
