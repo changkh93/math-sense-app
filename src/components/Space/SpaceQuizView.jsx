@@ -424,6 +424,31 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // 퀴즈 화면
   const progress = ((currentIdx + 1) / currentQuestions.length) * 100
 
+  // [SAFETY GUARD] If currentQuestion is undefined (e.g. ghost docs or index out of bounds),
+  // show a fallback to prevent white screen crash.
+  if (!currentQuestion && !isResultMode) {
+    return (
+      <div className="space-bg">
+        <div className="space-quiz-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', maxWidth: '400px' }}>
+            <h2 style={{ marginBottom: '1rem', color: '#ff6b6b' }}>데이터 로딩 오류</h2>
+            <p style={{ marginBottom: '1.5rem', lineHeight: '1.6' }}>
+              퀴즈 데이터를 불러오는 중 문제가 발생했습니다.<br/>
+              (오래된 데이터가 남아있을 수 있습니다)
+            </p>
+            <button 
+              className="quiz-btn primary"
+              onClick={() => handleComplete({ score: 0, total: 0 })} 
+              style={{ width: '100%' }}
+            >
+              퀴즈 종료하고 나가기
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-bg">
       <StarField count={100} />

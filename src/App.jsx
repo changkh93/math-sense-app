@@ -10,6 +10,7 @@ import { usePerformance } from './contexts/PerformanceContext'
 
 import ContentManager from './pages/Admin/ContentManager'
 import QuizEditor from './pages/Admin/QuizEditor'
+import DataSync from './pages/Admin/DataSync'
 
 function App() {
   const { isLowMode, performanceMode } = usePerformance();
@@ -31,6 +32,7 @@ function App() {
         <Route index element={<AdminDashboard />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="quizzes/:unitId" element={<QuizEditor />} />
+        <Route path="data-sync" element={<DataSync />} />
       </Route>
     </Routes>
   )

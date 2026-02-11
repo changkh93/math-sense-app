@@ -1,4 +1,3 @@
-// 비와 비례식1 - 제2장: 비례식 기초
 export const ratioChapter2Quizzes = {
   'unit1': {
     title: '1. 비례식(Proportion)의 성질',
@@ -8,141 +7,137 @@ export const ratioChapter2Quizzes = {
         question: '다음 중 비례식인 것은?',
         options: ['2 : 3 = 4 : 6', '2 : 5', '2 : 5 < 3 : 5', '1 : 2'],
         answer: '2 : 3 = 4 : 6',
-        hint: '비례식은 등호(=)를 사용하여 두 비가 같음을 나타내는 식입니다.'
+        hint: '비례식은 등호(=)를 사용하여 두 비가 같음을 나타내는 식입니다.',
       },
       {
         id: 'r2-1-2',
-        question: '비례식 a : b = c : d 에서 알 수 있는 성질이 아닌 것은?',
-        options: ['a/b = c/d', 'ad = bc', 'a + d = b + c', '내항의 곱은 외항의 곱과 같다'],
-        answer: 'a + d = b + c',
-        hint: '비례식에서 합의 관계는 성립하지 않습니다.'
+        question: '비례식의 성질을 이용하여, □ 안에 알맞은 수를 넣으세요. ',
+        options: ['30', '5', '20', '10'],
+        answer: '30',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770763842720_54.png?alt=media&token=b8c9ad2c-d23e-44a2-b868-468661d99307',
       },
       {
         id: 'r2-1-3',
         question: '비례식의 뜻으로 옳은 것은?',
         options: ['두 비가 같음을 나타내는 식', '두 수를 더하는 식', '두 수를 곱하는 식', '두 수를 나누는 식'],
         answer: '두 비가 같음을 나타내는 식',
-        hint: '비례(Proportion)는 비율이 같다는 의미입니다.'
+        hint: '비례(Proportion)는 비율이 같다는 의미입니다.',
       },
       {
         id: 'r2-1-4',
-        question: '비례식 2 : 5 = 4 : 10 에서 내항은?',
-        options: ['5, 4', '2, 10', '2, 5', '4, 10'],
-        answer: '5, 4',
-        hint: '등호(=)에 가까운 안쪽 두 수가 내항입니다.'
+        question: '□ 안에 알맞은 수를 넣으세요. ',
+        options: ['×3', '×4', '÷ 3', '+ 10'],
+        answer: '×3',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770763971754_54.png?alt=media&token=032155c2-5a26-4656-be77-b418e46f2822',
       },
       {
         id: 'r2-1-5',
-        question: '비례식 3 : 7 = 6 : 14 에서 외항의 곱은?',
-        options: ['42', '21', '18', '98'],
-        answer: '42',
-        hint: '외항은 바깥쪽 두 수인 3과 14입니다. 3 × 14 = 42'
+        question: '□ 안에 알맞은 수를 넣으세요. ',
+        options: ['2d', 'd', '2', '3d'],
+        answer: '2d',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770764126134_55.png?alt=media&token=7ca46438-3d05-454d-8b3b-ac84e42d9108',
       },
       {
         id: 'r2-1-6',
         question: '다음 빈칸에 알맞은 수는?  3 : 4 = 9 : (  )',
         options: ['12', '10', '16', '8'],
         answer: '12',
-        hint: '전항이 3배(3->9) 되었으므로 후항도 3배(4->12) 되어야 합니다.'
+        hint: '전항이 3배(3->9) 되었으므로 후항도 3배(4->12) 되어야 합니다.',
       },
       {
         id: 'r2-1-7',
         question: '5 : 2 = 15 : 6 은 비례식이 맞습니까?',
         options: ['예', '아니요', '알 수 없음', '경우에 따라 다름'],
         answer: '예',
-        hint: '$\\frac{5}{2} = 2.5$, $\\frac{15}{6} = 2.5$ 로 비율이 같으므로 비례식입니다.'
+        hint: '$\frac{5}{2} = 2.5$, $\frac{15}{6} = 2.5$ 로 비율이 같으므로 비례식입니다.',
       },
       {
         id: 'r2-1-8',
-        question: '비례식의 성질 "내항의 곱 = 외항의 곱"을 이용해 2 : x = 4 : 10 을 풀면?',
+        question: '비례식의 성질을 이용해 2 : x = 4 : 10 을 풀면?',
         options: ['5', '20', '4', '2'],
         answer: '5',
-        hint: '4x = 2 × 10 = 20, 따라서 x = 5'
       },
       {
         id: 'r2-1-9',
         question: '다음 중 비례식이 성립하는 것은?',
         options: ['1 : 2 = 3 : 6', '2 : 3 = 3 : 2', '4 : 5 = 5 : 6', '10 : 2 = 5 : 2'],
         answer: '1 : 2 = 3 : 6',
-        hint: '$\\frac{1}{2}$와 $\\frac{3}{6}$은 크기가 같은 분수입니다.'
+        hint: '$\frac{1}{2}$와 $\frac{3}{6}$은 크기가 같은 분수입니다.',
       },
       {
         id: 'r2-1-10',
-        question: '비례식에서 등호(=) 왼쪽의 비를 전항, 오른쪽의 비를 후항이라 합니까?',
-        options: ['아니요', '예', '반대입니다', '둘 다 전항입니다'],
-        answer: '아니요',
-        hint: '등호 양쪽은 각각 별개의 "비"이고, 비 안에서 앞뒤 항이 전항/후항입니다. 식 전체를 전항/후항이라 부르지 않습니다.'
+        question: '분수의 비를 자연수의 비로 바꾸세요.',
+        options: ['3 : 2', '2 : 3', 'a ; a', '통분된 건데...'],
+        answer: '3 : 2',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770764311521_55.png?alt=media&token=5a85502c-97c3-40c2-ab8e-934ccf53e230',
       },
       {
         id: 'r2-1-11',
-        question: '1 : 5 = 2 : ( ) 에서 빈칸을 구하는 방법으로 틀린 것은?',
-        options: ['1과 2를 더한다', '1이 2배 되었으니 5도 2배 한다', '외항의 곱과 내항의 곱이 같음을 이용한다', '비율($\\frac{1}{5}$)이 같음을 이용한다'],
-        answer: '1과 2를 더한다',
-        hint: '비례식은 곱셈/나눗셈(배수) 관계이지 덧셈 관계가 아닙니다.'
+        question: '분수의 비를 자연수의 비로 바꾸세요.',
+        options: ['3 : 4', '4 : 3', '1 : 2', '2 : 3'],
+        answer: '3 : 4',
+        hint: '비례식은 곱셈/나눗셈(배수) 관계이지 덧셈 관계가 아닙니다.',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770764538356_55.png?alt=media&token=8385b6f6-f64e-4ecc-a63b-22b6224db1aa',
       },
       {
         id: 'r2-1-12',
-        question: '다음 그림과 관련된 비례식은? "사과 2개당 1000원, 사과 4개당 2000원"',
-        options: ['2 : 1000 = 4 : 2000', '2 : 4 = 1000 : 2000', '둘 다 가능', '관련 없음'],
-        answer: '둘 다 가능',
-        hint: '사과 개수끼리 비와 가격끼리 비를 비교할 수도 있고, 개수 대 가격의 비를 비교할 수도 있습니다.'
+        question: '소수의 비를 자연수의 비로 바꾸세요.',
+        options: ['100 : 314', '10 : 31.4', '314 : 1', '314 : 100'],
+        answer: '314 : 1',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770764672691_55.png?alt=media&token=de38e588-b97a-4044-8338-7ee42b55724a',
       },
       {
         id: 'r2-1-13',
-        question: 'a : b = c : d 일 때, b와 c를 무엇이라 부릅니까?',
-        options: ['내항', '외항', '전항', '후항'],
-        answer: '내항',
-        hint: '안쪽(內)에 있는 항이라 하여 내항이라 합니다.'
+        question: '소수의 비를 자연수의 비로 바꾸세요.',
+        options: ['20 : 1', '2 : 1', '10 : 20', '2 : 10'],
+        answer: '20 : 1',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770764799892_55.png?alt=media&token=dd960531-27ba-44bf-80b5-04047742f341',
       },
       {
         id: 'r2-1-14',
-        question: '비례식 10 : 3 = 30 : 9 가 성립하는 이유는?',
-        options: ['전항과 후항에 각각 3을 곱했으므로', '10에 20을 더해서', '3에 6을 더해서', '우연히'],
-        answer: '전항과 후항에 각각 3을 곱했으므로',
-        hint: '비의 성질: 0이 아닌 같은 수를 곱해도 비의 값은 같습니다.'
+        question: '기준량이 1일 때, □ 안에 알맞은 값을 넣으세요. ',
+        options: ['111', '333', '11', '3'],
+        answer: '111',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770764981125_55.png?alt=media&token=960fc3fb-8930-40f7-8002-7f70b52fffad',
       },
       {
         id: 'r2-1-15',
-        question: '다음 중 옳은 식은?',
-        options: ['2 : 3 = 4 : 6', '2 : 3 = 3 : 2', '2 : 3 = 6 : 4', '2 : 3 = 5 : 6'],
-        answer: '2 : 3 = 4 : 6',
-        hint: '$\\frac{2}{3}$와 $\\frac{4}{6}$은 같습니다.'
+        question: '기준량을 100으로 만들기 위해 □ 안에 알맞은 값을 넣으세요. ',
+        options: ['0.5, 50', '20, 200', '2, 50', '1, 100'],
+        answer: '0.5, 50',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit1_1770765102428_56.png?alt=media&token=59eaaa30-43c4-4596-b8a1-c367507e2e6e',
       },
       {
         id: 'r2-1-16',
-        question: '비례식에서 외항은?',
-        options: ['가장 바깥쪽 두 수', '가장 안쪽 두 수', '왼쪽 두 수', '오른쪽 두 수'],
-        answer: '가장 바깥쪽 두 수',
-        hint: '식의 양 끝에 있는 수를 말합니다.'
+        question: '1 : 3 = 10 : 30 일 때, 곱의 관계로 표현하시오.',
+        options: ['1 × 30 = 3 × 10', '1 × 3 = 10 × 30', '1 × 10 < 3 × 30 ', '비례식의 성질을 배운 것 같은데..ㅠㅠ'],
+        answer: '1 × 30 = 3 × 10',
       },
       {
         id: 'r2-1-17',
-        question: '7 : 2 = 21 : ( )',
-        options: ['6', '5', '4', '7'],
-        answer: '6',
-        hint: '7이 3배 되어 21이 되었으므로, 2도 3배 하여 6이 됩니다.'
+        question: '볼펜 5개당 3100원이면, 볼펜 1개의 가격은?',
+        options: ['620', '600', '700', '650'],
+        answer: '620',
       },
       {
         id: 'r2-1-18',
-        question: '비례식이 성립하지 않는 경우는?',
-        options: ['내항의 곱과 외항의 곱이 다를 때', '비율이 같을 때', '전항과 후항에 같은 수를 곱했을 때', '전항과 후항을 같은 수로 나누었을 때'],
-        answer: '내항의 곱과 외항의 곱이 다를 때',
-        hint: '내항의 곱과 외항의 곱은 항상 같아야 비례식입니다.'
+        question: '연필 6자루에 1200원이면, 연필 15자루의 가격은?',
+        options: ['3000원', '2000원', '2400원', '10000원'],
+        answer: '3000원',
       },
       {
         id: 'r2-1-19',
-        question: '$\\frac{1}{2} : \\frac{1}{3} = 3 : 2$ 는 비례식인가?',
-        options: ['예', '아니요', '분수라 안 됨', '자연수만 됨'],
-        answer: '예',
-        hint: '내항의 곱(1) = 외항의 곱(1) 이므로 성립합니다.'
+        question: '음료수 8병에 5000원이라면,  20000원에는 몇 병?',
+        options: ['32병', '16병', '30병', '20병'],
+        answer: '32병',
       },
       {
         id: 'r2-1-20',
         question: '비례식을 공부하는 가장 큰 이유는?',
         options: ['미지수의 값을 구하기 위해', '숫자를 크게 만들기 위해', '덧셈을 잘하기 위해', '그림을 그리기 위해'],
         answer: '미지수의 값을 구하기 위해',
-        hint: '세 가지 값을 알 때 나머지 하나의 값(미지수)을 구하는 데 유용합니다.'
-      }
+        hint: '세 가지 값을 알 때 나머지 하나의 값(미지수)을 구하는 데 유용합니다.',
+      },
     ]
   },
   'unit2': {
@@ -153,141 +148,133 @@ export const ratioChapter2Quizzes = {
         question: '비례식 a : b = 2 : 3 과 같은 의미인 식은?',
         options: ['3a = 2b', '2a = 3b', 'a = 2b', 'b = 3a'],
         answer: '3a = 2b',
-        hint: '내항의 곱(2b)은 외항의 곱(3a)과 같습니다.'
+        hint: '내항의 곱(2b)은 외항의 곱(3a)과 같습니다.',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770772186029_1.png?alt=media&token=7360e9e8-e4eb-4921-b05a-01e8e56e47b9',
       },
       {
         id: 'r2-2-2',
         question: 'c : d = 2 : 5 일 때, 옳은 등식은?',
         options: ['5c = 2d', '2c = 5d', 'c = 2d', 'd = 5c'],
         answer: '5c = 2d',
-        hint: '외항의 곱(5c) = 내항의 곱(2d)'
+        hint: '외항의 곱(5c) = 내항의 곱(2d)',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770772283871_1.png?alt=media&token=28087ab9-bd04-4ced-9764-c3a54b91aadc',
       },
       {
         id: 'r2-2-3',
         question: '3x = 4y 를 비례식으로 바르게 나타낸 것은?',
         options: ['x : y = 4 : 3', 'x : y = 3 : 4', 'x : y = 1 : 1', '3 : x = 4 : y'],
         answer: 'x : y = 4 : 3',
-        hint: '내항의 곱(4y)과 외항의 곱(3x)이 같아야 하므로, x가 4, y가 3에 대응됩니다.'
+        hint: '내항의 곱(4y)과 외항의 곱(3x)이 같아야 하므로, x가 4, y가 3에 대응됩니다.',
       },
       {
         id: 'r2-2-4',
-        question: '길이 a가 3칸, b가 1칸일 때 a : b 는?',
-        options: ['3 : 1', '1 : 3', '3 : 3', '1 : 1'],
-        answer: '3 : 1',
-        hint: '길이의 비는 칸 수의 비와 같습니다.'
+        question: 'x : y =11 : 122 일 때, 곱의 관계로 표현하세요.',
+        options: ['122x = 11y', '11x = 122y'],
+        answer: '122x = 11y',
       },
       {
         id: 'r2-2-5',
-        question: '2a = 5b 일 때 a : b 는?',
-        options: ['5 : 2', '2 : 5', '1 : 1', '5 : 5'],
-        answer: '5 : 2',
-        hint: '2a = 5b 에서 a는 5, b는 2에 해당합니다.'
+        question: '□ 안에 알맞은 값을 넣으세요.',
+        options: ['a', '2a', '4', '1'],
+        answer: 'a',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770772550398_1.png?alt=media&token=08f11b31-1a36-4887-99e4-2eb2b605c401',
       },
       {
         id: 'r2-2-6',
-        question: 'x : y = 1 : 4 일 때 다음 중 옳은 것은?',
-        options: ['y = 4x', 'x = 4y', '4x = y', 'x = y'],
-        answer: 'y = 4x',
-        hint: '내항의 곱(y) = 외항의 곱(4x)'
+        question: '99a를 무엇으로 나눠야 a가 될까요?',
+        options: ['99', 'a', '11', '9'],
+        answer: '99',
       },
       {
         id: 'r2-2-7',
-        question: '다음 그림과 관련된 식은? (a는 2칸, b는 7칸)',
-        options: ['7a = 2b', '2a = 7b', 'a = b', '7a = 7b'],
-        answer: '7a = 2b',
-        hint: 'a : b = 2 : 7 이므로 7a = 2b 입니다.'
+        question: '□ 안에 알맞은 값을 넣으세요.',
+        options: ['$\frac{2b}{3}$', '$\frac{2b}{2}$', '$\frac{b}{1}$', '$\frac{b}{3}$'],
+        answer: '$\frac{2b}{3}$',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770772686731_1.png?alt=media&token=19ea66fd-1990-4a63-8669-72ae9046ad05',
       },
       {
         id: 'r2-2-8',
-        question: '5m = 3n 을 비례식으로 나타내면?',
-        options: ['m : n = 3 : 5', 'm : n = 5 : 3', 'n : m = 3 : 5', '5 : 3 = m : n'],
-        answer: 'm : n = 3 : 5',
-        hint: '내항 3n, 외항 5m 이 되도록 배치합니다.'
+        question: '□ 안에 알맞은 값을 넣으세요.',
+        options: ['$\frac{3억}{4}$', '$\frac{3억}{3}$', '$\frac{1억}{4}$', '$\frac{3억}{억}$'],
+        answer: '$\frac{3억}{4}$',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770772826898_1.png?alt=media&token=4171c9e5-556e-47ec-9850-8c315d9a1abf',
       },
       {
         id: 'r2-2-9',
-        question: 'a : b = 3 : 4 의 양변에 12를 곱하면 어떤 식이 됩니까?',
-        options: ['4a = 3b', '3a = 4b', '12a = 12b', '알 수 없다'],
-        answer: '4a = 3b',
-        hint: '내항의 곱(3b) = 외항의 곱(4a) 성질을 이용하거나, 분수 $\\frac{a}{b}=\\frac{3}{4}$에서 양변에 4b를 곱합니다.'
+        question: '4a = 3b 일 때, a는?',
+        options: ['$\frac{3b}{4}$', '$\frac{3b}{3}$', '$\frac{4a}{4}$', '$\frac{3b}{3}$'],
+        answer: '$\frac{3b}{4}$',
       },
       {
         id: 'r2-2-10',
-        question: '곱셈식 2 × 3 = 6 을 비례식으로 바꿀 수 있습니까?',
-        options: ['아니요', '예', '반반', '가끔'],
-        answer: '아니요',
-        hint: '단순한 곱셈식 하나로는 비례식(두 비의 등식)을 만들 수 없습니다. a:b=c:d 형태가 필요합니다.'
+        question: '4a = 33c 일 때, a는?',
+        options: ['$\frac{33c}{4}$', '$\frac{33c}{33}$', '$\frac{4a}{33}$', '$\frac{33c}{a}$'],
+        answer: '$\frac{33c}{4}$',
       },
       {
         id: 'r2-2-11',
-        question: '서로 같은 의미를 갖는다는 뜻의 기호는?',
-        options: ['⇔', '⇒', '∀', '∃'],
-        answer: '⇔',
-        hint: '양쪽 화살표는 서로 동치(같음)를 의미합니다.'
+        question: '8의 $\frac{1}{3}$ 은 얼마입니까?',
+        options: ['$\frac{8}{3}$', '$\frac{3}{8}$', '$\frac{3}{1}$', '$\frac{1}{8}$'],
+        answer: '$\frac{8}{3}$',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770775008327_1.png?alt=media&token=bbac60d6-bf33-4733-95b1-3f8b5a784559',
       },
       {
         id: 'r2-2-12',
-        question: 'a : b = 4 : 1 과 동치인 식은?',
-        options: ['a = 4b', 'b = 4a', '4a = b', 'a = b'],
-        answer: 'a = 4b',
-        hint: '1 × a = 4 × b'
+        question: 'b는 a의 몇 배입니까?',
+        options: ['$\frac{3}{4}$ 배', '$\frac{4}{3}$ 배', '$\frac{1}{3}$ 배', '$\frac{2}{4}$ 배'],
+        answer: '$\frac{3}{4}$ 배',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770775193605_1.png?alt=media&token=0271f880-09e9-4f6a-a3df-4b55747cd38b',
       },
       {
         id: 'r2-2-13',
-        question: '2x = 5y 에서 x가 5라면 y는 얼마입니까?',
-        options: ['2', '5', '10', '2.5'],
-        answer: '2',
-        hint: '2(5) = 10 = 5y, y=2'
+        question: 'y는 x의 몇 배입니까?',
+        options: ['$\frac{3}{7}$ 배입니다.', '$\frac{7}{3}$ 배입니다.', '$\frac{4}{7}$ 배입니다.', '$\frac{7}{4}$ 배입니다.'],
+        answer: '$\frac{3}{7}$ 배입니다.',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770775937930_1.png?alt=media&token=00fe79fe-bc9a-423b-9a8a-1310532a9174',
       },
       {
         id: 'r2-2-14',
-        question: 'p : q = 9 : 2 일 때, 2p = ( )q',
-        options: ['9', '2', '18', '4'],
-        answer: '9',
-        hint: '외항의 곱 2p = 내항의 곱 9q'
+        question: '10a = 31b 일 때, a는 b의 몇 배입니까?',
+        options: ['$\frac{31}{10}$ 배입니다.', '$\frac{10}{31}$ 배입니다.', '알 수 없습니다.', 'a가 큰 것 같긴한데..'],
+        answer: '$\frac{31}{10}$ 배입니다.',
       },
       {
         id: 'r2-2-15',
-        question: '문자와 숫자의 곱에서 곱하기 기호를 생략할 때 순서는?',
-        options: ['숫자를 문자 앞에 쓴다', '문자를 숫자 앞에 쓴다', '상관없다', '가나다순이다'],
-        answer: '숫자를 문자 앞에 쓴다',
-        hint: 'a × 3 = 3a 처럼 숫자를 앞에 씁니다.'
+        question: '길이의 관계를 자연수들 간의 곱으로 나타내세요. ',
+        options: ['5a = 2b', '2a = 5b', 'a = 2b', 'b = 5a'],
+        answer: '5a = 2b',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit2_1770776270008_1.png?alt=media&token=cc73ca0d-6acf-4e48-95d4-1310119742e2',
       },
       {
         id: 'r2-2-16',
-        question: '1 : 2 = x : y 일 때의 관계식은?',
-        options: ['y = 2x', 'x = 2y', 'y = x', '2x = 2y'],
-        answer: 'y = 2x',
-        hint: '1 × y = 2 × x'
+        question: 'a는 b의 $\frac{31}{10}$ 배일 때, 알맞은 것은?',
+        options: ['10a = 31b', '10b = 31a', '1a = 3b', 'a : b = 10 : 31'],
+        answer: '10a = 31b',
       },
       {
         id: 'r2-2-17',
-        question: '7a = 3b 를 만족하는 가장 작은 자연수 비 a : b 는?',
-        options: ['3 : 7', '7 : 3', '1 : 1', '3 : 10'],
-        answer: '3 : 7',
-        hint: 'a에 3, b에 7을 넣으면 21=21로 성립합니다.'
+        question: 'a는 b의 $\frac{2}{3}$ 배일 때, 알맞은 것은?',
+        options: ['a : b = 2 : 3', 'a : b = 3 : 2', 'a : b = 2 : 5', 'a : b = 3 : 5'],
+        answer: 'a : b = 2 : 3',
       },
       {
         id: 'r2-2-18',
-        question: '다음 식의 빈칸에 알맞은 수는?  x : y = 5 : 2 ⇔ 2x = ( )y',
-        options: ['5', '2', '10', '1'],
-        answer: '5',
-        hint: '외항 2x = 내항 5y'
+        question: 'd는 c의 $\frac{34}{20}$ 배일 때, 알맞은 것은?',
+        options: ['d : c = 34 : 20', 'd : c = 20 : 34', 'd : c = 34 : 54', 'd : c = 20 : 54'],
+        answer: 'd : c = 34 : 20',
       },
       {
         id: 'r2-2-19',
-        question: 'a가 b의 2배라면, 비례식으로 어떻게 나타납니까?',
-        options: ['a : b = 2 : 1', 'a : b = 1 : 2', 'a : b = 2 : 2', 'a : b = 1 : 1'],
-        answer: 'a : b = 2 : 1',
-        hint: 'a = 2b 이므로 a : b = 2 : 1'
+        question: 'm : w = 7 : 8 일 때, 알맞는 것은?',
+        options: ['m은 w의 $\frac{7}{8}$ 배이다.', 'm은 w의 $\frac{8}{7}$ 배이다.', 'w은 m의 $\frac{7}{8}$ 배이다.', 'w은 m의 $\frac{7}{15}$ 배이다.'],
+        answer: 'm은 w의 $\frac{7}{8}$ 배이다.',
       },
       {
         id: 'r2-2-20',
-        question: '비례식을 등식으로 바꾸는 가장 큰 이유는?',
-        options: ['방정식으로 풀어 미지수를 구하기 위해', '더 복잡하게 만들기 위해', '종이를 아끼기 위해', '글씨를 작게 쓰기 위해'],
-        answer: '방정식으로 풀어 미지수를 구하기 위해',
-        hint: '등식(방정식) 형태가 되면 이항, 나눗셈 등을 통해 답을 구하기 쉽습니다.'
-      }
+        question: 'a : e = 101 : 3 일 때, 옳은 것은?',
+        options: ['a는 e의 $\frac{101}{3}$ 배이다.', 'a는 e의 $\frac{3}{101}$ 배이다.', 'a는 e의 $\frac{3}{104}$ 배이다.', 'a는 e의 $\frac{101}{104}$ 배이다.'],
+        answer: 'a는 e의 $\frac{101}{3}$ 배이다.',
+      },
     ]
   },
   'unit3': {
@@ -298,141 +285,135 @@ export const ratioChapter2Quizzes = {
         question: '수학에서 아직 알지 못하는 수(값)를 무엇이라 합니까?',
         options: ['미지수', '기지수', '무리수', '유리수'],
         answer: '미지수',
-        hint: '아닐 미(未), 알 지(知), 수 수(數) 자를 씁니다.'
+        hint: '아닐 미(未), 알 지(知), 수 수(數) 자를 씁니다.',
       },
       {
         id: 'r2-3-2',
         question: '보통 미지수 x가 곱하기 기호(×)와 헷갈릴 수 있어서 어떻게 씁니까?',
         options: ['이탤릭체 혹은 필기체', '대문자', '빨간색', '거꾸로'],
         answer: '이탤릭체 혹은 필기체',
-        hint: '구분을 위해 모양을 약간 다르게 씁니다.'
+        hint: '구분을 위해 모양을 약간 다르게 씁니다.',
       },
       {
         id: 'r2-3-3',
         question: '다음 식에서 미지수는 무엇입니까?  2 + x = 5',
         options: ['x', '2', '5', '+'],
         answer: 'x',
-        hint: '아직 정해지지 않은 값을 나타내는 문자입니다.'
+        hint: '아직 정해지지 않은 값을 나타내는 문자입니다.',
       },
       {
         id: 'r2-3-4',
         question: '3x = 6 일 때 x의 값은?',
         options: ['2', '3', '6', '18'],
         answer: '2',
-        hint: '3에 무엇을 곱해야 6이 되는지 생각해보세요.'
+        hint: '3에 무엇을 곱해야 6이 되는지 생각해보세요.',
       },
       {
         id: 'r2-3-5',
         question: 'x를 5번 더한 것을 간단히 나타내면?',
         options: ['5x', 'x + 5', 'x/5', '5 + x'],
         answer: '5x',
-        hint: '곱셈은 덧셈의 반복입니다.'
+        hint: '곱셈은 덧셈의 반복입니다.',
       },
       {
         id: 'r2-3-6',
-        question: '다음 중 미지수 x를 사용한 식은?',
-        options: ['x + 3 = 10', '2 + 3 = 5', '5 - 1 = 4', '10 ÷ 2 = 5'],
-        answer: 'x + 3 = 10',
-        hint: '문자 x가 포함된 식을 찾으세요.'
+        question: '3 : 2 = x : 6 일 때, x의 값은?',
+        options: ['9', '8', '5', '7'],
+        answer: '9',
       },
       {
         id: 'r2-3-7',
         question: '4 : 5 = x : 10 에서 x의 값은?',
         options: ['8', '5', '4', '10'],
         answer: '8',
-        hint: '후항이 2배(5->10) 되었으므로 전항도 2배(4->8) 입니다.'
+        hint: '후항이 2배(5->10) 되었으므로 전항도 2배(4->8) 입니다.',
       },
       {
         id: 'r2-3-8',
         question: '어떤 수 x에 3을 곱했더니 12가 되었다. 이를 식으로 나타내면?',
-        options: ['3x = 12', 'x + 3 = 12', 'x - 3 = 12', 'x/3 = 12'],
+        options: ['3x = 12', 'x + 3 = 12', 'x - 3 = 12', 'x÷3 = 12'],
         answer: '3x = 12',
-        hint: 'x의 3배는 3x 입니다.'
+        hint: 'x의 3배는 3x 입니다.',
       },
       {
         id: 'r2-3-9',
         question: '2x = 10 이라는 식의 의미로 옳은 것은?',
         options: ['x가 2개 있으면 10이다', 'x에 2를 더하면 10이다', 'x에서 2를 빼면 10이다', 'x를 2로 나누면 10이다'],
         answer: 'x가 2개 있으면 10이다',
-        hint: '2x는 x + x 와 같습니다.'
+        hint: '2x는 x + x 와 같습니다.',
       },
       {
         id: 'r2-3-10',
-        question: '미지수 x를 구하는 과정을 무엇이라 합니까?',
-        options: ['방정식을 푼다', '방정식을 만든다', '방정식을 지운다', '방정식을 읽는다'],
-        answer: '방정식을 푼다',
-        hint: '해(답)를 구하는 것을 "푼다"라고 합니다.'
+        question: '2x = 99 일 때, x의 값은?',
+        options: ['$\frac{99}{2}$', '$\frac{2}{99}$', '$\frac{99}{101}$', '$\frac{2}{101}$'],
+        answer: '$\frac{99}{2}$',
       },
       {
         id: 'r2-3-11',
         question: 'x : 3 = 4 : 6 일 때 x는?',
         options: ['2', '1', '3', '4'],
         answer: '2',
-        hint: '3이 2배 되어 6이 되었으므로, x도 2배 되어 4가 되어야 합니다. 즉 x=2'
+        hint: '3이 2배 되어 6이 되었으므로, x도 2배 되어 4가 되어야 합니다. 즉 x=2',
       },
       {
         id: 'r2-3-12',
         question: '5x = 100 일 때 x는?',
         options: ['20', '10', '50', '5'],
         answer: '20',
-        hint: '100 나누기 5를 합니다.'
+        hint: '100 나누기 5를 합니다.',
       },
       {
         id: 'r2-3-13',
-        question: '다음 그림과 같은 상황은? (x가 3개 모여 9가 됨)',
-        options: ['3x = 9', 'x + 3 = 9', 'x - 3 = 9', '9x = 3'],
-        answer: '3x = 9',
-        hint: '똑같은 x가 3번 반복되었으므로 3x 입니다.'
+        question: '1 : 2 = x : 7 일 때, x의 값은?',
+        options: ['$\frac{7}{2}$', '$\frac{2}{7}$', '$\frac{1}{2}$', '$\frac{1}{7}$'],
+        answer: '$\frac{7}{2}$',
       },
       {
         id: 'r2-3-14',
         question: 'x = 3 일 때, 2x의 값은?',
         options: ['6', '5', '3', '2'],
         answer: '6',
-        hint: '2 × 3 = 6'
+        hint: '2 × 3 = 6',
       },
       {
         id: 'r2-3-15',
-        question: '초등학교 저학년 때 미지수 x 대신 주로 사용한 기호는?',
-        options: ['□ (네모)', '△ (세모)', '○ (동그라미)', '☆ (별)'],
-        answer: '□ (네모)',
-        hint: '빈 칸을 채우는 문제에서 네모를 많이 사용했습니다.'
+        question: 'x : 3 = 4 : 8 일 때, x의 값은?',
+        options: ['$\frac{3}{2}$', '$\frac{2}{3}$', '$\frac{3}{5}$', '$\frac{2}{5}$'],
+        answer: '$\frac{3}{2}$',
       },
       {
         id: 'r2-3-16',
         question: '4x = 51 일 때 x의 값은?',
-        options: ['$\\frac{51}{4}$', '$\\frac{4}{51}$', '47', '55'],
-        answer: '$\\frac{51}{4}$',
-        hint: '자연수로 떨어지지 않으면 분수로 나타낼 수 있습니다.'
+        options: ['$\frac{51}{4}$', '$\frac{4}{51}$', '47', '55'],
+        answer: '$\frac{51}{4}$',
+        hint: '자연수로 떨어지지 않으면 분수로 나타낼 수 있습니다.',
       },
       {
         id: 'r2-3-17',
         question: '3x = 301 의 해를 구하려면?',
         options: ['301을 3으로 나눈다', '301에 3을 곱한다', '301에서 3을 뺀다', '301에 3을 더한다'],
         answer: '301을 3으로 나눈다',
-        hint: 'x에 곱해진 수로 나누어야 x만 남습니다.'
+        hint: 'x에 곱해진 수로 나누어야 x만 남습니다.',
       },
       {
         id: 'r2-3-18',
         question: '1 : 2 = 5 : x 에서 x의 값은?',
         options: ['10', '5', '2.5', '2'],
         answer: '10',
-        hint: '내항의 곱 10 = 외항의 곱 x'
+        hint: '내항의 곱 10 = 외항의 곱 x',
       },
       {
         id: 'r2-3-19',
-        question: '미지수 x는 항상 자연수여야 합니까?',
-        options: ['아니요', '예', '0이어야 합니다', '1이어야 합니다'],
-        answer: '아니요',
-        hint: '분수, 소수 등 다양한 수가 될 수 있습니다.'
+        question: '3x = 302 일 때, x의 값은?',
+        options: ['$\frac{302}{3}$', '$\frac{3}{302}$', '$\frac{302}{305}$', '$\frac{3}{305}$'],
+        answer: '$\frac{302}{3}$',
       },
       {
         id: 'r2-3-20',
-        question: '방정식 2x = 7 에서 x의 값은?',
+        question: '2x = 7 에서 x의 값은?',
         options: ['3.5', '3', '4', '14'],
         answer: '3.5',
-        hint: '7 나누기 2는 3.5 입니다.'
-      }
+      },
     ]
   },
   'unit4': {
@@ -440,144 +421,133 @@ export const ratioChapter2Quizzes = {
     questions: [
       {
         id: 'r2-4-1',
-        question: '3 : 5 = 9 : x 에서 x의 값은?',
-        options: ['15', '12', '10', '25'],
-        answer: '15',
-        hint: '전항이 3배(3->9) 되었으므로 후항도 3배(5->15) 됩니다.'
+        question: '2에 몇을 곱해야 5가 될까요?',
+        options: ['$\frac{5}{2}$', '$\frac{2}{5}$', '어떤 것도 불가능', '$\frac{1}{2}$'],
+        answer: '$\frac{5}{2}$',
       },
       {
         id: 'r2-4-2',
         question: '비례식의 성질을 이용하여 x를 구할 때 가장 많이 쓰는 성질은?',
         options: ['내항의 곱 = 외항의 곱', '내항의 합 = 외항의 합', '전항 + 후항 = 일정', '전항 × 후항 = 일정'],
         answer: '내항의 곱 = 외항의 곱',
-        hint: '외항의 곱과 내항의 곱이 같다는 성질을 이용해 방정식을 만듭니다.'
+        hint: '외항의 곱과 내항의 곱이 같다는 성질을 이용해 방정식을 만듭니다.',
       },
       {
         id: 'r2-4-3',
-        question: '2 : x = 4 : 10 의 해는?',
-        options: ['5', '20', '8', '2.5'],
-        answer: '5',
-        hint: '4x = 20, x = 5'
+        question: '8에 몇을 곱해야 3가 될까요?',
+        options: ['$\frac{3}{8}$', '$\frac{8}{3}$', '0.5', '0.39'],
+        answer: '$\frac{3}{8}$',
       },
       {
         id: 'r2-4-4',
-        question: 'x : 10 = 3 : 5 에서 x를 구하는 식은?',
-        options: ['5x = 30', '3x = 50', 'x = 30', '$\\frac{x}{10} = \\frac{5}{3}$'],
-        answer: '5x = 30',
-        hint: '외항 x×5와 내항 10×3은 같습니다.'
+        question: '2에 몇을 곱해야 31가 될까요?',
+        options: ['$\frac{31}{2}$', '$\frac{2}{31}$', '$\frac{31}{35}$', '$\frac{2}{35}$'],
+        answer: '$\frac{31}{2}$',
       },
       {
         id: 'r2-4-5',
-        question: '5 : 8 = 15 : x 일 때 x는?',
-        options: ['24', '16', '40', '13'],
-        answer: '24',
-        hint: '5가 15로 3배 되었으니 8도 3배 해줍니다.'
+        question: '$\frac{3}{7}$에 몇을 곱해야 1이 될까요?',
+        options: ['$\frac{7}{3}$', '$\frac{3}{7}$', '1', '$\frac{7}{9}$'],
+        answer: '$\frac{7}{3}$',
       },
       {
         id: 'r2-4-6',
-        question: '비례식 1 : 2 = 3 : x 를 만족하는 x는?',
-        options: ['6', '5', '4', '2'],
-        answer: '6',
-        hint: '1이 3이 되면 2는 6이 됩니다.'
+        question: '$\frac{7}{6}$ 에 몇을 곱해야 $\frac{1}{5}$ 가 될까요?',
+        options: ['$\frac{6}{35}$', '$\frac{6}{7}$', '$\frac{35}{6}$', '이걸 어떻게 풀지?'],
+        answer: '$\frac{6}{35}$',
       },
       {
         id: 'r2-4-7',
         question: 'x : 7 = 4 : 14 에서 x의 값은?',
         options: ['2', '3', '1', '4'],
         answer: '2',
-        hint: '14는 7의 2배입니다. 4는 x의 2배여야 하므로 x는 2입니다.'
+        hint: '14는 7의 2배입니다. 4는 x의 2배여야 하므로 x는 2입니다.',
       },
       {
         id: 'r2-4-8',
         question: '0.1 : 0.2 = 5 : x 에서 x는?',
         options: ['10', '1', '2.5', '50'],
         answer: '10',
-        hint: '0.1 : 0.2 는 1 : 2 와 같습니다.'
+        hint: '0.1 : 0.2 는 1 : 2 와 같습니다.',
       },
       {
         id: 'r2-4-9',
-        question: '$\\frac{1}{2} : \\frac{1}{3} = x : 2$ 일 때, x는?',
+        question: '$\frac{1}{2} : \frac{1}{3} = x : 2$ 일 때, x는?',
         options: ['3', '2', '1', '4'],
         answer: '3',
-        hint: '$\\frac{1}{2} : \\frac{1}{3} = 3 : 2$ 입니다. $3 : 2 = x : 2$ 이므로 x=3'
+        hint: '$\frac{1}{2} : \frac{1}{3} = 3 : 2$ 입니다. $3 : 2 = x : 2$ 이므로 x=3',
       },
       {
         id: 'r2-4-10',
-        question: '4 : x = x : 9 일 때 양수 x는?',
-        options: ['6', '36', '4.5', '13'],
-        answer: '6',
-        hint: 'x × x = 36 이므로 x = 6'
+        question: '2 : 3 = 5 : x 일 때, x를 구하는 올바른 방법은?',
+        options: ['3 × $\frac{5}{2}$', '2 × $\frac{5}{2}$', '5 × $\frac{5}{2}$4.5', '3 × $\frac{2}{5}$'],
+        answer: '3 × $\frac{5}{2}$',
       },
       {
         id: 'r2-4-11',
-        question: '다음 중 x = 10 인 비례식은?',
-        options: ['2 : 5 = 4 : x', '1 : 2 = 5 : x', '3 : x = 1 : 4', 'x : 5 = 1 : 2'],
-        answer: '2 : 5 = 4 : x',
-        hint: '$2 : 5 = 4 : 10$ ($\\frac{2}{5} = \\frac{4}{10}$) 성립합니다.'
+        question: '$\frac{2}{3}$ 에 몇을 곱해야 $\frac{4}{5}$ 가 될까요?',
+        options: ['$\frac{12}{10}$', '$\frac{3}{2}$', '잉?', '$\frac{4}{5}$'],
+        answer: '$\frac{12}{10}$',
       },
       {
         id: 'r2-4-12',
-        question: '3 : 4 = 6 : (x + 1) 일 때 x는?',
-        options: ['7', '8', '6', '5'],
-        answer: '7',
-        hint: '3 : 4 = 6 : 8 이므로 x+1=8, x=7'
+        question: '3 : 5 = 5 : x 일 때, x를 구하는 올바른 방법은?',
+        options: ['5 × $\frac{5}{3}$', '3 × $\frac{5}{3}$', '5 × $\frac{3}{5}$', '3 × $\frac{3}{5}$'],
+        answer: '5 × $\frac{5}{3}$',
       },
       {
         id: 'r2-4-13',
         question: '2 : x = 1 : 0.5 일 때 x는?',
         options: ['1', '2', '0.25', '4'],
         answer: '1',
-        hint: '1 : 0.5 는 2 : 1 과 같습니다.'
+        hint: '1 : 0.5 는 2 : 1 과 같습니다.',
       },
       {
         id: 'r2-4-14',
-        question: '비례식을 풀어서 나온 값 x를 무엇이라 합니까?',
-        options: ['해 또는 근', '공식', '정의', '정리'],
-        answer: '해 또는 근',
-        hint: '방정식을 참이 되게 하는 값을 해라고 합니다.'
+        question: '3 : 5 = 4 : x 일 때, x를 구하는 올바른 방법은?',
+        options: ['3x = 20 따라서 x = $\frac{20}{3}$', '5x = 12 따라서 x = $\frac{12}{5}$', '3x = 20 따라서 x = $\frac{3}{20}$', '3x = 12 따라서 x = $\frac{12}{3}$'],
+        answer: '3x = 20 따라서 x = $\frac{20}{3}$',
       },
       {
         id: 'r2-4-15',
-        question: 'x : y = 2 : 3 이고 y = 12 일 때 x는?',
-        options: ['8', '6', '9', '18'],
-        answer: '8',
-        hint: '3 부분이 12가 되려면 4배. 2 부분도 4배 하면 8.'
+        question: '13 : 2 = x : 7 일 때 x는?',
+        options: ['$\frac{91}{2}$', '$\frac{13}{2}$', '$\frac{27}{7}$', '35'],
+        answer: '$\frac{91}{2}$',
       },
       {
         id: 'r2-4-16',
         question: '15 : 20 = 3 : x 에서 x의 값은?',
         options: ['4', '5', '3', '6'],
         answer: '4',
-        hint: '$\\frac{15}{20} = \\frac{3}{4}$ 이므로 x=4'
+        hint: '$\frac{15}{20} = \frac{3}{4}$ 이므로 x=4',
       },
       {
         id: 'r2-4-17',
         question: 'x : 5 = 2.4 : 4 에서 x는?',
         options: ['3', '2', '2.5', '4'],
         answer: '3',
-        hint: '4x = 5 × 2.4 = 12, x = 3'
+        hint: '4x = 5 × 2.4 = 12, x = 3',
       },
       {
         id: 'r2-4-18',
-        question: '$\\frac{2}{5} : \\frac{3}{5} = 4 : x$ 일 때 x는?',
+        question: '$\frac{2}{5} : \frac{3}{5} = 4 : x$ 일 때 x는?',
         options: ['6', '5', '4', '3'],
         answer: '6',
-        hint: '$\\frac{2}{5} : \\frac{3}{5} = 2 : 3$ 입니다. $2 : 3 = 4 : 6$'
+        hint: '$\frac{2}{5} : \frac{3}{5} = 2 : 3$ 입니다. $2 : 3 = 4 : 6$',
       },
       {
         id: 'r2-4-19',
-        question: '비례식을 이용해 x를 구할 때, 전항끼리의 배수 관계를 이용할 수 있습니까?',
-        options: ['예', '아니요', '가끔', '절대 안됨'],
-        answer: '예',
-        hint: '전항이 몇 배 되었는지 확인하면 후항도 똑같이 배수하면 됩니다.'
+        question: '10 : 11 = 11 : x 일 때, x 값은?',
+        options: ['$\frac{121}{10}$', '$\frac{111}{10}$', '$\frac{121}{11}$', '$\frac{11}{10}$'],
+        answer: '$\frac{121}{10}$',
       },
       {
         id: 'r2-4-20',
         question: '비례식 7 : 3 = 21 : x 의 x값은?',
         options: ['9', '7', '14', '21'],
         answer: '9',
-        hint: '7이 3배 되어 21, 3도 3배 되어 9.'
-      }
+        hint: '7이 3배 되어 21, 3도 3배 되어 9.',
+      },
     ]
   },
   'unit5': {
@@ -588,141 +558,140 @@ export const ratioChapter2Quizzes = {
         question: '크기는 다르지만 모양이 똑같은 것을 무엇이라 합니까?',
         options: ['닮은꼴', '합동', '대칭', '반사'],
         answer: '닮은꼴',
-        hint: '영어로 similar figures 라고 합니다.'
+        hint: '영어로 similar figures 라고 합니다.',
       },
       {
         id: 'r2-5-2',
-        question: '다음 중 닮은꼴에 대한 설명으로 옳은 것은?',
-        options: ['확대하거나 축소하면 완전히 겹쳐진다', '넓이가 항상 같다', '둘레가 항상 같다', '모양은 달라도 상관없다'],
-        answer: '확대하거나 축소하면 완전히 겹쳐진다',
-        hint: '모양을 바꾸지 않고 크기만 변화시킨 것입니다.'
+        question: '다음 중 닮은꼴이 아닌 것은?',
+        options: ['원본을 가로는 길게, 세로는 더 길게 해서 찌그러뜨린 것', '원본을 일정한 비율로 확대한 것', '원본을 일정한 비율로 확대한 후 회전시킨 것', '원본과 크기는 달라도 모양이 똑같은 것'],
+        answer: '원본을 가로는 길게, 세로는 더 길게 해서 찌그러뜨린 것',
       },
       {
         id: 'r2-5-3',
-        question: '닮은꼴 도형을 회전시키면 어떻게 됩니까?',
-        options: ['여전히 닮은꼴이다', '닮은꼴이 아니게 된다', '합동이 된다', '모양이 변한다'],
-        answer: '여전히 닮은꼴이다',
-        hint: '위치나 방향이 바뀌어도 모양 자체는 변하지 않습니다.'
+        question: 'sample과 닮은꼴이 아닌 것을 고르세요.',
+        options: ['②', '①', '③', '정답 없음'],
+        answer: '②',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit5_1770792076713_1.png?alt=media&token=bb4d9f73-d2f8-4405-a5ff-1c5147b4eb04',
       },
       {
         id: 'r2-5-4',
-        question: '직사각형에서 가로와 세로의 비를 무엇이라 합니까?',
-        options: ['Aspect Ratio (종횡비)', 'Similarity Ratio (닮음비)', 'Golden Ratio (황금비)', 'Area Ratio (넓이비)'],
-        answer: 'Aspect Ratio (종횡비)',
-        hint: '모니터나 화면 비율을 말할 때도 씁니다.'
+        question: '두 도형이 닮은꼴일 때 x의 길이를 구하세요.',
+        options: ['$\frac{15}{2}$', '10', '8', '$\frac{16}{3}$'],
+        answer: '$\frac{15}{2}$',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit5_1770792205376_1.png?alt=media&token=138808c7-c016-4da0-82f2-fcf7c6e50c5e',
       },
       {
         id: 'r2-5-5',
         question: '가로 2, 세로 1인 직사각형과 닮은꼴이 되려면 가로 6일 때 세로는?',
         options: ['3', '2', '4', '12'],
         answer: '3',
-        hint: '가로가 3배(2->6) 되었으므로 세로도 3배(1->3) 되어야 합니다.'
+        hint: '가로가 3배(2->6) 되었으므로 세로도 3배(1->3) 되어야 합니다.',
       },
       {
         id: 'r2-5-6',
         question: '닮은꼴인 두 삼각형에서 대응하는 변의 길이의 비를 무엇이라 합니까?',
         options: ['닮음비', '넓이비', '부피비', '각도비'],
         answer: '닮음비',
-        hint: '얼마나 확대/축소되었는지를 나타내는 비율입니다.'
+        hint: '얼마나 확대/축소되었는지를 나타내는 비율입니다.',
       },
       {
         id: 'r2-5-7',
-        question: '작은 삼각형의 밑변이 3, 큰 삼각형의 밑변이 6일 때 닮음비는?',
-        options: ['1 : 2', '1 : 3', '2 : 3', '1 : 4'],
-        answer: '1 : 2',
-        hint: '3 : 6 을 간단히 하면 1 : 2 입니다.'
+        question: '두 도형이 닮은꼴일 때 x의 길이를 구하세요.',
+        options: ['$\frac{16}{3}$', '5', '$\frac{15}{2}$', '$\frac{8}{3}$'],
+        answer: '$\frac{16}{3}$',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit5_1770792380807_1.png?alt=media&token=091faef8-44ac-4690-8864-dabf0fdc2910',
       },
       {
         id: 'r2-5-8',
         question: '원본을 2배 확대했다면 닮음비는?',
         options: ['1 : 2', '2 : 1', '1 : 4', '4 : 1'],
         answer: '1 : 2',
-        hint: '원본 : 확대본 = 1 : 2'
+        hint: '원본 : 확대본 = 1 : 2',
       },
       {
         id: 'r2-5-9',
         question: '그림자의 길이를 이용하여 나무의 높이를 잴 때 이용하는 원리는?',
         options: ['닮은꼴의 성질', '합동의 성질', '대칭의 성질', '회전의 성질'],
         answer: '닮은꼴의 성질',
-        hint: '태양광선에 의해 생기는 직각삼각형은 서로 닮음입니다.'
+        hint: '태양광선에 의해 생기는 직각삼각형은 서로 닮음입니다.',
       },
       {
         id: 'r2-5-10',
         question: '1m 막대의 그림자가 2m일 때, 그림자가 10m인 나무의 높이는?',
         options: ['5m', '20m', '10m', '2m'],
         answer: '5m',
-        hint: '막대 : 그림자 = 1 : 2 입니다. 나무 : 10 = 1 : 2'
+        hint: '막대 : 그림자 = 1 : 2 입니다. 나무 : 10 = 1 : 2',
       },
       {
         id: 'r2-5-11',
-        question: '가로 : 세로 = 4 : 3 인 모니터와 닮은꼴인 해상도는?',
-        options: ['800 : 600', '1920 : 1080', '1280 : 720', '1000 : 500'],
-        answer: '800 : 600',
-        hint: '800 : 600 을 약분하면 4 : 3 이 됩니다.'
+        question: '두 도형이 닮은꼴일 때 x의 길이를 구하세요.',
+        options: ['$\frac{80}{7}$', '12', '$\frac{400}{20}$', '13'],
+        answer: '$\frac{80}{7}$',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit5_1770792594310_1.png?alt=media&token=70c7205a-75ab-4ca2-a1e3-d8d37f276dad',
       },
       {
         id: 'r2-5-12',
         question: '두 도형이 닮은꼴이 아닌 경우는?',
         options: ['가로만 2배 늘린 경우', '가로, 세로 모두 2배 늘린 경우', '그대로 복사한 경우', '축소하여 회전한 경우'],
         answer: '가로만 2배 늘린 경우',
-        hint: '한쪽 방향으로만 늘리면 모양이 찌그러집니다.'
+        hint: '한쪽 방향으로만 늘리면 모양이 찌그러집니다.',
       },
       {
         id: 'r2-5-13',
         question: '닮음비가 1 : 3 이고 작은 도형의 한 변이 5일 때, 대응하는 큰 도형의 변의 길이는?',
         options: ['15', '5', '10', '25'],
         answer: '15',
-        hint: '5의 3배입니다.'
+        hint: '5의 3배입니다.',
       },
       {
         id: 'r2-5-14',
         question: '닮은 두 도형에서 대응하는 각의 크기는?',
         options: ['서로 같다', '일정한 비를 이룬다', '서로 다르다', '알 수 없다'],
         answer: '서로 같다',
-        hint: '모양이 같으므로 각도는 변하지 않고 유지됩니다.'
+        hint: '모양이 같으므로 각도는 변하지 않고 유지됩니다.',
       },
       {
         id: 'r2-5-15',
         question: '다음 중 항상 닮은꼴인 도형은?',
         options: ['원', '직사각형', '삼각형', '마름모'],
         answer: '원',
-        hint: '원은 반지름의 크기만 다를 뿐 모양은 항상 같습니다.'
+        hint: '원은 반지름의 크기만 다를 뿐 모양은 항상 같습니다.',
       },
       {
         id: 'r2-5-16',
         question: '키 160cm인 사람의 그림자가 120cm이다. 같은 시각 그림자가 6m인 건물의 높이는?',
         options: ['8m', '7m', '9m', '6m'],
         answer: '8m',
-        hint: '160 : 120 = 4 : 3. 높이 : 6 = 4 : 3. (단위 주의: 6m=600cm)'
+        hint: '160 : 120 = 4 : 3. 높이 : 6 = 4 : 3. (단위 주의: 6m=600cm)',
       },
       {
         id: 'r2-5-17',
-        question: '가로 10, 세로 8인 사진을 가로 5로 축소하면 세로는?',
-        options: ['4', '5', '2', '3'],
-        answer: '4',
-        hint: '가로가 절반이 되었으므로 세로도 절반이 됩니다.'
+        question: '나무의 높이는?',
+        options: ['약 4.17', '4', '5', '3.8'],
+        answer: '약 4.17',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit5_1770793375447_1.png?alt=media&token=dc2f8f55-bead-4580-bd1c-5360e1ef4d2b',
       },
       {
         id: 'r2-5-18',
-        question: 'A4 용지와 A3 용지는 닮은꼴입니까?',
-        options: ['예', '아니요', '때때로 그렇다', '알 수 없다'],
-        answer: '예',
-        hint: 'A열 용지는 모두 닮은꼴이 유지되도록 만들어졌습니다 (1 : 1.414).'
+        question: '나무의 높이는?',
+        options: ['10', '9', '11', '$\frac{5}{8}$'],
+        answer: '10',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit5_1770793483514_1.png?alt=media&token=3b5b68d2-a231-4d7c-a3d3-fb7b999ab742',
       },
       {
         id: 'r2-5-19',
-        question: '닮음비가 2 : 5 이다. 작은 변이 6일 때 큰 변은?',
-        options: ['15', '12', '10', '20'],
-        answer: '15',
-        hint: '2가 6이 되려면 3배. 5도 3배 하면 15.'
+        question: '나무의 높이는?',
+        options: ['$\frac{112}{5}$', '22.1', '22', '22.3'],
+        answer: '$\frac{112}{5}$',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit5_1770793575315_1.png?alt=media&token=39c77825-3731-444a-8b44-1dc2f63a3a48',
       },
       {
         id: 'r2-5-20',
-        question: '확대복사기의 % 설정은 무엇을 의미합니까?',
-        options: ['길이의 확대/축소 비율', '넓이의 확대/축소 비율', '종이의 두께', '잉크의 농도'],
-        answer: '길이의 확대/축소 비율',
-        hint: '100%가 원본이고, 141%는 A4->A3 확대 비율입니다. 길이를 기준으로 합니다.'
-      }
+        question: '나무의 높이는?',
+        options: ['$\frac{65}{4}$', '16', '$\frac{52}{5}$', '나무에 올라갈 수도 없고.'],
+        answer: '$\frac{65}{4}$',
+        imageUrl: 'https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Fratios_ratio_chap2_unit5_1770793732548_1.png?alt=media&token=ae0051b1-3423-4edf-be0f-384627fff60c',
+      },
     ]
   },
   'unit6': {
@@ -733,141 +702,141 @@ export const ratioChapter2Quizzes = {
         question: '퍼센트(percent)의 뜻은 무엇입니까?',
         options: ['100개당 (per 100)', '10개당', '1000개당', '1개당'],
         answer: '100개당 (per 100)',
-        hint: 'Centum은 라틴어로 100을 뜻합니다.'
+        hint: 'Centum은 라틴어로 100을 뜻합니다.',
       },
       {
         id: 'r2-6-2',
         question: '기호 %는 분수로 나타내면 얼마입니까?',
-        options: ['$\\frac{1}{100}$', '$\\frac{1}{10}$', '$\\frac{1}{1000}$', '100'],
-        answer: '$\\frac{1}{100}$',
-        hint: '100으로 나눈 비율이라는 뜻입니다.'
+        options: ['$\frac{1}{100}$', '$\frac{1}{10}$', '$\frac{1}{1000}$', '100'],
+        answer: '$\frac{1}{100}$',
+        hint: '100으로 나눈 비율이라는 뜻입니다.',
       },
       {
         id: 'r2-6-3',
         question: '소수 0.25를 퍼센트로 나타내면?',
         options: ['25%', '0.25%', '2.5%', '250%'],
         answer: '25%',
-        hint: '0.25 = $\\frac{25}{100}$ 입니다.'
+        hint: '0.25 = $\frac{25}{100}$ 입니다.',
       },
       {
         id: 'r2-6-4',
         question: '100%는 숫자(소수/자연수)로 얼마입니까?',
         options: ['1', '100', '0.1', '10'],
         answer: '1',
-        hint: '$\\frac{100}{100} = 1$ 원리입니다.'
+        hint: '$\frac{100}{100} = 1$ 원리입니다.',
       },
       {
         id: 'r2-6-5',
         question: '200%를 숫자로 나타내면?',
         options: ['2', '200', '0.2', '20'],
         answer: '2',
-        hint: '$\\frac{200}{100} = 2$'
+        hint: '$\frac{200}{100} = 2$',
       },
       {
         id: 'r2-6-6',
         question: '1.2를 퍼센트로 나타내면?',
         options: ['120%', '12%', '1.2%', '0.12%'],
         answer: '120%',
-        hint: '1.2 = $\\frac{120}{100}$ 입니다.'
+        hint: '1.2 = $\frac{120}{100}$ 입니다.',
       },
       {
         id: 'r2-6-7',
         question: '50의 10%는 얼마입니까?',
         options: ['5', '0.5', '50', '500'],
         answer: '5',
-        hint: '50 × ($\\frac{10}{100}$) = 5'
+        hint: '50 × ($\frac{10}{100}$) = 5',
       },
       {
         id: 'r2-6-8',
         question: '다음 중 50%와 같은 것을 고르세요.',
-        options: ['$\\frac{1}{2}$', '0.05', '5', '$\\frac{1}{5}$'],
-        answer: '$\\frac{1}{2}$',
-        hint: '$\\frac{50}{100}$을 약분하면 $\\frac{1}{2}$이 됩니다.'
+        options: ['$\frac{1}{2}$', '0.05', '5', '$\frac{1}{5}$'],
+        answer: '$\frac{1}{2}$',
+        hint: '$\frac{50}{100}$을 약분하면 $\frac{1}{2}$이 됩니다.',
       },
       {
         id: 'r2-6-9',
         question: '전체 100명 중 남자가 45명이라면 남자는 몇 %입니까?',
         options: ['45%', '55%', '0.45%', '4.5%'],
         answer: '45%',
-        hint: '$\\frac{45}{100}$ 이므로 45% 입니다.'
+        hint: '$\frac{45}{100}$ 이므로 45% 입니다.',
       },
       {
         id: 'r2-6-10',
         question: '300의 50%는?',
         options: ['150', '15', '30', '600'],
         answer: '150',
-        hint: '300의 절반입니다.'
+        hint: '300의 절반입니다.',
       },
       {
         id: 'r2-6-11',
         question: '1000원의 5%는 얼마입니까?',
         options: ['50원', '5원', '500원', '100원'],
         answer: '50원',
-        hint: '1000 × 0.05 = 50'
+        hint: '1000 × 0.05 = 50',
       },
       {
         id: 'r2-6-12',
         question: '남자 2명, 여자 3명일 때 여자는 전체의 몇 %입니까?',
         options: ['60%', '40%', '30%', '20%'],
         answer: '60%',
-        hint: '전체는 5명. 여자는 $\\frac{3}{5} = \\frac{60}{100}$ 입니다.'
+        hint: '전체는 5명. 여자는 $\frac{3}{5} = \frac{60}{100}$ 입니다.',
       },
       {
         id: 'r2-6-13',
         question: '소수 0.05를 퍼센트로 바꾸면?',
         options: ['5%', '0.5%', '50%', '0.05%'],
         answer: '5%',
-        hint: '$\\frac{5}{100}$ 입니다.'
+        hint: '$\frac{5}{100}$ 입니다.',
       },
       {
         id: 'r2-6-14',
         question: '퍼센트(%)는 전체를 얼마로 가정했을 때의 비율입니까?',
         options: ['100', '1', '10', '1000'],
         answer: '100',
-        hint: '백분율이라고도 합니다.'
+        hint: '백분율이라고도 합니다.',
       },
       {
         id: 'r2-6-15',
         question: '60의 1%는?',
         options: ['0.6', '6', '60', '0.06'],
         answer: '0.6',
-        hint: '60 ÷ 100 = 0.6'
+        hint: '60 ÷ 100 = 0.6',
       },
       {
         id: 'r2-6-16',
         question: '25%를 분수로 나타내어 기약분수로 만들면?',
-        options: ['$\\frac{1}{4}$', '$\\frac{1}{2}$', '$\\frac{1}{5}$', '$\\frac{1}{25}$'],
-        answer: '$\\frac{1}{4}$',
-        hint: '$\\frac{25}{100} = \\frac{1}{4}$'
+        options: ['$\frac{1}{4}$', '$\frac{1}{2}$', '$\frac{1}{5}$', '$\frac{1}{25}$'],
+        answer: '$\frac{1}{4}$',
+        hint: '$\frac{25}{100} = \frac{1}{4}$',
       },
       {
         id: 'r2-6-17',
         question: '남자 10명, 여자 40명일 때 남자의 비율(%)은?',
         options: ['20%', '25%', '10%', '40%'],
         answer: '20%',
-        hint: '전체는 50명. 남자는 $\\frac{10}{50} = \\frac{20}{100}$.'
+        hint: '전체는 50명. 남자는 $\frac{10}{50} = \frac{20}{100}$.',
       },
       {
         id: 'r2-6-18',
         question: '어떤 수의 100%는?',
-        options: ['자기 자신', '2배', '0', '1'],
+        options: ['자기 자신', '2배', '0', '되고 싶은 거 되겠지.'],
         answer: '자기 자신',
-        hint: '전체를 다 차지하는 비율입니다.'
+        hint: '전체를 다 차지하는 비율입니다.',
       },
       {
         id: 'r2-6-19',
         question: '80점 만점에 40점을 받았다면 득점률은?',
         options: ['50%', '40%', '80%', '60%'],
         answer: '50%',
-        hint: '40은 80의 절반입니다.'
+        hint: '40은 80의 절반입니다.',
       },
       {
         id: 'r2-6-20',
         question: '물건 가격의 10%를 할인해준다면, 1000원짜리 물건의 할인 금액은?',
         options: ['100원', '10원', '900원', '1100원'],
         answer: '100원',
-        hint: '1000 × 0.1 = 100'
-      }
+        hint: '1000 × 0.1 = 100',
+      },
     ]
-  }
+  },
 };

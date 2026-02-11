@@ -35,12 +35,18 @@ function SpaceHome() {
   const [selectedChapterDocId, setSelectedChapterDocId] = useState(null)
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
+  const [pendingUnit, setPendingUnit] = useState(null) // New: For RewardPotentialModal
 
   // Data Hooks
   const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions()
   const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
   const { data: units, isLoading: loadingUnits } = useUnits(selectedChapterDocId)
-  const { data: unitQuizzes, isLoading: loadingQuizzes } = useQuizzes(selectedUnitDocId || quickQuizUnitId)
+  const { 
+    data: unitQuizzes, 
+    isLoading: loadingQuizzes, 
+    isError: errorQuizzes, 
+    refetch: refetchQuizzes 
+  } = useQuizzes(selectedUnitDocId || quickQuizUnitId)
 
   // Active selections
   const activeRegion = regions?.find(r => r.id === selectedRegionId)
@@ -287,19 +293,40 @@ function SpaceHome() {
       if (totalCount === 0) return
 
       // Anti-grinding logic
-      const previousBest = bestScores[selectedUnitDocId] || 0
+      const currentUnitId = selectedUnitDocId || quickQuizUnitId
+      const previousBest = bestScores[currentUnitId] || 0
       let actualCrystalsEarned = 0
       let rewardMessage = ""
 
       if (score > previousBest) {
-        actualCrystalsEarned = crystalsEarned || 0
-        // if user already achieved 100 before, don't give perfect bonus (10) again
-        if (isPerfect && previousBest === 100) {
-          actualCrystalsEarned = Math.max(0, actualCrystalsEarned - 10)
+        // Incremental reward: sessionCrystals * (newScore - prevBest) / newScore
+        // Why? Because sessionCrystals includes combo bonuses earned during this specific session.
+        // We reward the 'newly conquered' part of the score.
+        const improvementRatio = (score - previousBest) / score
+        actualCrystalsEarned = Math.round((crystalsEarned || 0) * improvementRatio)
+        
+        // Perfect bonus (10 crystals) only for first-time 100%
+        if (isPerfect && previousBest < 100) {
+          // If the score improved and it is now perfect, handle bonus
+          // The 'crystalsEarned' from SpaceQuizView already includes 10 if isPerfect is true.
+          // But our ratio formula might have scaled it down if prevBest was, say, 80.
+          // Let's refine: Base reward scaled + Full bonus if first perfect.
+          const baseCrystals = (crystalsEarned || 0) - 10 
+          actualCrystalsEarned = Math.round(baseCrystals * improvementRatio) + 10
+        } else if (isPerfect && previousBest === 100) {
+          // Already got perfect bonus before
+          const baseCrystals = (crystalsEarned || 0) - 10
+          actualCrystalsEarned = Math.round(baseCrystals * improvementRatio) // ratio will be 0 anyway
+        }
+        
+        if (actualCrystalsEarned > 0) {
+          rewardMessage = `${score}점으로 최고 기록을 경신했습니다! (+${actualCrystalsEarned} 광석)`
         }
       } else {
         actualCrystalsEarned = 0
-        rewardMessage = "이미 달성한 최고 점수입니다. 새로운 도전을 통해 보상을 얻으세요!"
+        rewardMessage = score === 100 
+          ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)"
+          : `최고 점수(${previousBest}점)를 넘지 못해 추가 광석을 획득할 수 없습니다.`
       }
 
       soundManager.playCrystal()
@@ -361,9 +388,9 @@ function SpaceHome() {
       }, { merge: true })
 
       await addDoc(collection(db, 'users', user.uid, 'history'), {
-        unitId: selectedUnitDocId,
-        unitTitle: activeUnit?.title || "탐사 퀴즈",
-        regionId: selectedRegionId,
+        unitId: currentUnitId,
+        unitTitle: activeUnit?.title || history.find(h => h.unitId === currentUnitId)?.unitTitle || "탐사 퀴즈",
+        regionId: selectedRegionId || history.find(h => h.unitId === currentUnitId)?.regionId,
         regionTitle: activeRegion?.title || "Unknown Galaxy",
         chapterId: selectedChapterDocId,
         score: score,
@@ -621,17 +648,108 @@ function SpaceHome() {
   }
 
   // Quiz Mode
-  if (selectedUnitDocId && unitQuizzes) {
-    return (
-      <SpaceQuizView
-        key={selectedUnitDocId}
-        region={activeRegion}
-        quizData={{ title: activeUnit?.title || "탐사 퀴즈", questions: unitQuizzes }}
-        onExit={() => setSelectedUnitDocId(null)}
-        onComplete={handleComplete}
-        hasShield={equipment.shield}
-      />
-    )
+  if (selectedUnitDocId || quickQuizUnitId) {
+    if (loadingQuizzes) {
+      return (
+        <div className="space-bg">
+          <StarField count={100} />
+          <div style={{ 
+            height: '100vh', 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center',
+            color: 'var(--crystal-cyan)',
+            gap: '1rem'
+          }}>
+            <motion.div 
+              animate={{ rotate: 360 }} 
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              style={{ fontSize: '3rem' }}
+            >
+              🛰️
+            </motion.div>
+            <div className="font-tech">데이터 수신 중 (LOADING QUIZ)...</div>
+          </div>
+        </div>
+      )
+    }
+
+    if (errorQuizzes) {
+      return (
+        <div className="space-bg">
+          <StarField count={100} />
+          <div style={{ 
+            height: '100vh', 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center',
+            color: '#ff4d4d',
+            gap: '2rem'
+          }}>
+            <div className="glass-card" style={{ padding: '2rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+              <div className="font-title" style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>통신 오류</div>
+              <p className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+                퀴즈 데이터를 불러오지 못했습니다.
+              </p>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button 
+                  onClick={() => refetchQuizzes()}
+                  className="hud-btn primary glass"
+                  style={{
+                    padding: '0.8rem 1.5rem',
+                    background: 'rgba(0, 243, 255, 0.2)',
+                    border: '1px solid var(--neon-blue)',
+                    color: 'white',
+                    borderRadius: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  다시 시도
+                </button>
+                <button 
+                  onClick={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
+                  className="hud-btn secondary glass"
+                  style={{
+                    padding: '0.8rem 1.5rem',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    borderRadius: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  나가기
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (unitQuizzes && (selectedUnitDocId || quickQuizUnitId)) {
+      // Find region for quick quiz if not already active
+      const displayRegion = activeRegion || regions?.find(r => 
+        r.id === history.find(h => h.unitId === (selectedUnitDocId || quickQuizUnitId))?.regionId
+      )
+
+      return (
+        <SpaceQuizView
+          key={selectedUnitDocId || quickQuizUnitId}
+          region={displayRegion}
+          quizData={{ 
+            title: activeUnit?.title || history.find(h => h.unitId === quickQuizUnitId)?.unitTitle || "탐사 퀴즈", 
+            questions: unitQuizzes 
+          }}
+          onExit={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
+          onComplete={handleComplete}
+          hasShield={equipment.shield}
+        />
+      )
+    }
   }
 
   // Main App
@@ -907,7 +1025,15 @@ function SpaceHome() {
                           key={unit.docId}
                           whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
                           className={`glass-card hud-border ${isCompleted ? 'completed' : ''}`}
-                          onClick={() => { setSelectedUnitDocId(unit.docId); soundManager.playClick() }}
+                          onClick={() => { 
+                            setPendingUnit({
+                              docId: unit.docId,
+                              title: unit.title,
+                              bestScore,
+                              source: 'planet'
+                            })
+                            soundManager.playClick() 
+                          }}
                           style={{
                             padding: '1.2rem 1.5rem',
                             textAlign: 'left',
@@ -950,7 +1076,12 @@ function SpaceHome() {
               userData={userData} 
               onQuizSelect={(p) => {
                 if (p.unitId) {
-                  setQuickQuizUnitId(p.unitId)
+                  setPendingUnit({
+                    docId: p.unitId,
+                    title: p.unitTitle || "탐사 퀴즈",
+                    bestScore: bestScores[p.unitId],
+                    source: 'dashboard'
+                  })
                   soundManager.playClick()
                 }
               }} 
@@ -964,47 +1095,7 @@ function SpaceHome() {
           
           {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}
 
-          {/* Quick Quiz Modal Overlay */}
-          <AnimatePresence>
-            {quickQuizUnitId && unitQuizzes && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  width: '100vw',
-                  height: '100vh',
-                  zIndex: 2000,
-                  background: 'rgba(0,0,0,0.85)',
-                  backdropFilter: 'blur(10px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '2rem',
-                  pointerEvents: 'auto'
-                }}
-              >
-                <div style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
-                  <SpaceQuizView
-                    key={quickQuizUnitId}
-                    region={regions?.find(r => r.id === history.find(h => h.unitId === quickQuizUnitId)?.regionId)}
-                    quizData={{ 
-                      title: history.find(h => h.unitId === quickQuizUnitId)?.unitTitle || '탐사 퀴즈', 
-                      questions: unitQuizzes 
-                    }}
-                    onExit={() => setQuickQuizUnitId(null)}
-                    onComplete={async (result) => {
-                      await handleComplete(result)
-                      setQuickQuizUnitId(null)
-                    }}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Quick Quiz Modal now handled by main return branch for consistency */}
         </div>
       </main>
 
@@ -1118,7 +1209,105 @@ function SpaceHome() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 퀴즈 진입 전 보상 가능성 안내 모달 */}
+      <AnimatePresence>
+        {pendingUnit && (
+          <RewardPotentialModal 
+            unit={pendingUnit}
+            onCancel={() => setPendingUnit(null)}
+            onConfirm={() => {
+              if (pendingUnit.source === 'planet') {
+                setSelectedUnitDocId(pendingUnit.docId)
+              } else {
+                setQuickQuizUnitId(pendingUnit.docId)
+              }
+              setPendingUnit(null)
+              soundManager.playWarp()
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  )
+}
+
+function RewardPotentialModal({ unit, onCancel, onConfirm }) {
+  const isPerfect = unit.bestScore === 100
+
+  return (
+    <motion.div 
+      className="modal-overlay space-hud"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{ 
+        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 4000,
+        background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(10px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+      }}
+    >
+      <motion.div 
+        className="glass-card hud-border"
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        style={{ padding: '2.5rem', maxWidth: '450px', width: '100%', textAlign: 'center', background: 'rgba(5, 10, 25, 0.9)' }}
+      >
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{isPerfect ? '🛰️' : '💎'}</div>
+        <h2 className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.5rem', marginBottom: '1rem' }}>
+          {unit.title}
+        </h2>
+        
+        <div className="glass-card" style={{ padding: '1.2rem', background: 'rgba(255,255,255,0.05)', marginBottom: '2rem' }}>
+          <p className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>현재 최고 기록</p>
+          <div style={{ fontSize: '2rem', fontWeight: 900, color: isPerfect ? 'var(--star-gold)' : 'var(--crystal-cyan)' }}>
+            {unit.bestScore !== undefined ? `${unit.bestScore}점` : '기록 없음'}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '2.5rem', textAlign: 'left', padding: '0 0.5rem' }}>
+          {isPerfect ? (
+            <div style={{ padding: '1rem', borderLeft: '3px solid #ff4d4d', background: 'rgba(255, 77, 77, 0.1)' }}>
+              <p style={{ color: '#ffb3b3', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                ⚠️ **이미 100점을 획득한 단원입니다.**<br/>
+                학습을 위한 반복 탐사는 가능하지만, 추가적인 수학 광석 보상은 지급되지 않습니다.
+              </p>
+            </div>
+          ) : unit.bestScore > 0 ? (
+            <div style={{ padding: '1rem', borderLeft: '3px solid var(--star-gold)', background: 'rgba(255, 215, 0, 0.1)' }}>
+              <p style={{ color: '#ffeaa7', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                💡 **성적 경신 보상 시스템 가동 중**<br/>
+                현재 최고 점수인 **{unit.bestScore}점**을 초과하여 기록을 경신할 경우, 그 차이만큼의 수학 광석을 비례하여 획득할 수 있습니다.
+              </p>
+            </div>
+          ) : (
+            <div style={{ padding: '1rem', borderLeft: '3px solid var(--planet-green)', background: 'rgba(0, 255, 136, 0.1)' }}>
+              <p style={{ color: '#b2fcca', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                ✨ **첫 탐사 보상 대기 중**<br/>
+                이 단원의 첫 번째 탐사입니다. 획득한 모든 수학 광석과 만점 보너스(10개)를 온전히 획득할 수 있습니다!
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button 
+            className="hud-btn secondary glass"
+            style={{ flex: 1, padding: '1rem', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: 'white' }}
+            onClick={onCancel}
+          >
+            취소 (BACK)
+          </button>
+          <button 
+            className="hud-btn primary glass"
+            style={{ flex: 1.5, padding: '1rem', borderRadius: '10px', cursor: 'pointer', background: 'rgba(0, 243, 255, 0.2)', border: '1px solid var(--neon-blue)', color: 'white', fontWeight: 700 }}
+            onClick={onConfirm}
+          >
+            탐사 시작 (START)
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 

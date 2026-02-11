@@ -6,6 +6,8 @@ import './index.css'
 import App from './App.jsx'
 import { PerformanceProvider } from './contexts/PerformanceContext.jsx'
 
+import ErrorBoundary from './components/ErrorBoundary.jsx'
+
 const queryClient = new QueryClient()
 
 createRoot(document.getElementById('root')).render(
@@ -13,7 +15,9 @@ createRoot(document.getElementById('root')).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <PerformanceProvider>
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </PerformanceProvider>
       </BrowserRouter>
     </QueryClientProvider>
