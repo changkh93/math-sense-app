@@ -72,6 +72,19 @@ const QuizEditor = () => {
     }
   };
 
+  const handleImageDelete = async () => {
+    if (!editingQuiz.imageUrl) return;
+    if (editingQuiz.imageUrl.includes('firebasestorage')) {
+      try {
+        const oldRef = ref(storage, editingQuiz.imageUrl);
+        await deleteObject(oldRef);
+      } catch (e) {
+        console.warn("Could not delete image from storage", e);
+      }
+    }
+    setEditingQuiz(prev => ({ ...prev, imageUrl: '' }));
+  };
+
   if (isLoading) return <div>Loading Quizzes...</div>;
 
   return (
@@ -117,9 +130,31 @@ const QuizEditor = () => {
           <div className="form-group">
             <label>Image (Optional)</label>
             <div className="image-upload-area">
-              {editingQuiz.imageUrl && <img src={editingQuiz.imageUrl} alt="Preview" className="img-preview" />}
+              {editingQuiz.imageUrl && (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <img src={editingQuiz.imageUrl} alt="Preview" className="img-preview" />
+                  <button
+                    type="button"
+                    onClick={handleImageDelete}
+                    style={{
+                      position: 'absolute', top: 4, right: 4,
+                      background: 'rgba(220,38,38,0.85)', color: '#fff',
+                      border: 'none', borderRadius: '50%',
+                      width: 24, height: 24, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '14px', lineHeight: 1
+                    }}
+                    title="이미지 삭제"
+                  >×</button>
+                </div>
+              )}
               <input type="file" onChange={handleImageUpload} accept="image/*" />
               {uploading && <span>Uploading...</span>}
+              {editingQuiz.imageUrl && (
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  새 파일 선택 시 기존 이미지가 교체됩니다
+                </span>
+              )}
             </div>
           </div>
 
