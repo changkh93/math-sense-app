@@ -131,7 +131,7 @@ export default function SpaceRanking({ user, userData }) {
         {/* 헤더 행 */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '80px 1fr 120px 140px',
+          gridTemplateColumns: '60px 1fr 100px 100px 120px',
           padding: '1rem',
           borderBottom: '1px solid var(--glass-border)',
           color: 'var(--crystal-cyan)',
@@ -142,6 +142,7 @@ export default function SpaceRanking({ user, userData }) {
           <span>RANK</span>
           <span>PILOT</span>
           <span style={{ textAlign: 'center' }}>CRYSTALS</span>
+          <span style={{ textAlign: 'center' }}>SCORE</span>
           <span style={{ textAlign: 'right' }}>GROWTH</span>
         </div>
 
@@ -166,7 +167,7 @@ export default function SpaceRanking({ user, userData }) {
                   key={u.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '80px 1fr 120px 140px',
+                    gridTemplateColumns: '60px 1fr 100px 100px 120px',
                     padding: '1.2rem 1rem',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     alignItems: 'center',
@@ -213,6 +214,16 @@ export default function SpaceRanking({ user, userData }) {
                     fontWeight: 700 
                   }}>
                     💎 {u.crystals || 0}
+                  </span>
+
+                  {/* 평균 점수 */}
+                  <span style={{ 
+                    textAlign: 'center', 
+                    color: 'var(--text-muted)', 
+                    fontWeight: 600,
+                    fontSize: '0.9rem'
+                  }}>
+                    {u.averageScore ? u.averageScore.toFixed(1) : '─'}
                   </span>
 
                   {/* 상승 지표 */}
