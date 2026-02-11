@@ -1,8 +1,10 @@
 import { useState, useEffect, Suspense, useMemo, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
-import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
+import { signInWithPopup } from 'firebase/auth'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../../hooks/useContent'
+import { useAuth } from '../../hooks/useAuth'
 import { regions as localRegions } from '../../data/regions'
 import { motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
 
@@ -15,19 +17,21 @@ import SpaceDashboard from './SpaceDashboard'
 import SpaceCollection from './SpaceCollection'
 import SpaceStore from './SpaceStore'
 import SpaceRanking from './SpaceRanking'
+
 import { useParticles, createParticleBurst } from './ParticleEffects'
+
 import soundManager from '../../utils/SoundManager'
-import PerformanceToggle from '../PerformanceToggle'
+import SpaceNavbar from './SpaceNavbar'
 
 // Styles
 import '../../styles/space-theme.css'
 
 function SpaceHome() {
-  const [user, setUser] = useState(null)
-  const [userData, setUserData] = useState(null)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user, userData, loading: authLoading } = useAuth()
   const [history, setHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
-  const [authLoading, setAuthLoading] = useState(true)
   const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection'
   
   // Selection State
@@ -36,6 +40,17 @@ function SpaceHome() {
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
   const [pendingUnit, setPendingUnit] = useState(null) // New: For RewardPotentialModal
+
+  // Sync view from location state (e.g. when coming from Agora)
+  useEffect(() => {
+    if (location.state?.view) {
+      setCurrentView(location.state.view)
+      setSelectedRegionId(null)
+      setSelectedChapterDocId(null)
+      // Clear state to prevent re-triggering
+      window.history.replaceState({}, document.title)
+    }
+  }, [location])
 
   // Data Hooks
   const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions()
@@ -60,66 +75,6 @@ function SpaceHome() {
     }
   }, [chapters, selectedChapterDocId])
 
-  // Auth listener & Loading Timeout
-  const [loadingTimeout, setLoadingTimeout] = useState(false)
-
-  useEffect(() => {
-    let timeoutId = setTimeout(() => {
-      if (authLoading || loadingRegions) {
-        console.warn("⏳ Loading timeout reached. Force-releasing screen.")
-        setLoadingTimeout(true)
-      }
-    }, 5000)
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setUser(user)
-      if (user) {
-        const userDocRef = doc(db, 'users', user.uid)
-        // Correctly handle internal listener
-        const unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data()
-            setUserData({
-              crystals: 0,
-              totalQuizzes: 0,
-              totalScore: 0,
-              spaceshipLevel: 1,
-              ...data
-            })
-          } else {
-            const initialData = { 
-              crystals: 0, 
-              totalQuizzes: 0, 
-              totalScore: 0, 
-              spaceshipLevel: 1,
-              email: user.email, 
-              name: user.displayName 
-            }
-            setDoc(userDocRef, initialData)
-            setUserData(initialData)
-          }
-          setAuthLoading(false)
-        }, (err) => {
-          console.error("User doc snapshot error:", err)
-          setAuthLoading(false) // Proceed anyway
-        })
-        
-        // We need to return the cleanup for the inner listener if we want to stop it
-        // But since this is inside onAuthStateChanged, we should store it or use a separate effect.
-        // Actually, simplest is to just ensure it's cleaned up when auth changes.
-        return () => unsubscribeDoc()
-      } else {
-        setUser(null)
-        setUserData(null)
-        setAuthLoading(false)
-      }
-    })
-
-    return () => {
-      clearTimeout(timeoutId)
-      unsubscribeAuth()
-    }
-  }, [])
 
   // Interaction & UI State
   const [isBoosting, setIsBoosting] = useState(false)
@@ -280,10 +235,6 @@ function SpaceHome() {
     return progress
   }, [chapters, bestScores, selectedRegionId])
 
-  const handleLogout = () => {
-    soundManager.playClick()
-    signOut(auth)
-  }
 
   const handleComplete = async (result) => {
     if (!user) return
@@ -450,7 +401,7 @@ function SpaceHome() {
   }
 
   // Loading State with Timeout & Error handling
-  const isLoading = (authLoading || loadingRegions) && !loadingTimeout && !errorRegions
+  const isLoading = (authLoading || loadingRegions) && !errorRegions
 
   if (isLoading) {
     return (
@@ -741,6 +692,8 @@ function SpaceHome() {
           key={selectedUnitDocId || quickQuizUnitId}
           region={displayRegion}
           quizData={{ 
+            unitId: selectedUnitDocId || quickQuizUnitId,
+            chapterId: selectedChapterDocId || history.find(h => h.unitId === quickQuizUnitId)?.chapterId,
             title: activeUnit?.title || history.find(h => h.unitId === quickQuizUnitId)?.unitTitle || "탐사 퀴즈", 
             questions: unitQuizzes 
           }}
@@ -784,57 +737,14 @@ function SpaceHome() {
       {/* Scan line removed */}
       
       {/* Navigation */}
-      <nav className="space-nav hud-border" style={{ borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
-        <div className="space-nav-links font-title">
-          <button 
-            className={`space-nav-link ${currentView === 'planet' ? 'active' : ''}`}
-            onClick={() => { setCurrentView('planet'); setSelectedRegionId(null); setSelectedChapterDocId(null); }}
-          >
-            🪐 NAV
-          </button>
-          <button 
-            className={`space-nav-link ${currentView === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setCurrentView('dashboard')}
-          >
-            📊 LOGS
-          </button>
-          <button 
-            className={`space-nav-link ${currentView === 'collection' ? 'active' : ''}`}
-            onClick={() => setCurrentView('collection')}
-          >
-            🏆 DATABASE
-          </button>
-          <button 
-            className={`space-nav-link ${currentView === 'ranking' ? 'active' : ''}`}
-            onClick={() => setCurrentView('ranking')}
-          >
-            🏆 RANKING
-          </button>
-          <button 
-            className={`space-nav-link ${currentView === 'store' ? 'active' : ''}`}
-            onClick={() => setCurrentView('store')}
-          >
-            🎨 STORE
-          </button>
-          <div style={{ marginLeft: '1rem' }}>
-            <PerformanceToggle />
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div className="crystal-counter font-tech">
-            <div className="crystal-icon"></div>
-            <span>{userData?.crystals || 0} (광석)</span>
-          </div>
-          <button 
-            className="space-nav-link font-tech"
-            onClick={handleLogout}
-            style={{ fontSize: '0.8rem' }}
-          >
-            로그아웃
-          </button>
-        </div>
-      </nav>
+      <SpaceNavbar 
+        currentView={currentView} 
+        onViewChange={(view) => {
+          setCurrentView(view)
+          setSelectedRegionId(null)
+          setSelectedChapterDocId(null)
+        }} 
+      />
 
       {/* Main Content Overlay */}
       <main className="space-container" style={{ pointerEvents: 'none' }}>

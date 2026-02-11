@@ -173,14 +173,14 @@ export const ratioChapter3Quizzes = {
         question: '용돈 1000원을 형과 동생이 3 : 2 로 나누어 가질 때 형의 몫은?',
         options: ['600원', '400원', '500원', '300원'],
         answer: '600원',
-        hint: '1000 × ($\frac{3}{5}$) = 600',
+        hint: '1000 × ($\\frac{3}{5}$) = 600',
       },
       {
         id: 'r3-2-5',
         question: '길이 45cm 끈을 5 : 4 로 자르면 긴 쪽의 길이는?',
         options: ['25cm', '20cm', '15cm', '30cm'],
         answer: '25cm',
-        hint: '전체 9등분 중 5에 해당합니다. 45 × ($\frac{5}{9}$) = 25',
+        hint: '전체 9등분 중 5에 해당합니다. 45 × ($\\frac{5}{9}$) = 25',
       },
       {
         id: 'r3-2-6',
@@ -201,7 +201,7 @@ export const ratioChapter3Quizzes = {
         question: '30을 1 : 2 : 3 으로 나누었을 때 가장 작은 수는?',
         options: ['5', '10', '15', '1'],
         answer: '5',
-        hint: '30 × ($\frac{1}{6}$) = 5',
+        hint: '30 × ($\\frac{1}{6}$) = 5',
       },
       {
         id: 'r3-2-9',
@@ -222,14 +222,14 @@ export const ratioChapter3Quizzes = {
         question: '피자 8조각을 3 : 1 로 나누어 먹으려면?',
         options: ['6조각, 2조각', '5조각, 3조각', '4조각, 4조각', '7조각, 1조각'],
         answer: '6조각, 2조각',
-        hint: '8 × ($\frac{3}{4}$) = 6',
+        hint: '8 × ($\\frac{3}{4}$) = 6',
       },
       {
         id: 'r3-2-12',
         question: '120을 1 : 2 : 3 으로 비례배분한 것 중 가장 큰 수는?',
         options: ['60', '40', '20', '80'],
         answer: '60',
-        hint: '120 × ($\frac{3}{6}$) = 60',
+        hint: '120 × ($\\frac{3}{6}$) = 60',
       },
       {
         id: 'r3-2-13',
@@ -243,7 +243,7 @@ export const ratioChapter3Quizzes = {
         question: '형 12살, 동생 8살일 때, 나이에 비례해서 용돈 5000원을 나누면 동생은?',
         options: ['2000원', '3000원', '2500원', '1500원'],
         answer: '2000원',
-        hint: '나이 비는 12 : 8 = 3 : 2. 동생은 $\frac{2}{5}$를 가집니다.',
+        hint: '나이 비는 12 : 8 = 3 : 2. 동생은 $\\frac{2}{5}$를 가집니다.',
       },
       {
         id: 'r3-2-15',
@@ -264,14 +264,14 @@ export const ratioChapter3Quizzes = {
         question: '삼각형의 세 각의 비가 1 : 2 : 3 일 때 가장 큰 각도는?',
         options: ['90도', '60도', '30도', '45도'],
         answer: '90도',
-        hint: '삼각형 내각의 합은 180도. 180 × ($\frac{3}{6}$) = 90',
+        hint: '삼각형 내각의 합은 180도. 180 × ($\\frac{3}{6}$) = 90',
       },
       {
         id: 'r3-2-18',
         question: '재료 A와 B를 3 : 7 의 비율로 섞어 200g을 만들 때 A의 양은?',
         options: ['60g', '140g', '30g', '70g'],
         answer: '60g',
-        hint: '200 × ($\frac{3}{10}$) = 60',
+        hint: '200 × ($\\frac{3}{10}$) = 60',
       },
       {
         id: 'r3-2-19',
@@ -283,8 +283,8 @@ export const ratioChapter3Quizzes = {
       {
         id: 'r3-2-20',
         question: '전체 1을 1 : 3 으로 비례배분하면?',
-        options: ['$\frac{1}{4}$, $\frac{3}{4}$', '$\frac{1}{3}$, $\frac{2}{3}$', '$\frac{1}{2}$, $\frac{1}{2}$', '0.1, 0.3'],
-        answer: '$\frac{1}{4}$, $\frac{3}{4}$',
+        options: ['$\\frac{1}{4}$, $\\frac{3}{4}$', '$\\frac{1}{3}$, $\\frac{2}{3}$', '$\\frac{1}{2}$, $\\frac{1}{2}$', '0.1, 0.3'],
+        answer: '$\\frac{1}{4}$, $\\frac{3}{4}$',
         hint: '전체 합이 4이므로 분모가 4가 됩니다.',
       },
     ]
@@ -304,7 +304,7 @@ export const ratioChapter3Quizzes = {
         question: '500원이었던 과자가 600원이 되었습니다. 증가율은?',
         options: ['20%', '10%', '100원', '0.1'],
         answer: '20%',
-        hint: '증가량은 100원. $\frac{100}{500} = 0.2$',
+        hint: '증가량은 100원. $\\frac{100}{500} = 0.2$',
       },
       {
         id: 'r3-3-3',
@@ -318,7 +318,7 @@ export const ratioChapter3Quizzes = {
         question: '원래 100원에서 250원으로 올랐다면 증가율은?',
         options: ['150%', '250%', '1.5%', '2.5'],
         answer: '150%',
-        hint: '증가량은 150원. $\frac{150}{100} = 1.5$',
+        hint: '증가량은 150원. $\\frac{150}{100} = 1.5$',
       },
       {
         id: 'r3-3-5',
@@ -332,14 +332,14 @@ export const ratioChapter3Quizzes = {
         question: '원래 300원에서 330원이 되면 증가율은?',
         options: ['10%', '30%', '1.1', '0.3'],
         answer: '10%',
-        hint: '증가량 30. $\frac{30}{300} = 0.1$',
+        hint: '증가량 30. $\\frac{30}{300} = 0.1$',
       },
       {
         id: 'r3-3-7',
         question: '원래 400원에서 500원이 되면 증가율은 몇 %입니까?',
         options: ['25%', '20%', '100%', '125%'],
         answer: '25%',
-        hint: '증가량 100. $\frac{100}{400} = \frac{1}{4}$',
+        hint: '증가량 100. $\\frac{100}{400} = \\frac{1}{4}$',
       },
       {
         id: 'r3-3-8',
@@ -381,7 +381,7 @@ export const ratioChapter3Quizzes = {
         question: '500원에서 650원으로 오르면 증가율은?',
         options: ['30%', '15%', '130%', '0.3%'],
         answer: '30%',
-        hint: '증가량 150. $\frac{150}{500} = \frac{30}{100}$',
+        hint: '증가량 150. $\\frac{150}{500} = \\frac{30}{100}$',
       },
       {
         id: 'r3-3-14',
@@ -402,7 +402,7 @@ export const ratioChapter3Quizzes = {
         question: '어떤 수가 50에서 100이 되었다면 증가율은?',
         options: ['100%', '50%', '200%', '0.5%'],
         answer: '100%',
-        hint: '증가량이 50. $\frac{50}{50} = 1$',
+        hint: '증가량이 50. $\\frac{50}{50} = 1$',
       },
       {
         id: 'r3-3-17',
@@ -423,7 +423,7 @@ export const ratioChapter3Quizzes = {
         question: '1000원이 1100원이 되었습니다. 증가율은?',
         options: ['10%', '1%', '11%', '100원'],
         answer: '10%',
-        hint: '100원 증가. $\frac{100}{1000} = 0.1$',
+        hint: '100원 증가. $\\frac{100}{1000} = 0.1$',
       },
       {
         id: 'r3-3-20',
@@ -456,7 +456,7 @@ export const ratioChapter3Quizzes = {
         question: '500원짜리 과자를 50원 깎아주었습니다. 할인율은?',
         options: ['10%', '5%', '50%', '0.01'],
         answer: '10%',
-        hint: '$\frac{50}{500} = \frac{1}{10} = 0.1$',
+        hint: '$\\frac{50}{500} = \\frac{1}{10} = 0.1$',
       },
       {
         id: 'r3-4-4',
@@ -484,14 +484,14 @@ export const ratioChapter3Quizzes = {
         question: '3000원짜리 물건을 2700원에 팔았습니다. 할인율은?',
         options: ['10%', '30%', '90%', '27%'],
         answer: '10%',
-        hint: '할인 금액은 300원. $\frac{300}{3000} = 0.1$',
+        hint: '할인 금액은 300원. $\\frac{300}{3000} = 0.1$',
       },
       {
         id: 'r3-4-8',
         question: '할인율 50%의 의미는?',
         options: ['반값에 판다', '공짜로 준다', '조금 깎아준다', '두 배로 판다'],
         answer: '반값에 판다',
-        hint: '50%는 절반($\frac{1}{2}$)입니다.',
+        hint: '50%는 절반($\\frac{1}{2}$)입니다.',
       },
       {
         id: 'r3-4-9',
@@ -505,7 +505,7 @@ export const ratioChapter3Quizzes = {
         question: '원래 600원, 변경 후 450원이면 할인율은?',
         options: ['25%', '15%', '75%', '30%'],
         answer: '25%',
-        hint: '할인액 150원. $\frac{150}{600} = \frac{1}{4}$',
+        hint: '할인액 150원. $\\frac{150}{600} = \\frac{1}{4}$',
       },
       {
         id: 'r3-4-11',
@@ -533,7 +533,7 @@ export const ratioChapter3Quizzes = {
         question: '1000원짜리 물건을 500원에 팔았습니다. 할인율은?',
         options: ['50%', '100%', '10%', '5%'],
         answer: '50%',
-        hint: '500원 할인. $\frac{500}{1000} = \frac{1}{2}$',
+        hint: '500원 할인. $\\frac{500}{1000} = \\frac{1}{2}$',
       },
       {
         id: 'r3-4-15',
@@ -547,7 +547,7 @@ export const ratioChapter3Quizzes = {
         question: '원래 200원인데 40원 할인받았습니다. 할인율은?',
         options: ['20%', '40%', '10%', '200%'],
         answer: '20%',
-        hint: '$\frac{40}{200} = \frac{20}{100}$',
+        hint: '$\\frac{40}{200} = \\frac{20}{100}$',
       },
       {
         id: 'r3-4-17',
@@ -606,15 +606,15 @@ export const ratioChapter3Quizzes = {
       {
         id: 'r3-5-4',
         question: 'Centi(센티)의 뜻은 무엇입니까?',
-        options: ['100분의 1 ($\frac{1}{100}$)', '1000분의 1', '100배', '10배'],
-        answer: '100분의 1 ($\frac{1}{100}$)',
+        options: ['100분의 1 ($\\frac{1}{100}$)', '1000분의 1', '100배', '10배'],
+        answer: '100분의 1 ($\\frac{1}{100}$)',
         hint: '1m는 100cm 입니다.',
       },
       {
         id: 'r3-5-5',
         question: 'Milli(밀리)의 뜻은 무엇입니까?',
-        options: ['1000분의 1 ($\frac{1}{1000}$)', '100분의 1', '1000배', '100배'],
-        answer: '1000분의 1 ($\frac{1}{1000}$)',
+        options: ['1000분의 1 ($\\frac{1}{1000}$)', '100분의 1', '1000배', '100배'],
+        answer: '1000분의 1 ($\\frac{1}{1000}$)',
         hint: '1m는 1000mm 입니다.',
       },
       {
@@ -629,14 +629,14 @@ export const ratioChapter3Quizzes = {
         question: '500cm를 미터로 바꾸면?',
         options: ['5m', '50m', '0.5m', '5000m'],
         answer: '5m',
-        hint: 'c는 $\frac{1}{100}$을 의미하므로 500 ÷ 100 = 5',
+        hint: 'c는 $\\frac{1}{100}$을 의미하므로 500 ÷ 100 = 5',
       },
       {
         id: 'r3-5-8',
         question: '2000mm를 미터로 바꾸면?',
         options: ['2m', '20m', '0.2m', '200m'],
         answer: '2m',
-        hint: 'm은 $\frac{1}{1000}$을 의미하므로 2000 ÷ 1000 = 2',
+        hint: 'm은 $\\frac{1}{1000}$을 의미하므로 2000 ÷ 1000 = 2',
       },
       {
         id: 'r3-5-9',
@@ -778,7 +778,7 @@ export const ratioChapter3Quizzes = {
       },
       {
         id: 'r3-6-8',
-        question: '축척이 $\frac{1}{50000}$일 때 지도상 2cm는 실제 거리 얼마?',
+        question: '축척이 $\\frac{1}{50000}$일 때 지도상 2cm는 실제 거리 얼마?',
         options: ['1km', '500m', '2km', '10km'],
         answer: '1km',
         hint: '2cm × 50000 = 100000cm = 1km',
@@ -821,7 +821,7 @@ export const ratioChapter3Quizzes = {
       {
         id: 'r3-6-14',
         question: '다음 중 축척을 표현하는 방법이 아닌 것은?',
-        options: ['1개 : 100개', '1 : 50000', '$\frac{1}{50000}$', '0 막대자 500m'],
+        options: ['1개 : 100개', '1 : 50000', '$\\frac{1}{50000}$', '0 막대자 500m'],
         answer: '1개 : 100개',
         hint: '축척은 길이의 비입니다. 개수의 비가 아닙니다.',
       },
@@ -940,7 +940,7 @@ export const ratioChapter3Quizzes = {
         question: '45분(min)은 시간(h)으로 나타내면?',
         options: ['0.75h', '0.45h', '0.5h', '0.25h'],
         answer: '0.75h',
-        hint: '$\frac{45}{60} = \frac{3}{4} = 0.75$',
+        hint: '$\\frac{45}{60} = \\frac{3}{4} = 0.75$',
       },
       {
         id: 'r3-7-11',
@@ -996,7 +996,7 @@ export const ratioChapter3Quizzes = {
         question: '0.25시간(h)은 몇 분(min)입니까?',
         options: ['15min', '25min', '20min', '30min'],
         answer: '15min',
-        hint: '60 × $\frac{1}{4}$ = 15',
+        hint: '60 × $\\frac{1}{4}$ = 15',
       },
       {
         id: 'r3-7-19',

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import '../App.css'
 import './QuizView.css'
@@ -14,6 +15,7 @@ import RegionCard from './RegionCard'
 import PerformanceToggle from './PerformanceToggle'
 
 function GameHome() {
+  const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [userData, setUserData] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -248,7 +250,12 @@ function GameHome() {
         <QuizView 
           key={selectedUnitDocId}
           region={activeRegion} 
-          quizData={{ title: activeUnit?.title || "제목 없음", questions: unitQuizzes }}
+          quizData={{ 
+            unitId: selectedUnitDocId, 
+            chapterId: selectedChapterDocId,
+            title: activeUnit?.title || "제목 없음", 
+            questions: unitQuizzes 
+          }}
           onExit={() => setSelectedUnitDocId(null)}
           onComplete={handleComplete}
         />
@@ -269,6 +276,7 @@ function GameHome() {
           <button className={`nav-item ${currentView === 'map' ? 'active' : ''}`} onClick={() => { setCurrentView('map'); setSelectedRegionId(null); setSelectedChapterDocId(null); setSelectedUnitDocId(null); }}>🗺️ 지도</button>
           <button className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentView('dashboard')}>📈 성장 기록</button>
           <button className={`nav-item ${currentView === 'ranking' ? 'active' : ''}`} onClick={() => setCurrentView('ranking')}>🏆 명예의 전당</button>
+          <button className={`nav-item ${currentView === 'agora' ? 'active' : ''}`} onClick={() => setCurrentView('agora')}>🗣️ 아고라</button>
           <div style={{ marginLeft: '1rem', display: 'flex', alignItems: 'center' }}>
             <PerformanceToggle />
           </div>

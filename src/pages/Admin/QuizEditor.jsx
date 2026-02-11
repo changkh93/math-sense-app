@@ -115,7 +115,7 @@ const QuizEditor = () => {
                 type="button" 
                 className="text-btn" 
                 style={{ fontSize: '0.8rem', padding: '2px 8px' }}
-                onClick={() => setEditingQuiz({...editingQuiz, question: editingQuiz.question + '$\\frac{}{}$'})}
+                onClick={() => setEditingQuiz({...editingQuiz, question: editingQuiz.question + '$\\\\frac{}{}$'})}
               >
                 + 분수 틀($\frac{}{}$) 넣기
               </button>

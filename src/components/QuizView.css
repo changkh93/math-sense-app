@@ -352,3 +352,28 @@
   background: none;
   color: var(--text);
 }
+
+.teacher-call-btn {
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--crystal-cyan);
+  border: none;
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+  z-index: 10;
+}
+
+.teacher-call-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 243, 255, 0.4);
+}
+

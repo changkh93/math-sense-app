@@ -1,0 +1,359 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.question-modal-content {
+  width: 90%;
+  max-width: 500px;
+  padding: 2rem;
+  border-radius: 20px;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--crystal-cyan);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 2rem;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.close-btn:hover {
+  opacity: 1;
+}
+
+.quiz-info-badge {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  display: inline-block;
+  color: var(--star-gold);
+}
+
+.section-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.type-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.category-selector .type-chip.active {
+  background: rgba(188, 19, 254, 0.2);
+  border-color: #bc13fe;
+  color: #bc13fe;
+  box-shadow: 0 0 15px rgba(188, 19, 254, 0.4);
+}
+
+.type-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.6rem 1rem;
+  border-radius: 50px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.type-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.type-chip.active {
+  background: var(--crystal-cyan);
+  border-color: var(--crystal-cyan);
+  color: #000;
+  font-weight: bold;
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+}
+
+.question-textarea {
+  width: 100%;
+  height: 150px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 1rem;
+  color: white;
+  font-size: 1rem;
+  resize: none;
+  margin-bottom: 1.5rem;
+}
+
+.question-textarea:focus {
+  outline: none;
+  border-color: var(--crystal-cyan);
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.public-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.submit-btn {
+  background: var(--crystal-cyan);
+  color: #000;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 50px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 243, 255, 0.3);
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  color: #ff4d4d;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+/* Drawing Mode Styles */
+.draw-toggle-section {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.draw-toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--text-base);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.draw-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.draw-toggle-btn.active {
+  background: var(--star-gold);
+  color: #000;
+  border-color: var(--star-gold);
+  font-weight: bold;
+}
+
+.canvas-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 1.5rem;
+  background: white; /* Canvas needs white bg */
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.clear-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.clear-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* Full Screen Drawing Mode */
+.question-modal-content.drawing-mode {
+  width: 98vw !important;
+  height: 95vh !important;
+  max-width: none !important;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+}
+
+.drawing-mode .modal-header h3 {
+  font-size: 1.2rem;
+}
+
+/* Ensure the form takes full height of the modal content */
+.drawing-mode form {
+  height: 100% !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawing-mode .canvas-container {
+  flex: 1;
+  width: 100%;
+  height: 100%; /* Important for centering */
+  margin-bottom: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1a1a2e; 
+  border-radius: 12px;
+  position: relative;
+  
+  /* User Requested Centering */
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  overflow: hidden;
+  
+  /* Affordance: Cursor */
+  cursor: crosshair;
+}
+
+/* Hide the white background on canvas parent if it leaks */
+.drawing-mode .canvas-container canvas {
+  background: transparent !important;
+}
+
+/* Color Palette Toolbar */
+.color-palette {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  padding: 8px;
+  border-radius: 50px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 30;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.color-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+  padding: 0;
+}
+
+.color-btn:hover {
+  transform: scale(1.2);
+}
+
+.color-btn.active {
+  transform: scale(1.3);
+  border-color: white;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.floating-actions {
+  position: absolute;
+  bottom: 0px; /* Stick to very bottom */
+  left: 0;
+  right: 0;
+  padding: 20px;
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  z-index: 20;
+}
+
+.action-btn {
+  padding: 0.8rem 1.5rem; /* Slightly smaller to obscure less */
+  border-radius: 50px;
+  border: none;
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.action-btn.clear {
+  background: rgba(30, 30, 40, 0.9);
+  color: #ff6b6b;
+  border: 1px solid #ff6b6b;
+}
+
+.action-btn.submit {
+  background: linear-gradient(135deg, var(--crystal-cyan), #22d3ee);
+  color: #000;
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+}
+
+.action-btn:hover {
+  transform: scale(1.05);
+}
+
+

@@ -39,7 +39,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-1-5',
         question: '“3보다 1 더 크다”를 수식으로 나타내면?',
-        options: ['$3 + 1$', '$3 - 1$', '$1 + 3$', '$3 \times 1$'],
+        options: ['$3 + 1$', '$3 - 1$', '$1 + 3$', '$3 \\times 1$'],
         answer: '$3 + 1$',
         hint: '“~보다 더 크다”는 더하기($+$)로 표현합니다.',
       },
@@ -60,14 +60,14 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-1-8',
         question: '“그리고”라는 말은 수학적으로 어떤 기호와 같나요?',
-        options: ['$+$', '$-$', '$\times$', '$\div$'],
+        options: ['$+$', '$-$', '$\\times$', '$\\div$'],
         answer: '$+$',
         hint: '교재 p14: “그리고”는 더하기($+$)의 의미를 담고 있습니다.',
       },
       {
         id: 'add-1-1-9',
         question: '“10 그리고 3”을 수식으로 나타내면?',
-        options: ['$10 + 3$', '$10 - 3$', '$3 + 10$', '$10 \times 3$'],
+        options: ['$10 + 3$', '$10 - 3$', '$3 + 10$', '$10 \\times 3$'],
         answer: '$10 + 3$',
         hint: '“그리고”는 더하기 기호로 바꿀 수 있습니다.',
       },
@@ -95,7 +95,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-1-13',
         question: '“6 플러스 3”을 수식으로 쓰면?',
-        options: ['$6 + 3$', '$3 + 6$', '$6 - 3$', '$6 \times 3$'],
+        options: ['$6 + 3$', '$3 + 6$', '$6 - 3$', '$6 \\times 3$'],
         answer: '$6 + 3$',
         hint: '플러스는 $+$ 기호를 뜻합니다.',
       },
@@ -123,7 +123,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-1-17',
         question: '“3a 그리고 2a”를 수식으로 나타내면?',
-        options: ['$3a + 2a$', '$3a - 2a$', '$2a + 3a$', '$3a \times 2a$'],
+        options: ['$3a + 2a$', '$3a - 2a$', '$2a + 3a$', '$3a \\times 2a$'],
         answer: '$3a + 2a$',
         hint: 'p20 쓰기 문제 7. 문자식에서도 “그리고”는 더하기입니다.',
       },
@@ -144,7 +144,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-1-20',
         question: '$6$보다 $3$ 더 큰 수를 구하는 식은?',
-        options: ['$6 + 3$', '$6 - 3$', '$3 + 6$', '$6 \times 3$'],
+        options: ['$6 + 3$', '$6 - 3$', '$3 + 6$', '$6 \\times 3$'],
         answer: '$6 + 3$',
         hint: 'p19 쓰기 문제 7.',
       },
@@ -191,14 +191,14 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-2-6',
         question: '“덜어 내다”라는 말은 수학적으로 어떤 기호와 같나요?',
-        options: ['$+$', '$-$', '$\times$', '$\div$'],
+        options: ['$+$', '$-$', '$\\times$', '$\\div$'],
         answer: '$-$',
         hint: '덜어 내는 것은 빼기($-$)를 의미합니다.',
       },
       {
         id: 'add-1-2-7',
         question: '“3 빼기 2”를 수식으로 나타내면?',
-        options: ['$3 - 2$', '$3 + 2$', '$2 - 3$', '$3 \times 2$'],
+        options: ['$3 - 2$', '$3 + 2$', '$2 - 3$', '$3 \\times 2$'],
         answer: '$3 - 2$',
         hint: '교재 p21 쓰기 문제 1 참고.',
       },
@@ -212,7 +212,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-2-9',
         question: '“7보다 4 더 작다”를 수식으로 나타내면?',
-        options: ['$7 - 4$', '$7 + 4$', '$4 - 7$', '$7 \times 4$'],
+        options: ['$7 - 4$', '$7 + 4$', '$4 - 7$', '$7 \\times 4$'],
         answer: '$7 - 4$',
         hint: '“~보다 더 작다”는 빼기($-$)입니다.',
       },
@@ -240,7 +240,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-2-13',
         question: '“6 마이너스 2”를 수식으로 쓰면?',
-        options: ['$6 - 2$', '$2 - 6$', '$6 + 2$', '$6 \times 2$'],
+        options: ['$6 - 2$', '$2 - 6$', '$6 + 2$', '$6 \\times 2$'],
         answer: '$6 - 2$',
         hint: '마이너스는 $-$ 기호의 영어 이름입니다.',
       },
@@ -268,7 +268,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-2-17',
         question: '주머니에 구슬 9개가 있는데 4개를 잃어버렸습니다. 남은 구슬을 구하는 식은?',
-        options: ['$9 - 4$', '$9 + 4$', '$4 + 9$', '$9 \times 4$'],
+        options: ['$9 - 4$', '$9 + 4$', '$4 + 9$', '$9 \\times 4$'],
         answer: '$9 - 4$',
         hint: '잃어버린 것은 빼기로 계산합니다.',
       },
@@ -282,7 +282,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-2-19',
         question: '“차이”를 구할 때 사용하는 연산 기호는?',
-        options: ['$+$', '$-$', '$\times$', '$\div$'],
+        options: ['$+$', '$-$', '$\\times$', '$\\div$'],
         answer: '$-$',
         hint: '두 수의 차이를 구할 때는 큰 수에서 작은 수를 뺍니다.',
       },
@@ -308,23 +308,23 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-3-2',
         question: '“6 더하기 3은 9와 같다”를 수식으로 바르게 나타낸 것은?',
-        options: ['$6 + 3 = 9$', '$6 + 3 \neq 9$', '$6 + 3 > 9$', '$6 + 3 < 9$'],
+        options: ['$6 + 3 = 9$', '$6 + 3 \\neq 9$', '$6 + 3 > 9$', '$6 + 3 < 9$'],
         answer: '$6 + 3 = 9$',
         hint: '“같다”는 $=$ 기호를 사용합니다.',
       },
       {
         id: 'add-1-3-3',
-        question: '수학 기호 $\neq$의 뜻은 무엇인가요?',
+        question: '수학 기호 $\\neq$의 뜻은 무엇인가요?',
         options: ['같지 않다', '같다', '더 크다', '더 작다'],
         answer: '같지 않다',
-        hint: '교재 p31: $=$에 선을 그은 $\neq$는 “같지 않다”를 뜻합니다.',
+        hint: '교재 p31: $=$에 선을 그은 $\\neq$는 “같지 않다”를 뜻합니다.',
       },
       {
         id: 'add-1-3-4',
         question: '“10 빼기 5는 6과 같지 않다”를 수식으로 쓰면?',
-        options: ['$10 - 5 \neq 6$', '$10 - 5 = 6$', '$10 - 5 > 6$', '$10 - 5 < 6$'],
-        answer: '$10 - 5 \neq 6$',
-        hint: '“같지 않다”는 $\neq$ 기호를 사용합니다.',
+        options: ['$10 - 5 \\neq 6$', '$10 - 5 = 6$', '$10 - 5 > 6$', '$10 - 5 < 6$'],
+        answer: '$10 - 5 \\neq 6$',
+        hint: '“같지 않다”는 $\\neq$ 기호를 사용합니다.',
       },
       {
         id: 'add-1-3-5',
@@ -350,7 +350,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-3-8',
         question: '“1 더하기 2는 작다 5보다”를 수식으로 나타내면?',
-        options: ['$1 + 2 < 5$', '$1 + 2 > 5$', '$1 + 2 = 5$', '$1 + 2 \neq 5$'],
+        options: ['$1 + 2 < 5$', '$1 + 2 > 5$', '$1 + 2 = 5$', '$1 + 2 \\neq 5$'],
         answer: '$1 + 2 < 5$',
         hint: '“작다”는 $<$ 기호를 사용합니다.',
       },
@@ -364,29 +364,29 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-3-10',
         question: '동그라미 안에 알맞은 기호는? $5 + 5$ ( ) $10$',
-        options: ['=', '$\neq$', '$>$', '$<$'],
+        options: ['=', '$\\neq$', '$>$', '$<$'],
         answer: '=',
         hint: '$5+5$는 10과 같습니다.',
       },
       {
         id: 'add-1-3-11',
         question: '동그라미 안에 알맞은 기호는? $7 - 1$ ( ) $7$',
-        options: ['<', '>', '=', '$\neq$'],
+        options: ['<', '>', '=', '$\\neq$'],
         answer: '<',
         hint: '7에서 1을 빼면 6이므로 7보다 작습니다.',
       },
       {
         id: 'add-1-3-12',
         question: '$1 + 2$ ( ) $9$ 에서 알맞은 기호는?',
-        options: ['<', '>', '=', '$\neq$'],
+        options: ['<', '>', '=', '$\\neq$'],
         answer: '<',
         hint: '3은 9보다 작습니다.',
       },
       {
         id: 'add-1-3-13',
         question: '“6은 같지 않다 3과”를 수식으로 쓰면?',
-        options: ['$6 \neq 3$', '$6 = 3$', '$6 > 3$', '$6 < 3$'],
-        answer: '$6 \neq 3$',
+        options: ['$6 \\neq 3$', '$6 = 3$', '$6 > 3$', '$6 < 3$'],
+        answer: '$6 \\neq 3$',
         hint: 'p31 쓰기 문제 1.',
       },
       {
@@ -399,7 +399,7 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-3-15',
         question: '“지구 ( ) 우주” 에 들어갈 알맞은 기호는?',
-        options: ['<', '>', '=', '$\neq$'],
+        options: ['<', '>', '=', '$\\neq$'],
         answer: '<',
         hint: '지구는 우주보다 작습니다 (p37 연습문제 6).',
       },
@@ -420,14 +420,14 @@ export const additionChapteradd_1Quizzes = {
       {
         id: 'add-1-3-18',
         question: '“7 플러스 2는 같다 9와”를 수식으로 쓰면?',
-        options: ['$7 + 2 = 9$', '$7 + 2 \neq 9$', '$7 + 2 > 9$', '$7 + 2 < 9$'],
+        options: ['$7 + 2 = 9$', '$7 + 2 \\neq 9$', '$7 + 2 > 9$', '$7 + 2 < 9$'],
         answer: '$7 + 2 = 9$',
         hint: 'p32 쓰기 문제 2.',
       },
       {
         id: 'add-1-3-19',
         question: '“8은 같다 9 빼기 1과”를 수식으로 쓰면?',
-        options: ['$8 = 9 - 1$', '$8 \neq 9 - 1$', '$8 > 9 - 1$', '$8 < 9 - 1$'],
+        options: ['$8 = 9 - 1$', '$8 \\neq 9 - 1$', '$8 > 9 - 1$', '$8 < 9 - 1$'],
         answer: '$8 = 9 - 1$',
         hint: 'p32 쓰기 문제 2.',
       },
@@ -1072,7 +1072,7 @@ export const additionChapteradd_2Quizzes = {
       {
         id: 'add-2-5-7',
         question: '$3 + 1$ ( ) $3 + 0$ 에서 알맞은 기호는?',
-        options: ['>', '<', '=', '$\neq$'],
+        options: ['>', '<', '=', '$\\neq$'],
         answer: '>',
         hint: '1을 더한 쪽이 더 큽니다.',
       },
@@ -1595,7 +1595,7 @@ export const additionChapteradd_3Quizzes = {
       {
         id: 'add-3-1-19',
         question: '“8보다 3 더 작다”를 수식으로 나타내면?',
-        options: ['$8 - 3$', '$8 + 3$', '$3 - 8$', '$8 \times 3$'],
+        options: ['$8 - 3$', '$8 + 3$', '$3 - 8$', '$8 \\times 3$'],
         answer: '$8 - 3$',
         hint: '더 작다는 것은 뺄셈을 의미합니다.',
       },

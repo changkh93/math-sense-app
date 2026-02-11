@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import 'katex/dist/katex.min.css'
 import { InlineMath } from 'react-katex'
 import StarField from './StarField'
 import { createParticleBurst, shakeScreen } from './ParticleEffects'
 import soundManager from '../../utils/SoundManager'
+import { sanitizeLaTeX } from '../../utils/latexUtils'
 import '../../styles/space-theme.css'
+import QuestionModal from '../QuestionModal'
 
 export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield }) {
   const [currentQuestions, setCurrentQuestions] = useState([])
@@ -22,12 +24,15 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [originalTotal, setOriginalTotal] = useState(0)
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 유지
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [isFirstPassPerfect, setIsFirstPassPerfect] = useState(false)
+  const initializedUnitId = useRef(null) // Prevent accidental reshuffling
   const isMobile = window.innerWidth <= 768
 
   // 초기 문제 설정
   useEffect(() => {
-    if (quizData?.questions) {
+    // Only initialize if it's a new unit or hasn't been initialized yet
+    if (quizData?.questions && initializedUnitId.current !== quizData.unitId) {
       const allQ = [...quizData.questions].map(q => ({
         ...q,
         shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
@@ -37,13 +42,16 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       setCurrentQuestions(selected)
       setAllSessionQuestions(selected)
       setOriginalTotal(selected.length)
+      initializedUnitId.current = quizData.unitId;
+      setCurrentIdx(0); // Reset index on unit change
     }
   }, [quizData])
 
 
   const formatText = (text) => {
     if (!text || typeof text !== 'string') return ""
-    const parts = text.split('$')
+    const sanitized = sanitizeLaTeX(text)
+    const parts = sanitized.split('$')
     return parts.map((part, i) => {
       if (i % 2 === 1) {
         let math = part
@@ -104,6 +112,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       
       // 다음 문제로 이동 (일반 딜레이)
       setTimeout(() => {
+        // Guard against progression while Ask Teacher modal is open
+        if (isQuestionModalOpen) return;
+
         setShowFeedback(null)
         if (currentIdx < currentQuestions.length - 1) {
           setCurrentIdx(prev => prev + 1)
@@ -139,6 +150,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       // 시스템 리부트 (3초 딜레이)
       setIsRebooting(true)
       setTimeout(() => {
+        // Guard against progression while Ask Teacher modal is open
+        if (isQuestionModalOpen) return;
+
         setIsRebooting(false)
         setShowFeedback(null)
         if (currentIdx < currentQuestions.length - 1) {
@@ -153,6 +167,23 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       ...prev,
       [currentQuestion.id]: option
     }))
+  }
+
+  const handleCloseQuestionModal = () => {
+    setIsQuestionModalOpen(false)
+    // 피드백 도중 모달을 열었을 경우, 닫힐 때 다음 문제로 이동
+    if (showFeedback) {
+      const delay = showFeedback === 'correct' ? 500 : 1500
+      setTimeout(() => {
+        setIsRebooting(false)
+        setShowFeedback(null)
+        if (currentIdx < currentQuestions.length - 1) {
+          setCurrentIdx(prev => prev + 1)
+        } else {
+          setIsResultMode(true)
+        }
+      }, delay)
+    }
   }
 
   const handleReSolveWrong = () => {
@@ -454,7 +485,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       <StarField count={100} />
       
       <div className="space-quiz-container scale-in">
-        <div className="glass-card space-quiz-card">
+        <div id="quiz-capture-area" className="glass-card space-quiz-card">
           {/* 나가기 버튼 */}
           <button 
             onClick={() => { soundManager.playClick(); onExit() }}
@@ -668,6 +699,45 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               </motion.div>
             ))}
           </AnimatePresence>
+
+          {/* 선생님 호출 버튼 */}
+          {!isResultMode && (
+            <button 
+              className="space-teacher-btn glass-card" 
+              onClick={() => setIsQuestionModalOpen(true)}
+              style={{
+                position: 'absolute',
+                bottom: '1rem',
+                right: '1rem',
+                padding: '0.8rem',
+                borderRadius: '50%',
+                width: '50px',
+                height: '50px',
+                fontSize: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                border: '1px solid rgba(0, 243, 255, 0.3)',
+                boxShadow: 'var(--glow-cyan)'
+              }}
+            >
+              🙋
+            </button>
+          )}
+
+          <QuestionModal 
+            isOpen={isQuestionModalOpen}
+            onClose={handleCloseQuestionModal}
+            quizContext={{
+              quizId: quizData?.id,
+              quizTitle: quizData?.title,
+              questionId: currentQuestion?.id,
+              chapterId: quizData?.chapterId,
+              unitId: quizData?.unitId,
+              wrongAnswer: userAnswers[currentQuestion?.id]
+            }}
+          />
         </div>
       </div>
     </div>

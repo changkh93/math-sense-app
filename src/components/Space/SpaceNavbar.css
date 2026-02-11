@@ -1,0 +1,74 @@
+.space-nav.hud-border {
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  background: rgba(5, 5, 16, 0.4);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1.2rem;
+  box-sizing: border-box;
+}
+
+.space-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-toggle-wrapper {
+  margin-left: 1rem;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-shrink: 0;
+}
+
+.crystal-counter {
+  white-space: nowrap !important;
+  min-width: max-content;
+}
+
+.agora-nav-btn {
+  /* Remove default yellow as per user request */
+  color: var(--text-muted) !important;
+}
+
+.agora-nav-btn:hover,
+.agora-nav-btn.active {
+  color: var(--star-gold) !important;
+}
+
+.agora-nav-btn.active {
+  background: rgba(255, 215, 0, 0.1) !important;
+  border-color: var(--star-gold) !important;
+}
+
+.logout-btn {
+  font-size: 0.8rem !important;
+  opacity: 0.8;
+  color: var(--text-bright) !important;
+  white-space: nowrap;
+}
+
+.logout-btn:hover {
+  opacity: 1;
+}
+
+@media (max-width: 1024px) {
+  .space-nav-links {
+    gap: 0.2rem;
+  }
+  .space-nav-link {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}

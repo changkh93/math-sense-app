@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import './QuizView.css'
 import 'katex/dist/katex.min.css'
 import { InlineMath } from 'react-katex'
 import { createParticleBurst, shakeScreen } from './Space/ParticleEffects'
 import soundManager from '../utils/SoundManager'
+import { sanitizeLaTeX } from '../utils/latexUtils'
+import QuestionModal from './QuestionModal'
 
 export default function QuizView({ region, quizData, onExit, onComplete }) {
   const [currentQuestions, setCurrentQuestions] = useState([])
@@ -20,10 +22,13 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   const [originalTotal, setOriginalTotal] = useState(0)
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 저장
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
+  const initializedUnitId = useRef(null) // Prevent accidental reshuffling
 
   // 초기 문제 데이터 설정 (20문항 랜덤 샘플링 적용)
   useEffect(() => {
-    if (quizData?.questions) {
+    // Only initialize if it's a new unit or hasn't been initialized yet
+    if (quizData?.questions && initializedUnitId.current !== quizData.unitId) {
       const allQ = [...quizData.questions].map(q => ({
         ...q,
         shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
@@ -33,13 +38,16 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       setCurrentQuestions(selected);
       setAllSessionQuestions(selected);
       setOriginalTotal(selected.length);
+      initializedUnitId.current = quizData.unitId;
+      setCurrentIdx(0); // Reset index on unit change
     }
   }, [quizData])
 
 
   const formatText = (text) => {
     if (!text || typeof text !== 'string') return "";
-    const parts = text.split('$');
+    const sanitized = sanitizeLaTeX(text);
+    const parts = sanitized.split('$');
     return parts.map((part, i) => {
       if (i % 2 === 1) {
         let math = part;
@@ -96,6 +104,9 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       }
 
       setTimeout(() => {
+        // Guard against progression while Ask Teacher modal is open
+        if (isQuestionModalOpen) return;
+        
         setShowFeedback(null)
         if (currentIdx < currentQuestions.length - 1) {
           setCurrentIdx(prev => prev + 1)
@@ -123,6 +134,9 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
 
       setIsRebooting(true)
       setTimeout(() => {
+        // Guard against progression while Ask Teacher modal is open
+        if (isQuestionModalOpen) return;
+
         setIsRebooting(false)
         setShowFeedback(null)
         if (currentIdx < currentQuestions.length - 1) {
@@ -138,6 +152,23 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       [currentQuestion.id]: option
     }))
   }
+
+  const handleCloseQuestionModal = () => {
+    setIsQuestionModalOpen(false);
+    // 피드백(정답/오답 확인) 중에 질문 모달을 열었을 경우, 모달을 닫을 때 다음 문제로 이동
+    if (showFeedback) {
+      const delay = showFeedback === 'correct' ? 500 : 1500;
+      setTimeout(() => {
+        setIsRebooting(false);
+        setShowFeedback(null);
+        if (currentIdx < currentQuestions.length - 1) {
+          setCurrentIdx(prev => prev + 1);
+        } else {
+          setIsResultMode(true);
+        }
+      }, delay);
+    }
+  };
 
   const handleReSolveWrong = () => {
     const wrongQuestions = currentQuestions.filter(q => !userAnswers[q.id]?.isCorrect).map(q => ({
@@ -379,6 +410,27 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
           </motion.div>
         ))}
       </AnimatePresence>
+
+      <button 
+        className="teacher-call-btn" 
+        onClick={() => setIsQuestionModalOpen(true)}
+        title="선생님께 질문하기"
+      >
+        🙋
+      </button>
+
+      <QuestionModal 
+        isOpen={isQuestionModalOpen}
+        onClose={handleCloseQuestionModal}
+        quizContext={{
+          quizId: quizData?.id,
+          quizTitle: quizData?.title,
+          questionId: currentQuestion?.id,
+          chapterId: quizData?.chapterId,
+          unitId: quizData?.unitId,
+          wrongAnswer: userAnswers[currentQuestion?.id]
+        }}
+      />
     </div>
   )
 }
