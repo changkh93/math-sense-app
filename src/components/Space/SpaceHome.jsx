@@ -25,6 +25,8 @@ import '../../styles/space-theme.css'
 function SpaceHome() {
   const [user, setUser] = useState(null)
   const [userData, setUserData] = useState(null)
+  const [history, setHistory] = useState([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
   const [authLoading, setAuthLoading] = useState(true)
   const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection'
   
@@ -113,69 +115,6 @@ function SpaceHome() {
     }
   }, [])
 
-  // --- Daily Snapshot Logic (Added for Daily Growth) ---
-  useEffect(() => {
-    if (!user || !userData) return
-
-    const checkDailySnapshot = async () => {
-      // Use KST (UTC+9) for daily reset to match user's local time
-      const now = new Date()
-      const kstOffset = 9 * 60 * 60 * 1000
-      const kstDate = new Date(now.getTime() + kstOffset)
-      const snapshotKey = kstDate.toISOString().split('T')[0]
-
-      if (userData.lastDailySnapshotDate !== snapshotKey || !userData.hasOwnProperty('dailyBaseline')) {
-        console.log("🌅 New day or missing baseline. Updating daily baseline in background.")
-        try {
-          const userDocRef = doc(db, 'users', user.uid)
-          const updates = {
-            dailyBaseline: userData.crystals || 0,
-            lastDailySnapshotDate: snapshotKey
-          }
-          // Initialization: If weeklyBaseline is missing, set it too
-          if (!userData.lastSnapshotDate) {
-            updates.weeklyBaseline = userData.crystals || 0;
-            updates.lastSnapshotDate = snapshotKey; // Temporary key until next Monday
-          }
-          await setDoc(userDocRef, updates, { merge: true })
-        } catch (err) {
-          console.error("Failed to update daily baseline:", err)
-        }
-      }
-    }
-
-    checkDailySnapshot()
-  }, [user, userData?.lastDailySnapshotDate])
-
-  // --- Weekly Snapshot Logic (Safe Effect) ---
-  useEffect(() => {
-    if (!user || !userData) return
-
-    const checkWeeklySnapshot = async () => {
-      const now = new Date()
-      const lastMonday = new Date(now)
-      lastMonday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
-      lastMonday.setHours(0, 0, 0, 0)
-      const snapshotKey = lastMonday.toISOString().split('T')[0]
-
-      if (userData.lastSnapshotDate !== snapshotKey) {
-        console.log("📅 New week detected. Updating weekly baseline in background.")
-        try {
-          const userDocRef = doc(db, 'users', user.uid)
-          await setDoc(userDocRef, {
-            weeklyBaseline: userData.crystals || 0,
-            lastSnapshotDate: snapshotKey
-          }, { merge: true })
-        } catch (err) {
-          console.error("Failed to update weekly baseline:", err)
-        }
-      }
-    }
-
-    checkWeeklySnapshot()
-  }, [user, userData?.lastSnapshotDate])
-  // --------------------------------------------
-
   // Interaction & UI State
   const [isBoosting, setIsBoosting] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -246,8 +185,6 @@ function SpaceHome() {
     }
   }
 
-  const [history, setHistory] = useState([])
-  const [loadingHistory, setLoadingHistory] = useState(true)
   const [completionResult, setCompletionResult] = useState(null)
 
   // Fetch history for status calculation
@@ -383,6 +320,32 @@ function SpaceHome() {
       const newTotalQuizzes = prevTotalQuizzes + 1
       const newTotalScore = prevTotalScore + score
 
+      // --- Direct Growth Counter (replaces old baseline system) ---
+      const kstNow = new Date(Date.now() + 9 * 3600000)
+      const todayKST = kstNow.toISOString().split('T')[0]
+      const mondayOffset = (kstNow.getUTCDay() + 6) % 7
+      const mondayKST = new Date(kstNow.getTime() - mondayOffset * 86400000)
+        .toISOString().split('T')[0]
+
+      const growthUpdates = {}
+      if (actualCrystalsEarned > 0) {
+        // Daily growth: reset if new day, increment if same day
+        if (userData.dailyGrowthDate === todayKST) {
+          growthUpdates.dailyGrowth = (userData.dailyGrowth || 0) + actualCrystalsEarned
+        } else {
+          growthUpdates.dailyGrowth = actualCrystalsEarned
+          growthUpdates.dailyGrowthDate = todayKST
+        }
+        // Weekly growth: reset if new week, increment if same week
+        if (userData.weeklyGrowthMonday === mondayKST) {
+          growthUpdates.weeklyGrowth = (userData.weeklyGrowth || 0) + actualCrystalsEarned
+        } else {
+          growthUpdates.weeklyGrowth = actualCrystalsEarned
+          growthUpdates.weeklyGrowthMonday = mondayKST
+        }
+      }
+      // --- End Growth Counter ---
+
       await setDoc(doc(db, 'users', user.uid), {
         crystals: newCrystals,
         totalQuizzes: newTotalQuizzes,
@@ -393,7 +356,8 @@ function SpaceHome() {
         shieldDefended: prevShieldDefended,
         dailyQuizCount: dailyQuizCount,
         lastQuizDate: today,
-        lastActive: serverTimestamp()
+        lastActive: serverTimestamp(),
+        ...growthUpdates
       }, { merge: true })
 
       await addDoc(collection(db, 'users', user.uid, 'history'), {

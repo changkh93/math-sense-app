@@ -12,9 +12,7 @@ export default function SpaceRanking({ user, userData }) {
   useEffect(() => {
     // 랭킹 모드에 따른 쿼리 설정
     // global: crystals (총 광석) 기준
-    // weekly: 이번 주 획득량 기준 (crystals - weeklyBaseline)
-    // Firestore에서 복합 계산 쿼리는 인덱스가 필요하므로, 클라이언트 측에서 처리하거나 
-    // crystals 기준 정렬 후 상위 50명 중 weekly 성장을 계산하는 방식을 사용
+    // weekly: 이번 주 획득량 기준 (weeklyGrowth 필드 직접 참조)
     
     const q = query(
       collection(db, 'users'),
@@ -24,15 +22,21 @@ export default function SpaceRanking({ user, userData }) {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log("📊 SpaceRanking: Snapshot received. Size:", snapshot.size)
+      // Calculate current KST date keys
+      const kstNow = new Date(Date.now() + 9 * 3600000)
+      const todayKey = kstNow.toISOString().split('T')[0]
+      const mondayOffset = (kstNow.getUTCDay() + 6) % 7
+      const mondayKey = new Date(kstNow.getTime() - mondayOffset * 86400000)
+        .toISOString().split('T')[0]
+
       const users = snapshot.docs.map(doc => {
-        const data = doc.data()
+        const d = doc.data()
         return {
           id: doc.id,
-          ...data,
-          // Use weeklyBaseline as fallback for dailyBaseline if missing
-          // This ensures Daily Gain <= Weekly Gain logic holds
-          dailyGain: (data.crystals || 0) - (data.dailyBaseline || data.weeklyBaseline || data.crystals || 0),
-          weeklyGain: (data.crystals || 0) - (data.weeklyBaseline || data.crystals || 0)
+          ...d,
+          // Direct growth counter reads — no baseline math needed
+          dailyGain:  d.dailyGrowthDate    === todayKey  ? (d.dailyGrowth  || 0) : 0,
+          weeklyGain: d.weeklyGrowthMonday === mondayKey  ? (d.weeklyGrowth || 0) : 0,
         }
       })
 
@@ -239,9 +243,15 @@ export default function SpaceRanking({ user, userData }) {
       {/* 격려 문구 */}
       <div style={{ marginTop: '2.5rem', marginBottom: '4rem', textAlign: 'center' }}>
         <p className="font-tech" style={{ color: 'var(--text-muted)', letterSpacing: '1px' }}>
-          {userData?.weeklyGain > 0 
-            ? `🚀 대단합니다! 이번 주에 ${userData.weeklyGain}개의 광석을 추가로 채굴했습니다.` 
-            : "🔭 새로운 탐사를 시작하여 순위를 높여보세요!"}
+          {(() => {
+            const kstNow = new Date(Date.now() + 9 * 3600000)
+            const mondayOffset = (kstNow.getUTCDay() + 6) % 7
+            const mondayKey = new Date(kstNow.getTime() - mondayOffset * 86400000).toISOString().split('T')[0]
+            const myWeeklyGrowth = userData?.weeklyGrowthMonday === mondayKey ? (userData?.weeklyGrowth || 0) : 0
+            return myWeeklyGrowth > 0
+              ? `🚀 대단합니다! 이번 주에 ${myWeeklyGrowth}개의 광석을 추가로 채굴했습니다.`
+              : "🔭 새로운 탐사를 시작하여 순위를 높여보세요!"
+          })()}
         </p>
       </div>
     </motion.div>
