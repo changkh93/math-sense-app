@@ -22,6 +22,7 @@ import { useParticles, createParticleBurst } from './ParticleEffects'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
+import PerformanceToggle from '../PerformanceToggle'
 
 // Styles
 import '../../styles/space-theme.css'
