@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRegions, useChapters, useUnits, useQuizzes, useAdminMutations } from '../../hooks/useContent';
-import { Trash2, AlertTriangle, RefreshCw, Eye, Ghost, Search } from 'lucide-react';
+import { Trash2, AlertTriangle, RefreshCw, Eye, Ghost, Search, Globe, ShieldAlert } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const GhostCleaner = () => {
   const { data: regions, isLoading: loadingRegions } = useRegions();
@@ -15,10 +17,16 @@ const GhostCleaner = () => {
   const { deleteQuiz } = useAdminMutations();
   const [inspectQuiz, setInspectQuiz] = useState(null);
 
+  // Global Scan State
+  const [isGlobalMode, setIsGlobalMode] = useState(false);
+  const [globalQuizzes, setGlobalQuizzes] = useState([]);
+  const [scanning, setScanning] = useState(false);
+  const [scanStats, setScanStats] = useState({ total: 0, orphans: 0, suspicious: 0 });
+
   // Clear children selection when parent changes
   useEffect(() => setSelectedChapter(null), [selectedRegion]);
   useEffect(() => setSelectedUnit(null), [selectedChapter]);
-  useEffect(() => setInspectQuiz(null), [selectedUnit]);
+  // useEffect(() => setInspectQuiz(null), [selectedUnit]); // Removed to allow inspection in global mode
 
   const handleDelete = (quizId) => {
     if (confirm('Are you sure you want to delete this quiz? This action cannot be undone.')) {
@@ -26,9 +34,76 @@ const GhostCleaner = () => {
         onSuccess: () => {
           setInspectQuiz(null);
           // Auto-refetch is handled by hook invalidation, but we can force it
-          refetch();
+          if (isGlobalMode) {
+             setGlobalQuizzes(prev => prev.filter(q => q.docId !== quizId));
+          } else {
+             refetch();
+          }
         }
       });
+    }
+  };
+
+  const runGlobalScan = async () => {
+    setScanning(true);
+    setGlobalQuizzes([]);
+    setInspectQuiz(null);
+    try {
+      // 1. Fetch ALL Units to build a valid ID set
+      const unitsSnap = await getDocs(collection(db, 'units'));
+      const validUnitIds = new Set(unitsSnap.docs.map(d => d.id));
+      console.log(`[SCAN] Found ${validUnitIds.size} valid units.`);
+
+      // 2. Fetch ALL Quizzes (This might be heavy, but it's an admin tool)
+      // Note: In a massive DB, this should be paginated or done via a cloud function.
+      const quizzesSnap = await getDocs(collection(db, 'quizzes'));
+      console.log(`[SCAN] Found ${quizzesSnap.size} total quizzes.`);
+
+      const orphans = [];
+      let suspiciousCount = 0;
+
+      quizzesSnap.forEach(doc => {
+        const data = doc.data();
+        const quiz = { ...data, docId: doc.id };
+        let isOrphan = false;
+        let reasons = [];
+
+        // Check 1: Missing unitId
+        if (!quiz.unitId) {
+          isOrphan = true;
+          reasons.push('Missing unitId');
+        } 
+        // Check 2: Invalid unitId
+        else if (!validUnitIds.has(quiz.unitId)) {
+          isOrphan = true;
+          reasons.push(`Invalid unitId: ${quiz.unitId}`);
+        }
+
+        // Check 3: Suspicious Content (Specific user report)
+        if (quiz.question && quiz.question.includes('비를 우리말로 읽어주세요')) {
+          // Even if it has a valid unit, flag it if it's the specific reported one
+          isOrphan = true; 
+          reasons.push('REPORTED SUSPICIOUS CONTENT');
+          suspiciousCount++;
+        }
+
+        if (isOrphan) {
+          orphans.push({ ...quiz, ghostReasons: reasons });
+        }
+      });
+
+      setGlobalQuizzes(orphans);
+      setScanStats({ 
+        total: quizzesSnap.size, 
+        orphans: orphans.length, 
+        suspicious: suspiciousCount 
+      });
+
+    } catch (err) {
+      console.error("Global scan failed:", err);
+      alert("Scan failed. Check console for details.");
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -38,75 +113,109 @@ const GhostCleaner = () => {
         <div className="flex items-center gap-3 mb-2">
           <Ghost size={32} className="text-purple-400" />
           <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Ghost Cleaner
+            Ghost Cleaner & Scanner
           </h1>
         </div>
         <p className="text-gray-400">
           Identify and remove orphaned quiz documents from Firestore. 
-          Use this to fix "joke" questions or white screen issues caused by old data.
+          Use "Global Scan" to find quizzes with missing or invalid unit linkages.
         </p>
       </header>
 
-      <div className="filters glass p-6 rounded-xl mb-8 flex gap-4 flex-wrap">
-        <select 
-          className="bg-black/40 border border-white/20 rounded px-4 py-2 text-white min-w-[200px]"
-          value={selectedRegion || ''}
-          onChange={(e) => setSelectedRegion(e.target.value || null)}
+      <div className="filters glass p-6 rounded-xl mb-8 flex gap-4 flex-wrap items-center">
+        {/* Mode Toggle */}
+        <button
+          onClick={() => { setIsGlobalMode(!isGlobalMode); setInspectQuiz(null); }}
+          className={`flex items-center gap-2 px-4 py-2 rounded transition-colors border ${
+            isGlobalMode 
+              ? 'bg-purple-600 border-purple-400 text-white' 
+              : 'bg-black/40 border-white/20 text-gray-400 hover:text-white'
+          }`}
         >
-          <option value="">Select Region</option>
-          {regions?.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
-        </select>
-
-        <select 
-          className="bg-black/40 border border-white/20 rounded px-4 py-2 text-white min-w-[200px]"
-          value={selectedChapter || ''}
-          onChange={(e) => setSelectedChapter(e.target.value || null)}
-          disabled={!selectedRegion}
-        >
-          <option value="">Select Chapter</option>
-          {chapters?.map(c => <option key={c.docId} value={c.docId}>{c.title}</option>)}
-        </select>
-
-        <select 
-          className="bg-black/40 border border-white/20 rounded px-4 py-2 text-white min-w-[200px]"
-          value={selectedUnit || ''}
-          onChange={(e) => setSelectedUnit(e.target.value || null)}
-          disabled={!selectedChapter}
-        >
-          <option value="">Select Unit</option>
-          {units?.map(u => <option key={u.docId} value={u.docId}>{u.title}</option>)}
-        </select>
-
-        <button 
-          onClick={() => refetch()} 
-          className="ml-auto flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded text-white transition-colors"
-          title="Refresh List"
-          disabled={!selectedUnit}
-        >
-          <RefreshCw size={18} /> Refresh
+          <Globe size={18} /> {isGlobalMode ? 'Global Scan Mode' : 'Unit Browser Mode'}
         </button>
+
+        {!isGlobalMode ? (
+          <>
+            <div className="h-8 w-px bg-white/10 mx-2"></div>
+            <select 
+              className="bg-black/40 border border-white/20 rounded px-4 py-2 text-white min-w-[200px]"
+              value={selectedRegion || ''}
+              onChange={(e) => setSelectedRegion(e.target.value || null)}
+            >
+              <option value="">Select Region</option>
+              {regions?.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
+            </select>
+
+            <select 
+              className="bg-black/40 border border-white/20 rounded px-4 py-2 text-white min-w-[200px]"
+              value={selectedChapter || ''}
+              onChange={(e) => setSelectedChapter(e.target.value || null)}
+              disabled={!selectedRegion}
+            >
+              <option value="">Select Chapter</option>
+              {chapters?.map(c => <option key={c.docId} value={c.docId}>{c.title}</option>)}
+            </select>
+
+            <select 
+              className="bg-black/40 border border-white/20 rounded px-4 py-2 text-white min-w-[200px]"
+              value={selectedUnit || ''}
+              onChange={(e) => setSelectedUnit(e.target.value || null)}
+              disabled={!selectedChapter}
+            >
+              <option value="">Select Unit</option>
+              {units?.map(u => <option key={u.docId} value={u.docId}>{u.title}</option>)}
+            </select>
+
+            <button 
+              onClick={() => refetch()} 
+              className="ml-auto flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded text-white transition-colors"
+              title="Refresh List"
+              disabled={!selectedUnit}
+            >
+              <RefreshCw size={18} /> Refresh
+            </button>
+          </>
+        ) : (
+          <div className="flex items-center gap-4 ml-4 flex-1">
+             <button 
+              onClick={runGlobalScan}
+              disabled={scanning}
+              className="flex items-center gap-2 px-6 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/30 rounded transition-colors"
+            >
+              {scanning ? <RefreshCw className="animate-spin" size={18} /> : <ShieldAlert size={18} />}
+              {scanning ? 'Scanning Database...' : 'Run Global Orphan Scan'}
+            </button>
+            {scanStats.total > 0 && (
+              <span className="text-sm text-gray-400">
+                Scanned {scanStats.total} docs. Found <strong className="text-red-400">{scanStats.orphans} orphans</strong>.
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {!selectedUnit ? (
-        <div className="text-center py-20 text-gray-500 glass rounded-xl">
-          <Search size={48} className="mx-auto mb-4 opacity-50" />
-          <p className="text-xl">Please select a unit to inspect quizzes.</p>
-        </div>
-      ) : loadingQuizzes ? (
-        <div className="text-center py-20 text-gray-400">Loading Firestore Data...</div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* List Column */}
           <div className="glass rounded-xl overflow-hidden flex flex-col h-[700px]">
              <div className="p-4 bg-white/5 border-b border-white/10 flex justify-between items-center">
-               <h2 className="font-bold text-lg">Quizzes in Firestore ({quizzes?.length || 0})</h2>
-               <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-300 rounded">Live Data</span>
+               <h2 className="font-bold text-lg">
+                 {isGlobalMode ? `Scanned Orphans (${globalQuizzes.length})` : `Quizzes in Unit (${quizzes?.length || 0})`}
+               </h2>
+               <span className={`text-xs px-2 py-1 rounded ${isGlobalMode ? 'bg-red-500/20 text-red-300' : 'bg-purple-500/20 text-purple-300'}`}>
+                 {isGlobalMode ? 'Global Scan Results' : 'Live Unit Data'}
+               </span>
              </div>
+             
              <div className="overflow-y-auto flex-1 p-2 space-y-2">
-               {quizzes?.length === 0 ? (
-                 <div className="text-center py-10 text-gray-500">No quizzes found in this unit.</div>
+               {(isGlobalMode ? globalQuizzes : quizzes)?.length === 0 ? (
+                 <div className="text-center py-10 text-gray-500">
+                   {isGlobalMode 
+                     ? (scanning ? "Scanning..." : "No orphans found (Run Scan to check)") 
+                     : "No quizzes found in this unit."}
+                 </div>
                ) : (
-                 quizzes?.map((quiz, idx) => (
+                 (isGlobalMode ? globalQuizzes : quizzes)?.map((quiz, idx) => (
                    <div 
                      key={quiz.docId}
                      onClick={() => setInspectQuiz(quiz)}
@@ -122,8 +231,19 @@ const GhostCleaner = () => {
                      </div>
                      <p className="text-sm font-medium line-clamp-2">{quiz.question || "(No Question Text)"}</p>
                      
-                     {/* Heuristic for Ghost Detection: Weird ID or mismatch order? */}
-                     {(!quiz.question || !quiz.options) && (
+                     {/* Reasons in Global Mode */}
+                     {isGlobalMode && quiz.ghostReasons && (
+                       <div className="mt-2 flex flex-wrap gap-1">
+                         {quiz.ghostReasons.map((r, i) => (
+                           <span key={i} className="text-[10px] px-1 bg-red-500/20 text-red-300 border border-red-500/30 rounded">
+                             {r}
+                           </span>
+                         ))}
+                       </div>
+                     )}
+
+                     {/* Heuristic for Ghost Detection in Normal Mode */}
+                     {!isGlobalMode && (!quiz.question || !quiz.options) && (
                        <div className="flex items-center gap-1 text-red-400 text-xs mt-2">
                          <AlertTriangle size={12} /> Malformed Data
                        </div>
@@ -145,7 +265,9 @@ const GhostCleaner = () => {
               <div className="space-y-6">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-xl font-bold text-white mb-1">Quiz Inspector</h3>
+                    <h3 className="text-xl font-bold text-white mb-1">
+                      {isGlobalMode ? 'Orphan Inspector' : 'Quiz Inspector'}
+                    </h3>
                     <p className="font-mono text-sm text-purple-300">{inspectQuiz.docId}</p>
                   </div>
                   <button 
@@ -155,6 +277,15 @@ const GhostCleaner = () => {
                     <Trash2 size={18} /> Delete Document
                   </button>
                 </div>
+
+                {isGlobalMode && inspectQuiz.ghostReasons && (
+                   <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-lg">
+                      <span className="text-xs uppercase text-red-400 font-bold block mb-2">Why is this a ghost?</span>
+                      <ul className="list-disc list-inside text-sm text-red-200">
+                        {inspectQuiz.ghostReasons.map((r, i) => <li key={i}>{r}</li>)}
+                      </ul>
+                   </div>
+                )}
 
                 <div className="bg-black/30 p-4 rounded-lg">
                   <span className="text-xs uppercase text-gray-500 font-bold block mb-2">Question Text</span>
@@ -202,7 +333,6 @@ const GhostCleaner = () => {
             )}
           </div>
         </div>
-      )}
     </div>
   );
 };
