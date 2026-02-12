@@ -445,3 +445,82 @@
     word-break: break-word;
   }
 }
+/* ========================================
+   🌀 Warp Drive & Hyper-Jump Effects
+   ======================================== */
+.warp-drive-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 243, 255, 0.4) 0%, #050510 80%);
+  z-index: 100;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.warp-star-field {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  background-image: 
+    radial-gradient(1px 1px at 25% 25%, white 100%, transparent),
+    radial-gradient(1px 1px at 50% 50%, white 100%, transparent),
+    radial-gradient(1px 1px at 75% 75%, white 100%, transparent),
+    radial-gradient(2px 2px at 15% 85%, var(--neon-blue) 100%, transparent),
+    radial-gradient(2px 2px at 85% 15%, var(--neon-purple) 100%, transparent);
+  background-size: 300px 300px;
+  animation: warp-stars 0.8s ease-in forwards;
+}
+
+@keyframes warp-stars {
+  0% { transform: scale(1) translate(0, 0); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: scale(5) translate(-10%, -10%); opacity: 0; }
+}
+
+.warp-tunnel-lines {
+  position: absolute;
+  inset: 0;
+  background: repeating-radial-gradient(
+    circle at center,
+    transparent 0,
+    transparent 40px,
+    rgba(0, 243, 255, 0.1) 41px,
+    rgba(0, 243, 255, 0.1) 42px
+  );
+  animation: warp-tunnel 0.8s ease-out forwards;
+}
+
+@keyframes warp-tunnel {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+/* Glitch Effect for Contents */
+.glitch-warp {
+  animation: glitch-anim 0.4s step-end infinite;
+}
+
+@keyframes glitch-anim {
+  0% { transform: translate(0); filter: hue-rotate(0deg); }
+  20% { transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
+  40% { transform: translate(2px, -2px); filter: hue-rotate(180deg); }
+  60% { transform: translate(-2px, -2px); filter: hue-rotate(270deg); }
+  80% { transform: translate(2px, 2px); filter: hue-rotate(360deg); }
+  100% { transform: translate(0); }
+}
+
+.scanline-warp {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 50%,
+    rgba(0, 243, 255, 0.1) 50%
+  );
+  background-size: 100% 4px;
+  z-index: 101;
+  pointer-events: none;
+}

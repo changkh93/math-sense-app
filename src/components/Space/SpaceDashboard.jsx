@@ -154,7 +154,7 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
   const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: height + 20, overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '100%', height: height + 20, overflow: 'hidden' }} className={isWarping ? 'glitch-warp' : ''}>
       <AnimatePresence mode="wait">
         <motion.div
           key={windowIndex}
@@ -276,12 +276,19 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            style={{
-              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-              background: 'white', zIndex: 10,
-              mixBlendMode: 'overlay'
-            }}
-          />
+            className="warp-drive-overlay"
+          >
+            <div className="warp-star-field" />
+            <div className="warp-tunnel-lines" />
+            <div className="scanline-warp" />
+            <motion.div 
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1.2, opacity: 1 }}
+              style={{ color: 'var(--neon-blue)', fontSize: '2rem', fontWeight: 900, zIndex: 102, textShadow: '0 0 20px var(--neon-blue)' }}
+            >
+              WARP DRIVE
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
