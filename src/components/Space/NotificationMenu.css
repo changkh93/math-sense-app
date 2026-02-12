@@ -6,9 +6,8 @@
 }
 
 .notification-bell-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
+  background: transparent;
+  border: none;
   width: 40px;
   height: 40px;
   display: flex;
@@ -143,6 +142,18 @@
 .notif-time {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.5);
+}
+
+/* Ensure SVG is visible and sized correctly */
+.notification-bell-btn svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+  stroke: white;
+  min-width: 24px;
+  min-height: 24px;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .unread-dot {

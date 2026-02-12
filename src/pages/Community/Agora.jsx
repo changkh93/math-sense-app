@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X } from 'lucide-react';
 import { usePublicQuestions, useQAMutations } from '../../hooks/useQA';
@@ -15,7 +15,11 @@ import './Agora.css';
 export default function Agora() {
   const navigate = useNavigate();
   const { userData } = useAuth();
-  const [filter, setFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilter = searchParams.get('filter') || 'all';
+  const highlightId = searchParams.get('highlight');
+  
+  const [filter, setFilter] = useState(initialFilter);
   // const [category, setCategory] = useState('all');
   const [viewMode, setViewMode] = useState('grid'); // Default to 'grid' (LIST)
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,6 +28,21 @@ export default function Agora() {
   // Apply filters
   const { data: allQuestions, isLoading, isError, error } = usePublicQuestions(filter);
   const { upvote } = useQAMutations();
+
+  // Scroll to highlighted item when data loads
+  React.useEffect(() => {
+    if (highlightId && allQuestions && !isLoading) {
+      setTimeout(() => {
+        const el = document.getElementById(`question-${highlightId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 500); // Wait for animation
+    }
+  }, [highlightId, allQuestions, isLoading]);
+
+  // Ticker needs global questions regardless of current filter
+  const { data: tickerQuestions } = usePublicQuestions('all');
 
   const questions = React.useMemo(() => {
     if (!allQuestions) return [];
@@ -36,9 +55,21 @@ export default function Agora() {
         q.quizContext?.quizTitle?.toLowerCase().includes(term)
       );
     }
+
+    // If highlighting, move that item to top? 
+    // User requested "Pinning".
+    if (highlightId) {
+      const targetIdx = filtered.findIndex(q => q.id === highlightId);
+      if (targetIdx > -1) {
+        const target = filtered[targetIdx];
+        const others = [...filtered];
+        others.splice(targetIdx, 1);
+        filtered = [target, ...others];
+      }
+    }
     
     return filtered;
-  }, [allQuestions, searchTerm]);
+  }, [allQuestions, searchTerm, highlightId]);
 
   const filters = [
     { id: 'all', label: '전체 질문', icon: '🌌' },
@@ -60,7 +91,7 @@ export default function Agora() {
       
       <div className="agora-content-wrapper">
         <header className="agora-header">
-          <AgoraLiveTicker questions={questions} />
+          <AgoraLiveTicker questions={tickerQuestions || []} />
           <div className="agora-title">
             <h1 className="gradient-text">수학 아고라</h1>
             <p className="font-tech subtitle">궁금한 개념이나 키워드를 별에서 찾아 탐험해보세요!</p>
@@ -130,20 +161,23 @@ export default function Agora() {
               {questions.map((q, idx) => (
                 <motion.div
                   key={q.id}
+                  id={`question-${q.id}`}
                   layout
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="question-card glass"
+                  className={`question-card glass ${highlightId === q.id ? 'highlight-glow' : ''}`}
                   onClick={() => navigate(`/agora/${q.id}`)}
                 >
                   <div className="card-header">
                     <span className={`type-badge type-${q.type || 'other'}`}>
-                      {q.type === 'quiz' ? '📝 문제' : q.type === 'concept' ? '💡 개념' : '💬 기타'}
+                      {q.type === 'quiz' 
+                        ? (q.quizId || q.quizContext?.questionId || '📝 문제') 
+                        : (q.type === 'concept' ? '💡 개념' : '💬 기타')}
                     </span>
                     <span className={`status-badge status-${q.status}`}>
-                      {q.status === 'open' ? '대기중' : q.status === 'answered' ? '답변완료' : '해결됨'}
+                      {q.status === 'open' ? '대기중' : '해결됨'}
                     </span>
                   </div>
 

@@ -35,10 +35,12 @@ export function usePublicQuestions(filter = 'all') {
         if (filter === 'my') {
           data = data.filter(item => item.userId === auth.currentUser?.uid);
         } else if (filter === 'unanswered') {
-          // Both 'open' and 'answered' are considered "Waiting" until resolved
-          data = data.filter(item => item.status === 'open' || item.status === 'answered');
+          // Only 'open' is considered "Waiting". 'Answered' is now "Solved".
+          data = data.filter(item => item.status === 'open');
         } else if (filter === 'solved') {
-          data = data.filter(item => item.status === 'resolved');
+          // Include both 'resolved' (completely closed) and 'answered' (has answer but not closed yet)
+          // The user requested '해결됨' tab to show answered questions.
+          data = data.filter(item => item.status === 'resolved' || item.status === 'answered');
         }
 
         return data;

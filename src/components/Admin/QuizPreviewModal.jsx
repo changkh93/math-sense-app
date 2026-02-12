@@ -6,17 +6,18 @@ import { sanitizeLaTeX } from '../../utils/latexUtils';
 import { useQuizzes } from '../../hooks/useContent';
 import 'katex/dist/katex.min.css';
 
+import ReactDOM from 'react-dom';
+
 export default function QuizPreviewModal({ isOpen, onClose, unitId, quizId }) {
   const { data: quizzes, isLoading: loadingQuizzes } = useQuizzes(unitId);
   
-  console.log(`[DEBUG] Preview Modal - UnitId: ${unitId}, QuizId: ${quizId}`);
-  console.log(`[DEBUG] Loaded ${quizzes?.length || 0} quizzes for this unit.`);
+  // console.log(`[DEBUG] Preview Modal - UnitId: ${unitId}, QuizId: ${quizId}`);
 
   const quiz = quizzes?.find(q => q.id === quizId || q.docId === quizId);
 
   if (!isOpen) return null;
 
-  return (
+  return ReactDOM.createPortal(
     <AnimatePresence>
       <motion.div 
         className="modal-overlay"
@@ -24,7 +25,7 @@ export default function QuizPreviewModal({ isOpen, onClose, unitId, quizId }) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        style={{ zIndex: 1000 }}
+        style={{ zIndex: 9999, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
       >
         <motion.div 
           className="quiz-preview-modal glass"
@@ -92,6 +93,7 @@ export default function QuizPreviewModal({ isOpen, onClose, unitId, quizId }) {
           )}
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

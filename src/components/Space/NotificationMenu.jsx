@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
-import { Bell } from 'lucide-react';
+import { Bell } from 'lucide-react'; // Keep import if used elsewhere or remove if not. Actually I will replace usage.
 import './NotificationMenu.css';
 
 export default function NotificationMenu() {
@@ -54,7 +54,13 @@ export default function NotificationMenu() {
 
     // Deep Link Navigation
     if (notification.link) {
-      navigate(notification.link);
+      if (notification.link.match(/^\/agora\/[^/]+$/)) {
+         // Convert /agora/ID to /agora?highlight=ID to show in list view
+         const id = notification.link.split('/').pop();
+         navigate(`/agora?highlight=${id}&filter=my`); // Assuming it's usually 'my' question
+      } else {
+         navigate(notification.link);
+      }
     }
     setIsOpen(false);
   };
@@ -66,7 +72,20 @@ export default function NotificationMenu() {
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Notifications"
       >
-        <Bell size={20} color="white" />
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          width="24" 
+          height="24" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="white" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+        >
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
         {unreadCount > 0 && (
           <span className="notification-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
         )}
@@ -75,7 +94,23 @@ export default function NotificationMenu() {
       {isOpen && (
         <div className="notification-dropdown glass">
           <div className="notification-header">
-            <h4>알림 센터</h4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="var(--crystal-cyan)" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              </svg>
+              <h4>알림 센터</h4>
+            </div>
             {unreadCount > 0 && (
               <button 
                 className="mark-all-read-btn"

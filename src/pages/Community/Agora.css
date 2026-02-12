@@ -297,6 +297,18 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
 }
 
+@keyframes highlight-pulse {
+  0% { box-shadow: 0 0 0 rgba(173, 255, 47, 0); border-color: rgba(173, 255, 47, 0); }
+  50% { box-shadow: 0 0 20px rgba(173, 255, 47, 0.6); border-color: #adff2f; }
+  100% { box-shadow: 0 0 10px rgba(173, 255, 47, 0.3); border-color: rgba(173, 255, 47, 0.5); }
+}
+
+.question-card.highlight-glow {
+  animation: highlight-pulse 2s ease-in-out infinite;
+  border-color: #adff2f;
+  background: rgba(173, 255, 47, 0.05);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;

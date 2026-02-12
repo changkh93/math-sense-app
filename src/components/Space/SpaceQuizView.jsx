@@ -734,11 +734,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             isOpen={isQuestionModalOpen}
             onClose={handleCloseQuestionModal}
             quizContext={{
-              quizId: quizData?.id,
+              quizId: currentQuestion?.id, // This is the specific 1-1-15 ID
+              unitId: quizData?.unitId || quizData?.id,
               quizTitle: quizData?.title,
               questionId: currentQuestion?.id,
               chapterId: quizData?.chapterId,
-              unitId: quizData?.unitId,
               wrongAnswer: userAnswers[currentQuestion?.id]
             }}
           />
