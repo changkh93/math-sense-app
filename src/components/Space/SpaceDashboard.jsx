@@ -578,6 +578,7 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions }
         ) : (
           <div className="exploration-stage">
             <TrajectoryChart 
+              key={`${navState.level}-${navState.regionId || 'all'}-${windowIndex}`}
               data={windowedData} 
               onItemClick={onQuizSelect} 
               colorScale={colorScale} 
