@@ -37,11 +37,32 @@ const quizDataMapping = {
   'add_chap3': additionData.additionChapteradd_3Quizzes,
 };
 
-export const seedFirestore = async (targetRegionId = null) => {
+export const seedFirestore = async (targetRegionId = null, fullPurge = false) => {
   if (targetRegionId) {
     console.log(`[SEED] Starting Seeding Process for Region: ${targetRegionId}...`);
   } else {
     console.log("[SEED] Starting Seeding Process for ALL Regions...");
+  }
+
+  if (fullPurge) {
+    console.log("[SEED] FULL PURGE MODE ENABLED. Wiping 'quizzes' collection...");
+    const qSnapshot = await getDocs(collection(db, 'quizzes'));
+    const totalQuizzes = qSnapshot.size;
+    
+    // Process in batches of 500
+    let deletedCount = 0;
+    const batchSize = 500;
+    const docs = qSnapshot.docs;
+    
+    for (let i = 0; i < docs.length; i += batchSize) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(i, i + batchSize);
+      chunk.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      deletedCount += chunk.length;
+      console.log(`[SEED] Purged ${deletedCount}/${totalQuizzes} quizzes...`);
+    }
+    console.log("[SEED] Full purge complete.");
   }
   
   let totalDocsCreated = 0;

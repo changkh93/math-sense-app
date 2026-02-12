@@ -9,7 +9,8 @@ import {
   setDoc, 
   deleteDoc, 
   writeBatch,
-  getDoc
+  getDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -84,12 +85,11 @@ export function useQuizzes(unitId) {
     queryKey: ['quizzes', unitId],
     queryFn: async () => {
       if (!unitId) return [];
-      console.log(`[DEBUG] Fetching quizzes for unit: ${unitId}`);
+      console.log(`[DEBUG] Fetching quizzes for unit: ${unitId} (FROM SERVER)`);
       try {
         const q = query(
           collection(db, 'quizzes'), 
           where('unitId', '==', unitId)
-          // orderBy('order', 'asc')
         );
         const snap = await getDocs(q);
         console.log(`[DEBUG] Found ${snap.size} quizzes for unit: ${unitId}`);
@@ -100,7 +100,9 @@ export function useQuizzes(unitId) {
         throw err;
       }
     },
-    enabled: !!unitId
+    enabled: !!unitId,
+    staleTime: 1000 * 60 * 30, // 30 minutes of strong caching
+    gcTime: 1000 * 60 * 60, // 1 hour garbage collection
   });
 }
 
@@ -173,7 +175,11 @@ export function useAdminMutations() {
     saveUnit: useMutation({
       mutationFn: async (data) => {
         const id = data.docId || `${data.chapterId}_${data.id || Date.now()}`;
-        await setDoc(doc(db, 'units', id), { ...data, docId: id }, { merge: true });
+        await setDoc(doc(db, 'units', id), { 
+          ...data, 
+          docId: id,
+          lastUpdated: serverTimestamp() 
+        }, { merge: true });
       },
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['units'] })
     }),
@@ -203,28 +209,45 @@ export function useAdminMutations() {
     saveQuiz: useMutation({
       mutationFn: async (quizData) => {
         const id = quizData.id || `q_${Date.now()}`;
-        await setDoc(doc(db, 'quizzes', id), { ...quizData, id }, { merge: true });
+        const batch = writeBatch(db);
+        
+        // 1. Save the quiz
+        batch.set(doc(db, 'quizzes', id), { ...quizData, id }, { merge: true });
+        
+        // 2. Bump the parent unit's timestamp to signal update
+        if (quizData.unitId) {
+          batch.update(doc(db, 'units', quizData.unitId), {
+            lastUpdated: serverTimestamp()
+          });
+        }
+        
+        await batch.commit();
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['quizzes', variables.unitId] });
       }
     }),
     deleteQuiz: useMutation({
-      mutationFn: async (quizId) => {
-        // First get the quiz to find the imageUrl
+      mutationFn: async ({ quizId, unitId }) => {
         const quizDoc = await getDoc(doc(db, 'quizzes', quizId));
         const quizData = quizDoc.data();
         
+        const batch = writeBatch(db);
+
         if (quizData?.imageUrl) {
-          try {
-            const imageRef = ref(storage, quizData.imageUrl);
-            await deleteObject(imageRef);
-          } catch (err) {
-            console.error("Storage deletion failed during quiz delete", err);
-            // We continue deleting the doc even if image deletion fails
-          }
+          try { await deleteObject(ref(storage, quizData.imageUrl)); } catch (err) {}
         }
-        await deleteDoc(doc(db, 'quizzes', quizId));
+        
+        batch.delete(doc(db, 'quizzes', quizId));
+        
+        // Bump timestamp
+        if (unitId) {
+          batch.update(doc(db, 'units', unitId), {
+            lastUpdated: serverTimestamp()
+          });
+        }
+
+        await batch.commit();
       },
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['quizzes'] })
     })

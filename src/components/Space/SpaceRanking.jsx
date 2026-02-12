@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useRegions, useChapters, useUnits, useGrowth, useAuth } from '../../hooks/useContent'
-import { Trophy, Medal, Star, Target, Info, ShieldAlert } from 'lucide-react'
+import { useAuth } from '../../hooks/useAuth'
+import { Trophy, Medal, Star, Target, Info, ShieldAlert, Zap, CircleHelp } from 'lucide-react'
 import { db } from '../../firebase'
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
 import './SpaceRanking.css'
@@ -182,7 +182,7 @@ export default function SpaceRanking({ user, userData }) {
               </div>
               
               <div className="guide-footer-note glass">
-                <HelpCircle size={16} />
+                <CircleHelp size={16} />
                 <span>동일 단원 반복 시 <strong>최고 기록(Best)</strong>보다 높은 성적을 거둘 때만 광석이 추가 채굴됩니다.</span>
               </div>
             </motion.div>

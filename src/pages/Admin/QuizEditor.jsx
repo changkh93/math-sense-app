@@ -251,7 +251,7 @@ const QuizEditor = () => {
               <div className="node-actions">
                 <button className="icon-btn edit-btn" onClick={() => handleEdit(q)}><Edit3 size={18} /></button>
                 <button className="icon-btn delete-btn" onClick={() => {
-                  if (confirm('Delete this quiz?')) deleteQuiz.mutate(q.id);
+                  if (confirm('Delete this quiz?')) deleteQuiz.mutate({ quizId: q.id, unitId });
                 }}><Trash2 size={18} /></button>
               </div>
             </div>

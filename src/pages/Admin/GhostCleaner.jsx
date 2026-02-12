@@ -38,6 +38,36 @@ const quizDataMapping = {
   'add_chap3': additionData.additionChapteradd_3Quizzes,
 };
 
+// --- BUILD REGISTRY MAPS ---
+const whitelistChapters = new Set();
+const whitelistUnits = new Set();
+const whitelistQuizzes = new Set();
+const curriculumTitles = new Map();
+const quizToUnitMap = new Map();
+
+localRegions.forEach(region => {
+  region.chapters?.forEach(chapter => {
+    const chapterDocId = `${region.id}_${chapter.id}`;
+    whitelistChapters.add(chapterDocId);
+    curriculumTitles.set(chapterDocId, chapter.title);
+
+    chapter.units?.forEach(unit => {
+      const unitDocId = `${chapterDocId}_${unit.id}`;
+      whitelistUnits.add(unitDocId);
+      curriculumTitles.set(unitDocId, unit.title);
+
+      const quizDataSource = quizDataMapping[chapter.id];
+      if (quizDataSource && quizDataSource[unit.id]) {
+        const questions = quizDataSource[unit.id].questions || [];
+        questions.forEach(q => {
+          whitelistQuizzes.add(q.id);
+          quizToUnitMap.set(q.id, unitDocId);
+        });
+      }
+    });
+  });
+});
+
 const GhostCleaner = () => {
   const { data: regions, isLoading: loadingRegions } = useRegions();
   const [selectedRegion, setSelectedRegion] = useState(null);
@@ -302,12 +332,12 @@ const GhostCleaner = () => {
         const unitId = data.quizContext?.unitId;
         const correctTitle = curriculumTitles.get(unitId);
 
-        if (savedTitle && (savedTitle.includes('분해하는') || savedTitle.includes('범죄자') || (correctTitle && savedTitle !== correctTitle))) {
+        if (savedTitle && (savedTitle.includes('분해하는') || savedTitle.includes('범죄자') || savedTitle.includes('No stroke found') || (correctTitle && savedTitle !== correctTitle))) {
           badRecords.push({
             id: d.id,
             path: `questions/${d.id}`,
             data,
-            reason: savedTitle.includes('분해하는') ? 'Trash String Detected' : 'Stale Title (Legacy)',
+            reason: (savedTitle.includes('분해하는') || savedTitle.includes('No stroke found')) ? 'Trash String Detected' : 'Stale Title (Legacy)',
             savedTitle,
             correctTitle: correctTitle || 'Unknown',
             type: 'question'

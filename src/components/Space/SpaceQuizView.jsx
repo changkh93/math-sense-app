@@ -8,8 +8,12 @@ import soundManager from '../../utils/SoundManager'
 import { sanitizeLaTeX } from '../../utils/latexUtils'
 import '../../styles/space-theme.css'
 import QuestionModal from '../QuestionModal'
+import { useSmartSync } from '../../hooks/useSync'
 
 export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield }) {
+  // Real-time synchronization watchdog
+  useSmartSync(quizData?.unitId)
+
   const [currentQuestions, setCurrentQuestions] = useState([])
   const [currentIdx, setCurrentIdx] = useState(0)
   const [userAnswers, setUserAnswers] = useState({})
