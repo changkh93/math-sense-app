@@ -126,13 +126,12 @@ function StarNavigator({ regions, history, onFilterChange, currentLevel, navStat
 function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo, onHoverItem }) {
   const containerRef = React.useRef(null)
   const sorted = useMemo(() => [...history].reverse(), [history])
-  if (sorted.length === 0) return null
-
-  const firstTime = sorted[0].timestamp?.seconds * 1000 || Date.now()
-  const lastTime = sorted[sorted.length - 1].timestamp?.seconds * 1000 || Date.now()
+  const firstTime = sorted.length > 0 ? (sorted[0].timestamp?.seconds * 1000 || Date.now()) : Date.now()
+  const lastTime = sorted.length > 0 ? (sorted[sorted.length - 1].timestamp?.seconds * 1000 || Date.now()) : Date.now()
   const duration = Math.max(1, lastTime - firstTime)
 
   const sectors = useMemo(() => {
+    if (sorted.length === 0) return []
     const months = {}
     sorted.forEach((h, i) => {
       const date = new Date(h.timestamp?.seconds * 1000)
@@ -148,6 +147,8 @@ function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo, onHover
       return { label, left, density }
     })
   }, [sorted, firstTime, duration])
+
+  if (sorted.length === 0) return null
 
   return (
     <div className="chronicle-container" ref={containerRef}>
