@@ -123,10 +123,8 @@ function StarNavigator({ regions, history, onFilterChange, currentLevel, navStat
 /**
  * ChronicleScrubber - 시계열 타임라인 내비게이션
  */
-function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo }) {
-  const [hoverNode, setHoverNode] = useState(null)
+function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo, onHoverItem }) {
   const containerRef = React.useRef(null)
-
   const sorted = useMemo(() => [...history].reverse(), [history])
   if (sorted.length === 0) return null
 
@@ -134,7 +132,6 @@ function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo }) {
   const lastTime = sorted[sorted.length - 1].timestamp?.seconds * 1000 || Date.now()
   const duration = Math.max(1, lastTime - firstTime)
 
-  // 월별 레이블 추출 및 밀도 계산 (Activity Density)
   const sectors = useMemo(() => {
     const months = {}
     sorted.forEach((h, i) => {
@@ -147,7 +144,7 @@ function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo }) {
       const h = sorted[data.startIdx]
       const t = h.timestamp?.seconds * 1000
       const left = ((t - firstTime) / duration) * 100
-      const density = Math.min(1, data.count / 30) // 최대 30개 기준 밀도
+      const density = Math.min(1, data.count / 30)
       return { label, left, density }
     })
   }, [sorted, firstTime, duration])
@@ -156,8 +153,6 @@ function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo }) {
     <div className="chronicle-container" ref={containerRef}>
       <div className="chronicle-axis">
         <div className="chronicle-milky-way" />
-        
-        {/* Activity Clusters (Nebula clouds) */}
         {sectors.map((s, i) => (
           <motion.div 
             key={i} 
@@ -179,8 +174,6 @@ function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo }) {
         {sorted.map((h, i) => {
           const t = h.timestamp?.seconds * 1000
           const left = ((t - firstTime) / duration) * 100
-          // 시간 차이가 너무 크면 점 사이를 띄우기 (이미 duration 기반이라 자동 적용됨)
-          
           const targetWindow = Math.floor((history.length - 1 - i) / windowSize)
           const isActive = targetWindow === windowIndex
           const isMilestone = h.score === 100
@@ -190,32 +183,13 @@ function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo }) {
               key={h.id}
               className={`chronicle-node ${isActive ? 'active' : ''} ${isMilestone ? 'milestone' : ''}`}
               style={{ left: `${left}%` }}
-              onMouseEnter={() => setHoverNode({ ...h, left, date: new Date(t).toLocaleDateString() })}
-              onMouseLeave={() => setHoverNode(null)}
+              onMouseEnter={() => onHoverItem(h)}
+              onMouseLeave={() => onHoverItem(null)}
               onClick={() => onWarpTo(targetWindow)}
             />
           )
         })}
       </div>
-
-      <AnimatePresence>
-        {hoverNode && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            className="hologram-preview"
-            style={{ left: `${hoverNode.left}%`, transform: 'translateX(-50%)' }}
-          >
-            <div className="hologram-title">{hoverNode.unitTitle}</div>
-            <div className="hologram-meta">
-              <span>{hoverNode.date}</span>
-              <span style={{ fontWeight: 900 }}>{hoverNode.score}pts</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div style={{ textAlign: 'center', fontSize: '10px', color: 'var(--text-muted)', marginTop: '1.5rem', letterSpacing: '3px' }}>
         CHRONICLE TIMELINE
       </div>
@@ -223,8 +197,7 @@ function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo }) {
   )
 }
 
-function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping }) {
-  const [hoveredNode, setHoveredNode] = useState(null)
+function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping, onHoverItem }) {
   if (!data || data.length === 0) {
     return (
       <div style={{ 
@@ -312,8 +285,8 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
                   key={i} 
                   style={{ cursor: 'pointer', filter: isOld ? 'url(#nebula-filter)' : 'none', opacity: isOld ? 0.4 : 1 }} 
                   onClick={() => onItemClick && onItemClick(p)}
-                  onMouseEnter={() => setHoveredNode(p)}
-                  onMouseLeave={() => setHoveredNode(null)}
+                  onMouseEnter={() => onHoverItem(p)}
+                  onMouseLeave={() => onHoverItem(null)}
                 >
                   {p.score === 100 && (
                     <circle cx={p.x} cy={p.y} r="12" fill="var(--star-gold)" opacity="0.1" />
@@ -348,38 +321,14 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
                   </text>
                   
                   {/* 행성 아이콘 (랜드마크) */}
-                  <circle cx={p.x} cy={height - 35} r="3" fill={colorScale[1]} opacity={0.4} />
+                  <text x={p.x} y={height - 32} style={{ fontSize: '12px', opacity: 0.6, cursor: 'default', userSelect: 'none' }}>
+                    {['🪐', '🌑', '🌍', '☄️'][i % 4]}
+                  </text>
                 </g>
               )
             })}
           </svg>
         </motion.div>
-      </AnimatePresence>
-
-      {/* Hologram Tooltip */}
-      <AnimatePresence>
-        {hoveredNode && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-            className="hologram-preview"
-            style={{ 
-              left: `${(hoveredNode.x / width) * 100}%`, 
-              top: hoveredNode.y - 70,
-              transform: 'translateX(-50%)' 
-            }}
-          >
-            <div className="hologram-title">{hoveredNode.unitTitle}</div>
-            <div className="hologram-meta">
-              <span>{new Date(hoveredNode.timestamp?.seconds * 1000).toLocaleDateString()}</span>
-              <span style={{ color: 'var(--star-gold)', fontWeight: 800 }}>{hoveredNode.score} PTS</span>
-            </div>
-            <div style={{ marginTop: '8px', fontSize: '8px', opacity: 0.5, letterSpacing: '2px', textTransform: 'uppercase' }}>
-              SECTOR: {hoveredNode.regionTitle || 'UNKNOWN'}
-            </div>
-          </motion.div>
-        )}
       </AnimatePresence>
 
       {/* Warp overlay */}
@@ -409,11 +358,61 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
 }
 
 /**
+ * DiscoveryHUD - 고정형 정보 패널 (Hybrid Panel)
+ */
+function DiscoveryHUD({ activeItem, latestItem }) {
+  const display = activeItem || latestItem;
+
+  return (
+    <div className="discovery-hud">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={display?.id || 'empty'}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          style={{ width: '100%' }}
+        >
+          {display ? (
+            <>
+              <div className="hud-label">DISCOVERY LOG</div>
+              <div className="hud-title">{display.unitTitle}</div>
+              <div className="hud-metrics">
+                <div className="hud-metric">
+                  <span className="hud-metric-label">DATE</span>
+                  <span className="hud-metric-value">
+                    {new Date(display.timestamp?.seconds * 1000).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="hud-metric">
+                  <span className="hud-metric-label">SCORE</span>
+                  <span className="hud-metric-value" style={{ color: 'var(--star-gold)' }}>
+                    {display.score} PTS
+                  </span>
+                </div>
+              </div>
+              <div className="hud-footer">
+                SECTOR: {display.regionTitle || 'UNKNOWN'}
+              </div>
+            </>
+          ) : (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              탐사 노드를 선택하세요
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/**
  * SpaceDashboard Main
  */
 export default function SpaceDashboard({ user, userData, onQuizSelect, regions }) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  const [hoveredDiscovery, setHoveredDiscovery] = useState(null)
   const [navState, setNavState] = useState({ 
     level: 'galaxy', 
     regionId: null, 
@@ -558,53 +557,68 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions }
 
       {/* Trajectory */}
       <section className="glass-card" style={{ padding: '2rem', background: 'rgba(0,0,0,0.3)', position: 'relative' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h3 style={{ color: 'var(--text-bright)' }}>
-            📈 {chartTitle} 탐사 궤적 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>({filteredHistory.length} Sessions)</span>
-          </h3>
-          
-          {/* Navigation Controls */}
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button 
-                onClick={() => handleWarp(Math.min(totalPages - 1, windowIndex + 1))}
-                disabled={windowIndex >= totalPages - 1}
-                className="glass-btn"
-                style={{ padding: '0.5rem', opacity: windowIndex >= totalPages - 1 ? 0.3 : 1 }}
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button 
-                onClick={() => handleWarp(Math.max(0, windowIndex - 1))}
-                disabled={windowIndex <= 0}
-                className="glass-btn"
-                style={{ padding: '0.5rem', opacity: windowIndex <= 0 ? 0.3 : 1 }}
-              >
-                <ChevronRight size={20} />
-              </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', gap: '2rem' }}>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ color: 'var(--text-bright)', marginBottom: '0.4rem' }}>
+              📈 {chartTitle} 탐사 궤적
+            </h3>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+              ({filteredHistory.length} Sessions)
             </div>
-          )}
+          </div>
+          
+          <DiscoveryHUD 
+            activeItem={hoveredDiscovery} 
+            latestItem={filteredHistory[0]} 
+          />
         </div>
 
         {loading ? (
           <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>궤적 파동 수신 중...</div>
         ) : (
-          <>
+          <div className="exploration-stage">
             <TrajectoryChart 
               data={windowedData} 
               onItemClick={onQuizSelect} 
               colorScale={colorScale} 
               windowIndex={windowIndex}
               isWarping={isWarping}
+              onHoverItem={setHoveredDiscovery}
             />
-            
+
+            {/* Edge Navigation Buttons */}
+            {totalPages > 1 && (
+              <>
+                <button 
+                  className="edge-nav-btn left"
+                  onClick={() => handleWarp(Math.min(totalPages - 1, windowIndex + 1))}
+                  disabled={windowIndex >= totalPages - 1}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <ChevronLeft size={32} />
+                    <span style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '1px' }}>PAST</span>
+                  </div>
+                </button>
+                <button 
+                  className="edge-nav-btn right"
+                  onClick={() => handleWarp(Math.max(0, windowIndex - 1))}
+                  disabled={windowIndex <= 0}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <ChevronRight size={32} />
+                    <span style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '1px' }}>NEWER</span>
+                  </div>
+                </button>
+              </>
+            )}
             <ChronicleScrubber 
               history={filteredHistory}
               windowIndex={windowIndex}
               windowSize={WINDOW_SIZE}
               onWarpTo={handleWarp}
+              onHoverItem={setHoveredDiscovery}
             />
-          </>
+          </div>
         )}
       </section>
     </div>
