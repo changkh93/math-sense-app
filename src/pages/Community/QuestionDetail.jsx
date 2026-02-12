@@ -1,22 +1,61 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Send, CheckCircle, Heart, User } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle, Heart, User, Trash2, Edit3, X, Save } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
 import { getRandomNickname } from '../../utils/qaUtils';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
+import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
+import confetti from 'canvas-confetti';
 import './QuestionDetail.css';
 
 export default function QuestionDetail() {
   const { questionId } = useParams();
   const navigate = useNavigate();
   const [newAnswer, setNewAnswer] = useState('');
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
   
   const { data: question, isLoading: loadingQ } = useQuestionDetail(questionId);
-  const { data: answers, isLoading: loadingA } = useQuestionAnswers(questionId);
-  const { upvote, addAnswer, acceptAnswer, selfResolve } = useQAMutations();
+  const { data: answers, isLoading: loadingA, error: errorA } = useQuestionAnswers(questionId);
+  const { upvote, addAnswer, acceptAnswer, selfResolve, deleteQuestion, updateQuestion } = useQAMutations();
+
+  const [showRewardMask, setShowRewardMask] = useState(false);
+  const [rewardAmount, setRewardAmount] = useState(0);
+
+  const triggerVictory = (amount) => {
+    setRewardAmount(amount);
+    setShowRewardMask(true);
+    
+    const end = Date.now() + (3 * 1000);
+    const colors = ['#00f3ff', '#ffffff', '#ffd700'];
+
+    (function frame() {
+      confetti({
+        particleCount: 3,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0 },
+        colors: colors
+      });
+      confetti({
+        particleCount: 3,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1 },
+        colors: colors
+      });
+
+      if (Date.now() < end) {
+        requestAnimationFrame(frame);
+      }
+    }());
+
+    setTimeout(() => setShowRewardMask(false), 4000);
+  };
 
   const isOwner = question && auth.currentUser && question.userId === auth.currentUser.uid;
   const isResolved = question?.status === 'resolved';
@@ -31,6 +70,24 @@ export default function QuestionDetail() {
       isTeacher: false // Student answer
     });
     setNewAnswer('');
+  };
+
+  const handleDeleteQuestion = async () => {
+    if (window.confirm('정말 이 질문을 삭제하시겠습니까?')) {
+      await deleteQuestion.mutateAsync(questionId);
+      navigate('/agora');
+    }
+  };
+
+  const handleStartEdit = () => {
+    setEditContent(question.content);
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editContent.trim()) return;
+    await updateQuestion.mutateAsync({ questionId, content: editContent });
+    setIsEditing(false);
   };
 
   return (
@@ -62,18 +119,61 @@ export default function QuestionDetail() {
                   <div className="author-avatar"><User size={16} /></div>
                   <span>{getRandomNickname(question.userId)}</span>
                 </div>
-                <span className={`status-badge status-${question.status}`}>
-                  {question.status === 'open' ? '대기중' : question.status === 'answered' ? '답변완료' : '해결됨'}
-                </span>
+                <div className="status-container">
+                  <span className={`status-badge status-${question.status}`}>
+                    {question.status === 'open' ? '대기중' : question.status === 'answered' ? '답변완료' : '해결됨'}
+                  </span>
+                  {isOwner && (
+                    <div className="owner-actions">
+                      <button className="icon-btn edit-btn" onClick={handleStartEdit} title="수정">
+                        <Edit3 size={16} />
+                      </button>
+                      <button className="icon-btn delete-btn" onClick={handleDeleteQuestion} title="삭제">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <h2 className="question-content">{question.content}</h2>
+              {isEditing ? (
+                <div className="edit-question-box">
+                  <textarea 
+                    className="edit-textarea glass"
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                  />
+                  <div className="edit-actions">
+                    <button className="cancel-btn glass" onClick={() => setIsEditing(false)}>
+                      <X size={16} /> 취소
+                    </button>
+                    <button className="save-btn glass" onClick={handleSaveEdit}>
+                      <Save size={16} /> 저장
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <h2 className="question-content">{question.content}</h2>
+              )}
 
               {question.quizContext?.quizTitle && (
-                <div className="quiz-context-box glass">
+                <motion.div 
+                  className="quiz-context-box glass clickable"
+                  onClick={() => setIsPreviewOpen(true)}
+                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(0, 243, 255, 0.1)' }}
+                  whileTap={{ scale: 0.98 }}
+                >
                    📌 관련 퀴즈: {question.quizContext.quizTitle}
-                </div>
+                   <span className="preview-hint-text">미리보기 클릭</span>
+                </motion.div>
               )}
+
+              <QuizPreviewModal 
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                unitId={question.quizContext?.unitId}
+                quizId={question.quizContext?.questionId}
+              />
 
               {question.drawingUrl && (
                 <div className="question-drawing-container">
@@ -94,9 +194,10 @@ export default function QuestionDetail() {
                 {isOwner && !isResolved && (
                   <button 
                     className="stat-item resolve-btn"
-                    onClick={() => {
+                    onClick={async () => {
                       if(window.confirm('문제가 해결되었나요? 알려주셔서 감사해요!')) {
-                        selfResolve.mutate({ questionId, reason: 'self_solved' });
+                        await selfResolve.mutateAsync({ questionId, reason: 'self_solved' });
+                        triggerVictory(3);
                       }
                     }}
                   >
@@ -109,12 +210,16 @@ export default function QuestionDetail() {
 
             <section className="answers-section">
               <div className="answers-header-row">
-                 <strong className="answers-count font-tech">답변 {answers?.length || 0}개</strong>
+                 <strong className="answers-count font-tech">
+                   답변 {loadingA ? '...' : (answers?.length || 0)}개
+                 </strong>
                  {loadingA && <div className="loading-spinner-small" />}
               </div>
               
               <div className="answers-list">
-                {!answers && loadingA ? (
+                {errorA ? (
+                  <div className="error-msg glass">답변을 불러오는데 실패했습니다. (인덱스 생성 중일 수 있습니다)</div>
+                ) : !answers && loadingA ? (
                   Array.from({length: 2}).map((_, i) => <div key={i} className="answer-skeleton glass" />)
                 ) : answers?.length === 0 ? (
                   <div className="empty-answers font-tech">아직 답변이 없어요. 첫 번째 힌트를 남겨보세요!</div>
@@ -131,58 +236,87 @@ export default function QuestionDetail() {
                           {ans.isTeacher && <span className="teacher-badge">선생님</span>}
                           <span>{ans.isTeacher ? '관리자' : getRandomNickname(ans.userId)}</span>
                         </div>
-                        {ans.isAccepted && (
-                          <span className="accepted-badge"><CheckCircle size={16} /> 채택된 답변</span>
-                        )}
+                        
+                        <div className="header-right-actions">
+                          {ans.isAccepted && (
+                            <span className="accepted-badge"><CheckCircle size={16} /> 채택된 답변</span>
+                          )}
+                          
+                          {isOwner && !isResolved && !ans.isAccepted && (
+                            <button 
+                              className="accept-btn-small glass"
+                              onClick={async () => {
+                                if(window.confirm('이 답변을 채택하시겠습니까?')) {
+                                  await acceptAnswer.mutateAsync({ questionId, answerId: ans.id });
+                                  triggerVictory(5);
+                                }
+                              }}
+                            >
+                              이 답변 채택하기
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="answer-content">
                         {ans.content}
                       </div>
-                      
-                      {isOwner && !isResolved && !ans.isAccepted && (
-                        <div className="answer-actions">
-                          <button 
-                            className="accept-btn-small glass"
-                            onClick={() => {
-                              if(window.confirm('이 답변을 채택하시겠습니까?')) {
-                                acceptAnswer.mutate({ questionId, answerId: ans.id });
-                              }
-                            }}
-                          >
-                            이 답변 채택하기
-                          </button>
-                        </div>
-                      )}
                     </motion.div>
                   ))
                 )}
               </div>
             </section>
 
-            <motion.form 
-              className="new-answer-form glass"
-              onSubmit={handleAddAnswer}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <h4 className="font-title">나의 생각 나누기</h4>
-              <textarea
-                className="answer-textarea"
-                placeholder="친구에게 도움이 될 만한 힌트나 생각을 적어주세요!"
-                value={newAnswer}
-                onChange={(e) => setNewAnswer(e.target.value)}
-              ></textarea>
-              <button 
-                type="submit" 
-                className="submit-answer-btn action-flare-small"
-                disabled={addAnswer.isLoading || !newAnswer.trim()}
+            {!isOwner && (
+              <motion.form 
+                className="new-answer-form glass"
+                onSubmit={handleAddAnswer}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
               >
-                {addAnswer.isLoading ? '보내는 중...' : '답변 등록하기'}
-              </button>
-            </motion.form>
+                <h4 className="font-title">나의 생각 나누기</h4>
+                <textarea
+                  className="answer-textarea"
+                  placeholder="친구에게 도움이 될 만한 힌트나 생각을 적어주세요!"
+                  value={newAnswer}
+                  onChange={(e) => setNewAnswer(e.target.value)}
+                ></textarea>
+                <button 
+                  type="submit" 
+                  className="submit-answer-btn action-flare-small"
+                  disabled={addAnswer.isLoading || !newAnswer.trim()}
+                >
+                  {addAnswer.isLoading ? '보내는 중...' : '답변 등록하기'}
+                </button>
+              </motion.form>
+            )}
           </>
         )}
       </div>
+
+      <AnimatePresence>
+        {showRewardMask && (
+          <motion.div 
+            className="reward-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div 
+              className="reward-content glass"
+              initial={{ scale: 0.5, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 1.5, opacity: 0 }}
+            >
+              <Sparkles className="reward-icon" size={48} />
+              <h2 className="font-title">탐사 완료!</h2>
+              <p>성공적으로 문제를 해결했습니다.</p>
+              <div className="reward-badge font-tech">
+                💎 +{rewardAmount} CRYSTALS
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

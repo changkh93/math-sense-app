@@ -9,7 +9,8 @@ import {
   updateDoc, 
   doc, 
   serverTimestamp,
-  where
+  where,
+  increment
 } from 'firebase/firestore';
 import { 
   MessageSquare, 
@@ -24,9 +25,11 @@ import {
   ChevronUp
 } from 'lucide-react';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
+import { useQAMutations } from '../../hooks/useQA';
 import './Admin.css';
 
 export default function TeacherQA() {
+  const { verifyAnswer } = useQAMutations();
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({}); // questionId -> Array of answers
   const [loading, setLoading] = useState(true);
@@ -37,38 +40,62 @@ export default function TeacherQA() {
   const [previewInfo, setPreviewInfo] = useState({ isOpen: false, unitId: null, quizId: null });
   const [expandedQuestions, setExpandedQuestions] = useState({});
 
+  // 1. Listen for questions based on filter
   useEffect(() => {
+    setLoading(true);
     let q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
     if (filter !== 'all') {
       q = query(collection(db, 'questions'), where('status', '==', filter), orderBy('createdAt', 'desc'));
     }
 
-    const unsubscribeQuestions = onSnapshot(q, (snapshot) => {
-      const qs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setQuestions(qs);
-      setLoading(false);
-    });
+    const unsubscribeQuestions = onSnapshot(q, 
+      (snapshot) => {
+        const qs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setQuestions(qs);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("❌ Questions listener error:", error);
+        setLoading(false);
+      }
+    );
 
-    // Listen to all answers to keep UI in sync
-    const unsubscribeAnswers = onSnapshot(collection(db, 'answers'), (snapshot) => {
-      const ansMap = {};
-      snapshot.docs.forEach(doc => {
-        const data = { id: doc.id, ...doc.data() };
-        if (!ansMap[data.questionId]) ansMap[data.questionId] = [];
-        ansMap[data.questionId].push(data);
-      });
-      // Sort answers by date within each question
-      Object.keys(ansMap).forEach(key => {
-        ansMap[key].sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
-      });
-      setAnswers(ansMap);
-    });
-
-    return () => {
-      unsubscribeQuestions();
-      unsubscribeAnswers();
-    };
+    return () => unsubscribeQuestions();
   }, [filter]);
+
+  // 2. Global listener for all answers (sync once)
+  useEffect(() => {
+    console.log("📡 Subscribing to all answers...");
+    const unsubscribeAnswers = onSnapshot(collection(db, 'answers'), 
+      (snapshot) => {
+        const ansMap = {};
+        snapshot.docs.forEach(doc => {
+          const data = { id: doc.id, ...doc.data() };
+          if (data.questionId) {
+            if (!ansMap[data.questionId]) ansMap[data.questionId] = [];
+            ansMap[data.questionId].push(data);
+          }
+        });
+
+        // Sort answers within each group
+        Object.keys(ansMap).forEach(key => {
+          ansMap[key].sort((a, b) => {
+            const timeA = a.createdAt?.toMillis() || Date.now();
+            const timeB = b.createdAt?.toMillis() || Date.now();
+            return timeA - timeB;
+          });
+        });
+
+        setAnswers(ansMap);
+        console.log(`✅ Answers updated: ${snapshot.size} total.`);
+      },
+      (error) => {
+        console.error("❌ Answers listener error:", error);
+      }
+    );
+
+    return () => unsubscribeAnswers();
+  }, []);
 
   const handleDeleteAnswer = async (answerId, questionId) => {
     if (!confirm('답변을 삭제하시겠습니까?')) return;
@@ -115,9 +142,10 @@ export default function TeacherQA() {
         createdAt: serverTimestamp()
       });
 
-      // 2. Update question status
+      // 2. Update question status and answerCount
       await updateDoc(doc(db, 'questions', questionId), {
         status: 'answered',
+        answerCount: increment(1),
         updatedAt: serverTimestamp()
       });
 
@@ -253,11 +281,21 @@ export default function TeacherQA() {
                             <>
                               <div className="ans-text">
                                 {ans.isTeacher ? <span className="teacher-badge-small">선생님</span> : <span className="student-badge-small">학생</span>}
+                                {ans.isVerified && <span className="verified-badge-small">✨ 인증됨</span>}
                                 {ans.content}
                               </div>
                               <div className="ans-footer">
                                 <span className="ans-date">{ans.createdAt?.toDate().toLocaleString()}</span>
                                 <div className="ans-actions">
+                                  {!ans.isTeacher && !ans.isVerified && (
+                                    <button 
+                                      className="verify-action-btn"
+                                      onClick={() => verifyAnswer.mutate({ questionId: q.id, answerId: ans.id })}
+                                      title="우수 답변으로 인증하고 10광석 선물"
+                                    >
+                                      인증⭐
+                                    </button>
+                                  )}
                                   <button onClick={() => startEditAnswer(ans)}><Edit3 size={12} /></button>
                                   <button onClick={() => handleDeleteAnswer(ans.id, q.id)}><Trash2 size={12} /></button>
                                 </div>

@@ -2,18 +2,18 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { db } from '../../firebase'
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
+import { HelpCircle, Star, Target, Zap, Award } from 'lucide-react'
 import soundManager from '../../utils/SoundManager'
 
 export default function SpaceRanking({ user, userData }) {
   const [topUsers, setTopUsers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [rankMode, setRankMode] = useState('global') // 'global' | 'weekly'
+  const [rankMode, setRankMode] = useState('global') // 'global' | 'weekly' | 'guide'
 
   useEffect(() => {
-    // 랭킹 모드에 따른 쿼리 설정
-    // global: crystals (총 광석) 기준
-    // weekly: 이번 주 획득량 기준 (weeklyGrowth 필드 직접 참조)
-    
+    if (rankMode === 'guide') return;
+
+    setLoading(true);
     const q = query(
       collection(db, 'users'),
       orderBy('crystals', 'desc'),
@@ -21,8 +21,6 @@ export default function SpaceRanking({ user, userData }) {
     )
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.log("📊 SpaceRanking: Snapshot received. Size:", snapshot.size)
-      // Calculate current KST date keys
       const kstNow = new Date(Date.now() + 9 * 3600000)
       const todayKey = kstNow.toISOString().split('T')[0]
       const mondayOffset = (kstNow.getUTCDay() + 6) % 7
@@ -34,7 +32,6 @@ export default function SpaceRanking({ user, userData }) {
         return {
           id: doc.id,
           ...d,
-          // Direct growth counter reads — no baseline math needed
           dailyGain:  d.dailyGrowthDate    === todayKey  ? (d.dailyGrowth  || 0) : 0,
           weeklyGain: d.weeklyGrowthMonday === mondayKey  ? (d.weeklyGrowth || 0) : 0,
         }
@@ -54,23 +51,28 @@ export default function SpaceRanking({ user, userData }) {
     return () => unsubscribe()
   }, [rankMode])
 
-  const containerVariants = {
-    hidden: { opacity: 0, scale: 0.9, y: 20 },
-    visible: { 
-      opacity: 1, 
-      scale: 1, 
-      y: 0,
-      transition: { 
-        duration: 0.5,
-        staggerChildren: 0.05
-      }
+  const rewardRules = [
+    { 
+      category: '🎯 탐사(퀴즈) 보상', 
+      icon: <Target className="rule-icon-blue" />,
+      items: [
+        { label: '문제 정답', value: '+1 💎', desc: '최고 점수 경신 시 지급' },
+        { label: '3연속 콤보', value: '+5 💎', desc: '안정적인 비행 보너스' },
+        { label: '백점 만점', value: '+10 💎', desc: '단원 최초 1회 보너스' },
+        { label: '문제 오답', value: '-2 💎', desc: '에너지 손실 (쉴드로 방어 가능)' },
+      ]
+    },
+    { 
+      category: '🤝 아고라(커뮤니티) 보상', 
+      icon: <Zap className="rule-icon-purple" />,
+      items: [
+        { label: '답변 채택', value: '+20 💎', desc: '내가 쓴 답변이 채택됨' },
+        { label: '질문 해결', value: '+5 💎', desc: '내 질문이 해결됨' },
+        { label: '스스로 해결', value: '+3 💎', desc: '자기 주도 해결 보충' },
+        { label: '선생님 인증', value: '+10 💎', desc: '최우수 답변 추가 보너스' },
+      ]
     }
-  }
-
-  const rowVariants = {
-    hidden: { opacity: 0, x: -20 },
-    visible: { opacity: 1, x: 0 }
-  }
+  ]
 
   return (
     <motion.div 
@@ -88,7 +90,7 @@ export default function SpaceRanking({ user, userData }) {
           🏆 우주 관제 리더보드
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
-          실시간 탐사 대원들의 수학 광석 랭킹 시스템입니다. (대원 {topUsers.length}명 대기 중)
+          {rankMode === 'guide' ? '광석 획득 및 손실 기준 안내' : `실시간 탐사 대원들의 수학 광석 랭킹 시스템입니다. (대원 ${topUsers.length}명 대기 중)`}
         </p>
       </div>
 
@@ -99,162 +101,223 @@ export default function SpaceRanking({ user, userData }) {
         gap: '1rem', 
         marginBottom: '2rem' 
       }}>
-        {['global', 'weekly'].map(mode => (
+        {[
+          { id: 'global', label: '전 우주 정거장', icon: '🪐' },
+          { id: 'weekly', label: '이번 주 급상승', icon: '🚀' },
+          { id: 'guide', label: '탐사 가이드', icon: '💎', isSpecial: true }
+        ].map(mode => (
           <button
-            key={mode}
-            onClick={() => { setRankMode(mode); soundManager.playClick(); }}
-            className={`font-tech ${rankMode === mode ? 'active' : ''}`}
+            key={mode.id}
+            onClick={() => { setRankMode(mode.id); soundManager.playClick(); }}
+            className={`font-tech ${rankMode === mode.id ? 'active' : ''}`}
             style={{
-              padding: '0.8rem 2rem',
-              background: rankMode === mode ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-              border: `1px solid ${rankMode === mode ? 'var(--crystal-cyan)' : 'var(--glass-border)'}`,
+              padding: '0.8rem 1.5rem',
+              background: rankMode === mode.id 
+                ? (mode.isSpecial ? 'rgba(255, 215, 0, 0.2)' : 'rgba(0, 243, 255, 0.2)') 
+                : 'rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${rankMode === mode.id 
+                ? (mode.isSpecial ? '#ffd700' : 'var(--crystal-cyan)') 
+                : 'var(--glass-border)'}`,
               borderRadius: '12px',
-              color: rankMode === mode ? 'var(--crystal-cyan)' : 'var(--text-muted)',
+              color: rankMode === mode.id 
+                ? (mode.isSpecial ? '#ffd700' : 'var(--crystal-cyan)') 
+                : 'var(--text-muted)',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
               textTransform: 'uppercase',
-              letterSpacing: '2px',
+              letterSpacing: '1px',
               fontWeight: 700,
-              boxShadow: rankMode === mode ? 'var(--glow-cyan)' : 'none'
+              boxShadow: rankMode === mode.id 
+                ? (mode.isSpecial ? '0 0 15px rgba(255, 215, 0, 0.4)' : 'var(--glow-cyan)') 
+                : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
           >
-            {mode === 'global' ? '🪐 전 우주 정거장' : '🚀 이번 주 급상승'}
+            <span>{mode.icon}</span>
+            {mode.label}
           </button>
         ))}
       </div>
 
       <div className="glass-card hud-border" style={{ 
-        padding: '1.5rem', 
+        padding: rankMode === 'guide' ? '2.5rem' : '1.5rem', 
         background: 'rgba(5, 5, 16, 0.6)',
-        backdropFilter: 'blur(15px)'
+        backdropFilter: 'blur(15px)',
+        minHeight: '400px'
       }}>
-        {/* 헤더 행 */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '60px 1fr 100px 100px 120px',
-          padding: '1rem',
-          borderBottom: '1px solid var(--glass-border)',
-          color: 'var(--crystal-cyan)',
-          fontWeight: 700,
-          fontSize: '0.9rem',
-          letterSpacing: '1px'
-        }}>
-          <span>RANK</span>
-          <span>PILOT</span>
-          <span style={{ textAlign: 'center' }}>CRYSTALS</span>
-          <span style={{ textAlign: 'center' }}>SCORE</span>
-          <span style={{ textAlign: 'right' }}>GROWTH</span>
-        </div>
-
-        {/* 랭킹 리스트 */}
-        <div style={{ paddingRight: '5px' }}>
-          {loading ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              호로그램 데이터 수신 중...
-            </div>
-          ) : topUsers.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              현재 순위 데이터가 없습니다.<br/>
-              <span style={{ fontSize: '0.8rem' }}>탐사를 시작하여 광석을 채집해 보세요!</span>
-            </div>
+        <AnimatePresence mode="wait">
+          {rankMode === 'guide' ? (
+            <motion.div 
+              key="guide"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="reward-guide-container"
+            >
+              <div className="guide-grid">
+                {rewardRules.map((cat, i) => (
+                  <div key={i} className="guide-category">
+                    <h3 className="cat-title">
+                      {cat.icon} {cat.category}
+                    </h3>
+                    <div className="rule-items">
+                      {cat.items.map((item, j) => (
+                        <div key={j} className="rule-item glass">
+                          <div className="rule-main">
+                            <span className="rule-label">{item.label}</span>
+                            <span className={`rule-value ${item.value.includes('-') ? 'minus' : 'plus'}`}>
+                              {item.value}
+                            </span>
+                          </div>
+                          <p className="rule-desc">{item.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="guide-footer-note glass">
+                <HelpCircle size={16} />
+                <span>동일 단원 반복 시 <strong>최고 기록(Best)</strong>보다 높은 성적을 거둘 때만 광석이 추가 채굴됩니다.</span>
+              </div>
+            </motion.div>
           ) : (
-            topUsers.map((u, index) => {
-              const isMe = u.id === user?.uid
-              const growth = rankMode === 'weekly' ? (u.weeklyGain || 0) : (u.dailyGain || 0)
+            <motion.div 
+              key="ranking"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {/* 헤더 행 */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '60px 1fr 100px 100px 120px',
+                padding: '1rem',
+                borderBottom: '1px solid var(--glass-border)',
+                color: 'var(--crystal-cyan)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                letterSpacing: '1px'
+              }}>
+                <span>RANK</span>
+                <span>PILOT</span>
+                <span style={{ textAlign: 'center' }}>CRYSTALS</span>
+                <span style={{ textAlign: 'center' }}>SCORE</span>
+                <span style={{ textAlign: 'right' }}>GROWTH</span>
+              </div>
 
-              return (
-                <div
-                  key={u.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '60px 1fr 100px 100px 120px',
-                    padding: '1.2rem 1rem',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    alignItems: 'center',
-                    background: isMe ? 'rgba(0, 243, 255, 0.12)' : 'transparent',
-                    boxShadow: isMe ? 'inset 0 0 20px rgba(0, 243, 255, 0.2)' : 'none',
-                    borderRadius: isMe ? '10px' : '0',
-                    margin: isMe ? '5px 0' : '0',
-                    borderLeft: isMe ? '4px solid var(--crystal-cyan)' : 'none',
-                    color: '#fff !important' // Force visibility
-                  }}
-                >
-                  {/* 순위 */}
-                  <span style={{ 
-                    fontSize: '1.2rem', 
-                    fontWeight: 900,
-                    color: index < 3 ? 'var(--star-gold)' : '#ffffff'
-                  }}>
-                    {index + 1}
-                  </span>
-
-                  {/* 이름 & 상태 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ 
-                      fontSize: '1.1rem', 
-                      fontWeight: isMe ? 800 : 500,
-                      color: isMe ? '#ffffff' : 'rgba(255,255,255,0.8)'
-                    }}>
-                      {u.name || '무명 탐험가'}
-                    </span>
-                    {isMe && <span style={{ 
-                      fontSize: '0.7rem', 
-                      background: 'var(--crystal-cyan)', 
-                      color: '#000', 
-                      padding: '2px 6px', 
-                      borderRadius: '4px',
-                      fontWeight: 900
-                    }}>ME</span>}
+              {/* 랭킹 리스트 */}
+              <div style={{ paddingRight: '5px' }}>
+                {loading ? (
+                  <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    호로그램 데이터 수신 중...
                   </div>
-
-                  {/* 광석 개수 */}
-                  <span style={{ 
-                    textAlign: 'center', 
-                    color: 'var(--neon-blue)', 
-                    fontWeight: 700 
-                  }}>
-                    💎 {u.crystals || 0}
-                  </span>
-
-                  {/* 평균 점수 */}
-                  <span style={{ 
-                    textAlign: 'center', 
-                    color: 'var(--text-muted)', 
-                    fontWeight: 600,
-                    fontSize: '0.9rem'
-                  }}>
-                    {u.averageScore ? u.averageScore.toFixed(1) : '─'}
-                  </span>
-
-                  {/* 상승 지표 */}
-                  <div style={{ 
-                    textAlign: 'right',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end'
-                  }}>
-                    <span style={{ 
-                      color: growth > 0 ? 'var(--planet-green)' : growth < 0 ? '#ff4d4d' : 'rgba(255,255,255,0.4)',
-                      fontWeight: 800,
-                      fontSize: '0.9rem'
-                    }}>
-                      {growth > 0 ? `▲ ${growth}` : growth < 0 ? `▼ ${Math.abs(growth)}` : '─'}
-                    </span>
-                    <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
-                      {rankMode === 'weekly' ? 'WEEKLY' : 'DAILY'}
-                    </span>
+                ) : topUsers.length === 0 ? (
+                  <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    현재 순위 데이터가 없습니다.<br/>
+                    <span style={{ fontSize: '0.8rem' }}>탐사를 시작하여 광석을 채집해 보세요!</span>
                   </div>
-                </div>
-              )
-            })
+                ) : (
+                  topUsers.map((u, index) => {
+                    const isMe = u.id === user?.uid
+                    const growth = rankMode === 'weekly' ? (u.weeklyGain || 0) : (u.dailyGain || 0)
+
+                    return (
+                      <div
+                        key={u.id}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '60px 1fr 100px 100px 120px',
+                          padding: '1.2rem 1rem',
+                          borderBottom: '1px solid rgba(255,255,255,0.05)',
+                          alignItems: 'center',
+                          background: isMe ? 'rgba(0, 243, 255, 0.12)' : 'transparent',
+                          boxShadow: isMe ? 'inset 0 0 20px rgba(0, 243, 255, 0.2)' : 'none',
+                          borderRadius: isMe ? '10px' : '0',
+                          margin: isMe ? '5px 0' : '0',
+                          borderLeft: isMe ? '4px solid var(--crystal-cyan)' : 'none',
+                          color: '#fff !important'
+                        }}
+                      >
+                        <span style={{ 
+                          fontSize: '1.2rem', 
+                          fontWeight: 900,
+                          color: index < 3 ? 'var(--star-gold)' : '#ffffff'
+                        }}>
+                          {index + 1}
+                        </span>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ 
+                            fontSize: '1.1rem', 
+                            fontWeight: isMe ? 800 : 500,
+                            color: isMe ? '#ffffff' : 'rgba(255,255,255,0.8)'
+                          }}>
+                            {u.name || '무명 탐험가'}
+                          </span>
+                          {isMe && <span style={{ 
+                            fontSize: '0.7rem', 
+                            background: 'var(--crystal-cyan)', 
+                            color: '#000', 
+                            padding: '2px 6px', 
+                            borderRadius: '4px',
+                            fontWeight: 900
+                          }}>ME</span>}
+                        </div>
+
+                        <span style={{ 
+                          textAlign: 'center', 
+                          color: 'var(--neon-blue)', 
+                          fontWeight: 700 
+                        }}>
+                          💎 {u.crystals || 0}
+                        </span>
+
+                        <span style={{ 
+                          textAlign: 'center', 
+                          color: 'var(--text-muted)', 
+                          fontWeight: 600,
+                          fontSize: '0.9rem'
+                        }}>
+                          {u.averageScore ? u.averageScore.toFixed(1) : '─'}
+                        </span>
+
+                        <div style={{ 
+                          textAlign: 'right',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-end'
+                        }}>
+                          <span style={{ 
+                            color: growth > 0 ? 'var(--planet-green)' : growth < 0 ? '#ff4d4d' : 'rgba(255,255,255,0.4)',
+                            fontWeight: 800,
+                            fontSize: '0.9rem'
+                          }}>
+                            {growth > 0 ? `▲ ${growth}` : growth < 0 ? `▼ ${Math.abs(growth)}` : '─'}
+                          </span>
+                          <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
+                            {rankMode === 'weekly' ? 'WEEKLY' : 'DAILY'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
       </div>
 
       {/* 격려 문구 */}
       <div style={{ marginTop: '2.5rem', marginBottom: '4rem', textAlign: 'center' }}>
         <p className="font-tech" style={{ color: 'var(--text-muted)', letterSpacing: '1px' }}>
-          {(() => {
+          {rankMode === 'guide' ? (
+            "✨ 신중한 탐사가 위대한 대원을 만듭니다."
+          ) : (() => {
             const kstNow = new Date(Date.now() + 9 * 3600000)
             const mondayOffset = (kstNow.getUTCDay() + 6) % 7
             const mondayKey = new Date(kstNow.getTime() - mondayOffset * 86400000).toISOString().split('T')[0]
@@ -265,6 +328,80 @@ export default function SpaceRanking({ user, userData }) {
           })()}
         </p>
       </div>
+
+      <style jsx>{`
+        .guide-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 2rem;
+        }
+        .guide-category {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .cat-title {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 1.2rem;
+          color: #fff;
+          font-family: var(--font-title);
+        }
+        .rule-items {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .rule-item {
+          padding: 1.2rem;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .rule-main {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.5rem;
+        }
+        .rule-label {
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.9);
+        }
+        .rule-value {
+          font-family: var(--font-tech);
+          font-weight: 800;
+          font-size: 1.1rem;
+        }
+        .rule-value.plus { color: var(--crystal-cyan); }
+        .rule-value.minus { color: #ff4d4d; }
+        .rule-desc {
+          font-size: 0.85rem;
+          color: var(--text-muted);
+          margin: 0;
+        }
+        .guide-footer-note {
+          margin-top: 3rem;
+          padding: 1.2rem;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          border-radius: 12px;
+          color: var(--text-muted);
+          font-size: 0.9rem;
+          background: rgba(0, 243, 255, 0.05);
+          border: 1px solid rgba(0, 243, 255, 0.1);
+        }
+        .rule-icon-blue { color: var(--crystal-cyan); }
+        .rule-icon-purple { color: #a55eea; }
+
+        @media (max-width: 768px) {
+          .guide-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </motion.div>
   )
 }

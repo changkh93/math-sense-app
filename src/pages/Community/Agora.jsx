@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, ArrowLeft, Plus, Search } from 'lucide-react';
+import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X } from 'lucide-react';
 import { usePublicQuestions, useQAMutations } from '../../hooks/useQA';
 import { getRandomNickname } from '../../utils/qaUtils';
 import QuestionModal from '../../components/QuestionModal';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
-import AgoraStarMap from '../../components/Community/AgoraStarMap';
 import AgoraLiveTicker from '../../components/Community/AgoraLiveTicker';
 import AgoraMotivationPanel from '../../components/Community/AgoraMotivationPanel';
 import { useAuth } from '../../hooks/useAuth';
@@ -18,7 +17,8 @@ export default function Agora() {
   const { userData } = useAuth();
   const [filter, setFilter] = useState('all');
   // const [category, setCategory] = useState('all');
-  const [viewMode, setViewMode] = useState('map'); // 'map' | 'grid'
+  const [viewMode, setViewMode] = useState('grid'); // Default to 'grid' (LIST)
+  const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Apply filters
@@ -27,10 +27,18 @@ export default function Agora() {
 
   const questions = React.useMemo(() => {
     if (!allQuestions) return [];
-    // if (category === 'all') return allQuestions;
-    // return allQuestions.filter(q => q.category === category);
-    return allQuestions;
-  }, [allQuestions]);
+    let filtered = allQuestions;
+    
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(q => 
+        q.content?.toLowerCase().includes(term) || 
+        q.quizContext?.quizTitle?.toLowerCase().includes(term)
+      );
+    }
+    
+    return filtered;
+  }, [allQuestions, searchTerm]);
 
   const filters = [
     { id: 'all', label: '전체 질문', icon: '🌌' },
@@ -73,12 +81,21 @@ export default function Agora() {
             ))}
           </div>
           
-          <div className="view-toggle glass hud-border">
-            <button className={viewMode === 'map' ? 'active' : ''} onClick={() => setViewMode('map')}>🗺️ MAP</button>
-            <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>📋 LIST</button>
+          <div className="agora-search-bar glass">
+            <Search size={18} className="search-icon" />
+            <input 
+              type="text" 
+              placeholder="궁금한 키워드로 검색해보세요..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button className="clear-btn" onClick={() => setSearchTerm('')}>
+                <X size={16} />
+              </button>
+            )}
           </div>
         </div>
-
         <div className="agora-layout-grid">
           <main className="agora-main">
             {isLoading ? (
@@ -93,11 +110,20 @@ export default function Agora() {
           </div>
         ) : !questions || questions.length === 0 ? (
           <div className="empty-state glass">
-            <Search size={48} opacity={0.3} />
-            <p>성운이 아직 텅 비어있네요. 첫 번째 별을 쏘아보세요!</p>
+            <Telescope size={48} opacity={0.3} className="empty-icon" />
+            {searchTerm ? (
+              <div className="empty-text">
+                <h3>'{searchTerm}'에 대한 검색 결과가 없어요</h3>
+                <p>다른 키워드로 다시 별을 찾아보시겠어요?</p>
+                <button className="reset-search-btn" onClick={() => setSearchTerm('')}>검색 초기화</button>
+              </div>
+            ) : (
+              <div className="empty-text">
+                <h3>성운이 아직 텅 비어있네요</h3>
+                <p>첫 번째 질문을 올려서 나만의 별을 쏘아보세요!</p>
+              </div>
+            )}
           </div>
-        ) : viewMode === 'map' ? (
-          <AgoraStarMap questions={questions} onQuestionClick={(id) => navigate(`/agora/${id}`)} />
         ) : (
           <div className="questions-grid">
             <AnimatePresence mode="popLayout">
@@ -163,13 +189,9 @@ export default function Agora() {
         )}
           </main>
           
-          {viewMode === 'map' && (
-            <AgoraMotivationPanel 
-              userData={userData} 
-              // activeCategory={category}
-              // onCategoryChange={(cat) => setCategory(prev => prev === cat ? 'all' : cat)}
-            />
-          )}
+          <AgoraMotivationPanel 
+            userData={userData} 
+          />
         </div>
 
       <button className="floating-ask-btn action-flare" onClick={() => setIsModalOpen(true)}>

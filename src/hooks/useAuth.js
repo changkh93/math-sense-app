@@ -22,6 +22,7 @@ export function useAuth() {
               totalQuizzes: 0,
               totalScore: 0,
               spaceshipLevel: 1,
+              helpCount: 0,
               ...data
             });
           } else {
@@ -30,6 +31,7 @@ export function useAuth() {
               totalQuizzes: 0, 
               totalScore: 0, 
               spaceshipLevel: 1,
+              helpCount: 0,
               email: firebaseUser.email, 
               name: firebaseUser.displayName,
               createdAt: new Date().toISOString()

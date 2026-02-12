@@ -144,3 +144,60 @@
     order: 2;
   }
 }
+
+/* New Gamification Styles */
+.hall-item .count {
+  margin-left: auto;
+  color: var(--crystal-cyan);
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.loading-mini, .empty-mini {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+}
+
+.mini-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.mini-stat {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.8rem;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mini-stat .label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mini-stat .value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.icon-gold { color: #ffd700 !important; }
+.icon-cyan { color: var(--crystal-cyan) !important; }
+.icon-purple { color: #a55eea; }
+
+.hint {
+  margin-top: 0.8rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}

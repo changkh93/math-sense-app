@@ -22,6 +22,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
   const [backgroundImage, setBackgroundImage] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [strokeColor, setStrokeColor] = useState('#ff0000'); // Default Red
+  const [tempDrawing, setTempDrawing] = useState(null); // DataURL of merged image
+  const [paths, setPaths] = useState([]); // Raw paths for re-editing
   const canvasRef = useRef(null);
 
   const questionTypes = [
@@ -33,9 +35,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
 
   const handleToggleDrawMode = async () => {
     if (isDrawMode) {
-      // Turn OFF
+      // Exit drawing mode without automatic saving (user must click Complete Attachment)
       setIsDrawMode(false);
-      setBackgroundImage(null);
     } else {
       // Turn ON: Capture Background
       try {
@@ -47,15 +48,13 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
         if (element) {
           try {
             const dataUrl = await htmlToImage.toPng(element, { 
-              quality: 0.9, // Slightly reduced to ensure stability
-              pixelRatio: 2, // 3 might be too heavy causing timeouts or memory issues
+              quality: 0.9,
+              pixelRatio: 2,
               backgroundColor: '#1a1a2e',
               skipAutoScale: true,
               cacheBust: true,
-              // Fix for SecurityError with Google Fonts
               fontEmbedCSS: '', 
               filter: (node) => {
-                // Filter out external stylesheets that might cause CORS issues
                 if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
                    return false; 
                 }
@@ -64,14 +63,19 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
             });
             setBackgroundImage(dataUrl);
           } catch (captureErr) {
-            console.warn('Screen capture failed (likely CORS or Font issue), falling back to blank canvas:', captureErr);
-            // We do NOT want to stop draw mode just because capture failed.
-            // But we should try to get at least something or just proceed.
+            console.warn('Screen capture failed:', captureErr);
           }
         }
         
         setIsCapturing(false); 
         setIsDrawMode(true);
+
+        // If we have previous paths, load them after a short delay to ensure canvas is ready
+        if (paths.length > 0) {
+          setTimeout(() => {
+            canvasRef.current?.loadPaths(paths);
+          }, 100);
+        }
       } catch (err) {
         console.error('General error entering draw mode:', err);
         setIsCapturing(false);
@@ -80,10 +84,62 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
     }
   };
 
+  const finalizeDrawing = async () => {
+    if (!canvasRef.current) return;
+    
+    setIsSubmitting(true);
+    try {
+      // 1. Get Drawing Layer (Transparent PNG)
+      const drawingDataUrl = await canvasRef.current.exportImage('png');
+      const currentPaths = await canvasRef.current.exportPaths();
+      setPaths(currentPaths);
+      
+      let finalImageDataUrl = drawingDataUrl;
+
+      // 2. Merge with Background if exists
+      if (backgroundImage) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const bgImg = await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = backgroundImage;
+        });
+
+        const drawImg = await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = drawingDataUrl;
+        });
+
+        canvas.width = bgImg.width;
+        canvas.height = bgImg.height;
+        ctx.drawImage(bgImg, 0, 0);
+        ctx.drawImage(drawImg, 0, 0, canvas.width, canvas.height);
+        finalImageDataUrl = canvas.toDataURL('image/png');
+      }
+
+      setTempDrawing(finalImageDataUrl);
+      setIsDrawMode(false);
+    } catch (err) {
+      console.error('Failed to finalize drawing:', err);
+      setError('이미지 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveDrawing = () => {
+    setTempDrawing(null);
+    setPaths([]);
+    setBackgroundImage(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!content.trim() && !isDrawMode) return;
-
     setIsSubmitting(true);
     setError(null);
 
@@ -93,54 +149,14 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
 
       let drawingUrl = null;
 
-      // Handle Drawing Upload (with Background Merge)
-      if (isDrawMode && canvasRef.current) {
+      // Handle Final Upload to Firebase
+      if (tempDrawing) {
         try {
-          // 1. Get Drawing Layer (Transparent PNG)
-          const drawingDataUrl = await canvasRef.current.exportImage('png');
-          
-          let finalImageDataUrl = drawingDataUrl;
-
-          // 2. Merge with Background if exists
-          if (backgroundImage) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Load images async
-            const bgImg = await new Promise((resolve, reject) => {
-              const img = new Image();
-              img.onload = () => resolve(img);
-              img.onerror = reject;
-              img.src = backgroundImage;
-            });
-
-            const drawImg = await new Promise((resolve, reject) => {
-              const img = new Image();
-              img.onload = () => resolve(img);
-              img.onerror = reject;
-              img.src = drawingDataUrl;
-            });
-
-            // Set canvas size to match background
-            canvas.width = bgImg.width;
-            canvas.height = bgImg.height;
-
-            // Draw Background
-            ctx.drawImage(bgImg, 0, 0);
-            
-            // Draw Drawing Layer on top (scale to fit if needed)
-            ctx.drawImage(drawImg, 0, 0, canvas.width, canvas.height);
-
-            finalImageDataUrl = canvas.toDataURL('image/png');
-          }
-
-          // 3. Upload Merged Image
           const timestamp = Date.now();
           const path = `drawings/${user.uid}/${timestamp}.png`;
-          drawingUrl = await ImageService.uploadImage(finalImageDataUrl, path);
-
+          drawingUrl = await ImageService.uploadImage(tempDrawing, path);
         } catch (imgErr) {
-          console.error('Failed to process drawing:', imgErr);
+          console.error('Failed to upload drawing:', imgErr);
         }
       }
 
@@ -171,6 +187,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
       queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });
       
       setContent('');
+      setTempDrawing(null);
+      setPaths([]);
       setIsDrawMode(false);
       setBackgroundImage(null);
       onClose();
@@ -222,6 +240,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
                   {quizContext?.quizTitle} - {quizContext?.questionId ? `질문 중` : '자유 질문'}
                 </div>
 
+                {/* 
                 <div className="section-label font-tech">분류 선택</div>
                 <div className="type-selector">
                   {questionTypes.map(t => (
@@ -236,18 +255,36 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
                     </button>
                   ))}
                 </div>
+                */}
               </>
             )}
 
             <div className="draw-toggle-section">
-              <button 
-                type="button" 
-                className={`draw-toggle-btn ${isDrawMode ? 'active' : ''}`}
-                onClick={handleToggleDrawMode}
-                disabled={isCapturing}
-              >
-                {isCapturing ? '화면 캡처 중...' : (isDrawMode ? '↩️ 텍스트 모드로 돌아가기' : '🖌️ 그림으로 설명하기 (베타)')}
-              </button>
+              {tempDrawing && !isDrawMode ? (
+                <div className="drawing-preview-container">
+                  <div className="preview-label">첨부된 그림:</div>
+                  <div className="preview-box">
+                    <img src={tempDrawing} alt="Thumbnail" className="drawing-thumbnail" />
+                    <div className="preview-overlay">
+                      <button type="button" className="preview-btn edit" onClick={handleToggleDrawMode}>
+                        ✏️ 편집
+                      </button>
+                      <button type="button" className="preview-btn delete" onClick={handleRemoveDrawing}>
+                        🗑️ 삭제
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  type="button" 
+                  className={`draw-toggle-btn ${isDrawMode ? 'active' : ''}`}
+                  onClick={handleToggleDrawMode}
+                  disabled={isCapturing}
+                >
+                  {isCapturing ? '화면 캡처 중...' : (isDrawMode ? '↩️ 돌아가기' : '🖌️ 그림으로 설명하기 (베타)')}
+                </button>
+              )}
             </div>
 
             {isDrawMode ? (
@@ -299,8 +336,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
                   >
                     🗑️ 지우기
                   </button>
-                   <button type="submit" className="action-btn submit" disabled={isSubmitting}>
-                    {isSubmitting ? '전송 중...' : '질문 등록'}
+                   <button type="button" className="action-btn submit" onClick={finalizeDrawing} disabled={isSubmitting}>
+                    {isSubmitting ? '처리 중...' : '✅ 첨부 완료'}
                   </button>
                 </div>
               </div>
@@ -327,8 +364,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
 
                 <button 
                   type="submit" 
-                  className="submit-btn" 
-                  disabled={isSubmitting || (!content.trim() && !isDrawMode)}
+                  className="submit-btn"                   disabled={isSubmitting || (!content.trim() && !tempDrawing)}
                 >
                   {isSubmitting ? '보내는 중...' : '질문 보내기'}
                 </button>
