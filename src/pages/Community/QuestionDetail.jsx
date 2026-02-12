@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Send, CheckCircle, Heart, User, Trash2, Edit3, X, Save } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Send, CheckCircle, Heart, User, Trash2, Edit3, X, Save, Sparkles } from 'lucide-react';
 import { auth } from '../../firebase';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
 import { getRandomNickname } from '../../utils/qaUtils';
