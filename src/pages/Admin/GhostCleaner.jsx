@@ -1,8 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useRegions, useChapters, useUnits, useQuizzes, useAdminMutations } from '../../hooks/useContent';
-import { Trash2, AlertTriangle, RefreshCw, Eye, Ghost, Search, Globe, ShieldAlert } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
+import { Trash2, AlertTriangle, RefreshCw, Eye, Ghost, Search, Globe, ShieldAlert, Trash } from 'lucide-react';
+import { collection, getDocs, writeBatch, doc as firestoreDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { regions as localRegions } from '../../data/regions';
+import { chapter1Quizzes } from '../../data/chapter1Quizzes';
+import { chapter2Quizzes } from '../../data/chapter2Quizzes';
+import { chapter3Quizzes } from '../../data/chapter3Quizzes';
+import { chapter4Quizzes } from '../../data/chapter4Quizzes';
+import { chapter5Quizzes } from '../../data/chapter5Quizzes';
+import { chapter6Quizzes } from '../../data/chapter6Quizzes';
+import { ratioChapter1Quizzes } from '../../data/ratioChapter1Quizzes';
+import { ratioChapter2Quizzes } from '../../data/ratioChapter2Quizzes';
+import { ratioChapter3Quizzes } from '../../data/ratioChapter3Quizzes';
+import { ratioChapter4Quizzes } from '../../data/ratioChapter4Quizzes';
+import * as divisionData from '../../data/divisionQuizzes';
+import * as multiplicationData from '../../data/multiplicationQuizzes';
+import * as additionData from '../../data/additionQuizzes';
+
+const quizDataMapping = {
+  'chap1': chapter1Quizzes,
+  'chap2': chapter2Quizzes,
+  'chap3': chapter3Quizzes,
+  'chap4': chapter4Quizzes,
+  'chap5': chapter5Quizzes,
+  'chap6': chapter6Quizzes,
+  'ratio_chap1': ratioChapter1Quizzes,
+  'ratio_chap2': ratioChapter2Quizzes,
+  'ratio_chap3': ratioChapter3Quizzes,
+  'ratio_chap4': ratioChapter4Quizzes,
+  'div_chap1': divisionData.divisionChapterdiv_1Quizzes,
+  'mul_chap1': multiplicationData.multiplicationChaptermul_1Quizzes,
+  'mul_chap2': multiplicationData.multiplicationChaptermul_2Quizzes,
+  'mul_chap3': multiplicationData.multiplicationChaptermul_3Quizzes,
+  'add_chap1': additionData.additionChapteradd_1Quizzes,
+  'add_chap2': additionData.additionChapteradd_2Quizzes,
+  'add_chap3': additionData.additionChapteradd_3Quizzes,
+};
 
 const GhostCleaner = () => {
   const { data: regions, isLoading: loadingRegions } = useRegions();
@@ -20,8 +54,18 @@ const GhostCleaner = () => {
   // Global Scan State
   const [isGlobalMode, setIsGlobalMode] = useState(false);
   const [globalQuizzes, setGlobalQuizzes] = useState([]);
+  const [globalUnits, setGlobalUnits] = useState([]);
+  const [globalChapters, setGlobalChapters] = useState([]);
   const [scanning, setScanning] = useState(false);
-  const [scanStats, setScanStats] = useState({ total: 0, orphans: 0, suspicious: 0 });
+  const [scanStats, setScanStats] = useState({ total: 0, orphans: 0, suspicious: 0, unitOrphans: 0, chapterOrphans: 0 });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('quizzes'); // 'quizzes', 'units', 'chapters', 'scrub'
+  const [showOnlyOrphans, setShowOnlyOrphans] = useState(true);
+
+  // History Scrubber State
+  const [scrubResults, setScrubResults] = useState([]);
+  const [scrubbing, setScrubbing] = useState(false);
+  const [scrubStats, setScrubStats] = useState({ scanned: 0, bad: 0 });
 
   // Clear children selection when parent changes
   useEffect(() => setSelectedChapter(null), [selectedRegion]);
@@ -47,56 +91,86 @@ const GhostCleaner = () => {
   const runGlobalScan = async () => {
     setScanning(true);
     setGlobalQuizzes([]);
-    setInspectQuiz(null);
+    setGlobalUnits([]);
     try {
-      // 1. Fetch ALL Units to build a valid ID set
-      const unitsSnap = await getDocs(collection(db, 'units'));
-      const validUnitIds = new Set(unitsSnap.docs.map(d => d.id));
-      console.log(`[SCAN] Found ${validUnitIds.size} valid units.`);
+      console.log(`[SCAN] Target Project ID: ${db.app.options.projectId}`);
+      // 1. Fetch EVERYTHING from Firestore (The New Source of Truth)
+      const [regionsSnap, chaptersSnap, unitsSnap, quizzesSnap] = await Promise.all([
+        getDocs(collection(db, 'regions')),
+        getDocs(collection(db, 'chapters')),
+        getDocs(collection(db, 'units')),
+        getDocs(collection(db, 'quizzes'))
+      ]);
 
-      // 2. Fetch ALL Quizzes (This might be heavy, but it's an admin tool)
-      // Note: In a massive DB, this should be paginated or done via a cloud function.
-      const quizzesSnap = await getDocs(collection(db, 'quizzes'));
-      console.log(`[SCAN] Found ${quizzesSnap.size} total quizzes.`);
+      // 2. Audit Snapshot
+      const allFirestoreChapters = chaptersSnap.docs.map(d => ({ ...d.data(), docId: d.id }));
+      const allFirestoreUnits = unitsSnap.docs.map(d => ({ ...d.data(), docId: d.id }));
+      const allFirestoreQuizzes = quizzesSnap.docs.map(d => ({ ...d.data(), docId: d.id }));
 
-      const orphans = [];
-      let suspiciousCount = 0;
-
-      quizzesSnap.forEach(doc => {
-        const data = doc.data();
-        const quiz = { ...data, docId: doc.id };
+      // 3. Audit Chapters
+      const auditedChapters = allFirestoreChapters.map(chapter => {
         let isOrphan = false;
         let reasons = [];
-
-        // Check 1: Missing unitId
-        if (!quiz.unitId) {
+        if (!whitelistChapters.has(chapter.docId)) {
           isOrphan = true;
-          reasons.push('Missing unitId');
+          reasons.push('Registry Ghost (Chapter ID not in regions.js)');
+        }
+        const correctTitle = curriculumTitles.get(chapter.docId);
+        if (correctTitle && chapter.title !== correctTitle) {
+          isOrphan = true;
+          reasons.push(`Title Mismatch: Expected "${correctTitle}", found "${chapter.title}"`);
+        }
+        return { ...chapter, isOrphan, ghostReasons: reasons };
+      });
+      setGlobalChapters(auditedChapters);
+
+      // 4. Audit Units
+      const auditedUnits = allFirestoreUnits.map(unit => {
+        let isOrphan = false;
+        let reasons = [];
+        if (!whitelistUnits.has(unit.docId)) {
+          isOrphan = true;
+          reasons.push('Registry Ghost (Unit ID not in regions.js)');
+        }
+        const correctTitle = curriculumTitles.get(unit.docId);
+        if (correctTitle && unit.title !== correctTitle) {
+          isOrphan = true;
+          reasons.push(`Title Mismatch: Expected "${correctTitle}", found "${unit.title}"`);
+        }
+        return { ...unit, isOrphan, ghostReasons: reasons };
+      });
+      setGlobalUnits(auditedUnits);
+
+      // 5. Audit Quizzes
+      const auditedQuizzes = allFirestoreQuizzes.map(quiz => {
+        let isOrphan = false;
+        let reasons = [];
+        const qId = quiz.id || quiz.docId;
+        
+        // Rule A: Existence in Registry
+        if (!whitelistQuizzes.has(qId)) {
+          isOrphan = true;
+          reasons.push('Registry Ghost (Quiz ID not in local data files)');
         } 
-        // Check 2: Invalid unitId
-        else if (!validUnitIds.has(quiz.unitId)) {
+        // Rule B: Parent Connectivity Check
+        else if (!quiz.unitId) {
           isOrphan = true;
-          reasons.push(`Invalid unitId: ${quiz.unitId}`);
+          reasons.push('Stray Quiz (Missing parent unitId)');
+        } else if (quizToUnitMap.get(qId) !== quiz.unitId) {
+          isOrphan = true;
+          reasons.push(`Displaced Quiz: Expected Unit "${quizToUnitMap.get(qId)}", found in "${quiz.unitId}"`);
         }
 
-        // Check 3: Suspicious Content (Specific user report)
-        if (quiz.question && quiz.question.includes('비를 우리말로 읽어주세요')) {
-          // Even if it has a valid unit, flag it if it's the specific reported one
-          isOrphan = true; 
-          reasons.push('REPORTED SUSPICIOUS CONTENT');
-          suspiciousCount++;
-        }
-
-        if (isOrphan) {
-          orphans.push({ ...quiz, ghostReasons: reasons });
-        }
+        return { ...quiz, isOrphan, ghostReasons: reasons };
       });
 
-      setGlobalQuizzes(orphans);
+      setGlobalQuizzes(auditedQuizzes);
       setScanStats({ 
-        total: quizzesSnap.size, 
-        orphans: orphans.length, 
-        suspicious: suspiciousCount 
+        total: auditedQuizzes.length, 
+        orphans: auditedQuizzes.filter(q => q.isOrphan).length, 
+        suspicious: auditedQuizzes.filter(q => q.ghostReasons.some(r => r.includes('Displaced') || r.includes('Registry'))).length,
+        unitOrphans: auditedUnits.filter(u => u.isOrphan).length,
+        chapterOrphans: auditedChapters.filter(c => c.isOrphan).length
       });
 
     } catch (err) {
@@ -104,6 +178,232 @@ const GhostCleaner = () => {
       alert("Scan failed. Check console for details.");
     } finally {
       setScanning(false);
+    }
+  };
+
+  const getFilteredItems = () => {
+    let source = [];
+    if (activeTab === 'quizzes') source = globalQuizzes;
+    else if (activeTab === 'units') source = globalUnits;
+    else if (activeTab === 'chapters') source = globalChapters;
+
+    return source.filter(item => {
+      const matchesSearch = searchQuery === '' || 
+        JSON.stringify(item).toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesOrphan = !showOnlyOrphans || item.isOrphan;
+      
+      return matchesSearch && matchesOrphan;
+    });
+  };
+
+  const filteredItems = getFilteredItems();
+
+  const handlePurge = async () => {
+    const ghosts = globalQuizzes.filter(q => q.isOrphan);
+    if (ghosts.length === 0) return;
+    if (!confirm(`CRITICAL: Are you sure you want to delete ALL ${ghosts.length} detected ghost documents? This will permanently remove them from Firestore.`)) return;
+
+    setScanning(true);
+    try {
+      const batch = writeBatch(db);
+      ghosts.forEach(ghost => {
+        batch.delete(firestoreDoc(db, 'quizzes', ghost.docId));
+      });
+      await batch.commit();
+      setGlobalQuizzes(prev => prev.filter(q => !q.isOrphan));
+      alert(`${ghosts.length} ghost documents purged successfully.`);
+    } catch (err) {
+      console.error("Purge failed:", err);
+      alert("Purge failed. Check console.");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const purgeStaleUnits = async () => {
+    const targets = globalUnits.filter(u => u.isOrphan);
+    if (targets.length === 0) return;
+    if (!confirm(`CRITICAL: Are you sure you want to delete ${targets.length} detected ghost/stale units?`)) return;
+
+    setScanning(true);
+    try {
+      const batch = writeBatch(db);
+      targets.forEach(u => batch.delete(firestoreDoc(db, 'units', u.docId)));
+      await batch.commit();
+      alert(`Deleted ${targets.length} stale units.`);
+      runGlobalScan();
+    } catch (err) {
+      console.error("Unit purge failed:", err);
+      alert("Purge failed.");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const purgeStaleChapters = async () => {
+    const targets = globalChapters.filter(c => c.isOrphan);
+    if (targets.length === 0) return;
+    if (!confirm(`CRITICAL: Are you sure you want to delete ${targets.length} detected ghost/stale chapters?`)) return;
+
+    setScanning(true);
+    try {
+      const batch = writeBatch(db);
+      targets.forEach(c => batch.delete(firestoreDoc(db, 'chapters', c.docId)));
+      await batch.commit();
+      alert(`Deleted ${targets.length} stale chapters.`);
+      runGlobalScan();
+    } catch (err) {
+      console.error("Chapter purge failed:", err);
+      alert("Purge failed.");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleSyncTitle = async (item, type) => {
+    try {
+      const correctTitle = curriculumTitles.get(item.docId);
+      console.log(`[SYNC] Syncing ${type}/${item.docId} to: ${correctTitle}`);
+      if (!correctTitle) return alert("Could not find correct title in registry.");
+      
+      const batch = writeBatch(db);
+      batch.set(firestoreDoc(db, type, item.docId), { title: correctTitle }, { merge: true });
+      await batch.commit();
+      
+      // Update local state
+      if (type === 'units') setGlobalUnits(prev => prev.map(u => u.docId === item.docId ? { ...u, title: correctTitle, isOrphan: false, ghostReasons: [] } : u));
+      if (type === 'chapters') setGlobalChapters(prev => prev.map(c => c.docId === item.docId ? { ...c, title: correctTitle, isOrphan: false, ghostReasons: [] } : c));
+      
+      alert("Title synced successfully.");
+    } catch (err) {
+      console.error("Sync failed:", err);
+      alert("Sync failed: " + err.message);
+    }
+  };
+
+  const runHistoryScrub = async () => {
+    console.log("[SCRUB] Starting Deep History Audit...");
+    setScrubbing(true);
+    setScrubResults([]);
+    let totalScanned = 0;
+    let badRecords = [];
+
+    try {
+      // 1. Scan Questions (Agora/QA)
+      console.log("[SCRUB] Scanning questions collection...");
+      const questionsSnap = await getDocs(collection(db, 'questions'));
+      console.log(`[SCRUB] Found ${questionsSnap.size} questions.`);
+      
+      questionsSnap.docs.forEach(d => {
+        totalScanned++;
+        const data = d.data();
+        const savedTitle = data.quizContext?.quizTitle;
+        const unitId = data.quizContext?.unitId;
+        const correctTitle = curriculumTitles.get(unitId);
+
+        if (savedTitle && (savedTitle.includes('분해하는') || savedTitle.includes('범죄자') || (correctTitle && savedTitle !== correctTitle))) {
+          badRecords.push({
+            id: d.id,
+            path: `questions/${d.id}`,
+            data,
+            reason: savedTitle.includes('분해하는') ? 'Trash String Detected' : 'Stale Title (Legacy)',
+            savedTitle,
+            correctTitle: correctTitle || 'Unknown',
+            type: 'question'
+          });
+        }
+      });
+
+      // 2. Scan User History
+      console.log("[SCRUB] Fetching users list...");
+      const usersSnap = await getDocs(collection(db, 'users'));
+      console.log(`[SCRUB] Found ${usersSnap.size} users to audit history.`);
+      
+      for (const userDoc of usersSnap.docs) {
+        try {
+          const historySnap = await getDocs(collection(db, 'users', userDoc.id, 'history'));
+          if (!historySnap.empty) {
+            console.log(`[SCRUB] Auditing ${historySnap.size} records for user: ${userDoc.id}`);
+          }
+          
+          historySnap.docs.forEach(hd => {
+            totalScanned++;
+            const hData = hd.data();
+            const savedTitle = hData.unitTitle;
+            const unitId = hData.unitId;
+            const correctTitle = curriculumTitles.get(unitId);
+
+            if (savedTitle && (savedTitle.includes('분해하는') || savedTitle.includes('범죄자') || (correctTitle && savedTitle !== correctTitle))) {
+              badRecords.push({
+                id: hd.id,
+                userId: userDoc.id,
+                path: `users/${userDoc.id}/history/${hd.id}`,
+                data: hData,
+                reason: savedTitle.includes('분해하는') ? 'Trash String Detected' : 'Stale Title (Legacy)',
+                savedTitle,
+                correctTitle: correctTitle || 'Unknown',
+                type: 'history'
+              });
+            }
+          });
+        } catch (e) {
+          console.warn(`[SCRUB] Could not scan history for user ${userDoc.id}:`, e.message);
+        }
+      }
+
+      console.log(`[SCRUB] Finished. Scanned ${totalScanned} total records. Found ${badRecords.length} bad records.`);
+      setScrubResults(badRecords);
+      setScrubStats({ scanned: totalScanned, bad: badRecords.length });
+    } catch (err) {
+      console.error("[SCRUB] Major failure:", err);
+      alert("Scrub failed: " + err.message);
+    } finally {
+      setScrubbing(false);
+    }
+  };
+
+  const handleFixHistory = async (record) => {
+    try {
+      if (record.type === 'history') {
+        await firestoreDoc(db, 'users', record.userId, 'history', record.id).set({
+          unitTitle: record.correctTitle
+        }, { merge: true });
+      } else if (record.type === 'question') {
+        await firestoreDoc(db, 'questions', record.id).set({
+          quizContext: { ...record.data.quizContext, quizTitle: record.correctTitle }
+        }, { merge: true });
+      }
+      setScrubResults(prev => prev.filter(r => r.id !== record.id));
+    } catch (err) {
+      console.error("Fix failed:", err);
+      alert("Fix failed.");
+    }
+  };
+
+  const handleBatchFixHistory = async () => {
+    if (!confirm(`${scrubResults.length}개의 기록을 최신 커리큘럼 제목으로 강제 동기화하시겠습니까?`)) return;
+    setScrubbing(true);
+    try {
+      for (const record of scrubResults) {
+        if (record.correctTitle === 'Unknown') continue;
+        const ref = record.type === 'history' 
+          ? doc(db, 'users', record.userId, 'history', record.id)
+          : doc(db, 'questions', record.id);
+        
+        const update = record.type === 'history'
+          ? { unitTitle: record.correctTitle }
+          : { quizContext: { ...record.data.quizContext, quizTitle: record.correctTitle } };
+        
+        await setDoc(ref, update, { merge: true });
+      }
+      alert("Batch fix complete.");
+      runHistoryScrub();
+    } catch (err) {
+      console.error("Batch fix failed:", err);
+      alert("Batch fix failed.");
+    } finally {
+      setScrubbing(false);
     }
   };
 
@@ -178,80 +478,147 @@ const GhostCleaner = () => {
           </>
         ) : (
           <div className="flex items-center gap-4 ml-4 flex-1">
-             <button 
-              onClick={runGlobalScan}
-              disabled={scanning}
-              className="flex items-center gap-2 px-6 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/30 rounded transition-colors"
-            >
-              {scanning ? <RefreshCw className="animate-spin" size={18} /> : <ShieldAlert size={18} />}
-              {scanning ? 'Scanning Database...' : 'Run Global Orphan Scan'}
-            </button>
-            {scanStats.total > 0 && (
-              <span className="text-sm text-gray-400">
-                Scanned {scanStats.total} docs. Found <strong className="text-red-400">{scanStats.orphans} orphans</strong>.
-              </span>
-            )}
+              <div className="flex flex-wrap items-center gap-3">
+                <button 
+                  onClick={runGlobalScan}
+                  disabled={scanning}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all disabled:opacity-50 shadow-lg shadow-blue-900/20"
+                >
+                  <RefreshCw size={20} className={scanning ? 'animate-spin' : ''} />
+                  {scanning ? 'Scanning Firestore...' : 'Run Global Orphan Scan'}
+                </button>
+
+                <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
+                  <button 
+                    onClick={() => setShowOnlyOrphans(true)}
+                    className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${showOnlyOrphans ? 'bg-red-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    ORPHANS ONLY
+                  </button>
+                  <button 
+                    onClick={() => setShowOnlyOrphans(false)}
+                    className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${!showOnlyOrphans ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    ALL DOCUMENTS
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={20} />
+                <input 
+                  type="text"
+                  placeholder={`Search ${activeTab} by text, ID, or content...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-gray-600"
+                />
+              </div>
+
+              <div className="flex gap-2 p-1 bg-black/20 rounded-xl border border-white/5">
+                {[
+                  { id: 'quizzes', label: 'Quizzes', count: showOnlyOrphans ? scanStats.orphans : globalQuizzes.length },
+                  { id: 'units', label: 'Units', count: showOnlyOrphans ? scanStats.unitOrphans : globalUnits.length },
+                  { id: 'chapters', label: 'Chapters', count: showOnlyOrphans ? scanStats.chapterOrphans : globalChapters.length },
+                  { id: 'scrub', label: 'History Scrub', count: scrubResults.length }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id ? (tab.id === 'scrub' ? 'bg-orange-600 text-white' : 'bg-blue-500 text-white') : 'text-gray-400 hover:bg-white/5'}`}
+                  >
+                    {tab.label.toUpperCase()} ({tab.count})
+                  </button>
+                ))}
+              </div>
+                
+                <span className="text-sm text-gray-400 ml-4">
+                  {activeTab === 'scrub' ? `Found ${scrubStats.bad} issues.` : `Scanned ${scanStats.total} docs.`}
+                </span>
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* List Column */}
-          <div className="glass rounded-xl overflow-hidden flex flex-col h-[700px]">
-             <div className="p-4 bg-white/5 border-b border-white/10 flex justify-between items-center">
-               <h2 className="font-bold text-lg">
-                 {isGlobalMode ? `Scanned Orphans (${globalQuizzes.length})` : `Quizzes in Unit (${quizzes?.length || 0})`}
-               </h2>
-               <span className={`text-xs px-2 py-1 rounded ${isGlobalMode ? 'bg-red-500/20 text-red-300' : 'bg-purple-500/20 text-purple-300'}`}>
-                 {isGlobalMode ? 'Global Scan Results' : 'Live Unit Data'}
-               </span>
-             </div>
-             
-             <div className="overflow-y-auto flex-1 p-2 space-y-2">
-               {(isGlobalMode ? globalQuizzes : quizzes)?.length === 0 ? (
-                 <div className="text-center py-10 text-gray-500">
-                   {isGlobalMode 
-                     ? (scanning ? "Scanning..." : "No orphans found (Run Scan to check)") 
-                     : "No quizzes found in this unit."}
-                 </div>
-               ) : (
-                 (isGlobalMode ? globalQuizzes : quizzes)?.map((quiz, idx) => (
-                   <div 
-                     key={quiz.docId}
-                     onClick={() => setInspectQuiz(quiz)}
-                     className={`p-3 rounded cursor-pointer transition-all border ${
-                       inspectQuiz?.docId === quiz.docId 
-                         ? 'bg-purple-500/20 border-purple-500/50' 
-                         : 'bg-black/20 border-white/5 hover:bg-white/10'
-                     }`}
-                   >
-                     <div className="flex justify-between mb-1">
-                       <span className="font-mono text-xs text-gray-400">#{idx + 1} • {quiz.docId}</span>
-                       <span className="text-xs bg-white/10 px-1 rounded">{quiz.type}</span>
-                     </div>
-                     <p className="text-sm font-medium line-clamp-2">{quiz.question || "(No Question Text)"}</p>
-                     
-                     {/* Reasons in Global Mode */}
-                     {isGlobalMode && quiz.ghostReasons && (
-                       <div className="mt-2 flex flex-wrap gap-1">
-                         {quiz.ghostReasons.map((r, i) => (
-                           <span key={i} className="text-[10px] px-1 bg-red-500/20 text-red-300 border border-red-500/30 rounded">
-                             {r}
-                           </span>
-                         ))}
-                       </div>
-                     )}
+          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md">
+            <div className="p-6 bg-white/5 border-b border-white/10 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                {activeTab === 'scrub' ? 'History Issues' : (showOnlyOrphans ? 'Detected Ghosts' : 'All Firestore Records')}
+                <span className="text-sm bg-white/10 px-3 py-1 rounded-full text-gray-400 font-mono">
+                  {activeTab === 'scrub' ? `Found ${scrubResults.length}` : `Showing ${filteredItems.length}`}
+                </span>
+              </h2>
+              {activeTab === 'scrub' ? (
+                <div className="flex gap-2">
+                   <button onClick={runHistoryScrub} disabled={scrubbing} className="px-3 py-1 bg-blue-600 rounded text-xs">Re-Scan</button>
+                   {scrubResults.length > 0 && <button onClick={handleBatchFixHistory} disabled={scrubbing} className="px-3 py-1 bg-orange-600 rounded text-xs">Sync All Titles</button>}
+                </div>
+              ) : (
+                showOnlyOrphans && activeTab === 'quizzes' && filteredItems.length > 0 && (
+                  <button 
+                    onClick={handlePurge}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-red-900/20 animate-pulse"
+                  >
+                    <Trash2 size={18} /> Purge All {filteredItems.length} Quizzes
+                  </button>
+                )
+              )}
+            </div>
 
-                     {/* Heuristic for Ghost Detection in Normal Mode */}
-                     {!isGlobalMode && (!quiz.question || !quiz.options) && (
-                       <div className="flex items-center gap-1 text-red-400 text-xs mt-2">
-                         <AlertTriangle size={12} /> Malformed Data
+            <div className="divide-y divide-white/10 max-h-[500px] overflow-y-auto">
+              {activeTab === 'scrub' ? (
+                scrubResults.length === 0 ? (
+                  <div className="p-20 text-center">
+                    <ShieldAlert className="mx-auto mb-4 text-green-700" size={64} />
+                    <p className="text-green-500 text-lg">No history issues found.</p>
+                    <button onClick={runHistoryScrub} className="mt-4 text-blue-400 font-bold">Start History Audit</button>
+                  </div>
+                ) : (
+                  scrubResults.map(record => (
+                    <div key={record.path} className="p-4 hover:bg-white/5 cursor-pointer" onClick={() => setInspectQuiz(record)}>
+                       <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-bold bg-orange-500/20 text-orange-400 px-1 rounded">{record.reason}</span>
+                          <span className="text-[9px] text-gray-500 font-mono">{record.path}</span>
                        </div>
-                     )}
-                   </div>
-                 ))
-               )}
-             </div>
+                       <div className="text-red-300 line-through text-xs">{record.savedTitle}</div>
+                       <div className="text-emerald-400 text-sm font-bold">→ {record.correctTitle}</div>
+                    </div>
+                  ))
+                )
+              ) : (
+                filteredItems.length === 0 ? (
+                  <div className="p-20 text-center">
+                    <Ghost className="mx-auto mb-4 text-gray-700" size={64} />
+                    <p className="text-gray-500 text-lg">No items match your criteria.</p>
+                  </div>
+                ) : (
+                  filteredItems.map((item) => (
+                    <div 
+                      key={item.docId}
+                      className={`p-4 flex items-center justify-between transition-all cursor-pointer group ${inspectQuiz?.docId === item.docId ? 'bg-blue-500/20 shadow-[inset_4px_0_0_#3b82f6]' : 'hover:bg-white/5'}`}
+                      onClick={() => setInspectQuiz(item)}
+                    >
+                      {/* ... existing item list content ... */}
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${item.isOrphan ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-green-500/20 text-green-400 border-green-500/30'}`}>
+                            {item.isOrphan ? 'GHOST' : 'VALID'}
+                          </span>
+                          <span className="text-gray-400 text-xs font-mono truncate">{item.docId}</span>
+                        </div>
+                        <p className="text-white font-medium truncate group-hover:text-blue-300 transition-colors">
+                          {item.question || item.title || <span className="text-gray-600 italic">No Content</span>}
+                        </p>
+                      </div>
+                      <button className={`p-2 rounded-lg transition-all ${inspectQuiz?.docId === item.docId ? 'bg-blue-500 text-white' : 'text-gray-500 hover:bg-white/10 hover:text-white'}`}>
+                        <Eye size={20} />
+                      </button>
+                    </div>
+                  ))
+                )
+              )}
+            </div>
           </div>
 
           {/* Inspector Column */}
@@ -266,9 +633,9 @@ const GhostCleaner = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="text-xl font-bold text-white mb-1">
-                      {isGlobalMode ? 'Orphan Inspector' : 'Quiz Inspector'}
+                      {isGlobalMode ? 'Global Item Inspector' : 'Quiz Inspector'}
                     </h3>
-                    <p className="font-mono text-sm text-purple-300">{inspectQuiz.docId}</p>
+                    <p className="font-mono text-sm text-purple-300">ID: {inspectQuiz.docId}</p>
                   </div>
                   <button 
                     onClick={() => handleDelete(inspectQuiz.docId)}
@@ -280,7 +647,17 @@ const GhostCleaner = () => {
 
                 {isGlobalMode && inspectQuiz.ghostReasons && (
                    <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-lg">
-                      <span className="text-xs uppercase text-red-400 font-bold block mb-2">Why is this a ghost?</span>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs uppercase text-red-400 font-bold block">Why is this flagged?</span>
+                        {inspectQuiz.ghostReasons.some(r => r.includes('Title Mismatch')) && (
+                          <button 
+                            onClick={() => handleSyncTitle(inspectQuiz, activeTab)}
+                            className="bg-green-600 hover:bg-green-500 text-white text-[10px] px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"
+                          >
+                            <RefreshCw size={12} /> Sync Correct Title
+                          </button>
+                        )}
+                      </div>
                       <ul className="list-disc list-inside text-sm text-red-200">
                         {inspectQuiz.ghostReasons.map((r, i) => <li key={i}>{r}</li>)}
                       </ul>
@@ -288,8 +665,12 @@ const GhostCleaner = () => {
                 )}
 
                 <div className="bg-black/30 p-4 rounded-lg">
-                  <span className="text-xs uppercase text-gray-500 font-bold block mb-2">Question Text</span>
-                  <p className="text-lg text-white">{inspectQuiz.question || <span className="text-red-400 italic">Undefined</span>}</p>
+                  <span className="text-xs uppercase text-gray-400 font-bold block mb-2 font-mono">
+                    {activeTab === 'quizzes' ? 'Question Text' : 'Title'}
+                  </span>
+                  <p className="text-lg text-white">
+                    {inspectQuiz.question || inspectQuiz.title || <span className="text-red-400 italic">Undefined</span>}
+                  </p>
                 </div>
 
                 {inspectQuiz.imageUrl && (

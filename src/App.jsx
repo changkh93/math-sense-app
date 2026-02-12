@@ -11,6 +11,7 @@ import { usePerformance } from './contexts/PerformanceContext'
 import ContentManager from './pages/Admin/ContentManager'
 import QuizEditor from './pages/Admin/QuizEditor'
 import DataSync from './pages/Admin/DataSync'
+import GhostCleaner from './pages/Admin/GhostCleaner'
 import TeacherQA from './pages/Admin/TeacherQA'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
@@ -36,6 +37,7 @@ function App() {
         <Route path="content" element={<ContentManager />} />
         <Route path="quizzes/:unitId" element={<QuizEditor />} />
         <Route path="data-sync" element={<DataSync />} />
+        <Route path="ghost-cleaner" element={<GhostCleaner />} />
         <Route path="qa" element={<TeacherQA />} />
       </Route>
 

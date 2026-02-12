@@ -341,7 +341,7 @@ function SpaceHome() {
 
       await addDoc(collection(db, 'users', user.uid, 'history'), {
         unitId: currentUnitId,
-        unitTitle: activeUnit?.title || history.find(h => h.unitId === currentUnitId)?.unitTitle || "탐사 퀴즈",
+        unitTitle: activeUnit?.title || "탐사 퀴즈",
         regionId: selectedRegionId || history.find(h => h.unitId === currentUnitId)?.regionId,
         regionTitle: activeRegion?.title || "Unknown Galaxy",
         chapterId: selectedChapterDocId,
@@ -695,7 +695,7 @@ function SpaceHome() {
           quizData={{ 
             unitId: selectedUnitDocId || quickQuizUnitId,
             chapterId: selectedChapterDocId || history.find(h => h.unitId === quickQuizUnitId)?.chapterId,
-            title: activeUnit?.title || history.find(h => h.unitId === quickQuizUnitId)?.unitTitle || "탐사 퀴즈", 
+            title: activeUnit?.title || "탐사 퀴즈", 
             questions: unitQuizzes 
           }}
           onExit={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
@@ -989,7 +989,7 @@ function SpaceHome() {
                 if (p.unitId) {
                   setPendingUnit({
                     docId: p.unitId,
-                    title: p.unitTitle || "탐사 퀴즈",
+                    title: p.unitTitle,
                     bestScore: bestScores[p.unitId],
                     source: 'dashboard'
                   })
