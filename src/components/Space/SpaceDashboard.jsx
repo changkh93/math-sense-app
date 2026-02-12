@@ -120,7 +120,111 @@ function StarNavigator({ regions, history, onFilterChange, currentLevel, navStat
   )
 }
 
+/**
+ * ChronicleScrubber - 시계열 타임라인 내비게이션
+ */
+function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo }) {
+  const [hoverNode, setHoverNode] = useState(null)
+  const containerRef = React.useRef(null)
+
+  const sorted = useMemo(() => [...history].reverse(), [history])
+  if (sorted.length === 0) return null
+
+  const firstTime = sorted[0].timestamp?.seconds * 1000 || Date.now()
+  const lastTime = sorted[sorted.length - 1].timestamp?.seconds * 1000 || Date.now()
+  const duration = Math.max(1, lastTime - firstTime)
+
+  // 월별 레이블 추출 및 밀도 계산 (Activity Density)
+  const sectors = useMemo(() => {
+    const months = {}
+    sorted.forEach((h, i) => {
+      const date = new Date(h.timestamp?.seconds * 1000)
+      const key = `${date.getFullYear()}.${date.getMonth() + 1}`
+      if (!months[key]) months[key] = { startIdx: i, count: 0 }
+      months[key].count++
+    })
+    return Object.entries(months).map(([label, data]) => {
+      const h = sorted[data.startIdx]
+      const t = h.timestamp?.seconds * 1000
+      const left = ((t - firstTime) / duration) * 100
+      const density = Math.min(1, data.count / 30) // 최대 30개 기준 밀도
+      return { label, left, density }
+    })
+  }, [sorted, firstTime, duration])
+
+  return (
+    <div className="chronicle-container" ref={containerRef}>
+      <div className="chronicle-axis">
+        <div className="chronicle-milky-way" />
+        
+        {/* Activity Clusters (Nebula clouds) */}
+        {sectors.map((s, i) => (
+          <motion.div 
+            key={i} 
+            className="chronicle-sector-label" 
+            style={{ left: `${s.left}%` }}
+            animate={{ opacity: [0.3, 0.6, 0.3] }}
+            transition={{ repeat: Infinity, duration: 4, delay: i * 0.5 }}
+          >
+            <div style={{ 
+              position: 'absolute', top: 0, left: '50%', transform: 'translate(-50%, -50%)',
+              width: 40 + s.density * 60, height: 20, 
+              background: 'var(--crystal-glow)', filter: 'blur(20px)', opacity: s.density * 0.5,
+              borderRadius: '50%', zIndex: -1
+            }} />
+            {s.label}
+          </motion.div>
+        ))}
+
+        {sorted.map((h, i) => {
+          const t = h.timestamp?.seconds * 1000
+          const left = ((t - firstTime) / duration) * 100
+          // 시간 차이가 너무 크면 점 사이를 띄우기 (이미 duration 기반이라 자동 적용됨)
+          
+          const targetWindow = Math.floor((history.length - 1 - i) / windowSize)
+          const isActive = targetWindow === windowIndex
+          const isMilestone = h.score === 100
+
+          return (
+            <motion.div
+              key={h.id}
+              className={`chronicle-node ${isActive ? 'active' : ''} ${isMilestone ? 'milestone' : ''}`}
+              style={{ left: `${left}%` }}
+              onMouseEnter={() => setHoverNode({ ...h, left, date: new Date(t).toLocaleDateString() })}
+              onMouseLeave={() => setHoverNode(null)}
+              onClick={() => onWarpTo(targetWindow)}
+            />
+          )
+        })}
+      </div>
+
+      <AnimatePresence>
+        {hoverNode && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+            className="hologram-preview"
+            style={{ left: `${hoverNode.left}%`, transform: 'translateX(-50%)' }}
+          >
+            <div className="hologram-title">{hoverNode.unitTitle}</div>
+            <div className="hologram-meta">
+              <span>{hoverNode.date}</span>
+              <span style={{ fontWeight: 900 }}>{hoverNode.score}pts</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div style={{ textAlign: 'center', fontSize: '10px', color: 'var(--text-muted)', marginTop: '1.5rem', letterSpacing: '3px' }}>
+        CHRONICLE TIMELINE
+      </div>
+    </div>
+  )
+}
+
 function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping }) {
+  const [hoveredNode, setHoveredNode] = useState(null)
   if (!data || data.length === 0) {
     return (
       <div style={{ 
@@ -201,13 +305,15 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
 
             {points.map((p, i) => {
               const isLatest = i === points.length - 1 && windowIndex === 0;
-              const isOld = i < 3 && windowIndex > 0; // 왼쪽 뒤로 사라지는 효과
+              const isOld = i < 3 && windowIndex > 0;
               
               return (
                 <g 
                   key={i} 
                   style={{ cursor: 'pointer', filter: isOld ? 'url(#nebula-filter)' : 'none', opacity: isOld ? 0.4 : 1 }} 
                   onClick={() => onItemClick && onItemClick(p)}
+                  onMouseEnter={() => setHoveredNode(p)}
+                  onMouseLeave={() => setHoveredNode(null)}
                 >
                   {p.score === 100 && (
                     <circle cx={p.x} cy={p.y} r="12" fill="var(--star-gold)" opacity="0.1" />
@@ -236,37 +342,44 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
                     </motion.g>
                   )}
 
-                  <text x={p.x} y={p.y - 18} textAnchor="middle" fill="var(--text-bright)" fontSize="11" fontWeight="800">
-                    {p.score}
+                  {/* 세션 넘버 표시 (텍스트 대신) */}
+                  <text x={p.x} y={height - 15} textAnchor="middle" fill="var(--text-muted)" fontSize="9" fontWeight="700">
+                    {`EXP-${String(i + 1).padStart(2, '0')}`}
                   </text>
                   
-                  <foreignObject x={p.x - 30} y={height - 55} width="60" height="40">
-                    <div style={{ 
-                      textAlign: 'center', 
-                      fontSize: '9px', 
-                      color: 'var(--text-muted)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      lineHeight: '1.2'
-                    }}>
-                      {p.unitTitle}
-                    </div>
-                    <div style={{ 
-                      textAlign: 'center', 
-                      fontSize: '7px', 
-                      color: 'var(--text-muted)',
-                      opacity: 0.5,
-                      textTransform: 'uppercase'
-                    }}>
-                      {p.regionTitle?.slice(0, 6)}
-                    </div>
-                  </foreignObject>
+                  {/* 행성 아이콘 (랜드마크) */}
+                  <circle cx={p.x} cy={height - 35} r="3" fill={colorScale[1]} opacity={0.4} />
                 </g>
               )
             })}
           </svg>
         </motion.div>
+      </AnimatePresence>
+
+      {/* Hologram Tooltip */}
+      <AnimatePresence>
+        {hoveredNode && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            className="hologram-preview"
+            style={{ 
+              left: `${(hoveredNode.x / width) * 100}%`, 
+              top: hoveredNode.y - 70,
+              transform: 'translateX(-50%)' 
+            }}
+          >
+            <div className="hologram-title">{hoveredNode.unitTitle}</div>
+            <div className="hologram-meta">
+              <span>{new Date(hoveredNode.timestamp?.seconds * 1000).toLocaleDateString()}</span>
+              <span style={{ color: 'var(--star-gold)', fontWeight: 800 }}>{hoveredNode.score} PTS</span>
+            </div>
+            <div style={{ marginTop: '8px', fontSize: '8px', opacity: 0.5, letterSpacing: '2px', textTransform: 'uppercase' }}>
+              SECTOR: {hoveredNode.regionTitle || 'UNKNOWN'}
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Warp overlay */}
@@ -485,36 +598,12 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions }
               isWarping={isWarping}
             />
             
-            {/* Timeline Teleport (Minimap) */}
-            <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                {[...filteredHistory].reverse().map((h, i) => {
-                  const targetWindow = Math.floor((filteredHistory.length - 1 - i) / WINDOW_SIZE);
-                  const isActive = targetWindow === windowIndex;
-                  const isCurrent = i === filteredHistory.length - 1;
-
-                  return (
-                    <motion.div
-                      key={h.id}
-                      whileHover={{ scale: 1.5, y: -2 }}
-                      onClick={() => handleWarp(targetWindow)}
-                      style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        background: isCurrent ? 'var(--crystal-cyan)' : (isActive ? 'white' : 'rgba(255,255,255,0.15)'),
-                        cursor: 'pointer',
-                        boxShadow: isActive ? '0 0 8px white' : 'none'
-                      }}
-                      title={`${h.unitTitle} (${h.score}점)`}
-                    />
-                  )
-                })}
-              </div>
-              <div style={{ textAlign: 'center', fontSize: '10px', color: 'var(--text-muted)', marginTop: '0.8rem', letterSpacing: '2px' }}>
-                TIMELINE TELEPORT
-              </div>
-            </div>
+            <ChronicleScrubber 
+              history={filteredHistory}
+              windowIndex={windowIndex}
+              windowSize={WINDOW_SIZE}
+              onWarpTo={handleWarp}
+            />
           </>
         )}
       </section>

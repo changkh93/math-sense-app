@@ -524,3 +524,117 @@
   z-index: 101;
   pointer-events: none;
 }
+/* ========================================
+   🛰️ Chronicle Scrubber (Timeline)
+   ======================================== */
+.chronicle-container {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.chronicle-axis {
+  position: relative;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin: 0 20px;
+}
+
+.chronicle-milky-way {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(0, 243, 255, 0.2) 20%, 
+    rgba(188, 19, 254, 0.2) 50%, 
+    rgba(0, 243, 255, 0.2) 80%, 
+    transparent 100%
+  );
+  filter: blur(4px);
+}
+
+.chronicle-node {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chronicle-node:hover {
+  background: var(--text-bright);
+  box-shadow: 0 0 10px white;
+  transform: translate(-50%, -50%) scale(1.5);
+}
+
+.chronicle-node.active {
+  background: var(--crystal-cyan);
+  box-shadow: 0 0 15px var(--crystal-cyan);
+  width: 10px;
+  height: 10px;
+}
+
+.chronicle-node.milestone {
+  background: var(--star-gold);
+  box-shadow: 0 0 15px var(--star-gold);
+  width: 12px;
+  height: 12px;
+}
+
+.chronicle-sector-label {
+  position: absolute;
+  top: -25px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Hologram Preview */
+.hologram-preview {
+  position: absolute;
+  bottom: 25px;
+  background: rgba(5, 5, 16, 0.9);
+  border: 1px solid var(--crystal-cyan);
+  padding: 10px 15px;
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 200;
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
+  backdrop-filter: blur(8px);
+  min-width: 150px;
+}
+
+.hologram-preview::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--crystal-cyan);
+}
+
+.hologram-title {
+  font-size: 11px;
+  color: var(--text-bright);
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.hologram-meta {
+  font-size: 9px;
+  color: var(--crystal-cyan);
+  display: flex;
+  justify-content: space-between;
+}
