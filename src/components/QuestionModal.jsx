@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
@@ -24,7 +24,19 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
   const [strokeColor, setStrokeColor] = useState('#ff0000'); // Default Red
   const [tempDrawing, setTempDrawing] = useState(null); // DataURL of merged image
   const [paths, setPaths] = useState([]); // Raw paths for re-editing
+  const [canvasKey, setCanvasKey] = useState(0); // Key to force re-render
   const canvasRef = useRef(null);
+
+  // Force canvas refresh when entering draw mode to ensure correct resolution
+  useEffect(() => {
+    if (isDrawMode && !isCapturing) {
+      // Small delay to allow CSS transition (width change) to complete
+      const timer = setTimeout(() => {
+        setCanvasKey(prev => prev + 1);
+      }, 350); 
+      return () => clearTimeout(timer);
+    }
+  }, [isDrawMode, isCapturing]);
 
   const questionTypes = [
     { id: 'quiz', label: '이 문제 질문', icon: '📝' },
@@ -219,10 +231,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
           exit={{ scale: 0.9, y: 20 }}
           style={{ 
             opacity: isCapturing ? 0 : 1,
-            // Use 90vw/90vh for safety to avoid scrollbar issues
-            width: isDrawMode ? '90vw' : '90%',
-            height: isDrawMode ? '90vh' : 'auto',
-            maxWidth: isDrawMode ? 'none' : '500px',
+            // Use 95% width and max-width 1200px to match CSS
+            width: isDrawMode ? '95%' : '90%',
+            height: isDrawMode ? '95vh' : 'auto',
+            maxWidth: isDrawMode ? '1200px' : '500px',
             transition: 'width 0.3s, height 0.3s'
           }}
           onClick={e => e.stopPropagation()}
@@ -295,6 +307,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
                 backgroundRepeat: 'no-repeat'
               }}>
                 <ReactSketchCanvas
+                  key={canvasKey}
                   ref={canvasRef}
                   style={{ background: 'transparent' }}
                   width="100%"

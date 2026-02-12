@@ -230,14 +230,20 @@
 
 /* Full Screen Drawing Mode */
 .question-modal-content.drawing-mode {
-  width: 98vw !important;
+  width: 95% !important; /* Changed from 98vw for responsiveness */
+  max-width: 1200px !important; /* Limit maximum width */
   height: 95vh !important;
-  max-width: none !important;
+  margin: 0 auto; /* Center the modal */
   padding: 1rem;
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+  box-sizing: border-box; /* Ensure padding doesn't affect width */
+}
+
+.question-modal-content.drawing-mode * {
+  box-sizing: border-box; /* Apply to children as well */
 }
 
 .drawing-mode .modal-header h3 {
