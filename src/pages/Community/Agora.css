@@ -14,8 +14,24 @@
 }
 
 .agora-header {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
   text-align: center;
+}
+
+.ticker-row {
+  display: flex;
+  align-items: stretch;
+  gap: 1.2rem;
+  width: 100%;
+}
+
+.ticker-row > :first-child {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.ticker-row > :last-child {
+  flex-shrink: 0;
 }
 
 .subtitle {

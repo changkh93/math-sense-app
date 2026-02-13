@@ -8,6 +8,7 @@ import QuestionModal from '../../components/QuestionModal';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import AgoraLiveTicker from '../../components/Community/AgoraLiveTicker';
+import StarMessageInput from '../../components/Community/StarMessageInput';
 import AgoraMotivationPanel from '../../components/Community/AgoraMotivationPanel';
 import { useAuth } from '../../hooks/useAuth';
 import './Agora.css';
@@ -41,8 +42,6 @@ export default function Agora() {
     }
   }, [highlightId, allQuestions, isLoading]);
 
-  // Ticker needs global questions regardless of current filter
-  const { data: tickerQuestions } = usePublicQuestions('all');
 
   const questions = React.useMemo(() => {
     if (!allQuestions) return [];
@@ -91,10 +90,13 @@ export default function Agora() {
       
       <div className="agora-content-wrapper">
         <header className="agora-header">
-          <AgoraLiveTicker questions={tickerQuestions || []} />
+          <div className="ticker-row">
+            <AgoraLiveTicker />
+            <StarMessageInput />
+          </div>
           <div className="agora-title">
             <h1 className="gradient-text">수학 아고라</h1>
-            <p className="font-tech subtitle">궁금한 개념이나 키워드를 별에서 찾아 탐험해보세요!</p>
+            <p className="font-tech subtitle">궁금한 개념을 묻고, 성단의 친구들과 짧은 한마디를 나누어보세요!</p>
           </div>
         </header>
 
