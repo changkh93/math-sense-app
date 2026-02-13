@@ -11,7 +11,9 @@ import {
   serverTimestamp,
   increment,
   getDoc,
-  deleteDoc
+  deleteDoc,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 
@@ -123,10 +125,30 @@ export function useQAMutations() {
     // ... (upvote and addAnswer remain same, or I'll include them for context)
     upvote: useMutation({
       mutationFn: async (questionId) => {
+        const user = auth.currentUser;
+        if (!user) throw new Error('로그인이 필요합니다.');
+
         const docRef = doc(db, 'questions', questionId);
-        await updateDoc(docRef, {
-          upvotes: increment(1)
-        });
+        const snap = await getDoc(docRef);
+        if (!snap.exists()) return;
+        
+        const data = snap.data();
+        const upvotedBy = data.upvotedBy || [];
+        const isUpvoted = upvotedBy.includes(user.uid);
+
+        if (isUpvoted) {
+          // Toggle off
+          await updateDoc(docRef, {
+            upvotedBy: arrayRemove(user.uid),
+            upvotes: increment(-1)
+          });
+        } else {
+          // Toggle on
+          await updateDoc(docRef, {
+            upvotedBy: arrayUnion(user.uid),
+            upvotes: increment(1)
+          });
+        }
       },
       onSuccess: (_, questionId) => {
         queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });

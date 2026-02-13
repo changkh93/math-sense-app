@@ -173,6 +173,8 @@ export default function QuestionDetail() {
                 onClose={() => setIsPreviewOpen(false)}
                 unitId={question.quizContext?.unitId}
                 quizId={question.quizContext?.questionId}
+                showCorrectAnswer={false}
+                showHint={false}
               />
 
               {question.drawingUrl && (
@@ -184,10 +186,10 @@ export default function QuestionDetail() {
 
               <div className="card-footer">
                 <button 
-                  className={`stat-item ${question.upvotes > 0 ? 'active' : ''}`}
+                  className={`stat-item ${question.upvotedBy?.includes(auth.currentUser?.uid) ? 'active' : ''}`}
                   onClick={() => upvote.mutate(question.id)}
                 >
-                  <Heart size={18} fill={question.upvotes > 0 ? "currentColor" : "none"} />
+                  <Heart size={18} fill={question.upvotedBy?.includes(auth.currentUser?.uid) ? "currentColor" : "none"} />
                   <span>나도 궁금해요 {question.upvotes || 0}</span>
                 </button>
 

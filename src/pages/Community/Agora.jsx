@@ -14,7 +14,7 @@ import './Agora.css';
 
 export default function Agora() {
   const navigate = useNavigate();
-  const { userData } = useAuth();
+  const { user, userData } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get('filter') || 'all';
   const highlightId = searchParams.get('highlight');
@@ -204,10 +204,10 @@ export default function Agora() {
                     </div>
                     <div className="stats-info">
                       <button 
-                        className={`stat-item ${q.upvotes > 0 ? 'active' : ''}`}
+                        className={`stat-item ${q.upvotedBy?.includes(user?.uid) ? 'active' : ''}`}
                         onClick={(e) => handleUpvote(e, q.id)}
                       >
-                        <Heart size={16} fill={q.upvotes > 0 ? "currentColor" : "none"} />
+                        <Heart size={16} fill={q.upvotedBy?.includes(user?.uid) ? "currentColor" : "none"} />
                         <span>{q.upvotes || 0}</span>
                       </button>
                       <div className="stat-item">

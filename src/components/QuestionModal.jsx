@@ -190,6 +190,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
         drawingUrl,
         status: 'open',
         upvotes: 0,
+        upvotedBy: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };

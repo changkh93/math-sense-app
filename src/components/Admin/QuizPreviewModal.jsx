@@ -8,7 +8,14 @@ import 'katex/dist/katex.min.css';
 
 import ReactDOM from 'react-dom';
 
-export default function QuizPreviewModal({ isOpen, onClose, unitId, quizId }) {
+export default function QuizPreviewModal({ 
+  isOpen, 
+  onClose, 
+  unitId, 
+  quizId,
+  showCorrectAnswer = true,
+  showHint = true
+}) {
   const { data: quizzes, isLoading: loadingQuizzes } = useQuizzes(unitId);
   
   // console.log(`[DEBUG] Preview Modal - UnitId: ${unitId}, QuizId: ${quizId}`);
@@ -72,19 +79,19 @@ export default function QuizPreviewModal({ isOpen, onClose, unitId, quizId }) {
 
               <div className="preview-options">
                 {quiz.options.map((opt, idx) => (
-                  <div key={idx} className={`preview-option ${opt.isCorrect ? 'correct' : ''}`}>
+                  <div key={idx} className={`preview-option ${showCorrectAnswer && opt.isCorrect ? 'correct' : ''}`}>
                     <span className="opt-idx">{idx + 1}</span>
                     <span className="opt-text">
                       {opt.text.split(/(\$.*?\$)/g).map((part, i) => 
                         part.startsWith('$') ? <InlineMath key={i} math={part.slice(1, -1)} /> : part
                       )}
                     </span>
-                    {opt.isCorrect && <Check size={16} className="correct-icon" />}
+                    {showCorrectAnswer && opt.isCorrect && <Check size={16} className="correct-icon" />}
                   </div>
                 ))}
               </div>
 
-              {quiz.hint && (
+              {showHint && quiz.hint && (
                 <div className="preview-hint">
                   <strong>💡 힌트:</strong> {quiz.hint}
                 </div>
