@@ -58,6 +58,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     const parts = sanitized.split('$')
     return parts.map((part, i) => {
       if (i % 2 === 1) {
+        // 순수 한글(+공백, 구두점)만 포함된 경우 KaTeX가 아닌 일반 텍스트로 처리
+        // (AI 임포트 시 불필요하게 $...$로 감싸진 한글 보정)
+        if (/^[\uAC00-\uD7AF\u3131-\u3163\s,.!?()]+$/.test(part)) {
+          return part
+        }
         let math = part
         if (math.includes('/') && !math.includes('\\frac')) {
           math = math.replace(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/g, '\\frac{$1}{$2}')
@@ -211,7 +216,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setReSolveMode(true)
   }
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (isSubmitting) return
     setIsSubmitting(true)
     
@@ -221,25 +226,24 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     
     // 점수 계산: 재도전 여부와 관계없이 최초 총 문항수 기준으로 계산
     const score100 = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0
-    
-    // 만점 보너스 조건: 
-    // 1. 재도전 모드가 아닐 때 100% 달성 
-    // 2. 또는 재도전 후 모든 문제를 맞혔더라도, 보너스는 최초 100%일 때만 강력 부여 (혹은 정책에 따라 차등)
-    // 여기서는 '최초 만점' 또는 '재도전 포함 최종 만점' 중 '최초 만점'에만 보너스를 주는 것이 일관성을 높임
     const canGetPerfectBonus = (correctCount === originalTotal)
-    
     const crystalsEarned = sessionCrystals + (canGetPerfectBonus ? 10 : 0)
     
-    onComplete({ 
-      score: score100, 
-      total: 100, 
-      correctCount, 
-      totalCount: originalTotal, 
-      questions: currentQuestions,
-      crystalsEarned,
-      isPerfect: canGetPerfectBonus,
-      shieldUsed
-    })
+    try {
+      await onComplete({ 
+        score: score100, 
+        total: 100, 
+        correctCount, 
+        totalCount: originalTotal, 
+        questions: currentQuestions,
+        crystalsEarned,
+        isPerfect: canGetPerfectBonus,
+        shieldUsed
+      })
+    } catch (err) {
+      console.error("Finish failed:", err)
+      setIsSubmitting(false)
+    }
   }
 
   if (!isResultMode) {
@@ -473,7 +477,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             </p>
             <button 
               className="quiz-btn primary"
-              onClick={() => handleComplete({ score: 0, total: 0 })} 
+              onClick={() => handleFinish()} 
               style={{ width: '100%' }}
             >
               퀴즈 종료하고 나가기
@@ -489,6 +493,38 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       <StarField count={100} />
       
       <div className="space-quiz-container scale-in">
+        {/* 선생님 호출 버튼 (최상위 레이어 가시성 확보) */}
+        {!isResultMode && (
+          <button 
+            className="space-teacher-btn glass-card" 
+            onClick={() => setIsQuestionModalOpen(true)}
+            style={{
+              position: 'fixed',
+              bottom: '2rem',
+              right: '2rem',
+              padding: '0 1.5rem',
+              borderRadius: '30px',
+              height: '50px',
+              fontSize: '1rem',
+              fontWeight: 800,
+              color: 'var(--crystal-cyan)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.6rem',
+              cursor: 'pointer',
+              border: '2px solid rgba(0, 243, 255, 0.6)',
+              boxShadow: '0 0 25px rgba(0, 243, 255, 0.4)',
+              background: 'rgba(5, 5, 20, 0.9)',
+              zIndex: 9999,
+              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+            }}
+          >
+            <span style={{ fontSize: '1.4rem' }}>🙋</span>
+            <span>선생님 질문</span>
+          </button>
+        )}
+
         <div id="quiz-capture-area" className="glass-card space-quiz-card">
           {/* 나가기 버튼 */}
           <button 
@@ -502,7 +538,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               color: 'var(--text-muted)',
               padding: '0.5rem 1rem',
               borderRadius: '10px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              zIndex: 10
             }}
           >
             ✕ 나가기
@@ -703,32 +740,6 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               </motion.div>
             ))}
           </AnimatePresence>
-
-          {/* 선생님 호출 버튼 */}
-          {!isResultMode && (
-            <button 
-              className="space-teacher-btn glass-card" 
-              onClick={() => setIsQuestionModalOpen(true)}
-              style={{
-                position: 'absolute',
-                bottom: '1rem',
-                right: '1rem',
-                padding: '0.8rem',
-                borderRadius: '50%',
-                width: '50px',
-                height: '50px',
-                fontSize: '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                border: '1px solid rgba(0, 243, 255, 0.3)',
-                boxShadow: 'var(--glow-cyan)'
-              }}
-            >
-              🙋
-            </button>
-          )}
 
           <QuestionModal 
             isOpen={isQuestionModalOpen}

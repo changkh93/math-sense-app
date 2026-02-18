@@ -50,6 +50,10 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
     const parts = sanitized.split('$');
     return parts.map((part, i) => {
       if (i % 2 === 1) {
+        // 순수 한글(+공백, 구두점)만 포함된 경우 KaTeX가 아닌 일반 텍스트로 처리
+        if (/^[\uAC00-\uD7AF\u3131-\u3163\s,.!?()]+$/.test(part)) {
+          return part;
+        }
         let math = part;
         // Auto-convert n/d to \frac{n}{d} if not already using \frac
         if (math.includes('/') && !math.includes('\\frac')) {

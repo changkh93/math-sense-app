@@ -377,3 +377,7 @@
   box-shadow: 0 6px 20px rgba(0, 243, 255, 0.4);
 }
 
+/* 2D 옵션 버튼 내 KaTeX 크기 통일 */
+.option-btn .katex {
+  font-size: inherit !important;
+}

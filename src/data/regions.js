@@ -158,12 +158,10 @@ export const regions = [
           { id: 'unit3', title: '3. 같은 크기 - 수와 문자' },
           { id: 'unit4', title: '4. 엇갈려서 곱하기 기초' },
           { id: 'unit5', title: '5. 약분' },
-          { id: 'unit6', title: '6. 카드 관찰 1' },
-          { id: 'unit7', title: '7. 카드 관찰 2' },
-          { id: 'unit8', title: '8. 0에 가까운 분수' },
-          { id: 'unit9', title: '9. 1에 가까운 분수' },
-          { id: 'unit10', title: '10. 통분' },
-          { id: 'unit11', title: '11. 엇갈려서 곱하기 심화' }
+          { id: 'unit8', title: '6. 0에 가까운 분수' },
+          { id: 'unit9', title: '7. 1에 가까운 분수' },
+          { id: 'unit10', title: '8. 통분' },
+          { id: 'unit11', title: '9. 엇갈려서 곱하기 심화' }
         ]
       },
       {

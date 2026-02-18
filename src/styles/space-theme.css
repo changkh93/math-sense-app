@@ -311,6 +311,7 @@
 
 .space-quiz-card {
   padding: 2.5rem;
+  position: relative;
 }
 
 .space-option-btn {
@@ -323,6 +324,8 @@
   cursor: pointer;
   transition: var(--transition-smooth);
   word-break: keep-all;
+  font-family: var(--font-title);
+  font-weight: 500;
 }
 
 /* 3D Image Enhancement Styles */
@@ -730,4 +733,33 @@
 /* Hologram Preview - Deprecated by HUD (Keeping for reference or cleanup later) */
 .hologram-preview {
   display: none;
+}
+
+/* ========================================
+   KaTeX Font Override for Consistent Look
+   ======================================== */
+.katex, .katex-html {
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  font-size: 1em !important;
+}
+
+.katex .base {
+  font-family: inherit !important;
+}
+
+/* Ensure numbers in math mode look like regular text */
+.katex .mord, .katex .mord.mathnormal {
+  font-family: inherit !important;
+  font-style: normal !important;
+}
+
+/* 옵션 버튼 내 KaTeX 크기 통일 */
+.space-option-btn .katex {
+  font-size: inherit !important;
+}
+
+/* 질문 영역 내 KaTeX 크기 통일 */
+.font-title .katex {
+  font-size: inherit !important;
 }

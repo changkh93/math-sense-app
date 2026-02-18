@@ -113,9 +113,11 @@
 }
 
 .cat-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 800;
   color: #e0e0e0;
+  white-space: nowrap;
+  letter-spacing: -0.5px;
 }
 
 .template-view {

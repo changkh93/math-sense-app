@@ -1,8 +1,9 @@
 import { useState, useEffect, Suspense, useMemo, useRef } from 'react'
+import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { regions as localRegions } from '../../data/regions'
@@ -63,6 +64,23 @@ function SpaceHome() {
     isError: errorQuizzes, 
     refetch: refetchQuizzes 
   } = useQuizzes(selectedUnitDocId || quickQuizUnitId)
+
+  // Fetch all units for all chapters in the selected region to calculate progress
+  // Uses the same queryKey ['units', chapterId] as useUnits() to share cache
+  const chapterUnitResults = useQueries({
+    queries: (chapters || []).map(chapter => ({
+      queryKey: ['units', chapter.docId],
+      queryFn: async () => {
+        const q = query(collection(db, 'units'), where('chapterId', '==', chapter.docId));
+        const snap = await getDocs(q);
+        const data = snap.docs.map(d => ({ ...d.data(), docId: d.id }));
+        return data.sort((a, b) => (a.order || 0) - (b.order || 0));
+      },
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 10,   // 10 minutes garbage collection
+      enabled: !!chapter.docId
+    }))
+  })
 
   // Active selections
   const activeRegion = regions?.find(r => r.id === selectedRegionId)
@@ -163,6 +181,7 @@ function SpaceHome() {
   }, [user])
 
   // Calculate Exploration Status and Recent Region
+  // bestScores: { unitDocId: bestScore } - maps each completed unit to its best score
   const { explorationStatus, recentRegionId, bestScores } = useMemo(() => {
     const statusMap = {}
     const scores = {}
@@ -172,18 +191,17 @@ function SpaceHome() {
       return { explorationStatus: {}, recentRegionId: null, bestScores: {} }
     }
 
+    // Build bestScores from history - use unitId as key
     history.forEach(h => {
-      if (!scores[h.unitId] || h.score > scores[h.unitId]) {
+      if (h.unitId && (!scores[h.unitId] || h.score > scores[h.unitId])) {
         scores[h.unitId] = h.score
       }
     })
 
     if (history.length === 0) {
       regions?.forEach(r => statusMap[r.id] = 'not_started')
-      return { explorationStatus: statusMap, recentRegionId: null, bestScores: {} }
+      return { explorationStatus: statusMap, recentRegionId: null, bestScores: scores }
     }
-    
-    const solvedUnitIds = new Set(history.map(h => h.unitId))
     
     regions.forEach(region => {
       const isAnySolved = history.some(h => {
@@ -206,39 +224,54 @@ function SpaceHome() {
     return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores }
   }, [regions, history])
 
-  // Calculate chapter progress
+  // Calculate chapter progress dynamically from Firestore data
+  // Key insight: bestScores is computed from history which uses unitDocId format
+  // (e.g. "decimal_chap1_5-1"), and unit.docId from Firestore also uses the same format.
   const chapterProgress = useMemo(() => {
     const progress = {}
-    if (!chapters || !bestScores) return progress
+    
+    // Guard: need both chapters array AND history to have finished loading
+    if (!chapters || !chapters.length) return progress
+    if (loadingHistory) return progress
 
-    chapters.forEach(chapter => {
-      const localRegion = localRegions.find(r => r.id === selectedRegionId)
-      const localChapter = localRegion?.chapters?.find(c => c.id === chapter.id)
+    // Check if ALL chapterUnitResults have loaded
+    const allLoaded = chapterUnitResults.length > 0 && 
+      chapterUnitResults.every(r => !r.isPending && !r.isLoading)
+    if (!allLoaded) return progress
+
+    chapters.forEach((chapter, index) => {
+      const result = chapterUnitResults[index]
+      if (!result || !result.data) return
+
+      const unitsData = result.data
+      const totalUnits = unitsData.length
       
-      if (localChapter) {
-        const totalUnits = localChapter.units?.length || 0
-        let completedUnits = 0
-        
-        localChapter.units?.forEach(unit => {
-          const unitDocId = `${chapter.docId}_${unit.id}`
-          if (bestScores[unitDocId] !== undefined) {
-            completedUnits++
-          }
-        })
-        
-        progress[chapter.docDocId || chapter.docId] = {
-          completed: completedUnits,
-          total: totalUnits,
-          isFinished: totalUnits > 0 && completedUnits === totalUnits
+      let completedUnits = 0
+      unitsData.forEach(unit => {
+        // Primary match: unit.docId ("decimal_chap1_5-1-1") against history unitId
+        // Fallback match: unit.id ("5-1-1") against history unitId
+        const docIdMatch = unit.docId && bestScores[unit.docId] !== undefined
+        const idMatch = unit.id && bestScores[unit.id] !== undefined
+        if (docIdMatch || idMatch) {
+          completedUnits++
         }
+      })
+      
+      progress[chapter.docId] = {
+        completed: completedUnits,
+        total: totalUnits,
+        isFinished: totalUnits > 0 && completedUnits === totalUnits
       }
     })
     return progress
-  }, [chapters, bestScores, selectedRegionId])
+  }, [chapters, bestScores, chapterUnitResults, loadingHistory])
 
+
+  const isProcessingSave = useRef(false)
 
   const handleComplete = async (result) => {
-    if (!user) return
+    if (!user || isProcessingSave.current) return
+    isProcessingSave.current = true
     
     try {
       const { score, total, correctCount, totalCount, crystalsEarned, isPerfect, shieldUsed } = result
@@ -365,6 +398,8 @@ function SpaceHome() {
       // setCurrentView('dashboard') // No regular navigation, the modal will handle it
     } catch (error) {
       console.error("Error saving quiz result:", error)
+    } finally {
+      isProcessingSave.current = false
     }
   }
 

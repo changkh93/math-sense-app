@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useRegions, useChapters, useUnits, useAdminMutations } from '../../hooks/useContent';
-import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import AiQuizImportModal from '../../components/Admin/AiQuizImportModal';
 
 const ContentManager = () => {
   const { data: regions, isLoading: loadingRegions } = useRegions();
   const { saveRegion } = useAdminMutations();
   const [expandedRegions, setExpandedRegions] = useState({});
   const [expandedChapters, setExpandedChapters] = useState({});
+  const [aiImportUnitId, setAiImportUnitId] = useState(null);
 
   const toggleRegion = (id) => setExpandedRegions(prev => ({ ...prev, [id]: !prev[id] }));
   const toggleChapter = (id) => setExpandedChapters(prev => ({ ...prev, [id]: !prev[id] }));
@@ -40,14 +42,21 @@ const ContentManager = () => {
             onToggle={() => toggleRegion(region.id)}
             expandedChapters={expandedChapters}
             onToggleChapter={toggleChapter}
+            onOpenAiImport={setAiImportUnitId}
           />
         ))}
       </div>
+
+      <AiQuizImportModal 
+        isOpen={!!aiImportUnitId} 
+        unitId={aiImportUnitId} 
+        onClose={() => setAiImportUnitId(null)} 
+      />
     </div>
   );
 };
 
-const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleChapter }) => {
+const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleChapter, onOpenAiImport }) => {
   const { data: chapters, isLoading: loadingChapters } = useChapters(isExpanded ? region.id : null);
   const { saveRegion, deleteRegion, saveChapter } = useAdminMutations();
 
@@ -96,14 +105,33 @@ const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleCh
 
       {isExpanded && (
         <div className="node-children">
+
           {loadingChapters ? <div className="loading">Loading chapters...</div> : 
            chapters?.length === 0 ? <div className="loading">No chapters found.</div> :
-           chapters?.map(chapter => (
+           chapters?.map((chapter, index) => (
             <ChapterNode 
               key={chapter.docId} 
               chapter={chapter} 
               isExpanded={expandedChapters[chapter.docId]}
               onToggle={() => onToggleChapter(chapter.docId)}
+              onOpenAiImport={onOpenAiImport}
+              isFirst={index === 0}
+              isLast={index === chapters.length - 1}
+              onReorder={(dir) => {
+                const newChapters = [...chapters];
+                const targetIndex = dir === 'up' ? index - 1 : index + 1;
+                if (targetIndex < 0 || targetIndex >= newChapters.length) return;
+                
+                // Swap
+                [newChapters[index], newChapters[targetIndex]] = [newChapters[targetIndex], newChapters[index]];
+                
+                // Update orders for all (simplest way to ensure consistency)
+                newChapters.forEach((ch, idx) => {
+                  if (ch.order !== idx) {
+                    saveChapter.mutate({ ...ch, order: idx });
+                  }
+                });
+              }}
             />
           ))}
         </div>
@@ -112,7 +140,7 @@ const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleCh
   );
 };
 
-const ChapterNode = ({ chapter, isExpanded, onToggle }) => {
+const ChapterNode = ({ chapter, isExpanded, onToggle, onOpenAiImport, isFirst, isLast, onReorder }) => {
   const { data: units, isLoading: loadingUnits } = useUnits(isExpanded ? chapter.docId : null);
   const { saveChapter, deleteChapter, saveUnit } = useAdminMutations();
 
@@ -153,6 +181,17 @@ const ChapterNode = ({ chapter, isExpanded, onToggle }) => {
           <span className="node-title">{chapter.title}</span>
         </div>
         <div className="node-actions">
+          <button className="icon-btn ai-btn" onClick={() => onOpenAiImport(chapter.docId)} title="Import AI Quiz"><Sparkles size={14} /></button>
+          
+          <div className="reorder-btns" style={{ display: 'flex', gap: '2px', margin: '0 4px' }}>
+            <button className="icon-btn" disabled={isFirst} onClick={(e) => { e.stopPropagation(); onReorder('up'); }} title="Move Up">
+              <ArrowUp size={14} />
+            </button>
+            <button className="icon-btn" disabled={isLast} onClick={(e) => { e.stopPropagation(); onReorder('down'); }} title="Move Down">
+              <ArrowDown size={14} />
+            </button>
+          </div>
+
           <button className="icon-btn edit-btn" onClick={handleRename} title="Rename"><Edit3 size={14} /></button>
           <button className="icon-btn add-btn" onClick={handleAddUnit} title="Add Unit"><Plus size={14} /></button>
           <button className="icon-btn delete-btn" onClick={handleDelete} title="Delete"><Trash2 size={14} /></button>
@@ -161,10 +200,32 @@ const ChapterNode = ({ chapter, isExpanded, onToggle }) => {
 
       {isExpanded && (
         <div className="node-children">
+
           {loadingUnits ? <div className="loading">Loading units...</div> : 
            units?.length === 0 ? <div className="loading">No units found.</div> :
-           units?.map(unit => (
-            <UnitNode key={unit.docId} unit={unit} />
+           units?.map((unit, index) => (
+            <UnitNode 
+              key={unit.docId} 
+              unit={unit} 
+              onOpenAiImport={onOpenAiImport} 
+              isFirst={index === 0}
+              isLast={index === units.length - 1}
+              onReorder={(dir) => {
+                const newUnits = [...units];
+                const targetIndex = dir === 'up' ? index - 1 : index + 1;
+                if (targetIndex < 0 || targetIndex >= newUnits.length) return;
+
+                // Swap
+                [newUnits[index], newUnits[targetIndex]] = [newUnits[targetIndex], newUnits[index]];
+
+                // Update orders
+                newUnits.forEach((u, idx) => {
+                  if (u.order !== idx) {
+                    saveUnit.mutate({ ...u, order: idx });
+                  }
+                });
+              }}
+            />
           ))}
         </div>
       )}
@@ -172,7 +233,7 @@ const ChapterNode = ({ chapter, isExpanded, onToggle }) => {
   );
 };
 
-const UnitNode = ({ unit }) => {
+const UnitNode = ({ unit, onOpenAiImport, isFirst, isLast, onReorder }) => {
   const { saveUnit, deleteUnit } = useAdminMutations();
 
   const handleRename = (e) => {
@@ -198,10 +259,28 @@ const UnitNode = ({ unit }) => {
           <span className="node-title">{unit.title}</span>
         </div>
         <div className="node-actions">
+          <button 
+            className="icon-btn ai-btn" 
+            onClick={(e) => { e.stopPropagation(); onOpenAiImport(unit.docId); }} 
+            title="Import AI Quiz"
+            style={{ color: '#8b5cf6' }}
+          >
+            <Sparkles size={14} />
+          </button>
           {/* Navigation to Quiz Editor: CLEAR SEPARATION */}
           <Link to={`/admin/quizzes/${unit.docId}`} className="icon-btn quiz-btn" title="Manage Questions">
             <Settings size={14} />
           </Link>
+          
+          <div className="reorder-btns" style={{ display: 'flex', gap: '2px', margin: '0 4px' }}>
+            <button className="icon-btn" disabled={isFirst} onClick={(e) => { e.stopPropagation(); onReorder('up'); }} title="Move Up">
+              <ArrowUp size={14} />
+            </button>
+            <button className="icon-btn" disabled={isLast} onClick={(e) => { e.stopPropagation(); onReorder('down'); }} title="Move Down">
+              <ArrowDown size={14} />
+            </button>
+          </div>
+
           <button className="icon-btn edit-btn" onClick={handleRename} title="Rename"><Edit3 size={14} /></button>
           <button className="icon-btn delete-btn" onClick={handleDelete} title="Delete"><Trash2 size={14} /></button>
         </div>

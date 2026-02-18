@@ -50,7 +50,9 @@ export function useChapters(regionId) {
         throw err;
       }
     },
-    enabled: !!regionId
+    enabled: !!regionId,
+    staleTime: 1000 * 60 * 5,  // 5 minutes - prevents unnecessary refetches
+    gcTime: 1000 * 60 * 10,    // 10 minutes garbage collection
   });
 }
 
@@ -75,7 +77,9 @@ export function useUnits(chapterId) {
         throw err;
       }
     },
-    enabled: !!chapterId
+    enabled: !!chapterId,
+    staleTime: 1000 * 60 * 5,  // 5 minutes - prevents unnecessary refetches
+    gcTime: 1000 * 60 * 10,    // 10 minutes garbage collection
   });
 }
 
