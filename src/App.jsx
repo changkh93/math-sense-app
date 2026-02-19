@@ -15,6 +15,7 @@ import GhostCleaner from './pages/Admin/GhostCleaner'
 import TeacherQA from './pages/Admin/TeacherQA'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 
 function App() {
   const { isLowMode, performanceMode } = usePerformance();
@@ -43,6 +44,7 @@ function App() {
 
       <Route path="/agora" element={<Agora />} />
       <Route path="/agora/:questionId" element={<QuestionDetail />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
     </Routes>
   )
 }
