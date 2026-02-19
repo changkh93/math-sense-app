@@ -123,6 +123,16 @@ function SpaceHome() {
       
       const handleKeyDown = (e) => {
         if (e.code === 'Space' && equipment.engine) {
+          // Don't hijack spacebar when user is typing in input/textarea/contentEditable
+          const tag = document.activeElement?.tagName?.toLowerCase()
+          const isEditable = document.activeElement?.isContentEditable
+          if (tag === 'input' || tag === 'textarea' || tag === 'select' || isEditable) {
+            return // Let normal typing work
+          }
+          // Also skip if a modal overlay is open
+          if (document.querySelector('.modal-overlay')) {
+            return
+          }
           e.preventDefault()
           setIsBoosting(true)
           if (!isBoosting) soundManager.play('whoosh')

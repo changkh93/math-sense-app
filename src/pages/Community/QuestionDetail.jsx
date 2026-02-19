@@ -8,6 +8,7 @@ import { getRandomNickname } from '../../utils/qaUtils';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
+import { usePerformance } from '../../contexts/PerformanceContext';
 import confetti from 'canvas-confetti';
 import './QuestionDetail.css';
 
@@ -90,11 +91,17 @@ export default function QuestionDetail() {
     setIsEditing(false);
   };
 
+  const { isLowMode } = usePerformance();
+
   return (
-    <div className="question-detail-container space-bg fadeIn">
-      <StarField />
-      <div className="nebula-bg" />
-      <SpaceNavbar currentView="agora" />
+    <div className={`question-detail-container ${isLowMode ? 'agora-2d' : 'space-bg'} fadeIn`}>
+      {!isLowMode && (
+        <>
+          <StarField />
+          <div className="nebula-bg" />
+        </>
+      )}
+      {!isLowMode && <SpaceNavbar currentView="agora" />}
 
       <div className="detail-content-wrapper">
         <header className="detail-header">
@@ -187,7 +194,8 @@ export default function QuestionDetail() {
               <div className="card-footer">
                 <button 
                   className={`stat-item ${question.upvotedBy?.includes(auth.currentUser?.uid) ? 'active' : ''}`}
-                  onClick={() => upvote.mutate(question.id)}
+                  onClick={() => { if (!upvote.isPending) upvote.mutate(question.id); }}
+                  disabled={upvote.isPending}
                 >
                   <Heart size={18} fill={question.upvotedBy?.includes(auth.currentUser?.uid) ? "currentColor" : "none"} />
                   <span>나도 궁금해요 {question.upvotes || 0}</span>

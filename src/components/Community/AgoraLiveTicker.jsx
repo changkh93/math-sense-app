@@ -130,6 +130,31 @@ export default function AgoraLiveTicker() {
     );
   };
 
+  // Ref to measure content width for seamless loop
+  const contentRef = React.useRef(null);
+  const [contentWidth, setContentWidth] = React.useState(1500);
+
+  React.useEffect(() => {
+    if (contentRef.current) {
+      const children = contentRef.current.children;
+      if (children.length === 0) return;
+      
+      const timer = setTimeout(() => {
+        let width = 0;
+        const halfCount = Math.ceil(children.length / 2);
+        for (let i = 0; i < halfCount; i++) {
+          width += children[i]?.offsetWidth || 0;
+          width += 40; // approximate gap from CSS
+        }
+        if (width > 100) {
+          setContentWidth(width);
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
+
+  // Loading state
   if (isLoading && messages.length === 0) return (
     <div className="live-ticker-wrap glass hud-border">
       <div className="ticker-label font-tech">SCANNING...</div>
@@ -137,29 +162,40 @@ export default function AgoraLiveTicker() {
     </div>
   );
 
+  // If very few messages, add separator to avoid them appearing duplicated side-by-side
+  const needsPadding = messages.length <= 3;
+  const separator = needsPadding ? (
+    <span className="ticker-separator font-tech">{'  ·  ·  ·  '}</span>
+  ) : null;
+
   return (
     <div className="live-ticker-wrap glass star-ticker-bg">
       <div className="ticker-label font-tech">STAR MESSAGES</div>
       <div className="ticker-track">
         <motion.div 
+          ref={contentRef}
           className="ticker-content"
-          animate={{ x: [0, -1500] }}
+          animate={{ x: [0, -contentWidth] }}
           transition={{ 
             duration, 
             repeat: Infinity, 
             ease: "linear" 
           }}
         >
+          {/* Original set */}
           {messages.map((msg, i) => (
             <Fragment key={`${msg.id}-${i}`}>
               {renderMessage(msg)}
             </Fragment>
           ))}
+          {separator}
+          {/* Clone set for seamless loop */}
           {messages.map((msg, i) => (
             <Fragment key={`${msg.id}-cl1-${i}`}>
               {renderMessage(msg)}
             </Fragment>
           ))}
+          {separator}
         </motion.div>
       </div>
       <div className="ticker-aurora"></div>

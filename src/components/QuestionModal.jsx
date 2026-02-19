@@ -27,6 +27,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
   const [canvasKey, setCanvasKey] = useState(0); // Key to force re-render
   const canvasRef = useRef(null);
 
+  // Image Upload State
+  const [attachedImage, setAttachedImage] = useState(null); // DataURL of uploaded/pasted image
+  const fileInputRef = useRef(null);
+
   // Force canvas refresh when entering draw mode to ensure correct resolution
   useEffect(() => {
     if (isDrawMode && !isCapturing) {
@@ -150,6 +154,47 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
     setBackgroundImage(null);
   };
 
+  // --- Image Upload Handlers ---
+  const processImageFile = (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    // Limit to 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      setError('이미지 크기는 5MB 이하만 가능합니다.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setAttachedImage(e.target.result);
+      setError(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) processImageFile(file);
+    // Reset so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) processImageFile(file);
+        return;
+      }
+    }
+    // If no image found, let default paste (text) happen
+  };
+
+  const handleRemoveImage = () => {
+    setAttachedImage(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -161,14 +206,15 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
 
       let drawingUrl = null;
 
-      // Handle Final Upload to Firebase
-      if (tempDrawing) {
+      // Handle Final Upload to Firebase (drawing OR uploaded image)
+      const imageToUpload = tempDrawing || attachedImage;
+      if (imageToUpload) {
         try {
           const timestamp = Date.now();
           const path = `drawings/${user.uid}/${timestamp}.png`;
-          drawingUrl = await ImageService.uploadImage(tempDrawing, path);
+          drawingUrl = await ImageService.uploadImage(imageToUpload, path);
         } catch (imgErr) {
-          console.error('Failed to upload drawing:', imgErr);
+          console.error('Failed to upload image:', imgErr);
         }
       }
 
@@ -201,6 +247,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
       
       setContent('');
       setTempDrawing(null);
+      setAttachedImage(null);
       setPaths([]);
       setIsDrawMode(false);
       setBackgroundImage(null);
@@ -273,6 +320,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
             )}
 
             <div className="draw-toggle-section">
+              {/* Drawing preview (from sketch canvas) */}
               {tempDrawing && !isDrawMode ? (
                 <div className="drawing-preview-container">
                   <div className="preview-label">첨부된 그림:</div>
@@ -288,14 +336,54 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
                     </div>
                   </div>
                 </div>
+              ) : attachedImage && !isDrawMode ? (
+                /* Uploaded/pasted image preview */
+                <div className="drawing-preview-container">
+                  <div className="preview-label">첨부된 이미지:</div>
+                  <div className="preview-box">
+                    <img src={attachedImage} alt="Attached" className="drawing-thumbnail" />
+                    <div className="preview-overlay">
+                      <button type="button" className="preview-btn delete" onClick={handleRemoveImage}>
+                        🗑️ 삭제
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : !isDrawMode ? (
+                /* Attachment buttons: draw (quiz only) + upload */
+                <div className="attach-buttons-row">
+                  {quizContext?.questionId && (
+                    <button 
+                      type="button" 
+                      className={`draw-toggle-btn ${isDrawMode ? 'active' : ''}`}
+                      onClick={handleToggleDrawMode}
+                      disabled={isCapturing}
+                    >
+                      {isCapturing ? '화면 캡처 중...' : '🖌️ 그림으로 설명하기'}
+                    </button>
+                  )}
+                  <button 
+                    type="button" 
+                    className="draw-toggle-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    📎 이미지 첨부
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    style={{ display: 'none' }}
+                  />
+                </div>
               ) : (
                 <button 
                   type="button" 
-                  className={`draw-toggle-btn ${isDrawMode ? 'active' : ''}`}
+                  className="draw-toggle-btn active"
                   onClick={handleToggleDrawMode}
-                  disabled={isCapturing}
                 >
-                  {isCapturing ? '화면 캡처 중...' : (isDrawMode ? '↩️ 돌아가기' : '🖌️ 그림으로 설명하기 (베타)')}
+                  ↩️ 돌아가기
                 </button>
               )}
             </div>
@@ -358,9 +446,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
             ) : (
               <textarea
                 className="question-textarea"
-                placeholder="궁금한 점을 자세히 적어주세요..."
+                placeholder="궁금한 점을 자세히 적어주세요... (이미지를 Ctrl+V로 붙여넣기 할 수 있어요!)"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
+                onPaste={handlePaste}
                 required={!isDrawMode}
               ></textarea>
             )}
@@ -378,7 +467,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
 
                 <button 
                   type="submit" 
-                  className="submit-btn"                   disabled={isSubmitting || (!content.trim() && !tempDrawing)}
+                  className="submit-btn"
+                  disabled={isSubmitting || (!content.trim() && !tempDrawing && !attachedImage)}
                 >
                   {isSubmitting ? '보내는 중...' : '질문 보내기'}
                 </button>

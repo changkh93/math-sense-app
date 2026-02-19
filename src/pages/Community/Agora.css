@@ -513,3 +513,431 @@
   .subtitle { font-size: 0.8rem; }
   .floating-ask-btn.action-flare { width: 90%; padding: 0.8rem 1rem; bottom: 1.5rem; }
 }
+
+/* ========================================
+   🍃 2D Low-Spec Mode for Agora
+   ======================================== */
+.agora-2d {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 30%, #f5f0ff 60%, #f0f4ff 100%);
+  color: #333;
+}
+
+.agora-2d .agora-content-wrapper {
+  color: #333;
+}
+
+/* 2D Nav Bar */
+.agora-2d-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 1.5rem;
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom: 2px solid rgba(100, 120, 200, 0.15);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.agora-2d-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: 1px solid rgba(100, 120, 200, 0.3);
+  color: #4a5568;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.agora-2d-back-btn:hover {
+  background: rgba(100, 120, 200, 0.1);
+  color: #2d3748;
+}
+
+.agora-2d-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #4a5568;
+  margin: 0;
+}
+
+.agora-2d-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.agora-2d-crystals {
+  font-weight: 700;
+  color: #4a90e2;
+  font-size: 0.95rem;
+}
+
+/* ---- Question Cards in 2D ---- */
+.agora-2d .question-card {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(100, 120, 200, 0.15);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.agora-2d .question-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #4a90e2;
+  box-shadow: 0 8px 25px rgba(74, 144, 226, 0.15);
+}
+
+.agora-2d .card-content h3 {
+  color: #2d3748;
+}
+
+.agora-2d .card-content p {
+  color: #4a5568;
+}
+
+.agora-2d .author-info {
+  color: #718096;
+}
+
+.agora-2d .author-avatar {
+  background: #4a90e2;
+  color: white;
+}
+
+.agora-2d .stat-item {
+  color: #718096;
+}
+
+.agora-2d .stat-item.active {
+  color: #e53e3e;
+}
+
+.agora-2d .card-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* ---- Filter Buttons in 2D ---- */
+.agora-2d .filter-btn {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(100, 120, 200, 0.2);
+  color: #4a5568;
+  backdrop-filter: none;
+}
+
+.agora-2d .filter-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #4a90e2;
+}
+
+.agora-2d .filter-btn.active {
+  background: rgba(74, 144, 226, 0.15);
+  color: #4a90e2;
+  border-color: #4a90e2;
+  box-shadow: 0 0 10px rgba(74, 144, 226, 0.2);
+}
+
+/* ---- Search Bar in 2D ---- */
+.agora-2d .agora-search-bar {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(100, 120, 200, 0.2);
+}
+
+.agora-2d .agora-search-bar .search-icon {
+  color: #718096;
+}
+
+.agora-2d .agora-search-bar input {
+  color: #333;
+}
+
+.agora-2d .agora-search-bar input::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+/* ---- Title & Subtitle in 2D ---- */
+.agora-2d .gradient-text {
+  background: linear-gradient(135deg, #4a90e2, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.agora-2d .subtitle {
+  color: #718096;
+}
+
+/* ---- Status Badges in 2D ---- */
+.agora-2d .type-badge {
+  background: rgba(74, 144, 226, 0.1);
+  border-color: #4a90e2;
+  color: #4a90e2;
+}
+
+.agora-2d .status-open { color: #e67e22; background: rgba(230, 126, 34, 0.1); }
+.agora-2d .status-answered { color: #27ae60; background: rgba(39, 174, 96, 0.1); }
+.agora-2d .status-resolved { color: #4a90e2; background: rgba(74, 144, 226, 0.1); }
+
+/* ---- Quiz Ref in 2D ---- */
+.agora-2d .quiz-ref {
+  color: #27ae60;
+  background: rgba(39, 174, 96, 0.1);
+}
+
+/* ---- Floating Ask Button in 2D ---- */
+.agora-2d .floating-ask-btn.action-flare {
+  background: linear-gradient(135deg, #4a90e2, #3b82f6);
+  border: 2px solid white;
+  color: #000;
+  box-shadow: 0 4px 20px rgba(74, 144, 226, 0.4);
+}
+
+.agora-2d .floating-ask-btn.action-flare:hover {
+  background: white;
+  color: #4a90e2;
+  box-shadow: 0 4px 30px rgba(74, 144, 226, 0.5);
+}
+
+/* ---- Empty/Error States in 2D ---- */
+.agora-2d .empty-state {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.agora-2d .empty-icon {
+  color: #4a90e2;
+}
+
+.agora-2d .empty-text h3 {
+  color: #2d3748;
+}
+
+.agora-2d .empty-text p {
+  color: #718096;
+}
+
+/* ---- Glass Panels (Motivation Panel) in 2D ---- */
+.agora-2d .glass,
+.agora-2d .hud-border {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(100, 120, 200, 0.18) !important;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ---- Motivation Panel Text in 2D ---- */
+.agora-2d .section-title {
+  color: #2d3748 !important;
+}
+
+.agora-2d .hall-item {
+  background: rgba(0, 0, 0, 0.03);
+  color: #333;
+}
+
+.agora-2d .hall-item .name {
+  color: #2d3748;
+}
+
+.agora-2d .hall-item .count {
+  color: #4a90e2 !important;
+}
+
+.agora-2d .loading-mini,
+.agora-2d .empty-mini {
+  color: #718096;
+}
+
+.agora-2d .level-name {
+  color: #4a90e2 !important;
+}
+
+.agora-2d .next-level {
+  color: #718096 !important;
+}
+
+.agora-2d .progress-bar-wrap {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+.agora-2d .hint {
+  color: #718096 !important;
+}
+
+.agora-2d .mini-stat {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.agora-2d .mini-stat .label {
+  color: #718096 !important;
+}
+
+.agora-2d .mini-stat .value {
+  color: #2d3748 !important;
+}
+
+.agora-2d .helpful-tip {
+  color: #718096 !important;
+  border-color: rgba(100, 120, 200, 0.2) !important;
+}
+
+/* ---- Ticker in 2D ---- */
+.agora-2d .live-ticker-wrap {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(100, 120, 200, 0.2) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05) !important;
+}
+
+.agora-2d .ticker-label {
+  background: linear-gradient(90deg, #4a90e2, #3b82f6) !important;
+  color: #fff !important;
+  box-shadow: 4px 0 15px rgba(74, 144, 226, 0.2) !important;
+}
+
+.agora-2d .ticker-item {
+  color: #333 !important;
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  text-shadow: none !important;
+}
+
+.agora-2d .ticker-item:hover {
+  background: rgba(74, 144, 226, 0.1) !important;
+  border-color: #4a90e2 !important;
+}
+
+.agora-2d .ticker-item .msg-user {
+  color: #4a90e2 !important;
+  text-shadow: none !important;
+}
+
+.agora-2d .ticker-item .msg-text {
+  color: #333 !important;
+}
+
+.agora-2d .ticker-item.my-msg {
+  background: rgba(74, 144, 226, 0.08) !important;
+  border-color: rgba(74, 144, 226, 0.3) !important;
+}
+
+.agora-2d .ticker-item.my-msg .msg-user {
+  color: #3b82f6 !important;
+}
+
+.agora-2d .ticker-item .boost-badge {
+  background: rgba(74, 144, 226, 0.15) !important;
+  color: #4a90e2 !important;
+  border-color: rgba(74, 144, 226, 0.3) !important;
+}
+
+.agora-2d .ticker-aurora {
+  display: none;
+}
+
+.agora-2d .ticker-separator {
+  color: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ---- Star Message Input (한마디 남기기) in 2D ---- */
+.agora-2d .trigger-btn {
+  background: rgba(74, 144, 226, 0.1) !important;
+  color: #4a5568 !important;
+  border: 1px solid rgba(74, 144, 226, 0.3) !important;
+}
+
+.agora-2d .trigger-btn:hover {
+  background: rgba(74, 144, 226, 0.2) !important;
+}
+
+.agora-2d .trigger-btn.active {
+  background: #4a90e2 !important;
+  color: #fff !important;
+  border-color: #4a90e2 !important;
+}
+
+.agora-2d .input-panel-v2 {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(100, 120, 200, 0.2) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15) !important;
+}
+
+.agora-2d .step-indicator {
+  color: #4a90e2 !important;
+}
+
+.agora-2d .input-panel-v2 .close-btn {
+  color: #718096 !important;
+}
+
+.agora-2d .cat-card {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.agora-2d .cat-label {
+  color: #4a5568 !important;
+}
+
+.agora-2d .tpl-item {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.agora-2d .tpl-item:hover {
+  background: rgba(74, 144, 226, 0.08) !important;
+  border-color: #4a90e2 !important;
+}
+
+.agora-2d .tpl-text {
+  color: #333 !important;
+}
+
+.agora-2d .tpl-tag {
+  color: #4a90e2 !important;
+}
+
+.agora-2d .back-link {
+  color: #718096 !important;
+}
+
+.agora-2d .custom-input-section input {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #333 !important;
+}
+
+/* ---- View Toggle in 2D ---- */
+.agora-2d .view-toggle {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.agora-2d .view-toggle button {
+  color: #718096;
+}
+
+.agora-2d .view-toggle button.active {
+  background: #4a90e2;
+  color: #fff;
+}
+
+/* ---- Icon colors in 2D ---- */
+.agora-2d .icon-gold {
+  color: #d4a017 !important;
+}
+
+.agora-2d .icon-cyan {
+  color: #4a90e2 !important;
+}
+
+.agora-2d .icon-purple {
+  color: #7c3aed !important;
+}
+

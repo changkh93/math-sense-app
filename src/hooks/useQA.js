@@ -119,39 +119,116 @@ export function useQARanking() {
 }
 
 // --- Q&A Mutations ---
+// Lock map to prevent concurrent upvote mutations on the same question
+const _upvoteLocks = new Map();
+
 export function useQAMutations() {
   const queryClient = useQueryClient();
 
   return {
-    // ... (upvote and addAnswer remain same, or I'll include them for context)
     upvote: useMutation({
       mutationFn: async (questionId) => {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
 
-        const docRef = doc(db, 'questions', questionId);
-        const snap = await getDoc(docRef);
-        if (!snap.exists()) return;
-        
-        const data = snap.data();
-        const upvotedBy = data.upvotedBy || [];
-        const isUpvoted = upvotedBy.includes(user.uid);
+        // Prevent concurrent mutations on the same question
+        if (_upvoteLocks.get(questionId)) {
+          throw new Error('__LOCKED__');
+        }
+        _upvoteLocks.set(questionId, true);
 
-        if (isUpvoted) {
-          // Toggle off
-          await updateDoc(docRef, {
-            upvotedBy: arrayRemove(user.uid),
-            upvotes: increment(-1)
-          });
-        } else {
-          // Toggle on
-          await updateDoc(docRef, {
-            upvotedBy: arrayUnion(user.uid),
-            upvotes: increment(1)
-          });
+        try {
+          const docRef = doc(db, 'questions', questionId);
+          const snap = await getDoc(docRef);
+          if (!snap.exists()) return;
+
+          const data = snap.data();
+          const upvotedBy = data.upvotedBy || [];
+          const isUpvoted = upvotedBy.includes(user.uid);
+
+          if (isUpvoted) {
+            // Toggle off — derive count from array to stay in sync
+            const newArray = upvotedBy.filter(uid => uid !== user.uid);
+            await updateDoc(docRef, {
+              upvotedBy: arrayRemove(user.uid),
+              upvotes: newArray.length
+            });
+          } else {
+            // Toggle on — derive count from array to stay in sync
+            const newCount = upvotedBy.length + 1;
+            await updateDoc(docRef, {
+              upvotedBy: arrayUnion(user.uid),
+              upvotes: newCount
+            });
+          }
+        } finally {
+          _upvoteLocks.delete(questionId);
         }
       },
-      onSuccess: (_, questionId) => {
+
+      // Optimistic update: immediately show toggled state in UI
+      onMutate: async (questionId) => {
+        const user = auth.currentUser;
+        if (!user) return {};
+
+        // Cancel in-flight refetches so they don't overwrite our optimistic update
+        await queryClient.cancelQueries({ queryKey: ['publicQuestions'] });
+        await queryClient.cancelQueries({ queryKey: ['question', questionId] });
+
+        // Snapshot previous values for rollback
+        const prevLists = {};
+        const listKeys = [['publicQuestions', 'all'], ['publicQuestions', 'unanswered'], ['publicQuestions', 'solved'], ['publicQuestions', 'my']];
+        listKeys.forEach(key => {
+          prevLists[key.join('/')] = queryClient.getQueryData(key);
+        });
+        const prevDetail = queryClient.getQueryData(['question', questionId]);
+
+        // Helper: toggle a question object optimistically
+        const toggleQuestion = (q) => {
+          if (q.id !== questionId) return q;
+          const upvotedBy = q.upvotedBy || [];
+          const isUpvoted = upvotedBy.includes(user.uid);
+          const newUpvotedBy = isUpvoted
+            ? upvotedBy.filter(uid => uid !== user.uid)
+            : [...upvotedBy, user.uid];
+          return { ...q, upvotedBy: newUpvotedBy, upvotes: newUpvotedBy.length };
+        };
+
+        // Apply optimistic update to all cached question lists
+        listKeys.forEach(key => {
+          queryClient.setQueryData(key, (old) => old?.map(toggleQuestion));
+        });
+
+        // Apply to detail cache
+        if (prevDetail) {
+          queryClient.setQueryData(['question', questionId], toggleQuestion(prevDetail));
+        }
+
+        return { prevLists, prevDetail, questionId };
+      },
+
+      onError: (err, questionId, context) => {
+        // Silently swallow lock errors (user just clicked too fast)
+        if (err?.message === '__LOCKED__') return;
+
+        // Rollback on real errors
+        if (context?.prevLists) {
+          Object.entries(context.prevLists).forEach(([key, data]) => {
+            if (data !== undefined) {
+              queryClient.setQueryData(key.split('/'), data);
+            }
+          });
+        }
+        if (context?.prevDetail) {
+          queryClient.setQueryData(['question', context.questionId], context.prevDetail);
+        }
+      },
+
+      onSettled: (_, err, questionId) => {
+        // Skip refetch for lock errors since nothing changed server-side
+        if (err?.message === '__LOCKED__') return;
+
+        // After mutation completes (success or error), refetch to get authoritative data
         queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });
         queryClient.invalidateQueries({ queryKey: ['question', questionId] });
       }

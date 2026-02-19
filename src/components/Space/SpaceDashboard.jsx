@@ -484,10 +484,19 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions }
     return navState.chapterTitle
   }, [navState])
 
+  // Calculate spaceship level dynamically from crystals
+  const crystals = userData?.crystals || 0;
+  const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 5000];
+  let spaceLevel = 1;
+  for (let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
+    if (crystals >= LEVEL_THRESHOLDS[i]) spaceLevel = i + 1;
+    else break;
+  }
+
   const stats = [
-    { label: '희귀 광석', value: `${userData?.crystals || 0}개`, icon: '💎', color: 'var(--crystal-cyan)' },
+    { label: '희귀 광석', value: `${crystals}개`, icon: '💎', color: 'var(--crystal-cyan)' },
     { label: '탐사 정답률', value: `${Math.round(userData?.averageScore || 0)}%`, icon: '🎯', color: 'var(--planet-green)' },
-    { label: '우주선 레벨', value: `Lv.${userData?.spaceshipLevel || 1}`, icon: '🛸', color: 'var(--planet-purple)' },
+    { label: '우주선 레벨', value: `Lv.${spaceLevel}`, icon: '🛸', color: 'var(--planet-purple)' },
   ]
 
   return (

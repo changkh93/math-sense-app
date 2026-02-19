@@ -11,18 +11,50 @@ const getAchievementTitle = (helpCount = 0) => {
   return '수습 항해사';
 };
 
+// Level thresholds: cumulative crystals needed to reach each level
+// Lv.1: 0, Lv.2: 100, Lv.3: 250, Lv.4: 500, Lv.5: 1000, Lv.6: 2000, Lv.7: 5000
+const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 5000];
+
+/**
+ * Calculate level and progress from total crystals.
+ * Returns { level, progress (0-100), remaining, currentThreshold, nextThreshold }
+ */
+function calculateLevel(crystals) {
+  let level = 1;
+  for (let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
+    if (crystals >= LEVEL_THRESHOLDS[i]) {
+      level = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  const isMaxLevel = level >= LEVEL_THRESHOLDS.length;
+  const currentThreshold = LEVEL_THRESHOLDS[level - 1] || 0;
+  const nextThreshold = isMaxLevel
+    ? currentThreshold // Max level reached
+    : LEVEL_THRESHOLDS[level];
+
+  const rangeSize = nextThreshold - currentThreshold;
+  const crystalsInRange = crystals - currentThreshold;
+
+  const progress = isMaxLevel ? 100 : rangeSize > 0
+    ? Math.min(100, Math.round((crystalsInRange / rangeSize) * 100))
+    : 0;
+
+  const remaining = isMaxLevel ? 0 : nextThreshold - crystals;
+
+  return { level, progress, remaining, currentThreshold, nextThreshold, isMaxLevel };
+}
+
 export default function AgoraMotivationPanel({ userData, activeCategory, onCategoryChange }) {
   const { data: ranking, isLoading } = useQARanking();
 
-  const explorerLevel = userData?.spaceshipLevel || 1;
   const helpCount = userData?.helpCount || 0;
-  
-  // Calculate progress to next level based on crystals or score
-  // Since spaceshipLevel is already calculated elsewhere, we'll use a mock progress 
-  // until we have a clear formula for level-up in this app.
-  // For now, let's use a simple crystal-based mockup or actual crystal value.
   const crystals = userData?.crystals || 0;
-  const progress = (crystals % 100); 
+
+  // Calculate level dynamically from crystals (no longer relying on spaceshipLevel)
+  const { level: explorerLevel, progress, remaining, isMaxLevel } = calculateLevel(crystals);
 
   // Achievement Title
   const title = getAchievementTitle(helpCount);
@@ -59,14 +91,19 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
         <div className="my-progress">
           <div className="level-info">
             <span className="level-name">{title} (Lv.{explorerLevel})</span>
-            <span className="next-level">Lv.{explorerLevel + 1}</span>
+            {!isMaxLevel && <span className="next-level">Lv.{explorerLevel + 1}</span>}
+            {isMaxLevel && <span className="next-level">MAX</span>}
           </div>
           <div className="progress-bar-wrap">
             <div className="progress-bar-fill" style={{ width: `${progress}%` }}>
               <div className="progress-glow" />
             </div>
           </div>
-          <p className="hint">다음 레벨까지 광석 {100 - progress}개 더 필요해요!</p>
+          {isMaxLevel ? (
+            <p className="hint">🎉 최고 등급 달성! 총 광석: {crystals}개</p>
+          ) : (
+            <p className="hint">다음 레벨까지 광석 {remaining}개 더 필요해요! (보유: {crystals}개)</p>
+          )}
         </div>
       </section>
 
@@ -96,3 +133,4 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
     </aside>
   );
 }
+
