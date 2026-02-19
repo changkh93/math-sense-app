@@ -13,6 +13,7 @@ import { useRegions, useChapters, useUnits, useQuizzes } from '../hooks/useConte
 import { regions as localRegions } from '../data/regions'
 import RegionCard from './RegionCard'
 import PerformanceToggle from './PerformanceToggle'
+import Footer from './common/Footer'
 
 function GameHome() {
   const navigate = useNavigate()
@@ -393,6 +394,8 @@ function GameHome() {
         {currentView === 'dashboard' && <Dashboard user={user} userData={userData} />}
         {currentView === 'ranking' && <Ranking user={user} />}
       </main>
+      
+      <Footer />
 
       {/* 학습 완료 모달 */}
       <AnimatePresence>

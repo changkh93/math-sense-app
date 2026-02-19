@@ -26,6 +26,7 @@ import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
 import PerformanceToggle from '../PerformanceToggle'
+import Footer from '../common/Footer'
 
 // Styles
 import '../../styles/space-theme.css'
@@ -671,6 +672,9 @@ function SpaceHome() {
               <PerformanceToggle />
             </motion.div>
           </div>
+        </div>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', zIndex: 100 }}>
+          <Footer />
         </div>
       </div>
     )

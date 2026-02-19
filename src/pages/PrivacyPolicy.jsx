@@ -1,5 +1,5 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import Footer from '../components/common/Footer';
 
 const PrivacyPolicy = () => {
   const navigate = useNavigate();
@@ -66,7 +66,7 @@ const PrivacyPolicy = () => {
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ color: '#00f3ff', borderLeft: '4px solid #00f3ff', paddingLeft: '1rem', marginBottom: '1.2rem' }}>4. 문의처</h2>
           <p>개인정보 처리와 관련하여 문의 사항이 있으시면 아래로 연락해 주시기 바랍니다.</p>
-          <p>이메일: <a href="mailto:support@msense.me" style={{ color: '#8b5cf6' }}>support@msense.me</a></p>
+          <p>이메일: <a href="mailto:paul@dulcine.net" style={{ color: '#8b5cf6' }}>paul@dulcine.net</a></p>
         </section>
 
         <div style={{ marginTop: '4rem', padding: '2rem', background: '#0a0a20', borderRadius: '12px', border: '1px solid #1e293b', textAlign: 'center' }}>
@@ -77,6 +77,7 @@ const PrivacyPolicy = () => {
           <p style={{ fontWeight: 900, color: '#ffffff', marginTop: '1rem' }}>Powered by Meta Sense</p>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };
