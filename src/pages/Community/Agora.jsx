@@ -99,7 +99,7 @@ export default function Agora() {
           <button className="agora-2d-back-btn" onClick={() => navigate('/')}>
             <ArrowLeft size={18} /> 돌아가기
           </button>
-          <h2 className="agora-2d-title">🗣️ 수학 아고라</h2>
+          <h2 className="agora-2d-title">🗣️ 스텔라 아고라</h2>
           <div className="agora-2d-right">
             <span className="agora-2d-crystals">💎 {userData?.crystals || 0}</span>
             <PerformanceToggle />
@@ -116,7 +116,7 @@ export default function Agora() {
             <StarMessageInput />
           </div>
           <div className="agora-title">
-            <h1 className="gradient-text">수학 아고라</h1>
+            <h1 className="gradient-text">스텔라 아고라</h1>
             <p className="font-tech subtitle">궁금한 개념을 묻고, 성단의 친구들과 짧은 한마디를 나누어보세요!</p>
           </div>
         </header>

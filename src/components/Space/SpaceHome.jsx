@@ -500,7 +500,7 @@ function SpaceHome() {
 
   // Login Screen
   if (!user) {
-    const titleText = "MATH SENSE UNIVERSE"
+    const titleText = "META SENSE"
     
     return (
       <div className="space-bg">
@@ -567,6 +567,14 @@ function SpaceHome() {
           }}>
             {/* 타이틀 섹션 */}
             <div className="login-header" style={{ width: '100%', pointerEvents: 'none' }}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 1.5, ease: "easeOut" }}
+                style={{ display: 'flex', justifyContent: 'center', marginBottom: isMobile ? '1rem' : '2rem' }}
+              >
+                <img src="/m-logo.svg" alt="Meta Sense Logo" style={{ width: isMobile ? '80px' : '120px', filter: 'drop-shadow(0 0 20px rgba(0, 243, 255, 0.5))' }} />
+              </motion.div>
               <motion.div 
                 initial="hidden"
                 animate="visible"
@@ -1128,7 +1136,7 @@ function SpaceHome() {
               <div style={{ margin: '2rem 0' }}>
                 <div className="crystal-icon large" style={{ width: '60px', height: '60px', margin: '0 auto 1.5rem' }}></div>
                 <p className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--text-bright)' }}>
-                  획득한 수학 광석: <span style={{ color: 'var(--crystal-cyan)', fontWeight: 900 }}>{completionResult.crystalsEarned}개</span>
+                  획득한 메타 광석: <span style={{ color: 'var(--crystal-cyan)', fontWeight: 900 }}>{completionResult.crystalsEarned}개</span>
                 </p>
                 {completionResult.rewardMessage && (
                   <p className="font-tech" style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.8rem' }}>
@@ -1270,21 +1278,21 @@ function RewardPotentialModal({ unit, onCancel, onConfirm }) {
             <div style={{ padding: '1rem', borderLeft: '3px solid #ff4d4d', background: 'rgba(255, 77, 77, 0.1)' }}>
               <p style={{ color: '#ffb3b3', fontSize: '0.9rem', lineHeight: '1.5' }}>
                 ⚠️ **이미 100점을 획득한 단원입니다.**<br/>
-                학습을 위한 반복 탐사는 가능하지만, 추가적인 수학 광석 보상은 지급되지 않습니다.
+                학습을 위한 반복 탐사는 가능하지만, 추가적인 메타 광석 보상은 지급되지 않습니다.
               </p>
             </div>
           ) : unit.bestScore > 0 ? (
             <div style={{ padding: '1rem', borderLeft: '3px solid var(--star-gold)', background: 'rgba(255, 215, 0, 0.1)' }}>
               <p style={{ color: '#ffeaa7', fontSize: '0.9rem', lineHeight: '1.5' }}>
                 💡 **성적 경신 보상 시스템 가동 중**<br/>
-                현재 최고 점수인 **{unit.bestScore}점**을 초과하여 기록을 경신할 경우, 그 차이만큼의 수학 광석을 비례하여 획득할 수 있습니다.
+                현재 최고 점수인 **{unit.bestScore}점**을 초과하여 기록을 경신할 경우, 그 차이만큼의 메타 광석을 비례하여 획득할 수 있습니다.
               </p>
             </div>
           ) : (
             <div style={{ padding: '1rem', borderLeft: '3px solid var(--planet-green)', background: 'rgba(0, 255, 136, 0.1)' }}>
               <p style={{ color: '#b2fcca', fontSize: '0.9rem', lineHeight: '1.5' }}>
                 ✨ **첫 탐사 보상 대기 중**<br/>
-                이 단원의 첫 번째 탐사입니다. 획득한 모든 수학 광석과 만점 보너스(10개)를 온전히 획득할 수 있습니다!
+                이 단원의 첫 번째 탐사입니다. 획득한 모든 메타 광석과 만점 보너스(10개)를 온전히 획득할 수 있습니다!
               </p>
             </div>
           )}

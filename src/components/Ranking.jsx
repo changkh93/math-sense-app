@@ -33,14 +33,14 @@ export default function Ranking({ user }) {
     <div className="ranking-view fadeIn">
       <div className="hall-of-fame-header glass">
         <h2>🏆 명예의 전당</h2>
-        <p>수학감각의 땅을 가장 많이 탐험한 영웅들이에요!</p>
+        <p>메타 센스의 우주를 가장 많이 항해한 영웅들이에요!</p>
       </div>
 
       <div className="ranking-list glass">
         <div className="ranking-item header">
           <span className="rank">순위</span>
           <span className="name">이름</span>
-          <span className="orbs">수학 광석</span>
+          <span className="orbs">메타 광석</span>
           <span className="avg">평균 점수</span>
         </div>
         

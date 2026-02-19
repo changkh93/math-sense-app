@@ -202,3 +202,15 @@ body {
   color: #fff;
 }
 
+.powered-by {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 8px;
+}
+.powered-by strong {
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+

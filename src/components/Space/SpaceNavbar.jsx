@@ -37,6 +37,9 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   return (
     <nav className="space-nav hud-border">
       <div className="space-nav-links font-title">
+        <div style={{ display: 'flex', alignItems: 'center', marginRight: '1rem', cursor: 'pointer' }} onClick={() => handleNavClick('planet', '/')}>
+          <img src="/m-logo.svg" alt="Meta Sense Logo" style={{ width: '30px', filter: 'drop-shadow(0 0 8px rgba(0, 243, 255, 0.6))' }} />
+        </div>
         <button 
           className={`space-nav-link ${currentView === 'planet' ? 'active' : ''}`}
           onClick={() => handleNavClick('planet', '/')}
@@ -71,7 +74,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           className={`space-nav-link agora-nav-btn ${window.location.pathname.startsWith('/agora') ? 'active' : ''}`}
           onClick={() => handleNavClick('agora', '/agora')}
         >
-          🏛️ AGORA
+          🏛️ STELLAR AGORA
         </button>
         <div className="nav-toggle-wrapper">
           <PerformanceToggle />

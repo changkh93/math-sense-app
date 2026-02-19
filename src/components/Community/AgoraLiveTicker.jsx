@@ -27,7 +27,7 @@ export default function AgoraLiveTicker() {
     if (!starMessages || starMessages.length === 0) {
       if (isLoading) return [];
       return [
-        { id: 'sys1', content: '수학 아고라 성단에 오신 것을 환영합니다! 🌌', category: 'notice', userName: 'SYSTEM' },
+        { id: 'sys1', content: '스텔라 아고라 성단에 오신 것을 환영합니다! 🌌', category: 'notice', userName: 'SYSTEM' },
         { id: 'sys2', content: '오늘의 목표를 별자리 메시지로 남겨보세요. ✍️', category: 'notice', userName: 'SYSTEM' }
       ];
     }

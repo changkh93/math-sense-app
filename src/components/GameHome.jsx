@@ -221,14 +221,20 @@ function GameHome() {
     }
   }
 
-  if (authLoading || loadingRegions) return <div className="loading-screen">수학감각 로딩 중...</div>
+  if (authLoading || loadingRegions) return (
+    <div className="loading-screen" style={{ flexDirection: 'column', gap: '0.8rem' }}>
+      <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>메타 센스 로딩 중...</div>
+      <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>M is for Meta, Mind, and Mission.</div>
+    </div>
+  )
 
   if (!user) {
     return (
       <div className="login-container">
         <header>
-          <h1 className="hero-title gradient-text">수학감각의 땅</h1>
-          <p className="hero-subtitle">선생님이 만든 인터랙티브 수학 퀴즈!</p>
+          <img src="/m-logo.svg" alt="Meta Sense Logo" style={{ width: '80px', marginBottom: '1rem', filter: 'drop-shadow(0 0 10px rgba(0, 243, 255, 0.4))' }} />
+          <h1 className="hero-title gradient-text">메타 센스 (Meta Sense)</h1>
+          <p className="hero-subtitle">지식의 우주를 항해하는 가장 지적인 감각</p>
         </header>
         <div className="login-card glass">
           <p>친구들의 성취를 클라우드에 저장하려면 로그인이 필요해요.</p>
@@ -297,8 +303,9 @@ function GameHome() {
         {currentView === 'map' && (
           <>
             <header>
-              <h1 className="hero-title gradient-text">수학감각의 땅</h1>
-              <p className="hero-subtitle">탐험하고 싶은 지역을 선택하여 수학 마스터가 되어보세요!</p>
+              <img src="/m-logo.svg" alt="Meta Sense Logo" style={{ width: '60px', marginBottom: '0.5rem', filter: 'drop-shadow(0 0 10px rgba(0, 243, 255, 0.4))' }} />
+              <h1 className="hero-title gradient-text">메타 센스 (Meta Sense)</h1>
+              <p className="hero-subtitle">지식의 우주를 항해하는 가장 지적인 감각</p>
             </header>
 
             {!selectedRegionId ? (
@@ -409,7 +416,7 @@ function GameHome() {
               <div className="modal-body">
                 <div className="crystal-reward-display">
                   <div className="crystal-icon large" style={{ width: '40px', height: '40px', margin: '0 auto 1rem' }}></div>
-                <p className="reward-text"><strong>{completionResult.crystalsEarned}개</strong>의 수학 광석을 획득했습니다!</p>
+                <p className="reward-text"><strong>{completionResult.crystalsEarned}개</strong>의 메타 광석을 획득했습니다!</p>
                 {completionResult.rewardMessage && (
                   <p className="reward-subtext" style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
                     {completionResult.rewardMessage}

@@ -93,7 +93,7 @@ export default function SpaceRanking({ user, userData }) {
           🏆 우주 관제 리더보드
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
-          {rankMode === 'guide' ? '광석 획득 및 손실 기준 안내' : `실시간 탐사 대원들의 수학 광석 랭킹 시스템입니다. (대원 ${topUsers.length}명 대기 중)`}
+          {rankMode === 'guide' ? '광석 획득 및 손실 기준 안내' : `실시간 탐사 대원들의 메타 광석 랭킹 시스템입니다. (대원 ${topUsers.length}명 대기 중)`}
         </p>
       </div>
 
