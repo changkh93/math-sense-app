@@ -23,6 +23,12 @@ export function useAuth() {
               totalScore: 0,
               spaceshipLevel: 1,
               helpCount: 0,
+              // Streak defaults
+              currentStreak: 0,
+              longestStreak: 0,
+              lastStreakDate: "",
+              streakFreezeCount: 0,
+              streakMilestones: [],
               ...data
             });
           } else {
@@ -32,6 +38,12 @@ export function useAuth() {
               totalScore: 0, 
               spaceshipLevel: 1,
               helpCount: 0,
+              // Streak defaults
+              currentStreak: 0,
+              longestStreak: 0,
+              lastStreakDate: "",
+              streakFreezeCount: 0,
+              streakMilestones: [],
               email: firebaseUser.email, 
               name: firebaseUser.displayName,
               createdAt: new Date().toISOString()

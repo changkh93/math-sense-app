@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:ext": "bash scripts/build-ext.sh",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -20,6 +20,8 @@ import SpaceStore from './SpaceStore'
 import SpaceRanking from './SpaceRanking'
 
 import { useParticles, createParticleBurst } from './ParticleEffects'
+import { calculateStreakUpdate } from '../../utils/streakUtils'
+import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
@@ -176,6 +178,7 @@ function SpaceHome() {
   }
 
   const [completionResult, setCompletionResult] = useState(null)
+  const [streakCelebration, setStreakCelebration] = useState(null)
 
   // Fetch history for status calculation
   useEffect(() => {
@@ -368,6 +371,11 @@ function SpaceHome() {
       }
       // --- End Growth Counter ---
 
+      // --- Streak System ---
+      const streakResult = calculateStreakUpdate(userData)
+      const streakUpdates = streakResult.streakUpdate || {}
+      // --- End Streak ---
+
       await setDoc(doc(db, 'users', user.uid), {
         crystals: newCrystals,
         totalQuizzes: newTotalQuizzes,
@@ -379,7 +387,8 @@ function SpaceHome() {
         dailyQuizCount: dailyQuizCount,
         lastQuizDate: today,
         lastActive: serverTimestamp(),
-        ...growthUpdates
+        ...growthUpdates,
+        ...streakUpdates
       }, { merge: true })
 
       await addDoc(collection(db, 'users', user.uid, 'history'), {
@@ -397,10 +406,25 @@ function SpaceHome() {
         soundManager.playLevelUp()
       }
 
+      // Trigger streak celebration if milestone reached
+      if (streakResult.meta?.justReachedMilestone) {
+        setStreakCelebration({
+          milestone: streakResult.meta.justReachedMilestone,
+          currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak
+        })
+      }
+
       setCompletionResult({
         crystalsEarned: actualCrystalsEarned,
         isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
-        rewardMessage
+        rewardMessage,
+        streakInfo: {
+          currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak,
+          freezeUsed: streakResult.meta.freezeUsed,
+          isNewRecord: streakResult.meta.isNewRecord,
+          alreadyDoneToday: streakResult.meta.alreadyDoneToday,
+          justReachedMilestone: streakResult.meta.justReachedMilestone
+        }
       })
       setSelectedUnitDocId(null)
       // setSelectedChapterDocId(null)
@@ -1044,7 +1068,7 @@ function SpaceHome() {
               regions={regions}
             />
           )}
-          {currentView === 'collection' && <SpaceCollection userData={userData} />}
+          {currentView === 'collection' && <SpaceCollection userData={userData} history={history} />}
           {currentView === 'store' && (
             <SpaceStore user={user} userData={userData} />
           )}
@@ -1181,6 +1205,26 @@ function SpaceHome() {
               setPendingUnit(null)
               soundManager.playWarp()
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ☄️ 연속 학습 축하 모달 */}
+      <AnimatePresence>
+        {streakCelebration && (
+          <StreakCelebrationModal 
+            celebration={streakCelebration}
+            onClose={() => setStreakCelebration(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ☄️ 연속 학습 토스트 */}
+      <AnimatePresence>
+        {completionResult?.streakInfo && !streakCelebration && (
+          <StreakToast 
+            streakInfo={completionResult.streakInfo}
+            onDismiss={() => setCompletionResult(prev => prev ? { ...prev, streakInfo: null } : null)}
           />
         )}
       </AnimatePresence>

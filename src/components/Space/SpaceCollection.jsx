@@ -1,9 +1,10 @@
 import React from 'react'
+import { StreakCalendar } from './StreakCelebration'
 
 /**
  * SpaceCollection - 우주 도감 및 배지
  */
-export default function SpaceCollection({ userData }) {
+export default function SpaceCollection({ userData, history }) {
   const badges = [
     // --- 기존 배지 (기준 상향) ---
     { title: '코스모스 입문', icon: '🌌', unlocked: (userData?.totalQuizzes || 0) > 0, desc: '첫 번째 수학 탐사를 성공적으로 마쳤습니다.' },
@@ -19,6 +20,13 @@ export default function SpaceCollection({ userData }) {
     { title: '심우주 항해사', icon: '🌠', unlocked: (userData?.totalQuizzes || 0) >= 100, desc: '누적 퀴즈 100세트를 돌파한 베테랑 항해사입니다.' },
     { title: '수학의 수호자', icon: '🛡️', unlocked: (userData?.shieldDefended || 0) >= 200, desc: '광자 쉴드로 에너지(광석) 손실을 200회 이상 방어했습니다.' },
     { title: '완벽한 도약', icon: '⚡', unlocked: (userData?.perfectCount || 0) >= 20, desc: '백점 보너스(+10)를 20회 달성한 완벽주의 대원입니다.' },
+    
+    // --- 연속 학습(Streak) 배지 ---
+    { title: '항해의 시작', icon: '🕯️', unlocked: (userData?.longestStreak || 0) >= 3, desc: '3일 연속 학습을 달성했습니다.' },
+    { title: '궤도 진입', icon: '🔵', unlocked: (userData?.longestStreak || 0) >= 7, desc: '7일 연속 학습! 안정 궤도에 진입했습니다.' },
+    { title: '항성풍 서퍼', icon: '🟣', unlocked: (userData?.longestStreak || 0) >= 30, desc: '30일 연속! 항성풍을 타고 항해 중입니다.' },
+    { title: '초신성 폭발', icon: '💫', unlocked: (userData?.longestStreak || 0) >= 100, desc: '100일 연속! 초신성급 에너지를 방출합니다.' },
+    { title: '영원한 항해사', icon: '🌌', unlocked: (userData?.longestStreak || 0) >= 365, desc: '365일 연속! 은하핵에 도달한 전설의 항해사.' },
   ]
 
   const items = [
@@ -124,6 +132,9 @@ export default function SpaceCollection({ userData }) {
           </div>
         ))}
       </div>
+
+      {/* 📅 항해 기록 캘린더 */}
+      <StreakCalendar history={history} userData={userData} />
     </div>
   )
 }

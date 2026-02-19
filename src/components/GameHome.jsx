@@ -147,7 +147,10 @@ function GameHome() {
     }
   }
 
-  const handleLogout = () => signOut(auth)
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate('/');
+  };
 
   const handleComplete = async (result) => {
     if (!user) return;

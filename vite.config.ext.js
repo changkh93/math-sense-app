@@ -1,0 +1,57 @@
+import { defineConfig } from 'vite';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ============================================================
+// Chrome Extension 빌드 설정
+// ============================================================
+// 모든 JS 파일을 IIFE 포맷으로 빌드합니다.
+// IIFE = 모든 import가 하나의 파일에 인라인됨.
+// 크롬 확장 프로그램에서는 bare import가 불가능하므로 이 방식이 필수입니다.
+// ============================================================
+
+const target = process.env.EXT_TARGET;
+
+const configs = {
+  // --- Background Service Worker ---
+  bg: defineConfig({
+    build: {
+      outDir: 'dist-ext',
+      emptyOutDir: true,
+      lib: {
+        entry: path.resolve(__dirname, 'agora-connect-ext/background.js'),
+        name: 'AgoraBackground',
+        formats: ['iife'],
+        fileName: () => 'background.js',
+      },
+      rollupOptions: {
+        output: {
+          extend: true,
+        }
+      }
+    }
+  }),
+
+  // --- Popup Script ---
+  popup: defineConfig({
+    build: {
+      outDir: 'dist-ext',
+      emptyOutDir: false,   // background 결과 보존!
+      lib: {
+        entry: path.resolve(__dirname, 'agora-connect-ext/popup.js'),
+        name: 'AgoraPopup',
+        formats: ['iife'],
+        fileName: () => 'popup.js',
+      },
+      rollupOptions: {
+        output: {
+          extend: true,
+        }
+      }
+    }
+  }),
+};
+
+export default configs[target] || configs.bg;

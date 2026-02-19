@@ -6,6 +6,7 @@ import { db } from '../../firebase'
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
 import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
+import CometBadge from './CometBadge'
 
 export default function SpaceRanking({ user, userData }) {
   const [topUsers, setTopUsers] = useState([])
@@ -268,6 +269,9 @@ export default function SpaceRanking({ user, userData }) {
                             borderRadius: '4px',
                             fontWeight: 900
                           }}>ME</span>}
+                          {(u.currentStreak || 0) > 0 && (
+                            <CometBadge streak={u.currentStreak} compact showTooltip={false} />
+                          )}
                         </div>
 
                         <span style={{ 

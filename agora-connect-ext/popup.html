@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agora Connect</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <div class="header">
+      <div class="logo">
+        <span class="icon">🌌</span>
+        <span class="title">Math Agora</span>
+      </div>
+      <div class="status-indicator online"></div>
+    </div>
+
+    <div class="main-action">
+      <button id="capture-btn" class="capture-btn">
+        <div class="btn-icon">📸</div>
+        <div class="btn-text">
+          <span class="main-text">화면 캡쳐 후 질문하기</span>
+          <span class="sub-text">현재 보고 있는 화면을 바로 공유합니다</span>
+        </div>
+      </button>
+    </div>
+
+    <div class="recent-activity">
+      <div class="section-title">💬 내 질문 알림</div>
+      <div id="activity-list" class="activity-list">
+        <div class="empty-state">로그인이 필요합니다.</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button id="open-app-btn" class="text-link">수학 아고라 열기</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

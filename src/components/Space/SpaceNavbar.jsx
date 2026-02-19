@@ -6,15 +6,17 @@ import { useAuth } from '../../hooks/useAuth';
 import PerformanceToggle from '../PerformanceToggle';
 import soundManager from '../../utils/SoundManager';
 import NotificationMenu from './NotificationMenu';
+import CometBadge from './CometBadge';
 import './SpaceNavbar.css';
 
 export default function SpaceNavbar({ currentView, onViewChange }) {
   const navigate = useNavigate();
   const { userData } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     soundManager.playClick();
-    signOut(auth);
+    await signOut(auth);
+    navigate('/');
   };
 
   const handleNavClick = (view, path) => {
@@ -78,6 +80,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       
       <div className="nav-right">
         <NotificationMenu />
+        <CometBadge streak={userData?.currentStreak || 0} />
         <div className="crystal-counter font-tech">
           <div className="crystal-icon"></div>
           <span>{userData?.crystals || 0} (광석)</span>
