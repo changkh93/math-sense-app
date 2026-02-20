@@ -7,6 +7,7 @@ import PerformanceToggle from '../PerformanceToggle';
 import soundManager from '../../utils/SoundManager';
 import NotificationMenu from './NotificationMenu';
 import CometBadge from './CometBadge';
+import { getEffectiveStreak } from '../../utils/streakUtils';
 import './SpaceNavbar.css';
 
 export default function SpaceNavbar({ currentView, onViewChange }) {
@@ -83,7 +84,13 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       
       <div className="nav-right">
         <NotificationMenu />
-        <CometBadge streak={userData?.currentStreak || 0} />
+        <div 
+          onClick={() => handleNavClick('journey', '/')}
+          style={{ cursor: 'pointer', display: 'flex' }}
+          title="별자리 항해 기록 보기"
+        >
+          <CometBadge streak={getEffectiveStreak(userData)} />
+        </div>
         <div className="crystal-counter font-tech">
           <div className="crystal-icon"></div>
           <span>{userData?.crystals || 0} (광석)</span>

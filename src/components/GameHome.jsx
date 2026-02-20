@@ -8,12 +8,14 @@ import Dashboard from './Dashboard'
 import Ranking from './Ranking'
 import { auth, googleProvider, db } from '../firebase'
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
-import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy } from 'firebase/firestore'
+import { doc, setDoc, onSnapshot, collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, getDoc } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../hooks/useContent'
 import { regions as localRegions } from '../data/regions'
 import RegionCard from './RegionCard'
+import { getTodayKST, calculateStreakUpdate } from '../utils/streakUtils'
 import PerformanceToggle from './PerformanceToggle'
 import Footer from './common/Footer'
+import SpaceJourney from './Space/SpaceJourney'
 
 function GameHome() {
   const navigate = useNavigate()
@@ -187,6 +189,33 @@ function GameHome() {
       const newTotalScore = prevTotalScore + score;
       const newAverageScore = newTotalScore / newTotalQuizzes;
 
+      // --- Growth Counter ---
+      const kstNow = new Date(Date.now() + 9 * 3600000);
+      const todayKST = kstNow.toISOString().split('T')[0];
+      const mondayOffset = (kstNow.getUTCDay() + 6) % 7;
+      const mondayKST = new Date(kstNow.getTime() - mondayOffset * 86400000)
+        .toISOString().split('T')[0];
+
+      const growthUpdates = {};
+      if (actualCrystalsEarned > 0) {
+        if (userData.dailyGrowthDate === todayKST) {
+          growthUpdates.dailyGrowth = (userData.dailyGrowth || 0) + actualCrystalsEarned;
+        } else {
+          growthUpdates.dailyGrowth = actualCrystalsEarned;
+          growthUpdates.dailyGrowthDate = todayKST;
+        }
+        if (userData.weeklyGrowthMonday === mondayKST) {
+          growthUpdates.weeklyGrowth = (userData.weeklyGrowth || 0) + actualCrystalsEarned;
+        } else {
+          growthUpdates.weeklyGrowth = actualCrystalsEarned;
+          growthUpdates.weeklyGrowthMonday = mondayKST;
+        }
+      }
+
+      // --- Streak System ---
+      const streakResult = calculateStreakUpdate(userData);
+      const streakUpdates = streakResult.streakUpdate || {};
+
       // 1. 사용자 통계 업데이트
       await setDoc(doc(db, 'users', user.uid), {
         crystals: newCrystals,
@@ -194,7 +223,9 @@ function GameHome() {
         totalScore: newTotalScore,
         averageScore: newAverageScore,
         perfectCount: (isPerfect && previousBest < 100) ? prevPerfectCount + 1 : prevPerfectCount,
-        lastActive: serverTimestamp()
+        lastActive: serverTimestamp(),
+        ...growthUpdates,
+        ...streakUpdates
       }, { merge: true });
 
       // 2. 학습 이력 저장
@@ -285,6 +316,7 @@ function GameHome() {
         <nav className="main-nav">
           <button className={`nav-item ${currentView === 'map' ? 'active' : ''}`} onClick={() => { setCurrentView('map'); setSelectedRegionId(null); setSelectedChapterDocId(null); setSelectedUnitDocId(null); }}>🗺️ 지도</button>
           <button className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentView('dashboard')}>📈 성장 기록</button>
+          <button className={`nav-item ${currentView === 'journey' ? 'active' : ''}`} onClick={() => setCurrentView('journey')}>✨ 항해 기록</button>
           <button className={`nav-item ${currentView === 'ranking' ? 'active' : ''}`} onClick={() => setCurrentView('ranking')}>🏆 명예의 전당</button>
           <button className={`nav-item ${currentView === 'agora' ? 'active' : ''}`} onClick={() => navigate('/agora')}>🗣️ 아고라</button>
           <div style={{ marginLeft: '1rem', display: 'flex', alignItems: 'center' }}>
@@ -392,6 +424,7 @@ function GameHome() {
         )}
 
         {currentView === 'dashboard' && <Dashboard user={user} userData={userData} />}
+        {currentView === 'journey' && <SpaceJourney userData={userData} />}
         {currentView === 'ranking' && <Ranking user={user} />}
       </main>
       

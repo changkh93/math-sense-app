@@ -209,3 +209,36 @@ export function calculateStreakUpdate(userData, todayOverride) {
     }
   }
 }
+/**
+ * 현재 시점에서 유효한(표시될) 연속 학습 일수 반환
+ * (오늘 아직 안 했더라도 어제까지 했으면 스트릭 숫자를 유지하여 보여줌)
+ * @param {Object} userData - 사용자 데이터
+ * @returns {number}
+ */
+export function getEffectiveStreak(userData) {
+  if (!userData?.lastStreakDate || !userData?.currentStreak) return 0
+  
+  const todayKST = getTodayKST()
+  const lastDate = userData.lastStreakDate
+  
+  // 1. 오늘 이미 완료했거나 어제 완료한 경우 -> 확실히 활성 상태
+  if (lastDate === todayKST || lastDate === getYesterdayKST()) {
+    return userData.currentStreak
+  }
+  
+  // 2. 어제 빠졌지만 현재 시각이 '오늘'인 동안은 아직 '기회'가 있는 것으로 간주 (Duo 스타일)
+  // 즉, 오늘 밤 11:59분이 되기 전까진 어제의 스트릭 숫자가 유지되어 보여야 함.
+  // (어제가 깨졌더라도 오늘 하면 이어지도록 설계된 calculateStreakUpdate와 일맥상통)
+  const diff = daysBetween(lastDate, todayKST)
+  if (diff === 1) {
+    return userData.currentStreak // 어제 안 했어도 오늘 할 기회가 있으니 그대로 표시
+  }
+
+  // 3. 하루 더 빠졌지만(엊그제 마지막 학습) 크라이오 코어(Freeze)가 있는 경우 
+  // 내일(diff === 2)까지는 스트릭이 살아있는 것으로 보여줌
+  if (diff === 2 && (userData.streakFreezeCount || 0) > 0) {
+    return userData.currentStreak
+  }
+  
+  return 0
+}

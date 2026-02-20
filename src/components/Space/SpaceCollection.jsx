@@ -1,6 +1,4 @@
 import React from 'react'
-import { StreakCalendar } from './StreakCelebration'
-
 /**
  * SpaceCollection - 우주 도감 및 배지
  */
@@ -132,9 +130,6 @@ export default function SpaceCollection({ userData, history }) {
           </div>
         ))}
       </div>
-
-      {/* 📅 항해 기록 캘린더 */}
-      <StreakCalendar history={history} userData={userData} />
     </div>
   )
 }

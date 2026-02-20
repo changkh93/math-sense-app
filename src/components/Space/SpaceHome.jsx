@@ -18,6 +18,7 @@ import SpaceDashboard from './SpaceDashboard'
 import SpaceCollection from './SpaceCollection'
 import SpaceStore from './SpaceStore'
 import SpaceRanking from './SpaceRanking'
+import SpaceJourney from './SpaceJourney'
 
 import { useParticles, createParticleBurst } from './ParticleEffects'
 import { calculateStreakUpdate } from '../../utils/streakUtils'
@@ -1086,6 +1087,7 @@ function SpaceHome() {
           )}
           
           {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}
+          {currentView === 'journey' && <SpaceJourney userData={userData} />}
 
           {/* Quick Quiz Modal now handled by main return branch for consistency */}
         </div>

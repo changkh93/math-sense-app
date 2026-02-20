@@ -27,6 +27,7 @@ export default function NotificationMenu() {
     const user = auth.currentUser;
     if (!user) return;
 
+
     const q = query(
       collection(db, 'notifications'),
       where('recipientId', '==', user.uid),

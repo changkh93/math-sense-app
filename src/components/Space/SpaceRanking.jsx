@@ -3,15 +3,60 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { Trophy, Medal, Star, Target, Info, ShieldAlert, Zap, CircleHelp } from 'lucide-react'
 import { db } from '../../firebase'
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
+import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, setDoc } from 'firebase/firestore'
 import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
 import CometBadge from './CometBadge'
+import { getEffectiveStreak } from '../../utils/streakUtils'
+import { useAdmin } from '../../hooks/useAdmin'
 
 export default function SpaceRanking({ user, userData }) {
   const [topUsers, setTopUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [rankMode, setRankMode] = useState('global') // 'global' | 'weekly' | 'guide'
+  const { isAdmin } = useAdmin();
+
+  const handleRepairStreaks = async () => {
+    if (!window.confirm("모든 랭킹 사용자의 스트릭 데이터를 분석하여 복구하시겠습니까?\n(Firestore 읽기가 다수 발생합니다)")) return;
+    try {
+      const repairPromises = topUsers.map(async (u) => {
+        const histQ = query(collection(db, 'users', u.id, 'history'), orderBy('timestamp', 'desc'), limit(100));
+        const snap = await getDocs(histQ);
+        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+        if (docs.length === 0) return null;
+        const historyDates = docs.map(h => {
+          if (!h.timestamp) return null;
+          const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
+          const kst = new Date(d.getTime() + 9 * 3600000);
+          return kst.toISOString().split('T')[0];
+        }).filter(Boolean);
+        const uniqueDates = [...new Set(historyDates)].sort().reverse();
+        let calculatedStreak = 0; let lastDate = "";
+        if (uniqueDates.length > 0) {
+          lastDate = uniqueDates[0];
+          let currDate = uniqueDates[0];
+          calculatedStreak = 1;
+          for (let i = 1; i < uniqueDates.length; i++) {
+            const prevDate = uniqueDates[i];
+            const d1 = new Date(`${currDate}T12:00:00Z`);
+            const d2 = new Date(`${prevDate}T12:00:00Z`);
+            const diff = Math.round((d1 - d2) / 86400000);
+            if (diff === 1) { calculatedStreak++; currDate = prevDate; } else { break; }
+          }
+        }
+        if (calculatedStreak !== (u.currentStreak || 0) || lastDate !== (u.lastStreakDate || "")) {
+          await setDoc(doc(db, 'users', u.id), {
+            currentStreak: calculatedStreak, lastStreakDate: lastDate,
+            longestStreak: Math.max(u.longestStreak || 0, calculatedStreak)
+          }, { merge: true });
+          return u.id;
+        }
+        return null;
+      });
+      const results = await Promise.all(repairPromises);
+      alert(`${results.filter(Boolean).length}명의 스트릭 데이터가 복구되었습니다.`);
+    } catch (err) { alert("오류 발생: " + err.message); }
+  };
 
   useEffect(() => {
     if (rankMode === 'guide') return;
@@ -142,6 +187,28 @@ export default function SpaceRanking({ user, userData }) {
             {mode.label}
           </button>
         ))}
+
+        {isAdmin && (
+          <button
+            onClick={handleRepairStreaks}
+            className="font-tech"
+            style={{
+              padding: '0.8rem 1.5rem',
+              background: 'rgba(255, 191, 0, 0.1)',
+              border: '1px dashed #ffbf00',
+              borderRadius: '12px',
+              color: '#ffbf00',
+              cursor: 'pointer',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            title="모든 사용자의 스트릭 데이터 동기화 (Admin)"
+          >
+            🔄 동기화
+          </button>
+        )}
       </div>
 
       <div className="glass-card hud-border" style={{ 
@@ -269,8 +336,8 @@ export default function SpaceRanking({ user, userData }) {
                             borderRadius: '4px',
                             fontWeight: 900
                           }}>ME</span>}
-                          {(u.currentStreak || 0) > 0 && (
-                            <CometBadge streak={u.currentStreak} compact showTooltip={false} />
+                          {getEffectiveStreak(u) > 0 && (
+                            <CometBadge streak={getEffectiveStreak(u)} compact showTooltip={false} />
                           )}
                         </div>
 
