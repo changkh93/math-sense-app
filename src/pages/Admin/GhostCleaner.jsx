@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRegions, useChapters, useUnits, useQuizzes, useAdminMutations } from '../../hooks/useContent';
 import { Trash2, AlertTriangle, RefreshCw, Eye, Ghost, Search, Globe, ShieldAlert, Trash } from 'lucide-react';
-import { collection, getDocs, writeBatch, doc as firestoreDoc } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc as firestoreDoc, addDoc, Timestamp, setDoc, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { regions as localRegions } from '../../data/regions';
 import { chapter1Quizzes } from '../../data/chapter1Quizzes';
@@ -96,6 +96,11 @@ const GhostCleaner = () => {
   const [scrubResults, setScrubResults] = useState([]);
   const [scrubbing, setScrubbing] = useState(false);
   const [scrubStats, setScrubStats] = useState({ scanned: 0, bad: 0 });
+  
+  // Ledger Migration State
+  const [ledgerStats, setLedgerStats] = useState({ users: 0, txCreated: 0, discrepancies: 0 });
+  const [ledgerLogs, setLedgerLogs] = useState([]);
+  const [migratingLedger, setMigratingLedger] = useState(false);
 
   // Clear children selection when parent changes
   useEffect(() => setSelectedChapter(null), [selectedRegion]);
@@ -437,6 +442,93 @@ const GhostCleaner = () => {
     }
   };
 
+  const runLedgerMigration = async () => {
+    if (!confirm("모든 사용자의 과거 광석 내역을 분석하여 입출금 장부를 복원하시겠습니까? (기존 장부가 없는 사용자를 우선 처리합니다)")) return;
+    
+    setMigratingLedger(true);
+    setLedgerLogs([]);
+    let userCount = 0;
+    let totalTx = 0;
+    let totalDiscrepancies = 0;
+
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const users = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      for (const userData of users) {
+        userCount++;
+        const userId = userData.id;
+        const currentCrystals = userData.crystals || 0;
+        
+        // 1. Check existing transactions to avoid duplicates
+        const txSnap = await getDocs(collection(db, 'users', userId, 'crystal_transactions'));
+        const existingTxIds = new Set(txSnap.docs.map(d => d.data().metadata?.historyId || d.id));
+        
+        // 2. Fetch History
+        const historySnap = await getDocs(collection(db, 'users', userId, 'history'));
+        const historyItems = historySnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+        
+        const historySum = historyItems.reduce((sum, item) => sum + (item.crystalsEarned || 0), 0);
+        
+        let batch = writeBatch(db);
+        let batchCount = 0;
+        
+        // 3. Create missing history transactions
+        for (const item of historyItems) {
+          if (!existingTxIds.has(item.id)) {
+            const txRef = firestoreDoc(collection(db, 'users', userId, 'crystal_transactions'));
+            batch.set(txRef, {
+              amount: item.crystalsEarned || 0,
+              type: 'quiz_reward',
+              description: `${item.unitTitle || '탐사 퀴즈'} 보상`,
+              timestamp: item.timestamp || serverTimestamp(),
+              metadata: { historyId: item.id, unitId: item.unitId }
+            });
+            batchCount++;
+            totalTx++;
+          }
+        }
+        
+        // 4. Handle Discrepancy (if ledger doesn't match current total)
+        // Current total should include what we just added vs what we have.
+        // If it's the first sync, we might need a "Legacy Adjust"
+        if (existingTxIds.size === 0 || (existingTxIds.size === 1 && txSnap.docs[0].data().type === 'store_purchase')) {
+           const currentLoggedSum = txSnap.docs.reduce((s, d) => s + (d.data().amount || 0), 0);
+           const totalAfterHistory = historySum + currentLoggedSum;
+           const diff = currentCrystals - totalAfterHistory;
+           
+           if (diff !== 0) {
+             const txRef = firestoreDoc(collection(db, 'users', userId, 'crystal_transactions'));
+             batch.set(txRef, {
+               amount: diff,
+               type: 'admin_adjust',
+               description: '과거 활동 보정 (Legacy Sync)',
+               timestamp: historyItems[0]?.timestamp ? new Timestamp(historyItems[0].timestamp.seconds - 60, 0) : serverTimestamp(),
+               metadata: { syncType: 'initial_backfill' }
+             });
+             batchCount++;
+             totalTx++;
+             totalDiscrepancies++;
+           }
+        }
+
+        if (batchCount > 0) {
+          await batch.commit();
+          setLedgerLogs(prev => [`User ${userData.name || userId}: ${batchCount} tx created`, ...prev.slice(0, 49)]);
+        }
+      }
+
+      alert(`Migration Complete!\nUsers processed: ${userCount}\nTransactions created: ${totalTx}\nDiscrepancies adjusted: ${totalDiscrepancies}`);
+      setLedgerStats({ users: userCount, txCreated: totalTx, discrepancies: totalDiscrepancies });
+    } catch (err) {
+      console.error("Migration failed:", err);
+      alert("Migration failed: " + err.message);
+    } finally {
+      setMigratingLedger(false);
+    }
+  };
+
   return (
     <div className="ghost-cleaner" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <header className="mb-8 border-b pb-4 border-white/10">
@@ -550,7 +642,8 @@ const GhostCleaner = () => {
                   { id: 'quizzes', label: 'Quizzes', count: showOnlyOrphans ? scanStats.orphans : globalQuizzes.length },
                   { id: 'units', label: 'Units', count: showOnlyOrphans ? scanStats.unitOrphans : globalUnits.length },
                   { id: 'chapters', label: 'Chapters', count: showOnlyOrphans ? scanStats.chapterOrphans : globalChapters.length },
-                  { id: 'scrub', label: 'History Scrub', count: scrubResults.length }
+                  { id: 'scrub', label: 'History Scrub', count: scrubResults.length },
+                  { id: 'ledger', label: 'Ledger Backfill', count: ledgerStats.txCreated }
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -561,9 +654,10 @@ const GhostCleaner = () => {
                   </button>
                 ))}
               </div>
-                
-                <span className="text-sm text-gray-400 ml-4">
-                  {activeTab === 'scrub' ? `Found ${scrubStats.bad} issues.` : `Scanned ${scanStats.total} docs.`}
+                                <span className="text-sm text-gray-400 ml-4">
+                  {activeTab === 'scrub' ? `Found ${scrubStats.bad} issues.` : 
+                   activeTab === 'ledger' ? `${ledgerStats.users} users checked.` :
+                   `Scanned ${scanStats.total} docs.`}
                 </span>
           </div>
         )}
@@ -582,8 +676,14 @@ const GhostCleaner = () => {
               {activeTab === 'scrub' ? (
                 <div className="flex gap-2">
                    <button onClick={runHistoryScrub} disabled={scrubbing} className="px-3 py-1 bg-blue-600 rounded text-xs">Re-Scan</button>
-                   {scrubResults.length > 0 && <button onClick={handleBatchFixHistory} disabled={scrubbing} className="px-3 py-1 bg-orange-600 rounded text-xs">Sync All Titles</button>}
+                    {scrubResults.length > 0 && <button onClick={handleBatchFixHistory} disabled={scrubbing} className="px-3 py-1 bg-orange-600 rounded text-xs">Sync All Titles</button>}
                 </div>
+              ) : activeTab === 'ledger' ? (
+                 <div className="flex gap-2">
+                    <button onClick={runLedgerMigration} disabled={migratingLedger} className="px-3 py-1 bg-emerald-600 rounded text-xs">
+                      {migratingLedger ? 'Migrating...' : 'Start Full Backfill'}
+                    </button>
+                 </div>
               ) : (
                 showOnlyOrphans && activeTab === 'quizzes' && filteredItems.length > 0 && (
                   <button 
@@ -616,6 +716,19 @@ const GhostCleaner = () => {
                     </div>
                   ))
                 )
+              ) : activeTab === 'ledger' ? (
+                <div className="p-4 space-y-4">
+                   <div className="bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20">
+                      <h4 className="text-emerald-400 font-bold mb-1">복원 대기 중</h4>
+                      <p className="text-xs text-gray-400">모든 이용자의 `history` 컬렉션을 스캔하여 `crystal_transactions`가 비어있는 부분을 자동으로 채웁니다. 현재 잔고와 일치하지 않는 경우 '과거 활동 보정' 내역이 추가됩니다.</p>
+                   </div>
+                   <div className="divide-y divide-white/10">
+                      {ledgerLogs.map((log, i) => (
+                        <div key={i} className="py-2 text-[10px] font-mono text-gray-500">{log}</div>
+                      ))}
+                      {ledgerLogs.length === 0 && <div className="py-8 text-center text-gray-600 italic">상단의 버튼을 눌러 작업을 시작하세요.</div>}
+                   </div>
+                </div>
               ) : (
                 filteredItems.length === 0 ? (
                   <div className="p-20 text-center">

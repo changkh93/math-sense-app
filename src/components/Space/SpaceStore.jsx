@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
 import soundManager from '../../utils/SoundManager'
+import { recordCrystalTransaction } from '../../utils/crystalLedger'
 
 export default function SpaceStore({ userData, user }) {
   const [purchasing, setPurchasing] = useState(false)
@@ -57,6 +58,14 @@ export default function SpaceStore({ userData, user }) {
       soundManager.playCrystal()
       setPurchaseMessage({ type: 'success', text: `크라이오 코어 구매 완료! (보유: ${currentFreezeCount + 1}/3)` })
       setTimeout(() => setPurchaseMessage(null), 3000)
+
+      // Record crystal transaction for ledger
+      recordCrystalTransaction(user.uid, {
+        amount: -100,
+        type: 'store_purchase',
+        description: '크라이오 코어 구매',
+        metadata: { itemId: 'cryo_core' }
+      })
     } catch (err) {
       console.error('Purchase failed:', err)
       setPurchaseMessage({ type: 'error', text: '구매에 실패했습니다. 다시 시도해주세요.' })

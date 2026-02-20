@@ -40,41 +40,41 @@ export function getCometTier(streak) {
   if (streak >= 100) {
     return { 
       tier: 'galactic', 
-      label: '은하핵', 
-      color: '#E0C3FC', 
-      icon: '🌌', 
-      glowColor: 'rgba(224, 195, 252, 0.6)',
-      gradient: 'linear-gradient(135deg, #E0C3FC, #8EC5FC, #F5576C, #FFD700)'
+      label: '초은하핵', 
+      color: '#FFD700', 
+      icon: '☀️', 
+      glowColor: 'rgba(255, 215, 0, 0.6)',
+      gradient: 'linear-gradient(135deg, #FFD700, #FFF5E1, #FF9F43)'
     }
   }
   if (streak >= 30) {
     return { 
       tier: 'supernova', 
       label: '초신성', 
-      color: '#F59E0B', 
-      icon: '🟡', 
-      glowColor: 'rgba(245, 158, 11, 0.6)',
-      gradient: 'linear-gradient(135deg, #F59E0B, #FBBF24)'
+      color: '#FF4757', 
+      icon: '💥', 
+      glowColor: 'rgba(255, 71, 87, 0.6)',
+      gradient: 'linear-gradient(135deg, #FF4757, #FF6B81)'
     }
   }
   if (streak >= 14) {
     return { 
       tier: 'stellarwind', 
-      label: '항성풍', 
-      color: '#A855F7', 
-      icon: '🟣', 
-      glowColor: 'rgba(168, 85, 247, 0.6)',
-      gradient: 'linear-gradient(135deg, #A855F7, #7C3AED)'
+      label: '대화염', 
+      color: '#FF6B6B', 
+      icon: '☄️', 
+      glowColor: 'rgba(255, 107, 107, 0.6)',
+      gradient: 'linear-gradient(135deg, #FF6B6B, #EE5A24)'
     }
   }
   if (streak >= 7) {
     return { 
       tier: 'acceleration', 
-      label: '가속', 
-      color: '#54A0FF', 
-      icon: '🔵', 
-      glowColor: 'rgba(84, 160, 255, 0.6)',
-      gradient: 'linear-gradient(135deg, #54A0FF, #2E86DE)'
+      label: '연소', 
+      color: '#FF7F50', 
+      icon: '🔥', 
+      glowColor: 'rgba(255, 127, 80, 0.6)',
+      gradient: 'linear-gradient(135deg, #FF7F50, #FF6348)'
     }
   }
   if (streak >= 1) {
@@ -90,10 +90,10 @@ export function getCometTier(streak) {
   return { 
     tier: 'inactive', 
     label: '대기', 
-    color: '#6B7280', 
+    color: '#94a3b8', 
     icon: '⚫', 
-    glowColor: 'rgba(107, 114, 128, 0.3)',
-    gradient: 'linear-gradient(135deg, #6B7280, #4B5563)'
+    glowColor: 'rgba(148, 163, 184, 0.3)',
+    gradient: 'linear-gradient(135deg, #94a3b8, #64748b)'
   }
 }
 

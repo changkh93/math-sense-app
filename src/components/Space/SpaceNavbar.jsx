@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
-import PerformanceToggle from '../PerformanceToggle';
 import soundManager from '../../utils/SoundManager';
 import NotificationMenu from './NotificationMenu';
 import CometBadge from './CometBadge';
@@ -77,9 +76,6 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         >
           🏛️ STELLAR AGORA
         </button>
-        <div className="nav-toggle-wrapper">
-          <PerformanceToggle />
-        </div>
       </div>
       
       <div className="nav-right">
@@ -91,7 +87,12 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         >
           <CometBadge streak={getEffectiveStreak(userData)} />
         </div>
-        <div className="crystal-counter font-tech">
+        <div 
+          className={`crystal-counter font-tech ${currentView === 'ledger' ? 'ledger-open' : ''}`}
+          onClick={() => handleNavClick('ledger', '/')}
+          style={{ cursor: 'pointer' }}
+          title="광석 입출금 내역 보기"
+        >
           <div className="crystal-icon"></div>
           <span>{userData?.crystals || 0} (광석)</span>
         </div>

@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ReactSketchCanvas } from 'react-sketch-canvas'; 
 import * as htmlToImage from 'html-to-image';
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, increment, serverTimestamp } from 'firebase/firestore';
 import { ImageService } from '../services/imageService';
 import './QuestionModal.css';
 
@@ -242,6 +242,14 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
       };
 
       await addDoc(collection(db, 'questions'), questionData);
+      
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          questionCount: increment(1)
+        });
+      } catch (updateErr) {
+        console.warn('Failed to update question count:', updateErr);
+      }
       
       queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });
       

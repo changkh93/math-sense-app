@@ -1,15 +1,17 @@
 // ============================================================
-// Agora Connect - Popup Script v3.1 (Persistent Auth)
+// Agora Connect - Popup Script v6.0 (Login via Background)
+// ============================================================
+// 핵심: 로그인 플로우를 background로 위임합니다.
+// 팝업은 계정 선택 창이 뜨면 닫히므로, 팝업에서 직접 로그인하면
+// 콜백이 실행되지 않습니다. background는 팝업이 닫혀도 유지됩니다.
 // ============================================================
 
 import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
-  GoogleAuthProvider, 
-  signInWithCredential,
   onAuthStateChanged, 
   signOut
-} from "firebase/auth";
+} from "firebase/auth/web-extension";
 
 // --- Firebase 설정 ---
 const firebaseConfig = {
@@ -24,39 +26,20 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const GOOGLE_WEB_CLIENT_ID = "1075562222654-c7a2853oroa1ngv0s50uhjjonc6sg4cb.apps.googleusercontent.com";
 
 // DOM 요소
 const activityList = document.getElementById('activity-list');
 const statusIndicator = document.querySelector('.status-indicator');
 
 // ============================================================
-// 시작 시: 로컬 스토리지에서 인증 정보 즉시 확인 (화면 깜빡임 방지)
-// ============================================================
-(async function initPopup() {
-  const stored = await chrome.storage.local.get(['agoraAccessToken', 'agoraUser']);
-  if (stored.agoraAccessToken && stored.agoraUser) {
-    console.log("📦 Restoring session from storage:", stored.agoraUser.displayName);
-    renderPopupUI(stored.agoraUser);
-    loadCachedAnswers();
-    
-    try {
-      const credential = GoogleAuthProvider.credential(null, stored.agoraAccessToken);
-      await signInWithCredential(auth, credential);
-    } catch (err) {
-      console.warn("⚠️ Session restore failed:", err);
-    }
-  } else {
-    showLoginUI();
-  }
-})();
-
-// ============================================================
 // Auth 상태 모니터링
+// web-extension 모듈이 chrome.storage.local에서 세션을 복원합니다.
+// background에서 로그인이 완료되면, 다음에 팝업을 열 때
+// onAuthStateChanged가 올바른 user로 호출됩니다.
 // ============================================================
 onAuthStateChanged(auth, (user) => {
+  console.log("🔥 Auth state:", user ? `LOGGED_IN (${user.displayName})` : "LOGGED_OUT");
   if (user) {
-    console.log("🔥 Firebase Auth: LOGGED_IN", user.displayName);
     statusIndicator.style.backgroundColor = '#4ade80';
     statusIndicator.title = `로그인됨: ${user.displayName}`;
     
@@ -66,9 +49,16 @@ onAuthStateChanged(auth, (user) => {
     renderPopupUI(userData);
     loadCachedAnswers();
   } else {
-    console.log("🔥 Firebase Auth: LOGGED_OUT");
+    // Firebase에 세션이 없으면 → chrome.storage도 확인
+    // (background에서 로그인했지만 아직 sync 안된 경우)
     chrome.storage.local.get(['agoraUser'], (result) => {
-      if (!result.agoraUser) {
+      if (result.agoraUser) {
+        // storage에는 유저 있음 → UI 표시하고 background에 sync 요청
+        renderPopupUI(result.agoraUser);
+        loadCachedAnswers();
+      } else {
+        statusIndicator.style.backgroundColor = '#ef4444';
+        statusIndicator.title = "로그인 필요";
         showLoginUI();
       }
     });
@@ -76,9 +66,6 @@ onAuthStateChanged(auth, (user) => {
 });
 
 function showLoginUI() {
-  statusIndicator.style.backgroundColor = '#ef4444';
-  statusIndicator.title = "로그인 필요";
-  
   activityList.innerHTML = `
     <div class="activity-item" style="justify-content:center; flex-direction:column; gap:8px;">
       <div style="font-size:12px; color:#94A3B8; margin-bottom:4px; text-align:center;">
@@ -127,7 +114,7 @@ function renderPopupUI(user) {
     logoutBtn.onclick = async () => {
       chrome.runtime.sendMessage({ action: "LOGOUT" });
       await signOut(auth);
-      await chrome.storage.local.remove(['agoraUser', 'agoraAccessToken', 'unreadAnswers', 'unreadCount']);
+      await chrome.storage.local.remove(['agoraUser', 'unreadAnswers', 'unreadCount']);
       showLoginUI();
     };
   }
@@ -171,43 +158,41 @@ async function loadCachedAnswers() {
   await chrome.storage.local.set({ agoraLastChecked: Date.now() });
 }
 
-async function handleLogin() {
-  console.log("🔑 Initiating login flow...");
-  const redirectURL = chrome.identity.getRedirectURL();
-  const authURL = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  authURL.searchParams.set('client_id', GOOGLE_WEB_CLIENT_ID);
-  authURL.searchParams.set('response_type', 'token');
-  authURL.searchParams.set('redirect_uri', redirectURL);
-  authURL.searchParams.set('scope', 'openid email profile');
-  authURL.searchParams.set('prompt', 'select_account');
-
-  chrome.identity.launchWebAuthFlow({ url: authURL.toString(), interactive: true }, async (responseUrl) => {
-    if (chrome.runtime.lastError || !responseUrl) {
-      console.error("❌ Auth flow error:", chrome.runtime.lastError);
+// ============================================================
+// 로그인: background에 위임!
+// 팝업은 계정선택 창이 뜨면 닫히므로, background에서 처리합니다.
+// ============================================================
+function handleLogin() {
+  console.log("🔑 Sending LOGIN request to background...");
+  
+  // 버튼 상태 변경
+  const btn = document.getElementById('login-btn');
+  if (btn) {
+    btn.textContent = '⏳ 로그인 중...';
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+  }
+  
+  // background에 로그인 요청 전송
+  // 팝업이 닫혀도 background에서 로그인이 완료됩니다.
+  // 다시 팝업을 열면 onAuthStateChanged가 로그인 상태를 감지합니다.
+  chrome.runtime.sendMessage({ action: "LOGIN" }, (response) => {
+    // 이 콜백은 팝업이 닫히면 실행되지 않을 수 있습니다.
+    // 그래도 팝업이 살아있는 경우를 위해 처리합니다.
+    if (chrome.runtime.lastError) {
+      console.log("Popup closed during login (expected)");
       return;
     }
-
-    const url = new URL(responseUrl);
-    const hashParams = new URLSearchParams(url.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    if (!accessToken) return;
-
-    try {
-      const credential = GoogleAuthProvider.credential(null, accessToken);
-      const result = await signInWithCredential(auth, credential);
-      const user = result.user;
-      const userData = { uid: user.uid, displayName: user.displayName, email: user.email };
-
-      await chrome.storage.local.set({ agoraAccessToken: accessToken, agoraUser: userData });
-      console.log("✅ Logged in successfully:", user.displayName);
-
-      chrome.runtime.sendMessage({ action: "SYNC_AUTH", accessToken, user: userData });
-      
-      renderPopupUI(userData);
-      loadCachedAnswers();
-    } catch (err) {
-      console.error("❌ Login failed:", err);
-      alert("로그인 중 오류가 발생했습니다.");
+    if (response && response.success) {
+      console.log("✅ Login completed while popup is open");
+      // onAuthStateChanged가 자동으로 UI 업데이트
+    } else if (response && response.error) {
+      console.error("❌ Login failed:", response.error);
+      if (btn) {
+        btn.textContent = '🔐 Google 로그인';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
     }
   });
 }

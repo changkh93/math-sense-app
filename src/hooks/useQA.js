@@ -17,6 +17,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { recordCrystalTransaction } from '../utils/crystalLedger';
 
 // --- Fetch Public Questions (Agora Board) ---
 export function usePublicQuestions(filter = 'all') {
@@ -299,11 +300,23 @@ export function useQAMutations() {
              crystals: increment(20),
              helpCount: increment(1)
            });
+           recordCrystalTransaction(answererUid, {
+             amount: 20,
+             type: 'answer_accepted',
+             description: '답변이 채택되었습니다',
+             metadata: { questionId }
+           });
         }
 
         // Reward Asker (Resolution Bonus)
         await updateDoc(doc(db, 'users', user.uid), {
           crystals: increment(5)
+        });
+        recordCrystalTransaction(user.uid, {
+          amount: 5,
+          type: 'question_resolved',
+          description: '질문 해결 보너스',
+          metadata: { questionId }
         });
       },
       onSuccess: (_, variables) => {
@@ -330,6 +343,12 @@ export function useQAMutations() {
         await updateDoc(doc(db, 'users', user.uid), {
           crystals: increment(3)
         });
+        recordCrystalTransaction(user.uid, {
+          amount: 3,
+          type: 'self_resolve',
+          description: '스스로 해결 보너스',
+          metadata: { questionId }
+        });
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['question', variables.questionId] });
@@ -348,6 +367,12 @@ export function useQAMutations() {
         if (answerData.userId && answerData.userId !== 'admin') {
           await updateDoc(doc(db, 'users', answerData.userId), {
             crystals: increment(10)
+          });
+          recordCrystalTransaction(answerData.userId, {
+            amount: 10,
+            type: 'teacher_verify',
+            description: '교사 검증 보너스',
+            metadata: { questionId, answerId }
           });
         }
       },

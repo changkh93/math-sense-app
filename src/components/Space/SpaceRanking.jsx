@@ -6,14 +6,17 @@ import { db } from '../../firebase'
 import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, setDoc } from 'firebase/firestore'
 import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
 import { getEffectiveStreak } from '../../utils/streakUtils'
+import { calculateSEI } from '../../utils/rankingUtils'
 import { useAdmin } from '../../hooks/useAdmin'
 
 export default function SpaceRanking({ user, userData }) {
   const [topUsers, setTopUsers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [rankMode, setRankMode] = useState('global') // 'global' | 'weekly' | 'guide'
+  const [rankMode, setRankMode] = useState('sei') 
+  const [inspectUserId, setInspectUserId] = useState(null)
   const { isAdmin } = useAdmin();
 
   const handleRepairStreaks = async () => {
@@ -59,13 +62,11 @@ export default function SpaceRanking({ user, userData }) {
   };
 
   useEffect(() => {
-    if (rankMode === 'guide') return;
 
     setLoading(true);
     const q = query(
       collection(db, 'users'),
-      orderBy('crystals', 'desc'),
-      limit(100)
+      limit(200) // Fetch up to 200 to allow robust local sorting. We removed orderBy('crystals') so everyone is considered.
     )
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -77,16 +78,30 @@ export default function SpaceRanking({ user, userData }) {
 
       const users = snapshot.docs.map(doc => {
         const d = doc.data()
+        const streak = getEffectiveStreak(d) || 0;
+        const weeklyGain = d.weeklyGrowthMonday === mondayKey ? (d.weeklyGrowth || 0) : 0;
+        const dailyGain = d.dailyGrowthDate === todayKey ? (d.dailyGrowth || 0) : 0;
+        
+        // Caculate SEI & Tier
+        const seiData = calculateSEI(d, weeklyGain, streak);
+
         return {
           id: doc.id,
           ...d,
-          dailyGain:  d.dailyGrowthDate    === todayKey  ? (d.dailyGrowth  || 0) : 0,
-          weeklyGain: d.weeklyGrowthMonday === mondayKey  ? (d.weeklyGrowth || 0) : 0,
+          streak,
+          dailyGain,
+          weeklyGain,
+          seiData,
         }
       })
 
-      if (rankMode === 'weekly') {
+      // Sort based on current rankMode
+      if (rankMode === 'sei') {
+        users.sort((a, b) => b.seiData.total - a.seiData.total)
+      } else if (rankMode === 'growth') {
         users.sort((a, b) => b.weeklyGain - a.weeklyGain)
+      } else if (rankMode === 'streak') {
+        users.sort((a, b) => b.streak - a.streak)
       }
       
       setTopUsers(users.slice(0, 100))
@@ -135,10 +150,10 @@ export default function SpaceRanking({ user, userData }) {
           marginBottom: '0.8rem',
           textShadow: '0 0 20px var(--crystal-glow)'
         }}>
-          🏆 우주 관제 리더보드
+          🏆 스텔라 관제계 (Meta Sense Universe)
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
-          {rankMode === 'guide' ? '광석 획득 및 손실 기준 안내' : `실시간 탐사 대원들의 메타 광석 랭킹 시스템입니다. (대원 ${topUsers.length}명 대기 중)`}
+          단순한 광석 수량이 아닌, <strong>실력, 성실함, 성장세, 그리고 소통 능력</strong>을 종합하여 진정한 개척자를 가려냅니다. (대원 {topUsers.length}명 탐사 중)
         </p>
       </div>
 
@@ -150,9 +165,9 @@ export default function SpaceRanking({ user, userData }) {
         marginBottom: '2rem' 
       }}>
         {[
-          { id: 'global', label: '전 우주 정거장', icon: '🪐' },
-          { id: 'weekly', label: '이번 주 급상승', icon: '🚀' },
-          { id: 'guide', label: '탐사 가이드', icon: '💎', isSpecial: true }
+          { id: 'sei', label: '전 우주 정거장 (SEI)', icon: '🌌' },
+          { id: 'growth', label: '이번 주 급상승 (Warp Star)', icon: '☄️', isSpecial: true },
+          { id: 'streak', label: '불멸의 항해사 (Streak)', icon: '🛡️' }
         ].map(mode => (
           <button
             key={mode.id}
@@ -161,14 +176,14 @@ export default function SpaceRanking({ user, userData }) {
             style={{
               padding: '0.8rem 1.5rem',
               background: rankMode === mode.id 
-                ? (mode.isSpecial ? 'rgba(255, 215, 0, 0.2)' : 'rgba(0, 243, 255, 0.2)') 
+                ? (mode.isSpecial ? 'rgba(255, 69, 58, 0.2)' : 'rgba(0, 243, 255, 0.2)') 
                 : 'rgba(255, 255, 255, 0.05)',
               border: `1px solid ${rankMode === mode.id 
-                ? (mode.isSpecial ? '#ffd700' : 'var(--crystal-cyan)') 
+                ? (mode.isSpecial ? '#ff453a' : 'var(--crystal-cyan)') 
                 : 'var(--glass-border)'}`,
               borderRadius: '12px',
               color: rankMode === mode.id 
-                ? (mode.isSpecial ? '#ffd700' : 'var(--crystal-cyan)') 
+                ? (mode.isSpecial ? '#ff453a' : 'var(--crystal-cyan)') 
                 : 'var(--text-muted)',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
@@ -176,7 +191,7 @@ export default function SpaceRanking({ user, userData }) {
               letterSpacing: '1px',
               fontWeight: 700,
               boxShadow: rankMode === mode.id 
-                ? (mode.isSpecial ? '0 0 15px rgba(255, 215, 0, 0.4)' : 'var(--glow-cyan)') 
+                ? (mode.isSpecial ? '0 0 15px rgba(255, 69, 58, 0.4)' : 'var(--glow-cyan)') 
                 : 'none',
               display: 'flex',
               alignItems: 'center',
@@ -211,50 +226,14 @@ export default function SpaceRanking({ user, userData }) {
         )}
       </div>
 
-      <div className="glass-card hud-border" style={{ 
-        padding: rankMode === 'guide' ? '2.5rem' : '1.5rem', 
+      <div className="glass-card hud-border ranking-main-area" style={{ 
+        padding: '1.5rem', 
         background: 'rgba(5, 5, 16, 0.6)',
         backdropFilter: 'blur(15px)',
-        minHeight: '400px'
+        minHeight: '400px',
+        position: 'relative'
       }}>
         <AnimatePresence mode="wait">
-          {rankMode === 'guide' ? (
-            <motion.div 
-              key="guide"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="reward-guide-container"
-            >
-              <div className="guide-grid">
-                {rewardRules.map((cat, i) => (
-                  <div key={i} className="guide-category">
-                    <h3 className="cat-title">
-                      {cat.icon} {cat.category}
-                    </h3>
-                    <div className="rule-items">
-                      {cat.items.map((item, j) => (
-                        <div key={j} className="rule-item glass">
-                          <div className="rule-main">
-                            <span className="rule-label">{item.label}</span>
-                            <span className={`rule-value ${item.value.includes('-') ? 'minus' : 'plus'}`}>
-                              {item.value}
-                            </span>
-                          </div>
-                          <p className="rule-desc">{item.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="guide-footer-note glass">
-                <CircleHelp size={16} />
-                <span>동일 단원 반복 시 <strong>최고 기록(Best)</strong>보다 높은 성적을 거둘 때만 광석이 추가 채굴됩니다.</span>
-              </div>
-            </motion.div>
-          ) : (
             <motion.div 
               key="ranking"
               initial={{ opacity: 0 }}
@@ -264,7 +243,7 @@ export default function SpaceRanking({ user, userData }) {
               {/* 헤더 행 */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '60px 1fr 100px 100px 120px',
+                gridTemplateColumns: '60px 1.5fr 120px 100px 100px',
                 padding: '1rem',
                 borderBottom: '1px solid var(--glass-border)',
                 color: 'var(--crystal-cyan)',
@@ -274,8 +253,8 @@ export default function SpaceRanking({ user, userData }) {
               }}>
                 <span>RANK</span>
                 <span>PILOT</span>
+                <span style={{ textAlign: 'center' }}>SEI INDEX</span>
                 <span style={{ textAlign: 'center' }}>CRYSTALS</span>
-                <span style={{ textAlign: 'center' }}>SCORE</span>
                 <span style={{ textAlign: 'right' }}>GROWTH</span>
               </div>
 
@@ -293,14 +272,17 @@ export default function SpaceRanking({ user, userData }) {
                 ) : (
                   topUsers.map((u, index) => {
                     const isMe = u.id === user?.uid
-                    const growth = rankMode === 'weekly' ? (u.weeklyGain || 0) : (u.dailyGain || 0)
+                    const growth = u.weeklyGain || 0;
+                    const tier = u.seiData?.tier || { name: '브론즈 파일럿', color: '#cd7f32', icon: '🚀' };
 
                     return (
+                      <React.Fragment key={u.id}>
                       <div
-                        key={u.id}
+                        className="ranking-row"
+                        onClick={() => setInspectUserId(inspectUserId === u.id ? null : u.id)}
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '60px 1fr 100px 100px 120px',
+                          gridTemplateColumns: '60px 1.5fr 120px 100px 100px',
                           padding: '1.2rem 1rem',
                           borderBottom: '1px solid rgba(255,255,255,0.05)',
                           alignItems: 'center',
@@ -309,7 +291,9 @@ export default function SpaceRanking({ user, userData }) {
                           borderRadius: isMe ? '10px' : '0',
                           margin: isMe ? '5px 0' : '0',
                           borderLeft: isMe ? '4px solid var(--crystal-cyan)' : 'none',
-                          color: '#fff !important'
+                          color: '#fff !important',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s',
                         }}
                       >
                         <span style={{ 
@@ -320,25 +304,39 @@ export default function SpaceRanking({ user, userData }) {
                           {index + 1}
                         </span>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ 
-                            fontSize: '1.1rem', 
-                            fontWeight: isMe ? 800 : 500,
-                            color: isMe ? '#ffffff' : 'rgba(255,255,255,0.8)'
-                          }}>
-                            {u.name || '무명 탐험가'}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ 
+                              fontSize: '1.1rem', 
+                              fontWeight: isMe ? 800 : 500,
+                              color: isMe ? '#ffffff' : 'rgba(255,255,255,0.9)'
+                            }}>
+                              {u.name || '무명 탐험가'}
+                            </span>
+                            {isMe && <span style={{ 
+                              fontSize: '0.7rem', 
+                              background: 'var(--crystal-cyan)', 
+                              color: '#000', 
+                              padding: '2px 6px', 
+                              borderRadius: '4px',
+                              fontWeight: 900
+                            }}>ME</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {u.streak > 0 && (
+                              <CometBadge streak={u.streak} compact showTooltip={false} />
+                            )}
+                            <span style={{ fontSize: '0.75rem', color: tier.color, fontWeight: 700, background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                              {tier.icon} {tier.name}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ color: tier.color || 'var(--crystal-cyan)', fontWeight: 800, fontSize: '1.2rem', textShadow: `0 0 10px ${tier.color}40` }}>
+                            {u.seiData?.total || 0}
                           </span>
-                          {isMe && <span style={{ 
-                            fontSize: '0.7rem', 
-                            background: 'var(--crystal-cyan)', 
-                            color: '#000', 
-                            padding: '2px 6px', 
-                            borderRadius: '4px',
-                            fontWeight: 900
-                          }}>ME</span>}
-                          {getEffectiveStreak(u) > 0 && (
-                            <CometBadge streak={getEffectiveStreak(u)} compact showTooltip={false} />
-                          )}
+                          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>SEI</span>
                         </div>
 
                         <span style={{ 
@@ -346,16 +344,7 @@ export default function SpaceRanking({ user, userData }) {
                           color: 'var(--neon-blue)', 
                           fontWeight: 700 
                         }}>
-                          💎 {u.crystals || 0}
-                        </span>
-
-                        <span style={{ 
-                          textAlign: 'center', 
-                          color: 'var(--text-muted)', 
-                          fontWeight: 600,
-                          fontSize: '0.9rem'
-                        }}>
-                          {u.averageScore ? u.averageScore.toFixed(1) : '─'}
+                          💎 {parseFloat(u.crystals || 0).toLocaleString()}
                         </span>
 
                         <div style={{ 
@@ -372,31 +361,84 @@ export default function SpaceRanking({ user, userData }) {
                             {growth > 0 ? `▲ ${growth}` : growth < 0 ? `▼ ${Math.abs(growth)}` : '─'}
                           </span>
                           <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
-                            {rankMode === 'weekly' ? 'WEEKLY' : 'DAILY'}
+                            {rankMode === 'growth' ? 'WEEKLY' : 'GROWTH'}
                           </span>
                         </div>
                       </div>
-                    )
-                  })
+                      
+                      {/* Inline Expanded Radar Chart */}
+                      <AnimatePresence>
+                        {inspectUserId === u.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            style={{ overflow: 'hidden', padding: '0 2rem' }}
+                          >
+                            <div style={{ 
+                              display: 'flex', 
+                              gap: '2rem', 
+                              padding: '1.5rem', 
+                              background: 'rgba(0, 0, 0, 0.2)', 
+                              borderRadius: '0 0 12px 12px',
+                              border: '1px solid rgba(255,255,255,0.05)',
+                              borderTop: 'none',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <div style={{ width: '300px', height: '260px' }}>
+                                <RadarChart width={300} height={260} cx="50%" cy="50%" outerRadius="65%" data={[
+                                  { subject: '능력(부)', value: Math.min(100, (u.seiData?.wealth / 50) * 100) || 0, raw: u.seiData?.wealth || 0 },
+                                  { subject: '끈기(성실)', value: Math.min(100, (u.seiData?.diligence / 300) * 100) || 0, raw: u.seiData?.diligence || 0 },
+                                  { subject: '잠재력(성장)', value: Math.min(100, (u.seiData?.growth / 200) * 100) || 0, raw: u.seiData?.growth || 0 },
+                                  { subject: '소통(아고라)', value: u.seiData?.agora || 0, raw: u.seiData?.agora || 0 },
+                                  { subject: '전문성(실력)', value: Math.min(100, (u.seiData?.skill / 1000) * 100) || 0, raw: u.seiData?.skill || 0 },
+                                ]}>
+                                  <PolarGrid stroke="rgba(255,255,255,0.2)" />
+                                  <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 11 }} />
+                                  <Radar name="Capabilities" dataKey="value" stroke="var(--crystal-cyan)" fill="var(--crystal-cyan)" fillOpacity={0.4} />
+                                </RadarChart>
+                              </div>
+                              <div style={{ flex: 1, maxWidth: '300px' }}>
+                                <h4 style={{ color: tier.color, marginBottom: '1rem' }}>{tier.icon} {tier.name}</h4>
+                                <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>전문성(실력)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.skill || 0} pts</strong>
+                                  </li>
+                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>끈기(성실)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.diligence || 0} pts</strong>
+                                  </li>
+                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>능력(광석)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.wealth || 0} pts</strong>
+                                  </li>
+                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>잠재력(성장)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.growth || 0} pts</strong>
+                                  </li>
+                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>소통(아고라)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.agora || 0} pts</strong>
+                                  </li>
+                                </ul>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      </React.Fragment>
+                  )
+                })
                 )}
               </div>
             </motion.div>
-          )}
         </AnimatePresence>
       </div>
 
       {/* 격려 문구 */}
       <div style={{ marginTop: '2.5rem', marginBottom: '4rem', textAlign: 'center' }}>
         <p className="font-tech" style={{ color: 'var(--text-muted)', letterSpacing: '1px' }}>
-          {rankMode === 'guide' ? (
-            "✨ 신중한 탐사가 위대한 대원을 만듭니다."
-          ) : (() => {
-            const kstNow = new Date(Date.now() + 9 * 3600000)
-            const mondayOffset = (kstNow.getUTCDay() + 6) % 7
-            const mondayKey = new Date(kstNow.getTime() - mondayOffset * 86400000).toISOString().split('T')[0]
-            const myWeeklyGrowth = userData?.weeklyGrowthMonday === mondayKey ? (userData?.weeklyGrowth || 0) : 0
-            return myWeeklyGrowth > 0
-              ? `🚀 대단합니다! 이번 주에 ${myWeeklyGrowth}개의 광석을 추가로 채굴했습니다.`
+          {(() => {
+            const myTotal = user ? (topUsers.find(u => u.id === user.uid)?.seiData?.total || 0) : 0;
+            return myTotal > 0
+              ? `🚀 멋집니다! 당신의 스텔라 탐사 지수(SEI)는 ${myTotal}입니다.`
               : "🔭 새로운 탐사를 시작하여 순위를 높여보세요!"
           })()}
         </p>

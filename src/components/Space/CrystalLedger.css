@@ -1,0 +1,275 @@
+/* ==========================================
+   Crystal Ledger — Full Page (SpaceJourney 스타일)
+   ========================================== */
+
+.crystal-ledger-container {
+  min-height: calc(100vh - 80px);
+  box-sizing: border-box;
+  color: #e2e8f0;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 100%, #0a0f2b 0%, #03050c 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+/* View Container (same as journey-view-container) */
+.ledger-view-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 2rem;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.ledger-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Scroll Area (same as journey-scroll-area) */
+.ledger-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.5rem 2rem;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 243, 255, 0.3) transparent;
+  max-height: 55vh;
+}
+
+.ledger-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ledger-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(0, 243, 255, 0.3);
+  border-radius: 3px;
+}
+
+.ledger-scroll-area::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Transaction List */
+.ledger-tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* Date Group */
+.ledger-date-group {
+  margin-bottom: 0.8rem;
+}
+
+.ledger-date-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.5rem 0.4rem;
+  position: sticky;
+  top: -1.5rem;
+  background: rgba(10, 15, 43, 0.95);
+  backdrop-filter: blur(8px);
+  z-index: 2;
+  border-bottom: 1px solid rgba(0, 243, 255, 0.08);
+  margin-bottom: 0.3rem;
+}
+
+.ledger-date-label {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-family: var(--font-tech);
+}
+
+.ledger-date-summary {
+  display: flex;
+  gap: 0.8rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ledger-day-income {
+  color: #4ade80;
+}
+
+.ledger-day-expense {
+  color: #f87171;
+}
+
+/* Transaction Row */
+.ledger-tx-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background 0.15s ease;
+  border-radius: 8px;
+}
+
+.ledger-tx-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Icon */
+.ledger-tx-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+
+/* Info */
+.ledger-tx-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ledger-tx-type {
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.ledger-tx-desc {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ledger-tx-time {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.2);
+  margin-top: 3px;
+  font-family: var(--font-tech);
+}
+
+/* Amount Section */
+.ledger-tx-amount-section {
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.ledger-tx-amount {
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Orbitron', monospace;
+  line-height: 1.3;
+}
+
+.ledger-tx-amount.positive {
+  color: #4ade80;
+  text-shadow: 0 0 10px rgba(74, 222, 128, 0.3);
+}
+
+.ledger-tx-amount.negative {
+  color: #f87171;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.3);
+}
+
+.ledger-tx-balance {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.2);
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Empty State */
+.ledger-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 2rem;
+  text-align: center;
+}
+
+.ledger-empty-state p {
+  margin: 0;
+}
+
+/* Bottom Banner (consistent with SpaceJourney) */
+.ledger-bottom-banner {
+  background: rgba(5, 10, 25, 0.95);
+  border-top: 1px solid rgba(0, 243, 255, 0.2);
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 100;
+  box-shadow: inset 0 5px 20px rgba(0,0,0,0.5), 0 -5px 15px rgba(0,243,255,0.05);
+  backdrop-filter: blur(10px);
+}
+
+.ledger-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.ledger-banner-cheer {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+/* Crystal counter click state */
+.crystal-counter.ledger-open {
+  border-color: var(--crystal-cyan) !important;
+  box-shadow: 0 0 16px rgba(0, 243, 255, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ledger-view-container {
+    padding: 0 1rem;
+  }
+  
+  .ledger-scroll-area {
+    padding: 1rem;
+    max-height: 50vh;
+  }
+
+  .ledger-tx-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 0.95rem;
+  }
+
+  .ledger-tx-type {
+    font-size: 0.82rem;
+  }
+
+  .ledger-tx-amount {
+    font-size: 0.88rem;
+  }
+
+  .ledger-bottom-banner {
+    padding: 1rem;
+  }
+
+  .ledger-banner-header h2 {
+    font-size: 1.4rem !important;
+  }
+}

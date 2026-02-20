@@ -11,14 +11,11 @@ import AgoraLiveTicker from '../../components/Community/AgoraLiveTicker';
 import StarMessageInput from '../../components/Community/StarMessageInput';
 import AgoraMotivationPanel from '../../components/Community/AgoraMotivationPanel';
 import { useAuth } from '../../hooks/useAuth';
-import { usePerformance } from '../../contexts/PerformanceContext';
-import PerformanceToggle from '../../components/PerformanceToggle';
 import './Agora.css';
 
 export default function Agora() {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
-  const { isLowMode } = usePerformance();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get('filter') || 'all';
   const highlightId = searchParams.get('highlight');
@@ -87,27 +84,10 @@ export default function Agora() {
   };
 
   return (
-    <div className={`agora-container ${isLowMode ? 'agora-2d' : 'space-bg'} fadeIn`}>
-      {!isLowMode && (
-        <>
-          <StarField />
-          <div className="nebula-bg" />
-        </>
-      )}
-      {isLowMode ? (
-        <nav className="agora-2d-nav">
-          <button className="agora-2d-back-btn" onClick={() => navigate('/')}>
-            <ArrowLeft size={18} /> 돌아가기
-          </button>
-          <h2 className="agora-2d-title">🗣️ 스텔라 아고라</h2>
-          <div className="agora-2d-right">
-            <span className="agora-2d-crystals">💎 {userData?.crystals || 0}</span>
-            <PerformanceToggle />
-          </div>
-        </nav>
-      ) : (
-        <SpaceNavbar currentView="agora" />
-      )}
+    <div className={`agora-container space-bg fadeIn`}>
+      <StarField />
+      <div className="nebula-bg" />
+      <SpaceNavbar currentView="agora" />
       
       <div className="agora-content-wrapper">
         <header className="agora-header">

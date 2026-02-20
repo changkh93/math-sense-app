@@ -19,14 +19,15 @@ import SpaceCollection from './SpaceCollection'
 import SpaceStore from './SpaceStore'
 import SpaceRanking from './SpaceRanking'
 import SpaceJourney from './SpaceJourney'
+import CrystalLedger from './CrystalLedger'
 
 import { useParticles, createParticleBurst } from './ParticleEffects'
 import { calculateStreakUpdate } from '../../utils/streakUtils'
+import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
-import PerformanceToggle from '../PerformanceToggle'
 import Footer from '../common/Footer'
 
 // Styles
@@ -404,6 +405,16 @@ function SpaceHome() {
         timestamp: serverTimestamp()
       })
 
+      // Record crystal transaction for ledger
+      if (actualCrystalsEarned > 0) {
+        recordCrystalTransaction(user.uid, {
+          amount: actualCrystalsEarned,
+          type: 'quiz_reward',
+          description: `${activeUnit?.title || '탐사 퀴즈'} (${score}점)`,
+          metadata: { unitId: currentUnitId, score }
+        })
+      }
+
       if (isPerfect && previousBest < 100) {
         soundManager.playLevelUp()
       }
@@ -669,8 +680,6 @@ function SpaceHome() {
               >
                 시스템 접속 (LOGIN)
               </motion.button>
-
-              <PerformanceToggle />
             </motion.div>
           </div>
         </div>
@@ -1088,6 +1097,7 @@ function SpaceHome() {
           
           {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}
           {currentView === 'journey' && <SpaceJourney userData={userData} />}
+          {currentView === 'ledger' && <CrystalLedger userData={userData} />}
 
           {/* Quick Quiz Modal now handled by main return branch for consistency */}
         </div>

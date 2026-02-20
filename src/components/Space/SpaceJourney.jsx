@@ -3,15 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db, auth } from '../../firebase';
 import { collection, query, where, orderBy, getDocs, doc, setDoc } from 'firebase/firestore';
 import { getTodayKST, getCometTier } from '../../utils/streakUtils';
-import { usePerformance } from '../../contexts/PerformanceContext';
 import './SpaceJourney.css';
 
 export default function SpaceJourney({ userData }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const { isLowMode } = usePerformance();
-  const [viewMode, setViewMode] = useState(isLowMode ? 'calendar' : 'constellation');
+  const [viewMode, setViewMode] = useState('constellation');
   const [popover, setPopover] = useState(null); // { dayData, x, y }
 
   const scrollContainerRef = useRef(null);
@@ -162,6 +160,7 @@ export default function SpaceJourney({ userData }) {
 
   const streak = calculatedStreak; 
   const tier = getCometTier(streak);
+  const activeColor = streak > 0 ? tier.color : '#FF9F43';
   const isSupernova = streak >= 100;
   const isNebula = streak >= 30;
 
@@ -242,44 +241,44 @@ export default function SpaceJourney({ userData }) {
         
         {/* 모드 전환 탭 */}
         <div style={{ display: 'flex', gap: '1rem' }}>
-          {[
-            { id: 'constellation', label: '성좌 뷰', icon: '🌌' },
-            { id: 'calendar', label: '달력 뷰', icon: '📅' }
-          ].map(mode => (
-            <button
-              key={mode.id}
-              onClick={() => { setViewMode(mode.id); setPopover(null); }}
-              className={`font-tech ${viewMode === mode.id ? 'active' : ''}`}
-              style={{
-                padding: '0.8rem 1.5rem',
-                background: viewMode === mode.id 
-                  ? 'rgba(0, 243, 255, 0.2)' 
-                  : 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${viewMode === mode.id 
-                  ? 'var(--crystal-cyan, #00f3ff)' 
-                  : 'var(--glass-border, rgba(255,255,255,0.1))'}`,
-                borderRadius: '12px',
-                color: viewMode === mode.id 
-                  ? 'var(--crystal-cyan, #00f3ff)' 
-                  : 'var(--text-muted, #94a3b8)',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                fontWeight: 700,
-                boxShadow: viewMode === mode.id 
-                  ? 'var(--glow-cyan, 0 0 15px rgba(0, 243, 255, 0.4))' 
-                  : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <span>{mode.icon}</span>
-              {mode.label}
-            </button>
-          ))}
-        </div>
+            {[
+              { id: 'constellation', label: '성좌 뷰', icon: '🌌' },
+              { id: 'calendar', label: '달력 뷰', icon: '📅' }
+            ].map(mode => (
+              <button
+                key={mode.id}
+                onClick={() => { setViewMode(mode.id); setPopover(null); }}
+                className={`font-tech ${viewMode === mode.id ? 'active' : ''}`}
+                style={{
+                  padding: '0.8rem 1.5rem',
+                  background: viewMode === mode.id 
+                    ? 'rgba(0, 243, 255, 0.2)' 
+                    : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${viewMode === mode.id 
+                    ? 'var(--crystal-cyan, #00f3ff)' 
+                    : 'var(--glass-border, rgba(255,255,255,0.1))'}`,
+                  borderRadius: '12px',
+                  color: viewMode === mode.id 
+                    ? 'var(--crystal-cyan, #00f3ff)' 
+                    : 'var(--text-muted, #94a3b8)',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontWeight: 700,
+                  boxShadow: viewMode === mode.id 
+                    ? 'var(--glow-cyan, 0 0 15px rgba(0, 243, 255, 0.4))' 
+                    : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span>{mode.icon}</span>
+                {mode.label}
+              </button>
+            ))}
+          </div>
       </div>
 
       {/* 팝업 오버레이 */}
@@ -326,15 +325,15 @@ export default function SpaceJourney({ userData }) {
         <div className="glass-card hud-border journey-card">
           <div className="journey-scroll-area" ref={scrollContainerRef}>
             {viewMode === 'constellation' ? (
-              <ConstellationView nodes={timelineData.days} tier={tier} onStarClick={handleDayClick} />
+              <ConstellationView nodes={timelineData.days} tier={tier} activeColor={activeColor} onStarClick={handleDayClick} />
             ) : (
-              <TraditionalCalendarView months={calendarMonths} tier={tier} onDayClick={handleDayClick} />
+              <TraditionalCalendarView months={calendarMonths} tier={tier} activeColor={activeColor} onDayClick={handleDayClick} />
             )}
           </div>
         </div>
       </div>
 
-      <BottomStreakBanner streak={streak} tier={tier} timelineDays={timelineData.days} />
+      <BottomStreakBanner streak={streak} tier={tier} activeColor={activeColor} timelineDays={timelineData.days} />
     </div>
   );
 }
@@ -342,7 +341,7 @@ export default function SpaceJourney({ userData }) {
 // ------------------------------------------
 // 서브 컴포넌트: Bottom Streak Banner (듀오링고 스타일)
 // ------------------------------------------
-function BottomStreakBanner({ streak, tier, timelineDays }) {
+function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
   const thisWeek = timelineDays.slice(-7);
   
   return (
@@ -366,11 +365,11 @@ function BottomStreakBanner({ streak, tier, timelineDays }) {
              {thisWeek.map((d, i) => {
                 const isActive = d?.isActive;
                 const isToday = d?.isToday;
-                const color = isActive ? tier.color : 'rgba(255,255,255,0.08)';
+                const color = isActive ? activeColor : 'rgba(255,255,255,0.08)';
                 return (
                   <div key={i} className={`bar-segment ${isActive ? 'active' : ''}`} style={{ backgroundColor: color }}>
-                     {isToday && <div className="today-indicator" style={{ borderColor: tier.color }} />}
-                     {isActive && <div className="bar-glow" style={{ boxShadow: `0 0 10px ${tier.color}` }}></div>}
+                     {isToday && <div className="today-indicator" style={{ borderColor: activeColor }} />}
+                     {isActive && <div className="bar-glow" style={{ boxShadow: `0 0 10px ${activeColor}` }}></div>}
                   </div>
                 )
              })}
@@ -388,7 +387,7 @@ function BottomStreakBanner({ streak, tier, timelineDays }) {
 // ------------------------------------------
 // 서브 컴포넌트: Constellation View (성좌 뷰)
 // ------------------------------------------
-function ConstellationView({ nodes, tier, onStarClick }) {
+function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
   const ROW_HEIGHT = 100;
   const paddingX = 200;
   const contentWidth = 700;
@@ -444,10 +443,9 @@ function ConstellationView({ nodes, tier, onStarClick }) {
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
-          {/* 유동적인 빛의 궤적 (Comet Trail) */}
           <linearGradient id="comet-trail" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={tier.color} stopOpacity="0.1" />
-            <stop offset="50%" stopColor={tier.color} stopOpacity="0.8" />
+            <stop offset="0%" stopColor={activeColor} stopOpacity="0.1" />
+            <stop offset="50%" stopColor={activeColor} stopOpacity="0.8" />
             <stop offset="100%" stopColor="#fff" stopOpacity="1" />
           </linearGradient>
         </defs>
@@ -539,7 +537,7 @@ function ConstellationView({ nodes, tier, onStarClick }) {
                 <>
                   <circle 
                     r={r} 
-                    fill={tier.color} 
+                    fill={activeColor} 
                     className="core" 
                     filter="url(#glow-star)" 
                     opacity={glowIntensity}
@@ -551,7 +549,7 @@ function ConstellationView({ nodes, tier, onStarClick }) {
                     transform="scale(1.2)"
                   />
                   {node.isToday && (
-                    <circle r={r + 8} fill="none" strokeWidth="2" stroke={tier.color} opacity="0.6">
+                    <circle r={r + 8} fill="none" strokeWidth="2" stroke={activeColor} opacity="0.6">
                       <animate attributeName="r" values={`${r+4};${r+12};${r+4}`} dur="2s" repeatCount="indefinite" />
                       <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite" />
                     </circle>
@@ -584,7 +582,7 @@ function ConstellationView({ nodes, tier, onStarClick }) {
 // ------------------------------------------
 // 서브 컴포넌트: Traditional Calendar View (달력 뷰)
 // ------------------------------------------
-function TraditionalCalendarView({ months, tier, onDayClick }) {
+function TraditionalCalendarView({ months, tier, activeColor, onDayClick }) {
   const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
   return (
@@ -612,7 +610,7 @@ function TraditionalCalendarView({ months, tier, onDayClick }) {
                   {day.isActive && (
                     <div 
                       className="cal-intensity-bg" 
-                      style={{ background: tier.color, opacity: intensity }}
+                      style={{ background: activeColor, opacity: intensity }}
                     />
                   )}
                 </div>
