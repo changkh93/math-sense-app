@@ -63,6 +63,7 @@ export default function QuestionDetail() {
   const handleAddAnswer = async (e) => {
     e.preventDefault();
     if (!newAnswer.trim()) return;
+    if (addAnswer.isPending) return;
     
     await addAnswer.mutateAsync({
       questionId,
@@ -286,9 +287,9 @@ export default function QuestionDetail() {
                 <button 
                   type="submit" 
                   className="submit-answer-btn action-flare-small"
-                  disabled={addAnswer.isLoading || !newAnswer.trim()}
+                  disabled={addAnswer.isPending || !newAnswer.trim()}
                 >
-                  {addAnswer.isLoading ? '보내는 중...' : '답변 등록하기'}
+                  {addAnswer.isPending ? '보내는 중...' : '답변 등록하기'}
                 </button>
               </motion.form>
             )}

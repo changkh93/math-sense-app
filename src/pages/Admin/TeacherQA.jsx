@@ -126,9 +126,13 @@ export default function TeacherQA() {
     }
   };
 
+  const [isReplying, setIsReplying] = useState(false);
+
   const handleReply = async (questionId) => {
+    if (isReplying) return;
     const text = replyText[questionId];
     if (!text?.trim()) return;
+    setIsReplying(true);
 
     try {
       // 1. Add answer
@@ -174,6 +178,8 @@ export default function TeacherQA() {
     } catch (err) {
       console.error('Error replying:', err);
       alert('답변 등록에 실패했습니다.');
+    } finally {
+      setIsReplying(false);
     }
   };
 

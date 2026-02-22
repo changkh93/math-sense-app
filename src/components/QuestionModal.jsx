@@ -197,6 +197,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
 
