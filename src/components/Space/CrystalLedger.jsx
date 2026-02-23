@@ -332,6 +332,53 @@ export default function CrystalLedger({ userData }) {
            : crystals >= 100 ? '🌟 좋은 시작이에요! 계속 탐사하면 더 많은 광석을 획득할 수 있어요.'
            : '🎯 퀴즈를 풀고 활동에 참여하면 광석을 획득할 수 있어요!'}
         </p>
+
+        {/* Reward Guide Panel */}
+        <div style={{
+          marginTop: '2rem',
+          padding: '1.5rem',
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(0, 243, 255, 0.2)',
+          borderRadius: '16px',
+          textAlign: 'left'
+        }}>
+          <h3 style={{ 
+            fontSize: '1.1rem', 
+            margin: '0 0 1rem 0', 
+            color: 'var(--crystal-cyan)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>💡</span> 광석 획득 가이드
+          </h3>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '1rem',
+            fontSize: '0.9rem',
+            color: 'var(--text-bright)'
+          }}>
+            <div>
+              <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '0.3rem' }}>🚀 탐사 퀴즈</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
+                <li>정답당 <span style={{color: 'var(--text-bright)'}}>+1</span> 광석</li>
+                <li>3연속 정답 콤보 시 <span style={{color: 'var(--text-bright)'}}>+5</span> 광석</li>
+                <li>최초 100점 달성 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
+                <li>오답 시 <span style={{color: '#f87171'}}>-2</span> 광석 (쉴드 방어 가능)</li>
+              </ul>
+            </div>
+            <div>
+              <div style={{ color: '#60a5fa', fontWeight: 'bold', marginBottom: '0.3rem' }}>💬 스텔라 아고라</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
+                <li>질문 등록 완료 시 <span style={{color: 'var(--text-bright)'}}>+5</span> 광석</li>
+                <li>질문 스스로 해결 시 <span style={{color: 'var(--text-bright)'}}>+3</span> 광석</li>
+                <li>내 답변이 채택될 시 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
+                <li>선생님 인증 추가 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
