@@ -516,12 +516,12 @@ function SpaceHome() {
     const titleText = "META SENSE"
     
     return (
-      <div className="space-bg">
+      <div className="space-bg" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
         <StarField count={200} />
         <div className="nebula-bg" />
         
         <div className="space-container login-layout" style={{ 
-          height: '100dvh', 
+          flex: 1, // Take available vertical space
           display: 'flex', 
           flexDirection: 'column',
           alignItems: 'center', 
@@ -529,7 +529,7 @@ function SpaceHome() {
           textAlign: 'center',
           position: 'relative',
           zIndex: 10,
-          padding: isMobile ? '2rem 1.5rem' : '2rem'
+          padding: isMobile ? '4rem 1.5rem' : '4rem 2rem' // Added vertical padding
         }}>
           {/* 왼쪽 행성 장식 */}
           <div style={{ 
@@ -683,7 +683,7 @@ function SpaceHome() {
             </motion.div>
           </div>
         </div>
-        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', zIndex: 100 }}>
+        <div style={{ width: '100%', zIndex: 100, marginTop: 'auto' }}>
           <Footer />
         </div>
       </div>
