@@ -107,8 +107,7 @@ export default function SpaceRanking({ user, userData }) {
       } else if (rankMode === 'streak') {
         users.sort((a, b) => b.streak - a.streak)
       }
-      setUsersCount(users.length)
-
+      
       // 4. Dense Ranking 처리
       let currentRank = 1;
       for (let i = 0; i < users.length; i++) {
