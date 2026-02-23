@@ -166,14 +166,15 @@ export function calculateStreakUpdate(userData, todayOverride) {
   } else {
     // Case 4: 하루 이상 빠짐
     const diffDays = daysBetween(lastDate, todayKST)
+    const missedDays = diffDays - 1 // 어제 했으면 0, 엊그제 했으면 1...
     
-    if (diffDays === 2 && freezeCount > 0) {
-      // 정확히 하루만 빠졌고, 크라이오 코어 보유 → 자동 사용
+    if (missedDays > 0 && freezeCount >= missedDays) {
+      // 결석일 수 만큼 크라이오 코어 보유 중 → 모두 소모 방어 성공
       newStreak = currentStreak + 1
-      newFreezeCount = freezeCount - 1
+      newFreezeCount = freezeCount - missedDays
       freezeUsed = true
     } else {
-      // 스트릭 초기화
+      // 크라이오 코어가 부족하거나 0개임 → 스트릭 초기화
       newStreak = 1
     }
   }
@@ -234,9 +235,10 @@ export function getEffectiveStreak(userData) {
     return userData.currentStreak // 어제 안 했어도 오늘 할 기회가 있으니 그대로 표시
   }
 
-  // 3. 하루 더 빠졌지만(엊그제 마지막 학습) 크라이오 코어(Freeze)가 있는 경우 
-  // 내일(diff === 2)까지는 스트릭이 살아있는 것으로 보여줌
-  if (diff === 2 && (userData.streakFreezeCount || 0) > 0) {
+  // 3. 하루 이상 더 빠졌지만, 크라이오 코어(Freeze) 보유량이 결석일(diff-1)보다 충분한 경우
+  // 내일까지는 스트릭이 살아있는 것으로 보여줌
+  const missedDays = diff - 1
+  if (missedDays > 0 && (userData.streakFreezeCount || 0) >= missedDays) {
     return userData.currentStreak
   }
   

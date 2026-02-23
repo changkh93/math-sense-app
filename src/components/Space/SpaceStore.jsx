@@ -147,7 +147,7 @@ export default function SpaceStore({ userData, user }) {
               {item.desc}
               <br/>
               <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-                ※ 연속 학습이 끊길 위기일 때 자동으로 사용됩니다. (최대 {item.maxOwn}개 보유)
+                ※ 연속 학습이 끊길 위기일 때 자동으로 사용됩니다. (결석 1일당 1개 소모, 최대 {item.maxOwn}개 보유)
               </span>
             </p>
             <button 
