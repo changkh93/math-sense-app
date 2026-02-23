@@ -107,7 +107,33 @@ export default function SpaceRanking({ user, userData }) {
       } else if (rankMode === 'streak') {
         users.sort((a, b) => b.streak - a.streak)
       }
-      
+      setUsersCount(users.length)
+
+      // 4. Dense Ranking 처리
+      let currentRank = 1;
+      for (let i = 0; i < users.length; i++) {
+        if (i > 0) {
+          const prev = users[i - 1];
+          const curr = users[i];
+          let isTie = false;
+
+          if (rankMode === 'sei') {
+            isTie = prev.seiData.total === curr.seiData.total;
+          } else if (rankMode === 'growth') {
+            isTie = prev.weeklyGain === curr.weeklyGain &&
+                    prev.seiData.total === curr.seiData.total &&
+                    (prev.crystals || 0) === (curr.crystals || 0);
+          } else if (rankMode === 'streak') {
+            isTie = prev.streak === curr.streak;
+          }
+
+          if (!isTie) {
+            currentRank = i + 1;
+          }
+        }
+        users[i].displayRank = currentRank;
+      }
+
       setTopUsers(users.slice(0, 100))
       setLoading(false)
     }, (error) => {
@@ -323,13 +349,16 @@ export default function SpaceRanking({ user, userData }) {
                         }}
                       >
                         <span style={{ 
-                          fontSize: '1.2rem', 
+                          fontSize: u.displayRank === 1 ? '1.8rem' : u.displayRank <= 3 ? '1.5rem' : '1.2rem',
                           fontWeight: 900,
-                          color: index < 3 ? 'var(--star-gold)' : '#ffffff'
+                          color: u.displayRank === 1 ? 'var(--star-gold)' 
+                               : u.displayRank === 2 ? '#c0c0c0' 
+                               : u.displayRank === 3 ? '#cd7f32' 
+                               : 'var(--text-bright)',
+                          textShadow: u.displayRank <= 3 ? `0 0 10px ${u.displayRank === 1 ? 'rgba(255,215,0,0.5)' : u.displayRank === 2 ? 'rgba(192,192,192,0.5)' : 'rgba(205,127,50,0.5)'}` : 'none'
                         }}>
-                          {index + 1}
+                          {u.displayRank}
                         </span>
-
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ 
