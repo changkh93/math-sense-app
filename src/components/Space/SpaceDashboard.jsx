@@ -198,7 +198,7 @@ function ChronicleScrubber({ history, windowIndex, windowSize, onWarpTo, onHover
   )
 }
 
-function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping, onHoverItem }) {
+function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex, isWarping, onHoverItem }) {
   if (!data || data.length === 0) {
     return (
       <div style={{ 
@@ -222,7 +222,6 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
   
   const points = data.map((d, i) => {
     const space = (width - padding * 2) / (maxNodes - 1);
-    // 데이터가 20개보다 적을 경우 오른쪽 정렬 (최신이 오른쪽)
     const offset = maxNodes - data.length;
     const x = padding + (i + offset) * space;
     const y = height - padding - 30 - (d.score * (height - padding * 2 - 40)) / 100
@@ -231,6 +230,22 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
 
   const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 
+  const ghostPoints = (ghostData || []).map((d, i) => {
+    const space = (width - padding * 2) / (maxNodes - 1);
+    const offset = maxNodes - ghostData.length;
+    const x = padding + (i + offset) * space;
+    const y = height - padding - 30 - (d.score * (height - padding * 2 - 40)) / 100
+    return { ...d, x, y }
+  })
+
+  const ghostPathD = ghostPoints.length > 0 
+    ? ghostPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+    : '';
+
+  const currentAvg = data.length > 0 ? (data.reduce((acc, d) => acc + (d.score || 0), 0) / data.length) : 0;
+  const ghostAvg = ghostData?.length > 0 ? (ghostData.reduce((acc, d) => acc + (d.score || 0), 0) / ghostData.length) : 0;
+  const perfDiff = currentAvg - ghostAvg;
+  
   return (
     <div style={{ position: 'relative', width: '100%', height: height + 20, overflow: 'hidden' }} className={isWarping ? 'glitch-warp' : ''}>
       <AnimatePresence mode="wait">
@@ -269,6 +284,18 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
               )
             })}
 
+            {/* Ghost Trajectory Line */}
+            {ghostPathD && (
+              <motion.path 
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 0.2 }}
+                transition={{ duration: 1.5 }}
+                d={ghostPathD} fill="none" stroke="var(--text-muted)" strokeWidth="2"
+                strokeLinecap="round" strokeDasharray="5 5"
+              />
+            )}
+
+            {/* Main Trajectory Line */}
             <motion.path 
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 0.8 }}
@@ -329,6 +356,41 @@ function TrajectoryChart({ data, onItemClick, colorScale, windowIndex, isWarping
               )
             })}
           </svg>
+
+          {/* Ghost Comparison Message */}
+          {ghostData?.length > 0 && windowIndex === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1 }}
+              style={{
+                position: 'absolute',
+                top: 20,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(10px)',
+                border: `1px solid ${perfDiff >= 0 ? 'var(--planet-green)' : '#ff4d4d'}44`,
+                padding: '0.6rem 1.2rem',
+                borderRadius: '20px',
+                fontSize: '0.85rem',
+                color: 'var(--text-bright)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: `0 0 15px ${perfDiff >= 0 ? 'var(--planet-green)' : '#ff4d4d'}22`
+              }}
+            >
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: perfDiff >= 0 ? 'var(--planet-green)' : '#ff4d4d' }} />
+              <span>
+                고스트 궤적(과거의 나)보다 엔진 출력이 
+                <strong style={{ color: perfDiff >= 0 ? 'var(--planet-green)' : '#ff4d4d', marginLeft: '4px' }}>
+                  {Math.abs(perfDiff).toFixed(1)}% {perfDiff >= 0 ? '높습니다! 🚀' : '낮습니다. 분발하세요! 🔥'}
+                </strong>
+              </span>
+            </motion.div>
+          )}
+
         </motion.div>
       </AnimatePresence>
 
@@ -467,7 +529,18 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions }
     const raw = [...filteredHistory].reverse(); // 과거 -> 최신 순으로 정렬
     const total = raw.length;
     const start = Math.max(0, total - (windowIndex + 1) * WINDOW_SIZE);
-    const end = total - windowIndex * WINDOW_SIZE;
+    const end = Math.max(0, Math.min(total, total - windowIndex * WINDOW_SIZE));
+    return raw.slice(start, end);
+  }, [filteredHistory, windowIndex])
+
+  // 고스트 데이터 추출 (과거 윈도우)
+  const ghostData = useMemo(() => {
+    const raw = [...filteredHistory].reverse();
+    const total = raw.length;
+    const pastWindowIndex = windowIndex + 1;
+    const start = Math.max(0, total - (pastWindowIndex + 1) * WINDOW_SIZE);
+    const end = Math.max(0, Math.min(total, total - pastWindowIndex * WINDOW_SIZE));
+    if (end <= 0) return [];
     return raw.slice(start, end);
   }, [filteredHistory, windowIndex])
 
@@ -590,6 +663,7 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions }
             <TrajectoryChart 
               key={`${navState.level}-${navState.regionId || 'all'}-${windowIndex}`}
               data={windowedData} 
+              ghostData={ghostData}
               onItemClick={onQuizSelect} 
               colorScale={colorScale} 
               windowIndex={windowIndex}
