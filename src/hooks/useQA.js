@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { recordCrystalTransaction } from '../utils/crystalLedger';
+import { calculateGrowthUpdates } from '../utils/rankingUtils';
 
 // --- Fetch Public Questions (Agora Board) ---
 export function usePublicQuestions(filter = 'all') {
@@ -296,10 +297,16 @@ export function useQAMutations() {
 
         // Reward Answerer (if not self and not teacher admin)
         if (answererUid !== user.uid && answererUid !== 'admin') {
-           await updateDoc(doc(db, 'users', answererUid), {
+           const answererSnap = await getDoc(doc(db, 'users', answererUid));
+           let answererUpdates = {
              crystals: increment(20),
              helpCount: increment(1)
-           });
+           };
+           if (answererSnap.exists()) {
+             answererUpdates = { ...answererUpdates, ...calculateGrowthUpdates(answererSnap.data(), 20) };
+           }
+           await updateDoc(doc(db, 'users', answererUid), answererUpdates);
+           Object.assign(answererUpdates, { crystals: 20 });
            recordCrystalTransaction(answererUid, {
              amount: 20,
              type: 'answer_accepted',
@@ -309,9 +316,12 @@ export function useQAMutations() {
         }
 
         // Reward Asker (Resolution Bonus)
-        await updateDoc(doc(db, 'users', user.uid), {
-          crystals: increment(5)
-        });
+        const askerSnap = await getDoc(doc(db, 'users', user.uid));
+        let askerUpdates = { crystals: increment(5) };
+        if (askerSnap.exists()) {
+           askerUpdates = { ...askerUpdates, ...calculateGrowthUpdates(askerSnap.data(), 5) };
+        }
+        await updateDoc(doc(db, 'users', user.uid), askerUpdates);
         recordCrystalTransaction(user.uid, {
           amount: 5,
           type: 'question_resolved',
@@ -340,9 +350,12 @@ export function useQAMutations() {
         });
 
         // Small reward for self-resolution
-        await updateDoc(doc(db, 'users', user.uid), {
-          crystals: increment(3)
-        });
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        let userUpdates = { crystals: increment(3) };
+        if (userSnap.exists()) {
+           userUpdates = { ...userUpdates, ...calculateGrowthUpdates(userSnap.data(), 3) };
+        }
+        await updateDoc(doc(db, 'users', user.uid), userUpdates);
         recordCrystalTransaction(user.uid, {
           amount: 3,
           type: 'self_resolve',
@@ -365,9 +378,12 @@ export function useQAMutations() {
         const answerSnap = await getDoc(doc(db, 'answers', answerId));
         const answerData = answerSnap.data();
         if (answerData.userId && answerData.userId !== 'admin') {
-          await updateDoc(doc(db, 'users', answerData.userId), {
-            crystals: increment(10)
-          });
+          const answererSnap = await getDoc(doc(db, 'users', answerData.userId));
+          let updateData = { crystals: increment(10) };
+          if (answererSnap.exists()) {
+            updateData = { ...updateData, ...calculateGrowthUpdates(answererSnap.data(), 10) };
+          }
+          await updateDoc(doc(db, 'users', answerData.userId), updateData);
           recordCrystalTransaction(answerData.userId, {
             amount: 10,
             type: 'teacher_verify',

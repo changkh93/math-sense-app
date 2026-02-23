@@ -99,7 +99,11 @@ export default function SpaceRanking({ user, userData }) {
       if (rankMode === 'sei') {
         users.sort((a, b) => b.seiData.total - a.seiData.total)
       } else if (rankMode === 'growth') {
-        users.sort((a, b) => b.weeklyGain - a.weeklyGain)
+        users.sort((a, b) => {
+          if (b.weeklyGain !== a.weeklyGain) return b.weeklyGain - a.weeklyGain;
+          if (b.seiData.total !== a.seiData.total) return b.seiData.total - a.seiData.total;
+          return (b.crystals || 0) - (a.crystals || 0);
+        });
       } else if (rankMode === 'streak') {
         users.sort((a, b) => b.streak - a.streak)
       }
@@ -135,7 +139,10 @@ export default function SpaceRanking({ user, userData }) {
         { label: '선생님 인증', value: '+10 💎', desc: '최우수 답변 추가 보너스' },
       ]
     }
-  ]
+  ];
+
+  const kstNow = new Date(Date.now() + 9 * 3600000);
+  const isMondayMorning = kstNow.getUTCDay() === 1 && kstNow.getUTCHours() < 12;
 
   return (
     <motion.div 
@@ -255,7 +262,26 @@ export default function SpaceRanking({ user, userData }) {
                 <span>PILOT</span>
                 <span style={{ textAlign: 'center' }}>SEI INDEX</span>
                 <span style={{ textAlign: 'center' }}>CRYSTALS</span>
-                <span style={{ textAlign: 'right' }}>GROWTH</span>
+                <span style={{ textAlign: 'right', position: 'relative' }}>
+                  GROWTH
+                  {isMondayMorning && rankMode === 'growth' && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-18px',
+                      right: '0',
+                      fontSize: '0.65rem',
+                      color: 'var(--star-gold)',
+                      whiteSpace: 'nowrap',
+                      background: 'rgba(255,215,0,0.1)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(255,215,0,0.3)',
+                      boxShadow: '0 0 10px rgba(255,215,0,0.2)'
+                    }}>
+                      New Season 🚀
+                    </span>
+                  )}
+                </span>
               </div>
 
               {/* 랭킹 리스트 */}
@@ -272,7 +298,7 @@ export default function SpaceRanking({ user, userData }) {
                 ) : (
                   topUsers.map((u, index) => {
                     const isMe = u.id === user?.uid
-                    const growth = u.weeklyGain || 0;
+                    const growth = rankMode === 'growth' ? (u.weeklyGain || 0) : (u.dailyGain || 0);
                     const tier = u.seiData?.tier || { name: '브론즈 파일럿', color: '#cd7f32', icon: '🚀' };
 
                     return (
@@ -353,10 +379,13 @@ export default function SpaceRanking({ user, userData }) {
                           flexDirection: 'column',
                           alignItems: 'flex-end'
                         }}>
-                          <span style={{ 
+                          <span 
+                            title={growth === 0 && rankMode === 'growth' ? "첫 광석을 채집하고 이번 주 첫 번째 급상승 주인공이 되세요!" : ""}
+                            style={{ 
                             color: growth > 0 ? 'var(--planet-green)' : growth < 0 ? '#ff4d4d' : 'rgba(255,255,255,0.4)',
                             fontWeight: 800,
-                            fontSize: '0.9rem'
+                            fontSize: '0.9rem',
+                            cursor: growth === 0 && rankMode === 'growth' ? 'help' : 'default'
                           }}>
                             {growth > 0 ? `▲ ${growth}` : growth < 0 ? `▼ ${Math.abs(growth)}` : '─'}
                           </span>

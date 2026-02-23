@@ -8,8 +8,8 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   // 2. 전문성 (Skill): 평균 점수 * 10 -> 가중치 30%
   const skillScore = Math.floor(avgScore * 10);
   
-  // 3. 성실도 (Diligence): log2(연속 학습일 + 1) * 50 -> 가중치 25%
-  const diligenceScore = Math.floor(Math.log2(streak + 1) * 50);
+  // 3. 성실도 (Diligence): log2(연속 학습일 + 1) * 10 -> 가중치 하향
+  const diligenceScore = Math.floor(Math.log2(streak + 1) * 10);
   
   // 4. 추진력 (Growth): 주간 성장 * 2 -> 가중치 25%
   const growthScore = Math.max(0, weeklyGain * 2);
@@ -38,4 +38,35 @@ export function getTierFromSEI(sei) {
   if (sei >= 1200) return { name: '골드 제독', label: 'Gold', color: '#ffd700', icon: '👑' };
   if (sei >= 600)  return { name: '실버 캡틴', label: 'Silver', color: '#c0c0c0', icon: '⚔️' };
   return { name: '브론즈 파일럿', label: 'Bronze', color: '#cd7f32', icon: '🚀' };
+}
+
+export function calculateGrowthUpdates(userData, earnedAmount) {
+  if (!earnedAmount || earnedAmount <= 0) return {};
+  if (!userData) return {};
+
+  const kstNow = new Date(Date.now() + 9 * 3600000);
+  const todayKST = kstNow.toISOString().split('T')[0];
+  const mondayOffset = (kstNow.getUTCDay() + 6) % 7;
+  const mondayKST = new Date(kstNow.getTime() - mondayOffset * 86400000)
+    .toISOString().split('T')[0];
+
+  const growthUpdates = {};
+  
+  // Daily growth
+  if (userData.dailyGrowthDate === todayKST) {
+    growthUpdates.dailyGrowth = (userData.dailyGrowth || 0) + earnedAmount;
+  } else {
+    growthUpdates.dailyGrowth = earnedAmount;
+    growthUpdates.dailyGrowthDate = todayKST;
+  }
+
+  // Weekly growth
+  if (userData.weeklyGrowthMonday === mondayKST) {
+    growthUpdates.weeklyGrowth = (userData.weeklyGrowth || 0) + earnedAmount;
+  } else {
+    growthUpdates.weeklyGrowth = earnedAmount;
+    growthUpdates.weeklyGrowthMonday = mondayKST;
+  }
+
+  return growthUpdates;
 }
