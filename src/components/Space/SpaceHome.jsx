@@ -114,7 +114,6 @@ function SpaceHome() {
   const equipment = {
     radar: (userData?.crystals || 0) >= 100,
     engine: (userData?.crystals || 0) >= 500,
-    shield: (userData?.crystals || 0) >= 1000
   }
 
   // BGM Auto-start on user interaction
@@ -290,7 +289,7 @@ function SpaceHome() {
     isProcessingSave.current = true
     
     try {
-      const { score, total, correctCount, totalCount, crystalsEarned, isPerfect, shieldUsed } = result
+      const { score, total, correctCount, totalCount, crystalsEarned, isPerfect, shieldsUsed } = result
       if (totalCount === 0) return
 
       // Anti-grinding logic
@@ -337,7 +336,8 @@ function SpaceHome() {
       const prevTotalScore = userData.totalScore || 0
       const prevPerfectCount = userData.perfectCount || 0
       const prevConsecutiveGood = score >= 90 ? (userData.consecutiveGood || 0) + 1 : 0
-      const prevShieldDefended = (userData.shieldDefended || 0) + (shieldUsed ? 2 : 0)
+      const prevShieldDefended = (userData.shieldDefended || 0) + (shieldsUsed || 0)
+      const currentShieldCharges = userData?.shieldCharges || 0
 
       // Daily Task Reset Logic
       const today = new Date().toISOString().split('T')[0]
@@ -390,6 +390,7 @@ function SpaceHome() {
         dailyQuizCount: dailyQuizCount,
         lastQuizDate: today,
         lastActive: serverTimestamp(),
+        shieldCharges: Math.max(0, currentShieldCharges - (shieldsUsed || 0)),
         ...growthUpdates,
         ...streakUpdates
       }, { merge: true })
@@ -791,7 +792,7 @@ function SpaceHome() {
           }}
           onExit={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
           onComplete={handleComplete}
-          hasShield={equipment.shield}
+          hasShield={userData?.shieldCharges || 0}
         />
       )
     }

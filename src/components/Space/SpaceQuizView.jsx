@@ -23,7 +23,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [isRebooting, setIsRebooting] = useState(false)
   const [comboCount, setComboCount] = useState(0)
   const [sessionCrystals, setSessionCrystals] = useState(0)
-  const [shieldUsed, setShieldUsed] = useState(false)
+  const [shieldsUsed, setShieldsUsed] = useState(0)
   const [floatingMarkers, setFloatingMarkers] = useState([]) // { id, text, type, x, y }
   const [originalTotal, setOriginalTotal] = useState(0)
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 유지
@@ -145,9 +145,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       setComboCount(0)
       
       // 방패 방어 로직 (광자 쉴드)
-      if (hasShield && !shieldUsed) {
-        setShieldUsed(true)
-        addMarker('🛡️ DEFENDED!', 'gain')
+      const remainingShields = hasShield - shieldsUsed
+      if (remainingShields > 0) {
+        setShieldsUsed(prev => prev + 1)
+        addMarker(`🛡️ DEFENDED! (-1)`, 'gain')
       } else {
         // 재도전 모드에서는 광석 차감 없음
         if (!reSolveMode) {
@@ -238,7 +239,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         questions: currentQuestions,
         crystalsEarned,
         isPerfect: canGetPerfectBonus,
-        shieldUsed
+        shieldsUsed
       })
     } catch (err) {
       console.error("Finish failed:", err)
@@ -575,15 +576,29 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 boxShadow: 'var(--glow-cyan)'
               }}></div>
             </div>
-            <span style={{ 
-              color: 'var(--text-muted)', 
-              fontSize: '0.8rem',
-              display: 'block',
-              textAlign: 'right',
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginTop: '0.5rem'
             }}>
-              {currentIdx + 1} / {currentQuestions.length}
-            </span>
+              <span style={{ 
+                color: 'var(--star-gold)', 
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                {hasShield > 0 ? `🛡️ ${Math.max(0, hasShield - shieldsUsed)}` : ''}
+              </span>
+              <span style={{ 
+                color: 'var(--text-muted)', 
+                fontSize: '0.8rem',
+              }}>
+                {currentIdx + 1} / {currentQuestions.length}
+              </span>
+            </div>
           </div>
 
           {/* 문제 및 이미지 섹션 */}
@@ -686,9 +701,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 <div style={{ color: 'white', opacity: 0.8 }}>
                   에너지 손실로 인한 시스템 복구 중... (3s)
                 </div>
-                {hasShield && shieldUsed && (
+                {hasShield - shieldsUsed >= 0 && shieldsUsed > 0 && (
                   <div style={{ color: 'var(--star-gold)', marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                    🛡️ 광자 쉴드가 에너지를 보호했습니다!
+                    🛡️ 광자 쉴드가 에너지를 보호했습니다! (남은 방어: {hasShield - shieldsUsed}회)
                   </div>
                 )}
               </motion.div>

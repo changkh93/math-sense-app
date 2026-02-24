@@ -19,6 +19,15 @@ export default function SpaceStore({ userData, user }) {
       desc: '하루 학습을 빠뜨려도 연속 항해 기록이 유지됩니다.',
       currentOwned: userData?.streakFreezeCount || 0
     },
+    { 
+      id: 'photon_shield', 
+      name: '광자 실드 (10회)', 
+      icon: '🛡️', 
+      cost: 200, 
+      maxOwn: 20, // Max charges
+      desc: '퀴즈 오답 시 크리스탈 패널티(-2)를 방어해 줍니다. 1회 구매 시 10번 방어 가능합니다.',
+      currentOwned: userData?.shieldCharges || 0
+    },
   ]
 
   const skins = [
@@ -31,47 +40,82 @@ export default function SpaceStore({ userData, user }) {
     { id: 'ice_planet', name: '얼음 행성 테마', icon: '❄️', cost: 500, desc: '퀴즈 배경을 차가운 얼음 행성으로 변경합니다.' },
   ]
 
-  const handlePurchaseCryoCore = async () => {
+  const handlePurchaseCryoCore = async (item) => {
     if (purchasing || !user) return
     
     const currentCrystals = userData?.crystals || 0
-    const currentFreezeCount = userData?.streakFreezeCount || 0
     
-    if (currentCrystals < 100) {
-      setPurchaseMessage({ type: 'error', text: '광석이 부족합니다. (필요: 100개)' })
-      setTimeout(() => setPurchaseMessage(null), 3000)
-      return
-    }
-    if (currentFreezeCount >= 3) {
-      setPurchaseMessage({ type: 'error', text: '크라이오 코어는 최대 3개까지 보유할 수 있습니다.' })
+    if (currentCrystals < item.cost) {
+      setPurchaseMessage({ type: 'error', text: `광석이 부족합니다. (필요: ${item.cost}개)` })
       setTimeout(() => setPurchaseMessage(null), 3000)
       return
     }
 
-    setPurchasing(true)
-    try {
-      await setDoc(doc(db, 'users', user.uid), {
-        crystals: currentCrystals - 100,
-        streakFreezeCount: currentFreezeCount + 1,
-      }, { merge: true })
-      
-      soundManager.playCrystal()
-      setPurchaseMessage({ type: 'success', text: `크라이오 코어 구매 완료! (보유: ${currentFreezeCount + 1}/3)` })
-      setTimeout(() => setPurchaseMessage(null), 3000)
+    if (item.id === 'cryo_core') {
+      const currentFreezeCount = userData?.streakFreezeCount || 0
+      if (currentFreezeCount >= item.maxOwn) {
+        setPurchaseMessage({ type: 'error', text: `크라이오 코어는 최대 ${item.maxOwn}개까지 보유할 수 있습니다.` })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+        return
+      }
 
-      // Record crystal transaction for ledger
-      recordCrystalTransaction(user.uid, {
-        amount: -100,
-        type: 'store_purchase',
-        description: '크라이오 코어 구매',
-        metadata: { itemId: 'cryo_core' }
-      })
-    } catch (err) {
-      console.error('Purchase failed:', err)
-      setPurchaseMessage({ type: 'error', text: '구매에 실패했습니다. 다시 시도해주세요.' })
-      setTimeout(() => setPurchaseMessage(null), 3000)
-    } finally {
-      setPurchasing(false)
+      setPurchasing(true)
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          crystals: currentCrystals - item.cost,
+          streakFreezeCount: currentFreezeCount + 1,
+        }, { merge: true })
+        
+        soundManager.playCrystal()
+        setPurchaseMessage({ type: 'success', text: `${item.name} 구매 완료! (보유: ${currentFreezeCount + 1}/${item.maxOwn})` })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+
+        recordCrystalTransaction(user.uid, {
+          amount: -item.cost,
+          type: 'store_purchase',
+          description: `${item.name} 구매`,
+          metadata: { itemId: item.id }
+        })
+      } catch (err) {
+        console.error('Purchase failed:', err)
+        setPurchaseMessage({ type: 'error', text: '구매에 실패했습니다. 다시 시도해주세요.' })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+      } finally {
+        setPurchasing(false)
+      }
+    } else if (item.id === 'photon_shield') {
+      const currentShieldCharges = userData?.shieldCharges || 0
+      // 방어 횟수가 최대 20회를 초과하지 않도록 제한 (예: 15개 있을 때 10개 충전 불가)
+      if (currentShieldCharges + 10 > item.maxOwn) {
+        setPurchaseMessage({ type: 'error', text: `광자 실드는 최대 ${item.maxOwn}회 방어권까지만 충전할 수 있습니다.` })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+        return
+      }
+
+      setPurchasing(true)
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          crystals: currentCrystals - item.cost,
+          shieldCharges: currentShieldCharges + 10,
+        }, { merge: true })
+        
+        soundManager.playCrystal()
+        setPurchaseMessage({ type: 'success', text: `${item.name} 구매 완료! (현재 방어 횟수: ${currentShieldCharges + 10}회)` })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+
+        recordCrystalTransaction(user.uid, {
+          amount: -item.cost,
+          type: 'store_purchase',
+          description: `${item.name} 구매`,
+          metadata: { itemId: item.id }
+        })
+      } catch (err) {
+        console.error('Purchase failed:', err)
+        setPurchaseMessage({ type: 'error', text: '구매에 실패했습니다. 다시 시도해주세요.' })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+      } finally {
+        setPurchasing(false)
+      }
     }
   }
 
@@ -140,40 +184,48 @@ export default function SpaceStore({ userData, user }) {
               <div style={{ fontSize: '2.5rem' }}>{item.icon}</div>
               <div>
                 <div style={{ fontWeight: 700, color: 'var(--text-bright)' }}>{item.name}</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--crystal-cyan)' }}>💰 {item.cost} 광석 · 보유: {item.currentOwned}/{item.maxOwn}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--crystal-cyan)' }}>
+                  💰 {item.cost} 광석 · {item.id === 'photon_shield' ? `방어: ${item.currentOwned}/${item.maxOwn}회` : `보유: ${item.currentOwned}/${item.maxOwn}`}
+                </div>
               </div>
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
               {item.desc}
               <br/>
-              <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-                ※ 연속 학습이 끊길 위기일 때 자동으로 사용됩니다. (결석 1일당 1개 소모, 최대 {item.maxOwn}개 보유)
-              </span>
+              {item.id === 'cryo_core' ? (
+                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                  ※ 연속 학습이 끊길 위기일 때 자동으로 사용됩니다. (결석 1일당 1개 소모, 최대 {item.maxOwn}개 보유)
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                  ※ 퀴즈 중 오답 시 자동으로 소모됩니다. (최대 {item.maxOwn}회 방어까지 누적 충전 가능)
+                </span>
+              )}
             </p>
             <button 
               className="space-nav-link" 
-              disabled={purchasing || item.currentOwned >= item.maxOwn || (userData?.crystals || 0) < item.cost}
+              disabled={purchasing || (item.id === 'cyro_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn) || (userData?.crystals || 0) < item.cost}
               style={{ 
                 width: '100%', 
                 fontSize: '0.9rem', 
                 padding: '0.8rem',
                 fontWeight: 700,
-                background: item.currentOwned >= item.maxOwn 
+                background: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn)) 
                   ? 'rgba(107, 114, 128, 0.2)' 
                   : (userData?.crystals || 0) < item.cost 
                     ? 'rgba(239, 68, 68, 0.1)'
                     : 'rgba(0, 243, 255, 0.15)',
-                border: item.currentOwned >= item.maxOwn
+                border: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn))
                   ? '1px solid rgba(107, 114, 128, 0.3)'
                   : '1px solid rgba(0, 243, 255, 0.4)',
-                color: item.currentOwned >= item.maxOwn ? '#6B7280' : 'var(--crystal-cyan)',
-                cursor: (item.currentOwned >= item.maxOwn || purchasing) ? 'not-allowed' : 'pointer',
+                color: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn)) ? '#6B7280' : 'var(--crystal-cyan)',
+                cursor: (((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn)) || purchasing) ? 'not-allowed' : 'pointer',
                 opacity: purchasing ? 0.7 : 1
               }}
-              onClick={handlePurchaseCryoCore}
+              onClick={() => handlePurchaseCryoCore(item)}
             >
-              {item.currentOwned >= item.maxOwn 
-                ? '최대 보유 중' 
+              {((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn)) 
+                ? '최대 한도 초과' 
                 : (userData?.crystals || 0) < item.cost 
                   ? `광석 부족 (${item.cost - (userData?.crystals || 0)}개 더 필요)` 
                   : purchasing 
