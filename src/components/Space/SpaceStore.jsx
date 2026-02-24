@@ -30,6 +30,25 @@ export default function SpaceStore({ userData, user }) {
     },
   ]
 
+  const unownedEquipments = [
+    { 
+      id: 'radar', 
+      name: '광석 레이더', 
+      icon: '📡', 
+      cost: 100, 
+      desc: '주변의 수학 광석을 더 잘 찾아냅니다.',
+      isOwned: userData?.hasRadar || false
+    },
+    { 
+      id: 'engine', 
+      name: '중력 엔진', 
+      icon: '⚙️', 
+      cost: 500, 
+      desc: '더 먼 행성까지 빠르게 이동할 수 있습니다.',
+      isOwned: userData?.hasEngine || false
+    }
+  ]
+
   const skins = [
     { id: 'rainbow_engine', name: '무지개 엔진 불꽃', icon: '🌈', cost: 1000, desc: '엔진 추진력을 무지개 빛으로 변경합니다.' },
     { id: 'stealth_hull', name: '투명 선체', icon: '👻', cost: 2000, desc: '우주선을 반투명하게 만듭니다.' },
@@ -116,6 +135,38 @@ export default function SpaceStore({ userData, user }) {
       } finally {
         setPurchasing(false)
       }
+    } else if (item.id === 'radar' || item.id === 'engine') {
+      if (item.isOwned) {
+        setPurchaseMessage({ type: 'error', text: `이미 보유 중인 장비입니다.` })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+        return
+      }
+
+      setPurchasing(true)
+      try {
+        const fieldName = item.id === 'radar' ? 'hasRadar' : 'hasEngine'
+        await setDoc(doc(db, 'users', user.uid), {
+          crystals: currentCrystals - item.cost,
+          [fieldName]: true,
+        }, { merge: true })
+        
+        soundManager.playLevelUp()
+        setPurchaseMessage({ type: 'success', text: `${item.name} 장착 완료!` })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+
+        recordCrystalTransaction(user.uid, {
+          amount: -item.cost,
+          type: 'store_purchase',
+          description: `${item.name} 구매`,
+          metadata: { itemId: item.id }
+        })
+      } catch (err) {
+        console.error('Purchase failed:', err)
+        setPurchaseMessage({ type: 'error', text: '구매에 실패했습니다. 다시 시도해주세요.' })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+      } finally {
+        setPurchasing(false)
+      }
     }
   }
 
@@ -163,9 +214,73 @@ export default function SpaceStore({ userData, user }) {
         </motion.div>
       )}
 
+      {/* 🚢 영구 장비 (1회 구매) */}
+      <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem', marginTop: '3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <span>🚢 영구 장비</span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--planet-green)', fontWeight: 400, background: 'rgba(74, 222, 128, 0.15)', padding: '2px 8px', borderRadius: '8px' }}>1회 구매</span>
+      </h3>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        gap: '1.5rem',
+        marginBottom: '4rem'
+      }}>
+        {unownedEquipments.map(item => (
+          <div key={item.id} className="glass-card" style={{ 
+            padding: '1.5rem',
+            border: item.isOwned ? '1px solid rgba(107, 114, 128, 0.3)' : '1px solid rgba(0, 243, 255, 0.3)',
+            background: item.isOwned ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 243, 255, 0.05)',
+            opacity: item.isOwned ? 0.6 : 1
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '2.5rem' }}>{item.icon}</div>
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--text-bright)' }}>{item.name}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--crystal-cyan)' }}>
+                  💰 {item.cost} 광석
+                </div>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              {item.desc}
+            </p>
+            <button 
+              className="space-nav-link" 
+              disabled={purchasing || item.isOwned || (userData?.crystals || 0) < item.cost}
+              style={{ 
+                width: '100%', 
+                fontSize: '0.9rem', 
+                padding: '0.8rem',
+                fontWeight: 700,
+                background: item.isOwned 
+                  ? 'rgba(107, 114, 128, 0.2)' 
+                  : (userData?.crystals || 0) < item.cost 
+                    ? 'rgba(239, 68, 68, 0.1)'
+                    : 'rgba(0, 243, 255, 0.15)',
+                border: item.isOwned
+                  ? '1px solid rgba(107, 114, 128, 0.3)'
+                  : '1px solid rgba(0, 243, 255, 0.4)',
+                color: item.isOwned ? '#6B7280' : 'var(--crystal-cyan)',
+                cursor: (item.isOwned || purchasing) ? 'not-allowed' : 'pointer',
+                opacity: purchasing ? 0.7 : 1
+              }}
+              onClick={() => handlePurchaseCryoCore(item)}
+            >
+              {item.isOwned 
+                ? '장착 중 (보유 완료)' 
+                : (userData?.crystals || 0) < item.cost 
+                  ? `광석 부족 (${item.cost - (userData?.crystals || 0)}개 더 필요)` 
+                  : purchasing 
+                    ? '구매 중...' 
+                    : `구매하기 (${item.cost} 광석)`}
+            </button>
+          </div>
+        ))}
+      </div>
+
       {/* 🛡️ 항해 보호 장비 — 구매 가능! */}
       <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span>🛡️ 항해 보호 장비</span>
+        <span>🛡️ 소모성 보호 장비</span>
         <span style={{ fontSize: '0.75rem', color: 'var(--planet-green)', fontWeight: 400, background: 'rgba(74, 222, 128, 0.15)', padding: '2px 8px', borderRadius: '8px' }}>구매 가능</span>
       </h3>
       <div style={{

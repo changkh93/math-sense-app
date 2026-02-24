@@ -112,8 +112,8 @@ function SpaceHome() {
   
   // Equipment Logic
   const equipment = {
-    radar: (userData?.crystals || 0) >= 100,
-    engine: (userData?.crystals || 0) >= 500,
+    radar: userData?.hasRadar || false,
+    engine: userData?.hasEngine || false,
   }
 
   // BGM Auto-start on user interaction

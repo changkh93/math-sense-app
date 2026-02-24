@@ -27,13 +27,6 @@ export default function SpaceCollection({ userData, history }) {
     { title: '영원한 항해사', icon: '🌌', unlocked: (userData?.longestStreak || 0) >= 365, desc: '365일 연속! 은하핵에 도달한 전설의 항해사.' },
   ]
 
-  const items = [
-    { name: '기본 우주선', icon: '🚀', owned: true, cost: '기본 지급', desc: '모든 대원에게 지급되는 표준 탐사선입니다.' },
-    { name: '광석 레이더', icon: '📡', owned: (userData?.crystals || 0) >= 100, cost: '100 광석', desc: '주변의 수학 광석을 더 잘 찾아냅니다.' },
-    { name: '중력 엔진', icon: '⚙️', owned: (userData?.crystals || 0) >= 500, cost: '500 광석', desc: '더 먼 행성까지 빠르게 이동할 수 있습니다.' },
-    { name: '광자 쉴드', icon: '🛡️', owned: (userData?.crystals || 0) >= 1000, cost: '1000 광석', desc: '강력한 수치 오류로부터 우주선을 보호합니다.' },
-  ]
-
   return (
     <div className="fade-in">
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
@@ -93,43 +86,7 @@ export default function SpaceCollection({ userData, history }) {
         ))}
       </div>
 
-      <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span>🚢 보유 장비</span>
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>(광석 수집량에 따라 해제)</span>
-      </h3>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '1.5rem'
-      }}>
-        {items.map((item, idx) => (
-          <div 
-            key={idx} 
-            className="glass-card" 
-            style={{ 
-              padding: '1.5rem', 
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-              opacity: item.owned ? 1 : 0.4,
-              border: item.owned ? '1px solid var(--crystal-cyan)' : '1px solid var(--glass-border)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-              <div style={{ fontSize: '2.5rem' }}>{item.icon}</div>
-              <div>
-                <div style={{ fontWeight: 700, color: item.owned ? 'var(--text-bright)' : 'var(--text-muted)', fontSize: '1.1rem' }}>{item.name}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--crystal-cyan)', marginTop: '0.2rem' }}>
-                  {item.owned ? '🔹 장착 준비 완료' : `🔒 필요: ${item.cost}`}
-                </div>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px solid var(--glass-border)', paddingTop: '0.8rem' }}>
-              {item.desc}
-            </div>
-          </div>
-        ))}
-      </div>
+
     </div>
   )
 }
