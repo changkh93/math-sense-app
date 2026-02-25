@@ -29,6 +29,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 유지
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
+  const [modalContext, setModalContext] = useState(null)
   const [isFirstPassPerfect, setIsFirstPassPerfect] = useState(false)
   const [showRadarScan, setShowRadarScan] = useState(false)
   const [potentialOre, setPotentialOre] = useState(0)
@@ -188,6 +189,18 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       ...prev,
       [currentQuestion.id]: option
     }))
+  }
+
+  const handleOpenQuestionModal = () => {
+    setModalContext({
+      quizId: currentQuestion?.id,
+      unitId: quizData?.unitId || quizData?.id,
+      quizTitle: quizData?.title,
+      questionId: currentQuestion?.id,
+      chapterId: quizData?.chapterId,
+      wrongAnswer: userAnswers[currentQuestion?.id]
+    })
+    setIsQuestionModalOpen(true)
   }
 
   const handleCloseQuestionModal = () => {
@@ -518,7 +531,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         {!isResultMode && (
           <button 
             className="space-teacher-btn glass-card" 
-            onClick={() => setIsQuestionModalOpen(true)}
+            onClick={handleOpenQuestionModal}
             style={{
               position: 'fixed',
               bottom: '2rem',
@@ -860,14 +873,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           <QuestionModal 
             isOpen={isQuestionModalOpen}
             onClose={handleCloseQuestionModal}
-            quizContext={{
-              quizId: currentQuestion?.id, // This is the specific 1-1-15 ID
-              unitId: quizData?.unitId || quizData?.id,
-              quizTitle: quizData?.title,
-              questionId: currentQuestion?.id,
-              chapterId: quizData?.chapterId,
-              wrongAnswer: userAnswers[currentQuestion?.id]
-            }}
+            quizContext={modalContext}
           />
         </div>
       </div>

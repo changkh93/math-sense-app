@@ -23,6 +23,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 저장
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
+  const [modalContext, setModalContext] = useState(null)
   const initializedUnitId = useRef(null) // Prevent accidental reshuffling
 
   // 초기 문제 데이터 설정 (20문항 랜덤 샘플링 적용)
@@ -155,6 +156,18 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       ...prev,
       [currentQuestion.id]: option
     }))
+  }
+
+  const handleOpenQuestionModal = () => {
+    setModalContext({
+      quizId: quizData?.id,
+      quizTitle: quizData?.title,
+      questionId: currentQuestion?.id,
+      chapterId: quizData?.chapterId,
+      unitId: quizData?.unitId,
+      wrongAnswer: userAnswers[currentQuestion?.id]
+    })
+    setIsQuestionModalOpen(true)
   }
 
   const handleCloseQuestionModal = () => {
@@ -417,7 +430,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
 
       <button 
         className="teacher-call-btn" 
-        onClick={() => setIsQuestionModalOpen(true)}
+        onClick={handleOpenQuestionModal}
         title="선생님께 질문하기"
       >
         🙋
@@ -426,14 +439,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       <QuestionModal 
         isOpen={isQuestionModalOpen}
         onClose={handleCloseQuestionModal}
-        quizContext={{
-          quizId: quizData?.id,
-          quizTitle: quizData?.title,
-          questionId: currentQuestion?.id,
-          chapterId: quizData?.chapterId,
-          unitId: quizData?.unitId,
-          wrongAnswer: userAnswers[currentQuestion?.id]
-        }}
+        quizContext={modalContext}
       />
     </div>
   )
