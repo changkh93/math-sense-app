@@ -16,27 +16,36 @@ export default function SpaceStore({ userData, user }) {
       icon: '🧊', 
       cost: 100, 
       maxOwn: 3,
-      desc: '하루 학습을 빠뜨려도 연속 항해 기록이 유지됩니다.',
+      desc: '결석해도 연속 학습(스트릭) 불꽃이 꺼지지 않게 지켜주는 마법의 아이템! 하루 빼먹었다고 너무 아쉬워하지 마세요.',
       currentOwned: userData?.streakFreezeCount || 0
     },
     { 
       id: 'photon_shield', 
-      name: '광자 실드 (10회)', 
+      name: '광자 실드', 
       icon: '🛡️', 
       cost: 200, 
       maxOwn: 20, // Max charges
-      desc: '퀴즈 오답 시 크리스탈 패널티(-2)를 방어해 줍니다. 1회 구매 시 10번 방어 가능합니다.',
+      desc: '퀴즈를 풀다 틀려도 피같은 광석(-2)이 깎이지 않게 지켜줍니다! 한 번 구매하면 든든하게 10번이나 막아줘요.',
       currentOwned: userData?.shieldCharges || 0
+    },
+    { 
+      id: 'memory_core', 
+      name: '별빛 메모리 코어', 
+      icon: '☄️', 
+      cost: 200, 
+      maxOwn: 50, // Max charges
+      desc: '깨진 데이터를 복구하고 과거의 점수를 되찾을 수 있는 필수 장치입니다! 한 번 구매하면 10번의 복구 탐사가 가능합니다.',
+      currentOwned: userData?.memoryCoreCharges || 0
     },
   ]
 
   const unownedEquipments = [
     { 
       id: 'radar', 
-      name: '광석 레이더', 
+      name: '첨단 마이닝 스캐너', 
       icon: '📡', 
       cost: 100, 
-      desc: '주변의 수학 광석을 더 잘 찾아냅니다.',
+      desc: '우주 전역의 고밀도 광석 지대를 감지하는 첨단 장비입니다. 약 20%의 확률로 보너스 지대(💎)를 발견하여 +5 광석을 추가 획득하며, 퀴즈 중 채굴 현황을 실시간으로 관측합니다.',
       isOwned: userData?.hasRadar || false
     },
     { 
@@ -44,7 +53,7 @@ export default function SpaceStore({ userData, user }) {
       name: '중력 엔진', 
       icon: '⚙️', 
       cost: 500, 
-      desc: '더 먼 행성까지 빠르게 이동할 수 있습니다.',
+      desc: '우주선의 추진력을 엄청나게 높여주는 초강력 엔진! 남들보다 훨씬 더 빠르고 매끄럽게 다음 행성으로 넘어갈 수 있습니다.',
       isOwned: userData?.hasEngine || false
     }
   ]
@@ -102,11 +111,12 @@ export default function SpaceStore({ userData, user }) {
       } finally {
         setPurchasing(false)
       }
-    } else if (item.id === 'photon_shield') {
-      const currentShieldCharges = userData?.shieldCharges || 0
-      // 방어 횟수가 최대 20회를 초과하지 않도록 제한 (예: 15개 있을 때 10개 충전 불가)
-      if (currentShieldCharges + 10 > item.maxOwn) {
-        setPurchaseMessage({ type: 'error', text: `광자 실드는 최대 ${item.maxOwn}회 방어권까지만 충전할 수 있습니다.` })
+    } else if (item.id === 'photon_shield' || item.id === 'memory_core') {
+      const fieldName = item.id === 'photon_shield' ? 'shieldCharges' : 'memoryCoreCharges'
+      const currentCharges = userData?.[fieldName] || 0
+      
+      if (currentCharges + 10 > item.maxOwn) {
+        setPurchaseMessage({ type: 'error', text: `${item.name}는 최대 ${item.maxOwn}회까지 충전할 수 있습니다.` })
         setTimeout(() => setPurchaseMessage(null), 3000)
         return
       }
@@ -115,11 +125,11 @@ export default function SpaceStore({ userData, user }) {
       try {
         await setDoc(doc(db, 'users', user.uid), {
           crystals: currentCrystals - item.cost,
-          shieldCharges: currentShieldCharges + 10,
+          [fieldName]: currentCharges + 10,
         }, { merge: true })
         
         soundManager.playCrystal()
-        setPurchaseMessage({ type: 'success', text: `${item.name} 구매 완료! (현재 방어 횟수: ${currentShieldCharges + 10}회)` })
+        setPurchaseMessage({ type: 'success', text: `${item.name} 구매 완료! (현재 잔여: ${currentCharges + 10}회)` })
         setTimeout(() => setPurchaseMessage(null), 3000)
 
         recordCrystalTransaction(user.uid, {
@@ -297,10 +307,25 @@ export default function SpaceStore({ userData, user }) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
               <div style={{ fontSize: '2.5rem' }}>{item.icon}</div>
-              <div>
-                <div style={{ fontWeight: 700, color: 'var(--text-bright)' }}>{item.name}</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--crystal-cyan)' }}>
-                  💰 {item.cost} 광석 · {item.id === 'photon_shield' ? `방어: ${item.currentOwned}/${item.maxOwn}회` : `보유: ${item.currentOwned}/${item.maxOwn}`}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-bright)', fontSize: '1.2rem' }}>{item.name}</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--crystal-cyan)', marginTop: '0.2rem' }}>
+                  <span style={{ fontWeight: 800 }}>💰 {item.cost} 광석</span>
+                  {['photon_shield', 'memory_core'].includes(item.id) && <span style={{ opacity: 0.7, marginLeft: '0.5rem' }}>(10회분 충전)</span>}
+                </div>
+                <div style={{ 
+                  marginTop: '0.5rem', 
+                  fontSize: '0.8rem', 
+                  color: item.currentOwned > 0 ? 'var(--planet-green)' : 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: item.currentOwned > 0 ? 'var(--planet-green)' : 'var(--text-muted)' }} />
+                  {item.id === 'cryo_core' 
+                    ? `현재 보유: ${item.currentOwned}개 / 최대 ${item.maxOwn}개`
+                    : `남은 횟수: ${item.currentOwned}회 / 최대 ${item.maxOwn}회`
+                  }
                 </div>
               </div>
             </div>
@@ -311,35 +336,39 @@ export default function SpaceStore({ userData, user }) {
                 <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
                   ※ 연속 학습이 끊길 위기일 때 자동으로 사용됩니다. (결석 1일당 1개 소모, 최대 {item.maxOwn}개 보유)
                 </span>
-              ) : (
+              ) : item.id === 'photon_shield' ? (
                 <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
                   ※ 퀴즈 중 오답 시 자동으로 소모됩니다. (최대 {item.maxOwn}회 방어까지 누적 충전 가능)
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                  ※ 별빛 메모리 코어 진입 시 1개 소모됩니다. (최대 {item.maxOwn}회 탐사까지 누적 가능)
                 </span>
               )}
             </p>
             <button 
               className="space-nav-link" 
-              disabled={purchasing || (item.id === 'cyro_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn) || (userData?.crystals || 0) < item.cost}
+              disabled={purchasing || (item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (['photon_shield', 'memory_core'].includes(item.id) && (item.currentOwned + 10) > item.maxOwn) || (userData?.crystals || 0) < item.cost}
               style={{ 
                 width: '100%', 
                 fontSize: '0.9rem', 
                 padding: '0.8rem',
                 fontWeight: 700,
-                background: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn)) 
+                background: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (['photon_shield', 'memory_core'].includes(item.id) && (item.currentOwned + 10) > item.maxOwn)) 
                   ? 'rgba(107, 114, 128, 0.2)' 
                   : (userData?.crystals || 0) < item.cost 
                     ? 'rgba(239, 68, 68, 0.1)'
                     : 'rgba(0, 243, 255, 0.15)',
-                border: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn))
+                border: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (['photon_shield', 'memory_core'].includes(item.id) && (item.currentOwned + 10) > item.maxOwn))
                   ? '1px solid rgba(107, 114, 128, 0.3)'
                   : '1px solid rgba(0, 243, 255, 0.4)',
-                color: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn)) ? '#6B7280' : 'var(--crystal-cyan)',
-                cursor: (((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn)) || purchasing) ? 'not-allowed' : 'pointer',
+                color: ((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (['photon_shield', 'memory_core'].includes(item.id) && (item.currentOwned + 10) > item.maxOwn)) ? '#6B7280' : 'var(--crystal-cyan)',
+                cursor: (((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (['photon_shield', 'memory_core'].includes(item.id) && (item.currentOwned + 10) > item.maxOwn)) || purchasing) ? 'not-allowed' : 'pointer',
                 opacity: purchasing ? 0.7 : 1
               }}
               onClick={() => handlePurchaseCryoCore(item)}
             >
-              {((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (item.id === 'photon_shield' && (item.currentOwned + 10) > item.maxOwn)) 
+              {((item.id === 'cryo_core' && item.currentOwned >= item.maxOwn) || (['photon_shield', 'memory_core'].includes(item.id) && (item.currentOwned + 10) > item.maxOwn)) 
                 ? '최대 한도 초과' 
                 : (userData?.crystals || 0) < item.cost 
                   ? `광석 부족 (${item.cost - (userData?.crystals || 0)}개 더 필요)` 

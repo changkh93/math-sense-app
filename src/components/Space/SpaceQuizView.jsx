@@ -10,7 +10,7 @@ import '../../styles/space-theme.css'
 import QuestionModal from '../QuestionModal'
 import { useSmartSync } from '../../hooks/useSync'
 
-export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield }) {
+export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield, hasRadar, isRadarBonus }) {
   // Real-time synchronization watchdog
   useSmartSync(quizData?.unitId)
 
@@ -30,6 +30,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [isFirstPassPerfect, setIsFirstPassPerfect] = useState(false)
+  const [showRadarScan, setShowRadarScan] = useState(false)
+  const [potentialOre, setPotentialOre] = useState(0)
   const initializedUnitId = useRef(null) // Prevent accidental reshuffling
   const isMobile = window.innerWidth <= 768
 
@@ -48,8 +50,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       setOriginalTotal(selected.length)
       initializedUnitId.current = quizData.unitId;
       setCurrentIdx(0); // Reset index on unit change
+
+      // Radar Effects
+      if (hasRadar) {
+        setShowRadarScan(isRadarBonus) 
+        if (isRadarBonus) {
+          soundManager.playLevelUp() 
+          setTimeout(() => setShowRadarScan(false), 3000)
+        }
+      }
     }
-  }, [quizData])
+  }, [quizData, hasRadar])
 
 
   const formatText = (text) => {
@@ -106,11 +117,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       const newCombo = (comboCount || 0) + 1
       setComboCount(newCombo)
       
-      let earned = 1
+      let earned = 2
       
       // 재도전 모드(학습 모드)에서는 광석 획득/차감 및 보너스 없음
       if (!reSolveMode) {
-        addMarker('+1', 'gain')
+        addMarker('+2', 'gain')
 
         if (newCombo > 0 && newCombo % 3 === 0) {
           earned += 5 // 3콤보 보너스
@@ -236,10 +247,19 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         total: 100, 
         correctCount, 
         totalCount: originalTotal, 
-        questions: currentQuestions,
         crystalsEarned,
         isPerfect: canGetPerfectBonus,
-        shieldsUsed
+        shieldsUsed,
+        wrongQuestions: allSessionQuestions.filter(q => userAnswers[q.id] && userAnswers[q.id].isCorrect === false).map(q => ({
+          ...q,
+          unitId: q.unitId || quizData.unitId,
+          chapterId: q.chapterId || quizData.chapterId,
+          regionId: q.regionId || region?.id
+        })),
+        correctQuestions: allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).map(q => ({
+          id: q.id,
+          unitId: q.unitId || quizData.unitId
+        }))
       })
     } catch (err) {
       console.error("Finish failed:", err)
@@ -600,6 +620,87 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               </span>
             </div>
           </div>
+
+          {/* Radar HUD */}
+          {hasRadar && (
+            <div className="radar-hud glass-card" style={{
+              position: 'absolute',
+              top: '4.5rem',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '0.4rem 1rem',
+              background: 'rgba(5, 10, 30, 0.8)',
+              border: '1px solid var(--crystal-cyan)',
+              borderRadius: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.8rem',
+              zIndex: 5
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span className="radar-pulse-dot" style={{ 
+                  width: 8, height: 8, background: 'var(--crystal-cyan)', borderRadius: '50%' 
+                }}></span>
+                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--crystal-cyan)', letterSpacing: '1px' }}>SCANNER ACTIVE</span>
+              </div>
+              <div style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.2)' }}></div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-bright)' }}>
+                ORE DETECTED: <span style={{ color: 'var(--star-gold)' }}>+{sessionCrystals}</span>
+              </div>
+              {isRadarBonus && (
+                <div style={{ 
+                  fontSize: '0.6rem', 
+                  fontWeight: 900, 
+                  color: 'var(--secondary)', 
+                  background: 'rgba(255, 107, 129, 0.2)',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--secondary)'
+                }}>BONUS</div>
+              )}
+            </div>
+          )}
+
+          {/* Radar Scan Overlay */}
+          <AnimatePresence>
+            {showRadarScan && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  zIndex: 200,
+                  pointerEvents: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(0, 243, 255, 0.05)'
+                }}
+              >
+                <div className="radar-scanner-line" />
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  style={{
+                    padding: '2rem',
+                    background: 'rgba(5, 20, 40, 0.9)',
+                    border: '2px solid var(--crystal-cyan)',
+                    borderRadius: '20px',
+                    textAlign: 'center',
+                    boxShadow: '0 0 30px rgba(0, 243, 255, 0.5)'
+                  }}
+                >
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📡</div>
+                  <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', fontSize: '1.5rem', marginBottom: '0.5rem' }}>광석 반응 탐지됨</h3>
+                  <p className="font-tech" style={{ color: 'var(--text-bright)', fontSize: '0.9rem' }}>
+                    예상 채굴 가능량: <span style={{ color: 'var(--star-gold)', fontWeight: 900 }}>{potentialOre}개+</span>
+                  </p>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* 문제 및 이미지 섹션 */}
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>

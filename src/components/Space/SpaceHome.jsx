@@ -3,7 +3,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit } from 'firebase/firestore'
 import { useRegions, useChapters, useUnits, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { regions as localRegions } from '../../data/regions'
@@ -47,6 +47,11 @@ function SpaceHome() {
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
   const [pendingUnit, setPendingUnit] = useState(null) // New: For RewardPotentialModal
+  
+  // --- Memory Core State ---
+  const [isMemoryCoreMode, setIsMemoryCoreMode] = useState(false)
+  const [memoryCoreQuestions, setMemoryCoreQuestions] = useState([])
+  const [loadingMemoryCore, setLoadingMemoryCore] = useState(false)
 
   // Sync view from location state (e.g. when coming from Agora)
   useEffect(() => {
@@ -98,6 +103,59 @@ function SpaceHome() {
       setSelectedChapterDocId(chapters[0].docId)
     }
   }, [chapters, selectedChapterDocId])
+
+  const startMemoryCoreMode = async () => {
+    if (!user) return
+    
+    const currentCharges = userData?.memoryCoreCharges || 0
+    if (currentCharges <= 0) {
+      alert("메모리 코어 탐사권이 부족합니다. 상점에서 복구 탐사권을 구매해주세요!")
+      return
+    }
+
+    setLoadingMemoryCore(true)
+    soundManager.playWarp()
+    try {
+      // Consume one charge
+      await setDoc(doc(db, 'users', user.uid), {
+        memoryCoreCharges: currentCharges - 1
+      }, { merge: true })
+
+      const q = query(collection(db, 'users', user.uid, 'incorrect_questions'), orderBy('lastFailedAt', 'desc'), limit(20))
+      const snap = await getDocs(q)
+      const failedQs = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }))
+      
+      if (failedQs.length === 0) {
+        alert("복구할 데이터가 없습니다! 당신의 메모리는 완벽하게 보존되어 있습니다. 🚀")
+        return
+      }
+
+      setMemoryCoreQuestions(failedQs)
+      setIsMemoryCoreMode(true)
+    } catch (err) {
+      console.error("Error fetching memory core questions:", err)
+      alert("데이터를 불러오지 못했습니다.")
+    } finally {
+      setLoadingMemoryCore(false)
+    }
+  }
+
+  // --- Ore Radar Daily Bonus Logic ---
+  const checkIsBonusUnit = (unitId) => {
+    if (!userData?.hasRadar || !unitId) return false
+    
+    // Deterministic selection based on UnitID + UID + Today's Date
+    const today = new Date().toISOString().split('T')[0]
+    const seedStr = `${unitId}-${user.uid}-${today}`
+    let hash = 0
+    for (let i = 0; i < seedStr.length; i++) {
+        hash = ((hash << 5) - hash) + seedStr.charCodeAt(i)
+        hash |= 0
+    }
+    
+    // 20% chance (hash % 5 === 0)
+    return Math.abs(hash) % 5 === 0
+  }
 
 
   // Interaction & UI State
@@ -318,6 +376,16 @@ function SpaceHome() {
           const baseCrystals = (crystalsEarned || 0) - 10
           actualCrystalsEarned = Math.round(baseCrystals * improvementRatio) // ratio will be 0 anyway
         }
+
+      // --- Scanner Daily Bonus (+5) ---
+      // Only for non-recovery mode
+      if (!isMemoryCoreMode) {
+        const isScannerBonusUnit = checkIsBonusUnit(currentUnitId)
+        if (isScannerBonusUnit && userData?.hasRadar) {
+          actualCrystalsEarned += 5
+          rewardMessage += " 📡 스캐너 보너스 탐사 성공! (+5 광석)"
+        }
+      }
         
         if (actualCrystalsEarned > 0) {
           rewardMessage = `${score}점으로 최고 기록을 경신했습니다! (+${actualCrystalsEarned} 광석)`
@@ -405,6 +473,84 @@ function SpaceHome() {
         crystalsEarned: actualCrystalsEarned,
         timestamp: serverTimestamp()
       })
+
+      // Save wrong questions / Delete recovered questions for Recovery Planet
+      const batchStore = writeBatch(db)
+      let hasBatchOps = false
+
+      if (result.wrongQuestions && result.wrongQuestions.length > 0) {
+        result.wrongQuestions.forEach(q => {
+          const qRef = doc(collection(db, 'users', user.uid, 'incorrect_questions'), q.id)
+          batchStore.set(qRef, {
+            ...q,
+            lastFailedAt: serverTimestamp(),
+            failCount: increment(1)
+          }, { merge: true })
+        })
+        hasBatchOps = true
+      }
+
+      if (result.correctQuestions && result.correctQuestions.length > 0) {
+        result.correctQuestions.forEach(q => {
+          batchStore.delete(doc(collection(db, 'users', user.uid, 'incorrect_questions'), q.id))
+        })
+        hasBatchOps = true
+      }
+
+      if (hasBatchOps) await batchStore.commit()
+
+      // --- Mastery Compensation (Memory Core) ---
+      if (isMemoryCoreMode && result.correctQuestions && result.correctQuestions.length > 0) {
+        const uniqueUnitIds = [...new Set(result.correctQuestions.map(q => q.unitId))]
+        
+        for (const uid of uniqueUnitIds) {
+          if (!uid || uid === 'recovery_zone') continue
+          
+          // Count remaining mistakes for this specific unit
+          const qRem = query(collection(db, 'users', user.uid, 'incorrect_questions'), where('unitId', '==', uid))
+          const snapRem = await getDocs(qRem)
+          const remainingCount = snapRem.size
+          
+          // Assume 20 questions per unit for scoring
+          const compensatedScore = Math.floor(((20 - remainingCount) / 20) * 100)
+          const currentBest = bestScores[uid] || 0
+          
+          if (compensatedScore > currentBest) {
+            // Find first historical record of this unit to get metadata
+            const firstHistory = history.find(h => h.unitId === uid)
+            
+            // Check if this is the first time reaching 100%
+            const isFirstPerfect = (compensatedScore === 100 && currentBest < 100)
+            const masteryBonus = isFirstPerfect ? 10 : 0
+            
+            await addDoc(collection(db, 'users', user.uid, 'history'), {
+              unitId: uid,
+              unitTitle: firstHistory?.unitTitle || "복구 보상",
+              regionId: firstHistory?.regionId || "",
+              regionTitle: firstHistory?.regionTitle || "복구 구역",
+              chapterId: firstHistory?.chapterId || "",
+              score: compensatedScore,
+              crystalsEarned: masteryBonus,
+              timestamp: serverTimestamp(),
+              type: 'recovery_mastery'
+            })
+            
+            if (masteryBonus > 0) {
+              recordCrystalTransaction(user.uid, {
+                amount: masteryBonus,
+                type: 'mastery_bonus',
+                description: `${firstHistory?.unitTitle || '단원'} 완벽 복구 보너스`,
+                metadata: { unitId: uid, score: 100 }
+              })
+              // Update crystals in user doc too
+              await setDoc(doc(db, 'users', user.uid), {
+                crystals: increment(masteryBonus),
+                perfectCount: increment(1)
+              }, { merge: true })
+            }
+          }
+        }
+      }
 
       // Record crystal transaction for ledger
       if (actualCrystalsEarned > 0) {
@@ -793,9 +939,33 @@ function SpaceHome() {
           onExit={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
           onComplete={handleComplete}
           hasShield={userData?.shieldCharges || 0}
+          hasRadar={userData?.hasRadar || false}
+          isRadarBonus={checkIsBonusUnit(selectedUnitDocId || quickQuizUnitId)}
         />
       )
     }
+  }
+
+  // --- Memory Core View ---
+  if (isMemoryCoreMode && memoryCoreQuestions.length > 0) {
+    return (
+      <SpaceQuizView
+        key="memory-core"
+        region={{ color: 'var(--crystal-cyan)', title: '메모리 코어 센터' }}
+        quizData={{
+          unitId: 'recovery_zone',
+          title: '데이터 복구 탐사',
+          questions: memoryCoreQuestions
+        }}
+        onExit={() => setIsMemoryCoreMode(false)}
+        onComplete={async (result) => {
+          await handleComplete(result)
+          setIsMemoryCoreMode(false)
+        }}
+        hasShield={userData?.shieldCharges || 0}
+        hasRadar={false} // Memory Core doesn't use the scanner HUD
+      />
+    )
   }
 
   // Main App
@@ -1032,24 +1202,34 @@ function SpaceHome() {
                             setPendingUnit({
                               docId: unit.docId,
                               title: unit.title,
-                              bestScore,
-                              source: 'planet'
-                            })
-                            soundManager.playClick() 
-                          }}
-                          style={{
-                            padding: '1.2rem 1.5rem',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            color: 'var(--text-bright)',
-                            fontSize: '1.1rem',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            borderLeft: isCompleted ? '4px solid var(--secondary)' : '1px solid var(--neon-blue)'
-                          }}
-                        >
-                          <span className="font-title">
+                      bestScore,
+                    source: 'planet'
+                  })
+                  soundManager.playClick() 
+                }}
+                style={{
+                  padding: '1.2rem 1.5rem',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  color: 'var(--text-bright)',
+                  fontSize: '1.1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  borderLeft: isCompleted ? '4px solid var(--secondary)' : '1px solid var(--neon-blue)',
+                  position: 'relative'
+                }}
+              >
+                {checkIsBonusUnit(unit.docId || unit.id) && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '5px',
+                    left: '5px',
+                    fontSize: '0.8rem',
+                    zIndex: 1
+                  }}>💎</div>
+                )}
+                <span className="font-title">
                             <span style={{ color: 'var(--neon-blue)', marginRight: '1rem' }}>{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>
                             {isCompleted && <span style={{ marginRight: '0.5rem' }}>✅</span>}
                             {unit.title}
@@ -1089,7 +1269,9 @@ function SpaceHome() {
                 }
               }} 
               regions={regions}
-            />
+            startMemoryCoreMode={startMemoryCoreMode}
+            loadingMemoryCore={loadingMemoryCore}
+          />
           )}
           {currentView === 'collection' && <SpaceCollection userData={userData} history={history} />}
           {currentView === 'store' && (

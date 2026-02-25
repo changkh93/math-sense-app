@@ -472,7 +472,7 @@ function DiscoveryHUD({ activeItem, latestItem }) {
 /**
  * SpaceDashboard Main
  */
-export default function SpaceDashboard({ user, userData, onQuizSelect, regions }) {
+export default function SpaceDashboard({ user, userData, onQuizSelect, regions, startMemoryCoreMode, loadingMemoryCore }) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [hoveredDiscovery, setHoveredDiscovery] = useState(null)
@@ -583,6 +583,32 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions }
               <div style={{ color: s.color, fontWeight: 900, fontSize: '1.25rem' }}>{s.value}</div>
             </div>
           ))}
+          
+          <motion.div 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="glass-card hud-border" 
+            style={{ 
+              padding: '1rem 1.5rem', 
+              minWidth: '200px', 
+              cursor: 'pointer',
+              background: 'rgba(168, 85, 247, 0.1)',
+              border: '1px solid rgba(168, 85, 247, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.8rem'
+            }}
+            onClick={startMemoryCoreMode}
+          >
+            <div style={{ fontSize: '1.5rem' }}>☄️</div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--planet-purple)', fontWeight: 900 }}>STELLAR MEMORY CORE</div>
+              <div style={{ color: 'white', fontWeight: 800, fontSize: '0.9rem' }}>
+                {loadingMemoryCore ? '복구 모듈 기동 중...' : `별빛 메모리 코어 (${userData?.memoryCoreCharges || 0}회)`}
+              </div>
+            </div>
+          </motion.div>
         </div>
       </header>
 

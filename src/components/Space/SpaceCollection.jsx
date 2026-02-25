@@ -6,7 +6,7 @@ export default function SpaceCollection({ userData, history }) {
   const badges = [
     // --- 기존 배지 (기준 상향) ---
     { title: '코스모스 입문', icon: '🌌', unlocked: (userData?.totalQuizzes || 0) > 0, desc: '첫 번째 수학 탐사를 성공적으로 마쳤습니다.' },
-    { title: '광석 수집가', icon: '💎', unlocked: (userData?.crystals || 0) >= 500, desc: '수학 광석을 500개 이상 모았습니다. (중급 대원)' },
+    { title: '광석 수집가', icon: '💎', unlocked: (userData?.crystals || 0) >= 500, desc: '광석을 500개 이상 모았습니다. (중급 대원)' },
     { title: '은하 학자', icon: '📜', unlocked: (userData?.averageScore || 0) >= 95, desc: '평균 정답률 95% 이상을 유지 중인 엘리트 대원입니다.' },
     { title: '우주 비행사', icon: '👨‍🚀', unlocked: (userData?.totalQuizzes || 0) >= 30, desc: '탐험을 30번 이상 완료한 숙련된 비행사입니다.' },
     { title: '행성 개척자', icon: '🚩', unlocked: (userData?.totalQuizzes || 0) >= 70, desc: '수많은 행성을 개척한 위대한 탐험가입니다.' },
