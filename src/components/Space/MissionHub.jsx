@@ -60,7 +60,7 @@ const SilentCrystalToast = ({ amount, visible }) => (
 )
 
 // ─── YouTube Player Component ───
-const YoutubePlayer = ({ videoId, start, end, onComplete, onTimeUpdate, isOverlay = false }) => {
+const YoutubePlayer = ({ videoId, start, end, onComplete, onTimeUpdate, isOverlay = false, autoPlay = true }) => {
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
   const [hasError, setHasError] = useState(false)
@@ -93,7 +93,7 @@ const YoutubePlayer = ({ videoId, start, end, onComplete, onTimeUpdate, isOverla
         playerVars: {
           start: start,
           end: end,
-          autoplay: 1,
+          autoplay: autoPlay ? 1 : 0,
           controls: 1,
           modestbranding: 1,
           rel: 0
@@ -135,7 +135,22 @@ const YoutubePlayer = ({ videoId, start, end, onComplete, onTimeUpdate, isOverla
     if (window.YT && window.YT.Player) {
       initPlayer()
     } else {
-      window.onYouTubeIframeAPIReady = initPlayer
+      // Use interval to wait for YT API instead of overwriting global callback
+      const checkYT = setInterval(() => {
+        if (window.YT && window.YT.Player) {
+          clearInterval(checkYT)
+          initPlayer()
+        }
+      }, 100)
+      return () => {
+        clearInterval(checkYT)
+        if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
+        if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+          try { playerRef.current.destroy() } catch (e) {}
+          playerRef.current = null
+        }
+        if (wrapperRef.current) wrapperRef.current.innerHTML = ''
+      }
     }
 
     return () => {
@@ -287,11 +302,13 @@ export default function MissionHub({
   const newStampCountRef = useRef(0) // New stamps since last reward
   const [stampCount, setStampCount] = useState(0) // For UI display
   const [videoCompleted, setVideoCompleted] = useState(false)
+  const [isAtEnd, setIsAtEnd] = useState(false)
   const [videoCompletionBonusGiven, setVideoCompletionBonusGiven] = useState(false)
   const lastVideoTimeRef = useRef(0) // Current video playback position
   const totalTimeSpentRef = useRef(0) // Actual playback seconds (analytics)
   const videoDurationRef = useRef(0) // Video total duration for reward cap
   const totalRewardedCrystalsRef = useRef(0) // Total crystals given for this tx
+  const [totalRewardedCrystals, setTotalRewardedCrystals] = useState(0) // For UI reactivity
   const autoSaveIntervalRef = useRef(null)
   
   // ─── Silent Toast ───
@@ -548,6 +565,7 @@ export default function MissionHub({
       const reward = 10
       newStampCountRef.current -= 180
       totalRewardedCrystalsRef.current += reward
+      setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
       
       const txId = selectedTx.id || 'default'
 
@@ -701,9 +719,11 @@ export default function MissionHub({
       // Restore analytics and reward tracking
       totalTimeSpentRef.current = savedProgress?.totalTimeSpent || 0
       totalRewardedCrystalsRef.current = savedProgress?.totalRewardedCrystals || 0
+      setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
       videoDurationRef.current = 0 // Will be set by first onTimeUpdate
       
       setVideoCompleted(savedProgress?.completed || false)
+      setIsAtEnd(false) // Reset end detection when switching/reloading tx
       setVideoCompletionBonusGiven(savedProgress?.completionBonusGiven || false)
       lastVideoTimeRef.current = savedProgress?.lastPosition || 0
 
@@ -1014,17 +1034,34 @@ export default function MissionHub({
                 start={startPosition}
                 end={selectedTx.end}
                 onTimeUpdate={handleVideoTimeUpdate}
-                onComplete={() => setVideoCompleted(true)}
+                onComplete={() => setIsAtEnd(true)}
              />
           </div>
           <div style={{ marginTop: '2rem', textAlign: 'center' }}>
             <button 
               onClick={handleSaveVideoPosition}
               className="hud-btn secondary glass"
-              style={{ padding: '1rem 3rem', fontSize: '1rem' }}
+              style={{ 
+                padding: '1rem 3rem', 
+                fontSize: '1.1rem',
+                borderColor: videoCompleted ? 'var(--planet-green)' : (isAtEnd ? 'var(--alert-red)' : undefined),
+                background: videoCompleted ? 'rgba(0, 255, 136, 0.1)' : (isAtEnd ? 'rgba(255, 77, 77, 0.1)' : undefined),
+                color: isAtEnd && !videoCompleted ? '#ffb3b3' : 'white'
+              }}
             >
-              📋 오늘은 여기까지
+              {videoCompleted ? (
+                <>✨ 완료하고, {totalRewardedCrystals + (videoCompletionBonusGiven ? 20 : 0)}광석 획득하기</>
+              ) : isAtEnd ? (
+                <>⚠️ 데이터 수신 부족 ({Math.floor((stampCount / (videoDurationRef.current || 1)) * 100)}%)</>
+              ) : (
+                <>📋 오늘은 여기까지</>
+              )}
             </button>
+            {isAtEnd && !videoCompleted && (
+              <p className="font-tech" style={{ color: 'var(--alert-red)', marginTop: '1rem', fontSize: '0.9rem' }}>
+                통신 장애! 영상의 90% 이상을 탐사해야 보너스 수신이 가능합니다.
+              </p>
+            )}
           </div>
         </div>
       )
@@ -1198,7 +1235,7 @@ export default function MissionHub({
                       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                           <div style={{ width: '100%', aspectRatio: '16/9' }}>
                               {(() => {
-                                  const txList = missionData?.transmissions || [];
+                                   const txList = missionData?.transmissions || [];
                                   if (txList.length === 0) {
                                       return (
                                           <div style={{ width: '100%', height: '100%', background: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'gray' }}>
@@ -1207,26 +1244,41 @@ export default function MissionHub({
                                       );
                                   }
                                   
-                                  let targetTx = txList[0];
-                                  let startTimestamp = targetTx.start;
-                                  
+                                  // Case 1: Specific mapping info exists
                                   if (overlayReference?.transmissionId) {
-                                      const found = txList.find(t => t.id === overlayReference.transmissionId);
-                                      if (found) {
-                                          targetTx = found;
-                                          if (overlayReference.timestamp !== undefined) {
-                                              startTimestamp = overlayReference.timestamp;
-                                          }
+                                      const targetTx = txList.find(t => t.id === overlayReference.transmissionId);
+                                      if (targetTx) {
+                                          return (
+                                              <YoutubePlayer 
+                                                  videoId={targetTx.videoId}
+                                                  start={overlayReference.timestamp || targetTx.start}
+                                                  end={targetTx.end}
+                                                  isOverlay={true}
+                                              />
+                                          );
                                       }
                                   }
 
+                                  // Case 2: No specific mapping - Show all videos in a list
                                   return (
-                                      <YoutubePlayer 
-                                          videoId={targetTx.videoId}
-                                          start={startTimestamp}
-                                          end={targetTx.end}
-                                          isOverlay={true}
-                                      />
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                                          {txList.map((tx, idx) => (
+                                              <div key={tx.id || idx}>
+                                                  <div style={{ color: 'var(--planet-green)', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                                                      #{idx + 1} {tx.title || `영상 ${idx + 1}`}
+                                                  </div>
+                                                  <div style={{ width: '100%', aspectRatio: '16/9' }}>
+                                                      <YoutubePlayer 
+                                                          videoId={tx.videoId}
+                                                          start={tx.start}
+                                                          end={tx.end}
+                                                          isOverlay={true}
+                                                          autoPlay={false}
+                                                      />
+                                                  </div>
+                                              </div>
+                                          ))}
+                                      </div>
                                   );
                               })()}
                           </div>

@@ -4,7 +4,7 @@ import { useUnits, useAdminMutations, useChapters, useRegions } from '../../hook
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { compressImage } from '../../utils/storageUtils';
-import { Save, ArrowLeft, Image as ImageIcon, Video, FileText } from 'lucide-react';
+import { Save, ArrowLeft, Image as ImageIcon, Video, FileText, Sparkles, Copy, X } from 'lucide-react';
 import { db } from '../../firebase';
 import { getDoc, doc } from 'firebase/firestore';
 import MissionMarkdownViewer from '../../components/Space/MissionMarkdownViewer';
@@ -26,6 +26,8 @@ const MissionContentEditor = () => {
 
   const [transmissions, setTransmissions] = useState([]);
   const [learningText, setLearningText] = useState('');
+  const [isAiPromptOpen, setIsAiPromptOpen] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   
   const textAreaRef = useRef(null);
   const cursorPosRef = useRef(0); // Save cursor position before file dialog opens
@@ -154,6 +156,67 @@ const MissionContentEditor = () => {
     }
   };
 
+  const aiPromptTemplate = `당신은 초등 수학 교육 전문가이자 매력적인 학습 콘텐츠 에디터입니다. 
+첨부된 이미지는 '수학감각' 교재의 내용입니다. 이 이미지를 바탕으로 학생들이 흥미를 느낄 수 있는 '탐사 대원용 데이터 로그' 형식의 마크다운 문서를 작성해 주세요.
+
+### 작성 지침:
+1. **톤앤매너:** 우주 탐사선에서 정보를 전달하는 듯한 전문적이면서도 친절한 말투를 사용하세요. (예: "탐사 대원 여러분", "우주 항로를 표기하듯")
+2. **구조:** 아래의 형식을 반드시 따르세요.
+    - 주제에 대한 짧은 도입
+    - 번호가 매겨진 주요 개념 설명 (### 1, ### 2 등)
+    - 표(Table)를 활용한 정리 (필요시)
+    - 인용구(>)를 활용한 핵심 포인트 강조
+    - 💡 오늘의 요약
+3. **이미지 삽입:** 
+    - 교재 이미지에서 설명하는 시각적 요소(도형, 수직선, 그림 등)가 들어가야 할 위치를 파악하세요.
+    - 해당 위치에 \`> ![이미지 설명](여기에_Firebase_이미지_URL_넣기)\` 형식으로 표시해 주세요.
+    - 이미지 설명에는 어떤 그림이 들어가면 좋을지 구체적으로 적어주세요.
+4. **수식 표현:** 수학 기호나 식은 반드시 $...$ (인라인) 또는 $$...$$ (블록)를 사용하여 LaTeX 문법으로 작성하세요.
+
+### 생성할 문서의 형식 예시:
+---
+두 대상의 크기를 비교하는 가장 기초적인 도구인 **'비'**에 대해 알아봅니다.
+---
+### 1. 비(比)의 의미: "가까이 마주하다"
+'비'라는 글자는 **"대(對)하다"**, 즉 **"가까이 마주 보다"**라는 뜻에서 유래했습니다. 서로 다른 두 대상을 나란히 두고 그 크기를 비교하는 것이 탐사의 시작입니다.
+
+* **수학적 정의:** 서로 다른 두 대상 사이의 크기(양)를 비교하여 그들 사이의 관계를 표현한 것.
+* **어원:** 영어로 **Ratio(레이시오)**라고 하며, 이는 '헤아리다(Count)'라는 뜻을 품고 있습니다.
+
+> ![탐사 가이드: 막대기와 지팡이 비교](여기에_Firebase_이미지_URL_넣기)
+> *예시: 지팡이가 막대기보다 2배 더 길 때, 우리는 이 관계를 수학적으로 탐사합니다.*
+---
+### 2. 비를 쓰고 읽는 법
+우주 항로를 표기하듯, 비를 나타내는 표현에도 약속된 규칙이 있습니다.
+
+| 표현 형식 | 읽는 방법 (국문) | 읽는 방법 (Global) |
+| :--- | :--- | :--- |
+| $a : b$ | **$a$ 대 $b$** | **$a$ is to $b$** / **$a$ to $b$** |
+
+* **핵심 포인트:** $a : b$는 "$a$가 $b$에 가서 마주하고 있는 상태"를 의미합니다.
+---
+### 3. 수학적 표현의 두 가지 형태
+비는 상황에 따라 **콜론(:)**을 사용하거나 **분수**의 형태로 나타낼 수 있습니다.
+
+1.  **기호 사용:** $1 : 2$
+2.  **분수 사용:** $\\frac{1}{2}$
+
+⚠️ **주의 (Pilot's Note):** 분수 형태($\\frac{1}{2}$)로 쓰더라도, 이는 '전체 중의 부분'이 아니라 **'동등한 관계'**를 나타내는 것입니다. 따라서 **'2분의 1'**이라고 읽기보다는 **'1 대 2'**라고 읽는 것이 수학적 탐사 목적에 더 정확합니다.
+
+> ![비의 표현법 정리](여기에_두번째_이미지_URL_넣기)
+---
+### 💡 오늘의 요약
+* 비는 두 양을 **마주 대어** 비교하는 것이다.
+* $a : b$는 **$a$ 대 $b$**라고 읽는다.
+* 분수 형태로 써도 **$a$ 대 $b$**로 읽는 습관을 들이자!
+---`;
+
+  const handleCopyPrompt = () => {
+    navigator.clipboard.writeText(aiPromptTemplate);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
   if (loading) return <div className="loading">Loading Mission Content...</div>;
   if (!unitData) return <div className="error">Unit Not Found.</div>;
 
@@ -262,8 +325,8 @@ const MissionContentEditor = () => {
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--crystal-cyan)' }}>
                     <FileText size={20} /> 데이터 로그 (Text & Images)
                 </h3>
-                <div className="toolbar" style={{ display: 'flex', gap: '0.5rem' }}>
-                    <label className="icon-btn outline-btn" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}>
+                <div className="toolbar" style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
+                    <label className="icon-btn outline-btn" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifySelf: 'flex-end', gap: '0.5rem', padding: '0.5rem 1.2rem', whiteSpace: 'nowrap', flexShrink: 0, minWidth: 'fit-content' }}>
                         <ImageIcon size={16} /> 
                         <span>{uploading ? '업로드 중...' : '이미지 첨부'}</span>
                         <input 
@@ -274,6 +337,14 @@ const MissionContentEditor = () => {
                             disabled={uploading}
                         />
                     </label>
+                    <button 
+                        onClick={() => setIsAiPromptOpen(true)}
+                        className="icon-btn outline-btn" 
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1.2rem', borderColor: 'var(--planet-green)', color: 'var(--planet-green)', whiteSpace: 'nowrap', flexShrink: 0, minWidth: 'fit-content' }}
+                    >
+                        <Sparkles size={16} />
+                        <span>AI 프롬프트</span>
+                    </button>
                 </div>
             </div>
             
@@ -319,6 +390,93 @@ const MissionContentEditor = () => {
         </section>
 
       </div>
+
+      {/* AI Prompt Modal */}
+      {isAiPromptOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '2rem'
+        }}>
+          <div className="card glass" style={{
+            width: '100%',
+            maxWidth: '800px',
+            maxHeight: '80vh',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '2rem',
+            position: 'relative',
+            border: '1px solid var(--planet-green)'
+          }}>
+            <button 
+              onClick={() => setIsAiPromptOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={24} />
+            </button>
+
+            <h2 style={{ color: 'var(--planet-green)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Sparkles size={24} /> AI 프롬프트 복사하기
+            </h2>
+            
+            <p style={{ marginBottom: '1rem', color: 'var(--text-muted)' }}>
+              아래 프롬프트를 복사하여 Gemini에 교재 이미지와 함께 붙여넣으세요.
+            </p>
+
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              background: 'rgba(0,0,0,0.4)',
+              padding: '1.5rem',
+              borderRadius: '8px',
+              fontFamily: 'monospace',
+              fontSize: '0.9rem',
+              whiteSpace: 'pre-wrap',
+              border: '1px solid rgba(255,255,255,0.1)',
+              marginBottom: '1.5rem',
+              color: '#d1d5db'
+            }}>
+              {aiPromptTemplate}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <button 
+                className="secondary-btn" 
+                onClick={() => setIsAiPromptOpen(false)}
+              >
+                닫기
+              </button>
+              <button 
+                className="primary-btn" 
+                onClick={handleCopyPrompt}
+                style={{ background: copySuccess ? 'var(--planet-green)' : '' }}
+              >
+                {copySuccess ? (
+                  <>체크됨! 복사 완료</>
+                ) : (
+                  <><Copy size={18} /> 프롬프트 복사</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
