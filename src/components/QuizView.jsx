@@ -27,8 +27,6 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   
   // Interactive FAB (Support Tray) state
   const [isTrayExpanded, setIsTrayExpanded] = useState(false)
-  const [isTrayVisible, setIsTrayVisible] = useState(true)
-  const lastScrollY = useRef(0)
   
   const initializedUnitId = useRef(null) // Prevent accidental reshuffling
 
@@ -49,22 +47,6 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       setCurrentIdx(0); // Reset index on unit change
     }
   }, [quizData])
-
-  // Auto-hide FAB on scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY
-      if (currentScrollY > lastScrollY.current + 10) {
-        setIsTrayVisible(false)
-        setIsTrayExpanded(false)
-      } else if (currentScrollY < lastScrollY.current - 10) {
-        setIsTrayVisible(true)
-      }
-      lastScrollY.current = currentScrollY
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
 
 
   const formatText = (text) => {
@@ -438,11 +420,11 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         <motion.div 
           className="support-tray-wrapper"
           initial={{ x: 100, opacity: 0 }}
-          animate={{ x: isTrayVisible ? 0 : 120, opacity: isTrayVisible ? 1 : 0 }}
+          animate={{ x: 0, opacity: 1 }}
           transition={{ type: 'spring', damping: 20, stiffness: 100 }}
           style={{ 
             position: 'fixed', 
-            bottom: '2rem', 
+            bottom: '6rem', 
             right: '0', 
             zIndex: 9999,
             display: 'flex',
