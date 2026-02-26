@@ -14,6 +14,7 @@ import StarField from './StarField'
 import Planet3D from './Planet3D' // Keep for Login Screen
 import SpaceScene from './SpaceScene' // New 3D Scene
 import SpaceQuizView from './SpaceQuizView'
+import MissionHub from './MissionHub' // New Integration
 import SpaceDashboard from './SpaceDashboard'
 import SpaceCollection from './SpaceCollection'
 import SpaceStore from './SpaceStore'
@@ -46,7 +47,7 @@ function SpaceHome() {
   const [selectedChapterDocId, setSelectedChapterDocId] = useState(null)
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
-  const [pendingUnit, setPendingUnit] = useState(null) // New: For RewardPotentialModal
+  // pendingUnit removed — RewardPotentialModal now lives inside MissionHub
   
   // --- Memory Core State ---
   const [isMemoryCoreMode, setIsMemoryCoreMode] = useState(false)
@@ -837,113 +838,47 @@ function SpaceHome() {
     )
   }
 
-  // Quiz Mode
+  // Mission Hub Mode (Data Log, Transmission, Field Test)
   if (selectedUnitDocId || quickQuizUnitId) {
-    if (loadingQuizzes) {
-      return (
-        <div className="space-bg">
-          <StarField count={100} />
-          <div style={{ 
-            height: '100vh', 
-            display: 'flex', 
-            flexDirection: 'column',
-            alignItems: 'center', 
-            justifyContent: 'center',
-            color: 'var(--crystal-cyan)',
-            gap: '1rem'
-          }}>
-            <motion.div 
-              animate={{ rotate: 360 }} 
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              style={{ fontSize: '3rem' }}
-            >
-              🛰️
-            </motion.div>
-            <div className="font-tech">데이터 수신 중 (LOADING QUIZ)...</div>
-          </div>
-        </div>
-      )
-    }
+    // Pre-compute initial mode based on content availability
+    // Note: unitQuizzes is async, so we DON'T rely on it.
+    // Instead: if NO data log & NO transmission → it must be quiz-only → skip to quiz modal.
+    const unit = activeUnit || {}
+    const hasDataLog = !!(unit.learningContents?.text?.trim())
+    const hasTransmission = !!(
+      (unit.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) ||
+      (unit.videoConfig?.videoId)
+    )
 
-    if (errorQuizzes) {
-      return (
-        <div className="space-bg">
-          <StarField count={100} />
-          <div style={{ 
-            height: '100vh', 
-            display: 'flex', 
-            flexDirection: 'column',
-            alignItems: 'center', 
-            justifyContent: 'center',
-            color: '#ff4d4d',
-            gap: '2rem'
-          }}>
-            <div className="glass-card" style={{ padding: '2rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-              <div className="font-title" style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>통신 오류</div>
-              <p className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                퀴즈 데이터를 불러오지 못했습니다.
-              </p>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button 
-                  onClick={() => refetchQuizzes()}
-                  className="hud-btn primary glass"
-                  style={{
-                    padding: '0.8rem 1.5rem',
-                    background: 'rgba(0, 243, 255, 0.2)',
-                    border: '1px solid var(--neon-blue)',
-                    color: 'white',
-                    borderRadius: '10px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  다시 시도
-                </button>
-                <button 
-                  onClick={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
-                  className="hud-btn secondary glass"
-                  style={{
-                    padding: '0.8rem 1.5rem',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    borderRadius: '10px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  나가기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
+    let initialMode = 'briefing' // default: show dashboard
+    if (!hasDataLog && !hasTransmission) {
+      // No other content → quiz-only (or empty, handled gracefully)
+      initialMode = 'quiz-modal'
+    } else if (hasDataLog && !hasTransmission) {
+      // Data log only (no transmission, quiz status unknown)
+      initialMode = 'text'
+    } else if (!hasDataLog && hasTransmission) {
+      // Transmission only (no data log, quiz status unknown)
+      initialMode = 'video'
     }
+    // Both data log + transmission exist → show dashboard
 
-    if (unitQuizzes && (selectedUnitDocId || quickQuizUnitId)) {
-      // Find region for quick quiz if not already active
-      const displayRegion = activeRegion || regions?.find(r => 
-        r.id === history.find(h => h.unitId === (selectedUnitDocId || quickQuizUnitId))?.regionId
-      )
-
-      return (
-        <SpaceQuizView
-          key={selectedUnitDocId || quickQuizUnitId}
-          region={displayRegion}
-          quizData={{ 
-            unitId: selectedUnitDocId || quickQuizUnitId,
-            chapterId: selectedChapterDocId || history.find(h => h.unitId === quickQuizUnitId)?.chapterId,
-            title: activeUnit?.title || "탐사 퀴즈", 
-            questions: unitQuizzes 
-          }}
-          onExit={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
-          onComplete={handleComplete}
-          hasShield={userData?.shieldCharges || 0}
-          hasRadar={userData?.hasRadar || false}
-          isRadarBonus={checkIsBonusUnit(selectedUnitDocId || quickQuizUnitId)}
-        />
-      )
-    }
+    return (
+      <MissionHub
+        key={selectedUnitDocId || quickQuizUnitId}
+        unitId={selectedUnitDocId || quickQuizUnitId}
+        activeUnit={activeUnit || { title: "탐사 미션" }} 
+        unitQuizzes={unitQuizzes}
+        loadingQuizzes={loadingQuizzes}
+        errorQuizzes={errorQuizzes}
+        refetchQuizzes={refetchQuizzes}
+        userData={userData}
+        bestScores={bestScores}
+        initialMode={initialMode}
+        onBack={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
+        onComplete={handleComplete}
+      />
+    )
   }
 
   // --- Memory Core View ---
@@ -1199,12 +1134,7 @@ function SpaceHome() {
                           whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
                           className={`glass-card hud-border ${isCompleted ? 'completed' : ''}`}
                           onClick={() => { 
-                            setPendingUnit({
-                              docId: unit.docId,
-                              title: unit.title,
-                      bestScore,
-                    source: 'planet'
-                  })
+                  setSelectedUnitDocId(unit.docId)
                   soundManager.playClick() 
                 }}
                 style={{
@@ -1259,12 +1189,7 @@ function SpaceHome() {
               userData={userData} 
               onQuizSelect={(p) => {
                 if (p.unitId) {
-                  setPendingUnit({
-                    docId: p.unitId,
-                    title: p.unitTitle,
-                    bestScore: bestScores[p.unitId],
-                    source: 'dashboard'
-                  })
+                  setQuickQuizUnitId(p.unitId)
                   soundManager.playClick()
                 }
               }} 
@@ -1397,24 +1322,7 @@ function SpaceHome() {
         )}
       </AnimatePresence>
 
-      {/* 퀴즈 진입 전 보상 가능성 안내 모달 */}
-      <AnimatePresence>
-        {pendingUnit && (
-          <RewardPotentialModal 
-            unit={pendingUnit}
-            onCancel={() => setPendingUnit(null)}
-            onConfirm={() => {
-              if (pendingUnit.source === 'planet') {
-                setSelectedUnitDocId(pendingUnit.docId)
-              } else {
-                setQuickQuizUnitId(pendingUnit.docId)
-              }
-              setPendingUnit(null)
-              soundManager.playWarp()
-            }}
-          />
-        )}
-      </AnimatePresence>
+      {/* RewardPotentialModal moved to MissionHub - shown only before Field Test */}
 
       {/* ☄️ 연속 학습 축하 모달 */}
       <AnimatePresence>
@@ -1439,83 +1347,8 @@ function SpaceHome() {
   )
 }
 
-function RewardPotentialModal({ unit, onCancel, onConfirm }) {
-  const isPerfect = unit.bestScore === 100
 
-  return (
-    <motion.div 
-      className="modal-overlay space-hud"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{ 
-        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 4000,
-        background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(10px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
-      }}
-    >
-      <motion.div 
-        className="glass-card hud-border"
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        style={{ padding: '2.5rem', maxWidth: '450px', width: '100%', textAlign: 'center', background: 'rgba(5, 10, 25, 0.9)' }}
-      >
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{isPerfect ? '🛰️' : '💎'}</div>
-        <h2 className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.5rem', marginBottom: '1rem' }}>
-          {unit.title}
-        </h2>
-        
-        <div className="glass-card" style={{ padding: '1.2rem', background: 'rgba(255,255,255,0.05)', marginBottom: '2rem' }}>
-          <p className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>현재 최고 기록</p>
-          <div style={{ fontSize: '2rem', fontWeight: 900, color: isPerfect ? 'var(--star-gold)' : 'var(--crystal-cyan)' }}>
-            {unit.bestScore !== undefined ? `${unit.bestScore}점` : '기록 없음'}
-          </div>
-        </div>
+// RewardPotentialModal has been moved to MissionHub.jsx
 
-        <div style={{ marginBottom: '2.5rem', textAlign: 'left', padding: '0 0.5rem' }}>
-          {isPerfect ? (
-            <div style={{ padding: '1rem', borderLeft: '3px solid #ff4d4d', background: 'rgba(255, 77, 77, 0.1)' }}>
-              <p style={{ color: '#ffb3b3', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                ⚠️ **이미 100점을 획득한 단원입니다.**<br/>
-                학습을 위한 반복 탐사는 가능하지만, 추가적인 메타 광석 보상은 지급되지 않습니다.
-              </p>
-            </div>
-          ) : unit.bestScore > 0 ? (
-            <div style={{ padding: '1rem', borderLeft: '3px solid var(--star-gold)', background: 'rgba(255, 215, 0, 0.1)' }}>
-              <p style={{ color: '#ffeaa7', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                💡 **성적 경신 보상 시스템 가동 중**<br/>
-                현재 최고 점수인 **{unit.bestScore}점**을 초과하여 기록을 경신할 경우, 그 차이만큼의 메타 광석을 비례하여 획득할 수 있습니다.
-              </p>
-            </div>
-          ) : (
-            <div style={{ padding: '1rem', borderLeft: '3px solid var(--planet-green)', background: 'rgba(0, 255, 136, 0.1)' }}>
-              <p style={{ color: '#b2fcca', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                ✨ **첫 탐사 보상 대기 중**<br/>
-                이 단원의 첫 번째 탐사입니다. 획득한 모든 메타 광석과 만점 보너스(10개)를 온전히 획득할 수 있습니다!
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
-            className="hud-btn secondary glass"
-            style={{ flex: 1, padding: '1rem', borderRadius: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: 'white' }}
-            onClick={onCancel}
-          >
-            취소 (BACK)
-          </button>
-          <button 
-            className="hud-btn primary glass"
-            style={{ flex: 1.5, padding: '1rem', borderRadius: '10px', cursor: 'pointer', background: 'rgba(0, 243, 255, 0.2)', border: '1px solid var(--neon-blue)', color: 'white', fontWeight: 700 }}
-            onClick={onConfirm}
-          >
-            탐사 시작 (START)
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
 
 export default SpaceHome

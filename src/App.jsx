@@ -7,6 +7,8 @@ import AdminDashboard from './pages/Admin/Dashboard'
 import AdminRoute from './components/AdminRoute'
 
 import ContentManager from './pages/Admin/ContentManager'
+import MissionContentEditor from './pages/Admin/MissionContentEditor'
+import AITaggingEditor from './pages/Admin/AITaggingEditor'
 import QuizEditor from './pages/Admin/QuizEditor'
 import DataSync from './pages/Admin/DataSync'
 import GhostCleaner from './pages/Admin/GhostCleaner'
@@ -28,6 +30,8 @@ function App() {
       }>
         <Route index element={<AdminDashboard />} />
         <Route path="content" element={<ContentManager />} />
+        <Route path="mission/:unitId" element={<MissionContentEditor />} />
+        <Route path="mission/:unitId/ai-tagging" element={<AITaggingEditor />} />
         <Route path="quizzes/:unitId" element={<QuizEditor />} />
         <Route path="data-sync" element={<DataSync />} />
         <Route path="ghost-cleaner" element={<GhostCleaner />} />

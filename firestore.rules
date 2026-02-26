@@ -32,7 +32,7 @@ service cloud.firestore {
     }
     
     match /quizzes/{document=**} {
-      allow read: if true;
+      allow read: if isAuth();
       allow write: if isAdmin();
     }
 

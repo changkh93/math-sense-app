@@ -7,6 +7,8 @@ import './CrystalLedger.css'
 // Transaction type configs
 const TX_CONFIG = {
   quiz_reward: { icon: '🪐', label: '탐사 보상', color: '#4ade80' },
+  data_log_reward: { icon: '📄', label: '데이터 로그 보상', color: '#00f3ff' },
+  transmission_reward: { icon: '📡', label: '트랜스미션 보상', color: '#00ff88' },
   store_purchase: { icon: '🛒', label: '스토어 구매', color: '#f87171' },
   answer_accepted: { icon: '💬', label: '답변 채택 보상', color: '#4ade80' },
   question_resolved: { icon: '✅', label: '질문 해결 보상', color: '#4ade80' },
@@ -375,6 +377,22 @@ export default function CrystalLedger({ userData }) {
                 <li>질문 스스로 해결 시 <span style={{color: 'var(--text-bright)'}}>+3</span> 광석</li>
                 <li>내 답변이 채택될 시 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
                 <li>선생님 인증 추가 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
+              </ul>
+            </div>
+            <div>
+              <div style={{ color: '#00f3ff', fontWeight: 'bold', marginBottom: '0.3rem' }}>📄 데이터 로그</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
+                <li>학습 완료 시 <span style={{color: 'var(--text-bright)'}}>+30</span> 광석</li>
+                <li>1분 이상 학습 후 버튼 활성화</li>
+                <li>단원당 <span style={{color: 'var(--text-bright)'}}>최초 1회</span>만 지급</li>
+              </ul>
+            </div>
+            <div>
+              <div style={{ color: '#00ff88', fontWeight: 'bold', marginBottom: '0.3rem' }}>📡 트랜스미션</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
+                <li>3분 학습마다 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
+                <li>90% 시청 완료 보너스 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
+                <li>영상 길이에 따라 보상 상한 있음</li>
               </ul>
             </div>
           </div>

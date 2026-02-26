@@ -10,7 +10,7 @@ import '../../styles/space-theme.css'
 import QuestionModal from '../QuestionModal'
 import { useSmartSync } from '../../hooks/useSync'
 
-export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield, hasRadar, isRadarBonus }) {
+export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield, hasRadar, isRadarBonus, onRequestSupport }) {
   // Real-time synchronization watchdog
   useSmartSync(quizData?.unitId)
 
@@ -529,34 +529,61 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       <div className="space-quiz-container scale-in">
         {/* 선생님 호출 버튼 (최상위 레이어 가시성 확보) */}
         {!isResultMode && (
-          <button 
-            className="space-teacher-btn glass-card" 
-            onClick={handleOpenQuestionModal}
-            style={{
-              position: 'fixed',
-              bottom: '2rem',
-              right: '2rem',
-              padding: '0 1.5rem',
-              borderRadius: '30px',
-              height: '50px',
-              fontSize: '1rem',
-              fontWeight: 800,
-              color: 'var(--crystal-cyan)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.6rem',
-              cursor: 'pointer',
-              border: '2px solid rgba(0, 243, 255, 0.6)',
-              boxShadow: '0 0 25px rgba(0, 243, 255, 0.4)',
-              background: 'rgba(5, 5, 20, 0.9)',
-              zIndex: 9999,
-              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-            }}
-          >
-            <span style={{ fontSize: '1.4rem' }}>🙋</span>
-            <span>선생님 질문</span>
-          </button>
+          <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', zIndex: 9999 }}>
+            
+            {/* New AI Support Button */}
+            {onRequestSupport && (
+              <button 
+                className="space-teacher-btn glass-card"
+                onClick={() => onRequestSupport(currentQuestion?.reference)}
+                style={{
+                  padding: '0 1.5rem',
+                  borderRadius: '30px',
+                  height: '50px',
+                  fontSize: '1rem',
+                  fontWeight: 800,
+                  color: 'var(--planet-green)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.6rem',
+                  cursor: 'pointer',
+                  border: '2px solid rgba(0, 255, 136, 0.6)',
+                  boxShadow: '0 0 25px rgba(0, 255, 136, 0.4)',
+                  background: 'rgba(5, 20, 10, 0.9)',
+                  transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                }}
+              >
+                <span style={{ fontSize: '1.4rem' }}>📡</span>
+                <span>데이터 링크</span>
+              </button>
+            )}
+
+            <button 
+              className="space-teacher-btn glass-card" 
+              onClick={handleOpenQuestionModal}
+              style={{
+                padding: '0 1.5rem',
+                borderRadius: '30px',
+                height: '50px',
+                fontSize: '1rem',
+                fontWeight: 800,
+                color: 'var(--crystal-cyan)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.6rem',
+                cursor: 'pointer',
+                border: '2px solid rgba(0, 243, 255, 0.6)',
+                boxShadow: '0 0 25px rgba(0, 243, 255, 0.4)',
+                background: 'rgba(5, 5, 20, 0.9)',
+                transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+            >
+              <span style={{ fontSize: '1.4rem' }}>🙋</span>
+              <span>선생님 질문</span>
+            </button>
+          </div>
         )}
 
         <div id="quiz-capture-area" className="glass-card space-quiz-card">

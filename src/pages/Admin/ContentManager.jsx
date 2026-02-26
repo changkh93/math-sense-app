@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useRegions, useChapters, useUnits, useAdminMutations } from '../../hooks/useContent';
-import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown, Rocket, Bot, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AiQuizImportModal from '../../components/Admin/AiQuizImportModal';
+import { db } from '../../firebase';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 
 const ContentManager = () => {
   const { data: regions, isLoading: loadingRegions } = useRegions();
@@ -19,6 +21,40 @@ const ContentManager = () => {
     if (title) saveRegion.mutate({ title, order: regions?.length || 0 });
   };
 
+  const [batchUpdating, setBatchUpdating] = useState(false);
+
+  const handleBatchContentFlags = async () => {
+    if (!confirm('모든 단원의 contentFlags를 일괄 업데이트합니다. 진행하시겠습니까?')) return;
+    setBatchUpdating(true);
+    try {
+      const unitsSnap = await getDocs(collection(db, 'units'));
+      let updated = 0;
+      const promises = unitsSnap.docs.map(async (unitDoc) => {
+        const data = unitDoc.data();
+        const hasDataLog = !!(data.learningContents?.text?.trim());
+        const hasTransmission = !!(
+          (data.transmissions?.length > 0 && data.transmissions.some(tx => tx.videoId)) ||
+          (data.videoConfig?.videoId)
+        );
+        // Only update if flags are missing or different
+        const current = data.contentFlags || {};
+        if (current.hasDataLog !== hasDataLog || current.hasTransmission !== hasTransmission) {
+          await updateDoc(doc(db, 'units', unitDoc.id), {
+            contentFlags: { hasDataLog, hasTransmission }
+          });
+          updated++;
+        }
+      });
+      await Promise.all(promises);
+      alert(`✅ 완료! ${unitsSnap.size}개 단원 중 ${updated}개 업데이트됨.`);
+    } catch (err) {
+      console.error('Batch update failed:', err);
+      alert('일괄 업데이트 실패: ' + err.message);
+    } finally {
+      setBatchUpdating(false);
+    }
+  };
+
   if (loadingRegions) return <div className="loading">Loading Regions...</div>;
 
   return (
@@ -28,9 +64,20 @@ const ContentManager = () => {
           <h1>Content Manager</h1>
           <p>Regions → Chapters → Units</p>
         </div>
-        <button className="primary-btn" onClick={handleAddRegion}>
-          <Plus size={18} /> <span>Add Region</span>
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button 
+            className="outline-btn" 
+            onClick={handleBatchContentFlags} 
+            disabled={batchUpdating}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}
+          >
+            <RefreshCw size={14} className={batchUpdating ? 'spinning' : ''} /> 
+            <span>{batchUpdating ? '업데이트 중...' : 'ContentFlags 일괄 동기화'}</span>
+          </button>
+          <button className="primary-btn" onClick={handleAddRegion}>
+            <Plus size={18} /> <span>Add Region</span>
+          </button>
+        </div>
       </header>
 
       <div className="hierarchy-tree">
@@ -267,6 +314,17 @@ const UnitNode = ({ unit, onOpenAiImport, isFirst, isLast, onReorder }) => {
           >
             <Sparkles size={14} />
           </button>
+
+          {/* Navigation to Mission Content Editor */}
+          <Link to={`/admin/mission/${unit.docId}`} className="icon-btn" title="미션 콘텐츠 편집" style={{ color: 'var(--planet-green)' }}>
+            <Rocket size={14} />
+          </Link>
+
+          {/* Navigation to AI Auto-Tagging */}
+          <Link to={`/admin/mission/${unit.docId}/ai-tagging`} className="icon-btn" title="AI 구간 자동 매핑" style={{ color: '#ec4899' }}>
+            <Bot size={14} />
+          </Link>
+
           {/* Navigation to Quiz Editor: CLEAR SEPARATION */}
           <Link to={`/admin/quizzes/${unit.docId}`} className="icon-btn quiz-btn" title="Manage Questions">
             <Settings size={14} />

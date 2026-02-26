@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRegions, useChapters, useUnits, useQuizzes, useAdminMutations } from '../../hooks/useContent';
 import { Trash2, AlertTriangle, RefreshCw, Eye, Ghost, Search, Globe, ShieldAlert, Trash } from 'lucide-react';
-import { collection, getDocs, writeBatch, doc as firestoreDoc, addDoc, Timestamp, setDoc, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { ref, listAll, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '../../firebase';
 import { regions as localRegions } from '../../data/regions';
 import { chapter1Quizzes } from '../../data/chapter1Quizzes';
 import { chapter2Quizzes } from '../../data/chapter2Quizzes';
@@ -101,6 +101,11 @@ const GhostCleaner = () => {
   const [ledgerStats, setLedgerStats] = useState({ users: 0, txCreated: 0, discrepancies: 0 });
   const [ledgerLogs, setLedgerLogs] = useState([]);
   const [migratingLedger, setMigratingLedger] = useState(false);
+
+  // Storage Cleaner State
+  const [storageScrubbing, setStorageScrubbing] = useState(false);
+  const [storageOrphans, setStorageOrphans] = useState([]);
+  const [storageStats, setStorageStats] = useState({ scanned: 0, orphans: 0 });
 
   // Clear children selection when parent changes
   useEffect(() => setSelectedChapter(null), [selectedRegion]);
@@ -529,6 +534,97 @@ const GhostCleaner = () => {
     }
   };
 
+  const runStorageScan = async () => {
+    setStorageScrubbing(true);
+    setStorageOrphans([]);
+    
+    try {
+      console.log("[STORAGE] Starting Storage Scan...");
+      
+      // 1. Fetch all unit documents to extract image URLs used in texts
+      const unitsSnap = await getDocs(collection(db, 'units'));
+      const activeUrls = new Set();
+      
+      unitsSnap.docs.forEach(d => {
+        const data = d.data();
+        const text = data.learningContents?.text || '';
+        // Extract URLs from ![alt](url)
+        const regex = /!\[.*?\]\((.*?)\)/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+          activeUrls.add(match[1]);
+        }
+      });
+      console.log(`[STORAGE] Found ${activeUrls.size} active image URLs in Unit contents.`);
+
+      // 2. List all files in 'mission_images/' folder in Storage
+      const listRef = ref(storage, 'mission_images');
+      let res;
+      try {
+        res = await listAll(listRef);
+      } catch (err) {
+        if (err.code === 'storage/object-not-found') {
+           console.log("[STORAGE] No mission_images folder found.");
+           setStorageStats({ scanned: 0, orphans: 0 });
+           setStorageScrubbing(false);
+           return;
+        }
+        throw err;
+      }
+      
+      console.log(`[STORAGE] Found ${res.items.length} files in mission_images/ folder.`);
+
+      // 3. Compare and find orphans
+      const orphans = [];
+      let scanned = 0;
+      
+      for (const itemRef of res.items) {
+        scanned++;
+        const url = await getDownloadURL(itemRef);
+        if (!activeUrls.has(url)) {
+           orphans.push({
+               name: itemRef.name,
+               fullPath: itemRef.fullPath,
+               url: url
+           });
+        }
+      }
+
+      setStorageOrphans(orphans);
+      setStorageStats({ scanned, orphans: orphans.length });
+      console.log(`[STORAGE] Scan complete. Found ${orphans.length} orphaned images.`);
+
+    } catch (err) {
+      console.error("[STORAGE] Scan failed:", err);
+      alert("Storage Scan failed. Check console.");
+    } finally {
+      setStorageScrubbing(false);
+    }
+  };
+
+  const handlePurgeStorage = async () => {
+    if (!storageOrphans.length) return;
+    if (!confirm(`Are you sure you want to permanently delete ${storageOrphans.length} orphaned images from Firebase Storage?`)) return;
+
+    setStorageScrubbing(true);
+    let deletedCount = 0;
+    
+    try {
+        for (const orphan of storageOrphans) {
+            const itemRef = ref(storage, orphan.fullPath);
+            await deleteObject(itemRef);
+            deletedCount++;
+        }
+        alert(`Successfully deleted ${deletedCount} orphaned images.`);
+        runStorageScan(); // Refresh scan after purge
+    } catch (err) {
+        console.error("Storage purge failed:", err);
+        alert(`Purge interrupted. Deleted ${deletedCount} before failing.`);
+    } finally {
+        setStorageScrubbing(false);
+    }
+  };
+
   return (
     <div className="ghost-cleaner" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <header className="mb-8 border-b pb-4 border-white/10">
@@ -643,7 +739,8 @@ const GhostCleaner = () => {
                   { id: 'units', label: 'Units', count: showOnlyOrphans ? scanStats.unitOrphans : globalUnits.length },
                   { id: 'chapters', label: 'Chapters', count: showOnlyOrphans ? scanStats.chapterOrphans : globalChapters.length },
                   { id: 'scrub', label: 'History Scrub', count: scrubResults.length },
-                  { id: 'ledger', label: 'Ledger Backfill', count: ledgerStats.txCreated }
+                  { id: 'ledger', label: 'Ledger Backfill', count: ledgerStats.txCreated },
+                  { id: 'storage', label: 'Storage Cleanup', count: storageOrphans.length }
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -657,6 +754,7 @@ const GhostCleaner = () => {
                                 <span className="text-sm text-gray-400 ml-4">
                   {activeTab === 'scrub' ? `Found ${scrubStats.bad} issues.` : 
                    activeTab === 'ledger' ? `${ledgerStats.users} users checked.` :
+                   activeTab === 'storage' ? `Scanned ${storageStats.scanned} files.` :
                    `Scanned ${scanStats.total} docs.`}
                 </span>
           </div>
@@ -668,9 +766,9 @@ const GhostCleaner = () => {
           <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md">
             <div className="p-6 bg-white/5 border-b border-white/10 flex justify-between items-center">
               <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                {activeTab === 'scrub' ? 'History Issues' : (showOnlyOrphans ? 'Detected Ghosts' : 'All Firestore Records')}
+                {activeTab === 'scrub' ? 'History Issues' : activeTab === 'storage' ? 'Orphaned Images' : (showOnlyOrphans ? 'Detected Ghosts' : 'All Firestore Records')}
                 <span className="text-sm bg-white/10 px-3 py-1 rounded-full text-gray-400 font-mono">
-                  {activeTab === 'scrub' ? `Found ${scrubResults.length}` : `Showing ${filteredItems.length}`}
+                  {activeTab === 'scrub' ? `Found ${scrubResults.length}` : activeTab === 'storage' ? `Found ${storageOrphans.length}` : `Showing ${filteredItems.length}`}
                 </span>
               </h2>
               {activeTab === 'scrub' ? (
@@ -683,6 +781,13 @@ const GhostCleaner = () => {
                     <button onClick={runLedgerMigration} disabled={migratingLedger} className="px-3 py-1 bg-emerald-600 rounded text-xs">
                       {migratingLedger ? 'Migrating...' : 'Start Full Backfill'}
                     </button>
+                 </div>
+              ) : activeTab === 'storage' ? (
+                 <div className="flex gap-2">
+                    <button onClick={runStorageScan} disabled={storageScrubbing} className="px-3 py-1 bg-blue-600 rounded text-xs flex items-center gap-1">
+                      <RefreshCw size={14} className={storageScrubbing ? 'animate-spin' : ''} /> {storageScrubbing ? 'Scanning...' : 'Scan Storage'}
+                    </button>
+                    {storageOrphans.length > 0 && <button onClick={handlePurgeStorage} disabled={storageScrubbing} className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs flex items-center gap-1 shadow-lg animate-pulse"><Trash2 size={14}/> Purge Orphans</button>}
                  </div>
               ) : (
                 showOnlyOrphans && activeTab === 'quizzes' && filteredItems.length > 0 && (
@@ -729,6 +834,23 @@ const GhostCleaner = () => {
                       {ledgerLogs.length === 0 && <div className="py-8 text-center text-gray-600 italic">상단의 버튼을 눌러 작업을 시작하세요.</div>}
                    </div>
                 </div>
+              ) : activeTab === 'storage' ? (
+                storageOrphans.length === 0 ? (
+                  <div className="p-20 text-center">
+                    <ShieldAlert className="mx-auto mb-4 text-green-700" size={64} />
+                    <p className="text-green-500 text-lg">No orphaned images found.</p>
+                    <button onClick={runStorageScan} disabled={storageScrubbing} className="mt-4 text-blue-400 font-bold">Rescan Storage</button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 p-4">
+                     {storageOrphans.map(orphan => (
+                         <div key={orphan.fullPath} className="bg-black/40 border border-white/10 rounded-lg p-2 flex flex-col items-center">
+                             <img src={orphan.url} alt="orphan" className="w-full h-32 object-cover rounded-md mb-2 bg-gray-900 border border-white/5" />
+                             <span className="text-[10px] text-gray-500 font-mono truncate w-full text-center">{orphan.name}</span>
+                         </div>
+                     ))}
+                  </div>
+                )
               ) : (
                 filteredItems.length === 0 ? (
                   <div className="p-20 text-center">
