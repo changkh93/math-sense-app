@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, CheckCircle, Heart, User, Trash2, Edit3, X, Save, Sparkles } from 'lucide-react';
+import { parseInlineFormatting } from '../../utils/formatUtils';
+import 'katex/dist/katex.min.css';
 import { auth } from '../../firebase';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
 import { getRandomNickname } from '../../utils/qaUtils';
@@ -154,7 +156,9 @@ export default function QuestionDetail() {
                   </div>
                 </div>
               ) : (
-                <h2 className="question-content">{question.content}</h2>
+                <h2 className="question-content">
+                  {parseInlineFormatting(question.content, { keyPrefix: 'q-detail' })}
+                </h2>
               )}
 
               {question.quizContext?.quizTitle && (
@@ -262,7 +266,10 @@ export default function QuestionDetail() {
                         </div>
                       </div>
                       <div className="answer-content">
-                        {ans.content}
+                        {parseInlineFormatting(ans.content, { 
+                          keyPrefix: `ans-detail-${ans.id}`,
+                          boldColor: ans.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)'
+                        })}
                       </div>
                     </motion.div>
                   ))

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils'
 import 'katex/dist/katex.min.css'
 import { InlineMath } from 'react-katex'
 import StarField from './StarField'
 import { createParticleBurst, shakeScreen } from './ParticleEffects'
 import soundManager from '../../utils/SoundManager'
-import { sanitizeLaTeX } from '../../utils/latexUtils'
 import '../../styles/space-theme.css'
 import QuestionModal from '../QuestionModal'
 import { useSmartSync } from '../../hooks/useSync'
@@ -33,6 +33,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [isFirstPassPerfect, setIsFirstPassPerfect] = useState(false)
   const [showRadarScan, setShowRadarScan] = useState(false)
   const [potentialOre, setPotentialOre] = useState(0)
+  
+  // Interactive FAB (Support Tray) state
+  const [isTrayExpanded, setIsTrayExpanded] = useState(false)
+  const [isTrayVisible, setIsTrayVisible] = useState(true)
+  const lastScrollY = useRef(0)
+  
   const initializedUnitId = useRef(null) // Prevent accidental reshuffling
   const isMobile = window.innerWidth <= 768
 
@@ -63,26 +69,28 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }
   }, [quizData, hasRadar])
 
+  // Auto-hide FAB on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      if (currentScrollY > lastScrollY.current + 10) {
+        // Scrolling down - hide
+        setIsTrayVisible(false)
+        setIsTrayExpanded(false)
+      } else if (currentScrollY < lastScrollY.current - 10) {
+        // Scrolling up - show
+        setIsTrayVisible(true)
+      }
+      lastScrollY.current = currentScrollY
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
 
   const formatText = (text) => {
-    if (!text || typeof text !== 'string') return ""
-    const sanitized = sanitizeLaTeX(text)
-    const parts = sanitized.split('$')
-    return parts.map((part, i) => {
-      if (i % 2 === 1) {
-        // 순수 한글(+공백, 구두점)만 포함된 경우 KaTeX가 아닌 일반 텍스트로 처리
-        // (AI 임포트 시 불필요하게 $...$로 감싸진 한글 보정)
-        if (/^[\uAC00-\uD7AF\u3131-\u3163\s,.!?()]+$/.test(part)) {
-          return part
-        }
-        let math = part
-        if (math.includes('/') && !math.includes('\\frac')) {
-          math = math.replace(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/g, '\\frac{$1}{$2}')
-        }
-        return <InlineMath key={i} math={math} />
-      }
-      return part
-    })
+    return parseInlineFormatting(text, { keyPrefix: 'quiz' });
   }
 
   const currentQuestion = currentQuestions[currentIdx]
@@ -527,63 +535,114 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       <StarField count={100} />
       
       <div className="space-quiz-container scale-in">
-        {/* 선생님 호출 버튼 (최상위 레이어 가시성 확보) */}
+        {/* Interactive Support Tray (FAB) */}
         {!isResultMode && (
-          <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', zIndex: 9999 }}>
-            
-            {/* New AI Support Button */}
-            {onRequestSupport && (
-              <button 
-                className="space-teacher-btn glass-card"
-                onClick={() => onRequestSupport(currentQuestion?.reference)}
-                style={{
-                  padding: '0 1.5rem',
-                  borderRadius: '30px',
-                  height: '50px',
-                  fontSize: '1rem',
-                  fontWeight: 800,
-                  color: 'var(--planet-green)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.6rem',
-                  cursor: 'pointer',
-                  border: '2px solid rgba(0, 255, 136, 0.6)',
-                  boxShadow: '0 0 25px rgba(0, 255, 136, 0.4)',
-                  background: 'rgba(5, 20, 10, 0.9)',
-                  transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                }}
-              >
-                <span style={{ fontSize: '1.4rem' }}>📡</span>
-                <span>데이터 링크</span>
-              </button>
-            )}
+          <motion.div 
+            className="support-tray-wrapper"
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ 
+              x: isTrayVisible ? 0 : 120, 
+              opacity: isTrayVisible ? 1 : 0 
+            }}
+            transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+            style={{ 
+              position: 'fixed', 
+              bottom: '2rem', 
+              right: '0', 
+              zIndex: 9999,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: '0.8rem',
+              paddingRight: '1rem'
+            }}
+          >
+            <AnimatePresence>
+              {isTrayExpanded && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'flex-end' }}
+                >
+                  {/* Data Link Button */}
+                  {onRequestSupport && (
+                    <button 
+                      className="support-action-btn data-link"
+                      onClick={() => onRequestSupport(currentQuestion?.reference)}
+                      style={{
+                        padding: '0 1.2rem',
+                        borderRadius: '25px',
+                        height: '46px',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        color: 'var(--planet-green)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        cursor: 'pointer',
+                        border: '2px solid rgba(0, 255, 136, 0.6)',
+                        boxShadow: '0 0 15px rgba(0, 255, 136, 0.3)',
+                        background: 'rgba(5, 20, 10, 0.95)',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>📡</span>
+                      <span>데이터 링크</span>
+                    </button>
+                  )}
 
-            <button 
-              className="space-teacher-btn glass-card" 
-              onClick={handleOpenQuestionModal}
+                  {/* Ask Teacher Button */}
+                  <button 
+                    className="support-action-btn teacher-ask" 
+                    onClick={handleOpenQuestionModal}
+                    style={{
+                      padding: '0 1.2rem',
+                      borderRadius: '25px',
+                      height: '46px',
+                      fontSize: '0.9rem',
+                      fontWeight: 800,
+                      color: 'var(--crystal-cyan)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      cursor: 'pointer',
+                      border: '2px solid rgba(0, 243, 255, 0.6)',
+                      boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)',
+                      background: 'rgba(5, 5, 20, 0.95)',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span style={{ fontSize: '1.2rem' }}>🙋</span>
+                    <span>선생님 질문</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Toggle FAB */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setIsTrayExpanded(!isTrayExpanded)}
               style={{
-                padding: '0 1.5rem',
-                borderRadius: '30px',
-                height: '50px',
-                fontSize: '1rem',
-                fontWeight: 800,
-                color: 'var(--crystal-cyan)',
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, var(--crystal-cyan), var(--planet-purple))',
+                border: '2px solid white',
+                boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.6rem',
                 cursor: 'pointer',
-                border: '2px solid rgba(0, 243, 255, 0.6)',
-                boxShadow: '0 0 25px rgba(0, 243, 255, 0.4)',
-                background: 'rgba(5, 5, 20, 0.9)',
-                transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                fontSize: '1.5rem',
+                zIndex: 10001
               }}
             >
-              <span style={{ fontSize: '1.4rem' }}>🙋</span>
-              <span>선생님 질문</span>
-            </button>
-          </div>
+              {isTrayExpanded ? '✕' : '✨'}
+            </motion.button>
+          </motion.div>
         )}
 
         <div id="quiz-capture-area" className="glass-card space-quiz-card">

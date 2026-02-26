@@ -489,6 +489,7 @@
   font-size: 1.1rem;
   line-height: 1.6;
   margin: 0;
+  white-space: pre-wrap;
 }
 
 .reply-section {

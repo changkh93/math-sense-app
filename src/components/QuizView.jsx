@@ -5,7 +5,7 @@ import 'katex/dist/katex.min.css'
 import { InlineMath } from 'react-katex'
 import { createParticleBurst, shakeScreen } from './Space/ParticleEffects'
 import soundManager from '../utils/SoundManager'
-import { sanitizeLaTeX } from '../utils/latexUtils'
+import { parseInlineFormatting, sanitizeLaTeX } from '../utils/formatUtils'
 import QuestionModal from './QuestionModal'
 
 export default function QuizView({ region, quizData, onExit, onComplete }) {
@@ -24,6 +24,12 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [modalContext, setModalContext] = useState(null)
+  
+  // Interactive FAB (Support Tray) state
+  const [isTrayExpanded, setIsTrayExpanded] = useState(false)
+  const [isTrayVisible, setIsTrayVisible] = useState(true)
+  const lastScrollY = useRef(0)
+  
   const initializedUnitId = useRef(null) // Prevent accidental reshuffling
 
   // 초기 문제 데이터 설정 (20문항 랜덤 샘플링 적용)
@@ -44,26 +50,25 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
     }
   }, [quizData])
 
+  // Auto-hide FAB on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      if (currentScrollY > lastScrollY.current + 10) {
+        setIsTrayVisible(false)
+        setIsTrayExpanded(false)
+      } else if (currentScrollY < lastScrollY.current - 10) {
+        setIsTrayVisible(true)
+      }
+      lastScrollY.current = currentScrollY
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
 
   const formatText = (text) => {
-    if (!text || typeof text !== 'string') return "";
-    const sanitized = sanitizeLaTeX(text);
-    const parts = sanitized.split('$');
-    return parts.map((part, i) => {
-      if (i % 2 === 1) {
-        // 순수 한글(+공백, 구두점)만 포함된 경우 KaTeX가 아닌 일반 텍스트로 처리
-        if (/^[\uAC00-\uD7AF\u3131-\u3163\s,.!?()]+$/.test(part)) {
-          return part;
-        }
-        let math = part;
-        // Auto-convert n/d to \frac{n}{d} if not already using \frac
-        if (math.includes('/') && !math.includes('\\frac')) {
-          math = math.replace(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/g, '\\frac{$1}{$2}');
-        }
-        return <InlineMath key={i} math={math} />;
-      }
-      return part;
-    });
+    return parseInlineFormatting(text, { keyPrefix: 'quiz' });
   };
 
   const currentQuestion = currentQuestions[currentIdx]
@@ -428,13 +433,84 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         ))}
       </AnimatePresence>
 
-      <button 
-        className="teacher-call-btn" 
-        onClick={handleOpenQuestionModal}
-        title="선생님께 질문하기"
-      >
-        🙋
-      </button>
+      {/* Interactive Support Tray (FAB) */}
+      {!isResultMode && (
+        <motion.div 
+          className="support-tray-wrapper"
+          initial={{ x: 100, opacity: 0 }}
+          animate={{ x: isTrayVisible ? 0 : 120, opacity: isTrayVisible ? 1 : 0 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+          style={{ 
+            position: 'fixed', 
+            bottom: '2rem', 
+            right: '0', 
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: '0.8rem',
+            paddingRight: '1rem'
+          }}
+        >
+          <AnimatePresence>
+            {isTrayExpanded && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'flex-end' }}
+              >
+                <button 
+                  className="support-action-btn teacher-ask" 
+                  onClick={handleOpenQuestionModal}
+                  style={{
+                    padding: '0 1.2rem',
+                    borderRadius: '25px',
+                    height: '46px',
+                    fontSize: '0.9rem',
+                    fontWeight: 800,
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    cursor: 'pointer',
+                    background: '#5c67f2', // Theme color for regular quiz
+                    border: 'none',
+                    boxShadow: '0 4px 15px rgba(92, 103, 242, 0.4)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <span style={{ fontSize: '1.2rem' }}>🙋</span>
+                  <span>선생님 질문</span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setIsTrayExpanded(!isTrayExpanded)}
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#5c67f2',
+              color: 'white',
+              border: '2px solid white',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              fontSize: '1.5rem',
+              zIndex: 10001
+            }}
+          >
+            {isTrayExpanded ? '✕' : '✨'}
+          </motion.button>
+        </motion.div>
+      )}
 
       <QuestionModal 
         isOpen={isQuestionModalOpen}

@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 import SpaceQuizView from './SpaceQuizView'
 import soundManager from '../../utils/SoundManager'
-import { sanitizeLaTeX } from '../../utils/latexUtils'
 import { InlineMath } from 'react-katex'
 import 'katex/dist/katex.min.css'
 import MissionMarkdownViewer from './MissionMarkdownViewer'

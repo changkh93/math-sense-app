@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check } from 'lucide-react';
+import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { InlineMath } from 'react-katex';
-import { sanitizeLaTeX } from '../../utils/latexUtils';
 import { useQuizzes } from '../../hooks/useContent';
 import 'katex/dist/katex.min.css';
 
@@ -65,9 +65,7 @@ export default function QuizPreviewModal({
             <div className="preview-body">
               <div className="preview-question">
                 <p>
-                  {sanitizeLaTeX(quiz.question).split(/(\$.*?\$)/g).map((part, i) => 
-                    part.startsWith('$') ? <InlineMath key={i} math={part.slice(1, -1)} /> : part
-                  )}
+                  {parseInlineFormatting(quiz.question, { keyPrefix: 'preview-q' })}
                 </p>
               </div>
 
@@ -82,9 +80,7 @@ export default function QuizPreviewModal({
                   <div key={idx} className={`preview-option ${showCorrectAnswer && opt.isCorrect ? 'correct' : ''}`}>
                     <span className="opt-idx">{idx + 1}</span>
                     <span className="opt-text">
-                      {opt.text.split(/(\$.*?\$)/g).map((part, i) => 
-                        part.startsWith('$') ? <InlineMath key={i} math={part.slice(1, -1)} /> : part
-                      )}
+                      {parseInlineFormatting(opt.text, { keyPrefix: `preview-opt-${idx}` })}
                     </span>
                     {showCorrectAnswer && opt.isCorrect && <Check size={16} className="correct-icon" />}
                   </div>

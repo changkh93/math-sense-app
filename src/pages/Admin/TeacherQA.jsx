@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { parseInlineFormatting } from '../../utils/formatUtils';
+import 'katex/dist/katex.min.css';
 import { db } from '../../firebase';
 import { 
   collection, 
@@ -246,7 +248,13 @@ export default function TeacherQA() {
                 </div>
 
                 <div className="qa-content">
-                  <p>{q.content}</p>
+                  <div className="qa-text">
+                    {parseInlineFormatting(q.content, { 
+                      boldColor: '#4cc9f0', 
+                      italicColor: '#f72585',
+                      keyPrefix: `q-${q.id}` 
+                    })}
+                  </div>
                   {q.drawingUrl && (
                     <div className="qa-drawing">
                       <img 
@@ -288,7 +296,13 @@ export default function TeacherQA() {
                               <div className="ans-text">
                                 {ans.isTeacher ? <span className="teacher-badge-small">선생님</span> : <span className="student-badge-small">학생</span>}
                                 {ans.isVerified && <span className="verified-badge-small">✨ 인증됨</span>}
-                                {ans.content}
+                                <div className="ans-content-text">
+                                  {parseInlineFormatting(ans.content, {
+                                    boldColor: '#4cc9f0',
+                                    italicColor: '#f72585',
+                                    keyPrefix: `ans-${ans.id}`
+                                  })}
+                                </div>
                               </div>
                               <div className="ans-footer">
                                 <span className="ans-date">{ans.createdAt?.toDate().toLocaleString()}</span>

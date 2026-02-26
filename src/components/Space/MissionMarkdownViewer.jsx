@@ -1,52 +1,7 @@
 import React from 'react';
+import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { InlineMath } from 'react-katex';
-import { sanitizeLaTeX } from '../../utils/latexUtils';
 import 'katex/dist/katex.min.css';
-
-// Helper to parse inline bold (**text**) and inline math ($math$)
-const parseInlineFormatting = (text) => {
-  if (!text) return text;
-  
-  // A tokenizer that splits by the outer-most formatting or math wrapper.
-  // We process bold first, then math inside bold (and outside bold), then italic.
-
-  const boldParts = text.split(/(\*\*.*?\*\*)/g);
-  
-  return boldParts.map((bPart, bIndex) => {
-    // If it's a bold part
-    if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length >= 4) {
-      const innerBold = bPart.slice(2, -2);
-      // parse inner for math
-      const mathParts = innerBold.split(/(\$.*?\$)/g);
-      
-      const innerContent = mathParts.map((mPart, mIndex) => {
-          if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
-              return <InlineMath key={`math-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
-          }
-          return mPart;
-      });
-      
-      return <strong key={`bold-${bIndex}`} style={{ color: 'var(--crystal-cyan)' }}>{innerContent}</strong>;
-    }
-    
-    // If not bold, check math
-    const mathParts = bPart.split(/(\$.*?\$)/g);
-    return mathParts.map((mPart, mIndex) => {
-        if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
-            return <InlineMath key={`math-out-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
-        }
-        
-        // If not math, check italic
-        const italicParts = mPart.split(/(\*[^*]+\*)/g);
-        return italicParts.map((iPart, iIndex) => {
-            if (iPart.startsWith('*') && iPart.endsWith('*') && iPart.length >= 2) {
-                return <em key={`italic-${bIndex}-${mIndex}-${iIndex}`} style={{ color: 'var(--neon-blue)' }}>{iPart.slice(1, -1)}</em>;
-            }
-            return <span key={`text-${bIndex}-${mIndex}-${iIndex}`}>{iPart}</span>;
-        });
-    });
-  });
-};
 
 const MissionMarkdownViewer = ({ text }) => {
   if (!text) return null;
