@@ -275,7 +275,8 @@ export default function MissionHub({
   errorQuizzes,
   refetchQuizzes,
   bestScores = {}, // passed from SpaceHome
-  initialMode = 'briefing' // pre-computed by SpaceHome: 'briefing', 'text', 'video', 'quiz-modal'
+  initialMode = 'briefing', // pre-computed by SpaceHome: 'briefing', 'text', 'video', 'quiz-modal'
+  onNonQuizActivityComplete
 }) {
   const { user } = useAuth()
   const userId = user?.uid
@@ -495,6 +496,11 @@ export default function MissionHub({
       sessionStorage.removeItem(sessionStorageKey)
       showSilentToast(30)
       logActivity('data_log_reward_claimed')
+      
+      // Update Streak
+      if (onNonQuizActivityComplete) {
+        onNonQuizActivityComplete('데이터 로그 학습')
+      }
     } catch (err) {
       console.error("Failed to claim log reward:", err)
     }
@@ -595,6 +601,11 @@ export default function MissionHub({
           }, { merge: true })
 
           showSilentToast(reward)
+          
+          // Update Streak on partial watch (180s)
+          if (onNonQuizActivityComplete) {
+            onNonQuizActivityComplete('영상 교신 수신 (180초)')
+          }
         } catch (err) {
           console.error("Failed to award transmission reward:", err)
         }
@@ -640,6 +651,11 @@ export default function MissionHub({
 
         setVideoCompletionBonusGiven(true)
         showSilentToast(20)
+        
+        // Update Streak on full view
+        if (onNonQuizActivityComplete) {
+          onNonQuizActivityComplete('영상 교신 완료')
+        }
       } catch (err) {
         console.error("Failed to award completion bonus:", err)
       }
@@ -1160,6 +1176,7 @@ export default function MissionHub({
           region={null}
           quizData={{
             unitId: unitId,
+            chapterId: activeUnit?.chapterId,
             title: activeUnit?.title,
             questions: unitQuizzes || [] 
           }}

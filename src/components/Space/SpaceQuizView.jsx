@@ -252,13 +252,13 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         shieldsUsed,
         wrongQuestions: allSessionQuestions.filter(q => userAnswers[q.id] && userAnswers[q.id].isCorrect === false).map(q => ({
           ...q,
-          unitId: q.unitId || quizData.unitId,
-          chapterId: q.chapterId || quizData.chapterId,
-          regionId: q.regionId || region?.id
+          unitId: q.unitId || quizData?.unitId || "",
+          chapterId: q.chapterId || quizData?.chapterId || "",
+          regionId: q.regionId || region?.id || ""
         })),
         correctQuestions: allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).map(q => ({
           id: q.id,
-          unitId: q.unitId || quizData.unitId
+          unitId: q.unitId || quizData?.unitId || ""
         }))
       })
     } catch (err) {

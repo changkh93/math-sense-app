@@ -484,9 +484,9 @@ function SpaceHome() {
       await addDoc(collection(db, 'users', user.uid, 'history'), {
         unitId: currentUnitId,
         unitTitle: activeUnit?.title || "탐사 퀴즈",
-        regionId: selectedRegionId || history.find(h => h.unitId === currentUnitId)?.regionId,
+        regionId: selectedRegionId || history.find(h => h.unitId === currentUnitId)?.regionId || "",
         regionTitle: activeRegion?.title || "Unknown Galaxy",
-        chapterId: selectedChapterDocId,
+        chapterId: selectedChapterDocId || "",
         score: score,
         crystalsEarned: actualCrystalsEarned,
         timestamp: serverTimestamp()
@@ -612,6 +612,53 @@ function SpaceHome() {
       console.error("Error saving quiz result:", error)
     } finally {
       isProcessingSave.current = false
+    }
+  }
+
+  // Handle streak updates for non-quiz activities (Data Log, Transmission)
+  const handleNonQuizActivityComplete = async (activityType) => {
+    if (!user) return
+    const streakResult = calculateStreakUpdate(userData)
+    const streakUpdates = streakResult.streakUpdate || {}
+
+    // Track usage of freeze if happened outside of quiz
+    if (streakResult.meta?.freezeUsed) {
+      recordCrystalTransaction(user.uid, {
+        amount: 0,
+        type: 'streak_freeze',
+        description: `크라이오 코어로 연속 탐사 궤도 보호 (${activityType})`,
+        metadata: { 
+          unitId: selectedUnitDocId || quickQuizUnitId || 'unknown',
+          streakBefore: userData?.currentStreak || 0,
+          streakAfter: streakResult.meta.newStreak
+        }
+      })
+    }
+
+    // Only update DB if there are actual streak changes
+    if (Object.keys(streakUpdates).length > 0) {
+      await setDoc(doc(db, 'users', user.uid), streakUpdates, { merge: true })
+      
+      // Trigger milestone celebration or toast
+      if (streakResult.meta?.justReachedMilestone) {
+        setStreakCelebration({
+          milestone: streakResult.meta.justReachedMilestone,
+          currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak
+        })
+      } else if (!streakResult.meta?.alreadyDoneToday && streakResult.meta?.isNewRecord !== undefined) {
+         setCompletionResult({
+            crystalsEarned: 0,
+            isPerfect: false,
+            rewardMessage: `학습 연장 성공!`,
+            streakInfo: {
+              currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak,
+              freezeUsed: streakResult.meta.freezeUsed,
+              isNewRecord: streakResult.meta.isNewRecord,
+              alreadyDoneToday: streakResult.meta.alreadyDoneToday,
+              justReachedMilestone: false
+            }
+         })
+      }
     }
   }
 
@@ -894,6 +941,7 @@ function SpaceHome() {
         initialMode={initialMode}
         onBack={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
         onComplete={handleComplete}
+        onNonQuizActivityComplete={handleNonQuizActivityComplete}
       />
     )
   }
