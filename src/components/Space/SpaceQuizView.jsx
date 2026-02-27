@@ -105,11 +105,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       const newCombo = (comboCount || 0) + 1
       setComboCount(newCombo)
       
-      let earned = 2
+      let earned = 1
       
       // 재도전 모드(학습 모드)에서는 광석 획득/차감 및 보너스 없음
       if (!reSolveMode) {
-        addMarker('+2', 'gain')
+        addMarker('+1', 'gain')
 
         if (newCombo > 0 && newCombo % 3 === 0) {
           earned += 5 // 3콤보 보너스
