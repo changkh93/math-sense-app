@@ -446,6 +446,23 @@ function SpaceHome() {
       // --- Streak System ---
       const streakResult = calculateStreakUpdate(userData)
       const streakUpdates = streakResult.streakUpdate || {}
+      
+      // Record Cryo Core usage if freeze was triggered
+      if (streakResult.meta?.freezeUsed) {
+        // missedDays is diff - 1 in streakUtils.js
+        // We can't easily get missedDays here without re-calculating, 
+        // but streakUtils knows. Let's just record that a freeze happen on this today's update.
+        recordCrystalTransaction(user.uid, {
+          amount: 0,
+          type: 'streak_freeze',
+          description: `크라이오 코어로 연속 탐사 궤도 보호`,
+          metadata: { 
+            unitId: currentUnitId,
+            streakBefore: userData?.currentStreak || 0,
+            streakAfter: streakResult.meta.newStreak
+          }
+        })
+      }
       // --- End Streak ---
 
       await setDoc(doc(db, 'users', user.uid), {

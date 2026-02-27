@@ -11,6 +11,7 @@ export default function SpaceJourney({ userData }) {
   
   const [viewMode, setViewMode] = useState('constellation');
   const [popover, setPopover] = useState(null); // { dayData, x, y }
+  const [transactions, setTransactions] = useState([]);
 
   const scrollContainerRef = useRef(null);
   const todayKST = getTodayKST();
@@ -19,15 +20,22 @@ export default function SpaceJourney({ userData }) {
     const fetchHistory = async () => {
       if (!auth.currentUser) return;
       try {
-        const q = query(
+        const hQ = query(
           collection(db, 'users', auth.currentUser.uid, 'history'),
           orderBy('timestamp', 'asc')
         );
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setHistory(data);
+        const hSnap = await getDocs(hQ);
+        setHistory(hSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // Fetch crystal transactions to find Cryo Core usage/purchases
+        const tQ = query(
+          collection(db, 'users', auth.currentUser.uid, 'crystal_transactions'),
+          orderBy('timestamp', 'asc')
+        );
+        const tSnap = await getDocs(tQ);
+        setTransactions(tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
-        console.error("Error fetching history:", err);
+        console.error("Error fetching data:", err);
       } finally {
         setLoading(false);
       }
@@ -45,7 +53,7 @@ export default function SpaceJourney({ userData }) {
       const dateStr = kst.toISOString().split('T')[0];
       
       const existing = map.get(dateStr) || { 
-        quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0 
+        quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0, isProtected: false
       };
       existing.quizzes += 1;
       existing.scoreSum += (h.score || 0);
@@ -54,8 +62,24 @@ export default function SpaceJourney({ userData }) {
       
       map.set(dateStr, existing);
     });
+
+    // Mark protected days from transactions
+    transactions.forEach(t => {
+      if (t.type === 'streak_freeze' && t.timestamp) {
+        const d = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp);
+        const kst = new Date(d.getTime() + 9 * 3600000);
+        const dateStr = kst.toISOString().split('T')[0];
+        
+        const existing = map.get(dateStr) || { 
+          quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0, isProtected: true
+        };
+        existing.isProtected = true;
+        map.set(dateStr, existing);
+      }
+    });
+
     return map;
-  }, [history]);
+  }, [history, transactions]);
 
   // 기간 노드 생성 (기록 시작일 ~ 오늘)
   const timelineData = useMemo(() => {
@@ -93,18 +117,47 @@ export default function SpaceJourney({ userData }) {
     // 스트릭 및 connectsNext 계산
     let currentStreakCount = 0;
     for (let i = 0; i < days.length; i++) {
-      if (days[i].isActive) {
+      if (days[i].isActive || nodesWithProtection.has(days[i].date)) {
         currentStreakCount++;
       } else {
-         // 크라이오 코어가 있다면 이 부분을 보정해야 하지만, 일단 초기화
         currentStreakCount = 0;
       }
       days[i].streakRun = currentStreakCount;
-      days[i].connectsNext = days[i].isActive && i < days.length - 1 && days[i+1].isActive;
+      days[i].isProtected = nodesWithProtection.has(days[i].date);
+
+      // Connect if (active or protected) AND next is (active or protected)
+      const isCurrentActiveOrProtected = days[i].isActive || days[i].isProtected;
+      const isNextActiveOrProtected = i < days.length - 1 && (days[i+1].isActive || dailyStats.get(days[i+1].date)?.isProtected);
+      
+      days[i].connectsNext = isCurrentActiveOrProtected && isNextActiveOrProtected;
     }
 
     return { minDate, days };
   }, [history, todayKST, dailyStats]);
+
+  // Helper: Get protection nodes
+  const nodesWithProtection = useMemo(() => {
+    const set = new Set();
+    dailyStats.forEach((v, k) => {
+      if (v.isProtected) set.add(k);
+    });
+    return set;
+  }, [dailyStats]);
+
+  // Cryo Core Stats
+  const coreStats = useMemo(() => {
+    let purchased = 0;
+    let used = 0;
+    transactions.forEach(t => {
+      if (t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core') {
+        purchased += 1;
+      }
+      if (t.type === 'streak_freeze') {
+        used += 1;
+      }
+    });
+    return { purchased, used, remaining: userData?.streakFreezeCount || 0 };
+  }, [transactions, userData?.streakFreezeCount]);
 
   // 달력 뷰용 월별 데이터
   const calendarMonths = useMemo(() => {
@@ -233,9 +286,9 @@ export default function SpaceJourney({ userData }) {
             <span>우주력</span>
             <span>{activeDaysCount}일 탐사</span>
           </div>
-          <div className="stat-chip">
-            <span>보유 코어</span>
-            <span style={{ color: '#00f3ff' }}>🧊 {userData?.streakFreezeCount || 0}</span>
+          <div className="stat-chip core-analytics" title={`구매: ${coreStats.purchased} | 사용: ${coreStats.used}`}>
+            <span>코어 현황</span>
+            <span style={{ color: '#00f3ff' }}>🧊 {coreStats.remaining} (보유) / {coreStats.used} (사용)</span>
           </div>
         </div>
         
@@ -297,11 +350,19 @@ export default function SpaceJourney({ userData }) {
               <h4>{popover.day.date}</h4>
               {popover.day.isActive ? (
                 <>
-                  <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '10px' }}>✨ 탐사항해 완료</div>
+                  <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '10px' }}>
+                    {popover.day.isProtected ? '🧊 코어 보호 활성화' : '✨ 탐사항해 완료'}
+                  </div>
                   <ul className="hologram-details">
-                    <li>푼 세트: <strong>{popover.day.stats.quizzes}회</strong></li>
-                    <li>퍼펙트: <strong>{popover.day.stats.perfCount}회</strong></li>
-                    <li>획득 광석: <strong style={{ color: '#00f3ff' }}>💎{popover.day.stats.crystals}</strong></li>
+                    {popover.day.isActive ? (
+                      <>
+                        <li>푼 세트: <strong>{popover.day.stats.quizzes}회</strong></li>
+                        <li>퍼펙트: <strong>{popover.day.stats.perfCount}회</strong></li>
+                        <li>획득 광석: <strong style={{ color: '#00f3ff' }}>💎{popover.day.stats.crystals}</strong></li>
+                      </>
+                    ) : (
+                      <li>활동 기록 없음 (보호됨)</li>
+                    )}
                   </ul>
                   {popover.day.streakRun > 1 && (
                     <div style={{ background: 'rgba(0, 243, 255, 0.1)', padding: '5px', textAlign: 'center', marginTop: '10px', color: '#00f3ff', fontWeight: 'bold' }}>
@@ -351,7 +412,9 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
              {streak > 0 ? '🔥' : '🌑'}
           </div>
           <h2 style={{ color: streak > 0 ? tier.color : '#94a3b8' }}>
-            {streak > 0 ? `${streak}일 연속 탐사!` : "오늘의 탐사를 시작해보세요!"}
+            {streak > 0 
+              ? (thisWeek.find(d => d.isToday)?.isProtected ? `🧊 코어 보호 중 (${streak}일)` : `${streak}일 연속 탐사!`) 
+              : "오늘의 탐사를 시작해보세요!"}
           </h2>
        </div>
        
@@ -364,19 +427,22 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
           <div className="bar-track">
              {thisWeek.map((d, i) => {
                 const isActive = d?.isActive;
+                const isProtected = d?.isProtected;
                 const isToday = d?.isToday;
-                const color = isActive ? activeColor : 'rgba(255,255,255,0.08)';
+                const color = isActive ? activeColor : (isProtected ? 'rgba(0, 243, 255, 0.4)' : 'rgba(255,255,255,0.08)');
                 return (
-                  <div key={i} className={`bar-segment ${isActive ? 'active' : ''}`} style={{ backgroundColor: color }}>
-                     {isToday && <div className="today-indicator" style={{ borderColor: activeColor }} />}
+                  <div key={i} className={`bar-segment ${isActive ? 'active' : ''} ${isProtected ? 'protected' : ''}`} style={{ backgroundColor: color }}>
+                     {isToday && <div className="today-indicator" style={{ borderColor: isProtected ? 'var(--crystal-cyan)' : activeColor }} />}
                      {isActive && <div className="bar-glow" style={{ boxShadow: `0 0 10px ${activeColor}` }}></div>}
+                     {isProtected && <div className="freeze-icon" style={{ fontSize: '0.8rem', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>🧊</div>}
                   </div>
                 )
              })}
           </div>
        </div>
-       <p className="banner-cheer">
-         {streak >= 7 ? "와우! 일주일 내내 완벽한 연속 학습을 달성했어요!" : 
+        <p className="banner-cheer">
+         {thisWeek.find(d => d.isToday)?.isProtected ? "활동을 쉬어가는 날입니다. 크라이오 코어가 궤도를 보호하고 있어요!" :
+          streak >= 7 ? "와우! 일주일 내내 완벽한 연속 학습을 달성했어요!" : 
           streak > 0 ? "매일매일 새로운 지식의 항로를 개척하고 있어요!" :
           "단원을 완료하고 지식의 궤적에 처음으로 불을 밝혀보세요!"}
        </p>
@@ -537,17 +603,22 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
                 <>
                   <circle 
                     r={r} 
-                    fill={activeColor} 
+                    fill={node.isProtected ? 'rgba(0, 243, 255, 0.3)' : activeColor} 
                     className="core" 
                     filter="url(#glow-star)" 
                     opacity={glowIntensity}
+                    style={{ stroke: node.isProtected ? 'var(--crystal-cyan)' : 'none', strokeWidth: 2 }}
                   />
-                  {/* 별빛 중심점 */}
-                  <path 
-                    d={`M0,-${r/1.5} L${r/3},-${r/3} L${r/1.5},0 L${r/3},${r/3} L0,${r/1.5} L-${r/3},${r/3} L-${r/1.5},0 L-${r/3},-${r/3} Z`}
-                    fill="#fff" 
-                    transform="scale(1.2)"
-                  />
+                  {/* 별빛 중심점 - Only for active stars, Use ice for protected */}
+                  {node.isProtected ? (
+                    <text textAnchor="middle" dy=".3em" fontSize={r} style={{ pointerEvents: 'none' }}>🧊</text>
+                  ) : (
+                    <path 
+                      d={`M0,-${r/1.5} L${r/3},-${r/3} L${r/1.5},0 L${r/3},${r/3} L0,${r/1.5} L-${r/3},${r/3} L-${r/1.5},0 L-${r/3},-${r/3} Z`}
+                      fill="#fff" 
+                      transform="scale(1.2)"
+                    />
+                  )}
                   {node.isToday && (
                     <circle r={r + 8} fill="none" strokeWidth="2" stroke={activeColor} opacity="0.6">
                       <animate attributeName="r" values={`${r+4};${r+12};${r+4}`} dur="2s" repeatCount="indefinite" />
@@ -600,10 +671,10 @@ function TraditionalCalendarView({ months, tier, activeColor, onDayClick }) {
               // 색상 투명도로 활동 강도 표시 (히트맵)
               const intensity = day.isActive ? 0.3 + Math.min((day.stats?.crystals || 0) / 100, 0.7) : 0;
 
-              return (
+               return (
                 <div 
                   key={day.date} 
-                  className={`cal-cell clickable ${day.isActive ? 'active' : ''} ${day.isToday ? 'today' : ''}`}
+                  className={`cal-cell clickable ${day.isActive ? 'active' : ''} ${day.isProtected ? 'protected' : ''} ${day.isToday ? 'today' : ''}`}
                   onClick={(e) => onDayClick(e, day)}
                 >
                   <span className="cal-date-num">{parseInt(day.date.slice(8, 10), 10)}</span>
@@ -613,6 +684,7 @@ function TraditionalCalendarView({ months, tier, activeColor, onDayClick }) {
                       style={{ background: activeColor, opacity: intensity }}
                     />
                   )}
+                  {day.isProtected && <div className="freeze-icon-mini">🧊</div>}
                 </div>
               );
             })}

@@ -460,3 +460,30 @@
   }
 }
 
+.cal-cell.protected {
+  border-color: rgba(0, 243, 255, 0.4);
+  background: rgba(0, 243, 255, 0.1);
+}
+
+.freeze-icon-mini {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 0.7rem;
+  z-index: 3;
+}
+
+.bar-segment.protected {
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+  border: 1px solid rgba(0, 243, 255, 0.4);
+}
+
+.core-analytics {
+  cursor: help;
+  transition: all 0.3s ease;
+}
+
+.core-analytics:hover {
+  background: rgba(0, 243, 255, 0.1);
+  border-color: var(--crystal-cyan);
+}
