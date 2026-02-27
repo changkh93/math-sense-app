@@ -81,6 +81,76 @@ export default function SpaceJourney({ userData }) {
     return map;
   }, [history, transactions]);
 
+  // Cryo Core Stats - Inferred from (purchased vs remaining) + logged usage
+  const coreStats = useMemo(() => {
+    const purchasedFromLogs = transactions.filter(t => 
+      t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core'
+    ).length;
+    
+    const usedFromLogs = transactions.filter(t => t.type === 'streak_freeze').length;
+    const remaining = userData?.streakFreezeCount || 0;
+    
+    // Inferred total purchased (at least what we have now + what we know we used)
+    const totalPurchased = Math.max(purchasedFromLogs, usedFromLogs + remaining);
+    const totalUsed = totalPurchased - remaining;
+
+    return { purchased: totalPurchased, used: totalUsed, remaining };
+  }, [transactions, userData?.streakFreezeCount]);
+
+  // Helper: Identify nodes that SHOULD be protected (current gap + historical logs + retro-fill)
+  const nodesWithProtection = useMemo(() => {
+    const protectionSet = new Set();
+    
+    // 1. Add from historical transaction logs
+    dailyStats.forEach((v, k) => {
+      if (v.isProtected) protectionSet.add(k);
+    });
+
+    const dbStreakDate = userData?.lastStreakDate;
+    const dbStreakCount = userData?.currentStreak || 0;
+    const freezeCount = userData?.streakFreezeCount || 0;
+
+    // 2. Retro-fill: If the DB has a current streak, any missing day within that streak's timeframe 
+    // MUST have been protected in the past (even if the transaction was not logged).
+    if (dbStreakDate && dbStreakCount > 0) {
+       const streakStartObj = new Date(dbStreakDate + 'T12:00:00Z');
+       streakStartObj.setUTCDate(streakStartObj.getUTCDate() - (dbStreakCount - 1));
+       
+       const startIso = streakStartObj.toISOString().split('T')[0];
+       const endIso = dbStreakDate;
+       
+       const scanObj = new Date(startIso + 'T12:00:00Z');
+       const endObj = new Date(endIso + 'T12:00:00Z');
+       
+       while (scanObj <= endObj) {
+         const dStr = scanObj.toISOString().split('T')[0];
+         if (!dailyStats.has(dStr)) {
+            // It's missing in history but inside the official streak window!
+            protectionSet.add(dStr);
+         }
+         scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+       }
+    }
+
+    // 3. Predictively add for the current missing gap if cores are available
+    if (dbStreakDate && freezeCount > 0) {
+      const diffMs = new Date(todayKST + 'T00:00:00+09:00').getTime() - new Date(dbStreakDate + 'T00:00:00+09:00').getTime();
+      const diffDays = Math.floor(diffMs / 86400000);
+      const missed = diffDays - 1;
+
+      if (missed > 0 && freezeCount >= missed) {
+        // Mark these missing days as protected for the UI
+        const gapScanObj = new Date(dbStreakDate + 'T12:00:00Z');
+        for(let i = 0; i < missed; i++) {
+          gapScanObj.setUTCDate(gapScanObj.getUTCDate() + 1);
+          protectionSet.add(gapScanObj.toISOString().split('T')[0]);
+        }
+      }
+    }
+    
+    return protectionSet;
+  }, [dailyStats, userData, todayKST]);
+
   // 기간 노드 생성 (기록 시작일 ~ 오늘)
   const timelineData = useMemo(() => {
     let minDate = todayKST;
@@ -117,8 +187,11 @@ export default function SpaceJourney({ userData }) {
     // 스트릭 및 connectsNext 계산
     let currentStreakCount = 0;
     for (let i = 0; i < days.length; i++) {
-      if (days[i].isActive || nodesWithProtection.has(days[i].date)) {
+      if (days[i].isActive) {
         currentStreakCount++;
+      } else if (nodesWithProtection.has(days[i].date)) {
+        // Protected days maintain the streak, but do not increment it (just like Duo)
+        // If it's the very first node, it might be 0, but usually this happens mid-streak.
       } else {
         currentStreakCount = 0;
       }
@@ -133,33 +206,9 @@ export default function SpaceJourney({ userData }) {
     }
 
     return { minDate, days };
-  }, [history, todayKST, dailyStats]);
+  }, [history, todayKST, dailyStats, nodesWithProtection]);
 
-  // Helper: Get protection nodes
-  const nodesWithProtection = useMemo(() => {
-    const set = new Set();
-    dailyStats.forEach((v, k) => {
-      if (v.isProtected) set.add(k);
-    });
-    return set;
-  }, [dailyStats]);
-
-  // Cryo Core Stats
-  const coreStats = useMemo(() => {
-    let purchased = 0;
-    let used = 0;
-    transactions.forEach(t => {
-      if (t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core') {
-        purchased += 1;
-      }
-      if (t.type === 'streak_freeze') {
-        used += 1;
-      }
-    });
-    return { purchased, used, remaining: userData?.streakFreezeCount || 0 };
-  }, [transactions, userData?.streakFreezeCount]);
-
-  // 달력 뷰용 월별 데이터
+  // 달력 뷰용 월별 데이터 (일부 최적화)
   const calendarMonths = useMemo(() => {
     if (!timelineData.minDate) return [];
     
@@ -186,6 +235,7 @@ export default function SpaceJourney({ userData }) {
         cDays.push({
           date: dStr,
           isActive: !!stats,
+          isProtected: nodesWithProtection.has(dStr),
           stats: stats || null,
           isToday: dStr === todayKST
         });
@@ -196,7 +246,7 @@ export default function SpaceJourney({ userData }) {
       if (m > 12) { m = 1; y++; }
     }
     return months;
-  }, [timelineData.minDate, todayKST, dailyStats]);
+  }, [timelineData.minDate, todayKST, dailyStats, nodesWithProtection]);
 
   // 로딩 후 또는 뷰 모드 변경 시 맨 아랫부분으로 스크롤 (가장 최근)
   useLayoutEffect(() => {
@@ -205,10 +255,19 @@ export default function SpaceJourney({ userData }) {
     }
   }, [loading, viewMode]);
 
-  // 스트릭 소스 (로컬 계산값 우선 - 시각적 일관성)
+  // 스트릭 소스 (헤더와 동일한 로직 사용으로 완벽한 일치 보장)
   const calculatedStreak = useMemo(() => {
+    // We already aligned our timelineData with currentStreak.
+    // However, to ensure 100% consistency with the Navbar, we can just use the exact sequence generated in our timeline
     const todayNode = timelineData.days.find(d => d.date === todayKST);
-    return todayNode ? todayNode.streakRun : 0;
+    if (todayNode && (todayNode.isActive || todayNode.isProtected)) {
+      return todayNode.streakRun;
+    }
+    const yesterdayKST = new Date(new Date(todayKST + 'T12:00:00Z').getTime() - 86400000).toISOString().split('T')[0];
+    const yesterdayNode = timelineData.days.find(d => d.date === yesterdayKST);
+    // If today is an unprotected gap but yesterday was protected/active, they still haven't lost it *today* until tomorrow!
+    // Duo style: Streak stays alive visually today even if you haven't done it yet.
+    return yesterdayNode ? yesterdayNode.streakRun : 0;
   }, [timelineData.days, todayKST]);
 
   const streak = calculatedStreak; 
@@ -348,7 +407,7 @@ export default function SpaceJourney({ userData }) {
               style={{ left: popover.x, top: popover.y, transform: 'translate(-50%, -100%)', marginTop: '-15px' }}
             >
               <h4>{popover.day.date}</h4>
-              {popover.day.isActive ? (
+              {(popover.day.isActive || popover.day.isProtected) ? (
                 <>
                   <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '10px' }}>
                     {popover.day.isProtected ? '🧊 코어 보호 활성화' : '✨ 탐사항해 완료'}
@@ -361,10 +420,10 @@ export default function SpaceJourney({ userData }) {
                         <li>획득 광석: <strong style={{ color: '#00f3ff' }}>💎{popover.day.stats.crystals}</strong></li>
                       </>
                     ) : (
-                      <li>활동 기록 없음 (보호됨)</li>
+                      <li>크라이오 코어로 궤도 유지됨</li>
                     )}
                   </ul>
-                  {popover.day.streakRun > 1 && (
+                  {popover.day.streakRun > 0 && (
                     <div style={{ background: 'rgba(0, 243, 255, 0.1)', padding: '5px', textAlign: 'center', marginTop: '10px', color: '#00f3ff', fontWeight: 'bold' }}>
                       {popover.day.streakRun}-Day Streak!
                     </div>
@@ -595,11 +654,11 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
             <g
               key={`star-${i}`} 
               transform={`translate(${node.x}, ${node.y})`} 
-              className={`star-node ${node.isActive ? 'active' : ''}`}
+              className={`star-node ${(node.isActive || node.isProtected) ? 'active' : ''}`}
               style={{ cursor: 'pointer' }}
               onClick={(e) => onStarClick(e, node)}
             >
-              {node.isActive ? (
+              {(node.isActive || node.isProtected) ? (
                 <>
                   <circle 
                     r={r} 
@@ -633,11 +692,11 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
 
               {/* 밝게 보이는 날짜 텍스트 */}
               <text 
-                y={node.isActive ? r + 16 : 12} 
+                y={(node.isActive || node.isProtected) ? r + 16 : 12} 
                 textAnchor="middle" 
-                fill={node.isActive ? '#e2e8f0' : '#475569'} 
-                fontSize={node.isActive ? "12" : "11"} 
-                fontWeight={node.isActive ? '800' : 'normal'} 
+                fill={(node.isActive || node.isProtected) ? '#e2e8f0' : '#475569'} 
+                fontSize={(node.isActive || node.isProtected) ? "12" : "11"} 
+                fontWeight={(node.isActive || node.isProtected) ? '800' : 'normal'} 
                 style={{ pointerEvents: 'none' }}
               >
                 {node.date.slice(8, 10)}
