@@ -2,17 +2,17 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   const crystals = user.crystals || 0;
   const avgScore = user.averageScore || 0;
   
-  // 1. 기초 체급 (Wealth): 보유 광석 / 10 -> 이전보다 가중치 10배 증가 (노력 보상)
-  const wealthScore = Math.floor(crystals / 10);
+  // 1. 기초 체급 (Wealth): 보유 광석 / 2 -> 누적 핵심 지표로 가중치 대폭 강화 (기존 / 10)
+  const wealthScore = Math.floor(crystals / 2);
   
-  // 2. 전문성 (Skill): 평균 점수 * 5 -> 이전보다 가중치 절반 감소 (100점 만점 독점 방지)
+  // 2. 전문성 (Skill): 평균 점수 * 5 -> 가중치 유지 (100점 만점 시 500점)
   const skillScore = Math.floor(avgScore * 5);
   
-  // 3. 성실도 (Diligence): log2(연속 학습일 + 1) * 10 -> 가중치 유지
-  const diligenceScore = Math.floor(Math.log2(streak + 1) * 10);
+  // 3. 성실도 (Diligence): 연속 학습일 * 10 -> 선형 누적으로 꾸준함 강력 보상 (기존 log2)
+  const diligenceScore = Math.floor(streak * 10);
   
-  // 4. 추진력 (Growth): 주간 성장 * 2 -> 가중치 25%
-  const growthScore = Math.max(0, weeklyGain * 2);
+  // 4. 추진력 (Growth): 주간 성장 / 2 -> 주간 초기화 타격 완화 (기존 * 2)
+  const growthScore = Math.floor(Math.max(0, weeklyGain) / 2);
   
   // 5. 아고라 지수 (Agora): 질문 및 답변 활동 기반 -> 가중치 10%
   const helpCount = user.helpCount || 0;

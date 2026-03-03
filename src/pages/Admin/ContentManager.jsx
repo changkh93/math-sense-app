@@ -123,7 +123,7 @@ const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleCh
         regionId: region.id, 
         title, 
         order: chapters?.length || 0,
-        id: `chap${(chapters?.length || 0) + 1}` 
+        id: `chap_${Date.now()}` 
       });
     }
   };
@@ -207,7 +207,7 @@ const ChapterNode = ({ chapter, isExpanded, onToggle, onOpenAiImport, isFirst, i
         chapterId: chapter.docId, 
         title, 
         order: units?.length || 0,
-        id: `unit${(units?.length || 0) + 1}` 
+        id: `unit_${Date.now()}` 
       });
     }
   };
