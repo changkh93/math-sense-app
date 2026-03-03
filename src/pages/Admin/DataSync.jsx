@@ -3,7 +3,6 @@ import { useRegions, useChapters, useUnits, useQuizzes, useAdminMutations } from
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { Database, Download, Search, Trash2, RefreshCw, AlertTriangle, CheckCircle, FileJson, UploadCloud } from 'lucide-react';
-import { seedFirestore } from '../../utils/seedFirestore';
 
 const DataSync = () => {
   const [activeTab, setActiveTab] = useState('export'); // 'export' | 'seed' | 'scan' | 'inspect'
@@ -28,12 +27,6 @@ const DataSync = () => {
           <Download size={18} /> Bulk Export
         </button>
         <button 
-          onClick={() => setActiveTab('seed')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${activeTab === 'seed' ? 'bg-emerald-600 text-white' : 'bg-white/5 hover:bg-white/10'}`}
-        >
-          <UploadCloud size={18} /> Seed Data (파일 → DB)
-        </button>
-        <button 
           onClick={() => setActiveTab('scan')}
           className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${activeTab === 'scan' ? 'bg-red-600 text-white' : 'bg-white/5 hover:bg-white/10'}`}
         >
@@ -49,7 +42,6 @@ const DataSync = () => {
 
       <div className="tab-content glass p-6 rounded-xl">
         {activeTab === 'export' && <ExportTab />}
-        {activeTab === 'seed' && <SeedTab />}
         {activeTab === 'scan' && <GlobalScanTab />}
         {activeTab === 'inspect' && <InspectorTab />}
       </div>
@@ -357,123 +349,6 @@ const InspectorTab = () => {
            ))}
         </div>
       )}
-    </div>
-  );
-};
-
-const SeedTab = () => {
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState('마이그레이션 준비됨');
-
-  const handleSeed = async (regionId = null) => {
-    const message = regionId 
-      ? `'${regionId}' 데이터를 Firestore에 덮어쓰시겠습니까? (기존 유닛 데이터는 자동 정리됩니다)`
-      : '전체 데이터를 Firestore에 덮어쓰시겠습니까? (모든 유령 문서가 정리됩니다)';
-      
-    if (!confirm(message)) return;
-    
-    setLoading(true);
-    setStatus('워프 엔진 가동 중 (동기화 중)...');
-    try {
-      await seedFirestore(regionId);
-      setStatus('데이터 마이그레이션 완료!');
-    } catch (error) {
-      console.error(error);
-      setStatus('오류 발생: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-emerald-900/20 p-4 rounded-lg border border-emerald-500/30 mb-8">
-        <h3 className="text-emerald-300 font-bold mb-1 flex items-center gap-2">
-          <CheckCircle size={18} /> 데이터 동기화 (File → DB)
-        </h3>
-        <p className="text-sm text-emerald-200/70">
-          로컬 프로젝트 파일(`src/data/chapter*.js`)의 내용을 Firestore DB로 전송합니다.<br/>
-          <strong>중요:</strong> 새로운 "유령 문서 정리" 로직이 포함되어 있어, 실행 시 기존의 지저분한 데이터가 깔끔하게 정리됩니다.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <button 
-          onClick={() => handleSeed('addition')}
-          disabled={loading}
-          className="glass-card hud-border p-4 hover:bg-emerald-600/10 transition-all text-center group"
-        >
-          <div className="text-emerald-400 mb-2 group-hover:scale-110 transition-transform text-xl">➕</div>
-          <div className="font-bold text-white mb-1 text-sm">Addition</div>
-          <p className="text-[10px] text-gray-500">덧셈 데이터 업데이트</p>
-        </button>
-
-        <button 
-          onClick={() => handleSeed('multiplication')}
-          disabled={loading}
-          className="glass-card hud-border p-4 hover:bg-emerald-600/10 transition-all text-center group"
-        >
-          <div className="text-emerald-400 mb-2 group-hover:scale-110 transition-transform text-xl">✖️</div>
-          <div className="font-bold text-white mb-1 text-sm">Multiplication</div>
-          <p className="text-[10px] text-gray-500">곱셈 데이터 업데이트</p>
-        </button>
-
-        <button 
-          onClick={() => handleSeed('division')}
-          disabled={loading}
-          className="glass-card hud-border p-4 hover:bg-emerald-600/10 transition-all text-center group"
-        >
-          <div className="text-emerald-400 mb-2 group-hover:scale-110 transition-transform text-xl">➗</div>
-          <div className="font-bold text-white mb-1 text-sm">Division</div>
-          <p className="text-[10px] text-gray-500">나눗셈 데이터 업데이트</p>
-        </button>
-
-        <button 
-          onClick={() => handleSeed('fractions')}
-          disabled={loading}
-          className="glass-card hud-border p-4 hover:bg-emerald-600/10 transition-all text-center group"
-        >
-          <div className="text-emerald-400 mb-2 group-hover:scale-110 transition-transform text-xl">🍰</div>
-          <div className="font-bold text-white mb-1 text-sm">Fractions</div>
-          <p className="text-[10px] text-gray-500">분수 데이터 업데이트</p>
-        </button>
-
-        <button 
-          onClick={() => handleSeed('decimals')}
-          disabled={loading}
-          className="glass-card hud-border p-4 hover:bg-emerald-600/10 transition-all text-center group"
-        >
-          <div className="text-emerald-400 mb-2 group-hover:scale-110 transition-transform text-xl">🌾</div>
-          <div className="font-bold text-white mb-1 text-sm">Decimals</div>
-          <p className="text-[10px] text-gray-500">소수 데이터 업데이트</p>
-        </button>
-
-        <button 
-          onClick={() => handleSeed('ratios')}
-          disabled={loading}
-          className="glass-card hud-border p-4 hover:bg-emerald-600/10 transition-all text-center group"
-        >
-          <div className="text-emerald-400 mb-2 group-hover:scale-110 transition-transform text-xl">🏰</div>
-          <div className="font-bold text-white mb-1 text-sm">Ratios</div>
-          <p className="text-[10px] text-gray-500">비와 비례식 업데이트</p>
-        </button>
-
-        <button 
-          onClick={() => handleSeed(null)}
-          disabled={loading}
-          className="glass-card hud-border p-4 border-red-500/30 hover:bg-red-600/10 transition-all text-center group lg:col-span-2"
-        >
-          <div className="text-red-400 mb-2 group-hover:scale-110 transition-transform text-xl">🔥</div>
-          <div className="font-bold text-white mb-1 text-sm">Seed ALL Regions</div>
-          <p className="text-[10px] text-gray-500">전체 갤러리 데이터 초기화 (강력 추천)</p>
-        </button>
-      </div>
-
-      <div className="mt-8 pt-8 border-t border-white/5 text-center">
-        <div className={`font-tech ${loading ? 'text-emerald-400 animate-pulse' : 'text-gray-500'}`}>
-          STATUS: {status}
-        </div>
-      </div>
     </div>
   );
 };

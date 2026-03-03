@@ -1,7 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import './App.css'
 import SpaceHome from './components/Space/SpaceHome'
-import MigratePage from './pages/MigratePage'
 import AdminLayout from './pages/Admin/AdminLayout'
 import AdminDashboard from './pages/Admin/Dashboard'
 import AdminRoute from './components/AdminRoute'
@@ -21,7 +20,6 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<SpaceHome />} />
-      <Route path="/migrate" element={<MigratePage />} />
       
       <Route path="/admin" element={
         <AdminRoute>

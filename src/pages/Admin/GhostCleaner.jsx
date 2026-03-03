@@ -1,106 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useRegions, useChapters, useUnits, useQuizzes, useAdminMutations } from '../../hooks/useContent';
-import { Trash2, AlertTriangle, RefreshCw, Eye, Ghost, Search, Globe, ShieldAlert, Trash } from 'lucide-react';
+import { Trash2, RefreshCw, Search, Globe } from 'lucide-react';
 import { ref, listAll, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase';
-import { regions as localRegions } from '../../data/regions';
-import { chapter1Quizzes } from '../../data/chapter1Quizzes';
-import { chapter2Quizzes } from '../../data/chapter2Quizzes';
-import { chapter3Quizzes } from '../../data/chapter3Quizzes';
-import { chapter4Quizzes } from '../../data/chapter4Quizzes';
-import { chapter5Quizzes } from '../../data/chapter5Quizzes';
-import { chapter6Quizzes } from '../../data/chapter6Quizzes';
-import { ratioChapter1Quizzes } from '../../data/ratioChapter1Quizzes';
-import { ratioChapter2Quizzes } from '../../data/ratioChapter2Quizzes';
-import { ratioChapter3Quizzes } from '../../data/ratioChapter3Quizzes';
-import { ratioChapter4Quizzes } from '../../data/ratioChapter4Quizzes';
-import * as divisionData from '../../data/divisionQuizzes';
-import * as multiplicationData from '../../data/multiplicationQuizzes';
-import * as additionData from '../../data/additionQuizzes';
-
-const quizDataMapping = {
-  'chap1': chapter1Quizzes,
-  'chap2': chapter2Quizzes,
-  'chap3': chapter3Quizzes,
-  'chap4': chapter4Quizzes,
-  'chap5': chapter5Quizzes,
-  'chap6': chapter6Quizzes,
-  'ratio_chap1': ratioChapter1Quizzes,
-  'ratio_chap2': ratioChapter2Quizzes,
-  'ratio_chap3': ratioChapter3Quizzes,
-  'ratio_chap4': ratioChapter4Quizzes,
-  'div_chap1': divisionData.divisionChapterdiv_1Quizzes,
-  'mul_chap1': multiplicationData.multiplicationChaptermul_1Quizzes,
-  'mul_chap2': multiplicationData.multiplicationChaptermul_2Quizzes,
-  'mul_chap3': multiplicationData.multiplicationChaptermul_3Quizzes,
-  'add_chap1': additionData.additionChapteradd_1Quizzes,
-  'add_chap2': additionData.additionChapteradd_2Quizzes,
-  'add_chap3': additionData.additionChapteradd_3Quizzes,
-};
-
-// --- BUILD REGISTRY MAPS ---
-const whitelistChapters = new Set();
-const whitelistUnits = new Set();
-const whitelistQuizzes = new Set();
-const curriculumTitles = new Map();
-const quizToUnitMap = new Map();
-
-localRegions.forEach(region => {
-  region.chapters?.forEach(chapter => {
-    const chapterDocId = `${region.id}_${chapter.id}`;
-    whitelistChapters.add(chapterDocId);
-    curriculumTitles.set(chapterDocId, chapter.title);
-
-    chapter.units?.forEach(unit => {
-      const unitDocId = `${chapterDocId}_${unit.id}`;
-      whitelistUnits.add(unitDocId);
-      curriculumTitles.set(unitDocId, unit.title);
-
-      const quizDataSource = quizDataMapping[chapter.id];
-      if (quizDataSource && quizDataSource[unit.id]) {
-        const questions = quizDataSource[unit.id].questions || [];
-        questions.forEach(q => {
-          whitelistQuizzes.add(q.id);
-          quizToUnitMap.set(q.id, unitDocId);
-        });
-      }
-    });
-  });
-});
+import { collection, getDocs, writeBatch, doc as firestoreDoc } from 'firebase/firestore';
 
 const GhostCleaner = () => {
-  const { data: regions, isLoading: loadingRegions } = useRegions();
+  const { data: regions } = useRegions();
   const [selectedRegion, setSelectedRegion] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [selectedUnit, setSelectedUnit] = useState(null);
 
   const { data: chapters } = useChapters(selectedRegion);
   const { data: units } = useUnits(selectedChapter);
-  const { data: quizzes, isLoading: loadingQuizzes, refetch } = useQuizzes(selectedUnit);
+  const { refetch } = useQuizzes(selectedUnit);
 
   const { deleteQuiz } = useAdminMutations();
   const [inspectQuiz, setInspectQuiz] = useState(null);
 
   // Global Scan State
-  const [isGlobalMode, setIsGlobalMode] = useState(false);
+  const [isGlobalMode, setIsGlobalMode] = useState(true); // Default to global scan now
   const [globalQuizzes, setGlobalQuizzes] = useState([]);
   const [globalUnits, setGlobalUnits] = useState([]);
   const [globalChapters, setGlobalChapters] = useState([]);
   const [scanning, setScanning] = useState(false);
-  const [scanStats, setScanStats] = useState({ total: 0, orphans: 0, suspicious: 0, unitOrphans: 0, chapterOrphans: 0 });
+  const [scanStats, setScanStats] = useState({ total: 0, orphans: 0, unitOrphans: 0, chapterOrphans: 0 });
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('quizzes'); // 'quizzes', 'units', 'chapters', 'scrub'
+  const [activeTab, setActiveTab] = useState('quizzes'); // 'quizzes', 'units', 'chapters', 'storage'
   const [showOnlyOrphans, setShowOnlyOrphans] = useState(true);
-
-  // History Scrubber State
-  const [scrubResults, setScrubResults] = useState([]);
-  const [scrubbing, setScrubbing] = useState(false);
-  const [scrubStats, setScrubStats] = useState({ scanned: 0, bad: 0 });
-  
-  // Ledger Migration State
-  const [ledgerStats, setLedgerStats] = useState({ users: 0, txCreated: 0, discrepancies: 0 });
-  const [ledgerLogs, setLedgerLogs] = useState([]);
-  const [migratingLedger, setMigratingLedger] = useState(false);
 
   // Storage Cleaner State
   const [storageScrubbing, setStorageScrubbing] = useState(false);
@@ -110,7 +37,6 @@ const GhostCleaner = () => {
   // Clear children selection when parent changes
   useEffect(() => setSelectedChapter(null), [selectedRegion]);
   useEffect(() => setSelectedUnit(null), [selectedChapter]);
-  // useEffect(() => setInspectQuiz(null), [selectedUnit]); // Removed to allow inspection in global mode
 
   const handleDelete = (quizId) => {
     if (confirm('Are you sure you want to delete this quiz? This action cannot be undone.')) {
@@ -134,83 +60,61 @@ const GhostCleaner = () => {
     setGlobalUnits([]);
     try {
       console.log(`[SCAN] Target Project ID: ${db.app.options.projectId}`);
-      // 1. Fetch EVERYTHING from Firestore (The New Source of Truth)
-      const [regionsSnap, chaptersSnap, unitsSnap, quizzesSnap] = await Promise.all([
-        getDocs(collection(db, 'regions')),
+      // 1. Fetch EVERYTHING from Firestore
+      const [chaptersSnap, unitsSnap, quizzesSnap] = await Promise.all([
         getDocs(collection(db, 'chapters')),
         getDocs(collection(db, 'units')),
         getDocs(collection(db, 'quizzes'))
       ]);
 
-      // 2. Audit Snapshot
       const allFirestoreChapters = chaptersSnap.docs.map(d => ({ ...d.data(), docId: d.id }));
       const allFirestoreUnits = unitsSnap.docs.map(d => ({ ...d.data(), docId: d.id }));
       const allFirestoreQuizzes = quizzesSnap.docs.map(d => ({ ...d.data(), docId: d.id }));
 
-      // 3. Audit Chapters
-      const auditedChapters = allFirestoreChapters.map(chapter => {
-        let isOrphan = false;
-        let reasons = [];
-        if (!whitelistChapters.has(chapter.docId)) {
-          isOrphan = true;
-          reasons.push('Registry Ghost (Chapter ID not in regions.js)');
-        }
-        const correctTitle = curriculumTitles.get(chapter.docId);
-        if (correctTitle && chapter.title !== correctTitle) {
-          isOrphan = true;
-          reasons.push(`Title Mismatch: Expected "${correctTitle}", found "${chapter.title}"`);
-        }
-        return { ...chapter, isOrphan, ghostReasons: reasons };
-      });
-      setGlobalChapters(auditedChapters);
+      const existingChapterIds = new Set(allFirestoreChapters.map(c => c.docId));
+      const existingUnitIds = new Set(allFirestoreUnits.map(u => u.docId));
 
-      // 4. Audit Units
-      const auditedUnits = allFirestoreUnits.map(unit => {
-        let isOrphan = false;
-        let reasons = [];
-        if (!whitelistUnits.has(unit.docId)) {
-          isOrphan = true;
-          reasons.push('Registry Ghost (Unit ID not in regions.js)');
-        }
-        const correctTitle = curriculumTitles.get(unit.docId);
-        if (correctTitle && unit.title !== correctTitle) {
-          isOrphan = true;
-          reasons.push(`Title Mismatch: Expected "${correctTitle}", found "${unit.title}"`);
-        }
-        return { ...unit, isOrphan, ghostReasons: reasons };
-      });
-      setGlobalUnits(auditedUnits);
-
-      // 5. Audit Quizzes
+      // 2. Audit Quizzes
       const auditedQuizzes = allFirestoreQuizzes.map(quiz => {
         let isOrphan = false;
         let reasons = [];
-        const qId = quiz.id || quiz.docId;
         
-        // Rule A: Existence in Registry
-        if (!whitelistQuizzes.has(qId)) {
+        if (!quiz.unitId) {
           isOrphan = true;
-          reasons.push('Registry Ghost (Quiz ID not in local data files)');
-        } 
-        // Rule B: Parent Connectivity Check
-        else if (!quiz.unitId) {
+          reasons.push('Stray Quiz (Missing unitId)');
+        } else if (!existingUnitIds.has(quiz.unitId)) {
           isOrphan = true;
-          reasons.push('Stray Quiz (Missing parent unitId)');
-        } else if (quizToUnitMap.get(qId) !== quiz.unitId) {
-          isOrphan = true;
-          reasons.push(`Displaced Quiz: Expected Unit "${quizToUnitMap.get(qId)}", found in "${quiz.unitId}"`);
+          reasons.push(`Displaced Quiz: Parent unit "${quiz.unitId}" does not exist`);
         }
 
         return { ...quiz, isOrphan, ghostReasons: reasons };
       });
 
+      // 3. Audit Units
+      const auditedUnits = allFirestoreUnits.map(unit => {
+        let isOrphan = false;
+        let reasons = [];
+        
+        if (!unit.chapterId) {
+          isOrphan = true;
+          reasons.push('Stray Unit (Missing chapterId)');
+        } else if (!existingChapterIds.has(unit.chapterId)) {
+          isOrphan = true;
+          reasons.push(`Displaced Unit: Parent chapter "${unit.chapterId}" does not exist`);
+        }
+
+        return { ...unit, isOrphan, ghostReasons: reasons };
+      });
+
+      setGlobalChapters(allFirestoreChapters.map(c => ({...c, isOrphan: false, ghostReasons: []})));
+      setGlobalUnits(auditedUnits);
       setGlobalQuizzes(auditedQuizzes);
+      
       setScanStats({ 
         total: auditedQuizzes.length, 
         orphans: auditedQuizzes.filter(q => q.isOrphan).length, 
-        suspicious: auditedQuizzes.filter(q => q.ghostReasons.some(r => r.includes('Displaced') || r.includes('Registry'))).length,
         unitOrphans: auditedUnits.filter(u => u.isOrphan).length,
-        chapterOrphans: auditedChapters.filter(c => c.isOrphan).length
+        chapterOrphans: 0
       });
 
     } catch (err) {
@@ -301,238 +205,7 @@ const GhostCleaner = () => {
     }
   };
 
-  const handleSyncTitle = async (item, type) => {
-    try {
-      const correctTitle = curriculumTitles.get(item.docId);
-      console.log(`[SYNC] Syncing ${type}/${item.docId} to: ${correctTitle}`);
-      if (!correctTitle) return alert("Could not find correct title in registry.");
-      
-      const batch = writeBatch(db);
-      batch.set(firestoreDoc(db, type, item.docId), { title: correctTitle }, { merge: true });
-      await batch.commit();
-      
-      // Update local state
-      if (type === 'units') setGlobalUnits(prev => prev.map(u => u.docId === item.docId ? { ...u, title: correctTitle, isOrphan: false, ghostReasons: [] } : u));
-      if (type === 'chapters') setGlobalChapters(prev => prev.map(c => c.docId === item.docId ? { ...c, title: correctTitle, isOrphan: false, ghostReasons: [] } : c));
-      
-      alert("Title synced successfully.");
-    } catch (err) {
-      console.error("Sync failed:", err);
-      alert("Sync failed: " + err.message);
-    }
-  };
 
-  const runHistoryScrub = async () => {
-    console.log("[SCRUB] Starting Deep History Audit...");
-    setScrubbing(true);
-    setScrubResults([]);
-    let totalScanned = 0;
-    let badRecords = [];
-
-    try {
-      // 1. Scan Questions (Agora/QA)
-      console.log("[SCRUB] Scanning questions collection...");
-      const questionsSnap = await getDocs(collection(db, 'questions'));
-      console.log(`[SCRUB] Found ${questionsSnap.size} questions.`);
-      
-      questionsSnap.docs.forEach(d => {
-        totalScanned++;
-        const data = d.data();
-        const savedTitle = data.quizContext?.quizTitle;
-        const unitId = data.quizContext?.unitId;
-        const correctTitle = curriculumTitles.get(unitId);
-
-        if (savedTitle && (savedTitle.includes('분해하는') || savedTitle.includes('범죄자') || savedTitle.includes('No stroke found') || (correctTitle && savedTitle !== correctTitle))) {
-          badRecords.push({
-            id: d.id,
-            path: `questions/${d.id}`,
-            data,
-            reason: (savedTitle.includes('분해하는') || savedTitle.includes('No stroke found')) ? 'Trash String Detected' : 'Stale Title (Legacy)',
-            savedTitle,
-            correctTitle: correctTitle || 'Unknown',
-            type: 'question'
-          });
-        }
-      });
-
-      // 2. Scan User History
-      console.log("[SCRUB] Fetching users list...");
-      const usersSnap = await getDocs(collection(db, 'users'));
-      console.log(`[SCRUB] Found ${usersSnap.size} users to audit history.`);
-      
-      for (const userDoc of usersSnap.docs) {
-        try {
-          const historySnap = await getDocs(collection(db, 'users', userDoc.id, 'history'));
-          if (!historySnap.empty) {
-            console.log(`[SCRUB] Auditing ${historySnap.size} records for user: ${userDoc.id}`);
-          }
-          
-          historySnap.docs.forEach(hd => {
-            totalScanned++;
-            const hData = hd.data();
-            const savedTitle = hData.unitTitle;
-            const unitId = hData.unitId;
-            const correctTitle = curriculumTitles.get(unitId);
-
-            if (savedTitle && (savedTitle.includes('분해하는') || savedTitle.includes('범죄자') || (correctTitle && savedTitle !== correctTitle))) {
-              badRecords.push({
-                id: hd.id,
-                userId: userDoc.id,
-                path: `users/${userDoc.id}/history/${hd.id}`,
-                data: hData,
-                reason: savedTitle.includes('분해하는') ? 'Trash String Detected' : 'Stale Title (Legacy)',
-                savedTitle,
-                correctTitle: correctTitle || 'Unknown',
-                type: 'history'
-              });
-            }
-          });
-        } catch (e) {
-          console.warn(`[SCRUB] Could not scan history for user ${userDoc.id}:`, e.message);
-        }
-      }
-
-      console.log(`[SCRUB] Finished. Scanned ${totalScanned} total records. Found ${badRecords.length} bad records.`);
-      setScrubResults(badRecords);
-      setScrubStats({ scanned: totalScanned, bad: badRecords.length });
-    } catch (err) {
-      console.error("[SCRUB] Major failure:", err);
-      alert("Scrub failed: " + err.message);
-    } finally {
-      setScrubbing(false);
-    }
-  };
-
-  const handleFixHistory = async (record) => {
-    try {
-      if (record.type === 'history') {
-        await firestoreDoc(db, 'users', record.userId, 'history', record.id).set({
-          unitTitle: record.correctTitle
-        }, { merge: true });
-      } else if (record.type === 'question') {
-        await firestoreDoc(db, 'questions', record.id).set({
-          quizContext: { ...record.data.quizContext, quizTitle: record.correctTitle }
-        }, { merge: true });
-      }
-      setScrubResults(prev => prev.filter(r => r.id !== record.id));
-    } catch (err) {
-      console.error("Fix failed:", err);
-      alert("Fix failed.");
-    }
-  };
-
-  const handleBatchFixHistory = async () => {
-    if (!confirm(`${scrubResults.length}개의 기록을 최신 커리큘럼 제목으로 강제 동기화하시겠습니까?`)) return;
-    setScrubbing(true);
-    try {
-      for (const record of scrubResults) {
-        if (record.correctTitle === 'Unknown') continue;
-        const ref = record.type === 'history' 
-          ? doc(db, 'users', record.userId, 'history', record.id)
-          : doc(db, 'questions', record.id);
-        
-        const update = record.type === 'history'
-          ? { unitTitle: record.correctTitle }
-          : { quizContext: { ...record.data.quizContext, quizTitle: record.correctTitle } };
-        
-        await setDoc(ref, update, { merge: true });
-      }
-      alert("Batch fix complete.");
-      runHistoryScrub();
-    } catch (err) {
-      console.error("Batch fix failed:", err);
-      alert("Batch fix failed.");
-    } finally {
-      setScrubbing(false);
-    }
-  };
-
-  const runLedgerMigration = async () => {
-    if (!confirm("모든 사용자의 과거 광석 내역을 분석하여 입출금 장부를 복원하시겠습니까? (기존 장부가 없는 사용자를 우선 처리합니다)")) return;
-    
-    setMigratingLedger(true);
-    setLedgerLogs([]);
-    let userCount = 0;
-    let totalTx = 0;
-    let totalDiscrepancies = 0;
-
-    try {
-      const usersSnap = await getDocs(collection(db, 'users'));
-      const users = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      
-      for (const userData of users) {
-        userCount++;
-        const userId = userData.id;
-        const currentCrystals = userData.crystals || 0;
-        
-        // 1. Check existing transactions to avoid duplicates
-        const txSnap = await getDocs(collection(db, 'users', userId, 'crystal_transactions'));
-        const existingTxIds = new Set(txSnap.docs.map(d => d.data().metadata?.historyId || d.id));
-        
-        // 2. Fetch History
-        const historySnap = await getDocs(collection(db, 'users', userId, 'history'));
-        const historyItems = historySnap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
-        
-        const historySum = historyItems.reduce((sum, item) => sum + (item.crystalsEarned || 0), 0);
-        
-        let batch = writeBatch(db);
-        let batchCount = 0;
-        
-        // 3. Create missing history transactions
-        for (const item of historyItems) {
-          if (!existingTxIds.has(item.id)) {
-            const txRef = firestoreDoc(collection(db, 'users', userId, 'crystal_transactions'));
-            batch.set(txRef, {
-              amount: item.crystalsEarned || 0,
-              type: 'quiz_reward',
-              description: `${item.unitTitle || '탐사 퀴즈'} 보상`,
-              timestamp: item.timestamp || serverTimestamp(),
-              metadata: { historyId: item.id, unitId: item.unitId }
-            });
-            batchCount++;
-            totalTx++;
-          }
-        }
-        
-        // 4. Handle Discrepancy (if ledger doesn't match current total)
-        // Current total should include what we just added vs what we have.
-        // If it's the first sync, we might need a "Legacy Adjust"
-        if (existingTxIds.size === 0 || (existingTxIds.size === 1 && txSnap.docs[0].data().type === 'store_purchase')) {
-           const currentLoggedSum = txSnap.docs.reduce((s, d) => s + (d.data().amount || 0), 0);
-           const totalAfterHistory = historySum + currentLoggedSum;
-           const diff = currentCrystals - totalAfterHistory;
-           
-           if (diff !== 0) {
-             const txRef = firestoreDoc(collection(db, 'users', userId, 'crystal_transactions'));
-             batch.set(txRef, {
-               amount: diff,
-               type: 'admin_adjust',
-               description: '과거 활동 보정 (Legacy Sync)',
-               timestamp: historyItems[0]?.timestamp ? new Timestamp(historyItems[0].timestamp.seconds - 60, 0) : serverTimestamp(),
-               metadata: { syncType: 'initial_backfill' }
-             });
-             batchCount++;
-             totalTx++;
-             totalDiscrepancies++;
-           }
-        }
-
-        if (batchCount > 0) {
-          await batch.commit();
-          setLedgerLogs(prev => [`User ${userData.name || userId}: ${batchCount} tx created`, ...prev.slice(0, 49)]);
-        }
-      }
-
-      alert(`Migration Complete!\nUsers processed: ${userCount}\nTransactions created: ${totalTx}\nDiscrepancies adjusted: ${totalDiscrepancies}`);
-      setLedgerStats({ users: userCount, txCreated: totalTx, discrepancies: totalDiscrepancies });
-    } catch (err) {
-      console.error("Migration failed:", err);
-      alert("Migration failed: " + err.message);
-    } finally {
-      setMigratingLedger(false);
-    }
-  };
 
   const runStorageScan = async () => {
     setStorageScrubbing(true);
@@ -738,23 +411,19 @@ const GhostCleaner = () => {
                   { id: 'quizzes', label: 'Quizzes', count: showOnlyOrphans ? scanStats.orphans : globalQuizzes.length },
                   { id: 'units', label: 'Units', count: showOnlyOrphans ? scanStats.unitOrphans : globalUnits.length },
                   { id: 'chapters', label: 'Chapters', count: showOnlyOrphans ? scanStats.chapterOrphans : globalChapters.length },
-                  { id: 'scrub', label: 'History Scrub', count: scrubResults.length },
-                  { id: 'ledger', label: 'Ledger Backfill', count: ledgerStats.txCreated },
                   { id: 'storage', label: 'Storage Cleanup', count: storageOrphans.length }
                 ].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id ? (tab.id === 'scrub' ? 'bg-orange-600 text-white' : 'bg-blue-500 text-white') : 'text-gray-400 hover:bg-white/5'}`}
+                    className={`flex-1 py-3 px-4 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${activeTab === tab.id ? 'bg-blue-500 text-white' : 'text-gray-400 hover:bg-white/5'}`}
                   >
                     {tab.label.toUpperCase()} ({tab.count})
                   </button>
                 ))}
               </div>
-                                <span className="text-sm text-gray-400 ml-4">
-                  {activeTab === 'scrub' ? `Found ${scrubStats.bad} issues.` : 
-                   activeTab === 'ledger' ? `${ledgerStats.users} users checked.` :
-                   activeTab === 'storage' ? `Scanned ${storageStats.scanned} files.` :
+                <span className="text-sm text-gray-400 ml-4">
+                  {activeTab === 'storage' ? `Scanned ${storageStats.scanned} files.` :
                    `Scanned ${scanStats.total} docs.`}
                 </span>
           </div>
@@ -766,23 +435,12 @@ const GhostCleaner = () => {
           <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md">
             <div className="p-6 bg-white/5 border-b border-white/10 flex justify-between items-center">
               <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                {activeTab === 'scrub' ? 'History Issues' : activeTab === 'storage' ? 'Orphaned Images' : (showOnlyOrphans ? 'Detected Ghosts' : 'All Firestore Records')}
+                {activeTab === 'storage' ? 'Orphaned Images' : (showOnlyOrphans ? 'Detected Ghosts' : 'All Firestore Records')}
                 <span className="text-sm bg-white/10 px-3 py-1 rounded-full text-gray-400 font-mono">
-                  {activeTab === 'scrub' ? `Found ${scrubResults.length}` : activeTab === 'storage' ? `Found ${storageOrphans.length}` : `Showing ${filteredItems.length}`}
+                  {activeTab === 'storage' ? `Found ${storageOrphans.length}` : `Showing ${filteredItems.length}`}
                 </span>
               </h2>
-              {activeTab === 'scrub' ? (
-                <div className="flex gap-2">
-                   <button onClick={runHistoryScrub} disabled={scrubbing} className="px-3 py-1 bg-blue-600 rounded text-xs">Re-Scan</button>
-                    {scrubResults.length > 0 && <button onClick={handleBatchFixHistory} disabled={scrubbing} className="px-3 py-1 bg-orange-600 rounded text-xs">Sync All Titles</button>}
-                </div>
-              ) : activeTab === 'ledger' ? (
-                 <div className="flex gap-2">
-                    <button onClick={runLedgerMigration} disabled={migratingLedger} className="px-3 py-1 bg-emerald-600 rounded text-xs">
-                      {migratingLedger ? 'Migrating...' : 'Start Full Backfill'}
-                    </button>
-                 </div>
-              ) : activeTab === 'storage' ? (
+              {activeTab === 'storage' ? (
                  <div className="flex gap-2">
                     <button onClick={runStorageScan} disabled={storageScrubbing} className="px-3 py-1 bg-blue-600 rounded text-xs flex items-center gap-1">
                       <RefreshCw size={14} className={storageScrubbing ? 'animate-spin' : ''} /> {storageScrubbing ? 'Scanning...' : 'Scan Storage'}
@@ -802,39 +460,7 @@ const GhostCleaner = () => {
             </div>
 
             <div className="divide-y divide-white/10 max-h-[500px] overflow-y-auto">
-              {activeTab === 'scrub' ? (
-                scrubResults.length === 0 ? (
-                  <div className="p-20 text-center">
-                    <ShieldAlert className="mx-auto mb-4 text-green-700" size={64} />
-                    <p className="text-green-500 text-lg">No history issues found.</p>
-                    <button onClick={runHistoryScrub} className="mt-4 text-blue-400 font-bold">Start History Audit</button>
-                  </div>
-                ) : (
-                  scrubResults.map(record => (
-                    <div key={record.path} className="p-4 hover:bg-white/5 cursor-pointer" onClick={() => setInspectQuiz(record)}>
-                       <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] font-bold bg-orange-500/20 text-orange-400 px-1 rounded">{record.reason}</span>
-                          <span className="text-[9px] text-gray-500 font-mono">{record.path}</span>
-                       </div>
-                       <div className="text-red-300 line-through text-xs">{record.savedTitle}</div>
-                       <div className="text-emerald-400 text-sm font-bold">→ {record.correctTitle}</div>
-                    </div>
-                  ))
-                )
-              ) : activeTab === 'ledger' ? (
-                <div className="p-4 space-y-4">
-                   <div className="bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20">
-                      <h4 className="text-emerald-400 font-bold mb-1">복원 대기 중</h4>
-                      <p className="text-xs text-gray-400">모든 이용자의 `history` 컬렉션을 스캔하여 `crystal_transactions`가 비어있는 부분을 자동으로 채웁니다. 현재 잔고와 일치하지 않는 경우 '과거 활동 보정' 내역이 추가됩니다.</p>
-                   </div>
-                   <div className="divide-y divide-white/10">
-                      {ledgerLogs.map((log, i) => (
-                        <div key={i} className="py-2 text-[10px] font-mono text-gray-500">{log}</div>
-                      ))}
-                      {ledgerLogs.length === 0 && <div className="py-8 text-center text-gray-600 italic">상단의 버튼을 눌러 작업을 시작하세요.</div>}
-                   </div>
-                </div>
-              ) : activeTab === 'storage' ? (
+              {activeTab === 'storage' ? (
                 storageOrphans.length === 0 ? (
                   <div className="p-20 text-center">
                     <ShieldAlert className="mx-auto mb-4 text-green-700" size={64} />
@@ -914,14 +540,6 @@ const GhostCleaner = () => {
                    <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-lg">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs uppercase text-red-400 font-bold block">Why is this flagged?</span>
-                        {inspectQuiz.ghostReasons.some(r => r.includes('Title Mismatch')) && (
-                          <button 
-                            onClick={() => handleSyncTitle(inspectQuiz, activeTab)}
-                            className="bg-green-600 hover:bg-green-500 text-white text-[10px] px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"
-                          >
-                            <RefreshCw size={12} /> Sync Correct Title
-                          </button>
-                        )}
                       </div>
                       <ul className="list-disc list-inside text-sm text-red-200">
                         {inspectQuiz.ghostReasons.map((r, i) => <li key={i}>{r}</li>)}

@@ -21,40 +21,6 @@ const ContentManager = () => {
     if (title) saveRegion.mutate({ title, order: regions?.length || 0 });
   };
 
-  const [batchUpdating, setBatchUpdating] = useState(false);
-
-  const handleBatchContentFlags = async () => {
-    if (!confirm('모든 단원의 contentFlags를 일괄 업데이트합니다. 진행하시겠습니까?')) return;
-    setBatchUpdating(true);
-    try {
-      const unitsSnap = await getDocs(collection(db, 'units'));
-      let updated = 0;
-      const promises = unitsSnap.docs.map(async (unitDoc) => {
-        const data = unitDoc.data();
-        const hasDataLog = !!(data.learningContents?.text?.trim());
-        const hasTransmission = !!(
-          (data.transmissions?.length > 0 && data.transmissions.some(tx => tx.videoId)) ||
-          (data.videoConfig?.videoId)
-        );
-        // Only update if flags are missing or different
-        const current = data.contentFlags || {};
-        if (current.hasDataLog !== hasDataLog || current.hasTransmission !== hasTransmission) {
-          await updateDoc(doc(db, 'units', unitDoc.id), {
-            contentFlags: { hasDataLog, hasTransmission }
-          });
-          updated++;
-        }
-      });
-      await Promise.all(promises);
-      alert(`✅ 완료! ${unitsSnap.size}개 단원 중 ${updated}개 업데이트됨.`);
-    } catch (err) {
-      console.error('Batch update failed:', err);
-      alert('일괄 업데이트 실패: ' + err.message);
-    } finally {
-      setBatchUpdating(false);
-    }
-  };
-
   if (loadingRegions) return <div className="loading">Loading Regions...</div>;
 
   return (
@@ -65,15 +31,6 @@ const ContentManager = () => {
           <p>Regions → Chapters → Units</p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button 
-            className="outline-btn" 
-            onClick={handleBatchContentFlags} 
-            disabled={batchUpdating}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}
-          >
-            <RefreshCw size={14} className={batchUpdating ? 'spinning' : ''} /> 
-            <span>{batchUpdating ? '업데이트 중...' : 'ContentFlags 일괄 동기화'}</span>
-          </button>
           <button className="primary-btn" onClick={handleAddRegion}>
             <Plus size={18} /> <span>Add Region</span>
           </button>
