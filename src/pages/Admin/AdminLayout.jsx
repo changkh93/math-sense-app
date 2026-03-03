@@ -31,9 +31,9 @@ const AdminLayout = () => {
           </Link>
           <Link to="/admin/data-sync" className="nav-link">
             <Database size={20} />
-            <span>Data Sync</span>
+            <span>Data Backup</span>
           </Link>
-          <Link to="/admin/ghost-cleaner" className="nav-link text-red-400">
+          <Link to="/admin/ghost-cleaner" className="nav-link">
             <Ghost size={20} />
             <span>Ghost Cleaner</span>
           </Link>

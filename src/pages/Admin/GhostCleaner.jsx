@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRegions, useChapters, useUnits, useQuizzes, useAdminMutations } from '../../hooks/useContent';
-import { Trash2, RefreshCw, Search, Globe } from 'lucide-react';
+import { Trash2, RefreshCw, Search, Globe, Ghost, ShieldAlert, Eye } from 'lucide-react';
 import { ref, listAll, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 import { collection, getDocs, writeBatch, doc as firestoreDoc } from 'firebase/firestore';

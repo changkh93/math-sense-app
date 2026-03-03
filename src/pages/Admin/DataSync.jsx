@@ -5,17 +5,17 @@ import { collection, query, where, getDocs, orderBy, doc, deleteDoc } from 'fire
 import { Database, Download, Search, Trash2, RefreshCw, AlertTriangle, CheckCircle, FileJson, UploadCloud } from 'lucide-react';
 
 const DataSync = () => {
-  const [activeTab, setActiveTab] = useState('export'); // 'export' | 'seed' | 'scan' | 'inspect'
+  const [activeTab, setActiveTab] = useState('export'); // 'export'
 
   return (
     <div className="data-sync-container p-6 max-w-6xl mx-auto">
       <header className="mb-8 border-b border-white/10 pb-4">
         <div className="flex items-center gap-3 mb-2">
           <Database size={32} className="text-blue-400" />
-          <h1 className="text-3xl font-bold text-white">Data Sync & Maintenance</h1>
+          <h1 className="text-3xl font-bold text-white">Data Backup & Export</h1>
         </div>
         <p className="text-gray-400">
-          Manage your Firestore data, backup manual edits, and purge "ghost" documents.
+          Export your Firestore data to local files for backup purposes.
         </p>
       </header>
 
@@ -26,24 +26,10 @@ const DataSync = () => {
         >
           <Download size={18} /> Bulk Export
         </button>
-        <button 
-          onClick={() => setActiveTab('scan')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${activeTab === 'scan' ? 'bg-red-600 text-white' : 'bg-white/5 hover:bg-white/10'}`}
-        >
-          <AlertTriangle size={18} /> Global Ghost Scan
-        </button>
-        <button 
-          onClick={() => setActiveTab('inspect')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${activeTab === 'inspect' ? 'bg-purple-600 text-white' : 'bg-white/5 hover:bg-white/10'}`}
-        >
-          <Search size={18} /> Unit Inspector
-        </button>
       </div>
 
       <div className="tab-content glass p-6 rounded-xl">
         {activeTab === 'export' && <ExportTab />}
-        {activeTab === 'scan' && <GlobalScanTab />}
-        {activeTab === 'inspect' && <InspectorTab />}
       </div>
     </div>
   );
@@ -218,137 +204,6 @@ const ExportTab = () => {
           </div>
         ))}
       </div>
-    </div>
-  );
-};
-
-const GlobalScanTab = () => {
-  const [ghosts, setGhosts] = useState([]);
-  const [isScanning, setIsScanning] = useState(false);
-  const { deleteQuiz } = useAdminMutations();
-
-  const handleScan = async () => {
-    setIsScanning(true);
-    setGhosts([]);
-    try {
-      const quizzesSnap = await getDocs(collection(db, 'quizzes'));
-      const allQuizzes = quizzesSnap.docs.map(d => ({ ...d.data(), docId: d.id }));
-      
-      const ghostCandidates = allQuizzes.filter(q => {
-        // 1. Options format is wrong (legacy string array instead of object array)
-        const isLegacyOptions = q.options && q.options.length > 0 && typeof q.options[0] === 'string';
-        // 2. Or unitId is missing
-        const hasNoUnit = !q.unitId;
-        // 3. Or broken text from specific migration failures
-        const brokenText = q.question?.includes('비/에이') || q.question === '';
-        
-        return isLegacyOptions || hasNoUnit || brokenText;
-      });
-
-      setGhosts(ghostCandidates);
-    } catch (err) {
-       console.error(err);
-       alert("Scan failed");
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  const handleFixAll = async () => {
-    if (!confirm(`${ghosts.length}개의 유령 문서를 모두 삭제하시겠습니까?`)) return;
-    for (const g of ghosts) {
-      await deleteQuiz.mutateAsync(g.docId);
-    }
-    setGhosts([]);
-    alert("Cleanup complete!");
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-bold text-red-400">전체 유령 문서 스캔</h3>
-          <p className="text-sm text-gray-400">데이터 구조가 오래되었거나 깨진 퀴즈를 찾아냅니다.</p>
-        </div>
-        <button onClick={handleScan} disabled={isScanning} className="btn-primary bg-red-600 hover:bg-red-500 py-2 px-6 rounded-lg">
-          {isScanning ? "Scanning DB..." : "Start Scan"}
-        </button>
-      </div>
-
-      {ghosts.length > 0 && (
-        <div className="space-y-4">
-          <div className="bg-red-900/20 p-4 rounded border border-red-500/30 flex justify-between items-center">
-             <span className="text-red-200">{ghosts.length}개의 유령 문서를 발견했습니다!</span>
-             <button onClick={handleFixAll} className="bg-red-600 text-white px-4 py-2 rounded font-bold">Fix All</button>
-          </div>
-          <div className="max-h-[400px] overflow-y-auto space-y-2">
-            {ghosts.map(g => (
-              <div key={g.docId} className="flex items-center gap-4 bg-black/30 p-3 rounded border border-white/5 text-xs">
-                 <span className="text-red-400 font-mono">{g.docId}</span>
-                 <span className="flex-1 truncate">{g.question || "(No Question Text)"}</span>
-                 <span className="text-gray-500">{g.unitId}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {!isScanning && ghosts.length === 0 && <div className="text-center py-20 text-gray-500">시스템이 깨끗합니다.</div>}
-    </div>
-  );
-};
-
-const InspectorTab = () => {
-  const { data: regions } = useRegions();
-  const [selectedRegion, setSelectedRegion] = useState('');
-  const [selectedChapter, setSelectedChapter] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('');
-
-  const { data: chapters } = useChapters(selectedRegion);
-  const { data: units } = useUnits(selectedChapter);
-  const { data: quizzes, isLoading, refetch } = useQuizzes(selectedUnit);
-  const { deleteQuiz } = useAdminMutations();
-
-  return (
-    <div className="space-y-6">
-      <div className="flex gap-4">
-        <select className="input-dark w-1/4" value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)}>
-          <option value="">Select Region</option>
-          {regions?.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
-        </select>
-        <select className="input-dark w-1/4" value={selectedChapter} onChange={e => setSelectedChapter(e.target.value)} disabled={!selectedRegion}>
-          <option value="">Select Chapter</option>
-          {chapters?.map(c => <option key={c.docId} value={c.docId}>{c.title}</option>)}
-        </select>
-        <select className="input-dark w-1/4" value={selectedUnit} onChange={e => setSelectedUnit(e.target.value)} disabled={!selectedChapter}>
-          <option value="">Select Unit</option>
-          {units?.map(u => <option key={u.docId} value={u.docId}>{u.title}</option>)}
-        </select>
-        <button onClick={() => refetch()} className="btn-icon bg-white/10 p-2 rounded"><RefreshCw size={18} /></button>
-      </div>
-
-      {isLoading ? <div>Loading...</div> : (
-        <div className="grid gap-2">
-           <div className="flex justify-between items-center mb-2">
-             <span className="text-gray-400">Found {quizzes?.length || 0} Quizzes</span>
-           </div>
-           {quizzes?.map((q, i) => (
-             <div key={q.docId} className="flex items-center gap-4 bg-black/20 p-2 rounded border border-white/5">
-                <span className="text-gray-500 font-mono w-8">#{i+1}</span>
-                <span className="text-purple-300 font-mono text-[10px] w-24 truncate">{q.docId}</span>
-                <span className="flex-1 truncate">{q.question}</span>
-                <span className="text-xs bg-white/10 px-2 py-0.5 rounded">{q.options?.length} opts</span>
-                <button 
-                  onClick={() => {
-                    if (confirm(`Delete quiz ${q.docId}?`)) deleteQuiz.mutate(q.docId);
-                  }}
-                  className="text-red-400 hover:text-red-300 p-1"
-                >
-                  <Trash2 size={16} />
-                </button>
-             </div>
-           ))}
-        </div>
-      )}
     </div>
   );
 };
