@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 import SpaceQuizView from './SpaceQuizView'
+import WorkbookPlayer from './WorkbookPlayer'
 import soundManager from '../../utils/SoundManager'
 import { InlineMath } from 'react-katex'
 import 'katex/dist/katex.min.css'
@@ -10,6 +11,7 @@ import { db } from '../../firebase'
 import { doc, setDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { useAuth } from '../../hooks/useAuth'
+import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 
 // Mock Data for demonstration - In production this would come from Firestore
 // (Mock data removed — use only real Firestore data)
@@ -95,11 +97,19 @@ const YoutubePlayer = ({ videoId, start, end, onComplete, onTimeUpdate, isOverla
           autoplay: autoPlay ? 1 : 0,
           controls: 1,
           modestbranding: 1,
-          rel: 0
+          rel: 0,
+          origin: window.location.origin
         },
         events: {
           'onStateChange': (event) => {
             if (event.data === window.YT.PlayerState.ENDED) {
+              // Force one last time update before ending, crucial for capturing short remaining playbacks
+              if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+                const currentTime = playerRef.current.getCurrentTime()
+                const duration = playerRef.current.getDuration ? playerRef.current.getDuration() : 0
+                const playbackRate = playerRef.current.getPlaybackRate ? playerRef.current.getPlaybackRate() : 1
+                if (onTimeUpdate) onTimeUpdate({ currentTime, duration, playbackRate })
+              }
               if (onComplete) onComplete()
             }
             // Start/stop time tracking
@@ -479,10 +489,17 @@ export default function MissionHub({
         logReadAt: serverTimestamp()
       }, { merge: true })
 
-      // Award crystals
-      await setDoc(doc(db, 'users', userId), {
-        crystals: increment(30)
-      }, { merge: true })
+      // Award crystals and growth metrics
+      const updates = {
+        crystals: increment(30),
+        totalQuizzes: increment(1),
+        totalScore: increment(100)
+      }
+      
+      const growthUpdates = calculateGrowthUpdates(userData, 30)
+      Object.assign(updates, growthUpdates)
+
+      await setDoc(doc(db, 'users', userId), updates, { merge: true })
 
       // Record transaction
       await recordCrystalTransaction(userId, {
@@ -499,7 +516,7 @@ export default function MissionHub({
       
       // Update Streak
       if (onNonQuizActivityComplete) {
-        onNonQuizActivityComplete('데이터 로그 학습')
+        onNonQuizActivityComplete('데이터 로그 학습', 30)
       }
     } catch (err) {
       console.error("Failed to claim log reward:", err)
@@ -576,9 +593,11 @@ export default function MissionHub({
 
       const awardReward = async () => {
         try {
-          await setDoc(doc(db, 'users', userId), {
-            crystals: increment(reward)
-          }, { merge: true })
+          const updates = { crystals: increment(reward) };
+          const growthUpdates = calculateGrowthUpdates(userData, reward);
+          Object.assign(updates, growthUpdates);
+
+          await setDoc(doc(db, 'users', userId), updates, { merge: true })
 
           await recordCrystalTransaction(userId, {
             amount: reward,
@@ -604,7 +623,7 @@ export default function MissionHub({
           
           // Update Streak on partial watch (180s)
           if (onNonQuizActivityComplete) {
-            onNonQuizActivityComplete('영상 교신 수신 (180초)')
+            onNonQuizActivityComplete('영상 교신 수신 (180초)', 10)
           }
         } catch (err) {
           console.error("Failed to award transmission reward:", err)
@@ -627,9 +646,16 @@ export default function MissionHub({
 
     const awardCompletion = async () => {
       try {
-        await setDoc(doc(db, 'users', userId), {
-          crystals: increment(20)
-        }, { merge: true })
+        const updates = {
+          crystals: increment(20),
+          totalQuizzes: increment(1),
+          totalScore: increment(100)
+        }
+        
+        const growthUpdates = calculateGrowthUpdates(userData, 20)
+        Object.assign(updates, growthUpdates)
+
+        await setDoc(doc(db, 'users', userId), updates, { merge: true })
 
         await recordCrystalTransaction(userId, {
           amount: 20,
@@ -654,7 +680,7 @@ export default function MissionHub({
         
         // Update Streak on full view
         if (onNonQuizActivityComplete) {
-          onNonQuizActivityComplete('영상 교신 완료')
+          onNonQuizActivityComplete('영상 교신 완료', 20)
         }
       } catch (err) {
         console.error("Failed to award completion bonus:", err)
@@ -790,6 +816,7 @@ export default function MissionHub({
   const txCompleted = videoCompletionBonusGiven || 
     (learningProgress?.videoProgress && Object.values(learningProgress.videoProgress).some(v => v.completionBonusGiven)) || false
   const quizCompleted = bestScores[unitId] !== undefined
+  const workbookCompleted = bestScores[`${unitId}_workbook`] !== undefined
 
   // --- Render Functions ---
 
@@ -797,7 +824,8 @@ export default function MissionHub({
     const hasDataLog = !!(missionData?.learningContents?.text?.trim())
     const hasTransmission = !!(missionData?.transmissions?.length > 0 && missionData.transmissions.some(tx => tx.videoId))
     const hasQuiz = !!(unitQuizzes && unitQuizzes.length > 0)
-    const availableCount = [hasDataLog, hasTransmission, hasQuiz].filter(Boolean).length
+    const hasWorkbook = !!(activeUnit?.workbookPages && activeUnit.workbookPages.length > 0)
+    const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasWorkbook].filter(Boolean).length
 
     return (
     <div className="mission-dashboard fade-in">
@@ -818,7 +846,7 @@ export default function MissionHub({
       ) : (
       <div className="mission-grid" style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${Math.min(availableCount, 3)}, minmax(280px, 1fr))`,
+        gridTemplateColumns: `repeat(${Math.min(availableCount, 4)}, minmax(240px, 1fr))`,
         gap: '2rem',
         maxWidth: '1200px',
         margin: '0 auto'
@@ -877,7 +905,36 @@ export default function MissionHub({
         </motion.div>
         )}
 
-        {/* 3. Field Test Card */}
+        {/* 3. Workbook Card */}
+        {hasWorkbook && (
+        <motion.div 
+          whileHover={{ scale: 1.03, y: -5 }}
+          className="glass-card hud-border"
+          onClick={() => handleModeChange('workbook')}
+          style={{ 
+            cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', 
+            border: workbookCompleted ? '1px solid var(--neon-blue)' : '1px solid var(--neon-blue)',
+            background: workbookCompleted ? 'rgba(0, 243, 255, 0.08)' : undefined,
+            position: 'relative'
+          }}
+        >
+          {workbookCompleted && (
+            <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
+          )}
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
+          <h3 className="font-title" style={{ color: 'var(--neon-blue)', marginBottom: '1rem' }}>WORKBOOK</h3>
+          <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
+            상호작용 캔버스로<br/>실력을 검증합니다.
+          </p>
+          {workbookCompleted && (
+            <span className="font-tech" style={{ color: 'var(--neon-blue)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+              BEST: {bestScores[`${unitId}_workbook`]}점
+            </span>
+          )}
+        </motion.div>
+        )}
+
+        {/* 4. Field Test Card */}
         {hasQuiz && (
         <motion.div 
           whileHover={{ scale: 1.03, y: -5 }}
@@ -1067,7 +1124,7 @@ export default function MissionHub({
               {videoCompleted ? (
                 <>✨ 완료하고, {totalRewardedCrystals + (videoCompletionBonusGiven ? 20 : 0)}광석 획득하기</>
               ) : isAtEnd ? (
-                <>⚠️ 데이터 수신 부족 ({Math.floor((stampCount / (videoDurationRef.current || 1)) * 100)}%)</>
+                <>⚠️ 데이터 수신 부족 ({Math.min(100, Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100))}%)</>
               ) : (
                 <>📋 오늘은 여기까지</>
               )}
@@ -1138,6 +1195,21 @@ export default function MissionHub({
       setOverlayContent('text')
     }
     logActivity('overlay_view_' + (reference?.transmissionId ? 'video' : 'text'))
+  }
+
+  // If in workbook mode, we render the WorkbookPlayer directly
+  if (currentMode === 'workbook') {
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000, background: '#050a19' }}>
+        <WorkbookPlayer 
+          pages={activeUnit?.workbookPages || []} 
+          unitId={unitId}
+          unitTitle={activeUnit?.title}
+          onComplete={onComplete}
+          onClose={returnFromContent}
+        />
+      </div>
+    )
   }
 
   // If in quiz mode, we render SpaceQuizView BUT we wrap it to handle the overlay

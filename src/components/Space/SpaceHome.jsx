@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit } from 'firebase/firestore'
-import { useRegions, useChapters, useUnits, useQuizzes } from '../../hooks/useContent'
+import { useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { regions as localRegions } from '../../data/regions'
 import { motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
@@ -47,6 +47,7 @@ function SpaceHome() {
   const [selectedChapterDocId, setSelectedChapterDocId] = useState(null)
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
+  const [quickQuizMode, setQuickQuizMode] = useState(null) // New: Mode for quick quiz
   // pendingUnit removed — RewardPotentialModal now lives inside MissionHub
   
   // --- Memory Core State ---
@@ -69,6 +70,7 @@ function SpaceHome() {
   const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions()
   const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
   const { data: units, isLoading: loadingUnits } = useUnits(selectedChapterDocId)
+  const { data: singleUnit } = useUnit(selectedUnitDocId || quickQuizUnitId)
   const { 
     data: unitQuizzes, 
     isLoading: loadingQuizzes, 
@@ -96,7 +98,7 @@ function SpaceHome() {
   // Active selections
   const activeRegion = regions?.find(r => r.id === selectedRegionId)
   const activeChapter = chapters?.find(c => c.docId === selectedChapterDocId)
-  const activeUnit = units?.find(u => u.docId === selectedUnitDocId)
+  const activeUnit = units?.find(u => u.docId === (selectedUnitDocId || quickQuizUnitId)) || singleUnit
 
   // Auto-skip single chapter
   useEffect(() => {
@@ -255,26 +257,45 @@ function SpaceHome() {
   }, [user])
 
   // Calculate Exploration Status and Recent Region
-  // bestScores: { unitDocId: bestScore } - maps each completed unit to its best score
-  const { explorationStatus, recentRegionId, bestScores } = useMemo(() => {
+  // bestScores: { unitDocId: bestScore } - maps each completed unit to its best quiz score
+  // unitProgressMap: { unitDocId: { quiz: true, video: true, text: true, workbook: true } }
+  const { explorationStatus, recentRegionId, bestScores, unitProgressMap } = useMemo(() => {
     const statusMap = {}
     const scores = {}
+    const progressMap = {}
     let lastRegionId = null
 
     if (!regions) {
-      return { explorationStatus: {}, recentRegionId: null, bestScores: {} }
+      return { explorationStatus: {}, recentRegionId: null, bestScores: {}, unitProgressMap: {} }
     }
 
-    // Build bestScores from history - use unitId as key
+    // Build bestScores and unitProgressMap from history
     history.forEach(h => {
-      if (h.unitId && (!scores[h.unitId] || h.score > scores[h.unitId])) {
-        scores[h.unitId] = h.score
+      const uid = h.unitId
+      if (!uid) return
+
+      // Map legacy history types to modalities
+      let hType = 'quiz' // default
+      if (h.type === 'workbook') hType = 'workbook'
+      else if (h.type === 'video') hType = 'video'
+      else if (h.type === 'text') hType = 'text'
+
+      // Tracking modality completion
+      if (!progressMap[uid]) {
+        progressMap[uid] = { quiz: false, video: false, text: false, workbook: false }
+      }
+      progressMap[uid][hType] = true
+
+      // Tracking scores for old logic
+      const scoreKey = hType === 'workbook' ? `${uid}_workbook` : uid;
+      if (!scores[scoreKey] || h.score > scores[scoreKey]) {
+        scores[scoreKey] = h.score
       }
     })
 
     if (history.length === 0) {
       regions?.forEach(r => statusMap[r.id] = 'not_started')
-      return { explorationStatus: statusMap, recentRegionId: null, bestScores: scores }
+      return { explorationStatus: statusMap, recentRegionId: null, bestScores: scores, unitProgressMap: {} }
     }
     
     regions.forEach(region => {
@@ -295,12 +316,10 @@ function SpaceHome() {
       }
     })
 
-    return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores }
+    return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores, unitProgressMap: progressMap }
   }, [regions, history])
 
   // Calculate chapter progress dynamically from Firestore data
-  // Key insight: bestScores is computed from history which uses unitDocId format
-  // (e.g. "decimal_chap1_5-1"), and unit.docId from Firestore also uses the same format.
   const chapterProgress = useMemo(() => {
     const progress = {}
     
@@ -318,27 +337,57 @@ function SpaceHome() {
       if (!result || !result.data) return
 
       const unitsData = result.data
-      const totalUnits = unitsData.length
       
-      let completedUnits = 0
+      let counts = {
+        quiz: { total: 0, completed: 0 },
+        video: { total: 0, completed: 0 },
+        text: { total: 0, completed: 0 },
+        workbook: { total: 0, completed: 0 }
+      }
+
       unitsData.forEach(unit => {
-        // Primary match: unit.docId ("decimal_chap1_5-1-1") against history unitId
-        // Fallback match: unit.id ("5-1-1") against history unitId
-        const docIdMatch = unit.docId && bestScores[unit.docId] !== undefined
-        const idMatch = unit.id && bestScores[unit.id] !== undefined
-        if (docIdMatch || idMatch) {
-          completedUnits++
+        // Find progress using docId or fallback id
+        const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
+
+        // Check availability of each modality
+        const hasQuiz = (unit.contentFlags && unit.contentFlags.hasQuiz !== undefined) ? unit.contentFlags.hasQuiz : true
+        const hasVideo = !!((unit.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) || unit.videoConfig?.videoId)
+        const hasText = !!(unit.learningContents?.text?.trim())
+        const hasWorkbook = !!(unit.workbookPages && unit.workbookPages.length > 0)
+
+        if (hasQuiz) {
+          counts.quiz.total++
+          if (uProg.quiz) counts.quiz.completed++
+        }
+        if (hasVideo) {
+          counts.video.total++
+          if (uProg.video) counts.video.completed++
+        }
+        if (hasText) {
+          counts.text.total++
+          if (uProg.text) counts.text.completed++
+        }
+        if (hasWorkbook) {
+          counts.workbook.total++
+          if (uProg.workbook) counts.workbook.completed++
         }
       })
       
+      // Determine if the entire chapter is finished across ALL active modalities
+      const hasAnyContent = counts.quiz.total > 0 || counts.video.total > 0 || counts.text.total > 0 || counts.workbook.total > 0
+      const isFinished = hasAnyContent && 
+        (counts.quiz.total === counts.quiz.completed) &&
+        (counts.video.total === counts.video.completed) &&
+        (counts.text.total === counts.text.completed) &&
+        (counts.workbook.total === counts.workbook.completed)
+      
       progress[chapter.docId] = {
-        completed: completedUnits,
-        total: totalUnits,
-        isFinished: totalUnits > 0 && completedUnits === totalUnits
+        counts,
+        isFinished
       }
     })
     return progress
-  }, [chapters, bestScores, chapterUnitResults, loadingHistory])
+  }, [chapters, unitProgressMap, chapterUnitResults, loadingHistory])
 
 
   const isProcessingSave = useRef(false)
@@ -353,7 +402,8 @@ function SpaceHome() {
 
       // Anti-grinding logic
       const currentUnitId = selectedUnitDocId || quickQuizUnitId
-      const previousBest = bestScores[currentUnitId] || 0
+      const scoreKey = result.type === 'workbook' ? `${currentUnitId}_workbook` : currentUnitId
+      const previousBest = bestScores[scoreKey] || 0
       let actualCrystalsEarned = 0
       let rewardMessage = ""
 
@@ -616,7 +666,7 @@ function SpaceHome() {
   }
 
   // Handle streak updates for non-quiz activities (Data Log, Transmission)
-  const handleNonQuizActivityComplete = async (activityType) => {
+  const handleNonQuizActivityComplete = async (activityType, crystalsEarned = 0) => {
     if (!user) return
     const streakResult = calculateStreakUpdate(userData)
     const streakUpdates = streakResult.streakUpdate || {}
@@ -635,31 +685,46 @@ function SpaceHome() {
       })
     }
 
-    // Only update DB if there are actual streak changes
+    // ✨ ADDITION: Always log non-quiz activity into History for Dashboard Timeline
+    await addDoc(collection(db, 'users', user.uid, 'history'), {
+      unitId: selectedUnitDocId || quickQuizUnitId || 'unknown',
+      unitTitle: activeUnit?.title || `탐사 기록 (${activityType})`,
+      regionId: selectedRegionId || activeRegion?.id || "",
+      regionTitle: activeRegion?.title || "Unknown Galaxy",
+      chapterId: selectedChapterDocId || "",
+      score: 100, // Nominal score for non-quiz completions to show nicely on the chart
+      crystalsEarned: crystalsEarned,
+      timestamp: serverTimestamp(),
+      type: activityType.includes('로그') ? 'text' : activityType.includes('영상') ? 'video' : activityType 
+    })
+
+    // Only update DB streak if there are actual streak changes
     if (Object.keys(streakUpdates).length > 0) {
       await setDoc(doc(db, 'users', user.uid), streakUpdates, { merge: true })
-      
-      // Trigger milestone celebration or toast
-      if (streakResult.meta?.justReachedMilestone) {
-        setStreakCelebration({
-          milestone: streakResult.meta.justReachedMilestone,
-          currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak
-        })
-      } else if (!streakResult.meta?.alreadyDoneToday && streakResult.meta?.isNewRecord !== undefined) {
-         setCompletionResult({
-            crystalsEarned: 0,
-            isPerfect: false,
-            rewardMessage: `학습 연장 성공!`,
-            streakInfo: {
-              currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak,
-              freezeUsed: streakResult.meta.freezeUsed,
-              isNewRecord: streakResult.meta.isNewRecord,
-              alreadyDoneToday: streakResult.meta.alreadyDoneToday,
-              justReachedMilestone: false
-            }
-         })
-      }
     }
+
+    // Trigger milestone celebration
+    if (streakResult.meta?.justReachedMilestone) {
+      setStreakCelebration({
+        milestone: streakResult.meta.justReachedMilestone,
+        currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak
+      })
+    }
+
+    // Always trigger visual celebration modal (like Field Test)
+    soundManager.playLevelUp()
+    setCompletionResult({
+      crystalsEarned: crystalsEarned,
+      isPerfect: true, // Give full star visual effect
+      rewardMessage: `${activityType} 달성! (+${crystalsEarned} 광석)`,
+      streakInfo: {
+        currentStreak: streakUpdates.currentStreak || streakResult.meta?.newStreak || userData?.currentStreak || 0,
+        freezeUsed: streakResult.meta?.freezeUsed || false,
+        isNewRecord: streakResult.meta?.isNewRecord || false,
+        alreadyDoneToday: streakResult.meta?.alreadyDoneToday || false,
+        justReachedMilestone: streakResult.meta?.justReachedMilestone || false
+      }
+    })
   }
 
   const hasStartedRef = useRef(false)
@@ -905,27 +970,54 @@ function SpaceHome() {
   // Mission Hub Mode (Data Log, Transmission, Field Test)
   if (selectedUnitDocId || quickQuizUnitId) {
     // Pre-compute initial mode based on content availability
-    // Note: unitQuizzes is async, so we DON'T rely on it.
-    // Instead: if NO data log & NO transmission → it must be quiz-only → skip to quiz modal.
+    // We now use contentFlags if available to know exactly what exists,
+    // including if a quiz exists before the quiz data actually loads.
     const unit = activeUnit || {}
+    
+    // Fallback detection if contentFlags is missing
     const hasDataLog = !!(unit.learningContents?.text?.trim())
     const hasTransmission = !!(
       (unit.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) ||
       (unit.videoConfig?.videoId)
     )
+    const hasWorkbook = !!(unit.workbookPages && unit.workbookPages.length > 0)
+    
+    // We can definitively know if text, video, or workbook exist from the unit doc itself.
+    // We ONLY need flags for hasQuiz, because quizzes are fetched async later.
+    const hasQuiz = (unit.contentFlags && unit.contentFlags.hasQuiz !== undefined) 
+      ? unit.contentFlags.hasQuiz 
+      : true;
 
-    let initialMode = 'briefing' // default: show dashboard
-    if (!hasDataLog && !hasTransmission) {
-      // No other content → quiz-only (or empty, handled gracefully)
-      initialMode = 'quiz-modal'
-    } else if (hasDataLog && !hasTransmission) {
-      // Data log only (no transmission, quiz status unknown)
-      initialMode = 'text'
-    } else if (!hasDataLog && hasTransmission) {
-      // Transmission only (no data log, quiz status unknown)
-      initialMode = 'video'
+    let initialMode = 'briefing' // default: show Mission Control
+    
+    const availableContentsCount = [
+      hasQuiz, 
+      hasTransmission, 
+      hasDataLog, 
+      hasWorkbook
+    ].filter(Boolean).length;
+
+    if (quickQuizMode) {
+      initialMode = quickQuizMode;
+    } else if (availableContentsCount > 1) {
+      initialMode = 'briefing'; // Multiple items, show Mission Control
+    } else if (availableContentsCount === 0) {
+      // Empty unit? Fallback to quiz modal safely
+      initialMode = 'quiz-modal';
+    } else if (hasQuiz && !hasTransmission && !hasDataLog && !hasWorkbook) {
+      // ONLY Quiz
+      initialMode = 'quiz-modal';
+    } else if (!hasQuiz && hasDataLog && !hasTransmission && !hasWorkbook) {
+      // ONLY Data log
+      initialMode = 'text';
+    } else if (!hasQuiz && hasTransmission && !hasDataLog && !hasWorkbook) {
+      // ONLY Transmission
+      initialMode = 'video';
+    } else if (!hasQuiz && hasWorkbook && !hasTransmission && !hasDataLog) {
+      // ONLY Workbook
+      initialMode = 'workbook';
     }
-    // Both data log + transmission exist → show dashboard
+    // If it reaches here somehow, initialMode remains 'briefing'
 
     return (
       <MissionHub
@@ -939,7 +1031,7 @@ function SpaceHome() {
         userData={userData}
         bestScores={bestScores}
         initialMode={initialMode}
-        onBack={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); }}
+        onBack={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); setQuickQuizMode(null); }}
         onComplete={handleComplete}
         onNonQuizActivityComplete={handleNonQuizActivityComplete}
       />
@@ -1108,13 +1200,39 @@ function SpaceHome() {
                         {chapterProgress[chapter.docId] ? (
                           chapterProgress[chapter.docId].isFinished ? (
                             <p className="font-tech" style={{ color: '#50c878', fontSize: '0.9rem', fontWeight: 800 }}>완료 🏆</p>
-                          ) : chapterProgress[chapter.docId].completed > 0 ? (
-                            <p className="font-tech" style={{ color: 'var(--neon-blue)', fontSize: '0.9rem', fontWeight: 700 }}>
-                              진행 중 ({chapterProgress[chapter.docId].completed}/{chapterProgress[chapter.docId].total})
-                            </p>
-                          ) : (
-                            <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>탐험 전</p>
-                          )
+                          ) : (() => {
+                            const p = chapterProgress[chapter.docId].counts;
+                            const hasAny = p.quiz.total > 0 || p.video.total > 0 || p.text.total > 0 || p.workbook.total > 0;
+                            
+                            if (!hasAny) {
+                              return <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>탐험 전</p>;
+                            }
+
+                            return (
+                              <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                                {p.text.total > 0 && (
+                                  <span className="font-tech" style={{ color: p.text.completed === p.text.total ? '#50c878' : 'var(--text-bright)', fontSize: '0.85rem' }}>
+                                    📝 {p.text.completed}/{p.text.total}
+                                  </span>
+                                )}
+                                {p.video.total > 0 && (
+                                  <span className="font-tech" style={{ color: p.video.completed === p.video.total ? '#50c878' : 'var(--planet-green)', fontSize: '0.85rem' }}>
+                                    🎬 {p.video.completed}/{p.video.total}
+                                  </span>
+                                )}
+                                {p.workbook.total > 0 && (
+                                  <span className="font-tech" style={{ color: p.workbook.completed === p.workbook.total ? '#50c878' : 'var(--star-gold)', fontSize: '0.85rem' }}>
+                                    🧮 {p.workbook.completed}/{p.workbook.total}
+                                  </span>
+                                )}
+                                {p.quiz.total > 0 && (
+                                  <span className="font-tech" style={{ color: p.quiz.completed === p.quiz.total ? '#50c878' : 'var(--neon-blue)', fontSize: '0.85rem' }}>
+                                    🚀 {p.quiz.completed}/{p.quiz.total}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()
                         ) : (
                           <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>스캔 중...</p>
                         )}
@@ -1191,51 +1309,105 @@ function SpaceHome() {
                     {loadingUnits ? (
                       <div className="font-tech" style={{ color: 'var(--text-muted)' }}>LOADING MISSION DATA...</div>
                     ) : units?.map((unit, idx) => {
+                      const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
+                      
+                      const hasQuiz = (unit.contentFlags && unit.contentFlags.hasQuiz !== undefined) ? unit.contentFlags.hasQuiz : true
+                      const hasVideo = !!((unit.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) || unit.videoConfig?.videoId)
+                      const hasText = !!(unit.learningContents?.text?.trim())
+                      const hasWorkbook = !!(unit.workbookPages && unit.workbookPages.length > 0)
+
+                      const isOverallCompleted = 
+                        (!hasQuiz || uProg.quiz) &&
+                        (!hasVideo || uProg.video) &&
+                        (!hasText || uProg.text) &&
+                        (!hasWorkbook || uProg.workbook)
+
                       const bestScore = bestScores[unit.docId]
-                      const isCompleted = bestScore !== undefined
+
                       return (
                         <motion.button
                           key={unit.docId}
                           whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
-                          className={`glass-card hud-border ${isCompleted ? 'completed' : ''}`}
+                          className={`glass-card hud-border ${isOverallCompleted ? 'completed' : ''}`}
                           onClick={() => { 
-                  setSelectedUnitDocId(unit.docId)
-                  soundManager.playClick() 
-                }}
-                style={{
-                  padding: '1.2rem 1.5rem',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  color: 'var(--text-bright)',
-                  fontSize: '1.1rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderLeft: isCompleted ? '4px solid var(--secondary)' : '1px solid var(--neon-blue)',
-                  position: 'relative'
-                }}
-              >
-                {checkIsBonusUnit(unit.docId || unit.id) && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '5px',
-                    left: '5px',
-                    fontSize: '0.8rem',
-                    zIndex: 1
-                  }}>💎</div>
-                )}
-                <span className="font-title">
-                            <span style={{ color: 'var(--neon-blue)', marginRight: '1rem' }}>{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>
-                            {isCompleted && <span style={{ marginRight: '0.5rem' }}>✅</span>}
-                            {unit.title}
-                          </span>
+                            setSelectedUnitDocId(unit.docId)
+                            soundManager.playClick() 
+                          }}
+                          style={{
+                            padding: '1.2rem 1.5rem',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            color: 'var(--text-bright)',
+                            fontSize: '1.1rem',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            borderLeft: isOverallCompleted ? '4px solid var(--secondary)' : '1px solid var(--neon-blue)',
+                            position: 'relative',
+                            flexWrap: 'wrap',
+                            gap: '1rem'
+                          }}
+                        >
+                          {checkIsBonusUnit(unit.docId || unit.id) && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '5px',
+                              left: '5px',
+                              fontSize: '0.8rem',
+                              zIndex: 1
+                            }}>💎</div>
+                          )}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            {isCompleted && (
+                            <span className="font-title">
+                              <span style={{ color: 'var(--neon-blue)', marginRight: '1rem' }}>{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>
+                              {isOverallCompleted && <span style={{ marginRight: '0.5rem' }}>✅</span>}
+                              {unit.title}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                            {/* Modality Badges */}
+                            <div style={{ display: 'flex', gap: '0.8rem' }}>
+                              {hasText && (
+                                <span className="font-tech" style={{ 
+                                  color: uProg.text ? '#50c878' : 'rgba(255,255,255,0.3)', 
+                                  fontSize: '1rem',
+                                  textShadow: uProg.text ? '0 0 10px rgba(80, 200, 120, 0.5)' : 'none'
+                                }} title="Data Log">📝</span>
+                              )}
+                              {hasVideo && (
+                                <span className="font-tech" style={{ 
+                                  color: uProg.video ? '#50c878' : 'rgba(255,255,255,0.3)', 
+                                  fontSize: '1rem',
+                                  textShadow: uProg.video ? '0 0 10px rgba(80, 200, 120, 0.5)' : 'none'
+                                }} title="Transmission">🎬</span>
+                              )}
+                              {hasWorkbook && (
+                                <span className="font-tech" style={{ 
+                                  color: uProg.workbook ? '#50c878' : 'rgba(255,255,255,0.3)', 
+                                  fontSize: '1rem',
+                                  textShadow: uProg.workbook ? '0 0 10px rgba(80, 200, 120, 0.5)' : 'none'
+                                }} title="Workbook">🧮</span>
+                              )}
+                              {hasQuiz && (
+                                <span className="font-tech" style={{ 
+                                  color: uProg.quiz ? '#50c878' : 'rgba(255,255,255,0.3)', 
+                                  fontSize: '1rem',
+                                  textShadow: uProg.quiz ? '0 0 10px rgba(80, 200, 120, 0.5)' : 'none'
+                                }} title="Field Test">🚀</span>
+                              )}
+                            </div>
+
+                            {/* Best Score for Quiz (Legacy behavior preservation) */}
+                            {hasQuiz && bestScore !== undefined && (
                               <span className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.9rem' }}>
                                 BEST: {bestScore}
                               </span>
                             )}
-                            <span style={{ color: 'var(--crystal-cyan)' }}>{isCompleted ? 'REPLAY' : '🚀 START'}</span>
+                            
+                            <span style={{ color: 'var(--crystal-cyan)', minWidth: '80px', textAlign: 'right' }}>
+                              {isOverallCompleted ? 'REPLAY' : '🚀 START'}
+                            </span>
                           </div>
                         </motion.button>
                       )
@@ -1255,6 +1427,10 @@ function SpaceHome() {
               onQuizSelect={(p) => {
                 if (p.unitId) {
                   setQuickQuizUnitId(p.unitId)
+                  if (p.type === 'video') setQuickQuizMode('video')
+                  else if (p.type === 'text') setQuickQuizMode('text')
+                  else if (p.type === 'workbook') setQuickQuizMode('workbook')
+                  else setQuickQuizMode('quiz-modal')
                   soundManager.playClick()
                 }
               }} 

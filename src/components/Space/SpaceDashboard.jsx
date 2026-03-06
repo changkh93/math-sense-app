@@ -224,7 +224,13 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
     const space = (width - padding * 2) / (maxNodes - 1);
     const offset = maxNodes - data.length;
     const x = padding + (i + offset) * space;
-    const y = height - padding - 30 - (d.score * (height - padding * 2 - 40)) / 100
+    
+    // Winding path using sine wave for Y-axis (exploratory trajectory)
+    const angle = (i + offset) * 1.5;
+    const baseAmplitude = 50;
+    const scoreMod = ((d.score || 100) / 100) * 30; // Score slightly boosts amplitude
+    const y = (height / 2) + Math.sin(angle) * (baseAmplitude + scoreMod);
+    
     return { ...d, x, y }
   })
 
@@ -234,7 +240,12 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
     const space = (width - padding * 2) / (maxNodes - 1);
     const offset = maxNodes - ghostData.length;
     const x = padding + (i + offset) * space;
-    const y = height - padding - 30 - (d.score * (height - padding * 2 - 40)) / 100
+    
+    const angle = (i + offset) * 1.5;
+    const baseAmplitude = 50;
+    const scoreMod = ((d.score || 100) / 100) * 30;
+    const y = (height / 2) + Math.sin(angle) * (baseAmplitude + scoreMod);
+    
     return { ...d, x, y }
   })
 
@@ -242,9 +253,19 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
     ? ghostPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
     : '';
 
-  const currentAvg = data.length > 0 ? (data.reduce((acc, d) => acc + (d.score || 0), 0) / data.length) : 0;
-  const ghostAvg = ghostData?.length > 0 ? (ghostData.reduce((acc, d) => acc + (d.score || 0), 0) / ghostData.length) : 0;
-  const perfDiff = currentAvg - ghostAvg;
+  // 탐사 활성도 (엔진 출력) 로직: 미션 수(기본치 10) + 채굴한 광석량
+  const currentEngine = data.length > 0 ? data.reduce((acc, d) => acc + (d.crystalsEarned || 0) + 10, 0) : 0;
+  const ghostEngine = ghostData?.length > 0 ? ghostData.reduce((acc, d) => acc + (d.crystalsEarned || 0) + 10, 0) : 0;
+  
+  let perfDiffStr = '';
+  let isBetter = currentEngine >= ghostEngine;
+  
+  if (ghostEngine === 0) {
+     perfDiffStr = currentEngine > 0 ? '무한대' : '0%';
+  } else {
+     const diffRatio = ((currentEngine - ghostEngine) / ghostEngine) * 100;
+     perfDiffStr = `${Math.abs(diffRatio).toFixed(1)}%`;
+  }
   
   return (
     <div style={{ position: 'relative', width: '100%', height: height + 20, overflow: 'hidden' }} className={isWarping ? 'glitch-warp' : ''}>
@@ -273,16 +294,12 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
               </filter>
             </defs>
 
-            {/* Guides */}
-            {[0, 50, 100].map(val => {
-              const y = height - padding - 30 - (val * (height - padding * 2 - 40)) / 100
-              return (
-                <g key={val}>
-                  <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                  <text x={padding - 10} y={y + 4} textAnchor="end" fill="var(--text-muted)" fontSize="10">{val}</text>
-                </g>
-              )
-            })}
+            {/* 궤도 눈금(Guides) - 사인파이므로 중앙선 위주로 표시 */}
+            {[height / 4, height / 2, (height * 3) / 4].map((y, idx) => (
+              <g key={idx}>
+                <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+              </g>
+            ))}
 
             {/* Ghost Trajectory Line */}
             {ghostPathD && (
@@ -308,6 +325,28 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
               const isLatest = i === points.length - 1 && windowIndex === 0;
               const isOld = i < 3 && windowIndex > 0;
               
+              // Determine node style based on activity type
+              let nodeIcon = '🚀';
+              let nodeColor = 'var(--star-gold)'; 
+              let glowColor = 'rgba(255, 215, 0, 0.5)';
+              
+              if (p.type === 'video') { 
+                nodeIcon = '📡'; 
+                nodeColor = 'var(--planet-green)'; 
+                glowColor = 'rgba(0, 255, 136, 0.5)';
+              } else if (p.type === 'text') { 
+                nodeIcon = '🧩';
+                nodeColor = 'var(--neon-blue)'; 
+                glowColor = 'rgba(0, 243, 255, 0.5)';
+              } else if (p.type === 'workbook') { 
+                nodeIcon = '🌠'; 
+                nodeColor = 'var(--planet-purple)'; 
+                glowColor = 'rgba(168, 85, 247, 0.5)';
+              }
+
+              // Dynamic radius based on earned crystals (baseline 5, max 10)
+              const dynamicRadius = Math.max(5, Math.min(10, 5 + (p.crystalsEarned || 0) / 10));
+
               return (
                 <g 
                   key={i} 
@@ -316,16 +355,17 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
                   onMouseEnter={() => onHoverItem(p)}
                   onMouseLeave={() => onHoverItem(null)}
                 >
-                  {p.score === 100 && (
-                    <circle cx={p.x} cy={p.y} r="12" fill="var(--star-gold)" opacity="0.1" />
+                  {/* Pulse for high scores or large crystal earning */}
+                  {(p.score === 100 || p.crystalsEarned > 20) && (
+                    <circle cx={p.x} cy={p.y} r={dynamicRadius * 2} fill={glowColor} opacity="0.2" />
                   )}
                   
                   <motion.circle 
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    cx={p.x} cy={p.y} r={p.score === 100 ? "6" : "4.5"} 
-                    fill={p.score === 100 ? 'var(--star-gold)' : colorScale[1]}
-                    filter={p.score === 100 ? 'url(#point-glow)' : 'none'}
+                    cx={p.x} cy={p.y} r={dynamicRadius} 
+                    fill={nodeColor}
+                    filter={p.score === 100 || p.crystalsEarned > 20 ? 'url(#point-glow)' : 'none'}
                   />
 
                   {isLatest && (
@@ -334,12 +374,9 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
                       animate={{ scale: [1, 1.2, 1] }}
                       transition={{ repeat: Infinity, duration: 2 }}
                     >
-                      <Rocket 
-                        x={p.x - 10} y={p.y - 35} 
-                        size={20} 
-                        color="var(--crystal-cyan)" 
-                        style={{ filter: 'drop-shadow(0 0 8px var(--crystal-cyan))', transform: 'rotate(45deg)' }} 
-                      />
+                       <text x={p.x} y={p.y - 15} textAnchor="middle" fontSize="18" style={{ filter: `drop-shadow(0 0 8px ${nodeColor})` }}>
+                         {nodeIcon}
+                       </text>
                     </motion.g>
                   )}
 
@@ -370,7 +407,7 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
                 transform: 'translateX(-50%)',
                 background: 'rgba(0,0,0,0.6)',
                 backdropFilter: 'blur(10px)',
-                border: `1px solid ${perfDiff >= 0 ? 'var(--planet-green)' : '#ff4d4d'}44`,
+                border: `1px solid ${isBetter ? 'var(--planet-green)' : '#ff4d4d'}44`,
                 padding: '0.6rem 1.2rem',
                 borderRadius: '20px',
                 fontSize: '0.85rem',
@@ -378,14 +415,14 @@ function TrajectoryChart({ data, ghostData, onItemClick, colorScale, windowIndex
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: `0 0 15px ${perfDiff >= 0 ? 'var(--planet-green)' : '#ff4d4d'}22`
+                boxShadow: `0 0 15px ${isBetter ? 'var(--planet-green)' : '#ff4d4d'}22`
               }}
             >
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: perfDiff >= 0 ? 'var(--planet-green)' : '#ff4d4d' }} />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: isBetter ? 'var(--planet-green)' : '#ff4d4d' }} />
               <span>
-                고스트 궤적(과거의 나)보다 엔진 출력이 
-                <strong style={{ color: perfDiff >= 0 ? 'var(--planet-green)' : '#ff4d4d', marginLeft: '4px' }}>
-                  {Math.abs(perfDiff).toFixed(1)}% {perfDiff >= 0 ? '높습니다! 🚀' : '낮습니다. 분발하세요! 🔥'}
+                과거의 고스트 궤적보다 통합 엔진 출력이 
+                <strong style={{ color: isBetter ? 'var(--planet-green)' : '#ff4d4d', marginLeft: '4px' }}>
+                  {perfDiffStr} {isBetter ? '높습니다! 🚀' : '낮습니다. 분발하세요! 🔥'}
                 </strong>
               </span>
             </motion.div>
@@ -448,9 +485,22 @@ function DiscoveryHUD({ activeItem, latestItem }) {
                   </span>
                 </div>
                 <div className="hud-metric">
-                  <span className="hud-metric-label">SCORE</span>
+                  <span className="hud-metric-label">
+                    {display.type === 'video' ? 'VIDEO LOG' : 
+                     display.type === 'text' ? 'DATA LOG' : 
+                     'PERFORMANCE'}
+                  </span>
                   <span className="hud-metric-value" style={{ color: 'var(--star-gold)' }}>
-                    {display.score} PTS
+                    {display.type === 'video' ? '통신 수신 완료' :
+                     display.type === 'text' ? '해독 완료' :
+                     `${display.score} PTS`}
+                  </span>
+                </div>
+                
+                <div className="hud-metric">
+                  <span className="hud-metric-label">REWARD</span>
+                  <span className="hud-metric-value" style={{ color: 'var(--crystal-cyan)' }}>
+                    {display.crystalsEarned > 0 ? `+${display.crystalsEarned} 💎` : '0 💎'}
                   </span>
                 </div>
               </div>
