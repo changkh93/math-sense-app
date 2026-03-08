@@ -15,7 +15,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Regions, Chapters, Units, Quizzes: Public Read, Admin Write
+    // Regions, Chapters, Units: Public Read, Admin Write
     match /regions/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
@@ -31,38 +31,48 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
+    // Quizzes: Authenticated Read, Admin Write
     match /quizzes/{document=**} {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
 
-    // Questions & Answers
+    // Questions: Authenticated users can list/read public questions
     match /questions/{questionId} {
       allow create: if isAuth();
-      allow read: if isAuth() && (resource.data.isPublic == true || resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isAuth();
       allow update: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
     }
 
+    // Answers: Authenticated users can read
     match /answers/{answerId} {
       allow create: if isAuth();
-      allow read: if isAuth() && (
-        isAdmin() || 
-        get(/databases/$(database)/documents/questions/$(resource.data.questionId)).data.isPublic == true || 
-        get(/databases/$(database)/documents/questions/$(resource.data.questionId)).data.userId == request.auth.uid
-      );
+      allow read: if isAuth();
       allow update, delete: if isAuth() && (request.auth.uid == resource.data.userId || isAdmin());
     }
 
-    // Users: User can read/write their own data. Admin can read all.
+    // Users: Any authenticated user can read user profiles (for ranking). Writing is restricted.
     match /users/{userId} {
-      allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+      allow read: if isAuth();
       allow write: if isAuth() && (request.auth.uid == userId || isAdmin());
       
-      // Allow subcollections (like 'history')
+      // Allow subcollections (like 'history', 'crystal_transactions')
       match /{document=**} {
         allow read, write: if isAuth() && (request.auth.uid == userId || isAdmin());
       }
+    }
+
+    // Notifications: Users can read/write their own notifications
+    match /notifications/{notificationId} {
+      allow read, write: if isAuth();
+    }
+
+    // Star Messages (Community Ticker)
+    match /starMessages/{messageId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
     }
   }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import 'katex/dist/katex.min.css';
-import { db } from '../../firebase';
+import { db, auth } from '../../firebase';
 import { 
   collection, 
   query, 
@@ -65,11 +65,15 @@ export default function TeacherQA() {
     );
 
     return () => {
-      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (cleanupTimeout) clearTimeout(cleanupTimeout);
       if (unsubscribeQuestions) {
-        cleanupTimeout = setTimeout(() => {
-          if (unsubscribeQuestions) unsubscribeQuestions();
-        }, 100);
+        if (!auth.currentUser) {
+           unsubscribeQuestions();
+        } else {
+           cleanupTimeout = setTimeout(() => {
+             if (unsubscribeQuestions) unsubscribeQuestions();
+           }, 100);
+        }
       }
     };
   }, [filter]);

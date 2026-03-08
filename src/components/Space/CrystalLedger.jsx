@@ -90,11 +90,15 @@ export default function CrystalLedger({ userData }) {
     })
 
     return () => {
-      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (cleanupTimeout) clearTimeout(cleanupTimeout);
       if (unsubscribeSnapshot) {
-        cleanupTimeout = setTimeout(() => {
-          if (unsubscribeSnapshot) unsubscribeSnapshot();
-        }, 100);
+        if (!auth.currentUser) {
+           unsubscribeSnapshot();
+        } else {
+           cleanupTimeout = setTimeout(() => {
+             if (unsubscribeSnapshot) unsubscribeSnapshot();
+           }, 100);
+        }
       }
     };
   }, [])

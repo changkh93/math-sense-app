@@ -76,10 +76,12 @@ export function useAuth() {
     });
 
     return () => {
-      // Add a small delay to the snapshot unsubscribe to prevent Firestore
-      // internal assertion errors (b815, ca9) caused by rapid subscribe/unsubscribe cycles
-      // often triggered by React StrictMode during development.
+      if (cleanupTimeout) {
+        clearTimeout(cleanupTimeout);
+      }
       if (unsubscribeSnapshot) {
+        // When unmounting, delay to avoid React 18 strict mode assertion issues.
+        // But if auth state changes, we cancel immediately (handled inside the onAuthStateChanged).
         cleanupTimeout = setTimeout(() => {
           if (unsubscribeSnapshot) {
             unsubscribeSnapshot();

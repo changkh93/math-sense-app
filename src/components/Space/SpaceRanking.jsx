@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { Trophy, Medal, Star, Target, Info, ShieldAlert, Zap, CircleHelp } from 'lucide-react'
-import { db } from '../../firebase'
+import { db, auth } from '../../firebase'
 import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, setDoc } from 'firebase/firestore'
 import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
@@ -144,11 +144,15 @@ export default function SpaceRanking({ user, userData }) {
     })
 
     return () => {
-      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (cleanupTimeout) clearTimeout(cleanupTimeout);
       if (unsubscribeSnapshot) {
-        cleanupTimeout = setTimeout(() => {
-          if (unsubscribeSnapshot) unsubscribeSnapshot();
-        }, 100);
+        if (!auth.currentUser) {
+           unsubscribeSnapshot();
+        } else {
+           cleanupTimeout = setTimeout(() => {
+             if (unsubscribeSnapshot) unsubscribeSnapshot();
+           }, 100);
+        }
       }
     };
   }, [rankMode])

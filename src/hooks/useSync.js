@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useQueryClient } from '@tanstack/react-query';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 
 /**
  * useSmartSync
@@ -44,11 +44,15 @@ export function useSmartSync(unitId) {
     });
 
     return () => {
-      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (cleanupTimeout) clearTimeout(cleanupTimeout);
       if (unsubscribeSnapshot) {
-        cleanupTimeout = setTimeout(() => {
-          if (unsubscribeSnapshot) unsubscribeSnapshot();
-        }, 100);
+        if (!auth.currentUser) {
+           unsubscribeSnapshot();
+        } else {
+           cleanupTimeout = setTimeout(() => {
+             if (unsubscribeSnapshot) unsubscribeSnapshot();
+           }, 100);
+        }
       }
     };
   }, [unitId, queryClient]);
