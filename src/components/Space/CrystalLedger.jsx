@@ -64,13 +64,16 @@ export default function CrystalLedger({ userData }) {
     if (!user) return
 
     setLoading(true)
+    let unsubscribeSnapshot = null;
+    let cleanupTimeout = null;
+
     const q = query(
       collection(db, 'users', user.uid, 'crystal_transactions'),
       orderBy('timestamp', 'desc'),
       limit(200)
     )
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
       const txs = snapshot.docs.map(doc => {
         const data = doc.data()
         return {
@@ -86,7 +89,14 @@ export default function CrystalLedger({ userData }) {
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    return () => {
+      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (unsubscribeSnapshot) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+        }, 100);
+      }
+    };
   }, [])
 
   // Filter transactions

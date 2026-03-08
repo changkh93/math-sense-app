@@ -26,7 +26,9 @@ export default function NotificationMenu() {
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
-
+    
+    let unsubscribeSnapshot = null;
+    let cleanupTimeout = null;
 
     const q = query(
       collection(db, 'notifications'),
@@ -34,13 +36,20 @@ export default function NotificationMenu() {
       orderBy('createdAt', 'desc') // Requires composite index usually
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.isRead).length);
     });
 
-    return () => unsubscribe();
+    return () => {
+      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (unsubscribeSnapshot) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+        }, 100);
+      }
+    };
   }, []);
 
   const handleNotificationClick = async (notification) => {

@@ -15,10 +15,13 @@ export function useSmartSync(unitId) {
   useEffect(() => {
     if (!unitId) return;
 
+    let unsubscribeSnapshot = null;
+    let cleanupTimeout = null;
+
     // console.log(`[SYNC] Watching unit for changes: ${unitId}`);
     
     // Set up a real-time listener on the UNIT metadata doc
-    const unsub = onSnapshot(doc(db, 'units', unitId), (snap) => {
+    unsubscribeSnapshot = onSnapshot(doc(db, 'units', unitId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         const currentTimestamp = data.lastUpdated?.toMillis() || 0;
@@ -40,6 +43,13 @@ export function useSmartSync(unitId) {
       console.error(`[SYNC] Listener error for ${unitId}:`, err);
     });
 
-    return () => unsub();
+    return () => {
+      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (unsubscribeSnapshot) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+        }, 100);
+      }
+    };
   }, [unitId, queryClient]);
 }

@@ -9,12 +9,25 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let unsubscribeSnapshot = null;
+    let cleanupTimeout = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       
+      if (cleanupTimeout) {
+        clearTimeout(cleanupTimeout);
+        cleanupTimeout = null;
+      }
+      
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
+
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const unsubscribeDoc = onSnapshot(userDocRef, (docSnap) => {
+        unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             setUserData({
@@ -56,15 +69,25 @@ export function useAuth() {
           console.error("useAuth: User doc snapshot error:", err);
           setLoading(false);
         });
-
-        return () => unsubscribeDoc();
       } else {
         setUserData(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      // Add a small delay to the snapshot unsubscribe to prevent Firestore
+      // internal assertion errors (b815, ca9) caused by rapid subscribe/unsubscribe cycles
+      // often triggered by React StrictMode during development.
+      if (unsubscribeSnapshot) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeSnapshot) {
+            unsubscribeSnapshot();
+          }
+        }, 100);
+      }
+      unsubscribeAuth();
+    };
   }, []);
 
   return { user, userData, loading };

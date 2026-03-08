@@ -1,0 +1,223 @@
+.workbook-player-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 80px); /* Adjust based on navbar height */
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.workbook-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background: rgba(10, 15, 30, 0.8);
+  border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+  z-index: 10;
+}
+
+.workbook-header .back-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: color 0.2s;
+}
+
+.workbook-header .back-btn:hover {
+  color: var(--alert-red);
+}
+
+.workbook-header .unit-title {
+  color: var(--text-bright);
+  font-size: 1.2rem;
+  text-align: center;
+  flex: 1;
+}
+
+.workbook-header .page-indicator {
+  color: var(--crystal-cyan);
+  background: rgba(0, 243, 255, 0.1);
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.workbook-canvas-area {
+  flex: 1;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: #111;
+  padding: 1rem;
+  padding-bottom: 350px; /* Extra padding for bottom sheet */
+  scroll-behavior: smooth;
+}
+
+.workbook-page-container {
+  position: relative;
+  width: 100%;
+  max-width: 800px; /* Sensible limit */
+  height: auto;
+}
+
+/* Image must preserve aspect ratio but fit inside container */
+.workbook-page-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  border-radius: 8px;
+}
+
+/* The elements overlay container aligns perfectly with the image boundaries */
+.workbook-elements-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Let clicks pass to inputs */
+}
+
+/* Base styles for interactive elements */
+.wb-element {
+  position: absolute;
+  pointer-events: auto; /* Re-enable clicks for interactive elements */
+}
+
+/* Input boxes */
+.wb-input {
+  border: 2px solid rgba(0, 243, 255, 0.5);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: text;
+  color: #000;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 1.2rem;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.wb-input.active {
+  border-color: var(--star-gold);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 10px var(--star-gold);
+  transform: scale(1.05); /* Slight pop when focused */
+  z-index: 100;
+}
+
+.wb-input.correct {
+  border-color: var(--planet-green);
+  background: rgba(200, 255, 200, 0.9);
+}
+
+.wb-input.wrong {
+  border-color: var(--alert-red);
+  background: rgba(255, 200, 200, 0.9);
+}
+
+.input-val {
+  pointer-events: none;
+}
+
+.result-icon {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Mask boxes */
+.wb-mask {
+  background: #ffffff; /* White to cover underlying content */
+  z-index: 50; /* Needs to be below active input popups but above image */
+}
+
+.workbook-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background: rgba(10, 15, 30, 0.8);
+  border-top: 1px solid rgba(0, 243, 255, 0.2);
+  z-index: 10;
+}
+
+.pagination-btn {
+  background: rgba(0, 243, 255, 0.1);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  color: var(--crystal-cyan);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+}
+
+.pagination-btn:not(:disabled):hover {
+  background: rgba(0, 243, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.submit-btn {
+  padding: 1rem 3rem;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, rgba(0, 243, 255, 0.8), rgba(0, 255, 136, 0.8));
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.submit-btn:disabled {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: wait;
+}
+
+.submit-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 25px rgba(0, 255, 136, 0.5);
+}
+
+/* Empty State */
+.workbook-player-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 50vh;
+  text-align: center;
+  gap: 2rem;
+}

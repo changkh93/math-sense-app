@@ -16,6 +16,8 @@ import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 
+import PrivateRoute from './components/PrivateRoute'
+
 function App() {
   return (
     <Routes>
@@ -36,8 +38,16 @@ function App() {
         <Route path="qa" element={<TeacherQA />} />
       </Route>
 
-      <Route path="/agora" element={<Agora />} />
-      <Route path="/agora/:questionId" element={<QuestionDetail />} />
+      <Route path="/agora" element={
+        <PrivateRoute>
+          <Agora />
+        </PrivateRoute>
+      } />
+      <Route path="/agora/:questionId" element={
+        <PrivateRoute>
+          <QuestionDetail />
+        </PrivateRoute>
+      } />
       <Route path="/privacy" element={<PrivacyPolicy />} />
     </Routes>
   )

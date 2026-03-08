@@ -243,17 +243,27 @@ function SpaceHome() {
   const [completionResult, setCompletionResult] = useState(null)
   const [streakCelebration, setStreakCelebration] = useState(null)
 
-  // Fetch history for status calculation
   useEffect(() => {
     if (!user) return
+    let unsubscribeSnapshot = null;
+    let cleanupTimeout = null;
+    
     const historyRef = collection(db, 'users', user.uid, 'history')
     const q = query(historyRef, orderBy('timestamp', 'desc'))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
       const historyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       setHistory(historyData)
       setLoadingHistory(false)
     })
-    return () => unsubscribe()
+    
+    return () => {
+      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (unsubscribeSnapshot) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+        }, 100);
+      }
+    }
   }, [user])
 
   // Calculate Exploration Status and Recent Region

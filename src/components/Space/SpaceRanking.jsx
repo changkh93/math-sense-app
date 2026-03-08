@@ -64,12 +64,15 @@ export default function SpaceRanking({ user, userData }) {
   useEffect(() => {
 
     setLoading(true);
+    let unsubscribeSnapshot = null;
+    let cleanupTimeout = null;
+
     const q = query(
       collection(db, 'users'),
       limit(200) // Fetch up to 200 to allow robust local sorting. We removed orderBy('crystals') so everyone is considered.
     )
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
       const kstNow = new Date(Date.now() + 9 * 3600000)
       const todayKey = kstNow.toISOString().split('T')[0]
       const mondayOffset = (kstNow.getUTCDay() + 6) % 7
@@ -140,7 +143,14 @@ export default function SpaceRanking({ user, userData }) {
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    return () => {
+      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (unsubscribeSnapshot) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+        }, 100);
+      }
+    };
   }, [rankMode])
 
   const rewardRules = [

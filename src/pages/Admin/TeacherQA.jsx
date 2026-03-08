@@ -42,15 +42,17 @@ export default function TeacherQA() {
   const [previewInfo, setPreviewInfo] = useState({ isOpen: false, unitId: null, quizId: null });
   const [expandedQuestions, setExpandedQuestions] = useState({});
 
-  // 1. Listen for questions based on filter
   useEffect(() => {
     setLoading(true);
+    let unsubscribeQuestions = null;
+    let cleanupTimeout = null;
+
     let q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
     if (filter !== 'all') {
       q = query(collection(db, 'questions'), where('status', '==', filter), orderBy('createdAt', 'desc'));
     }
 
-    const unsubscribeQuestions = onSnapshot(q, 
+    unsubscribeQuestions = onSnapshot(q, 
       (snapshot) => {
         const qs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setQuestions(qs);
@@ -62,7 +64,14 @@ export default function TeacherQA() {
       }
     );
 
-    return () => unsubscribeQuestions();
+    return () => {
+      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (unsubscribeQuestions) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeQuestions) unsubscribeQuestions();
+        }, 100);
+      }
+    };
   }, [filter]);
 
   // 2. Global listener for all answers (sync once)

@@ -8,6 +8,8 @@ export default function Ranking({ user }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let unsubscribeSnapshot = null;
+    let cleanupTimeout = null;
     // 광석 개수 기준으로 상위 20명 가져오기
     const q = query(
       collection(db, 'users'),
@@ -15,7 +17,7 @@ export default function Ranking({ user }) {
       limit(20)
     )
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
       const users = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -24,7 +26,14 @@ export default function Ranking({ user }) {
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    return () => {
+      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (unsubscribeSnapshot) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+        }, 100);
+      }
+    };
   }, [])
 
   if (loading) return <div className="loading-small">랭킹 불러오는 중...</div>

@@ -8,6 +8,7 @@ import { Save, ArrowLeft, Image as ImageIcon, Video, FileText, Sparkles, Copy, X
 import { db } from '../../firebase';
 import { getDoc, doc } from 'firebase/firestore';
 import MissionMarkdownViewer from '../../components/Space/MissionMarkdownViewer';
+import WorkbookVisualEditor from './WorkbookVisualEditor';
 
 const MissionContentEditor = () => {
   const { unitId } = useParams();
@@ -26,6 +27,8 @@ const MissionContentEditor = () => {
 
   const [transmissions, setTransmissions] = useState([]);
   const [learningText, setLearningText] = useState('');
+  const [workbookPages, setWorkbookPages] = useState([]);
+  const [activeTab, setActiveTab] = useState('workbook');
   const [isAiPromptOpen, setIsAiPromptOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   
@@ -53,6 +56,7 @@ const MissionContentEditor = () => {
             }]);
           }
           if (data.learningContents) setLearningText(data.learningContents.text || '');
+          if (data.workbookPages) setWorkbookPages(data.workbookPages);
         } else {
            console.error("Unit not found");
         }
@@ -97,6 +101,7 @@ const MissionContentEditor = () => {
       const contentFlags = {
         hasDataLog: !!(learningText?.trim()),
         hasTransmission: processedTransmissions.some(tx => tx.videoId),
+        hasWorkbook: workbookPages && workbookPages.length > 0
       };
 
       await saveUnit.mutateAsync({
@@ -106,6 +111,7 @@ const MissionContentEditor = () => {
         learningContents: {
             text: learningText
         },
+        workbookPages,
         contentFlags
       });
       alert('미션 콘텐츠가 성공적으로 저장되었습니다.');
@@ -235,9 +241,40 @@ const MissionContentEditor = () => {
         </button>
       </header>
 
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+        <button 
+          onClick={() => setActiveTab('workbook')} 
+          style={{ padding: '0.8rem 1.5rem', background: activeTab === 'workbook' ? 'var(--neon-blue)' : 'transparent', color: 'white', border: '1px solid ' + (activeTab === 'workbook' ? 'var(--neon-blue)' : 'rgba(255,255,255,0.2)'), borderRadius: '4px', cursor: 'pointer', fontWeight: activeTab === 'workbook' ? 'bold' : 'normal', transition: 'all 0.2s' }}
+        >
+          인터랙티브 워크북
+        </button>
+        <button 
+          onClick={() => setActiveTab('datalog')} 
+          style={{ padding: '0.8rem 1.5rem', background: activeTab === 'datalog' ? 'var(--neon-blue)' : 'transparent', color: 'white', border: '1px solid ' + (activeTab === 'datalog' ? 'var(--neon-blue)' : 'rgba(255,255,255,0.2)'), borderRadius: '4px', cursor: 'pointer', fontWeight: activeTab === 'datalog' ? 'bold' : 'normal', transition: 'all 0.2s' }}
+        >
+          데이터 로그 (마크다운)
+        </button>
+        <button 
+          onClick={() => setActiveTab('video')} 
+          style={{ padding: '0.8rem 1.5rem', background: activeTab === 'video' ? 'var(--neon-blue)' : 'transparent', color: 'white', border: '1px solid ' + (activeTab === 'video' ? 'var(--neon-blue)' : 'rgba(255,255,255,0.2)'), borderRadius: '4px', cursor: 'pointer', fontWeight: activeTab === 'video' ? 'bold' : 'normal', transition: 'all 0.2s' }}
+        >
+          전송 피드 (Video)
+        </button>
+      </div>
+
       <div className="editor-panels" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
+        {/* Interactive Workbook Setting */}
+        {activeTab === 'workbook' && (
+          <WorkbookVisualEditor 
+              workbookPages={workbookPages} 
+              setWorkbookPages={setWorkbookPages} 
+              unitId={unitId} 
+          />
+        )}
+
         {/* Transmission Feed (Multi-Video) Setting */}
+        {activeTab === 'video' && (
         <section className="card glass" style={{ padding: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--planet-green)' }}>
@@ -318,8 +355,10 @@ const MissionContentEditor = () => {
                 )}
             </div>
         </section>
+        )}
 
         {/* Data Log (Text/Markdown) Setting */}
+        {activeTab === 'datalog' && (
         <section className="card glass" style={{ padding: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: 'var(--crystal-cyan)' }}>
@@ -388,6 +427,7 @@ const MissionContentEditor = () => {
                 </div>
             </div>
         </section>
+        )}
 
       </div>
 

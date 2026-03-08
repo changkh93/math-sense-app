@@ -536,14 +536,24 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions, 
 
   useEffect(() => {
     if (!user) return
+    let unsubscribeSnapshot = null;
+    let cleanupTimeout = null;
+    
     const historyRef = collection(db, 'users', user.uid, 'history')
     // 늘어난 데이터 규모를 고려하여 200개까지 가져오기
     const q = query(historyRef, orderBy('timestamp', 'desc'), limit(200))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
       setHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
       setLoading(false)
     })
-    return () => unsubscribe()
+    return () => {
+      // Delay to prevent Firestore assertion errors (b815/ca9) on rapid remounts
+      if (unsubscribeSnapshot) {
+        cleanupTimeout = setTimeout(() => {
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+        }, 100);
+      }
+    };
   }, [user])
 
   // 윈도우 인덱스 (뒤에서부터 0, 1, 2... 순서)

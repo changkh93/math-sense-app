@@ -83,6 +83,31 @@ export function useUnits(chapterId) {
   });
 }
 
+// --- Single Unit ---
+export function useUnit(unitId) {
+  return useQuery({
+    queryKey: ['unit', unitId],
+    queryFn: async () => {
+      if (!unitId) return null;
+      console.log(`[DEBUG] Fetching single unit: ${unitId}`);
+      try {
+        const docRef = doc(db, 'units', unitId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          return { ...snap.data(), docId: snap.id };
+        }
+        return null;
+      } catch (err) {
+        console.error(`[CRITICAL] Error fetching unit ${unitId}:`, err);
+        throw err;
+      }
+    },
+    enabled: !!unitId,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+  });
+}
+
 // --- Quizzes ---
 export function useQuizzes(unitId) {
   return useQuery({
