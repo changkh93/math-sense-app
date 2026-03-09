@@ -53,7 +53,7 @@ export default function SpaceStore({ userData, user }) {
       name: '중력 엔진', 
       icon: '⚙️', 
       cost: 500, 
-      desc: '우주선의 추진력을 엄청나게 높여주는 초강력 엔진! 스페이스바를 꾹 누르면 슝~ 소리와 함께 초고속으로 이동할 수 있고, 방해되는 배경음악도 완전히 제거됩니다.',
+      desc: '우주선의 추진력을 엄청나게 높여주는 초강력 엔진! 스페이스바를 꾹 누르면 슝~ 소리와 함께 초고속으로 이동하며, 배경음악도 깔끔하게 꺼집니다.',
       isOwned: userData?.hasEngine || false
     }
   ]

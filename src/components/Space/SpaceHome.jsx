@@ -177,9 +177,15 @@ function SpaceHome() {
     engine: userData?.hasEngine || false,
   }
 
-  // Space key boost (Gravity Engine)
+  // BGM auto-start on user interaction
   useEffect(() => {
     if (user && !authLoading) {
+      const startAudio = () => {
+        soundManager.startBGM()
+        window.removeEventListener('click', startAudio)
+        window.removeEventListener('touchstart', startAudio)
+      }
+
       const handleKeyDown = (e) => {
         if (e.code === 'Space' && equipment.engine) {
           // Don't hijack spacebar when user is typing in input/textarea/contentEditable
@@ -194,7 +200,11 @@ function SpaceHome() {
           }
           e.preventDefault()
           setIsBoosting(true)
-          if (!isBoosting) soundManager.play('whoosh')
+          if (!isBoosting) {
+            soundManager.play('whoosh')
+            // 중력 엔진: 스페이스바를 누르면 배경음악을 이 세션에서 완전히 제거
+            soundManager.stopBGM()
+          }
         }
       }
 
@@ -204,13 +214,18 @@ function SpaceHome() {
         }
       }
 
+      window.addEventListener('click', startAudio)
+      window.addEventListener('touchstart', startAudio)
       window.addEventListener('keydown', handleKeyDown)
       window.addEventListener('keyup', handleKeyUp)
       
       // Cleanup
       return () => {
+        window.removeEventListener('click', startAudio)
+        window.removeEventListener('touchstart', startAudio)
         window.removeEventListener('keydown', handleKeyDown)
         window.removeEventListener('keyup', handleKeyUp)
+        soundManager.stopBGM()
       }
     }
   }, [user, authLoading, equipment.engine, isBoosting])
