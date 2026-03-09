@@ -290,6 +290,10 @@ export default function MissionHub({
 }) {
   const { user } = useAuth()
   const userId = user?.uid
+
+  // Keep a ref to userData to avoid stale closures in useCallback/useEffect
+  const userDataRef = useRef(userData)
+  useEffect(() => { userDataRef.current = userData }, [userData])
   const [currentMode, setCurrentMode] = useState(initialMode === 'quiz-modal' ? 'briefing' : initialMode)
   const [missionData, setMissionData] = useState(null)
   const [showOverlay, setShowOverlay] = useState(false) 
@@ -496,7 +500,7 @@ export default function MissionHub({
         totalScore: increment(100)
       }
       
-      const growthUpdates = calculateGrowthUpdates(userData, 30)
+      const growthUpdates = calculateGrowthUpdates(userDataRef.current, 30)
       Object.assign(updates, growthUpdates)
 
       await setDoc(doc(db, 'users', userId), updates, { merge: true })
@@ -594,7 +598,7 @@ export default function MissionHub({
       const awardReward = async () => {
         try {
           const updates = { crystals: increment(reward) };
-          const growthUpdates = calculateGrowthUpdates(userData, reward);
+          const growthUpdates = calculateGrowthUpdates(userDataRef.current, reward);
           Object.assign(updates, growthUpdates);
 
           await setDoc(doc(db, 'users', userId), updates, { merge: true })
@@ -652,7 +656,7 @@ export default function MissionHub({
           totalScore: increment(100)
         }
         
-        const growthUpdates = calculateGrowthUpdates(userData, 20)
+        const growthUpdates = calculateGrowthUpdates(userDataRef.current, 20)
         Object.assign(updates, growthUpdates)
 
         await setDoc(doc(db, 'users', userId), updates, { merge: true })
