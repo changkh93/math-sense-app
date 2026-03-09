@@ -177,15 +177,9 @@ function SpaceHome() {
     engine: userData?.hasEngine || false,
   }
 
-  // BGM Auto-start on user interaction
+  // Space key boost (Gravity Engine)
   useEffect(() => {
     if (user && !authLoading) {
-      const startAudio = () => {
-        soundManager.startBGM()
-        window.removeEventListener('click', startAudio)
-        window.removeEventListener('touchstart', startAudio)
-      }
-      
       const handleKeyDown = (e) => {
         if (e.code === 'Space' && equipment.engine) {
           // Don't hijack spacebar when user is typing in input/textarea/contentEditable
@@ -210,18 +204,13 @@ function SpaceHome() {
         }
       }
 
-      window.addEventListener('click', startAudio)
-      window.addEventListener('touchstart', startAudio)
       window.addEventListener('keydown', handleKeyDown)
       window.addEventListener('keyup', handleKeyUp)
       
       // Cleanup
       return () => {
-        window.removeEventListener('click', startAudio)
-        window.removeEventListener('touchstart', startAudio)
         window.removeEventListener('keydown', handleKeyDown)
         window.removeEventListener('keyup', handleKeyUp)
-        soundManager.stopBGM()
       }
     }
   }, [user, authLoading, equipment.engine, isBoosting])
