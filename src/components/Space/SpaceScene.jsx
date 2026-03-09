@@ -22,6 +22,19 @@ function WarpStars({ active }) {
 }
 
 /**
+ * Smooth FOV transition
+ */
+function CameraFOV({ isBoosting }) {
+  const { camera } = useThree()
+  useFrame((state, delta) => {
+    const targetFov = isBoosting ? 70 : 45
+    camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, delta * 5)
+    camera.updateProjectionMatrix()
+  })
+  return null
+}
+
+/**
  * 3D Space Scene with Spiral Layout
  */
 function SceneContent({ 
@@ -120,6 +133,7 @@ function SceneContent({
       <directionalLight position={[10, 10, 5]} intensity={1.5} />
       <pointLight position={[-10, -10, -5]} intensity={0.5} color="#00d4ff" />
       
+      <CameraFOV isBoosting={isBoosting} />
       <WarpStars active={warpActive || isBoosting} />
       
       <CameraControls 
@@ -207,10 +221,11 @@ function Line({ start, end }) {
 }
 
 export default function SpaceScene(props) {
+  const fov = props.isBoosting ? 60 : 45;
   return (
     <div style={{ width: '100%', height: '100vh', position: 'absolute', top: 0, left: 0 }}>
       <Canvas
-        camera={{ position: [0, 5, 15], fov: 45 }}
+        camera={{ position: [0, 5, 15], fov: fov }}
         gl={{ antialias: true, alpha: true }}
       >
         <SceneContent {...props} />

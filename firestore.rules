@@ -5,9 +5,8 @@ service cloud.firestore {
     
     // Helper function to check if user is admin
     function isAdmin() {
-      return request.auth != null && 
-             (request.auth.token.admin == true || 
-              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      return isAuth() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     // Helper to check if user is authenticated
@@ -15,9 +14,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Regions, Chapters, Units: Public Read, Admin Write
-    match /regions/{document=**} {
+    match /clusters/{clusterId} {
       allow read: if true;
+      allow write: if isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /regions/{regionId} {
+      allow read: if isAdmin() ||
+                  !('clusterId' in resource.data) || 
+                  resource.data.clusterId == 'cluster_elementary' ||
+                  (isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clusterAccess[resource.data.clusterId] == 'active');
       allow write: if isAdmin();
     }
     
@@ -41,8 +47,7 @@ service cloud.firestore {
     match /questions/{questionId} {
       allow create: if isAuth();
       allow read: if isAuth();
-      allow update: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow delete: if isAdmin();
+      allow update, delete: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Answers: Authenticated users can read

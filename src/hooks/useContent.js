@@ -15,16 +15,49 @@ import {
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebase';
 
-// --- Regions ---
-export function useRegions() {
+// --- Clusters ---
+export function useClusters() {
   return useQuery({
-    queryKey: ['regions'],
+    queryKey: ['clusters'],
     queryFn: async () => {
-      const q = query(collection(db, 'regions'), orderBy('order', 'asc'));
+      const q = query(collection(db, 'clusters'), orderBy('order', 'asc'));
       const snap = await getDocs(q);
-      return snap.docs.map(doc => doc.data());
+      return snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 30, // 30 mins
+  });
+}
+
+// --- Regions ---
+export function useRegions(clusterId = 'cluster_elementary') {
+  const cid = clusterId || 'cluster_elementary';
+  return useQuery({
+    queryKey: ['regions', cid],
+    queryFn: async () => {
+      // 1. Try specific cluster query first (efficient and respects rules)
+      const q = query(
+        collection(db, 'regions'), 
+        where('clusterId', '==', cid)
+      );
+      const snap = await getDocs(q);
+      let data = snap.docs.map(doc => ({ ...doc.data(), id: doc.id, docId: doc.id }));
+
+      // 2. Legacy Fallback: If elementary and no regions found, try fetching all
+      if (cid === 'cluster_elementary' && data.length === 0) {
+        try {
+          const allSnap = await getDocs(collection(db, 'regions'));
+          const legacy = allSnap.docs
+            .map(doc => ({ ...doc.data(), id: doc.id, docId: doc.id }))
+            .filter(r => !r.clusterId);
+          if (legacy.length > 0) data = legacy;
+        } catch (err) {
+          console.warn("Legacy regions fetch failed (permission or other):", err);
+        }
+      }
+
+      return data.sort((a, b) => (a.order || 0) - (b.order || 0));
+    },
+    staleTime: 1000 * 60 * 5,
     retry: 2
   });
 }
@@ -140,6 +173,64 @@ export function useAdminMutations() {
   const queryClient = useQueryClient();
 
   return {
+    // --- Cluster Mutations ---
+    saveCluster: useMutation({
+      mutationFn: async (data) => {
+        // data.id가 비어있거나 ''인 경우 자동 생성
+        const clusterId = (data.id && data.id.trim() !== '') ? data.id : `cluster_${Date.now()}`;
+        
+        // Firestore는 undefined 필드를 저장할 수 없으므로 null로 변환하거나 제외해야 함
+        const cleanData = {};
+        Object.keys(data).forEach(key => {
+          if (data[key] !== undefined) {
+            cleanData[key] = data[key];
+          }
+        });
+
+        const finalData = { 
+          ...cleanData, 
+          id: clusterId,
+          updatedAt: serverTimestamp()
+        };
+
+        console.log('Final clean data to Firestore:', finalData);
+        await setDoc(doc(db, 'clusters', clusterId), finalData, { merge: true });
+      },
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clusters'] })
+    }),
+    deleteCluster: useMutation({
+      mutationFn: async (clusterId) => {
+        await deleteDoc(doc(db, 'clusters', clusterId));
+      },
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clusters'] })
+    }),
+
+    repairClusters: useMutation({
+      mutationFn: async () => {
+        const batch = writeBatch(db);
+        // 1. Create default cluster
+        batch.set(doc(db, 'clusters', 'cluster_elementary'), {
+          id: 'cluster_elementary',
+          name: '초등수학',
+          isPrivate: false,
+          order: 0
+        }, { merge: true });
+
+        // 2. Patch regions
+        const snap = await getDocs(collection(db, 'regions'));
+        snap.forEach(d => {
+          if (!d.data().clusterId) {
+            batch.update(d.ref, { clusterId: 'cluster_elementary' });
+          }
+        });
+        await batch.commit();
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['clusters'] });
+        queryClient.invalidateQueries({ queryKey: ['regions'] });
+      }
+    }),
+
     // --- Region Mutations ---
     saveRegion: useMutation({
       mutationFn: async (data) => {

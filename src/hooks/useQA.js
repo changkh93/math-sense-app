@@ -265,9 +265,37 @@ export function useQAMutations() {
 
         await updateDoc(doc(db, 'questions', questionId), updateData);
 
-        return { id: answerRef.id, ...answerData };
+        return { id: answerRef.id, ...answerData, createdAt: new Date() };
       },
-      onSuccess: (_, variables) => {
+      onMutate: async (newAnswer) => {
+        const { questionId } = newAnswer;
+        await queryClient.cancelQueries({ queryKey: ['answers', questionId] });
+        const previousAnswers = queryClient.getQueryData(['answers', questionId]);
+
+        if (previousAnswers) {
+          queryClient.setQueryData(['answers', questionId], (old) => [
+            ...(old || []),
+            {
+              id: `temp-${Date.now()}`,
+              userId: auth.currentUser?.uid,
+              userName: auth.currentUser?.displayName || '익명 학생',
+              content: newAnswer.content,
+              isTeacher: newAnswer.isTeacher,
+              isAccepted: false,
+              createdAt: new Date(),
+              isOptimistic: true // UI indicator if needed
+            }
+          ]);
+        }
+
+        return { previousAnswers, questionId };
+      },
+      onError: (err, newAnswer, context) => {
+        if (context?.previousAnswers) {
+          queryClient.setQueryData(['answers', context.questionId], context.previousAnswers);
+        }
+      },
+      onSettled: (data, error, variables) => {
         queryClient.invalidateQueries({ queryKey: ['answers', variables.questionId] });
         queryClient.invalidateQueries({ queryKey: ['question', variables.questionId] });
       }

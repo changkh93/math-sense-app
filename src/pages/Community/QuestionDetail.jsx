@@ -20,6 +20,7 @@ export default function QuestionDetail() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
+  const [isCooldown, setIsCooldown] = useState(false);
   
   const { data: question, isLoading: loadingQ } = useQuestionDetail(questionId);
   const { data: answers, isLoading: loadingA, error: errorA } = useQuestionAnswers(questionId);
@@ -64,15 +65,26 @@ export default function QuestionDetail() {
 
   const handleAddAnswer = async (e) => {
     e.preventDefault();
-    if (!newAnswer.trim()) return;
-    if (addAnswer.isPending) return;
+    if (!newAnswer.trim() || addAnswer.isPending || isCooldown) return;
     
-    await addAnswer.mutateAsync({
-      questionId,
-      content: newAnswer,
-      isTeacher: false // Student answer
-    });
-    setNewAnswer('');
+    const content = newAnswer.trim();
+    setNewAnswer(''); // Clear immediately for better UX
+    setIsCooldown(true);
+    
+    try {
+      await addAnswer.mutateAsync({
+        questionId,
+        content: content,
+        isTeacher: false
+      });
+      
+      // Cooldown for 3 seconds to prevent double posting accidentally
+      setTimeout(() => setIsCooldown(false), 3000);
+    } catch (error) {
+      setNewAnswer(content); // Restore if failed
+      setIsCooldown(false);
+      console.error("Failed to post answer:", error);
+    }
   };
 
   const handleDeleteQuestion = async () => {
@@ -293,10 +305,10 @@ export default function QuestionDetail() {
                 ></textarea>
                 <button 
                   type="submit" 
-                  className="submit-answer-btn action-flare-small"
-                  disabled={addAnswer.isPending || !newAnswer.trim()}
+                  className={`submit-answer-btn action-flare-small ${(addAnswer.isPending || isCooldown) ? 'disabled' : ''}`}
+                  disabled={addAnswer.isPending || !newAnswer.trim() || isCooldown}
                 >
-                  {addAnswer.isPending ? '보내는 중...' : '답변 등록하기'}
+                  {addAnswer.isPending ? '보내는 중...' : isCooldown ? '완료! (대기중)' : '답변 등록하기'}
                 </button>
               </motion.form>
             )}

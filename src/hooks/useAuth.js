@@ -42,6 +42,7 @@ export function useAuth() {
               lastStreakDate: "",
               streakFreezeCount: 0,
               streakMilestones: [],
+              clusterAccess: { cluster_elementary: 'active' },
               ...data
             });
           } else {
@@ -57,6 +58,7 @@ export function useAuth() {
               lastStreakDate: "",
               streakFreezeCount: 0,
               streakMilestones: [],
+              clusterAccess: { cluster_elementary: 'active' },
               email: firebaseUser.email, 
               name: firebaseUser.displayName,
               createdAt: new Date().toISOString()

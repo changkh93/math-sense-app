@@ -4,13 +4,14 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit } from 'firebase/firestore'
-import { useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
+import { useClusters, useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { regions as localRegions } from '../../data/regions'
 import { motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
 
 // Space Components
 import StarField from './StarField'
+import ClusterSelector from './ClusterSelector'
 import Planet3D from './Planet3D' // Keep for Login Screen
 import SpaceScene from './SpaceScene' // New 3D Scene
 import SpaceQuizView from './SpaceQuizView'
@@ -43,6 +44,7 @@ function SpaceHome() {
   const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection'
   
   // Selection State
+  const [selectedClusterId, setSelectedClusterId] = useState(null)
   const [selectedRegionId, setSelectedRegionId] = useState(null)
   const [selectedChapterDocId, setSelectedChapterDocId] = useState(null)
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
@@ -67,7 +69,32 @@ function SpaceHome() {
   }, [location])
 
   // Data Hooks
-  const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions()
+  const { data: clusters, isLoading: loadingClusters } = useClusters()
+  
+  const activeClusters = useMemo(() => {
+    if (loadingClusters) return [];
+    
+    let list = clusters || [];
+    if (list.length === 0) {
+      // Fallback only if really empty after loading
+      list = [{ id: 'cluster_elementary', docId: 'cluster_elementary', name: '초등수학', isPrivate: false, order: 0 }];
+    }
+    const access = userData?.clusterAccess || { cluster_elementary: 'active' };
+    
+    // Admin can see all clusters
+    if (userData?.role === 'admin') return list;
+    
+    return list.filter(c => access[c.docId] === 'active' || access[c.id] === 'active');
+  }, [clusters, userData, loadingClusters]);
+
+  useEffect(() => {
+    // Only auto-select if we have exactly one cluster AND it's not loading
+    if (!loadingClusters && activeClusters.length === 1 && !selectedClusterId) {
+      setSelectedClusterId(activeClusters[0].docId || activeClusters[0].id);
+    }
+  }, [activeClusters, selectedClusterId, loadingClusters]);
+
+  const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions(selectedClusterId)
   const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
   const { data: units, isLoading: loadingUnits } = useUnits(selectedChapterDocId)
   const { data: singleUnit } = useUnit(selectedUnitDocId || quickQuizUnitId)
@@ -164,6 +191,7 @@ function SpaceHome() {
   // Interaction & UI State
   const [isBoosting, setIsBoosting] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [bgmDisabledForSession, setBgmDisabledForSession] = useState(false)
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -177,58 +205,65 @@ function SpaceHome() {
     engine: userData?.hasEngine || false,
   }
 
-  // BGM auto-start on user interaction
+  // 1. Persistent BGM Management
+  useEffect(() => {
+    if (user && !authLoading && !bgmDisabledForSession) {
+      // Start BGM on any interaction
+      const startAudio = () => {
+        soundManager.startBGM();
+        window.removeEventListener('click', startAudio);
+        window.removeEventListener('touchstart', startAudio);
+      };
+      window.addEventListener('click', startAudio);
+      window.addEventListener('touchstart', startAudio);
+      
+      return () => {
+        window.removeEventListener('click', startAudio);
+        window.removeEventListener('touchstart', startAudio);
+        // Only stop BGM on actual unmount of SpaceHome
+        soundManager.stopBGM();
+      };
+    }
+  }, [user, authLoading]);
+
+  // 2. Interaction & Booster Logic
   useEffect(() => {
     if (user && !authLoading) {
-      const startAudio = () => {
-        soundManager.startBGM()
-        window.removeEventListener('click', startAudio)
-        window.removeEventListener('touchstart', startAudio)
-      }
-
       const handleKeyDown = (e) => {
         if (e.code === 'Space' && equipment.engine) {
-          // Don't hijack spacebar when user is typing in input/textarea/contentEditable
-          const tag = document.activeElement?.tagName?.toLowerCase()
-          const isEditable = document.activeElement?.isContentEditable
-          if (tag === 'input' || tag === 'textarea' || tag === 'select' || isEditable) {
-            return // Let normal typing work
-          }
-          // Also skip if a modal overlay is open
-          if (document.querySelector('.modal-overlay')) {
-            return
-          }
-          e.preventDefault()
-          setIsBoosting(true)
+          const tag = document.activeElement?.tagName?.toLowerCase();
+          const isEditable = document.activeElement?.isContentEditable;
+          if (tag === 'input' || tag === 'textarea' || tag === 'select' || isEditable) return;
+          if (document.querySelector('.modal-overlay')) return;
+          
+          e.preventDefault();
+          setIsBoosting(true);
+          
           if (!isBoosting) {
-            soundManager.play('whoosh')
-            // 중력 엔진: 스페이스바를 누르면 배경음악을 이 세션에서 완전히 제거
-            soundManager.stopBGM()
+            soundManager.play('whoosh');
+            // Gravity Engine: Disable BGM for this session when booster is first used
+            setBgmDisabledForSession(true);
+            soundManager.stopBGM();
           }
         }
-      }
+      };
 
       const handleKeyUp = (e) => {
         if (e.code === 'Space') {
-          setIsBoosting(false)
+          setIsBoosting(false);
+          // soundManager.setBGMVolume(0.1); // Restore
         }
-      }
+      };
 
-      window.addEventListener('click', startAudio)
-      window.addEventListener('touchstart', startAudio)
-      window.addEventListener('keydown', handleKeyDown)
-      window.addEventListener('keyup', handleKeyUp)
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keyup', handleKeyUp);
       
-      // Cleanup
       return () => {
-        window.removeEventListener('click', startAudio)
-        window.removeEventListener('touchstart', startAudio)
-        window.removeEventListener('keydown', handleKeyDown)
-        window.removeEventListener('keyup', handleKeyUp)
-        soundManager.stopBGM()
-      }
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keyup', handleKeyUp);
+      };
     }
-  }, [user, authLoading, equipment.engine, isBoosting])
+  }, [user, authLoading, equipment.engine, isBoosting]);
 
   const handleLogin = async () => {
     try {
@@ -779,7 +814,7 @@ function SpaceHome() {
   }
 
   // Loading State with Timeout & Error handling
-  const isLoading = (authLoading || loadingRegions) && !errorRegions
+  const isLoading = (authLoading || loadingClusters || loadingRegions) && !errorRegions
 
   if (isLoading) {
     return (
@@ -1083,7 +1118,7 @@ function SpaceHome() {
     <div className="space-bg">
       {/* 3D Background Scene - Always Visible but controlled by state */}
       <AnimatePresence>
-        {currentView === 'planet' && (
+        {currentView === 'planet' && selectedClusterId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1121,7 +1156,18 @@ function SpaceHome() {
 
       {/* Main Content Overlay */}
       <main className="space-container" style={{ pointerEvents: 'none' }}>
-        {currentView === 'planet' && (
+        {currentView === 'planet' && !selectedClusterId && (
+          <div style={{ pointerEvents: 'auto', width: '100%' }}>
+            <ClusterSelector 
+              clusters={activeClusters}
+              onSelect={(id) => {
+                setSelectedClusterId(id);
+                soundManager.playWarp();
+              }}
+            />
+          </div>
+        )}
+        {currentView === 'planet' && selectedClusterId && (
           <>
             {!selectedRegionId ? (
               // Region Selection (Overlay only)
@@ -1134,6 +1180,26 @@ function SpaceHome() {
                 width: '100%',
                 pointerEvents: 'none'
               }}>
+                {activeClusters.length > 1 && (
+                  <button 
+                    className="space-btn cosmic-btn" 
+                    onClick={() => { setSelectedClusterId(null); soundManager.playClick(); }}
+                    style={{ 
+                      position: 'fixed', 
+                      left: '20px', 
+                      top: '120px', 
+                      padding: '12px 24px', 
+                      fontSize: '1rem', 
+                      pointerEvents: 'auto',
+                      background: 'rgba(0, 243, 255, 0.15)',
+                      border: '1px solid var(--neon-blue)',
+                      boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)',
+                      zIndex: 100
+                    }}
+                  >
+                    🚀 행성 군집 목록 (Multi-Verse)
+                  </button>
+                )}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

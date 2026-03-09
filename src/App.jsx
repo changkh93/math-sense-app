@@ -1,10 +1,13 @@
 import { Routes, Route } from 'react-router-dom'
 import './App.css'
+import './styles/space-theme.css' /* Global Space Theme */
 import SpaceHome from './components/Space/SpaceHome'
 import AdminLayout from './pages/Admin/AdminLayout'
 import AdminDashboard from './pages/Admin/Dashboard'
 import AdminRoute from './components/AdminRoute'
 
+import ClusterManager from './pages/Admin/ClusterManager'
+import UserAccessManager from './pages/Admin/UserAccessManager'
 import ContentManager from './pages/Admin/ContentManager'
 import MissionContentEditor from './pages/Admin/MissionContentEditor'
 import AITaggingEditor from './pages/Admin/AITaggingEditor'
@@ -15,6 +18,7 @@ import TeacherQA from './pages/Admin/TeacherQA'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import InviteHandler from './pages/InviteHandler'
 
 import PrivateRoute from './components/PrivateRoute'
 
@@ -22,6 +26,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<SpaceHome />} />
+      <Route path="/invite/:inviteCode" element={<InviteHandler />} />
       
       <Route path="/admin" element={
         <AdminRoute>
@@ -29,6 +34,8 @@ function App() {
         </AdminRoute>
       }>
         <Route index element={<AdminDashboard />} />
+        <Route path="clusters" element={<ClusterManager />} />
+        <Route path="users" element={<UserAccessManager />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="mission/:unitId" element={<MissionContentEditor />} />
         <Route path="mission/:unitId/ai-tagging" element={<AITaggingEditor />} />

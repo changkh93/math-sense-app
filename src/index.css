@@ -13,12 +13,12 @@
   --accent: #ff6b6b;
   --success: #1dd1a1;
   --surface: #ffffff;
-  --background: #f8faff;
+  --background: #050510; /* Dark space fallback to prevent white flicker */
   --text: #2d3436;
   --text-muted: #636e72;
   
   /* Glassmorphism Effect */
-  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg: rgba(15, 23, 42, 0.7); /* Darker glass for better contrast on dark bg */
   --glass-border: rgba(255, 255, 255, 0.3);
   --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
   --blur: 10px;
@@ -42,6 +42,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  background-color: #050510 !important; /* Force dark background globally */
 }
 
 #root {

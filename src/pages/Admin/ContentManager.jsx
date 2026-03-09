@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRegions, useChapters, useUnits, useAdminMutations } from '../../hooks/useContent';
+import { useClusters, useRegions, useChapters, useUnits, useAdminMutations } from '../../hooks/useContent';
 import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown, Rocket, Bot, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AiQuizImportModal from '../../components/Admin/AiQuizImportModal';
@@ -7,7 +7,9 @@ import { db } from '../../firebase';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 
 const ContentManager = () => {
-  const { data: regions, isLoading: loadingRegions } = useRegions();
+  const { data: clusters, isLoading: loadingClusters } = useClusters();
+  const [selectedClusterId, setSelectedClusterId] = useState('cluster_elementary');
+  const { data: regions, isLoading: loadingRegions, refetch: refetchRegions } = useRegions(selectedClusterId);
   const { saveRegion } = useAdminMutations();
   const [expandedRegions, setExpandedRegions] = useState({});
   const [expandedChapters, setExpandedChapters] = useState({});
@@ -18,7 +20,13 @@ const ContentManager = () => {
 
   const handleAddRegion = () => {
     const title = prompt("New Region Title:");
-    if (title) saveRegion.mutate({ title, order: regions?.length || 0 });
+    if (title) {
+      saveRegion.mutate({ 
+        title, 
+        clusterId: selectedClusterId,
+        order: regions?.length || 0 
+      });
+    }
   };
 
   if (loadingRegions) return <div className="loading">Loading Regions...</div>;
@@ -30,7 +38,32 @@ const ContentManager = () => {
           <h1>Content Manager</h1>
           <p>Regions → Chapters → Units</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="cluster-filter" style={{ minWidth: '200px' }}>
+            <select 
+              value={selectedClusterId} 
+              onChange={(e) => {
+                setSelectedClusterId(e.target.value);
+                setExpandedRegions({}); // Clear expansion on switch
+              }}
+              className="glass"
+              style={{
+                width: '100%',
+                padding: '0.6rem',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '0.9rem'
+              }}
+            >
+              {clusters?.map(c => (
+                <option key={c.docId} value={c.docId} style={{ background: '#0f172a' }}>
+                  {c.name} {c.isPrivate ? '(🔒 Private)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
           <button className="primary-btn" onClick={handleAddRegion}>
             <Plus size={18} /> <span>Add Region</span>
           </button>

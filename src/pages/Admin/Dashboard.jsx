@@ -1,12 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Database, BookOpen, Layers, Users } from 'lucide-react';
+import { Database, BookOpen, Layers, Users, RefreshCw } from 'lucide-react';
+import { useAdminMutations } from '../../hooks/useContent';
 
 const AdminDashboard = () => {
+  const { repairClusters } = useAdminMutations();
+  
+  const handleRepair = async () => {
+    if (window.confirm("기존 은하/행성 데이터를 새로운 행성 군집(초등수학)으로 연결하고 기본 설정을 복구하시겠습니까? (화면에 행성이 보이지 않을 때 유용합니다)")) {
+      try {
+        await repairClusters.mutateAsync();
+        alert("데이터 복구가 완료되었습니다! 메인 화면을 확인해 보세요.");
+        window.location.reload();
+      } catch (err) {
+        console.error(err);
+        alert("복구 실패: " + err.message);
+      }
+    }
+  };
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
+      // ... stats fetching logic (already correct) ...
       const regions = await getCountFromServer(collection(db, 'regions'));
       const chapters = await getCountFromServer(collection(db, 'chapters'));
       const units = await getCountFromServer(collection(db, 'units'));
@@ -35,12 +52,31 @@ const AdminDashboard = () => {
         <StatCard icon={<Database size={24} />} label="Quizzes" value={isLoading ? '...' : stats?.quizzes ?? 0} />
       </div>
 
+      <div className="card glass" style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h3>시스템 데이터 복구</h3>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', marginTop: '10px' }}>
+            새로운 멀티-버스 아키텍처에 맞게 기존 데이터를 최적화합니다. <br/>
+            행성 군집 목록이 비어있거나 행성이 보이지 않을 경우 아래 버튼을 클릭하십시오.
+          </p>
+        </div>
+        <button 
+          className="primary-btn" 
+          onClick={handleRepair}
+          disabled={repairClusters.isPending}
+          style={{ background: 'var(--planet-green, #50c878)', border: 'none' }}
+        >
+          <RefreshCw size={18} className={repairClusters.isPending ? 'spin' : ''} />
+          {repairClusters.isPending ? '복구 중...' : '데이터 연결 및 복구'}
+        </button>
+      </div>
+
       <div className="card glass" style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.05)' }}>
         <h3>시스템 안내</h3>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', marginTop: '10px' }}>
-          • 화면이 어두워 글자가 보이지 않던 문제를 해결했습니다.<br />
-          • 데이터 로딩 최적화를 위해 쿼리를 조정했습니다.<br />
-          • 위 통계 숫자가 0이라면 마이그레이션 도구(/migrate)를 다시 실행해 주세요.
+          • 행성 군집(Cluster) 기능을 통해 중등수학 등 새로운 교육 과정을 확장할 수 있습니다.<br />
+          • 기존 사용자는 '초등수학' 군집에 자동으로 연결됩니다.<br />
+          • 관제 센터(Admin)의 'Multi-Verse' 메뉴에서 신규 군집을 생성하고 초대 코드를 관리할 수 있습니다.
         </p>
       </div>
     </div>
