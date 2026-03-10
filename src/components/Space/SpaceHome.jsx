@@ -24,7 +24,7 @@ import SpaceJourney from './SpaceJourney'
 import CrystalLedger from './CrystalLedger'
 
 import { useParticles, createParticleBurst } from './ParticleEffects'
-import { calculateStreakUpdate } from '../../utils/streakUtils'
+import { calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 
@@ -558,6 +558,18 @@ function SpaceHome() {
       
       // Record Cryo Core usage if freeze was triggered
       if (streakResult.meta?.freezeUsed) {
+        // Calculate the actual defended dates
+        const defendedDates = [];
+        const lastDate = freshUserData?.lastStreakDate;
+        if (lastDate) {
+          const scanObj = new Date(lastDate + 'T12:00:00Z');
+          const todayDate = new Date(getTodayKST() + 'T12:00:00Z');
+          scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+          while (scanObj < todayDate) {
+            defendedDates.push(scanObj.toISOString().split('T')[0]);
+            scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+          }
+        }
         recordCrystalTransaction(user.uid, {
           amount: 0,
           type: 'streak_freeze',
@@ -565,7 +577,8 @@ function SpaceHome() {
           metadata: { 
             unitId: currentUnitId,
             streakBefore: freshUserData?.currentStreak || 0,
-            streakAfter: streakResult.meta.newStreak
+            streakAfter: streakResult.meta.newStreak,
+            defendedDates: defendedDates
           }
         })
       }
@@ -740,6 +753,18 @@ function SpaceHome() {
 
     // Track usage of freeze if happened outside of quiz
     if (streakResult.meta?.freezeUsed) {
+      // Calculate the actual defended dates
+      const defendedDates = [];
+      const lastDate = freshUserData?.lastStreakDate;
+      if (lastDate) {
+        const scanObj = new Date(lastDate + 'T12:00:00Z');
+        const todayDate = new Date(getTodayKST() + 'T12:00:00Z');
+        scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+        while (scanObj < todayDate) {
+          defendedDates.push(scanObj.toISOString().split('T')[0]);
+          scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+        }
+      }
       recordCrystalTransaction(user.uid, {
         amount: 0,
         type: 'streak_freeze',
@@ -747,7 +772,8 @@ function SpaceHome() {
         metadata: { 
           unitId: selectedUnitDocId || quickQuizUnitId || 'unknown',
           streakBefore: freshUserData?.currentStreak || 0,
-          streakAfter: streakResult.meta.newStreak
+          streakAfter: streakResult.meta.newStreak,
+          defendedDates: defendedDates
         }
       })
     }

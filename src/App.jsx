@@ -12,8 +12,8 @@ import ContentManager from './pages/Admin/ContentManager'
 import MissionContentEditor from './pages/Admin/MissionContentEditor'
 import AITaggingEditor from './pages/Admin/AITaggingEditor'
 import QuizEditor from './pages/Admin/QuizEditor'
-import DataSync from './pages/Admin/DataSync'
 import GhostCleaner from './pages/Admin/GhostCleaner'
+import StreakFixer from './pages/Admin/StreakFixer'
 import TeacherQA from './pages/Admin/TeacherQA'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
@@ -40,8 +40,8 @@ function App() {
         <Route path="mission/:unitId" element={<MissionContentEditor />} />
         <Route path="mission/:unitId/ai-tagging" element={<AITaggingEditor />} />
         <Route path="quizzes/:unitId" element={<QuizEditor />} />
-        <Route path="data-sync" element={<DataSync />} />
         <Route path="ghost-cleaner" element={<GhostCleaner />} />
+        <Route path="streak-fixer" element={<StreakFixer />} />
         <Route path="qa" element={<TeacherQA />} />
       </Route>
 

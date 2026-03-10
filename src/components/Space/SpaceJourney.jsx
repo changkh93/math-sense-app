@@ -53,12 +53,23 @@ export default function SpaceJourney({ userData }) {
       const dateStr = kst.toISOString().split('T')[0];
       
       const existing = map.get(dateStr) || { 
-        quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0, isProtected: false
+        quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0,
+        videos: 0, texts: 0, workbooks: 0, isProtected: false
       };
-      existing.quizzes += 1;
-      existing.scoreSum += (h.score || 0);
+
+      const hType = h.type || 'quiz';
+      if (hType === 'video') {
+        existing.videos += 1;
+      } else if (hType === 'text') {
+        existing.texts += 1;
+      } else if (hType === 'workbook') {
+        existing.workbooks += 1;
+      } else {
+        existing.quizzes += 1;
+        existing.scoreSum += (h.score || 0);
+        if (h.score === 100) existing.perfCount += 1;
+      }
       existing.crystals += (h.crystalsEarned || 0);
-      if (h.score === 100) existing.perfCount += 1;
       
       map.set(dateStr, existing);
     });
@@ -97,59 +108,68 @@ export default function SpaceJourney({ userData }) {
     return { purchased: totalPurchased, used: totalUsed, remaining };
   }, [transactions, userData?.streakFreezeCount]);
 
-  // Helper: Identify nodes that SHOULD be protected (current gap + historical logs + retro-fill)
+  // Helper: Identify nodes that SHOULD be protected (historical + current gap)
   const nodesWithProtection = useMemo(() => {
     const protectionSet = new Set();
-    
-    // 1. Add from historical transaction logs
-    dailyStats.forEach((v, k) => {
-      if (v.isProtected) protectionSet.add(k);
+
+    // 1. From future-format streak_freeze transactions with explicit defendedDates
+    transactions.forEach(t => {
+      if (t.type === 'streak_freeze' && t.metadata?.defendedDates) {
+        t.metadata.defendedDates.forEach(d => protectionSet.add(d));
+      }
     });
 
-    const dbStreakDate = userData?.lastStreakDate;
-    const dbStreakCount = userData?.currentStreak || 0;
-    const freezeCount = userData?.streakFreezeCount || 0;
+    // 2. Full timeline reconstruction: find gaps bridged by cores
+    //    Walk through all active dates chronologically. If a gap between
+    //    two consecutive active dates is small enough (≤ remaining core budget),
+    //    those gap days were core-defended.
+    const activeDates = Array.from(dailyStats.keys()).sort();
+    const totalCoresUsed = coreStats.used;
+    let coresRemaining = totalCoresUsed - protectionSet.size;
 
-    // 2. Retro-fill: If the DB has a current streak, any missing day within that streak's timeframe 
-    // MUST have been protected in the past (even if the transaction was not logged).
-    if (dbStreakDate && dbStreakCount > 0) {
-       const streakStartObj = new Date(dbStreakDate + 'T12:00:00Z');
-       streakStartObj.setUTCDate(streakStartObj.getUTCDate() - (dbStreakCount - 1));
-       
-       const startIso = streakStartObj.toISOString().split('T')[0];
-       const endIso = dbStreakDate;
-       
-       const scanObj = new Date(startIso + 'T12:00:00Z');
-       const endObj = new Date(endIso + 'T12:00:00Z');
-       
-       while (scanObj <= endObj) {
-         const dStr = scanObj.toISOString().split('T')[0];
-         if (!dailyStats.has(dStr)) {
-            // It's missing in history but inside the official streak window!
-            protectionSet.add(dStr);
-         }
-         scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-       }
+    if (coresRemaining > 0 && activeDates.length > 1) {
+      for (let i = 0; i < activeDates.length - 1 && coresRemaining > 0; i++) {
+        const curr = activeDates[i];
+        const next = activeDates[i + 1];
+        const d1 = new Date(curr + 'T00:00:00+09:00');
+        const d2 = new Date(next + 'T00:00:00+09:00');
+        const gap = Math.floor((d2 - d1) / 86400000) - 1;
+
+        if (gap > 0 && gap <= coresRemaining) {
+          // These gap days were defended by cores
+          const scanObj = new Date(curr + 'T12:00:00Z');
+          for (let j = 0; j < gap; j++) {
+            scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+            const dStr = scanObj.toISOString().split('T')[0];
+            if (!protectionSet.has(dStr)) {
+              protectionSet.add(dStr);
+              coresRemaining--;
+            }
+          }
+        }
+      }
     }
 
-    // 3. Predictively add for the current missing gap if cores are available
+    // 3. Current gap: if cores are available and there's an active gap right now
+    const dbStreakDate = userData?.lastStreakDate;
+    const freezeCount = userData?.streakFreezeCount || 0;
+
     if (dbStreakDate && freezeCount > 0) {
       const diffMs = new Date(todayKST + 'T00:00:00+09:00').getTime() - new Date(dbStreakDate + 'T00:00:00+09:00').getTime();
       const diffDays = Math.floor(diffMs / 86400000);
       const missed = diffDays - 1;
 
       if (missed > 0 && freezeCount >= missed) {
-        // Mark these missing days as protected for the UI
         const gapScanObj = new Date(dbStreakDate + 'T12:00:00Z');
-        for(let i = 0; i < missed; i++) {
+        for (let i = 0; i < missed; i++) {
           gapScanObj.setUTCDate(gapScanObj.getUTCDate() + 1);
           protectionSet.add(gapScanObj.toISOString().split('T')[0]);
         }
       }
     }
-    
+
     return protectionSet;
-  }, [dailyStats, userData, todayKST]);
+  }, [dailyStats, transactions, coreStats.used, userData, todayKST]);
 
   // 기간 노드 생성 (기록 시작일 ~ 오늘)
   const timelineData = useMemo(() => {
@@ -200,7 +220,7 @@ export default function SpaceJourney({ userData }) {
 
       // Connect if (active or protected) AND next is (active or protected)
       const isCurrentActiveOrProtected = days[i].isActive || days[i].isProtected;
-      const isNextActiveOrProtected = i < days.length - 1 && (days[i+1].isActive || dailyStats.get(days[i+1].date)?.isProtected);
+      const isNextActiveOrProtected = i < days.length - 1 && (days[i+1].isActive || nodesWithProtection.has(days[i+1].date));
       
       days[i].connectsNext = isCurrentActiveOrProtected && isNextActiveOrProtected;
     }
@@ -415,8 +435,18 @@ export default function SpaceJourney({ userData }) {
                   <ul className="hologram-details">
                     {popover.day.isActive ? (
                       <>
-                        <li>푼 세트: <strong>{popover.day.stats.quizzes}회</strong></li>
-                        <li>퍼펙트: <strong>{popover.day.stats.perfCount}회</strong></li>
+                        {popover.day.stats.quizzes > 0 && (
+                          <li>🧪 탐사 퀴즈: <strong>{popover.day.stats.quizzes}회</strong>{popover.day.stats.perfCount > 0 && <span style={{ color: '#fbbf24', marginLeft: '6px' }}>⭐{popover.day.stats.perfCount}</span>}</li>
+                        )}
+                        {popover.day.stats.texts > 0 && (
+                          <li>📋 데이터 로그: <strong>{popover.day.stats.texts}회</strong></li>
+                        )}
+                        {popover.day.stats.videos > 0 && (
+                          <li>📡 트랜스미션: <strong>{popover.day.stats.videos}회</strong></li>
+                        )}
+                        {popover.day.stats.workbooks > 0 && (
+                          <li>📝 워크북: <strong>{popover.day.stats.workbooks}회</strong></li>
+                        )}
                         <li>획득 광석: <strong style={{ color: '#00f3ff' }}>💎{popover.day.stats.crystals}</strong></li>
                       </>
                     ) : (

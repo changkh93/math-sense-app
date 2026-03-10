@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, setDoc, increment } from 'firebase/firestore'
 import { db } from '../../firebase'
 import soundManager from '../../utils/SoundManager'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
@@ -90,8 +90,8 @@ export default function SpaceStore({ userData, user }) {
       setPurchasing(true)
       try {
         await setDoc(doc(db, 'users', user.uid), {
-          crystals: currentCrystals - item.cost,
-          streakFreezeCount: currentFreezeCount + 1,
+          crystals: increment(-item.cost),
+          streakFreezeCount: increment(1),
         }, { merge: true })
         
         soundManager.playCrystal()
@@ -124,8 +124,8 @@ export default function SpaceStore({ userData, user }) {
       setPurchasing(true)
       try {
         await setDoc(doc(db, 'users', user.uid), {
-          crystals: currentCrystals - item.cost,
-          [fieldName]: currentCharges + 10,
+          crystals: increment(-item.cost),
+          [fieldName]: increment(10),
         }, { merge: true })
         
         soundManager.playCrystal()
@@ -156,7 +156,7 @@ export default function SpaceStore({ userData, user }) {
       try {
         const fieldName = item.id === 'radar' ? 'hasRadar' : 'hasEngine'
         await setDoc(doc(db, 'users', user.uid), {
-          crystals: currentCrystals - item.cost,
+          crystals: increment(-item.cost),
           [fieldName]: true,
         }, { merge: true })
         

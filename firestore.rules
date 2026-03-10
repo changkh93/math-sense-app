@@ -54,17 +54,26 @@ service cloud.firestore {
     match /answers/{answerId} {
       allow create: if isAuth();
       allow read: if isAuth();
-      allow update, delete: if isAuth() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow update: if isAuth() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin() || 
+        request.auth.uid == get(/databases/$(database)/documents/questions/$(resource.data.questionId)).data.userId
+      );
+      allow delete: if isAuth() && (request.auth.uid == resource.data.userId || isAdmin());
     }
 
     // Users: Any authenticated user can read user profiles (for ranking). Writing is restricted.
     match /users/{userId} {
       allow read: if isAuth();
-      allow write: if isAuth() && (request.auth.uid == userId || isAdmin());
+      // Allow cross-user updates for Q&A rewards (since crystals are granted client-side)
+      allow update: if isAuth();
+      allow create, delete: if isAuth() && (request.auth.uid == userId || isAdmin());
       
       // Allow subcollections (like 'history', 'crystal_transactions')
       match /{document=**} {
-        allow read, write: if isAuth() && (request.auth.uid == userId || isAdmin());
+        // Allow creating transactions for other users (e.g. reward transactions)
+        allow create: if isAuth(); 
+        allow read, update, delete: if isAuth() && (request.auth.uid == userId || isAdmin());
       }
     }
 
