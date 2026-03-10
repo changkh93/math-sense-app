@@ -817,8 +817,18 @@ export default function MissionHub({
 
   // ─── Computed: completion status for dashboard cards ───
   const logCompleted = logRewardClaimed || learningProgress?.logRead || false
-  const txCompleted = videoCompletionBonusGiven || 
-    (learningProgress?.videoProgress && Object.values(learningProgress.videoProgress).some(v => v.completionBonusGiven)) || false
+  
+  const txListCalc = activeUnit?.transmissions?.length > 0 
+      ? activeUnit.transmissions 
+      : (activeUnit?.videoConfig?.videoId ? [{ id: 'legacy_tx' }] : [])
+  const txTotalCount = txListCalc.length
+  const txCompletedCount = txListCalc.filter(tx => {
+    const txId = tx.id || 'default'
+    return learningProgress?.videoProgress?.[txId]?.completionBonusGiven
+  }).length
+  const txAllCompleted = txTotalCount > 0 && txCompletedCount === txTotalCount
+  const txAnyCompleted = txCompletedCount > 0
+  
   const quizCompleted = bestScores[unitId] !== undefined
   const workbookCompleted = bestScores[`${unitId}_workbook`] !== undefined
 
@@ -890,12 +900,12 @@ export default function MissionHub({
           onClick={() => handleModeChange('video')}
           style={{ 
             cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-            background: txCompleted ? 'rgba(0, 255, 136, 0.08)' : undefined,
-            borderColor: txCompleted ? 'var(--planet-green)' : undefined,
+            background: txAllCompleted ? 'rgba(0, 255, 136, 0.08)' : (txAnyCompleted ? 'rgba(255, 255, 255, 0.05)' : undefined),
+            borderColor: txAllCompleted ? 'var(--planet-green)' : (txAnyCompleted ? 'var(--crystal-cyan)' : undefined),
             position: 'relative'
           }}
         >
-          {txCompleted && (
+          {txAllCompleted && (
             <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
           )}
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📡</div>
@@ -903,9 +913,11 @@ export default function MissionHub({
           <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
             본부의 영상 브리핑을<br/>수신합니다.
           </p>
-          {txCompleted && (
+          {txAllCompleted ? (
             <span className="font-tech" style={{ color: 'var(--planet-green)', fontSize: '0.8rem', marginTop: '0.5rem' }}>수신 완료</span>
-          )}
+          ) : txAnyCompleted ? (
+            <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginTop: '0.5rem' }}>진행 중 ({txCompletedCount} / {txTotalCount})</span>
+          ) : null}
         </motion.div>
         )}
 
@@ -1083,7 +1095,7 @@ export default function MissionHub({
       const startPosition = savedProgress?.lastPosition || selectedTx.start
 
       return (
-        <div className="mission-content-view fade-in" style={{ width: '100%', height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="mission-content-view fade-in" style={{ width: '100%', height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: '2rem 0', boxSizing: 'border-box' }}>
           <div style={{ width: '90%', maxWidth: '1000px', display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
              <h3 className="font-title" style={{ margin: 0, color: 'var(--planet-green)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1.5rem' }}>📡</span> {selectedTx.title}
@@ -1103,7 +1115,14 @@ export default function MissionHub({
                </button>
              </div>
           </div>
-          <div className="glass-card" style={{ width: '90%', maxWidth: '1000px', aspectRatio: '16/9', padding: '5px', background: 'rgba(0,0,0,0.5)' }}>
+          <div className="glass-card" style={{ 
+            width: '100%', 
+            maxWidth: 'min(1000px, 90vw, calc((100vh - 250px) * 1.7778))', 
+            aspectRatio: '16/9', 
+            padding: '5px', 
+            background: 'rgba(0,0,0,0.5)',
+            margin: '0 auto' 
+          }}>
              <YoutubePlayer 
                 key={`${selectedTx.videoId}_${startPosition}`}
                 videoId={selectedTx.videoId}
@@ -1126,7 +1145,11 @@ export default function MissionHub({
               }}
             >
               {videoCompleted ? (
-                <>✨ 완료하고, {totalRewardedCrystals + (videoCompletionBonusGiven ? 20 : 0)}광석 획득하기</>
+                learningProgress?.videoProgress?.[txId]?.completed ? (
+                  <>✅ 탐사 완료 (돌아가기)</>
+                ) : (
+                  <>✨ 데이터 수신 완료! (총 {totalRewardedCrystals + (videoCompletionBonusGiven ? 20 : 0)}광석 획득) · 돌아가기</>
+                )
               ) : isAtEnd ? (
                 <>⚠️ 데이터 수신 부족 ({Math.min(100, Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100))}%)</>
               ) : (
@@ -1199,6 +1222,18 @@ export default function MissionHub({
       setOverlayContent('text')
     }
     logActivity('overlay_view_' + (reference?.transmissionId ? 'video' : 'text'))
+  }
+
+// If in workbook mode, we render the WorkbookPlayer directly
+  if (loadingProgress) {
+    return (
+      <div className="space-bg" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', color: 'var(--crystal-cyan)' }}>
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} style={{ fontSize: '3rem' }}>🛰️</motion.div>
+          <div className="font-tech" style={{ marginTop: '1rem' }}>데이터 수신 중 (LOADING DATA)...</div>
+        </div>
+      </div>
+    )
   }
 
   // If in workbook mode, we render the WorkbookPlayer directly
