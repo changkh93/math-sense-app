@@ -3,7 +3,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, getDoc, where, getDocs, writeBatch, increment, limit } from 'firebase/firestore'
 import { useClusters, useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { regions as localRegions } from '../../data/regions'
@@ -224,16 +224,23 @@ function SpaceHome() {
         soundManager.stopBGM();
       };
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, bgmDisabledForSession]);
 
   // 2. Interaction & Booster Logic
   useEffect(() => {
     if (user && !authLoading) {
       const handleKeyDown = (e) => {
-        if (e.code === 'Space' && equipment.engine) {
+        if ((e.code === 'Space' || e.key === ' ') && equipment.engine) {
           const tag = document.activeElement?.tagName?.toLowerCase();
           const isEditable = document.activeElement?.isContentEditable;
           if (tag === 'input' || tag === 'textarea' || tag === 'select' || isEditable) return;
+          
+          // BGM stop should work regardless of modals (fixes Gravity Engine issue)
+          if (!bgmDisabledForSession) {
+            setBgmDisabledForSession(true);
+            soundManager.stopBGM();
+          }
+
           if (document.querySelector('.modal-overlay')) return;
           
           e.preventDefault();
@@ -241,9 +248,6 @@ function SpaceHome() {
           
           if (!isBoosting) {
             soundManager.play('whoosh');
-            // Gravity Engine: Disable BGM for this session when booster is first used
-            setBgmDisabledForSession(true);
-            soundManager.stopBGM();
           }
         }
       };
@@ -502,23 +506,25 @@ function SpaceHome() {
       }
 
       soundManager.playCrystal()
-      
-      const prevCrystals = userData.crystals || 0
-      const prevTotalQuizzes = userData.totalQuizzes || 0
-      const prevTotalScore = userData.totalScore || 0
-      const prevPerfectCount = userData.perfectCount || 0
-      const prevConsecutiveGood = score >= 90 ? (userData.consecutiveGood || 0) + 1 : 0
-      const prevShieldDefended = (userData.shieldDefended || 0) + (shieldsUsed || 0)
-      const currentShieldCharges = userData?.shieldCharges || 0
+
+      // --- Fetch FRESH userData from Firestore to avoid stale-closure bugs ---
+      // React의 userData는 클로저에 의해 퀴즈 시작 시점의 값일 수 있으므로,
+      // streak/freeze 계산 전 최신 데이터를 직접 가져옵니다.
+      let freshUserData = userData // fallback
+      try {
+        const freshSnap = await getDoc(doc(db, 'users', user.uid))
+        if (freshSnap.exists()) freshUserData = freshSnap.data()
+      } catch (e) {
+        console.warn('Failed to fetch fresh userData, using stale:', e)
+      }
+
+      const prevConsecutiveGood = score >= 90 ? (freshUserData.consecutiveGood || 0) + 1 : 0
+      const currentShieldCharges = freshUserData?.shieldCharges || 0
 
       // Daily Task Reset Logic
       const today = new Date().toISOString().split('T')[0]
-      const lastQuizDate = userData.lastQuizDate || ""
-      const dailyQuizCount = (lastQuizDate === today) ? (userData.dailyQuizCount || 0) + 1 : 1
-
-      const newCrystals = prevCrystals + actualCrystalsEarned
-      const newTotalQuizzes = prevTotalQuizzes + 1
-      const newTotalScore = prevTotalScore + score
+      const lastQuizDate = freshUserData.lastQuizDate || ""
+      const dailyQuizCount = (lastQuizDate === today) ? (freshUserData.dailyQuizCount || 0) + 1 : 1
 
       // --- Direct Growth Counter (replaces old baseline system) ---
       const kstNow = new Date(Date.now() + 9 * 3600000)
@@ -530,15 +536,15 @@ function SpaceHome() {
       const growthUpdates = {}
       if (actualCrystalsEarned > 0) {
         // Daily growth: reset if new day, increment if same day
-        if (userData.dailyGrowthDate === todayKST) {
-          growthUpdates.dailyGrowth = (userData.dailyGrowth || 0) + actualCrystalsEarned
+        if (freshUserData.dailyGrowthDate === todayKST) {
+          growthUpdates.dailyGrowth = (freshUserData.dailyGrowth || 0) + actualCrystalsEarned
         } else {
           growthUpdates.dailyGrowth = actualCrystalsEarned
           growthUpdates.dailyGrowthDate = todayKST
         }
         // Weekly growth: reset if new week, increment if same week
-        if (userData.weeklyGrowthMonday === mondayKST) {
-          growthUpdates.weeklyGrowth = (userData.weeklyGrowth || 0) + actualCrystalsEarned
+        if (freshUserData.weeklyGrowthMonday === mondayKST) {
+          growthUpdates.weeklyGrowth = (freshUserData.weeklyGrowth || 0) + actualCrystalsEarned
         } else {
           growthUpdates.weeklyGrowth = actualCrystalsEarned
           growthUpdates.weeklyGrowthMonday = mondayKST
@@ -546,36 +552,34 @@ function SpaceHome() {
       }
       // --- End Growth Counter ---
 
-      // --- Streak System ---
-      const streakResult = calculateStreakUpdate(userData)
+      // --- Streak System (uses fresh data to avoid stale freeze count) ---
+      const streakResult = calculateStreakUpdate(freshUserData)
       const streakUpdates = streakResult.streakUpdate || {}
       
       // Record Cryo Core usage if freeze was triggered
       if (streakResult.meta?.freezeUsed) {
-        // missedDays is diff - 1 in streakUtils.js
-        // We can't easily get missedDays here without re-calculating, 
-        // but streakUtils knows. Let's just record that a freeze happen on this today's update.
         recordCrystalTransaction(user.uid, {
           amount: 0,
           type: 'streak_freeze',
           description: `크라이오 코어로 연속 탐사 궤도 보호`,
           metadata: { 
             unitId: currentUnitId,
-            streakBefore: userData?.currentStreak || 0,
+            streakBefore: freshUserData?.currentStreak || 0,
             streakAfter: streakResult.meta.newStreak
           }
         })
       }
       // --- End Streak ---
 
+      // Use increment() for numeric fields to prevent race-condition overwrites
       await setDoc(doc(db, 'users', user.uid), {
-        crystals: newCrystals,
-        totalQuizzes: newTotalQuizzes,
-        totalScore: newTotalScore,
-        averageScore: newTotalScore / newTotalQuizzes,
-        perfectCount: (isPerfect && previousBest < 100) ? prevPerfectCount + 1 : prevPerfectCount,
+        crystals: increment(actualCrystalsEarned),
+        totalQuizzes: increment(1),
+        totalScore: increment(score),
+        averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
+        perfectCount: (isPerfect && previousBest < 100) ? increment(1) : (freshUserData.perfectCount || 0),
         consecutiveGood: prevConsecutiveGood,
-        shieldDefended: prevShieldDefended,
+        shieldDefended: increment(shieldsUsed || 0),
         dailyQuizCount: dailyQuizCount,
         lastQuizDate: today,
         lastActive: serverTimestamp(),
@@ -721,7 +725,17 @@ function SpaceHome() {
   // Handle streak updates for non-quiz activities (Data Log, Transmission)
   const handleNonQuizActivityComplete = async (activityType, crystalsEarned = 0) => {
     if (!user) return
-    const streakResult = calculateStreakUpdate(userData)
+
+    // Fetch FRESH userData to avoid stale-closure bugs (same fix as handleComplete)
+    let freshUserData = userData
+    try {
+      const freshSnap = await getDoc(doc(db, 'users', user.uid))
+      if (freshSnap.exists()) freshUserData = freshSnap.data()
+    } catch (e) {
+      console.warn('Failed to fetch fresh userData for non-quiz activity:', e)
+    }
+
+    const streakResult = calculateStreakUpdate(freshUserData)
     const streakUpdates = streakResult.streakUpdate || {}
 
     // Track usage of freeze if happened outside of quiz
@@ -732,7 +746,7 @@ function SpaceHome() {
         description: `크라이오 코어로 연속 탐사 궤도 보호 (${activityType})`,
         metadata: { 
           unitId: selectedUnitDocId || quickQuizUnitId || 'unknown',
-          streakBefore: userData?.currentStreak || 0,
+          streakBefore: freshUserData?.currentStreak || 0,
           streakAfter: streakResult.meta.newStreak
         }
       })
