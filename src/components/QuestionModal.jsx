@@ -8,15 +8,27 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, updateDoc, doc, increment, serverTimestamp } from 'firebase/firestore';
 import { ImageService } from '../services/imageService';
 import AnnotationCanvas from './AnnotationCanvas';
+import { useSpeechToText } from '../hooks/useSpeechToText';
 import './QuestionModal.css';
 
-export default function QuestionModal({ isOpen, onClose, quizContext }) {
+export default function QuestionModal({ isOpen, onClose, quizContext, contextData }) {
+  const activeContext = quizContext || contextData;
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [type, setType] = useState('quiz');
   const [isPublic, setIsPublic] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Speech to Text
+  const { isListening, transcript, startListening, stopListening } = useSpeechToText();
+
+  // Sync transcript to content while recording
+  useEffect(() => {
+    if (isListening && transcript) {
+      setContent(prev => prev + ' ' + transcript);
+    }
+  }, [transcript, isListening]);
   
   // Drawing State
   const [isDrawMode, setIsDrawMode] = useState(false);
@@ -24,6 +36,11 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [tempDrawing, setTempDrawing] = useState(null); // DataURL of final image
   const [canvasState, setCanvasState] = useState(null); // Fabric JSON for re-editing
+
+  // Extension Bridge State
+  const [extensionStatus, setExtensionStatus] = useState('unknown'); // 'unknown', 'detected', 'not_found'
+  const [showExtensionPrompt, setShowExtensionPrompt] = useState(false);
+  const captureResolveRef = useRef(null);
 
   // Image Upload State
   const [attachedImage, setAttachedImage] = useState(null); // DataURL of uploaded/pasted image
@@ -33,11 +50,54 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      // Detect extension on open
+      checkExtension();
     } else {
       document.body.style.overflow = 'auto';
+      // Reset state when closing modal to prevent stale data
+      setTempDrawing(null);
+      setAttachedImage(null);
+      setCanvasState(null);
+      setBackgroundImage(null);
+      setIsDrawMode(false);
+      setIsCapturing(false);
+      setError(null);
+      setShowExtensionPrompt(false);
     }
     return () => { document.body.style.overflow = 'auto'; };
   }, [isOpen]);
+
+  // Handle messages from Extension Bridge
+  useEffect(() => {
+    const handleBridgeMessage = (event) => {
+      const { type, dataUrl, error, version } = event.data;
+      
+      if (type === 'AGORA_PONG') {
+        console.log('🌌 Agora Extension Bridge Detected. Version:', version);
+        setExtensionStatus('detected');
+      }
+
+      if (type === 'AGORA_CAPTURE_RESPONSE') {
+        if (captureResolveRef.current) {
+          if (dataUrl) captureResolveRef.current({ dataUrl });
+          else captureResolveRef.current({ error });
+          captureResolveRef.current = null;
+        }
+      }
+    };
+
+    window.addEventListener('message', handleBridgeMessage);
+    return () => window.removeEventListener('message', handleBridgeMessage);
+  }, []);
+
+  const checkExtension = () => {
+    setExtensionStatus('unknown');
+    window.postMessage({ type: 'AGORA_PING' }, window.location.origin);
+    // Set a timeout to mark as not found if no pong received
+    setTimeout(() => {
+      setExtensionStatus(prev => prev === 'unknown' ? 'not_found' : prev);
+    }, 1000);
+  };
 
   const questionTypes = [
     { id: 'quiz', label: '이 문제 질문', icon: '📝' },
@@ -53,38 +113,137 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
     } else {
       // Turn ON: Capture Background
       try {
+        // 혁신적 해결책: 영상 캡처 시 확장 프로그램 사용 시도
+        if (activeContext?.type === 'video') {
+          if (extensionStatus === 'not_found') {
+             setShowExtensionPrompt(true);
+             return; // Don't proceed to draw mode if user needs extension for accuracy
+          }
+          
+          if (extensionStatus === 'detected') {
+            setIsCapturing(true);
+            document.body.classList.add('is-capturing');
+            document.body.classList.add('is-extension-capturing');
+            
+            // Request capture from bridge with a small delay to ensure modal is hidden
+            const capturePromise = new Promise(resolve => {
+              captureResolveRef.current = resolve;
+              
+              // CRITICAL: Wait for modal to hide via framer-motion
+              setTimeout(() => {
+                window.postMessage({ type: 'AGORA_CAPTURE_REQUEST' }, window.location.origin);
+              }, 300);
+
+              // Timeout fallback
+              setTimeout(() => {
+                if (captureResolveRef.current === resolve) {
+                  resolve({ error: 'Extension response timeout' });
+                  captureResolveRef.current = null;
+                }
+              }, 6000);
+            });
+
+            const result = await capturePromise;
+            if (result.dataUrl) {
+              setBackgroundImage(result.dataUrl);
+               // Success! Skip html2image logic
+              return; 
+            }
+            console.warn('Extension capture failed, falling back to legacy capture:', result.error);
+          }
+        }
+
+        setBackgroundImage(null); 
         setIsCapturing(true); 
+        document.body.classList.add('is-capturing');
         
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for class change / UI state to settle
+        await new Promise(resolve => setTimeout(resolve, 200));
 
         const element = document.getElementById('quiz-capture-area');
         if (element) {
           try {
-            const dataUrl = await htmlToImage.toPng(element, { 
+            // Precise Viewport Capture for Data Log
+            const scrollEl = element.querySelector('.mission-content-view');
+            const cardEl = scrollEl?.querySelector('.glass-card');
+            
+            let captureTarget = element;
+            let captureOptions = {
               quality: 0.9,
               pixelRatio: 2,
-              backgroundColor: '#1a1a2e',
+              backgroundColor: '#050a19',
               skipAutoScale: true,
               cacheBust: true,
-              fontEmbedCSS: '', 
+              fontEmbedCSS: '',
               filter: (node) => {
-                if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
-                   return false; 
-                }
+                if (node.tagName === 'LINK' && node.rel === 'stylesheet') return false;
+                if (node.classList?.contains('modal-overlay')) return false;
+                if (node.classList?.contains('capture-hide')) return false;
                 return true;
               }
-            });
-            setBackgroundImage(dataUrl);
+            };
+
+            if (scrollEl && cardEl && activeContext?.type === 'datalog') {
+              const scrollTop = scrollEl.scrollTop;
+              const viewportHeight = scrollEl.clientHeight;
+              const viewportWidth = scrollEl.clientWidth;
+              const ratio = 2; // Capture at 2x for clarity
+
+              // Capture the full content card first
+              const fullCanvas = await htmlToImage.toCanvas(cardEl, {
+                quality: 1,
+                pixelRatio: ratio,
+                backgroundColor: '#050a19',
+                cacheBust: true,
+                filter: (node) => {
+                  if (node.classList?.contains('modal-overlay')) return false;
+                  if (node.classList?.contains('capture-hide')) return false;
+                  return true;
+                }
+              });
+
+              // Crop the visible part onto a new canvas
+              const cropCanvas = document.createElement('canvas');
+              cropCanvas.width = viewportWidth * ratio;
+              cropCanvas.height = viewportHeight * ratio;
+              const ctx = cropCanvas.getContext('2d');
+              
+              if (ctx) {
+                ctx.drawImage(
+                  fullCanvas,
+                  0, scrollTop * ratio, cardEl.clientWidth * ratio, viewportHeight * ratio,
+                  0, 0, viewportWidth * ratio, viewportHeight * ratio
+                );
+                setBackgroundImage(cropCanvas.toDataURL('image/png'));
+              }
+            } else {
+              // Fallback for types without special scrolling needs (like video or quiz)
+              // We capture the whole area to ensure consistency with the user's viewport
+              const dataUrl = await htmlToImage.toPng(element, { 
+                quality: 0.9,
+                pixelRatio: 2,
+                backgroundColor: '#050a19',
+                cacheBust: true,
+                filter: (node) => {
+                  if (node.classList?.contains('modal-overlay')) return false;
+                  if (node.classList?.contains('capture-hide')) return false;
+                  return true;
+                }
+              });
+              setBackgroundImage(dataUrl);
+            }
           } catch (captureErr) {
             console.warn('Screen capture failed:', captureErr);
           }
+        } else {
+          console.warn('Capture target element #quiz-capture-area not found.');
         }
-        
-        setIsCapturing(false); 
-        setIsDrawMode(true);
       } catch (err) {
         console.error('General error entering draw mode:', err);
+      } finally {
         setIsCapturing(false);
+        document.body.classList.remove('is-capturing');
+        document.body.classList.remove('is-extension-capturing');
         setIsDrawMode(true);
       }
     }
@@ -175,16 +334,17 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
         userId: user.uid,
         userName: user.displayName || '익명 학생',
         content,
-        type,
+        type: activeContext?.type || type,
         category: 'general', 
         isPublic,
-        quizId: quizContext?.quizId || null,
+        quizId: activeContext?.quizId || null,
         quizContext: {
-          chapterId: quizContext?.chapterId || '',
-          unitId: quizContext?.unitId || '',
-          questionId: quizContext?.questionId || '',
-          wrongAnswer: quizContext?.wrongAnswer || null,
-          quizTitle: quizContext?.quizTitle || ''
+          chapterId: activeContext?.chapterId || '',
+          unitId: activeContext?.unitId || '',
+          questionId: activeContext?.questionId || '',
+          wrongAnswer: activeContext?.wrongAnswer || null,
+          quizTitle: activeContext?.quizTitle || activeContext?.unitTitle || '',
+          transmissionTitle: activeContext?.transmissionTitle || ''
         },
         drawingUrl,
         status: 'open',
@@ -224,7 +384,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
   if (!isOpen) return null;
 
   return ReactDOM.createPortal(
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       <motion.div 
         className="modal-overlay"
         initial={{ opacity: 0 }}
@@ -257,7 +418,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
             {!isDrawMode && (
               <>
                 <div className="quiz-info-badge">
-                  {quizContext?.quizTitle} - {quizContext?.questionId ? `질문 중` : '자유 질문'}
+                  {activeContext?.type === 'datalog' && `📄 데이터 로그 - ${activeContext.unitTitle}`}
+                  {activeContext?.type === 'video' && `📡 영상 학습 - ${activeContext.transmissionTitle || activeContext.unitTitle}`}
+                  {(!activeContext?.type || activeContext?.type === 'quiz') && `${activeContext?.quizTitle} - ${activeContext?.questionId ? '질문 중' : '자유 질문'}`}
                 </div>
 
                 {/* 
@@ -312,7 +475,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
               ) : !isDrawMode ? (
                 /* Attachment buttons: draw (quiz only) + upload */
                 <div className="attach-buttons-row">
-                  {quizContext?.questionId && (
+                  {(activeContext?.quizId !== undefined || activeContext?.type) && (
                     <button 
                       type="button" 
                       className={`draw-toggle-btn ${isDrawMode ? 'active' : ''}`}
@@ -392,7 +555,76 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
           </form>
         </motion.div>
       </motion.div>
-    </AnimatePresence>,
+      </AnimatePresence>
+
+      {/* --- Extension Installation Prompt --- */}
+      <AnimatePresence>
+        {showExtensionPrompt && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay"
+            style={{ zIndex: 1100, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="glass-card"
+              style={{ width: '90%', maxWidth: '450px', padding: '2.5rem', textAlign: 'center', border: '1px solid var(--neon-blue)', background: 'linear-gradient(135deg, rgba(10, 20, 40, 0.95), rgba(5, 10, 25, 0.98))' }}
+            >
+              <div style={{ fontSize: '3.5rem', marginBottom: '1.5rem' }}>🛰️</div>
+              <h2 className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.5rem', marginBottom: '1rem' }}>시스템 연동 필요</h2>
+              <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '2rem', textAlign: 'center' }}>
+                영상의 <span style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>현재 프레임을 100% 정확하게</span> 캡처하려면<br/>
+                아고라 커넥트 확장 프로그램을 설치해야 합니다.
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <a 
+                  href="https://chromewebstore.google.com/detail/lponajbmhhknagjpoicmhhboalpmegbn?utm_source=item-share-cb"
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hud-btn primary glass"
+                  style={{ textDecoration: 'none', padding: '1.2rem', fontSize: '1.1rem', background: 'rgba(0, 243, 255, 0.2)', border: '1px solid var(--neon-blue)', color: 'white', borderRadius: '12px', textAlign: 'center', display: 'block' }}
+                >
+                  시스템 설치하기 (Chrome WEB)
+                </a>
+                
+                <button 
+                  onClick={() => {
+                    // Start legacy capture as fallback even if they don't install, but warn them
+                    setShowExtensionPrompt(false);
+                    // Force legacy capture by tricking status
+                    setExtensionStatus('ignoring');
+                    setTimeout(() => handleToggleDrawMode(), 100);
+                  }}
+                  className="hud-btn secondary glass"
+                  style={{ padding: '0.8rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}
+                >
+                  기존 방식으로 계속 (정확도 낮음)
+                </button>
+                
+                <button 
+                  onClick={() => setShowExtensionPrompt(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', marginTop: '0.5rem', cursor: 'pointer' }}
+                >
+                  나중에 하기
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {isListening && (
+        <canvas 
+          id="voice-visualizer" 
+          style={{ position: 'fixed', bottom: 20, left: 20, width: 150, height: 40, pointerEvents: 'none', opacity: 1, transition: 'opacity 0.3s' }}
+        />
+      )}
+    </>,
     document.body
   );
 }

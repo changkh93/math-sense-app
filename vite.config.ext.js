@@ -54,6 +54,19 @@ const configs = {
   }),
   // --- Content Script ---
   content: defineConfig({
+    plugins: [
+      // react() 플러그인을 명시적으로 추가하여 JSX 처리 및 최적화 보장
+      import('@vitejs/plugin-react').then(m => m.default())
+    ],
+    define: {
+      'process.env.NODE_ENV': JSON.stringify('production'),
+    },
+    resolve: {
+      alias: {
+        'react': path.resolve(__dirname, 'node_modules/react'),
+        'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      },
+    },
     build: {
       outDir: 'dist-ext',
       emptyOutDir: false,   // preserve background & popup

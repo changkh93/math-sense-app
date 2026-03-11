@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 import SpaceQuizView from './SpaceQuizView'
 import WorkbookPlayer from './WorkbookPlayer'
+import QuestionModal from '../QuestionModal'
 import soundManager from '../../utils/SoundManager'
 import { InlineMath } from 'react-katex'
 import 'katex/dist/katex.min.css'
@@ -61,12 +62,27 @@ const SilentCrystalToast = ({ amount, visible }) => (
 )
 
 // ─── YouTube Player Component ───
-const YoutubePlayer = ({ videoId, start, end, onComplete, onTimeUpdate, isOverlay = false, autoPlay = true }) => {
+const YoutubePlayer = React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, isOverlay = false, autoPlay = true }, ref) => {
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
   const [hasError, setHasError] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
   const timeUpdateInterval = useRef(null)
   const playerTargetId = useRef(`yt-player-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
+
+  useImperativeHandle(ref, () => ({
+    pauseVideo: () => {
+      if (playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+        playerRef.current.pauseVideo()
+        // Proactive sync right after pause
+        setCurrentTime(playerRef.current.getCurrentTime())
+        if (playerRef.current.getDuration) {
+          setDuration(playerRef.current.getDuration())
+        }
+      }
+    }
+  }))
 
   useEffect(() => {
     if (!window.YT) {
@@ -101,33 +117,36 @@ const YoutubePlayer = ({ videoId, start, end, onComplete, onTimeUpdate, isOverla
           origin: window.location.origin
         },
         events: {
+          'onReady': () => {
+            // Start continuous time tracking as soon as player is ready
+            // and keep it running even when paused to handle seeking/stale caps.
+            if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
+            timeUpdateInterval.current = setInterval(() => {
+              if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+                const curr = playerRef.current.getCurrentTime()
+                const dur = playerRef.current.getDuration ? playerRef.current.getDuration() : 0
+                const rate = playerRef.current.getPlaybackRate ? playerRef.current.getPlaybackRate() : 1
+                
+                setCurrentTime(curr)
+                setDuration(dur)
+                
+                // Report back to MissionHub immediately to keep context updated
+                if (onTimeUpdate) {
+                  onTimeUpdate({ currentTime: curr, duration: dur, playbackRate: rate })
+                }
+              }
+            }, 200) // Much higher frequency to catch seeking/timeline drags
+          },
           'onStateChange': (event) => {
             if (event.data === window.YT.PlayerState.ENDED) {
               // Force one last time update before ending, crucial for capturing short remaining playbacks
               if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
-                const currentTime = playerRef.current.getCurrentTime()
-                const duration = playerRef.current.getDuration ? playerRef.current.getDuration() : 0
-                const playbackRate = playerRef.current.getPlaybackRate ? playerRef.current.getPlaybackRate() : 1
-                if (onTimeUpdate) onTimeUpdate({ currentTime, duration, playbackRate })
+                const curr = playerRef.current.getCurrentTime()
+                const dur = playerRef.current.getDuration ? playerRef.current.getDuration() : 0
+                const rate = playerRef.current.getPlaybackRate ? playerRef.current.getPlaybackRate() : 1
+                if (onTimeUpdate) onTimeUpdate({ currentTime: curr, duration: dur, playbackRate: rate })
               }
               if (onComplete) onComplete()
-            }
-            // Start/stop time tracking
-            if (event.data === window.YT.PlayerState.PLAYING) {
-              if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
-              timeUpdateInterval.current = setInterval(() => {
-                if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
-                  const currentTime = playerRef.current.getCurrentTime()
-                  const duration = playerRef.current.getDuration ? playerRef.current.getDuration() : 0
-                  const playbackRate = playerRef.current.getPlaybackRate ? playerRef.current.getPlaybackRate() : 1
-                  if (onTimeUpdate) onTimeUpdate({ currentTime, duration, playbackRate })
-                }
-              }, 1000) // Every 1 second for accurate stamp tracking
-            } else {
-              if (timeUpdateInterval.current) {
-                clearInterval(timeUpdateInterval.current)
-                timeUpdateInterval.current = null
-              }
             }
           },
           'onError': (event) => {
@@ -187,8 +206,65 @@ const YoutubePlayer = ({ videoId, start, end, onComplete, onTimeUpdate, isOverla
     )
   }
 
-  return <div ref={wrapperRef} style={{ width: '100%', height: '100%', borderRadius: '15px', overflow: 'hidden' }} />
-}
+  // Helper to format time
+  const formatTime = (seconds) => {
+    const min = Math.floor(seconds / 60)
+    const sec = Math.floor(seconds % 60)
+    return `${min}:${sec.toString().padStart(2, '0')}`
+  }
+
+  // Determine which thumbnail to show based on progress (YouTube usually has 1, 2, 3 as segment snapshots)
+  const getThumbType = () => {
+    if (!duration) return 'hqdefault'
+    const progress = currentTime / duration
+    if (progress < 0.3) return 'hq1'
+    if (progress < 0.7) return 'hq2'
+    return 'hq3'
+  }
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: '15px', overflow: 'hidden' }}>
+      <div ref={wrapperRef} className="yt-iframe-wrapper" style={{ width: '100%', height: '100%' }} />
+      <div 
+        className="yt-placeholder" 
+        style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          width: '100%', 
+          height: '100%', 
+          backgroundImage: `url(https://img.youtube.com/vi/${videoId}/${getThumbType()}.jpg)`, 
+          backgroundSize: 'cover', 
+          backgroundPosition: 'center',
+          zIndex: 10,
+          display: 'none', // Managed by body.is-capturing in CSS
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }} 
+      >
+        <div 
+          className="capture-hide"
+          style={{ 
+            background: 'rgba(0,0,0,0.8)', 
+            color: 'var(--crystal-cyan)', 
+            padding: '1.5rem 2.5rem', 
+            borderRadius: '15px', 
+            border: '1px solid var(--neon-blue)',
+            textAlign: 'center'
+          }}
+        >
+          <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem', fontWeight: 700 }}>
+            우주 전송 데이터 캡처 중
+          </div>
+          <div style={{ fontSize: '2.5rem', fontFamily: 'var(--font-tech)', letterSpacing: '2px' }}>
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})
 
 // ─── Reward Potential Modal (moved from SpaceHome) ───
 function RewardPotentialModal({ unit, onCancel, onConfirm }) {
@@ -300,6 +376,26 @@ export default function MissionHub({
   const [overlayContent, setOverlayContent] = useState('text')
   const [overlayReference, setOverlayReference] = useState(null)
   const [selectedTx, setSelectedTx] = useState(null)
+  const videoPlayerRef = useRef(null)
+
+  // ─── Question Modal State ───
+  const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
+  const [questionContext, setQuestionContext] = useState(null)
+
+  const handleOpenQuestionModal = (contextType) => {
+    // If opening from video, pause the player
+    if (contextType === 'video' && videoPlayerRef.current) {
+      videoPlayerRef.current.pauseVideo()
+    }
+
+    setQuestionContext({
+      type: contextType, // 'datalog' or 'video'
+      unitId: unitId,
+      unitTitle: activeUnit?.title,
+      transmissionTitle: selectedTx?.title
+    })
+    setIsQuestionModalOpen(true)
+  }
 
   // ─── Field Test modal state ───
   const [showFieldTestModal, setShowFieldTestModal] = useState(initialMode === 'quiz-modal')
@@ -1095,7 +1191,7 @@ export default function MissionHub({
       const startPosition = savedProgress?.lastPosition || selectedTx.start
 
       return (
-        <div className="mission-content-view fade-in" style={{ width: '100%', height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: '2rem 0', boxSizing: 'border-box' }}>
+        <div className="mission-content-view fade-in" style={{ width: '100%', minHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflowY: 'auto', padding: '2rem 0', boxSizing: 'border-box' }}>
           <div style={{ width: '90%', maxWidth: '1000px', display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
              <h3 className="font-title" style={{ margin: 0, color: 'var(--planet-green)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1.5rem' }}>📡</span> {selectedTx.title}
@@ -1124,6 +1220,7 @@ export default function MissionHub({
             margin: '0 auto' 
           }}>
              <YoutubePlayer 
+                ref={videoPlayerRef}
                 key={`${selectedTx.videoId}_${startPosition}`}
                 videoId={selectedTx.videoId}
                 start={startPosition}
@@ -1132,7 +1229,7 @@ export default function MissionHub({
                 onComplete={() => setIsAtEnd(true)}
              />
           </div>
-          <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+          <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button 
               onClick={handleSaveVideoPosition}
               className="hud-btn secondary glass"
@@ -1156,6 +1253,26 @@ export default function MissionHub({
                 <>📋 오늘은 여기까지</>
               )}
             </button>
+
+            <button
+              onClick={() => handleOpenQuestionModal('video')}
+              className="hud-btn primary glass capture-hide"
+              style={{
+                padding: '1rem 2rem',
+                fontSize: '1.1rem',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.2), rgba(34, 211, 238, 0.2))',
+                borderColor: 'var(--crystal-cyan)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.8rem'
+              }}
+            >
+              🙋 선생님께 영상 질문하기
+            </button>
+          </div>
+          <div style={{ textAlign: 'center' }}>
             {isAtEnd && !videoCompleted && (
               <p className="font-tech" style={{ color: 'var(--alert-red)', marginTop: '1rem', fontSize: '0.9rem' }}>
                 통신 장애! 영상의 90% 이상을 탐사해야 보너스 수신이 가능합니다.
@@ -1420,7 +1537,7 @@ export default function MissionHub({
   }
 
   return (
-    <div className="mission-hub-container space-bg" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000 }}>
+    <div className="mission-hub-container space-bg" id="quiz-capture-area" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000 }}>
        <AnimatePresence mode='wait'>
           {currentMode === 'briefing' && (
              <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1468,6 +1585,40 @@ export default function MissionHub({
            />
          )}
        </AnimatePresence>
+
+       {/* Conditionally render Global FAB for text mode */}
+       {(currentMode === 'text') && (
+          <button
+            onClick={() => handleOpenQuestionModal('datalog')}
+            className="hud-btn primary glass capture-hide"
+            style={{
+              position: 'fixed',
+              bottom: '2rem',
+              right: '2rem',
+              padding: '1rem 1.5rem',
+              borderRadius: '50px',
+              background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.9), rgba(34, 211, 238, 0.9))',
+              color: '#000',
+              fontWeight: 800,
+              fontSize: '1rem',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+              border: 'none',
+              zIndex: 3000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            🙋 선생님 질문
+          </button>
+       )}
+
+       {/* Question Modal */}
+       <QuestionModal
+         isOpen={isQuestionModalOpen}
+         onClose={() => setIsQuestionModalOpen(false)}
+         contextData={questionContext}
+       />
     </div>
   )
 }

@@ -17,7 +17,7 @@ let floatingOrb = null;
 let preSelectedText = ''; // 캡처 전 페이지에서 선택한 텍스트
 
 // ============================================================
-// 메시지 리스너
+// 메시지 리스너 (Extension -> Content Script)
 // ============================================================
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "INIT_OVERLAY") {
@@ -29,6 +29,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
   }
   return true;
+});
+
+// ============================================================
+// 브릿지 리스너 (Web App -> Content Script -> Web App)
+// 획기적인 영상 캡처 해결책: 웹 앱에서 요청하면 확장 프로그램이 응답함
+// ============================================================
+window.addEventListener('message', (event) => {
+  // 보안을 위해 출처 확인이 필요할 수 있으나, 여기서는 액션 기반으로 처리
+  const { type } = event.data;
+
+  // 1. 상태 확인 (Ping)
+  if (type === 'AGORA_PING') {
+    console.log('🌌 [Content] Received AGORA_PING');
+    window.postMessage({ type: 'AGORA_PONG', version: '1.0.2' }, window.location.origin);
+  }
+
+  // 2. 캡처 요청
+  if (type === 'AGORA_CAPTURE_REQUEST') {
+    console.log('🌌 [Content] Received AGORA_CAPTURE_REQUEST');
+    chrome.runtime.sendMessage({ action: "CAPTURE_VISIBLE_TAB" }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('🌌 [Content] Capture Error:', chrome.runtime.lastError.message);
+        window.postMessage({ type: 'AGORA_CAPTURE_RESPONSE', error: chrome.runtime.lastError.message }, window.location.origin);
+        return;
+      }
+      if (response && response.dataUrl) {
+        console.log('🌌 [Content] Capture Success, sending response');
+        window.postMessage({ type: 'AGORA_CAPTURE_RESPONSE', dataUrl: response.dataUrl }, window.location.origin);
+      } else {
+        console.warn('🌌 [Content] Capture returned empty response');
+        window.postMessage({ type: 'AGORA_CAPTURE_RESPONSE', error: 'Capture failed or returned empty' }, window.location.origin);
+      }
+    });
+  }
 });
 
 // ============================================================

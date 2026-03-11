@@ -449,3 +449,23 @@
 .preview-btn:hover {
   transform: scale(1.1);
 }
+
+/* --- Screen Capture Mode --- */
+/* Hide floating UI elements during capture */
+body.is-capturing .capture-hide {
+  display: none !important;
+}
+
+/* Hide YouTube iframes (which capture as black due to CORS) and show thumbnails instead */
+/* EXTENSION BRIDGE: If we use extension, we DON'T hide the video because extension can see it! */
+body.is-capturing:not(.is-extension-capturing) .yt-iframe-wrapper {
+  opacity: 0 !important;
+}
+
+.yt-placeholder {
+  display: none;
+}
+
+body.is-capturing:not(.is-extension-capturing) .yt-placeholder {
+  display: flex !important;
+}
