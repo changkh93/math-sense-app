@@ -31,15 +31,21 @@ export default function AnnotationCanvas({ backgroundImage, initialState, onComp
   // STT Integration
   const { isListening, transcript, interimTranscript, startListening, stopListening, isSupported } = useSpeechToText();
   const sttTextObjectRef = useRef(null);
+  const micRequestedRef = useRef(false);
 
   // Sync mode when STT stops natively
   useEffect(() => {
-    if (!isListening && mode === MODES.MIC) {
+    if (isListening) {
+      micRequestedRef.current = false;
+    } else if (mode === MODES.MIC && !micRequestedRef.current) {
       setMode(MODES.SELECT);
     }
   }, [isListening, mode]);
 
   const handleModeChange = (newMode) => {
+    if (newMode === MODES.MIC) {
+      micRequestedRef.current = true;
+    }
     if (isListening && newMode !== MODES.MIC) {
       stopListening();
     }
@@ -471,8 +477,7 @@ export default function AnnotationCanvas({ backgroundImage, initialState, onComp
                 className={`toolbar-btn ${mode === MODES.MIC ? 'active' : ''}`} 
                 onClick={() => {
                   if (mode === MODES.MIC) {
-                    stopListening();
-                    setMode(MODES.SELECT);
+                    handleModeChange(MODES.SELECT);
                   } else {
                     handleModeChange(MODES.MIC);
                     startListening();
