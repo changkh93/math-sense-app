@@ -141,12 +141,21 @@ function createFloatingOrb() {
     floatingOrb.style.bottom = 'auto';
   });
 
-  document.addEventListener('mouseup', () => {
+  document.addEventListener('mouseup', async () => {
     if (!isDragging) return;
     isDragging = false;
     floatingOrb.style.cursor = 'grab';
     floatingOrb.style.transition = 'transform 0.2s, opacity 0.3s, box-shadow 0.3s';
+    
     if (!wasDragged) {
+      // ★ 추가: 캡처 전 로그인 상태 확인 ★
+      const data = await chrome.storage.local.get(['agoraUser']);
+      if (!data.agoraUser) {
+        if (confirm("로그인이 필요합니다. 로그인 페이지로 이동하시겠습니까? (로그인 후 다시 시도해 주세요)")) {
+          window.open('https://msense.me/agora', '_blank');
+        }
+        return;
+      }
       triggerCapture();
     }
   });
@@ -352,68 +361,138 @@ function startSnippingMode(dataUrl) {
 }
 
 // ============================================================
-// 3. 판서 오버레이 (Annotation Overlay)
+// 3. 판서 오버레이 (Annotation Overlay) - React Component
 // ============================================================
+const AgoraExtensionOverlay = ({ croppedDataUrl, preSelectedText, onClose }) => {
+  const [text, setText] = React.useState(preSelectedText ? `> ${preSelectedText.substring(0, 200)}\n\n` : '');
+  const [isSending, setIsSending] = React.useState(false);
+  const canvasRef = React.useRef(null);
+
+  const handleSend = async () => {
+    if (isSending) return;
+    setIsSending(true);
+    showToast('⏳ 전송 중...', '#F59E0B');
+
+    try {
+      const finalImage = canvasRef.current.getCaptureData();
+      
+      chrome.runtime.sendMessage({
+        action: "SUBMIT_QUESTION",
+        payload: {
+          image: finalImage,
+          text: text || "(첨부된 그림 참조)",
+          url: window.location.href,
+          title: document.title,
+        }
+      }, (response) => {
+        setIsSending(false);
+        if (response && response.success) {
+          showToast('✅ 질문이 아고라로 전송되었습니다!', '#10B981');
+          onClose();
+        } else {
+          showToast('❌ ' + (response?.error || '전송 실패'), '#EF4444');
+        }
+      });
+    } catch (err) {
+      setIsSending(false);
+      showToast('❌ 오류 발생', '#EF4444');
+    }
+  };
+
+  return (
+    <div style={{
+      width: '100vw', height: '100vh',
+      backgroundColor: 'rgba(10, 10, 30, 0.95)',
+      display: 'flex', flexDirection: 'column',
+      backdropFilter: 'blur(12px)',
+      position: 'relative'
+    }}>
+      {/* Top Close Button */}
+      <button 
+        onClick={onClose}
+        style={{
+          position: 'absolute', top: '20px', right: '20px',
+          background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white',
+          width: '40px', height: '40px', borderRadius: '50%',
+          fontSize: '24px', cursor: 'pointer', zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}
+      >
+        ✕
+      </button>
+
+      {/* Main Content Area */}
+      <div style={{ flex: 1, display: 'flex', padding: '20px', paddingTop: '60px', overflow: 'hidden' }}>
+        <AnnotationCanvas 
+          ref={canvasRef}
+          backgroundImage={croppedDataUrl}
+          showFooter={false}
+        />
+      </div>
+
+      {/* Bottom Input Area */}
+      <div style={{
+        padding: '20px', background: 'rgba(0,0,0,0.4)',
+        borderTop: '1px solid rgba(255,255,255,0.1)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'
+      }}>
+        <div style={{ width: '100%', maxWidth: '800px', display: 'flex', gap: '12px' }}>
+          <textarea 
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="질문을 입력하세요... (캡처 이미지와 함께 전송됩니다)"
+            style={{
+              flex: 1, height: '60px', background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px',
+              padding: '12px', color: 'white', fontSize: '14px', resize: 'none',
+              outline: 'none'
+            }}
+          />
+          <button 
+            onClick={handleSend}
+            disabled={isSending}
+            style={{
+              padding: '0 24px', borderRadius: '12px', background: '#6C5CE7',
+              color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer',
+              opacity: isSending ? 0.5 : 1, transition: 'all 0.2s',
+              display: 'flex', alignItems: 'center', gap: '8px'
+            }}
+          >
+            🚀 전송
+          </button>
+        </div>
+        <div style={{ fontSize: '11px', color: '#64748B' }}>
+          📋 출처 정보(현재 페이지 URL)가 함께 기록됩니다.
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function createAnnotationOverlay(croppedDataUrl) {
   if (overlayContainer) return;
 
-  // === 컨테이너 ===
   overlayContainer = document.createElement('div');
   overlayContainer.id = 'agora-connect-overlay';
   Object.assign(overlayContainer.style, {
-    position: 'fixed',
-    top: '0', left: '0',
-    width: '100vw', height: '100vh',
+    position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
     zIndex: '2147483647',
-    backgroundColor: 'rgba(10, 10, 30, 0.92)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backdropFilter: 'blur(8px)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   });
 
   document.body.appendChild(overlayContainer);
-
   const reactRoot = createRoot(overlayContainer);
 
-  const handleComplete = (dataUrl, json) => {
-    submitQuestion(dataUrl);
-  };
-
-  const handleCancel = () => {
-    closeOverlay();
-  };
-
   reactRoot.render(
-    <div style={{ width: '85%', height: '80%', display: 'flex', flexDirection: 'column' }}>
-      <AnnotationCanvas 
-        backgroundImage={croppedDataUrl}
-        onComplete={handleComplete}
-        onCancel={handleCancel}
-      />
-    </div>
+    <AgoraExtensionOverlay 
+      croppedDataUrl={croppedDataUrl}
+      preSelectedText={preSelectedText}
+      onClose={() => closeOverlay()}
+    />
   );
 
   overlayContainer._reactRoot = reactRoot;
 
-  // === 저작권 배너 ===
-  const copyrightNote = document.createElement('div');
-  Object.assign(copyrightNote.style, {
-    fontSize: '10px', color: '#64748B', marginTop: '16px',
-    textAlign: 'center',
-    zIndex: 10,
-  });
-  copyrightNote.textContent = '📋 출처 정보(현재 페이지 URL)가 함께 기록됩니다.';
-  overlayContainer.appendChild(copyrightNote);
-
-  // === 자동 인용 토스트 ===
-  if (preSelectedText) {
-    showToast('✨ 선택한 텍스트가 인용되었습니다!', '#6C5CE7');
-  }
-
-  // === 키보드 이벤트 ===
+  // ESC key to close
   const keyHandler = (e) => {
     if (e.key === 'Escape') closeOverlay();
   };
@@ -421,40 +500,7 @@ function createAnnotationOverlay(croppedDataUrl) {
   overlayContainer._cleanup = () => document.removeEventListener('keydown', keyHandler);
 }
 
-// ============================================================
-// 질문 전송 (Inline)
-// ============================================================
-function submitQuestion(finalImage) {
-  showToast('⏳ 전송 중...', '#F59E0B');
-
-  // 15초 타임아웃
-  const timeout = setTimeout(() => {
-    showToast('⚠️ 전송 시간 초과. 다시 시도해주세요.', '#F59E0B');
-  }, 15000);
-
-  const textMsg = preSelectedText 
-    ? `> ${preSelectedText.substring(0, 200)}\n\n(첨부된 그림 참조)` 
-    : "(첨부된 그림 참조)";
-
-  chrome.runtime.sendMessage({
-    action: "SUBMIT_QUESTION",
-    payload: {
-      image: finalImage,
-      text: textMsg,
-      url: window.location.href,
-      title: document.title,
-    }
-  }, (response) => {
-    clearTimeout(timeout);
-    if (response && response.success) {
-      showToast('✅ 질문이 아고라로 전송되었습니다!', '#10B981');
-      closeOverlay();
-    } else {
-      const err = response?.error || '알 수 없는 오류';
-      showToast('❌ ' + err, '#EF4444');
-    }
-  });
-}
+// submission logic is now inside the React component
 
 // ============================================================
 // 오버레이 닫기

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { fabric } from 'fabric';
 import { useSpeechToText } from '../hooks/useSpeechToText';
 import './AnnotationCanvas.css';
@@ -15,7 +15,7 @@ const MODES = {
 
 const COLORS = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#ffffff'];
 
-export default function AnnotationCanvas({ backgroundImage, initialState, onComplete, onCancel }) {
+const AnnotationCanvas = forwardRef(({ backgroundImage, initialState, onComplete, onCancel, showFooter = true }, ref) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [canvas, setCanvas] = useState(null);
@@ -405,6 +405,20 @@ export default function AnnotationCanvas({ backgroundImage, initialState, onComp
     if (onComplete) onComplete(dataUrl, json);
   };
 
+  // Expose capture functionality to parent (extension overlay)
+  useImperativeHandle(ref, () => ({
+    getCaptureData: () => {
+      if (!canvas) return null;
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+      return canvas.toDataURL({
+        format: 'png',
+        quality: 0.9,
+        multiplier: 1
+      });
+    }
+  }));
+
   return (
     <div className="annotation-canvas-wrapper">
       <div className="annotation-canvas-container" ref={containerRef}>
@@ -507,11 +521,15 @@ export default function AnnotationCanvas({ backgroundImage, initialState, onComp
           </div>
         </div>
 
-      <div className="annotation-actions" style={{ justifyContent: 'center' }}>
-        <button type="button" className="action-btn complete" onClick={handleComplete} style={{ transform: 'scale(1.1)' }}>
-          ✅ 질문 첨부하기
-        </button>
-      </div>
+      {showFooter && (
+        <div className="annotation-actions" style={{ justifyContent: 'center' }}>
+          <button type="button" className="action-btn complete" onClick={handleComplete} style={{ transform: 'scale(1.1)' }}>
+            ✅ 질문 첨부하기
+          </button>
+        </div>
+      )}
     </div>
   );
-}
+});
+
+export default AnnotationCanvas;
