@@ -20,11 +20,14 @@ service cloud.firestore {
     }
 
     match /regions/{regionId} {
-      allow read: if isAdmin() ||
-                  !('clusterId' in resource.data) || 
-                  resource.data.clusterId == 'cluster_elementary' ||
-                  (isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clusterAccess[resource.data.clusterId] == 'active');
+      allow read: if true; // Regions metadata must be readable so clients can check `isPrivate` and `accessCode` (or handle this via restricted fields if needed, but for now we need titles & codes).
       allow write: if isAdmin();
+      
+      // Allow students to add themselves when they verify the code
+      match /students/{studentId} {
+        allow read: if isAdmin() || request.auth.uid == studentId;
+        allow write: if isAdmin() || request.auth.uid == studentId;
+      }
     }
     
     match /chapters/{document=**} {

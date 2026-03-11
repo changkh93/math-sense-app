@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useClusters, useRegions, useChapters, useUnits, useAdminMutations } from '../../hooks/useContent';
-import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown, Rocket, Bot, RefreshCw } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown, Rocket, Bot, RefreshCw, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AiQuizImportModal from '../../components/Admin/AiQuizImportModal';
 import { db } from '../../firebase';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import RegionEditModal from '../../components/Admin/RegionEditModal';
+import RegionStudentManagerModal from '../../components/Admin/RegionStudentManagerModal';
 
 const ContentManager = () => {
   const { data: clusters, isLoading: loadingClusters } = useClusters();
@@ -15,18 +17,19 @@ const ContentManager = () => {
   const [expandedChapters, setExpandedChapters] = useState({});
   const [aiImportUnitId, setAiImportUnitId] = useState(null);
 
+  // Modals state
+  const [editingRegion, setEditingRegion] = useState(null);
+  const [managingRegionStudents, setManagingRegionStudents] = useState(null);
+
   const toggleRegion = (id) => setExpandedRegions(prev => ({ ...prev, [id]: !prev[id] }));
   const toggleChapter = (id) => setExpandedChapters(prev => ({ ...prev, [id]: !prev[id] }));
 
   const handleAddRegion = () => {
-    const title = prompt("New Region Title:");
-    if (title) {
-      saveRegion.mutate({ 
-        title, 
-        clusterId: selectedClusterId,
-        order: regions?.length || 0 
-      });
-    }
+    setEditingRegion({ isNew: true, clusterId: selectedClusterId, order: regions?.length || 0 });
+  };
+
+  const handleSaveRegion = (regionData) => {
+    saveRegion.mutate(regionData);
   };
 
   if (loadingRegions) return <div className="loading">Loading Regions...</div>;
@@ -80,6 +83,8 @@ const ContentManager = () => {
             expandedChapters={expandedChapters}
             onToggleChapter={toggleChapter}
             onOpenAiImport={setAiImportUnitId}
+            onEditRegion={(region) => setEditingRegion(region)}
+            onManageStudents={(region) => setManagingRegionStudents(region)}
           />
         ))}
       </div>
@@ -89,20 +94,30 @@ const ContentManager = () => {
         unitId={aiImportUnitId} 
         onClose={() => setAiImportUnitId(null)} 
       />
+
+      <RegionEditModal
+        isOpen={!!editingRegion}
+        initialData={editingRegion}
+        onClose={() => setEditingRegion(null)}
+        onSave={handleSaveRegion}
+      />
+
+      <RegionStudentManagerModal
+        isOpen={!!managingRegionStudents}
+        region={managingRegionStudents}
+        onClose={() => setManagingRegionStudents(null)}
+      />
     </div>
   );
 };
 
-const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleChapter, onOpenAiImport }) => {
+const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleChapter, onOpenAiImport, onEditRegion, onManageStudents }) => {
   const { data: chapters, isLoading: loadingChapters } = useChapters(isExpanded ? region.id : null);
   const { saveRegion, deleteRegion, saveChapter } = useAdminMutations();
 
   const handleRename = (e) => {
     e.stopPropagation();
-    const newTitle = prompt("Rename Region:", region.title);
-    if (newTitle && newTitle !== region.title) {
-      saveRegion.mutate({ ...region, title: newTitle });
-    }
+    onEditRegion(region);
   };
 
   const handleAddChapter = (e) => {
@@ -134,7 +149,8 @@ const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleCh
           <span className="node-title">{region.title}</span>
         </div>
         <div className="node-actions">
-          <button className="icon-btn edit-btn" onClick={handleRename} title="Rename"><Edit3 size={16} /></button>
+          <button className="icon-btn" onClick={(e) => { e.stopPropagation(); onManageStudents(region); }} title="Manage Students" style={{ color: 'var(--crystal-cyan)' }}><Users size={16} /></button>
+          <button className="icon-btn edit-btn" onClick={handleRename} title="Edit Region"><Settings size={16} /></button>
           <button className="icon-btn add-btn" onClick={handleAddChapter} title="Add Chapter"><Plus size={16} /></button>
           <button className="icon-btn delete-btn" onClick={handleDelete} title="Delete"><Trash2 size={16} /></button>
         </div>

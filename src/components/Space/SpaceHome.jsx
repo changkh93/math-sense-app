@@ -22,6 +22,7 @@ import SpaceStore from './SpaceStore'
 import SpaceRanking from './SpaceRanking'
 import SpaceJourney from './SpaceJourney'
 import CrystalLedger from './CrystalLedger'
+import RegionAccessModal from './RegionAccessModal' // New Integration
 
 import { useParticles, createParticleBurst } from './ParticleEffects'
 import { calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils'
@@ -50,7 +51,10 @@ function SpaceHome() {
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
   const [quickQuizMode, setQuickQuizMode] = useState(null) // New: Mode for quick quiz
-  // pendingUnit removed — RewardPotentialModal now lives inside MissionHub
+  // Region Access State
+  const [pendingRegion, setPendingRegion] = useState(null)
+  const [accessError, setAccessError] = useState(null)
+  const [verifyingCode, setVerifyingCode] = useState(false)
   
   // --- Memory Core State ---
   const [isMemoryCoreMode, setIsMemoryCoreMode] = useState(false)
@@ -1172,6 +1176,18 @@ function SpaceHome() {
               recentRegionId={recentRegionId}
               explorationStatus={explorationStatus}
               onSelectRegion={(id) => {
+                const region = regions?.find(r => r.id === id);
+                if (region?.isPrivate) {
+                   const accessStatus = userData?.regionAccess?.[id];
+                   if (accessStatus === 'suspended') {
+                      alert('이 행성에 대한 접근이 일시정지되었습니다. 선생님께 문의하세요.');
+                      return;
+                   } else if (accessStatus !== 'active') {
+                      setPendingRegion(region);
+                      soundManager.playClick();
+                      return;
+                   }
+                }
                 setSelectedRegionId(id)
                 soundManager.playWarp()
               }}
@@ -1192,6 +1208,45 @@ function SpaceHome() {
           setSelectedRegionId(null)
           setSelectedChapterDocId(null)
         }} 
+      />
+
+      <RegionAccessModal
+        isOpen={!!pendingRegion}
+        onClose={() => {
+          setPendingRegion(null);
+          setAccessError(null);
+        }}
+        region={pendingRegion}
+        loading={verifyingCode}
+        error={accessError}
+        onSubmitCode={async (region, code) => {
+          setVerifyingCode(true);
+          setAccessError(null);
+          try {
+            if (region.accessCode === code) {
+              const batch = writeBatch(db);
+              batch.set(doc(db, 'users', user.uid), {
+                regionAccess: { [region.id]: 'active' }
+              }, { merge: true });
+              batch.set(doc(db, 'regions', region.id, 'students', user.uid), {
+                email: user.email,
+                status: 'active',
+                joinedAt: serverTimestamp()
+              });
+              await batch.commit();
+              setPendingRegion(null);
+              setSelectedRegionId(region.id);
+              soundManager.playWarp();
+            } else {
+              setAccessError('접근 코드가 올바르지 않습니다.');
+            }
+          } catch (err) {
+            console.error('[Region Access Error]', err);
+            setAccessError('오류가 발생했습니다. 다시 시도해주세요.');
+          } finally {
+            setVerifyingCode(false);
+          }
+        }}
       />
 
       {/* Main Content Overlay */}
