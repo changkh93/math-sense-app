@@ -409,7 +409,9 @@ export default function MissionHub({
       type: contextType, // 'datalog' or 'video'
       unitId: unitId,
       unitTitle: activeUnit?.title,
-      transmissionTitle: selectedTx?.title
+      transmissionTitle: selectedTx?.title,
+      videoId: contextType === 'video' ? selectedTx?.videoId : null,
+      startTime: contextType === 'video' ? Math.floor(lastVideoTimeRef.current || 0) : null
     })
     setIsQuestionModalOpen(true)
   }
@@ -431,7 +433,7 @@ export default function MissionHub({
   const [videoCompleted, setVideoCompleted] = useState(false)
   const [isAtEnd, setIsAtEnd] = useState(false)
   const [videoCompletionBonusGiven, setVideoCompletionBonusGiven] = useState(false)
-  const lastVideoTimeRef = useRef(0) // Current video playback position
+  const lastVideoTimeRef = useRef(-1) // Current video playback position (starts at -1 to capture 0s)
   const totalTimeSpentRef = useRef(0) // Actual playback seconds (analytics)
   const videoDurationRef = useRef(0) // Video total duration for reward cap
   const totalRewardedCrystalsRef = useRef(0) // Total crystals given for this tx
@@ -649,8 +651,8 @@ export default function MissionHub({
     lastVideoTimeRef.current = currentTime
     if (duration > 0) videoDurationRef.current = duration
 
-    // Track actual playback time (always increases, for analytics)
-    totalTimeSpentRef.current += 1 // Called every 1 second
+    // Track actual playback time (accumulate real elapsed time)
+    totalTimeSpentRef.current += 0.2 // Called every ~200ms from YoutubePlayer poll
 
     // Calculate gap between polls
     const gap = currentSecond - lastSecond
@@ -883,7 +885,7 @@ export default function MissionHub({
       setVideoCompleted(savedProgress?.completed || false)
       setIsAtEnd(false) // Reset end detection when switching/reloading tx
       setVideoCompletionBonusGiven(savedProgress?.completionBonusGiven || false)
-      lastVideoTimeRef.current = savedProgress?.lastPosition || 0
+      lastVideoTimeRef.current = (savedProgress?.lastPosition !== undefined) ? savedProgress.lastPosition : -1
 
       // Auto-save every 10 seconds
       if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)

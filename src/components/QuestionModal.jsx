@@ -344,7 +344,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
           questionId: activeContext?.questionId || '',
           wrongAnswer: activeContext?.wrongAnswer || null,
           quizTitle: activeContext?.quizTitle || activeContext?.unitTitle || '',
-          transmissionTitle: activeContext?.transmissionTitle || ''
+          transmissionTitle: activeContext?.transmissionTitle || '',
+          videoId: activeContext?.videoId || null,
+          startTime: activeContext?.startTime || null
         },
         drawingUrl,
         status: 'open',

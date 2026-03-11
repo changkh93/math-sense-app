@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { InlineMath } from 'react-katex';
-import { useQuizzes } from '../../hooks/useContent';
+import { useQuizzes, useUnit } from '../../hooks/useContent';
+import MissionMarkdownViewer from '../Space/MissionMarkdownViewer';
 import 'katex/dist/katex.min.css';
 
 import ReactDOM from 'react-dom';
@@ -13,14 +14,20 @@ export default function QuizPreviewModal({
   onClose, 
   unitId, 
   quizId,
+  videoId,
+  startTime,
+  type = 'quiz',
+  title = '',
   showCorrectAnswer = true,
   showHint = true
 }) {
-  const { data: quizzes, isLoading: loadingQuizzes } = useQuizzes(unitId);
+  const { data: quizzes, isLoading: loadingQuizzes } = useQuizzes(type === 'quiz' ? unitId : null);
+  const { data: unit, isLoading: loadingUnit } = useUnit(type !== 'quiz' ? unitId : null);
   
   // console.log(`[DEBUG] Preview Modal - UnitId: ${unitId}, QuizId: ${quizId}`);
 
-  const quiz = quizzes?.find(q => q.id === quizId || q.docId === quizId);
+  const quiz = type === 'quiz' ? quizzes?.find(q => q.id === quizId || q.docId === quizId) : null;
+  const isLoading = type === 'quiz' ? loadingQuizzes : loadingUnit;
 
   if (!isOpen) return null;
 
@@ -46,9 +53,9 @@ export default function QuizPreviewModal({
             <button className="close-btn" onClick={onClose}><X size={20} /></button>
           </div>
 
-          {loadingQuizzes ? (
-            <div className="preview-loading">문제를 불러오는 중...</div>
-          ) : !quiz ? (
+          {isLoading ? (
+            <div className="preview-loading">정보를 불러오는 중...</div>
+          ) : type === 'quiz' && !quiz ? (
             <div className="preview-error">
               <p>문제를 찾을 수 없습니다.</p>
               <div style={{ fontSize: '0.8rem', marginTop: '1rem', opacity: 0.7 }}>
@@ -60,6 +67,46 @@ export default function QuizPreviewModal({
                   ⚠️ 이전 버전에서 작성된 질문은 단원 정보가 누락되어 미리보기가 제한될 수 있습니다.
                 </p>
               )}
+            </div>
+          ) : type === 'video' ? (
+            <div className="preview-body video-preview">
+               <div className="video-info-box glass" style={{ marginBottom: '1.5rem' }}>
+                 <div className="video-icon">📡</div>
+                 <div className="video-details">
+                    <h4>교신 영상 정보</h4>
+                    <p className="video-title">{title || unit?.title}</p>
+                    <p className="unit-name text-muted">{unit?.title} 학습 중</p>
+                 </div>
+               </div>
+               
+               {videoId ? (
+                 <div className="video-player-preview glass" style={{ position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(0, 243, 255, 0.3)' }}>
+                   <iframe
+                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                     src={`https://www.youtube.com/embed/${videoId}?start=${startTime || 0}&autoplay=0&rel=0&modestbranding=1`}
+                     title="Question Video Context"
+                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                     allowFullScreen
+                   ></iframe>
+                 </div>
+               ) : (
+                 <div className="preview-hint" style={{ marginTop: '2rem', textAlign: 'center', opacity: 0.8 }}>
+                   영상을 시청하며 궁금한 점을 질문했습니다.
+                 </div>
+               )}
+            </div>
+          ) : type === 'datalog' ? (
+            <div className="preview-body datalog-preview">
+               <div className="datalog-header glass">
+                 📄 {title || unit?.title} - 데이터 로그 본문
+               </div>
+               <div className="datalog-content-scroll glass" style={{ maxHeight: '400px', overflowY: 'auto', padding: '1.5rem', marginTop: '1rem', background: 'rgba(5, 10, 25, 0.6)' }}>
+                  {unit?.learningContents ? (
+                    <MissionMarkdownViewer text={unit.learningContents} />
+                  ) : (
+                    <p className="text-muted">학습 데이터를 불러올 수 없습니다.</p>
+                  )}
+               </div>
             </div>
           ) : (
             <div className="preview-body">

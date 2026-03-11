@@ -173,14 +173,15 @@ export default function QuestionDetail() {
                 </h2>
               )}
 
-              {question.quizContext?.quizTitle && (
+              {question.quizContext && (question.quizContext.quizTitle || question.quizContext.transmissionTitle) && (
                 <motion.div 
-                  className="quiz-context-box glass clickable"
+                  className={`quiz-context-box glass clickable context-${question.type || 'quiz'}`}
                   onClick={() => setIsPreviewOpen(true)}
                   whileHover={{ scale: 1.02, backgroundColor: 'rgba(0, 243, 255, 0.1)' }}
                   whileTap={{ scale: 0.98 }}
                 >
-                   📌 관련 퀴즈: {question.quizContext.quizTitle}
+                   {question.type === 'video' ? '📡 관련 영상: ' : question.type === 'datalog' ? '📄 관련 데이터: ' : '📌 관련 퀴즈: '}
+                   {question.quizContext.transmissionTitle || question.quizContext.quizTitle}
                    <span className="preview-hint-text">미리보기 클릭</span>
                 </motion.div>
               )}
@@ -190,6 +191,10 @@ export default function QuestionDetail() {
                 onClose={() => setIsPreviewOpen(false)}
                 unitId={question.quizContext?.unitId}
                 quizId={question.quizContext?.questionId}
+                videoId={question.quizContext?.videoId}
+                startTime={question.quizContext?.startTime}
+                type={question.type}
+                title={question.quizContext?.transmissionTitle || question.quizContext?.quizTitle}
                 showCorrectAnswer={false}
                 showHint={false}
               />
