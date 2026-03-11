@@ -938,7 +938,8 @@ export default function MissionHub({
     const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasWorkbook].filter(Boolean).length
 
     return (
-    <div className="mission-dashboard fade-in">
+    <div className="mission-dashboard fade-in" style={{ width: '100%', height: '100%', overflowY: 'auto', paddingBottom: '3rem' }}>
+      <div style={{ maxWidth: '1200px', width: '90%', margin: '0 auto', paddingTop: '3rem' }}>
       <h2 className="font-title" style={{ 
         textAlign: 'center', 
         fontSize: '2rem', 
@@ -1089,12 +1090,13 @@ export default function MissionHub({
       >
         ← RETURN TO ORBIT
       </button>
+      </div>
     </div>
   )
   }
   const renderTextView = () => (
-    <div className="mission-content-view fade-in" style={{ maxWidth: '960px', width: '95%', margin: '0 auto', padding: '1rem', height: 'calc(100vh - 80px)', overflowY: 'auto' }}>
-      <div className="glass-card" style={{ padding: '2.5rem 3rem', background: 'rgba(5, 10, 25, 0.9)' }}>
+    <div className="mission-content-view fade-in" style={{ maxWidth: '960px', width: '95%', margin: '0 auto', padding: '1.5rem', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
+      <div className="glass-card" style={{ padding: '2.5rem 3rem', background: 'rgba(5, 10, 25, 0.9)', minHeight: 'fit-content' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
           <h2 className="font-title" style={{ fontSize: '1.8rem', color: 'var(--crystal-cyan)' }}>DATA LOG: {activeUnit?.title}</h2>
           <button onClick={returnFromContent} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
@@ -1191,7 +1193,17 @@ export default function MissionHub({
       const startPosition = savedProgress?.lastPosition || selectedTx.start
 
       return (
-        <div className="mission-content-view fade-in" style={{ width: '100%', minHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflowY: 'auto', padding: '2rem 0', boxSizing: 'border-box' }}>
+        <div className="mission-content-view fade-in" style={{ 
+          width: '100%', 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'flex-start', 
+          overflowY: 'auto', 
+          padding: '1.5rem 0 4rem', 
+          boxSizing: 'border-box' 
+        }}>
           <div style={{ width: '90%', maxWidth: '1000px', display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
              <h3 className="font-title" style={{ margin: 0, color: 'var(--planet-green)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1.5rem' }}>📡</span> {selectedTx.title}
@@ -1213,7 +1225,7 @@ export default function MissionHub({
           </div>
           <div className="glass-card" style={{ 
             width: '100%', 
-            maxWidth: 'min(1000px, 90vw, calc((100vh - 250px) * 1.7778))', 
+            maxWidth: 'min(1000px, 90vw, calc((100vh - 280px) * 1.7778))', 
             aspectRatio: '16/9', 
             padding: '5px', 
             background: 'rgba(0,0,0,0.5)',
@@ -1269,7 +1281,7 @@ export default function MissionHub({
                 gap: '0.8rem'
               }}
             >
-              🙋 선생님께 영상 질문하기
+              🙋 선생님께 질문하기
             </button>
           </div>
           <div style={{ textAlign: 'center' }}>
@@ -1537,20 +1549,23 @@ export default function MissionHub({
   }
 
   return (
-    <div className="mission-hub-container space-bg" id="quiz-capture-area" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000 }}>
+    <div className="mission-hub-container space-bg" id="quiz-capture-area" style={{ 
+      position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000,
+      display: 'flex', flexDirection: 'column', overflow: 'hidden'
+    }}>
        <AnimatePresence mode='wait'>
           {currentMode === 'briefing' && (
-             <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ flex: 1, minHeight: 0 }}>
                 {renderDashboard()}
              </motion.div>
           )}
           {currentMode === 'text' && (
-             <motion.div key="text" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} style={{ paddingTop: '100px' }}>
+             <motion.div key="text" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px' }}>
                 {renderTextView()}
              </motion.div>
           )}
           {currentMode === 'video' && (
-             <motion.div key="video" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} style={{ paddingTop: '100px' }}>
+             <motion.div key="video" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px' }}>
                 {renderVideoView()}
              </motion.div>
           )}
