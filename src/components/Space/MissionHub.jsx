@@ -85,6 +85,23 @@ const YoutubePlayer = React.forwardRef(({ videoId, start, end, onComplete, onTim
   }))
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+        try {
+          playerRef.current.pauseVideo()
+        } catch (e) {
+          console.error("Failed to pause video on visibility change", e)
+        }
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!window.YT) {
       const tag = document.createElement('script')
       tag.src = "https://www.youtube.com/iframe_api"
