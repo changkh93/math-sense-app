@@ -4,7 +4,7 @@ import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Libra
 import { Link } from 'react-router-dom';
 import AiQuizImportModal from '../../components/Admin/AiQuizImportModal';
 import { db } from '../../firebase';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import RegionEditModal from '../../components/Admin/RegionEditModal';
 import RegionStudentManagerModal from '../../components/Admin/RegionStudentManagerModal';
 
@@ -30,6 +30,46 @@ const ContentManager = () => {
 
   const handleSaveRegion = (regionData) => {
     saveRegion.mutate(regionData);
+  };
+
+  const handleRecountAnswers = async () => {
+    if (!window.confirm('전체 질문의 답변 개수를 동기화하시겠습니까? (이 작업은 시간이 조금 걸릴 수 있습니다.)')) return;
+    try {
+      const qSnap = await getDocs(collection(db, 'questions'));
+      const aSnap = await getDocs(collection(db, 'answers'));
+      
+      const answerCounts = {};
+      aSnap.docs.forEach(doc => {
+        const qId = doc.data().questionId;
+        if (qId) {
+           answerCounts[qId] = (answerCounts[qId] || 0) + 1;
+        }
+      });
+
+      let count = 0;
+      let batch = writeBatch(db);
+
+      for (const qDoc of qSnap.docs) {
+        const actualCount = answerCounts[qDoc.id] || 0;
+        if (qDoc.data().answerCount !== actualCount) {
+           batch.update(doc(db, 'questions', qDoc.id), { answerCount: actualCount });
+           count++;
+           if (count % 400 === 0) {
+             await batch.commit();
+             batch = writeBatch(db);
+           }
+        }
+      }
+      
+      if (count % 400 !== 0) {
+        await batch.commit();
+      }
+
+      alert(`동기화 완료! ${count}개의 질문 데이터가 수정되었습니다.`);
+    } catch (err) {
+      console.error(err);
+      alert('오류 발생: 콘솔을 확인하세요.');
+    }
   };
 
   if (loadingRegions) return <div className="loading">Loading Regions...</div>;
@@ -67,6 +107,9 @@ const ContentManager = () => {
               ))}
             </select>
           </div>
+          <button className="hud-btn secondary glass" onClick={handleRecountAnswers} style={{ padding: '0.6rem 1rem', fontSize: '0.85rem' }}>
+            <RefreshCw size={16} /> 답변수 동기화
+          </button>
           <button className="primary-btn" onClick={handleAddRegion}>
             <Plus size={18} /> <span>Add Region</span>
           </button>

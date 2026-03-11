@@ -298,6 +298,7 @@ export function useQAMutations() {
       onSettled: (data, error, variables) => {
         queryClient.invalidateQueries({ queryKey: ['answers', variables.questionId] });
         queryClient.invalidateQueries({ queryKey: ['question', variables.questionId] });
+        queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });
       }
     }),
 
