@@ -110,7 +110,7 @@ const RegionEditModal = ({ isOpen, onClose, onSave, initialData }) => {
                 </button>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '0.5rem 0 0 0', lineHeight: 1.4 }}>
-                코드를 갱신하면 기존 코드는 무효화됩니다.
+                코드를 변경한 경우, 반드시 <strong>저장 버튼</strong>을 눌러야 실제 시스템에 반영됩니다.
               </p>
             </div>
           )}

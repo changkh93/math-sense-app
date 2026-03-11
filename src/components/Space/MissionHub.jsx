@@ -379,7 +379,8 @@ export default function MissionHub({
   refetchQuizzes,
   bestScores = {}, // passed from SpaceHome
   initialMode = 'briefing', // pre-computed by SpaceHome: 'briefing', 'text', 'video', 'quiz-modal'
-  onNonQuizActivityComplete
+  onNonQuizActivityComplete,
+  clusterId // added to handle cluster-specific UI
 }) {
   const { user } = useAuth()
   const userId = user?.uid
@@ -950,7 +951,7 @@ export default function MissionHub({
   // --- Render Functions ---
 
   const renderDashboard = () => {
-    const hasDataLog = !!(missionData?.learningContents?.text?.trim())
+    const hasDataLog = !!(missionData?.learningContents?.text?.trim() || missionData?.learningContents?.pdfUrl?.trim())
     const hasTransmission = !!(missionData?.transmissions?.length > 0 && missionData.transmissions.some(tx => tx.videoId))
     const hasQuiz = !!(unitQuizzes && unitQuizzes.length > 0)
     const hasWorkbook = !!(activeUnit?.workbookPages && activeUnit.workbookPages.length > 0)
@@ -981,119 +982,147 @@ export default function MissionHub({
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        {/* 1. Data Log Card */}
-        {hasDataLog && (
-        <motion.div 
-          whileHover={{ scale: 1.03, y: -5 }}
-          className="glass-card hud-border"
-          onClick={() => handleModeChange('text')}
-          style={{ 
-            cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-            background: logCompleted ? 'rgba(0, 243, 255, 0.08)' : undefined,
-            borderColor: logCompleted ? 'var(--crystal-cyan)' : undefined,
-            position: 'relative'
-          }}
-        >
-          {logCompleted && (
-            <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
-          )}
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
-          <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '1rem' }}>DATA LOG</h3>
-          <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
-            핵심 개념과 공식을<br/>확인합니다.
-          </p>
-          {logCompleted && (
-            <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginTop: '0.5rem' }}>탐사 완료</span>
-          )}
-        </motion.div>
-        )}
+        {(() => {
+          // Define all possible cards
+          const cards = [
+            {
+              id: 'text',
+              shouldRender: hasDataLog,
+              render: () => (
+                <motion.div 
+                  key="text"
+                  whileHover={{ scale: 1.03, y: -5 }}
+                  className="glass-card hud-border"
+                  onClick={() => handleModeChange('text')}
+                  style={{ 
+                    cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                    background: logCompleted ? 'rgba(0, 243, 255, 0.08)' : undefined,
+                    borderColor: logCompleted ? 'var(--crystal-cyan)' : undefined,
+                    position: 'relative'
+                  }}
+                >
+                  {logCompleted && (
+                    <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
+                  )}
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
+                  <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '1rem' }}>DATA LOG</h3>
+                  <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                    핵심 개념과 공식을<br/>확인합니다.
+                  </p>
+                  {logCompleted && (
+                    <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginTop: '0.5rem' }}>탐사 완료</span>
+                  )}
+                </motion.div>
+              )
+            },
+            {
+              id: 'video',
+              shouldRender: hasTransmission,
+              render: () => (
+                <motion.div 
+                  key="video"
+                  whileHover={{ scale: 1.03, y: -5 }}
+                  className="glass-card hud-border"
+                  onClick={() => handleModeChange('video')}
+                  style={{ 
+                    cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                    background: txAllCompleted ? 'rgba(0, 255, 136, 0.08)' : (txAnyCompleted ? 'rgba(255, 255, 255, 0.05)' : undefined),
+                    borderColor: txAllCompleted ? 'var(--planet-green)' : (txAnyCompleted ? 'var(--crystal-cyan)' : undefined),
+                    position: 'relative'
+                  }}
+                >
+                  {txAllCompleted && (
+                    <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
+                  )}
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📡</div>
+                  <h3 className="font-title" style={{ color: 'var(--planet-green)', marginBottom: '1rem' }}>TRANSMISSION</h3>
+                  <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                    본부의 영상 브리핑을<br/>수신합니다.
+                  </p>
+                  {txAllCompleted ? (
+                    <span className="font-tech" style={{ color: 'var(--planet-green)', fontSize: '0.8rem', marginTop: '0.5rem' }}>수신 완료</span>
+                  ) : txAnyCompleted ? (
+                    <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginTop: '0.5rem' }}>진행 중 ({txCompletedCount} / {txTotalCount})</span>
+                  ) : null}
+                </motion.div>
+              )
+            },
+            {
+              id: 'workbook',
+              shouldRender: hasWorkbook,
+              render: () => (
+                <motion.div 
+                  key="workbook"
+                  whileHover={{ scale: 1.03, y: -5 }}
+                  className="glass-card hud-border"
+                  onClick={() => handleModeChange('workbook')}
+                  style={{ 
+                    cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', 
+                    border: workbookCompleted ? '1px solid var(--neon-blue)' : '1px solid var(--neon-blue)',
+                    background: workbookCompleted ? 'rgba(0, 243, 255, 0.08)' : undefined,
+                    position: 'relative'
+                  }}
+                >
+                  {workbookCompleted && (
+                    <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
+                  )}
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
+                  <h3 className="font-title" style={{ color: 'var(--neon-blue)', marginBottom: '1rem' }}>WORKBOOK</h3>
+                  <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                    상호작용 캔버스로<br/>실력을 검증합니다.
+                  </p>
+                  {workbookCompleted && (
+                    <span className="font-tech" style={{ color: 'var(--neon-blue)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                      BEST: {bestScores[`${unitId}_workbook`]}점
+                    </span>
+                  )}
+                </motion.div>
+              )
+            },
+            {
+              id: 'quiz',
+              shouldRender: hasQuiz,
+              render: () => (
+                <motion.div 
+                  key="quiz"
+                  whileHover={{ scale: 1.03, y: -5 }}
+                  className="glass-card hud-border"
+                  onClick={() => handleModeChange('quiz')}
+                  style={{ 
+                    cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', 
+                    border: quizCompleted ? '1px solid var(--star-gold)' : '1px solid var(--star-gold)',
+                    background: quizCompleted ? 'rgba(255, 215, 0, 0.08)' : undefined,
+                    position: 'relative'
+                  }}
+                >
+                  {quizCompleted && (
+                    <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
+                  )}
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚀</div>
+                  <h3 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '1rem' }}>FIELD TEST</h3>
+                  <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                    실전 퀴즈 탐사를<br/>시작합니다.
+                  </p>
+                  {quizCompleted && (
+                    <span className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                      BEST: {bestScores[unitId]}점
+                    </span>
+                  )}
+                </motion.div>
+              )
+            }
+          ];
 
-        {/* 2. Transmission Feed Card */}
-        {hasTransmission && (
-        <motion.div 
-          whileHover={{ scale: 1.03, y: -5 }}
-          className="glass-card hud-border"
-          onClick={() => handleModeChange('video')}
-          style={{ 
-            cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
-            background: txAllCompleted ? 'rgba(0, 255, 136, 0.08)' : (txAnyCompleted ? 'rgba(255, 255, 255, 0.05)' : undefined),
-            borderColor: txAllCompleted ? 'var(--planet-green)' : (txAnyCompleted ? 'var(--crystal-cyan)' : undefined),
-            position: 'relative'
-          }}
-        >
-          {txAllCompleted && (
-            <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
-          )}
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📡</div>
-          <h3 className="font-title" style={{ color: 'var(--planet-green)', marginBottom: '1rem' }}>TRANSMISSION</h3>
-          <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
-            본부의 영상 브리핑을<br/>수신합니다.
-          </p>
-          {txAllCompleted ? (
-            <span className="font-tech" style={{ color: 'var(--planet-green)', fontSize: '0.8rem', marginTop: '0.5rem' }}>수신 완료</span>
-          ) : txAnyCompleted ? (
-            <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginTop: '0.5rem' }}>진행 중 ({txCompletedCount} / {txTotalCount})</span>
-          ) : null}
-        </motion.div>
-        )}
+          // Determine sorting order based on cluster
+          let sortedCards = cards;
+          if (clusterId === 'python') {
+            // Requested order for Python: Transmission -> Data Log -> Workbook -> Field Test
+            const pythonOrder = ['video', 'text', 'workbook', 'quiz'];
+            sortedCards = cards.sort((a, b) => pythonOrder.indexOf(a.id) - pythonOrder.indexOf(b.id));
+          }
 
-        {/* 3. Workbook Card */}
-        {hasWorkbook && (
-        <motion.div 
-          whileHover={{ scale: 1.03, y: -5 }}
-          className="glass-card hud-border"
-          onClick={() => handleModeChange('workbook')}
-          style={{ 
-            cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', 
-            border: workbookCompleted ? '1px solid var(--neon-blue)' : '1px solid var(--neon-blue)',
-            background: workbookCompleted ? 'rgba(0, 243, 255, 0.08)' : undefined,
-            position: 'relative'
-          }}
-        >
-          {workbookCompleted && (
-            <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
-          )}
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
-          <h3 className="font-title" style={{ color: 'var(--neon-blue)', marginBottom: '1rem' }}>WORKBOOK</h3>
-          <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
-            상호작용 캔버스로<br/>실력을 검증합니다.
-          </p>
-          {workbookCompleted && (
-            <span className="font-tech" style={{ color: 'var(--neon-blue)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-              BEST: {bestScores[`${unitId}_workbook`]}점
-            </span>
-          )}
-        </motion.div>
-        )}
-
-        {/* 4. Field Test Card */}
-        {hasQuiz && (
-        <motion.div 
-          whileHover={{ scale: 1.03, y: -5 }}
-          className="glass-card hud-border"
-          onClick={() => handleModeChange('quiz')}
-          style={{ 
-            cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', 
-            border: quizCompleted ? '1px solid var(--star-gold)' : '1px solid var(--star-gold)',
-            background: quizCompleted ? 'rgba(255, 215, 0, 0.08)' : undefined,
-            position: 'relative'
-          }}
-        >
-          {quizCompleted && (
-            <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
-          )}
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚀</div>
-          <h3 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '1rem' }}>FIELD TEST</h3>
-          <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
-            실전 퀴즈 탐사를<br/>시작합니다.
-          </p>
-          {quizCompleted && (
-            <span className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-              BEST: {bestScores[unitId]}점
-            </span>
-          )}
-        </motion.div>
-        )}
+          return sortedCards.map(card => card.shouldRender ? card.render() : null);
+        })()}
       </div>
       )}
 
@@ -1120,9 +1149,28 @@ export default function MissionHub({
           <h2 className="font-title" style={{ fontSize: '1.8rem', color: 'var(--crystal-cyan)' }}>DATA LOG: {activeUnit?.title}</h2>
           <button onClick={returnFromContent} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
         </div>
-        <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
-          <MissionMarkdownViewer text={missionData?.learningContents?.text} />
-        </div>
+        
+        {missionData?.learningContents?.pdfUrl ? (
+          <div style={{ width: '100%', height: '70vh', border: '1px solid var(--neon-blue)', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
+            <object 
+              data={missionData.learningContents.pdfUrl} 
+              type="application/pdf" 
+              width="100%" 
+              height="100%"
+            >
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#333' }}>
+                <p>브라우저에서 PDF를 바로 열 수 없습니다.</p>
+                <a href={missionData.learningContents.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--neon-blue)', textDecoration: 'underline' }}>
+                  이곳을 클릭하여 PDF 다운로드 / 열기
+                </a>
+              </div>
+            </object>
+          </div>
+        ) : (
+          <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
+            <MissionMarkdownViewer text={missionData?.learningContents?.text} />
+          </div>
+        )}
 
         {/* ─── Data Log Reward Button ─── */}
         <div style={{ marginTop: '3rem', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2rem' }}>

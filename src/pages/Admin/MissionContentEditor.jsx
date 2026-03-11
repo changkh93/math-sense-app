@@ -27,6 +27,7 @@ const MissionContentEditor = () => {
 
   const [transmissions, setTransmissions] = useState([]);
   const [learningText, setLearningText] = useState('');
+  const [pdfUrl, setPdfUrl] = useState('');
   const [workbookPages, setWorkbookPages] = useState([]);
   const [activeTab, setActiveTab] = useState('workbook');
   const [isAiPromptOpen, setIsAiPromptOpen] = useState(false);
@@ -55,7 +56,10 @@ const MissionContentEditor = () => {
               end: data.videoConfig.end
             }]);
           }
-          if (data.learningContents) setLearningText(data.learningContents.text || '');
+          if (data.learningContents) {
+            setLearningText(data.learningContents.text || '');
+            setPdfUrl(data.learningContents.pdfUrl || '');
+          }
           if (data.workbookPages) setWorkbookPages(data.workbookPages);
         } else {
            console.error("Unit not found");
@@ -99,7 +103,7 @@ const MissionContentEditor = () => {
 
       // Pre-compute content flags for instant routing (no flash)
       const contentFlags = {
-        hasDataLog: !!(learningText?.trim()),
+        hasDataLog: !!(learningText?.trim() || pdfUrl?.trim()),
         hasTransmission: processedTransmissions.some(tx => tx.videoId),
         hasWorkbook: workbookPages && workbookPages.length > 0
       };
@@ -109,7 +113,8 @@ const MissionContentEditor = () => {
         videoConfig: { videoId: '', start: 0, end: 0 },
         transmissions: processedTransmissions,
         learningContents: {
-            text: learningText
+            text: learningText,
+            pdfUrl: pdfUrl?.trim() || ''
         },
         workbookPages,
         contentFlags
@@ -389,6 +394,23 @@ const MissionContentEditor = () => {
             
             <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                 <div className="editor-side">
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--neon-blue)' }}>PDF URL (Optional)</label>
+                    <input 
+                      type="text" 
+                      value={pdfUrl} 
+                      onChange={e => setPdfUrl(e.target.value)}
+                      style={{ 
+                          width: '100%', 
+                          padding: '0.8rem',
+                          background: 'rgba(5, 10, 25, 0.6)',
+                          color: '#fff',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '8px'
+                      }}
+                      placeholder="예: /pdfs/python/02_문자열.pdf (입력 시 텍스트 대신 PDF가 우선 표시됩니다)"
+                    />
+                  </div>
                   <label style={{ display: 'block', marginBottom: '0.5rem' }}>내용 (Markdown 문법 지원, 수식은 $...$ 사용)</label>
                   <textarea 
                       ref={textAreaRef}
@@ -399,7 +421,7 @@ const MissionContentEditor = () => {
                       onClick={e => { cursorPosRef.current = e.target.selectionStart; }}
                       style={{ 
                           width: '100%', 
-                          minHeight: '600px', 
+                          minHeight: '500px', 
                           fontFamily: 'monospace', 
                           lineHeight: '1.6', 
                           padding: '1rem',

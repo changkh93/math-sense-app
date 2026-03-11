@@ -1072,7 +1072,7 @@ function SpaceHome() {
     const unit = activeUnit || {}
     
     // Fallback detection if contentFlags is missing
-    const hasDataLog = !!(unit.learningContents?.text?.trim())
+    const hasDataLog = !!(unit.learningContents?.text?.trim() || unit.learningContents?.pdfUrl?.trim())
     const hasTransmission = !!(
       (unit.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) ||
       (unit.videoConfig?.videoId)
@@ -1120,6 +1120,7 @@ function SpaceHome() {
       <MissionHub
         key={selectedUnitDocId || quickQuizUnitId}
         unitId={selectedUnitDocId || quickQuizUnitId}
+        clusterId={selectedClusterId}
         activeUnit={activeUnit || { title: "탐사 미션" }} 
         unitQuizzes={unitQuizzes}
         loadingQuizzes={loadingQuizzes}

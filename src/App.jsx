@@ -15,6 +15,7 @@ import QuizEditor from './pages/Admin/QuizEditor'
 import GhostCleaner from './pages/Admin/GhostCleaner'
 import StreakFixer from './pages/Admin/StreakFixer'
 import TeacherQA from './pages/Admin/TeacherQA'
+import PythonCourseBuilder from './pages/Admin/PythonCourseBuilder'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
@@ -43,6 +44,7 @@ function App() {
         <Route path="ghost-cleaner" element={<GhostCleaner />} />
         <Route path="streak-fixer" element={<StreakFixer />} />
         <Route path="qa" element={<TeacherQA />} />
+        <Route path="python-builder" element={<PythonCourseBuilder />} />
       </Route>
 
       <Route path="/agora" element={
