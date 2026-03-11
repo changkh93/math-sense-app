@@ -105,9 +105,14 @@
   position: absolute;
   top: 1rem;
   right: 1rem;
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
   gap: 1rem;
   z-index: 100;
+  height: auto !important;
+  width: auto !important;
 }
 
 .action-btn {
@@ -134,10 +139,15 @@
   background: var(--planet-green);
   color: #000;
   box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+  height: auto !important;
+  min-height: 48px;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .action-btn.complete:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.1); /* Merged the scale from inline style */
   box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
 }
 
