@@ -151,8 +151,16 @@ function createFloatingOrb() {
       // ★ 추가: 캡처 전 로그인 상태 확인 ★
       const data = await chrome.storage.local.get(['agoraUser']);
       if (!data.agoraUser) {
-        if (confirm("로그인이 필요합니다. 로그인 페이지로 이동하시겠습니까? (로그인 후 다시 시도해 주세요)")) {
-          window.open('https://msense.me/agora', '_blank');
+        if (confirm("아고라 확장에서 로그인이 필요합니다. 지금 로그인하시겠습니까?")) {
+          chrome.runtime.sendMessage({ action: "LOGIN" }, (response) => {
+            if (response && response.success) {
+              showToast('✅ 로그인 성공! 다시 캡처해 주세요.', '#10B981');
+              // 로그인 성공 후 자동으로 캡처를 시작할 수도 있지만, 
+              // 사용자 혼란을 줄이기 위해 여기서 멈추고 다시 누르게 유도합니다.
+            } else {
+              showToast('❌ 로그인 실패: ' + (response?.error || '사용자가 취소함'), '#EF4444');
+            }
+          });
         }
         return;
       }
