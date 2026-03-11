@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { ReactSketchCanvas } from 'react-sketch-canvas'; 
+import { ReactSketchCanvas } from 'react-sketch-canvas'; // KEEP FOR NOW IF NEEDED ELSEWHERE OR REMOVE
 import * as htmlToImage from 'html-to-image';
 import { db, auth } from '../firebase';
 import { collection, addDoc, updateDoc, doc, increment, serverTimestamp } from 'firebase/firestore';
 import { ImageService } from '../services/imageService';
+import AnnotationCanvas from './AnnotationCanvas';
 import './QuestionModal.css';
 
 export default function QuestionModal({ isOpen, onClose, quizContext }) {
@@ -21,26 +22,22 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
   const [isDrawMode, setIsDrawMode] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [strokeColor, setStrokeColor] = useState('#ff0000'); // Default Red
-  const [tempDrawing, setTempDrawing] = useState(null); // DataURL of merged image
-  const [paths, setPaths] = useState([]); // Raw paths for re-editing
-  const [canvasKey, setCanvasKey] = useState(0); // Key to force re-render
-  const canvasRef = useRef(null);
+  const [tempDrawing, setTempDrawing] = useState(null); // DataURL of final image
+  const [canvasState, setCanvasState] = useState(null); // Fabric JSON for re-editing
 
   // Image Upload State
   const [attachedImage, setAttachedImage] = useState(null); // DataURL of uploaded/pasted image
   const fileInputRef = useRef(null);
 
-  // Force canvas refresh when entering draw mode to ensure correct resolution
+  // Prevent background scroll when modal open
   useEffect(() => {
-    if (isDrawMode && !isCapturing) {
-      // Small delay to allow CSS transition (width change) to complete
-      const timer = setTimeout(() => {
-        setCanvasKey(prev => prev + 1);
-      }, 350); 
-      return () => clearTimeout(timer);
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
     }
-  }, [isDrawMode, isCapturing]);
+    return () => { document.body.style.overflow = 'auto'; };
+  }, [isOpen]);
 
   const questionTypes = [
     { id: 'quiz', label: '이 문제 질문', icon: '📝' },
@@ -85,13 +82,6 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
         
         setIsCapturing(false); 
         setIsDrawMode(true);
-
-        // If we have previous paths, load them after a short delay to ensure canvas is ready
-        if (paths.length > 0) {
-          setTimeout(() => {
-            canvasRef.current?.loadPaths(paths);
-          }, 100);
-        }
       } catch (err) {
         console.error('General error entering draw mode:', err);
         setIsCapturing(false);
@@ -100,57 +90,19 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
     }
   };
 
-  const finalizeDrawing = async () => {
-    if (!canvasRef.current) return;
-    
-    setIsSubmitting(true);
-    try {
-      // 1. Get Drawing Layer (Transparent PNG)
-      const drawingDataUrl = await canvasRef.current.exportImage('png');
-      const currentPaths = await canvasRef.current.exportPaths();
-      setPaths(currentPaths);
-      
-      let finalImageDataUrl = drawingDataUrl;
+  const handleAnnotationComplete = (dataUrl, json) => {
+    setTempDrawing(dataUrl);
+    setCanvasState(json);
+    setIsDrawMode(false);
+  };
 
-      // 2. Merge with Background if exists
-      if (backgroundImage) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        const bgImg = await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = reject;
-          img.src = backgroundImage;
-        });
-
-        const drawImg = await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = reject;
-          img.src = drawingDataUrl;
-        });
-
-        canvas.width = bgImg.width;
-        canvas.height = bgImg.height;
-        ctx.drawImage(bgImg, 0, 0);
-        ctx.drawImage(drawImg, 0, 0, canvas.width, canvas.height);
-        finalImageDataUrl = canvas.toDataURL('image/png');
-      }
-
-      setTempDrawing(finalImageDataUrl);
-      setIsDrawMode(false);
-    } catch (err) {
-      console.error('Failed to finalize drawing:', err);
-      setError('이미지 처리 중 오류가 발생했습니다.');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleAnnotationCancel = () => {
+    setIsDrawMode(false);
   };
 
   const handleRemoveDrawing = () => {
     setTempDrawing(null);
-    setPaths([]);
+    setCanvasState(null);
     setBackgroundImage(null);
   };
 
@@ -254,10 +206,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
       
       queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });
       
-      setContent('');
       setTempDrawing(null);
       setAttachedImage(null);
-      setPaths([]);
+      setCanvasState(null);
       setIsDrawMode(false);
       setBackgroundImage(null);
       onClose();
@@ -398,59 +349,13 @@ export default function QuestionModal({ isOpen, onClose, quizContext }) {
             </div>
 
             {isDrawMode ? (
-              <div className="canvas-container" style={{ 
-                backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
-                backgroundSize: 'contain', 
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
-              }}>
-                <ReactSketchCanvas
-                  key={canvasKey}
-                  ref={canvasRef}
-                  style={{ background: 'transparent' }}
-                  width="100%"
-                  height="100%"
-                  strokeWidth={4}
-                  strokeColor={strokeColor}
-                  canvasColor="transparent"
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <AnnotationCanvas 
+                  backgroundImage={backgroundImage} 
+                  initialState={canvasState}
+                  onComplete={handleAnnotationComplete} 
+                  onCancel={handleAnnotationCancel} 
                 />
-                
-                {/* Color Palette */}
-                <div className="color-palette">
-                  {[
-                    { color: '#ff0000', label: 'Red' },
-                    { color: '#00d4ff', label: 'Blue' },
-                    { color: '#ffd700', label: 'Yellow' }
-                  ].map((c) => (
-                    <button
-                      key={c.color}
-                      type="button"
-                      className={`color-btn ${strokeColor === c.color ? 'active' : ''}`}
-                      style={{ backgroundColor: c.color }}
-                      onClick={() => setStrokeColor(c.color)}
-                      aria-label={c.label}
-                    />
-                  ))}
-                </div>
-                
-                <div className="floating-actions">
-                  <button 
-                    type="button" 
-                    className="action-btn clear" 
-                    onClick={() => {
-                      try {
-                        canvasRef.current?.clearCanvas();
-                      } catch (e) {
-                         console.debug('Canvas clear error (benign):', e);
-                      }
-                    }}
-                  >
-                    🗑️ 지우기
-                  </button>
-                   <button type="button" className="action-btn submit" onClick={finalizeDrawing} disabled={isSubmitting}>
-                    {isSubmitting ? '처리 중...' : '✅ 첨부 완료'}
-                  </button>
-                </div>
               </div>
             ) : (
               <textarea

@@ -15,10 +15,12 @@ EXT_TARGET=bg npx vite build -c vite.config.ext.js
 echo "🔨 [2/5] popup.js (IIFE) 빌드..."
 EXT_TARGET=popup npx vite build -c vite.config.ext.js
 
-echo "📦 [3/5] 정적 파일 복사..."
-# popup.html, content.js, manifest, styles, icons 복사
+echo "🔨 [3/6] content.js (IIFE) 빌드..."
+EXT_TARGET=content npx vite build -c vite.config.ext.js
+
+echo "📦 [4/6] 정적 파일 복사..."
+# popup.html, manifest, styles, icons 복사
 cp agora-connect-ext/popup.html dist-ext/
-cp agora-connect-ext/content.js dist-ext/
 cp agora-connect-ext/manifest.json dist-ext/
 cp agora-connect-ext/styles.css dist-ext/
 mkdir -p dist-ext/icons

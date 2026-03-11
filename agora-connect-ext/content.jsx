@@ -1,3 +1,7 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import AnnotationCanvas from '../src/components/AnnotationCanvas';
+
 // ============================================================
 // Agora Connect - Content Script v2.0 (UX Innovation)
 // ============================================================
@@ -9,11 +13,6 @@
 // ============================================================
 
 let overlayContainer = null;
-let canvas = null;
-let ctx = null;
-let isDrawing = false;
-let screenshotImage = null;
-let drawingHistory = [];
 let floatingOrb = null;
 let preSelectedText = ''; // 캡처 전 페이지에서 선택한 텍스트
 
@@ -324,11 +323,6 @@ function startSnippingMode(dataUrl) {
 function createAnnotationOverlay(croppedDataUrl) {
   if (overlayContainer) return;
 
-  let currentTool = 'pen';
-  let currentColor = '#FF5252';
-  let stampCount = 1;
-  drawingHistory = [];
-
   // === 컨테이너 ===
   overlayContainer = document.createElement('div');
   overlayContainer.id = 'agora-connect-overlay';
@@ -346,220 +340,73 @@ function createAnnotationOverlay(croppedDataUrl) {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   });
 
-  // === 상단 툴바 ===
-  const toolbar = document.createElement('div');
-  Object.assign(toolbar.style, {
-    display: 'flex',
-    gap: '6px',
-    alignItems: 'center',
-    backgroundColor: 'rgba(30, 30, 50, 0.95)',
-    padding: '8px 14px',
-    borderRadius: '14px',
-    boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
-    marginBottom: '12px',
-  });
+  document.body.appendChild(overlayContainer);
 
-  // 툴팁 스타일 주입 (한번만)
-  if (!document.getElementById('agora-tooltip-style')) {
-    const style = document.createElement('style');
-    style.id = 'agora-tooltip-style';
-    style.textContent = `
-      .agora-tool-btn { position:relative; }
-      .agora-tool-btn:hover::after {
-        content: attr(data-tip);
-        position: absolute; bottom: -30px; left: 50%;
-        transform: translateX(-50%);
-        background: #1E1E2E; color: #E2E8F0;
-        padding: 3px 8px; border-radius: 6px;
-        font-size: 10px; white-space: nowrap;
-        pointer-events: none; z-index: 99999;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        font-weight: 500;
-      }
-    `;
-    document.head.appendChild(style);
-  }
+  const reactRoot = createRoot(overlayContainer);
 
-  const toolBtn = (id, bg, label, text = '', extra = '') =>
-    `<button id="${id}" class="agora-tool-btn" data-tip="${label}" style="
-      width:36px; height:36px; border-radius:50%;
-      background:${bg}; border:none; cursor:pointer;
-      display:flex; align-items:center; justify-content:center;
-      font-size:${text ? '16px' : '14px'}; font-weight:bold; color:#fff;
-      transition: transform 0.1s, box-shadow 0.15s; ${extra}
-    " title="${label}">${text}</button>`;
-
-  const divider = '<div style="width:1px; height:26px; background:#333; margin:0 4px;"></div>';
-
-  toolbar.innerHTML = `
-    ${toolBtn('agora-pen-red', '#FF5252', '빨간 펜', '', 'border:2.5px solid white;')}
-    ${toolBtn('agora-pen-blue', '#448AFF', '파란 펜')}
-    ${toolBtn('agora-pen-yellow', 'rgba(255,235,59,0.5)', '형광펜', '', 'backdrop-filter:blur(2px);')}
-    ${divider}
-    ${toolBtn('agora-stamp-num', '#FFD700', '번호 스탬프', '①')}
-    ${toolBtn('agora-stamp-q', '#FF6B6B', '궁금해요!', '❓')}
-    ${toolBtn('agora-stamp-imp', '#FF9800', '중요!', '❗')}
-    ${toolBtn('agora-stamp-x', '#78909C', '틀렸어요', '✗')}
-    ${toolBtn('agora-arrow', '#E040FB', '여기를 모르겠어요!', '👆')}
-    ${divider}
-    ${toolBtn('agora-undo', '#555', '되돌리기 (Ctrl+Z)', '↩')}
-    <button id="agora-close" style="
-      background:#374151; color:#9CA3AF; border:none;
-      padding:6px 12px; border-radius:8px; cursor:pointer;
-      font-size:12px; margin-left:6px;
-    ">✕</button>
-  `;
-
-  // === 캔버스 래퍼 ===
-  const canvasWrapper = document.createElement('div');
-  Object.assign(canvasWrapper.style, {
-    position: 'relative',
-    boxShadow: '0 0 60px rgba(99,102,241,0.15)',
-    border: '2px solid #374151',
-    borderRadius: '10px',
-    overflow: 'hidden',
-  });
-
-  // === 캔버스 ===
-  canvas = document.createElement('canvas');
-  canvas.style.cursor = 'crosshair';
-  canvas.style.display = 'block';
-
-  screenshotImage = new Image();
-  screenshotImage.onload = () => {
-    const maxW = window.innerWidth * 0.85;
-    const maxH = window.innerHeight * 0.6;
-    const ratio = Math.min(maxW / screenshotImage.width, maxH / screenshotImage.height, 1);
-
-    canvas.width = screenshotImage.width;
-    canvas.height = screenshotImage.height;
-    canvas.style.width = `${screenshotImage.width * ratio}px`;
-    canvas.style.height = `${screenshotImage.height * ratio}px`;
-
-    ctx = canvas.getContext('2d');
-    ctx.drawImage(screenshotImage, 0, 0);
-    saveToHistory();
-
-    ctx.strokeStyle = currentColor;
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+  const handleComplete = (dataUrl, json) => {
+    submitQuestion(dataUrl);
   };
-  screenshotImage.src = croppedDataUrl;
 
-  // === 하단: 인라인 질문 입력 ===
-  const inputPanel = document.createElement('div');
-  Object.assign(inputPanel.style, {
-    display: 'flex',
-    gap: '8px',
-    alignItems: 'center',
-    backgroundColor: 'rgba(30, 30, 50, 0.95)',
-    padding: '10px 16px',
-    borderRadius: '14px',
-    boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
-    marginTop: '12px',
-    width: canvas.style.width || '80%',
-    maxWidth: '700px',
-    minWidth: '400px',
-  });
-  inputPanel.innerHTML = `
-    <input id="agora-question-input" type="text" placeholder="📝 질문을 입력하세요... (캡처 이미지와 함께 전송됩니다)" style="
-      flex: 1; background: #1E1E2E; border: 1px solid #374151;
-      color: #E2E8F0; padding: 10px 14px; border-radius: 10px;
-      font-size: 13px; outline: none;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    " value="${preSelectedText ? '> ' + preSelectedText.replace(/"/g, '&quot;').substring(0, 200) + '\n\n' : ''}">
-    <button id="agora-send-btn" style="
-      background: linear-gradient(135deg, #6C5CE7, #a29bfe);
-      color: white; border: none; padding: 10px 20px;
-      border-radius: 10px; cursor: pointer; font-weight: bold;
-      font-size: 13px; white-space: nowrap;
-      box-shadow: 0 2px 12px rgba(108,92,231,0.4);
-      transition: transform 0.1s, box-shadow 0.15s;
-    ">📤 전송</button>
-  `;
+  const handleCancel = () => {
+    closeOverlay();
+  };
+
+  reactRoot.render(
+    <div style={{ width: '85%', height: '80%', display: 'flex', flexDirection: 'column' }}>
+      <AnnotationCanvas 
+        backgroundImage={croppedDataUrl}
+        onComplete={handleComplete}
+        onCancel={handleCancel}
+      />
+    </div>
+  );
+
+  overlayContainer._reactRoot = reactRoot;
 
   // === 저작권 배너 ===
   const copyrightNote = document.createElement('div');
   Object.assign(copyrightNote.style, {
-    fontSize: '10px', color: '#64748B', marginTop: '8px',
+    fontSize: '10px', color: '#64748B', marginTop: '16px',
     textAlign: 'center',
+    zIndex: 10,
   });
   copyrightNote.textContent = '📋 출처 정보(현재 페이지 URL)가 함께 기록됩니다.';
+  overlayContainer.appendChild(copyrightNote);
 
   // === 자동 인용 토스트 ===
   if (preSelectedText) {
     showToast('✨ 선택한 텍스트가 인용되었습니다!', '#6C5CE7');
   }
 
-  // === DOM 조립 ===
-  canvasWrapper.appendChild(canvas);
-  overlayContainer.appendChild(toolbar);
-  overlayContainer.appendChild(canvasWrapper);
-  overlayContainer.appendChild(inputPanel);
-  overlayContainer.appendChild(copyrightNote);
-  document.body.appendChild(overlayContainer);
-
   // === 키보드 이벤트 ===
   const keyHandler = (e) => {
     if (e.key === 'Escape') closeOverlay();
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLastAction(); }
-    if (e.key === 'Enter' && e.target.id === 'agora-question-input') submitQuestion();
   };
   document.addEventListener('keydown', keyHandler);
   overlayContainer._cleanup = () => document.removeEventListener('keydown', keyHandler);
-
-  // 입력창에 포커스
-  setTimeout(() => document.getElementById('agora-question-input')?.focus(), 300);
-
-  // === 이벤트 바인딩 ===
-  setupCanvasEvents(canvas, () => currentTool, () => { const n = stampCount; stampCount++; return n; }, () => currentColor);
-  setupToolbarEvents(toolbar, {
-    setTool: (t) => currentTool = t,
-    setColor: (c) => { currentColor = c; if (ctx) ctx.strokeStyle = c; },
-  });
-
-  // 전송 버튼
-  document.getElementById('agora-send-btn').onclick = submitQuestion;
 }
 
 // ============================================================
 // 질문 전송 (Inline)
 // ============================================================
-function submitQuestion() {
-  const input = document.getElementById('agora-question-input');
-  const btn = document.getElementById('agora-send-btn');
-  const text = input?.value?.trim();
-
-  if (!text) {
-    input.style.borderColor = '#FF5252';
-    input.placeholder = '⚠️ 질문 내용을 입력해주세요!';
-    setTimeout(() => {
-      input.style.borderColor = '#374151';
-      input.placeholder = '📝 질문을 입력하세요...';
-    }, 2000);
-    return;
-  }
-
-  btn.textContent = '⏳ 전송 중...';
-  btn.disabled = true;
-  btn.style.opacity = '0.6';
-
-  const finalImage = canvas.toDataURL('image/png');
+function submitQuestion(finalImage) {
+  showToast('⏳ 전송 중...', '#F59E0B');
 
   // 15초 타임아웃
   const timeout = setTimeout(() => {
-    btn.textContent = '📤 전송';
-    btn.disabled = false;
-    btn.style.opacity = '1';
     showToast('⚠️ 전송 시간 초과. 다시 시도해주세요.', '#F59E0B');
   }, 15000);
+
+  const textMsg = preSelectedText 
+    ? `> ${preSelectedText.substring(0, 200)}\n\n(첨부된 그림 참조)` 
+    : "(첨부된 그림 참조)";
 
   chrome.runtime.sendMessage({
     action: "SUBMIT_QUESTION",
     payload: {
       image: finalImage,
-      text: text,
+      text: textMsg,
       url: window.location.href,
       title: document.title,
     }
@@ -569,9 +416,6 @@ function submitQuestion() {
       showToast('✅ 질문이 아고라로 전송되었습니다!', '#10B981');
       closeOverlay();
     } else {
-      btn.textContent = '📤 전송';
-      btn.disabled = false;
-      btn.style.opacity = '1';
       const err = response?.error || '알 수 없는 오류';
       showToast('❌ ' + err, '#EF4444');
     }
@@ -579,209 +423,16 @@ function submitQuestion() {
 }
 
 // ============================================================
-// Undo / History
-// ============================================================
-function saveToHistory() {
-  if (!canvas) return;
-  drawingHistory.push(canvas.toDataURL());
-  if (drawingHistory.length > 20) drawingHistory.shift();
-}
-
-function undoLastAction() {
-  if (drawingHistory.length <= 1) return;
-  drawingHistory.pop();
-  const prev = drawingHistory[drawingHistory.length - 1];
-  const img = new Image();
-  img.onload = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-  };
-  img.src = prev;
-}
-
-// ============================================================
-// 캔버스 이벤트
-// ============================================================
-function setupCanvasEvents(cvs, getTool, getNextStamp, getColor) {
-  const getPos = (e) => {
-    const rect = cvs.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left) * (cvs.width / rect.width),
-      y: (e.clientY - rect.top) * (cvs.height / rect.height),
-    };
-  };
-
-  cvs.addEventListener('mousedown', (e) => {
-    const tool = getTool();
-    const pos = getPos(e);
-
-    if (tool === 'pen') {
-      isDrawing = true;
-      ctx.beginPath();
-      ctx.strokeStyle = getColor();
-      ctx.lineWidth = 4;
-      ctx.globalAlpha = 1;
-      ctx.moveTo(pos.x, pos.y);
-    } else if (tool === 'highlighter') {
-      isDrawing = true;
-      ctx.beginPath();
-      ctx.strokeStyle = 'rgba(255, 235, 59, 0.3)';
-      ctx.lineWidth = 22;
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.lineCap = 'square';
-      ctx.moveTo(pos.x, pos.y);
-    } else if (tool === 'stamp-num') {
-      drawStamp(pos, getNextStamp(), '#FFD700', '#1a1a2e');
-    } else if (tool === 'stamp-q') {
-      drawIconStamp(pos, '❓', '#FF6B6B');
-    } else if (tool === 'stamp-imp') {
-      drawIconStamp(pos, '❗', '#FF9800');
-    } else if (tool === 'stamp-x') {
-      drawIconStamp(pos, '✗', '#78909C');
-    } else if (tool === 'arrow') {
-      drawArrowPreset(pos);
-    }
-  });
-
-  cvs.addEventListener('mousemove', (e) => {
-    if (!isDrawing) return;
-    const pos = getPos(e);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-  });
-
-  cvs.addEventListener('mouseup', () => {
-    if (isDrawing) {
-      isDrawing = false;
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.lineCap = 'round';
-      saveToHistory();
-    }
-  });
-
-  cvs.addEventListener('mouseleave', () => {
-    if (isDrawing) {
-      isDrawing = false;
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.lineCap = 'round';
-      saveToHistory();
-    }
-  });
-}
-
-// === 스탬프 그리기 ===
-function drawStamp(pos, num, bgColor, textColor) {
-  ctx.save();
-  ctx.fillStyle = bgColor;
-  ctx.shadowColor = 'rgba(0,0,0,0.3)';
-  ctx.shadowBlur = 6;
-  ctx.beginPath();
-  ctx.arc(pos.x, pos.y, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  ctx.fillStyle = textColor;
-  ctx.font = 'bold 22px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(num, pos.x, pos.y + 1);
-  ctx.restore();
-  saveToHistory();
-}
-
-function drawIconStamp(pos, icon, bgColor) {
-  ctx.save();
-  ctx.fillStyle = bgColor;
-  ctx.shadowColor = 'rgba(0,0,0,0.3)';
-  ctx.shadowBlur = 6;
-  ctx.beginPath();
-  ctx.arc(pos.x, pos.y, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.font = '20px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#fff';
-  ctx.fillText(icon, pos.x, pos.y + 1);
-  ctx.restore();
-  saveToHistory();
-}
-
-function drawArrowPreset(pos) {
-  ctx.save();
-  const s = 50;
-  ctx.fillStyle = '#E040FB';
-  ctx.shadowColor = 'rgba(0,0,0,0.4)';
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.moveTo(pos.x, pos.y);
-  ctx.lineTo(pos.x - s * 0.45, pos.y - s);
-  ctx.lineTo(pos.x + s * 0.45, pos.y - s);
-  ctx.closePath();
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  const lw = 180, lh = 34;
-  const lx = pos.x - lw / 2, ly = pos.y - s - lh - 6;
-  ctx.fillStyle = 'rgba(224,64,251,0.92)';
-  ctx.beginPath();
-  ctx.roundRect(lx, ly, lw, lh, 8);
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 16px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('👉 여기를 모르겠어요!', pos.x, ly + lh / 2);
-  ctx.restore();
-  saveToHistory();
-}
-
-// ============================================================
-// 툴바 이벤트
-// ============================================================
-function setupToolbarEvents(toolbar, { setTool, setColor }) {
-  const allBtns = ['#agora-pen-red', '#agora-pen-blue', '#agora-pen-yellow',
-    '#agora-stamp-num', '#agora-stamp-q', '#agora-stamp-imp', '#agora-stamp-x', '#agora-arrow'];
-
-  const selectBtn = (sel) => {
-    allBtns.forEach(s => {
-      const b = toolbar.querySelector(s);
-      if (b) b.style.border = 'none';
-    });
-    const b = toolbar.querySelector(sel);
-    if (b) b.style.border = '2.5px solid white';
-  };
-
-  toolbar.querySelector('#agora-pen-red').onclick = () => { setTool('pen'); setColor('#FF5252'); selectBtn('#agora-pen-red'); };
-  toolbar.querySelector('#agora-pen-blue').onclick = () => { setTool('pen'); setColor('#448AFF'); selectBtn('#agora-pen-blue'); };
-  toolbar.querySelector('#agora-pen-yellow').onclick = () => { setTool('highlighter'); selectBtn('#agora-pen-yellow'); };
-  toolbar.querySelector('#agora-stamp-num').onclick = () => { setTool('stamp-num'); selectBtn('#agora-stamp-num'); };
-  toolbar.querySelector('#agora-stamp-q').onclick = () => { setTool('stamp-q'); selectBtn('#agora-stamp-q'); };
-  toolbar.querySelector('#agora-stamp-imp').onclick = () => { setTool('stamp-imp'); selectBtn('#agora-stamp-imp'); };
-  toolbar.querySelector('#agora-stamp-x').onclick = () => { setTool('stamp-x'); selectBtn('#agora-stamp-x'); };
-  toolbar.querySelector('#agora-arrow').onclick = () => { setTool('arrow'); selectBtn('#agora-arrow'); };
-  toolbar.querySelector('#agora-undo').onclick = undoLastAction;
-  toolbar.querySelector('#agora-close').onclick = closeOverlay;
-}
-
-// ============================================================
 // 오버레이 닫기
 // ============================================================
 function closeOverlay() {
   if (overlayContainer) {
+    if (overlayContainer._reactRoot) {
+      overlayContainer._reactRoot.unmount();
+    }
     if (overlayContainer._cleanup) overlayContainer._cleanup();
     document.body.removeChild(overlayContainer);
     overlayContainer = null;
-    canvas = null;
-    ctx = null;
-    drawingHistory = [];
   }
   if (floatingOrb) floatingOrb.style.display = 'flex';
 }

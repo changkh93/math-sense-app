@@ -52,6 +52,24 @@ const configs = {
       }
     }
   }),
+  // --- Content Script ---
+  content: defineConfig({
+    build: {
+      outDir: 'dist-ext',
+      emptyOutDir: false,   // preserve background & popup
+      lib: {
+        entry: path.resolve(__dirname, 'agora-connect-ext/content.jsx'),
+        name: 'AgoraContent',
+        formats: ['iife'],
+        fileName: () => 'content.js',
+      },
+      rollupOptions: {
+        output: {
+          extend: true,
+        }
+      }
+    }
+  }),
 };
 
 export default configs[target] || configs.bg;

@@ -336,22 +336,23 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         <StarField count={150} />
         <div className="space-quiz-container fade-in">
           <div className="glass-card space-quiz-card" style={{ textAlign: 'center' }}>
-            <button 
-              onClick={() => { soundManager.playClick(); onExit() }}
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: 'rgba(255,255,255,0.1)',
-                border: 'none',
-                color: 'var(--text-muted)',
-                padding: '0.5rem 1rem',
-                borderRadius: '10px',
-                cursor: 'pointer'
-              }}
-            >
-              ✕ 나가기
-            </button>
+              <button 
+                onClick={() => { soundManager.playClick(); onExit() }}
+                style={{
+                  position: 'absolute',
+                  top: '1rem',
+                  right: '1rem',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                ✕ 나가기
+              </button>
 
             <h2 style={{ 
               fontSize: '2rem', 
@@ -638,7 +639,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               padding: '0.5rem 1rem',
               borderRadius: '10px',
               cursor: 'pointer',
-              zIndex: 10
+              zIndex: 10,
+              whiteSpace: 'nowrap'
             }}
           >
             ✕ 나가기

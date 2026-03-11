@@ -30,6 +30,7 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
+      "css": ["math-sense-app.css", "styles.css"],
       "run_at": "document_end"
     }
   ],
