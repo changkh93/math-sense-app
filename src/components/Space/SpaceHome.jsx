@@ -44,8 +44,20 @@ function SpaceHome() {
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection'
   
-  // Selection State
-  const [selectedClusterId, setSelectedClusterId] = useState(null)
+  // Selection State (Persist Cluster ID in session)
+  const [selectedClusterId, setSelectedClusterId] = useState(() => {
+    return sessionStorage.getItem('metasense_cluster_id') || null;
+  });
+
+  // Save selection instantly when changed
+  const updateSelectedClusterId = (id) => {
+    setSelectedClusterId(id);
+    if (id) {
+      sessionStorage.setItem('metasense_cluster_id', id);
+    } else {
+      sessionStorage.removeItem('metasense_cluster_id');
+    }
+  };
   const [selectedRegionId, setSelectedRegionId] = useState(null)
   const [selectedChapterDocId, setSelectedChapterDocId] = useState(null)
   const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
@@ -1270,7 +1282,7 @@ function SpaceHome() {
             <ClusterSelector 
               clusters={activeClusters}
               onSelect={(id) => {
-                setSelectedClusterId(id);
+                updateSelectedClusterId(id);
                 soundManager.playWarp();
               }}
             />
@@ -1292,7 +1304,7 @@ function SpaceHome() {
                 {activeClusters.length > 1 && (
                   <button 
                     className="space-btn cosmic-btn" 
-                    onClick={() => { setSelectedClusterId(null); soundManager.playClick(); }}
+                    onClick={() => { updateSelectedClusterId(null); soundManager.playClick(); }}
                     style={{ 
                       position: 'fixed', 
                       left: '20px', 

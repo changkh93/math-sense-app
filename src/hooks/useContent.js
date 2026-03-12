@@ -57,6 +57,7 @@ export function useRegions(clusterId = 'cluster_elementary') {
 
       return data.sort((a, b) => (a.order || 0) - (b.order || 0));
     },
+    enabled: !!cid, // Only fetch if we have a clusterId (prevents default 'cluster_elementary' leaks)
     staleTime: 1000 * 60 * 5,
     retry: 2
   });
