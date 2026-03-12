@@ -28,48 +28,77 @@ export const parseInlineFormatting = (text, options = {}) => {
   const {
     boldColor = 'var(--crystal-cyan)',
     italicColor = 'var(--neon-blue)',
+    linkColor = 'var(--neon-blue)',
     keyPrefix = 'fmt'
   } = options;
   
-  // A tokenizer that splits by the outer-most formatting or math wrapper.
-  const boldParts = text.split(/(\*\*.*?\*\*)/g);
+  // 1. Split by Links: [text](url)
+  const linkParts = text.split(/(\[.*?\]\(.*?\))/g);
   
-  return boldParts.map((bPart, bIndex) => {
-    // If it's a bold part
-    if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length >= 4) {
-      const innerBold = bPart.slice(2, -2);
-      // parse inner for math
-      const mathParts = innerBold.split(/(\$.*?\$)/g);
-      
-      const innerContent = mathParts.map((mPart, mIndex) => {
-          if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
-              return <InlineMath key={`${keyPrefix}-math-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
-          }
-          return mPart;
-      });
-      
-      return <strong key={`${keyPrefix}-bold-${bIndex}`} style={{ color: boldColor }}>{innerContent}</strong>;
+  return linkParts.flatMap((lPart, lIndex) => {
+    // Check if it's a link match
+    const linkMatch = lPart.match(/^\[(.*?)\]\((.*?)\)$/);
+    if (linkMatch) {
+      const linkText = linkMatch[1];
+      const linkUrl = linkMatch[2];
+      return (
+        <a 
+          key={`${keyPrefix}-link-${lIndex}`}
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ 
+            color: linkColor, 
+            textDecoration: 'underline',
+            cursor: 'pointer'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {parseInlineFormatting(linkText, { ...options, keyPrefix: `${keyPrefix}-lnk-${lIndex}` })}
+        </a>
+      );
     }
+
+    // 2. Split by Bold: **text**
+    const boldParts = lPart.split(/(\*\*.*?\*\*)/g);
     
-    // If not bold, check math
-    const mathParts = bPart.split(/(\$.*?\$)/g);
-    return mathParts.map((mPart, mIndex) => {
-        if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
-            return <InlineMath key={`${keyPrefix}-math-out-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
-        }
+    return boldParts.map((bPart, bIndex) => {
+      // If it's a bold part
+      if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length >= 4) {
+        const innerBold = bPart.slice(2, -2);
+        // parse inner for math
+        const mathParts = innerBold.split(/(\$.*?\$)/g);
         
-        // If not math, check italic
-        const italicParts = mPart.split(/(\*[^*]+\*)/g);
-        return italicParts.map((iPart, iIndex) => {
-            if (iPart.startsWith('*') && iPart.endsWith('*') && iPart.length >= 2) {
-                return (
-                  <em key={`${keyPrefix}-italic-${bIndex}-${mIndex}-${iIndex}`} style={{ color: italicColor }}>
-                    {iPart.slice(1, -1)}
-                  </em>
-                );
+        const innerContent = mathParts.map((mPart, mIndex) => {
+            if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
+                return <InlineMath key={`${keyPrefix}-math-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
             }
-            return <span key={`${keyPrefix}-text-${bIndex}-${mIndex}-${iIndex}`}>{iPart}</span>;
+            return mPart;
         });
+        
+        return <strong key={`${keyPrefix}-bold-${lIndex}-${bIndex}`} style={{ color: boldColor }}>{innerContent}</strong>;
+      }
+      
+      // 3. Check math: $math$
+      const mathParts = bPart.split(/(\$.*?\$)/g);
+      return mathParts.map((mPart, mIndex) => {
+          if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
+              return <InlineMath key={`${keyPrefix}-math-out-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
+          }
+          
+          // 4. Check italic: *text*
+          const italicParts = mPart.split(/(\*[^*]+\*)/g);
+          return italicParts.map((iPart, iIndex) => {
+              if (iPart.startsWith('*') && iPart.endsWith('*') && iPart.length >= 2) {
+                  return (
+                    <em key={`${keyPrefix}-italic-${lIndex}-${bIndex}-${mIndex}-${iIndex}`} style={{ color: italicColor }}>
+                      {iPart.slice(1, -1)}
+                    </em>
+                  );
+              }
+              return <span key={`${keyPrefix}-text-${lIndex}-${bIndex}-${mIndex}-${iIndex}`}>{iPart}</span>;
+          });
+      });
     });
   });
 };

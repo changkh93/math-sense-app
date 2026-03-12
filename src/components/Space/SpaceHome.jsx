@@ -3,7 +3,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, getDoc, where, getDocs, writeBatch, increment, limit } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, getDoc, where, getDocs, writeBatch, increment, limit, runTransaction } from 'firebase/firestore'
 import { useClusters, useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { regions as localRegions } from '../../data/regions'
@@ -511,60 +511,79 @@ function SpaceHome() {
 
       soundManager.playCrystal()
 
-      // --- Fetch FRESH userData from Firestore to avoid stale-closure bugs ---
-      // React의 userData는 클로저에 의해 퀴즈 시작 시점의 값일 수 있으므로,
-      // streak/freeze 계산 전 최신 데이터를 직접 가져옵니다.
-      let freshUserData = userData // fallback
-      try {
-        const freshSnap = await getDoc(doc(db, 'users', user.uid))
-        if (freshSnap.exists()) freshUserData = freshSnap.data()
-      } catch (e) {
-        console.warn('Failed to fetch fresh userData, using stale:', e)
-      }
+      // --- Atomic Transaction: 모든 사용자 데이터 읽기+계산+쓰기를 하나의 트랜잭션으로 처리 ---
+      // getDoc() + setDoc() 패턴은 중간에 다른 쓰기(예: 코어 구매 increment)가 끼어들어
+      // streakFreezeCount를 옛날 값으로 덮어쓰는 race condition을 유발합니다.
+      // runTransaction은 충돌 시 자동 재시도하여 이를 방지합니다.
+      const userDocRef = doc(db, 'users', user.uid)
+      const streakResult = await runTransaction(db, async (transaction) => {
+        const freshSnap = await transaction.get(userDocRef)
+        if (!freshSnap.exists()) throw new Error('User document not found')
+        const freshUserData = freshSnap.data()
 
-      const prevConsecutiveGood = score >= 90 ? (freshUserData.consecutiveGood || 0) + 1 : 0
-      const currentShieldCharges = freshUserData?.shieldCharges || 0
+        const prevConsecutiveGood = score >= 90 ? (freshUserData.consecutiveGood || 0) + 1 : 0
+        const currentShieldCharges = freshUserData?.shieldCharges || 0
 
-      // Daily Task Reset Logic
-      const today = new Date().toISOString().split('T')[0]
-      const lastQuizDate = freshUserData.lastQuizDate || ""
-      const dailyQuizCount = (lastQuizDate === today) ? (freshUserData.dailyQuizCount || 0) + 1 : 1
+        // Daily Task Reset Logic
+        const today = new Date().toISOString().split('T')[0]
+        const lastQuizDate = freshUserData.lastQuizDate || ""
+        const dailyQuizCount = (lastQuizDate === today) ? (freshUserData.dailyQuizCount || 0) + 1 : 1
 
-      // --- Direct Growth Counter (replaces old baseline system) ---
-      const kstNow = new Date(Date.now() + 9 * 3600000)
-      const todayKST = kstNow.toISOString().split('T')[0]
-      const mondayOffset = (kstNow.getUTCDay() + 6) % 7
-      const mondayKST = new Date(kstNow.getTime() - mondayOffset * 86400000)
-        .toISOString().split('T')[0]
+        // --- Direct Growth Counter ---
+        const kstNow = new Date(Date.now() + 9 * 3600000)
+        const todayKST = kstNow.toISOString().split('T')[0]
+        const mondayOffset = (kstNow.getUTCDay() + 6) % 7
+        const mondayKST = new Date(kstNow.getTime() - mondayOffset * 86400000)
+          .toISOString().split('T')[0]
 
-      const growthUpdates = {}
-      if (actualCrystalsEarned > 0) {
-        // Daily growth: reset if new day, increment if same day
-        if (freshUserData.dailyGrowthDate === todayKST) {
-          growthUpdates.dailyGrowth = (freshUserData.dailyGrowth || 0) + actualCrystalsEarned
-        } else {
-          growthUpdates.dailyGrowth = actualCrystalsEarned
-          growthUpdates.dailyGrowthDate = todayKST
+        const growthUpdates = {}
+        if (actualCrystalsEarned > 0) {
+          if (freshUserData.dailyGrowthDate === todayKST) {
+            growthUpdates.dailyGrowth = (freshUserData.dailyGrowth || 0) + actualCrystalsEarned
+          } else {
+            growthUpdates.dailyGrowth = actualCrystalsEarned
+            growthUpdates.dailyGrowthDate = todayKST
+          }
+          if (freshUserData.weeklyGrowthMonday === mondayKST) {
+            growthUpdates.weeklyGrowth = (freshUserData.weeklyGrowth || 0) + actualCrystalsEarned
+          } else {
+            growthUpdates.weeklyGrowth = actualCrystalsEarned
+            growthUpdates.weeklyGrowthMonday = mondayKST
+          }
         }
-        // Weekly growth: reset if new week, increment if same week
-        if (freshUserData.weeklyGrowthMonday === mondayKST) {
-          growthUpdates.weeklyGrowth = (freshUserData.weeklyGrowth || 0) + actualCrystalsEarned
-        } else {
-          growthUpdates.weeklyGrowth = actualCrystalsEarned
-          growthUpdates.weeklyGrowthMonday = mondayKST
-        }
-      }
-      // --- End Growth Counter ---
 
-      // --- Streak System (uses fresh data to avoid stale freeze count) ---
-      const streakResult = calculateStreakUpdate(freshUserData)
-      const streakUpdates = streakResult.streakUpdate || {}
-      
+        // --- Streak System (transaction 내에서 최신 freeze count 사용) ---
+        const result = calculateStreakUpdate(freshUserData)
+        const streakUpdates = result.streakUpdate || {}
+
+        // Transaction 내에서는 increment()를 쓸 수 없으므로, 직접 계산
+        transaction.update(userDocRef, {
+          crystals: (freshUserData.crystals || 0) + actualCrystalsEarned,
+          totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
+          totalScore: (freshUserData.totalScore || 0) + score,
+          averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
+          perfectCount: (isPerfect && previousBest < 100) ? (freshUserData.perfectCount || 0) + 1 : (freshUserData.perfectCount || 0),
+          consecutiveGood: prevConsecutiveGood,
+          shieldDefended: (freshUserData.shieldDefended || 0) + (shieldsUsed || 0),
+          dailyQuizCount: dailyQuizCount,
+          lastQuizDate: today,
+          lastActive: serverTimestamp(),
+          shieldCharges: Math.max(0, currentShieldCharges - (shieldsUsed || 0)),
+          ...growthUpdates,
+          ...streakUpdates
+        })
+
+        return { result, freshUserData }
+      })
+
+      // Transaction 밖에서 부수효과 처리 (트랜잭션 성공 후)
+      const { result: streakCalcResult, freshUserData: txUserData } = streakResult
+      const streakUpdates = streakCalcResult.streakUpdate || {}
+
       // Record Cryo Core usage if freeze was triggered
-      if (streakResult.meta?.freezeUsed) {
-        // Calculate the actual defended dates
+      if (streakCalcResult.meta?.freezeUsed) {
         const defendedDates = [];
-        const lastDate = freshUserData?.lastStreakDate;
+        const lastDate = txUserData?.lastStreakDate;
         if (lastDate) {
           const scanObj = new Date(lastDate + 'T12:00:00Z');
           const todayDate = new Date(getTodayKST() + 'T12:00:00Z');
@@ -580,30 +599,12 @@ function SpaceHome() {
           description: `크라이오 코어로 연속 탐사 궤도 보호`,
           metadata: { 
             unitId: currentUnitId,
-            streakBefore: freshUserData?.currentStreak || 0,
-            streakAfter: streakResult.meta.newStreak,
+            streakBefore: txUserData?.currentStreak || 0,
+            streakAfter: streakCalcResult.meta.newStreak,
             defendedDates: defendedDates
           }
         })
       }
-      // --- End Streak ---
-
-      // Use increment() for numeric fields to prevent race-condition overwrites
-      await setDoc(doc(db, 'users', user.uid), {
-        crystals: increment(actualCrystalsEarned),
-        totalQuizzes: increment(1),
-        totalScore: increment(score),
-        averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
-        perfectCount: (isPerfect && previousBest < 100) ? increment(1) : (freshUserData.perfectCount || 0),
-        consecutiveGood: prevConsecutiveGood,
-        shieldDefended: increment(shieldsUsed || 0),
-        dailyQuizCount: dailyQuizCount,
-        lastQuizDate: today,
-        lastActive: serverTimestamp(),
-        shieldCharges: Math.max(0, currentShieldCharges - (shieldsUsed || 0)),
-        ...growthUpdates,
-        ...streakUpdates
-      }, { merge: true })
 
       await addDoc(collection(db, 'users', user.uid, 'history'), {
         unitId: currentUnitId,
@@ -709,10 +710,10 @@ function SpaceHome() {
       }
 
       // Trigger streak celebration if milestone reached
-      if (streakResult.meta?.justReachedMilestone) {
+      if (streakCalcResult.meta?.justReachedMilestone) {
         setStreakCelebration({
-          milestone: streakResult.meta.justReachedMilestone,
-          currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak
+          milestone: streakCalcResult.meta.justReachedMilestone,
+          currentStreak: streakUpdates.currentStreak || streakCalcResult.meta.newStreak
         })
       }
 
@@ -721,11 +722,11 @@ function SpaceHome() {
         isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
         rewardMessage,
         streakInfo: {
-          currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak,
-          freezeUsed: streakResult.meta.freezeUsed,
-          isNewRecord: streakResult.meta.isNewRecord,
-          alreadyDoneToday: streakResult.meta.alreadyDoneToday,
-          justReachedMilestone: streakResult.meta.justReachedMilestone
+          currentStreak: streakUpdates.currentStreak || streakCalcResult.meta.newStreak,
+          freezeUsed: streakCalcResult.meta.freezeUsed,
+          isNewRecord: streakCalcResult.meta.isNewRecord,
+          alreadyDoneToday: streakCalcResult.meta.alreadyDoneToday,
+          justReachedMilestone: streakCalcResult.meta.justReachedMilestone
         }
       })
       setSelectedUnitDocId(null)
@@ -743,23 +744,34 @@ function SpaceHome() {
   const handleNonQuizActivityComplete = async (activityType, crystalsEarned = 0) => {
     if (!user) return
 
-    // Fetch FRESH userData to avoid stale-closure bugs (same fix as handleComplete)
-    let freshUserData = userData
-    try {
-      const freshSnap = await getDoc(doc(db, 'users', user.uid))
-      if (freshSnap.exists()) freshUserData = freshSnap.data()
-    } catch (e) {
-      console.warn('Failed to fetch fresh userData for non-quiz activity:', e)
-    }
+    const userDocRef = doc(db, 'users', user.uid)
+    const txResult = await runTransaction(db, async (transaction) => {
+      const freshSnap = await transaction.get(userDocRef)
+      if (!freshSnap.exists()) throw new Error('User document not found')
+      const freshUserData = freshSnap.data()
 
-    const streakResult = calculateStreakUpdate(freshUserData)
-    const streakUpdates = streakResult.streakUpdate || {}
+      const result = calculateStreakUpdate(freshUserData)
+      const streakUpdates = result.streakUpdate || {}
+
+      // Update basic fields if needed (non-quiz activities might grant crystals)
+      if (crystalsEarned > 0 || Object.keys(streakUpdates).length > 0) {
+        transaction.update(userDocRef, {
+          crystals: (freshUserData.crystals || 0) + crystalsEarned,
+          lastActive: serverTimestamp(),
+          ...streakUpdates
+        })
+      }
+
+      return { result, freshUserData }
+    })
+
+    const { result: streakCalcResult, freshUserData: txUserData } = txResult
+    const streakUpdates = streakCalcResult.streakUpdate || {}
 
     // Track usage of freeze if happened outside of quiz
-    if (streakResult.meta?.freezeUsed) {
-      // Calculate the actual defended dates
+    if (streakCalcResult.meta?.freezeUsed) {
       const defendedDates = [];
-      const lastDate = freshUserData?.lastStreakDate;
+      const lastDate = txUserData?.lastStreakDate;
       if (lastDate) {
         const scanObj = new Date(lastDate + 'T12:00:00Z');
         const todayDate = new Date(getTodayKST() + 'T12:00:00Z');
@@ -775,8 +787,8 @@ function SpaceHome() {
         description: `크라이오 코어로 연속 탐사 궤도 보호 (${activityType})`,
         metadata: { 
           unitId: selectedUnitDocId || quickQuizUnitId || 'unknown',
-          streakBefore: freshUserData?.currentStreak || 0,
-          streakAfter: streakResult.meta.newStreak,
+          streakBefore: txUserData?.currentStreak || 0,
+          streakAfter: streakCalcResult.meta.newStreak,
           defendedDates: defendedDates
         }
       })
@@ -795,16 +807,11 @@ function SpaceHome() {
       type: activityType.includes('로그') ? 'text' : activityType.includes('영상') ? 'video' : activityType 
     })
 
-    // Only update DB streak if there are actual streak changes
-    if (Object.keys(streakUpdates).length > 0) {
-      await setDoc(doc(db, 'users', user.uid), streakUpdates, { merge: true })
-    }
-
     // Trigger milestone celebration
-    if (streakResult.meta?.justReachedMilestone) {
+    if (streakCalcResult.meta?.justReachedMilestone) {
       setStreakCelebration({
-        milestone: streakResult.meta.justReachedMilestone,
-        currentStreak: streakUpdates.currentStreak || streakResult.meta.newStreak
+        milestone: streakCalcResult.meta.justReachedMilestone,
+        currentStreak: streakUpdates.currentStreak || streakCalcResult.meta.newStreak
       })
     }
 
@@ -815,11 +822,11 @@ function SpaceHome() {
       isPerfect: true, // Give full star visual effect
       rewardMessage: `${activityType} 달성! (+${crystalsEarned} 광석)`,
       streakInfo: {
-        currentStreak: streakUpdates.currentStreak || streakResult.meta?.newStreak || userData?.currentStreak || 0,
-        freezeUsed: streakResult.meta?.freezeUsed || false,
-        isNewRecord: streakResult.meta?.isNewRecord || false,
-        alreadyDoneToday: streakResult.meta?.alreadyDoneToday || false,
-        justReachedMilestone: streakResult.meta?.justReachedMilestone || false
+        currentStreak: streakUpdates.currentStreak || streakCalcResult.meta?.newStreak || txUserData?.currentStreak || 0,
+        freezeUsed: streakCalcResult.meta?.freezeUsed || false,
+        isNewRecord: streakCalcResult.meta?.isNewRecord || false,
+        alreadyDoneToday: streakCalcResult.meta?.alreadyDoneToday || false,
+        justReachedMilestone: streakCalcResult.meta?.justReachedMilestone || false
       }
     })
   }

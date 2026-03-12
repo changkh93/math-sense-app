@@ -212,7 +212,12 @@ export function calculateStreakUpdate(userData, todayOverride) {
 }
 /**
  * 현재 시점에서 유효한(표시될) 연속 학습 일수 반환
- * (오늘 아직 안 했더라도 어제까지 했으면 스트릭 숫자를 유지하여 보여줌)
+ * 
+ * DB 확정값만 기반으로 판단합니다 (예측/희망 고문 제거):
+ * - 오늘 이미 학습 완료 → currentStreak 표시
+ * - 어제 학습 완료 → currentStreak 표시 (오늘 할 기회가 아직 있으므로)
+ * - 그 외 → 0 (코어 보유량에 관계없이; 코어 처리는 학습 완료 시에만)
+ *
  * @param {Object} userData - 사용자 데이터
  * @returns {number}
  */
@@ -222,25 +227,13 @@ export function getEffectiveStreak(userData) {
   const todayKST = getTodayKST()
   const lastDate = userData.lastStreakDate
   
-  // 1. 오늘 이미 완료했거나 어제 완료한 경우 -> 확실히 활성 상태
+  // 오늘 이미 완료했거나 어제 완료한 경우 → 확실히 활성 상태
   if (lastDate === todayKST || lastDate === getYesterdayKST()) {
     return userData.currentStreak
   }
   
-  // 2. 어제 빠졌지만 현재 시각이 '오늘'인 동안은 아직 '기회'가 있는 것으로 간주 (Duo 스타일)
-  // 즉, 오늘 밤 11:59분이 되기 전까진 어제의 스트릭 숫자가 유지되어 보여야 함.
-  // (어제가 깨졌더라도 오늘 하면 이어지도록 설계된 calculateStreakUpdate와 일맥상통)
-  const diff = daysBetween(lastDate, todayKST)
-  if (diff === 1) {
-    return userData.currentStreak // 어제 안 했어도 오늘 할 기회가 있으니 그대로 표시
-  }
-
-  // 3. 하루 이상 더 빠졌지만, 크라이오 코어(Freeze) 보유량이 결석일(diff-1)보다 충분한 경우
-  // 내일까지는 스트릭이 살아있는 것으로 보여줌
-  const missedDays = diff - 1
-  if (missedDays > 0 && (userData.streakFreezeCount || 0) >= missedDays) {
-    return userData.currentStreak
-  }
-  
+  // 그 외: 코어 보유와 무관하게 0 반환
+  // 코어 방어는 학습 완료(handleComplete/handleNonQuizActivityComplete) 시에만 실행되므로,
+  // UI에서 "방어된 것처럼" 미리 보여주면 DB 확정값과 불일치하는 희망 고문이 됨.
   return 0
 }

@@ -1150,7 +1150,8 @@ export default function MissionHub({
           <button onClick={returnFromContent} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
         </div>
         
-        {missionData?.learningContents?.pdfUrl ? (
+        {/* PDF Viewer */}
+        {missionData?.learningContents?.pdfUrl && (
           <div style={{ width: '100%', height: '70vh', border: '1px solid var(--neon-blue)', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
             <object 
               data={missionData.learningContents.pdfUrl} 
@@ -1166,9 +1167,24 @@ export default function MissionHub({
               </div>
             </object>
           </div>
-        ) : (
-          <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
-            <MissionMarkdownViewer text={missionData?.learningContents?.text} />
+        )}
+
+        {/* Markdown Content (shown below PDF if both exist, or alone if no PDF) */}
+        {missionData?.learningContents?.text?.trim() && (
+          <div style={{ marginTop: missionData?.learningContents?.pdfUrl ? '2rem' : 0 }}>
+            {missionData?.learningContents?.pdfUrl && (
+              <div style={{ 
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                marginBottom: '1rem', paddingBottom: '0.8rem',
+                borderBottom: '1px solid rgba(0, 243, 255, 0.2)'
+              }}>
+                <span style={{ fontSize: '1.2rem' }}>📋</span>
+                <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', fontSize: '1.2rem', margin: 0 }}>추가 자료</h3>
+              </div>
+            )}
+            <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
+              <MissionMarkdownViewer text={missionData?.learningContents?.text} />
+            </div>
           </div>
         )}
 
