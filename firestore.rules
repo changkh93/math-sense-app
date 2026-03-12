@@ -16,7 +16,11 @@ service cloud.firestore {
 
     match /clusters/{clusterId} {
       allow read: if true;
-      allow write: if isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow create, delete: if isAdmin();
+      allow update: if isAuth() && (
+        isAdmin() || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usageCount'])
+      );
     }
 
     match /regions/{regionId} {

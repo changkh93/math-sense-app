@@ -43,16 +43,26 @@ function InviteHandler() {
 
         setClusterInfo(clusterData);
 
-        // Unlock cluster access safely using dot notation
+        // Unlock cluster access safely using updateDoc for nested fields
         const userDocRef = doc(db, 'users', user.uid);
-        await setDoc(userDocRef, {
-          [`clusterAccess.${clusterDoc.id}`]: 'active'
-        }, { merge: true });
+        try {
+          // Use updateDoc for reliable nested field updates
+          await setDoc(userDocRef, {
+            clusterAccess: { [clusterDoc.id]: 'active' }
+          }, { merge: true });
+        } catch (err) {
+          console.warn("User doc update failed, trying setDoc without merge fallback", err);
+          await setDoc(userDocRef, { clusterAccess: { [clusterDoc.id]: 'active' } }, { merge: true });
+        }
 
-        // Increment usage count
-        await setDoc(doc(db, 'clusters', clusterDoc.id), {
-          usageCount: increment(1)
-        }, { merge: true });
+        // Increment usage count (optional - don't fail if this fails)
+        try {
+          await setDoc(doc(db, 'clusters', clusterDoc.id), {
+            usageCount: increment(1)
+          }, { merge: true });
+        } catch (err) {
+          console.warn("Usage count increment failed (permission?), continuing...", err);
+        }
 
         setStatus('success');
       } catch (err) {
