@@ -27,23 +27,7 @@ async function inspect() {
   }
   const userData = userSnap.data();
   console.log("User Data:", JSON.stringify(userData, null, 2));
-
-  console.log("\n--- History (Recent 20) ---");
-  const histSnap = await getDocs(query(collection(db, "users", uid, "history"), orderBy("timestamp", "desc")));
-  histSnap.docs.slice(0, 20).forEach(d => {
-    const h = d.data();
-    const ts = h.timestamp?.toDate() || new Date(h.timestamp);
-    console.log(`[${ts.toISOString()}] ${h.type} - ${h.unitTitle || h.unitId}`);
-  });
-
-  console.log("\n--- Transactions ---");
-  const txSnap = await getDocs(query(collection(db, "users", uid, "crystal_transactions"), orderBy("timestamp", "desc")));
-  txSnap.docs.forEach(d => {
-    const t = d.data();
-    const ts = t.timestamp?.toDate() || new Date(t.timestamp);
-    console.log(`[${ts.toISOString()}] ${t.type} (${t.amount}) - ${t.description}`);
-    if (t.metadata) console.log("   Metadata:", JSON.stringify(t.metadata));
-  });
+  console.log("\nCluster Access:", JSON.stringify(userData.clusterAccess || {}, null, 2));
 }
 
 inspect();

@@ -88,7 +88,13 @@ function SpaceHome() {
     // Admin can see all clusters
     if (userData?.role === 'admin') return list;
     
-    return list.filter(c => access[c.docId] === 'active' || access[c.id] === 'active');
+    // Logic: 
+    // 1. Show all public clusters (isPrivate: false)
+    // 2. Show private clusters if user has 'active' access in clusterAccess
+    return list.filter(c => {
+      if (!c.isPrivate) return true;
+      return access[c.docId] === 'active' || access[c.id] === 'active';
+    });
   }, [clusters, userData, loadingClusters]);
 
   useEffect(() => {

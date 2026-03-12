@@ -43,12 +43,10 @@ function InviteHandler() {
 
         setClusterInfo(clusterData);
 
-        // Unlock cluster access
+        // Unlock cluster access safely using dot notation
         const userDocRef = doc(db, 'users', user.uid);
         await setDoc(userDocRef, {
-          clusterAccess: {
-            [clusterDoc.id]: 'active'
-          }
+          [`clusterAccess.${clusterDoc.id}`]: 'active'
         }, { merge: true });
 
         // Increment usage count
