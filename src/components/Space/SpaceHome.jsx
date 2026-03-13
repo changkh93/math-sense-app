@@ -213,13 +213,32 @@ function SpaceHome() {
   // Interaction & UI State
   const [isBoosting, setIsBoosting] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-  const [bgmDisabledForSession, setBgmDisabledForSession] = useState(false)
+  const [bgmDisabledForSession, setBgmDisabledForSession] = useState(() => {
+    return localStorage.getItem('metasense_bgm_muted') === 'true'
+  })
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // Sync BGM mute state across tabs
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'metasense_bgm_muted') {
+        const isMuted = e.newValue === 'true'
+        setBgmDisabledForSession(isMuted)
+        if (isMuted) {
+          soundManager.stopBGM()
+        } else if (user && !authLoading) {
+          soundManager.startBGM()
+        }
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [user, authLoading])
   
   // Equipment Logic
   const equipment = {
@@ -245,6 +264,8 @@ function SpaceHome() {
         // Only stop BGM on actual unmount of SpaceHome
         soundManager.stopBGM();
       };
+    } else if (bgmDisabledForSession) {
+      soundManager.stopBGM();
     }
   }, [user, authLoading, bgmDisabledForSession]);
 
@@ -260,6 +281,7 @@ function SpaceHome() {
           // BGM stop should work regardless of modals (fixes Gravity Engine issue)
           if (!bgmDisabledForSession) {
             setBgmDisabledForSession(true);
+            localStorage.setItem('metasense_bgm_muted', 'true');
             soundManager.stopBGM();
           }
 
@@ -1333,10 +1355,49 @@ function SpaceHome() {
                         color: 'var(--star-gold)', 
                         fontSize: '0.9rem', 
                         marginTop: '0.5rem',
-                        textShadow: '0 0 10px var(--neon-blue)'
+                        textShadow: '0 0 10px var(--neon-blue)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '1rem'
                       }}
                     >
                       (BOOST: SPACE BAR)
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (bgmDisabledForSession) {
+                            setBgmDisabledForSession(false);
+                            // Set localStorage
+                            localStorage.setItem('metasense_bgm_muted', 'false');
+                            soundManager.startBGM();
+                          } else {
+                            setBgmDisabledForSession(true);
+                            // Set localStorage
+                            localStorage.setItem('metasense_bgm_muted', 'true');
+                            soundManager.stopBGM();
+                          }
+                          soundManager.playClick();
+                        }}
+                        style={{
+                          background: 'rgba(5, 10, 25, 0.6)',
+                          border: `1px solid ${bgmDisabledForSession ? 'var(--text-muted)' : 'var(--crystal-cyan)'}`,
+                          color: bgmDisabledForSession ? 'var(--text-muted)' : 'var(--crystal-cyan)',
+                          padding: '0.3rem 0.8rem',
+                          borderRadius: '15px',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto',
+                          fontSize: '0.8rem',
+                          fontFamily: 'var(--font-tech)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        {bgmDisabledForSession ? '🔇 BGM OFF' : '🔊 BGM ON'}
+                      </button>
                     </motion.p>
                   )}
                 </motion.div>
