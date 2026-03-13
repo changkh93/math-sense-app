@@ -418,9 +418,13 @@ function SpaceHome() {
       }
       progressMap[uid][hType] = true
 
-      // Tracking scores for old logic
-      const scoreKey = hType === 'workbook' ? `${uid}_workbook` : uid;
-      if (!scores[scoreKey] || h.score > scores[scoreKey]) {
+      // Tracking scores for old logic (MissionHub cards)
+      // ONLY include 'quiz' and 'workbook' in bestScores to prevent video/text nominal scores (100) from leaking
+      let scoreKey = null;
+      if (hType === 'workbook') scoreKey = `${uid}_workbook`;
+      else if (hType === 'quiz') scoreKey = uid;
+
+      if (scoreKey && (!scores[scoreKey] || h.score > scores[scoreKey])) {
         scores[scoreKey] = h.score
       }
     })
