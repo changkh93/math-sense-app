@@ -509,7 +509,7 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
        
        <div className="streak-week-bar">
           <div className="week-days-labels">
-             {['일','월','화','수','목','금','토'].map((wd, i) => (
+             {['일', '월', '화', '수', '목', '금', '토'].map((wd, i) => (
                 <span key={wd} className={thisWeek[i]?.isToday ? 'today-label' : ''}>{wd}</span>
              ))}
           </div>

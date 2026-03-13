@@ -388,12 +388,33 @@ export default function MissionHub({
   // Keep a ref to userData to avoid stale closures in useCallback/useEffect
   const userDataRef = useRef(userData)
   useEffect(() => { userDataRef.current = userData }, [userData])
-  const [currentMode, setCurrentMode] = useState(initialMode === 'quiz-modal' ? 'briefing' : initialMode)
+  const [currentMode, internalSetCurrentMode] = useState(() => {
+    const savedMode = sessionStorage.getItem(`metasense_hub_mode_${unitId}`);
+    return savedMode || (initialMode === 'quiz-modal' ? 'briefing' : initialMode);
+  });
+
+  // Persistence for mode
+  const updateCurrentMode = (mode) => {
+    internalSetCurrentMode(mode);
+    if (mode) sessionStorage.setItem(`metasense_hub_mode_${unitId}`, mode);
+    else sessionStorage.removeItem(`metasense_hub_mode_${unitId}`);
+  };
+
   const [missionData, setMissionData] = useState(null)
   const [showOverlay, setShowOverlay] = useState(false) 
   const [overlayContent, setOverlayContent] = useState('text')
   const [overlayReference, setOverlayReference] = useState(null)
   const [selectedTx, setSelectedTx] = useState(null)
+  
+  // Persist selected transmission ID
+  useEffect(() => {
+    if (selectedTx) {
+      sessionStorage.setItem(`metasense_hub_tx_${unitId}`, selectedTx.id || 'default');
+    } else {
+      sessionStorage.removeItem(`metasense_hub_tx_${unitId}`);
+    }
+  }, [selectedTx, unitId])
+
   const videoPlayerRef = useRef(null)
 
   // ─── Question Modal State ───
@@ -440,6 +461,7 @@ export default function MissionHub({
   const totalRewardedCrystalsRef = useRef(0) // Total crystals given for this tx
   const [totalRewardedCrystals, setTotalRewardedCrystals] = useState(0) // For UI reactivity
   const autoSaveIntervalRef = useRef(null)
+  const [initialStartPosition, setInitialStartPosition] = useState(0)
   
   // ─── Silent Toast ───
   const [toastVisible, setToastVisible] = useState(false)
@@ -501,7 +523,21 @@ export default function MissionHub({
       transmissions: defaultTxList,
       learningContents: activeUnit?.learningContents || null
     })
-    setSelectedTx(null) 
+
+    // Restore selectedTx from sessionStorage if available
+    const savedTxId = sessionStorage.getItem(`metasense_hub_tx_${unitId}`);
+    if (savedTxId && defaultTxList.length > 0) {
+      const foundTx = defaultTxList.find(tx => (tx.id || 'default') === savedTxId);
+      if (foundTx) {
+        setSelectedTx(foundTx);
+        updateCurrentMode('video'); // Also restore mode to video if a transmission was selected
+      } else {
+        setSelectedTx(null);
+        sessionStorage.removeItem(`metasense_hub_tx_${unitId}`);
+      }
+    } else {
+      setSelectedTx(null);
+    }
   }, [unitId, activeUnit])
 
   // Smart routing is now handled by SpaceHome via initialMode prop (no flash)
@@ -513,7 +549,7 @@ export default function MissionHub({
       // Single-content unit — go directly back to SpaceHome
       onBack()
     } else {
-      setCurrentMode('briefing')
+      updateCurrentMode('briefing')
     }
   }, [initialMode, onBack])
 
@@ -548,11 +584,11 @@ export default function MissionHub({
     if (logRewardClaimed) return
 
     // Restore from sessionStorage
-    const savedTimer = sessionStorage.getItem(sessionStorageKey)
+    // `savedTimer` is not defined in the original code, assuming it's meant to be retrieved from sessionStorage
+    const savedTimer = sessionStorage.getItem(sessionStorageKey);
     if (savedTimer) {
       const saved = JSON.parse(savedTimer)
-      const elapsed = (Date.now() - saved.timestamp) / 1000
-      if (elapsed < 60) { // Within 1 minute, restore
+      if (saved.remaining > 0) {
         setTimeRemaining(Math.max(0, saved.remaining))
       }
     }
@@ -580,13 +616,30 @@ export default function MissionHub({
 
     timerRef.current = setInterval(tick, 1000)
 
-    // Page Visibility API - pause timer when tab is hidden
+    // Page Visibility API - pause timer when tab is hidden and save video progress
     const handleVisibility = () => {
       if (document.hidden) {
         if (timerRef.current) clearInterval(timerRef.current)
+        
+        // Proactively save video position if in video mode
+        if (currentMode === 'video' && selectedTx && userId) {
+           const pos = Math.floor(lastVideoTimeRef.current || 0)
+           if (pos > 0) {
+             const txId = selectedTx.id || 'default'
+             const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
+             setDoc(progressRef, {
+               [`videoProgress.${txId}.lastPosition`]: pos,
+               [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+               [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
+               [`videoProgress.${txId}.stampedSeconds`]: Array.from(stampedSetRef.current)
+             }, { merge: true }).catch(err => console.warn("Background save failed:", err))
+           }
+        }
       } else {
-        // Resume
-        timerRef.current = setInterval(tick, 1000)
+        // Resume reading timer if applicable
+        if (currentMode === 'text' && logTimerActive && timeRemaining > 0) {
+          timerRef.current = setInterval(tick, 1000)
+        }
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
@@ -595,7 +648,7 @@ export default function MissionHub({
       if (timerRef.current) clearInterval(timerRef.current)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [logTimerActive, timeRemaining, sessionStorageKey])
+  }, [logTimerActive, timeRemaining, sessionStorageKey, currentMode, selectedTx, userId, unitId])
 
   // ─── Data Log: Claim reward ───
   const handleClaimLogReward = async () => {
@@ -728,14 +781,12 @@ export default function MissionHub({
 
           const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
           await setDoc(progressRef, {
-            videoProgress: {
-              [txId]: {
-                stampedSeconds: Array.from(stampedSetRef.current),
-                rewardedStampCount: stampedSetRef.current.size - newStampCountRef.current,
-                totalRewardedCrystals: totalRewardedCrystalsRef.current,
-                totalTimeSpent: totalTimeSpentRef.current,
-                updatedAt: serverTimestamp()
-              }
+            [`videoProgress.${txId}`]: {
+              stampedSeconds: Array.from(stampedSetRef.current),
+              rewardedStampCount: stampedSetRef.current.size - newStampCountRef.current,
+              totalRewardedCrystals: totalRewardedCrystalsRef.current,
+              totalTimeSpent: totalTimeSpentRef.current,
+              updatedAt: serverTimestamp()
             }
           }, { merge: true })
 
@@ -751,7 +802,7 @@ export default function MissionHub({
       }
       awardReward()
     }
-  }, [selectedTx, userId, unitId])
+  }, [selectedTx, userId, unitId, activeUnit?.title, onNonQuizActivityComplete, showSilentToast, userDataRef])
 
   // ─── Transmission: Completion bonus ───
   useEffect(() => {
@@ -807,7 +858,7 @@ export default function MissionHub({
       }
     }
     awardCompletion()
-  }, [videoCompleted, videoCompletionBonusGiven, userId, selectedTx])
+  }, [videoCompleted, videoCompletionBonusGiven, userId, selectedTx, learningProgress?.videoProgress, unitId, activeUnit?.title, onNonQuizActivityComplete, showSilentToast, userDataRef])
 
   // ─── Transmission: Save position ("오늘은 여기까지") ───
   const handleSaveVideoPosition = async () => {
@@ -824,15 +875,13 @@ export default function MissionHub({
       
       const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
       await setDoc(progressRef, {
-        videoProgress: {
-          [txId]: {
-            lastPosition: savedPosition,
-            stampedSeconds: stamps,
-            rewardedStampCount: stamps.length - newStampCountRef.current,
-            totalRewardedCrystals: totalRewardedCrystalsRef.current,
-            totalTimeSpent: totalTimeSpentRef.current,
-            updatedAt: serverTimestamp()
-          }
+        [`videoProgress.${txId}`]: {
+          lastPosition: savedPosition,
+          stampedSeconds: stamps,
+          rewardedStampCount: stamps.length - newStampCountRef.current,
+          totalRewardedCrystals: totalRewardedCrystalsRef.current,
+          totalTimeSpent: totalTimeSpentRef.current,
+          updatedAt: serverTimestamp()
         }
       }, { merge: true })
 
@@ -844,10 +893,8 @@ export default function MissionHub({
           [txId]: {
             ...(prev?.videoProgress?.[txId] || {}),
             lastPosition: savedPosition,
-            stampedSeconds: stamps,
-            rewardedStampCount: stamps.length - newStampCountRef.current,
-            totalRewardedCrystals: totalRewardedCrystalsRef.current,
-            totalTimeSpent: totalTimeSpentRef.current
+            totalTimeSpent: totalTimeSpentRef.current,
+            stampedSeconds: stamps
           }
         }
       }))
@@ -887,6 +934,7 @@ export default function MissionHub({
       setIsAtEnd(false) // Reset end detection when switching/reloading tx
       setVideoCompletionBonusGiven(savedProgress?.completionBonusGiven || false)
       lastVideoTimeRef.current = (savedProgress?.lastPosition !== undefined) ? savedProgress.lastPosition : -1
+      setInitialStartPosition((savedProgress?.lastPosition !== undefined) ? savedProgress.lastPosition : (selectedTx.start || 0))
 
       // Auto-save every 10 seconds
       if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
@@ -895,16 +943,31 @@ export default function MissionHub({
           try {
             const pos = Math.floor(lastVideoTimeRef.current || 0)
             if (pos > 0) {
+              const stamps = Array.from(stampedSetRef.current)
               const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-              await setDoc(progressRef, {
+              
+              const updateData = {
+                [`videoProgress.${txId}.lastPosition`]: pos,
+                [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+                [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
+                [`videoProgress.${txId}.stampedSeconds`]: stamps
+              }
+              
+              await setDoc(progressRef, updateData, { merge: true })
+
+              // Sync local state as well
+              setLearningProgress(prev => ({
+                ...prev,
                 videoProgress: {
+                  ...(prev?.videoProgress || {}),
                   [txId]: {
+                    ...(prev?.videoProgress?.[txId] || {}),
                     lastPosition: pos,
                     totalTimeSpent: totalTimeSpentRef.current,
-                    updatedAt: serverTimestamp()
+                    stampedSeconds: stamps
                   }
                 }
-              }, { merge: true })
+              }))
             }
           } catch (err) {
             console.warn("Auto-save failed:", err)
@@ -916,7 +979,7 @@ export default function MissionHub({
     return () => {
       if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
     }
-  }, [selectedTx?.id, userId, unitId])
+  }, [selectedTx?.id, userId, unitId, selectedTx?.start])
 
   const handleModeChange = (mode) => {
     soundManager.playClick()
@@ -925,7 +988,7 @@ export default function MissionHub({
       setShowFieldTestModal(true)
       return
     }
-    setCurrentMode(mode)
+    updateCurrentMode(mode)
     if (mode === 'text' || mode === 'video') {
        logActivity(`view_${mode}`)
     }
@@ -1273,7 +1336,8 @@ export default function MissionHub({
       // Get saved position for resume
       const txId = selectedTx.id || 'default'
       const savedProgress = learningProgress?.videoProgress?.[txId]
-      const startPosition = savedProgress?.lastPosition || selectedTx.start
+      // initialStartPosition is already set in useEffect based on savedProgress or selectedTx.start
+      // const startPosition = savedProgress?.lastPosition || selectedTx.start
 
       return (
         <div className="mission-content-view fade-in" style={{ 
@@ -1316,9 +1380,9 @@ export default function MissionHub({
           }}>
              <YoutubePlayer 
                 ref={videoPlayerRef}
-                key={`${selectedTx.videoId}_${startPosition}`}
+                key={`${selectedTx.videoId}_${initialStartPosition}`}
                 videoId={selectedTx.videoId}
-                start={startPosition}
+                start={initialStartPosition}
                 end={selectedTx.end}
                 onTimeUpdate={handleVideoTimeUpdate}
                 onComplete={() => setIsAtEnd(true)}
@@ -1719,7 +1783,7 @@ export default function MissionHub({
              }}
              onConfirm={() => {
                setShowFieldTestModal(false)
-               setCurrentMode('quiz')
+               updateCurrentMode('quiz')
                soundManager.playWarp()
              }}
            />

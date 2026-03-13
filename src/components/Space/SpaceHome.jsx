@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, useMemo, useRef } from 'react'
+import { useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
@@ -45,25 +45,55 @@ function SpaceHome() {
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection', 'assignment_hub'
   
-  // Selection State (Persist Cluster ID in session)
+  // Selection State (Persist ID in session)
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
     return sessionStorage.getItem('metasense_cluster_id') || null;
   });
+  
+  const [selectedRegionId, internalSetSelectedRegionId] = useState(() => {
+    return sessionStorage.getItem('metasense_region_id') || null;
+  });
 
-  // Save selection instantly when changed
+  const [selectedChapterDocId, internalSetSelectedChapterDocId] = useState(() => {
+    return sessionStorage.getItem('metasense_chapter_id') || null;
+  });
+
+  const [selectedUnitDocId, internalSetSelectedUnitDocId] = useState(() => {
+    return sessionStorage.getItem('metasense_unit_id') || null;
+  });
+
+  // Specialized setters to persist
   const updateSelectedClusterId = (id) => {
     setSelectedClusterId(id);
-    if (id) {
-      sessionStorage.setItem('metasense_cluster_id', id);
-    } else {
-      sessionStorage.removeItem('metasense_cluster_id');
-    }
+    if (id) sessionStorage.setItem('metasense_cluster_id', id);
+    else sessionStorage.removeItem('metasense_cluster_id');
   };
-  const [selectedRegionId, setSelectedRegionId] = useState(null)
-  const [selectedChapterDocId, setSelectedChapterDocId] = useState(null)
-  const [selectedUnitDocId, setSelectedUnitDocId] = useState(null)
+
+  const updateSelectedRegionId = (id) => {
+    internalSetSelectedRegionId(id);
+    if (id) sessionStorage.setItem('metasense_region_id', id);
+    else sessionStorage.removeItem('metasense_region_id');
+  };
+
+  const updateSelectedChapterDocId = (id) => {
+    internalSetSelectedChapterDocId(id);
+    if (id) sessionStorage.setItem('metasense_chapter_id', id);
+    else sessionStorage.removeItem('metasense_chapter_id');
+  };
+
+  const updateSelectedUnitDocId = (id) => {
+    internalSetSelectedUnitDocId(id);
+    if (id) sessionStorage.setItem('metasense_unit_id', id);
+    else sessionStorage.removeItem('metasense_unit_id');
+  };
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
   const [quickQuizMode, setQuickQuizMode] = useState(null) // New: Mode for quick quiz
+
+  const handleBackFromMission = useCallback(() => {
+    updateSelectedUnitDocId(null);
+    setQuickQuizUnitId(null);
+    setQuickQuizMode(null);
+  }, []);
   // Region Access State
   const [pendingRegion, setPendingRegion] = useState(null)
   const [accessError, setAccessError] = useState(null)
@@ -78,8 +108,8 @@ function SpaceHome() {
   useEffect(() => {
     if (location.state?.view) {
       setCurrentView(location.state.view)
-      setSelectedRegionId(null)
-      setSelectedChapterDocId(null)
+      updateSelectedRegionId(null)
+      updateSelectedChapterDocId(null)
       // Clear state to prevent re-triggering
       window.history.replaceState({}, document.title)
     }
@@ -153,7 +183,7 @@ function SpaceHome() {
   // Auto-skip single chapter
   useEffect(() => {
     if (chapters && chapters.length === 1 && !selectedChapterDocId) {
-      setSelectedChapterDocId(chapters[0].docId)
+      updateSelectedChapterDocId(chapters[0].docId)
     }
   }, [chapters, selectedChapterDocId])
 
@@ -778,9 +808,9 @@ function SpaceHome() {
           justReachedMilestone: streakCalcResult.meta.justReachedMilestone
         }
       })
-      setSelectedUnitDocId(null)
-      // setSelectedChapterDocId(null)
-      // setSelectedRegionId(null)
+      updateSelectedUnitDocId(null)
+      // updateSelectedChapterDocId(null)
+      // updateSelectedRegionId(null)
       // setCurrentView('dashboard') // No regular navigation, the modal will handle it
     } catch (error) {
       console.error("Error saving quiz result:", error)
@@ -1186,7 +1216,7 @@ function SpaceHome() {
         userData={userData}
         bestScores={bestScores}
         initialMode={initialMode}
-        onBack={() => { setSelectedUnitDocId(null); setQuickQuizUnitId(null); setQuickQuizMode(null); }}
+        onBack={handleBackFromMission}
         onComplete={handleComplete}
         onNonQuizActivityComplete={handleNonQuizActivityComplete}
       />
@@ -1246,7 +1276,7 @@ function SpaceHome() {
                       return;
                    }
                 }
-                setSelectedRegionId(id)
+                updateSelectedRegionId(id)
                 soundManager.playWarp()
               }}
               onSelectArchive={() => {
@@ -1267,8 +1297,8 @@ function SpaceHome() {
         currentView={currentView} 
         onViewChange={(view) => {
           setCurrentView(view)
-          setSelectedRegionId(null)
-          setSelectedChapterDocId(null)
+          updateSelectedRegionId(null)
+          updateSelectedChapterDocId(null)
         }} 
       />
 
@@ -1297,7 +1327,7 @@ function SpaceHome() {
               });
               await batch.commit();
               setPendingRegion(null);
-              setSelectedRegionId(region.id);
+              updateSelectedRegionId(region.id);
               soundManager.playWarp();
             } else {
               setAccessError('접근 코드가 올바르지 않습니다.');
@@ -1421,7 +1451,7 @@ function SpaceHome() {
               <div className="fade-in" style={{ pointerEvents: 'auto', marginTop: '5vh' }}>
                 <button 
                   className="space-nav-link font-tech"
-                  onClick={() => { setSelectedRegionId(null); soundManager.playClick() }}
+                  onClick={() => { updateSelectedRegionId(null); soundManager.playClick() }}
                   style={{ marginBottom: '1rem' }}
                 >
                   ← RETURN TO GALAXY
@@ -1429,7 +1459,7 @@ function SpaceHome() {
                 <div className="glass-card" style={{ padding: '2rem', background: 'rgba(5, 5, 16, 0.8)', backdropFilter: 'blur(20px)', position: 'relative' }}>
                   {/* Close Button */}
                   <button 
-                    onClick={() => { setSelectedRegionId(null); soundManager.playClick() }}
+                    onClick={() => { updateSelectedRegionId(null); soundManager.playClick() }}
                     style={{
                       position: 'absolute',
                       top: '1.5rem',
@@ -1471,7 +1501,7 @@ function SpaceHome() {
                         key={chapter.docId}
                         whileHover={{ scale: 1.02, backgroundColor: 'rgba(0, 243, 255, 0.1)' }}
                         className="glass-card hud-border"
-                        onClick={() => { setSelectedChapterDocId(chapter.docId); soundManager.playWarp() }}
+                        onClick={() => { updateSelectedChapterDocId(chapter.docId); soundManager.playWarp() }}
                         style={{ padding: '2rem', cursor: 'pointer' }}
                       >
                         <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.5rem' }}>
@@ -1529,10 +1559,10 @@ function SpaceHome() {
                   onClick={() => {
                     soundManager.playClick()
                     if (chapters?.length === 1) {
-                      setSelectedChapterDocId(null)
-                      setSelectedRegionId(null)
+                      updateSelectedChapterDocId(null)
+                      updateSelectedRegionId(null)
                     } else {
-                      setSelectedChapterDocId(null)
+                      updateSelectedChapterDocId(null)
                     }
                   }}
                   style={{ marginBottom: '1rem' }}
@@ -1545,10 +1575,10 @@ function SpaceHome() {
                     onClick={() => {
                       soundManager.playClick()
                       if (chapters?.length === 1) {
-                        setSelectedChapterDocId(null)
-                        setSelectedRegionId(null)
+                        updateSelectedChapterDocId(null)
+                        updateSelectedRegionId(null)
                       } else {
-                        setSelectedChapterDocId(null)
+                        updateSelectedChapterDocId(null)
                       }
                     }}
                     style={{
@@ -1610,7 +1640,7 @@ function SpaceHome() {
                           whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
                           className={`glass-card hud-border ${isOverallCompleted ? 'completed' : ''}`}
                           onClick={() => { 
-                            setSelectedUnitDocId(unit.docId)
+                            updateSelectedUnitDocId(unit.docId)
                             soundManager.playClick() 
                           }}
                           style={{
@@ -1809,9 +1839,9 @@ function SpaceHome() {
                   }}
                   onClick={() => {
                     setCompletionResult(null)
-                    setSelectedUnitDocId(null)
-                    setSelectedChapterDocId(null)
-                    setSelectedRegionId(null)
+                    updateSelectedUnitDocId(null)
+                    updateSelectedChapterDocId(null)
+                    updateSelectedRegionId(null)
                     setCurrentView('dashboard')
                     soundManager.playClick()
                   }}
@@ -1831,7 +1861,7 @@ function SpaceHome() {
                   }}
                   onClick={() => {
                     setCompletionResult(null)
-                    setSelectedUnitDocId(null)
+                    updateSelectedUnitDocId(null)
                     soundManager.playClick()
                   }}
                 >
