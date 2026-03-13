@@ -1567,8 +1567,34 @@ export default function MissionHub({
 
                <div style={{ height: 'calc(100vh - 200px)', overflowY: 'auto' }}>
                   {overlayContent === 'text' ? (
-                      <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.6' }}>
-                          <MissionMarkdownViewer text={missionData?.learningContents?.text} />
+                      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                          {missionData?.learningContents?.pdfUrl && (
+                              <div style={{ width: '100%', minHeight: '50vh', flex: 1, border: '1px solid var(--neon-blue)', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
+                                  <object 
+                                      data={missionData.learningContents.pdfUrl} 
+                                      type="application/pdf" 
+                                      width="100%" 
+                                      height="100%"
+                                  >
+                                      <div style={{ padding: '2rem', textAlign: 'center', color: '#333' }}>
+                                          <p>브라우저에서 PDF를 바로 열 수 없습니다.</p>
+                                          <a href={missionData.learningContents.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--neon-blue)', textDecoration: 'underline' }}>
+                                              이곳을 클릭하여 PDF 다운로드 / 열기
+                                          </a>
+                                      </div>
+                                  </object>
+                              </div>
+                          )}
+                          {missionData?.learningContents?.text?.trim() && (
+                              <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.6', flexShrink: 0 }}>
+                                  <MissionMarkdownViewer text={missionData?.learningContents?.text} />
+                              </div>
+                          )}
+                          {!missionData?.learningContents?.pdfUrl && !missionData?.learningContents?.text?.trim() && (
+                              <div className="font-tech" style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem', flexShrink: 0 }}>
+                                  표시할 데이터가 없습니다.
+                              </div>
+                          )}
                       </div>
                   ) : (
                       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
