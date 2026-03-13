@@ -9,7 +9,7 @@ class SoundManager {
     this.sounds = {}
     this.bgm = null
     this.isMuted = false
-    this.bgmVolume = 0.1
+    this.bgmVolume = 0.05 // Reduced by half as requested
     this.sfxVolume = 0.6
     
     // 사운드 초기화
