@@ -494,6 +494,25 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
   const isNeedsRevision = assignment?.status === 'needs_revision';
   const isSubmitted = assignment?.status === 'submitted';
 
+  // Window check: Today and previous 6 days (total 7 days)
+  const isWithinWindow = useMemo(() => {
+    const today = new Date(getTodayKST() + 'T00:00:00Z');
+    const selected = new Date(dateStr + 'T00:00:00Z');
+    const diffTime = today - selected;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 6;
+  }, [dateStr]);
+
+  const canSubmit = isWithinWindow || isNeedsRevision; 
+  // If it needs revision, we allow submission even if window passed? 
+  // User said "제출할 수 있도록", usually implies new work. 
+  // But let's follow the strict window for now as "Too past is not right".
+  // Actually, if it's already 'needs_revision', it's better to allow the student to fix it.
+  // But the user's request sounds like a rule for the "Target Date".
+  // "너무 과거 날짜에 과제를 제출하는 것도 맞지 않아요." -> The target date of the assignment.
+  // So even if it needs revision, if it's too old, they shouldn't be able to?
+  // Let's stick to the window rule for ALL submissions/edits to be safe and simple.
+
   const handleAddLink = (e) => {
     if (e) e.preventDefault();
     if (!newLink.trim()) return;
@@ -657,6 +676,21 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
                  ))}
                </div>
              )}
+          </div>
+        </div>
+      ) : !isWithinWindow ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
+          <p className="font-tech">
+            {new Date(dateStr) > new Date(getTodayKST()) 
+              ? "미래의 날짜에는 보고서를 전송할 수 없습니다." 
+              : "과거 7일(오늘 포함) 이내의 날짜에만 보고서를 전송할 수 있습니다."}
+          </p>
+          <div className="glass-card" style={{ marginTop: '2rem', padding: '1.5rem', opacity: 0.6, width: '100%' }}>
+             <h4 style={{ color: 'var(--text-bright)', marginBottom: '1rem' }}>제출된 기록</h4>
+             <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', lineHeight: '1.6' }}>
+               {assignment ? assignment.content : "제출된 기록이 없습니다."}
+             </div>
           </div>
         </div>
       ) : (
