@@ -406,20 +406,27 @@ function SpaceHome() {
       })
 
       if (isAnySolved) {
-        if (!lastRegionId) {
-          const latest = history[0]
-          if (latest.unitId?.startsWith(region.id) || latest.regionId === region.id) {
-            lastRegionId = region.id
-          }
-        }
         statusMap[region.id] = 'in_progress'
       } else {
         statusMap[region.id] = 'not_started'
       }
     })
 
+    // Find the most recent region WITHIN the current cluster
+    if (history.length > 0) {
+      const latestMatchingEntry = history.find(h => 
+        (h.clusterId && h.clusterId === selectedClusterId) || 
+        regions.some(r => h.unitId?.startsWith(r.id) || h.regionId === r.id)
+      )
+      if (latestMatchingEntry) {
+        lastRegionId = regions.find(r => 
+          latestMatchingEntry.unitId?.startsWith(r.id) || latestMatchingEntry.regionId === r.id
+        )?.id
+      }
+    }
+
     return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores, unitProgressMap: progressMap }
-  }, [regions, history])
+  }, [regions, history, selectedClusterId])
 
   // Calculate chapter progress dynamically from Firestore data
   const chapterProgress = useMemo(() => {
@@ -653,6 +660,7 @@ function SpaceHome() {
         regionId: selectedRegionId || history.find(h => h.unitId === currentUnitId)?.regionId || "",
         regionTitle: activeRegion?.title || "Unknown Galaxy",
         chapterId: selectedChapterDocId || "",
+        clusterId: selectedClusterId, // Added for per-cluster tracking
         score: score,
         crystalsEarned: actualCrystalsEarned,
         timestamp: serverTimestamp()
@@ -842,6 +850,7 @@ function SpaceHome() {
       regionId: selectedRegionId || activeRegion?.id || "",
       regionTitle: activeRegion?.title || "Unknown Galaxy",
       chapterId: selectedChapterDocId || "",
+      clusterId: selectedClusterId, // Added for per-cluster tracking
       score: 100, // Nominal score for non-quiz completions to show nicely on the chart
       crystalsEarned: crystalsEarned,
       timestamp: serverTimestamp(),
