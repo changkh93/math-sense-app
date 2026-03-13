@@ -493,7 +493,8 @@ export default function SpaceJourney({ userData }) {
 // ------------------------------------------
 function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
   const thisWeek = timelineDays.slice(-7);
-  
+  const dayLabels = ['일', '월', '화', '수', '목', '금', '토'];
+
   return (
     <div className="streak-bottom-banner">
        <div className="streak-banner-header">
@@ -508,24 +509,24 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
        </div>
        
        <div className="streak-week-bar">
-          <div className="week-days-labels">
-             {['일', '월', '화', '수', '목', '금', '토'].map((wd, i) => (
-                <span key={wd} className={thisWeek[i]?.isToday ? 'today-label' : ''}>{wd}</span>
-             ))}
-          </div>
-          <div className="bar-track">
-             {thisWeek.map((d, i) => {
+          <div className="week-columns">
+             {dayLabels.map((wd, i) => {
+                const d = thisWeek[i];
                 const isActive = d?.isActive;
                 const isProtected = d?.isProtected;
                 const isToday = d?.isToday;
                 const color = isActive ? activeColor : (isProtected ? 'rgba(0, 243, 255, 0.4)' : 'rgba(255,255,255,0.08)');
+                
                 return (
-                  <div key={i} className={`bar-segment ${isActive ? 'active' : ''} ${isProtected ? 'protected' : ''}`} style={{ backgroundColor: color }}>
-                     {isToday && <div className="today-indicator" style={{ borderColor: isProtected ? 'var(--crystal-cyan)' : activeColor }} />}
-                     {isActive && <div className="bar-glow" style={{ boxShadow: `0 0 10px ${activeColor}` }}></div>}
-                     {isProtected && <div className="freeze-icon" style={{ fontSize: '0.8rem', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>🧊</div>}
+                  <div key={wd} className="day-column">
+                    <span className={`day-label ${isToday ? 'banner-today-label' : ''}`}>{wd}</span>
+                    <div className={`bar-segment ${isActive ? 'active' : ''} ${isProtected ? 'protected' : ''}`} style={{ backgroundColor: color }}>
+                       {isToday && <div className="today-indicator" style={{ borderColor: isProtected ? 'var(--crystal-cyan)' : activeColor }} />}
+                       {isActive && <div className="bar-glow" style={{ boxShadow: `0 0 10px ${activeColor}` }}></div>}
+                       {isProtected && <div className="freeze-icon" style={{ fontSize: '0.8rem', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>🧊</div>}
+                    </div>
                   </div>
-                )
+                );
              })}
           </div>
        </div>
