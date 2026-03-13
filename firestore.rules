@@ -89,6 +89,14 @@ service cloud.firestore {
       allow read, write: if isAuth();
     }
 
+    // Assignments (Stellar Archive)
+    match /assignments/{assignmentId} {
+      allow create: if isAuth();
+      allow read: if isAuth();
+      allow update: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
     // Star Messages (Community Ticker)
     match /starMessages/{messageId} {
       allow read: if isAuth();

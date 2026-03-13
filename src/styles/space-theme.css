@@ -759,7 +759,27 @@
   font-size: inherit !important;
 }
 
-/* 질문 영역 내 KaTeX 크기 통일 */
 .font-title .katex {
   font-size: inherit !important;
+}
+
+/* ========================================
+   Assignment Hub Status Animations
+   ======================================== */
+.siren-pulse {
+  animation: sirenPulse 2s infinite alternate;
+}
+
+@keyframes sirenPulse {
+  0% { box-shadow: 0 0 5px rgba(255, 69, 0, 0.2); border-color: rgba(255, 69, 0, 0.3); }
+  100% { box-shadow: 0 0 20px rgba(255, 69, 0, 0.8); border-color: rgba(255, 69, 0, 1); }
+}
+
+.pulse-slow {
+  animation: glowPulseSlow 3s infinite alternate;
+}
+
+@keyframes glowPulseSlow {
+  0% { box-shadow: 0 0 5px rgba(2fb8ff, 0.1); border-color: rgba(2fb8ff, 0.2); }
+  100% { box-shadow: 0 0 15px rgba(2fb8ff, 0.5); border-color: rgba(2fb8ff, 0.6); }
 }

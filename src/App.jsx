@@ -16,6 +16,7 @@ import GhostCleaner from './pages/Admin/GhostCleaner'
 import StreakFixer from './pages/Admin/StreakFixer'
 import TeacherQA from './pages/Admin/TeacherQA'
 import PythonCourseBuilder from './pages/Admin/PythonCourseBuilder'
+import AdminAssignments from './pages/Admin/AdminAssignments'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
@@ -38,6 +39,7 @@ function App() {
         <Route path="clusters" element={<ClusterManager />} />
         <Route path="users" element={<UserAccessManager />} />
         <Route path="content" element={<ContentManager />} />
+        <Route path="assignments" element={<AdminAssignments />} />
         <Route path="mission/:unitId" element={<MissionContentEditor />} />
         <Route path="mission/:unitId/ai-tagging" element={<AITaggingEditor />} />
         <Route path="quizzes/:unitId" element={<QuizEditor />} />

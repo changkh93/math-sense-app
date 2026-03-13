@@ -23,6 +23,7 @@ import SpaceRanking from './SpaceRanking'
 import SpaceJourney from './SpaceJourney'
 import CrystalLedger from './CrystalLedger'
 import RegionAccessModal from './RegionAccessModal' // New Integration
+import AssignmentHub from './AssignmentHub' // New Integration
 
 import { useParticles, createParticleBurst } from './ParticleEffects'
 import { calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils'
@@ -42,7 +43,7 @@ function SpaceHome() {
   const { user, userData, loading: authLoading } = useAuth()
   const [history, setHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
-  const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection'
+  const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection', 'assignment_hub'
   
   // Selection State (Persist Cluster ID in session)
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
@@ -1239,6 +1240,10 @@ function SpaceHome() {
                 setSelectedRegionId(id)
                 soundManager.playWarp()
               }}
+              onSelectArchive={() => {
+                setCurrentView('assignment_hub');
+                soundManager.playWarp();
+              }}
               equipment={equipment}
               isBoosting={isBoosting}
             />
@@ -1713,6 +1718,7 @@ function SpaceHome() {
           {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}
           {currentView === 'journey' && <SpaceJourney userData={userData} />}
           {currentView === 'ledger' && <CrystalLedger userData={userData} />}
+          {/* AssignmentHub moved to root level */}
 
           {/* Quick Quiz Modal now handled by main return branch for consistency */}
         </div>
@@ -1847,6 +1853,14 @@ function SpaceHome() {
           <StreakToast 
             streakInfo={completionResult.streakInfo}
             onDismiss={() => setCompletionResult(prev => prev ? { ...prev, streakInfo: null } : null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {currentView === 'assignment_hub' && (
+          <AssignmentHub 
+            clusterId={selectedClusterId} 
+            onClose={() => setCurrentView('planet')} 
           />
         )}
       </AnimatePresence>

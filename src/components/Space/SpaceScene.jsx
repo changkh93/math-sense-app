@@ -40,6 +40,7 @@ function CameraFOV({ isBoosting }) {
 function SceneContent({ 
   regions, 
   onSelectRegion, 
+  onSelectArchive,
   selectedRegionId,
   recentRegionId,
   explorationStatus = {},
@@ -198,6 +199,49 @@ function SceneContent({
           )}
         </group>
       ))}
+
+      {( !selectedRegionId ) && ( // Only show when looking at the cluster overview
+        <group position={[0, 0.5, -2]}>
+          <Float speed={1.5} rotationIntensity={0.5} floatIntensity={1} floatingRange={[-0.5, 0.5]}>
+            <PlanetMesh 
+              color="#ffaa00" 
+              size={0.8} 
+              planetType="crystal" /* Special distinct look */
+              showSpaceship={false}
+              showFormulas={true}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectArchive) onSelectArchive();
+              }}
+              onPointerOver={() => { document.body.style.cursor = 'pointer' }}
+              onPointerOut={() => { document.body.style.cursor = 'auto' }}
+            />
+            {/* Assignment Label */}
+            <Text
+              position={[0, 1.2, 0]}
+              fontSize={0.4}
+              color="#ffd700"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.03}
+              outlineColor="#000000"
+            >
+              과제 기록소
+            </Text>
+            <Text
+              position={[0, 0.7, 0]}
+              fontSize={0.2}
+              color="#ffffff"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.01}
+              outlineColor="#000000"
+            >
+              Stellar Archive
+            </Text>
+          </Float>
+        </group>
+      )}
     </>
   )
 }
