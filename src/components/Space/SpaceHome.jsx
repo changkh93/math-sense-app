@@ -407,8 +407,9 @@ function SpaceHome() {
       if (!uid) return
 
       // Map legacy history types to modalities
-      let hType = 'quiz' // default
-      if (h.type === 'workbook') hType = 'workbook'
+      let hType = 'unknown' 
+      if (!h.type || h.type === 'quiz') hType = 'quiz' 
+      else if (h.type === 'workbook') hType = 'workbook'
       else if (h.type === 'video') hType = 'video'
       else if (h.type === 'text') hType = 'text'
 
