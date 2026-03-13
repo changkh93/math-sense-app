@@ -1,11 +1,13 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
-import { useStudentAssignments, useSubmitAssignment } from '../../hooks/useAssignments';
+import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments';
+import { useClusters } from '../../hooks/useContent';
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import AssignmentChronicle from './AssignmentChronicle';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
+import { getTodayKST } from '../../utils/streakUtils';
 
 /**
  * Assignment Hub (Stellar Archive)
@@ -16,10 +18,22 @@ export default function AssignmentHub({ clusterId, regionId, onClose }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(null); // The date the user clicked on
   const [showChronicle, setShowChronicle] = useState(false);
+
+  // Auto-select today
+  useEffect(() => {
+    setSelectedDateStr(getTodayKST());
+  }, []);
   
   // Data Fetching - Fetch cluster-wide assignments (ignore regionId)
   const { data: assignments, isLoading } = useStudentAssignments(user?.uid, clusterId);
+  const { data: attendanceRecords, isLoading: isAttendanceLoading } = useStudentAttendance(user?.uid, clusterId);
+  const { data: clusters } = useClusters();
   const submitMutation = useSubmitAssignment();
+  const attendanceMutation = useRecordAttendance();
+
+  const clusterData = useMemo(() => {
+    return clusters?.find(c => c.id === clusterId || c.docId === clusterId);
+  }, [clusters, clusterId]);
 
   // Calendar Logic
   const daysInMonth = useMemo(() => {
@@ -58,15 +72,17 @@ export default function AssignmentHub({ clusterId, regionId, onClose }) {
       
       // Find assignment for this date
       const assignment = assignments?.find(a => a.date === dateStr);
+      const attendance = attendanceRecords?.find(a => a.date === dateStr);
       
       days.push({
         dateStr,
         dayNumber: i,
-        assignment: assignment || null
+        assignment: assignment || null,
+        attendance: attendance || null
       });
     }
     return days;
-  }, [currentDate, firstDayOfMonth, daysInMonth, assignments]);
+  }, [currentDate, firstDayOfMonth, daysInMonth, assignments, attendanceRecords]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -165,6 +181,16 @@ export default function AssignmentHub({ clusterId, regionId, onClose }) {
         </div>
       </div>
 
+      {/* Warp Gate Docking Section */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '1rem', flexShrink: 0 }}>
+        <WarpGateDocking 
+          clusterData={clusterData} 
+          user={user} 
+          attendanceMutation={attendanceMutation}
+          todayAttendance={attendanceRecords?.find(a => a.date === getTodayKST())}
+        />
+      </div>
+
       {/* Scrollable Content Container */}
       <div style={{ 
         flex: 1, 
@@ -228,12 +254,14 @@ export default function AssignmentHub({ clusterId, regionId, onClose }) {
               if (day.assignment?.status === 'needs_revision') animationClass = 'siren-pulse'; // Need to add to space-theme.css
               else if (day.assignment?.status === 'submitted') animationClass = 'pulse-slow';
               
+              const isToday = day.dateStr === getTodayKST();
+
               return (
                 <motion.div
                   key={day.dateStr}
                   whileHover={{ scale: 1.05 }}
                   onClick={() => setSelectedDateStr(day.dateStr)}
-                  className={`glass-card ${animationClass}`}
+                  className={`glass-card ${animationClass} ${isToday ? 'today-highlight' : ''}`}
                   style={{
                     aspectRatio: '1/1',
                     padding: '0.5rem',
@@ -247,6 +275,15 @@ export default function AssignmentHub({ clusterId, regionId, onClose }) {
                   }}
                 >
                   <span className="font-tech" style={{ color: 'var(--text-muted)' }}>{day.dayNumber}</span>
+                  
+                  {/* Attendance Marker - Move to bottom right to avoid overlap with TODAY label */}
+                  {day.attendance && (
+                    <div style={{ position: 'absolute', bottom: '5px', right: '5px', fontSize: '1rem', zIndex: 1, filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.5))' }}>
+                      {day.attendance.status === 'late' ? '⚠️' : '✅'}
+                    </div>
+                  )}
+
+                  {isToday && <div className="today-label">TODAY</div>}
                   
                   {hasAssignment && (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
@@ -297,6 +334,146 @@ export default function AssignmentHub({ clusterId, regionId, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Warp Gate Docking Button (Attendance)
+ */
+function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendance }) {
+  const [status, setStatus] = useState({ state: 'invalid', message: '', countdown: null });
+
+  useEffect(() => {
+    if (todayAttendance) {
+      setStatus({ 
+        state: 'completed', 
+        message: `도킹 완료 (${todayAttendance.status === 'late' ? '지각' : '정상'})` 
+      });
+      return;
+    }
+    
+    if (!clusterData?.classSchedule) return;
+
+    const timer = setInterval(() => {
+      const now = new Date();
+      const currentDay = now.getDay();
+      const currentHour = now.getHours();
+      const currentMin = now.getMinutes();
+      const currentTimeInMins = currentHour * 60 + currentMin;
+
+      // Find matching schedule for today
+      const todaySchedule = clusterData.classSchedule.find(s => 
+        (s.days && s.days.includes(currentDay)) || s.day === currentDay
+      );
+
+      if (!todaySchedule) {
+        setStatus({ state: 'invalid', message: '오늘은 수업이 없습니다.' });
+        return;
+      }
+
+      const [startHour, startMin] = todaySchedule.startTime.split(':').map(Number);
+      const [endHour, endMin] = todaySchedule.endTime.split(':').map(Number);
+      
+      const startTimeInMins = startHour * 60 + startMin;
+      const endTimeInMins = endHour * 60 + endMin;
+      const dockingOpenTimeInMins = startTimeInMins - 10;
+      const closingTimeInMins = startTimeInMins + 5;
+
+      if (currentTimeInMins < dockingOpenTimeInMins) {
+        setStatus({ state: 'invalid', message: `수업 시작 10분 전부터 도킹이 가능합니다. (${todaySchedule.startTime})` });
+      } else if (currentTimeInMins >= dockingOpenTimeInMins && currentTimeInMins < startTimeInMins) {
+        setStatus({ state: 'open', message: '탐사선 도킹 승인' });
+      } else if (currentTimeInMins >= startTimeInMins && currentTimeInMins <= closingTimeInMins) {
+        // Calculate countdown
+        const currentSecs = now.getSeconds();
+        const totalClosingSecs = (closingTimeInMins * 60) - (currentHour * 3600 + currentMin * 60 + currentSecs);
+        const mins = Math.floor(totalClosingSecs / 60);
+        const secs = totalClosingSecs % 60;
+        setStatus({ 
+          state: 'closing', 
+          message: `도킹 마감 임박 - ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}` 
+        });
+      } else if (currentTimeInMins > closingTimeInMins && currentTimeInMins <= endTimeInMins) {
+        setStatus({ state: 'late', message: '게이트 폐쇄 (지각 도킹)' });
+      } else {
+        setStatus({ state: 'invalid', message: '오늘 수업이 종료되었습니다.' });
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [clusterData, todayAttendance]);
+
+  const handleDocking = async () => {
+    if (status.state === 'invalid') return;
+    
+    try {
+      await attendanceMutation.mutateAsync({
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0],
+        clusterId: clusterData.id,
+        clusterName: clusterData.name,
+        date: getTodayKST(),
+        timestamp: new Date(),
+        status: status.state === 'late' ? 'late' : 'present'
+      });
+      alert(status.state === 'late' ? '지각 도킹되었습니다. 다음에는 서둘러주세요!' : '정상적으로 도킹(출석)되었습니다. 즐거운 탐험 되세요!');
+    } catch (err) {
+      console.error('Docking failed:', err);
+      alert('도킹 시스템 오류가 발생했습니다.');
+    }
+  };
+
+  if (status.state === 'invalid') {
+    return (
+      <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '20px' }}>
+        📡 {status.message}
+      </div>
+    );
+  }
+
+  if (status.state === 'completed') {
+    return (
+      <div className="font-tech" style={{ 
+        padding: '0.8rem 2rem', 
+        fontSize: '1.1rem', 
+        borderColor: 'var(--crystal-cyan)',
+        color: 'var(--crystal-cyan)',
+        boxShadow: `0 0 15px var(--crystal-cyan)`,
+        background: 'rgba(0, 212, 255, 0.1)',
+        fontWeight: 'bold',
+        borderRadius: '4px',
+        border: '1px solid var(--crystal-cyan)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem'
+      }}>
+        ✨ {status.message}
+      </div>
+    );
+  }
+
+  let btnColor = 'var(--neon-blue)';
+  if (status.state === 'closing') btnColor = 'var(--planet-orange)';
+  if (status.state === 'late') btnColor = '#ff4500';
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={handleDocking}
+      className="space-btn cosmic-btn font-tech"
+      style={{ 
+        padding: '0.8rem 2rem', 
+        fontSize: '1.1rem', 
+        borderColor: btnColor,
+        color: btnColor,
+        boxShadow: `0 0 15px ${btnColor}`,
+        background: 'rgba(0,0,0,0.4)',
+        fontWeight: 'bold'
+      }}
+    >
+      🚀 {status.message}
+    </motion.button>
   );
 }
 

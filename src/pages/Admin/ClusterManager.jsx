@@ -15,7 +15,8 @@ function ClusterManager() {
     name: '',
     isPrivate: false,
     inviteCode: '',
-    expiresAt: ''
+    expiresAt: '',
+    classSchedule: [] // Array of { day, startTime, endTime }
   });
 
   const handleEdit = (cluster) => {
@@ -25,7 +26,11 @@ function ClusterManager() {
       name: cluster.name || '',
       isPrivate: !!cluster.isPrivate,
       inviteCode: cluster.inviteCode || '',
-      expiresAt: cluster.expiresAt ? new Date(cluster.expiresAt.toDate ? cluster.expiresAt.toDate() : cluster.expiresAt).toISOString().split('T')[0] : ''
+      expiresAt: cluster.expiresAt ? new Date(cluster.expiresAt.toDate ? cluster.expiresAt.toDate() : cluster.expiresAt).toISOString().split('T')[0] : '',
+      classSchedule: (cluster.classSchedule || []).map(s => ({
+        ...s,
+        days: s.days || (s.day !== undefined ? [s.day] : [1])
+      }))
     });
   };
 
@@ -36,7 +41,8 @@ function ClusterManager() {
       name: '',
       isPrivate: false,
       inviteCode: Math.random().toString(36).substring(2, 10).toUpperCase(),
-      expiresAt: ''
+      expiresAt: '',
+      classSchedule: []
     });
   };
 
@@ -205,6 +211,106 @@ function ClusterManager() {
                     </div>
                   </>
                 )}
+
+                <div className="form-group" style={{ marginTop: '1rem', borderTop: '1px solid #333', paddingTop: '1rem' }}>
+                  <label>수업 시간표 (Class Schedule)</label>
+                  <p className="font-tech" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '5px' }}>
+                    * 워프 게이트 도킹(출석체크) 시스템이 이 시간표를 기반으로 작동합니다.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                    {formData.classSchedule.map((sched, idx) => (
+                      <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '4px' }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[
+                            { v: 1, l: '월' }, { v: 2, l: '화' }, { v: 3, l: '수' }, 
+                            { v: 4, l: '목' }, { v: 5, l: '금' }, { v: 6, l: '토' }, { v: 0, l: '일' }
+                          ].map(d => {
+                            const isSelected = (sched.days || []).includes(d.v);
+                            return (
+                              <button
+                                key={d.v}
+                                type="button"
+                                onClick={() => {
+                                  const newSchedule = [...formData.classSchedule];
+                                  const currentDays = newSchedule[idx].days || [];
+                                  if (isSelected) {
+                                    newSchedule[idx].days = currentDays.filter(v => v !== d.v);
+                                  } else {
+                                    newSchedule[idx].days = [...currentDays, d.v];
+                                  }
+                                  setFormData({...formData, classSchedule: newSchedule});
+                                }}
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.8rem',
+                                  cursor: 'pointer',
+                                  background: isSelected ? 'var(--neon-blue)' : '#222',
+                                  color: isSelected ? '#000' : '#888',
+                                  border: isSelected ? 'none' : '1px solid #444',
+                                  fontWeight: isSelected ? 'bold' : 'normal',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                {d.l}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <input 
+                          type="time" 
+                          value={sched.startTime}
+                          onChange={(e) => {
+                            const newSchedule = [...formData.classSchedule];
+                            newSchedule[idx].startTime = e.target.value;
+                            setFormData({...formData, classSchedule: newSchedule});
+                          }}
+                          style={{ background: '#222', color: '#fff', border: '1px solid #444', padding: '5px' }}
+                        />
+                        <span style={{ color: '#aaa' }}>~</span>
+                        <input 
+                          type="time" 
+                          value={sched.endTime}
+                          onChange={(e) => {
+                            const newSchedule = [...formData.classSchedule];
+                            newSchedule[idx].endTime = e.target.value;
+                            setFormData({...formData, classSchedule: newSchedule});
+                          }}
+                          style={{ background: '#222', color: '#fff', border: '1px solid #444', padding: '5px' }}
+                        />
+                        <button 
+                          type="button" 
+                          className="icon-btn danger" 
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              classSchedule: formData.classSchedule.filter((_, i) => i !== idx)
+                            });
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <button 
+                      type="button" 
+                      className="secondary-btn" 
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          classSchedule: [...formData.classSchedule, { days: [1], startTime: '17:00', endTime: '17:50' }]
+                        });
+                      }}
+                      style={{ marginTop: '5px', padding: '8px' }}
+                    >
+                      <Plus size={14} /> 시간표 추가
+                    </button>
+                  </div>
+                </div>
 
                 <div className="form-actions">
                   <button type="button" className="ghost-btn" onClick={() => setEditingCluster(null)}>

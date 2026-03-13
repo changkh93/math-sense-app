@@ -164,3 +164,57 @@ export const useReviewAssignment = () => {
     }
   });
 };
+
+/**
+ * Fetch attendance for a student in a cluster
+ */
+export const useStudentAttendance = (userId, clusterId) => {
+  return useQuery({
+    queryKey: ['attendance', 'student', userId, clusterId],
+    queryFn: async () => {
+      if (!userId || !clusterId) return [];
+      
+      // Normalize clusterId
+      let normalizedClusterId = clusterId;
+      if (clusterId === '초등수학' || clusterId === 'cluster_elementary') normalizedClusterId = 'cluster_elementary';
+      else if (clusterId === '파이썬' || clusterId === 'python') normalizedClusterId = 'python';
+      else if (clusterId === '중등수학' || clusterId === 'middle-math') normalizedClusterId = 'middle-math';
+      else if (clusterId === '서양고전' || clusterId === 'western-classic') normalizedClusterId = 'western-classic';
+
+      const q = query(
+        collection(db, 'attendance'),
+        where('userId', '==', userId),
+        where('clusterId', '==', normalizedClusterId)
+      );
+      
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+    enabled: !!userId && !!clusterId
+  });
+};
+
+/**
+ * Record attendance (Warp Gate Docking)
+ */
+export const useRecordAttendance = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (attendanceData) => {
+      // Create a unique doc ID for the student+date+cluster to prevent double attendance
+      const docId = `${attendanceData.userId}_${attendanceData.date}_${attendanceData.clusterId}`;
+      const ref = doc(db, 'attendance', docId);
+      
+      await setDoc(ref, {
+        ...attendanceData,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      
+      return { id: docId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    }
+  });
+};
