@@ -53,6 +53,17 @@ const AdminLayout = () => {
             <MessageSquare size={20} />
             <span>Q&A Manager</span>
           </Link>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '10px 0', paddingTop: '10px' }}>
+            <div style={{ padding: '0 1rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '5px' }}>Course Builders</div>
+            <Link to="/admin/python-builder" className="nav-link">
+              <Database size={20} />
+              <span>Python Builder</span>
+            </Link>
+            <Link to="/admin/middle-math-builder" className="nav-link">
+              <Database size={20} />
+              <span>Middle Math Builder</span>
+            </Link>
+          </div>
         </nav>
 
         <div className="admin-footer">

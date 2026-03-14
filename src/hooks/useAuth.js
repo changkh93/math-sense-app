@@ -63,7 +63,7 @@ export function useAuth() {
               name: firebaseUser.displayName,
               createdAt: new Date().toISOString()
             };
-            setDoc(userDocRef, initialData);
+            setDoc(userDocRef, initialData, { merge: true });
             setUserData(initialData);
           }
           setLoading(false);

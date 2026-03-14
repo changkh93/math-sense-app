@@ -16,6 +16,7 @@ import GhostCleaner from './pages/Admin/GhostCleaner'
 import StreakFixer from './pages/Admin/StreakFixer'
 import TeacherQA from './pages/Admin/TeacherQA'
 import PythonCourseBuilder from './pages/Admin/PythonCourseBuilder'
+import MiddleSchoolMathBuilder from './pages/Admin/MiddleSchoolMathBuilder'
 import AdminAssignments from './pages/Admin/AdminAssignments'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
@@ -47,6 +48,7 @@ function App() {
         <Route path="streak-fixer" element={<StreakFixer />} />
         <Route path="qa" element={<TeacherQA />} />
         <Route path="python-builder" element={<PythonCourseBuilder />} />
+        <Route path="middle-math-builder" element={<MiddleSchoolMathBuilder />} />
       </Route>
 
       <Route path="/agora" element={

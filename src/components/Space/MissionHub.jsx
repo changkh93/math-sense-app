@@ -468,6 +468,9 @@ export default function MissionHub({
   const [toastAmount, setToastAmount] = useState(0)
   const toastTimeoutRef = useRef(null)
 
+  // --- Reward Protection Lock ---
+  const rewardLockRef = useRef(false)
+
   // ─── Learning Progress (Firestore) ───
   const [learningProgress, setLearningProgress] = useState(null)
   const [loadingProgress, setLoadingProgress] = useState(true)
@@ -750,6 +753,8 @@ export default function MissionHub({
 
     // Auto-reward: every 180 NEW stamps = 10 crystals (with cap)
     if (newStampCountRef.current >= 180) {
+      if (rewardLockRef.current) return // Prevent concurrent award
+      
       // Reward cap: max crystals = Math.floor(duration / 180) * 10
       const maxIntervalRewards = duration > 0 ? Math.floor(duration / 180) * 10 : Infinity
       if (totalRewardedCrystalsRef.current >= maxIntervalRewards) {
@@ -759,6 +764,9 @@ export default function MissionHub({
 
       const reward = 10
       newStampCountRef.current -= 180
+      
+      // OPTIMISTIC UPDATE: Set state/refs immediately before async
+      rewardLockRef.current = true
       totalRewardedCrystalsRef.current += reward
       setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
       
@@ -798,6 +806,8 @@ export default function MissionHub({
           }
         } catch (err) {
           console.error("Failed to award transmission reward:", err)
+        } finally {
+          rewardLockRef.current = false
         }
       }
       awardReward()
@@ -807,6 +817,7 @@ export default function MissionHub({
   // ─── Transmission: Completion bonus ───
   useEffect(() => {
     if (!videoCompleted || videoCompletionBonusGiven || !userId || !selectedTx) return
+    if (rewardLockRef.current) return // Prevent concurrent award
 
     const txId = selectedTx.id || 'default'
     const savedProgress = learningProgress?.videoProgress?.[txId]
@@ -817,6 +828,20 @@ export default function MissionHub({
 
     const awardCompletion = async () => {
       try {
+        rewardLockRef.current = true
+        // OPTIMISTIC UPDATE: Set state before async
+        setVideoCompletionBonusGiven(true)
+
+        // FINAL GUARD: Double check Firestore state before incrementing
+        // This prevents duplicates if multiple renders/sessions attempt the same reward.
+        const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
+        const freshSnap = await getDoc(progressRef)
+        const freshProgress = freshSnap.exists() ? freshSnap.data() : {}
+        if (freshProgress.videoProgress?.[txId]?.completionBonusGiven) {
+          console.warn("Duplicate reward prevented by Firestore check:", txId)
+          return 
+        }
+
         const updates = {
           crystals: increment(20),
           totalQuizzes: increment(1),
@@ -835,7 +860,6 @@ export default function MissionHub({
           metadata: { unitId, transmissionId: txId, type: 'completion_bonus' }
         })
 
-        const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
         await setDoc(progressRef, {
           videoProgress: {
             [txId]: {
@@ -846,7 +870,6 @@ export default function MissionHub({
           }
         }, { merge: true })
 
-        setVideoCompletionBonusGiven(true)
         showSilentToast(20)
         
         // Update Streak on full view
@@ -855,6 +878,10 @@ export default function MissionHub({
         }
       } catch (err) {
         console.error("Failed to award completion bonus:", err)
+        // Reset state on failure so it can be retried
+        setVideoCompletionBonusGiven(false)
+      } finally {
+        rewardLockRef.current = false
       }
     }
     awardCompletion()
