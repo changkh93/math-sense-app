@@ -10,7 +10,6 @@ import 'katex/dist/katex.min.css'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import { db } from '../../firebase'
 import { doc, setDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore'
-import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 
