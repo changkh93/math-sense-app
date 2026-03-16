@@ -9,11 +9,15 @@ import 'katex/dist/katex.min.css';
 export const sanitizeLaTeX = (text) => {
   if (!text || typeof text !== 'string') return text;
   
-  // Replace the Form Feed character (\u000c) with \f, but then specifically handle \frac
-  // If we find \u000c followed by 'rac', it's almost certainly a corrupted \frac
   return text
-    .replace(/\u000c/g, '\\f') 
-    .replace(/\\frac/g, '\\frac'); // Ensure it stays as \frac for KaTeX
+    .replace(/\u000c\s?rac/g, '\\frac') // Form Feed + (space) + rac -> \frac
+    .replace(/\u000a\s?neq/g, '\\neq')  // Newline + (space) + neq -> \neq
+    .replace(/\u000c/g, '\\f') // Fallback Form Feed
+    .replace(/\u000b/g, '\\v') // Vertical Tab
+    .replace(/\u0008/g, '\\b') // Backspace
+    .replace(/\u0009/g, '\\t') // Tab
+    .replace(/\u000a/g, '\\n') // Newline
+    .replace(/\u000d/g, '\\r'); // Carriage Return
 };
 
 /**

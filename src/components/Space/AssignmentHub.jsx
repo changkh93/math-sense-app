@@ -4,10 +4,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments';
 import { useClusters } from '../../hooks/useContent';
 import { storage } from '../../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import AssignmentChronicle from './AssignmentChronicle';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
-import { getTodayKST } from '../../utils/streakUtils';
+import { getTodayKST, getNowKST } from '../../utils/streakUtils';
 
 /**
  * Assignment Hub (Stellar Archive)
@@ -355,7 +355,7 @@ function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendanc
     if (!clusterData?.classSchedule) return;
 
     const timer = setInterval(() => {
-      const now = new Date();
+      const now = getNowKST();
       const currentDay = now.getDay();
       const currentHour = now.getHours();
       const currentMin = now.getMinutes();
@@ -377,23 +377,23 @@ function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendanc
       const startTimeInMins = startHour * 60 + startMin;
       const endTimeInMins = endHour * 60 + endMin;
       const dockingOpenTimeInMins = startTimeInMins - 10;
-      const closingTimeInMins = startTimeInMins + 5;
+      const onTimeGraceMins = startTimeInMins + 5; // User requested 5 minutes
 
       if (currentTimeInMins < dockingOpenTimeInMins) {
         setStatus({ state: 'invalid', message: `수업 시작 10분 전부터 도킹이 가능합니다. (${todaySchedule.startTime})` });
       } else if (currentTimeInMins >= dockingOpenTimeInMins && currentTimeInMins < startTimeInMins) {
         setStatus({ state: 'open', message: '탐사선 도킹 승인' });
-      } else if (currentTimeInMins >= startTimeInMins && currentTimeInMins <= closingTimeInMins) {
-        // Calculate countdown
+      } else if (currentTimeInMins >= startTimeInMins && currentTimeInMins <= onTimeGraceMins) {
+        // Calculate countdown for "on-time" docking
         const currentSecs = now.getSeconds();
-        const totalClosingSecs = (closingTimeInMins * 60) - (currentHour * 3600 + currentMin * 60 + currentSecs);
+        const totalClosingSecs = (onTimeGraceMins * 60) - (currentHour * 3600 + currentMin * 60 + currentSecs);
         const mins = Math.floor(totalClosingSecs / 60);
         const secs = totalClosingSecs % 60;
         setStatus({ 
           state: 'closing', 
           message: `도킹 마감 임박 - ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}` 
         });
-      } else if (currentTimeInMins > closingTimeInMins && currentTimeInMins <= endTimeInMins) {
+      } else if (currentTimeInMins > onTimeGraceMins && currentTimeInMins <= endTimeInMins) {
         setStatus({ state: 'late', message: '게이트 폐쇄 (지각 도킹)' });
       } else {
         setStatus({ state: 'invalid', message: '오늘 수업이 종료되었습니다.' });
@@ -483,11 +483,14 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
   const [links, setLinks] = useState(assignment?.links || []);
   const [newLink, setNewLink] = useState('');
   const [files, setFiles] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState({}); // { fileName: percentage }
   const [existingAttachments, setExistingAttachments] = useState(assignment?.attachments || []);
   const [attachmentMode, setAttachmentMode] = useState(null); // 'link' or 'file' or null
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
   // Status check
   const isReviewed = assignment?.status === 'reviewed';
@@ -526,7 +529,15 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
 
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFiles([...files, ...Array.from(e.target.files)]);
+      const selectedFiles = Array.from(e.target.files);
+      const validFiles = selectedFiles.filter(file => {
+        if (file.size > MAX_FILE_SIZE) {
+          alert(`${file.name} 파일이 너무 큽니다 (최대 50MB).`);
+          return false;
+        }
+        return true;
+      });
+      setFiles([...files, ...validFiles]);
     }
   };
 
@@ -561,21 +572,40 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
     }
 
     try {
-      // 1. Upload new files to Firebase Storage
-      // ... (existing file upload logic)
+      // 1. Upload new files to Firebase Storage with Progress
       const uploadedAttachments = [];
-      for (const file of files) {
-        const storagePath = `assignments/${user.uid}/${Date.now()}_${file.name}`;
-        const fileRef = ref(storage, storagePath);
-        const snapshot = await uploadBytes(fileRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        uploadedAttachments.push({
-          name: file.name,
-          url: downloadURL,
-          type: file.name.split('.').pop(),
-          storagePath 
+      setUploadProgress({});
+
+      const uploadPromises = files.map(file => {
+        return new Promise((resolve, reject) => {
+          const storagePath = `assignments/${user.uid}/${Date.now()}_${file.name}`;
+          const fileRef = ref(storage, storagePath);
+          const uploadTask = uploadBytesResumable(fileRef, file);
+
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(prev => ({ ...prev, [file.name]: Math.round(progress) }));
+            }, 
+            (error) => {
+              console.error(`Upload error for ${file.name}:`, error);
+              reject(error);
+            }, 
+            async () => {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              uploadedAttachments.push({
+                name: file.name,
+                url: downloadURL,
+                type: file.name.split('.').pop(),
+                storagePath 
+              });
+              resolve();
+            }
+          );
         });
-      }
+      });
+
+      await Promise.all(uploadPromises);
 
       const finalAttachments = [...existingAttachments, ...uploadedAttachments];
 
@@ -618,6 +648,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
       });
       // Clear after submit 
       setFiles([]);
+      setUploadProgress({});
       onCancel(); // close panel
     } catch (error) {
       console.error("Submission failed:", error);
@@ -729,9 +760,22 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
                 </div>
               ))}
               {files.map((file, idx) => (
-                <div key={`new-${idx}`} style={{ display: 'flex', alignItems: 'center', background: 'rgba(50, 255, 120, 0.15)', padding: '0.3rem 0.6rem', borderRadius: '4px', maxWidth: '200px' }}>
-                  <span style={{ color: '#50c878', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📁 {file.name}</span>
-                  <button type="button" onClick={() => handleRemoveNewFile(idx)} style={{ background: 'none', border: 'none', color: '#ff4500', cursor: 'pointer', marginLeft: '0.3rem' }}>✕</button>
+                <div key={`new-${idx}`} style={{ display: 'flex', alignItems: 'center', background: 'rgba(50, 255, 120, 0.15)', padding: '0.3rem 0.6rem', borderRadius: '4px', maxWidth: '200px', position: 'relative' }}>
+                  <span style={{ color: '#50c878', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', zIndex: 1 }}>📁 {file.name}</span>
+                  {uploadProgress[file.name] !== undefined && (
+                    <div style={{ 
+                      position: 'absolute', left: 0, bottom: 0, 
+                      height: '3px', background: 'var(--crystal-cyan)', 
+                      width: `${uploadProgress[file.name]}%`,
+                      transition: 'width 0.3s ease'
+                    }} />
+                  )}
+                  {uploadProgress[file.name] !== undefined && (
+                    <span style={{ fontSize: '0.65rem', color: 'var(--crystal-cyan)', marginLeft: '4px', zIndex: 1, fontWeight: 'bold' }}>
+                      {uploadProgress[file.name]}%
+                    </span>
+                  )}
+                  <button type="button" onClick={() => handleRemoveNewFile(idx)} style={{ background: 'none', border: 'none', color: '#ff4500', cursor: 'pointer', marginLeft: '0.3rem', zIndex: 1 }}>✕</button>
                 </div>
               ))}
             </div>
@@ -827,7 +871,13 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
                   onDrop={(e) => {
                     e.preventDefault();
                     setIsDragging(false);
-                    const droppedFiles = Array.from(e.dataTransfer.files);
+                    const droppedFiles = Array.from(e.dataTransfer.files).filter(file => {
+                      if (file.size > MAX_FILE_SIZE) {
+                        alert(`${file.name} 파일이 너무 큽니다 (최대 50MB).`);
+                        return false;
+                      }
+                      return true;
+                    });
                     if (droppedFiles.length > 0) {
                       setFiles(prev => [...prev, ...droppedFiles]);
                     }

@@ -9,7 +9,7 @@
  * KST 기준 오늘 날짜를 YYYY-MM-DD 형식으로 반환
  */
 export function getTodayKST() {
-  const kstNow = new Date(Date.now() + 9 * 3600000)
+  const kstNow = getNowKST()
   return kstNow.toISOString().split('T')[0]
 }
 
@@ -17,9 +17,18 @@ export function getTodayKST() {
  * KST 기준 어제 날짜를 YYYY-MM-DD 형식으로 반환
  */
 export function getYesterdayKST() {
-  const kstNow = new Date(Date.now() + 9 * 3600000)
+  const kstNow = getNowKST()
   const yesterday = new Date(kstNow.getTime() - 86400000)
   return yesterday.toISOString().split('T')[0]
+}
+
+/**
+ * 전 세계 어디서든 한국 표준시(KST, UTC+9) 기준의 Date 객체를 반환
+ */
+export function getNowKST() {
+  const now = new Date()
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
+  return new Date(utc + (9 * 3600000))
 }
 
 /**

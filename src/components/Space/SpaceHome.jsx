@@ -824,96 +824,181 @@ function SpaceHome() {
     }
   }
 
-  // Handle streak updates for non-quiz activities (Data Log, Transmission)
-  const handleNonQuizActivityComplete = async (activityType, crystalsEarned = 0) => {
+  // Handle streak updates and rewards for non-quiz activities (Data Log, Transmission)
+  const handleNonQuizActivityComplete = async (activityType, crystalsEarned = 0, activityMetadata = {}) => {
     if (!user) return
 
+    const { transmissionId, stampedSeconds } = activityMetadata
+    const currentUnitId = selectedUnitDocId || quickQuizUnitId || 'unknown'
+    
     const userDocRef = doc(db, 'users', user.uid)
-    const txResult = await runTransaction(db, async (transaction) => {
-      const freshSnap = await transaction.get(userDocRef)
-      if (!freshSnap.exists()) throw new Error('User document not found')
-      const freshUserData = freshSnap.data()
+    const progressDocRef = doc(db, 'users', user.uid, 'learning_progress', currentUnitId)
 
-      const result = calculateStreakUpdate(freshUserData)
-      const streakUpdates = result.streakUpdate || {}
+    try {
+      const txResult = await runTransaction(db, async (transaction) => {
+        const freshUserSnap = await transaction.get(userDocRef)
+        const freshProgressSnap = await transaction.get(progressDocRef)
+        
+        if (!freshUserSnap.exists()) throw new Error('User document not found')
+        const freshUserData = freshUserSnap.data()
+        const freshProgressData = freshProgressSnap.exists() ? freshProgressSnap.data() : {}
 
-      // Update basic fields if needed (non-quiz activities might grant crystals)
-      if (crystalsEarned > 0 || Object.keys(streakUpdates).length > 0) {
-        transaction.update(userDocRef, {
-          crystals: (freshUserData.crystals || 0) + crystalsEarned,
+        // --- Duplicate Reward Prevention ---
+        let actualReward = crystalsEarned
+        const isVideoActivity = activityType.includes('영상')
+        const isLogActivity = activityType.includes('로그')
+
+        if (isVideoActivity && transmissionId) {
+          const videoProg = freshProgressData.videoProgress?.[transmissionId] || {}
+          
+          if (activityType.includes('완료') && videoProg.completionBonusGiven) {
+            actualReward = 0 // Already got completion bonus
+          } else if (activityType.includes('180초')) {
+            // Check based on rewardedStampCount
+            const rewardedCount = videoProg.rewardedStampCount || 0
+            const currentTotalStamps = stampedSeconds?.length || 0
+            if (currentTotalStamps <= rewardedCount) {
+              actualReward = 0 // No new stamps to reward
+            }
+          }
+        } else if (isLogActivity) {
+          if (freshProgressData.logRead) {
+            actualReward = 0 // Already awarded
+          }
+        }
+
+        const streakResult = calculateStreakUpdate(freshUserData)
+        const streakUpdates = streakResult.streakUpdate || {}
+
+        // Update User Doc
+        const userUpdates = {
           lastActive: serverTimestamp(),
           ...streakUpdates
+        }
+        if (actualReward > 0) {
+          userUpdates.crystals = (freshUserData.crystals || 0) + actualReward
+          // Also track growth
+          const growthUpdates = calculateGrowthUpdates(freshUserData, actualReward)
+          Object.assign(userUpdates, growthUpdates)
+          
+          if (activityType.includes('완료') || isLogActivity) {
+             userUpdates.totalQuizzes = (freshUserData.totalQuizzes || 0) + 1
+             userUpdates.totalScore = (freshUserData.totalScore || 0) + 100
+          }
+        }
+        transaction.update(userDocRef, userUpdates)
+
+        // Update Progress Doc (Idempotent update)
+        const progressUpdates = {}
+        if (isLogActivity && !freshProgressData.logRead) {
+          progressUpdates.logRead = true
+          progressUpdates.logReadAt = serverTimestamp()
+        } else if (isVideoActivity && transmissionId) {
+          if (!progressUpdates.videoProgress) progressUpdates.videoProgress = {}
+          if (activityType.includes('완료')) {
+            progressUpdates.videoProgress[transmissionId] = {
+              ...(freshProgressData.videoProgress?.[transmissionId] || {}),
+              completed: true,
+              completionBonusGiven: true,
+              updatedAt: serverTimestamp()
+            }
+          } else if (activityType.includes('180초') && stampedSeconds) {
+             progressUpdates.videoProgress[transmissionId] = {
+              ...(freshProgressData.videoProgress?.[transmissionId] || {}),
+              rewardedStampCount: stampedSeconds.length,
+              stampedSeconds: stampedSeconds,
+              updatedAt: serverTimestamp()
+            }
+          }
+        }
+        
+        if (Object.keys(progressUpdates).length > 0) {
+          transaction.set(progressDocRef, progressUpdates, { merge: true })
+        }
+
+        return { streakCalcResult: streakResult, txUserData: freshUserData, actualReward }
+      })
+
+      const { streakCalcResult, txUserData, actualReward } = txResult
+      const streakUpdates = streakCalcResult.streakUpdate || {}
+
+      // Track usage of freeze if happened outside of quiz
+      if (streakCalcResult.meta?.freezeUsed) {
+        const defendedDates = [];
+        const lastDate = txUserData?.lastStreakDate;
+        if (lastDate) {
+          const scanObj = new Date(lastDate + 'T12:00:00Z');
+          const todayDate = new Date(getTodayKST() + 'T12:00:00Z');
+          scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+          while (scanObj < todayDate) {
+            defendedDates.push(scanObj.toISOString().split('T')[0]);
+            scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+          }
+        }
+        recordCrystalTransaction(user.uid, {
+          amount: 0,
+          type: 'streak_freeze',
+          description: `크라이오 코어로 연속 탐사 궤도 보호 (${activityType})`,
+          metadata: { 
+            unitId: currentUnitId,
+            streakBefore: txUserData?.currentStreak || 0,
+            streakAfter: streakCalcResult.meta.newStreak,
+            defendedDates: defendedDates
+          }
         })
       }
 
-      return { result, freshUserData }
-    })
+      // Log into History (Only if actualReward > 0)
+      // This prevents duplicate history entries while allowing the very first completion/log-read/180s-milestone to be recorded.
+      if (actualReward > 0) {
+        await addDoc(collection(db, 'users', user.uid, 'history'), {
+          unitId: currentUnitId,
+          unitTitle: activeUnit?.title || `탐사 기록 (${activityType})`,
+          regionId: selectedRegionId || activeRegion?.id || "",
+          regionTitle: activeRegion?.title || "Unknown Galaxy",
+          chapterId: selectedChapterDocId || "",
+          clusterId: selectedClusterId,
+          score: 100,
+          crystalsEarned: actualReward,
+          timestamp: serverTimestamp(),
+          type: activityType.includes('로그') ? 'text' : activityType.includes('영상') ? 'video' : activityType 
+        })
 
-    const { result: streakCalcResult, freshUserData: txUserData } = txResult
-    const streakUpdates = streakCalcResult.streakUpdate || {}
-
-    // Track usage of freeze if happened outside of quiz
-    if (streakCalcResult.meta?.freezeUsed) {
-      const defendedDates = [];
-      const lastDate = txUserData?.lastStreakDate;
-      if (lastDate) {
-        const scanObj = new Date(lastDate + 'T12:00:00Z');
-        const todayDate = new Date(getTodayKST() + 'T12:00:00Z');
-        scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-        while (scanObj < todayDate) {
-          defendedDates.push(scanObj.toISOString().split('T')[0]);
-          scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-        }
+        recordCrystalTransaction(user.uid, {
+          amount: actualReward,
+          type: isVideoActivity ? 'transmission_reward' : 'data_log_reward',
+          description: `${activeUnit?.title || '탐사'} 보상 (${activityType})`,
+          metadata: { unitId: currentUnitId, ...activityMetadata }
+        })
       }
-      recordCrystalTransaction(user.uid, {
-        amount: 0,
-        type: 'streak_freeze',
-        description: `크라이오 코어로 연속 탐사 궤도 보호 (${activityType})`,
-        metadata: { 
-          unitId: selectedUnitDocId || quickQuizUnitId || 'unknown',
-          streakBefore: txUserData?.currentStreak || 0,
-          streakAfter: streakCalcResult.meta.newStreak,
-          defendedDates: defendedDates
-        }
-      })
-    }
 
-    // ✨ ADDITION: Always log non-quiz activity into History for Dashboard Timeline
-    await addDoc(collection(db, 'users', user.uid, 'history'), {
-      unitId: selectedUnitDocId || quickQuizUnitId || 'unknown',
-      unitTitle: activeUnit?.title || `탐사 기록 (${activityType})`,
-      regionId: selectedRegionId || activeRegion?.id || "",
-      regionTitle: activeRegion?.title || "Unknown Galaxy",
-      chapterId: selectedChapterDocId || "",
-      clusterId: selectedClusterId, // Added for per-cluster tracking
-      score: 100, // Nominal score for non-quiz completions to show nicely on the chart
-      crystalsEarned: crystalsEarned,
-      timestamp: serverTimestamp(),
-      type: activityType.includes('로그') ? 'text' : activityType.includes('영상') ? 'video' : activityType 
-    })
-
-    // Trigger milestone celebration
-    if (streakCalcResult.meta?.justReachedMilestone) {
-      setStreakCelebration({
-        milestone: streakCalcResult.meta.justReachedMilestone,
-        currentStreak: streakUpdates.currentStreak || streakCalcResult.meta.newStreak
-      })
-    }
-
-    // Always trigger visual celebration modal (like Field Test)
-    soundManager.playLevelUp()
-    setCompletionResult({
-      crystalsEarned: crystalsEarned,
-      isPerfect: true, // Give full star visual effect
-      rewardMessage: `${activityType} 달성! (+${crystalsEarned} 광석)`,
-      streakInfo: {
-        currentStreak: streakUpdates.currentStreak || streakCalcResult.meta?.newStreak || txUserData?.currentStreak || 0,
-        freezeUsed: streakCalcResult.meta?.freezeUsed || false,
-        isNewRecord: streakCalcResult.meta?.isNewRecord || false,
-        alreadyDoneToday: streakCalcResult.meta?.alreadyDoneToday || false,
-        justReachedMilestone: streakCalcResult.meta?.justReachedMilestone || false
+      // Trigger milestone celebration
+      if (streakCalcResult.meta?.justReachedMilestone) {
+        setStreakCelebration({
+          milestone: streakCalcResult.meta.justReachedMilestone,
+          currentStreak: streakUpdates.currentStreak || streakCalcResult.meta.newStreak
+        })
       }
-    })
+
+      // Visual feedback
+      if (actualReward > 0 || activityType.includes('완료')) {
+        soundManager.playLevelUp()
+        setCompletionResult({
+          crystalsEarned: actualReward,
+          isPerfect: true,
+          rewardMessage: actualReward > 0 ? `${activityType} 달성! (+${actualReward} 광석)` : `이미 보상을 획득한 활동입니다.`,
+          streakInfo: {
+            currentStreak: streakUpdates.currentStreak || streakCalcResult.meta?.newStreak || txUserData?.currentStreak || 0,
+            freezeUsed: streakCalcResult.meta?.freezeUsed || false,
+            isNewRecord: streakCalcResult.meta?.isNewRecord || false,
+            alreadyDoneToday: streakCalcResult.meta?.alreadyDoneToday || false,
+            justReachedMilestone: streakCalcResult.meta?.justReachedMilestone || false
+          }
+        })
+      }
+    } catch (err) {
+      console.error("Error in activity completion:", err)
+    }
   }
 
   const hasStartedRef = useRef(false)

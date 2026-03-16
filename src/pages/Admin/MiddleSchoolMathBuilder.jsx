@@ -68,6 +68,45 @@ const EQUATION_PDF_FILES = [
   "10_속력에 관한 방정식.pdf"
 ];
 
+const EQ_INEQ_3_PDF_FILES = [
+  "01_지수법칙1,2.pdf",
+  "02_지수법칙3,4.pdf",
+  "03_단항식의 곱셈과 나눗셈.pdf",
+  "04_곱셈공식1.pdf",
+  "05_곱셈공식2.pdf",
+  "06_곱셈공식의 활용.pdf",
+  "07_곱셈공식 변형.pdf",
+  "08_등식의 변형 문제.pdf",
+  "09_식의 대입.pdf"
+];
+
+const EQ_INEQ_4_PDF_FILES = [
+  "01_연립방정식 가감법.pdf",
+  "02_연립방정식 대입법.pdf",
+  "03_해가 없는 연립방정식.pdf",
+  "04_부등식의 성질.pdf",
+  "05_일차부등식.pdf",
+  "06_부등식의 해와 수직선.pdf",
+  "07_인수분해의 기초.pdf",
+  "08_인수분해공식1(완전제곱식).pdf",
+  "09_인수분해공식2(합차공식).pdf",
+  "10_인수분해공식 3.pdf",
+  "연립부등식.pdf"
+];
+
+const EQ_INEQ_5_PDF_FILES = [
+  "01_인수분해 공식 4.pdf",
+  "02_완전제곱식 만들기.pdf",
+  "03_복잡한 인수분해.pdf",
+  "04_이차방정식의 뜻과 풀이.pdf",
+  "05_이차방정식의 중근.pdf",
+  "06_제곱근을 이용한 이차방정식 풀이.pdf",
+  "07_완전제곱식을 이용한 이차방정식 풀이.pdf",
+  "08_근의 공식을 이용한 이차방정식 풀이.pdf",
+  "09_이차방정식의 근과 계수의 관계.pdf",
+  "10_위로 쏘아 올린 물체.pdf"
+];
+
 const MiddleSchoolMathBuilder = () => {
   const [status, setStatus] = useState('대기 중...');
   const [building, setBuilding] = useState(false);
@@ -245,6 +284,157 @@ const MiddleSchoolMathBuilder = () => {
     }
   };
 
+  const handleBuildEquations3 = async () => {
+    setBuilding(true);
+    setStatus('🔥 방정식과 부등식 III 구축 시작...');
+
+    try {
+      const chapterId = 'reg_1773407437227_chap_1773451462594'; // Verified actual ID for "방정식과 부등식 III"
+      
+      setStatus('✔️ 대상 챕터 확인 완료. 유닛 생성 중...');
+
+      const unitsRef = collection(db, 'units');
+      const batch = writeBatch(db);
+
+      EQ_INEQ_3_PDF_FILES.forEach((filename, index) => {
+        // Extract title: "01_지수법칙1,2.pdf" -> "지수법칙1,2"
+        let cleanTitle = filename.replace('.pdf', '');
+        cleanTitle = cleanTitle.replace(/^\d+_/, ''); 
+
+        const order = index + 1; 
+        const unitId = `unit_middle_math_eq3_${order.toString().padStart(2, '0')}`;
+        const unitRef = doc(unitsRef, unitId);
+        
+        batch.set(unitRef, {
+          docId: unitId,
+          id: unitId,
+          chapterId: chapterId,
+          title: cleanTitle,
+          order: order,
+          learningContents: {
+            text: 'PDF를 보며 개념을 학습하세요.',
+            pdfUrl: `/pdfs/middle_math/eq_and_ineq_3/${filename}`
+          },
+          contentFlags: {
+            hasDataLog: true,
+            hasTransmission: false,
+            hasWorkbook: false
+          },
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+      });
+
+      setStatus('💾 서버에 저장 중...');
+      await batch.commit();
+      setStatus('✅ 방정식과 부등식 III 유닛 구축 완료!');
+    } catch (err) {
+      console.error(err);
+      setStatus(`❌ 오류 발생: ${err.message}`);
+    } finally {
+      setBuilding(false);
+    }
+  };
+
+  const handleBuildEquations4 = async () => {
+    setBuilding(true);
+    setStatus('🔥 방정식과 부등식 IV 구축 시작...');
+
+    try {
+      const chapterId = 'reg_1773407437227_chap_1773536152595'; // Verified ID for "방정식과 부등식 IV"
+      
+      setStatus('✔️ 대상 챕터 확인 완료. 유닛 생성 중...');
+
+      const unitsRef = collection(db, 'units');
+      const batch = writeBatch(db);
+
+      EQ_INEQ_4_PDF_FILES.forEach((filename, index) => {
+        let cleanTitle = filename.replace('.pdf', '');
+        cleanTitle = cleanTitle.replace(/^\d+_/, ''); 
+
+        const order = index + 1; 
+        const unitId = `unit_middle_math_eq4_${order.toString().padStart(2, '0')}`;
+        const unitRef = doc(unitsRef, unitId);
+        
+        batch.set(unitRef, {
+          docId: unitId,
+          id: unitId,
+          chapterId: chapterId,
+          title: cleanTitle,
+          order: order,
+          learningContents: {
+            text: 'PDF를 보며 개념을 학습하세요.',
+            pdfUrl: `/pdfs/middle_math/eq_and_ineq_4/${filename}`
+          },
+          contentFlags: {
+            hasDataLog: true,
+            hasTransmission: false,
+            hasWorkbook: false
+          },
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+      });
+
+      setStatus('💾 서버에 저장 중...');
+      await batch.commit();
+      setStatus('✅ 방정식과 부등식 IV 유닛 구축 완료!');
+    } catch (err) {
+      console.error(err);
+      setStatus(`❌ 오류 발생: ${err.message}`);
+    } finally {
+      setBuilding(false);
+    }
+  };
+
+  const handleBuildEquations5 = async () => {
+    setBuilding(true);
+    setStatus('🔥 방정식과 부등식 V 구축 시작...');
+
+    try {
+      const chapterId = 'reg_1773407437227_chap_1773626782624'; // Verified ID for "방정식과 부등식 V"
+      
+      setStatus('✔️ 대상 챕터 확인 완료. 유닛 생성 중...');
+
+      const unitsRef = collection(db, 'units');
+      const batch = writeBatch(db);
+
+      EQ_INEQ_5_PDF_FILES.forEach((filename, index) => {
+        let cleanTitle = filename.replace('.pdf', '');
+        cleanTitle = cleanTitle.replace(/^\d+_/, ''); 
+
+        const order = index + 1; 
+        const unitId = `unit_middle_math_eq5_${order.toString().padStart(2, '0')}`;
+        const unitRef = doc(unitsRef, unitId);
+        
+        batch.set(unitRef, {
+          docId: unitId,
+          id: unitId,
+          chapterId: chapterId,
+          title: cleanTitle,
+          order: order,
+          learningContents: {
+            text: 'PDF를 보며 개념을 학습하세요.',
+            pdfUrl: `/pdfs/middle_math/eq_and_ineq_5/${filename}`
+          },
+          contentFlags: {
+            hasDataLog: true,
+            hasTransmission: false,
+            hasWorkbook: false
+          },
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+      });
+
+      setStatus('💾 서버에 저장 중...');
+      await batch.commit();
+      setStatus('✅ 방정식과 부등식 V 유닛 구축 완료!');
+    } catch (err) {
+      console.error(err);
+      setStatus(`❌ 오류 발생: ${err.message}`);
+    } finally {
+      setBuilding(false);
+    }
+  };
+
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', color: 'white' }}>
       <h1>📐 Middle School Math Builder</h1>
@@ -269,14 +459,49 @@ const MiddleSchoolMathBuilder = () => {
           padding: '1rem 2rem', background: building ? 'gray' : '#4CAF50',
           color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
         }}>
-          {building ? '구축 중...' : '🚀 방정식 11-20 유닛 생성'}
+          {building ? '구축 중...' : '🚀 방정식 II 유닛 생성'}
+        </button>
+
+        <button onClick={handleBuildEquations3} disabled={building} style={{
+          padding: '1rem 2rem', background: building ? 'gray' : '#2196F3',
+          color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
+        }}>
+          {building ? '구축 중...' : '🚀 방정식 III 유닛 생성'}
+        </button>
+
+        <button onClick={handleBuildEquations4} disabled={building} style={{
+          padding: '1rem 2rem', background: building ? 'gray' : '#9C27B0',
+          color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
+        }}>
+          {building ? '구축 중...' : '🚀 방정식 IV 유닛 생성'}
+        </button>
+
+        <button onClick={handleBuildEquations5} disabled={building} style={{
+          padding: '1rem 2rem', background: building ? 'gray' : '#E91E63',
+          color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
+        }}>
+          {building ? '구축 중...' : '🚀 방정식 V 유닛 생성'}
         </button>
       </div>
 
       <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
-        <h3>신규 방정식 PDF 파일: {EQUATION_PDF_FILES.length}개</h3>
+        <h3>신규 방정식 III PDF 파일: {EQ_INEQ_3_PDF_FILES.length}개</h3>
         <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
-          {EQUATION_PDF_FILES.map(f => <li key={f}>{f}</li>)}
+          {EQ_INEQ_3_PDF_FILES.map(f => <li key={f}>{f}</li>)}
+        </ul>
+      </div>
+
+      <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
+        <h3>신규 방정식 IV PDF 파일: {EQ_INEQ_4_PDF_FILES.length}개</h3>
+        <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
+          {EQ_INEQ_4_PDF_FILES.map(f => <li key={f}>{f}</li>)}
+        </ul>
+      </div>
+
+      <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
+        <h3>신규 방정식 V PDF 파일: {EQ_INEQ_5_PDF_FILES.length}개</h3>
+        <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
+          {EQ_INEQ_5_PDF_FILES.map(f => <li key={f}>{f}</li>)}
         </ul>
       </div>
 

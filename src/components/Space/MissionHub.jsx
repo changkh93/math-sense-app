@@ -658,42 +658,13 @@ export default function MissionHub({
     if (logRewardClaimed || timeRemaining > 0 || !userId) return
 
     try {
-      // Save to Firestore
-      const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-      await setDoc(progressRef, {
-        logRead: true,
-        logReadAt: serverTimestamp()
-      }, { merge: true })
-
-      // Award crystals and growth metrics
-      const updates = {
-        crystals: increment(30),
-        totalQuizzes: increment(1),
-        totalScore: increment(100)
+      if (onNonQuizActivityComplete) {
+        await onNonQuizActivityComplete('데이터 로그 학습', 30)
       }
-      
-      const growthUpdates = calculateGrowthUpdates(userDataRef.current, 30)
-      Object.assign(updates, growthUpdates)
-
-      await setDoc(doc(db, 'users', userId), updates, { merge: true })
-
-      // Record transaction
-      await recordCrystalTransaction(userId, {
-        amount: 30,
-        type: 'data_log_reward',
-        description: `${activeUnit?.title || '단원'} 데이터 로그 학습 완료`,
-        metadata: { unitId }
-      })
-
       setLogRewardClaimed(true)
       sessionStorage.removeItem(sessionStorageKey)
       showSilentToast(30)
       logActivity('data_log_reward_claimed')
-      
-      // Update Streak
-      if (onNonQuizActivityComplete) {
-        onNonQuizActivityComplete('데이터 로그 학습', 30)
-      }
     } catch (err) {
       console.error("Failed to claim log reward:", err)
     }
@@ -774,36 +745,16 @@ export default function MissionHub({
 
       const awardReward = async () => {
         try {
-          const updates = { crystals: increment(reward) };
-          const growthUpdates = calculateGrowthUpdates(userDataRef.current, reward);
-          Object.assign(updates, growthUpdates);
-
-          await setDoc(doc(db, 'users', userId), updates, { merge: true })
-
-          await recordCrystalTransaction(userId, {
-            amount: reward,
-            type: 'transmission_reward',
-            description: `${activeUnit?.title || '영상'} 시청 보상 (${stampedSetRef.current.size}초 학습)`,
-            metadata: { unitId, transmissionId: txId }
-          })
-
-          const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-          await setDoc(progressRef, {
-            [`videoProgress.${txId}`]: {
-              stampedSeconds: Array.from(stampedSetRef.current),
-              rewardedStampCount: stampedSetRef.current.size - newStampCountRef.current,
-              totalRewardedCrystals: totalRewardedCrystalsRef.current,
-              totalTimeSpent: totalTimeSpentRef.current,
-              updatedAt: serverTimestamp()
-            }
-          }, { merge: true })
-
-          showSilentToast(reward)
+          rewardLockRef.current = true
           
-          // Update Streak on partial watch (180s)
           if (onNonQuizActivityComplete) {
-            onNonQuizActivityComplete('영상 교신 수신 (180초)', 10)
+            await onNonQuizActivityComplete('영상 교신 수신 (180초)', 10, {
+              transmissionId: txId,
+              stampedSeconds: Array.from(stampedSetRef.current)
+            })
           }
+          
+          showSilentToast(10)
         } catch (err) {
           console.error("Failed to award transmission reward:", err)
         } finally {
@@ -829,56 +780,17 @@ export default function MissionHub({
     const awardCompletion = async () => {
       try {
         rewardLockRef.current = true
-        // OPTIMISTIC UPDATE: Set state before async
         setVideoCompletionBonusGiven(true)
 
-        // FINAL GUARD: Double check Firestore state before incrementing
-        // This prevents duplicates if multiple renders/sessions attempt the same reward.
-        const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-        const freshSnap = await getDoc(progressRef)
-        const freshProgress = freshSnap.exists() ? freshSnap.data() : {}
-        if (freshProgress.videoProgress?.[txId]?.completionBonusGiven) {
-          console.warn("Duplicate reward prevented by Firestore check:", txId)
-          return 
+        if (onNonQuizActivityComplete) {
+          await onNonQuizActivityComplete('영상 교신 완료', 20, {
+            transmissionId: txId
+          })
         }
-
-        const updates = {
-          crystals: increment(20),
-          totalQuizzes: increment(1),
-          totalScore: increment(100)
-        }
-        
-        const growthUpdates = calculateGrowthUpdates(userDataRef.current, 20)
-        Object.assign(updates, growthUpdates)
-
-        await setDoc(doc(db, 'users', userId), updates, { merge: true })
-
-        await recordCrystalTransaction(userId, {
-          amount: 20,
-          type: 'transmission_reward',
-          description: `${activeUnit?.title || '영상'} 시청 완료 보너스`,
-          metadata: { unitId, transmissionId: txId, type: 'completion_bonus' }
-        })
-
-        await setDoc(progressRef, {
-          videoProgress: {
-            [txId]: {
-              completed: true,
-              completionBonusGiven: true,
-              updatedAt: serverTimestamp()
-            }
-          }
-        }, { merge: true })
 
         showSilentToast(20)
-        
-        // Update Streak on full view
-        if (onNonQuizActivityComplete) {
-          onNonQuizActivityComplete('영상 교신 완료', 20)
-        }
       } catch (err) {
         console.error("Failed to award completion bonus:", err)
-        // Reset state on failure so it can be retried
         setVideoCompletionBonusGiven(false)
       } finally {
         rewardLockRef.current = false
