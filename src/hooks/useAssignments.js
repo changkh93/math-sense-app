@@ -8,6 +8,8 @@ import {
   doc, 
   addDoc, 
   setDoc, 
+  updateDoc,
+  increment,
   serverTimestamp,
   orderBy
 } from 'firebase/firestore'
@@ -156,7 +158,18 @@ export const useReviewAssignment = () => {
 
       // Award crystals if approved and there's a bonus
       if (status === 'reviewed' && updateData.bonusCrystals > 0 && userId) {
-        await recordCrystalTransaction(userId, updateData.bonusCrystals, `항행 일지 보상 (과제)`);
+        // 1. Record in Ledger
+        await recordCrystalTransaction(userId, {
+          amount: updateData.bonusCrystals,
+          type: 'teacher_verify',
+          description: `항행 일지 보상 (과제)`
+        });
+
+        // 2. Actually update user balance
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+          crystals: increment(updateData.bonusCrystals)
+        });
       }
     },
     onSuccess: () => {

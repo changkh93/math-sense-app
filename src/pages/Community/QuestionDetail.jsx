@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, CheckCircle, Heart, User, Trash2, Edit3, X, Save, Sparkles } from 'lucide-react';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import 'katex/dist/katex.min.css';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { updateDoc, doc } from 'firebase/firestore';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
 import { getRandomNickname } from '../../utils/qaUtils';
 import StarField from '../../components/Space/StarField';
@@ -59,6 +60,19 @@ export default function QuestionDetail() {
 
     setTimeout(() => setShowRewardMask(false), 4000);
   };
+
+  // --- SELF-HEALING: Sync answerCount if out of sync ---
+  React.useEffect(() => {
+    if (question && answers && !loadingQ && !loadingA) {
+      const actualCount = answers.length;
+      if (question.answerCount !== actualCount) {
+        console.log(`🧹 Self-healing: Syncing answerCount for question ${questionId}. Expected: ${actualCount}, Found: ${question.answerCount}`);
+        updateDoc(doc(db, 'questions', questionId), {
+          answerCount: actualCount
+        }).catch(err => console.warn('Failed self-healing sync:', err));
+      }
+    }
+  }, [question, answers, loadingQ, loadingA, questionId]);
 
   const isOwner = question && auth.currentUser && question.userId === auth.currentUser.uid;
   const isResolved = question?.status === 'resolved';

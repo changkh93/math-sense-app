@@ -116,7 +116,10 @@ export default function TeacherQA() {
     if (!confirm('답변을 삭제하시겠습니까?')) return;
     try {
       await deleteDoc(doc(db, 'answers', answerId));
-      // If no more answers, we should technically consider reverting status but for now let's keep it
+      // Sync answerCount
+      await updateDoc(doc(db, 'questions', questionId), {
+        answerCount: increment(-1)
+      });
       alert('답변이 삭제되었습니다.');
     } catch (err) {
       console.error('Error deleting answer:', err);

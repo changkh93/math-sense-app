@@ -352,6 +352,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         status: 'open',
         upvotes: 0,
         upvotedBy: [],
+        answerCount: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };

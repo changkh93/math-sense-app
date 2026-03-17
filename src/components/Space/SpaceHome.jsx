@@ -584,12 +584,20 @@ function SpaceHome() {
         
         if (actualCrystalsEarned > 0) {
           rewardMessage = `${score}점으로 최고 기록을 경신했습니다! (+${actualCrystalsEarned} 광석)`
+        } else {
+          actualCrystalsEarned = 0 // In case it's negative or malformed
         }
       } else {
         actualCrystalsEarned = 0
         rewardMessage = score === 100 
           ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)"
           : `최고 점수(${previousBest}점)를 넘지 못해 추가 광석을 획득할 수 없습니다.`
+      }
+
+      // Safety Guard: Ensure actualCrystalsEarned is a valid number
+      if (isNaN(actualCrystalsEarned) || actualCrystalsEarned === undefined) {
+        console.warn("SpaceHome: actualCrystalsEarned is NaN or undefined, resetting to 0", actualCrystalsEarned)
+        actualCrystalsEarned = 0
       }
 
       soundManager.playCrystal()
@@ -875,6 +883,12 @@ function SpaceHome() {
           lastActive: serverTimestamp(),
           ...streakUpdates
         }
+        // Safety Guard: Ensure actualReward is a valid number
+        if (isNaN(actualReward) || actualReward === undefined) {
+          console.warn("SpaceHome: actualReward is NaN or undefined in handleNonQuizActivityComplete, resetting to 0")
+          actualReward = 0
+        }
+
         if (actualReward > 0) {
           userUpdates.crystals = (freshUserData.crystals || 0) + actualReward
           // Also track growth
@@ -885,6 +899,8 @@ function SpaceHome() {
              userUpdates.totalQuizzes = (freshUserData.totalQuizzes || 0) + 1
              userUpdates.totalScore = (freshUserData.totalScore || 0) + 100
           }
+        } else {
+          actualReward = 0 // Ensure non-negative
         }
         transaction.update(userDocRef, userUpdates)
 
