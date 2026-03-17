@@ -245,9 +245,6 @@ function SpaceHome() {
   // Interaction & UI State
   const [isBoosting, setIsBoosting] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-  const [bgmDisabledForSession, setBgmDisabledForSession] = useState(() => {
-    return localStorage.getItem('metasense_bgm_muted') === 'true'
-  })
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -255,22 +252,6 @@ function SpaceHome() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Sync BGM mute state across tabs
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'metasense_bgm_muted') {
-        const isMuted = e.newValue === 'true'
-        setBgmDisabledForSession(isMuted)
-        if (isMuted) {
-          soundManager.stopBGM()
-        } else if (user && !authLoading) {
-          soundManager.startBGM()
-        }
-      }
-    }
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [user, authLoading])
   
   // Equipment Logic
   const equipment = {
@@ -278,28 +259,6 @@ function SpaceHome() {
     engine: userData?.hasEngine || false,
   }
 
-  // 1. Persistent BGM Management
-  useEffect(() => {
-    if (user && !authLoading && !bgmDisabledForSession) {
-      // Start BGM on any interaction
-      const startAudio = () => {
-        soundManager.startBGM();
-        window.removeEventListener('click', startAudio);
-        window.removeEventListener('touchstart', startAudio);
-      };
-      window.addEventListener('click', startAudio);
-      window.addEventListener('touchstart', startAudio);
-      
-      return () => {
-        window.removeEventListener('click', startAudio);
-        window.removeEventListener('touchstart', startAudio);
-        // Only stop BGM on actual unmount of SpaceHome
-        soundManager.stopBGM();
-      };
-    } else if (bgmDisabledForSession) {
-      soundManager.stopBGM();
-    }
-  }, [user, authLoading, bgmDisabledForSession]);
 
   // 2. Interaction & Booster Logic
   useEffect(() => {
@@ -310,12 +269,6 @@ function SpaceHome() {
           const isEditable = document.activeElement?.isContentEditable;
           if (tag === 'input' || tag === 'textarea' || tag === 'select' || isEditable) return;
           
-          // BGM stop should work regardless of modals (fixes Gravity Engine issue)
-          if (!bgmDisabledForSession) {
-            setBgmDisabledForSession(true);
-            localStorage.setItem('metasense_bgm_muted', 'true');
-            soundManager.stopBGM();
-          }
 
           if (document.querySelector('.modal-overlay')) return;
           
@@ -331,7 +284,6 @@ function SpaceHome() {
       const handleKeyUp = (e) => {
         if (e.code === 'Space') {
           setIsBoosting(false);
-          // soundManager.setBGMVolume(0.1); // Restore
         }
       };
 
@@ -1514,41 +1466,6 @@ function SpaceHome() {
                       }}
                     >
                       (BOOST: SPACE BAR)
-                      
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (bgmDisabledForSession) {
-                            setBgmDisabledForSession(false);
-                            // Set localStorage
-                            localStorage.setItem('metasense_bgm_muted', 'false');
-                            soundManager.startBGM();
-                          } else {
-                            setBgmDisabledForSession(true);
-                            // Set localStorage
-                            localStorage.setItem('metasense_bgm_muted', 'true');
-                            soundManager.stopBGM();
-                          }
-                          soundManager.playClick();
-                        }}
-                        style={{
-                          background: 'rgba(5, 10, 25, 0.6)',
-                          border: `1px solid ${bgmDisabledForSession ? 'var(--text-muted)' : 'var(--crystal-cyan)'}`,
-                          color: bgmDisabledForSession ? 'var(--text-muted)' : 'var(--crystal-cyan)',
-                          padding: '0.3rem 0.8rem',
-                          borderRadius: '15px',
-                          cursor: 'pointer',
-                          pointerEvents: 'auto',
-                          fontSize: '0.8rem',
-                          fontFamily: 'var(--font-tech)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          transition: 'all 0.3s ease'
-                        }}
-                      >
-                        {bgmDisabledForSession ? '🔇 BGM OFF' : '🔊 BGM ON'}
-                      </button>
                     </motion.p>
                   )}
                 </motion.div>

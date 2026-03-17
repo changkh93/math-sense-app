@@ -9,7 +9,6 @@ class SoundManager {
     this.sounds = {}
     this.bgm = null
     this.isMuted = false
-    this.bgmVolume = 0.05 // Reduced by half as requested
     this.sfxVolume = 0.6
     
     // 사운드 초기화
@@ -101,39 +100,6 @@ class SoundManager {
   }
 
 
-  // BGM 시작
-  startBGM() {
-    if (this.bgm) {
-      this.bgm.play()
-      return
-    }
-
-    this.bgm = new Howl({
-      src: ['/sounds/space-bgm.mp3', '/sounds/space-bgm.wav'],
-      volume: this.bgmVolume,
-      loop: true,
-      onloaderror: () => {
-        console.warn('BGM not found')
-      }
-    })
-    
-    this.bgm.play()
-  }
-
-  // BGM 정지
-  stopBGM() {
-    if (this.bgm) {
-      this.bgm.stop()
-    }
-  }
-
-  // BGM 페이드 아웃
-  fadeBGM(duration = 1000) {
-    if (this.bgm) {
-      this.bgm.fade(this.bgmVolume, 0, duration)
-      setTimeout(() => this.bgm.stop(), duration)
-    }
-  }
 
   // 음소거 토글
   toggleMute() {
@@ -147,13 +113,6 @@ class SoundManager {
     Howler.volume(volume)
   }
 
-  // BGM 볼륨 설정
-  setBGMVolume(volume) {
-    this.bgmVolume = volume
-    if (this.bgm) {
-      this.bgm.volume(volume)
-    }
-  }
 }
 
 // 싱글톤 인스턴스
