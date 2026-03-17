@@ -28,6 +28,7 @@ import AssignmentHub from './AssignmentHub' // New Integration
 import { useParticles, createParticleBurst } from './ParticleEffects'
 import { calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
+import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 
 import soundManager from '../../utils/SoundManager'
