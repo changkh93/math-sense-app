@@ -276,21 +276,10 @@ export default function SpaceJourney({ userData }) {
   }, [loading, viewMode]);
 
   // 스트릭 소스 (헤더와 동일한 로직 사용으로 완벽한 일치 보장)
-  const calculatedStreak = useMemo(() => {
-    // We already aligned our timelineData with currentStreak.
-    // However, to ensure 100% consistency with the Navbar, we can just use the exact sequence generated in our timeline
-    const todayNode = timelineData.days.find(d => d.date === todayKST);
-    if (todayNode && (todayNode.isActive || todayNode.isProtected)) {
-      return todayNode.streakRun;
-    }
-    const yesterdayKST = new Date(new Date(todayKST + 'T12:00:00Z').getTime() - 86400000).toISOString().split('T')[0];
-    const yesterdayNode = timelineData.days.find(d => d.date === yesterdayKST);
-    // If today is an unprotected gap but yesterday was protected/active, they still haven't lost it *today* until tomorrow!
-    // Duo style: Streak stays alive visually today even if you haven't done it yet.
-    return yesterdayNode ? yesterdayNode.streakRun : 0;
-  }, [timelineData.days, todayKST]);
+  const streak = useMemo(() => {
+    return getEffectiveStreak(userData);
+  }, [userData]);
 
-  const streak = calculatedStreak; 
   const tier = getCometTier(streak);
   const activeColor = streak > 0 ? tier.color : '#FF9F43';
   const isSupernova = streak >= 100;

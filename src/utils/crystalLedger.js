@@ -1,4 +1,4 @@
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase'
 
 /**
@@ -7,23 +7,30 @@ import { db } from '../firebase'
  * @param {string} userId - The user's UID
  * @param {Object} tx - Transaction details
  * @param {number} tx.amount - Positive for earned, negative for spent
- * @param {string} tx.type - Transaction type: 'quiz_reward' | 'store_purchase' | 'answer_accepted' | 'question_resolved' | 'self_resolve' | 'teacher_verify' | 'streak_bonus' | 'admin_adjust'
- * @param {string} tx.description - Human-readable description (e.g. "소수와 십분의 몇 탐사 완료")
- * @param {Object} [tx.metadata] - Optional additional data (e.g. unitId, questionId)
+ * @param {string} tx.type - Transaction type
+ * @param {string} tx.description - Human-readable description
+ * @param {Object} [tx.metadata] - Optional additional data
+ * @param {Object} [transaction] - Optional Firestore Transaction object for atomic writes
  */
-export async function recordCrystalTransaction(userId, { amount, type, description, metadata = {} }) {
-  if (!userId || amount === 0) return
+export async function recordCrystalTransaction(userId, { amount, type, description, metadata = {} }, transaction = null) {
+  if (!userId || (amount === 0 && type !== 'streak_freeze')) return
+
+  const txData = {
+    amount,
+    type,
+    description,
+    metadata,
+    timestamp: serverTimestamp()
+  }
 
   try {
-    await addDoc(collection(db, 'users', userId, 'crystal_transactions'), {
-      amount,
-      type,
-      description,
-      metadata,
-      timestamp: serverTimestamp()
-    })
+    const txRef = doc(collection(db, 'users', userId, 'crystal_transactions'))
+    if (transaction) {
+      transaction.set(txRef, txData)
+    } else {
+      await setDoc(txRef, txData)
+    }
   } catch (error) {
-    // Don't let ledger recording failure break the main flow
     console.error('Failed to record crystal transaction:', error)
   }
 }

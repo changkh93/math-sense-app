@@ -600,6 +600,57 @@ function SpaceHome() {
         const result = calculateStreakUpdate(freshUserData)
         const streakUpdates = result.streakUpdate || {}
 
+        // --- Atomic Logging: Streak Freeze ---
+        if (result.meta?.freezeUsed) {
+          const defendedDates = []
+          const lastDate = freshUserData?.lastStreakDate
+          if (lastDate) {
+            const scanObj = new Date(lastDate + 'T12:00:00Z')
+            const todayDateKST = getTodayKST()
+            const todayDate = new Date(todayDateKST + 'T12:00:00Z')
+            scanObj.setUTCDate(scanObj.getUTCDate() + 1)
+            while (scanObj < todayDate) {
+              defendedDates.push(scanObj.toISOString().split('T')[0])
+              scanObj.setUTCDate(scanObj.getUTCDate() + 1)
+            }
+          }
+          recordCrystalTransaction(user.uid, {
+            amount: 0,
+            type: 'streak_freeze',
+            description: `크라이오 코어로 연속 탐사 궤도 보호`,
+            metadata: { 
+              unitId: currentUnitId,
+              streakBefore: freshUserData?.currentStreak || 0,
+              streakAfter: result.meta.newStreak,
+              defendedDates: defendedDates
+            }
+          }, transaction)
+        }
+
+        // --- Atomic Logging: Quiz Reward ---
+        if (actualCrystalsEarned > 0) {
+          recordCrystalTransaction(user.uid, {
+            amount: actualCrystalsEarned,
+            type: 'quiz_reward',
+            description: `${activeUnit?.title || '탐사 퀴즈'} (${score}점)`,
+            metadata: { unitId: currentUnitId, score }
+          }, transaction)
+        }
+
+        // --- Atomic Logging: History ---
+        const historyRef = doc(collection(db, 'users', user.uid, 'history'))
+        transaction.set(historyRef, {
+          unitId: currentUnitId,
+          unitTitle: activeUnit?.title || "탐사 퀴즈",
+          regionId: selectedRegionId || freshUserData.lastRegionId || "",
+          regionTitle: activeRegion?.title || "Unknown Galaxy",
+          chapterId: selectedChapterDocId || "",
+          clusterId: selectedClusterId,
+          score: score,
+          crystalsEarned: actualCrystalsEarned,
+          timestamp: serverTimestamp()
+        })
+
         // Transaction 내에서는 increment()를 쓸 수 없으므로, 직접 계산
         transaction.update(userDocRef, {
           crystals: (freshUserData.crystals || 0) + actualCrystalsEarned,
@@ -623,44 +674,6 @@ function SpaceHome() {
       // Transaction 밖에서 부수효과 처리 (트랜잭션 성공 후)
       const { result: streakCalcResult, freshUserData: txUserData } = streakResult
       const streakUpdates = streakCalcResult.streakUpdate || {}
-
-      // Record Cryo Core usage if freeze was triggered
-      if (streakCalcResult.meta?.freezeUsed) {
-        const defendedDates = [];
-        const lastDate = txUserData?.lastStreakDate;
-        if (lastDate) {
-          const scanObj = new Date(lastDate + 'T12:00:00Z');
-          const todayDate = new Date(getTodayKST() + 'T12:00:00Z');
-          scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-          while (scanObj < todayDate) {
-            defendedDates.push(scanObj.toISOString().split('T')[0]);
-            scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-          }
-        }
-        recordCrystalTransaction(user.uid, {
-          amount: 0,
-          type: 'streak_freeze',
-          description: `크라이오 코어로 연속 탐사 궤도 보호`,
-          metadata: { 
-            unitId: currentUnitId,
-            streakBefore: txUserData?.currentStreak || 0,
-            streakAfter: streakCalcResult.meta.newStreak,
-            defendedDates: defendedDates
-          }
-        })
-      }
-
-      await addDoc(collection(db, 'users', user.uid, 'history'), {
-        unitId: currentUnitId,
-        unitTitle: activeUnit?.title || "탐사 퀴즈",
-        regionId: selectedRegionId || history.find(h => h.unitId === currentUnitId)?.regionId || "",
-        regionTitle: activeRegion?.title || "Unknown Galaxy",
-        chapterId: selectedChapterDocId || "",
-        clusterId: selectedClusterId, // Added for per-cluster tracking
-        score: score,
-        crystalsEarned: actualCrystalsEarned,
-        timestamp: serverTimestamp()
-      })
 
       // Save wrong questions / Delete recovered questions for Recovery Planet
       const batchStore = writeBatch(db)
@@ -885,61 +898,62 @@ function SpaceHome() {
           transaction.set(progressDocRef, progressUpdates, { merge: true })
         }
 
+        // --- Atomic Logging: Streak Freeze ---
+        if (streakResult.meta?.freezeUsed) {
+          const defendedDates = []
+          const lastDate = freshUserData?.lastStreakDate
+          if (lastDate) {
+            const scanObj = new Date(lastDate + 'T12:00:00Z')
+            const todayDateKST = getTodayKST()
+            const todayDate = new Date(todayDateKST + 'T12:00:00Z')
+            scanObj.setUTCDate(scanObj.getUTCDate() + 1)
+            while (scanObj < todayDate) {
+              defendedDates.push(scanObj.toISOString().split('T')[0])
+              scanObj.setUTCDate(scanObj.getUTCDate() + 1)
+            }
+          }
+          recordCrystalTransaction(user.uid, {
+            amount: 0,
+            type: 'streak_freeze',
+            description: `크라이오 코어로 연속 탐사 궤도 보호 (${activityType})`,
+            metadata: { 
+              unitId: currentUnitId,
+              streakBefore: freshUserData?.currentStreak || 0,
+              streakAfter: streakResult.meta.newStreak,
+              defendedDates: defendedDates
+            }
+          }, transaction)
+        }
+
+        // --- Atomic Logging: Reward ---
+        if (actualReward > 0) {
+          recordCrystalTransaction(user.uid, {
+            amount: actualReward,
+            type: isVideoActivity ? 'transmission_reward' : 'data_log_reward',
+            description: `${activeUnit?.title || '탐사'} 보상 (${activityType})`,
+            metadata: { unitId: currentUnitId, ...activityMetadata }
+          }, transaction)
+
+          // --- Atomic Logging: History ---
+          const historyRef = doc(collection(db, 'users', user.uid, 'history'))
+          transaction.set(historyRef, {
+            unitId: currentUnitId,
+            unitTitle: activeUnit?.title || `탐사 기록 (${activityType})`,
+            regionId: selectedRegionId || activeRegion?.id || "",
+            regionTitle: activeRegion?.title || "Unknown Galaxy",
+            chapterId: selectedChapterDocId || "",
+            clusterId: selectedClusterId,
+            score: 100,
+            crystalsEarned: actualReward,
+            timestamp: serverTimestamp(),
+            type: activityType.includes('로그') ? 'text' : activityType.includes('영상') ? 'video' : activityType 
+          })
+        }
+
         return { streakCalcResult: streakResult, txUserData: freshUserData, actualReward }
       })
 
       const { streakCalcResult, txUserData, actualReward } = txResult
-      const streakUpdates = streakCalcResult.streakUpdate || {}
-
-      // Track usage of freeze if happened outside of quiz
-      if (streakCalcResult.meta?.freezeUsed) {
-        const defendedDates = [];
-        const lastDate = txUserData?.lastStreakDate;
-        if (lastDate) {
-          const scanObj = new Date(lastDate + 'T12:00:00Z');
-          const todayDate = new Date(getTodayKST() + 'T12:00:00Z');
-          scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-          while (scanObj < todayDate) {
-            defendedDates.push(scanObj.toISOString().split('T')[0]);
-            scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-          }
-        }
-        recordCrystalTransaction(user.uid, {
-          amount: 0,
-          type: 'streak_freeze',
-          description: `크라이오 코어로 연속 탐사 궤도 보호 (${activityType})`,
-          metadata: { 
-            unitId: currentUnitId,
-            streakBefore: txUserData?.currentStreak || 0,
-            streakAfter: streakCalcResult.meta.newStreak,
-            defendedDates: defendedDates
-          }
-        })
-      }
-
-      // Log into History (Only if actualReward > 0)
-      // This prevents duplicate history entries while allowing the very first completion/log-read/180s-milestone to be recorded.
-      if (actualReward > 0) {
-        await addDoc(collection(db, 'users', user.uid, 'history'), {
-          unitId: currentUnitId,
-          unitTitle: activeUnit?.title || `탐사 기록 (${activityType})`,
-          regionId: selectedRegionId || activeRegion?.id || "",
-          regionTitle: activeRegion?.title || "Unknown Galaxy",
-          chapterId: selectedChapterDocId || "",
-          clusterId: selectedClusterId,
-          score: 100,
-          crystalsEarned: actualReward,
-          timestamp: serverTimestamp(),
-          type: activityType.includes('로그') ? 'text' : activityType.includes('영상') ? 'video' : activityType 
-        })
-
-        recordCrystalTransaction(user.uid, {
-          amount: actualReward,
-          type: isVideoActivity ? 'transmission_reward' : 'data_log_reward',
-          description: `${activeUnit?.title || '탐사'} 보상 (${activityType})`,
-          metadata: { unitId: currentUnitId, ...activityMetadata }
-        })
-      }
 
       // Trigger milestone celebration
       if (streakCalcResult.meta?.justReachedMilestone) {
