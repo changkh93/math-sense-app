@@ -107,6 +107,15 @@ const EQ_INEQ_5_PDF_FILES = [
   "10_위로 쏘아 올린 물체.pdf"
 ];
 
+const FUNCTIONS_1_PDF_FILES = [
+  "01_함수란.pdf",
+  "02_함수의 표현.pdf",
+  "03_xy의 정체.pdf",
+  "04_함수 그래프1.pdf",
+  "05_함수 그래프2.pdf",
+  "06_함수의 기울기.pdf"
+];
+
 const MiddleSchoolMathBuilder = () => {
   const [status, setStatus] = useState('대기 중...');
   const [building, setBuilding] = useState(false);
@@ -435,6 +444,56 @@ const MiddleSchoolMathBuilder = () => {
     }
   };
 
+  const handleBuildFunctions1 = async () => {
+    setBuilding(true);
+    setStatus('🔥 함수 I 구축 시작...');
+
+    try {
+      const chapterId = 'reg_1773407437227_chap_1773823180266'; // Verified ID for "함수 I"
+      
+      setStatus('✔️ 대상 챕터 확인 완료. 유닛 생성 중...');
+
+      const unitsRef = collection(db, 'units');
+      const batch = writeBatch(db);
+
+      FUNCTIONS_1_PDF_FILES.forEach((filename, index) => {
+        let cleanTitle = filename.replace('.pdf', '');
+        cleanTitle = cleanTitle.replace(/^\d+_/, ''); 
+
+        const order = index + 1; 
+        const unitId = `unit_middle_math_func1_${order.toString().padStart(2, '0')}`;
+        const unitRef = doc(unitsRef, unitId);
+        
+        batch.set(unitRef, {
+          docId: unitId,
+          id: unitId,
+          chapterId: chapterId,
+          title: cleanTitle,
+          order: order,
+          learningContents: {
+            text: 'PDF를 보며 개념을 학습하세요.',
+            pdfUrl: `/pdfs/middle_math/functions_1/${filename}`
+          },
+          contentFlags: {
+            hasDataLog: true,
+            hasTransmission: false,
+            hasWorkbook: false
+          },
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+      });
+
+      setStatus('💾 서버에 저장 중...');
+      await batch.commit();
+      setStatus('✅ 함수 I 유닛 구축 완료!');
+    } catch (err) {
+      console.error(err);
+      setStatus(`❌ 오류 발생: ${err.message}`);
+    } finally {
+      setBuilding(false);
+    }
+  };
+
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', color: 'white' }}>
       <h1>📐 Middle School Math Builder</h1>
@@ -482,6 +541,13 @@ const MiddleSchoolMathBuilder = () => {
         }}>
           {building ? '구축 중...' : '🚀 방정식 V 유닛 생성'}
         </button>
+
+        <button onClick={handleBuildFunctions1} disabled={building} style={{
+          padding: '1rem 2rem', background: building ? 'gray' : '#009688',
+          color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
+        }}>
+          {building ? '구축 중...' : '🚀 함수 I 유닛 생성'}
+        </button>
       </div>
 
       <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
@@ -502,6 +568,13 @@ const MiddleSchoolMathBuilder = () => {
         <h3>신규 방정식 V PDF 파일: {EQ_INEQ_5_PDF_FILES.length}개</h3>
         <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
           {EQ_INEQ_5_PDF_FILES.map(f => <li key={f}>{f}</li>)}
+        </ul>
+      </div>
+
+      <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
+        <h3>신규 함수 I PDF 파일: {FUNCTIONS_1_PDF_FILES.length}개</h3>
+        <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
+          {FUNCTIONS_1_PDF_FILES.map(f => <li key={f}>{f}</li>)}
         </ul>
       </div>
 
