@@ -11,7 +11,9 @@
 1.  로컬의 신규 PDF 파일들을 프로젝트의 `public` 디렉토리 하위로 복사합니다.
     -   경로 규칙: `public/pdfs/middle_math/[단원명_영문]/`
     -   예시: `public/pdfs/middle_math/eq_and_ineq_3/`
-2.  파일 이름은 `01_단원명.pdf`, `02_단원명.pdf` 형식을 권장합니다. (빌더에서 숫자를 제거하고 제목으로 사용함)
+2.  **중요 (인코딩)**: 모든 한글 파일명은 반드시 **NFC(Normalization Form C)** 방식으로 저장되어야 합니다.
+    -   Mac(NFD 방식)에서 복사한 파일은 브라우저에서 404 에러가 발생할 수 있으므로, 반드시 NFC로 변환 후 커밋합니다.
+3.  파일 이름은 `01_단원명.pdf`, `02_단원명.pdf` 형식을 권장합니다. (빌더에서 숫자를 제거하고 제목으로 사용함)
 
 ### 단계 2: 어드민 빌더(`MiddleSchoolMathBuilder.jsx`) 수정
 `src/pages/Admin/MiddleSchoolMathBuilder.jsx` 파일을 열고 다음을 추가합니다.
@@ -36,7 +38,16 @@
 3.  상태 메시지가 "✅ 구축 완료"로 변경되는지 확인합니다.
 4.  실제 학습 페이지나 Firestore Console에서 유닛이 올바른 챕터 하위에 생성되었는지 확인합니다.
 
-## 3. 주요 설정 정보
+## 3. 주의사항: 한글 인코딩 (NFC vs NFD)
+Mac OS는 한글 전송 시 자음과 모음을 분리하는 **NFD** 방식을 사용하고, 웹 브라우저와 Windows는 이를 하나로 합친 **NFC** 방식을 표준으로 사용합니다.
+
+-   **현상**: DB에는 "가"라고 적혀 있는데 서버 파일명이 "ㄱㅏ"로 되어 있으면 웹에서 파일을 찾지 못해 검은 화면만 나옵니다.
+-   **해결책**:
+    1.  서버에 올리는 파일명은 모두 `normalize('NFC')` 변환을 거칩니다.
+    2.  `MiddleSchoolMathBuilder.jsx` 코드에 적는 한글 파일명 리스트도 NFC여야 합니다.
+-   **도구**: 프로젝트 루트의 `normalize_all_files.mjs` 스크립트를 실행하여 전체 PDF 경로의 인코딩을 일괄 교정할 수 있습니다.
+
+## 4. 주요 설정 정보
 -   **Cluster ID**: `middle-math` (중등수학)
 -   **Region ID**: `reg_1773407437227` (기본개념 전과정)
 -   **Firestore Collections**: `regions` -> `chapters` -> `units`

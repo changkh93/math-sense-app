@@ -116,6 +116,17 @@ const FUNCTIONS_1_PDF_FILES = [
   "06_함수의 기울기.pdf"
 ];
 
+const PROBABILITY_PDF_FILES = [
+  "01_확률의 뜻과 표현.pdf",
+  "02_확률에서 합의 법칙.pdf",
+  "03_확률에서 곱의 법칙.pdf",
+  "04_조합.pdf",
+  "05_순열.pdf",
+  "06_평군, 가운데수, 최빈수.pdf",
+  "07_분포와 산포도.pdf",
+  "08_표본.pdf"
+];
+
 const MiddleSchoolMathBuilder = () => {
   const [status, setStatus] = useState('대기 중...');
   const [building, setBuilding] = useState(false);
@@ -494,6 +505,56 @@ const MiddleSchoolMathBuilder = () => {
     }
   };
 
+  const handleBuildProbability = async () => {
+    setBuilding(true);
+    setStatus('🔥 확률과 통계 구축 시작...');
+
+    try {
+      const chapterId = 'reg_1773407437227_chap_1773839509261'; // Verified ID for "확률과 통계"
+      
+      setStatus('✔️ 대상 챕터 확인 완료. 유닛 생성 중...');
+
+      const unitsRef = collection(db, 'units');
+      const batch = writeBatch(db);
+
+      PROBABILITY_PDF_FILES.forEach((filename, index) => {
+        let cleanTitle = filename.replace('.pdf', '');
+        cleanTitle = cleanTitle.replace(/^\d+_/, ''); 
+
+        const order = index + 1; 
+        const unitId = `unit_middle_math_prob_${order.toString().padStart(2, '0')}`;
+        const unitRef = doc(unitsRef, unitId);
+        
+        batch.set(unitRef, {
+          docId: unitId,
+          id: unitId,
+          chapterId: chapterId,
+          title: cleanTitle,
+          order: order,
+          learningContents: {
+            text: 'PDF를 보며 개념을 학습하세요.',
+            pdfUrl: `/pdfs/middle_math/probability/${filename}`
+          },
+          contentFlags: {
+            hasDataLog: true,
+            hasTransmission: false,
+            hasWorkbook: false
+          },
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+      });
+
+      setStatus('💾 서버에 저장 중...');
+      await batch.commit();
+      setStatus('✅ 확률과 통계 유닛 구축 완료!');
+    } catch (err) {
+      console.error(err);
+      setStatus(`❌ 오류 발생: ${err.message}`);
+    } finally {
+      setBuilding(false);
+    }
+  };
+
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', color: 'white' }}>
       <h1>📐 Middle School Math Builder</h1>
@@ -506,7 +567,7 @@ const MiddleSchoolMathBuilder = () => {
         </ul>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <button onClick={handleBuild} disabled={building} style={{
           padding: '1rem 2rem', background: building ? 'gray' : '#FF9800',
           color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
@@ -542,12 +603,30 @@ const MiddleSchoolMathBuilder = () => {
           {building ? '구축 중...' : '🚀 방정식 V 유닛 생성'}
         </button>
 
-        <button onClick={handleBuildFunctions1} disabled={building} style={{
-          padding: '1rem 2rem', background: building ? 'gray' : '#009688',
-          color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
-        }}>
-          {building ? '구축 중...' : '🚀 함수 I 유닛 생성'}
-        </button>
+        <button 
+            onClick={handleBuildProbability}
+            disabled={building}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: building ? '#ccc' : '#e67e22',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: building ? 'not-allowed' : 'pointer'
+            }}
+          >
+            🚀 확률 유닛 생성
+          </button>
+          <button 
+            onClick={handleBuildFunctions1}
+            disabled={building}
+            style={{
+              padding: '1rem 2rem', background: building ? 'gray' : '#009688',
+              color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
+            }}
+          >
+            {building ? '구축 중...' : '🚀 함수 I 유닛 생성'}
+          </button>
       </div>
 
       <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
@@ -571,11 +650,19 @@ const MiddleSchoolMathBuilder = () => {
         </ul>
       </div>
 
-      <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
-        <h3>신규 함수 I PDF 파일: {FUNCTIONS_1_PDF_FILES.length}개</h3>
-        <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
-          {FUNCTIONS_1_PDF_FILES.map(f => <li key={f}>{f}</li>)}
-        </ul>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+        <section style={{ flex: 1, minWidth: '300px', backgroundColor: '#111', padding: '1.5rem', borderRadius: '8px' }}>
+          <h3 style={{ marginTop: 0 }}>확률 PDF 파일 ({PROBABILITY_PDF_FILES.length}개)</h3>
+          <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
+            {PROBABILITY_PDF_FILES.map(f => <li key={f}>{f}</li>)}
+          </ul>
+        </section>
+        <section style={{ flex: 1, minWidth: '300px', backgroundColor: '#111', padding: '1.5rem', borderRadius: '8px' }}>
+          <h3 style={{ marginTop: 0 }}>신규 함수 I PDF 파일: {FUNCTIONS_1_PDF_FILES.length}개</h3>
+          <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
+            {FUNCTIONS_1_PDF_FILES.map(f => <li key={f}>{f}</li>)}
+          </ul>
+        </section>
       </div>
 
       <div style={{ marginTop: '2rem', fontWeight: 'bold' }}>상태: {status}</div>
