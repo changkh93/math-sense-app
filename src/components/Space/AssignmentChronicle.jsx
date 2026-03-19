@@ -240,8 +240,8 @@ export default function AssignmentChronicle({ assignments, onClose }) {
                         <span className="font-tech" style={{ marginLeft: 'auto', color: 'var(--star-gold)', fontSize: '0.85rem' }}>💎 +{currentLog.bonusCrystals}</span>
                       )}
                     </div>
-                    <div style={{ color: 'var(--text-bright)', lineHeight: '1.6', fontSize: '0.95rem' }}>
-                      <ReactMarkdown>{currentLog.feedback}</ReactMarkdown>
+                    <div style={{ color: 'var(--text-bright)', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>
+                      {currentLog.feedback}
                     </div>
                   </div>
                 )}
