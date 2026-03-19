@@ -925,7 +925,6 @@ function SpaceHome() {
           }, transaction)
         }
 
-        // --- Atomic Logging: Reward ---
         if (actualReward > 0) {
           recordCrystalTransaction(user.uid, {
             amount: actualReward,
@@ -933,8 +932,13 @@ function SpaceHome() {
             description: `${activeUnit?.title || '탐사'} 보상 (${activityType})`,
             metadata: { unitId: currentUnitId, ...activityMetadata }
           }, transaction)
+        }
 
-          // --- Atomic Logging: History ---
+        // --- Atomic Logging: History ---
+        const isCompletionActivity = activityType.includes('완료') || isLogActivity
+        const shouldLogHistory = isCompletionActivity
+
+        if (shouldLogHistory) {
           const historyRef = doc(collection(db, 'users', user.uid, 'history'))
           transaction.set(historyRef, {
             unitId: currentUnitId,
@@ -946,7 +950,7 @@ function SpaceHome() {
             score: 100,
             crystalsEarned: actualReward,
             timestamp: serverTimestamp(),
-            type: activityType.includes('로그') ? 'text' : activityType.includes('영상') ? 'video' : activityType 
+            type: isLogActivity ? 'text' : 'video' 
           })
         }
 
