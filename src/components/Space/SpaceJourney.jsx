@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, auth } from '../../firebase';
 import { collection, query, where, orderBy, getDocs, doc, setDoc } from 'firebase/firestore';
-import { getTodayKST, getCometTier } from '../../utils/streakUtils';
+import { getTodayKST, getCometTier, getEffectiveStreak } from '../../utils/streakUtils';
 import './SpaceJourney.css';
 
 export default function SpaceJourney({ userData }) {

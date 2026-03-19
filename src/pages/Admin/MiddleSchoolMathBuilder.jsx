@@ -510,6 +510,8 @@ const MiddleSchoolMathBuilder = () => {
     setStatus('🔥 확률과 통계 구축 시작...');
 
     try {
+      const clusterId = 'middle-math';
+      const regionId = 'reg_1773407437227';
       const chapterId = 'reg_1773407437227_chap_1773839509261'; // Verified ID for "확률과 통계"
       
       setStatus('✔️ 대상 챕터 확인 완료. 유닛 생성 중...');
@@ -522,12 +524,14 @@ const MiddleSchoolMathBuilder = () => {
         cleanTitle = cleanTitle.replace(/^\d+_/, ''); 
 
         const order = index + 1; 
-        const unitId = `unit_middle_math_prob_${order.toString().padStart(2, '0')}`;
+        const unitId = `${chapterId}_prob_${order.toString().padStart(2, '0')}`;
         const unitRef = doc(unitsRef, unitId);
         
         batch.set(unitRef, {
           docId: unitId,
           id: unitId,
+          clusterId: clusterId,
+          regionId: regionId,
           chapterId: chapterId,
           title: cleanTitle,
           order: order,
