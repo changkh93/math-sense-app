@@ -850,6 +850,13 @@ export default function MissionHub({
       if (isManualComplete) {
          updateData[`videoProgress.${txId}.completed`] = true
          updateData[`videoProgress.${txId}.completionBonusGiven`] = true
+         
+         // Trigger history log creation and dashboard ring update without crystals
+         if (onNonQuizActivityComplete) {
+            await onNonQuizActivityComplete('영상 수동 완료 (크리스탈 제외)', 0, {
+              transmissionId: txId
+            });
+         }
       }
       
       await setDoc(progressRef, updateData, { merge: true })
@@ -979,16 +986,25 @@ export default function MissionHub({
           const finalPos = Math.floor(lastVideoTimeRef.current || 0)
           if (finalPos <= 0 || !idTokenRef.current) return
           const FIREBASE_POST_URL = "https://us-central1-math-sense-1f6a8.cloudfunctions.net/syncVideoProgress"
+          
+          const txProgress = learningProgress?.videoProgress?.[txId]
+          const isCompleted = txProgress?.completed || videoCompleted
+          const isBonusGiven = txProgress?.completionBonusGiven || videoCompletionBonusGiven
+          
+          const progressData = {
+              lastPosition: finalPos,
+              totalTimeSpent: totalTimeSpentRef.current,
+              stampedSeconds: Array.from(stampedSetRef.current)
+          }
+          if (isCompleted) progressData.completed = true
+          if (isBonusGiven) progressData.completionBonusGiven = true
+
           const payload = JSON.stringify({
             idToken: idTokenRef.current,
             userId,
             unitId,
             txId,
-            progressData: {
-              lastPosition: finalPos,
-              totalTimeSpent: totalTimeSpentRef.current,
-              stampedSeconds: Array.from(stampedSetRef.current)
-            }
+            progressData
           })
           navigator.sendBeacon(FIREBASE_POST_URL, payload)
         }
