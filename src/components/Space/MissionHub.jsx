@@ -452,8 +452,15 @@ export default function MissionHub({
   const newStampCountRef = useRef(0) // New stamps since last reward
   const [stampCount, setStampCount] = useState(0) // For UI display
   const [videoCompleted, setVideoCompleted] = useState(false)
+  const videoCompletedRef = useRef(false)
+  useEffect(() => { videoCompletedRef.current = videoCompleted }, [videoCompleted])
+
   const [isAtEnd, setIsAtEnd] = useState(false)
+  
   const [videoCompletionBonusGiven, setVideoCompletionBonusGiven] = useState(false)
+  const videoCompletionBonusGivenRef = useRef(false)
+  useEffect(() => { videoCompletionBonusGivenRef.current = videoCompletionBonusGiven }, [videoCompletionBonusGiven])
+
   const lastVideoTimeRef = useRef(-1) // Current video playback position (starts at -1 to capture 0s)
   const totalTimeSpentRef = useRef(0) // Actual playback seconds (analytics)
   const videoDurationRef = useRef(0) // Video total duration for reward cap
@@ -800,6 +807,7 @@ export default function MissionHub({
       try {
         rewardLockRef.current = true
         setVideoCompletionBonusGiven(true)
+        videoCompletionBonusGivenRef.current = true
 
         if (onNonQuizActivityComplete) {
           await onNonQuizActivityComplete('영상 교신 완료', 20, {
@@ -850,6 +858,8 @@ export default function MissionHub({
       if (isManualComplete) {
          updateData[`videoProgress.${txId}.completed`] = true
          updateData[`videoProgress.${txId}.completionBonusGiven`] = true
+         videoCompletedRef.current = true
+         videoCompletionBonusGivenRef.current = true
          
          // Trigger history log creation and dashboard ring update without crystals
          if (onNonQuizActivityComplete) {
@@ -988,8 +998,8 @@ export default function MissionHub({
           const FIREBASE_POST_URL = "https://us-central1-math-sense-1f6a8.cloudfunctions.net/syncVideoProgress"
           
           const txProgress = learningProgress?.videoProgress?.[txId]
-          const isCompleted = txProgress?.completed || videoCompleted
-          const isBonusGiven = txProgress?.completionBonusGiven || videoCompletionBonusGiven
+          const isCompleted = videoCompletedRef.current || txProgress?.completed
+          const isBonusGiven = videoCompletionBonusGivenRef.current || txProgress?.completionBonusGiven
           
           const progressData = {
               lastPosition: finalPos,
