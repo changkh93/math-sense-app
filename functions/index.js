@@ -1,4 +1,6 @@
 const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+try { admin.initializeApp(); } catch (e) {}
 const cors = require("cors")({ origin: true });
 const fetch = require("node-fetch");
 
@@ -224,3 +226,59 @@ function parseNotebook(notebook) {
     },
   };
 }
+
+/**
+ * syncVideoProgress
+ * 
+ * HTTP endpoint for navigator.sendBeacon to securely save video progress 
+ * when the user closes the tab or navigates away.
+ */
+exports.syncVideoProgress = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    try {
+      if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
+      
+      let data = req.body;
+      if (typeof data === "string") {
+        try { data = JSON.parse(data); } catch (e) {}
+      }
+
+      const { idToken, userId, unitId, txId, progressData } = data;
+      if (!idToken || !userId || !unitId || !txId || !progressData) {
+        return res.status(400).send("Missing required fields");
+      }
+
+      // Verify token
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      if (decodedToken.uid !== userId) {
+        return res.status(403).send("Unauthorized");
+      }
+
+      // We use server Timestamp for updatedAt but the client might pass their own.
+      const updateData = {};
+      
+      // Prevent destroying existing fields like 'completed' when sending beacon
+      if (progressData && typeof progressData === 'object') {
+        for (const [key, val] of Object.entries(progressData)) {
+          updateData[`videoProgress.${txId}.${key}`] = val;
+        }
+      }
+      
+      updateData[`videoProgress.${txId}.updatedAt`] = admin.firestore.FieldValue.serverTimestamp();
+
+      const progressRef = admin.firestore()
+        .collection('users')
+        .doc(userId)
+        .collection('learning_progress')
+        .doc(unitId);
+
+      await progressRef.set(updateData, { merge: true });
+
+      return res.status(200).send("OK");
+    } catch (error) {
+      console.error("syncVideoProgress error:", error);
+      return res.status(500).send("Internal Server Error");
+    }
+  });
+});
+

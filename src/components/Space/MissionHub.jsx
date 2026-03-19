@@ -445,7 +445,7 @@ export default function MissionHub({
   const [logTimerActive, setLogTimerActive] = useState(false)
   const [logRewardClaimed, setLogRewardClaimed] = useState(false)
   const timerRef = useRef(null)
-  const sessionStorageKey = `datalog_timer_${unitId}`
+  const storageKey = `datalog_timer_${userId || 'anon'}_${unitId}`
 
   // ─── Transmission reward state (Bitset/Checklist) ───
   const stampedSetRef = useRef(new Set()) // Set of stamped video seconds
@@ -460,6 +460,19 @@ export default function MissionHub({
   const totalRewardedCrystalsRef = useRef(0) // Total crystals given for this tx
   const [totalRewardedCrystals, setTotalRewardedCrystals] = useState(0) // For UI reactivity
   const autoSaveIntervalRef = useRef(null)
+
+  const idTokenRef = useRef(null)
+  useEffect(() => {
+    if (user) {
+      user.getIdToken().then(t => idTokenRef.current = t)
+      const interval = setInterval(() => user.getIdToken().then(t => idTokenRef.current = t), 5 * 60 * 1000)
+      return () => clearInterval(interval)
+    }
+  }, [user])
+
+  const [saveStatus, setSaveStatus] = useState(null)
+  const [resumePosStr, setResumePosStr] = useState("")
+
   const [initialStartPosition, setInitialStartPosition] = useState(0)
   
   // ─── Silent Toast ───
@@ -587,7 +600,7 @@ export default function MissionHub({
 
     // Restore from sessionStorage
     // `savedTimer` is not defined in the original code, assuming it's meant to be retrieved from sessionStorage
-    const savedTimer = sessionStorage.getItem(sessionStorageKey);
+    const savedTimer = localStorage.getItem(storageKey);
     if (savedTimer) {
       const saved = JSON.parse(savedTimer)
       if (saved.remaining > 0) {
@@ -597,7 +610,7 @@ export default function MissionHub({
 
     setLogTimerActive(true)
     return () => setLogTimerActive(false)
-  }, [currentMode, logRewardClaimed, sessionStorageKey])
+  }, [currentMode, logRewardClaimed, storageKey])
 
   useEffect(() => {
     if (!logTimerActive || timeRemaining <= 0) return
@@ -607,7 +620,7 @@ export default function MissionHub({
         const next = Math.max(0, prev - 1)
         // Save to sessionStorage every 5 seconds
         if (next % 5 === 0) {
-          sessionStorage.setItem(sessionStorageKey, JSON.stringify({
+          localStorage.setItem(storageKey, JSON.stringify({
             remaining: next,
             timestamp: Date.now()
           }))
@@ -650,7 +663,7 @@ export default function MissionHub({
       if (timerRef.current) clearInterval(timerRef.current)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [logTimerActive, timeRemaining, sessionStorageKey, currentMode, selectedTx, userId, unitId])
+  }, [logTimerActive, timeRemaining, storageKey, currentMode, selectedTx, userId, unitId])
 
   // ─── Data Log: Claim reward ───
   const handleClaimLogReward = async () => {
@@ -661,7 +674,7 @@ export default function MissionHub({
         await onNonQuizActivityComplete('데이터 로그 학습', 30)
       }
       setLogRewardClaimed(true)
-      sessionStorage.removeItem(sessionStorageKey)
+      localStorage.removeItem(storageKey)
       showSilentToast(30)
       logActivity('data_log_reward_claimed')
     } catch (err) {
@@ -710,6 +723,13 @@ export default function MissionHub({
 
     if (newStampsAdded) {
       setStampCount(stampedSetRef.current.size)
+      // Save locally every stamp update (Offline-first caching)
+      if (userId && selectedTx) {
+        const txId = selectedTx.id || 'default'
+        const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+        localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(Array.from(stampedSetRef.current)))
+        localStorage.setItem(localCacheKey + '_pos', currentSecond.toString())
+      }
     }
 
     // Check completion: 90%+ of video seconds stamped
@@ -811,31 +831,54 @@ export default function MissionHub({
       const savedPosition = Math.floor(lastVideoTimeRef.current || 0)
       const stamps = Array.from(stampedSetRef.current)
       
+      let isManualComplete = false
+      // Remove 20% hurdle. If they reached the end but didn't complete, allow manual completion without bonus
+      if (isAtEnd && !videoCompleted) {
+         isManualComplete = true
+      }
+      
       const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-      await setDoc(progressRef, {
-        [`videoProgress.${txId}`]: {
-          lastPosition: savedPosition,
-          stampedSeconds: stamps,
-          rewardedStampCount: stamps.length - newStampCountRef.current,
-          totalRewardedCrystals: totalRewardedCrystalsRef.current,
-          totalTimeSpent: totalTimeSpentRef.current,
-          updatedAt: serverTimestamp()
-        }
-      }, { merge: true })
+      const updateData = {
+        [`videoProgress.${txId}.lastPosition`]: savedPosition,
+        [`videoProgress.${txId}.stampedSeconds`]: stamps,
+        [`videoProgress.${txId}.rewardedStampCount`]: stamps.length - newStampCountRef.current,
+        [`videoProgress.${txId}.totalRewardedCrystals`]: totalRewardedCrystalsRef.current,
+        [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+        [`videoProgress.${txId}.updatedAt`]: serverTimestamp()
+      }
+      
+      if (isManualComplete) {
+         updateData[`videoProgress.${txId}.completed`] = true
+         updateData[`videoProgress.${txId}.completionBonusGiven`] = true
+      }
+      
+      await setDoc(progressRef, updateData, { merge: true })
+      
+      // Cleanup local storage
+      const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+      localStorage.removeItem(localCacheKey + '_stamps')
+      localStorage.removeItem(localCacheKey + '_pos')
 
       // Update local state
-      setLearningProgress(prev => ({
-        ...prev,
-        videoProgress: {
-          ...(prev?.videoProgress || {}),
-          [txId]: {
+      setLearningProgress(prev => {
+        const updatedVideoProgress = {
             ...(prev?.videoProgress?.[txId] || {}),
             lastPosition: savedPosition,
             totalTimeSpent: totalTimeSpentRef.current,
             stampedSeconds: stamps
-          }
+        };
+        if (isManualComplete) {
+            updatedVideoProgress.completed = true;
+            updatedVideoProgress.completionBonusGiven = true;
         }
-      }))
+        return {
+          ...prev,
+          videoProgress: {
+            ...(prev?.videoProgress || {}),
+            [txId]: updatedVideoProgress
+          }
+        };
+      })
 
       showSilentToast(0)
     } catch (err) {
@@ -851,28 +894,44 @@ export default function MissionHub({
 
   // ─── Reset video tracking when switching transmissions ───
   useEffect(() => {
+    if (loadingProgress) return; // Wait until initial Firestore progress is loaded
     if (selectedTx) {
       const txId = selectedTx.id || 'default'
       const savedProgress = learningProgress?.videoProgress?.[txId]
       
-      // Restore stamped set from Firestore
-      const savedStamps = savedProgress?.stampedSeconds || []
-      stampedSetRef.current = new Set(savedStamps)
-      const rewardedCount = savedProgress?.rewardedStampCount || 0
-      newStampCountRef.current = Math.max(0, savedStamps.length - rewardedCount)
-      setStampCount(savedStamps.length)
+      // Offline-First Union: Merge local and remote stamps
+      const serverStamps = savedProgress?.stampedSeconds || []
+      const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+      const localStampsRaw = localStorage.getItem(localCacheKey + '_stamps')
+      const localStamps = localStampsRaw ? JSON.parse(localStampsRaw) : []
+      stampedSetRef.current = new Set([...serverStamps, ...localStamps])
       
-      // Restore analytics and reward tracking
+      const combinedStampCount = stampedSetRef.current.size
+      const rewardedCount = savedProgress?.rewardedStampCount || 0
+      newStampCountRef.current = Math.max(0, combinedStampCount - rewardedCount)
+      setStampCount(combinedStampCount)
+      
+      // Offline-First Max: Secure local position priority
+      const serverPos = savedProgress?.lastPosition || 0
+      const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
+      const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
+      const maxPos = Math.max(serverPos, localPos)
+      
       totalTimeSpentRef.current = savedProgress?.totalTimeSpent || 0
       totalRewardedCrystalsRef.current = savedProgress?.totalRewardedCrystals || 0
       setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
-      videoDurationRef.current = 0 // Will be set by first onTimeUpdate
+      videoDurationRef.current = 0 
       
       setVideoCompleted(savedProgress?.completed || false)
-      setIsAtEnd(false) // Reset end detection when switching/reloading tx
+      setIsAtEnd(false)
       setVideoCompletionBonusGiven(savedProgress?.completionBonusGiven || false)
-      lastVideoTimeRef.current = (savedProgress?.lastPosition !== undefined) ? savedProgress.lastPosition : -1
-      setInitialStartPosition((savedProgress?.lastPosition !== undefined) ? savedProgress.lastPosition : (selectedTx.start || 0))
+      lastVideoTimeRef.current = maxPos > 0 ? maxPos : -1
+      setInitialStartPosition(maxPos > 0 ? maxPos : (selectedTx.start || 0))
+      
+      if (maxPos > 0) {
+         setResumePosStr(`이전 지점(${Math.floor(maxPos / 60)}분 ${Math.floor(maxPos % 60)}초)에서 이어보기 되었습니다.`)
+         setTimeout(() => setResumePosStr(""), 4000)
+      }
 
       // Auto-save every 10 seconds
       if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
@@ -891,7 +950,11 @@ export default function MissionHub({
                 [`videoProgress.${txId}.stampedSeconds`]: stamps
               }
               
+              setSaveStatus('saving')
               await setDoc(progressRef, updateData, { merge: true })
+              
+              setSaveStatus('saved')
+              setTimeout(() => setSaveStatus(null), 2000)
 
               // Sync local state as well
               setLearningProgress(prev => ({
@@ -911,13 +974,43 @@ export default function MissionHub({
             console.warn("Auto-save failed:", err)
           }
         }, 10000) // Every 10 seconds
+
+        const handleUnloadSave = () => {
+          const finalPos = Math.floor(lastVideoTimeRef.current || 0)
+          if (finalPos <= 0 || !idTokenRef.current) return
+          const FIREBASE_POST_URL = "https://us-central1-math-sense-1f6a8.cloudfunctions.net/syncVideoProgress"
+          const payload = JSON.stringify({
+            idToken: idTokenRef.current,
+            userId,
+            unitId,
+            txId,
+            progressData: {
+              lastPosition: finalPos,
+              totalTimeSpent: totalTimeSpentRef.current,
+              stampedSeconds: Array.from(stampedSetRef.current)
+            }
+          })
+          navigator.sendBeacon(FIREBASE_POST_URL, payload)
+        }
+        
+        const handleVisibilityChange = () => { if (document.hidden) handleUnloadSave() }
+
+        window.addEventListener('beforeunload', handleUnloadSave)
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        
+        // Save unmount funcs closely mapping current closures
+        autoSaveIntervalRef.currentDestructors = () => {
+           window.removeEventListener('beforeunload', handleUnloadSave)
+           document.removeEventListener('visibilitychange', handleVisibilityChange)
+        }
       }
     }
 
     return () => {
       if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
+      if (autoSaveIntervalRef.currentDestructors) autoSaveIntervalRef.currentDestructors()
     }
-  }, [selectedTx?.id, userId, unitId, selectedTx?.start])
+  }, [selectedTx?.id, userId, unitId, selectedTx?.start, loadingProgress])
 
   const handleModeChange = (mode) => {
     soundManager.playClick()
@@ -1294,6 +1387,30 @@ export default function MissionHub({
                 <span style={{ fontSize: '1.5rem' }}>📡</span> {selectedTx.title}
              </h3>
              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+               {/* Cloud Save Micro-interaction */}
+               <AnimatePresence>
+                 {saveStatus && (
+                   <motion.div 
+                     initial={{ opacity: 0, scale: 0.8 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     exit={{ opacity: 0 }}
+                     style={{ color: saveStatus === 'saved' ? 'var(--planet-green)' : 'var(--crystal-cyan)', fontSize: '1rem', marginRight: '0.5rem' }}
+                     title="데이터 안전하게 동기화 중"
+                   >
+                     {saveStatus === 'saved' ? '✔' : '☁️'}
+                   </motion.div>
+                 )}
+                 {resumePosStr && (
+                   <motion.div
+                     initial={{ opacity: 0, x: 20 }}
+                     animate={{ opacity: 1, x: 0 }}
+                     exit={{ opacity: 0 }}
+                     style={{ color: 'var(--star-gold)', fontSize: '0.85rem', marginRight: '0.5rem', fontStyle: 'italic', fontFamily: 'var(--font-tech)' }}
+                   >
+                     {resumePosStr}
+                   </motion.div>
+                 )}
+               </AnimatePresence>
                {/* Watch progress indicator */}
                {stampCount > 0 && (
                  <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
@@ -1345,7 +1462,7 @@ export default function MissionHub({
                   <>✨ 데이터 수신 완료! (총 {totalRewardedCrystals + (videoCompletionBonusGiven ? 20 : 0)}광석 획득) · 돌아가기</>
                 )
               ) : isAtEnd ? (
-                <>⚠️ 데이터 수신 부족 ({Math.min(100, Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100))}%)</>
+                  <>☑️ 수동 완료 처리 (완료 보너스 제외) - 수신율 {Math.min(100, Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100))}%</>
               ) : (
                 <>📋 오늘은 여기까지</>
               )}
@@ -1389,6 +1506,13 @@ export default function MissionHub({
                  const txId = tx.id || 'default'
                  const txProgress = learningProgress?.videoProgress?.[txId]
                  const isTxCompleted = txProgress?.completionBonusGiven
+                 
+                 // Offline-First UI: Use local storage cache for resume display if more up-to-date
+                 const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+                 const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
+                 const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
+                 const displayPos = Math.max(txProgress?.lastPosition || 0, localPos)
+
                  return (
                    <motion.div 
                       key={tx.id}
@@ -1409,9 +1533,9 @@ export default function MissionHub({
                        <div>
                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'var(--font-tech)', marginBottom: '0.2rem' }}>DATA CHIP #{idx + 1}</div>
                            <div style={{ color: 'var(--text-bright)', fontWeight: 'bold', fontSize: '1.1rem' }}>{tx.title || `영상 ${idx + 1}`}</div>
-                           {txProgress?.lastPosition > 0 && !isTxCompleted && (
+                           {displayPos > 0 && !isTxCompleted && (
                              <div style={{ color: 'var(--crystal-cyan)', fontSize: '0.75rem', fontFamily: 'var(--font-tech)', marginTop: '0.3rem' }}>
-                               ▶ {Math.floor(txProgress.lastPosition / 60)}:{String(Math.floor(txProgress.lastPosition % 60)).padStart(2, '0')}부터 이어보기
+                               ▶ {Math.floor(displayPos / 60)}:{String(Math.floor(displayPos % 60)).padStart(2, '0')}부터 이어보기
                              </div>
                            )}
                        </div>
