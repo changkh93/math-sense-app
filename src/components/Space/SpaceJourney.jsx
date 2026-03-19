@@ -212,7 +212,8 @@ export default function SpaceJourney({ userData }) {
       } else if (nodesWithProtection.has(days[i].date)) {
         // Protected days maintain the streak, but do not increment it (just like Duo)
         // If it's the very first node, it might be 0, but usually this happens mid-streak.
-      } else {
+      } else if (days[i].date < todayKST) {
+        // 어제가 마지막이었고 오늘 아직 안 했더라도, 오늘이 지나기 전까지는 스트릭 유지 (Duo 스타일)
         currentStreakCount = 0;
       }
       days[i].streakRun = currentStreakCount;
@@ -287,26 +288,29 @@ export default function SpaceJourney({ userData }) {
 
   // db의 스트릭이 데이터 기반 계산값보다 낮을 경우 강제 동기화 (헤더 등 상시 노출 영역 정정)
   // ⚠️ IMPORTANT: lastStreakDate는 절대 여기서 수정하지 않음!
-  // lastStreakDate를 코어 소모 없이 오늘로 기록하면, 실제 결석일에 코어가 트리거되지 않는 치명적 버그 발생.
   useEffect(() => {
     const syncStreak = async () => {
-      if (!auth.currentUser || loading) return;
-      if (streak > (userData?.currentStreak || 0)) {
+      if (!auth.currentUser || loading || timelineData.days.length === 0) return;
+      
+      // 실제 히스토리 기반의 현재 스트릭 추출 (오늘 아직 안 했으면 어제까지의 기록)
+      const todayNode = timelineData.days.find(d => d.isToday);
+      const calculatedTrueStreak = todayNode ? todayNode.streakRun : 0;
+
+      if (calculatedTrueStreak > (userData?.currentStreak || 0)) {
         try {
           const updates = {
-            currentStreak: streak,
-            longestStreak: Math.max(userData?.longestStreak || 0, streak)
+            currentStreak: calculatedTrueStreak,
+            longestStreak: Math.max(userData?.longestStreak || 0, calculatedTrueStreak)
           };
-          // lastStreakDate는 실제 학습 완료 시(handleComplete, handleNonQuizActivityComplete)에서만 기록
           await setDoc(doc(db, 'users', auth.currentUser.uid), updates, { merge: true });
-          console.log("🔥 SpaceJourney: Out-of-sync streak repaired to", streak, "(lastStreakDate preserved)");
+          console.log("🔥 SpaceJourney: Out-of-sync streak repaired to", calculatedTrueStreak, "from history");
         } catch (err) {
           console.error("Streak sync failed:", err);
         }
       }
     };
     syncStreak();
-  }, [streak, userData?.currentStreak, loading]);
+  }, [timelineData.days, userData?.currentStreak, loading]);
 
   const handleDayClick = (e, day) => {
     const { clientX, clientY } = e;
