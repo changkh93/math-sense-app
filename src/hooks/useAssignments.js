@@ -137,6 +137,67 @@ export const useAdminAssignments = (clusterId, regionId, dateStr, status) => {
 };
 
 /**
+ * Admin: Search users by name or email
+ */
+export const useAdminUserSearch = (searchTerm) => {
+  return useQuery({
+    queryKey: ['admin', 'users', 'search', searchTerm],
+    queryFn: async () => {
+      if (!searchTerm || searchTerm.trim().length < 2) return [];
+      
+      const usersRef = collection(db, 'users');
+      const snapshot = await getDocs(usersRef);
+      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      const term = searchTerm.toLowerCase();
+      return allUsers.filter(u => 
+        (u.name && u.name.toLowerCase().includes(term)) ||
+        (u.email && u.email.toLowerCase().includes(term)) ||
+        (u.id && u.id.toLowerCase().includes(term))
+      );
+    },
+    enabled: !!searchTerm && searchTerm.trim().length >= 2,
+    staleTime: 1000 * 60 * 5,
+  });
+};
+
+/**
+ * Admin: Get Voyage Log (recent assignments by user and subject)
+ */
+export const useAdminVoyageLog = (userId, clusterId, limitCount = 10) => {
+  return useQuery({
+    queryKey: ['admin', 'voyageLog', userId, clusterId, limitCount],
+    queryFn: async () => {
+      if (!userId || !clusterId) return [];
+      
+      let normalizedClusterId = clusterId;
+      if (clusterId === '초등수학' || clusterId === 'cluster_elementary') normalizedClusterId = 'cluster_elementary';
+      else if (clusterId === '파이썬' || clusterId === 'python') normalizedClusterId = 'python';
+      else if (clusterId === '중등수학' || clusterId === 'middle-math') normalizedClusterId = 'middle-math';
+      else if (clusterId === '서양고전' || clusterId === 'western-classic') normalizedClusterId = 'western-classic';
+
+      let q = query(
+        collection(db, 'assignments'),
+        where('userId', '==', userId),
+        where('clusterId', '==', normalizedClusterId)
+      );
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Sort descending by date
+      const sorted = data.sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        return dateB.localeCompare(dateA); 
+      });
+      
+      return sorted.slice(0, limitCount);
+    },
+    enabled: !!userId && !!clusterId
+  });
+};
+
+/**
  * Admin review & feedback mutation
  */
 export const useReviewAssignment = () => {
@@ -229,5 +290,55 @@ export const useRecordAttendance = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
     }
+  });
+};
+
+/**
+ * Admin: Get all assignments for a specific user across all clusters
+ */
+export const useAdminUserAllAssignments = (userId) => {
+  return useQuery({
+    queryKey: ['admin', 'userAllAssignments', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const q = query(
+        collection(db, 'assignments'),
+        where('userId', '==', userId)
+      );
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return data.sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        return dateB.localeCompare(dateA); 
+      });
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5,
+  });
+};
+
+/**
+ * Admin: Get all attendance for a specific user across all clusters
+ */
+export const useAdminUserAllAttendance = (userId) => {
+  return useQuery({
+    queryKey: ['admin', 'userAllAttendance', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const q = query(
+        collection(db, 'attendance'),
+        where('userId', '==', userId)
+      );
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return data.sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        return dateB.localeCompare(dateA); 
+      });
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5,
   });
 };
