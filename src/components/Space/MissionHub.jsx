@@ -820,6 +820,7 @@ export default function MissionHub({
             const minutes = Math.floor(stampedSetRef.current.size / 60);
             await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
               transmissionId: txId,
+              transmissionTitle: selectedTx?.title || "Main Video",
               stampedSeconds: Array.from(stampedSetRef.current),
               videoTime: currentTime
             })
@@ -858,6 +859,7 @@ export default function MissionHub({
           const currentTime = playerRef.current?.getCurrentTime() || 0;
           await onNonQuizActivityComplete('영상 교신 완료', 20, {
             transmissionId: selectedTx?.id || 'default',
+            transmissionTitle: selectedTx?.title || "Main Video",
             videoTime: currentTime
           })
         }

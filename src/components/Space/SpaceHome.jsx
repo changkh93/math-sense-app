@@ -831,7 +831,7 @@ function SpaceHome() {
     if (!user || isProcessingNonQuiz.current) return
     isProcessingNonQuiz.current = true
 
-    const { transmissionId, stampedSeconds } = activityMetadata
+    const { transmissionId, transmissionTitle, stampedSeconds } = activityMetadata
     const currentUnitId = selectedUnitDocId || quickQuizUnitId || 'unknown'
     
     const userDocRef = doc(db, 'users', user.uid)
@@ -1013,7 +1013,7 @@ function SpaceHome() {
           recordCrystalTransaction(user.uid, {
             amount: actualReward,
             type: isVideoActivity ? 'transmission_reward' : 'data_log_reward',
-            description: `${activeUnit?.title || '탐사'} 보상 (${activityType})`,
+            description: `${transmissionTitle || activeUnit?.title || '탐사'} 보상 (${activityType})`,
             metadata: { unitId: currentUnitId, ...activityMetadata }
           }, transaction, stableTxId)
         }
@@ -1026,7 +1026,7 @@ function SpaceHome() {
           const historyRef = doc(collection(db, 'users', user.uid, 'history'))
           transaction.set(historyRef, {
             unitId: currentUnitId,
-            unitTitle: activeUnit?.title || `탐사 기록 (${activityType})`,
+            unitTitle: transmissionTitle || activeUnit?.title || `탐사 기록 (${activityType})`,
             transmissionId: transmissionId || "",
             regionId: selectedRegionId || activeRegion?.id || "",
             regionTitle: activeRegion?.title || "Unknown Galaxy",
