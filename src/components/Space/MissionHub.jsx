@@ -817,6 +817,7 @@ export default function MissionHub({
           
           if (onNonQuizActivityComplete) {
             const currentTime = playerRef.current?.getCurrentTime() || 0;
+            const minutes = Math.floor(stampedSetRef.current.size / 60);
             await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
               transmissionId: txId,
               stampedSeconds: Array.from(stampedSetRef.current),
