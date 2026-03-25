@@ -379,11 +379,11 @@ export default function CrystalLedger({ userData }) {
           }}>
             <div>
               <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '0.3rem' }}>🚀 탐사 퀴즈</div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
-                <li>정답당 <span style={{color: 'var(--text-bright)'}}>+1</span> 광석</li>
-                <li>3연속 정답 콤보 시 <span style={{color: 'var(--text-bright)'}}>+5</span> 광석</li>
-                <li>최초 100점 달성 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
-                <li>오답 시 <span style={{color: '#f87171'}}>-2</span> 광석 (쉴드 방어 가능)</li>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+                <li>정답 시 <span style={{color: 'var(--text-bright)'}}>+1</span> / 3콤보 <span style={{color: 'var(--text-bright)'}}>+5</span> / 최초 100점 <span style={{color: 'var(--text-bright)'}}>+10</span></li>
+                <li>오답 시 광석 유실 <span style={{color: '#f87171'}}>(1회차 -2, 2회차 -3, 3회차 -4)</span></li>
+                <li>재도전 시 점수 상한 <span style={{color: '#f87171'}}>(2회차 90, 3회차 80, 4회차 70점)</span></li>
+                <li>오답 시 <span style={{color: '#f87171'}}>시스템 복구 대기(3~9초)</span> 발생</li>
               </ul>
             </div>
             <div>
