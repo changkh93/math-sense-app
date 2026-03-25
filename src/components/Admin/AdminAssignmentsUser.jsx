@@ -73,11 +73,19 @@ export default function AdminAssignmentsUser({ onSelectDate }) {
             display: 'flex',
             flexDirection: 'column',
             gap: '0.2rem',
-            cursor: hasAssignments ? 'pointer' : 'default',
-            background: hasAssignments ? 'rgba(0, 212, 255, 0.05)' : 'transparent'
+            cursor: 'pointer',
+            background: hasAssignments ? 'rgba(0, 212, 255, 0.05)' : 'transparent',
+            transition: 'background 0.2s'
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 212, 255, 0.1)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = hasAssignments ? 'rgba(0, 212, 255, 0.05)' : 'transparent'; }}
           onClick={() => {
-            if (hasAssignments) onSelectDate(dayData.assignments);
+            onSelectDate({ 
+              assignments: dayData?.assignments || [], 
+              date: dateStr, 
+              userId: selectedUser?.id,
+              userName: selectedUser?.name
+            });
           }}
         >
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{i}</span>

@@ -33,7 +33,9 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
         userId: assignment.userId,
         feedback,
         status: isApproved ? 'reviewed' : 'needs_revision',
-        bonusCrystals: isApproved ? Number(bonusCrystals) : 0
+        bonusCrystals: isApproved ? Number(bonusCrystals) : 0,
+        previousBonusCrystals: assignment.status === 'reviewed' ? (assignment.bonusCrystals || 0) : 0,
+        previousStatus: assignment.status
       });
       alert("검토 처리되었습니다.");
       if (onReviewed) onReviewed({ ...assignment, status: isApproved ? 'reviewed' : 'needs_revision' });

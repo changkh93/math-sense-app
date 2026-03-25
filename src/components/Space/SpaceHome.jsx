@@ -755,22 +755,14 @@ function SpaceHome() {
         }
       }
 
-      // Record crystal transaction for ledger
-      if (actualCrystalsEarned > 0) {
-        recordCrystalTransaction(user.uid, {
-          amount: actualCrystalsEarned,
-          type: 'quiz_reward',
-          description: `${activeUnit?.title || '탐사 퀴즈'} (${score}점)`,
-          metadata: { unitId: currentUnitId, score }
-        })
-      }
+      // Mastery Compensation removed duplicate check
 
       if (isPerfect && previousBest < 100) {
         soundManager.playLevelUp()
       }
 
       // Trigger streak celebration if milestone reached
-      if (streakCalcResult.meta?.justReachedMilestone) {
+      if (streakCalcResult?.meta?.justReachedMilestone) {
         setStreakCelebration({
           milestone: streakCalcResult.meta.justReachedMilestone,
           currentStreak: streakUpdates.currentStreak || streakCalcResult.meta.newStreak
@@ -782,17 +774,14 @@ function SpaceHome() {
         isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
         rewardMessage,
         streakInfo: {
-          currentStreak: streakUpdates.currentStreak || streakCalcResult.meta.newStreak,
-          freezeUsed: streakCalcResult.meta.freezeUsed,
-          isNewRecord: streakCalcResult.meta.isNewRecord,
-          alreadyDoneToday: streakCalcResult.meta.alreadyDoneToday,
-          justReachedMilestone: streakCalcResult.meta.justReachedMilestone
+          currentStreak: streakUpdates.currentStreak || streakCalcResult?.meta?.newStreak,
+          freezeUsed: streakCalcResult?.meta?.freezeUsed,
+          isNewRecord: streakCalcResult?.meta?.isNewRecord,
+          alreadyDoneToday: streakCalcResult?.meta?.alreadyDoneToday,
+          justReachedMilestone: streakCalcResult?.meta?.justReachedMilestone
         }
       })
       updateSelectedUnitDocId(null)
-      // updateSelectedChapterDocId(null)
-      // updateSelectedRegionId(null)
-      // setCurrentView('dashboard') // No regular navigation, the modal will handle it
     } catch (error) {
       console.error("Error saving quiz result:", error)
     } finally {
@@ -800,9 +789,12 @@ function SpaceHome() {
     }
   }
 
+  const isProcessingNonQuiz = useRef(false)
+
   // Handle streak updates and rewards for non-quiz activities (Data Log, Transmission)
   const handleNonQuizActivityComplete = async (activityType, crystalsEarned = 0, activityMetadata = {}) => {
-    if (!user) return
+    if (!user || isProcessingNonQuiz.current) return
+    isProcessingNonQuiz.current = true
 
     const { transmissionId, stampedSeconds } = activityMetadata
     const currentUnitId = selectedUnitDocId || quickQuizUnitId || 'unknown'
@@ -829,7 +821,7 @@ function SpaceHome() {
           
           if (activityType.includes('완료') && videoProg.completionBonusGiven) {
             actualReward = 0 // Already got completion bonus
-          } else if (activityType.includes('180초')) {
+          } else if (activityType.includes('수신')) {
             // Check based on rewardedStampCount
             const rewardedCount = videoProg.rewardedStampCount || 0
             const currentTotalStamps = stampedSeconds?.length || 0
@@ -886,7 +878,7 @@ function SpaceHome() {
               completionBonusGiven: true,
               updatedAt: serverTimestamp()
             }
-          } else if (activityType.includes('180초') && stampedSeconds) {
+          } else if (activityType.includes('수신') && stampedSeconds) {
              progressUpdates.videoProgress[transmissionId] = {
               ...(freshProgressData.videoProgress?.[transmissionId] || {}),
               rewardedStampCount: stampedSeconds.length,
@@ -956,10 +948,10 @@ function SpaceHome() {
           })
         }
 
-        return { streakCalcResult: streakResult, txUserData: freshUserData, actualReward }
+        return { streakCalcResult: streakResult, streakUpdates, txUserData: freshUserData, actualReward }
       })
 
-      const { streakCalcResult, txUserData, actualReward } = txResult
+      const { streakCalcResult, streakUpdates, txUserData, actualReward } = txResult
 
       // Trigger milestone celebration
       if (streakCalcResult.meta?.justReachedMilestone) {
@@ -987,6 +979,8 @@ function SpaceHome() {
       }
     } catch (err) {
       console.error("Error in activity completion:", err)
+    } finally {
+      isProcessingNonQuiz.current = false
     }
   }
 

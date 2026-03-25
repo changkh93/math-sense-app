@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import NotebookViewer from './NotebookViewer';
+import DailyLearningTimeline from './DailyLearningTimeline';
+import { useLearningHistory } from '../../hooks/useLearningHistory';
 import '../../styles/space-theme.css';
 
 /**
@@ -18,12 +20,14 @@ export default function AssignmentChronicle({ assignments, onClose }) {
 
   const [currentPage, setCurrentPage] = useState(validAssignments.length > 0 ? validAssignments.length - 1 : 0);
   const [showIndex, setShowIndex] = useState(false);
+  const [activeTab, setActiveTab] = useState('report'); 
 
   // Reset page when assignments change
   useEffect(() => {
     if (validAssignments.length > 0 && currentPage >= validAssignments.length) {
       setCurrentPage(validAssignments.length - 1);
     }
+    setActiveTab('report');
   }, [validAssignments, currentPage]);
 
   const nextPage = () => {
@@ -33,6 +37,15 @@ export default function AssignmentChronicle({ assignments, onClose }) {
     if (currentPage > 0) setCurrentPage(p => p - 1);
   };
 
+  const currentLog = validAssignments[currentPage] || {};
+  const isReviewed = currentLog.status === 'reviewed';
+  const isNeedsRevision = currentLog.status === 'needs_revision';
+
+  const { activities, loading: timelineLoading } = useLearningHistory(
+    activeTab === 'timeline' ? currentLog.userId : null, 
+    activeTab === 'timeline' ? currentLog.date : null
+  );
+
   if (validAssignments.length === 0) {
     return (
       <div className="fade-in" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10001, background: 'rgba(5,5,16,0.98)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -41,10 +54,6 @@ export default function AssignmentChronicle({ assignments, onClose }) {
       </div>
     );
   }
-
-  const currentLog = validAssignments[currentPage];
-  const isReviewed = currentLog.status === 'reviewed';
-  const isNeedsRevision = currentLog.status === 'needs_revision';
 
   return (
     <div className="fade-in" style={{ 
@@ -201,78 +210,110 @@ export default function AssignmentChronicle({ assignments, onClose }) {
                 boxShadow: '0 0 30px rgba(0,0,0,0.5)'
               }}
             >
-              {/* Page Header */}
+              {/* Page Header & Tabs */}
               <div style={{ 
-                padding: '1.5rem 2rem', 
+                padding: '1.5rem 2rem 0 2rem', 
                 borderBottom: '1px solid rgba(255,255,255,0.1)', 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
                 flexShrink: 0,
                 background: 'rgba(0,0,0,0.2)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <h3 className="font-title" style={{ fontSize: '1.4rem', color: 'var(--text-bright)', margin: 0 }}>항해 일지</h3>
-                  {/* Status Badge */}
-                  {isReviewed && <span className="font-tech" style={{ background: 'rgba(0,212,255,0.2)', color: 'var(--crystal-cyan)', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid var(--crystal-cyan)' }}>✓ APPROVED</span>}
-                  {isNeedsRevision && <span className="font-tech siren-pulse" style={{ background: 'rgba(255,69,0,0.2)', color: '#ff4500', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #ff4500' }}>⚠ REVISION</span>}
-                  {currentLog.status === 'submitted' && <span className="font-tech" style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #fbbf24' }}>⏳ 검토 대기</span>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <h3 className="font-title" style={{ fontSize: '1.4rem', color: 'var(--text-bright)', margin: 0 }}>항해 일지</h3>
+                    {/* Status Badge */}
+                    {isReviewed && <span className="font-tech" style={{ background: 'rgba(0,212,255,0.2)', color: 'var(--crystal-cyan)', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid var(--crystal-cyan)' }}>✓ APPROVED</span>}
+                    {isNeedsRevision && <span className="font-tech siren-pulse" style={{ background: 'rgba(255,69,0,0.2)', color: '#ff4500', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #ff4500' }}>⚠ REVISION</span>}
+                    {currentLog.status === 'submitted' && <span className="font-tech" style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #fbbf24' }}>⏳ 검토 대기</span>}
+                  </div>
+                  <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '1.1rem' }}>{currentLog.date}</span>
                 </div>
-                <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '1.1rem' }}>{currentLog.date}</span>
+
+                {/* Tabs */}
+                <div style={{ display: 'flex', gap: '2rem' }}>
+                  <button 
+                    onClick={() => setActiveTab('report')}
+                    style={{
+                      background: 'none', border: 'none',
+                      color: activeTab === 'report' ? 'var(--crystal-cyan)' : 'var(--text-muted)',
+                      borderBottom: activeTab === 'report' ? '2px solid var(--crystal-cyan)' : '2px solid transparent',
+                      padding: '0.5rem 1rem', fontSize: '1rem', cursor: 'pointer', fontFamily: 'var(--font-tech)'
+                    }}
+                  >
+                    탐사과제 보고서
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('timeline')}
+                    style={{
+                      background: 'none', border: 'none',
+                      color: activeTab === 'timeline' ? 'var(--crystal-cyan)' : 'var(--text-muted)',
+                      borderBottom: activeTab === 'timeline' ? '2px solid var(--crystal-cyan)' : '2px solid transparent',
+                      padding: '0.5rem 1rem', fontSize: '1rem', cursor: 'pointer', fontFamily: 'var(--font-tech)'
+                    }}
+                  >
+                    일일 학습 기록
+                  </button>
+                </div>
               </div>
 
               {/* Scrollable Content */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
-                
-                {/* Feedback Banner (if exists) - shown at top */}
-                {currentLog.feedback && (
-                  <div style={{ 
-                    marginBottom: '2rem', 
-                    padding: '1.2rem 1.5rem', 
-                    background: isNeedsRevision ? 'rgba(255,69,0,0.08)' : 'rgba(0,212,255,0.08)', 
-                    borderLeft: `4px solid ${isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)'}`,
-                    borderRadius: '0 8px 8px 0'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '1rem' }}>📡</span>
-                      <span className="font-tech" style={{ fontSize: '0.8rem', color: isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)' }}>사령부 피드백</span>
-                      {currentLog.bonusCrystals > 0 && (
-                        <span className="font-tech" style={{ marginLeft: 'auto', color: 'var(--star-gold)', fontSize: '0.85rem' }}>💎 +{currentLog.bonusCrystals}</span>
-                      )}
+                {activeTab === 'report' && (
+                  <>
+                    {/* Feedback Banner (if exists) - shown at top */}
+                    {currentLog.feedback && (
+                      <div style={{ 
+                        marginBottom: '2rem', 
+                        padding: '1.2rem 1.5rem', 
+                        background: isNeedsRevision ? 'rgba(255,69,0,0.08)' : 'rgba(0,212,255,0.08)', 
+                        borderLeft: `4px solid ${isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)'}`,
+                        borderRadius: '0 8px 8px 0'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '1rem' }}>📡</span>
+                          <span className="font-tech" style={{ fontSize: '0.8rem', color: isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)' }}>사령부 피드백</span>
+                          {currentLog.bonusCrystals > 0 && (
+                            <span className="font-tech" style={{ marginLeft: 'auto', color: 'var(--star-gold)', fontSize: '0.85rem' }}>💎 +{currentLog.bonusCrystals}</span>
+                          )}
+                        </div>
+                        <div style={{ color: 'var(--text-bright)', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>
+                          {currentLog.feedback}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Main Written Content */}
+                    <div className="markdown-content" style={{ color: 'var(--text-bright)', lineHeight: '1.8', fontSize: '1.05rem', marginBottom: '2rem' }}>
+                      <ReactMarkdown>{currentLog.content}</ReactMarkdown>
                     </div>
-                    <div style={{ color: 'var(--text-bright)', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>
-                      {currentLog.feedback}
-                    </div>
-                  </div>
+
+                    {/* Inline File Previews */}
+                    {currentLog.attachments?.length > 0 && (
+                      <div style={{ marginBottom: '2rem' }}>
+                        <h4 className="font-tech" style={{ color: 'var(--star-gold)', marginBottom: '1rem', fontSize: '0.9rem' }}>첨부 자료</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {currentLog.attachments.map((att, i) => (
+                            <FilePreview key={i} attachment={att} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Link Previews */}
+                    {currentLog.links?.length > 0 && (
+                      <div style={{ marginBottom: '2rem' }}>
+                        <h4 className="font-tech" style={{ color: 'var(--star-gold)', marginBottom: '1rem', fontSize: '0.9rem' }}>참고 링크</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {currentLog.links.map((lnk, i) => (
+                            <LinkPreview key={i} link={lnk} notebookData={currentLog.notebookData} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {/* Main Written Content */}
-                <div className="markdown-content" style={{ color: 'var(--text-bright)', lineHeight: '1.8', fontSize: '1.05rem', marginBottom: '2rem' }}>
-                  <ReactMarkdown>{currentLog.content}</ReactMarkdown>
-                </div>
-
-                {/* Inline File Previews */}
-                {currentLog.attachments?.length > 0 && (
-                  <div style={{ marginBottom: '2rem' }}>
-                    <h4 className="font-tech" style={{ color: 'var(--star-gold)', marginBottom: '1rem', fontSize: '0.9rem' }}>첨부 자료</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      {currentLog.attachments.map((att, i) => (
-                        <FilePreview key={i} attachment={att} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Link Previews */}
-                {currentLog.links?.length > 0 && (
-                  <div style={{ marginBottom: '2rem' }}>
-                    <h4 className="font-tech" style={{ color: 'var(--star-gold)', marginBottom: '1rem', fontSize: '0.9rem' }}>참고 링크</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      {currentLog.links.map((lnk, i) => (
-                        <LinkPreview key={i} link={lnk} notebookData={currentLog.notebookData} />
-                      ))}
-                    </div>
-                  </div>
+                {activeTab === 'timeline' && (
+                  <DailyLearningTimeline activities={activities} loading={timelineLoading} />
                 )}
               </div>
             </motion.div>

@@ -204,32 +204,36 @@ export const useReviewAssignment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ assignmentId, feedback, status, bonusCrystals, userId }) => {
+    mutationFn: async ({ assignmentId, feedback, status, bonusCrystals, userId, previousBonusCrystals = 0 }) => {
       const ref = doc(db, 'assignments', assignmentId);
       
+      const newBonus = status === 'reviewed' ? (Number(bonusCrystals) || 0) : 0;
+      const crystalDiff = newBonus - previousBonusCrystals;
+
       const updateData = {
         feedback,
         status,
-        bonusCrystals: Number(bonusCrystals) || 0,
+        bonusCrystals: newBonus,
         reviewedAt: serverTimestamp(),
         updatedAt: serverTimestamp() // To trigger revision alerts if admin edits comment
       };
 
       await setDoc(ref, updateData, { merge: true });
 
-      // Award crystals if approved and there's a bonus
-      if (status === 'reviewed' && updateData.bonusCrystals > 0 && userId) {
+      // Award or revoke crystals based on the difference
+      if (crystalDiff !== 0 && userId) {
         // 1. Record in Ledger
         await recordCrystalTransaction(userId, {
-          amount: updateData.bonusCrystals,
-          type: 'teacher_verify',
-          description: `항행 일지 보상 (과제)`
+          amount: crystalDiff,
+          type: crystalDiff > 0 ? 'teacher_verify' : 'teacher_revoke',
+          description: crystalDiff > 0 ? `항행 일지 보상 (과제)` : `항행 일지 보상 취소 (보완 요청)`,
+          metadata: { assignmentId }
         });
 
         // 2. Actually update user balance
         const userRef = doc(db, 'users', userId);
         await updateDoc(userRef, {
-          crystals: increment(updateData.bonusCrystals)
+          crystals: increment(crystalDiff)
         });
       }
     },

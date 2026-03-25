@@ -1,27 +1,31 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
 import AdminAssignmentsList from '../../components/Admin/AdminAssignmentsList';
 import AdminAssignmentsDate from '../../components/Admin/AdminAssignmentsDate';
 import AdminAssignmentsUser from '../../components/Admin/AdminAssignmentsUser';
 import AdminAssignmentDetail from '../../components/Admin/AdminAssignmentDetail';
+import AdminUserDayDetail from '../../components/Admin/AdminUserDayDetail';
 import './Admin.css';
 
 export default function AdminAssignments() {
-  const { user } = useAuth();
   
   // Tabs: 'list', 'date', 'user'
   const [activeTab, setActiveTab] = useState('list');
   
   // Selected items for the right panel
   const [selectedAssignments, setSelectedAssignments] = useState([]);
+  const [selectedUserDateInfo, setSelectedUserDateInfo] = useState(null);
 
   // Helpers to select single or multiple
   const handleSelectSingle = (assignment) => {
     setSelectedAssignments([assignment]);
+    setSelectedUserDateInfo(null);
   };
 
-  const handleSelectMultiple = (assignments) => {
-    setSelectedAssignments(assignments);
+  // Removed handleSelectMultiple as it's no longer used
+
+  const handleSelectUserDate = (info) => {
+    setSelectedUserDateInfo(info);
+    setSelectedAssignments(info.assignments || []);
   };
 
   const handleReviewed = (updatedAssignment) => {
@@ -42,21 +46,21 @@ export default function AdminAssignments() {
           <button 
             className={`admin-btn ${activeTab === 'list' ? 'primary' : 'secondary'}`}
             style={{ padding: '0.5rem 1.5rem', border: activeTab === 'list' ? '' : 'none' }}
-            onClick={() => { setActiveTab('list'); setSelectedAssignments([]); }}
+            onClick={() => { setActiveTab('list'); setSelectedAssignments([]); setSelectedUserDateInfo(null); }}
           >
             📋 목록 보기
           </button>
           <button 
             className={`admin-btn ${activeTab === 'date' ? 'primary' : 'secondary'}`}
             style={{ padding: '0.5rem 1.5rem', border: activeTab === 'date' ? '' : 'none' }}
-            onClick={() => { setActiveTab('date'); setSelectedAssignments([]); }}
+            onClick={() => { setActiveTab('date'); setSelectedAssignments([]); setSelectedUserDateInfo(null); }}
           >
             📅 날짜별 보기
           </button>
           <button 
             className={`admin-btn ${activeTab === 'user' ? 'primary' : 'secondary'}`}
             style={{ padding: '0.5rem 1.5rem', border: activeTab === 'user' ? '' : 'none' }}
-            onClick={() => { setActiveTab('user'); setSelectedAssignments([]); }}
+            onClick={() => { setActiveTab('user'); setSelectedAssignments([]); setSelectedUserDateInfo(null); }}
           >
             🧑‍🚀 학생별 보기
           </button>
@@ -81,17 +85,19 @@ export default function AdminAssignments() {
           )}
           {activeTab === 'user' && (
             <AdminAssignmentsUser 
-              onSelectDate={handleSelectMultiple}
+              onSelectDate={handleSelectUserDate}
             />
           )}
         </div>
 
         {/* Right Panel: Detail View */}
         <div className="admin-card" style={{ flex: '2', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {selectedAssignments.length === 0 ? (
+          {(activeTab !== 'user' && selectedAssignments.length === 0) || (activeTab === 'user' && !selectedUserDateInfo) ? (
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)' }}>
-              왼쪽 목록에서 과제를 선택하세요.
+              왼쪽 목록에서 항목을 선택하세요.
             </div>
+          ) : activeTab === 'user' ? (
+            <AdminUserDayDetail info={selectedUserDateInfo} onReviewed={handleReviewed} />
           ) : (
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {selectedAssignments.length > 1 && (

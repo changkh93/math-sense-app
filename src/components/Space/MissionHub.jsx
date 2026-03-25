@@ -702,7 +702,7 @@ export default function MissionHub({
   }
 
   // ─── Transmission: Bitset stamp tracking ───
-  const handleVideoTimeUpdate = useCallback(({ currentTime, duration, playbackRate }) => {
+  const handleVideoTimeUpdate = useCallback(({ currentTime, duration }) => {
     if (!selectedTx || !userId) return
 
     const currentSecond = Math.floor(currentTime)
@@ -786,7 +786,9 @@ export default function MissionHub({
           rewardLockRef.current = true
           
           if (onNonQuizActivityComplete) {
-            await onNonQuizActivityComplete('영상 교신 수신 (180초)', 10, {
+            const currentTotalSeconds = (totalRewardedCrystalsRef.current / 10) * 180;
+            const minutes = Math.round(currentTotalSeconds / 60);
+            await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
               transmissionId: txId,
               stampedSeconds: Array.from(stampedSetRef.current)
             })
@@ -1438,9 +1440,6 @@ export default function MissionHub({
     if (selectedTx) {
       // Get saved position for resume
       const txId = selectedTx.id || 'default'
-      const savedProgress = learningProgress?.videoProgress?.[txId]
-      // initialStartPosition is already set in useEffect based on savedProgress or selectedTx.start
-      // const startPosition = savedProgress?.lastPosition || selectedTx.start
 
       return (
         <div className="mission-content-view fade-in" style={{ 

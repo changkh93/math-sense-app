@@ -478,7 +478,12 @@ function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendanc
 }
 
 // Detailed Submission Panel
+import { useLearningHistory } from '../../hooks/useLearningHistory';
+import DailyLearningTimeline from './DailyLearningTimeline';
+
 function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submitMutation, onCancel }) {
+  const [activeTab, setActiveTab] = useState('report'); // 'report' or 'timeline'
+  
   const [content, setContent] = useState(assignment?.content || '');
   const [links, setLinks] = useState(assignment?.links || []);
   const [newLink, setNewLink] = useState('');
@@ -489,6 +494,8 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+
+  const { activities, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -658,35 +665,79 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--neon-blue)', paddingBottom: '1rem' }}>
-        <h3 className="font-title" style={{ margin: 0, color: 'var(--text-bright)' }}>탐사 보고서 전송망</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {isNeedsRevision && <span className="siren-pulse font-tech" style={{ color: '#ff4500', fontWeight: 'bold' }}>⚠️ 재검토 요망</span>}
-          {isSubmitted && <span className="pulse-slow font-tech" style={{ color: 'var(--star-gold)' }}>대기중</span>}
-          <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '1.2rem' }}>{dateStr}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', minHeight: 0 }}>
+      {/* Header and Tabs */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--neon-blue)', paddingBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 className="font-title" style={{ margin: 0, color: 'var(--text-bright)' }}>탐사 보고서 전송망</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {isNeedsRevision && <span className="siren-pulse font-tech" style={{ color: '#ff4500', fontWeight: 'bold' }}>⚠️ 재검토 요망</span>}
+            {isSubmitted && <span className="pulse-slow font-tech" style={{ color: 'var(--star-gold)' }}>대기중</span>}
+            <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '1.2rem' }}>{dateStr}</span>
+          </div>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button 
+            className={`space-btn font-tech ${activeTab === 'report' ? 'cosmic-btn active' : ''}`}
+            onClick={() => setActiveTab('report')}
+            style={{ 
+              padding: '0.6rem 1.5rem', 
+              fontSize: '0.9rem',
+              background: activeTab === 'report' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.05)',
+              borderColor: activeTab === 'report' ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.1)'
+            }}
+          >
+            📝 탐사 보고서 전송
+          </button>
+          <button 
+            className={`space-btn font-tech ${activeTab === 'timeline' ? 'cosmic-btn active' : ''}`}
+            onClick={() => setActiveTab('timeline')}
+            style={{ 
+              padding: '0.6rem 1.5rem', 
+              fontSize: '0.9rem',
+              background: activeTab === 'timeline' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.05)',
+              borderColor: activeTab === 'timeline' ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.1)'
+            }}
+          >
+            ⏱️ 일일 학습 기록
+          </button>
         </div>
       </div>
       
-      {/* Feedback Section (if reviewed or needs revision) */}
-      {assignment?.feedback && (
-        <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem', borderLeft: `4px solid ${isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)'}`, background: 'rgba(0,0,0,0.4)' }}>
-          <p className="font-tech" style={{ fontSize: '0.9rem', color: isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span>📡사령부 회신 (COMMAND FEEDBACK)</span>
-          </p>
-          <div style={{ color: 'var(--text-bright)', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-            {assignment.feedback}
-          </div>
+      {/* Daily Learning Timeline View */}
+      {activeTab === 'timeline' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <DailyLearningTimeline 
+            activities={activities} 
+            loading={timelineLoading} 
+            error={timelineError} 
+          />
         </div>
       )}
 
-      {/* Submission Form */}
-      {isReviewed ? (
-        <div style={{ flex: 1, color: 'var(--text-muted)' }}>
-          <p>이 보고서는 사령부 확인이 완료되어 더 이상 수정할 수 없습니다.</p>
-          <div className="glass-card" style={{ marginTop: '2rem', padding: '1.5rem', opacity: 0.8 }}>
-             <h4 style={{ color: 'var(--text-bright)', marginBottom: '1rem' }}>제출된 기록</h4>
-             <div style={{ whiteSpace: 'pre-wrap', fontSize: '1rem', lineHeight: '1.6', color: 'var(--text-muted)' }}>{assignment.content}</div>
+      {/* Report Form View */}
+      {activeTab === 'report' && (
+        <>
+          {/* Feedback Section (if reviewed or needs revision) */}
+          {assignment?.feedback && (
+            <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem', borderLeft: `4px solid ${isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)'}`, background: 'rgba(0,0,0,0.4)' }}>
+              <p className="font-tech" style={{ fontSize: '0.9rem', color: isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>📡사령부 회신 (COMMAND FEEDBACK)</span>
+              </p>
+              <div style={{ color: 'var(--text-bright)', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                {assignment.feedback}
+              </div>
+            </div>
+          )}
+
+          {/* Submission Form */}
+          {isReviewed ? (
+            <div style={{ flex: 1, color: 'var(--text-muted)', overflowY: 'auto' }}>
+              <p>이 보고서는 사령부 확인이 완료되어 더 이상 수정할 수 없습니다.</p>
+              <div className="glass-card" style={{ marginTop: '2rem', padding: '1.5rem', opacity: 0.8 }}>
+                 <h4 style={{ color: 'var(--text-bright)', marginBottom: '1rem' }}>제출된 기록</h4>
+                 <div style={{ whiteSpace: 'pre-wrap', fontSize: '1rem', lineHeight: '1.6', color: 'var(--text-muted)' }}>{assignment.content}</div>
              
              {assignment.attachments?.length > 0 && (
                <div style={{ marginTop: '1.5rem' }}>
@@ -707,9 +758,9 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
                  ))}
                </div>
              )}
+            </div>
           </div>
-        </div>
-      ) : !isWithinWindow ? (
+        ) : !isWithinWindow ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
           <p className="font-tech">
@@ -904,7 +955,9 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
             </button>
           </div>
         </div>
+        )}
+        </>
       )}
     </div>
-  )
+  );
 }
