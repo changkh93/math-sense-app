@@ -68,18 +68,50 @@ export function useLearningHistory(userId, dateStr) {
           fsWhere('timestamp', '<=', endTime)
         );
 
+        // 4. Fetch Assignments (Query from root collection)
+        const assignmentsRef = fsCollection(db, 'assignments');
+        const assignmentsQuery = fsQuery(
+          assignmentsRef,
+          fsWhere('userId', '==', userId),
+          fsWhere('submittedAt', '>=', startTime),
+          fsWhere('submittedAt', '<=', endTime)
+        );
+
         // Execute queries in parallel
-        const [historySnap, txSnap, logsSnap] = await Promise.all([
+        const [historySnap, txSnap, logsSnap, assignmentsSnap] = await Promise.all([
           fsGetDocs(historyQuery).catch(e => { console.warn("Failed to fetch history:", e); return { docs: [] }; }),
           fsGetDocs(txQuery).catch(e => { console.warn("Failed to fetch tx:", e); return { docs: [] }; }),
-          fsGetDocs(logsQuery).catch(e => { console.warn("Failed to fetch logs:", e); return { docs: [] }; })
+          fsGetDocs(logsQuery).catch(e => { console.warn("Failed to fetch logs:", e); return { docs: [] }; }),
+          fsGetDocs(assignmentsQuery).catch(e => { console.warn("Failed to fetch assignments:", e); return { docs: [] }; })
         ]);
 
         const aggregated = [];
+        const stats = {
+          quizCount: 0,
+          logCount: 0,
+          totalVideoSeconds: 0,
+          isAssignmentSubmitted: !assignmentsSnap.empty
+        };
+
+        // Cluster name mapping helper
+        const getClusterName = (cid) => {
+          if (!cid) return '';
+          if (cid.includes('python')) return '파이썬';
+          if (cid.includes('middle')) return '중등수학';
+          if (cid.includes('elementary')) return '초등수학';
+          return cid;
+        };
+
+        const getDocsSafe = (snap) => {
+          if (snap && typeof snap.forEach === 'function') return snap;
+          if (snap && Array.isArray(snap.docs)) return snap.docs;
+          return [];
+        };
 
         // --- Process Quiz History ---
-        historySnap.forEach(doc => {
-          const data = doc.data();
+        getDocsSafe(historySnap).forEach(doc => {
+          const data = doc.data ? doc.data() : doc;
+          stats.quizCount++;
           aggregated.push({
             id: `quiz_${doc.id}`,
             timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
@@ -92,10 +124,11 @@ export function useLearningHistory(userId, dateStr) {
         });
 
         // --- Process Transactions ---
-        txSnap.forEach(doc => {
-          const data = doc.data();
+        getDocsSafe(txSnap).forEach(doc => {
+          const data = doc.data ? doc.data() : doc;
           const tType = data.type || '';
           const desc = data.description || '';
+          const metadata = data.metadata || {};
           
           if (tType === 'quiz_reward') return; 
           if (tType === 'mastery_bonus') return; 
@@ -103,9 +136,14 @@ export function useLearningHistory(userId, dateStr) {
           let displayType = 'general';
           let displayTitle = `💎 광석 획득: ${desc}`;
 
-          if (tType === 'video_reward') {
+          if (tType === 'transmission_reward' || tType === 'video_reward') {
             displayType = 'video_complete';
-            displayTitle = `🎬 영상 수신 완료: ${desc.replace(' 영상 수신', '')}`;
+            displayTitle = `🎬 영상 보상: ${desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '보너스')}`;
+            
+            // Stats: Every 10 crystals in a '수신' type usually means 180s
+            if (desc.includes('수신') && data.amount === 10) {
+              stats.totalVideoSeconds += 180;
+            }
           } else if (tType.includes('agora')) {
             displayType = 'agora_activity';
             displayTitle = `🗣️ 아고라 활동: ${desc}`;
@@ -121,24 +159,46 @@ export function useLearningHistory(userId, dateStr) {
             title: displayTitle,
             score: null,
             crystalsEarned: data.amount || 0,
-            metadata: data
+            metadata: {
+              ...data,
+              videoTime: metadata.videoTime
+            }
           });
         });
 
         // --- Process Activity Logs ---
-        logsSnap.forEach(doc => {
-          const data = doc.data();
+        getDocsSafe(logsSnap).forEach(doc => {
+          const data = doc.data ? doc.data() : doc;
           if (data.action?.includes('DATA LOG')) {
+            stats.logCount++;
             aggregated.push({
               id: `log_${doc.id}`,
               timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
               type: 'data_log_read',
-              title: `📝 데이터 로그 열람${data.unitId ? ' (구역 ID: ' + data.unitId + ')' : ''}`,
+              title: `📝 데이터 로그 열람${data.unitId ? ' (' + (data.unitTitle || data.unitId) + ')' : ''}`,
               score: null,
               crystalsEarned: 0,
               metadata: data
             });
           }
+        });
+
+        // --- Process Assignments ---
+        const assignmentsSnapActual = assignmentsSnap.docs || assignmentsSnap;
+        stats.isAssignmentSubmitted = (assignmentsSnap.empty === false) || (assignmentsSnap.docs && assignmentsSnap.docs.length > 0) || (assignmentsSnap.size > 0);
+        
+        getDocsSafe(assignmentsSnap).forEach(doc => {
+          const data = doc.data ? doc.data() : doc;
+          const clusterName = getClusterName(data.clusterId);
+          aggregated.push({
+            id: `assignment_${doc.id}`,
+            timestamp: data.submittedAt?.toDate ? data.submittedAt.toDate() : new Date(),
+            type: 'assignment_submission',
+            title: `📁 항행 일지 제출${clusterName ? ' (' + clusterName + ')' : ''}: ${data.title || data.unitTitle || '과제'}`,
+            score: null,
+            crystalsEarned: 0,
+            metadata: data
+          });
         });
 
         // Sort all activities by timestamp ascending
@@ -150,13 +210,16 @@ export function useLearningHistory(userId, dateStr) {
 
         if (isMounted) {
           setActivities(aggregated);
+          setDailyStats(stats);
+          setLoading(false);
         }
 
       } catch (err) {
         console.error("Error fetching learning history:", err);
-        if (isMounted) setError(err);
-      } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setError(err);
+          setLoading(false);
+        }
       }
     }
 
@@ -167,5 +230,12 @@ export function useLearningHistory(userId, dateStr) {
     };
   }, [userId, dateStr]);
 
-  return { activities, loading, error };
+  const [dailyStats, setDailyStats] = useState({
+    quizCount: 0,
+    logCount: 0,
+    totalVideoSeconds: 0,
+    isAssignmentSubmitted: false
+  });
+
+  return { activities, dailyStats, loading, error };
 }

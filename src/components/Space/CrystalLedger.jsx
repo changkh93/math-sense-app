@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
 import { db, auth } from '../../firebase'
 import './CrystalLedger.css'
@@ -37,7 +37,7 @@ function formatDateLabel(dateStr) {
   if (dateStr === todayStr) return '오늘'
   if (dateStr === yesterdayStr) return '어제'
 
-  const [y, m, d] = dateStr.split('-')
+  const [, m, d] = dateStr.split('-')
   return `${parseInt(m)}월 ${parseInt(d)}일`
 }
 
@@ -135,12 +135,14 @@ export default function CrystalLedger({ userData }) {
 
   // Running balance (going backwards from current crystals)
   const transactionsWithBalance = useMemo(() => {
-    let balance = crystals
-    return filteredTransactions.map(tx => {
-      const b = balance
-      balance -= (tx.amount || 0)
-      return { ...tx, balance: b }
-    })
+    let currentBalance = crystals
+    const result = []
+    for (let i = 0; i < filteredTransactions.length; i++) {
+      const tx = filteredTransactions[i]
+      result.push({ ...tx, balance: currentBalance })
+      currentBalance = currentBalance - (tx.amount || 0)
+    }
+    return result
   }, [filteredTransactions, crystals])
 
   // Summary stats
@@ -234,13 +236,13 @@ export default function CrystalLedger({ userData }) {
           <div className="ledger-scroll-area">
             {loading ? (
               <div className="ledger-empty-state">
-                <motion.div 
+                <Motion.div 
                   animate={{ rotate: 360 }}
                   transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                   style={{ fontSize: '2.5rem' }}
                 >
                   💎
-                </motion.div>
+                </Motion.div>
                 <p>거래 내역 불러오는 중...</p>
               </div>
             ) : filteredTransactions.length === 0 ? (
@@ -279,7 +281,7 @@ export default function CrystalLedger({ userData }) {
                       const balanceEntry = transactionsWithBalance.find(t => t.id === tx.id)
 
                       return (
-                        <motion.div 
+                        <Motion.div 
                           key={tx.id}
                           className="ledger-tx-row"
                           initial={{ opacity: 0, x: -20 }}
@@ -317,7 +319,7 @@ export default function CrystalLedger({ userData }) {
                               </div>
                             )}
                           </div>
-                        </motion.div>
+                        </Motion.div>
                       )
                     })}
                   </div>
@@ -402,11 +404,19 @@ export default function CrystalLedger({ userData }) {
               </ul>
             </div>
             <div>
-              <div style={{ color: '#00ff88', fontWeight: 'bold', marginBottom: '0.3rem' }}>📡 트랜스미션</div>
+              <div style={{ color: '#00ff88', fontWeight: 'bold', marginBottom: '0.3rem' }}>📡 트랜스미션 (영상)</div>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
                 <li>3분 학습마다 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
-                <li>90% 시청 완료 보너스 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
-                <li>영상 길이에 따라 보상 상한 있음</li>
+                <li>90% 시청 완료 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
+                <li><span style={{color: '#f87171', fontSize: '0.85em'}}>⚠️ 다중 창 및 기기 동시재생 보상 차단 (170초 쿨타임)</span></li>
+                <li><span style={{color: '#f87171', fontSize: '0.85em'}}>⚠️ 영상 시청 보상 1일 상한선: 300 광석</span></li>
+              </ul>
+            </div>
+            <div>
+              <div style={{ color: '#a855f7', fontWeight: 'bold', marginBottom: '0.3rem' }}>📁 항행 일지 (과제)</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
+                <li>과제 제출 및 승인 시 <span style={{color: 'var(--text-bright)'}}>+10 ~ 40</span> 광석</li>
+                <li>제출 내용의 성실도에 따라 본부에서 차등 지급</li>
               </ul>
             </div>
           </div>

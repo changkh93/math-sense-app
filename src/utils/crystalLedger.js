@@ -11,8 +11,9 @@ import { db } from '../firebase'
  * @param {string} tx.description - Human-readable description
  * @param {Object} [tx.metadata] - Optional additional data
  * @param {Object} [transaction] - Optional Firestore Transaction object for atomic writes
+ * @param {string} [txId] - Optional unique ID for the transaction (for idempotency)
  */
-export async function recordCrystalTransaction(userId, { amount, type, description, metadata = {} }, transaction = null) {
+export async function recordCrystalTransaction(userId, { amount, type, description, metadata = {} }, transaction = null, txId = null) {
   if (!userId || (amount === 0 && type !== 'streak_freeze')) return
 
   const txData = {
@@ -24,7 +25,10 @@ export async function recordCrystalTransaction(userId, { amount, type, descripti
   }
 
   try {
-    const txRef = doc(collection(db, 'users', userId, 'crystal_transactions'))
+    const txRef = txId 
+      ? doc(db, 'users', userId, 'crystal_transactions', txId)
+      : doc(collection(db, 'users', userId, 'crystal_transactions'))
+    
     if (transaction) {
       transaction.set(txRef, txData)
     } else {

@@ -3,11 +3,11 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, getDoc, where, getDocs, writeBatch, increment, limit, runTransaction } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit, runTransaction, Timestamp } from 'firebase/firestore'
 import { useClusters, useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
-import { regions as localRegions } from '../../data/regions'
-import { motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
+// import { regions as localRegions } from '../../data/regions'
+import { motion as Motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
 
 // Space Components
 import StarField from './StarField'
@@ -27,7 +27,7 @@ import AssignmentHub from './AssignmentHub' // New Integration
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 
-import { useParticles, createParticleBurst } from './ParticleEffects'
+// import { useParticles, createParticleBurst } from './ParticleEffects'
 import { calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
@@ -41,7 +41,7 @@ import Footer from '../common/Footer'
 import '../../styles/space-theme.css'
 
 function SpaceHome() {
-  const navigate = useNavigate()
+  // const navigate = useNavigate()
   const location = useLocation()
   const { user, userData, loading: authLoading } = useAuth()
   const [history, setHistory] = useState([])
@@ -496,7 +496,7 @@ function SpaceHome() {
     isProcessingSave.current = true
     
     try {
-      const { score, total, correctCount, totalCount, crystalsEarned, isPerfect, shieldsUsed } = result
+      const { score, totalCount, crystalsEarned, isPerfect, shieldsUsed } = result
       if (totalCount === 0) return
 
       // Anti-grinding logic
@@ -564,8 +564,32 @@ function SpaceHome() {
       const userDocRef = doc(db, 'users', user.uid)
       const streakResult = await runTransaction(db, async (transaction) => {
         const freshSnap = await transaction.get(userDocRef)
+        const progressDocRef = doc(db, 'users', user.uid, 'learning_progress', currentUnitId)
+        const freshProgressSnap = await transaction.get(progressDocRef)
+        
         if (!freshSnap.exists()) throw new Error('User document not found')
         const freshUserData = freshSnap.data()
+        const freshProgressData = freshProgressSnap.exists() ? freshProgressSnap.data() : {}
+
+        // --- Server-side Reward Calculation (Prevent duplicate payout) ---
+        const serverPreviousBest = freshProgressData.bestScore || 0
+        let atomicCrystalsEarned = 0
+        if (score > serverPreviousBest) {
+          const improvementRatio = (score - serverPreviousBest) / score
+          atomicCrystalsEarned = Math.round((crystalsEarned || 0) * improvementRatio)
+          
+          if (isPerfect && serverPreviousBest < 100) {
+            const baseCrystals = (crystalsEarned || 0) - 10 
+            atomicCrystalsEarned = Math.max(0, Math.round(baseCrystals * improvementRatio)) + 10
+          } else if (isPerfect && serverPreviousBest === 100) {
+            const baseCrystals = (crystalsEarned || 0) - 10
+            atomicCrystalsEarned = Math.max(0, Math.round(baseCrystals * improvementRatio))
+          }
+          
+          if (!isMemoryCoreMode && checkIsBonusUnit(currentUnitId) && freshUserData?.hasRadar) {
+            atomicCrystalsEarned += 5
+          }
+        }
 
         const prevConsecutiveGood = score >= 90 ? (freshUserData.consecutiveGood || 0) + 1 : 0
         const currentShieldCharges = freshUserData?.shieldCharges || 0
@@ -583,17 +607,17 @@ function SpaceHome() {
           .toISOString().split('T')[0]
 
         const growthUpdates = {}
-        if (actualCrystalsEarned > 0) {
+        if (atomicCrystalsEarned > 0) {
           if (freshUserData.dailyGrowthDate === todayKST) {
-            growthUpdates.dailyGrowth = (freshUserData.dailyGrowth || 0) + actualCrystalsEarned
+            growthUpdates.dailyGrowth = (freshUserData.dailyGrowth || 0) + atomicCrystalsEarned
           } else {
-            growthUpdates.dailyGrowth = actualCrystalsEarned
+            growthUpdates.dailyGrowth = atomicCrystalsEarned
             growthUpdates.dailyGrowthDate = todayKST
           }
           if (freshUserData.weeklyGrowthMonday === mondayKST) {
-            growthUpdates.weeklyGrowth = (freshUserData.weeklyGrowth || 0) + actualCrystalsEarned
+            growthUpdates.weeklyGrowth = (freshUserData.weeklyGrowth || 0) + atomicCrystalsEarned
           } else {
-            growthUpdates.weeklyGrowth = actualCrystalsEarned
+            growthUpdates.weeklyGrowth = atomicCrystalsEarned
             growthUpdates.weeklyGrowthMonday = mondayKST
           }
         }
@@ -630,13 +654,15 @@ function SpaceHome() {
         }
 
         // --- Atomic Logging: Quiz Reward ---
-        if (actualCrystalsEarned > 0) {
+        if (atomicCrystalsEarned > 0) {
+          const stableQuizTxId = `quiz_${currentUnitId}_s${score}`;
+          
           recordCrystalTransaction(user.uid, {
-            amount: actualCrystalsEarned,
+            amount: atomicCrystalsEarned,
             type: 'quiz_reward',
             description: `${activeUnit?.title || '탐사 퀴즈'} (${score}점)`,
             metadata: { unitId: currentUnitId, score }
-          }, transaction)
+          }, transaction, stableQuizTxId)
         }
 
         // --- Atomic Logging: History ---
@@ -649,17 +675,24 @@ function SpaceHome() {
           chapterId: selectedChapterDocId || "",
           clusterId: selectedClusterId,
           score: score,
-          crystalsEarned: actualCrystalsEarned,
+          crystalsEarned: atomicCrystalsEarned,
+          type: result.type === 'workbook' ? 'workbook' : 'quiz',
           timestamp: serverTimestamp()
         })
 
+        // --- Update Progress Doc (Source of truth for bestScore) ---
+        transaction.set(progressDocRef, {
+          bestScore: Math.max(serverPreviousBest, score),
+          updatedAt: serverTimestamp()
+        }, { merge: true })
+
         // Transaction 내에서는 increment()를 쓸 수 없으므로, 직접 계산
         transaction.update(userDocRef, {
-          crystals: (freshUserData.crystals || 0) + actualCrystalsEarned,
+          crystals: (freshUserData.crystals || 0) + atomicCrystalsEarned,
           totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
           totalScore: (freshUserData.totalScore || 0) + score,
           averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
-          perfectCount: (isPerfect && previousBest < 100) ? (freshUserData.perfectCount || 0) + 1 : (freshUserData.perfectCount || 0),
+          perfectCount: (isPerfect && serverPreviousBest < 100) ? (freshUserData.perfectCount || 0) + 1 : (freshUserData.perfectCount || 0),
           consecutiveGood: prevConsecutiveGood,
           shieldDefended: (freshUserData.shieldDefended || 0) + (shieldsUsed || 0),
           dailyQuizCount: dailyQuizCount,
@@ -670,11 +703,11 @@ function SpaceHome() {
           ...streakUpdates
         })
 
-        return { result, freshUserData }
+        return { result, freshUserData, atomicCrystalsEarned }
       })
 
       // Transaction 밖에서 부수효과 처리 (트랜잭션 성공 후)
-      const { result: streakCalcResult, freshUserData: txUserData } = streakResult
+      const { result: streakCalcResult, atomicCrystalsEarned: finalCrystals } = streakResult
       const streakUpdates = streakCalcResult.streakUpdate || {}
 
       // Save wrong questions / Delete recovered questions for Recovery Planet
@@ -770,9 +803,11 @@ function SpaceHome() {
       }
 
       setCompletionResult({
-        crystalsEarned: actualCrystalsEarned,
+        crystalsEarned: finalCrystals,
         isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
-        rewardMessage,
+        rewardMessage: finalCrystals > 0 
+          ? `${score}점으로 최고 기록을 경신했습니다! (+${finalCrystals} 광석)`
+          : (score === 100 ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)" : `최고 점수를 넘지 못해 추가 광석을 획득할 수 없습니다.`),
         streakInfo: {
           currentStreak: streakUpdates.currentStreak || streakCalcResult?.meta?.newStreak,
           freezeUsed: streakCalcResult?.meta?.freezeUsed,
@@ -827,6 +862,22 @@ function SpaceHome() {
             const currentTotalStamps = stampedSeconds?.length || 0
             if (currentTotalStamps <= rewardedCount) {
               actualReward = 0 // No new stamps to reward
+            } else {
+              // --- Multi-Device / Concurrent Video Exploit Prevention ---
+              const now = Timestamp.now()
+              if (freshUserData.lastVideoRewardTime) {
+                // Support both Timestamp objects and serialized ones
+                const lastTimeSec = freshUserData.lastVideoRewardTime.seconds 
+                                    || freshUserData.lastVideoRewardTime._seconds 
+                                    || 0;
+                if (lastTimeSec > 0) {
+                  const diffSeconds = now.seconds - lastTimeSec
+                  // 170 seconds cooldown required between consecutive 180s watch rewards
+                  if (diffSeconds < 170) {
+                    actualReward = 0
+                  }
+                }
+              }
             }
           }
         } else if (isLogActivity) {
@@ -843,6 +894,33 @@ function SpaceHome() {
           lastActive: serverTimestamp(),
           ...streakUpdates
         }
+        
+        // Calculate KST Date
+        const kstNow = new Date(Date.now() + 9 * 3600000)
+        const todayKST = kstNow.toISOString().split('T')[0]
+
+        // --- Daily Video Reward Cap (Prevent infinite farming) ---
+        if (actualReward > 0 && isVideoActivity && activityType.includes('수신')) {
+          let dailyVideoCrystals = freshUserData.dailyVideoCrystals || 0
+          if (freshUserData.dailyVideoDate !== todayKST) {
+            dailyVideoCrystals = 0
+          }
+          
+          const DAILY_VIDEO_CAP = 300 // Max 300 crystals per day from video watch time (~90 mins)
+          if (dailyVideoCrystals >= DAILY_VIDEO_CAP) {
+            actualReward = 0
+          } else if (dailyVideoCrystals + actualReward > DAILY_VIDEO_CAP) {
+            actualReward = DAILY_VIDEO_CAP - dailyVideoCrystals
+          }
+
+          if (actualReward > 0) {
+            userUpdates.dailyVideoCrystals = dailyVideoCrystals + actualReward
+            userUpdates.dailyVideoDate = todayKST
+            // Also update the global cooldown
+            userUpdates.lastVideoRewardTime = Timestamp.now()
+          }
+        }
+
         // Safety Guard: Ensure actualReward is a valid number
         if (isNaN(actualReward) || actualReward === undefined) {
           console.warn("SpaceHome: actualReward is NaN or undefined in handleNonQuizActivityComplete, resetting to 0")
@@ -920,12 +998,16 @@ function SpaceHome() {
         }
 
         if (actualReward > 0) {
+          const stableTxId = isLogActivity 
+            ? `log_${currentUnitId}` 
+            : (activityType.includes('완료') ? `video_bonus_${currentUnitId}_${transmissionId}` : null);
+
           recordCrystalTransaction(user.uid, {
             amount: actualReward,
             type: isVideoActivity ? 'transmission_reward' : 'data_log_reward',
             description: `${activeUnit?.title || '탐사'} 보상 (${activityType})`,
             metadata: { unitId: currentUnitId, ...activityMetadata }
-          }, transaction)
+          }, transaction, stableTxId)
         }
 
         // --- Atomic Logging: History ---
@@ -1033,13 +1115,13 @@ function SpaceHome() {
           fontSize: '1.5rem',
           fontWeight: 700
         }}>
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
           >
             🚀 워프 엔진 가동 중...
-          </motion.div>
+          </Motion.div>
         </div>
       </div>
     )
@@ -1114,15 +1196,15 @@ function SpaceHome() {
           }}>
             {/* 타이틀 섹션 */}
             <div className="login-header" style={{ width: '100%', pointerEvents: 'none' }}>
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 1.5, ease: "easeOut" }}
                 style={{ display: 'flex', justifyContent: 'center', marginBottom: isMobile ? '1rem' : '2rem' }}
               >
                 <img src="/m-logo.svg" alt="Meta Sense Logo" style={{ width: isMobile ? '80px' : '120px', filter: 'drop-shadow(0 0 20px rgba(0, 243, 255, 0.5))' }} />
-              </motion.div>
-              <motion.div 
+              </Motion.div>
+              <Motion.div 
                 initial="hidden"
                 animate="visible"
                 className="font-title"
@@ -1141,7 +1223,7 @@ function SpaceHome() {
                      {word.split("").map((char, j) => {
                        const index = i * 10 + j
                        return (
-                         <motion.span
+                         <Motion.span
                            key={j}
                            custom={index}
                            variants={letterVariants}
@@ -1155,15 +1237,15 @@ function SpaceHome() {
                            }}
                          >
                            {char}
-                         </motion.span>
+                         </Motion.span>
                        )
                      })}
                      <span style={{ width: isMobile ? '0.6rem' : '1.2rem' }}></span>
                   </div>
                 ))}
-              </motion.div>
+              </Motion.div>
               
-              <motion.p 
+              <Motion.p 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1 }}
@@ -1177,11 +1259,11 @@ function SpaceHome() {
                 }}
               >
                 SYSTEM ONLINE. WAITING FOR PILOT.
-              </motion.p>
+              </Motion.p>
             </div>
             
             {/* 컨트롤 섹션: 버튼 + 토글 가로 배치 */}
-            <motion.div 
+            <Motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.2 }}
@@ -1195,7 +1277,7 @@ function SpaceHome() {
                 marginTop: '1rem'
               }}
             >
-              <motion.button 
+              <Motion.button 
                 whileHover={{ scale: 1.05, boxShadow: "0 0 30px var(--neon-blue)" }}
                 whileTap={{ scale: 0.95 }}
                 className="glass-card font-title"
@@ -1213,8 +1295,8 @@ function SpaceHome() {
                 }}
               >
                 시스템 접속 (LOGIN)
-              </motion.button>
-            </motion.div>
+              </Motion.button>
+            </Motion.div>
           </div>
         </div>
         <div style={{ width: '100%', zIndex: 100, marginTop: 'auto' }}>
@@ -1324,7 +1406,7 @@ function SpaceHome() {
       {/* 3D Background Scene - Always Visible but controlled by state */}
       <AnimatePresence>
         {currentView === 'planet' && selectedClusterId && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1359,7 +1441,7 @@ function SpaceHome() {
               equipment={equipment}
               isBoosting={isBoosting}
             />
-          </motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
 
@@ -1460,13 +1542,13 @@ function SpaceHome() {
                     🚀 행성 군집 목록 (Multi-Verse)
                   </button>
                 )}
-                <motion.div
+                <Motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 1 }}
                 >
                   {equipment.engine && (
-                    <motion.p 
+                    <Motion.p 
                       className="font-tech" 
                       style={{ 
                         color: 'var(--star-gold)', 
@@ -1480,9 +1562,9 @@ function SpaceHome() {
                       }}
                     >
                       (BOOST: SPACE BAR)
-                    </motion.p>
+                    </Motion.p>
                   )}
-                </motion.div>
+                </Motion.div>
               </div>
             ) : !selectedChapterDocId ? (
               // Chapter Selection (Overlay)
@@ -1536,7 +1618,7 @@ function SpaceHome() {
                     {loadingChapters ? (
                       <div className="font-tech" style={{ color: 'var(--text-muted)' }}>SCANNING...</div>
                     ) : chapters?.map(chapter => (
-                      <motion.div
+                      <Motion.div
                         key={chapter.docId}
                         whileHover={{ scale: 1.02, backgroundColor: 'rgba(0, 243, 255, 0.1)' }}
                         className="glass-card hud-border"
@@ -1585,7 +1667,7 @@ function SpaceHome() {
                         ) : (
                           <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>스캔 중...</p>
                         )}
-                      </motion.div>
+                      </Motion.div>
                     ))}
                   </div>
 
@@ -1688,7 +1770,7 @@ function SpaceHome() {
                       const bestScore = bestScores[unit.docId]
 
                       return (
-                        <motion.button
+                        <Motion.button
                           key={unit.docId}
                           whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
                           className={`glass-card hud-border ${isOverallCompleted ? 'completed' : ''}`}
@@ -1772,7 +1854,7 @@ function SpaceHome() {
                               {isOverallCompleted ? 'REPLAY' : '🚀 START'}
                             </span>
                           </div>
-                        </motion.button>
+                        </Motion.button>
                       )
                     })}
                   </div>
@@ -1840,7 +1922,7 @@ function SpaceHome() {
       {/* 우주 테마 학습 완료 모달 */}
       <AnimatePresence>
         {completionResult && (
-          <motion.div 
+          <Motion.div 
             className="modal-overlay space-hud"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1859,7 +1941,7 @@ function SpaceHome() {
               justifyContent: 'center'
             }}
           >
-            <motion.div 
+            <Motion.div 
               className="glass-card hud-border completion-modal-space"
               initial={{ scale: 0.8, y: 50, rotateX: 20 }}
               animate={{ scale: 1, y: 0, rotateX: 0 }}
@@ -1943,8 +2025,8 @@ function SpaceHome() {
                 </button>
               </div>
               <div className="hud-line mt-4"></div>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
 

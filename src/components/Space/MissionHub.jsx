@@ -112,6 +112,31 @@ const YoutubePlayer = React.forwardRef(({ videoId, start, end, onComplete, onTim
     }
   }, [])
 
+  const tabIdRef = useRef(Math.random().toString(36).substring(2, 9))
+  const channelRef = useRef(null)
+
+  useEffect(() => {
+    if (window.BroadcastChannel) {
+      const channel = new BroadcastChannel('math_sense_video_sync')
+      channelRef.current = channel
+
+      channel.onmessage = (event) => {
+        if (event.data.type === 'START_PLAYING' && event.data.tabId !== tabIdRef.current) {
+          if (playerRef.current && typeof playerRef.current.getPlayerState === 'function') {
+            const state = playerRef.current.getPlayerState()
+            if (state === window.YT?.PlayerState?.PLAYING) {
+              playerRef.current.pauseVideo()
+              console.warn("Paused video because another tab started streaming.")
+            }
+          }
+        }
+      }
+    }
+    return () => {
+      if (channelRef.current) channelRef.current.close()
+    }
+  }, [])
+
   useEffect(() => {
     if (!window.YT) {
       const tag = document.createElement('script')
@@ -166,6 +191,11 @@ const YoutubePlayer = React.forwardRef(({ videoId, start, end, onComplete, onTim
             }, 200) // Much higher frequency to catch seeking/timeline drags
           },
           'onStateChange': (event) => {
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              if (channelRef.current) {
+                channelRef.current.postMessage({ type: 'START_PLAYING', tabId: tabIdRef.current })
+              }
+            }
             if (event.data === window.YT.PlayerState.ENDED) {
               // Force one last time update before ending, crucial for capturing short remaining playbacks
               if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
@@ -786,11 +816,11 @@ export default function MissionHub({
           rewardLockRef.current = true
           
           if (onNonQuizActivityComplete) {
-            const currentTotalSeconds = (totalRewardedCrystalsRef.current / 10) * 180;
-            const minutes = Math.round(currentTotalSeconds / 60);
+            const currentTime = playerRef.current?.getCurrentTime() || 0;
             await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
               transmissionId: txId,
-              stampedSeconds: Array.from(stampedSetRef.current)
+              stampedSeconds: Array.from(stampedSetRef.current),
+              videoTime: currentTime
             })
           }
           
@@ -824,8 +854,10 @@ export default function MissionHub({
         videoCompletionBonusGivenRef.current = true
 
         if (onNonQuizActivityComplete) {
+          const currentTime = playerRef.current?.getCurrentTime() || 0;
           await onNonQuizActivityComplete('영상 교신 완료', 20, {
-            transmissionId: txId
+            transmissionId: selectedTx?.id || 'default',
+            videoTime: currentTime
           })
         }
 

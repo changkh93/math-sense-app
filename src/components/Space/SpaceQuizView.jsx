@@ -49,7 +49,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
       }));
       const shuffled = allQ.sort(() => Math.random() - 0.5)
-      const selected = shuffled.slice(0, 20)
+      const selected = shuffled // Use all available questions
       setCurrentQuestions(selected)
       setAllSessionQuestions(selected)
       setOriginalTotal(selected.length)

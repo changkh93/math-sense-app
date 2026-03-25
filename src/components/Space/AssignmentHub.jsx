@@ -495,7 +495,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
 
-  const { activities, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
+  const { activities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -710,6 +710,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <DailyLearningTimeline 
             activities={activities} 
+            dailyStats={dailyStats}
             loading={timelineLoading} 
             error={timelineError} 
           />

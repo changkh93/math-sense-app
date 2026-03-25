@@ -7,7 +7,14 @@ import { motion } from 'framer-motion';
  * @param {boolean} loading - Loading state
  * @param {Error} error - Error state
  */
-export default function DailyLearningTimeline({ activities, loading, error }) {
+/**
+ * Renders a vertical timeline of learning activities for a specific date.
+ * @param {Array} activities - Sorted array of activity objects from useLearningHistory
+ * @param {Object} dailyStats - Aggregated stats (quizCount, logCount, totalVideoSeconds, isAssignmentSubmitted)
+ * @param {boolean} loading - Loading state
+ * @param {Error} error - Error state
+ */
+export default function DailyLearningTimeline({ activities, dailyStats, loading, error }) {
   if (loading) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }} className="font-tech">
@@ -28,7 +35,7 @@ export default function DailyLearningTimeline({ activities, loading, error }) {
   if (!activities || activities.length === 0) {
     return (
       <div style={{ padding: '3rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }} className="glass-card">
-        <div style={{ fontSize: '3rem', opacity: 0.5, marginBottom: '1rem' }}>🏜️</div>
+        <div style={{ fontSize: '3rem', opacity: 0.5, marginBottom: '1rem' }}> Desert... 🏜️</div>
         <h3 className="font-title" style={{ color: 'var(--text-bright)', marginBottom: '0.5rem' }}>기록 없음</h3>
         <p className="font-tech" style={{ fontSize: '0.9rem' }}>해당 날짜의 탐사 기록이 존재하지 않습니다.</p>
       </div>
@@ -38,27 +45,74 @@ export default function DailyLearningTimeline({ activities, loading, error }) {
   // Calculate total crystals for the day
   const totalEarned = activities.reduce((sum, act) => sum + (act.crystalsEarned || 0), 0);
 
+  // Helper for video time formatting
+  const formatSeconds = (sec) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
+
   return (
     <div style={{ padding: '1rem' }}>
       {/* Daily Summary Header */}
       <div className="glass-card" style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        padding: '1rem 1.5rem',
+        padding: '1.2rem 1.5rem',
         marginBottom: '2rem',
-        background: 'rgba(0, 212, 255, 0.05)',
-        border: '1px solid rgba(0, 212, 255, 0.2)'
+        background: 'rgba(0, 212, 255, 0.08)',
+        border: '1px solid rgba(0, 212, 255, 0.2)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
       }}>
-        <div>
-          <h3 className="font-title" style={{ margin: 0, color: 'var(--text-bright)', fontSize: '1.2rem' }}>일일 활동 요약</h3>
-          <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>총 {activities.length}개의 기록된 활동</span>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '1.5rem', fontWeight: 'bold' }}>
-            +{totalEarned} 💎
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div>
+            <h3 className="font-title" style={{ margin: 0, color: 'var(--text-bright)', fontSize: '1.3rem', letterSpacing: '1px' }}>
+              DAILY EXPEDITION SUMMARY
+            </h3>
+            <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              총 {activities.length}개의 기록된 활동
+            </span>
           </div>
-          <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>획득한 수호석</span>
+          <div style={{ textAlign: 'right' }}>
+            <div className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '1.6rem', fontWeight: 'bold', textShadow: '0 0 10px rgba(255,215,0,0.3)' }}>
+              +{totalEarned} 💎
+            </div>
+            <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>획득한 수호석</span>
+          </div>
+        </div>
+
+        {/* Detailed Stats Row */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
+          gap: '1rem',
+          padding: '1rem',
+          background: 'rgba(0,0,0,0.3)',
+          borderRadius: '12px',
+          border: '1px solid rgba(255,255,255,0.05)'
+        }}>
+          <div className="font-tech" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>🚀 퀴즈 탐사</span>
+            <span style={{ color: 'var(--text-bright)', fontSize: '1rem', fontWeight: 'bold' }}>{dailyStats?.quizCount || 0}회</span>
+          </div>
+          <div className="font-tech" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>📝 데이터 로그</span>
+            <span style={{ color: 'var(--text-bright)', fontSize: '1rem', fontWeight: 'bold' }}>{dailyStats?.logCount || 0}개</span>
+          </div>
+          <div className="font-tech" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>🎬 동영상 학습</span>
+            <span style={{ color: 'var(--crystal-cyan)', fontSize: '1rem', fontWeight: 'bold' }}>
+              {formatSeconds(dailyStats?.totalVideoSeconds || 0)}
+            </span>
+          </div>
+          <div className="font-tech" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>📁 항행 일지</span>
+            <span style={{ 
+              color: dailyStats?.isAssignmentSubmitted ? 'var(--neon-blue)' : '#f87171', 
+              fontSize: '1rem', 
+              fontWeight: 'bold' 
+            }}>
+              {dailyStats?.isAssignmentSubmitted ? '제출 완료' : '미제출'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -110,7 +164,15 @@ export default function DailyLearningTimeline({ activities, loading, error }) {
             iconBg = 'rgba(0, 212, 255, 0.1)';
             iconColor = 'var(--neon-blue)';
             borderColor = 'var(--neon-blue)';
+          } else if (act.type === 'assignment_submission') {
+            icon = '📁';
+            iconBg = 'rgba(168, 85, 247, 0.2)';
+            iconColor = '#a855f7';
+            borderColor = '#a855f7';
           }
+
+          const videoTime = act.metadata?.videoTime || act.metadata?.metadata?.videoTime;
+          const formattedVideoTime = videoTime ? formatSeconds(Math.floor(videoTime)) : null;
 
           return (
             <motion.div 
@@ -165,29 +227,48 @@ export default function DailyLearningTimeline({ activities, loading, error }) {
                   )}
                 </div>
 
-                {/* Additional Details based on type */}
-                {act.type === 'quiz_pass' && act.score !== null && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.3rem' }}>
+                {/* Additional Details row */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', marginTop: '0.2rem' }}>
+                  {/* Quiz Score */}
+                  {act.type === 'quiz_pass' && act.score !== null && (
                     <div style={{ 
                       background: 'rgba(0,0,0,0.5)', 
-                      padding: '0.3rem 0.8rem', 
+                      padding: '0.2rem 0.6rem', 
                       borderRadius: '4px', 
                       display: 'inline-flex', 
                       alignItems: 'center', 
-                      gap: '0.5rem',
+                      gap: '0.4rem',
                       border: '1px solid rgba(255,255,255,0.05)'
                     }}>
-                      <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>SCORE</span>
+                      <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>SCORE</span>
                       <span className="font-tech" style={{ 
                         color: act.score === 100 ? 'var(--star-gold)' : (act.score >= 80 ? 'var(--crystal-cyan)' : '#ef4444'),
-                        fontSize: '1.1rem',
+                        fontSize: '0.9rem',
                         fontWeight: 'bold'
                       }}>
                         {act.score}
                       </span>
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {/* Video Position */}
+                  {formattedVideoTime && (
+                    <div style={{ 
+                      background: 'rgba(0,243,255,0.05)', 
+                      padding: '0.2rem 0.6rem', 
+                      borderRadius: '4px', 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '0.4rem',
+                      border: '1px solid rgba(0,243,255,0.1)'
+                    }}>
+                      <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.75rem' }}>POSITION</span>
+                      <span className="font-tech" style={{ color: 'var(--text-bright)', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                        {formattedVideoTime} 지점 시청
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           );
