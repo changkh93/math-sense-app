@@ -1091,15 +1091,35 @@ export default function MissionHub({
 
     return (
     <div className="mission-dashboard fade-in" style={{ width: '100%', height: '100%', overflowY: 'auto', paddingBottom: '3rem' }}>
-      <div style={{ maxWidth: '1200px', width: '90%', margin: '0 auto', paddingTop: '3rem' }}>
-      <h2 className="font-title" style={{ 
-        textAlign: 'center', 
-        fontSize: '2rem', 
-        marginBottom: '2rem',
-        textShadow: '0 0 10px var(--crystal-cyan)'
-      }}>
-        MISSION CONTROL: {activeUnit?.title || "비밀 작전 구역"}
-      </h2>
+      <div style={{ maxWidth: '1200px', width: '95%', margin: '0 auto', paddingTop: '1.5rem', position: 'relative' }}>
+        {/* Unified Top-Left Back Link */}
+        <button 
+          className="space-nav-link font-tech"
+          onClick={onBack}
+          style={{ 
+            marginBottom: '1rem',
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            padding: '0.5rem 0',
+            fontSize: '1rem',
+            display: 'block'
+          }}
+          onMouseEnter={(e) => e.target.style.color = 'var(--neon-blue)'}
+          onMouseLeave={(e) => e.target.style.color = 'var(--text-muted)'}
+        >
+          ← RETURN TO MISSION SELECT
+        </button>
+
+        <h2 className="font-title" style={{ 
+          textAlign: 'center', 
+          fontSize: '2rem', 
+          marginBottom: '2rem',
+          textShadow: '0 0 10px var(--crystal-cyan)'
+        }}>
+          MISSION CONTROL: {activeUnit?.title || "비밀 작전 구역"}
+        </h2>
 
       <UnitLeaderboard 
         user={user} 

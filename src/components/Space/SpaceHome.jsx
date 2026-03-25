@@ -1594,6 +1594,19 @@ function SpaceHome() {
                       </motion.div>
                     ))}
                   </div>
+
+                  {/* Unified Bottom Back Button */}
+                  <button 
+                    className="hud-btn secondary glass"
+                    onClick={() => { updateSelectedRegionId(null); soundManager.playClick() }}
+                    style={{ 
+                      display: 'block', 
+                      margin: '3rem auto 0',
+                      padding: '0.8rem 2.5rem'
+                    }}
+                  >
+                    ← RETURN TO GALAXY
+                  </button>
                 </div>
               </div>
             ) : (
@@ -1769,6 +1782,27 @@ function SpaceHome() {
                       )
                     })}
                   </div>
+
+                  {/* Unified Bottom Back Button */}
+                  <button 
+                    className="hud-btn secondary glass"
+                    onClick={() => {
+                      soundManager.playClick()
+                      if (chapters?.length === 1) {
+                        updateSelectedChapterDocId(null)
+                        updateSelectedRegionId(null)
+                      } else {
+                        updateSelectedChapterDocId(null)
+                      }
+                    }}
+                    style={{ 
+                      display: 'block', 
+                      margin: '3rem auto 0',
+                      padding: '0.8rem 2.5rem'
+                    }}
+                  >
+                    ← RETURN TO SECTOR
+                  </button>
                 </div>
               </div>
             )}
