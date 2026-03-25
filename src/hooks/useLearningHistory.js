@@ -165,6 +165,10 @@ export function useLearningHistory(userId, dateStr) {
           let displayTitle = `💎 광석 획득: ${desc}`;
 
           if (tType === 'transmission_reward' || tType === 'video_reward') {
+            // Avoid duplication: Completion bonus (+20) is already handled by 'history' records
+            // only include interval rewards (+10) in the transactions section
+            if (data.amount === 20 || desc.includes('완료')) return;
+
             displayType = 'video_complete';
             displayTitle = `🎬 영상 보상: ${desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '보너스')}`;
             

@@ -853,30 +853,33 @@ function SpaceHome() {
 
         if (isVideoActivity && transmissionId) {
           const videoProg = freshProgressData.videoProgress?.[transmissionId] || {}
-          
-          if (activityType.includes('완료') && videoProg.completionBonusGiven) {
-            actualReward = 0 // Already got completion bonus
-          } else if (activityType.includes('수신')) {
-            // Check based on rewardedStampCount
-            const rewardedCount = videoProg.rewardedStampCount || 0
-            const currentTotalStamps = stampedSeconds?.length || 0
-            if (currentTotalStamps <= rewardedCount) {
-              actualReward = 0 // No new stamps to reward
-            } else {
-              // --- Multi-Device / Concurrent Video Exploit Prevention ---
-              const now = Timestamp.now()
-              if (freshUserData.lastVideoRewardTime) {
-                // Support both Timestamp objects and serialized ones
-                const lastTimeSec = freshUserData.lastVideoRewardTime.seconds 
-                                    || freshUserData.lastVideoRewardTime._seconds 
-                                    || 0;
-                if (lastTimeSec > 0) {
-                  const diffSeconds = now.seconds - lastTimeSec
-                  // 170 seconds cooldown required between consecutive 180s watch rewards
-                  if (diffSeconds < 170) {
-                    actualReward = 0
-                  }
-                }
+          const isInterval = activityType.includes('수신')
+          const isCompletion = activityType.includes('완료')
+
+          // --- Multi-Device / Concurrent Video Exploit Prevention (170s Cooldown) ---
+          // Apply cooldown only to interval rewards to allow completion bonus (+20) 
+          // to immediately follow an interval reward (+10) for the same video.
+          if (isInterval && freshUserData.lastVideoRewardTime) {
+            const lastTimeSec = freshUserData.lastVideoRewardTime.seconds 
+                                || freshUserData.lastVideoRewardTime._seconds 
+                                || 0;
+            if (lastTimeSec > 0) {
+              const diffSeconds = Timestamp.now().seconds - lastTimeSec
+              if (diffSeconds < 170) {
+                actualReward = 0
+              }
+            }
+          }
+
+          if (actualReward > 0) {
+            if (isCompletion && videoProg.completionBonusGiven) {
+              actualReward = 0 // Already got completion bonus
+            } else if (isInterval) {
+              // Check based on rewardedStampCount
+              const rewardedCount = videoProg.rewardedStampCount || 0
+              const currentTotalStamps = stampedSeconds?.length || 0
+              if (currentTotalStamps <= rewardedCount) {
+                actualReward = 0 // No new stamps to reward
               }
             }
           }
@@ -896,17 +899,17 @@ function SpaceHome() {
         }
         
         // Calculate KST Date
-        const kstNow = new Date(Date.now() + 9 * 3600000)
-        const todayKST = kstNow.toISOString().split('T')[0]
+        const todayKST = getTodayKST()
 
         // --- Daily Video Reward Cap (Prevent infinite farming) ---
-        if (actualReward > 0 && isVideoActivity && activityType.includes('수신')) {
+        // Apply cap to both interval and completion rewards
+        if (actualReward > 0 && isVideoActivity) {
           let dailyVideoCrystals = freshUserData.dailyVideoCrystals || 0
           if (freshUserData.dailyVideoDate !== todayKST) {
             dailyVideoCrystals = 0
           }
           
-          const DAILY_VIDEO_CAP = 300 // Max 300 crystals per day from video watch time (~90 mins)
+          const DAILY_VIDEO_CAP = 300 // Max 300 crystals per day from video activities
           if (dailyVideoCrystals >= DAILY_VIDEO_CAP) {
             actualReward = 0
           } else if (dailyVideoCrystals + actualReward > DAILY_VIDEO_CAP) {
@@ -916,8 +919,8 @@ function SpaceHome() {
           if (actualReward > 0) {
             userUpdates.dailyVideoCrystals = dailyVideoCrystals + actualReward
             userUpdates.dailyVideoDate = todayKST
-            // Also update the global cooldown
-            userUpdates.lastVideoRewardTime = Timestamp.now()
+            // Update the global video reward timestamp whenever ANY video reward is given
+            userUpdates.lastVideoRewardTime = serverTimestamp()
           }
         }
 
@@ -942,32 +945,27 @@ function SpaceHome() {
         }
         transaction.update(userDocRef, userUpdates)
 
-        // Update Progress Doc (Idempotent update)
-        const progressUpdates = {}
+        // Update Progress Doc (Idempotent update using dot notation to avoid overwriting maps)
         if (isLogActivity && !freshProgressData.logRead) {
-          progressUpdates.logRead = true
-          progressUpdates.logReadAt = serverTimestamp()
+          transaction.set(progressDocRef, {
+            logRead: true,
+            logReadAt: serverTimestamp()
+          }, { merge: true })
         } else if (isVideoActivity && transmissionId) {
-          if (!progressUpdates.videoProgress) progressUpdates.videoProgress = {}
+          const baseKey = `videoProgress.${transmissionId}`
           if (activityType.includes('완료')) {
-            progressUpdates.videoProgress[transmissionId] = {
-              ...(freshProgressData.videoProgress?.[transmissionId] || {}),
-              completed: true,
-              completionBonusGiven: true,
-              updatedAt: serverTimestamp()
-            }
+             transaction.set(progressDocRef, {
+               [`${baseKey}.completed`]: true,
+               [`${baseKey}.completionBonusGiven`]: true,
+               [`${baseKey}.updatedAt`]: serverTimestamp()
+             }, { merge: true })
           } else if (activityType.includes('수신') && stampedSeconds) {
-             progressUpdates.videoProgress[transmissionId] = {
-              ...(freshProgressData.videoProgress?.[transmissionId] || {}),
-              rewardedStampCount: stampedSeconds.length,
-              stampedSeconds: stampedSeconds,
-              updatedAt: serverTimestamp()
-            }
+             transaction.set(progressDocRef, {
+               [`${baseKey}.rewardedStampCount`]: stampedSeconds.length,
+               [`${baseKey}.stampedSeconds`]: stampedSeconds,
+               [`${baseKey}.updatedAt`]: serverTimestamp()
+             }, { merge: true })
           }
-        }
-        
-        if (Object.keys(progressUpdates).length > 0) {
-          transaction.set(progressDocRef, progressUpdates, { merge: true })
         }
 
         // --- Atomic Logging: Streak Freeze ---
@@ -998,9 +996,19 @@ function SpaceHome() {
         }
 
         if (actualReward > 0) {
-          const stableTxId = isLogActivity 
-            ? `log_${currentUnitId}` 
-            : (activityType.includes('완료') ? `video_bonus_${currentUnitId}_${transmissionId}` : null);
+          let stableTxId = null;
+          if (isLogActivity) {
+            stableTxId = `log_${currentUnitId}`;
+          } else if (isVideoActivity) {
+            if (activityType.includes('완료')) {
+              stableTxId = `video_bonus_${currentUnitId}_${transmissionId}`;
+            } else if (activityType.includes('수신')) {
+              // Extract minutes for interval reward stable ID
+              const minMatch = activityType.match(/\((\d+)분/);
+              const minutes = minMatch ? minMatch[1] : 'unknown';
+              stableTxId = `video_interval_${currentUnitId}_${transmissionId}_${minutes}min`;
+            }
+          }
 
           recordCrystalTransaction(user.uid, {
             amount: actualReward,
@@ -1019,6 +1027,7 @@ function SpaceHome() {
           transaction.set(historyRef, {
             unitId: currentUnitId,
             unitTitle: activeUnit?.title || `탐사 기록 (${activityType})`,
+            transmissionId: transmissionId || "",
             regionId: selectedRegionId || activeRegion?.id || "",
             regionTitle: activeRegion?.title || "Unknown Galaxy",
             chapterId: selectedChapterDocId || "",
