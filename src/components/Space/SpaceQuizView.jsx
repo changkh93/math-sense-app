@@ -167,8 +167,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       } else {
         // 재도전 모드에서는 광석 차감 없음
         if (!reSolveMode) {
-          setSessionCrystals(prev => prev - 2)
-          addMarker('-2', 'loss')
+          const currentPenalty = Math.min(retryCount + 2, 4)
+          setSessionCrystals(prev => prev - currentPenalty)
+          addMarker(`-${currentPenalty}`, 'loss')
         }
       }
       
