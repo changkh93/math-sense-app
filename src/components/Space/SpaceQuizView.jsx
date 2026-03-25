@@ -453,8 +453,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               marginBottom: '2rem'
             }}>
               <div className="crystal-icon" style={{ width: '20px', height: '20px' }}></div>
-              <span style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>
-                +{crystalsEarnedDisplay} 광석 획득!
+              <span style={{ color: crystalsEarnedDisplay >= 0 ? 'var(--crystal-cyan)' : '#f87171', fontWeight: 700 }}>
+                {crystalsEarnedDisplay > 0 ? '+' : ''}{crystalsEarnedDisplay} 광석 {crystalsEarnedDisplay >= 0 ? '획득' : '유실'}!
               </span>
             </div>
 
