@@ -9,10 +9,12 @@ import soundManager from '../../utils/SoundManager'
 import '../../styles/space-theme.css'
 import QuestionModal from '../QuestionModal'
 import { useSmartSync } from '../../hooks/useSync'
+import { useAuth } from '../../hooks/useAuth'
 
 export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield, hasRadar, isRadarBonus, onRequestSupport }) {
   // Real-time synchronization watchdog
   useSmartSync(quizData?.unitId)
+  const { user } = useAuth()
 
   const [currentQuestions, setCurrentQuestions] = useState([])
   const [currentIdx, setCurrentIdx] = useState(0)
@@ -37,13 +39,27 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // Interactive FAB (Support Tray) state
   const [isTrayExpanded, setIsTrayExpanded] = useState(false)
   
-  const initializedUnitId = useRef(null) // Prevent accidental reshuffling
+  // Anti-Guessing State
+  const [retryCount, setRetryCount] = useState(0)
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const isMobile = window.innerWidth <= 768
+
+  const initializedUnitId = useRef(null) // Prevent accidental reshuffling
 
   // 초기 문제 설정
   useEffect(() => {
     // Only initialize if it's a new unit or hasn't been initialized yet
     if (quizData?.questions && initializedUnitId.current !== quizData.unitId) {
+      // Load retry count from local storage to prevent F5 abuse
+      if (user?.uid && quizData.unitId) {
+        const storedRetry = localStorage.getItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
+        if (storedRetry) {
+          setRetryCount(parseInt(storedRetry, 10))
+        } else {
+          setRetryCount(0)
+        }
+      }
+
       const allQ = [...quizData.questions].map(q => ({
         ...q,
         shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
@@ -151,12 +167,14 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       } else {
         // 재도전 모드에서는 광석 차감 없음
         if (!reSolveMode) {
-          setSessionCrystals(prev => Math.max(0, prev - 2))
+          setSessionCrystals(prev => prev - 2)
           addMarker('-2', 'loss')
         }
       }
       
-      // 시스템 리부트 (3초 딜레이)
+      
+      // 시스템 리부트 (시도 횟수에 따라 3초, 6초, 9초 딜레이)
+      const rebootDelay = Math.min((retryCount + 1) * 3000, 9000)
       setIsRebooting(true)
       setTimeout(() => {
         // Guard against progression while Ask Teacher modal is open
@@ -169,7 +187,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         } else {
           setIsResultMode(true)
         }
-      }, 3000)
+      }, rebootDelay)
     }
     
     setUserAnswers(prev => ({
@@ -209,6 +227,18 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   const handleReSolveWrong = () => {
     soundManager.playClick()
+    
+    // Save retry count to local storage
+    const newRetryCount = retryCount + 1
+    setRetryCount(newRetryCount)
+    if (user?.uid && quizData?.unitId) {
+      localStorage.setItem(`metasense_retry_${user.uid}_${quizData.unitId}`, newRetryCount.toString())
+    }
+
+    startReSolveProcess()
+  }
+
+  const startReSolveProcess = () => {
     // 현재 세션의 전체 문제 중 틀린 문제만 필터링
     const wrongQuestions = currentQuestions.filter(q => !userAnswers[q.id]?.isCorrect).map(q => ({
       ...q,
@@ -228,22 +258,40 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setReSolveMode(true)
   }
 
+  // 점수 계산 유틸리티
+  const calculateFinalScore = (rawScore, retryCount) => {
+    const PENALTY_PER_RETRY = 10;
+    const MIN_SCORE_FLOOR = 70;
+    
+    if (retryCount === 0) return rawScore;
+    
+    const penaltyScore = 100 - (retryCount * PENALTY_PER_RETRY);
+    const finalScoreLimit = Math.max(penaltyScore, MIN_SCORE_FLOOR);
+    
+    return Math.min(rawScore, finalScoreLimit);
+  };
+
   const handleFinish = async () => {
     if (isSubmitting) return
     setIsSubmitting(true)
     
     soundManager.playClick()
-    // 점수 계산: 최초 전체 세션 문항(allSessionQuestions) 기준
+    // 점수 계산
     const correctCount = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
+    const rawScore = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0
+    const finalScore = calculateFinalScore(rawScore, retryCount)
     
-    // 점수 계산: 재도전 여부와 관계없이 최초 총 문항수 기준으로 계산
-    const score100 = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0
     const canGetPerfectBonus = (correctCount === originalTotal)
     const crystalsEarned = sessionCrystals + (canGetPerfectBonus ? 10 : 0)
     
     try {
+      // Clear localStorage on successful finish
+      if (user?.uid && quizData?.unitId) {
+        localStorage.removeItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
+      }
+
       await onComplete({ 
-        score: score100, 
+        score: finalScore, 
         total: 100, 
         correctCount, 
         totalCount: originalTotal, 
@@ -322,9 +370,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   // 결과 화면
   if (isResultMode) {
-    // 점수 계산: 최초 개별 문항들의 최종 정답 여부 합산
     const correctCount = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
-    const score100 = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0
+    const rawScore = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0
+    const finalScore = calculateFinalScore(rawScore, retryCount)
     const isPerfect = (correctCount === originalTotal)
     
     // 만점 보너스 가시성 (저장 로직과 동일하게 유지)
@@ -381,10 +429,16 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 fontWeight: 900,
                 color: canGetPerfectBonus ? 'var(--star-gold)' : 'var(--crystal-cyan)'
               }}>
-                {score100}
+                {finalScore}
               </span>
               <span style={{ color: 'var(--text-muted)' }}>점</span>
             </div>
+
+            {retryCount > 0 && isPerfect && (
+              <p style={{ color: 'var(--planet-green)', fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '1.1rem' }}>
+                🌟 완벽한 복구 성공! (재도전 시스템 보정 최종 점수)
+              </p>
+            )}
 
             <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
               {correctCount} / {originalTotal} 정답 (전체 기준)
@@ -789,7 +843,6 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 className="space-image-card-wrapper"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ rotateY: 10, rotateX: -5, scale: 1.02 }}
                 style={{ 
                   perspective: '1000px',
                   marginBottom: '2.5rem',
@@ -804,8 +857,6 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                     src={currentQuestion.imageUrl} 
                     alt="Question" 
                     className="space-question-image"
-                    animate={{ y: [0, -10, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                   />
                 </div>
               </motion.div>
@@ -880,7 +931,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   ⚠️ SYSTEM REBOOT
                 </div>
                 <div style={{ color: 'white', opacity: 0.8 }}>
-                  에너지 손실로 인한 시스템 복구 중... (3s)
+                  에너지 손실로 인한 시스템 복구 중... ({Math.min((retryCount + 1) * 3, 9)}s)
                 </div>
                 {hasShield - shieldsUsed >= 0 && shieldsUsed > 0 && (
                   <div style={{ color: 'var(--star-gold)', marginTop: '0.5rem', fontSize: '0.9rem' }}>

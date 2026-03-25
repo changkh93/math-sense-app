@@ -506,41 +506,38 @@ function SpaceHome() {
       let actualCrystalsEarned = 0
       let rewardMessage = ""
 
-      if (score > previousBest) {
+      if (crystalsEarned < 0) {
+        // --- Negative Reward (Penalty) ---
+        // Always apply penalty even if score didn't improve
+        actualCrystalsEarned = crystalsEarned
+        rewardMessage = `무지성 탐사로 인해 광석 ${Math.abs(crystalsEarned)}개가 소멸되었습니다.`
+      } else if (score > previousBest) {
         // Incremental reward: sessionCrystals * (newScore - prevBest) / newScore
-        // Why? Because sessionCrystals includes combo bonuses earned during this specific session.
-        // We reward the 'newly conquered' part of the score.
         const improvementRatio = (score - previousBest) / score
         actualCrystalsEarned = Math.round((crystalsEarned || 0) * improvementRatio)
         
         // Perfect bonus (10 crystals) only for first-time 100%
         if (isPerfect && previousBest < 100) {
-          // If the score improved and it is now perfect, handle bonus
-          // The 'crystalsEarned' from SpaceQuizView already includes 10 if isPerfect is true.
-          // But our ratio formula might have scaled it down if prevBest was, say, 80.
-          // Let's refine: Base reward scaled + Full bonus if first perfect.
           const baseCrystals = (crystalsEarned || 0) - 10 
-          actualCrystalsEarned = Math.round(baseCrystals * improvementRatio) + 10
+          actualCrystalsEarned = Math.max(0, Math.round(baseCrystals * improvementRatio)) + 10
         } else if (isPerfect && previousBest === 100) {
-          // Already got perfect bonus before
           const baseCrystals = (crystalsEarned || 0) - 10
-          actualCrystalsEarned = Math.round(baseCrystals * improvementRatio) // ratio will be 0 anyway
+          actualCrystalsEarned = Math.max(0, Math.round(baseCrystals * improvementRatio))
         }
 
-      // --- Scanner Daily Bonus (+5) ---
-      // Only for non-recovery mode
-      if (!isMemoryCoreMode) {
-        const isScannerBonusUnit = checkIsBonusUnit(currentUnitId)
-        if (isScannerBonusUnit && userData?.hasRadar) {
-          actualCrystalsEarned += 5
-          rewardMessage += " 📡 스캐너 보너스 탐사 성공! (+5 광석)"
+        // --- Scanner Daily Bonus (+5) ---
+        if (!isMemoryCoreMode) {
+          const isScannerBonusUnit = checkIsBonusUnit(currentUnitId)
+          if (isScannerBonusUnit && userData?.hasRadar) {
+            actualCrystalsEarned += 5
+            rewardMessage += " 📡 스캐너 보너스 탐사 성공! (+5 광석)"
+          }
         }
-      }
         
         if (actualCrystalsEarned > 0) {
-          rewardMessage = `${score}점으로 최고 기록을 경신했습니다! (+${actualCrystalsEarned} 광석)`
+          rewardMessage = `${score}점으로 최고 기록을 경신했습니다! (+${actualCrystalsEarned} 광석)` + rewardMessage
         } else {
-          actualCrystalsEarned = 0 // In case it's negative or malformed
+          actualCrystalsEarned = 0
         }
       } else {
         actualCrystalsEarned = 0
@@ -574,7 +571,10 @@ function SpaceHome() {
         // --- Server-side Reward Calculation (Prevent duplicate payout) ---
         const serverPreviousBest = freshProgressData.bestScore || 0
         let atomicCrystalsEarned = 0
-        if (score > serverPreviousBest) {
+
+        if (crystalsEarned < 0) {
+          atomicCrystalsEarned = crystalsEarned
+        } else if (score > serverPreviousBest) {
           const improvementRatio = (score - serverPreviousBest) / score
           atomicCrystalsEarned = Math.round((crystalsEarned || 0) * improvementRatio)
           
@@ -653,16 +653,16 @@ function SpaceHome() {
           }, transaction)
         }
 
-        // --- Atomic Logging: Quiz Reward ---
-        if (atomicCrystalsEarned > 0) {
-          const stableQuizTxId = `quiz_${currentUnitId}_s${score}`;
+        // --- Atomic Logging: Quiz Reward / Penalty ---
+        if (atomicCrystalsEarned !== 0) {
+          const stableQuizTxId = `quiz_${currentUnitId}_s${score}_${Date.now()}`; // Add timestamp for penalties to allow multiple
           
           recordCrystalTransaction(user.uid, {
             amount: atomicCrystalsEarned,
-            type: 'quiz_reward',
-            description: `${activeUnit?.title || '탐사 퀴즈'} (${score}점)`,
-            metadata: { unitId: currentUnitId, score }
-          }, transaction, stableQuizTxId)
+            type: atomicCrystalsEarned > 0 ? 'quiz_reward' : 'quiz_penalty',
+            description: `${activeUnit?.title || '탐사 퀴즈'} ${atomicCrystalsEarned > 0 ? `(${score}점)` : '(시스템 손상)'}`,
+            metadata: { unitId: currentUnitId, score, penalty: atomicCrystalsEarned < 0 }
+          }, transaction, atomicCrystalsEarned > 0 ? `quiz_${currentUnitId}_s${score}` : `${stableQuizTxId}`)
         }
 
         // --- Atomic Logging: History ---
@@ -688,7 +688,7 @@ function SpaceHome() {
 
         // Transaction 내에서는 increment()를 쓸 수 없으므로, 직접 계산
         transaction.update(userDocRef, {
-          crystals: (freshUserData.crystals || 0) + atomicCrystalsEarned,
+          crystals: Math.max(0, (freshUserData.crystals || 0) + atomicCrystalsEarned),
           totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
           totalScore: (freshUserData.totalScore || 0) + score,
           averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
