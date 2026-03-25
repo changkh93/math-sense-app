@@ -76,13 +76,22 @@ export function useLearningHistory(userId, dateStr) {
           fsWhere('submittedAt', '>=', startTime),
           fsWhere('submittedAt', '<=', endTime)
         );
-
+        
+        // 5. Fetch Learning Progress updates (to capture partial video watches/data logs)
+        const lpRef = fsCollection(db, 'users', userId, 'learning_progress');
+        const lpQuery = fsQuery(
+          lpRef,
+          fsWhere('updatedAt', '>=', startTime),
+          fsWhere('updatedAt', '<=', endTime)
+        );
+        
         // Execute queries in parallel
-        const [historySnap, txSnap, logsSnap, assignmentsSnap] = await Promise.all([
+        const [historySnap, txSnap, logsSnap, assignmentsSnap, lpSnap] = await Promise.all([
           fsGetDocs(historyQuery).catch(e => { console.warn("Failed to fetch history:", e); return { docs: [] }; }),
           fsGetDocs(txQuery).catch(e => { console.warn("Failed to fetch tx:", e); return { docs: [] }; }),
           fsGetDocs(logsQuery).catch(e => { console.warn("Failed to fetch logs:", e); return { docs: [] }; }),
-          fsGetDocs(assignmentsQuery).catch(e => { console.warn("Failed to fetch assignments:", e); return { docs: [] }; })
+          fsGetDocs(assignmentsQuery).catch(e => { console.warn("Failed to fetch assignments:", e); return { docs: [] }; }),
+          fsGetDocs(lpQuery).catch(e => { console.warn("Failed to fetch lp:", e); return { docs: [] }; })
         ]);
 
         const aggregated = [];
@@ -111,12 +120,31 @@ export function useLearningHistory(userId, dateStr) {
         // --- Process Quiz History ---
         getDocsSafe(historySnap).forEach(doc => {
           const data = doc.data ? doc.data() : doc;
-          stats.quizCount++;
+          // Dynamically determine type and increment corresponding stats
+          const hType = data.type || 'quiz_pass'; 
+          
+          let displayType = 'quiz_pass';
+          let displayTitle = `🚀 현장 탐사(퀴즈): ${data.unitTitle || '이름 없음'}`;
+
+          if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
+            displayType = 'video_complete';
+            displayTitle = `🎬 영상 학습 완료: ${data.unitTitle || '이름 없음'}`;
+            // If it's a recovery or video type in history, it usually means 100% completion
+            // Note: We don't have duration here, but we can treat it as a significant activity.
+          } else if (hType === 'text' || hType === 'data_log_read') {
+            stats.logCount++;
+            displayType = 'data_log_read';
+            displayTitle = `📝 데이터 로그 열람: ${data.unitTitle || '이름 없음'}`;
+          } else {
+            // Default to quiz
+            stats.quizCount++;
+          }
+
           aggregated.push({
             id: `quiz_${doc.id}`,
             timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
-            type: 'quiz_pass',
-            title: `🚀 현장 탐사(퀴즈): ${data.unitTitle || '이름 없음'}`,
+            type: displayType,
+            title: displayTitle,
             score: data.score,
             crystalsEarned: data.crystalsEarned || 0,
             metadata: data
@@ -140,8 +168,24 @@ export function useLearningHistory(userId, dateStr) {
             displayType = 'video_complete';
             displayTitle = `🎬 영상 보상: ${desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '보너스')}`;
             
-            // Stats: Every 10 crystals in a '수신' type usually means 180s
-            if (desc.includes('수신') && data.amount === 10) {
+            // Stats: Priority 1: Use stampedSeconds.length if available
+            // Priority 2: Use totalTimeSpent if available
+            // Priority 3: Fallback to the 180s heuristic
+            const videoMetadata = metadata || data.metadata || {};
+            const stampedCount = videoMetadata.stampedSeconds?.length;
+            const timeSpent = videoMetadata.totalTimeSpent;
+
+            if (stampedCount !== undefined) {
+              // Since metadata is cumulative for the current video session, 
+              // we don't just sum them up. We should track unique seconds per transmissionId.
+              const txId = videoMetadata.transmissionId || 'default';
+              if (!stats._videoTxMap) stats._videoTxMap = {};
+              stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, stampedCount);
+            } else if (timeSpent !== undefined) {
+              const txId = videoMetadata.transmissionId || 'default';
+              if (!stats._videoTxMap) stats._videoTxMap = {};
+              stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, Math.floor(timeSpent));
+            } else if (desc.includes('수신') && data.amount === 10) {
               stats.totalVideoSeconds += 180;
             }
           } else if (tType.includes('agora')) {
@@ -152,6 +196,11 @@ export function useLearningHistory(userId, dateStr) {
             displayTitle = `✅ 출석: ${desc}`;
           }
 
+          const videoMetadata = metadata || data.metadata || {};
+          const vTime = videoMetadata.videoTime || 
+                        (videoMetadata.stampedSeconds ? videoMetadata.stampedSeconds.length : undefined) || 
+                        videoMetadata.totalTimeSpent;
+
           aggregated.push({
             id: `tx_${doc.id}`,
             timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
@@ -161,7 +210,7 @@ export function useLearningHistory(userId, dateStr) {
             crystalsEarned: data.amount || 0,
             metadata: {
               ...data,
-              videoTime: metadata.videoTime
+              videoTime: vTime
             }
           });
         });
@@ -200,6 +249,30 @@ export function useLearningHistory(userId, dateStr) {
             metadata: data
           });
         });
+        
+        // --- Process Learning Progress (Capturing partial progress) ---
+        getDocsSafe(lpSnap).forEach(doc => {
+          const data = doc.data ? doc.data() : doc;
+          // Capture video progress even if no reward was triggered
+          if (data.videoProgress) {
+            Object.entries(data.videoProgress).forEach(([txId, vData]) => {
+              const timeVal = vData.stampedSeconds?.length || Math.floor(vData.totalTimeSpent || 0);
+              if (timeVal > 0) {
+                if (!stats._videoTxMap) stats._videoTxMap = {};
+                stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, timeVal);
+              }
+            });
+          }
+          // Note: data.logRead could also be used here if needed
+        });
+        
+        // Finalize totalVideoSeconds from our _videoTxMap
+        if (stats._videoTxMap) {
+          Object.values(stats._videoTxMap).forEach(v => {
+            stats.totalVideoSeconds += v;
+          });
+          delete stats._videoTxMap;
+        }
 
         // Sort all activities by timestamp ascending
         aggregated.sort((a, b) => {
