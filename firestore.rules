@@ -111,5 +111,13 @@ service cloud.firestore {
       allow update: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
     }
+
+    // Collection Group: history (for Region/Chapter leaderboards)
+    // Allows authenticated users to query quiz history across all users
+    // for scope-specific ranking (e.g. all scores within a Region or Chapter).
+    // History docs only contain quiz metadata: unitId, regionId, chapterId, score.
+    match /{path=**}/history/{historyId} {
+      allow read: if isAuth();
+    }
   }
 }

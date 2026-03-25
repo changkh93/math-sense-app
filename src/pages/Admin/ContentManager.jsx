@@ -190,6 +190,7 @@ const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleCh
           {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
           <Library className="icon" size={18} />
           <span className="node-title">{region.title}</span>
+          <span className="node-id" style={{ fontSize: '0.75rem', opacity: 0.4, marginLeft: '0.8rem', fontFamily: 'monospace' }}>[{region.id}]</span>
         </div>
         <div className="node-actions">
           <button className="icon-btn" onClick={(e) => { e.stopPropagation(); onManageStudents(region); }} title="Manage Students" style={{ color: 'var(--crystal-cyan)' }}><Users size={16} /></button>
@@ -275,6 +276,7 @@ const ChapterNode = ({ chapter, isExpanded, onToggle, onOpenAiImport, isFirst, i
           {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
           <Layers className="icon" size={16} />
           <span className="node-title">{chapter.title}</span>
+          <span className="node-id" style={{ fontSize: '0.7rem', opacity: 0.3, marginLeft: '0.6rem', fontFamily: 'monospace' }}>[{chapter.docId || chapter.id}]</span>
         </div>
         <div className="node-actions">
           <button className="icon-btn ai-btn" onClick={() => onOpenAiImport(chapter.docId)} title="Import AI Quiz"><Sparkles size={14} /></button>
@@ -353,6 +355,7 @@ const UnitNode = ({ unit, onOpenAiImport, isFirst, isLast, onReorder }) => {
         <div className="node-info">
           <BookOpen className="icon" size={14} />
           <span className="node-title">{unit.title}</span>
+          <span className="node-id" style={{ fontSize: '0.65rem', opacity: 0.2, marginLeft: '0.5rem', fontFamily: 'monospace' }}>[{unit.docId || unit.id}]</span>
         </div>
         <div className="node-actions">
           <button 

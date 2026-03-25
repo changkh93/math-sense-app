@@ -24,6 +24,8 @@ import SpaceJourney from './SpaceJourney'
 import CrystalLedger from './CrystalLedger'
 import RegionAccessModal from './RegionAccessModal' // New Integration
 import AssignmentHub from './AssignmentHub' // New Integration
+import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
+import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 
 import { useParticles, createParticleBurst } from './ParticleEffects'
 import { calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils'
@@ -1531,6 +1533,7 @@ function SpaceHome() {
                   }}>
                     SECTOR: {activeRegion?.title}
                   </h2>
+                  <SectorLeaderboard user={user} regionId={selectedRegionId} />
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
@@ -1653,6 +1656,7 @@ function SpaceHome() {
                   }}>
                     MISSION SELECT: {chapters?.length === 1 ? activeRegion?.title : activeChapter?.title}
                   </h2>
+                  <MissionLeaderboard user={user} chapterId={selectedChapterDocId} chapterTitle={chapters?.length === 1 ? activeRegion?.title : activeChapter?.title} />
                   <div style={{
                     display: 'flex',
                     flexDirection: 'column',

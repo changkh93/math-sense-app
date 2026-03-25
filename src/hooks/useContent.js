@@ -284,6 +284,10 @@ export function useAdminMutations() {
           }
           batch.delete(doc(db, 'units', uDoc.id));
         }
+        
+        // --- Added: Delete the chapter document itself ---
+        batch.delete(doc(db, 'chapters', chapterDocId));
+        
         await batch.commit();
       },
       onSuccess: () => {

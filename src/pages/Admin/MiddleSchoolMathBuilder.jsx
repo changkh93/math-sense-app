@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
-import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 
 const PDF_FILES = [
   "퀴즈_01_소수와 합성수_소인수분해.pdf",
@@ -127,9 +127,41 @@ const PROBABILITY_PDF_FILES = [
   "08_표본.pdf"
 ];
 
+const GEOMETRY_1_PDF_FILES = [
+  "01_점, 선, 직선, 면, 평면에 대한 유클리드 원론에 나타난 정의.pdf",
+  "02_각의 정의와 종류.pdf",
+  "03_평행, 삼각형의 종류.pdf",
+  "04_사각형의 종류.pdf",
+  "05_볼록다각형과 원에 대한 정의.pdf",
+  "06_공준과 공리.pdf",
+  "07_기하학의 표기법.pdf",
+  "08_모든 직각은 서로 같은가?.pdf",
+  "09_직선각과 정삼각형 작도.pdf",
+  "10_맞꼭지각과 한 점에서 이루어지는 모든 각의 합에 관하여.pdf"
+];
+
 const MiddleSchoolMathBuilder = () => {
   const [status, setStatus] = useState('대기 중...');
   const [building, setBuilding] = useState(false);
+  const [existingChapters, setExistingChapters] = useState([]);
+
+  const fetchExistingChapters = async () => {
+    try {
+      const regionId = 'reg_1773407437227';
+      const q = query(collection(db, 'chapters'), where('regionId', '==', regionId));
+      const snap = await getDocs(q);
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setExistingChapters(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
+      setStatus('✔️ 기존 챕터 목록을 불러왔습니다.');
+    } catch (err) {
+      console.error(err);
+      setStatus(`❌ 챕터 조회 오류: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    fetchExistingChapters();
+  }, []);
 
   const groupFiles = () => {
     const chapters = {};
@@ -559,6 +591,88 @@ const MiddleSchoolMathBuilder = () => {
     }
   };
 
+  const handleBuildGeometry1 = async () => {
+    setBuilding(true);
+    setStatus('🔥 기하학 I 구축 시작...');
+
+    try {
+      const clusterId = 'middle-math';
+      const regionId = 'reg_1773407437227';
+      const chapterId = 'chap_1773926956828'; // 사용자 확인된 실제 ID
+      const chapterRef = doc(collection(db, 'chapters'), chapterId);
+      
+      setStatus('✔️ 대상 챕터(chap_1773926956828) 확인 완료. 유닛 생성 중...');
+
+      const batch = writeBatch(db);
+      // 기존 챕터 정보 업데이트 (필요한 경우)
+      batch.set(chapterRef, {
+        docId: chapterId,
+        id: chapterId,
+        regionId: regionId,
+        title: '기하학 I',
+        order: 11, // 실제 확인된 순서로 반영
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      const unitsRef = collection(db, 'units');
+
+      GEOMETRY_1_PDF_FILES.forEach((filename, index) => {
+        let cleanTitle = filename.replace('.pdf', '');
+        cleanTitle = cleanTitle.replace(/^\d+_/, ''); 
+
+        const order = index + 1; 
+        const unitId = `${chapterId}_geo1_${order.toString().padStart(2, '0')}`;
+        const unitRef = doc(unitsRef, unitId);
+        
+        batch.set(unitRef, {
+          docId: unitId,
+          id: unitId,
+          clusterId: clusterId,
+          regionId: regionId,
+          chapterId: chapterId,
+          title: cleanTitle,
+          order: order,
+          learningContents: {
+            text: 'PDF를 보며 기하학의 기초 개념을 학습하세요.',
+            pdfUrl: `/pdfs/middle_math/geometry_1/${filename}`
+          },
+          contentFlags: {
+            hasDataLog: true,
+            hasTransmission: false,
+            hasWorkbook: false
+          },
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+      });
+
+      setStatus('💾 서버에 저장 중...');
+      await batch.commit();
+      setStatus('✅ 기하학 I 유닛 구축 완료! (기존 챕터 chap_1773926956828)');
+    } catch (err) {
+      console.error(err);
+      setStatus(`❌ 오류 발생: ${err.message}`);
+    } finally {
+      setBuilding(false);
+      fetchExistingChapters();
+    }
+  };
+
+  const handleCleanupDuplicate = async () => {
+    if (!window.confirm('중복 생성된 챕터 [reg_1773407437227_chap_geometry_1]를 삭제할까요?')) return;
+    setBuilding(true);
+    try {
+      const duplicateId = 'reg_1773407437227_chap_geometry_1';
+      await deleteDoc(doc(db, 'chapters', duplicateId));
+      setStatus(`✅ 중복 챕터 ${duplicateId} 삭제 완료!`);
+      fetchExistingChapters();
+    } catch (err) {
+      console.error(err);
+      setStatus(`❌ 삭제 오류: ${err.message}`);
+    } finally {
+      setBuilding(false);
+    }
+  };
+
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', color: 'white' }}>
       <h1>📐 Middle School Math Builder</h1>
@@ -622,6 +736,20 @@ const MiddleSchoolMathBuilder = () => {
             🚀 확률 유닛 생성
           </button>
           <button 
+            onClick={handleBuildGeometry1}
+            disabled={building}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: building ? '#ccc' : '#FF5722',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: building ? 'not-allowed' : 'pointer'
+            }}
+          >
+            🚀 기하 I 유닛 생성
+          </button>
+          <button 
             onClick={handleBuildFunctions1}
             disabled={building}
             style={{
@@ -631,6 +759,62 @@ const MiddleSchoolMathBuilder = () => {
           >
             {building ? '구축 중...' : '🚀 함수 I 유닛 생성'}
           </button>
+          
+          <button 
+            onClick={handleCleanupDuplicate}
+            disabled={building}
+            style={{
+              padding: '1rem 2rem', background: '#f44336',
+              color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
+            }}
+          >
+            🗑️ 중복 기하 챕터 삭제
+          </button>
+
+          <button 
+            onClick={fetchExistingChapters}
+            style={{
+              padding: '1rem 2rem', background: '#607D8B',
+              color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
+            }}
+          >
+            🔄 챕터 새로고침
+          </button>
+      </div>
+
+      <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
+        <h3>기존 등록된 챕터 목록 (Region: reg_1773407437227)</h3>
+        <ul style={{ maxHeight: '400px', overflowY: 'auto', fontSize: '0.9rem', listStyle: 'none', padding: 0 }}>
+          {existingChapters.map(c => (
+            <li key={c.id} style={{ 
+              marginBottom: '8px', 
+              padding: '8px', 
+              background: 'rgba(255,255,255,0.05)', 
+              borderRadius: '4px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              border: c.id === 'chap_1773926956828' ? '1px solid #00bcd4' : '1px solid transparent'
+            }}>
+              <div>
+                <strong style={{ color: '#00bcd4', marginRight: '10px' }}>[{c.id}]</strong> 
+                <span style={{ fontSize: '1rem', fontWeight: 600 }}>{c.title}</span>
+                <span style={{ marginLeft: '10px', opacity: 0.6 }}>(Order: {c.order})</span>
+              </div>
+              <button 
+                onClick={() => handleDeleteChapter(c.id, c.title)}
+                disabled={building}
+                style={{
+                  padding: '4px 8px', background: '#f44336',
+                  color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer',
+                  fontSize: '0.8rem'
+                }}
+              >
+                삭제
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
@@ -667,6 +851,20 @@ const MiddleSchoolMathBuilder = () => {
             {FUNCTIONS_1_PDF_FILES.map(f => <li key={f}>{f}</li>)}
           </ul>
         </section>
+      </div>
+
+      <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
+        <h3>신규 기하학 I PDF 파일: {GEOMETRY_1_PDF_FILES.length}개</h3>
+        <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
+          {GEOMETRY_1_PDF_FILES.map(f => <li key={f}>{f}</li>)}
+        </ul>
+      </div>
+
+      <div style={{ background: '#111', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
+        <h3>신규 기하학 I PDF 파일: {GEOMETRY_1_PDF_FILES.length}개</h3>
+        <ul style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.9rem' }}>
+          {GEOMETRY_1_PDF_FILES.map(f => <li key={f}>{f}</li>)}
+        </ul>
       </div>
 
       <div style={{ marginTop: '2rem', fontWeight: 'bold' }}>상태: {status}</div>

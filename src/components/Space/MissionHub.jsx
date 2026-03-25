@@ -8,6 +8,7 @@ import soundManager from '../../utils/SoundManager'
 import { InlineMath } from 'react-katex'
 import 'katex/dist/katex.min.css'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
+import UnitLeaderboard from './UnitLeaderboard'
 import { db } from '../../firebase'
 import { doc, setDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
@@ -15,6 +16,17 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 
 // Mock Data for demonstration - In production this would come from Firestore
 // (Mock data removed — use only real Firestore data)
+
+// ─── PDF URL Transformer (Google Drive support) ───
+const getEmbeddablePdfUrl = (url) => {
+  if (!url) return null;
+  // Handle Google Drive /view links
+  const driveViewMatch = url.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
+  if (driveViewMatch && driveViewMatch[1]) {
+    return `https://drive.google.com/file/d/${driveViewMatch[1]}/preview`;
+  }
+  return url;
+};
 
 // ─── Silent Crystal Toast ───
 const SilentCrystalToast = ({ amount, visible }) => (
@@ -1089,6 +1101,12 @@ export default function MissionHub({
         MISSION CONTROL: {activeUnit?.title || "비밀 작전 구역"}
       </h2>
 
+      <UnitLeaderboard 
+        user={user} 
+        unitId={unitId} 
+        unitTitle={activeUnit?.title} 
+      />
+
       {availableCount === 0 ? (
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', maxWidth: '500px', margin: '0 auto' }}>
           <h3 className="font-title" style={{ color: 'var(--text-muted)' }}>등록된 콘텐츠가 없습니다.</h3>
@@ -1272,20 +1290,28 @@ export default function MissionHub({
         
         {/* PDF Viewer */}
         {missionData?.learningContents?.pdfUrl && (
-          <div style={{ width: '100%', height: '70vh', border: '1px solid var(--neon-blue)', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
-            <object 
-              data={missionData.learningContents.pdfUrl} 
-              type="application/pdf" 
-              width="100%" 
-              height="100%"
-            >
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#333' }}>
-                <p>브라우저에서 PDF를 바로 열 수 없습니다.</p>
-                <a href={missionData.learningContents.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--neon-blue)', textDecoration: 'underline' }}>
-                  이곳을 클릭하여 PDF 다운로드 / 열기
-                </a>
-              </div>
-            </object>
+          <div style={{ width: '100%', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.8rem' }}>
+              <a 
+                href={missionData.learningContents.pdfUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hud-btn secondary glass"
+                style={{ fontSize: '0.8rem', padding: '0.5rem 1rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <span>↗️</span> 새 창에서 열기
+              </a>
+            </div>
+            <div style={{ width: '100%', height: '75vh', border: '1px solid var(--neon-blue)', borderRadius: '12px', overflow: 'hidden', background: '#fff', boxShadow: '0 0 20px rgba(0, 243, 255, 0.1)' }}>
+              <iframe 
+                src={getEmbeddablePdfUrl(missionData.learningContents.pdfUrl)}
+                width="100%" 
+                height="100%"
+                style={{ border: 'none' }}
+                title="PDF Document"
+                allow="autoplay"
+              />
+            </div>
           </div>
         )}
 
@@ -1722,20 +1748,27 @@ export default function MissionHub({
                       <div style={{ width: '100%' }}>
                           {/* PDF Viewer */}
                           {missionData?.learningContents?.pdfUrl && (
-                            <div style={{ width: '100%', height: '70vh', border: '1px solid var(--neon-blue)', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
-                              <object 
-                                data={missionData.learningContents.pdfUrl} 
-                                type="application/pdf" 
-                                width="100%" 
-                                height="100%"
-                              >
-                                <div style={{ padding: '2rem', textAlign: 'center', color: '#333' }}>
-                                  <p>브라우저에서 PDF를 바로 열 수 없습니다.</p>
-                                  <a href={missionData.learningContents.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--neon-blue)', textDecoration: 'underline' }}>
-                                    이곳을 클릭하여 PDF 다운로드 / 열기
-                                  </a>
-                                </div>
-                              </object>
+                            <div style={{ width: '100%', marginBottom: '1.5rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+                                <a 
+                                  href={missionData.learningContents.pdfUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="hud-btn secondary glass"
+                                  style={{ fontSize: '0.7rem', padding: '0.4rem 0.8rem', textDecoration: 'none' }}
+                                >
+                                  ↗️ 새 창에서 열기
+                                </a>
+                              </div>
+                              <div style={{ width: '100%', height: '65vh', border: '1px solid var(--neon-blue)', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
+                                <iframe 
+                                  src={getEmbeddablePdfUrl(missionData.learningContents.pdfUrl)}
+                                  width="100%" 
+                                  height="100%"
+                                  style={{ border: 'none' }}
+                                  title="PDF Document Overlay"
+                                />
+                              </div>
                             </div>
                           )}
 
