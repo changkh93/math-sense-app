@@ -958,8 +958,8 @@ function SpaceHome() {
                                 || freshUserData.lastVideoRewardTime._seconds 
                                 || 0;
             if (lastTimeSec > 0) {
-              const diffSeconds = Timestamp.now().seconds - lastTimeSec
-              if (diffSeconds < 170) {
+              // --- Relaxed Cooldown (Accommodates 2x playback speed) ---
+              if (diffSeconds < 60) {
                 actualReward = 0
               }
             }

@@ -117,43 +117,8 @@ export function useLearningHistory(userId, dateStr) {
           return [];
         };
 
-        // --- Process Quiz History ---
-        getDocsSafe(historySnap).forEach(doc => {
-          const data = doc.data ? doc.data() : doc;
-          // Dynamically determine type and increment corresponding stats
-          const hType = data.type || 'quiz_pass'; 
-          
-          let displayType = 'quiz_pass';
-          let displayTitle = `🚀 현장 탐사(퀴즈): ${data.unitTitle || '이름 없음'}`;
-
-          if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
-            displayType = 'video_complete';
-            displayTitle = `🎬 영상 학습 완료: ${data.unitTitle || '이름 없음'}`;
-            // If it's a recovery or video type in history, it usually means 100% completion
-            // Note: We don't have duration here, but we can treat it as a significant activity.
-          } else if (hType === 'text' || hType === 'data_log_read') {
-            stats.logCount++;
-            displayType = 'data_log_read';
-            displayTitle = `📝 데이터 로그 열람: ${data.unitTitle || '이름 없음'}`;
-          } else {
-            // Default to quiz
-            stats.quizCount++;
-          }
-
-          aggregated.push({
-            id: `quiz_${doc.id}`,
-            timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
-            type: displayType,
-            title: displayTitle,
-            score: data.score,
-            initialScore: data.initialScore,
-            attemptCount: data.attemptCount,
-            crystalsEarned: data.crystalsEarned || 0,
-            metadata: data
-          });
-        });
-
-        // --- Process Transactions ---
+        // --- Process Transactions (Priority: Rewards) ---
+        const trackedDataLogs = new Set();
         getDocsSafe(txSnap).forEach(doc => {
           const data = doc.data ? doc.data() : doc;
           const tType = data.type || '';
@@ -174,16 +139,12 @@ export function useLearningHistory(userId, dateStr) {
             displayType = 'video_complete';
             displayTitle = `🎬 영상 보상: ${desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '보너스')}`;
             
-            // Stats: Priority 1: Use stampedSeconds.length if available
-            // Priority 2: Use totalTimeSpent if available
-            // Priority 3: Fallback to the 180s heuristic
+            // Stats logic...
             const videoMetadata = metadata || data.metadata || {};
             const stampedCount = videoMetadata.stampedSeconds?.length;
             const timeSpent = videoMetadata.totalTimeSpent;
 
             if (stampedCount !== undefined) {
-              // Since metadata is cumulative for the current video session, 
-              // we don't just sum them up. We should track unique seconds per transmissionId.
               const txId = videoMetadata.transmissionId || 'default';
               if (!stats._videoTxMap) stats._videoTxMap = {};
               stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, stampedCount);
@@ -200,6 +161,13 @@ export function useLearningHistory(userId, dateStr) {
           } else if (tType === 'attendance') {
             displayType = 'attendance';
             displayTitle = `✅ 출석: ${desc}`;
+          } else if (tType === 'data_log_reward') {
+            displayType = 'data_log_read';
+            const cleanTitle = `📝 데이터 로그 열람: ${desc.replace('보상 (데이터 로그 학습)', '').replace('보상', '').trim()}`;
+            if (trackedDataLogs.has(cleanTitle)) return;
+            trackedDataLogs.add(cleanTitle);
+            displayTitle = cleanTitle;
+            stats.logCount++;
           }
 
           const videoMetadata = metadata || data.metadata || {};
@@ -214,56 +182,120 @@ export function useLearningHistory(userId, dateStr) {
             title: displayTitle,
             score: null,
             crystalsEarned: data.amount || 0,
-            metadata: {
-              ...data,
-              videoTime: vTime
-            }
+            metadata: { ...data, videoTime: vTime }
           });
         });
 
-        // --- Process Activity Logs ---
+        // --- Process Quiz History (Completions) ---
+        getDocsSafe(historySnap).forEach(doc => {
+          const data = doc.data ? doc.data() : doc;
+          const hType = data.type || 'quiz_pass'; 
+          
+          let displayType = 'quiz_pass';
+          let displayTitle = `🚀 현장 탐사(퀴즈): ${data.unitTitle || '이름 없음'}`;
+
+          if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
+            displayType = 'video_complete';
+            displayTitle = `🎬 영상 학습 완료: ${data.unitTitle || '이름 없음'}`;
+          } else if (hType === 'text' || hType === 'data_log_read') {
+            const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || '이름 없음'}`;
+            if (trackedDataLogs.has(cleanTitle)) return;
+            trackedDataLogs.add(cleanTitle);
+            
+            stats.logCount++;
+            displayType = 'data_log_read';
+            displayTitle = cleanTitle;
+          } else {
+            stats.quizCount++;
+          }
+
+          aggregated.push({
+            id: `quiz_${doc.id}`,
+            timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
+            type: displayType,
+            title: displayTitle,
+            score: data.score,
+            initialScore: data.initialScore,
+            attemptCount: data.attemptCount,
+            crystalsEarned: data.crystalsEarned || 0,
+            metadata: data
+          });
+        });
+
+        // --- Process Activity Logs (General Actions) ---
         getDocsSafe(logsSnap).forEach(doc => {
           const data = doc.data ? doc.data() : doc;
           if (data.action?.includes('DATA LOG')) {
+            const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || data.unitId || '알 수 없는 단원'}`;
+            
+            // AGGRESSIVE DE-DUPLICATION: Use the same title key
+            if (trackedDataLogs.has(cleanTitle)) return;
+            trackedDataLogs.add(cleanTitle);
+
             stats.logCount++;
             aggregated.push({
               id: `log_${doc.id}`,
               timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
               type: 'data_log_read',
-              title: `📝 데이터 로그 열람${data.unitId ? ' (' + (data.unitTitle || data.unitId) + ')' : ''}`,
+              title: cleanTitle,
               score: null,
               crystalsEarned: 0,
               metadata: data
             });
           }
         });
-
-        // --- Process Assignments ---
-        const assignmentsSnapActual = assignmentsSnap.docs || assignmentsSnap;
-        stats.isAssignmentSubmitted = (assignmentsSnap.empty === false) || (assignmentsSnap.docs && assignmentsSnap.docs.length > 0) || (assignmentsSnap.size > 0);
-        
-        getDocsSafe(assignmentsSnap).forEach(doc => {
-          const data = doc.data ? doc.data() : doc;
-          const clusterName = getClusterName(data.clusterId);
-          aggregated.push({
-            id: `assignment_${doc.id}`,
-            timestamp: data.submittedAt?.toDate ? data.submittedAt.toDate() : new Date(),
-            type: 'assignment_submission',
-            title: `📁 항행 일지 제출${clusterName ? ' (' + clusterName + ')' : ''}: ${data.title || data.unitTitle || '과제'}`,
-            score: null,
-            crystalsEarned: 0,
-            metadata: data
-          });
-        });
         
         // --- Process Learning Progress (Capturing partial progress for timeline visibility) ---
         getDocsSafe(lpSnap).forEach(doc => {
           const data = doc.data ? doc.data() : doc;
-          // Note: Previously we added cumulative time here, but it caused past records to disappear 
-          // when updatedAt moved to a new day. We now only use lpSnap for timeline node generation 
-          // if we decide to add one, but NOT for the totalVideoSeconds sum.
-          // totalVideoSeconds is now accurately derived from crystal_transactions (transmission_reward) above.
+          const unitId = doc.id;
+          
+          if (data.videoProgress) {
+            Object.entries(data.videoProgress).forEach(([txId, prog]) => {
+              const stamps = prog.stampedSeconds?.length || 0;
+              if (stamps > 0) {
+                if (!stats._videoTxMap) stats._videoTxMap = {};
+                stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, stamps);
+                
+                // PARTIAL PROGRESS TIMELINE NODE
+                // If it's a significant amount of new time (relative to total) 
+                // and there's no completion reward for it today, show it.
+                const hasTimelineEntry = aggregated.some(act => 
+                  act.metadata?.transmissionId === txId || 
+                  (act.metadata?.unitId === unitId && act.type === 'video_complete')
+                );
+                
+                if (!hasTimelineEntry && stamps > 10) { // Only show if > 10s watched
+                  aggregated.push({
+                    id: `lp_partial_${unitId}_${txId}`,
+                    timestamp: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+                    type: 'video_complete',
+                    title: `🎬 영상 학습 진행 (${Math.floor(stamps / 60)}분): ${prog.transmissionTitle || '영상'}`,
+                    score: null,
+                    crystalsEarned: 0,
+                    metadata: { ...prog, unitId, videoTime: stamps }
+                  });
+                }
+              }
+            });
+          }
+          
+          if (data.logReadAt) {
+             const unitTitle = data.unitTitle || unitId;
+             const cleanTitle = `📝 데이터 로그 열람: ${unitTitle}`;
+             
+             // Ensure logCount includes units read today but perhaps not rewarded yet
+             if (!trackedDataLogs.has(cleanTitle)) {
+                stats.logCount++;
+                trackedDataLogs.add(cleanTitle);
+             }
+          }
         });
+
+        // --- FINAL AGGREGATION: Sum Video Seconds ---
+        if (stats._videoTxMap) {
+          stats.totalVideoSeconds = Object.values(stats._videoTxMap).reduce((sum, val) => sum + val, 0);
+        }
 
         // Sort all activities by timestamp ascending
         aggregated.sort((a, b) => {

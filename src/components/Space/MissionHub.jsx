@@ -92,6 +92,12 @@ const YoutubePlayer = React.forwardRef(({ videoId, start, end, onComplete, onTim
           setDuration(playerRef.current.getDuration())
         }
       }
+    },
+    getCurrentTime: () => {
+      if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+        return playerRef.current.getCurrentTime()
+      }
+      return currentTime
     }
   }))
 
@@ -547,16 +553,29 @@ export default function MissionHub({
         const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
         const snap = await getDoc(progressRef)
         if (snap.exists()) {
-          setLearningProgress(snap.data())
-          // Restore completion states
           const data = snap.data()
+          setLearningProgress(data)
+          // Restore completion states
           if (data.logRead) setLogRewardClaimed(true)
+          
           if (data.videoProgress) {
             // Check if any transmission has been fully completed
             const anyCompleted = Object.values(data.videoProgress).some(v => v.completed && v.completionBonusGiven)
             if (anyCompleted) {
               setVideoCompleted(true)
               setVideoCompletionBonusGiven(true)
+            }
+
+            // --- Milestone Restoration for Selected Video ---
+            const txId = selectedTx?.id || 'default'
+            const specificProg = data.videoProgress[txId]
+            if (specificProg && specificProg.stampedSeconds) {
+              stampedSetRef.current = new Set(specificProg.stampedSeconds)
+              newStampCountRef.current = stampedSetRef.current.size % 180
+              
+              const rewardedCount = specificProg.rewardedStampCount || 0
+              totalRewardedCrystalsRef.current = Math.floor(rewardedCount / 180) * 10
+              setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
             }
           }
         }
@@ -595,6 +614,17 @@ export default function MissionHub({
       if (foundTx) {
         setSelectedTx(foundTx);
         updateCurrentMode('video'); // Also restore mode to video if a transmission was selected
+        
+        // Restore stamps for this specific TX if progress already loaded
+        const txId = foundTx.id || 'default'
+        const specificProg = learningProgress?.videoProgress?.[txId]
+        if (specificProg && specificProg.stampedSeconds) {
+          stampedSetRef.current = new Set(specificProg.stampedSeconds)
+          newStampCountRef.current = stampedSetRef.current.size % 180
+        } else {
+          stampedSetRef.current = new Set()
+          newStampCountRef.current = 0
+        }
       } else {
         setSelectedTx(null);
         sessionStorage.removeItem(`metasense_hub_tx_${unitId}`);
@@ -604,18 +634,56 @@ export default function MissionHub({
     }
   }, [unitId, activeUnit])
 
+  // ─── Silent Toast helper ───
+  const showSilentToast = useCallback((amount) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
+    setToastAmount(amount)
+    setToastVisible(true)
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastVisible(false)
+    }, 2500)
+  }, [])
+
   // Smart routing is now handled by SpaceHome via initialMode prop (no flash)
   // Helper: when exiting content, go back to SpaceHome if single-content unit
-  const returnFromContent = useCallback(() => {
+  const returnFromContent = useCallback(async () => {
+    // 1. Final Sync: Ensure the latest progress is sent before unmounting
+    if (onNonQuizActivityComplete && selectedTx) {
+      const txId = selectedTx?.id || 'default';
+      const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
+      
+      // Check if we hit a milestone JUST before exiting
+      if (newStampCountRef.current >= 180 && !rewardLockRef.current) {
+        const minutes = Math.floor(stampedSetRef.current.size / 60);
+        await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
+          transmissionId: txId,
+          transmissionTitle: selectedTx?.title || "Main Video",
+          stampedSeconds: Array.from(stampedSetRef.current),
+          videoTime: currentTime
+        });
+        showSilentToast(10);
+      } else {
+        // Just sync progress without reward
+        await onNonQuizActivityComplete('영상 학습 기록 동기화', 0, {
+          transmissionId: txId,
+          transmissionTitle: selectedTx?.title || "Main Video",
+          stampedSeconds: Array.from(stampedSetRef.current),
+          videoTime: currentTime
+        });
+      }
+    }
+
     setSelectedTx(null) // Reset transmission selection
     setShowFieldTestModal(false) // Reset quiz modal
+    setVideoCompleted(false)
+    setVideoCompletionBonusGiven(false)
     if (initialMode !== 'briefing') {
       // Single-content unit — go directly back to SpaceHome
       onBack()
     } else {
       updateCurrentMode('briefing')
     }
-  }, [initialMode, onBack])
+  }, [initialMode, onBack, selectedTx, onNonQuizActivityComplete, showSilentToast])
 
   const logActivity = async (actionStr) => {
     if (!userId) return;
@@ -631,16 +699,6 @@ export default function MissionHub({
         console.warn("Failed to log activity", err)
     }
   }
-
-  // ─── Silent Toast helper ───
-  const showSilentToast = useCallback((amount) => {
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
-    setToastAmount(amount)
-    setToastVisible(true)
-    toastTimeoutRef.current = setTimeout(() => {
-      setToastVisible(false)
-    }, 2500)
-  }, [])
 
   // ─── Data Log Timer Logic ───
   useEffect(() => {
@@ -816,7 +874,7 @@ export default function MissionHub({
           rewardLockRef.current = true
           
           if (onNonQuizActivityComplete) {
-            const currentTime = playerRef.current?.getCurrentTime() || 0;
+            const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
             const minutes = Math.floor(stampedSetRef.current.size / 60);
             await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
               transmissionId: txId,
@@ -856,7 +914,7 @@ export default function MissionHub({
         videoCompletionBonusGivenRef.current = true
 
         if (onNonQuizActivityComplete) {
-          const currentTime = playerRef.current?.getCurrentTime() || 0;
+          const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
           await onNonQuizActivityComplete('영상 교신 완료', 20, {
             transmissionId: selectedTx?.id || 'default',
             transmissionTitle: selectedTx?.title || "Main Video",
@@ -1891,6 +1949,7 @@ export default function MissionHub({
                                                   </div>
                                                   <div style={{ width: '100%', aspectRatio: '16/9' }}>
                                                       <YoutubePlayer 
+                                                        ref={videoPlayerRef}
                                                           videoId={tx.videoId}
                                                           start={tx.start}
                                                           end={tx.end}
