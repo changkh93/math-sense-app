@@ -1,3 +1,5 @@
+import { getTodayKST, getKSTComponents } from './streakUtils';
+
 export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   const crystals = user.crystals || 0;
   const avgScore = user.averageScore || 0;
@@ -44,11 +46,12 @@ export function calculateGrowthUpdates(userData, earnedAmount) {
   if (!earnedAmount || earnedAmount <= 0) return {};
   if (!userData) return {};
 
-  const kstNow = new Date(Date.now() + 9 * 3600000);
-  const todayKST = kstNow.toISOString().split('T')[0];
-  const mondayOffset = (kstNow.getUTCDay() + 6) % 7;
-  const mondayKST = new Date(kstNow.getTime() - mondayOffset * 86400000)
-    .toISOString().split('T')[0];
+  const kstPart = getKSTComponents();
+  const todayKST = getTodayKST();
+  const mondayOffset = (kstPart.dayOfWeek + 6) % 7;
+  const mondayDate = new Date();
+  mondayDate.setDate(mondayDate.getDate() - mondayOffset);
+  const mondayKST = getTodayKST(mondayDate);
 
   const growthUpdates = {};
   

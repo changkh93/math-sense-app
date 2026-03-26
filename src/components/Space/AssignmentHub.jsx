@@ -7,7 +7,7 @@ import { storage } from '../../firebase';
 import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import AssignmentChronicle from './AssignmentChronicle';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
-import { getTodayKST, getNowKST } from '../../utils/streakUtils';
+import { getTodayKST, getNowKST, getKSTComponents } from '../../utils/streakUtils';
 
 /**
  * Assignment Hub (Stellar Archive)
@@ -355,15 +355,12 @@ function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendanc
     if (!clusterData?.classSchedule) return;
 
     const timer = setInterval(() => {
-      const now = getNowKST();
-      const currentDay = now.getDay();
-      const currentHour = now.getHours();
-      const currentMin = now.getMinutes();
-      const currentTimeInMins = currentHour * 60 + currentMin;
+      const { dayOfWeek, hours, minutes, seconds } = getKSTComponents();
+      const currentTimeInMins = hours * 60 + minutes;
 
       // Find matching schedule for today
       const todaySchedule = clusterData.classSchedule.find(s => 
-        (s.days && s.days.includes(currentDay)) || s.day === currentDay
+        (s.days && s.days.includes(dayOfWeek)) || s.day === dayOfWeek
       );
 
       if (!todaySchedule) {
@@ -385,8 +382,7 @@ function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendanc
         setStatus({ state: 'open', message: '탐사선 도킹 승인' });
       } else if (currentTimeInMins >= startTimeInMins && currentTimeInMins <= onTimeGraceMins) {
         // Calculate countdown for "on-time" docking
-        const currentSecs = now.getSeconds();
-        const totalClosingSecs = (onTimeGraceMins * 60) - (currentHour * 3600 + currentMin * 60 + currentSecs);
+        const totalClosingSecs = (onTimeGraceMins * 60) - (hours * 3600 + minutes * 60 + seconds);
         const mins = Math.floor(totalClosingSecs / 60);
         const secs = totalClosingSecs % 60;
         setStatus({ 

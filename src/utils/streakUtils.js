@@ -6,28 +6,74 @@
  */
 
 /**
- * KST 기준 오늘 날짜를 YYYY-MM-DD 형식으로 반환
+ * KST 기준 날짜를 YYYY-MM-DD 형식으로 반환
+ * @param {Date|number|string} [date] - 기준 날짜
  */
-export function getTodayKST() {
-  const kstNow = getNowKST()
-  return kstNow.toISOString().split('T')[0]
+export function getTodayKST(date = new Date()) {
+  const kstParts = getKSTComponents(date);
+  const month = String(kstParts.month).padStart(2, '0');
+  const day = String(kstParts.day).padStart(2, '0');
+  return `${kstParts.year}-${month}-${day}`;
 }
 
 /**
  * KST 기준 어제 날짜를 YYYY-MM-DD 형식으로 반환
  */
 export function getYesterdayKST() {
-  const kstNow = getNowKST()
-  const yesterday = new Date(kstNow.getTime() - 86400000)
-  return yesterday.toISOString().split('T')[0]
+  const date = new Date();
+  date.setDate(date.getDate() - 1); // Subtract 24 hours approximately
+  return getTodayKST(date);
 }
 
 /**
- * 전 세계 어디서든 한국 표준시(KST, UTC+9) 기준의 Date 객체를 반환
+ * 전 세계 어디서든 KST 기준의 시간 정보를 객체로 반환
+ * @param {Date|number|string} [date] - 기준 날짜
  */
+export function getKSTComponents(date = new Date()) {
+  const d = new Date(date);
+  
+  // Use Intl.DateTimeFormat for guaranteed KST
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hourCycle: 'h23',
+    weekday: 'short'
+  }).formatToParts(d);
+
+  const p = {};
+  for (const part of parts) {
+    if (part.type !== 'literal') p[part.type] = part.value;
+  }
+
+  const weekdays = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+
+  return {
+    year: parseInt(p.year, 10),
+    month: parseInt(p.month, 10),
+    day: parseInt(p.day, 10),
+    hours: parseInt(p.hour, 10), // 0-23
+    minutes: parseInt(p.minute, 10),
+    seconds: parseInt(p.second, 10),
+    dayOfWeek: weekdays[p.weekday]
+  };
+}
+
+/**
+ * 임시 하위 호환성 유지용 (가급적 getKSTComponents 사용 권장)
+ * Date 객체의 메소가 UTC 오프셋이 적용된 상태가 아니므로 가짜 KST 날짜 객체를 생성합니다.
+ */
+export function getKSTDate(date = new Date()) {
+  const d = new Date(date);
+  return new Date(d.getTime() + (9 * 3600000));
+}
+
 export function getNowKST() {
-  const now = new Date()
-  return new Date(now.getTime() + (9 * 3600000))
+  return getKSTDate();
 }
 
 /**

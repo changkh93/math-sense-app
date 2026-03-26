@@ -3,11 +3,7 @@ import { collection, getDocs, doc as firestoreDoc, setDoc, query, orderBy, where
 import { db } from '../../firebase';
 import { Wrench, ShieldAlert, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 
-// KST 기준 오늘
-function getTodayKST() {
-  const kstNow = new Date(Date.now() + 9 * 3600000);
-  return kstNow.toISOString().split('T')[0];
-}
+import { getTodayKST } from '../../utils/streakUtils';
 
 function daysBetween(d1, d2) {
   const a = new Date(d1 + 'T00:00:00+09:00');
@@ -149,7 +145,7 @@ const StreakFixer = () => {
       const h = d.data();
       if (!h.timestamp) return null;
       const ts = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
-      return new Date(ts.getTime() + 9 * 3600000).toISOString().split('T')[0];
+      return getTodayKST(ts);
     }).filter(d => d);
 
     if (activeDates.length === 0) return null;

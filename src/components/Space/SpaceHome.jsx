@@ -29,7 +29,7 @@ import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
-import { calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils'
+import { calculateStreakUpdate, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
@@ -299,7 +299,7 @@ function SpaceHome() {
     if (!userData?.hasRadar || !unitId) return false
     
     // Deterministic selection based on UnitID + UID + Today's Date
-    const today = new Date().toISOString().split('T')[0]
+    const today = getTodayKST()
     const seedStr = `${unitId}-${user.uid}-${today}`
     let hash = 0
     for (let i = 0; i < seedStr.length; i++) {
@@ -682,16 +682,17 @@ function SpaceHome() {
         const currentShieldCharges = freshUserData?.shieldCharges || 0
 
         // Daily Task Reset Logic
-        const today = new Date().toISOString().split('T')[0]
+        const today = getTodayKST()
         const lastQuizDate = freshUserData.lastQuizDate || ""
         const dailyQuizCount = (lastQuizDate === today) ? (freshUserData.dailyQuizCount || 0) + 1 : 1
 
         // --- Direct Growth Counter ---
-        const kstNow = new Date(Date.now() + 9 * 3600000)
-        const todayKST = kstNow.toISOString().split('T')[0]
-        const mondayOffset = (kstNow.getUTCDay() + 6) % 7
-        const mondayKST = new Date(kstNow.getTime() - mondayOffset * 86400000)
-          .toISOString().split('T')[0]
+        const kstPart = getKSTComponents()
+        const todayKST = getTodayKST()
+        const mondayOffset = (kstPart.dayOfWeek + 6) % 7
+        const mondayDate = new Date()
+        mondayDate.setDate(mondayDate.getDate() - mondayOffset)
+        const mondayKST = getTodayKST(mondayDate)
 
         const growthUpdates = {}
         if (atomicCrystalsEarned > 0) {
@@ -718,13 +719,14 @@ function SpaceHome() {
           const defendedDates = []
           const lastDate = freshUserData?.lastStreakDate
           if (lastDate) {
-            const scanObj = new Date(lastDate + 'T12:00:00Z')
-            const todayDateKST = getTodayKST()
-            const todayDate = new Date(todayDateKST + 'T12:00:00Z')
-            scanObj.setUTCDate(scanObj.getUTCDate() + 1)
-            while (scanObj < todayDate) {
-              defendedDates.push(scanObj.toISOString().split('T')[0])
-              scanObj.setUTCDate(scanObj.getUTCDate() + 1)
+            let scanDate = new Date(lastDate)
+            scanDate.setDate(scanDate.getDate() + 1)
+            let scanKST = getTodayKST(scanDate)
+
+            while (scanKST < todayKST) {
+              defendedDates.push(scanKST)
+              scanDate.setDate(scanDate.getDate() + 1)
+              scanKST = getTodayKST(scanDate)
             }
           }
           recordCrystalTransaction(user.uid, {
@@ -1065,13 +1067,14 @@ function SpaceHome() {
           const defendedDates = []
           const lastDate = freshUserData?.lastStreakDate
           if (lastDate) {
-            const scanObj = new Date(lastDate + 'T12:00:00Z')
-            const todayDateKST = getTodayKST()
-            const todayDate = new Date(todayDateKST + 'T12:00:00Z')
-            scanObj.setUTCDate(scanObj.getUTCDate() + 1)
-            while (scanObj < todayDate) {
-              defendedDates.push(scanObj.toISOString().split('T')[0])
-              scanObj.setUTCDate(scanObj.getUTCDate() + 1)
+            let scanDate = new Date(lastDate)
+            scanDate.setDate(scanDate.getDate() + 1)
+            let scanKST = getTodayKST(scanDate)
+
+            while (scanKST < todayKST) {
+              defendedDates.push(scanKST)
+              scanDate.setDate(scanDate.getDate() + 1)
+              scanKST = getTodayKST(scanDate)
             }
           }
           recordCrystalTransaction(user.uid, {

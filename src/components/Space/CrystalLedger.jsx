@@ -3,6 +3,7 @@ import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
 import { db, auth } from '../../firebase'
 import './CrystalLedger.css'
+import { getTodayKST, getYesterdayKST, getKSTComponents } from '../../utils/streakUtils'
 
 // Transaction type configs
 const TX_CONFIG = {
@@ -26,13 +27,8 @@ const FILTER_TABS = [
 ]
 
 function formatDateLabel(dateStr) {
-  const now = new Date()
-  const kstNow = new Date(now.getTime() + 9 * 3600000)
-  const todayStr = kstNow.toISOString().split('T')[0]
-
-  const yesterday = new Date(kstNow)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayStr = yesterday.toISOString().split('T')[0]
+  const todayStr = getTodayKST()
+  const yesterdayStr = getYesterdayKST()
 
   if (dateStr === todayStr) return '오늘'
   if (dateStr === yesterdayStr) return '어제'
@@ -42,10 +38,9 @@ function formatDateLabel(dateStr) {
 }
 
 function formatTime(date) {
-  const d = new Date(date)
-  const kst = new Date(d.getTime() + 9 * 3600000)
-  const h = kst.getUTCHours()
-  const m = kst.getUTCMinutes().toString().padStart(2, '0')
+  const kst = getKSTComponents(date)
+  const h = kst.hours
+  const m = kst.minutes.toString().padStart(2, '0')
   const period = h < 12 ? '오전' : '오후'
   const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
   return `${period} ${hour12}:${m}`
@@ -115,8 +110,7 @@ export default function CrystalLedger({ userData }) {
   const groupedTransactions = useMemo(() => {
     const groups = {}
     filteredTransactions.forEach(tx => {
-      const kst = new Date(tx.timestamp.getTime() + 9 * 3600000)
-      const dateKey = kst.toISOString().split('T')[0]
+      const dateKey = getTodayKST(tx.timestamp)
       if (!groups[dateKey]) {
         groups[dateKey] = {
           date: dateKey,

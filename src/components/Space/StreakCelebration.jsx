@@ -148,9 +148,7 @@ export function StreakCalendar({ history, userData }) {
       if (h.timestamp) {
         // Firestore Timestamp or Date
         const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp)
-        // KST 변환
-        const kst = new Date(d.getTime() + 9 * 3600000)
-        dates.add(kst.toISOString().split('T')[0])
+        dates.add(getTodayKST(d))
       }
     })
     return dates
@@ -159,11 +157,10 @@ export function StreakCalendar({ history, userData }) {
   // 최근 90일의 그리드 생성
   const calendarData = useMemo(() => {
     const days = []
-    const kstNow = new Date(Date.now() + 9 * 3600000)
     
     for (let i = 89; i >= 0; i--) {
-      const d = new Date(kstNow.getTime() - i * 86400000)
-      const dateStr = d.toISOString().split('T')[0]
+      const d = new Date(Date.now() - i * 86400000)
+      const dateStr = getTodayKST(d)
       const isActive = activeDates.has(dateStr)
       const isToday = dateStr === todayKST
       

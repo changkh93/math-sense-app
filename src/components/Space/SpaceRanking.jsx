@@ -8,7 +8,7 @@ import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
-import { getEffectiveStreak } from '../../utils/streakUtils'
+import { getEffectiveStreak, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
 import { calculateSEI } from '../../utils/rankingUtils'
 import { useAdmin } from '../../hooks/useAdmin'
 
@@ -30,8 +30,8 @@ export default function SpaceRanking({ user, userData }) {
         const historyDates = docs.map(h => {
           if (!h.timestamp) return null;
           const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
-          const kst = new Date(d.getTime() + 9 * 3600000);
-          return kst.toISOString().split('T')[0];
+          const kst = getKSTComponents(d);
+          return `${kst.year}-${String(kst.month).padStart(2, '0')}-${String(kst.day).padStart(2, '0')}`;
         }).filter(Boolean);
         const uniqueDates = [...new Set(historyDates)].sort().reverse();
         let calculatedStreak = 0; let lastDate = "";
@@ -41,9 +41,9 @@ export default function SpaceRanking({ user, userData }) {
           calculatedStreak = 1;
           for (let i = 1; i < uniqueDates.length; i++) {
             const prevDate = uniqueDates[i];
-            const d1 = new Date(`${currDate}T12:00:00Z`);
-            const d2 = new Date(`${prevDate}T12:00:00Z`);
-            const diff = Math.round((d1 - d2) / 86400000);
+            const d1 = new Date(currDate)
+            const d2 = new Date(prevDate)
+            const diff = Math.round((d1.getTime() - d2.getTime()) / 86400000);
             if (diff === 1) { calculatedStreak++; currDate = prevDate; } else { break; }
           }
         }
@@ -73,11 +73,12 @@ export default function SpaceRanking({ user, userData }) {
     )
 
     unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-      const kstNow = new Date(Date.now() + 9 * 3600000)
-      const todayKey = kstNow.toISOString().split('T')[0]
-      const mondayOffset = (kstNow.getUTCDay() + 6) % 7
-      const mondayKey = new Date(kstNow.getTime() - mondayOffset * 86400000)
-        .toISOString().split('T')[0]
+      const kstPart = getKSTComponents()
+      const todayKey = getTodayKST()
+      const mondayOffset = (kstPart.dayOfWeek + 6) % 7
+      const mondayDate = new Date()
+      mondayDate.setDate(mondayDate.getDate() - mondayOffset)
+      const mondayKey = getTodayKST(mondayDate)
 
       const users = snapshot.docs.map(doc => {
         const d = doc.data()

@@ -49,8 +49,7 @@ export default function SpaceJourney({ userData }) {
     history.forEach(h => {
       if (!h.timestamp) return;
       const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
-      const kst = new Date(d.getTime() + 9 * 3600000);
-      const dateStr = kst.toISOString().split('T')[0];
+      const dateStr = getTodayKST(d);
       
       const existing = map.get(dateStr) || { 
         quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0,
@@ -78,8 +77,7 @@ export default function SpaceJourney({ userData }) {
     transactions.forEach(t => {
       if (t.type === 'streak_freeze' && t.timestamp) {
         const d = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp);
-        const kst = new Date(d.getTime() + 9 * 3600000);
-        const dateStr = kst.toISOString().split('T')[0];
+        const dateStr = getTodayKST(d);
         
         const existing = map.get(dateStr) || { 
           quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0, isProtected: true
@@ -177,7 +175,7 @@ export default function SpaceJourney({ userData }) {
     history.forEach(h => {
       if (!h.timestamp) return;
       const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
-      const dateStr = new Date(d.getTime() + 9 * 3600000).toISOString().split('T')[0];
+      const dateStr = getTodayKST(d);
       if (dateStr < minDate) minDate = dateStr;
     });
 
