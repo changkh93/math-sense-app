@@ -810,3 +810,73 @@
   font-family: var(--font-tech);
   letter-spacing: 1px;
 }
+
+/* ========================================
+   📝 Markdown Content Styles
+   ======================================== */
+.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+  color: var(--text-bright);
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  font-family: var(--font-title);
+}
+
+.markdown-content h1 { font-size: 1.6rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; }
+.markdown-content h2 { font-size: 1.4rem; }
+.markdown-content h3 { font-size: 1.2rem; }
+
+.markdown-content p {
+  margin-bottom: 1.2rem;
+  line-height: 1.7;
+}
+
+.markdown-content ul, .markdown-content ol {
+  margin-bottom: 1.2rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.5rem;
+}
+
+/* Code Blocks & Inline Code */
+.markdown-content pre {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.2rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  white-space: pre; /* CRITICAL: Preserve indentation */
+  position: relative;
+}
+
+.markdown-content code {
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 0.9rem;
+  color: var(--neon-blue);
+  background: rgba(0, 243, 255, 0.05);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  padding: 0;
+  color: #e0e0e0;
+  display: block;
+  line-height: 1.5;
+}
+
+/* Link Styles */
+.markdown-content a {
+  color: var(--neon-blue);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: var(--transition-smooth);
+}
+
+.markdown-content a:hover {
+  border-bottom-color: var(--neon-blue);
+  text-shadow: var(--glow-text-blue);
+}
