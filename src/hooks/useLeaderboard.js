@@ -98,10 +98,14 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
           const uId = d.unitId
           if (!uId) return
 
-          // Track best score per unit
-          if (!userScores[uid].units[uId] || d.score > userScores[uid].units[uId]) {
-            userScores[uid].units[uId] = d.score
-          }
+          // Track metrics per unit
+          const unitData = userScores[uid].units[uId] || { bestScore: 0, initialScore: d.score, attemptCount: 1 }
+          
+          unitData.bestScore = Math.max(unitData.bestScore, d.score)
+          if (d.initialScore !== undefined) unitData.initialScore = d.initialScore
+          if (d.attemptCount !== undefined) unitData.attemptCount = Math.max(unitData.attemptCount, d.attemptCount)
+          
+          userScores[uid].units[uId] = unitData
 
           // Accumulate total crystals earned in this scope
           if (d.crystalsEarned) {
@@ -117,7 +121,7 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
 
         // Calculate average best score per user
         const ranked = Object.entries(userScores).map(([uid, data]) => {
-          const scores = Object.values(data.units)
+          const scores = Object.values(data.units).map(u => u.bestScore)
           const totalScoreSum = scores.reduce((sum, s) => sum + s, 0)
           const unitCount = scores.length
           const avgScore = unitCount > 0 ? totalScoreSum / unitCount : 0
@@ -127,6 +131,8 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
             id: uid,
             name: userNameMap[uid] || '무명 탐험가',
             avgScore: Math.round(avgScore * 10) / 10,
+            avgInitialScore: Math.round((unitCount > 0 ? Object.values(data.units).reduce((sum, u) => sum + u.initialScore, 0) / unitCount : 0) * 10) / 10,
+            totalAttemptCount: Object.values(data.units).reduce((sum, u) => sum + (u.attemptCount || 1), 0),
             totalScore: totalScoreSum,
             unitCount,
             perfectCount,

@@ -146,6 +146,8 @@ export function useLearningHistory(userId, dateStr) {
             type: displayType,
             title: displayTitle,
             score: data.score,
+            initialScore: data.initialScore,
+            attemptCount: data.attemptCount,
             crystalsEarned: data.crystalsEarned || 0,
             metadata: data
           });

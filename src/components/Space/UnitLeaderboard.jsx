@@ -45,7 +45,10 @@ export default function UnitLeaderboard({ user, unitId, unitTitle }) {
           {isMe && <span className="lb-me-badge">ME</span>}
         </div>
         <div className="lb-score">
-          평균 {u.avgScore}점
+          최고 {u.avgScore}점
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+            최초 {u.avgInitialScore}% / {u.totalAttemptCount}회 시도
+          </div>
         </div>
         <div className="lb-progress-wrapper">
           <div className="lb-progress-bar">

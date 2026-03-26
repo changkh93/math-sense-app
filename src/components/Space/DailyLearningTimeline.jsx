@@ -231,23 +231,42 @@ export default function DailyLearningTimeline({ activities, dailyStats, loading,
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', marginTop: '0.2rem' }}>
                   {/* Quiz Score */}
                   {act.type === 'quiz_pass' && act.score !== null && (
-                    <div style={{ 
-                      background: 'rgba(0,0,0,0.5)', 
-                      padding: '0.2rem 0.6rem', 
-                      borderRadius: '4px', 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '0.4rem',
-                      border: '1px solid rgba(255,255,255,0.05)'
-                    }}>
-                      <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>SCORE</span>
-                      <span className="font-tech" style={{ 
-                        color: act.score === 100 ? 'var(--star-gold)' : (act.score >= 80 ? 'var(--crystal-cyan)' : '#ef4444'),
-                        fontSize: '0.9rem',
-                        fontWeight: 'bold'
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <div style={{ 
+                        background: 'rgba(0,0,0,0.5)', 
+                        padding: '0.2rem 0.6rem', 
+                        borderRadius: '4px', 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.4rem',
+                        border: '1px solid rgba(255,255,255,0.05)'
                       }}>
-                        {act.score}
-                      </span>
+                        <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>SCORE</span>
+                        <span className="font-tech" style={{ 
+                          color: act.score === 100 ? 'var(--star-gold)' : (act.score >= 80 ? 'var(--crystal-cyan)' : '#ef4444'),
+                          fontSize: '0.9rem',
+                          fontWeight: 'bold'
+                        }}>
+                          {act.score}
+                        </span>
+                      </div>
+
+                      {act.initialScore !== undefined && (
+                        <div style={{ 
+                          background: 'rgba(255,107,129,0.05)', 
+                          padding: '0.2rem 0.6rem', 
+                          borderRadius: '4px', 
+                          display: 'inline-flex', 
+                          alignItems: 'center', 
+                          gap: '0.4rem',
+                          border: '1px solid rgba(255,107,129,0.1)'
+                        }}>
+                          <span className="font-tech" style={{ color: 'var(--secondary)', fontSize: '0.65rem' }}>INIT / ATTEMPT</span>
+                          <span className="font-tech" style={{ color: 'var(--text-bright)', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                            {act.initialScore}% / {act.attemptCount || 1}회
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
 

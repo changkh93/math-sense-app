@@ -666,6 +666,13 @@ function SpaceHome() {
         }
 
         // --- Atomic Logging: History ---
+        const existingInitialScore = freshProgressData.initialScore
+        const sessionAttemptCount = scoreData.attemptCount || 1 // 1 pass + N re-solves
+        const currentAttemptCount = (freshProgressData.attemptCount || 0) + sessionAttemptCount
+        
+        // 최초 정답률은 '한 번도 기록된 적 없을 때만' 현재 세션의 첫 패스 성적으로 기록
+        const initialScoreToSave = (existingInitialScore !== undefined) ? existingInitialScore : (scoreData.initialRawScore ?? score)
+
         const historyRef = doc(collection(db, 'users', user.uid, 'history'))
         transaction.set(historyRef, {
           unitId: currentUnitId,
@@ -680,9 +687,11 @@ function SpaceHome() {
           timestamp: serverTimestamp()
         })
 
-        // --- Update Progress Doc (Source of truth for bestScore) ---
+        // --- Update Progress Doc (Source of truth for bestScore, initialScore, attemptCount) ---
         transaction.set(progressDocRef, {
           bestScore: Math.max(serverPreviousBest, score),
+          initialScore: initialScoreToSave,
+          attemptCount: currentAttemptCount,
           updatedAt: serverTimestamp()
         }, { merge: true })
 

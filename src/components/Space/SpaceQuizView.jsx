@@ -33,6 +33,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [modalContext, setModalContext] = useState(null)
   const [isFirstPassPerfect, setIsFirstPassPerfect] = useState(false)
+  const [firstPassScore, setFirstPassScore] = useState(null)
   const [showRadarScan, setShowRadarScan] = useState(false)
   const [potentialOre, setPotentialOre] = useState(0)
   
@@ -148,6 +149,13 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           if (totalCorrectSoFar === originalTotal) {
             setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
           }
+          
+          // 최초 정답률 기록 (첫 패스 종료 시점)
+          if (retryCount === 0 && firstPassScore === null) {
+            const fPassScore = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
+            setFirstPassScore(fPassScore)
+          }
+
           setIsResultMode(true)
         }
       }, 800)
@@ -186,6 +194,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         if (currentIdx < currentQuestions.length - 1) {
           setCurrentIdx(prev => prev + 1)
         } else {
+          // 최초 정답률 기록 (첫 패스 종료 시점 - 실패 케이스)
+          if (retryCount === 0 && firstPassScore === null) {
+            const totalCorrectSoFar = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
+            const fPassScore = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
+            setFirstPassScore(fPassScore)
+          }
           setIsResultMode(true)
         }
       }, rebootDelay)
@@ -259,17 +273,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setReSolveMode(true)
   }
 
-  // 점수 계산 유틸리티
+  // 점수 계산 유틸리티 (상한 점수 폐지)
   const calculateFinalScore = (rawScore, retryCount) => {
-    const PENALTY_PER_RETRY = 10;
-    const MIN_SCORE_FLOOR = 70;
-    
-    if (retryCount === 0) return rawScore;
-    
-    const penaltyScore = 100 - (retryCount * PENALTY_PER_RETRY);
-    const finalScoreLimit = Math.max(penaltyScore, MIN_SCORE_FLOOR);
-    
-    return Math.min(rawScore, finalScoreLimit);
+    // 이제 더 이상 상한 점수를 적용하지 않고 원점수를 그대로 반환합니다.
+    return rawScore;
   };
 
   const handleFinish = async () => {
@@ -293,6 +300,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
       await onComplete({ 
         score: finalScore, 
+        initialRawScore: (firstPassScore !== null ? firstPassScore : rawScore), // Capture first pass specifically
+        retryCount: retryCount, // Current session retry count
+        attemptCount: (retryCount + 1), // Total attempts in THIS session (1 initial + N re-solves)
         total: 100, 
         correctCount, 
         totalCount: originalTotal, 
