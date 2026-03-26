@@ -256,29 +256,14 @@ export function useLearningHistory(userId, dateStr) {
           });
         });
         
-        // --- Process Learning Progress (Capturing partial progress) ---
+        // --- Process Learning Progress (Capturing partial progress for timeline visibility) ---
         getDocsSafe(lpSnap).forEach(doc => {
           const data = doc.data ? doc.data() : doc;
-          // Capture video progress even if no reward was triggered
-          if (data.videoProgress) {
-            Object.entries(data.videoProgress).forEach(([txId, vData]) => {
-              const timeVal = vData.stampedSeconds?.length || Math.floor(vData.totalTimeSpent || 0);
-              if (timeVal > 0) {
-                if (!stats._videoTxMap) stats._videoTxMap = {};
-                stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, timeVal);
-              }
-            });
-          }
-          // Note: data.logRead could also be used here if needed
+          // Note: Previously we added cumulative time here, but it caused past records to disappear 
+          // when updatedAt moved to a new day. We now only use lpSnap for timeline node generation 
+          // if we decide to add one, but NOT for the totalVideoSeconds sum.
+          // totalVideoSeconds is now accurately derived from crystal_transactions (transmission_reward) above.
         });
-        
-        // Finalize totalVideoSeconds from our _videoTxMap
-        if (stats._videoTxMap) {
-          Object.values(stats._videoTxMap).forEach(v => {
-            stats.totalVideoSeconds += v;
-          });
-          delete stats._videoTxMap;
-        }
 
         // Sort all activities by timestamp ascending
         aggregated.sort((a, b) => {

@@ -901,7 +901,8 @@ export default function MissionHub({
         [`videoProgress.${txId}.rewardedStampCount`]: stamps.length - newStampCountRef.current,
         [`videoProgress.${txId}.totalRewardedCrystals`]: totalRewardedCrystalsRef.current,
         [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
-        [`videoProgress.${txId}.updatedAt`]: serverTimestamp()
+        [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
+        updatedAt: serverTimestamp()
       }
       
       if (isManualComplete) {
@@ -1013,7 +1014,8 @@ export default function MissionHub({
                 [`videoProgress.${txId}.lastPosition`]: pos,
                 [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
                 [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
-                [`videoProgress.${txId}.stampedSeconds`]: stamps
+                [`videoProgress.${txId}.stampedSeconds`]: stamps,
+                updatedAt: serverTimestamp()
               }
               
               setSaveStatus('saving')

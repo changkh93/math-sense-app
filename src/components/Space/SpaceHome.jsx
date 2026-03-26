@@ -1043,7 +1043,8 @@ function SpaceHome() {
         if (isLogActivity && !freshProgressData.logRead) {
           transaction.set(progressDocRef, {
             logRead: true,
-            logReadAt: serverTimestamp()
+            logReadAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
           }, { merge: true })
         } else if (isVideoActivity && transmissionId) {
           const baseKey = `videoProgress.${transmissionId}`
@@ -1051,13 +1052,15 @@ function SpaceHome() {
              transaction.set(progressDocRef, {
                [`${baseKey}.completed`]: true,
                [`${baseKey}.completionBonusGiven`]: true,
-               [`${baseKey}.updatedAt`]: serverTimestamp()
+               [`${baseKey}.updatedAt`]: serverTimestamp(),
+               updatedAt: serverTimestamp()
              }, { merge: true })
           } else if (activityType.includes('수신') && stampedSeconds) {
              transaction.set(progressDocRef, {
                [`${baseKey}.rewardedStampCount`]: stampedSeconds.length,
                [`${baseKey}.stampedSeconds`]: stampedSeconds,
-               [`${baseKey}.updatedAt`]: serverTimestamp()
+               [`${baseKey}.updatedAt`]: serverTimestamp(),
+               updatedAt: serverTimestamp()
              }, { merge: true })
           }
         }
