@@ -28,15 +28,6 @@ export default function SpaceStore({ userData, user }) {
       desc: '퀴즈를 풀다 틀려도 피같은 광석(-2)이 깎이지 않게 지켜줍니다! 한 번 구매하면 든든하게 10번이나 막아줘요.',
       currentOwned: userData?.shieldCharges || 0
     },
-    { 
-      id: 'memory_core', 
-      name: '별빛 메모리 코어', 
-      icon: '☄️', 
-      cost: 200, 
-      maxOwn: 50, // Max charges
-      desc: '깨진 데이터를 복구하고 과거의 점수를 되찾을 수 있는 필수 장치입니다! 한 번 구매하면 10번의 복구 탐사가 가능합니다.',
-      currentOwned: userData?.memoryCoreCharges || 0
-    },
   ]
 
   const unownedEquipments = [
@@ -111,8 +102,8 @@ export default function SpaceStore({ userData, user }) {
       } finally {
         setPurchasing(false)
       }
-    } else if (item.id === 'photon_shield' || item.id === 'memory_core') {
-      const fieldName = item.id === 'photon_shield' ? 'shieldCharges' : 'memoryCoreCharges'
+    } else if (item.id === 'photon_shield') {
+      const fieldName = 'shieldCharges'
       const currentCharges = userData?.[fieldName] || 0
       
       if (currentCharges + 10 > item.maxOwn) {

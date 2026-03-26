@@ -36,6 +36,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [firstPassScore, setFirstPassScore] = useState(null)
   const [showRadarScan, setShowRadarScan] = useState(false)
   const [potentialOre, setPotentialOre] = useState(0)
+  const [reviewMarks, setReviewMarks] = useState(new Set()) // 재검토 마크 문항 ID
   
   // Interactive FAB (Support Tray) state
   const [isTrayExpanded, setIsTrayExpanded] = useState(false)
@@ -286,7 +287,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     const finalScore = calculateFinalScore(rawScore, retryCount)
     
     const canGetPerfectBonus = (correctCount === originalTotal)
-    const crystalsEarned = sessionCrystals + (canGetPerfectBonus ? 10 : 0)
+    const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
+    
+    // Confidence-based Reward: Only Correct AND NOT Marked for review
+    const reviewMarkedIds = new Set(Array.from(reviewMarks))
+    const solvedAndReleasedCount = allSessionQuestions.filter(q => 
+      userAnswers[q.id]?.isCorrect && !reviewMarkedIds.has(q.id)
+    ).length
+
+    const crystalsEarned = isDarkMatter 
+      ? Math.min(5, solvedAndReleasedCount) 
+      : sessionCrystals + (canGetPerfectBonus ? 10 : 0)
     
     try {
       // Clear localStorage on successful finish
@@ -308,12 +319,21 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         wrongQuestions: allSessionQuestions.filter(q => userAnswers[q.id] && userAnswers[q.id].isCorrect === false).map(q => ({
           ...q,
           unitId: q.unitId || quizData?.unitId || "",
+          unitTitle: q.unitTitle || quizData?.title || "",
           chapterId: q.chapterId || quizData?.chapterId || "",
           regionId: q.regionId || region?.id || ""
         })),
         correctQuestions: allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).map(q => ({
           id: q.id,
-          unitId: q.unitId || quizData?.unitId || ""
+          unitId: q.unitId || quizData?.unitId || "",
+          unitTitle: q.unitTitle || quizData?.title || ""
+        })),
+        reviewMarkedQuestions: allSessionQuestions.filter(q => reviewMarks.has(q.id)).map(q => ({
+          id: q.id,
+          unitId: q.unitId || quizData?.unitId || "",
+          unitTitle: quizData?.title || "",
+          chapterId: q.chapterId || quizData?.chapterId || "",
+          regionId: q.regionId || region?.id || ""
         }))
       })
     } catch (err) {
@@ -384,7 +404,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     
     // 만점 보너스 가시성 (저장 로직과 동일하게 유지)
     const canGetPerfectBonus = isPerfect
-    const crystalsEarnedDisplay = sessionCrystals + (canGetPerfectBonus ? 10 : 0)
+    const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
+    
+    // Confidence-based display: Only Correct AND NOT Marked
+    const reviewMarkedIds = new Set(Array.from(reviewMarks))
+    const solvedAndReleasedCount = allSessionQuestions.filter(q => 
+      userAnswers[q.id]?.isCorrect && !reviewMarkedIds.has(q.id)
+    ).length
+
+    const crystalsEarnedDisplay = isDarkMatter 
+      ? Math.min(5, solvedAndReleasedCount) 
+      : sessionCrystals + (canGetPerfectBonus ? 10 : 0)
 
     return (
       <div className="space-bg">
@@ -537,7 +567,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   opacity: isSubmitting ? 0.7 : 1
                 }}
               >
-                {isSubmitting ? '제출 중...' : (canGetPerfectBonus ? '🌟 만점 보상 받기' : '📤 결과 저장하기')}
+                {isSubmitting ? '제출 중...' : (isDarkMatter ? '🌌 탐사 완료하기' : (canGetPerfectBonus ? '🌟 만점 보상 받기' : '📤 결과 저장하기'))}
               </button>
             </div>
           </div>
@@ -720,7 +750,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               fontSize: '0.9rem',
               fontWeight: 700
             }}>
-              {quizData?.title} {reSolveMode && '(재도전)'}
+              {currentQuestion?.unitTitle || quizData?.title} {reSolveMode && '(재도전)'}
             </span>
             
             {/* 진행바 */}
@@ -880,6 +910,43 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             }}>
               {formatText(currentQuestion.question)}
             </h2>
+
+            {/* 재검토 마크 토글 */}
+            <button
+              onClick={() => {
+                setReviewMarks(prev => {
+                  const next = new Set(prev)
+                  if (next.has(currentQuestion.id)) next.delete(currentQuestion.id)
+                  else next.add(currentQuestion.id)
+                  return next
+                })
+                soundManager.playClick()
+              }}
+              style={{
+                marginTop: '1rem',
+                padding: '0.4rem 1rem',
+                borderRadius: '20px',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: reviewMarks.has(currentQuestion.id) 
+                  ? '2px solid #a855f7' 
+                  : '1px solid rgba(255,255,255,0.2)',
+                background: reviewMarks.has(currentQuestion.id) 
+                  ? 'rgba(168, 85, 247, 0.25)' 
+                  : 'rgba(255,255,255,0.05)',
+                color: reviewMarks.has(currentQuestion.id) 
+                  ? '#c084fc' 
+                  : 'var(--text-muted)',
+                transition: 'all 0.2s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              {reviewMarks.has(currentQuestion.id) ? '🔖' : '📌'}
+              {reviewMarks.has(currentQuestion.id) ? '재검토 마크됨' : '재검토 마크'}
+            </button>
           </div>
 
           {/* 보기 */}

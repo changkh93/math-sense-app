@@ -280,6 +280,9 @@ export default function PlanetMesh({
     } else if (planetType === 'cloud') {
       baseColor = '#a7ffeb'
       secondaryColor = '#e0f2f1'
+    } else if (planetType === 'dark_matter') {
+      baseColor = '#1a0033'
+      secondaryColor = '#6b21a8'
     }
 
     const gradient = ctx.createLinearGradient(0, 0, 512, 256)

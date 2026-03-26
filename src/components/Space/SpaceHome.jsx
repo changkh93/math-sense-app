@@ -3,7 +3,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit, runTransaction, Timestamp } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit, runTransaction, Timestamp, documentId } from 'firebase/firestore'
 import { useClusters, useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 // import { regions as localRegions } from '../../data/regions'
@@ -26,6 +26,7 @@ import RegionAccessModal from './RegionAccessModal' // New Integration
 import AssignmentHub from './AssignmentHub' // New Integration
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
+import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
 import { calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils'
@@ -102,10 +103,28 @@ function SpaceHome() {
   const [accessError, setAccessError] = useState(null)
   const [verifyingCode, setVerifyingCode] = useState(false)
   
-  // --- Memory Core State ---
-  const [isMemoryCoreMode, setIsMemoryCoreMode] = useState(false)
-  const [memoryCoreQuestions, setMemoryCoreQuestions] = useState([])
-  const [loadingMemoryCore, setLoadingMemoryCore] = useState(false)
+  // --- Dark Matter State ---
+  const [isDarkMatterMode, setIsDarkMatterMode] = useState(false)
+  const [darkMatterQuestions, setDarkMatterQuestions] = useState([])
+  const [loadingDarkMatter, setLoadingDarkMatter] = useState(false)
+  const [darkMatterCount, setDarkMatterCount] = useState(0)
+  const [activeDarkMatterQuizQs, setActiveDarkMatterQuizQs] = useState(null)
+
+  // Load initial dark matter count
+  useEffect(() => {
+    if (!user) return
+    const loadCount = async () => {
+      try {
+        const iqSnap = await getDocs(collection(db, 'users', user.uid, 'incorrect_questions'))
+        const rmSnap = await getDocs(query(collection(db, 'users', user.uid, 'review_marks'), where('status', '==', 'active')))
+        const allIds = new Set()
+        iqSnap.docs.forEach(d => allIds.add(d.id))
+        rmSnap.docs.forEach(d => allIds.add(d.id))
+        setDarkMatterCount(allIds.size)
+      } catch (e) { /* non-critical */ }
+    }
+    loadCount()
+  }, [user])
 
   // Sync view from location state (e.g. when coming from Agora)
   useEffect(() => {
@@ -190,39 +209,88 @@ function SpaceHome() {
     }
   }, [chapters, selectedChapterDocId])
 
-  const startMemoryCoreMode = async () => {
-    if (!user) return
-    
-    const currentCharges = userData?.memoryCoreCharges || 0
-    if (currentCharges <= 0) {
-      alert("메모리 코어 탐사권이 부족합니다. 상점에서 복구 탐사권을 구매해주세요!")
-      return
-    }
+  const fetchDarkMatterQuestions = async () => {
+    if (!user) return []
+    try {
+      // 1. Fetch metadata IDs from incorrect_questions & review_marks
+      const iqSnap = await getDocs(query(collection(db, 'users', user.uid, 'incorrect_questions'), orderBy('lastFailedAt', 'desc'), limit(100)))
+      const rmSnap = await getDocs(query(collection(db, 'users', user.uid, 'review_marks'), where('status', '==', 'active')))
+      
+      const iqMeta = iqSnap.docs.map(d => ({ id: d.id, ...d.data(), _source: 'incorrect' }))
+      const rmMeta = rmSnap.docs.map(d => ({ id: d.id, ...d.data(), _source: 'review' }))
+      
+      const allIds = Array.from(new Set([...iqMeta.map(m => m.id), ...rmMeta.map(m => m.id)]))
+      if (allIds.length === 0) return []
 
-    setLoadingMemoryCore(true)
+      // 2. Fetch fresh quiz data from 'quizzes'
+      const freshQuestions = []
+      for (let i = 0; i < allIds.length; i += 30) {
+        const chunk = allIds.slice(i, i + 30)
+        // Use documentId() here too since the IDs are document names
+        const qSnap = await getDocs(query(collection(db, 'quizzes'), where(documentId(), 'in', chunk)))
+        qSnap.docs.forEach(doc => {
+          const id = doc.id
+          const qData = doc.data()
+          const rmItem = rmMeta.find(m => m.id === id)
+          const iqItem = iqMeta.find(m => m.id === id)
+          
+          freshQuestions.push({
+            ...qData,
+            id,
+            _source: iqItem ? 'incorrect' : 'review',
+            _reviewMark: !!rmItem,
+            // Temporary, will be updated with unitTitle below
+            unitId: qData.unitId || iqItem?.unitId || rmItem?.unitId
+          })
+        })
+      }
+
+      // 3. Resolve unitTitles for all unique unitIds
+      const uniqueUnitIds = Array.from(new Set(freshQuestions.map(q => q.unitId).filter(Boolean)))
+      if (uniqueUnitIds.length > 0) {
+        const unitTitlesMap = {}
+        for (let i = 0; i < uniqueUnitIds.length; i += 30) {
+          const chunk = uniqueUnitIds.slice(i, i + 30)
+          // Use documentId() because unit IDs are document names in the units collection
+          const uSnap = await getDocs(query(collection(db, 'units'), where(documentId(), 'in', chunk)))
+          uSnap.docs.forEach(doc => {
+            unitTitlesMap[doc.id] = doc.data().title
+          })
+        }
+        
+        // Update questions with resolved titles
+        freshQuestions.forEach(q => {
+          q.unitTitle = unitTitlesMap[q.unitId] || q.unitTitle || "수학 탐사"
+        })
+      }
+
+      // 4. Sort by unitTitle for logical grouping in dashboard
+      return freshQuestions.sort((a, b) => (a.unitTitle || '').localeCompare(b.unitTitle || ''))
+    } catch (err) {
+      console.error('Error fetching dark matter questions:', err)
+      return []
+    }
+  }
+
+  const startDarkMatterMode = async () => {
+    if (!user) return
+    setLoadingDarkMatter(true)
     soundManager.playWarp()
     try {
-      // Consume one charge
-      await setDoc(doc(db, 'users', user.uid), {
-        memoryCoreCharges: currentCharges - 1
-      }, { merge: true })
+      const merged = await fetchDarkMatterQuestions()
 
-      const q = query(collection(db, 'users', user.uid, 'incorrect_questions'), orderBy('lastFailedAt', 'desc'), limit(20))
-      const snap = await getDocs(q)
-      const failedQs = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }))
-      
-      if (failedQs.length === 0) {
-        alert("복구할 데이터가 없습니다! 당신의 메모리는 완벽하게 보존되어 있습니다. 🚀")
+      if (merged.length === 0) {
+        alert('다크 매터 영역에 문항이 없습니다! 당신의 지식은 완벽하게 빛나고 있습니다. 🌟')
+        setLoadingDarkMatter(false)
         return
       }
 
-      setMemoryCoreQuestions(failedQs)
-      setIsMemoryCoreMode(true)
-    } catch (err) {
-      console.error("Error fetching memory core questions:", err)
-      alert("데이터를 불러오지 못했습니다.")
+      setDarkMatterQuestions(merged)
+      setDarkMatterCount(merged.length)
+      setActiveDarkMatterQuizQs(null) // Reset quiz selection
+      setIsDarkMatterMode(true)
     } finally {
-      setLoadingMemoryCore(false)
+      setLoadingDarkMatter(false)
     }
   }
 
@@ -500,7 +568,7 @@ function SpaceHome() {
       if (totalCount === 0) return
 
       // Anti-grinding logic
-      const currentUnitId = selectedUnitDocId || quickQuizUnitId
+      const currentUnitId = result.unitId || selectedUnitDocId || quickQuizUnitId || 'unknown'
       const scoreKey = result.type === 'workbook' ? `${currentUnitId}_workbook` : currentUnitId
       const previousBest = bestScores[scoreKey] || 0
       let actualCrystalsEarned = 0
@@ -511,6 +579,25 @@ function SpaceHome() {
         // Always apply penalty even if score didn't improve
         actualCrystalsEarned = crystalsEarned
         rewardMessage = `무지성 탐사로 인해 광석 ${Math.abs(crystalsEarned)}개가 소멸되었습니다.`
+      } else if (isDarkMatterMode) {
+        // --- Dark Matter Confidence-based Reward Policy ---
+        // Reward is ONLY given for questions that are solved correctly AND the review mark is released.
+        // If a user gets a question right but chooses to keep the review mark (guess or lack of confidence),
+        // the question stays in Dark Matter and 0 crystals are awarded.
+        const reviewMarkedIds = new Set((result.reviewMarkedQuestions || []).map(q => q.id))
+        const correctIds = new Set((result.correctQuestions || []).map(q => q.id))
+        
+        let solvedAndReleasedCount = 0
+        result.correctQuestions?.forEach(q => {
+          if (!reviewMarkedIds.has(q.id)) {
+            solvedAndReleasedCount++
+          }
+        })
+
+        actualCrystalsEarned = Math.min(5, solvedAndReleasedCount)
+        rewardMessage = actualCrystalsEarned > 0 
+          ? `🌌 다크 매터 정화 성공! (+${actualCrystalsEarned} 광석)`
+          : "문제를 맞혔으나 '재검토' 마크를 유지하여 보상이 지급되지 않았습니다. (학습 지속)"
       } else if (score > previousBest) {
         // Incremental reward: sessionCrystals * (newScore - prevBest) / newScore
         const improvementRatio = (score - previousBest) / score
@@ -526,7 +613,7 @@ function SpaceHome() {
         }
 
         // --- Scanner Daily Bonus (+5) ---
-        if (!isMemoryCoreMode) {
+        if (!isDarkMatterMode) {
           const isScannerBonusUnit = checkIsBonusUnit(currentUnitId)
           if (isScannerBonusUnit && userData?.hasRadar) {
             actualCrystalsEarned += 5
@@ -586,7 +673,7 @@ function SpaceHome() {
             atomicCrystalsEarned = Math.max(0, Math.round(baseCrystals * improvementRatio))
           }
           
-          if (!isMemoryCoreMode && checkIsBonusUnit(currentUnitId) && freshUserData?.hasRadar) {
+          if (!isDarkMatterMode && checkIsBonusUnit(currentUnitId) && freshUserData?.hasRadar) {
             atomicCrystalsEarned += 5
           }
         }
@@ -721,14 +808,16 @@ function SpaceHome() {
       const { streakCalc: streakResultsFinal, atomicCrystalsEarned: finalCrystals } = streakResult
       const finalStreakUpdates = streakResultsFinal.streakUpdate || {}
 
-      // Save wrong questions / Delete recovered questions for Recovery Planet
-      const batchStore = writeBatch(db)
+      // --- Atomic Batch: Update incorrect_questions and review_marks ---
+      const finalBatch = writeBatch(db)
       let hasBatchOps = false
+      const reviewMarkedIds = new Set((result.reviewMarkedQuestions || []).map(q => q.id))
 
+      // 1. Handle wrongly answered questions (incorrect_questions)
       if (result.wrongQuestions && result.wrongQuestions.length > 0) {
         result.wrongQuestions.forEach(q => {
-          const qRef = doc(collection(db, 'users', user.uid, 'incorrect_questions'), q.id)
-          batchStore.set(qRef, {
+          const qRef = doc(db, 'users', user.uid, 'incorrect_questions', q.id)
+          finalBatch.set(qRef, {
             ...q,
             lastFailedAt: serverTimestamp(),
             failCount: increment(1)
@@ -737,67 +826,59 @@ function SpaceHome() {
         hasBatchOps = true
       }
 
+      // 2. Handle correctly answered questions (Delete from incorrect, conditionally mark as mastered)
       if (result.correctQuestions && result.correctQuestions.length > 0) {
         result.correctQuestions.forEach(q => {
-          batchStore.delete(doc(collection(db, 'users', user.uid, 'incorrect_questions'), q.id))
+          // Delete from incorrect_questions
+          finalBatch.delete(doc(db, 'users', user.uid, 'incorrect_questions', q.id))
+          
+          // Mastery ONLY if NOT marked for review (confidence)
+          if (!reviewMarkedIds.has(q.id)) {
+            finalBatch.set(doc(db, 'users', user.uid, 'review_marks', q.id), { 
+              status: 'mastered', 
+              masteredAt: serverTimestamp() 
+            }, { merge: true })
+          } else {
+            // Keep as active if marked, even if correct
+            finalBatch.set(doc(db, 'users', user.uid, 'review_marks', q.id), { 
+              ...q,
+              status: 'active',
+              markedAt: serverTimestamp()
+            }, { merge: true })
+          }
         })
         hasBatchOps = true
       }
 
-      if (hasBatchOps) await batchStore.commit()
+      // 3. Handle NEW/TOGGLED review marks for questions NOT in correctQuestions 
+      // (Correct questions already handled in step 2)
+      const correctIds = new Set((result.correctQuestions || []).map(q => q.id))
+      if (result.reviewMarkedQuestions && result.reviewMarkedQuestions.length > 0) {
+        result.reviewMarkedQuestions.forEach(q => {
+          if (correctIds.has(q.id)) return // Already handled
 
-      // --- Mastery Compensation (Memory Core) ---
-      if (isMemoryCoreMode && result.correctQuestions && result.correctQuestions.length > 0) {
-        const uniqueUnitIds = [...new Set(result.correctQuestions.map(q => q.unitId))]
-        
-        for (const uid of uniqueUnitIds) {
-          if (!uid || uid === 'recovery_zone') continue
-          
-          // Count remaining mistakes for this specific unit
-          const qRem = query(collection(db, 'users', user.uid, 'incorrect_questions'), where('unitId', '==', uid))
-          const snapRem = await getDocs(qRem)
-          const remainingCount = snapRem.size
-          
-          // Assume 20 questions per unit for scoring
-          const compensatedScore = Math.floor(((20 - remainingCount) / 20) * 100)
-          const currentBest = bestScores[uid] || 0
-          
-          if (compensatedScore > currentBest) {
-            // Find first historical record of this unit to get metadata
-            const firstHistory = history.find(h => h.unitId === uid)
-            
-            // Check if this is the first time reaching 100%
-            const isFirstPerfect = (compensatedScore === 100 && currentBest < 100)
-            const masteryBonus = isFirstPerfect ? 10 : 0
-            
-            await addDoc(collection(db, 'users', user.uid, 'history'), {
-              unitId: uid,
-              unitTitle: firstHistory?.unitTitle || "복구 보상",
-              regionId: firstHistory?.regionId || "",
-              regionTitle: firstHistory?.regionTitle || "복구 구역",
-              chapterId: firstHistory?.chapterId || "",
-              score: compensatedScore,
-              crystalsEarned: masteryBonus,
-              timestamp: serverTimestamp(),
-              type: 'recovery_mastery'
-            })
-            
-            if (masteryBonus > 0) {
-              recordCrystalTransaction(user.uid, {
-                amount: masteryBonus,
-                type: 'mastery_bonus',
-                description: `${firstHistory?.unitTitle || '단원'} 완벽 복구 보너스`,
-                metadata: { unitId: uid, score: 100 }
-              })
-              // Update crystals in user doc too
-              await setDoc(doc(db, 'users', user.uid), {
-                crystals: increment(masteryBonus),
-                perfectCount: increment(1)
-              }, { merge: true })
-            }
-          }
-        }
+          const rmRef = doc(db, 'users', user.uid, 'review_marks', q.id)
+          finalBatch.set(rmRef, {
+            questionId: q.id,
+            unitId: q.unitId || '',
+            unitTitle: q.unitTitle || '',
+            regionId: q.regionId || '',
+            chapterId: q.chapterId || '',
+            markedAt: serverTimestamp(),
+            status: 'active'
+          }, { merge: true })
+        })
+        hasBatchOps = true
       }
+
+      if (hasBatchOps) await finalBatch.commit()
+
+      // --- Update dark matter count & list ---
+      try {
+        const updatedList = await fetchDarkMatterQuestions()
+        setDarkMatterQuestions(updatedList)
+        setDarkMatterCount(updatedList.length)
+      } catch (e) { /* non-critical */ }
 
       // Mastery Compensation removed duplicate check
 
@@ -1398,24 +1479,39 @@ function SpaceHome() {
     )
   }
 
-  // --- Memory Core View ---
-  if (isMemoryCoreMode && memoryCoreQuestions.length > 0) {
+  // --- Dark Matter View ---
+  if (isDarkMatterMode && darkMatterQuestions.length > 0) {
+    // Stage 1: Dashboard
+    if (!activeDarkMatterQuizQs) {
+      return (
+        <DarkMatterView 
+          questions={darkMatterQuestions}
+          totalHistoryCount={history.length}
+          onStartQuiz={(qs) => setActiveDarkMatterQuizQs(qs)}
+          onExit={() => setIsDarkMatterMode(false)}
+        />
+      )
+    }
+
+    // Stage 2: Quiz
     return (
       <SpaceQuizView
-        key="memory-core"
-        region={{ color: 'var(--crystal-cyan)', title: '메모리 코어 센터' }}
+        key="dark-matter-quiz"
+        region={{ color: '#a855f7', title: '다크 매터 영역' }}
         quizData={{
-          unitId: 'recovery_zone',
-          title: '데이터 복구 탐사',
-          questions: memoryCoreQuestions
+          unitId: 'dark_matter_zone',
+          title: '🌌 다크 매터 탐사',
+          questions: activeDarkMatterQuizQs
         }}
-        onExit={() => setIsMemoryCoreMode(false)}
+        onExit={() => setActiveDarkMatterQuizQs(null)}
         onComplete={async (result) => {
           await handleComplete(result)
-          setIsMemoryCoreMode(false)
+          // If we finished the current batch, go back to dashboard to see remaining
+          setActiveDarkMatterQuizQs(null)
+          // We don't exit entirely so they can see the progress in the meter
         }}
         hasShield={userData?.shieldCharges || 0}
-        hasRadar={false} // Memory Core doesn't use the scanner HUD
+        hasRadar={false}
       />
     )
   }
@@ -1458,6 +1554,10 @@ function SpaceHome() {
                 setCurrentView('assignment_hub');
                 soundManager.playWarp();
               }}
+              onSelectDarkMatter={() => {
+                startDarkMatterMode();
+              }}
+              darkMatterCount={darkMatterCount}
               equipment={equipment}
               isBoosting={isBoosting}
             />
@@ -1921,8 +2021,9 @@ function SpaceHome() {
                 }
               }} 
               regions={regions}
-            startMemoryCoreMode={startMemoryCoreMode}
-            loadingMemoryCore={loadingMemoryCore}
+            startDarkMatterMode={startDarkMatterMode}
+            loadingDarkMatter={loadingDarkMatter}
+            darkMatterCount={darkMatterCount}
           />
           )}
           {currentView === 'collection' && <SpaceCollection userData={userData} history={history} />}

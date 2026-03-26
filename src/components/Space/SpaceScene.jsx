@@ -45,7 +45,9 @@ function SceneContent({
   recentRegionId,
   explorationStatus = {},
   equipment = {},
-  isBoosting = false 
+  isBoosting = false,
+  onSelectDarkMatter,
+  darkMatterCount = 0
 }) {
   const controlsRef = useRef()
   const { camera } = useThree()
@@ -238,6 +240,50 @@ function SceneContent({
               outlineColor="#000000"
             >
               Stellar Archive
+            </Text>
+          </Float>
+        </group>
+      )}
+
+      {/* Dark Matter Planet */}
+      {( !selectedRegionId ) && (
+        <group position={[-5, 0.5, -1]}>
+          <Float speed={2.5} rotationIntensity={0.8} floatIntensity={1.2} floatingRange={[-0.3, 0.3]}>
+            <PlanetMesh 
+              color="#6b21a8" 
+              size={0.7} 
+              planetType="dark_matter"
+              speed={0.005 + Math.min(0.02, (darkMatterCount || 0) * 0.001)}
+              showSpaceship={false}
+              showFormulas={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectDarkMatter) onSelectDarkMatter();
+              }}
+              onPointerOver={() => { document.body.style.cursor = 'pointer' }}
+              onPointerOut={() => { document.body.style.cursor = 'auto' }}
+            />
+            <Text
+              position={[0, 1.2, 0]}
+              fontSize={0.35}
+              color="#c084fc"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.03}
+              outlineColor="#000000"
+            >
+              다크 매터
+            </Text>
+            <Text
+              position={[0, 0.7, 0]}
+              fontSize={0.2}
+              color="#a78bfa"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.01}
+              outlineColor="#000000"
+            >
+              Dark Matter
             </Text>
           </Float>
         </group>

@@ -522,7 +522,7 @@ function DiscoveryHUD({ activeItem, latestItem }) {
 /**
  * SpaceDashboard Main
  */
-export default function SpaceDashboard({ user, userData, onQuizSelect, regions, startMemoryCoreMode, loadingMemoryCore }) {
+export default function SpaceDashboard({ user, userData, onQuizSelect, regions, startDarkMatterMode, loadingDarkMatter, darkMatterCount }) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [hoveredDiscovery, setHoveredDiscovery] = useState(null)
@@ -640,7 +640,7 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions, 
     <div className="fade-in" style={{ paddingBottom: '3rem' }}>
       <header style={{ textAlign: 'center', marginBottom: '3rem' }}>
         <h2 style={{ fontSize: '2.5rem', color: 'var(--text-bright)', marginBottom: '0.5rem' }}>📊 탐사 대시보드</h2>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           {stats.map((s, i) => (
             <div key={i} className="glass-card" style={{ padding: '1rem 1.5rem', minWidth: '120px' }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{s.label}</div>
@@ -656,20 +656,24 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions, 
               padding: '1rem 1.5rem', 
               minWidth: '200px', 
               cursor: 'pointer',
-              background: 'rgba(168, 85, 247, 0.1)',
-              border: '1px solid rgba(168, 85, 247, 0.4)',
+              background: darkMatterCount > 0 
+                ? 'rgba(107, 33, 168, 0.15)' 
+                : 'rgba(168, 85, 247, 0.05)',
+              border: darkMatterCount > 0 
+                ? '1px solid rgba(168, 85, 247, 0.6)'
+                : '1px solid rgba(168, 85, 247, 0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.8rem'
             }}
-            onClick={startMemoryCoreMode}
+            onClick={startDarkMatterMode}
           >
-            <div style={{ fontSize: '1.5rem' }}>☄️</div>
+            <div style={{ fontSize: '1.5rem' }}>🌌</div>
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--planet-purple)', fontWeight: 900 }}>STELLAR MEMORY CORE</div>
+              <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 900, letterSpacing: '1px' }}>DARK MATTER</div>
               <div style={{ color: 'white', fontWeight: 800, fontSize: '0.9rem' }}>
-                {loadingMemoryCore ? '복구 모듈 기동 중...' : `별빛 메모리 코어 (${userData?.memoryCoreCharges || 0}회)`}
+                {loadingDarkMatter ? '다크 매터 스캔 중...' : `미지의 영역 탐사 (${darkMatterCount || 0}개)`}
               </div>
             </div>
           </motion.div>
