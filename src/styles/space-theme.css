@@ -812,71 +812,76 @@
 }
 
 /* ========================================
-   📝 Markdown Content Styles
+   📝 Markdown Content Styles (Unified)
    ======================================== */
-.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+.markdown-content h1, .markdown-content h2, .markdown-content h3,
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
   color: var(--text-bright);
   margin-top: 1.5rem;
   margin-bottom: 1rem;
   font-family: var(--font-title);
+  line-height: 1.4;
 }
 
-.markdown-content h1 { font-size: 1.6rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; }
-.markdown-content h2 { font-size: 1.4rem; }
-.markdown-content h3 { font-size: 1.2rem; }
+.markdown-content h1, .markdown-body h1 { font-size: 1.6rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; }
+.markdown-content h2, .markdown-body h2 { font-size: 1.4rem; color: var(--neon-blue); }
+.markdown-content h3, .markdown-body h3 { font-size: 1.2rem; color: var(--crystal-cyan); }
 
-.markdown-content p {
+.markdown-content p, .markdown-body p {
   margin-bottom: 1.2rem;
   line-height: 1.7;
 }
 
-.markdown-content ul, .markdown-content ol {
+.markdown-content ul, .markdown-content ol,
+.markdown-body ul, .markdown-body ol {
   margin-bottom: 1.2rem;
   padding-left: 1.5rem;
 }
 
-.markdown-content li {
+.markdown-content li, .markdown-body li {
   margin-bottom: 0.5rem;
 }
 
 /* Code Blocks & Inline Code */
-.markdown-content pre {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.markdown-content pre, .markdown-body pre {
+  background: rgba(0, 0, 0, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 8px;
   padding: 1.2rem;
   margin: 1.5rem 0;
   overflow-x: auto;
-  white-space: pre; /* CRITICAL: Preserve indentation */
+  white-space: pre-wrap !important; /* Preserve indentation AND handle long lines */
+  word-break: break-all;
   position: relative;
 }
 
-.markdown-content code {
-  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+.markdown-content code, .markdown-body code {
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace !important;
   font-size: 0.9rem;
   color: var(--neon-blue);
-  background: rgba(0, 243, 255, 0.05);
+  background: rgba(0, 241, 255, 0.08);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
 }
 
-.markdown-content pre code {
-  background: transparent;
-  padding: 0;
-  color: #e0e0e0;
+.markdown-content pre code, .markdown-body pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  color: #e0e0e0 !important;
   display: block;
-  line-height: 1.5;
+  line-height: 1.6;
+  white-space: pre-wrap !important; /* Ensure child also stays pre-wrap */
 }
 
 /* Link Styles */
-.markdown-content a {
+.markdown-content a, .markdown-body a {
   color: var(--neon-blue);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: var(--transition-smooth);
 }
 
-.markdown-content a:hover {
+.markdown-content a:hover, .markdown-body a:hover {
   border-bottom-color: var(--neon-blue);
   text-shadow: var(--glow-text-blue);
 }

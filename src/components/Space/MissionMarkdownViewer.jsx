@@ -9,10 +9,36 @@ const MissionMarkdownViewer = ({ text }) => {
   const lines = text.split('\n');
   const blocks = [];
   let inTable = false;
+  let inCodeBlock = false;
+  let currentCodeLines = [];
+  let currentCodeLang = '';
   let tableRows = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    
+    // Handle Code Block Toggle (```)
+    if (line.trim().startsWith('```')) {
+      if (inCodeBlock) {
+        // End of code block
+        blocks.push({ type: 'code', content: currentCodeLines.join('\n'), lang: currentCodeLang });
+        inCodeBlock = false;
+        currentCodeLines = [];
+        currentCodeLang = '';
+      } else {
+        // Start of code block
+        inCodeBlock = true;
+        currentCodeLang = line.trim().slice(3); // e.g., 'python'
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      currentCodeLines.push(line);
+      continue;
+    }
+
+    // Handle Tables
     if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
       inTable = true;
       tableRows.push(line);
@@ -28,6 +54,10 @@ const MissionMarkdownViewer = ({ text }) => {
     blocks.push({ type: 'line', content: line });
   }
 
+  // Cleanup open blocks
+  if (inCodeBlock) {
+    blocks.push({ type: 'code', content: currentCodeLines.join('\n'), lang: currentCodeLang });
+  }
   if (inTable) {
     blocks.push({ type: 'table', rows: tableRows });
   }
@@ -40,6 +70,33 @@ const MissionMarkdownViewer = ({ text }) => {
   return (
     <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
       {blocks.map((block, i) => {
+        if (block.type === 'code') {
+          return (
+            <div key={`code-${i}`} className="code-block-wrapper" style={{ margin: '1.5rem 0' }}>
+              {block.lang && (
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                   {block.lang}
+                </div>
+              )}
+              <pre style={{
+                background: 'rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                padding: '1.2rem',
+                margin: 0,
+                overflowX: 'auto',
+                whiteSpace: 'pre', /* Preserve indentation */
+                fontFamily: "'Fira Code', 'Consolas', 'Monaco', monospace",
+                fontSize: '0.9rem',
+                color: '#e0e0e0',
+                lineHeight: '1.5'
+              }}>
+                <code>{block.content}</code>
+              </pre>
+            </div>
+          );
+        }
+
         if (block.type === 'table') {
           return (
             <div key={`table-${i}`} style={{ overflowX: 'auto', margin: '2rem 0', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)' }}>
