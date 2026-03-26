@@ -623,11 +623,11 @@ function SpaceHome() {
         }
 
         // --- Streak System (transaction 내에서 최신 freeze count 사용) ---
-        const result = calculateStreakUpdate(freshUserData)
-        const streakUpdates = result.streakUpdate || {}
+        const streakCalc = calculateStreakUpdate(freshUserData)
+        const streakUpdates = streakCalc.streakUpdate || {}
 
         // --- Atomic Logging: Streak Freeze ---
-        if (result.meta?.freezeUsed) {
+        if (streakCalc.meta?.freezeUsed) {
           const defendedDates = []
           const lastDate = freshUserData?.lastStreakDate
           if (lastDate) {
@@ -647,7 +647,7 @@ function SpaceHome() {
             metadata: { 
               unitId: currentUnitId,
               streakBefore: freshUserData?.currentStreak || 0,
-              streakAfter: result.meta.newStreak,
+              streakAfter: streakCalc.meta.newStreak,
               defendedDates: defendedDates
             }
           }, transaction)
@@ -667,11 +667,11 @@ function SpaceHome() {
 
         // --- Atomic Logging: History ---
         const existingInitialScore = freshProgressData.initialScore
-        const sessionAttemptCount = scoreData.attemptCount || 1 // 1 pass + N re-solves
+        const sessionAttemptCount = result.attemptCount || 1 // 1 pass + N re-solves
         const currentAttemptCount = (freshProgressData.attemptCount || 0) + sessionAttemptCount
         
-        // 최초 정답률은 '한 번도 기록된 적 없을 때만' 현재 세션의 첫 패스 성적으로 기록
-        const initialScoreToSave = (existingInitialScore !== undefined) ? existingInitialScore : (scoreData.initialRawScore ?? score)
+        // 진척도 문서(learning_progress)에는 최초 발생했던 점수를 영구 보존합니다.
+        const initialScoreToSave = (existingInitialScore !== undefined) ? existingInitialScore : (result.initialRawScore ?? score)
 
         const historyRef = doc(collection(db, 'users', user.uid, 'history'))
         transaction.set(historyRef, {
@@ -682,6 +682,8 @@ function SpaceHome() {
           chapterId: selectedChapterDocId || "",
           clusterId: selectedClusterId,
           score: score,
+          initialScore: result.initialRawScore ?? score, // 해당 세션만의 순수 최초 점수를 기록 (useLeaderboard가 과거 영수증을 역산하는데 사용됨)
+          attemptCount: sessionAttemptCount, // 해당 세션에서 발생한 시도 횟수만 기록 (useLeaderboard가 합산하는데 사용됨)
           crystalsEarned: atomicCrystalsEarned,
           type: result.type === 'workbook' ? 'workbook' : 'quiz',
           timestamp: serverTimestamp()
@@ -697,7 +699,7 @@ function SpaceHome() {
 
         // Transaction 내에서는 increment()를 쓸 수 없으므로, 직접 계산
         transaction.update(userDocRef, {
-          crystals: Math.max(0, (freshUserData.crystals || 0) + atomicCrystalsEarned),
+          crystals: (freshUserData.crystals || 0) + atomicCrystalsEarned,
           totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
           totalScore: (freshUserData.totalScore || 0) + score,
           averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
@@ -712,12 +714,12 @@ function SpaceHome() {
           ...streakUpdates
         })
 
-        return { result, freshUserData, atomicCrystalsEarned }
+        return { streakCalc, freshUserData, atomicCrystalsEarned }
       })
 
       // Transaction 밖에서 부수효과 처리 (트랜잭션 성공 후)
-      const { result: streakCalcResult, atomicCrystalsEarned: finalCrystals } = streakResult
-      const streakUpdates = streakCalcResult.streakUpdate || {}
+      const { streakCalc: streakResultsFinal, atomicCrystalsEarned: finalCrystals } = streakResult
+      const finalStreakUpdates = streakResultsFinal.streakUpdate || {}
 
       // Save wrong questions / Delete recovered questions for Recovery Planet
       const batchStore = writeBatch(db)
@@ -804,10 +806,10 @@ function SpaceHome() {
       }
 
       // Trigger streak celebration if milestone reached
-      if (streakCalcResult?.meta?.justReachedMilestone) {
+      if (streakResultsFinal?.meta?.justReachedMilestone) {
         setStreakCelebration({
-          milestone: streakCalcResult.meta.justReachedMilestone,
-          currentStreak: streakUpdates.currentStreak || streakCalcResult.meta.newStreak
+          milestone: streakResultsFinal.meta.justReachedMilestone,
+          currentStreak: finalStreakUpdates.currentStreak || streakResultsFinal.meta.newStreak
         })
       }
 
@@ -818,11 +820,11 @@ function SpaceHome() {
           ? `${score}점으로 최고 기록을 경신했습니다! (+${finalCrystals} 광석)`
           : (score === 100 ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)" : `최고 점수를 넘지 못해 추가 광석을 획득할 수 없습니다.`),
         streakInfo: {
-          currentStreak: streakUpdates.currentStreak || streakCalcResult?.meta?.newStreak,
-          freezeUsed: streakCalcResult?.meta?.freezeUsed,
-          isNewRecord: streakCalcResult?.meta?.isNewRecord,
-          alreadyDoneToday: streakCalcResult?.meta?.alreadyDoneToday,
-          justReachedMilestone: streakCalcResult?.meta?.justReachedMilestone
+          currentStreak: finalStreakUpdates.currentStreak || streakResultsFinal?.meta?.newStreak,
+          freezeUsed: streakResultsFinal?.meta?.freezeUsed,
+          isNewRecord: streakResultsFinal?.meta?.isNewRecord,
+          alreadyDoneToday: streakResultsFinal?.meta?.alreadyDoneToday,
+          justReachedMilestone: streakResultsFinal?.meta?.justReachedMilestone
         }
       })
       updateSelectedUnitDocId(null)

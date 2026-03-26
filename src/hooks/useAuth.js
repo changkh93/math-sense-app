@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 export function useAuth() {
@@ -46,25 +46,42 @@ export function useAuth() {
               ...data
             });
           } else {
-            const initialData = { 
-              crystals: 0, 
-              totalQuizzes: 0, 
-              totalScore: 0, 
-              spaceshipLevel: 1,
-              helpCount: 0,
-              // Streak defaults
-              currentStreak: 0,
-              longestStreak: 0,
-              lastStreakDate: "",
-              streakFreezeCount: 0,
-              streakMilestones: [],
-              clusterAccess: { cluster_elementary: 'active' },
-              email: firebaseUser.email, 
-              name: firebaseUser.displayName,
-              createdAt: new Date().toISOString()
+            // [안전 장치] 만약 유저 메인 문서만 삭제되었고 거래 내역(하위 컬렉션)이 남아있는 경우를 대비해 잔고를 복원합니다.
+            const recoverCrystals = async () => {
+              try {
+                const txsSnap = await getDocs(collection(db, 'users', firebaseUser.uid, 'crystal_transactions'));
+                if (!txsSnap.empty) {
+                  console.warn("⚠️ 유저 문서가 없지만 거래 내역이 발견되었습니다. 광석 잔고를 자동 복원합니다.");
+                  let sum = 0;
+                  txsSnap.forEach(d => { sum += (d.data().amount || 0) });
+                  return sum;
+                }
+              } catch (err) {
+                console.error("광석 자동 복원 실패:", err);
+              }
+              return 0;
             };
-            setDoc(userDocRef, initialData, { merge: true });
-            setUserData(initialData);
+
+            recoverCrystals().then((recoveredCrystals) => {
+              const initialData = { 
+                crystals: recoveredCrystals, 
+                totalQuizzes: 0, 
+                totalScore: 0, 
+                spaceshipLevel: 1,
+                helpCount: 0,
+                currentStreak: 0,
+                longestStreak: 0,
+                lastStreakDate: "",
+                streakFreezeCount: 0,
+                streakMilestones: [],
+                clusterAccess: { cluster_elementary: 'active' },
+                email: firebaseUser.email, 
+                name: firebaseUser.displayName,
+                createdAt: new Date().toISOString()
+              };
+              setDoc(userDocRef, initialData, { merge: true });
+              setUserData(initialData);
+            });
           }
           setLoading(false);
         }, (err) => {

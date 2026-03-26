@@ -123,17 +123,15 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       setComboCount(newCombo)
       
       let earned = 1
-      
-      // 재도전 모드(학습 모드)에서는 광석 획득/차감 및 보너스 없음
-      if (!reSolveMode) {
-        addMarker('+1', 'gain')
+      addMarker('+1', 'gain')
 
+      if (!reSolveMode) {
         if (newCombo > 0 && newCombo % 3 === 0) {
           earned += 5 // 3콤보 보너스
           setTimeout(() => addMarker('+5 COMBO!', 'gain', 40, -40), 200)
         }
-        setSessionCrystals(prev => prev + earned)
       }
+      setSessionCrystals(prev => prev + earned)
       
       // 다음 문제로 이동 (일반 딜레이)
       setTimeout(() => {
@@ -173,12 +171,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         setShieldsUsed(prev => prev + 1)
         addMarker(`🛡️ DEFENDED! (-1)`, 'gain')
       } else {
-        // 재도전 모드에서는 광석 차감 없음
-        if (!reSolveMode) {
-          const currentPenalty = Math.min(retryCount + 2, 4)
-          setSessionCrystals(prev => prev - currentPenalty)
-          addMarker(`-${currentPenalty}`, 'loss')
-        }
+        // 시도 횟수에 따른 차등 감점 적용: 1회(-2), 2회(-4), 3회(-6) ...
+        const currentPenalty = (retryCount + 1) * 2
+        setSessionCrystals(prev => prev - currentPenalty)
+        addMarker(`-${currentPenalty}`, 'loss')
       }
       
       
@@ -453,6 +449,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
             <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
               {correctCount} / {originalTotal} 정답 (전체 기준)
+            </p>
+            <p style={{ color: 'var(--secondary)', fontSize: '1rem', marginBottom: '1rem', fontWeight: 'bold' }}>
+              이번 탐사 시도: {retryCount + 1}회
             </p>
             
             <div style={{

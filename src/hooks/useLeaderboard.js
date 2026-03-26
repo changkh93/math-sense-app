@@ -99,13 +99,28 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
           if (!uId) return
 
           // Track metrics per unit
-          const unitData = userScores[uid].units[uId] || { bestScore: 0, initialScore: d.score, attemptCount: 1 }
+          const ts = d.timestamp?.toMillis() || Date.now()
           
-          unitData.bestScore = Math.max(unitData.bestScore, d.score)
-          if (d.initialScore !== undefined) unitData.initialScore = d.initialScore
-          if (d.attemptCount !== undefined) unitData.attemptCount = Math.max(unitData.attemptCount, d.attemptCount)
-          
-          userScores[uid].units[uId] = unitData
+          if (!userScores[uid].units[uId]) {
+            userScores[uid].units[uId] = { 
+              bestScore: d.score, 
+              initialScore: d.initialScore !== undefined ? d.initialScore : d.score, 
+              attemptCount: d.attemptCount || 1,
+              firstTimestamp: ts
+            }
+          } else {
+            const unitData = userScores[uid].units[uId]
+            unitData.bestScore = Math.max(unitData.bestScore, d.score)
+            
+            // Lock initialScore to the chronologically first ever attempt
+            if (ts < unitData.firstTimestamp) {
+              unitData.firstTimestamp = ts
+              unitData.initialScore = d.initialScore !== undefined ? d.initialScore : d.score
+            }
+            
+            // Sum attempt counts across multiple history records (sessions)
+            unitData.attemptCount += (d.attemptCount || 1)
+          }
 
           // Accumulate total crystals earned in this scope
           if (d.crystalsEarned) {
@@ -113,7 +128,6 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
           }
 
           // Track earliest achievement in this scope
-          const ts = d.timestamp?.toMillis()
           if (ts && ts < userScores[uid].firstTimestamp) {
             userScores[uid].firstTimestamp = ts
           }

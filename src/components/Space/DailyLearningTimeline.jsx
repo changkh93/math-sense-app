@@ -72,8 +72,8 @@ export default function DailyLearningTimeline({ activities, dailyStats, loading,
             </span>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '1.6rem', fontWeight: 'bold', textShadow: '0 0 10px rgba(255,215,0,0.3)' }}>
-              +{totalEarned} 💎
+            <div className="font-tech" style={{ color: totalEarned >= 0 ? 'var(--star-gold)' : '#f87171', fontSize: '1.6rem', fontWeight: 'bold', textShadow: `0 0 10px ${totalEarned >= 0 ? 'rgba(255,215,0,0.3)' : 'rgba(248,113,113,0.3)'}` }}>
+              {totalEarned >= 0 ? '+' : ''}{totalEarned} 💎
             </div>
             <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>획득한 수호석</span>
           </div>
@@ -220,9 +220,16 @@ export default function DailyLearningTimeline({ activities, dailyStats, loading,
                       {act.title}
                     </strong>
                   </div>
-                  {act.crystalsEarned > 0 && (
-                    <span className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.9rem', flexShrink: 0, background: 'rgba(255,215,0,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                      +{act.crystalsEarned} 💎
+                  {act.crystalsEarned !== 0 && (
+                    <span className="font-tech" style={{ 
+                      color: act.crystalsEarned > 0 ? 'var(--star-gold)' : '#f87171', 
+                      fontSize: '0.9rem', 
+                      flexShrink: 0, 
+                      background: act.crystalsEarned > 0 ? 'rgba(255,215,0,0.1)' : 'rgba(248,113,113,0.1)', 
+                      padding: '0.2rem 0.5rem', 
+                      borderRadius: '4px' 
+                    }}>
+                      {act.crystalsEarned > 0 ? '+' : ''}{act.crystalsEarned} 💎
                     </span>
                   )}
                 </div>
@@ -263,7 +270,7 @@ export default function DailyLearningTimeline({ activities, dailyStats, loading,
                         }}>
                           <span className="font-tech" style={{ color: 'var(--secondary)', fontSize: '0.65rem' }}>INIT / ATTEMPT</span>
                           <span className="font-tech" style={{ color: 'var(--text-bright)', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                            {act.initialScore}% / {act.attemptCount || 1}회
+                            {act.initialScore}점 / {act.attemptCount || 1}회
                           </span>
                         </div>
                       )}

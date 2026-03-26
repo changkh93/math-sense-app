@@ -499,8 +499,8 @@ function DiscoveryHUD({ activeItem, latestItem }) {
                 
                 <div className="hud-metric">
                   <span className="hud-metric-label">REWARD</span>
-                  <span className="hud-metric-value" style={{ color: 'var(--crystal-cyan)' }}>
-                    {display.crystalsEarned > 0 ? `+${display.crystalsEarned} 💎` : '0 💎'}
+                  <span className="hud-metric-value" style={{ color: display.crystalsEarned >= 0 ? 'var(--crystal-cyan)' : '#f87171' }}>
+                    {display.crystalsEarned > 0 ? `+${display.crystalsEarned} 💎` : `${display.crystalsEarned || 0} 💎`}
                   </span>
                 </div>
               </div>

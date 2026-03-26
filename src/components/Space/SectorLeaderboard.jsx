@@ -77,7 +77,7 @@ export default function SectorLeaderboard({ user, regionId, regionTitle }) {
                         <div className="lb-score">
                           최고 {u.avgScore}점
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            최초 {u.avgInitialScore}% / {u.totalAttemptCount}회 시도
+                            최초 {u.avgInitialScore}점 / {u.totalAttemptCount}회 시도
                           </div>
                         </div>
                       </div>
@@ -99,7 +99,7 @@ export default function SectorLeaderboard({ user, regionId, regionTitle }) {
                         <div className="lb-score">
                           최고 {myData.avgScore}점
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            최초 {myData.avgInitialScore}% / {myData.totalAttemptCount}회 시도
+                            최초 {myData.avgInitialScore}점 / {myData.totalAttemptCount}회 시도
                           </div>
                         </div>
                       </div>

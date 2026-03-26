@@ -145,26 +145,74 @@ export default function CrystalLedger({ userData }) {
     return result
   }, [filteredTransactions, crystals])
 
-  // Summary stats
-  const stats = useMemo(() => {
-    const totalIncome = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
-    const totalExpense = Math.abs(transactions.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0))
-    return { totalIncome, totalExpense, txCount: transactions.length }
-  }, [transactions])
+  // Summary stats for filtered transactions
+  const totalEarned = useMemo(() => {
+    return filteredTransactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  }, [filteredTransactions])
+
+  const totalSpent = useMemo(() => {
+    return Math.abs(filteredTransactions.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0))
+  }, [filteredTransactions])
+
+  const pastBalance = useMemo(() => {
+    return (crystals || 0) - totalEarned + totalSpent
+  }, [crystals, totalEarned, totalSpent])
 
   return (
-    <div className="crystal-ledger-container">
-      {/* Page Title (SpaceJourney style) */}
+    <div className="crystal-ledger-container fade-in">
       <div style={{ textAlign: 'center', marginBottom: '2.5rem', marginTop: '3rem' }}>
         <h2 className="journey-main-title">
-          💎 광석 입출금 기록 (Crystal Ledger)
+          💎 광석 입출금 기록 <span style={{opacity: 0.6, fontSize: '0.6em'}}>(Crystal Ledger)</span>
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
           탐사 활동과 스토어 거래를 통한 광석의 흐름을 한눈에 확인하세요.
         </p>
       </div>
 
-      {/* Summary Stats (stat-chip style like SpaceJourney) */}
+      {/* Logical Mathematical Summary */}
+      <div className="glass-panel" style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(4, 1fr)', 
+        gap: '1rem', 
+        padding: '1.5rem', 
+        alignItems: 'center',
+        marginBottom: '2.5rem',
+        background: 'rgba(255, 255, 255, 0.03)'
+      }}>
+        
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '0.3rem' }}>이전 잔고 ({filteredTransactions.length}건 전)</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#94a3b8' }}>
+            {pastBalance.toLocaleString()}
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: '-10px', top: '50%', transform: 'translateY(-50%)', color: '#4ade80', fontWeight: 'bold' }}>+</div>
+          <div style={{ fontSize: '0.85rem', color: '#4ade80', marginBottom: '0.3rem' }}>최근 획득</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80' }}>
+            {totalEarned.toLocaleString()}
+          </div>
+        </div>
+        
+        <div style={{ textAlign: 'center', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: '-10px', top: '50%', transform: 'translateY(-50%)', color: '#f87171', fontWeight: 'bold', fontSize: '1.5rem', marginTop: '-2px' }}>-</div>
+          <div style={{ fontSize: '0.85rem', color: '#f87171', marginBottom: '0.3rem' }}>최근 소진</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f87171' }}>
+            {totalSpent.toLocaleString()}
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', position: 'relative', background: 'rgba(0, 243, 255, 0.1)', padding: '0.5rem', borderRadius: '12px', border: '1px solid rgba(0, 243, 255, 0.3)' }}>
+          <div style={{ position: 'absolute', left: '-15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--crystal-cyan)', fontWeight: 'bold', fontSize: '1.2rem' }}>=</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--crystal-cyan)', marginBottom: '0.3rem' }}>현재 잔고</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--crystal-cyan)', textShadow: '0 0 10px rgba(0, 243, 255, 0.5)' }}>
+            {crystals?.toLocaleString() || 0}
+          </div>
+        </div>
+
+      </div>
+
       <div style={{ 
         display: 'flex', 
         flexDirection: 'column',
@@ -172,25 +220,6 @@ export default function CrystalLedger({ userData }) {
         gap: '1.5rem', 
         marginBottom: '2rem' 
       }}>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <div className="stat-chip">
-            <span>현재 잔고</span>
-            <span style={{ color: 'var(--crystal-cyan, #00f3ff)' }}>{crystals.toLocaleString()}</span>
-          </div>
-          <div className="stat-chip">
-            <span>총 획득</span>
-            <span style={{ color: '#4ade80' }}>+{stats.totalIncome.toLocaleString()}</span>
-          </div>
-          <div className="stat-chip">
-            <span>총 소진</span>
-            <span style={{ color: '#f87171' }}>-{stats.totalExpense.toLocaleString()}</span>
-          </div>
-          <div className="stat-chip">
-            <span>거래 횟수</span>
-            <span>{stats.txCount}건</span>
-          </div>
-        </div>
-
         {/* Filter Tabs (SpaceJourney view toggle style) */}
         <div style={{ display: 'flex', gap: '1rem' }}>
           {FILTER_TABS.map(tab => (
@@ -381,8 +410,8 @@ export default function CrystalLedger({ userData }) {
               <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '0.3rem' }}>🚀 탐사 퀴즈</div>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
                 <li>정답 시 <span style={{color: 'var(--text-bright)'}}>+1</span> / 3콤보 <span style={{color: 'var(--text-bright)'}}>+5</span> / 최초 100점 <span style={{color: 'var(--text-bright)'}}>+10</span></li>
-                <li>오답 시 광석 유실 <span style={{color: '#f87171'}}>(1회차 -2, 2회차 -3, 3회차 -4)</span></li>
-                <li>재도전 시 점수 상한 <span style={{color: '#f87171'}}>(2회차 90, 3회차 80, 4회차 70점)</span></li>
+                <li>오답 시 광석 유실 <span style={{color: '#f87171'}}>(1회차 -2, 2회차 -4, 3회차 -6 ...)</span></li>
+                <li>언제든 <span style={{color: 'var(--crystal-cyan)'}}>100점 달성 가능</span> (점수 제한 없음)</li>
                 <li>오답 시 <span style={{color: '#f87171'}}>시스템 복구 대기(3~9초)</span> 발생</li>
               </ul>
             </div>

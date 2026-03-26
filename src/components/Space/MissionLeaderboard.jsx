@@ -64,7 +64,7 @@ export default function MissionLeaderboard({ user, chapterId, chapterTitle }) {
         <div className="lb-score">
           최고 {u.avgScore}점
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            최초 {u.avgInitialScore}% / {u.totalAttemptCount}회 시도
+            최초 {u.avgInitialScore}점 / {u.totalAttemptCount}회 시도
           </div>
         </div>
         <div className="lb-progress-wrapper" style={{ flex: '1 1 200px' }}>
