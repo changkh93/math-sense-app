@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import AdminAssignmentDetail from './AdminAssignmentDetail';
 import DailyLearningTimeline from '../Space/DailyLearningTimeline';
+import AdminDarkMatterTab from './AdminDarkMatterTab';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 
 export default function AdminUserDayDetail({ info, onReviewed }) {
-  const [activeTab, setActiveTab] = useState('assignments'); // 'assignments' | 'timeline'
+  const [activeTab, setActiveTab] = useState('assignments'); // 'assignments' | 'timeline' | 'darkmatter'
   
   const { assignments = [], date, userId, userName } = info || {};
 
@@ -54,6 +55,17 @@ export default function AdminUserDayDetail({ info, onReviewed }) {
           >
             일일 학습 기록
           </button>
+          <button 
+            onClick={() => setActiveTab('darkmatter')}
+            style={{
+              background: 'none', border: 'none',
+              color: activeTab === 'darkmatter' ? '#a855f7' : 'var(--text-muted)',
+              borderBottom: activeTab === 'darkmatter' ? '2px solid #a855f7' : '2px solid transparent',
+              padding: '0.5rem', fontSize: '1rem', cursor: 'pointer', fontFamily: 'var(--font-tech)'
+            }}
+          >
+            🌌 다크 매터
+          </button>
         </div>
       </div>
 
@@ -97,6 +109,10 @@ export default function AdminUserDayDetail({ info, onReviewed }) {
             dailyStats={dailyStats}
             loading={loading} 
           />
+        )}
+
+        {activeTab === 'darkmatter' && (
+          <AdminDarkMatterTab userId={userId} />
         )}
       </div>
 
