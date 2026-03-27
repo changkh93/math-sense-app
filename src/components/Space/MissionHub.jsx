@@ -565,18 +565,6 @@ export default function MissionHub({
               setVideoCompleted(true)
               setVideoCompletionBonusGiven(true)
             }
-
-            // --- Milestone Restoration for Selected Video ---
-            const txId = selectedTx?.id || 'default'
-            const specificProg = data.videoProgress[txId]
-            if (specificProg && specificProg.stampedSeconds) {
-              stampedSetRef.current = new Set(specificProg.stampedSeconds)
-              newStampCountRef.current = stampedSetRef.current.size % 180
-              
-              const rewardedCount = specificProg.rewardedStampCount || 0
-              totalRewardedCrystalsRef.current = Math.floor(rewardedCount / 180) * 10
-              setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
-            }
           }
         }
       } catch (err) {
@@ -633,6 +621,151 @@ export default function MissionHub({
       setSelectedTx(null);
     }
   }, [unitId, activeUnit])
+
+  // ─── Video Progress: Consolidated Restoration, Auto-save & Unload-save ───
+  useEffect(() => {
+    if (loadingProgress || !userId || !selectedTx || !learningProgress) return
+
+    const txId = selectedTx.id || 'default'
+    const savedProgress = learningProgress.videoProgress?.[txId]
+
+    // 1. Initial State Restoration
+    if (savedProgress) {
+      // Merge local and remote stamps (Offline-First Union)
+      const serverStamps = savedProgress.stampedSeconds || []
+      const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+      const localStampsRaw = localStorage.getItem(localCacheKey + '_stamps')
+      const localStamps = localStampsRaw ? JSON.parse(localStampsRaw) : []
+      stampedSetRef.current = new Set([...serverStamps, ...localStamps])
+      
+      const combinedStampCount = stampedSetRef.current.size
+      const rewardedCount = savedProgress.rewardedStampCount || 0
+      newStampCountRef.current = Math.max(0, combinedStampCount - rewardedCount)
+      setStampCount(combinedStampCount)
+      
+      // Merge local and remote position (Offline-First Max)
+      const serverPos = savedProgress.lastPosition || 0
+      const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
+      const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
+      const maxPos = Math.max(serverPos, localPos)
+      
+      totalTimeSpentRef.current = savedProgress.totalTimeSpent || 0
+      totalRewardedCrystalsRef.current = savedProgress.totalRewardedCrystals || 0
+      setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
+      
+      setVideoCompleted(savedProgress.completed || false)
+      videoCompletedRef.current = savedProgress.completed || false
+      setVideoCompletionBonusGiven(savedProgress.completionBonusGiven || false)
+      videoCompletionBonusGivenRef.current = savedProgress.completionBonusGiven || false
+      
+      setIsAtEnd(false)
+      lastVideoTimeRef.current = maxPos > 0 ? maxPos : -1
+      setInitialStartPosition(maxPos > 0 ? maxPos : (selectedTx.start || 0))
+      
+      if (maxPos > 0) {
+         setResumePosStr(`이전 지점(${Math.floor(maxPos / 60)}분 ${Math.floor(maxPos % 60)}초)에서 이어보기 되었습니다.`)
+         setTimeout(() => setResumePosStr(""), 4000)
+      }
+    } else {
+      // Start fresh for new video
+      stampedSetRef.current = new Set()
+      setStampCount(0)
+      newStampCountRef.current = 0
+      totalTimeSpentRef.current = 0
+      totalRewardedCrystalsRef.current = 0
+      setTotalRewardedCrystals(0)
+      setVideoCompleted(false)
+      videoCompletedRef.current = false
+      setVideoCompletionBonusGiven(false)
+      videoCompletionBonusGivenRef.current = false
+      setInitialStartPosition(selectedTx.start || 0)
+      lastVideoTimeRef.current = -1
+      setIsAtEnd(false)
+    }
+
+    // 2. Auto-save Interval (Every 10 seconds)
+    if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
+    autoSaveIntervalRef.current = setInterval(async () => {
+      try {
+        const pos = Math.floor(lastVideoTimeRef.current || 0)
+        if (pos > 0) {
+          const stamps = Array.from(stampedSetRef.current)
+          const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
+          
+          const updateData = {
+            [`videoProgress.${txId}.lastPosition`]: pos,
+            [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+            [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
+            [`videoProgress.${txId}.stampedSeconds`]: stamps,
+            updatedAt: serverTimestamp()
+          }
+          
+          setSaveStatus('saving')
+          await setDoc(progressRef, updateData, { merge: true })
+          setSaveStatus('saved')
+          setTimeout(() => setSaveStatus(null), 2000)
+
+          // Sync local state as well
+          setLearningProgress(prev => ({
+            ...prev,
+            videoProgress: {
+              ...(prev?.videoProgress || {}),
+              [txId]: {
+                ...(prev?.videoProgress?.[txId] || {}),
+                lastPosition: pos,
+                totalTimeSpent: totalTimeSpentRef.current,
+                stampedSeconds: stamps
+              }
+            }
+          }))
+        }
+      } catch (err) {
+        console.warn("Auto-save failed:", err)
+      }
+    }, 10000)
+
+    // 3. Unload-save (Beacon API for tab close / navigation)
+    const handleUnloadSave = () => {
+      const finalPos = Math.floor(lastVideoTimeRef.current || 0)
+      if (finalPos <= 0 || !idTokenRef.current) return
+      
+      const txProgress = learningProgress?.videoProgress?.[txId]
+      const isCompleted = videoCompletedRef.current || txProgress?.completed
+      const isBonusGiven = videoCompletionBonusGivenRef.current || txProgress?.completionBonusGiven
+      
+      const FIREBASE_POST_URL = "https://us-central1-math-sense-1f6a8.cloudfunctions.net/syncVideoProgress"
+      const progressData = {
+          lastPosition: finalPos,
+          totalTimeSpent: totalTimeSpentRef.current,
+          stampedSeconds: Array.from(stampedSetRef.current)
+      }
+      if (isCompleted) progressData.completed = true
+      if (isBonusGiven) progressData.completionBonusGiven = true
+
+      const payload = JSON.stringify({
+        idToken: idTokenRef.current,
+        userId,
+        unitId,
+        txId,
+        progressData
+      })
+      
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(FIREBASE_POST_URL, payload)
+      }
+    }
+
+    if (userId) {
+      window.addEventListener('beforeunload', handleUnloadSave)
+      window.addEventListener('popstate', handleUnloadSave)
+    }
+
+    return () => {
+      if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
+      window.removeEventListener('beforeunload', handleUnloadSave)
+      window.removeEventListener('popstate', handleUnloadSave)
+    }
+  }, [userId, selectedTx, learningProgress, loadingProgress, unitId])
 
   // ─── Silent Toast helper ───
   const showSilentToast = useCallback((amount) => {
@@ -963,17 +1096,24 @@ export default function MissionHub({
         updatedAt: serverTimestamp()
       }
       
-      if (isManualComplete) {
+      // Save completion if threshold met (coverage >= 0.9) OR manually triggered (isAtEnd)
+      if (videoCompleted || isManualComplete) {
          updateData[`videoProgress.${txId}.completed`] = true
          updateData[`videoProgress.${txId}.completionBonusGiven`] = true
          videoCompletedRef.current = true
          videoCompletionBonusGivenRef.current = true
          
-         // Trigger history log creation and dashboard ring update without crystals
+         // Trigger history log creation and dashboard ring update
          if (onNonQuizActivityComplete) {
-            await onNonQuizActivityComplete('영상 수동 완료 (크리스탈 제외)', 0, {
-              transmissionId: txId
-            });
+            await onNonQuizActivityComplete(
+              isManualComplete ? '영상 수동 완료 (크리스탈 제외)' : '영상 교신 완료', 
+              isManualComplete ? 0 : 20, 
+              {
+                transmissionId: txId,
+                transmissionTitle: selectedTx?.title || "Main Video",
+                videoTime: savedPosition
+              }
+            );
          }
       }
       
@@ -1017,135 +1157,6 @@ export default function MissionHub({
     }, 1200)
   }
 
-  // ─── Reset video tracking when switching transmissions ───
-  useEffect(() => {
-    if (loadingProgress) return; // Wait until initial Firestore progress is loaded
-    if (selectedTx) {
-      const txId = selectedTx.id || 'default'
-      const savedProgress = learningProgress?.videoProgress?.[txId]
-      
-      // Offline-First Union: Merge local and remote stamps
-      const serverStamps = savedProgress?.stampedSeconds || []
-      const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-      const localStampsRaw = localStorage.getItem(localCacheKey + '_stamps')
-      const localStamps = localStampsRaw ? JSON.parse(localStampsRaw) : []
-      stampedSetRef.current = new Set([...serverStamps, ...localStamps])
-      
-      const combinedStampCount = stampedSetRef.current.size
-      const rewardedCount = savedProgress?.rewardedStampCount || 0
-      newStampCountRef.current = Math.max(0, combinedStampCount - rewardedCount)
-      setStampCount(combinedStampCount)
-      
-      // Offline-First Max: Secure local position priority
-      const serverPos = savedProgress?.lastPosition || 0
-      const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
-      const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
-      const maxPos = Math.max(serverPos, localPos)
-      
-      totalTimeSpentRef.current = savedProgress?.totalTimeSpent || 0
-      totalRewardedCrystalsRef.current = savedProgress?.totalRewardedCrystals || 0
-      setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
-      videoDurationRef.current = 0 
-      
-      setVideoCompleted(savedProgress?.completed || false)
-      setIsAtEnd(false)
-      setVideoCompletionBonusGiven(savedProgress?.completionBonusGiven || false)
-      lastVideoTimeRef.current = maxPos > 0 ? maxPos : -1
-      setInitialStartPosition(maxPos > 0 ? maxPos : (selectedTx.start || 0))
-      
-      if (maxPos > 0) {
-         setResumePosStr(`이전 지점(${Math.floor(maxPos / 60)}분 ${Math.floor(maxPos % 60)}초)에서 이어보기 되었습니다.`)
-         setTimeout(() => setResumePosStr(""), 4000)
-      }
-
-      // Auto-save every 10 seconds
-      if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
-      if (userId) {
-        autoSaveIntervalRef.current = setInterval(async () => {
-          try {
-            const pos = Math.floor(lastVideoTimeRef.current || 0)
-            if (pos > 0) {
-              const stamps = Array.from(stampedSetRef.current)
-              const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-              
-              const updateData = {
-                [`videoProgress.${txId}.lastPosition`]: pos,
-                [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
-                [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
-                [`videoProgress.${txId}.stampedSeconds`]: stamps,
-                updatedAt: serverTimestamp()
-              }
-              
-              setSaveStatus('saving')
-              await setDoc(progressRef, updateData, { merge: true })
-              
-              setSaveStatus('saved')
-              setTimeout(() => setSaveStatus(null), 2000)
-
-              // Sync local state as well
-              setLearningProgress(prev => ({
-                ...prev,
-                videoProgress: {
-                  ...(prev?.videoProgress || {}),
-                  [txId]: {
-                    ...(prev?.videoProgress?.[txId] || {}),
-                    lastPosition: pos,
-                    totalTimeSpent: totalTimeSpentRef.current,
-                    stampedSeconds: stamps
-                  }
-                }
-              }))
-            }
-          } catch (err) {
-            console.warn("Auto-save failed:", err)
-          }
-        }, 10000) // Every 10 seconds
-
-        const handleUnloadSave = () => {
-          const finalPos = Math.floor(lastVideoTimeRef.current || 0)
-          if (finalPos <= 0 || !idTokenRef.current) return
-          const FIREBASE_POST_URL = "https://us-central1-math-sense-1f6a8.cloudfunctions.net/syncVideoProgress"
-          
-          const txProgress = learningProgress?.videoProgress?.[txId]
-          const isCompleted = videoCompletedRef.current || txProgress?.completed
-          const isBonusGiven = videoCompletionBonusGivenRef.current || txProgress?.completionBonusGiven
-          
-          const progressData = {
-              lastPosition: finalPos,
-              totalTimeSpent: totalTimeSpentRef.current,
-              stampedSeconds: Array.from(stampedSetRef.current)
-          }
-          if (isCompleted) progressData.completed = true
-          if (isBonusGiven) progressData.completionBonusGiven = true
-
-          const payload = JSON.stringify({
-            idToken: idTokenRef.current,
-            userId,
-            unitId,
-            txId,
-            progressData
-          })
-          navigator.sendBeacon(FIREBASE_POST_URL, payload)
-        }
-        
-        const handleVisibilityChange = () => { if (document.hidden) handleUnloadSave() }
-
-        window.addEventListener('beforeunload', handleUnloadSave)
-        document.addEventListener('visibilitychange', handleVisibilityChange)
-        
-        // Save unmount funcs closely mapping current closures
-        autoSaveIntervalRef.currentDestructors = () => {
-           window.removeEventListener('beforeunload', handleUnloadSave)
-           document.removeEventListener('visibilitychange', handleVisibilityChange)
-        }
-      }
-    }
-
-    return () => {
-      if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
-      if (autoSaveIntervalRef.currentDestructors) autoSaveIntervalRef.currentDestructors()
-    }
-  }, [selectedTx?.id, userId, unitId, selectedTx?.start, loadingProgress])
 
   const handleModeChange = (mode) => {
     soundManager.playClick()
