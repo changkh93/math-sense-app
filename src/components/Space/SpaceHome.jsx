@@ -958,6 +958,8 @@ function SpaceHome() {
                                 || freshUserData.lastVideoRewardTime._seconds 
                                 || 0;
             if (lastTimeSec > 0) {
+              const nowSeconds = Math.floor(Date.now() / 1000);
+              const diffSeconds = nowSeconds - lastTimeSec;
               // --- Relaxed Cooldown (Accommodates 2x playback speed) ---
               if (diffSeconds < 60) {
                 actualReward = 0
@@ -1121,7 +1123,12 @@ function SpaceHome() {
         const shouldLogHistory = isCompletionActivity
 
         if (shouldLogHistory) {
-          const historyRef = doc(collection(db, 'users', user.uid, 'history'))
+          // Use stable ID for completion records to prevent duplication in timeline
+          const stableHistoryId = isLogActivity 
+            ? `log_completion_${currentUnitId}`
+            : `video_completion_${currentUnitId}_${transmissionId || 'default'}`;
+          
+          const historyRef = doc(db, 'users', user.uid, 'history', stableHistoryId)
           transaction.set(historyRef, {
             unitId: currentUnitId,
             unitTitle: transmissionTitle || activeUnit?.title || `탐사 기록 (${activityType})`,
@@ -1133,8 +1140,11 @@ function SpaceHome() {
             score: 100,
             crystalsEarned: actualReward,
             timestamp: serverTimestamp(),
-            type: isLogActivity ? 'text' : 'video' 
-          })
+            type: isLogActivity ? 'text' : 'video',
+            // Include video duration and stamp count in metadata for summary calculation
+            videoTime: activityMetadata.videoTime || 0,
+            stampedCount: stampedSeconds?.length || 0
+          }, { merge: true })
         }
 
         return { streakCalcResult: streakResult, streakUpdates, txUserData: freshUserData, actualReward }
@@ -1151,20 +1161,28 @@ function SpaceHome() {
       }
 
       // Visual feedback
-      if (actualReward > 0 || activityType.includes('완료')) {
+      // ONLY show the large completion modal for completion or data log rewards.
+      // Interval rewards (영상 교신 수신) only show the Silent Toast in MissionHub.
+      const isIntervalActivity = activityType.includes('수신');
+      const shouldShowModal = activityType.includes('완료') || isLogActivity;
+
+      if (actualReward > 0 || shouldShowModal) {
         soundManager.playLevelUp()
-        setCompletionResult({
-          crystalsEarned: actualReward,
-          isPerfect: true,
-          rewardMessage: actualReward > 0 ? `${activityType} 달성! (+${actualReward} 광석)` : `이미 보상을 획득한 활동입니다.`,
-          streakInfo: {
-            currentStreak: streakUpdates.currentStreak || streakCalcResult.meta?.newStreak || txUserData?.currentStreak || 0,
-            freezeUsed: streakCalcResult.meta?.freezeUsed || false,
-            isNewRecord: streakCalcResult.meta?.isNewRecord || false,
-            alreadyDoneToday: streakCalcResult.meta?.alreadyDoneToday || false,
-            justReachedMilestone: streakCalcResult.meta?.justReachedMilestone || false
-          }
-        })
+        
+        if (shouldShowModal) {
+          setCompletionResult({
+            crystalsEarned: actualReward,
+            isPerfect: true,
+            rewardMessage: actualReward > 0 ? `${activityType} 달성! (+${actualReward} 광석)` : `이미 보상을 획득한 활동입니다.`,
+            streakInfo: {
+              currentStreak: streakUpdates.currentStreak || streakCalcResult.meta?.newStreak || txUserData?.currentStreak || 0,
+              freezeUsed: streakCalcResult.meta?.freezeUsed || false,
+              isNewRecord: streakCalcResult.meta?.isNewRecord || false,
+              alreadyDoneToday: streakCalcResult.meta?.alreadyDoneToday || false,
+              justReachedMilestone: streakCalcResult.meta?.justReachedMilestone || false
+            }
+          })
+        }
       }
     } catch (err) {
       console.error("Error in activity completion:", err)

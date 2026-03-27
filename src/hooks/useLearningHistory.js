@@ -209,6 +209,13 @@ export function useLearningHistory(userId, dateStr) {
             stats.quizCount++;
           }
 
+          if ((displayType === 'video_complete' || hType === 'video') && (data.videoTime || data.stampedCount)) {
+            const txId = data.transmissionId || 'default';
+            if (!stats._videoTxMap) stats._videoTxMap = {};
+            const vTime = data.videoTime || data.stampedCount || 0;
+            stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, Math.floor(vTime));
+          }
+
           aggregated.push({
             id: `quiz_${doc.id}`,
             timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
