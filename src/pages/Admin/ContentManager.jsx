@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useClusters, useRegions, useChapters, useUnits, useAdminMutations } from '../../hooks/useContent';
 import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown, Rocket, Bot, RefreshCw, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -10,11 +10,45 @@ import RegionStudentManagerModal from '../../components/Admin/RegionStudentManag
 
 const ContentManager = () => {
   const { data: clusters, isLoading: loadingClusters } = useClusters();
-  const [selectedClusterId, setSelectedClusterId] = useState('cluster_elementary');
+  
+  // Use sessionStorage to persist UI state across navigations
+  const [selectedClusterId, setSelectedClusterId] = useState(() => {
+    return sessionStorage.getItem('admin_selectedClusterId') || 'cluster_elementary';
+  });
+  
+  const [expandedRegions, setExpandedRegions] = useState(() => {
+    const saved = sessionStorage.getItem('admin_expandedRegions');
+    try {
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  const [expandedChapters, setExpandedChapters] = useState(() => {
+    const saved = sessionStorage.getItem('admin_expandedChapters');
+    try {
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  // Sync to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('admin_selectedClusterId', selectedClusterId);
+  }, [selectedClusterId]);
+
+  useEffect(() => {
+    sessionStorage.setItem('admin_expandedRegions', JSON.stringify(expandedRegions));
+  }, [expandedRegions]);
+
+  useEffect(() => {
+    sessionStorage.setItem('admin_expandedChapters', JSON.stringify(expandedChapters));
+  }, [expandedChapters]);
+
   const { data: regions, isLoading: loadingRegions, refetch: refetchRegions } = useRegions(selectedClusterId);
   const { saveRegion } = useAdminMutations();
-  const [expandedRegions, setExpandedRegions] = useState({});
-  const [expandedChapters, setExpandedChapters] = useState({});
   const [aiImportUnitId, setAiImportUnitId] = useState(null);
 
   // Modals state

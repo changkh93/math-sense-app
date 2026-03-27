@@ -4,7 +4,7 @@ import { useQuizzes, useAdminMutations } from '../../hooks/useContent';
 import { storage, db } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { compressImage } from '../../utils/storageUtils';
-import { Plus, Trash2, Save, X, Image as ImageIcon, Check, Edit3 } from 'lucide-react';
+import { Plus, Trash2, Save, X, Image as ImageIcon, Check, Edit3, ArrowLeft } from 'lucide-react';
 
 const QuizEditor = () => {
   const { unitId } = useParams();
@@ -89,16 +89,21 @@ const QuizEditor = () => {
 
   return (
     <div className="quiz-editor">
-      <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1>Quiz Editor [v1.1]</h1>
-          <p>Unit ID: {unitId}</p>
+      <div className="section-header" style={{ marginBottom: '2rem' }}>
+        <button onClick={() => navigate('/admin/content')} className="text-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+          <ArrowLeft size={16} /> 목록으로 돌아가기
+        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1>Quiz Editor [v1.1]</h1>
+            <p style={{ color: 'var(--crystal-cyan)', fontWeight: 'bold' }}>Unit ID: {unitId}</p>
+          </div>
+          {!editingQuiz && (
+            <button className="primary-btn" onClick={handleAddNew}>
+              <Plus size={18} /> <span>Add New Quiz</span>
+            </button>
+          )}
         </div>
-        {!editingQuiz && (
-          <button className="primary-btn" onClick={handleAddNew}>
-            <Plus size={18} /> <span>Add New Quiz</span>
-          </button>
-        )}
       </div>
 
       {editingQuiz ? (
