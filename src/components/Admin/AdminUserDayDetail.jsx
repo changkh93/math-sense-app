@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import AdminAssignmentDetail from './AdminAssignmentDetail';
 import DailyLearningTimeline from '../Space/DailyLearningTimeline';
 import AdminDarkMatterTab from './AdminDarkMatterTab';
+import AdminStudentCalendar from './AdminStudentCalendar';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 
-export default function AdminUserDayDetail({ info, onReviewed }) {
-  const [activeTab, setActiveTab] = useState('assignments'); // 'assignments' | 'timeline' | 'darkmatter'
+export default function AdminUserDayDetail({ info, onReviewed, onSelectDate }) {
+  const [activeTab, setActiveTab] = useState('assignments'); // 'assignments' | 'timeline' | 'darkmatter' | 'calendar'
   
   const { assignments = [], date, userId, userName } = info || {};
 
@@ -32,7 +33,7 @@ export default function AdminUserDayDetail({ info, onReviewed }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <button 
             onClick={() => setActiveTab('assignments')}
             style={{
@@ -65,6 +66,17 @@ export default function AdminUserDayDetail({ info, onReviewed }) {
             }}
           >
             🌌 다크 매터
+          </button>
+          <button 
+            onClick={() => setActiveTab('calendar')}
+            style={{
+              background: 'none', border: 'none',
+              color: activeTab === 'calendar' ? 'var(--star-gold)' : 'var(--text-muted)',
+              borderBottom: activeTab === 'calendar' ? '2px solid var(--star-gold)' : '2px solid transparent',
+              padding: '0.5rem', fontSize: '1rem', cursor: 'pointer', fontFamily: 'var(--font-tech)'
+            }}
+          >
+            📅 전체 기록
           </button>
         </div>
       </div>
@@ -113,6 +125,18 @@ export default function AdminUserDayDetail({ info, onReviewed }) {
 
         {activeTab === 'darkmatter' && (
           <AdminDarkMatterTab userId={userId} />
+        )}
+
+        {activeTab === 'calendar' && (
+          <AdminStudentCalendar 
+            userId={userId} 
+            userName={userName} 
+            initialDate={date}
+            onSelectDate={(newInfo) => {
+              if (onSelectDate) onSelectDate(newInfo);
+              setActiveTab('assignments'); // Switch back to assignments when a date is selected
+            }}
+          />
         )}
       </div>
 

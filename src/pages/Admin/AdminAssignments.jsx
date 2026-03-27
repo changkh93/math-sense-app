@@ -17,11 +17,15 @@ export default function AdminAssignments() {
 
   // Helpers to select single or multiple
   const handleSelectSingle = (assignment) => {
+    const date = assignment.date || (assignment.submittedAt ? assignment.submittedAt.toDate().toLocaleDateString('en-CA') : '');
     setSelectedAssignments([assignment]);
-    setSelectedUserDateInfo(null);
+    setSelectedUserDateInfo({
+      userId: assignment.userId,
+      userName: assignment.userName,
+      date: date,
+      assignments: [assignment]
+    });
   };
-
-  // Removed handleSelectMultiple as it's no longer used
 
   const handleSelectUserDate = (info) => {
     setSelectedUserDateInfo(info);
@@ -92,32 +96,16 @@ export default function AdminAssignments() {
 
         {/* Right Panel: Detail View */}
         <div className="admin-card" style={{ flex: '2', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {(activeTab !== 'user' && selectedAssignments.length === 0) || (activeTab === 'user' && !selectedUserDateInfo) ? (
+          {!selectedUserDateInfo ? (
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)' }}>
               왼쪽 목록에서 항목을 선택하세요.
             </div>
-          ) : activeTab === 'user' ? (
-            <AdminUserDayDetail info={selectedUserDateInfo} onReviewed={handleReviewed} />
           ) : (
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              {selectedAssignments.length > 1 && (
-                <div style={{ padding: '1rem', background: 'rgba(0, 212, 255, 0.1)', borderBottom: '1px solid var(--crystal-cyan)', color: 'var(--crystal-cyan)', fontWeight: 'bold' }}>
-                  해당 날짜에 일괄 제출된 총 {selectedAssignments.length}건의 과제 상세 내용입니다.
-                </div>
-              )}
-              {selectedAssignments.map((assignment, index) => (
-                <div key={assignment.id} style={{ 
-                  borderBottom: selectedAssignments.length > 1 && index < selectedAssignments.length - 1 ? '4px dashed rgba(255,255,255,0.2)' : 'none',
-                  paddingBottom: selectedAssignments.length > 1 && index < selectedAssignments.length - 1 ? '1rem' : '0',
-                  marginBottom: selectedAssignments.length > 1 && index < selectedAssignments.length - 1 ? '1rem' : '0',
-                }}>
-                  <AdminAssignmentDetail 
-                    assignment={assignment} 
-                    onReviewed={handleReviewed}
-                  />
-                </div>
-              ))}
-            </div>
+            <AdminUserDayDetail 
+              info={selectedUserDateInfo} 
+              onReviewed={handleReviewed} 
+              onSelectDate={handleSelectUserDate}
+            />
           )}
         </div>
 
