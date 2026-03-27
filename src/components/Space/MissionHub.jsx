@@ -1462,61 +1462,93 @@ export default function MissionHub({
           </div>
         )}
 
-        {/* ─── Data Log Reward Button ─── */}
-        <div style={{ marginTop: '3rem', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '2rem' }}>
-          {logRewardClaimed ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--crystal-cyan)' }}>
-              <span style={{ fontSize: '1.5rem' }}>✅</span>
-              <span className="font-tech" style={{ fontSize: '1.1rem' }}>데이터 분석 완료 (보상 수령됨)</span>
-            </div>
-          ) : timeRemaining > 0 ? (
-            <button
-              disabled
-              className="hud-btn glass"
-              style={{
-                padding: '1rem 3rem',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                color: 'var(--text-muted)',
-                borderRadius: '10px',
-                cursor: 'not-allowed',
-                fontSize: '1rem',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-            >
-              <span className="font-tech">데이터 분석 중... ({timeRemaining}s)</span>
-              {/* Progress bar */}
-              <div style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                height: '3px',
-                width: `${((60 - timeRemaining) / 60) * 100}%`,
-                background: 'var(--crystal-cyan)',
-                transition: 'width 1s linear'
-              }} />
-            </button>
-          ) : (
-            <motion.button
-              whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleClaimLogReward}
-              className="hud-btn primary glass"
-              style={{
-                padding: '1rem 3rem',
-                background: 'rgba(0, 243, 255, 0.2)',
-                border: '2px solid var(--crystal-cyan)',
-                color: 'var(--text-bright)',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                fontSize: '1.1rem',
-                fontWeight: 700
-              }}
-            >
-              💎 학습 완료 · 보상 받기 (+30 광석)
-            </motion.button>
-          )}
+        {/* ─── Data Log Reward & Bottom Actions ─── */}
+        <div style={{ 
+          marginTop: '3rem', 
+          textAlign: 'center', 
+          borderTop: '1px solid rgba(255,255,255,0.1)', 
+          paddingTop: '2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '2rem'
+        }}>
+          {/* Reward Section */}
+          <div style={{ width: '100%' }}>
+            {logRewardClaimed ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--crystal-cyan)' }}>
+                <span style={{ fontSize: '1.5rem' }}>✅</span>
+                <span className="font-tech" style={{ fontSize: '1.1rem' }}>데이터 분석 완료 (보상 수령됨)</span>
+              </div>
+            ) : timeRemaining > 0 ? (
+              <button
+                disabled
+                className="hud-btn glass"
+                style={{
+                  padding: '1rem 3rem',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: 'var(--text-muted)',
+                  borderRadius: '10px',
+                  cursor: 'not-allowed',
+                  fontSize: '1rem',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+              >
+                <span className="font-tech">데이터 분석 중... ({timeRemaining}s)</span>
+                {/* Progress bar */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  height: '3px',
+                  width: `${((60 - timeRemaining) / 60) * 100}%`,
+                  background: 'var(--crystal-cyan)',
+                  transition: 'width 1s linear'
+                }} />
+              </button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleClaimLogReward}
+                className="hud-btn primary glass"
+                style={{
+                  padding: '1rem 3rem',
+                  background: 'rgba(0, 243, 255, 0.2)',
+                  border: '2px solid var(--crystal-cyan)',
+                  color: 'var(--text-bright)',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                  fontWeight: 700
+                }}
+              >
+                💎 학습 완료 · 보상 받기 (+30 광석)
+              </motion.button>
+            )}
+          </div>
+
+          {/* Bottom Close Button (requested by user for better UX on long docs) */}
+          <button
+            onClick={returnFromContent}
+            className="hud-btn secondary glass"
+            style={{
+              padding: '0.8rem 2.5rem',
+              fontSize: '1rem',
+              color: 'var(--text-muted)',
+              borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.05)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span>←</span> 본부로 돌아가기 (CLOSE)
+          </button>
         </div>
       </div>
     </div>
