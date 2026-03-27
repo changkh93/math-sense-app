@@ -528,9 +528,9 @@ export default function MissionHub({
   }, [user])
 
   const [saveStatus, setSaveStatus] = useState(null)
+  // Video synchronization states
+  const [initialStartPosition, setInitialStartPosition] = useState(null)
   const [resumePosStr, setResumePosStr] = useState("")
-
-  const [initialStartPosition, setInitialStartPosition] = useState(0)
   
   // ─── Silent Toast ───
   const [toastVisible, setToastVisible] = useState(false)
@@ -623,6 +623,14 @@ export default function MissionHub({
       setSelectedTx(null);
     }
   }, [unitId, activeUnit])
+
+  // Reset video-related states when video changes to ensure clean re-initialization
+  useEffect(() => {
+    setInitialStartPosition(null)
+    prevTxIdRef.current = null
+    setIsAtEnd(false)
+    setSaveStatus(null)
+  }, [selectedTx?.id])
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
   const prevTxIdRef = useRef(null)
@@ -1638,17 +1646,26 @@ export default function MissionHub({
             aspectRatio: '16/9', 
             padding: '5px', 
             background: 'rgba(0,0,0,0.5)',
-            margin: '0 auto' 
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
-             <YoutubePlayer 
-                ref={videoPlayerRef}
-                key={`${selectedTx.videoId}_${initialStartPosition}`}
-                videoId={selectedTx.videoId}
-                start={initialStartPosition}
-                end={selectedTx.end}
-                onTimeUpdate={handleVideoTimeUpdate}
-                onComplete={() => setIsAtEnd(true)}
-             />
+             {initialStartPosition !== null ? (
+               <YoutubePlayer 
+                  ref={videoPlayerRef}
+                  key={`${selectedTx.videoId}_${initialStartPosition}`}
+                  videoId={selectedTx.videoId}
+                  start={initialStartPosition}
+                  end={selectedTx.end}
+                  onTimeUpdate={handleVideoTimeUpdate}
+                  onComplete={() => setIsAtEnd(true)}
+               />
+             ) : (
+               <div className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                 🚀 데이터 동기화 중...
+               </div>
+             )}
           </div>
           <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button 
