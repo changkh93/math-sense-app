@@ -582,8 +582,17 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
       const uploadPromises = files.map(file => {
         return new Promise((resolve, reject) => {
           const storagePath = `assignments/${user.uid}/${Date.now()}_${file.name}`;
+          const extension = file.name.split('.').pop().toLowerCase();
+          const isTextFile = ['py', 'txt', 'js', 'json', 'csv', 'md'].includes(extension) || file.type.startsWith('text/');
+          
+          const metadata = {
+            contentType: isTextFile 
+              ? `${file.type || 'text/plain'}; charset=utf-8` 
+              : file.type
+          };
+
           const fileRef = ref(storage, storagePath);
-          const uploadTask = uploadBytesResumable(fileRef, file);
+          const uploadTask = uploadBytesResumable(fileRef, file, metadata);
 
           uploadTask.on('state_changed', 
             (snapshot) => {

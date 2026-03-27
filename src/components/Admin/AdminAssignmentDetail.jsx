@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useReviewAssignment } from '../../hooks/useAssignments';
+import FileViewerModal from './FileViewerModal';
+import { Eye } from 'lucide-react';
 
 export default function AdminAssignmentDetail({ assignment, onReviewed }) {
   const reviewMutation = useReviewAssignment();
   
   const [feedback, setFeedback] = useState(assignment?.feedback || '');
-  const [bonusCrystals, setBonusCrystals] = useState(assignment?.bonusCrystals || 0);
+  const [bonusCrystals, setBonusCrystals] = useState(assignment?.bonusCrystals ?? 40);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   useEffect(() => {
     setFeedback(assignment?.feedback || '');
-    setBonusCrystals(assignment?.bonusCrystals || 0);
+    setBonusCrystals(assignment?.bonusCrystals ?? 40);
   }, [assignment]);
 
   if (!assignment) {
@@ -49,6 +53,11 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
     setFeedback(prev => prev + (prev ? '\n\n' : '') + text);
   };
 
+  const handlePreview = (att) => {
+    setPreviewFile(att);
+    setIsPreviewOpen(true);
+  };
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Target Data (Readonly) */}
@@ -64,12 +73,61 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
 
         {assignment.attachments?.length > 0 && (
           <div style={{ marginTop: '2rem' }}>
-            <h4 style={{ color: 'var(--star-gold)', marginBottom: '0.5rem' }}>첨부 파일</h4>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <h4 style={{ color: 'var(--star-gold)', marginBottom: '0.8rem' }}>첨부 파일</h4>
+            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
               {assignment.attachments.map((att, i) => (
-                <a key={i} href={att.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.1)', color: 'white', textDecoration: 'none', borderRadius: '4px' }}>
-                  📄 {att.name}
-                </a>
+                <div 
+                  key={i} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    background: 'rgba(255,255,255,0.05)', 
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(255,255,255,0.1)'
+                  }}
+                >
+                  <a 
+                    href={att.url} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    title="원본 파일 열기"
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      color: 'white', 
+                      textDecoration: 'none',
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      borderRight: '1px solid rgba(255,255,255,0.1)',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    📄 {att.name}
+                  </a>
+                  <button 
+                    onClick={() => handlePreview(att)}
+                    title="미리보기"
+                    style={{ 
+                      padding: '0.5rem', 
+                      background: 'none', 
+                      border: 'none', 
+                      color: 'var(--crystal-cyan)', 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = 'rgba(0, 212, 255, 0.1)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <Eye size={18} />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -138,6 +196,13 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           </div>
         </div>
       </div>
+
+      {/* File Viewer Modal */}
+      <FileViewerModal 
+        isOpen={isPreviewOpen} 
+        onClose={() => setIsPreviewOpen(false)} 
+        file={previewFile}
+      />
     </div>
   );
 }
