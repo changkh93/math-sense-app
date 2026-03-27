@@ -463,6 +463,8 @@ export default function MissionHub({
     }
   }, [selectedTx, unitId])
 
+  // ─── Question Modal State ───
+  const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [questionContext, setQuestionContext] = useState(null)
   
   // Video Progress Refs
