@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import AdminAssignmentsList from '../../components/Admin/AdminAssignmentsList';
 import AdminAssignmentsDate from '../../components/Admin/AdminAssignmentsDate';
 import AdminAssignmentsUser from '../../components/Admin/AdminAssignmentsUser';
-import AdminAssignmentDetail from '../../components/Admin/AdminAssignmentDetail';
 import AdminUserDayDetail from '../../components/Admin/AdminUserDayDetail';
 import './Admin.css';
 
