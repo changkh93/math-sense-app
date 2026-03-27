@@ -73,7 +73,8 @@ const SilentCrystalToast = ({ amount, visible }) => (
 )
 
 // ─── YouTube Player Component ───
-const YoutubePlayer = React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, isOverlay = false, autoPlay = true }, ref) => {
+// Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
+const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, isOverlay = false, autoPlay = true }, ref) => {
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
   const [hasError, setHasError] = useState(false)
@@ -328,7 +329,7 @@ const YoutubePlayer = React.forwardRef(({ videoId, start, end, onComplete, onTim
       </div>
     </div>
   )
-})
+}))
 
 // ─── Reward Potential Modal (moved from SpaceHome) ───
 function RewardPotentialModal({ unit, onCancel, onConfirm }) {
@@ -503,7 +504,8 @@ export default function MissionHub({
   const videoCompletedRef = useRef(false)
   useEffect(() => { videoCompletedRef.current = videoCompleted }, [videoCompleted])
 
-  const [isAtEnd, setIsAtEnd] = useState(false)
+  const [isAtEnd, internalSetIsAtEnd] = useState(false)
+  const setIsAtEnd = useCallback((val) => internalSetIsAtEnd(val), [])
   
   const [videoCompletionBonusGiven, setVideoCompletionBonusGiven] = useState(false)
   const videoCompletionBonusGivenRef = useRef(false)
@@ -622,16 +624,19 @@ export default function MissionHub({
     }
   }, [unitId, activeUnit])
 
-  // ─── Video Progress: Consolidated Restoration, Auto-save & Unload-save ───
+  // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
+  const prevTxIdRef = useRef(null)
   useEffect(() => {
     if (loadingProgress || !userId || !selectedTx || !learningProgress) return
-
+    
     const txId = selectedTx.id || 'default'
+    // ONLY run if the video has changed or the very first time progress is loaded
+    if (prevTxIdRef.current === txId) return
+    prevTxIdRef.current = txId
+
     const savedProgress = learningProgress.videoProgress?.[txId]
 
-    // 1. Initial State Restoration
     if (savedProgress) {
-      // Merge local and remote stamps (Offline-First Union)
       const serverStamps = savedProgress.stampedSeconds || []
       const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
       const localStampsRaw = localStorage.getItem(localCacheKey + '_stamps')
@@ -643,7 +648,6 @@ export default function MissionHub({
       newStampCountRef.current = Math.max(0, combinedStampCount - rewardedCount)
       setStampCount(combinedStampCount)
       
-      // Merge local and remote position (Offline-First Max)
       const serverPos = savedProgress.lastPosition || 0
       const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
       const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
@@ -667,7 +671,6 @@ export default function MissionHub({
          setTimeout(() => setResumePosStr(""), 4000)
       }
     } else {
-      // Start fresh for new video
       stampedSetRef.current = new Set()
       setStampCount(0)
       newStampCountRef.current = 0
@@ -682,8 +685,13 @@ export default function MissionHub({
       lastVideoTimeRef.current = -1
       setIsAtEnd(false)
     }
+  }, [userId, selectedTx, loadingProgress, learningProgress, unitId])
 
-    // 2. Auto-save Interval (Every 10 seconds)
+  // ─── Video Progress: Part 2 - Auto-save Interval & Unload-save (Stable loop) ───
+  useEffect(() => {
+    if (loadingProgress || !userId || !selectedTx) return
+    const txId = selectedTx.id || 'default'
+
     if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
     autoSaveIntervalRef.current = setInterval(async () => {
       try {
@@ -705,7 +713,7 @@ export default function MissionHub({
           setSaveStatus('saved')
           setTimeout(() => setSaveStatus(null), 2000)
 
-          // Sync local state as well
+          // Local state sync (careful: this might trigger parent re-renders, but since the player is memoized it won't flicker)
           setLearningProgress(prev => ({
             ...prev,
             videoProgress: {
@@ -724,48 +732,38 @@ export default function MissionHub({
       }
     }, 10000)
 
-    // 3. Unload-save (Beacon API for tab close / navigation)
     const handleUnloadSave = () => {
       const finalPos = Math.floor(lastVideoTimeRef.current || 0)
       if (finalPos <= 0 || !idTokenRef.current) return
       
-      const txProgress = learningProgress?.videoProgress?.[txId]
-      const isCompleted = videoCompletedRef.current || txProgress?.completed
-      const isBonusGiven = videoCompletionBonusGivenRef.current || txProgress?.completionBonusGiven
-      
-      const FIREBASE_POST_URL = "https://us-central1-math-sense-1f6a8.cloudfunctions.net/syncVideoProgress"
-      const progressData = {
-          lastPosition: finalPos,
-          totalTimeSpent: totalTimeSpentRef.current,
-          stampedSeconds: Array.from(stampedSetRef.current)
-      }
-      if (isCompleted) progressData.completed = true
-      if (isBonusGiven) progressData.completionBonusGiven = true
-
       const payload = JSON.stringify({
         idToken: idTokenRef.current,
         userId,
         unitId,
         txId,
-        progressData
+        progressData: {
+          lastPosition: finalPos,
+          totalTimeSpent: totalTimeSpentRef.current,
+          stampedSeconds: Array.from(stampedSetRef.current),
+          completed: videoCompletedRef.current,
+          completionBonusGiven: videoCompletionBonusGivenRef.current
+        }
       })
       
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(FIREBASE_POST_URL, payload)
+        navigator.sendBeacon("https://us-central1-math-sense-1f6a8.cloudfunctions.net/syncVideoProgress", payload)
       }
     }
 
-    if (userId) {
-      window.addEventListener('beforeunload', handleUnloadSave)
-      window.addEventListener('popstate', handleUnloadSave)
-    }
+    window.addEventListener('beforeunload', handleUnloadSave)
+    window.addEventListener('popstate', handleUnloadSave)
 
     return () => {
       if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
       window.removeEventListener('beforeunload', handleUnloadSave)
       window.removeEventListener('popstate', handleUnloadSave)
     }
-  }, [userId, selectedTx, learningProgress, loadingProgress, unitId])
+  }, [userId, selectedTx, loadingProgress, unitId])
 
   // ─── Silent Toast helper ───
   const showSilentToast = useCallback((amount) => {
