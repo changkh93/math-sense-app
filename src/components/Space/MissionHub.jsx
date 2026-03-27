@@ -1978,23 +1978,43 @@ export default function MissionHub({
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000,
       display: 'flex', flexDirection: 'column', overflow: 'hidden'
     }}>
-       <AnimatePresence mode='wait'>
-          {currentMode === 'briefing' && (
-             <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ flex: 1, minHeight: 0 }}>
-                {renderDashboard()}
-             </motion.div>
-          )}
-          {currentMode === 'text' && (
-             <motion.div key="text" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px' }}>
-                {renderTextView()}
-             </motion.div>
-          )}
-          {currentMode === 'video' && (
-             <motion.div key="video" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px' }}>
-                {renderVideoView()}
-             </motion.div>
-          )}
-       </AnimatePresence>
+        {/* Global Back Button (Top-Left) */}
+        <button 
+          className="space-nav-link font-tech"
+          onClick={() => {
+            soundManager.playClick()
+            onBack()
+          }}
+          style={{ 
+            position: 'absolute', 
+            top: '2rem', 
+            left: '2rem', 
+            zIndex: 3000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          ← RETURN TO SECTOR
+        </button>
+
+        <AnimatePresence mode='wait'>
+           {currentMode === 'briefing' && (
+              <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                 {renderDashboard()}
+              </motion.div>
+           )}
+           {currentMode === 'text' && (
+              <motion.div key="text" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px', overflowY: 'auto' }}>
+                 {renderTextView()}
+              </motion.div>
+           )}
+           {currentMode === 'video' && (
+              <motion.div key="video" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px', overflowY: 'auto' }}>
+                 {renderVideoView()}
+              </motion.div>
+           )}
+        </AnimatePresence>
 
        {/* Silent Crystal Toast */}
        <SilentCrystalToast amount={toastAmount} visible={toastVisible} />
