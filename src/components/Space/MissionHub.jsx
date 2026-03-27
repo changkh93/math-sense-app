@@ -463,11 +463,28 @@ export default function MissionHub({
     }
   }, [selectedTx, unitId])
 
-  const videoPlayerRef = useRef(null)
-
-  // ─── Question Modal State ───
-  const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [questionContext, setQuestionContext] = useState(null)
+  
+  // Video Progress Refs
+  const videoPrevTxIdRef = useRef(null)
+  const videoPlayerRef = useRef(null)
+  const autoSaveIntervalRef = useRef(null)
+  const lastVideoTimeRef = useRef(null)
+  const videoCompletedRef = useRef(false)
+  const videoCompletionBonusGivenRef = useRef(false)
+  const stampedSetRef = useRef(new Set())
+  const newStampCountRef = useRef(0)
+  const totalTimeSpentRef = useRef(0)
+  const totalRewardedCrystalsRef = useRef(0)
+  const idTokenRef = useRef(null)
+  const isVideoProcessingRef = useRef(false)
+  const lastActivityTimeRef = useRef(Date.now())
+  
+  // Re-consolidate remaining scattered refs
+  const timerRef = useRef(null)
+  const videoDurationRef = useRef(0)
+  const toastTimeoutRef = useRef(null)
+  const rewardLockRef = useRef(false)
 
   const handleOpenQuestionModal = (contextType) => {
     // If opening from video, pause the player
@@ -493,32 +510,20 @@ export default function MissionHub({
   const [timeRemaining, setTimeRemaining] = useState(60)
   const [logTimerActive, setLogTimerActive] = useState(false)
   const [logRewardClaimed, setLogRewardClaimed] = useState(false)
-  const timerRef = useRef(null)
   const storageKey = `datalog_timer_${userId || 'anon'}_${unitId}`
 
   // ─── Transmission reward state (Bitset/Checklist) ───
-  const stampedSetRef = useRef(new Set()) // Set of stamped video seconds
-  const newStampCountRef = useRef(0) // New stamps since last reward
   const [stampCount, setStampCount] = useState(0) // For UI display
   const [videoCompleted, setVideoCompleted] = useState(false)
-  const videoCompletedRef = useRef(false)
   useEffect(() => { videoCompletedRef.current = videoCompleted }, [videoCompleted])
 
   const [isAtEnd, internalSetIsAtEnd] = useState(false)
   const setIsAtEnd = useCallback((val) => internalSetIsAtEnd(val), [])
   
   const [videoCompletionBonusGiven, setVideoCompletionBonusGiven] = useState(false)
-  const videoCompletionBonusGivenRef = useRef(false)
   useEffect(() => { videoCompletionBonusGivenRef.current = videoCompletionBonusGiven }, [videoCompletionBonusGiven])
 
-  const lastVideoTimeRef = useRef(-1) // Current video playback position (starts at -1 to capture 0s)
-  const totalTimeSpentRef = useRef(0) // Actual playback seconds (analytics)
-  const videoDurationRef = useRef(0) // Video total duration for reward cap
-  const totalRewardedCrystalsRef = useRef(0) // Total crystals given for this tx
   const [totalRewardedCrystals, setTotalRewardedCrystals] = useState(0) // For UI reactivity
-  const autoSaveIntervalRef = useRef(null)
-
-  const idTokenRef = useRef(null)
   useEffect(() => {
     if (user) {
       user.getIdToken().then(t => idTokenRef.current = t)
@@ -535,10 +540,6 @@ export default function MissionHub({
   // ─── Silent Toast ───
   const [toastVisible, setToastVisible] = useState(false)
   const [toastAmount, setToastAmount] = useState(0)
-  const toastTimeoutRef = useRef(null)
-
-  // --- Reward Protection Lock ---
-  const rewardLockRef = useRef(false)
 
   // ─── Learning Progress (Firestore) ───
   const [learningProgress, setLearningProgress] = useState(null)
@@ -633,7 +634,6 @@ export default function MissionHub({
   }, [selectedTx?.id])
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
-  const videoPrevTxIdRef = useRef(null)
   useEffect(() => {
     if (loadingProgress || !userId || !selectedTx || !learningProgress) return
     
