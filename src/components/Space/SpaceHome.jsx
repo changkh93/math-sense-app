@@ -931,6 +931,9 @@ function SpaceHome() {
     const userDocRef = doc(db, 'users', user.uid)
     const progressDocRef = doc(db, 'users', user.uid, 'learning_progress', currentUnitId)
 
+    const isVideoActivity = activityType.includes('영상')
+    const isLogActivity = activityType.includes('로그')
+
     try {
       const txResult = await runTransaction(db, async (transaction) => {
         const freshUserSnap = await transaction.get(userDocRef)
@@ -942,8 +945,6 @@ function SpaceHome() {
 
         // --- Duplicate Reward Prevention ---
         let actualReward = crystalsEarned
-        const isVideoActivity = activityType.includes('영상')
-        const isLogActivity = activityType.includes('로그')
 
         if (isVideoActivity && transmissionId) {
           const videoProg = freshProgressData.videoProgress?.[transmissionId] || {}

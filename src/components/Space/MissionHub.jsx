@@ -627,20 +627,20 @@ export default function MissionHub({
   // Reset video-related states when video changes to ensure clean re-initialization
   useEffect(() => {
     setInitialStartPosition(null)
-    prevTxIdRef.current = null
+    if (videoPrevTxIdRef.current) videoPrevTxIdRef.current = null
     setIsAtEnd(false)
     setSaveStatus(null)
   }, [selectedTx?.id])
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
-  const prevTxIdRef = useRef(null)
+  const videoPrevTxIdRef = useRef(null)
   useEffect(() => {
     if (loadingProgress || !userId || !selectedTx || !learningProgress) return
     
     const txId = selectedTx.id || 'default'
     // ONLY run if the video has changed or the very first time progress is loaded
-    if (prevTxIdRef.current === txId) return
-    prevTxIdRef.current = txId
+    if (videoPrevTxIdRef.current === txId) return
+    videoPrevTxIdRef.current = txId
 
     const savedProgress = learningProgress.videoProgress?.[txId]
 
