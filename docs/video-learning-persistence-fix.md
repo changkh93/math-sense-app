@@ -1,49 +1,39 @@
-# 기술 문서: 영상 학습 데이터 보존 및 완료 처리 개선 (2026-03-27)
+# 기술 문서: 영상 학습 데이터 보존 및 UI/UX 성능 최적화 (2026-03-28)
 
 ## 1. 개요
-영상 학습 과정에서 시청 위치(이어보기), 누적 학습 시간, 그리고 '데이터 수신 완료' 체크 여부가 페이지 새로고침이나 세션 종료 시 유실되는 고질적인 문제를 해결하기 위한 기술적 내역을 기록합니다.
-
-## 2. 기존의 문제점 (Root Causes)
-
-### A. 상태 복원 로직의 부재 및 Stale Closure
-- 사용자가 영상을 선택하거나 페이지를 새로고침했을 때, Firestore에 저장된 `learning_progress` 데이터를 컴포넌트 내부의 Refs(`stampedSetRef`, `totalTimeSpentRef`)와 동기화하는 로직이 없거나 부적절한 위치에 있었습니다.
-- 특히 `useEffect`의 의존성 배열에 `selectedTx`가 누락되어, 영상이 바뀔 때 이전 시청 데이터가 활성화되지 않는 "Stale Closure" 현상이 발생했습니다.
-
-### B. 완료 상태 저장 누락
-- 시청률 90% 이상을 달성하여 '데이터 수신 완료' 버튼이 활성화되었을 때, 이 버튼을 클릭하더라도 Firestore에 `completed: true` 플래그를 명시적으로 저장하는 코드가 `handleSaveVideoPosition` 함수에 빠져 있었습니다.
-- 이로 인해 UI에서는 완료된 것처럼 보이지만, DB에는 반영되지 않아 새로고침 시 미완료 상태(체크표시 없음)로 되돌아갔습니다.
-
-### C. 누적 학습 시간 유실
-- `totalTimeSpent`가 단순히 메모리 상의 Ref에만 기록되고, Firestore에서 불러와 합산하는 과정이 누락되어 세션마다 학습 시간이 0초부터 다시 카운트되는 문제가 있었습니다.
-
-### D. 중복되고 파편화된 로직
-- `useEffect` 블록이 여러 개로 흩어져 서로의 상태를 덮어씌우거나, 초기화 순서가 꼬이는 레이스 컨디션(Race Condition)이 발생하고 있었습니다.
+영상 학습 과정에서의 고질적인 데이터 유실 문제를 해결(03-27)한 데 이어, 대규모 리렌더링으로 인한 시청 방해(깜빡임) 및 운영 효율성을 개선한 기술적 내역을 기록합니다.
 
 ---
 
-## 3. 개선 사항 (Improvements)
+## 2. 03-27 개선 사항: 데이터 보존 (Data Persistence)
 
 ### ✅ 통합된 상태 복원 (Consolidated Restoration)
-- `useEffect` 하나로 모든 영상 위치 정보를 통합 관리하도록 개선했습니다.
-- `userId`, `selectedTx`, `learningProgress`가 변경될 때마다:
-    1. Firestore의 `stampedSeconds`를 `stampedSetRef`로 복원.
-    2. `totalTimeSpent`를 Ref로 복원.
-    3. 해당 영상의 과거 `completed` 여부를 즉시 UI 상태(`setVideoCompleted`)에 반영.
-    4. 마지막 시청 위치(`maxPos`)를 계산하여 영상 시작 지점(`initialStartPosition`)으로 설정.
-
-### ✅ 명시적 완료 플래그 저장
-- `handleSaveVideoPosition` 함수 내에 시청률 임계값(90%)을 달성했는지 확인하는 로직을 추가했습니다.
-- 버튼 클릭 시 `completed: true`와 `completionBonusGiven: true`를 강제로 저장하여 DB와 UI의 싱크를 맞췄습니다.
+- `useEffect`를 통해 Firestore의 `stampedSeconds`, `totalTimeSpent`, `completed` 플래그를 로컬 캐시와 병합하여 복원합니다.
 
 ### ✅ 비동기 저장 강화 (Auto-save & Unload-save)
 - **10초 주기 자동 저장**: 학습 중 예기치 않은 종료에 대비해 주기적으로 Firestore와 동기화합니다.
-- **Beacon API 도입**: 브라우저 탭을 닫거나 뒤로 가기를 누를 때 `navigator.sendBeacon`을 사용하여 서버에 최종 상태를 안정적으로 전송합니다.
-
-### ✅ 오프라인 우선 정책 (Offline-First Union)
-- Firestore 데이터와 LocalStorage의 로컬 캐시 중 더 진보된 데이터(더 많은 스탬프, 더 뒤의 재생 위치)를 병합하여 사용자가 어떤 환경에서도 최신 기록을 유지할 수 있도록 보장합니다.
+- **Beacon API 도입**: 브라우저 탭을 닫거나 이동할 때 `navigator.sendBeacon`을 사용하여 서버에 최종 상태를 안정적으로 전송합니다.
 
 ---
 
-## 4. 향후 주의사항
-1. **Tx ID 일관성**: 영상 식별자(`txId`)를 생성할 때 `id` 필드가 없는 경우 `default`로 처리되는데, 이 로직이 모든 기능에서 동일하게 유지되어야 합니다.
-2. **Ref vs State**: 실시간 재생 위치와 학습 시간은 성능을 위해 `Ref`를 사용하고, UI 표시용(체크표시, 진행바)은 `State`를 사용합니다. 이들 간의 동기화는 `handleSaveVideoPosition`이나 `autoSaveInterval`을 통해서만 이루어지도록 엄격히 관리해야 합니다.
+## 3. 03-28 개선 사항: UI/UX 및 성능 최적화 (UX & Performance)
+
+### ✅ 영상 깜빡임 해결 (Flicker-Free Optimization)
+1. **플레이어 메모이제이션**: `YoutubePlayer` 컴포넌트를 `React.memo`로 래핑하여, 자동 저장 시 발생하는 부모 컴포넌트(`MissionHub`)의 상태 변화(저장 완료 상태 등)가 영상 재생에 영향을 주지 않도록 차단했습니다.
+2. **이펙트 분리**: '초기 복원(Restoration)'과 '주기적 동기화(Sync)' 로직을 분리했습니다. 이전에는 동기화가 일어날 때마다 초기 복원 로직이 다시 실행되면서 영상 플레이어의 `key`가 변하고, 이로 인해 플레이어가 새로고침(Re-mount)되는 현상이 있었습니다. 현재는 `prevTxIdRef`를 사용하여 초기 위치 설정이 한 번만 수행되도록 고정했습니다.
+3. **상태 안정화**: `onComplete`, `onTimeUpdate` 등 플레이어에 전달되는 콜백 함수들을 `useCallback`으로 감싸 프롭스(Props) 변화로 인한 리렌더링을 방지했습니다.
+
+### ✅ 학습 콘텐츠(마크다운) 편의성 강화
+- **체크박스(Task List) 지원**: `* [ ]` 및 `* [x]` 문법을 정식 지원하며, 완료된 항목은 시각적으로 구분되도록 커스텀 UI를 적용했습니다.
+- **하단 닫기 기능**: 문서가 길어질 경우 상단까지 스크롤하지 않고 즉시 나갈 수 있도록 하단에 "본부로 돌아가기 (CLOSE)" 버튼을 추가했습니다.
+- **스타일 최적화**: Gemini Canvas 스타일의 촘촘한 간격과 블록 수식($$) 중앙 정렬을 지원합니다.
+
+### ✅ 어드민 운영 편의성 개선
+- **세션 상태 유지**: `ContentManager`에서 탐색하던 지역/챕터 목록 확장 상태를 `sessionStorage`에 저장합니다. 이제 편집기에서 돌아왔을 때 이전 작업 위치가 그대로 유지됩니다.
+
+---
+
+## 4. 향후 주의사항 및 가이드라인
+1. **Component Stability**: 영상 플레이어처럼 무거운 외부 API를 사용하는 컴포넌트는 반드시 메모이제이션하고, 부모로부터 전달받는 `key`나 `start` 지점이 시청 중에 변하지 않도록 관리해야 합니다.
+2. **Effect Dependencies**: 주기적으로 상태를 업데이트하는 이펙트와 초기 로딩 시 한 번만 실행되어야 하는 이펙트를 엄격히 분리하여, 리렌더링 사이클이 무한 루프나 깜빡임을 유발하지 않도록 주의합니다.
+3. **Tx ID Consistency**: 영상 식별자(`txId`) 처리는 전 시스템에서 일관된 포맷을 유지해야 합니다.
