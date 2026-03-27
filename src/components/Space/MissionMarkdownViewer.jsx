@@ -1,6 +1,7 @@
 import React from 'react';
 import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { InlineMath, BlockMath } from 'react-katex';
+import { Check } from 'lucide-react';
 import 'katex/dist/katex.min.css';
 
 const MissionMarkdownViewer = ({ text }) => {
@@ -210,11 +211,48 @@ const MissionMarkdownViewer = ({ text }) => {
             );
         }
 
-        // 3. Lists
-        if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+        // 3. Lists & Task Lists
+        const listMatch = line.match(/^\s*[*|-]\s+(.*)$/);
+        if (listMatch) {
+            const rawContent = listMatch[1];
+            const taskMatch = rawContent.match(/^\[([ xX])\]\s+(.*)$/);
+            
+            if (taskMatch) {
+                const checked = taskMatch[1].toLowerCase() === 'x';
+                const taskContent = taskMatch[2];
+                return (
+                    <div key={i} style={{ 
+                        display: 'flex', 
+                        alignItems: 'flex-start', 
+                        gap: '0.6rem', 
+                        margin: '0.4rem 0', 
+                        paddingLeft: '0.4rem' 
+                    }}>
+                        <span style={{ 
+                            marginTop: '0.2rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '1.05rem',
+                            height: '1.05rem',
+                            border: `1.5px solid ${checked ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.3)'}`,
+                            borderRadius: '3px',
+                            background: checked ? 'var(--crystal-cyan)' : 'transparent',
+                            color: 'black',
+                            flexShrink: 0
+                        }}>
+                            {checked && <Check size={12} strokeWidth={4} />}
+                        </span>
+                        <div style={{ wordBreak: 'keep-all', color: checked ? 'var(--text-muted)' : 'inherit' }}>
+                            {parseInlineFormatting(taskContent)}
+                        </div>
+                    </div>
+                );
+            }
+
             return (
                 <ul key={i} style={{ margin: '0.3rem 0', paddingLeft: '1.5rem' }}>
-                    <li style={{ wordBreak: 'keep-all', marginBottom: '0.2rem' }}>{parseInlineFormatting(line.replace(/^\s*[*|-]\s+/, ''))}</li>
+                    <li style={{ wordBreak: 'keep-all', marginBottom: '0.2rem' }}>{parseInlineFormatting(rawContent)}</li>
                 </ul>
             );
         }
