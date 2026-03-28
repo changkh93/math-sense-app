@@ -877,7 +877,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           </AnimatePresence>
 
           {/* 문제 및 이미지 섹션 */}
-          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+          <div style={{ textAlign: 'left', marginBottom: '2.5rem' }}>
             {currentQuestion.imageUrl && (
               <motion.div 
                 className="space-image-card-wrapper"
@@ -906,7 +906,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               fontSize: isMobile ? '1.4rem' : '1.8rem', 
               color: 'var(--text-bright)',
               lineHeight: 1.4,
-              wordBreak: 'keep-all'
+              wordBreak: 'keep-all',
+              textAlign: 'left'
             }}>
               {formatText(currentQuestion.question)}
             </h2>
