@@ -100,6 +100,14 @@ export const parseInlineFormatting = (text, options = {}) => {
                     </em>
                   );
               }
+              // 5. Final check for newlines in the remaining text: \n
+              if (typeof iPart === 'string' && iPart.includes('\n')) {
+                const lineParts = iPart.split(/(\n)/g);
+                return lineParts.map((lPart, lIndex) => {
+                  if (lPart === '\n') return <br key={`${keyPrefix}-br-${lIndex}-${bIndex}-${mIndex}-${iIndex}`} />;
+                  return lPart ? <span key={`${keyPrefix}-text-${lIndex}-${bIndex}-${mIndex}-${iIndex}`}>{lPart}</span> : null;
+                });
+              }
               return <span key={`${keyPrefix}-text-${lIndex}-${bIndex}-${mIndex}-${iIndex}`}>{iPart}</span>;
           });
       });
