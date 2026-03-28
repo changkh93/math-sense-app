@@ -216,23 +216,34 @@ const QuizEditor = () => {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group flex-1">
-              <label>Score Points</label>
-              <input 
-                type="number" 
-                value={editingQuiz.score} 
-                onChange={e => setEditingQuiz({ ...editingQuiz, score: parseInt(e.target.value) })}
-              />
-            </div>
-            <div className="form-group flex-2">
-              <label>Hint (Optional)</label>
-              <input 
-                type="text" 
-                value={editingQuiz.hint} 
-                onChange={e => setEditingQuiz({ ...editingQuiz, hint: e.target.value })}
-              />
-            </div>
+          <div className="form-group">
+            <label>Score Points</label>
+            <input 
+              type="number" 
+              value={editingQuiz.score} 
+              onChange={e => setEditingQuiz({ ...editingQuiz, score: parseInt(e.target.value) })}
+              style={{ width: '150px' }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label style={{ color: 'var(--crystal-cyan)', fontWeight: 'bold' }}>AI 설명 / Hint (Markdown Supported, Optional)</label>
+            <textarea 
+              value={editingQuiz.hint} 
+              onChange={e => setEditingQuiz({ ...editingQuiz, hint: e.target.value })}
+              placeholder="# 제목\n\n중학생이 통찰력을 가질 수 있도록 돕는 단계별 유도 질문형 가이드를 마크다운으로 작성하세요.\n\n수식 예시: $x^2$"
+              style={{
+                width: '100%',
+                minHeight: '200px',
+                fontFamily: 'monospace',
+                lineHeight: '1.6',
+                padding: '1rem',
+                background: 'rgba(5, 10, 25, 0.6)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px'
+              }}
+            />
           </div>
 
           <div className="form-actions">

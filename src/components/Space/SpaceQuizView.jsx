@@ -10,6 +10,7 @@ import '../../styles/space-theme.css'
 import QuestionModal from '../QuestionModal'
 import { useSmartSync } from '../../hooks/useSync'
 import { useAuth } from '../../hooks/useAuth'
+import MissionMarkdownViewer from './MissionMarkdownViewer'
 
 export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield, hasRadar, isRadarBonus, onRequestSupport }) {
   // Real-time synchronization watchdog
@@ -45,6 +46,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [retryCount, setRetryCount] = useState(0)
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const isMobile = window.innerWidth <= 768
+  const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
+  const [isAiExplanationOpen, setIsAiExplanationOpen] = useState(false)
 
   const initializedUnitId = useRef(null) // Prevent accidental reshuffling
 
@@ -84,6 +87,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       }
     }
   }, [quizData, hasRadar])
+
+  // 문제 변경 시 AI 설명 패널 닫기
+  useEffect(() => {
+    setIsAiExplanationOpen(false)
+  }, [currentIdx])
 
 
   const formatText = (text) => {
@@ -287,7 +295,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     const finalScore = calculateFinalScore(rawScore, retryCount)
     
     const canGetPerfectBonus = (correctCount === originalTotal)
-    const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
+    // isDarkMatter is now in component scope
     
     // Confidence-based Reward: Only Correct AND NOT Marked for review
     const reviewMarkedIds = new Set(Array.from(reviewMarks))
@@ -404,7 +412,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     
     // 만점 보너스 가시성 (저장 로직과 동일하게 유지)
     const canGetPerfectBonus = isPerfect
-    const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
+    // isDarkMatter is now in component scope
     
     // Confidence-based display: Only Correct AND NOT Marked
     const reviewMarkedIds = new Set(Array.from(reviewMarks))
@@ -605,10 +613,19 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   return (
-    <div className="space-bg">
+    <div className="space-bg" style={{ display: 'flex', width: '100%', position: 'relative' }}>
       <StarField count={100} />
       
-      <div className="space-quiz-container scale-in">
+      <div 
+        className="space-quiz-container scale-in"
+        style={{
+          transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+          width: '100%',
+          flex: 1,
+          margin: 0,
+          paddingRight: (isAiExplanationOpen && !isMobile) ? '400px' : '0'
+        }}
+      >
         {/* Interactive Support Tray (FAB) */}
         {!isResultMode && (
           <motion.div 
@@ -663,6 +680,33 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                     >
                       <span style={{ fontSize: '1.2rem' }}>📡</span>
                       <span>데이터 링크</span>
+                    </button>
+                  )}
+
+                  {/* AI Explanation Button */}
+                  {isDarkMatter && currentQuestion?.hint && (
+                    <button 
+                      className="support-action-btn ai-explanation" 
+                      onClick={() => setIsAiExplanationOpen(prev => !prev)}
+                      style={{
+                        padding: '0 1.2rem',
+                        borderRadius: '25px',
+                        height: '46px',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        color: 'var(--planet-purple)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        cursor: 'pointer',
+                        border: '2px solid rgba(168, 85, 247, 0.6)',
+                        boxShadow: '0 0 15px rgba(168, 85, 247, 0.3)',
+                        background: 'rgba(20, 5, 25, 0.95)',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>🤖</span>
+                      <span>AI 설명</span>
                     </button>
                   )}
 
@@ -1073,6 +1117,61 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           />
         </div>
       </div>
+
+      {/* AI Explanation Panel */}
+      <AnimatePresence>
+        {isAiExplanationOpen && (
+          <motion.div
+            initial={isMobile ? { y: '100%' } : { x: '100%' }}
+            animate={isMobile ? { y: 0 } : { x: 0 }}
+            exit={isMobile ? { y: '100%' } : { x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            style={{
+              position: 'fixed',
+              zIndex: 1000,
+              background: 'rgba(10, 10, 25, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid var(--planet-purple)',
+              boxShadow: '0 0 30px rgba(168, 85, 247, 0.3)',
+              overflowY: 'auto',
+              ...(isMobile ? {
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '80vh',
+                borderTopLeftRadius: '20px',
+                borderTopRightRadius: '20px',
+                borderBottom: 'none'
+              } : {
+                top: 0,
+                right: 0,
+                width: '400px',
+                height: '100vh',
+                borderLeft: '2px solid var(--planet-purple)',
+                borderTop: 'none',
+                borderBottom: 'none',
+                borderRight: 'none'
+              })
+            }}
+          >
+            <div style={{ padding: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', position: 'sticky', top: 0, background: 'rgba(10, 10, 25, 0.95)', zIndex: 10, paddingBottom: '1rem', borderBottom: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                <h3 style={{ color: 'var(--planet-purple)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem' }}>
+                  🤖 AI 설명
+                </h3>
+                <button 
+                  onClick={() => setIsAiExplanationOpen(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}
+                >✕</button>
+              </div>
+              <div style={{ color: 'var(--text-bright)', lineHeight: 1.6, paddingBottom: '2rem' }}>
+                <MissionMarkdownViewer text={currentQuestion?.hint || ''} />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   )
 }
