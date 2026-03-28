@@ -250,6 +250,7 @@
 .quiz-text {
   margin: 0.5rem 0;
   font-size: 1.1rem;
+  white-space: pre-wrap;
 }
 
 .quiz-meta {
@@ -670,6 +671,7 @@
   font-size: 1.3rem;
   margin-bottom: 1.5rem;
   line-height: 1.4;
+  white-space: pre-wrap;
 }
 
 .preview-image img {
@@ -716,7 +718,10 @@
   color: #000;
 }
 
-.opt-text { flex: 1; }
+.opt-text { 
+  flex: 1; 
+  white-space: pre-wrap;
+}
 
 .correct-icon { color: #1dd1a1; }
 
@@ -726,6 +731,7 @@
   border-radius: 10px;
   color: #ff9f43;
   font-size: 0.9rem;
+  white-space: pre-wrap;
 }
 
 .preview-loading, .preview-error {
