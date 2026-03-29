@@ -286,6 +286,42 @@ export function useLearningHistory(userId, dateStr) {
               }
             });
           }
+
+          // --- Detect In-Progress Quiz Sessions (이어풀기 저장 데이터) ---
+          if (data.quizSession && data.quizSession.currentIdx > 0) {
+            const session = data.quizSession;
+            const answeredCount = Object.keys(session.userAnswers || {}).length;
+            const totalCount = session.originalTotal || answeredCount;
+            const correctCount = Object.values(session.userAnswers || {})
+              .filter(a => a?.isCorrect).length;
+
+            // Don't show if there's already a completed quiz record for this unit today
+            const hasCompletedQuiz = aggregated.some(act =>
+              act.type === 'quiz_pass' && (act.metadata?.unitId === unitId)
+            );
+
+            if (!hasCompletedQuiz && answeredCount > 0) {
+              aggregated.push({
+                id: `lp_quiz_progress_${unitId}`,
+                timestamp: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+                type: 'quiz_in_progress',
+                title: `⏳ 퀴즈 진행 중: ${answeredCount}/${totalCount}문항 (${correctCount}개 정답)`,
+                score: null,
+                crystalsEarned: 0,
+                metadata: {
+                  unitId,
+                  currentIdx: session.currentIdx,
+                  answeredCount,
+                  totalCount,
+                  correctCount
+                }
+              });
+
+              // Increment quiz-related stat to reflect partial activity
+              if (!stats._quizInProgress) stats._quizInProgress = 0;
+              stats._quizInProgress++;
+            }
+          }
           
           if (data.logReadAt) {
              const unitTitle = data.unitTitle || unitId;

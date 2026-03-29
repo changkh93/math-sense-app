@@ -11,6 +11,18 @@ import QuestionModal from '../QuestionModal'
 import { useSmartSync } from '../../hooks/useSync'
 import { useAuth } from '../../hooks/useAuth'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
+import { db } from '../../firebase'
+import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
+
+// Fisher-Yates 셔플 알고리즘
+const shuffleArray = (array) => {
+  const newArr = [...array];
+  for (let i = newArr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+  }
+  return newArr;
+}
 
 export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield, hasRadar, isRadarBonus, onRequestSupport }) {
   // Real-time synchronization watchdog
@@ -31,6 +43,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [originalTotal, setOriginalTotal] = useState(0)
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 유지
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingSession, setIsLoadingSession] = useState(true)
+  const [isSavingExit, setIsSavingExit] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [modalContext, setModalContext] = useState(null)
   const [isFirstPassPerfect, setIsFirstPassPerfect] = useState(false)
@@ -49,44 +63,88 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
   const [isAiExplanationOpen, setIsAiExplanationOpen] = useState(false)
 
-  const initializedUnitId = useRef(null) // Prevent accidental reshuffling
+  const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
 
-  // 초기 문제 설정
+  // 초기 문제 설정 및 이어풀기 세션 로드
   useEffect(() => {
-    // Only initialize if it's a new unit or hasn't been initialized yet
-    if (quizData?.questions && initializedUnitId.current !== quizData.unitId) {
-      // Load retry count from local storage to prevent F5 abuse
-      if (user?.uid && quizData.unitId) {
-        const storedRetry = localStorage.getItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
-        if (storedRetry) {
-          setRetryCount(parseInt(storedRetry, 10))
-        } else {
-          setRetryCount(0)
+    // Guard key includes user uid so that when auth loads, we re-init with Firestore data
+    const guardKey = `${quizData?.unitId}__${user?.uid || 'anon'}`
+    if (quizData?.questions?.length > 0 && initializedRef.current !== guardKey) {
+      const initQuizSession = async () => {
+        setIsLoadingSession(true)
+        try {
+          let savedRetryCount = 0
+          if (user?.uid && quizData.unitId) {
+            const storedRetry = localStorage.getItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
+            if (storedRetry) {
+              savedRetryCount = parseInt(storedRetry, 10)
+            }
+          }
+
+          let targetCurrentIdx = 0
+          let targetUserAnswers = {}
+          let targetSessionCrystals = 0
+          let targetComboCount = 0
+          let targetShieldsUsed = 0
+          let targetRetryCount = savedRetryCount
+          let targetFirstPassScore = null
+
+          if (user?.uid && quizData.unitId) {
+            const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+            const snap = await getDoc(progressRef)
+            if (snap.exists()) {
+              const data = snap.data()
+              if (data.quizSession) {
+                const session = data.quizSession
+                // 문항 수가 달라졌더라도 최대한 기존 진행도를 살려서 로드합니다.
+                targetCurrentIdx = session.currentIdx || 0
+                targetUserAnswers = session.userAnswers || {}
+                targetSessionCrystals = session.sessionCrystals || 0
+                targetComboCount = session.comboCount || 0
+                targetShieldsUsed = session.shieldsUsed || 0
+                targetFirstPassScore = session.firstPassScore !== undefined ? session.firstPassScore : null
+                if (session.retryCount !== undefined) {
+                  targetRetryCount = session.retryCount
+                }
+              }
+            }
+          }
+
+          const selected = [...quizData.questions].map(q => ({
+            ...q,
+            shuffledOptions: q.options ? shuffleArray(q.options) : []
+          }));
+          
+          setCurrentQuestions(selected)
+          setAllSessionQuestions(selected)
+          setOriginalTotal(selected.length)
+          setRetryCount(targetRetryCount)
+          setCurrentIdx(targetCurrentIdx)
+          setUserAnswers(targetUserAnswers)
+          setSessionCrystals(targetSessionCrystals)
+          setComboCount(targetComboCount)
+          setShieldsUsed(targetShieldsUsed)
+          setFirstPassScore(targetFirstPassScore)
+          
+          initializedRef.current = guardKey;
+
+          if (hasRadar) {
+            setShowRadarScan(isRadarBonus) 
+            if (isRadarBonus) {
+              soundManager.playLevelUp() 
+              setTimeout(() => setShowRadarScan(false), 3000)
+            }
+          }
+        } catch (error) {
+          console.error("Failed to init quiz session", error)
+        } finally {
+          setIsLoadingSession(false)
         }
       }
 
-      const allQ = [...quizData.questions].map(q => ({
-        ...q,
-        shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
-      }));
-      const shuffled = allQ.sort(() => Math.random() - 0.5)
-      const selected = shuffled // Use all available questions
-      setCurrentQuestions(selected)
-      setAllSessionQuestions(selected)
-      setOriginalTotal(selected.length)
-      initializedUnitId.current = quizData.unitId;
-      setCurrentIdx(0); // Reset index on unit change
-
-      // Radar Effects
-      if (hasRadar) {
-        setShowRadarScan(isRadarBonus) 
-        if (isRadarBonus) {
-          soundManager.playLevelUp() 
-          setTimeout(() => setShowRadarScan(false), 3000)
-        }
-      }
+      initQuizSession()
     }
-  }, [quizData, hasRadar])
+  }, [quizData, hasRadar, user])
 
   // 문제 변경 시 AI 설명 패널 닫기
   useEffect(() => {
@@ -106,31 +164,34 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     
     // 피드백 표시
     setShowFeedback(isCorrect ? 'correct' : 'wrong')
+
+    const newUserAnswers = {
+      ...userAnswers,
+      [currentQuestion.id]: option
+    }
+    
+    // 계산 로직 (Auto-save에 최신 값을 넘기기 위함)
+    let newCombo = comboCount || 0
+    let newSessionCrystals = sessionCrystals
+    let newShieldsUsed = shieldsUsed
     
     // 부유 효과 트리거 함수
     const addMarker = (text, type, bonusX = 0, bonusY = 0) => {
       const id = Date.now() + Math.random()
       setFloatingMarkers(prev => [...prev, { 
-        id, 
-        text, 
-        type, 
-        x: event.clientX + bonusX, 
-        y: event.clientY + bonusY 
+        id, text, type, x: event.clientX + bonusX, y: event.clientY + bonusY 
       }])
       setTimeout(() => {
         setFloatingMarkers(prev => prev.filter(m => m.id !== id))
       }, 2000)
     }
 
-    // 사운드 & 파티클 & 로직
     if (isCorrect) {
       soundManager.playCorrect()
       createParticleBurst(event.clientX, event.clientY, 'star')
       createParticleBurst(event.clientX, event.clientY, 'ore')
       
-      const newCombo = (comboCount || 0) + 1
-      setComboCount(newCombo)
-      
+      newCombo += 1
       let earned = 1
       addMarker('+1', 'gain')
 
@@ -140,80 +201,139 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           setTimeout(() => addMarker('+5 COMBO!', 'gain', 40, -40), 200)
         }
       }
-      setSessionCrystals(prev => prev + earned)
-      
-      // 다음 문제로 이동 (일반 딜레이)
-      setTimeout(() => {
-        // Guard against progression while Ask Teacher modal is open
-        if (isQuestionModalOpen) return;
-
-        setShowFeedback(null)
-        if (currentIdx < currentQuestions.length - 1) {
-          setCurrentIdx(prev => prev + 1)
-        } else {
-          // 마지막 문제이고 전체 정답률 100% 인 경우 보너스 알림
-          const totalCorrectSoFar = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect || q.id === currentQuestion.id).length
-          if (totalCorrectSoFar === originalTotal) {
-            setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
-          }
-          
-          // 최초 정답률 기록 (첫 패스 종료 시점)
-          if (retryCount === 0 && firstPassScore === null) {
-            const fPassScore = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
-            setFirstPassScore(fPassScore)
-          }
-
-          setIsResultMode(true)
-        }
-      }, 800)
-
+      newSessionCrystals += earned
     } else {
       soundManager.playWrong()
       createParticleBurst(event.clientX, event.clientY, 'wrong')
       shakeScreen(300)
       
-      setComboCount(0)
-      
-      // 방패 방어 로직 (광자 쉴드)
+      newCombo = 0
       const remainingShields = hasShield - shieldsUsed
       if (remainingShields > 0) {
-        setShieldsUsed(prev => prev + 1)
+        newShieldsUsed += 1
         addMarker(`🛡️ DEFENDED! (-1)`, 'gain')
       } else {
-        // 시도 횟수에 따른 차등 감점 적용: 1회(-2), 2회(-4), 3회(-6) ...
         const currentPenalty = (retryCount + 1) * 2
-        setSessionCrystals(prev => prev - currentPenalty)
+        newSessionCrystals -= currentPenalty
         addMarker(`-${currentPenalty}`, 'loss')
       }
-      
-      
-      // 시스템 리부트 (시도 횟수에 따라 3초, 6초, 9초 딜레이)
-      const rebootDelay = Math.min((retryCount + 1) * 3000, 9000)
-      setIsRebooting(true)
-      setTimeout(() => {
-        // Guard against progression while Ask Teacher modal is open
-        if (isQuestionModalOpen) return;
+    }
 
-        setIsRebooting(false)
-        setShowFeedback(null)
-        if (currentIdx < currentQuestions.length - 1) {
-          setCurrentIdx(prev => prev + 1)
-        } else {
-          // 최초 정답률 기록 (첫 패스 종료 시점 - 실패 케이스)
-          if (retryCount === 0 && firstPassScore === null) {
-            const totalCorrectSoFar = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
-            const fPassScore = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
-            setFirstPassScore(fPassScore)
+    // React 상태 즉시 업데이트
+    setUserAnswers(newUserAnswers)
+    setComboCount(newCombo)
+    setSessionCrystals(newSessionCrystals)
+    setShieldsUsed(newShieldsUsed)
+
+    // 세션 자동 저장 함수 (즉시 호출용)
+    const triggerAutoSave = async (willBeResultMode, computedFirstPass) => {
+      // 다음 문제 인덱스를 미리 계산하여 저장합니다.
+      let nextIdxForSave = currentIdx
+      if (currentIdx < currentQuestions.length - 1) {
+        nextIdxForSave = currentIdx + 1
+      }
+      
+      if (user?.uid && quizData?.unitId && !reSolveMode && !willBeResultMode) {
+        try {
+          const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+          const sessionObj = {
+            currentIdx: nextIdxForSave,
+            userAnswers: newUserAnswers,
+            comboCount: newCombo,
+            sessionCrystals: newSessionCrystals,
+            retryCount: retryCount,
+            shieldsUsed: newShieldsUsed,
+            originalTotal: originalTotal,
+            firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore
           }
-          setIsResultMode(true)
-        }
-      }, rebootDelay)
+          await setDoc(progressRef, {
+            quizSession: JSON.parse(JSON.stringify(sessionObj)),
+            updatedAt: serverTimestamp()
+          }, { merge: true })
+        } catch (e) { console.error("Auto save failed", e) }
+      }
     }
     
-    setUserAnswers(prev => ({
-      ...prev,
-      [currentQuestion.id]: option
-    }))
+    // 답안 확정 즉시 백그라운드 저장 실행 (사용자가 이펙트 도중 나가더라도 유실되지 않음)
+    let willBeResultModeImmediate = false
+    let computedFirstPassImmediate = firstPassScore
+    
+    if (currentIdx >= currentQuestions.length - 1) {
+      willBeResultModeImmediate = true
+      const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect).length
+      if (retryCount === 0 && firstPassScore === null) {
+        computedFirstPassImmediate = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
+      }
+    }
+    
+    // 비동기로 호출 (await ❌)
+    triggerAutoSave(willBeResultModeImmediate, computedFirstPassImmediate)
+
+    // 딜레이 후 다음 문제 이동 로직 (UI 전환만 담당)
+    const performNextStep = () => {
+      if (isQuestionModalOpen) return; // 선생님 질문 모달이 열려있으면 대기
+
+      setShowFeedback(null)
+      setIsRebooting(false)
+      
+      let nextIdx = currentIdx
+      if (currentIdx < currentQuestions.length - 1) {
+        nextIdx = currentIdx + 1
+        setCurrentIdx(nextIdx)
+      } else {
+        // 마지막 문제 로직
+        const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect).length
+        if (isCorrect && totalCorrectSoFar === originalTotal) {
+          setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
+        }
+        
+        if (retryCount === 0 && firstPassScore === null) {
+          const fPassScore = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
+          setFirstPassScore(fPassScore)
+        }
+        setIsResultMode(true)
+      }
+    }
+
+    if (isCorrect) {
+      setTimeout(performNextStep, 800)
+    } else {
+      const rebootDelay = Math.min((retryCount + 1) * 3000, 9000)
+      setIsRebooting(true)
+      setTimeout(performNextStep, rebootDelay)
+    }
+  }
+
+  // 명시적 닫기/저장 로직
+  const handleExitClick = async () => {
+    soundManager.playClick()
+    
+    // 이펙트/대기열이 돌고 있는(즉시저장 완료된) 상태가 아닐 때만 현재 상태 강제 저장
+    if (!isRebooting && !showFeedback) {
+      if (user?.uid && quizData?.unitId && !reSolveMode && !isResultMode) {
+        setIsSavingExit(true)
+        try {
+          const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+          const sessionObj = {
+            currentIdx: currentIdx,
+            userAnswers: userAnswers,
+            comboCount: comboCount,
+            sessionCrystals: sessionCrystals,
+            retryCount: retryCount,
+            shieldsUsed: shieldsUsed,
+            originalTotal: originalTotal,
+            firstPassScore: firstPassScore !== null ? firstPassScore : null
+          }
+          await setDoc(progressRef, {
+            quizSession: JSON.parse(JSON.stringify(sessionObj)),
+            updatedAt: serverTimestamp()
+          }, { merge: true })
+        } catch (e) {
+          console.error("Exit save failed", e)
+        }
+      }
+    }
+    onExit()
   }
 
   const handleOpenQuestionModal = () => {
@@ -311,6 +431,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       // Clear localStorage on successful finish
       if (user?.uid && quizData?.unitId) {
         localStorage.removeItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
+        try {
+          const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+          await setDoc(progressRef, { quizSession: deleteField() }, { merge: true })
+        } catch(e) { console.error("Failed to clear quiz session", e) }
       }
 
       await onComplete({ 
@@ -348,6 +472,25 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       console.error("Finish failed:", err)
       setIsSubmitting(false)
     }
+  }
+
+  if (isLoadingSession) {
+    return (
+      <div className="space-bg">
+        <StarField count={100} />
+        <div style={{ 
+          height: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          color: 'var(--crystal-cyan)',
+          fontSize: '1.2rem',
+          letterSpacing: '2px'
+        }}>
+          🚀 퀴즈 세션을 불러오는 중...
+        </div>
+      </div>
+    )
   }
 
   if (!isResultMode) {
@@ -764,9 +907,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         )}
 
         <div id="quiz-capture-area" className="glass-card space-quiz-card">
-          {/* 나가기 버튼 */}
+          {/* 닫기 버튼 (X 모양, 위치 저장 기능 유지) */}
           <button 
-            onClick={() => { soundManager.playClick(); onExit() }}
+            onClick={handleExitClick}
+            title="학습 위치를 저장하고 나갑니다"
             style={{
               position: 'absolute',
               top: '1rem',
@@ -774,14 +918,21 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               background: 'rgba(255,255,255,0.1)',
               border: 'none',
               color: 'var(--text-muted)',
-              padding: '0.5rem 1rem',
-              borderRadius: '10px',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
               zIndex: 10,
-              whiteSpace: 'nowrap'
+              fontSize: '1.2rem',
+              transition: 'all 0.2s ease'
             }}
+            onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
+            onMouseLeave={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
           >
-            ✕ 나가기
+            ✕
           </button>
 
           {/* 헤더 */}
@@ -1019,6 +1170,53 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               )
             })}
           </div>
+          
+          {/* 하단 중앙 기능 버튼 (영상 학습과 통일성) */}
+          {!isResultMode && (
+            <div style={{ 
+              marginTop: '3rem', 
+              display: 'flex', 
+              justifyContent: 'center' 
+            }}>
+              <button 
+                onClick={handleExitClick}
+                disabled={isSavingExit}
+                className="hud-btn secondary glass"
+                style={{ 
+                  padding: '0.8rem 2.5rem', 
+                  fontSize: '1.1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  borderRadius: '12px',
+                  background: isSavingExit ? 'rgba(0,243,255,0.15)' : 'rgba(255,255,255,0.05)',
+                  border: isSavingExit ? '1px solid var(--crystal-cyan)' : '1px solid rgba(255,255,255,0.1)',
+                  color: 'white',
+                  cursor: isSavingExit ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  opacity: isSavingExit ? 0.85 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSavingExit) {
+                    e.target.style.background = 'rgba(255,255,255,0.12)'
+                    e.target.style.transform = 'translateY(-2px)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSavingExit) {
+                    e.target.style.background = 'rgba(255,255,255,0.05)'
+                    e.target.style.transform = 'translateY(0)'
+                  }
+                }}
+              >
+                {isSavingExit ? (
+                  <><span className="spinner-inline"></span> 저장 중...</>
+                ) : (
+                  <>📋 오늘은 여기까지</>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* 시스템 리부트 오버레이 */}
           <AnimatePresence>

@@ -159,6 +159,11 @@ export default function DailyLearningTimeline({ activities, dailyStats, loading,
             iconBg = 'rgba(245, 158, 11, 0.2)';
             iconColor = '#f59e0b';
             borderColor = '#f59e0b';
+          } else if (act.type === 'quiz_in_progress') {
+            icon = '⏳';
+            iconBg = 'rgba(251, 191, 36, 0.2)';
+            iconColor = '#fbbf24';
+            borderColor = '#fbbf24';
           } else if (act.type === 'attendance') {
             icon = '✅';
             iconBg = 'rgba(0, 212, 255, 0.1)';
@@ -294,6 +299,40 @@ export default function DailyLearningTimeline({ activities, dailyStats, loading,
                       </span>
                     </div>
                   )}
+
+                  {/* Quiz In-Progress Bar */}
+                  {act.type === 'quiz_in_progress' && act.metadata?.totalCount > 0 && (() => {
+                    const pct = Math.round((act.metadata.answeredCount / act.metadata.totalCount) * 100);
+                    return (
+                      <div style={{ width: '100%', marginTop: '0.3rem' }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          marginBottom: '0.3rem',
+                          fontSize: '0.75rem'
+                        }}>
+                          <span className="font-tech" style={{ color: 'var(--text-muted)' }}>PROGRESS</span>
+                          <span className="font-tech" style={{ color: '#fbbf24', fontWeight: 'bold' }}>{pct}%</span>
+                        </div>
+                        <div style={{
+                          width: '100%',
+                          height: '6px',
+                          background: 'rgba(255,255,255,0.08)',
+                          borderRadius: '3px',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            width: `${pct}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, #fbbf24, #f59e0b)',
+                            borderRadius: '3px',
+                            transition: 'width 0.5s ease',
+                            boxShadow: '0 0 8px rgba(251, 191, 36, 0.4)'
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </motion.div>

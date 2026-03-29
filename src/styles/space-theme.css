@@ -885,3 +885,21 @@
   border-bottom-color: var(--neon-blue);
   text-shadow: var(--glow-text-blue);
 }
+
+/* ========================================
+   Inline Spinner (Save / Loading states)
+   ======================================== */
+.spinner-inline {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--crystal-cyan);
+  border-radius: 50%;
+  animation: spin-inline 0.7s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin-inline {
+  to { transform: rotate(360deg); }
+}
