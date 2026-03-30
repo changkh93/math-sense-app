@@ -472,6 +472,7 @@ export default function MissionHub({
   const videoPlayerRef = useRef(null)
   const autoSaveIntervalRef = useRef(null)
   const lastVideoTimeRef = useRef(null)
+  const lastPollTimeRef = useRef(Date.now())
   const videoCompletedRef = useRef(false)
   const videoCompletionBonusGivenRef = useRef(false)
   const stampedSetRef = useRef(new Set())
@@ -661,7 +662,14 @@ export default function MissionHub({
       const serverPos = savedProgress.lastPosition || 0
       const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
       const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
-      const maxPos = Math.max(serverPos, localPos)
+      
+      // Determine chronological position bookmark
+      const serverUpdateTs = savedProgress.updatedAt?.toMillis 
+        ? savedProgress.updatedAt.toMillis() 
+        : (savedProgress.updatedAt?.seconds ? savedProgress.updatedAt.seconds * 1000 : 0)
+      const localUpdateTs = parseInt(localStorage.getItem(localCacheKey + '_updatedAt') || '0', 10)
+      
+      const latestPos = (localUpdateTs > serverUpdateTs) ? localPos : serverPos
       
       totalTimeSpentRef.current = savedProgress.totalTimeSpent || 0
       totalRewardedCrystalsRef.current = savedProgress.totalRewardedCrystals || 0
@@ -673,11 +681,11 @@ export default function MissionHub({
       videoCompletionBonusGivenRef.current = savedProgress.completionBonusGiven || false
       
       setIsAtEnd(false)
-      lastVideoTimeRef.current = maxPos > 0 ? maxPos : -1
-      setInitialStartPosition(maxPos > 0 ? maxPos : (selectedTx.start || 0))
+      lastVideoTimeRef.current = latestPos > 0 ? latestPos : -1
+      setInitialStartPosition(latestPos > 0 ? latestPos : (selectedTx.start || 0))
       
-      if (maxPos > 0) {
-         setResumePosStr(`이전 지점(${Math.floor(maxPos / 60)}분 ${Math.floor(maxPos % 60)}초)에서 이어보기 되었습니다.`)
+      if (latestPos > 0) {
+         setResumePosStr(`이전 지점(${Math.floor(latestPos / 60)}분 ${Math.floor(latestPos % 60)}초)에서 이어보기 되었습니다.`)
          setTimeout(() => setResumePosStr(""), 4000)
       }
     } else {
@@ -706,8 +714,15 @@ export default function MissionHub({
     autoSaveIntervalRef.current = setInterval(async () => {
       try {
         const pos = Math.floor(lastVideoTimeRef.current || 0)
-        if (pos > 0) {
+        if (pos > 0 || stampedSetRef.current.size > 0) {
           const stamps = Array.from(stampedSetRef.current)
+          
+          // Offline-first caching (10초 주기 일괄 저장으로 성능 최적화)
+          const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+          localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(stamps))
+          localStorage.setItem(localCacheKey + '_pos', pos.toString())
+          localStorage.setItem(localCacheKey + '_updatedAt', Date.now().toString())
+
           const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
           
           const updateData = {
@@ -744,8 +759,16 @@ export default function MissionHub({
 
     const handleUnloadSave = () => {
       const finalPos = Math.floor(lastVideoTimeRef.current || 0)
-      if (finalPos <= 0 || !idTokenRef.current) return
+      if ((finalPos <= 0 && stampedSetRef.current.size === 0) || !idTokenRef.current) return
       
+      const stamps = Array.from(stampedSetRef.current)
+
+      // Unload 시점의 로컬 캐시 갱신
+      const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+      localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(stamps))
+      localStorage.setItem(localCacheKey + '_pos', finalPos.toString())
+      localStorage.setItem(localCacheKey + '_updatedAt', Date.now().toString())
+
       const payload = JSON.stringify({
         idToken: idTokenRef.current,
         userId,
@@ -931,8 +954,14 @@ export default function MissionHub({
   }
 
   // ─── Transmission: Bitset stamp tracking ───
-  const handleVideoTimeUpdate = useCallback(({ currentTime, duration }) => {
+  const handleVideoTimeUpdate = useCallback(({ currentTime, duration, playbackRate = 1 }) => {
     if (!selectedTx || !userId) return
+
+    const now = Date.now()
+    const lastPollTime = lastPollTimeRef.current || now
+    lastPollTimeRef.current = now
+
+    const realGapMs = now - lastPollTime
 
     const currentSecond = Math.floor(currentTime)
     const lastSecond = Math.floor(lastVideoTimeRef.current)
@@ -940,19 +969,25 @@ export default function MissionHub({
     if (duration > 0) videoDurationRef.current = duration
 
     // Track actual playback time (accumulate real elapsed time)
-    totalTimeSpentRef.current += 0.2 // Called every ~200ms from YoutubePlayer poll
+    // Use actual real time gap to be accurate (protect against extreme throttling > 1s)
+    totalTimeSpentRef.current += Math.min(realGapMs / 1000, 1)
 
     // Calculate gap between polls
     const gap = currentSecond - lastSecond
-    // Max reasonable gap for speed playback (allows up to ~3x speed)
-    // Skip detection: gaps > 5 seconds are treated as timeline jumps
-    const MAX_NORMAL_GAP = 5
+    
+    // Check if the gap is heavily discrepant from real time passed
+    // If user scrubs natively, the real clock time didn't change much, but `gap` is huge.
+    // If browser throttles, real clock time matches the `gap` (accounting for playback speed).
+    const expectedVideoElapsed = (realGapMs / 1000) * playbackRate
+    const isScrubbing = Math.abs(expectedVideoElapsed - gap) > 2 // 2 seconds tolerance
 
     let newStampsAdded = false
 
-    if (gap > 0 && gap <= MAX_NORMAL_GAP) {
-      // Normal playback (including speed) — stamp ALL seconds in range
-      for (let s = lastSecond + 1; s <= currentSecond; s++) {
+    if (gap > 0 && !isScrubbing) {
+      // Normal playback (including speed playback AND background throttled polls). 
+      // Safely stamp ALL seconds in range (limited to 60s max per tick safety bound)
+      const maxStamps = Math.min(gap, 60)
+      for (let s = lastSecond + 1; s <= lastSecond + maxStamps; s++) {
         if (!stampedSetRef.current.has(s)) {
           stampedSetRef.current.add(s)
           newStampCountRef.current++
@@ -960,7 +995,7 @@ export default function MissionHub({
         }
       }
     } else {
-      // Skip detected (gap > 5) OR backwards seek (gap <= 0) OR first poll
+      // Skip detected (isScrubbing) OR backwards seek (gap <= 0) OR first poll
       // Only stamp the current second
       if (!stampedSetRef.current.has(currentSecond)) {
         stampedSetRef.current.add(currentSecond)
@@ -971,13 +1006,6 @@ export default function MissionHub({
 
     if (newStampsAdded) {
       setStampCount(stampedSetRef.current.size)
-      // Save locally every stamp update (Offline-first caching)
-      if (userId && selectedTx) {
-        const txId = selectedTx.id || 'default'
-        const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-        localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(Array.from(stampedSetRef.current)))
-        localStorage.setItem(localCacheKey + '_pos', currentSecond.toString())
-      }
     }
 
     // Check completion: 90%+ of video seconds stamped
@@ -1131,6 +1159,7 @@ export default function MissionHub({
       const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
       localStorage.removeItem(localCacheKey + '_stamps')
       localStorage.removeItem(localCacheKey + '_pos')
+      localStorage.removeItem(localCacheKey + '_updatedAt')
 
       // Update local state
       setLearningProgress(prev => {
