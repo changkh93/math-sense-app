@@ -637,14 +637,14 @@ export default function MissionHub({
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
   useEffect(() => {
-    if (loadingProgress || !userId || !selectedTx || !learningProgress) return
+    if (loadingProgress || !userId || !selectedTx) return
     
     const txId = selectedTx.id || 'default'
     // ONLY run if the video has changed or the very first time progress is loaded
     if (videoPrevTxIdRef.current === txId) return
     videoPrevTxIdRef.current = txId
 
-    const savedProgress = learningProgress.videoProgress?.[txId]
+    const savedProgress = learningProgress?.videoProgress?.[txId]
 
     if (savedProgress) {
       const serverStamps = savedProgress.stampedSeconds || []
