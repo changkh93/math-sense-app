@@ -176,7 +176,7 @@ export default function Agora() {
                   <div className="card-header">
                     <span className={`type-badge type-${q.type || 'other'}`}>
                       {q.type === 'quiz' 
-                        ? (q.quizId || q.quizContext?.questionId || '📝 문제') 
+                        ? (q.quizContext?.quizTitle || '📝 문제') 
                         : (q.type === 'concept' ? '💡 개념' : '💬 기타')}
                     </span>
                     <span className={`status-badge status-${q.status}`}>

@@ -162,27 +162,35 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
 
         const element = document.getElementById('quiz-capture-area');
         if (element) {
+          const captureOptions = {
+            quality: 0.9,
+            pixelRatio: 2,
+            backgroundColor: '#050a19',
+            cacheBust: true,
+            filter: (node) => {
+              // Skip problematic modal/UI elements
+              if (node.classList?.contains('modal-overlay')) return false;
+              if (node.classList?.contains('capture-hide')) return false;
+              // Skip style/link nodes that might trigger SecurityError if crossorigin fails
+              // We keep it broad but usually cross-origin links are the culprit
+              if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+                try {
+                  // If we can't access rules, it's a security risk to keep it during capture
+                  if (node.sheet && !node.sheet.cssRules) return false;
+                } catch (e) {
+                  console.warn('Skipping stylesheet due to potential SecurityError:', node.href);
+                  return false;
+                }
+              }
+              return true;
+            }
+          };
+
           try {
             // Precise Viewport Capture for Data Log
             const scrollEl = element.querySelector('.mission-content-view');
             const cardEl = scrollEl?.querySelector('.glass-card');
             
-            let captureTarget = element;
-            let captureOptions = {
-              quality: 0.9,
-              pixelRatio: 2,
-              backgroundColor: '#050a19',
-              skipAutoScale: true,
-              cacheBust: true,
-              fontEmbedCSS: '',
-              filter: (node) => {
-                if (node.tagName === 'LINK' && node.rel === 'stylesheet') return false;
-                if (node.classList?.contains('modal-overlay')) return false;
-                if (node.classList?.contains('capture-hide')) return false;
-                return true;
-              }
-            };
-
             if (scrollEl && cardEl && activeContext?.type === 'datalog') {
               const scrollTop = scrollEl.scrollTop;
               const viewportHeight = scrollEl.clientHeight;
@@ -191,15 +199,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
 
               // Capture the full content card first
               const fullCanvas = await htmlToImage.toCanvas(cardEl, {
+                ...captureOptions,
                 quality: 1,
-                pixelRatio: ratio,
-                backgroundColor: '#050a19',
-                cacheBust: true,
-                filter: (node) => {
-                  if (node.classList?.contains('modal-overlay')) return false;
-                  if (node.classList?.contains('capture-hide')) return false;
-                  return true;
-                }
+                pixelRatio: ratio
               });
 
               // Crop the visible part onto a new canvas
@@ -218,22 +220,12 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
               }
             } else {
               // Fallback for types without special scrolling needs (like video or quiz)
-              // We capture the whole area to ensure consistency with the user's viewport
-              const dataUrl = await htmlToImage.toPng(element, { 
-                quality: 0.9,
-                pixelRatio: 2,
-                backgroundColor: '#050a19',
-                cacheBust: true,
-                filter: (node) => {
-                  if (node.classList?.contains('modal-overlay')) return false;
-                  if (node.classList?.contains('capture-hide')) return false;
-                  return true;
-                }
-              });
+              const dataUrl = await htmlToImage.toPng(element, captureOptions);
               setBackgroundImage(dataUrl);
             }
           } catch (captureErr) {
-            console.warn('Screen capture failed:', captureErr);
+            console.error('Screen capture failed with Error:', captureErr);
+            setError('화면을 캡처하는 중 보안 오류가 발생했습니다. 브라우저 설정이나 확장 프로그램을 확인해 주세요.');
           }
         } else {
           console.warn('Capture target element #quiz-capture-area not found.');
