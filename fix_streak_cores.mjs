@@ -136,7 +136,7 @@ async function auditAndFix() {
     const dbLongest = userData.longestStreak || 0;
     const dbLastDate = userData.lastStreakDate || '';
     const longestShouldBe = Math.max(dbLongest, result.correctStreak);
-    const shouldFix = result.correctStreak > dbStreak;
+    const shouldFix = result.correctStreak !== dbStreak || result.correctLastDate !== dbLastDate;
 
     if (shouldFix) {
       affectedUsers.push({

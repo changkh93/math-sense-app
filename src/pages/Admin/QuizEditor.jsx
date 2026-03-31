@@ -30,6 +30,7 @@ const QuizEditor = () => {
     options: [{ text: '', isCorrect: true }, { text: '', isCorrect: false }],
     score: 1,
     hint: '',
+    explanation: '',
     imageUrl: ''
   });
 
@@ -232,6 +233,26 @@ const QuizEditor = () => {
               value={editingQuiz.hint} 
               onChange={e => setEditingQuiz({ ...editingQuiz, hint: e.target.value })}
               placeholder="# 제목\n\n중학생이 통찰력을 가질 수 있도록 돕는 단계별 유도 질문형 가이드를 마크다운으로 작성하세요.\n\n수식 예시: $x^2$"
+              style={{
+                width: '100%',
+                minHeight: '200px',
+                fontFamily: 'monospace',
+                lineHeight: '1.6',
+                padding: '1rem',
+                background: 'rgba(5, 10, 25, 0.6)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px'
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label style={{ color: 'var(--planet-green)', fontWeight: 'bold' }}>상세 해설 / Explanation (Markdown Supported, Optional)</label>
+            <textarea 
+              value={editingQuiz.explanation || ''} 
+              onChange={e => setEditingQuiz({ ...editingQuiz, explanation: e.target.value })}
+              placeholder="# 문제 해설\n\n학생이 문제를 완전히 이해할 수 있도록 깊이 있는 해설, 풀이 과정, 핵심 개념을 상세하게 작성하세요.\n\n수식 예시: $x^2 + y^2 = z^2$"
               style={{
                 width: '100%',
                 minHeight: '200px',

@@ -62,6 +62,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const isMobile = window.innerWidth <= 768
   const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
   const [isAiExplanationOpen, setIsAiExplanationOpen] = useState(false)
+  const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
 
   const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
 
@@ -149,6 +150,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // 문제 변경 시 AI 설명 패널 닫기
   useEffect(() => {
     setIsAiExplanationOpen(false)
+    setIsDetailedExplanationOpen(false)
   }, [currentIdx])
 
 
@@ -827,7 +829,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   )}
 
                   {/* AI Explanation Button */}
-                  {isDarkMatter && currentQuestion?.hint && (
+                  {isDarkMatter && (currentQuestion?.hint || currentQuestion?.explanation) && (
                     <button 
                       className="support-action-btn ai-explanation" 
                       onClick={() => setIsAiExplanationOpen(prev => !prev)}
@@ -1363,7 +1365,52 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 >✕</button>
               </div>
               <div style={{ color: 'var(--text-bright)', lineHeight: 1.6, paddingBottom: '2rem' }}>
-                <MissionMarkdownViewer text={currentQuestion?.hint || ''} />
+                {currentQuestion?.hint && (
+                  <MissionMarkdownViewer text={currentQuestion.hint} />
+                )}
+                
+                {currentQuestion?.explanation && (
+                  <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                    <button 
+                      onClick={() => setIsDetailedExplanationOpen(!isDetailedExplanationOpen)}
+                      style={{
+                        background: 'rgba(168, 85, 247, 0.1)',
+                        border: '1px solid var(--planet-purple)',
+                        color: 'var(--planet-purple)',
+                        padding: '0.8rem 1.5rem',
+                        borderRadius: '20px',
+                        fontSize: '0.95rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = 'rgba(168, 85, 247, 0.2)'}
+                      onMouseLeave={(e) => e.target.style.background = 'rgba(168, 85, 247, 0.1)'}
+                    >
+                      <span style={{ pointerEvents: 'none' }}>💡 자세한 설명 보기</span>
+                      <span style={{ pointerEvents: 'none' }}>{isDetailedExplanationOpen ? '▲' : '▼'}</span>
+                    </button>
+                    
+                    <AnimatePresence>
+                      {isDetailedExplanationOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          style={{ overflow: 'hidden', marginTop: '1rem' }}
+                        >
+                          <div style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '15px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <MissionMarkdownViewer text={currentQuestion.explanation} />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>

@@ -23,7 +23,8 @@ const PROMPT_TEMPLATE = `
       "question": "문제 내용 (모든 숫자는 $로 감싸기. 예: $15$를 $2$로 나누면?)",
       "options": ["$보기1$", "$보기2$", "$보기3$", "$보기4$"],
       "answer": "정답 텍스트 (옵션 중 하나와 정확히 일치해야 함)",
-      "hint": "이 문제를 전혀 이해하지 못하는 중학생이 통찰력을 가질 수 있도록 돕는 단계별 유도 질문형 가이드 (Markdown 형식 필수. 정답을 바로 알려주지 말고 스스로 생각하게 유도. 수식은 $...$ 사용)"
+      "hint": "이 문제를 전혀 이해하지 못하는 중학생이 통찰력을 가질 수 있도록 돕는 단계별 유도 질문형 가이드 (Markdown 형식 필수. 정답을 바로 알려주지 말고 스스로 생각하게 유도. 수식은 $...$ 사용)",
+      "explanation": "첨부된 4장의 이미지와 같이 한 문제에 대한 깊이 있는 해설, 풀이 과정, 핵심 개념을 모두 포함한 상세한 마크다운 문서 (정답 확인용으로 매우 자세하게 작성. 1번 문제 풀이와 같은 양식으로 작성. 수식은 $...$ 사용)"
     }
   ]
 }
@@ -128,6 +129,7 @@ export default function AiQuizImportModal({ isOpen, onClose, unitId }) {
           options: formattedOptions,
           answer: q.answer, 
           hint: q.hint || '',
+          explanation: q.explanation || '',
           score: 1,
           order: 999 + index // Just put it at the end. Ideally we'd query existing count, but for now 999+ ensures it's likely last or we can reorder later.
         };
