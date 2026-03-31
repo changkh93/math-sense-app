@@ -54,16 +54,19 @@ function recalculateStreak(activeDates, totalCoresAvailable) {
     }
   }
 
-  // 끝에서부터 역방향으로 가장 최근 연속 체인 길이 계산
+  // 끝에서부터 역방향으로 가장 최근 연속 체인 구성
   const allSorted = Array.from(allDates).sort();
-  let streakCount = 1;
+  let chainDates = [allSorted[allSorted.length - 1]];
   for (let i = allSorted.length - 2; i >= 0; i--) {
     if (daysBetween(allSorted[i], allSorted[i + 1]) === 1) {
-      streakCount++;
+      chainDates.push(allSorted[i]);
     } else {
       break;
     }
   }
+
+  // 체인 내에서 코어로 보충된 날짜를 제외하고, 실제 학습일만 센다
+  const streakCount = chainDates.filter(d => activeDates.includes(d)).length;
 
   const lastDate = allSorted[allSorted.length - 1];
   return {

@@ -294,7 +294,7 @@ export default function SpaceJourney({ userData }) {
       const todayNode = timelineData.days.find(d => d.isToday);
       const calculatedTrueStreak = todayNode ? todayNode.streakRun : 0;
 
-      if (calculatedTrueStreak > (userData?.currentStreak || 0)) {
+      if (calculatedTrueStreak !== (userData?.currentStreak || 0)) {
         try {
           const updates = {
             currentStreak: calculatedTrueStreak,
