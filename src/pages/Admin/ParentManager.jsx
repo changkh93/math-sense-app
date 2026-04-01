@@ -42,7 +42,10 @@ export default function ParentManager() {
   // Load all parents in real-time
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'parents'), (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(p => !p.isDeleted); // Skip soft-deleted accounts
+
       list.sort((a, b) => (a.phone || '').localeCompare(b.phone || ''));
       setParents(list);
       setLoading(false);
@@ -61,6 +64,30 @@ export default function ParentManager() {
     try {
       const email = phoneToEmail(digits);
 
+      // Check if a parent record already exists for this phone (even if soft-deleted)
+      const q = query(collection(db, 'parents'), where('phone', '==', digits));
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        const docId = snap.docs[0].id;
+        const docData = snap.docs[0].data();
+        if (docData.isDeleted) {
+          // Reactivate the existing account
+          await setDoc(doc(db, 'parents', docId), { 
+            isDeleted: false, 
+            deletedAt: null,
+            updatedAt: new Date()
+          }, { merge: true });
+          
+          alert('기존 삭제 기록이 발견되어 계정이 자동으로 복구되었습니다! ✅');
+          setNewPhone('');
+          setNewPassword('');
+          return;
+        } else {
+          return alert('이미 등록된 번호입니다. 활성화된 계정 목록을 확인해 주세요.');
+        }
+      }
+
       // Create Firebase Auth account via secondary app (won't log out admin)
       const cred = await createUserWithEmailAndPassword(secondaryAuth, email, newPassword);
       await secondaryAuth.signOut(); // Sign out from secondary immediately
@@ -71,6 +98,7 @@ export default function ParentManager() {
         email: email,
         childrenUids: [],
         role: 'parent',
+        isDeleted: false,
         createdAt: new Date()
       });
 
@@ -80,7 +108,7 @@ export default function ParentManager() {
     } catch (err) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
-        alert('이미 등록된 전화번호입니다.');
+        alert('이미 인증 시스템에 등록된 번호입니다. (삭제된 정보가 Firestore에 없을 수 있습니다. 선생님께서 직접 Auth 정리를 하시거나, 다른 비밀번호로 로그인을 시도해 보세요.)');
       } else {
         alert('계정 생성 실패: ' + err.message);
       }
@@ -197,12 +225,18 @@ export default function ParentManager() {
     }
   };
 
-  // Delete parent account (Firestore doc only; Auth account remains but is harmless)
+  // Delete parent account (Soft Delete: keeps Auth account intact)
   const handleDeleteParent = async (parentId) => {
-    if (!confirm('이 학부모 계정을 삭제하시겠습니까? (Firestore 문서만 삭제됩니다)')) return;
+    if (!confirm('이 학부모 계정을 삭제하시겠습니까? (삭제 후 동일 번호로 가입 시 정보가 복구됩니다)')) return;
     try {
-      await deleteDoc(doc(db, 'parents', parentId));
-      alert('삭제 완료');
+      // Mark as deleted in Firestore instead of physical delete
+      // This allows "recreating" the account later despite Firebase Auth constraints
+      await setDoc(doc(db, 'parents', parentId), { 
+        isDeleted: true, 
+        deletedAt: new Date() 
+      }, { merge: true });
+      
+      alert('삭제 완료 (비활성화되었습니다)');
     } catch (err) {
       console.error(err);
       alert('삭제 실패');
