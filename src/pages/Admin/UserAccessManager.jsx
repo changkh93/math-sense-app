@@ -13,21 +13,61 @@ function UserAccessManager() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!searchTerm.trim()) return;
+    const term = searchTerm.trim();
+    if (!term) return;
     
     setLoading(true);
+    setUsers([]);
+
     try {
-      const q = query(collection(db, 'users'), where('email', '==', searchTerm.trim()));
-      const snap = await getDocs(q);
-      const fetchedUsers = snap.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+      const termLower = term.toLowerCase();
+      const usersRef = collection(db, 'users');
+
+      // 1. Search by name (Starts with)
+      const nameQ = query(usersRef, 
+        where('name', '>=', term), 
+        where('name', '<=', term + '\uf8ff'),
+        limit(20)
+      );
+
+      // 2. Search by email (Starts with)
+      const emailQ = query(usersRef, 
+        where('email', '>=', termLower), 
+        where('email', '<=', termLower + '\uf8ff'),
+        limit(20)
+      );
+
+      const [nameSnap, emailSnap] = await Promise.all([getDocs(nameQ), getDocs(emailQ)]);
+      
+      const resultsMap = new Map();
+      
+      const processSnap = (snap) => {
+        snap.docs.forEach(doc => {
+          resultsMap.set(doc.id, { ...doc.data(), uid: doc.id });
+        });
+      };
+
+      processSnap(nameSnap);
+      processSnap(emailSnap);
+
+      // 3. Fallback: extract email pattern and search exact
+      const emailMatch = term.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      if (emailMatch && !resultsMap.has(term)) {
+        const extractedEmail = emailMatch[0].toLowerCase();
+        const specificEmailQ = query(usersRef, where('email', '==', extractedEmail));
+        const specSnap = await getDocs(specificEmailQ);
+        processSnap(specSnap);
+      }
+
+      const fetchedUsers = Array.from(resultsMap.values());
       setUsers(fetchedUsers);
       
       if (fetchedUsers.length === 0) {
-        alert('해당 이메일을 가진 유저를 찾을 수 없습니다.');
+        alert('해당 이름 또는 이메일을 가진 유저를 찾을 수 없습니다.');
       }
     } catch (err) {
       console.error(err);
-      alert('유저 검색 실패. 이메일이 정확한지 확인하세요.');
+      alert('유저 검색 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -83,12 +123,11 @@ function UserAccessManager() {
         <div className="editor-section block-appear">
           <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
             <input 
-              type="email" 
-              placeholder="유저의 정확한 이메일을 입력하세요..." 
+              type="text" 
+              placeholder="이름 또는 이메일 앞부분을 입력하세요..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ flex: 1, padding: '12px 20px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--panel-bg)', color: 'white', fontSize: '1rem' }}
-              required
             />
             <button type="submit" className="primary-btn" disabled={loading}>
               {loading ? '검색 중...' : <><Search size={18} /> 검색</>}
