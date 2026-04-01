@@ -11,7 +11,7 @@ import { doc, onSnapshot, collection as fsCollection, query as fsQuery, where as
  * 
  * @param {string} userId - The user's ID
  * @param {string} dateStr - The target date in YYYY-MM-DD format (KST)
- * @returns {object} { activities, loading, error }
+ * @returns {object} { activities, dailyStats, loading, error }
  */
 export function useLearningHistory(userId, dateStr) {
   const [activities, setActivities] = useState([]);
@@ -103,12 +103,10 @@ export function useLearningHistory(userId, dateStr) {
       updateRaw('assignments', []);
     });
 
-    // 5. LP
-    const unsubLP = onSnapshot(fsQuery(
-      fsCollection(db, 'users', userId, 'learning_progress'),
-      fsWhere('updatedAt', '>=', startTime),
-      fsWhere('updatedAt', '<=', endTime)
-    ), (snap) => updateRaw('lp', snap.docs), (err) => {
+    // 5. LP (Fetch all progress docs for the user to ensure we catch all state)
+    const unsubLP = onSnapshot(fsCollection(db, 'users', userId, 'learning_progress'), (snap) => {
+      updateRaw('lp', snap.docs);
+    }, (err) => {
       console.error("LP listen error:", err);
       updateRaw('lp', []);
     });
@@ -124,9 +122,8 @@ export function useLearningHistory(userId, dateStr) {
 
   // AGGREGATE DATA
   useEffect(() => {
-    // Check if at least essential data is loaded to show SOMETHING
-    // Or wait for all to be "attempted"
-    if (!rawData.loaded.history && !rawData.loaded.tx && !rawData.loaded.logs && !rawData.loaded.assignments && !rawData.loaded.lp) {
+    // Check if at least one essential stream is active
+    if (!rawData.loaded.history && !rawData.loaded.tx && !rawData.loaded.logs && !rawData.loaded.lp) {
       return; 
     }
 
@@ -135,9 +132,13 @@ export function useLearningHistory(userId, dateStr) {
       quizCount: 0,
       logCount: 0,
       totalVideoSeconds: 0,
-      isAssignmentSubmitted: rawData.assignments.length > 0
+      isAssignmentSubmitted: rawData.assignments.length > 0,
+      _videoTxMap: {} // Use a private map for calculating unique video time
     };
     const trackedDataLogs = new Set();
+
+    // Helper to generate a unique key for video activities
+    const getVideoKey = (unitId, txId) => `${unitId || 'no_unit'}_${txId || 'default'}`;
 
     // --- Process Transactions ---
     rawData.tx.forEach(docSnap => {
@@ -155,12 +156,14 @@ export function useLearningHistory(userId, dateStr) {
         if (data.amount === 20 || desc.includes('완료')) return;
         displayType = 'video_complete';
         displayTitle = `🎬 영상 보상: ${desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '보너스')}`;
-        const videoMetadata = metadata || data.metadata || {};
+        
+        const videoMetadata = metadata || {};
         const vTime = videoMetadata.stampedSeconds?.length || videoMetadata.totalTimeSpent || 0;
         if (vTime > 0) {
+          const unitId = videoMetadata.unitId || 'unknown';
           const txId = videoMetadata.transmissionId || 'default';
-          if (!stats._videoTxMap) stats._videoTxMap = {};
-          stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, Math.floor(vTime));
+          const vKey = getVideoKey(unitId, txId);
+          stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, Math.floor(vTime));
         } else if (desc.includes('수신') && data.amount === 10) {
           stats.totalVideoSeconds += 180;
         }
@@ -213,10 +216,14 @@ export function useLearningHistory(userId, dateStr) {
         stats.quizCount++;
       }
 
-      if ((displayType === 'video_complete' || hType === 'video') && (data.videoTime || data.stampedCount)) {
+      if ((displayType === 'video_complete' || hType === 'video')) {
+        const unitId = data.unitId || 'unknown';
         const txId = data.transmissionId || 'default';
-        if (!stats._videoTxMap) stats._videoTxMap = {};
-        stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, Math.floor(data.videoTime || data.stampedCount || 0));
+        const vKey = getVideoKey(unitId, txId);
+        const vTime = data.videoTime || data.stampedCount || 0;
+        if (vTime > 0) {
+          stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, Math.floor(vTime));
+        }
       }
 
       aggregated.push({
@@ -250,62 +257,80 @@ export function useLearningHistory(userId, dateStr) {
       }
     });
 
-    // --- Process LP ---
+    // --- Process Learning Progress ---
     rawData.lp.forEach(docSnap => {
       const data = docSnap.data();
       const unitId = docSnap.id;
+      
+      // Filter for activity today using updatedAt
+      const updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : null;
+      const isUpdatedToday = updatedAt && updatedAt >= startTime.toDate() && updatedAt <= endTime.toDate();
+
       if (data.videoProgress) {
         Object.entries(data.videoProgress).forEach(([txId, prog]) => {
           const stamps = prog.stampedSeconds?.length || 0;
           if (stamps > 0) {
-            if (!stats._videoTxMap) stats._videoTxMap = {};
-            stats._videoTxMap[txId] = Math.max(stats._videoTxMap[txId] || 0, stamps);
-            if (stamps > 10 && !aggregated.some(a => a.metadata?.transmissionId === txId || (a.metadata?.unitId === unitId && a.type === 'video_complete'))) {
-              aggregated.push({
-                id: `lp_p_${unitId}_${txId}`,
-                timestamp: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
-                type: 'video_complete',
-                title: `🎬 영상 학습 진행 (${Math.floor(stamps / 60)}분): ${prog.transmissionTitle || '영상'}`,
-                score: null,
-                metadata: { ...prog, unitId, videoTime: stamps }
-              });
+            // Check if this specific video was updated today
+            const progUpdatedAt = prog.updatedAt?.toDate ? prog.updatedAt.toDate() : updatedAt;
+            const isProgUpdatedToday = progUpdatedAt && progUpdatedAt >= startTime.toDate() && progUpdatedAt <= endTime.toDate();
+
+            if (isProgUpdatedToday) {
+               const vKey = getVideoKey(unitId, txId);
+               stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, stamps);
+               
+               const isAlreadyTracked = aggregated.some(a => 
+                 a.type === 'video_complete' && 
+                 (a.metadata?.transmissionId === txId || (a.metadata?.unitId === unitId && !a.metadata?.transmissionId))
+               );
+
+               if (stamps > 10 && !isAlreadyTracked) {
+                 aggregated.push({
+                   id: `lp_p_${unitId}_${txId}`,
+                   timestamp: progUpdatedAt || new Date(),
+                   type: 'video_complete',
+                   title: `🎬 영상 학습 진행 (${Math.floor(stamps / 60)}분): ${prog.transmissionTitle || '영상'}`,
+                   score: null,
+                   metadata: { ...prog, unitId, transmissionId: txId, videoTime: stamps }
+                 });
+               }
             }
           }
         });
       }
-      if (data.quizSession && data.quizSession.currentIdx > 0) {
-        const session = data.quizSession;
-        const answeredCount = Object.keys(session.userAnswers || {}).length;
-        if (answeredCount > 0 && !aggregated.some(a => a.type === 'quiz_pass' && a.metadata?.unitId === unitId)) {
-          aggregated.push({
-            id: `lp_q_${unitId}`,
-            timestamp: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
-            type: 'quiz_in_progress',
-            title: `⏳ 퀴즈 진행 중: ${answeredCount}/${session.originalTotal || '?'}문항`,
-            score: null,
-            metadata: { unitId, ...session }
-          });
+
+      if (isUpdatedToday) {
+        if (data.quizSession && data.quizSession.currentIdx > 0) {
+          const session = data.quizSession;
+          const answeredCount = Object.keys(session.userAnswers || {}).length;
+          if (answeredCount > 0 && !aggregated.some(a => a.type === 'quiz_pass' && a.metadata?.unitId === unitId)) {
+            aggregated.push({
+              id: `lp_q_${unitId}`,
+              timestamp: updatedAt || new Date(),
+              type: 'quiz_in_progress',
+              title: `⏳ 퀴즈 진행 중: ${answeredCount}/${session.originalTotal || '?'}문항`,
+              score: null,
+              metadata: { unitId, ...session }
+            });
+          }
         }
-      }
-      if (data.logReadAt) {
-         const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || unitId}`;
-         if (!trackedDataLogs.has(cleanTitle)) {
-            stats.logCount++;
-            trackedDataLogs.add(cleanTitle);
-         }
+        if (data.logReadAt) {
+           const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || unitId}`;
+           if (!trackedDataLogs.has(cleanTitle)) {
+              stats.logCount++;
+              trackedDataLogs.add(cleanTitle);
+           }
+        }
       }
     });
 
-    if (stats._videoTxMap) {
-      stats.totalVideoSeconds = Object.values(stats._videoTxMap).reduce((sum, val) => sum + val, 0);
-    }
+    const sumVideoSeconds = Object.values(stats._videoTxMap).reduce((sum, val) => sum + val, 0);
+    stats.totalVideoSeconds += sumVideoSeconds;
 
     aggregated.sort((a, b) => (a.timestamp?.getTime() || 0) - (b.timestamp?.getTime() || 0));
 
     setActivities(aggregated);
     setDailyStats(stats);
     
-    // Only set loading to false if all essential fields have been ATTEMPTED to load
     if (Object.values(rawData.loaded).every(v => v === true)) {
       setLoading(false);
     }
@@ -313,4 +338,3 @@ export function useLearningHistory(userId, dateStr) {
 
   return { activities, dailyStats, loading, error };
 }
-
