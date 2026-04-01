@@ -76,11 +76,18 @@ service cloud.firestore {
       allow update: if isAuth();
       allow create, delete: if isAuth() && (request.auth.uid == userId || isAdmin());
       
-      // Allow subcollections (like 'history', 'crystal_transactions')
+      // Allow subcollections (like 'history', 'crystal_transactions', 'learning_progress', 'activityLogs')
       match /{document=**} {
         // Allow creating transactions for other users (e.g. reward transactions)
         allow create: if isAuth(); 
-        allow read, update, delete: if isAuth() && (request.auth.uid == userId || isAdmin());
+        allow read, update, delete: if isAuth() && (
+          request.auth.uid == userId || 
+          isAdmin() ||
+          (
+            exists(/databases/$(database)/documents/parents/$(request.auth.uid)) &&
+            userId in get(/databases/$(database)/documents/parents/$(request.auth.uid)).data.childrenUids
+          )
+        );
       }
     }
 
