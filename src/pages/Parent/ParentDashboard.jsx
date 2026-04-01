@@ -394,9 +394,17 @@ const ChildCard = ({ childUid }) => {
                         {act.timestamp ? new Date(act.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
-                    {act.score !== null && act.score !== undefined && (
+                    {/* Show Score only for Quizzes */}
+                    {(act.type === 'quiz_pass' || act.type === 'quiz_in_progress') && act.score !== null && act.score !== undefined && (
                       <div style={{ fontSize: '0.8rem', color: '#00ffa0', marginTop: 4 }}>
                         점수: {act.score}점
+                      </div>
+                    )}
+                    
+                    {/* Show Video Time for Video activities */}
+                    {act.type === 'video_complete' && act.metadata?.videoTime > 0 && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--star-gold)', marginTop: 4, fontFamily: 'var(--font-tech)' }}>
+                        시청 시간: {Math.floor(act.metadata.videoTime / 60)}분 {Math.floor(act.metadata.videoTime % 60)}초
                       </div>
                     )}
                   </div>

@@ -164,6 +164,7 @@ export function useLearningHistory(userId, dateStr) {
           const txId = videoMetadata.transmissionId || 'default';
           const vKey = getVideoKey(unitId, txId);
           stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, Math.floor(vTime));
+          metadata.videoTime = Math.floor(vTime); // Attach for UI display
         } else if (desc.includes('수신') && data.amount === 10) {
           stats.totalVideoSeconds += 180;
         }
@@ -231,9 +232,13 @@ export function useLearningHistory(userId, dateStr) {
         timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
         type: displayType,
         title: displayTitle,
-        score: data.score,
+        // Hide score for non-quizzes
+        score: (displayType === 'quiz_pass' || displayType === 'quiz_in_progress') ? data.score : null,
         crystalsEarned: data.crystalsEarned || 0,
-        metadata: data
+        metadata: {
+          ...data,
+          videoTime: data.videoTime || data.stampedCount || 0
+        }
       });
     });
 
@@ -279,8 +284,13 @@ export function useLearningHistory(userId, dateStr) {
                stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, stamps);
                
                const isAlreadyTracked = aggregated.some(a => 
-                 a.type === 'video_complete' && 
-                 (a.metadata?.transmissionId === txId || (a.metadata?.unitId === unitId && !a.metadata?.transmissionId))
+                 (a.type === 'video_complete' || a.type === 'video_reward') && 
+                 (
+                    (a.metadata?.transmissionId === txId && a.metadata?.unitId === unitId) ||
+                    // If history record exists for the unit but is missing txId, it's ambiguous. 
+                    // We only suppress if there's only one transmission in the unit (not a multi-chip unit).
+                    (a.metadata?.unitId === unitId && !a.metadata?.transmissionId && Object.keys(data.videoProgress).length === 1)
+                 )
                );
 
                if (stamps > 10 && !isAlreadyTracked) {
@@ -288,7 +298,7 @@ export function useLearningHistory(userId, dateStr) {
                    id: `lp_p_${unitId}_${txId}`,
                    timestamp: progUpdatedAt || new Date(),
                    type: 'video_complete',
-                   title: `🎬 영상 학습 진행 (${Math.floor(stamps / 60)}분): ${prog.transmissionTitle || '영상'}`,
+                   title: `🎬 영상 학습 진행: ${prog.transmissionTitle || '영상'}`,
                    score: null,
                    metadata: { ...prog, unitId, transmissionId: txId, videoTime: stamps }
                  });
