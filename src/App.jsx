@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import './App.css'
 import './styles/space-theme.css' /* Global Space Theme */
@@ -31,6 +32,13 @@ import InviteHandler from './pages/InviteHandler'
 import PrivateRoute from './components/PrivateRoute'
 
 function App() {
+  // 앱 로드 시 만료된 localStorage 캐시(7일 이상) 일괄 정리
+  useEffect(() => {
+    import('./utils/storageUtils').then(({ cleanExpiredLocalStorage }) => {
+      cleanExpiredLocalStorage();
+    });
+  }, []);
+
   return (
     <Routes>
       <Route path="/" element={<SpaceHome />} />

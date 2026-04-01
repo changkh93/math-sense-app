@@ -547,6 +547,7 @@ export default function MissionHub({
   // ─── Learning Progress (Firestore) ───
   const [learningProgress, setLearningProgress] = useState(null)
   const [loadingProgress, setLoadingProgress] = useState(true)
+  const initialProgressRef = useRef(null) // Immutable snapshot from initial getDoc (not affected by auto-save)
   
   // Load learning progress from Firestore
   useEffect(() => {
@@ -561,6 +562,7 @@ export default function MissionHub({
         if (snap.exists()) {
           const data = snap.data()
           setLearningProgress(data)
+          initialProgressRef.current = data  // Store immutable snapshot for restoration effect
           // Restore completion states
           if (data.logRead) setLogRewardClaimed(true)
           
@@ -609,16 +611,9 @@ export default function MissionHub({
         setSelectedTx(foundTx);
         updateCurrentMode('video'); // Also restore mode to video if a transmission was selected
         
-        // Restore stamps for this specific TX if progress already loaded
-        const txId = foundTx.id || 'default'
-        const specificProg = learningProgress?.videoProgress?.[txId]
-        if (specificProg && specificProg.stampedSeconds) {
-          stampedSetRef.current = new Set(specificProg.stampedSeconds)
-          newStampCountRef.current = stampedSetRef.current.size % 180
-        } else {
-          stampedSetRef.current = new Set()
-          newStampCountRef.current = 0
-        }
+        // Stamp restoration is handled by the dedicated restoration effect (Part 1)
+        // which runs after getDoc completes. Don't reset stamps here since
+        // learningProgress is still null on mount (getDoc is async).
       } else {
         setSelectedTx(null);
         sessionStorage.removeItem(`metasense_hub_tx_${unitId}`);
@@ -645,40 +640,55 @@ export default function MissionHub({
     if (videoPrevTxIdRef.current === txId) return
     videoPrevTxIdRef.current = txId
 
-    const savedProgress = learningProgress?.videoProgress?.[txId]
+    const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
 
-    if (savedProgress) {
-      const serverStamps = savedProgress.stampedSeconds || []
-      const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-      const localStampsRaw = localStorage.getItem(localCacheKey + '_stamps')
-      const localStamps = localStampsRaw ? JSON.parse(localStampsRaw) : []
+    // ── Gather data from BOTH sources ──
+    const serverData = learningProgress?.videoProgress?.[txId] || null
+    const localStampsRaw = localStorage.getItem(localCacheKey + '_stamps')
+    const localStamps = localStampsRaw ? JSON.parse(localStampsRaw) : []
+    const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
+    const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
+    const localUpdateTs = parseInt(localStorage.getItem(localCacheKey + '_updatedAt') || '0', 10)
+
+    const hasServerData = serverData && (serverData.stampedSeconds?.length > 0 || serverData.lastPosition > 0)
+    const hasLocalData = localStamps.length > 0 || localPos > 0
+
+    if (hasServerData || hasLocalData) {
+      // ── Merge stamps from both sources ──
+      const serverStamps = serverData?.stampedSeconds || []
       stampedSetRef.current = new Set([...serverStamps, ...localStamps])
       
       const combinedStampCount = stampedSetRef.current.size
-      const rewardedCount = savedProgress.rewardedStampCount || 0
+      const rewardedCount = serverData?.rewardedStampCount || 0
       newStampCountRef.current = Math.max(0, combinedStampCount - rewardedCount)
       setStampCount(combinedStampCount)
       
-      const serverPos = savedProgress.lastPosition || 0
-      const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
-      const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
+      // ── Determine position by timestamp (most recently saved wins) ──
+      const serverPos = serverData?.lastPosition || 0
+      const serverUpdateTs = serverData?.updatedAt?.toMillis 
+        ? serverData.updatedAt.toMillis() 
+        : (serverData?.updatedAt?.seconds ? serverData.updatedAt.seconds * 1000 : 0)
       
-      // Determine chronological position bookmark
-      const serverUpdateTs = savedProgress.updatedAt?.toMillis 
-        ? savedProgress.updatedAt.toMillis() 
-        : (savedProgress.updatedAt?.seconds ? savedProgress.updatedAt.seconds * 1000 : 0)
-      const localUpdateTs = parseInt(localStorage.getItem(localCacheKey + '_updatedAt') || '0', 10)
+      let latestPos
+      if (hasServerData && hasLocalData) {
+        // Both exist: pick whichever was saved more recently
+        latestPos = (localUpdateTs > serverUpdateTs) ? localPos : serverPos
+      } else if (hasLocalData) {
+        // Only localStorage (server hasn't received the save yet)
+        latestPos = localPos
+      } else {
+        // Only server data
+        latestPos = serverPos
+      }
       
-      const latestPos = (localUpdateTs > serverUpdateTs) ? localPos : serverPos
-      
-      totalTimeSpentRef.current = savedProgress.totalTimeSpent || 0
-      totalRewardedCrystalsRef.current = savedProgress.totalRewardedCrystals || 0
+      totalTimeSpentRef.current = serverData?.totalTimeSpent || 0
+      totalRewardedCrystalsRef.current = serverData?.totalRewardedCrystals || 0
       setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
       
-      setVideoCompleted(savedProgress.completed || false)
-      videoCompletedRef.current = savedProgress.completed || false
-      setVideoCompletionBonusGiven(savedProgress.completionBonusGiven || false)
-      videoCompletionBonusGivenRef.current = savedProgress.completionBonusGiven || false
+      setVideoCompleted(serverData?.completed || false)
+      videoCompletedRef.current = serverData?.completed || false
+      setVideoCompletionBonusGiven(serverData?.completionBonusGiven || false)
+      videoCompletionBonusGivenRef.current = serverData?.completionBonusGiven || false
       
       setIsAtEnd(false)
       lastVideoTimeRef.current = latestPos > 0 ? latestPos : -1
@@ -689,6 +699,7 @@ export default function MissionHub({
          setTimeout(() => setResumePosStr(""), 4000)
       }
     } else {
+      // No data from either source — truly a fresh start
       stampedSetRef.current = new Set()
       setStampCount(0)
       newStampCountRef.current = 0
@@ -730,6 +741,7 @@ export default function MissionHub({
             [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
             [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
             [`videoProgress.${txId}.stampedSeconds`]: stamps,
+            [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || 'Main Video',
             updatedAt: serverTimestamp()
           }
           
@@ -808,11 +820,13 @@ export default function MissionHub({
     }, 2500)
   }, [])
 
-  // Smart routing is now handled by SpaceHome via initialMode prop (no flash)
+  const videoAlreadySavedRef = useRef(false) // Flag to prevent double-save via returnFromContent
+
   // Helper: when exiting content, go back to SpaceHome if single-content unit
   const returnFromContent = useCallback(async () => {
     // 1. Final Sync: Ensure the latest progress is sent before unmounting
-    if (onNonQuizActivityComplete && selectedTx) {
+    //    Skip if handleSaveVideoPosition already persisted (prevents double-write race)
+    if (onNonQuizActivityComplete && selectedTx && !videoAlreadySavedRef.current) {
       const txId = selectedTx?.id || 'default';
       const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
       
@@ -837,6 +851,7 @@ export default function MissionHub({
       }
     }
 
+    videoAlreadySavedRef.current = false // Reset flag for next entry
     setSelectedTx(null) // Reset transmission selection
     setShowFieldTestModal(false) // Reset quiz modal
     setVideoCompleted(false)
@@ -1112,7 +1127,13 @@ export default function MissionHub({
     const txId = selectedTx.id || 'default'
 
     try {
-      const savedPosition = Math.floor(lastVideoTimeRef.current || 0)
+      // Get the ACTUAL current position directly from the YouTube player API
+      // (lastVideoTimeRef may be stale by up to 200ms from the polling interval)
+      let savedPosition = Math.floor(lastVideoTimeRef.current || 0)
+      if (videoPlayerRef.current && typeof videoPlayerRef.current.getCurrentTime === 'function') {
+        const livePos = videoPlayerRef.current.getCurrentTime()
+        if (livePos > 0) savedPosition = Math.floor(livePos)
+      }
       const stamps = Array.from(stampedSetRef.current)
       
       let isManualComplete = false
@@ -1128,6 +1149,7 @@ export default function MissionHub({
         [`videoProgress.${txId}.rewardedStampCount`]: stamps.length - newStampCountRef.current,
         [`videoProgress.${txId}.totalRewardedCrystals`]: totalRewardedCrystalsRef.current,
         [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+        [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || 'Main Video',
         [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
         updatedAt: serverTimestamp()
       }
@@ -1155,11 +1177,11 @@ export default function MissionHub({
       
       await setDoc(progressRef, updateData, { merge: true })
       
-      // Cleanup local storage
+      // localStorage도 최신 위치로 갱신 — 오프라인 복구 백업
       const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-      localStorage.removeItem(localCacheKey + '_stamps')
-      localStorage.removeItem(localCacheKey + '_pos')
-      localStorage.removeItem(localCacheKey + '_updatedAt')
+      localStorage.setItem(localCacheKey + '_pos', savedPosition.toString())
+      localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(stamps))
+      localStorage.setItem(localCacheKey + '_updatedAt', Date.now().toString())
 
       // Update local state
       setLearningProgress(prev => {
@@ -1188,6 +1210,7 @@ export default function MissionHub({
     }
 
     if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
+    videoAlreadySavedRef.current = true // Prevent returnFromContent from double-writing
     setTimeout(() => {
       setSelectedTx(null)
       returnFromContent()
@@ -1766,7 +1789,12 @@ export default function MissionHub({
                  const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
                  const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
                  const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
-                 const displayPos = Math.max(txProgress?.lastPosition || 0, localPos)
+                 // Timestamp-based position selection (consistent with restoration effect)
+                 const serverUpdateTs = txProgress?.updatedAt?.toMillis 
+                   ? txProgress.updatedAt.toMillis() 
+                   : (txProgress?.updatedAt?.seconds ? txProgress.updatedAt.seconds * 1000 : 0)
+                 const localUpdateTs = parseInt(localStorage.getItem(localCacheKey + '_updatedAt') || '0', 10)
+                 const displayPos = (localUpdateTs > serverUpdateTs) ? localPos : (txProgress?.lastPosition || 0)
 
                  return (
                    <motion.div 

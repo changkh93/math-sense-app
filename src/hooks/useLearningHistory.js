@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot, collection as fsCollection, query as fsQuery, where as fsWhere, Timestamp as fsTimestamp } from 'firebase/firestore';
 
@@ -40,19 +40,25 @@ export function useLearningHistory(userId, dateStr) {
     }
   });
 
+  // ── Date range computed once per dateStr change (shared by listener & aggregation effects) ──
+  const { startTime, endTime } = useMemo(() => {
+    if (!dateStr) return { startTime: null, endTime: null };
+    const kstStartStr = `${dateStr}T00:00:00+09:00`;
+    const kstEndStr = `${dateStr}T23:59:59.999+09:00`;
+    return {
+      startTime: fsTimestamp.fromDate(new Date(kstStartStr)),
+      endTime: fsTimestamp.fromDate(new Date(kstEndStr))
+    };
+  }, [dateStr]);
+
   // SET UP LISTENERS
   useEffect(() => {
-    if (!userId || !dateStr) {
+    if (!userId || !dateStr || !startTime || !endTime) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
-
-    const kstStartStr = `${dateStr}T00:00:00+09:00`;
-    const kstEndStr = `${dateStr}T23:59:59.999+09:00`;
-    const startTime = fsTimestamp.fromDate(new Date(kstStartStr));
-    const endTime = fsTimestamp.fromDate(new Date(kstEndStr));
 
     const updateRaw = (key, docs) => {
       setRawData(prev => ({
@@ -118,7 +124,7 @@ export function useLearningHistory(userId, dateStr) {
       unsubAssignments();
       unsubLP();
     };
-  }, [userId, dateStr]);
+  }, [userId, dateStr, startTime, endTime]);
 
   // AGGREGATE DATA
   useEffect(() => {
@@ -126,6 +132,8 @@ export function useLearningHistory(userId, dateStr) {
     if (!rawData.loaded.history && !rawData.loaded.tx && !rawData.loaded.logs && !rawData.loaded.lp) {
       return; 
     }
+    // Guard: startTime/endTime must be available for LP date filtering
+    if (!startTime || !endTime) return;
 
     const aggregated = [];
     const stats = {
@@ -176,11 +184,12 @@ export function useLearningHistory(userId, dateStr) {
         displayTitle = `✅ 출석: ${desc}`;
       } else if (tType === 'data_log_reward') {
         displayType = 'data_log_read';
+        // unitId-based dedup key to prevent title variations from causing duplicates
+        const dedupeKey = `datalog_${metadata.unitId || desc}`;
         const cleanTitle = `📝 데이터 로그 열람: ${desc.replace('보상 (데이터 로그 학습)', '').replace('보상', '').trim()}`;
-        if (!trackedDataLogs.has(cleanTitle)) {
-           trackedDataLogs.add(cleanTitle);
-           stats.logCount++;
-        }
+        if (trackedDataLogs.has(dedupeKey)) return; // Skip duplicate — don't push to aggregated
+        trackedDataLogs.add(dedupeKey);
+        stats.logCount++;
         displayTitle = cleanTitle;
       }
 
@@ -206,13 +215,13 @@ export function useLearningHistory(userId, dateStr) {
         displayType = 'video_complete';
         displayTitle = `🎬 영상 학습 완료: ${data.unitTitle || '이름 없음'}`;
       } else if (hType === 'text' || hType === 'data_log_read') {
-        const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || '이름 없음'}`;
-        if (!trackedDataLogs.has(cleanTitle)) {
-          trackedDataLogs.add(cleanTitle);
-          stats.logCount++;
-        }
+        // unitId-based dedup key — consistent with transaction processing
+        const dedupeKey = `datalog_${data.unitId || data.unitTitle || '이름 없음'}`;
+        if (trackedDataLogs.has(dedupeKey)) return; // Skip duplicate entirely
+        trackedDataLogs.add(dedupeKey);
+        stats.logCount++;
         displayType = 'data_log_read';
-        displayTitle = cleanTitle;
+        displayTitle = `📝 데이터 로그 열람: ${data.unitTitle || '이름 없음'}`;
       } else {
         stats.quizCount++;
       }
@@ -232,7 +241,6 @@ export function useLearningHistory(userId, dateStr) {
         timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
         type: displayType,
         title: displayTitle,
-        // Hide score for non-quizzes
         score: (displayType === 'quiz_pass' || displayType === 'quiz_in_progress') ? data.score : null,
         crystalsEarned: data.crystalsEarned || 0,
         metadata: {
@@ -246,10 +254,12 @@ export function useLearningHistory(userId, dateStr) {
     rawData.logs.forEach(docSnap => {
       const data = docSnap.data();
       if (data.action?.includes('DATA LOG')) {
-        const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || data.unitId || '알 수 없는 단원'}`;
-        if (trackedDataLogs.has(cleanTitle)) return;
-        trackedDataLogs.add(cleanTitle);
+        // unitId-based dedup key — consistent with other sections
+        const dedupeKey = `datalog_${data.unitId || data.unitTitle || '알 수 없는 단원'}`;
+        if (trackedDataLogs.has(dedupeKey)) return;
+        trackedDataLogs.add(dedupeKey);
         stats.logCount++;
+        const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || data.unitId || '알 수 없는 단원'}`;
         aggregated.push({
           id: `log_${docSnap.id}`,
           timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
@@ -263,73 +273,91 @@ export function useLearningHistory(userId, dateStr) {
     });
 
     // --- Process Learning Progress ---
+    const dayStart = startTime.toDate();
+    const dayEnd = endTime.toDate();
+
     rawData.lp.forEach(docSnap => {
-      const data = docSnap.data();
-      const unitId = docSnap.id;
-      
-      // Filter for activity today using updatedAt
-      const updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : null;
-      const isUpdatedToday = updatedAt && updatedAt >= startTime.toDate() && updatedAt <= endTime.toDate();
+      try {
+        const data = docSnap.data();
+        const unitId = docSnap.id;
+        
+        // Filter for activity today using updatedAt
+        // Handle pending serverTimestamp() by defaulting to "now" for local updates
+        const updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date();
+        const isUpdatedToday = updatedAt >= dayStart && updatedAt <= dayEnd;
 
-      if (data.videoProgress) {
-        Object.entries(data.videoProgress).forEach(([txId, prog]) => {
-          const stamps = prog.stampedSeconds?.length || 0;
-          if (stamps > 0) {
-            // Check if this specific video was updated today
-            const progUpdatedAt = prog.updatedAt?.toDate ? prog.updatedAt.toDate() : updatedAt;
-            const isProgUpdatedToday = progUpdatedAt && progUpdatedAt >= startTime.toDate() && progUpdatedAt <= endTime.toDate();
+        if (data.videoProgress) {
+          Object.entries(data.videoProgress).forEach(([txId, prog]) => {
+            const stamps = prog.stampedSeconds?.length || 0;
+            if (stamps > 0) {
+              // Robust prog.updatedAt parsing: handle all serverTimestamp() states
+              let progUpdatedAt;
+              if (prog.updatedAt?.toDate) {
+                progUpdatedAt = prog.updatedAt.toDate();         // Firestore Timestamp
+              } else if (prog.updatedAt?.seconds) {
+                progUpdatedAt = new Date(prog.updatedAt.seconds * 1000); // Raw seconds obj
+              } else if (typeof prog.updatedAt === 'number') {
+                progUpdatedAt = new Date(prog.updatedAt);         // Client ms timestamp
+              } else {
+                // serverTimestamp() pending or missing
+                // Fall back to document-level updatedAt, or "now" if doc also pending
+                progUpdatedAt = isUpdatedToday ? updatedAt : new Date();
+              }
+              const isProgUpdatedToday = progUpdatedAt >= dayStart && progUpdatedAt <= dayEnd;
 
-            if (isProgUpdatedToday) {
-               const vKey = getVideoKey(unitId, txId);
-               stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, stamps);
-               
-               const isAlreadyTracked = aggregated.some(a => 
-                 (a.type === 'video_complete' || a.type === 'video_reward') && 
-                 (
-                    (a.metadata?.transmissionId === txId && a.metadata?.unitId === unitId) ||
-                    // If history record exists for the unit but is missing txId, it's ambiguous. 
-                    // We only suppress if there's only one transmission in the unit (not a multi-chip unit).
-                    (a.metadata?.unitId === unitId && !a.metadata?.transmissionId && Object.keys(data.videoProgress).length === 1)
-                 )
-               );
+              if (isProgUpdatedToday) {
+                 const vKey = getVideoKey(unitId, txId);
+                 stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, stamps);
+                 
+                 const isAlreadyTracked = aggregated.some(a => 
+                   (a.type === 'video_complete' || a.type === 'video_reward') && 
+                   (
+                      (a.metadata?.transmissionId === txId && a.metadata?.unitId === unitId) ||
+                      (a.metadata?.unitId === unitId && !a.metadata?.transmissionId && Object.keys(data.videoProgress).length === 1)
+                   )
+                 );
 
-               if (stamps > 10 && !isAlreadyTracked) {
-                 aggregated.push({
-                   id: `lp_p_${unitId}_${txId}`,
-                   timestamp: progUpdatedAt || new Date(),
-                   type: 'video_complete',
-                   title: `🎬 영상 학습 진행: ${prog.transmissionTitle || '영상'}`,
-                   score: null,
-                   metadata: { ...prog, unitId, transmissionId: txId, videoTime: stamps }
-                 });
-               }
+                 if (!isAlreadyTracked) {
+                   aggregated.push({
+                     id: `lp_p_${unitId}_${txId}`,
+                     timestamp: progUpdatedAt || new Date(),
+                     type: 'video_complete',
+                     title: `🎬 영상 학습 진행: ${prog.transmissionTitle || '영상'}`,
+                     score: null,
+                     metadata: { ...prog, unitId, transmissionId: txId, videoTime: stamps }
+                   });
+                 }
+              }
+            }
+
+          });
+        }
+
+        if (isUpdatedToday) {
+          if (data.quizSession && data.quizSession.currentIdx > 0) {
+            const session = data.quizSession;
+            const answeredCount = Object.keys(session.userAnswers || {}).length;
+            if (answeredCount > 0 && !aggregated.some(a => a.type === 'quiz_pass' && a.metadata?.unitId === unitId)) {
+              aggregated.push({
+                id: `lp_q_${unitId}`,
+                timestamp: updatedAt || new Date(),
+                type: 'quiz_in_progress',
+                title: `⏳ 퀴즈 진행 중: ${answeredCount}/${session.originalTotal || '?'}문항`,
+                score: null,
+                metadata: { unitId, ...session }
+              });
             }
           }
-        });
-      }
-
-      if (isUpdatedToday) {
-        if (data.quizSession && data.quizSession.currentIdx > 0) {
-          const session = data.quizSession;
-          const answeredCount = Object.keys(session.userAnswers || {}).length;
-          if (answeredCount > 0 && !aggregated.some(a => a.type === 'quiz_pass' && a.metadata?.unitId === unitId)) {
-            aggregated.push({
-              id: `lp_q_${unitId}`,
-              timestamp: updatedAt || new Date(),
-              type: 'quiz_in_progress',
-              title: `⏳ 퀴즈 진행 중: ${answeredCount}/${session.originalTotal || '?'}문항`,
-              score: null,
-              metadata: { unitId, ...session }
-            });
+          if (data.logReadAt) {
+             const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || unitId}`;
+             if (!trackedDataLogs.has(cleanTitle)) {
+                stats.logCount++;
+                trackedDataLogs.add(cleanTitle);
+             }
           }
         }
-        if (data.logReadAt) {
-           const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || unitId}`;
-           if (!trackedDataLogs.has(cleanTitle)) {
-              stats.logCount++;
-              trackedDataLogs.add(cleanTitle);
-           }
-        }
+      } catch (lpErr) {
+        console.warn('LP processing error for doc:', docSnap.id, lpErr);
       }
     });
 
@@ -344,7 +372,7 @@ export function useLearningHistory(userId, dateStr) {
     if (Object.values(rawData.loaded).every(v => v === true)) {
       setLoading(false);
     }
-  }, [rawData]);
+  }, [rawData, startTime, endTime]);
 
   return { activities, dailyStats, loading, error };
 }
