@@ -84,6 +84,12 @@ service cloud.firestore {
       }
     }
 
+    // Parents: Parent accounts can read their own doc, admins can manage
+    match /parents/{parentId} {
+      allow read: if isAuth() && (request.auth.uid == parentId || isAdmin());
+      allow write: if isAdmin();
+    }
+
     // Notifications: Users can read/write their own notifications
     match /notifications/{notificationId} {
       allow read, write: if isAuth();

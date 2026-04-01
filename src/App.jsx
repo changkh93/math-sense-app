@@ -6,6 +6,10 @@ import AdminLayout from './pages/Admin/AdminLayout'
 import AdminDashboard from './pages/Admin/Dashboard'
 import AdminRoute from './components/AdminRoute'
 import LiveStatus from './pages/Admin/LiveStatus'
+import ParentManager from './pages/Admin/ParentManager'
+
+import ParentLogin from './pages/Parent/ParentLogin'
+import ParentDashboard from './pages/Parent/ParentDashboard'
 
 import ClusterManager from './pages/Admin/ClusterManager'
 import UserAccessManager from './pages/Admin/UserAccessManager'
@@ -41,6 +45,7 @@ function App() {
         <Route path="live-status" element={<LiveStatus />} />
         <Route path="clusters" element={<ClusterManager />} />
         <Route path="users" element={<UserAccessManager />} />
+        <Route path="parents" element={<ParentManager />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="assignments" element={<AdminAssignments />} />
         <Route path="mission/:unitId" element={<MissionContentEditor />} />
@@ -64,6 +69,10 @@ function App() {
         </PrivateRoute>
       } />
       <Route path="/privacy" element={<PrivacyPolicy />} />
+
+      {/* Parent Portal */}
+      <Route path="/parent" element={<ParentLogin />} />
+      <Route path="/parent/dashboard" element={<ParentDashboard />} />
     </Routes>
   )
 }
