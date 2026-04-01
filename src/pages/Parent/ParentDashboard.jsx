@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
@@ -428,32 +428,36 @@ export default function ParentDashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      navigate('/parent');
-      return;
-    }
-
-    // Listen to parent document
-    const unsub = onSnapshot(doc(db, 'parents', user.uid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.isDeleted) {
-          setError('해당 계정은 비활성화(삭제)되었습니다. 선생님에게 문의해 주세요.');
-        } else {
-          setParentData({ id: snap.id, ...data });
-        }
-      } else {
-        setError('학부모 계정 정보를 찾을 수 없습니다. 선생님에게 문의해 주세요.');
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        navigate('/parent');
+        return;
       }
-      setLoading(false);
-    }, (err) => {
-      console.error(err);
-      setError('데이터를 불러오는 데 실패했습니다.');
-      setLoading(false);
+
+      // Listen to parent document
+      const unsubDoc = onSnapshot(doc(db, 'parents', user.uid), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.isDeleted) {
+            setError('해당 계정은 비활성화(삭제)되었습니다. 선생님에게 문의해 주세요.');
+          } else {
+            setParentData({ id: snap.id, ...data });
+          }
+        } else {
+          setError('학부모 계정 정보를 찾을 수 없습니다. 선생님에게 문의해 주세요.');
+        }
+        setLoading(false);
+      }, (err) => {
+        console.error(err);
+        setError('데이터를 불러오는 데 실패했습니다.');
+        setLoading(false);
+      });
+
+      // Cleanup snapshot listener on unmount or auth state change
+      return () => unsubDoc();
     });
 
-    return () => unsub();
+    return () => unsubAuth();
   }, [navigate]);
 
   const handleLogout = async () => {

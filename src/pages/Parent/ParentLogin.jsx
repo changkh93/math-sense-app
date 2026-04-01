@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { Phone, Lock, LogIn, Rocket } from 'lucide-react';
@@ -15,6 +15,15 @@ export default function ParentLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        navigate('/parent/dashboard');
+      }
+    });
+    return () => unsub();
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

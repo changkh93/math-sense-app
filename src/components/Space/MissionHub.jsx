@@ -1144,20 +1144,24 @@ export default function MissionHub({
       
       const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
       const updateData = {
-        [`videoProgress.${txId}.lastPosition`]: savedPosition,
-        [`videoProgress.${txId}.stampedSeconds`]: stamps,
-        [`videoProgress.${txId}.rewardedStampCount`]: stamps.length - newStampCountRef.current,
-        [`videoProgress.${txId}.totalRewardedCrystals`]: totalRewardedCrystalsRef.current,
-        [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
-        [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || 'Main Video',
-        [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
+        videoProgress: {
+          [txId]: {
+            lastPosition: savedPosition,
+            stampedSeconds: stamps,
+            rewardedStampCount: stamps.length - newStampCountRef.current,
+            totalRewardedCrystals: totalRewardedCrystalsRef.current,
+            totalTimeSpent: totalTimeSpentRef.current,
+            transmissionTitle: selectedTx?.title || 'Main Video',
+            updatedAt: serverTimestamp()
+          }
+        },
         updatedAt: serverTimestamp()
       }
       
       // Save completion if threshold met (coverage >= 0.9) OR manually triggered (isAtEnd)
       if (videoCompleted || isManualComplete) {
-         updateData[`videoProgress.${txId}.completed`] = true
-         updateData[`videoProgress.${txId}.completionBonusGiven`] = true
+         updateData.videoProgress[txId].completed = true
+         updateData.videoProgress[txId].completionBonusGiven = true
          videoCompletedRef.current = true
          videoCompletionBonusGivenRef.current = true
          
