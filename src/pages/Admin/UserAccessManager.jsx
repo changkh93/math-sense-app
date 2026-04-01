@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useClusters } from '../../hooks/useContent';
 import { Search, User as UserIcon } from 'lucide-react';
