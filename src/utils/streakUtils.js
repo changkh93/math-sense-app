@@ -32,34 +32,17 @@ export function getYesterdayKST() {
 export function getKSTComponents(date = new Date()) {
   const d = new Date(date);
   
-  // Use Intl.DateTimeFormat for guaranteed KST
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    hourCycle: 'h23',
-    weekday: 'short'
-  }).formatToParts(d);
-
-  const p = {};
-  for (const part of parts) {
-    if (part.type !== 'literal') p[part.type] = part.value;
-  }
-
-  const weekdays = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
-
+  // Calculate KST time by adding 9 hours in milliseconds to the UTC time.
+  const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
+  
   return {
-    year: parseInt(p.year, 10),
-    month: parseInt(p.month, 10),
-    day: parseInt(p.day, 10),
-    hours: parseInt(p.hour, 10), // 0-23
-    minutes: parseInt(p.minute, 10),
-    seconds: parseInt(p.second, 10),
-    dayOfWeek: weekdays[p.weekday]
+    year: kst.getUTCFullYear(),
+    month: kst.getUTCMonth() + 1,
+    day: kst.getUTCDate(),
+    hours: kst.getUTCHours(),
+    minutes: kst.getUTCMinutes(),
+    seconds: kst.getUTCSeconds(),
+    dayOfWeek: kst.getUTCDay()
   };
 }
 
