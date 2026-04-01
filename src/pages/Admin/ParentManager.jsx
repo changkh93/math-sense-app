@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, doc, setDoc, deleteDoc, where, onSnapshot, limit } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
 import { db } from '../../firebase';
 import { Phone, UserPlus, Search, Trash2, Link2, Users, Eye, EyeOff } from 'lucide-react';
@@ -108,7 +108,30 @@ export default function ParentManager() {
     } catch (err) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
-        alert('이미 인증 시스템에 등록된 번호입니다. (삭제된 정보가 Firestore에 없을 수 있습니다. 선생님께서 직접 Auth 정리를 하시거나, 다른 비밀번호로 로그인을 시도해 보세요.)');
+        // Case: Auth account exists but Firestore document is missing (orphaned from previous delete logic)
+        try {
+          // Attempt to sign in to get the UID (this works if the password matches)
+          const cred = await signInWithEmailAndPassword(secondaryAuth, email, newPassword);
+          const uid = cred.user.uid;
+          
+          await setDoc(doc(db, 'parents', uid), {
+            phone: digits,
+            email: email,
+            childrenUids: [],
+            role: 'parent',
+            isDeleted: false,
+            createdAt: new Date(),
+            relinkedAt: new Date()
+          });
+          
+          await secondaryAuth.signOut();
+          alert('기존 인증 정보(Auth)가 남아 있어 계정을 성공적으로 연결하고 정보를 복구했습니다! ✅');
+          setNewPhone('');
+          setNewPassword('');
+        } catch (authErr) {
+          // If sign in fails, it means the account exists but with a different password
+          alert('이미 등록된 번호이지만, 입력하신 비밀번호가 기존과 다릅니다. (기존 비밀번호를 입력하시거나, 관리를 위해 수동 조치가 필요합니다.)');
+        }
       } else {
         alert('계정 생성 실패: ' + err.message);
       }
