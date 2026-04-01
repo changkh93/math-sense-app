@@ -5,6 +5,7 @@ import SpaceHome from './components/Space/SpaceHome'
 import AdminLayout from './pages/Admin/AdminLayout'
 import AdminDashboard from './pages/Admin/Dashboard'
 import AdminRoute from './components/AdminRoute'
+import LiveStatus from './pages/Admin/LiveStatus'
 
 import ClusterManager from './pages/Admin/ClusterManager'
 import UserAccessManager from './pages/Admin/UserAccessManager'
@@ -37,6 +38,7 @@ function App() {
         </AdminRoute>
       }>
         <Route index element={<AdminDashboard />} />
+        <Route path="live-status" element={<LiveStatus />} />
         <Route path="clusters" element={<ClusterManager />} />
         <Route path="users" element={<UserAccessManager />} />
         <Route path="content" element={<ContentManager />} />

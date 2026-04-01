@@ -6,6 +6,7 @@ import { signInWithPopup } from 'firebase/auth'
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit, runTransaction, Timestamp, documentId } from 'firebase/firestore'
 import { useClusters, useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
+import { usePresence } from '../../hooks/usePresence'
 // import { regions as localRegions } from '../../data/regions'
 import { motion as Motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
 
@@ -201,6 +202,20 @@ function SpaceHome() {
   const activeRegion = regions?.find(r => r.id === selectedRegionId)
   const activeChapter = chapters?.find(c => c.docId === selectedChapterDocId)
   const activeUnit = units?.find(u => u.docId === (selectedUnitDocId || quickQuizUnitId)) || singleUnit
+
+  // Track Presence Activity
+  const currentLocationString = useMemo(() => {
+    if (activeUnit) return `${activeUnit.title} ${quickQuizMode ? '(퀴즈 중)' : '(학습 중)'}`;
+    if (activeChapter) return `${activeChapter.title} 진입`;
+    if (activeRegion) return `${activeRegion.title} 탐색 중`;
+    if (isDarkMatterMode) return '다크 매터(오답 노트) 정화 중';
+    if (currentView === 'dashboard') return '대시보드 방문 중';
+    if (currentView === 'collection') return '도감 방문 중';
+    if (currentView === 'assignment_hub') return '항행 일지(과제) 작성 중';
+    return '우주 공간(메인) 대기 중';
+  }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode]);
+
+  usePresence(user?.uid, selectedClusterId, currentLocationString, activeUnit?.docId);
 
   // Auto-skip single chapter
   useEffect(() => {
