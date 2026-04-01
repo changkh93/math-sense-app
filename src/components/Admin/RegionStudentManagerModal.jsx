@@ -82,7 +82,7 @@ const RegionStudentManagerModal = ({ isOpen, onClose, region }) => {
             <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e2e8f0', fontSize: '0.95rem' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
-                  <th style={{ padding: '1rem', fontWeight: 600, color: '#94a3b8' }}>이메일</th>
+                  <th style={{ padding: '1rem', fontWeight: 600, color: '#94a3b8' }}>학생 / 이메일</th>
                   <th style={{ padding: '1rem', fontWeight: 600, color: '#94a3b8' }}>가입 일시</th>
                   <th style={{ padding: '1rem', fontWeight: 600, color: '#94a3b8', textAlign: 'center' }}>상태</th>
                   <th style={{ padding: '1rem', fontWeight: 600, color: '#94a3b8', textAlign: 'right' }}>관리</th>
@@ -91,7 +91,10 @@ const RegionStudentManagerModal = ({ isOpen, onClose, region }) => {
               <tbody>
                 {students.map((student) => (
                   <tr key={student.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: student.status === 'suspended' ? 'rgba(239, 68, 68, 0.05)' : 'transparent' }}>
-                    <td style={{ padding: '1rem' }}>{student.email || '알 수 없음'}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ fontWeight: 600, color: '#e2e8f0', marginBottom: '4px' }}>{student.name || '이름 없음'}</div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{student.email || '알 수 없음'}</div>
+                    </td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{formatDate(student.joinedAt)}</td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
                       {student.status === 'active' ? (

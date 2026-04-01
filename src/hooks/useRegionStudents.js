@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, deleteDoc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export function useRegionStudents(regionId) {
@@ -8,7 +8,17 @@ export function useRegionStudents(regionId) {
     queryFn: async () => {
       if (!regionId) return [];
       const snap = await getDocs(collection(db, 'regions', regionId, 'students'));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const studentsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      const userSnaps = await Promise.all(studentsData.map(s => getDoc(doc(db, 'users', s.id))));
+      userSnaps.forEach((userSnap, i) => {
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          studentsData[i].name = uData.name || uData.displayName || uData.profileName || studentsData[i].displayName;
+        }
+      });
+      
+      return studentsData;
     },
     enabled: !!regionId,
   });
