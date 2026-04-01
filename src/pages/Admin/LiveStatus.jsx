@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Activity, Clock, AlertTriangle, X, Play, RefreshCw, FileText, CheckCircle2 } from 'lucide-react';
 import { useClusters } from '../../hooks/useContent';
@@ -158,33 +158,45 @@ export default function LiveStatus() {
   const [selectedActivities, setSelectedActivities] = useState([]);
 
   useEffect(() => {
-    // We only want users who have logged in/updated today.
-    // 12 hours ago is a good threshold for "recently active to show". 
-    // Usually we just want today's KST date bounds, but since it's real time, last 24h is fine.
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Fetch ALL non-admin users to ensure no student is missed.
+    // Students without liveStatus (e.g. cached old code) will still appear as "offline".
+    // For a class of ~20-30 students, this is both performant and robust.
 
     const usersRef = collection(db, 'users');
-    // Using a simple query: liveStatus.lastUpdatedAt > oneDayAgo.
-    // It requires a composite index if combined with other fields, so we do client-side filtering.
-    const q = query(
-      usersRef, 
-      where('liveStatus.lastUpdatedAt', '>=', oneDayAgo)
-    );
+    // We cannot easily query "role != admin" in Firestore, 
+    // so we fetch all users and filter client-side.
+    const unsubscribe = onSnapshot(usersRef, (snap) => {
+      const allUsers = snap.docs
+        .map(doc => ({ uid: doc.id, ...doc.data() }))
+        // Exclude admins and parent accounts
+        .filter(u => u.role !== 'admin' && u.role !== 'parent');
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const activeUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-      // Sort by last updated descending
-      activeUsers.sort((a, b) => {
+      // Sort: online first, then away, then offline. Within each group, sort by recency.
+      const statusPriority = (u) => {
+        const live = u.liveStatus || {};
+        const state = live.state || 'offline';
+        const lastUpdated = live.lastUpdatedAt?.toMillis() || 0;
+        const timeSince = Date.now() - lastUpdated;
+        
+        if (state === 'online' && timeSince < 5 * 60000) return 0; // Online
+        if ((state === 'away' && timeSince < 30 * 60000) || (state === 'online' && timeSince >= 5 * 60000 && timeSince < 15 * 60000)) return 1; // Away
+        return 2; // Offline
+      };
+
+      allUsers.sort((a, b) => {
+        const pa = statusPriority(a);
+        const pb = statusPriority(b);
+        if (pa !== pb) return pa - pb;
+        // Within same priority, sort by last updated descending
         const aTime = a.liveStatus?.lastUpdatedAt?.toMillis() || 0;
         const bTime = b.liveStatus?.lastUpdatedAt?.toMillis() || 0;
         return bTime - aTime;
       });
-      setUsers(activeUsers);
+
+      setUsers(allUsers);
       setLoading(false);
     }, (error) => {
       console.error("LiveStatus fetch error:", error);
-      // Fallback: If index is missing, we might have to fetch all and filter.
-      // Assuming no index needed for just one equality/inequality.
       setLoading(false);
     });
 
