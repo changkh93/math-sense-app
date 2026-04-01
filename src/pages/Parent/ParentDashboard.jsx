@@ -4,8 +4,10 @@ import { signOut } from 'firebase/auth';
 import { db, auth } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
+import { useAdminUserAllAssignments, useAdminUserAllAttendance } from '../../hooks/useAssignments';
 import { getTodayKST } from '../../utils/streakUtils';
-import { Rocket, LogOut, Clock, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Rocket, LogOut, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // -------------------------------------------------------------
 // Helper: format relative time
@@ -20,14 +22,146 @@ const formatTimeElapsed = (ms) => {
 };
 
 // -------------------------------------------------------------
+// ChildCalendar: Monthly calendar view for attendance/assignments
+// -------------------------------------------------------------
+const ChildCalendar = ({ childUid, onDateSelect, selectedDate }) => {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  // Fetch all assignments and attendance for this child
+  const { data: assignments } = useAdminUserAllAssignments(childUid);
+  const { data: attendanceRecords } = useAdminUserAllAttendance(childUid);
+
+  const daysInMonth = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    return new Date(year, month + 1, 0).getDate();
+  }, [currentMonth]);
+
+  const firstDayOfMonth = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    return new Date(year, month, 1).getDay();
+  }, [currentMonth]);
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
+  const handleNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
+
+  const calendarDays = useMemo(() => {
+    const days = [];
+    const year = currentMonth.getFullYear();
+    const month = String(currentMonth.getMonth() + 1).padStart(2, '0');
+
+    for (let i = 0; i < firstDayOfMonth; i++) {
+       days.push(null);
+    }
+    
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dayStr = String(i).padStart(2, '0');
+      const dateStr = `${year}-${month}-${dayStr}`;
+      
+      const dayAssignments = assignments?.filter(a => a.date === dateStr) || [];
+      const attendance = attendanceRecords?.find(a => a.date === dateStr);
+      
+      days.push({
+        dateStr,
+        dayNumber: i,
+        assignments: dayAssignments,
+        attendance: attendance || null
+      });
+    }
+    return days;
+  }, [currentMonth, firstDayOfMonth, daysInMonth, assignments, attendanceRecords]);
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'submitted': return '#fbbf24'; 
+      case 'reviewed': return '#00ffa0'; 
+      case 'needs_revision': return '#ff4500'; 
+      default: return 'rgba(255, 255, 255, 0.1)'; 
+    }
+  };
+
+  return (
+    <div style={{ padding: '15px', background: 'rgba(0,0,0,0.2)', borderRadius: '16px', marginTop: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <CalendarIcon size={16} /> 학습 달력
+        </h4>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button onClick={handlePrevMonth} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronLeft size={18} /></button>
+          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{currentMonth.getFullYear()}.{String(currentMonth.getMonth() + 1).padStart(2, '0')}</span>
+          <button onClick={handleNextMonth} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronRight size={18} /></button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+        {['일', '월', '화', '수', '목', '금', '토'].map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', paddingBottom: '4px' }}>{d}</div>
+        ))}
+        {calendarDays.map((day, idx) => {
+          if (!day) return <div key={`empty-${idx}`} />;
+          
+          const isSelected = selectedDate === day.dateStr;
+          const isToday = day.dateStr === getTodayKST();
+          
+          return (
+            <div
+              key={day.dateStr}
+              onClick={() => onDateSelect(day.dateStr)}
+              style={{
+                aspectRatio: '1/1',
+                borderRadius: '8px',
+                background: isSelected ? 'rgba(165, 94, 234, 0.2)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${isSelected ? '#a55eea' : isToday ? 'rgba(255,255,255,0.2)' : 'transparent'}`,
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                transition: 'all 0.2s'
+              }}
+            >
+              <span style={{ fontSize: '0.75rem', color: isToday ? '#a55eea' : 'white', fontWeight: isToday ? 700 : 400 }}>{day.dayNumber}</span>
+              
+              <div style={{ display: 'flex', gap: '2px', marginTop: '2px' }}>
+                {day.attendance && (
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: day.attendance.status === 'late' ? '#ffb703' : '#00ffa0' }} title="출석" />
+                )}
+                {day.assignments.length > 0 && (
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: getStatusColor(day.assignments[0].status) }} title="과제" />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: '12px', display: 'flex', gap: '12px', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00ffa0' }} /> 출석</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fbbf24' }} /> 과제제출</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ffb703' }} /> 지각/보완</div>
+      </div>
+    </div>
+  );
+};
+
+// -------------------------------------------------------------
 // ChildCard: Single child's live status + today's summary
 // -------------------------------------------------------------
 const ChildCard = ({ childUid }) => {
   const [childData, setChildData] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [expanded, setExpanded] = useState(false);
-  const today = getTodayKST();
-  const { activities, dailyStats, loading: historyLoading } = useLearningHistory(childUid, today);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(getTodayKST());
+  
+  const isToday = selectedDate === getTodayKST();
+
+  const { activities, dailyStats, loading: historyLoading } = useLearningHistory(childUid, selectedDate);
 
   // Listen to child's user document in real-time
   useEffect(() => {
@@ -155,82 +289,122 @@ const ChildCard = ({ childUid }) => {
         )}
       </div>
 
-      {/* Today's Summary */}
-      <div style={{ padding: '18px 20px' }}>
-        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          오늘의 학습 ({today})
-        </div>
-
-        {historyLoading ? (
-          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem' }}>조회 중...</div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'rgba(0, 255, 160, 0.06)', borderRadius: '12px', border: '1px solid rgba(0, 255, 160, 0.1)' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#00ffa0' }}>{dailyStats.quizCount}</div>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>퀴즈 완료</div>
+        {/* Today's Summary */}
+        <div style={{ padding: '18px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {isToday ? `오늘의 학습 (${selectedDate})` : `학습 기록 (${selectedDate})`}
             </div>
-            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'rgba(165, 94, 234, 0.06)', borderRadius: '12px', border: '1px solid rgba(165, 94, 234, 0.1)' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a55eea' }}>{Math.floor(dailyStats.totalVideoSeconds / 60)}</div>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>영상(분)</div>
-            </div>
-            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'rgba(69, 170, 242, 0.06)', borderRadius: '12px', border: '1px solid rgba(69, 170, 242, 0.1)' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#45aaf2' }}>{dailyStats.logCount}</div>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>데이터 로그</div>
-            </div>
+            <button 
+              onClick={() => setShowCalendar(!showCalendar)}
+              style={{
+                background: showCalendar ? 'rgba(165, 94, 234, 0.15)' : 'none',
+                border: '1px solid rgba(165, 94, 234, 0.3)',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                color: '#a55eea',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <CalendarIcon size={12} /> {showCalendar ? '달력 닫기' : '달력 보기'}
+            </button>
           </div>
-        )}
 
-        {/* Expandable Timeline */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          style={{
-            width: '100%', marginTop: '14px',
-            padding: '10px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '10px',
-            color: 'rgba(255,255,255,0.6)',
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            fontSize: '0.85rem',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          {expanded ? '접기' : `상세 타임라인 보기 (${activities.length}건)`}
-        </button>
-
-        {expanded && (
-          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-            {activities.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem' }}>
-                오늘 완료된 활동이 없습니다.
-              </div>
-            ) : (
-              activities.map(act => (
-                <div key={act.id} style={{
-                  padding: '12px 14px',
-                  background: 'rgba(255,255,255,0.04)',
-                  borderRadius: '10px',
-                  borderLeft: `3px solid ${act.type === 'quiz_pass' ? '#00ffa0' : act.type === 'video_complete' ? '#a55eea' : '#45aaf2'}`
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{act.title}</span>
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
-                      {act.timestamp ? new Date(act.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
-                  </div>
-                  {act.score !== null && act.score !== undefined && (
-                    <div style={{ fontSize: '0.8rem', color: '#00ffa0', marginTop: 4 }}>
-                      점수: {act.score}점
-                    </div>
-                  )}
-                </div>
-              ))
+          <AnimatePresence>
+            {showCalendar && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{ overflow: 'hidden' }}
+              >
+                <ChildCalendar 
+                  childUid={childUid} 
+                  selectedDate={selectedDate} 
+                  onDateSelect={(date) => {
+                    setSelectedDate(date);
+                    setExpanded(true); // Auto-expand timeline when date is picked
+                  }} 
+                />
+                <div style={{ height: '20px' }} />
+              </motion.div>
             )}
-          </div>
-        )}
-      </div>
+          </AnimatePresence>
+
+          {historyLoading ? (
+            <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', textAlign: 'center', padding: '20px' }}>조회 중...</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+              <div style={{ textAlign: 'center', padding: '12px 8px', background: 'rgba(0, 255, 160, 0.06)', borderRadius: '12px', border: '1px solid rgba(0, 255, 160, 0.1)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#00ffa0' }}>{dailyStats.quizCount}</div>
+                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>퀴즈 완료</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '12px 8px', background: 'rgba(165, 94, 234, 0.06)', borderRadius: '12px', border: '1px solid rgba(165, 94, 234, 0.1)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a55eea' }}>{Math.floor(dailyStats.totalVideoSeconds / 60)}</div>
+                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>영상(분)</div>
+              </div>
+              <div style={{ textAlign: 'center', padding: '12px 8px', background: 'rgba(69, 170, 242, 0.06)', borderRadius: '12px', border: '1px solid rgba(69, 170, 242, 0.1)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#45aaf2' }}>{dailyStats.logCount}</div>
+                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>데이터 로그</div>
+              </div>
+            </div>
+          )}
+
+          {/* Expandable Timeline */}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            style={{
+              width: '100%', marginTop: '14px',
+              padding: '10px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '10px',
+              color: 'rgba(255,255,255,0.6)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              fontSize: '0.85rem',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {expanded ? '활동 내역 접기' : `${selectedDate} 상세 타임라인 보기 (${activities.length}건)`}
+          </button>
+
+          {expanded && (
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
+              {activities.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem' }}>
+                  해당 날짜에 기록된 활동이 없습니다.
+                </div>
+              ) : (
+                activities.map(act => (
+                  <div key={act.id} style={{
+                    padding: '12px 14px',
+                    background: 'rgba(255,255,255,0.04)',
+                    borderRadius: '10px',
+                    borderLeft: `3px solid ${act.type === 'quiz_pass' ? '#00ffa0' : act.type === 'video_complete' ? '#a55eea' : '#45aaf2'}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{act.title}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
+                        {act.timestamp ? new Date(act.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                    {act.score !== null && act.score !== undefined && (
+                      <div style={{ fontSize: '0.8rem', color: '#00ffa0', marginTop: 4 }}>
+                        점수: {act.score}점
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
     </div>
   );
 };
