@@ -255,7 +255,12 @@ export default function ParentDashboard() {
     // Listen to parent document
     const unsub = onSnapshot(doc(db, 'parents', user.uid), (snap) => {
       if (snap.exists()) {
-        setParentData({ id: snap.id, ...snap.data() });
+        const data = snap.data();
+        if (data.isDeleted) {
+          setError('해당 계정은 비활성화(삭제)되었습니다. 선생님에게 문의해 주세요.');
+        } else {
+          setParentData({ id: snap.id, ...data });
+        }
       } else {
         setError('학부모 계정 정보를 찾을 수 없습니다. 선생님에게 문의해 주세요.');
       }

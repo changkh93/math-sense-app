@@ -32,7 +32,20 @@ export default function ParentLogin() {
     setLoading(true);
     try {
       const email = phoneToEmail(digits);
-      await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Additional check: is the document soft-deleted?
+      const { getDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../../firebase');
+      const snap = await getDoc(doc(db, 'parents', cred.user.uid));
+      
+      if (snap.exists() && snap.data().isDeleted) {
+        await auth.signOut();
+        setError('삭제(비활성화)된 계정입니다. 선생님에게 문의해 주세요.');
+        setLoading(false);
+        return;
+      }
+
       navigate('/parent/dashboard');
     } catch (err) {
       console.error(err);
