@@ -92,31 +92,70 @@ export default function ParentManager() {
   // Search for children (students)
   const handleChildSearch = async (e) => {
     e.preventDefault();
-    if (!childSearchTerm.trim()) return;
+    const term = childSearchTerm.trim();
+    if (!term) return;
+    
     setSearchingChild(true);
+    setChildSearchResults([]);
+    
     try {
-      // Search by name
-      const nameQ = query(collection(db, 'users'), where('name', '==', childSearchTerm.trim()));
-      const nameSnap = await getDocs(nameQ);
-      let results = nameSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      // 1. Prepare queries: Firestore doesn't support "OR" easily for prefix matches, 
+      // so we run two parallel queries and merge them.
+      
+      const termLower = term.toLowerCase();
+      const usersRef = collection(db, 'users');
 
-      // Also search by email if no results
-      if (results.length === 0) {
-        const emailQ = query(collection(db, 'users'), where('email', '==', childSearchTerm.trim()));
-        const emailSnap = await getDocs(emailQ);
-        results = emailSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      // Try exact name match or prefix name match
+      const nameQ = query(usersRef, 
+        where('name', '>=', term), 
+        where('name', '<=', term + '\uf8ff'),
+        limit(20)
+      );
+
+      // Try exact email match or prefix email match (emails are often lowercase)
+      const emailQ = query(usersRef, 
+        where('email', '>=', termLower), 
+        where('email', '<=', termLower + '\uf8ff'),
+        limit(20)
+      );
+
+      const [nameSnap, emailSnap] = await Promise.all([getDocs(nameQ), getDocs(emailQ)]);
+      
+      const resultsMap = new Map();
+      
+      // Combine results
+      const processSnap = (snap) => {
+        snap.docs.forEach(doc => {
+          const data = doc.data();
+          // Filter out non-students
+          if (data.role !== 'admin' && data.role !== 'parent') {
+            resultsMap.set(doc.id, { uid: doc.id, ...data });
+          }
+        });
+      };
+
+      processSnap(nameSnap);
+      processSnap(emailSnap);
+
+      // Special case: if user input contains an email-like pattern (e.g. "Name <email@xxx.com>")
+      // try to extract it and search specifically by that email
+      const emailMatch = term.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      if (emailMatch && !resultsMap.has(term)) {
+        const extractedEmail = emailMatch[0].toLowerCase();
+        const specificEmailQ = query(usersRef, where('email', '==', extractedEmail));
+        const specSnap = await getDocs(specificEmailQ);
+        processSnap(specSnap);
       }
 
-      // Filter out admins and parents
-      results = results.filter(u => u.role !== 'admin' && u.role !== 'parent');
+      const results = Array.from(resultsMap.values());
       setChildSearchResults(results);
 
       if (results.length === 0) {
-        alert('해당 이름/이메일의 학생을 찾을 수 없습니다.');
+        alert(`${term}에 해당하는 학생을 찾을 수 없습니다. (이름이나 이메일 앞부분만 입력해 보세요)`);
       }
     } catch (err) {
       console.error(err);
-      alert('검색 실패');
+      alert('검색 중 오류가 발생했습니다.');
     } finally {
       setSearchingChild(false);
     }
