@@ -69,11 +69,9 @@ export function usePresence(userId, clusterId, currentLocation, unitId) {
     if (isNewLocation) {
       lastLocationRef.current = currentLocation;
       lastUnitIdRef.current = unitId;
-      // When jumping to a new location, update immediately (or slightly debounced)
+      // Force update immediately, sometimes document.hidden is true incorrectly during rapid react mounts in some webviews
       timeoutId = setTimeout(() => {
-        if (!document.hidden) {
-           updatePresence('online', true);
-        }
+        updatePresence(document.hidden ? 'away' : 'online', true);
       }, 500);
     }
 

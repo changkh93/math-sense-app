@@ -264,9 +264,10 @@ export function useLearningHistory(userId, dateStr) {
     // --- Process Activity Logs ---
     rawData.logs.forEach(docSnap => {
       const data = docSnap.data();
-      if (data.action?.includes('DATA LOG')) {
+      const action = data.action || '';
+      if (action.includes('DATA LOG') || action.includes('view_text') || action.includes('data_log')) {
         // unitId-based dedup key — consistent with other sections
-        const dedupeKey = `datalog_${data.unitId || data.unitTitle || '알 수 없는 단원'}`;
+        const dedupeKey = `datalog_${data.unitId || data.unitTitle || '알 수 없는 단원'}_${action}`;
         if (trackedDataLogs.has(dedupeKey)) return;
         trackedDataLogs.add(dedupeKey);
         stats.logCount++;
@@ -280,6 +281,16 @@ export function useLearningHistory(userId, dateStr) {
           crystalsEarned: 0,
           metadata: data
         });
+      } else if (action === 'view_video' || action === 'overlay_view_video') {
+         stats._videoTxMap[getVideoKey(data.unitId, 'default')] = 1; // Mark at least 1 second to count as video view if not in LP
+         aggregated.push({
+           id: `log_vid_${docSnap.id}`,
+           timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
+           type: 'video_complete',
+           title: `🎬 영상 열람: ${data.unitTitle || data.unitId || '알 수 없는 단원'}`,
+           score: null,
+           metadata: data
+         });
       }
     });
 
