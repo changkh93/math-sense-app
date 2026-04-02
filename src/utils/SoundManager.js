@@ -9,7 +9,7 @@ class SoundManager {
     this.sounds = {}
     this.bgm = null
     this.isMuted = false
-    this.sfxVolume = 0.6
+    this.sfxVolume = 0.15 // 0.6에서 대폭 하향하여 학습 영상 소리를 방해하지 않도록 조정
     
     // 사운드 초기화
     this.initSounds()
@@ -36,15 +36,15 @@ class SoundManager {
       },
       crystal: {
         src: ['/sounds/crystal.mp3', '/sounds/crystal.wav'],
-        volume: this.sfxVolume * 0.7,
+        volume: this.sfxVolume * 0.4, // 0.7에서 하향
       },
       whoosh: {
         src: ['/sounds/whoosh.wav', '/sounds/whoosh.mp3'],
-        volume: this.sfxVolume * 0.4,
+        volume: this.sfxVolume * 0.3, // 0.4에서 하향
       },
       warp: {
         src: ['/sounds/space_warp.wav'],
-        volume: this.sfxVolume * 0.9,
+        volume: this.sfxVolume * 0.5, // 0.9에서 하향
       },
     }
 
