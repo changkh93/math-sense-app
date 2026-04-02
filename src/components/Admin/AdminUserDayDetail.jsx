@@ -10,7 +10,7 @@ export default function AdminUserDayDetail({ info, onReviewed, onSelectDate }) {
   
   const { assignments = [], date, userId, userName } = info || {};
 
-  const { activities, dailyStats, loading } = useLearningHistory(
+  const { activities, groupedActivities, dailyStats, loading } = useLearningHistory(
     activeTab === 'timeline' ? userId : null,
     activeTab === 'timeline' ? date : null
   );
@@ -117,6 +117,7 @@ export default function AdminUserDayDetail({ info, onReviewed, onSelectDate }) {
 
         {activeTab === 'timeline' && (
           <DailyLearningTimeline 
+            groupedActivities={groupedActivities}
             activities={activities} 
             dailyStats={dailyStats}
             loading={loading} 
