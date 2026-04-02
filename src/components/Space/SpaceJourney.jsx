@@ -117,36 +117,33 @@ export default function SpaceJourney({ userData }) {
       }
     });
 
-    // 2. Full timeline reconstruction: find gaps bridged by cores
-    //    Walk through all active dates chronologically. If a gap between
-    //    two consecutive active dates is small enough (≤ remaining core budget),
-    //    those gap days were core-defended.
+    // 2. Full timeline reconstruction for legacy freezes (without metadata.defendedDates)
+    // If a freeze happened on a specific day (t.timestamp), it means the gap IMMEDIATELY
+    // before that day was defended.
     const activeDates = Array.from(dailyStats.keys()).sort();
-    const totalCoresUsed = coreStats.used;
-    let coresRemaining = totalCoresUsed - protectionSet.size;
-
-    if (coresRemaining > 0 && activeDates.length > 1) {
-      for (let i = 0; i < activeDates.length - 1 && coresRemaining > 0; i++) {
-        const curr = activeDates[i];
-        const next = activeDates[i + 1];
-        const d1 = new Date(curr + 'T00:00:00+09:00');
-        const d2 = new Date(next + 'T00:00:00+09:00');
-        const gap = Math.floor((d2 - d1) / 86400000) - 1;
-
-        if (gap > 0 && gap <= coresRemaining) {
-          // These gap days were defended by cores
-          const scanObj = new Date(curr + 'T12:00:00Z');
-          for (let j = 0; j < gap; j++) {
-            scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-            const dStr = scanObj.toISOString().split('T')[0];
-            if (!protectionSet.has(dStr)) {
+    
+    transactions.forEach(t => {
+      if (t.type === 'streak_freeze' && !t.metadata?.defendedDates && t.timestamp) {
+        const freezeDate = getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp));
+        // Find the most recent active date BEFORE the freezeDate
+        const prevActive = [...activeDates].reverse().find(d => d < freezeDate);
+        
+        if (prevActive) {
+          const d1 = new Date(prevActive + 'T12:00:00Z');
+          const d2 = new Date(freezeDate + 'T12:00:00Z');
+          const gap = Math.floor((d2 - d1) / 86400000) - 1;
+          
+          if (gap > 0 && gap <= 10) { // Safety ceiling to avoid infinite loops
+            const scanObj = new Date(d1);
+            for (let j = 0; j < gap; j++) {
+              scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+              const dStr = scanObj.toISOString().split('T')[0];
               protectionSet.add(dStr);
-              coresRemaining--;
             }
           }
         }
       }
-    }
+    });
 
     // 3. Current gap: if cores are available and there's an active gap right now
     const dbStreakDate = userData?.lastStreakDate;
@@ -284,31 +281,7 @@ export default function SpaceJourney({ userData }) {
   const isSupernova = streak >= 100;
   const isNebula = streak >= 30;
 
-  // db의 스트릭이 데이터 기반 계산값보다 낮을 경우 강제 동기화 (헤더 등 상시 노출 영역 정정)
-  // ⚠️ IMPORTANT: lastStreakDate는 절대 여기서 수정하지 않음!
-  useEffect(() => {
-    const syncStreak = async () => {
-      if (!auth.currentUser || loading || timelineData.days.length === 0) return;
-      
-      // 실제 히스토리 기반의 현재 스트릭 추출 (오늘 아직 안 했으면 어제까지의 기록)
-      const todayNode = timelineData.days.find(d => d.isToday);
-      const calculatedTrueStreak = todayNode ? todayNode.streakRun : 0;
-
-      if (calculatedTrueStreak !== (userData?.currentStreak || 0)) {
-        try {
-          const updates = {
-            currentStreak: calculatedTrueStreak,
-            longestStreak: Math.max(userData?.longestStreak || 0, calculatedTrueStreak)
-          };
-          await setDoc(doc(db, 'users', auth.currentUser.uid), updates, { merge: true });
-          console.log("🔥 SpaceJourney: Out-of-sync streak repaired to", calculatedTrueStreak, "from history");
-        } catch (err) {
-          console.error("Streak sync failed:", err);
-        }
-      }
-    };
-    syncStreak();
-  }, [timelineData.days, userData?.currentStreak, loading]);
+  // removed destructive syncStreak loop. DB is the source of truth for streak numbers.
 
   const handleDayClick = (e, day) => {
     const { clientX, clientY } = e;
