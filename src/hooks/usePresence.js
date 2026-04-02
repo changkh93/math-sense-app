@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
@@ -24,25 +24,26 @@ export function usePresence(userId, clusterId, currentLocation, unitId) {
       try {
         const userRef = doc(db, 'users', userId);
         
-        // We use dot notation for merging to strictly update liveStatus without affecting other fields
-        // This is more efficient and avoids potentially overwriting subfields in some conditions.
-        const updateData = {
-          'liveStatus.state': state,
-          'liveStatus.lastUpdatedAt': serverTimestamp(),
-          'liveStatus.currentLocation': currentLocation || '메인 화면',
-          'liveStatus.clusterId': clusterId || 'cluster_elementary',
-          'liveStatus.unitId': unitId || null
+        // We use setDoc with merge: true to ensure parent fields like 'liveStatus'
+        // are created if they are missing (as found in some student records).
+        const mergeData = {
+          liveStatus: {
+            state: state,
+            lastUpdatedAt: serverTimestamp(),
+            currentLocation: currentLocation || '메인 화면',
+            clusterId: clusterId || 'cluster_elementary',
+            unitId: unitId || null
+          }
         };
 
         if (isNewLocation) {
-          updateData['liveStatus.enteredAt'] = serverTimestamp();
+          mergeData.liveStatus.enteredAt = serverTimestamp();
         }
 
-        await updateDoc(userRef, updateData);
+        await setDoc(userRef, mergeData, { merge: true });
         lastPresenceTimeRef.current = Date.now();
         
       } catch (err) {
-        // If updateDoc fails (e.g. document missing), we could fallback to setDoc, but for presence it's usually fine
         console.error("Presence update failed:", err);
       }
     };

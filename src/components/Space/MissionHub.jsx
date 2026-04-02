@@ -144,6 +144,12 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     }
   }, [])
 
+  // Use a ref for onTimeUpdate to prevent stale closures in the player's intervals
+  const onTimeUpdateRef = useRef(onTimeUpdate)
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate
+  }, [onTimeUpdate])
+
   useEffect(() => {
     if (!window.YT) {
       const tag = document.createElement('script')
@@ -179,7 +185,6 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         events: {
           'onReady': () => {
             // Start continuous time tracking as soon as player is ready
-            // and keep it running even when paused to handle seeking/stale caps.
             if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
             timeUpdateInterval.current = setInterval(() => {
               if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
@@ -190,12 +195,12 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
                 setCurrentTime(curr)
                 setDuration(dur)
                 
-                // Report back to MissionHub immediately to keep context updated
-                if (onTimeUpdate) {
-                  onTimeUpdate({ currentTime: curr, duration: dur, playbackRate: rate })
+                // Use the ref here to avoid getting stuck with initial/null context
+                if (onTimeUpdateRef.current) {
+                  onTimeUpdateRef.current({ currentTime: curr, duration: dur, playbackRate: rate })
                 }
               }
-            }, 200) // Much higher frequency to catch seeking/timeline drags
+            }, 200) 
           },
           'onStateChange': (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
@@ -204,12 +209,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
               }
             }
             if (event.data === window.YT.PlayerState.ENDED) {
-              // Force one last time update before ending, crucial for capturing short remaining playbacks
               if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
                 const curr = playerRef.current.getCurrentTime()
                 const dur = playerRef.current.getDuration ? playerRef.current.getDuration() : 0
                 const rate = playerRef.current.getPlaybackRate ? playerRef.current.getPlaybackRate() : 1
-                if (onTimeUpdate) onTimeUpdate({ currentTime: curr, duration: dur, playbackRate: rate })
+                if (onTimeUpdateRef.current) onTimeUpdateRef.current({ currentTime: curr, duration: dur, playbackRate: rate })
               }
               if (onComplete) onComplete()
             }
@@ -228,7 +232,6 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     if (window.YT && window.YT.Player) {
       initPlayer()
     } else {
-      // Use interval to wait for YT API instead of overwriting global callback
       const checkYT = setInterval(() => {
         if (window.YT && window.YT.Player) {
           clearInterval(checkYT)
@@ -247,14 +250,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     }
 
     return () => {
-      // Clean up interval
       if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
-      // Properly destroy YouTube player before React removes DOM
       if (playerRef.current && typeof playerRef.current.destroy === 'function') {
         try { playerRef.current.destroy() } catch (e) { /* ignore */ }
         playerRef.current = null
       }
-      // Clear the wrapper manually to avoid React removeChild conflicts
       if (wrapperRef.current) {
         wrapperRef.current.innerHTML = ''
       }
