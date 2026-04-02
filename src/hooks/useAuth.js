@@ -46,27 +46,57 @@ export function useAuth() {
               ...data
             });
           } else {
-            // [안전 장치] 만약 유저 메인 문서만 삭제되었고 거래 내역(하위 컬렉션)이 남아있는 경우를 대비해 잔고를 복원합니다.
-            const recoverCrystals = async () => {
+            // [안전 장치] 만약 유저 메인 문서만 삭제되었고 하위 데이터가 남아있는 경우를 대비해 스탯 복원을 시도합니다.
+            const recoverUserData = async () => {
               try {
+                let sumCrystals = 0;
+                let totalQ = 0, totalS = 0, perfectC = 0;
+
+                // 1. 거래 내역(crystals) 복원
                 const txsSnap = await getDocs(collection(db, 'users', firebaseUser.uid, 'crystal_transactions'));
                 if (!txsSnap.empty) {
-                  console.warn("⚠️ 유저 문서가 없지만 거래 내역이 발견되었습니다. 광석 잔고를 자동 복원합니다.");
-                  let sum = 0;
-                  txsSnap.forEach(d => { sum += (d.data().amount || 0) });
-                  return sum;
+                  console.warn("⚠️ 유저 문서가 없으나 거래 내역 발견. 광석을 복원합니다.");
+                  txsSnap.forEach(d => { sumCrystals += (d.data().amount || 0) });
                 }
+
+                // 2. 퀴즈 기록(history) 복원
+                const histSnap = await getDocs(collection(db, 'users', firebaseUser.uid, 'history'));
+                if (!histSnap.empty) {
+                  console.warn("⚠️ 유저 문서가 없으나 학습 기록 발견. 통계를 복원합니다.");
+                  histSnap.forEach(d => {
+                    const data = d.data();
+                    totalQ++;
+                    totalS += (data.score || 0);
+                    if (data.score === 100) perfectC++;
+                  });
+                  
+                  // 만약 거래 내역 테이블이 생기기 전의 계정이라면 대략적으로 보상 추산
+                  if (txsSnap.empty) {
+                     sumCrystals = totalQ * 38; // 평균 보상치 (100점=40, 그외 등등)
+                  }
+                }
+
+                return {
+                  crystals: sumCrystals,
+                  totalQuizzes: totalQ,
+                  totalScore: totalS,
+                  averageScore: totalQ > 0 ? Math.round((totalS / totalQ) * 10) / 10 : 0,
+                  perfectCount: perfectC,
+                  _restored: true
+                };
               } catch (err) {
-                console.error("광석 자동 복원 실패:", err);
+                console.error("데이터 자동 복원 실패:", err);
+                return { crystals: 0, totalQuizzes: 0, totalScore: 0, averageScore: 0, perfectCount: 0 };
               }
-              return 0;
             };
 
-            recoverCrystals().then((recoveredCrystals) => {
+            recoverUserData().then((recovered) => {
               const initialData = { 
-                crystals: recoveredCrystals, 
-                totalQuizzes: 0, 
-                totalScore: 0, 
+                crystals: recovered.crystals, 
+                totalQuizzes: recovered.totalQuizzes, 
+                totalScore: recovered.totalScore, 
+                averageScore: recovered.averageScore,
+                perfectCount: recovered.perfectCount,
                 spaceshipLevel: 1,
                 helpCount: 0,
                 currentStreak: 0,
@@ -79,6 +109,9 @@ export function useAuth() {
                 name: firebaseUser.displayName,
                 createdAt: new Date().toISOString()
               };
+              if (recovered._restored) {
+                initialData.adjustmentReason = "자동 복구 완료";
+              }
               setDoc(userDocRef, initialData, { merge: true });
               setUserData(initialData);
             });

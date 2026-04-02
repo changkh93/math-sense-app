@@ -86,7 +86,7 @@ export default function SpaceRanking({ user, userData }) {
         const weeklyGain = d.weeklyGrowthMonday === mondayKey ? (d.weeklyGrowth || 0) : 0;
         const dailyGain = d.dailyGrowthDate === todayKey ? (d.dailyGrowth || 0) : 0;
         
-        // Caculate SEI & Tier
+        // Calculate SEI & Tier
         const seiData = calculateSEI(d, weeklyGain, streak);
 
         return {
@@ -97,7 +97,7 @@ export default function SpaceRanking({ user, userData }) {
           weeklyGain,
           seiData,
         }
-      })
+      }).filter(u => u.role !== 'admin' && u.role !== 'developer' && u.role !== 'teacher');
 
       // Sort based on current rankMode
       if (rankMode === 'sei') {

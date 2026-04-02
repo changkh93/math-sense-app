@@ -39,7 +39,15 @@ export default function TeacherQA() {
   const [replyText, setReplyText] = useState({}); 
   const [editingAnswerId, setEditingAnswerId] = useState(null);
   const [editBuffer, setEditBuffer] = useState('');
-  const [previewInfo, setPreviewInfo] = useState({ isOpen: false, unitId: null, quizId: null });
+  const [previewInfo, setPreviewInfo] = useState({ 
+    isOpen: false, 
+    unitId: null, 
+    quizId: null,
+    type: 'quiz',
+    videoId: null,
+    startTime: null,
+    title: ''
+  });
   const [expandedQuestions, setExpandedQuestions] = useState({});
 
   useEffect(() => {
@@ -255,12 +263,16 @@ export default function TeacherQA() {
                   onClick={() => setPreviewInfo({ 
                     isOpen: true, 
                     unitId: q.quizContext?.unitId || q.quizId, 
-                    quizId: q.quizContext?.questionId 
+                    quizId: q.quizContext?.questionId,
+                    type: q.type || 'quiz',
+                    videoId: q.quizContext?.videoId,
+                    startTime: q.quizContext?.startTime,
+                    title: q.quizContext?.transmissionTitle || q.quizContext?.quizTitle
                   })}
                 >
                   <ExternalLink size={14} />
-                  <strong>[{q.quizContext?.quizTitle || '단원 정보 없음'}]</strong> 
-                  {q.quizContext?.questionId && ` - 문제 번호: ${q.quizContext.questionId}`}
+                  <strong>[{q.quizContext?.transmissionTitle || q.quizContext?.quizTitle || '단원 정보 없음'}]</strong> 
+                  {q.quizContext?.questionId ? ` - 문제 번호: ${q.quizContext.questionId}` : ''}
                 </div>
 
                 <div className="qa-content">
@@ -363,6 +375,10 @@ export default function TeacherQA() {
         onClose={() => setPreviewInfo({ ...previewInfo, isOpen: false })}
         unitId={previewInfo.unitId}
         quizId={previewInfo.quizId}
+        type={previewInfo.type}
+        videoId={previewInfo.videoId}
+        startTime={previewInfo.startTime}
+        title={previewInfo.title}
       />
     </div>
   );
