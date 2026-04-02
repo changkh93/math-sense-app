@@ -158,7 +158,18 @@ export function useLearningHistory(userId, dateStr) {
       if (tType === 'quiz_reward' || tType === 'mastery_bonus') return; 
 
       let displayType = 'general';
-      let displayTitle = `💎 광석 획득: ${desc}`;
+      let displayTitle = data.amount < 0 ? `🛒 광석 소모: ${desc}` : `💎 광석 획득: ${desc}`;
+
+      if (tType === 'streak_freeze') {
+        displayType = 'streak_freeze';
+        displayTitle = `🧊 궤도 방어: ${desc}`;
+      } else if (tType === 'store_purchase') {
+        displayType = 'store_purchase';
+        displayTitle = `🛒 아이템 구매: ${desc}`;
+      } else if (tType === 'maintenance_compensation' || tType === 'admin_reward') {
+        displayType = 'admin_reward';
+        displayTitle = `🎁 운영자 선물: ${desc}`;
+      }
 
       if (tType === 'transmission_reward' || tType === 'video_reward') {
         if (data.amount === 20 || desc.includes('완료')) return;
