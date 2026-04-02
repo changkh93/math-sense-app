@@ -118,7 +118,6 @@ export default function FileViewerModal({ isOpen, onClose, file }) {
               <button 
                 onClick={onClose} 
                 style={{ 
-                  background: 'none', 
                   border: 'none', 
                   color: 'white', 
                   cursor: 'pointer',
@@ -126,6 +125,7 @@ export default function FileViewerModal({ isOpen, onClose, file }) {
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   background: 'rgba(255,255,255,0.05)'
                 }}
               >

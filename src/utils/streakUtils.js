@@ -297,27 +297,93 @@ export function calculateStreakFromHistory(activeDates, defendedDates, todayKST 
  * @returns {number}
  */
 export function getEffectiveStreak(userData, historyData = null) {
-  // historyData가 제공되면 이력 기반으로 계산 (가장 정확)
-  if (historyData && historyData.activeDates) {
-    return calculateStreakFromHistory(
-      historyData.activeDates, 
-      historyData.defendedDates || new Set(),
-      getTodayKST()
-    );
+  // 1. historyData가 제공되면 이력 기반으로 계산 (가장 정확)
+  if (historyData && (historyData.activeDates || historyData.activeSet)) {
+    const active = historyData.activeSet || historyData.activeDates;
+    const defended = historyData.defendedSet || historyData.defendedDates || new Set();
+    return calculateStreakFromHistory(active, defended, getTodayKST());
   }
 
+  // 2. historyData가 없으면 DB에 저장된 캐시된 값 사용
   if (!userData?.lastStreakDate || !userData?.currentStreak) return 0
   
   const todayKST = getTodayKST()
   const lastDate = userData.lastStreakDate
   
-  // 오늘 이미 완료했거나 어제 완료한 경우 → 확실히 활성 상태
+  // 오늘 이미 완료했거나 어제 완료한 경우 → 확실히 활성 상태로 간주
+  // (어제의 경우 오늘이 아직 안 끝났으므로 스트릭이 유지되는 Duo 스타일)
   if (lastDate === todayKST || lastDate === getYesterdayKST()) {
     return userData.currentStreak
   }
   
-  // 그 외: 코어 보유와 무관하게 0 반환
-  // 코어 방어는 학습 완료(handleComplete/handleNonQuizActivityComplete) 시에만 실행되므로,
-  // UI에서 "방어된 것처럼" 미리 보여주면 DB 확정값과 불일치하는 희망 고문이 됨.
+  // 그 외: 며칠 이상 공백이 있다면 0 반환 (코어 방어는 다음 학습 시점에 결산됨)
   return 0
+}
+
+/**
+ * 트랜잭션 기록으로부터 방어된 날짜들을 추출
+ * 
+ * @param {Array} transactions - 사용자의 crystal_transactions 배열
+ * @param {Object} userData - 사용자 데이터 (streakFreezeCount, lastStreakDate 포함)
+ * @param {Map|Object} dailyStats - 일별 활동 통계 (YYYY-MM-DD 키)
+ * @returns {Set<string>} 방어된 날짜들의 Set
+ */
+export function extractDefendedDates(transactions, userData, dailyStats) {
+  const protectionSet = new Set();
+  const todayKST = getTodayKST();
+
+  // 1. future-format streak_freeze transactions with explicit defendedDates
+  (transactions || []).forEach(t => {
+    if (t.type === 'streak_freeze' && t.metadata?.defendedDates) {
+      t.metadata.defendedDates.forEach(d => protectionSet.add(d));
+    }
+  });
+
+  // 2. Full timeline reconstruction for legacy freezes
+  const activeDates = dailyStats instanceof Map ? Array.from(dailyStats.keys()) : Object.keys(dailyStats || {});
+  activeDates.sort();
+  
+  (transactions || []).forEach(t => {
+    if (t.type === 'streak_freeze' && !t.metadata?.defendedDates && t.timestamp) {
+      const ts = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp);
+      const freezeDate = getTodayKST(ts);
+      // Find the most recent active date BEFORE the freezeDate
+      const prevActive = [...activeDates].reverse().find(d => d < freezeDate);
+      
+      if (prevActive) {
+        const d1 = new Date(prevActive + 'T12:00:00Z');
+        const d2 = new Date(freezeDate + 'T12:00:00Z');
+        const gap = Math.floor((d2 - d1) / 86400000) - 1;
+        
+        if (gap > 0 && gap <= 10) { 
+          const scanObj = new Date(d1);
+          for (let j = 0; j < gap; j++) {
+            scanObj.setUTCDate(scanObj.getUTCDate() + 1);
+            const dStr = scanObj.toISOString().split('T')[0];
+            protectionSet.add(dStr);
+          }
+        }
+      }
+    }
+  });
+
+  // 3. Current gap: core availability based active defense
+  const dbStreakDate = userData?.lastStreakDate;
+  const freezeCount = userData?.streakFreezeCount || 0;
+
+  if (dbStreakDate && freezeCount > 0) {
+    const diffMs = new Date(todayKST + 'T00:00:00+09:00').getTime() - new Date(dbStreakDate + 'T00:00:00+09:00').getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    const missed = diffDays - 1;
+
+    if (missed > 0 && freezeCount >= missed) {
+      const gapScanObj = new Date(dbStreakDate + 'T12:00:00Z');
+      for (let i = 0; i < missed; i++) {
+        gapScanObj.setUTCDate(gapScanObj.getUTCDate() + 1);
+        protectionSet.add(gapScanObj.toISOString().split('T')[0]);
+      }
+    }
+  }
+
+  return protectionSet;
 }

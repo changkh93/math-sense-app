@@ -41,7 +41,7 @@ export default function AssignmentChronicle({ assignments, onClose }) {
   const isReviewed = currentLog.status === 'reviewed';
   const isNeedsRevision = currentLog.status === 'needs_revision';
 
-  const { activities, dailyStats, loading: timelineLoading } = useLearningHistory(
+  const { activities, groupedActivities, dailyStats, loading: timelineLoading } = useLearningHistory(
     activeTab === 'timeline' ? currentLog.userId : null, 
     activeTab === 'timeline' ? currentLog.date : null
   );
@@ -314,6 +314,7 @@ export default function AssignmentChronicle({ assignments, onClose }) {
 
                 {activeTab === 'timeline' && (
                   <DailyLearningTimeline 
+                    groupedActivities={groupedActivities}
                     activities={activities} 
                     dailyStats={dailyStats}
                     loading={timelineLoading} 

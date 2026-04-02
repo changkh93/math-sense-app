@@ -30,7 +30,7 @@ import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
-import { calculateStreakUpdate, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
+import { calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
@@ -49,6 +49,8 @@ function SpaceHome() {
   const [history, setHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection', 'assignment_hub'
+  const [transactions, setTransactions] = useState([])
+  const [loadingTransactions, setLoadingTransactions] = useState(true)
   
   // Selection State (Persist ID in session)
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
@@ -411,7 +413,6 @@ function SpaceHome() {
       setHistory(historyData)
       setLoadingHistory(false)
     })
-    
     return () => {
       if (cleanupTimeout) clearTimeout(cleanupTimeout);
       if (unsubscribeSnapshot) {
@@ -425,6 +426,55 @@ function SpaceHome() {
       }
     };
   }, [user])
+
+  // Fetch Transactions for Streak Sync
+  useEffect(() => {
+    if (!user) return;
+    const txRef = collection(db, 'users', user.uid, 'crystal_transactions');
+    // Only need recent ones for streak protection calculation
+    const q = query(txRef, orderBy('timestamp', 'desc'), limit(100));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoadingTransactions(false);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  /**
+   * --- Streak Sync (Self-healing) ---
+   * Compare calculated streak from history/transactions with stored counter.
+   */
+  useEffect(() => {
+    if (!user || !userData || loadingHistory || loadingTransactions) return;
+    
+    // 1. Calculate the ground truth streak from history and transactions
+    const activeDates = new Set(history.map(h => {
+      const ts = h.timestamp?.toDate ? h.timestamp.toDate() : (h.timestamp ? new Date(h.timestamp) : null);
+      return ts ? getTodayKST(ts) : null;
+    }).filter(Boolean));
+
+    // Simple daily stats for extractDefendedDates (Key: YYYY-MM-DD)
+    const dailyStatsObj = {};
+    activeDates.forEach(d => { dailyStatsObj[d] = true; });
+
+    const defendedDates = extractDefendedDates(transactions, userData, dailyStatsObj);
+    const calculatedStreak = calculateStreakFromHistory(activeDates, defendedDates, getTodayKST());
+
+    // 2. Compare with userData.currentStreak
+    const storedStreak = userData.currentStreak || 0;
+    
+    // Ensure we have a valid calculated value
+    if (calculatedStreak !== storedStreak && (history.length > 0 || transactions.length > 0)) {
+      console.log(`[StreakSync] Detected drift. Calculated: ${calculatedStreak}, Stored: ${storedStreak}. Syncing...`);
+      const userRef = doc(db, 'users', user.uid);
+      setDoc(userRef, { 
+        currentStreak: calculatedStreak,
+        lastStreakSyncAt: serverTimestamp() 
+      }, { merge: true })
+        .then(() => console.log("[StreakSync] Successfully matched history."))
+        .catch(err => console.error("[StreakSync] Sync Error:", err));
+    }
+  }, [user, userData, history, transactions, loadingHistory, loadingTransactions]);
 
   // Calculate Exploration Status and Recent Region
   // bestScores: { unitDocId: bestScore } - maps each completed unit to its best quiz score
@@ -2223,7 +2273,11 @@ function SpaceHome() {
         {currentView === 'assignment_hub' && (
           <AssignmentHub 
             clusterId={selectedClusterId} 
-            onClose={() => setCurrentView('planet')} 
+            onClose={() => setCurrentView('planet')}
+            onNavigateToUnit={(unitId) => {
+              setCurrentView('planet');
+              if (unitId) updateSelectedUnitDocId(unitId);
+            }}
           />
         )}
       </AnimatePresence>

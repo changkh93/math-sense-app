@@ -161,7 +161,7 @@ const ChildCard = ({ childUid }) => {
   
   const isToday = selectedDate === getTodayKST();
 
-  const { activities, dailyStats, loading: historyLoading } = useLearningHistory(childUid, selectedDate);
+  const { activities, groupedActivities, dailyStats, loading: historyLoading } = useLearningHistory(childUid, selectedDate);
 
   // Listen to child's user document in real-time
   useEffect(() => {
@@ -376,39 +376,57 @@ const ChildCard = ({ childUid }) => {
 
           {expanded && (
             <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-              {activities.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem' }}>
-                  해당 날짜에 기록된 활동이 없습니다.
-                </div>
-              ) : (
-                activities.map(act => (
-                  <div key={act.id} style={{
-                    padding: '12px 14px',
-                    background: 'rgba(255,255,255,0.04)',
-                    borderRadius: '10px',
-                    borderLeft: `3px solid ${act.type === 'quiz_pass' ? '#00ffa0' : act.type === 'video_complete' ? '#a55eea' : '#45aaf2'}`
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{act.title}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
-                        {act.timestamp ? new Date(act.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </span>
+              {(groupedActivities && groupedActivities.length > 0) ? (
+                groupedActivities.map(item => {
+                  const typeConfig = {
+                    quiz: { icon: '🚀', color: '#00ffa0', label: '퀴즈 탐사' },
+                    video: { icon: '🎬', color: '#a55eea', label: '영상 학습' },
+                    text: { icon: '📝', color: '#45aaf2', label: '데이터 로그' }
+                  };
+                  const cfg = typeConfig[item.type] || typeConfig.quiz;
+                  const timeStr = item.firstTimestamp 
+                    ? new Date(item.firstTimestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                    : '';
+                  
+                  return (
+                    <div key={item.id} style={{
+                      padding: '12px 14px',
+                      background: 'rgba(255,255,255,0.04)',
+                      borderRadius: '10px',
+                      borderLeft: `3px solid ${cfg.color}`
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.85rem' }}>{cfg.icon}</span>
+                          <span style={{ fontSize: '0.7rem', color: cfg.color, fontWeight: 600 }}>{cfg.label}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {item.completed && (
+                            <span style={{ fontSize: '0.65rem', color: '#10b981', background: 'rgba(16,185,129,0.15)', padding: '1px 6px', borderRadius: '3px' }}>✅ 완료</span>
+                          )}
+                          <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{timeStr}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
+                        {item.unitTitle}
+                      </div>
+                      {item.type === 'quiz' && item.score !== null && item.score !== undefined && (
+                        <div style={{ fontSize: '0.8rem', color: '#00ffa0', marginTop: 4 }}>
+                          점수: {item.score}점
+                        </div>
+                      )}
+                      {item.type === 'video' && item.totalVideoSeconds > 0 && (
+                        <div style={{ fontSize: '0.8rem', color: '#a55eea', marginTop: 4 }}>
+                          시청 시간: {Math.floor(item.totalVideoSeconds / 60)}분 {Math.floor(item.totalVideoSeconds % 60)}초
+                        </div>
+                      )}
                     </div>
-                    {/* Show Score only for Quizzes */}
-                    {(act.type === 'quiz_pass' || act.type === 'quiz_in_progress') && act.score !== null && act.score !== undefined && (
-                      <div style={{ fontSize: '0.8rem', color: '#00ffa0', marginTop: 4 }}>
-                        점수: {act.score}점
-                      </div>
-                    )}
-                    
-                    {/* Show Video Time for Video activities */}
-                    {act.type === 'video_complete' && act.metadata?.videoTime > 0 && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--star-gold)', marginTop: 4, fontFamily: 'var(--font-tech)' }}>
-                        시청 시간: {Math.floor(act.metadata.videoTime / 60)}분 {Math.floor(act.metadata.videoTime % 60)}초
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem' }}>
+                  해당 날짜에 기록된 학습 활동이 없습니다.
+                </div>
               )}
             </div>
           )}

@@ -13,7 +13,7 @@ import { getTodayKST, getNowKST, getKSTComponents } from '../../utils/streakUtil
  * Assignment Hub (Stellar Archive)
  * The main interface for students to view their assignments map (calendar) and submit work.
  */
-export default function AssignmentHub({ clusterId, regionId, onClose }) {
+export default function AssignmentHub({ clusterId, regionId, onClose, onNavigateToUnit }) {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(null); // The date the user clicked on
@@ -328,6 +328,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose }) {
               user={user}
               submitMutation={submitMutation}
               onCancel={() => setSelectedDateStr(null)}
+              onNavigateToUnit={onNavigateToUnit}
             />
           )}
         </div>
@@ -477,7 +478,7 @@ function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendanc
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import DailyLearningTimeline from './DailyLearningTimeline';
 
-function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submitMutation, onCancel }) {
+function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submitMutation, onCancel, onNavigateToUnit }) {
   const [activeTab, setActiveTab] = useState('report'); // 'report' or 'timeline'
   
   const [content, setContent] = useState(assignment?.content || '');
@@ -491,7 +492,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
 
-  const { activities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
+  const { activities, groupedActivities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -714,10 +715,12 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
       {activeTab === 'timeline' && (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <DailyLearningTimeline 
+            groupedActivities={groupedActivities}
             activities={activities} 
             dailyStats={dailyStats}
             loading={timelineLoading} 
-            error={timelineError} 
+            error={timelineError}
+            onActivityClick={onNavigateToUnit}
           />
         </div>
       )}

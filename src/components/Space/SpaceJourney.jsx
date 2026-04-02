@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, auth } from '../../firebase';
 import { collection, query, where, orderBy, getDocs, doc, setDoc } from 'firebase/firestore';
-import { getTodayKST, getCometTier, getEffectiveStreak } from '../../utils/streakUtils';
+import { getTodayKST, getCometTier, getEffectiveStreak, extractDefendedDates } from '../../utils/streakUtils';
 import './SpaceJourney.css';
 
 export default function SpaceJourney({ userData }) {
@@ -121,63 +121,8 @@ export default function SpaceJourney({ userData }) {
 
   // Helper: Identify nodes that SHOULD be protected (historical + current gap)
   const nodesWithProtection = useMemo(() => {
-    const protectionSet = new Set();
-
-    // 1. From future-format streak_freeze transactions with explicit defendedDates
-    transactions.forEach(t => {
-      if (t.type === 'streak_freeze' && t.metadata?.defendedDates) {
-        t.metadata.defendedDates.forEach(d => protectionSet.add(d));
-      }
-    });
-
-    // 2. Full timeline reconstruction for legacy freezes (without metadata.defendedDates)
-    // If a freeze happened on a specific day (t.timestamp), it means the gap IMMEDIATELY
-    // before that day was defended.
-    const activeDates = Array.from(dailyStats.keys()).sort();
-    
-    transactions.forEach(t => {
-      if (t.type === 'streak_freeze' && !t.metadata?.defendedDates && t.timestamp) {
-        const freezeDate = getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp));
-        // Find the most recent active date BEFORE the freezeDate
-        const prevActive = [...activeDates].reverse().find(d => d < freezeDate);
-        
-        if (prevActive) {
-          const d1 = new Date(prevActive + 'T12:00:00Z');
-          const d2 = new Date(freezeDate + 'T12:00:00Z');
-          const gap = Math.floor((d2 - d1) / 86400000) - 1;
-          
-          if (gap > 0 && gap <= 10) { // Safety ceiling to avoid infinite loops
-            const scanObj = new Date(d1);
-            for (let j = 0; j < gap; j++) {
-              scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-              const dStr = scanObj.toISOString().split('T')[0];
-              protectionSet.add(dStr);
-            }
-          }
-        }
-      }
-    });
-
-    // 3. Current gap: if cores are available and there's an active gap right now
-    const dbStreakDate = userData?.lastStreakDate;
-    const freezeCount = userData?.streakFreezeCount || 0;
-
-    if (dbStreakDate && freezeCount > 0) {
-      const diffMs = new Date(todayKST + 'T00:00:00+09:00').getTime() - new Date(dbStreakDate + 'T00:00:00+09:00').getTime();
-      const diffDays = Math.floor(diffMs / 86400000);
-      const missed = diffDays - 1;
-
-      if (missed > 0 && freezeCount >= missed) {
-        const gapScanObj = new Date(dbStreakDate + 'T12:00:00Z');
-        for (let i = 0; i < missed; i++) {
-          gapScanObj.setUTCDate(gapScanObj.getUTCDate() + 1);
-          protectionSet.add(gapScanObj.toISOString().split('T')[0]);
-        }
-      }
-    }
-
-    return protectionSet;
-  }, [dailyStats, transactions, coreStats.used, userData, todayKST]);
+    return extractDefendedDates(transactions, userData, dailyStats);
+  }, [dailyStats, transactions, userData]);
 
   // 기간 노드 생성 (기록 시작일 ~ 오늘)
   const timelineData = useMemo(() => {

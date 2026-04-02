@@ -15,6 +15,7 @@ import { doc, onSnapshot, collection as fsCollection, query as fsQuery, where as
  */
 export function useLearningHistory(userId, dateStr) {
   const [activities, setActivities] = useState([]);
+  const [groupedActivities, setGroupedActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dailyStats, setDailyStats] = useState({
@@ -408,6 +409,11 @@ export function useLearningHistory(userId, dateStr) {
     aggregated.sort((a, b) => (a.timestamp?.getTime() || 0) - (b.timestamp?.getTime() || 0));
 
     setActivities(aggregated);
+
+    // ── Grouping Pipeline: merge by unitId + activityType ──
+    const grouped = buildGroupedActivities(aggregated);
+    setGroupedActivities(grouped);
+
     setDailyStats(stats);
     
     if (Object.values(rawData.loaded).every(v => v === true)) {
@@ -415,5 +421,172 @@ export function useLearningHistory(userId, dateStr) {
     }
   }, [rawData, startTime, endTime]);
 
-  return { activities, dailyStats, loading, error };
+  return { activities, groupedActivities, dailyStats, loading, error };
+}
+
+// ── Learning-only activity types ──
+const LEARNING_TYPES = new Set([
+  'quiz_pass', 'quiz_in_progress', 'video_complete', 'data_log_read'
+]);
+
+/**
+ * Resolve a human-readable title from activity metadata.
+ * Falls back gracefully: unitTitle > transmissionTitle > cleaned unitId > fallback.
+ */
+function resolveTitle(act) {
+  // 1. Direct title from metadata
+  const meta = act.metadata || {};
+  if (meta.unitTitle && !looksLikeId(meta.unitTitle)) return meta.unitTitle;
+  if (act.metadata?.metadata?.unitTitle && !looksLikeId(act.metadata.metadata.unitTitle)) return act.metadata.metadata.unitTitle;
+  
+  // 2. transmissionTitle for video activities
+  if (meta.transmissionTitle && !looksLikeId(meta.transmissionTitle)) return meta.transmissionTitle;
+  
+  // 3. regionTitle as context  
+  if (meta.regionTitle && !looksLikeId(meta.regionTitle)) return meta.regionTitle;
+  
+  // 4. Extract from the display title (strip emoji prefixes)
+  const cleaned = (act.title || '')
+    .replace(/^[🚀🎬📝⏳💎🛒🧊🎁✅🗣️📌]\s*/g, '')
+    .replace(/^(현장 탐사\(퀴즈\)|영상 보상|영상 학습 완료|영상 학습 진행|영상 열람|데이터 로그 열람)[:\s]*/g, '')
+    .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
+    .trim();
+  if (cleaned && !looksLikeId(cleaned)) return cleaned;
+  
+  // 5. unitId as absolute fallback — but try to humanize it
+  const uid = meta.unitId || '';
+  if (uid) return humanizeId(uid);
+  
+  return '학습 활동';
+}
+
+/** Check if a string looks like a machine-generated ID (contains underscores + numbers pattern) */
+function looksLikeId(str) {
+  if (!str) return true;
+  // Patterns like: unit_gameproj_13, reg_177340..., chap_177383...
+  return /^(unit|reg|chap|prob|cluster)_\d/.test(str) || 
+         /^\w+_\d{10,}/.test(str) ||
+         /^[a-f0-9]{24,}$/.test(str);
+}
+
+/** Convert a raw ID like "unit_gameproj_13" to something slightly more readable */
+function humanizeId(id) {
+  return id
+    .replace(/^(unit|reg|chap|prob|cluster)_/g, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim() || '학습 활동';
+}
+
+/**
+ * Group raw activities into clean, deduplicated learning cards.
+ * Key: unitId + activityType (quiz | video | text)
+ */
+function buildGroupedActivities(rawActivities) {
+  // 1. Filter to learning-only activities
+  const learningOnly = rawActivities.filter(a => LEARNING_TYPES.has(a.type));
+  
+  // 2. Build groups by unitId + normalized type
+  const groupMap = new Map();
+  
+  learningOnly.forEach(act => {
+    const meta = act.metadata || {};
+    const unitId = meta.unitId || meta.metadata?.unitId || extractUnitId(act) || 'unknown';
+    
+    let normalizedType = 'quiz';
+    if (act.type === 'video_complete') normalizedType = 'video';
+    else if (act.type === 'data_log_read') normalizedType = 'text';
+    else if (act.type === 'quiz_in_progress') normalizedType = 'quiz';
+    
+    const groupKey = `${unitId}_${normalizedType}`;
+    
+    if (!groupMap.has(groupKey)) {
+      groupMap.set(groupKey, {
+        id: `group_${groupKey}`,
+        type: normalizedType,
+        unitId: unitId,
+        unitTitle: '', // resolved below
+        regionTitle: meta.regionTitle || '',
+        chapterId: meta.chapterId || '',
+        firstTimestamp: act.timestamp,
+        lastTimestamp: act.timestamp,
+        score: null,
+        initialScore: undefined,
+        attemptCount: undefined,
+        totalVideoSeconds: 0,
+        completed: false,
+        subActivities: []
+      });
+    }
+    
+    const group = groupMap.get(groupKey);
+    group.subActivities.push(act);
+    
+    // Update timestamps
+    if (act.timestamp && (!group.firstTimestamp || act.timestamp < group.firstTimestamp)) {
+      group.firstTimestamp = act.timestamp;
+    }
+    if (act.timestamp && (!group.lastTimestamp || act.timestamp > group.lastTimestamp)) {
+      group.lastTimestamp = act.timestamp;
+    }
+    
+    // Quiz: take best score
+    if (normalizedType === 'quiz' && act.score !== null && act.score !== undefined) {
+      if (group.score === null || act.score > group.score) {
+        group.score = act.score;
+        // Also capture initial score and attempt count from the same entry
+        if (act.metadata?.initialScore !== undefined) group.initialScore = act.metadata.initialScore;
+        if (act.metadata?.attemptCount !== undefined) group.attemptCount = act.metadata.attemptCount;
+      }
+      group.completed = true;
+    }
+    if (act.type === 'quiz_in_progress' && !group.completed) {
+      // Only set in-progress if we haven't already seen a completed quiz
+      group.score = null;
+    }
+    
+    // Video: accumulate max video time
+    const vTime = meta.videoTime || meta.stampedCount || meta.metadata?.videoTime || 0;
+    if (vTime > 0) {
+      group.totalVideoSeconds = Math.max(group.totalVideoSeconds, Math.floor(vTime));
+    }
+    
+    // Completion markers
+    if (act.title?.includes('완료') || act.title?.includes('complete')) {
+      group.completed = true;
+    }
+    
+    // Data log: always counts as completed once seen
+    if (normalizedType === 'text') {
+      group.completed = true;
+    }
+  });
+  
+  // 3. Resolve titles using best available info from sub-activities
+  groupMap.forEach((group) => {
+    // Try each sub-activity for the best title
+    let bestTitle = '';
+    for (const sub of group.subActivities) {
+      const candidate = resolveTitle(sub);
+      if (candidate && !looksLikeId(candidate) && candidate.length > bestTitle.length) {
+        bestTitle = candidate;
+      }
+      // Also capture regionTitle if found
+      const rTitle = sub.metadata?.regionTitle;
+      if (rTitle && !group.regionTitle) group.regionTitle = rTitle;
+    }
+    group.unitTitle = bestTitle || humanizeId(group.unitId);
+  });
+  
+  // 4. Sort by first timestamp
+  const result = Array.from(groupMap.values());
+  result.sort((a, b) => (a.firstTimestamp?.getTime() || 0) - (b.firstTimestamp?.getTime() || 0));
+  
+  return result;
+}
+
+/** Try to extract unitId from various metadata locations */
+function extractUnitId(act) {
+  const meta = act.metadata || {};
+  return meta.unitId || meta.metadata?.unitId || null;
 }
