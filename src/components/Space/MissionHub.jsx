@@ -1264,25 +1264,8 @@ export default function MissionHub({
     return (
     <div className="mission-dashboard fade-in" style={{ width: '100%', height: '100%', overflowY: 'auto', paddingBottom: '3rem' }}>
       <div style={{ maxWidth: '1200px', width: '95%', margin: '0 auto', paddingTop: '1.5rem', position: 'relative' }}>
-        {/* Unified Top-Left Back Link */}
-        <button 
-          className="space-nav-link font-tech"
-          onClick={onBack}
-          style={{ 
-            marginBottom: '1rem',
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            padding: '0.5rem 0',
-            fontSize: '1rem',
-            display: 'block'
-          }}
-          onMouseEnter={(e) => e.target.style.color = 'var(--neon-blue)'}
-          onMouseLeave={(e) => e.target.style.color = 'var(--text-muted)'}
-        >
-          ← RETURN TO MISSION SELECT
-        </button>
+        {/* Redundant back link removed to fix overlap with global back button */}
+
 
         <h2 className="font-title" style={{ 
           textAlign: 'center', 
@@ -2121,7 +2104,7 @@ export default function MissionHub({
 
         <AnimatePresence mode='wait'>
            {currentMode === 'briefing' && (
-              <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px', overflowY: 'auto' }}>
                  {renderDashboard()}
               </motion.div>
            )}
