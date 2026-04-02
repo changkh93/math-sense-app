@@ -282,3 +282,47 @@ exports.syncVideoProgress = functions.https.onRequest((req, res) => {
   });
 });
 
+/**
+ * adminResetUserPassword
+ * 
+ * Callable function to let Admis resetting any user's password securely.
+ */
+exports.adminResetUserPassword = functions.https.onCall(async (data, context) => {
+  // 1. Ensure authenticated
+  if (!context.auth || !context.auth.uid) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "이 작업을 수행하려면 로그인해야 합니다."
+    );
+  }
+
+  // 2. Ensure caller is an admin
+  const adminDoc = await admin.firestore().collection("users").doc(context.auth.uid).get();
+  if (!adminDoc.exists || adminDoc.data().role !== "admin") {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "관리자 권한이 없습니다."
+    );
+  }
+
+  // 3. Validate input
+  const { targetUid, newPassword } = data;
+  if (!targetUid || typeof targetUid !== "string") {
+    throw new functions.https.HttpsError("invalid-argument", "대상의 UID가 올바르지 않습니다.");
+  }
+  if (!newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
+    throw new functions.https.HttpsError("invalid-argument", "비밀번호는 6자 이상이어야 합니다.");
+  }
+
+  // 4. Update the user's password
+  try {
+    await admin.auth().updateUser(targetUid, {
+      password: newPassword,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("adminResetUserPassword error:", error);
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});
+

@@ -17,11 +17,26 @@ export default function ParentLogin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const checkParentStatus = async (user) => {
       if (user) {
-        navigate('/parent/dashboard');
+        try {
+          const { getDoc, doc } = await import('firebase/firestore');
+          const { db } = await import('../../firebase');
+          const snap = await getDoc(doc(db, 'parents', user.uid));
+          
+          if (snap.exists() && !snap.data().isDeleted) {
+            navigate('/parent/dashboard');
+          } else {
+            // 학생 또는 다른 세션이 남아있거나, 비활성화된 학부모라면 강제 로그아웃
+            await auth.signOut();
+          }
+        } catch (e) {
+          console.error('Failed to verify parent status:', e);
+        }
       }
-    });
+    };
+
+    const unsub = onAuthStateChanged(auth, checkParentStatus);
     return () => unsub();
   }, [navigate]);
 
@@ -43,12 +58,23 @@ export default function ParentLogin() {
       const email = phoneToEmail(digits);
       const cred = await signInWithEmailAndPassword(auth, email, password);
       
-      // Additional check: is the document soft-deleted?
-      const { getDoc, doc } = await import('firebase/firestore');
+      const { getDoc, doc, setDoc } = await import('firebase/firestore');
       const { db } = await import('../../firebase');
       const snap = await getDoc(doc(db, 'parents', cred.user.uid));
       
-      if (snap.exists() && snap.data().isDeleted) {
+      if (!snap.exists()) {
+        // Auth에는 있지만 Firestore 문서가 유실된 상태 (수동 삭제 등)
+        // 로그인에 성공했으므로 문서를 즉시 자동 복구합니다 (Self-heal)
+        await setDoc(doc(db, 'parents', cred.user.uid), {
+          phone: digits,
+          email: email,
+          childrenUids: [],
+          role: 'parent',
+          isDeleted: false,
+          createdAt: new Date(),
+          repairedAt: new Date()
+        });
+      } else if (snap.data().isDeleted) {
         await auth.signOut();
         setError('삭제(비활성화)된 계정입니다. 선생님에게 문의해 주세요.');
         setLoading(false);

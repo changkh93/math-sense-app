@@ -58,6 +58,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   
   // Anti-Guessing State
   const [retryCount, setRetryCount] = useState(0)
+  const [everWrongSet, setEverWrongSet] = useState(new Set())
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const isMobile = window.innerWidth <= 768
   const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
@@ -90,6 +91,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           let targetRetryCount = savedRetryCount
           let targetFirstPassScore = null
 
+          let targetEverWrong = []
+
           if (user?.uid && quizData.unitId) {
             const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
             const snap = await getDoc(progressRef)
@@ -104,6 +107,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 targetComboCount = session.comboCount || 0
                 targetShieldsUsed = session.shieldsUsed || 0
                 targetFirstPassScore = session.firstPassScore !== undefined ? session.firstPassScore : null
+                targetEverWrong = session.everWrong || []
                 if (session.retryCount !== undefined) {
                   targetRetryCount = session.retryCount
                 }
@@ -126,6 +130,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           setComboCount(targetComboCount)
           setShieldsUsed(targetShieldsUsed)
           setFirstPassScore(targetFirstPassScore)
+          setEverWrongSet(new Set(targetEverWrong))
           
           initializedRef.current = guardKey;
 
@@ -176,7 +181,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     let newCombo = comboCount || 0
     let newSessionCrystals = sessionCrystals
     let newShieldsUsed = shieldsUsed
-    
+    let newEverWrongSet = everWrongSet
+
     // 부유 효과 트리거 함수
     const addMarker = (text, type, bonusX = 0, bonusY = 0) => {
       const id = Date.now() + Math.random()
@@ -219,6 +225,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         newSessionCrystals -= currentPenalty
         addMarker(`-${currentPenalty}`, 'loss')
       }
+      
+      newEverWrongSet = new Set(everWrongSet)
+      newEverWrongSet.add(currentQuestion.id)
     }
 
     // React 상태 즉시 업데이트
@@ -226,6 +235,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setComboCount(newCombo)
     setSessionCrystals(newSessionCrystals)
     setShieldsUsed(newShieldsUsed)
+    setEverWrongSet(newEverWrongSet)
 
     // 세션 자동 저장 함수 (즉시 호출용)
     const triggerAutoSave = async (willBeResultMode, computedFirstPass) => {
@@ -246,7 +256,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             retryCount: retryCount,
             shieldsUsed: newShieldsUsed,
             originalTotal: originalTotal,
-            firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore
+            firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore,
+            everWrong: Array.from(newEverWrongSet)
           }
           await setDoc(progressRef, {
             quizSession: JSON.parse(JSON.stringify(sessionObj)),
@@ -324,7 +335,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             retryCount: retryCount,
             shieldsUsed: shieldsUsed,
             originalTotal: originalTotal,
-            firstPassScore: firstPassScore !== null ? firstPassScore : null
+            firstPassScore: firstPassScore !== null ? firstPassScore : null,
+            everWrong: Array.from(everWrongSet)
           }
           await setDoc(progressRef, {
             quizSession: JSON.parse(JSON.stringify(sessionObj)),
@@ -450,14 +462,14 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         crystalsEarned,
         isPerfect: canGetPerfectBonus,
         shieldsUsed,
-        wrongQuestions: allSessionQuestions.filter(q => userAnswers[q.id] && userAnswers[q.id].isCorrect === false).map(q => ({
+        wrongQuestions: allSessionQuestions.filter(q => everWrongSet.has(q.id) || (userAnswers[q.id] && userAnswers[q.id].isCorrect === false)).map(q => ({
           ...q,
           unitId: q.unitId || quizData?.unitId || "",
           unitTitle: q.unitTitle || quizData?.title || "",
           chapterId: q.chapterId || quizData?.chapterId || "",
           regionId: q.regionId || region?.id || ""
         })),
-        correctQuestions: allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).map(q => ({
+        correctQuestions: allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect && !everWrongSet.has(q.id)).map(q => ({
           id: q.id,
           unitId: q.unitId || quizData?.unitId || "",
           unitTitle: q.unitTitle || quizData?.title || ""

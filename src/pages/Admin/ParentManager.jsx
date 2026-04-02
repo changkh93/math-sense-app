@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, doc, setDoc, deleteDoc, where, onSnapshot, limit } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
 import { db } from '../../firebase';
-import { Phone, UserPlus, Search, Trash2, Link2, Users, Eye, EyeOff } from 'lucide-react';
+import { Phone, UserPlus, Search, Trash2, Link2, Users, Eye, EyeOff, Key } from 'lucide-react';
 import './Admin.css';
 
 // Secondary Firebase app for creating parent accounts without logging out the admin
@@ -248,6 +249,27 @@ export default function ParentManager() {
     }
   };
 
+  // Reset parent password
+  const handleResetPassword = async (parentId, phone) => {
+    const formattedPhone = phone?.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') || phone;
+    const newPassword = prompt(`[${formattedPhone}] 학부모님의 새 비밀번호를 설정하세요 (6자 이상):`);
+    
+    if (!newPassword) return;
+    if (newPassword.length < 6) return alert('비밀번호는 6자 이상이어야 합니다.');
+    
+    if (!confirm(`정말로 해당 계정의 비밀번호를 '${newPassword}'(으)로 변경하시겠습니까?`)) return;
+
+    try {
+      const functions = getFunctions();
+      const resetFn = httpsCallable(functions, 'adminResetUserPassword');
+      await resetFn({ targetUid: parentId, newPassword });
+      alert('비밀번호가 성공적으로 변경되었습니다! ✅');
+    } catch (err) {
+      console.error(err);
+      alert('비밀번호 변경 실패: 관리자 권한을 확인해주세요. ' + err.message);
+    }
+  };
+
   // Delete parent account (Soft Delete: keeps Auth account intact)
   const handleDeleteParent = async (parentId) => {
     if (!confirm('이 학부모 계정을 삭제하시겠습니까? (삭제 후 동일 번호로 가입 시 정보가 복구됩니다)')) return;
@@ -364,9 +386,14 @@ export default function ParentManager() {
                         </div>
                       </div>
                     </div>
-                    <button onClick={() => handleDeleteParent(parent.id)} style={{ background: 'rgba(255,50,50,0.1)', border: '1px solid rgba(255,50,50,0.3)', borderRadius: '8px', padding: '8px', cursor: 'pointer', color: '#ff6060' }}>
-                      <Trash2 size={16} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleResetPassword(parent.id, parent.phone)} style={{ background: 'rgba(69, 170, 242, 0.1)', border: '1px solid rgba(69, 170, 242, 0.3)', borderRadius: '8px', padding: '8px', cursor: 'pointer', color: '#45aaf2' }} title="비밀번호 재설정">
+                        <Key size={16} />
+                      </button>
+                      <button onClick={() => handleDeleteParent(parent.id)} style={{ background: 'rgba(255,50,50,0.1)', border: '1px solid rgba(255,50,50,0.3)', borderRadius: '8px', padding: '8px', cursor: 'pointer', color: '#ff6060' }} title="계정 삭제">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Connected Children */}

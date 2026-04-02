@@ -360,10 +360,29 @@ export function useLearningHistory(userId, dateStr) {
             }
           }
           if (data.logReadAt) {
-             const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || unitId}`;
-             if (!trackedDataLogs.has(cleanTitle)) {
-                stats.logCount++;
-                trackedDataLogs.add(cleanTitle);
+             const logReadTime = data.logReadAt.toDate ? data.logReadAt.toDate() : new Date(data.logReadAt);
+             const isReadToday = logReadTime >= dayStart && logReadTime <= dayEnd;
+
+             if (isReadToday) {
+                const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || unitId}`;
+                if (!trackedDataLogs.has(cleanTitle)) {
+                   stats.logCount++;
+                   trackedDataLogs.add(cleanTitle);
+                   
+                   // Ensure it's in the activity feed as well
+                   const isAlreadyInFeed = aggregated.some(a => a.type === 'data_log_read' && a.title === cleanTitle);
+                   if (!isAlreadyInFeed) {
+                      aggregated.push({
+                         id: `lp_log_${unitId}`,
+                         timestamp: logReadTime,
+                         type: 'data_log_read',
+                         title: cleanTitle,
+                         score: null,
+                         crystalsEarned: 0,
+                         metadata: data
+                      });
+                   }
+                }
              }
           }
         }
