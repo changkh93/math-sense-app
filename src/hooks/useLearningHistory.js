@@ -421,8 +421,99 @@ export function useLearningHistory(userId, dateStr) {
     }
   }, [rawData, startTime, endTime]);
 
+  // ── Missing Title Resolution Effect ──
+  useEffect(() => {
+    if (!groupedActivities.length) return;
+
+    let mounted = true;
+    const missingIds = new Set();
+    groupedActivities.forEach(group => {
+      let title = group.unitTitle;
+      
+      // Cleanup garbage prefix like "🎬 영상 열람:" if it somehow survived
+      if (title.includes(':')) {
+        title = title.substring(title.indexOf(':') + 1).trim();
+      }
+      
+      if (!unitTitleCache.has(group.unitId)) {
+        const isUgly = !title || looksLikeId(title) || title.includes('unit_') || title.includes('영상 열람');
+        const isHumanized = /^(Py Math|Chap|Reg|Cluster)\b/i.test(title);
+        if (isUgly || isHumanized) {
+          missingIds.add(group.unitId);
+        }
+      }
+    });
+
+    if (missingIds.size > 0 && mounted) {
+      const fetchMissingTitles = async () => {
+        try {
+          const { getDoc, doc } = await import('firebase/firestore');
+          const promises = Array.from(missingIds).map(async id => {
+            if (unitTitleCache.has(id)) return;
+            const snap = await getDoc(doc(db, 'units', id));
+            if (snap.exists()) {
+              const data = snap.data();
+              if (data.title || data.name) {
+                unitTitleCache.set(id, data.title || data.name);
+              } else {
+                 unitTitleCache.set(id, null); // mark as not found
+              }
+            } else {
+              unitTitleCache.set(id, null); // missing document
+            }
+          });
+          
+          await Promise.all(promises);
+
+          if (mounted) {
+            setGroupedActivities(prev => prev.map(group => {
+              let title = group.unitTitle;
+              if (title.includes(':')) title = title.substring(title.indexOf(':') + 1).trim();
+
+              const cached = unitTitleCache.get(group.unitId);
+              if (cached) {
+                return { ...group, unitTitle: cached };
+              }
+              
+              if (looksLikeId(title) || title.includes('unit_')) title = humanizeId(group.unitId);
+              return { ...group, unitTitle: title };
+            }));
+          }
+        } catch (err) {
+          console.warn('Failed to fetch missing unit titles:', err);
+        }
+      };
+      fetchMissingTitles();
+    } else {
+      // If we don't need to fetch, we should still ensure any prefixed garbage is stripped from state
+      let updated = false;
+      const newGroups = groupedActivities.map(group => {
+         let title = group.unitTitle;
+         const cached = unitTitleCache.get(group.unitId);
+         if (cached && title !== cached) {
+           updated = true;
+           return { ...group, unitTitle: cached };
+         }
+         if (title.includes(':')) {
+           title = title.substring(title.indexOf(':') + 1).trim();
+           if (looksLikeId(title) || title.includes('unit_')) title = humanizeId(group.unitId);
+           updated = true;
+           return { ...group, unitTitle: title };
+         }
+         return group;
+      });
+      if (updated && mounted) {
+         setGroupedActivities(newGroups);
+      }
+    }
+
+    return () => { mounted = false; };
+  }, [groupedActivities, rawData]);
+
   return { activities, groupedActivities, dailyStats, loading, error };
 }
+
+const unitTitleCache = new Map();
 
 // ── Learning-only activity types ──
 const LEARNING_TYPES = new Set([
