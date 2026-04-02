@@ -427,6 +427,31 @@ export default function ParentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // 다중 자녀 탭 관리
+  const [selectedChildUid, setSelectedChildUid] = useState(null);
+  const [childrenProfiles, setChildrenProfiles] = useState({});
+
+  useEffect(() => {
+    if (parentData?.childrenUids?.length > 0) {
+      if (!selectedChildUid || !parentData.childrenUids.includes(selectedChildUid)) {
+        setSelectedChildUid(parentData.childrenUids[0]);
+      }
+    }
+  }, [parentData?.childrenUids, selectedChildUid]);
+
+  useEffect(() => {
+    if (parentData?.childrenUids?.length > 0) {
+      const unsubs = parentData.childrenUids.map(uid => 
+        onSnapshot(doc(db, 'users', uid), snap => {
+          if(snap.exists()) {
+            setChildrenProfiles(prev => ({ ...prev, [uid]: { uid: snap.id, ...snap.data()} }));
+          }
+        })
+      );
+      return () => unsubs.forEach(u => u());
+    }
+  }, [parentData?.childrenUids]);
+
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -549,11 +574,70 @@ export default function ParentDashboard() {
                 선생님에게 자녀 연결을 요청해 주세요.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {parentData.childrenUids.map(uid => (
-                  <ChildCard key={uid} childUid={uid} />
-                ))}
-              </div>
+              <>
+                {/* 다중 자녀 탭 (자녀가 2명 이상일 때만 노출) */}
+                {parentData.childrenUids.length > 1 && (
+                  <div style={{ 
+                    display: 'flex', gap: '10px', marginBottom: '20px', 
+                    overflowX: 'auto', paddingBottom: '10px',
+                    scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch'
+                  }}>
+                    {parentData.childrenUids.map(uid => {
+                      const profile = childrenProfiles[uid] || {};
+                      const name = profile.name || '불러오는 중...';
+                      const isActive = selectedChildUid === uid;
+                      
+                      return (
+                        <button 
+                          key={`tab-${uid}`}
+                          onClick={() => setSelectedChildUid(uid)}
+                          style={{
+                            flex: '0 0 auto',
+                            padding: '10px 18px 10px 12px',
+                            borderRadius: '16px',
+                            background: isActive ? 'rgba(165, 94, 234, 0.2)' : 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${isActive ? '#a55eea' : 'rgba(255,255,255,0.08)'}`,
+                            color: isActive ? 'white' : 'rgba(255,255,255,0.5)',
+                            fontWeight: isActive ? 'bold' : 'normal',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            whiteSpace: 'nowrap',
+                            boxShadow: isActive ? '0 4px 12px rgba(165, 94, 234, 0.15)' : 'none'
+                          }}
+                        >
+                          <div style={{ 
+                            width: 26, height: 26, borderRadius: '50%', 
+                            background: isActive ? '#a55eea' : 'rgba(255,255,255,0.1)', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.85rem', color: isActive ? 'white' : 'rgba(255,255,255,0.4)',
+                            fontWeight: 700
+                          }}>
+                            {name === '불러오는 중...' ? '?' : name[0]}
+                          </div>
+                          {name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div style={{ position: 'relative' }}>
+                  {parentData.childrenUids.map(uid => (
+                    <div 
+                      key={`card-${uid}`}
+                      style={{ 
+                        // 컴포넌트를 언마운트하지 않고 화면에서만 숨겨서 백그라운드 데이터 동기화를 유지합니다.
+                        display: (parentData.childrenUids.length === 1 || selectedChildUid === uid) ? 'block' : 'none' 
+                      }}
+                    >
+                      <ChildCard childUid={uid} />
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </>
         )}
