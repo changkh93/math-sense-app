@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
@@ -12,36 +12,37 @@ import { db } from '../firebase';
 export function usePresence(userId, clusterId, currentLocation, unitId) {
   const lastLocationRef = useRef(null);
   const lastUnitIdRef = useRef(null);
+  const lastPresenceTimeRef = useRef(0);
 
   useEffect(() => {
     if (!userId) return;
 
     let timeoutId;
+    let heartbeatId;
 
     const updatePresence = async (state, isNewLocation = false) => {
       try {
         const userRef = doc(db, 'users', userId);
         
         // We use dot notation for merging to strictly update liveStatus without affecting other fields
-        // However, if the user doesn't exist, we fallback to setDoc.
-        // Doing setDoc with merge: true deeply merges nested objects.
-        const mergeData = {
-          liveStatus: {
-            state: state,
-            lastUpdatedAt: serverTimestamp(),
-            currentLocation: currentLocation || '메인 화면',
-            clusterId: clusterId || 'cluster_elementary',
-            unitId: unitId || null
-          }
+        // This is more efficient and avoids potentially overwriting subfields in some conditions.
+        const updateData = {
+          'liveStatus.state': state,
+          'liveStatus.lastUpdatedAt': serverTimestamp(),
+          'liveStatus.currentLocation': currentLocation || '메인 화면',
+          'liveStatus.clusterId': clusterId || 'cluster_elementary',
+          'liveStatus.unitId': unitId || null
         };
 
         if (isNewLocation) {
-          mergeData.liveStatus.enteredAt = serverTimestamp();
+          updateData['liveStatus.enteredAt'] = serverTimestamp();
         }
 
-        await setDoc(userRef, mergeData, { merge: true });
+        await updateDoc(userRef, updateData);
+        lastPresenceTimeRef.current = Date.now();
         
       } catch (err) {
+        // If updateDoc fails (e.g. document missing), we could fallback to setDoc, but for presence it's usually fine
         console.error("Presence update failed:", err);
       }
     };
@@ -69,15 +70,25 @@ export function usePresence(userId, clusterId, currentLocation, unitId) {
     if (isNewLocation) {
       lastLocationRef.current = currentLocation;
       lastUnitIdRef.current = unitId;
-      // Force update immediately, sometimes document.hidden is true incorrectly during rapid react mounts in some webviews
+      
+      // Force update immediately on change/mount
       timeoutId = setTimeout(() => {
         updatePresence(document.hidden ? 'away' : 'online', true);
       }, 500);
     }
 
+    // --- HEARTBEAT ---
+    // Update every 60 seconds if tab is active to keep "online" status fresh in admin dash
+    heartbeatId = setInterval(() => {
+      if (!document.hidden) {
+         updatePresence('online', false);
+      }
+    }, 60000); 
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearTimeout(timeoutId);
+      clearInterval(heartbeatId);
     };
   }, [userId, clusterId, currentLocation, unitId]); 
 }
