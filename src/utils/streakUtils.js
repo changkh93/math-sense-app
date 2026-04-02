@@ -247,18 +247,65 @@ export function calculateStreakUpdate(userData, todayOverride) {
     }
   }
 }
+
+/**
+ * 이력(History) 및 방어(Freeze) 기록으로부터 연속 학습 일수를 결정론적으로 계산
+ * 
+ * @param {Set<string>|string[]} activeDates - 학습 활동이 있었던 날짜들의 집합 (YYYY-MM-DD)
+ * @param {Set<string>|string[]} defendedDates - 크라이오 코어로 방어된 날짜들의 집합 (YYYY-MM-DD)
+ * @param {string} [todayKST] - 기준 날짜 (기본값: 오늘)
+ * @returns {number} 계산된 연속 학습 일수
+ */
+export function calculateStreakFromHistory(activeDates, defendedDates, todayKST = getTodayKST()) {
+  const activeSet = activeDates instanceof Set ? activeDates : new Set(activeDates);
+  const defendedSet = defendedDates instanceof Set ? defendedDates : new Set(defendedDates);
+  
+  // 오늘 또는 어제 마지막 활동이 있어야 스트릭이 유지됨
+  const yesterdayKST = getTodayKST(new Date(new Date(todayKST + 'T12:00:00Z').getTime() - 86400000));
+  
+  let startTrackingDate = null;
+  if (activeSet.has(todayKST) || defendedSet.has(todayKST)) {
+    startTrackingDate = todayKST;
+  } else if (activeSet.has(yesterdayKST) || defendedSet.has(yesterdayKST)) {
+    startTrackingDate = yesterdayKST;
+  } else {
+    // 오늘/어제 둘 다 기록 없으면 스트릭 종료
+    return 0;
+  }
+
+  let streak = 0;
+  let checkDate = new Date(startTrackingDate + 'T12:00:00Z');
+  
+  while (true) {
+    const dateStr = getTodayKST(checkDate);
+    if (activeSet.has(dateStr) || defendedSet.has(dateStr)) {
+      streak++;
+      checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
 /**
  * 현재 시점에서 유효한(표시될) 연속 학습 일수 반환
  * 
- * DB 확정값만 기반으로 판단합니다 (예측/희망 고문 제거):
- * - 오늘 이미 학습 완료 → currentStreak 표시
- * - 어제 학습 완료 → currentStreak 표시 (오늘 할 기회가 아직 있으므로)
- * - 그 외 → 0 (코어 보유량에 관계없이; 코어 처리는 학습 완료 시에만)
- *
  * @param {Object} userData - 사용자 데이터
+ * @param {Object} [historyData] - { activeDates: Set, defendedDates: Set } (제공 시 이력 기반 계산 수행)
  * @returns {number}
  */
-export function getEffectiveStreak(userData) {
+export function getEffectiveStreak(userData, historyData = null) {
+  // historyData가 제공되면 이력 기반으로 계산 (가장 정확)
+  if (historyData && historyData.activeDates) {
+    return calculateStreakFromHistory(
+      historyData.activeDates, 
+      historyData.defendedDates || new Set(),
+      getTodayKST()
+    );
+  }
+
   if (!userData?.lastStreakDate || !userData?.currentStreak) return 0
   
   const todayKST = getTodayKST()

@@ -1136,13 +1136,20 @@ function SpaceHome() {
 
         // --- Atomic Logging: History ---
         const isCompletionActivity = activityType.includes('완료') || isLogActivity
-        const shouldLogHistory = isCompletionActivity
+        const streakDateUpdated = !!streakResult.streakUpdate?.lastStreakDate
+        const shouldLogHistory = isCompletionActivity || streakDateUpdated || actualReward > 0
 
         if (shouldLogHistory) {
-          // Use stable ID for completion records to prevent duplication in timeline
-          const stableHistoryId = isLogActivity 
+          // Use stable ID to prevent duplicates. For non-completion intervals, include the time marker.
+          let stableHistoryId = isLogActivity 
             ? `log_completion_${currentUnitId}`
             : `video_completion_${currentUnitId}_${transmissionId || 'default'}`;
+          
+          if (!isCompletionActivity && isVideoActivity) {
+            const minMatch = activityType.match(/\((\d+)분/);
+            const minutes = minMatch ? minMatch[1] : 'int';
+            stableHistoryId = `video_interval_${currentUnitId}_${transmissionId || 'default'}_${minutes}min`;
+          }
           
           const historyRef = doc(db, 'users', user.uid, 'history', stableHistoryId)
           transaction.set(historyRef, {

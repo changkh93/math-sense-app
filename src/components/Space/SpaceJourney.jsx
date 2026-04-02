@@ -73,18 +73,31 @@ export default function SpaceJourney({ userData }) {
       map.set(dateStr, existing);
     });
 
-    // Mark protected days from transactions
+    // Mark protected days and fallback activities from transactions
     transactions.forEach(t => {
-      if (t.type === 'streak_freeze' && t.timestamp) {
-        const d = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp);
-        const dateStr = getTodayKST(d);
-        
-        const existing = map.get(dateStr) || { 
-          quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0, isProtected: true
-        };
+      if (!t.timestamp) return;
+      const d = t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp);
+      const dateStr = getTodayKST(d);
+      
+      const existing = map.get(dateStr) || { 
+        quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0,
+        videos: 0, texts: 0, workbooks: 0, isProtected: false
+      };
+
+      if (t.type === 'streak_freeze') {
         existing.isProtected = true;
-        map.set(dateStr, existing);
+      } else if (t.type === 'transmission_reward' || t.type === 'data_log_reward') {
+        // Fallback for missing history logs
+        // Note: We use a simple count if history didn't record it
+        const historyOnDate = history.some(h => getTodayKST(h.timestamp?.toDate?.() || h.timestamp) === dateStr);
+        if (!historyOnDate) {
+          if (t.type === 'transmission_reward') existing.videos += 1;
+          if (t.type === 'data_log_reward') existing.texts += 1;
+          existing.crystals += (t.amount || 0);
+        }
       }
+      
+      map.set(dateStr, existing);
     });
 
     return map;
@@ -273,8 +286,12 @@ export default function SpaceJourney({ userData }) {
 
   // 스트릭 소스 (헤더와 동일한 로직 사용으로 완벽한 일치 보장)
   const streak = useMemo(() => {
-    return getEffectiveStreak(userData);
-  }, [userData]);
+    const historyData = {
+      activeDates: new Set(Array.from(dailyStats.keys())),
+      defendedDates: nodesWithProtection
+    };
+    return getEffectiveStreak(userData, historyData);
+  }, [userData, dailyStats, nodesWithProtection]);
 
   const tier = getCometTier(streak);
   const activeColor = streak > 0 ? tier.color : '#FF9F43';
