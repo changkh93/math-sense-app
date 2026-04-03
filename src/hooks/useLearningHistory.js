@@ -365,7 +365,7 @@ export function useLearningHistory(userId, dateStr) {
                 id: `lp_q_${unitId}`,
                 timestamp: updatedAt || new Date(),
                 type: 'quiz_in_progress',
-                title: `🚀 퀴즈: ${answeredCount}/${session.originalTotal || '?'}문항`,
+                title: `🚀 퀴즈: ${data.unitTitle || "탐사 퀴즈"}`,
                 score: null,
                 metadata: { unitId, ...session }
               });
@@ -436,7 +436,7 @@ export function useLearningHistory(userId, dateStr) {
       }
       
       if (!unitTitleCache.has(group.unitId)) {
-        const isUgly = !title || looksLikeId(title) || title.includes('unit_') || title.includes('영상 열람');
+        const isUgly = !title || looksLikeId(title) || title.includes('unit_') || title.includes('영상 열람') || title === '탐사 퀴즈' || /^\d+\/\d+문항$/.test(title);
         const isHumanized = /^(Py Math|Chap|Reg|Cluster)\b/i.test(title);
         if (isUgly || isHumanized) {
           missingIds.add(group.unitId);
@@ -539,7 +539,7 @@ function resolveTitle(act) {
   // 4. Extract from the display title (strip emoji prefixes)
   const cleaned = (act.title || '')
     .replace(/^[🚀🎬📝⏳💎🛒🧊🎁✅🗣️📌]\s*/g, '')
-    .replace(/^(현장 탐사\(퀴즈\)|영상 보상|영상 학습 완료|영상 학습 진행|영상 열람|데이터 로그 열람)[:\s]*/g, '')
+    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 열람|데이터 로그 열람)[:\s]*/g, '')
     .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
     .trim();
   if (cleaned && !looksLikeId(cleaned)) return cleaned;
