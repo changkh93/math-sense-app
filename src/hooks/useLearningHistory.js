@@ -447,19 +447,32 @@ export function useLearningHistory(userId, dateStr) {
     if (missingIds.size > 0 && mounted) {
       const fetchMissingTitles = async () => {
         try {
-          const { getDoc, doc } = await import('firebase/firestore');
+          const { getDoc, doc, query: fsQuery, collection: fsCollection, where: fsWhere, limit: fsLimit, getDocs } = await import('firebase/firestore');
           const promises = Array.from(missingIds).map(async id => {
             if (unitTitleCache.has(id)) return;
-            const snap = await getDoc(doc(db, 'units', id));
+            let snap = await getDoc(doc(db, 'units', id));
+            let resolvedTitle = '';
+            
             if (snap.exists()) {
-              const data = snap.data();
-              if (data.title || data.name) {
-                unitTitleCache.set(id, data.title || data.name);
-              } else {
-                 unitTitleCache.set(id, null); // mark as not found
-              }
+              resolvedTitle = snap.data().title || snap.data().name || '';
             } else {
-              unitTitleCache.set(id, null); // missing document
+              // Fallback: Check 'assignments' collection for this unitId to find teacher-defined title
+              const assignQuery = fsQuery(
+                fsCollection(db, 'assignments'),
+                fsWhere('unitId', '==', id),
+                fsLimit(1)
+              );
+              const assignSnap = await getDocs(assignQuery);
+              if (!assignSnap.empty) {
+                const aData = assignSnap.docs[0].data();
+                resolvedTitle = aData.unitTitle || aData.title || '';
+              }
+            }
+            
+            if (resolvedTitle) {
+              unitTitleCache.set(id, resolvedTitle);
+            } else {
+              unitTitleCache.set(id, null); // mark as not found
             }
           });
           
