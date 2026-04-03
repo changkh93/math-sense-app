@@ -1533,7 +1533,7 @@ export default function MissionHub({
           margin: '4rem auto 0'
         }}
       >
-        ← RETURN TO ORBIT
+        ← RETURN TO MISSION SELECT
       </button>
       </div>
     </div>
@@ -2189,7 +2189,7 @@ export default function MissionHub({
             gap: '0.5rem'
           }}
         >
-          ← RETURN TO SECTOR
+          ← RETURN TO MISSION SELECT
         </button>
 
         <AnimatePresence mode='wait'>

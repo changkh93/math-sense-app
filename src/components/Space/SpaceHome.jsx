@@ -102,8 +102,9 @@ function SpaceHome() {
     setQuickQuizUnitId(null);
     setQuickQuizMode(null);
     
-    // Deterministic hierarchy: If we were deep-linked, ensure we show the Chapter view
-    // SpaceHome rendering logic handles the rest based on selectedChapterDocId
+    // Ensure we transition into the hierarchy view (Planet view)
+    // regardless of where we came from (e.g. assignment hub)
+    setCurrentView('planet');
   }, []);
   // Region Access State
   const [pendingRegion, setPendingRegion] = useState(null)
