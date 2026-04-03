@@ -309,16 +309,43 @@ function GroupedCard({ item, index, onClick }) {
         )}
 
         {/* Quiz score */}
-        {item.type === 'quiz' && item.score !== null && item.score !== undefined && (
-          <span className="font-tech" style={{ 
-            color: item.score === 100 ? 'var(--star-gold)' : item.score >= 80 ? config.color : '#ef4444',
-            fontWeight: 'bold',
-            background: 'rgba(0,0,0,0.3)',
-            padding: '0.15rem 0.5rem',
-            borderRadius: '4px'
-          }}>
-            점수 {item.score}점
-          </span>
+        {/* Quiz score / Progress */}
+        {item.type === 'quiz' && (
+          <>
+            {item.score !== null && item.score !== undefined ? (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <span className="font-tech" style={{ 
+                  color: item.score === 100 ? 'var(--star-gold)' : item.score >= 80 ? config.color : '#ef4444',
+                  fontWeight: 'bold',
+                  background: 'rgba(0,0,0,0.3)',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '4px'
+                }}>
+                  점수 {item.score}점
+                </span>
+                {item.totalCount > 0 && (
+                  <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    ({item.totalCount}문항 완료)
+                  </span>
+                )}
+              </div>
+            ) : item.totalCount > 0 ? (
+              <span className="font-tech" style={{ 
+                color: 'var(--text-muted)',
+                fontWeight: 'bold',
+                background: 'rgba(255, 165, 0, 0.1)',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid rgba(255, 165, 0, 0.2)'
+              }}>
+                🔭 진행 중 {item.answeredCount}/{item.totalCount}문항
+              </span>
+            ) : (
+                <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                  탐사 준비 중
+                </span>
+            )}
+          </>
         )}
 
         {/* Video time */}

@@ -604,6 +604,8 @@ function buildGroupedActivities(rawActivities) {
         score: null,
         initialScore: undefined,
         attemptCount: undefined,
+        answeredCount: 0,
+        totalCount: 0,
         totalVideoSeconds: 0,
         completed: false,
         subActivities: []
@@ -634,6 +636,20 @@ function buildGroupedActivities(rawActivities) {
     if (act.type === 'quiz_in_progress' && !group.completed) {
       // Only set in-progress if we haven't already seen a completed quiz
       group.score = null;
+      // Capture progress counts from quizSession metadata
+      const answered = Object.keys(meta.userAnswers || {}).length;
+      const total = meta.originalTotal || 0;
+      if (answered > group.answeredCount) {
+        group.answeredCount = answered;
+        group.totalCount = total;
+      }
+    }
+    
+    // Also capture counts from completed quizzes if available
+    if (normalizedType === 'quiz' && act.metadata?.correctCount !== undefined) {
+      // For completed, "answered" is essentially "total" (all are answered)
+      // But we can use totalCount specifically
+      if (act.metadata.totalCount) group.totalCount = act.metadata.totalCount;
     }
     
     // Video: accumulate max video time

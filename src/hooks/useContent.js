@@ -29,6 +29,21 @@ export function useClusters() {
 }
 
 // --- Regions ---
+export function useRegion(regionId) {
+  return useQuery({
+    queryKey: ['region', regionId],
+    queryFn: async () => {
+      if (!regionId) return null;
+      const docRef = doc(db, 'regions', regionId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) return { ...snap.data(), id: snap.id, docId: snap.id };
+      return null;
+    },
+    enabled: !!regionId,
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
 export function useRegions(clusterId = 'cluster_elementary') {
   const cid = clusterId || 'cluster_elementary';
   return useQuery({
@@ -64,6 +79,21 @@ export function useRegions(clusterId = 'cluster_elementary') {
 }
 
 // --- Chapters ---
+export function useChapter(chapterId) {
+  return useQuery({
+    queryKey: ['chapter', chapterId],
+    queryFn: async () => {
+      if (!chapterId) return null;
+      const docRef = doc(db, 'chapters', chapterId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) return { ...snap.data(), docId: snap.id };
+      return null;
+    },
+    enabled: !!chapterId,
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
 export function useChapters(regionId) {
   return useQuery({
     queryKey: ['chapters', regionId],

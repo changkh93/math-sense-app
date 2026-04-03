@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit, runTransaction, Timestamp, documentId } from 'firebase/firestore'
-import { useClusters, useRegions, useChapters, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
+import { useClusters, useRegions, useRegion, useChapters, useChapter, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { usePresence } from '../../hooks/usePresence'
 // import { regions as localRegions } from '../../data/regions'
@@ -96,27 +96,6 @@ function SpaceHome() {
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
   const [quickQuizMode, setQuickQuizMode] = useState(null) // New: Mode for quick quiz
 
-  const handleBackFromMission = useCallback(() => {
-    // Logic: Mission Control -> Chapter Selection (Units List -> Chapters List)
-    
-    // Explicitly preserve hierarchy before clearing unit for deep-linked scenarios
-    if (activeUnit?.chapterId) {
-       updateSelectedChapterDocId(activeUnit.chapterId);
-    }
-    if (activeChapter?.regionId) {
-       updateSelectedRegionId(activeChapter.regionId);
-    } else if (activeUnit?.regionId) {
-       updateSelectedRegionId(activeUnit.regionId);
-    }
-
-    updateSelectedUnitDocId(null);
-    setQuickQuizUnitId(null);
-    setQuickQuizMode(null);
-    
-    // Ensure we transition into the hierarchy view (Planet view)
-    // regardless of where we came from (e.g. assignment hub)
-    setCurrentView('planet');
-  }, [activeUnit, activeChapter]);
   // Region Access State
   const [pendingRegion, setPendingRegion] = useState(null)
   const [accessError, setAccessError] = useState(null)
@@ -191,7 +170,12 @@ function SpaceHome() {
   const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions(selectedClusterId)
   const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
   const { data: units, isLoading: loadingUnits } = useUnits(selectedChapterDocId)
+  
+  // Singular hooks to resolve hierarchy for deep links
   const { data: singleUnit } = useUnit(selectedUnitDocId || quickQuizUnitId)
+  const { data: singleChapter } = useChapter(selectedChapterDocId || singleUnit?.chapterId)
+  const { data: singleRegion } = useRegion(selectedRegionId || singleChapter?.regionId)
+
   const { 
     data: unitQuizzes, 
     isLoading: loadingQuizzes, 
@@ -218,8 +202,29 @@ function SpaceHome() {
 
   // Active selections
   const activeRegion = regions?.find(r => r.id === selectedRegionId)
-  const activeChapter = chapters?.find(c => c.docId === selectedChapterDocId)
+  const activeChapter = chapters?.find(c => c.docId === selectedChapterDocId) || singleChapter
   const activeUnit = units?.find(u => u.docId === (selectedUnitDocId || quickQuizUnitId)) || singleUnit
+
+  const handleBackFromMission = useCallback(() => {
+    // Logic: Mission Control -> Chapter Selection (Units List -> Chapters List)
+    
+    // Explicitly preserve hierarchy before clearing unit for deep-linked scenarios
+    const cid = activeUnit?.chapterId || selectedChapterDocId;
+    const rid = activeChapter?.regionId || singleChapter?.regionId || selectedRegionId;
+    const clid = singleRegion?.clusterId || activeRegion?.clusterId || selectedClusterId;
+
+    if (cid) updateSelectedChapterDocId(cid);
+    if (rid) updateSelectedRegionId(rid);
+    if (clid) updateSelectedClusterId(clid);
+
+    updateSelectedUnitDocId(null);
+    setQuickQuizUnitId(null);
+    setQuickQuizMode(null);
+    
+    // Ensure we transition into the hierarchy view (Planet view)
+    // regardless of where we came from (e.g. assignment hub)
+    setCurrentView('planet');
+  }, [activeUnit, activeChapter, singleChapter, singleRegion, activeRegion, selectedChapterDocId, selectedRegionId, selectedClusterId]);
 
   // Track Presence Activity
   const currentLocationString = useMemo(() => {
@@ -247,11 +252,16 @@ function SpaceHome() {
        updateSelectedRegionId(activeChapter.regionId);
     }
 
-    // 3. Auto-skip single chapter (if we just opened a region)
+    // 3. Resolve Cluster from singleRegion if it's missing (for direct link jumps)
+    if (singleRegion?.clusterId && !selectedClusterId) {
+       updateSelectedClusterId(singleRegion.clusterId);
+    }
+
+    // 4. Auto-skip single chapter (if we just opened a region)
     if (chapters && chapters.length === 1 && !selectedChapterDocId) {
       updateSelectedChapterDocId(chapters[0].docId)
     }
-  }, [chapters, activeUnit, activeChapter, selectedChapterDocId, selectedRegionId])
+  }, [chapters, activeUnit, activeChapter, singleRegion, selectedChapterDocId, selectedRegionId, selectedClusterId])
 
   const fetchDarkMatterQuestions = async () => {
     if (!user) return []
@@ -865,6 +875,8 @@ function SpaceHome() {
           score: score,
           initialScore: result.initialRawScore ?? score, // 해당 세션만의 순수 최초 점수를 기록 (useLeaderboard가 과거 영수증을 역산하는데 사용됨)
           attemptCount: sessionAttemptCount, // 해당 세션에서 발생한 시도 횟수만 기록 (useLeaderboard가 합산하는데 사용됨)
+          totalCount: result.totalCount || 0,
+          correctCount: result.correctCount || 0,
           crystalsEarned: atomicCrystalsEarned,
           type: result.type === 'workbook' ? 'workbook' : 'quiz',
           timestamp: serverTimestamp()
