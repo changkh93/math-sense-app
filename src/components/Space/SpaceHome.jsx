@@ -1523,7 +1523,7 @@ function SpaceHome() {
     // We ONLY need flags for hasQuiz, because quizzes are fetched async later.
     const hasQuiz = (unit.contentFlags && unit.contentFlags.hasQuiz !== undefined) 
       ? unit.contentFlags.hasQuiz 
-      : true;
+      : false; // Default to false if unknown to avoid quiz popups
 
     let initialMode = 'briefing' // default: show Mission Control
     
@@ -1539,8 +1539,8 @@ function SpaceHome() {
     } else if (availableContentsCount > 1) {
       initialMode = 'briefing'; // Multiple items, show Mission Control
     } else if (availableContentsCount === 0) {
-      // Empty unit? Fallback to quiz modal safely
-      initialMode = 'quiz-modal';
+      // Empty unit or still loading? Fallback to briefing (Mission Control)
+      initialMode = 'briefing';
     } else if (hasQuiz && !hasTransmission && !hasDataLog && !hasWorkbook) {
       // ONLY Quiz
       initialMode = 'quiz-modal';

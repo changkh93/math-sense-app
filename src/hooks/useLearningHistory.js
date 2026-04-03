@@ -174,8 +174,8 @@ export function useLearningHistory(userId, dateStr) {
 
       if (tType === 'transmission_reward' || tType === 'video_reward') {
         if (data.amount === 20 || desc.includes('완료')) return;
-        displayType = 'video_complete';
-        displayTitle = `🎬 영상 보상: ${desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '보너스')}`;
+        displayType = 'video_reward';
+        displayTitle = `🎬 영상 학습: ${desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '').replace('보너스', '').trim()}`;
         
         const videoMetadata = metadata || {};
         const vTime = videoMetadata.stampedSeconds?.length || videoMetadata.totalTimeSpent || 0;
@@ -224,8 +224,8 @@ export function useLearningHistory(userId, dateStr) {
       let displayTitle = `🚀 현장 탐사(퀴즈): ${data.unitTitle || '이름 없음'}`;
 
       if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
-        displayType = 'video_complete';
-        displayTitle = `🎬 영상 학습 완료: ${data.unitTitle || '이름 없음'}`;
+        displayType = 'video_reward';
+        displayTitle = `🎬 영상 학습: ${data.unitTitle || '이름 없음'}`;
       } else if (hType === 'text' || hType === 'data_log_read') {
         // unitId-based dedup key — consistent with transaction processing
         const dedupeKey = `datalog_${data.unitId || data.unitTitle || '이름 없음'}`;
@@ -238,7 +238,7 @@ export function useLearningHistory(userId, dateStr) {
         stats.quizCount++;
       }
 
-      if ((displayType === 'video_complete' || hType === 'video')) {
+      if ((displayType === 'video_reward' || hType === 'video')) {
         const unitId = data.unitId || 'unknown';
         const txId = data.transmissionId || 'default';
         const vKey = getVideoKey(unitId, txId);
@@ -287,7 +287,7 @@ export function useLearningHistory(userId, dateStr) {
          aggregated.push({
            id: `log_vid_${docSnap.id}`,
            timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
-           type: 'video_complete',
+           type: 'video_view',
            title: `🎬 영상 열람: ${data.unitTitle || data.unitId || '알 수 없는 단원'}`,
            score: null,
            metadata: data
@@ -333,7 +333,7 @@ export function useLearningHistory(userId, dateStr) {
                  stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, stamps);
                  
                  const isAlreadyTracked = aggregated.some(a => 
-                   (a.type === 'video_complete' || a.type === 'video_reward') && 
+                   (a.type === 'video_reward' || a.type === 'video_view') && 
                    (
                       (a.metadata?.transmissionId === txId && a.metadata?.unitId === unitId) ||
                       (a.metadata?.unitId === unitId && !a.metadata?.transmissionId && Object.keys(data.videoProgress).length === 1)
@@ -344,8 +344,8 @@ export function useLearningHistory(userId, dateStr) {
                    aggregated.push({
                      id: `lp_p_${unitId}_${txId}`,
                      timestamp: progUpdatedAt || new Date(),
-                     type: 'video_complete',
-                     title: `🎬 영상 학습 진행: ${prog.transmissionTitle || '영상'}`,
+                     type: 'video_view',
+                     title: `🎬 영상 학습: ${prog.transmissionTitle || '영상'}`,
                      score: null,
                      metadata: { ...prog, unitId, transmissionId: txId, videoTime: stamps }
                    });
@@ -365,7 +365,7 @@ export function useLearningHistory(userId, dateStr) {
                 id: `lp_q_${unitId}`,
                 timestamp: updatedAt || new Date(),
                 type: 'quiz_in_progress',
-                title: `⏳ 퀴즈 진행 중: ${answeredCount}/${session.originalTotal || '?'}문항`,
+                title: `🚀 퀴즈: ${answeredCount}/${session.originalTotal || '?'}문항`,
                 score: null,
                 metadata: { unitId, ...session }
               });
@@ -517,7 +517,7 @@ const unitTitleCache = new Map();
 
 // ── Learning-only activity types ──
 const LEARNING_TYPES = new Set([
-  'quiz_pass', 'quiz_in_progress', 'video_complete', 'data_log_read'
+  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'data_log_read'
 ]);
 
 /**
@@ -585,9 +585,9 @@ function buildGroupedActivities(rawActivities) {
     const unitId = meta.unitId || meta.metadata?.unitId || extractUnitId(act) || 'unknown';
     
     let normalizedType = 'quiz';
-    if (act.type === 'video_complete') normalizedType = 'video';
+    if (act.type === 'video_reward' || act.type === 'video_view') normalizedType = 'video';
     else if (act.type === 'data_log_read') normalizedType = 'text';
-    else if (act.type === 'quiz_in_progress') normalizedType = 'quiz';
+    else if (act.type === 'quiz_in_progress' || act.type === 'quiz_pass') normalizedType = 'quiz';
     
     const groupKey = `${unitId}_${normalizedType}`;
     
@@ -643,7 +643,15 @@ function buildGroupedActivities(rawActivities) {
     }
     
     // Completion markers
-    if (act.title?.includes('완료') || act.title?.includes('complete')) {
+    if (act.completed === true || act.type === 'video_reward') {
+      group.completed = true;
+    }
+    // Fuzzy title match for non-video activities
+    if (normalizedType !== 'video' && act.title?.includes('완료') && !act.title?.includes('진행')) {
+      group.completed = true;
+    }
+    // Only inherit 'complete' word if it's explicitly about finishing
+    if (act.title?.toLowerCase().includes('complete') && !act.title?.includes('video_')) {
       group.completed = true;
     }
     

@@ -166,8 +166,8 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
           <StatChip 
             icon="📁" 
             label="항행 일지" 
-            value={dailyStats?.isAssignmentSubmitted ? '제출 완료' : '미제출'}
-            color={dailyStats?.isAssignmentSubmitted ? 'var(--neon-blue)' : 'rgba(255,255,255,0.3)'}
+            value={dailyStats?.isAssignmentSubmitted ? '제출됨' : '미작성'}
+            color={dailyStats?.isAssignmentSubmitted ? 'var(--text-bright)' : 'rgba(255,255,255,0.3)'}
           />
         </div>
       </div>
@@ -179,6 +179,7 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
             key={item.id} 
             item={item} 
             index={index}
+            onClick={onActivityClick ? () => onActivityClick(item.unitId, item.chapterId) : null}
           />
         ))}
       </div>
@@ -221,8 +222,9 @@ function StatChip({ icon, label, value, subValue, color }) {
 }
 
 // ── Grouped Activity Card ──
-function GroupedCard({ item, index }) {
+function GroupedCard({ item, index, onClick }) {
   const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.quiz;
+  const isClickable = !!onClick;
   
   const timeRange = (() => {
     const start = formatTime(item.firstTimestamp);
@@ -237,14 +239,21 @@ function GroupedCard({ item, index }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04, duration: 0.25 }}
+      onClick={isClickable ? onClick : undefined}
       style={{ 
         padding: '1rem 1.2rem',
         background: config.bg,
         border: `1px solid ${config.border}`,
         borderRadius: '12px',
+        cursor: isClickable ? 'pointer' : 'default',
+        transition: 'all 0.2s ease',
         position: 'relative',
         overflow: 'hidden'
       }}
+      whileHover={isClickable ? { 
+        scale: 1.01, 
+        boxShadow: `0 4px 20px ${config.border}` 
+      } : {}}
     >
       {/* Top row: type badge + completion */}
       <div style={{ 
@@ -270,33 +279,7 @@ function GroupedCard({ item, index }) {
           </span>
         </div>
         
-        {/* Completion badge */}
-        {item.completed && (
-          <span className="font-tech" style={{
-            background: 'rgba(16, 185, 129, 0.15)',
-            color: '#10b981',
-            fontSize: '0.7rem',
-            padding: '0.2rem 0.5rem',
-            borderRadius: '4px',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            fontWeight: 'bold'
-          }}>
-            ✅ 완료
-          </span>
-        )}
-        {!item.completed && item.type === 'quiz' && item.score === null && (
-          <span className="font-tech" style={{
-            background: 'rgba(251, 191, 36, 0.15)',
-            color: '#fbbf24',
-            fontSize: '0.7rem',
-            padding: '0.2rem 0.5rem',
-            borderRadius: '4px',
-            border: '1px solid rgba(251, 191, 36, 0.3)',
-            fontWeight: 'bold'
-          }}>
-            ⏳ 진행 중
-          </span>
-        )}
+        {/* Status badges removed per user request */}
       </div>
 
       {/* Title */}

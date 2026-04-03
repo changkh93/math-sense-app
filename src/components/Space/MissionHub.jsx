@@ -507,7 +507,8 @@ export default function MissionHub({
   }
 
   // ─── Field Test modal state ───
-  const [showFieldTestModal, setShowFieldTestModal] = useState(initialMode === 'quiz-modal')
+  // Only show the field test modal if we are actually in quiz-modal mode
+  const [showFieldTestModal, setShowFieldTestModal] = useState(initialMode === 'quiz-modal' && currentMode === 'quiz-modal')
 
   // ─── Data Log reward state ───
   const [timeRemaining, setTimeRemaining] = useState(60)
@@ -1244,7 +1245,8 @@ export default function MissionHub({
   const txTotalCount = txListCalc.length
   const txCompletedCount = txListCalc.filter(tx => {
     const txId = tx.id || 'default'
-    return learningProgress?.videoProgress?.[txId]?.completionBonusGiven
+    const prog = learningProgress?.videoProgress?.[txId]
+    return prog?.completed || prog?.completionBonusGiven
   }).length
   const txAllCompleted = txTotalCount > 0 && txCompletedCount === txTotalCount
   const txAnyCompleted = txCompletedCount > 0
@@ -1770,7 +1772,7 @@ export default function MissionHub({
              {txList.map((tx, idx) => {
                  const txId = tx.id || 'default'
                  const txProgress = learningProgress?.videoProgress?.[txId]
-                 const isTxCompleted = txProgress?.completionBonusGiven
+                 const isTxCompleted = txProgress?.completed || txProgress?.completionBonusGiven
                  
                  // Offline-First UI: Use local storage cache for resume display if more up-to-date
                  const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
