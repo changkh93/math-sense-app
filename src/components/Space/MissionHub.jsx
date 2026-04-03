@@ -10,7 +10,7 @@ import 'katex/dist/katex.min.css'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import UnitLeaderboard from './UnitLeaderboard'
 import { db } from '../../firebase'
-import { doc, setDoc, getDoc, serverTimestamp, increment } from 'firebase/firestore'
+import { doc, setDoc, getDoc, onSnapshot, serverTimestamp, increment } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 
@@ -550,39 +550,45 @@ export default function MissionHub({
   const [loadingProgress, setLoadingProgress] = useState(true)
   const initialProgressRef = useRef(null) // Immutable snapshot from initial getDoc (not affected by auto-save)
   
-  // Load learning progress from Firestore
+  // Load learning progress from Firestore with real-time sync
   useEffect(() => {
-    const loadProgress = async () => {
-      if (!userId || !unitId) {
-        setLoadingProgress(false)
-        return
-      }
-      try {
-        const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-        const snap = await getDoc(progressRef)
-        if (snap.exists()) {
-          const data = snap.data()
-          setLearningProgress(data)
-          initialProgressRef.current = data  // Store immutable snapshot for restoration effect
-          // Restore completion states
-          if (data.logRead) setLogRewardClaimed(true)
-          
-          if (data.videoProgress) {
-            // Check if any transmission has been fully completed
-            const anyCompleted = Object.values(data.videoProgress).some(v => v.completed && v.completionBonusGiven)
-            if (anyCompleted) {
-              setVideoCompleted(true)
-              setVideoCompletionBonusGiven(true)
-            }
+    if (!userId || !unitId) {
+      setLoadingProgress(false)
+      return
+    }
+
+    const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
+    
+    // Switch to onSnapshot for real-time reactivity (fixes stale state issues)
+    const unsubscribe = onSnapshot(progressRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        setLearningProgress(data)
+        
+        // Only set initial snapshot once for restoration effect
+        if (!initialProgressRef.current) {
+          initialProgressRef.current = data
+        }
+
+        // Restore completion states
+        if (data.logRead) setLogRewardClaimed(true)
+        
+        if (data.videoProgress) {
+          // Robust check for completion across any transmission
+          const anyCompleted = Object.values(data.videoProgress).some(v => v.completed || v.completionBonusGiven)
+          if (anyCompleted) {
+            setVideoCompleted(true)
+            setVideoCompletionBonusGiven(true)
           }
         }
-      } catch (err) {
-        console.warn("Failed to load learning progress", err)
-      } finally {
-        setLoadingProgress(false)
       }
-    }
-    loadProgress()
+      setLoadingProgress(false)
+    }, (err) => {
+      console.warn("Failed to sync learning progress", err)
+      setLoadingProgress(false)
+    })
+
+    return () => unsubscribe()
   }, [userId, unitId])
 
   // Load mission data
@@ -1196,7 +1202,7 @@ export default function MissionHub({
             totalTimeSpent: totalTimeSpentRef.current,
             stampedSeconds: stamps
         };
-        if (isManualComplete) {
+        if (videoCompleted || isManualComplete) {
             updatedVideoProgress.completed = true;
             updatedVideoProgress.completionBonusGiven = true;
         }
