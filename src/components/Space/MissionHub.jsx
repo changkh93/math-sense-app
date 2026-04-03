@@ -919,16 +919,31 @@ export default function MissionHub({
     }
 
     videoAlreadySavedRef.current = false // Reset flag for next entry
-    setSelectedTx(null) // Reset transmission selection
+    
+    // Check if we should return to the selection list or the briefing based on current metadata
+    const txList = missionData?.transmissions || []
+    
+    // If we were in a sub-content (selectedTx was set), return to selection list if there are multiple.
+    // If only one, return to briefing.
+    if (selectedTx) {
+        setSelectedTx(null)
+        if (txList.length <= 1) {
+            updateCurrentMode('briefing')
+        }
+        return // Stay in selection list if txList.length > 1
+    }
+
     setShowFieldTestModal(false) // Reset quiz modal
-    // No longer reset currentMode to 'briefing' automatically.
-    // If they were manually in 'video' category, stay in 'video' category (shows the tape selection list).
+    setVideoCompleted(false)
+    setVideoCompletionBonusGiven(false)
+
+    // Final Exit from the Unit
     if (initialMode !== 'briefing') {
       // Single-content unit — go directly back to SpaceHome
       onBack()
     } else {
-      // Unit with multiple categories. Stay in current category (video selection list).
-      // If we really want to go to briefing, we can manually click the breadcrumbs/back btn.
+      // Return to Mission Control (Briefing)
+      updateCurrentMode('briefing')
     }
   }, [initialMode, onBack, selectedTx, onNonQuizActivityComplete, showSilentToast])
 
@@ -1883,7 +1898,13 @@ export default function MissionHub({
              })}
          </div>
          <div style={{ textAlign: 'center', marginTop: '3rem' }}>
-             <button onClick={returnFromContent} className="hud-btn secondary glass" style={{ padding: '1rem 3rem' }}>← RETURN TO ORBIT</button>
+             <button 
+               onClick={() => updateCurrentMode('briefing')} 
+               className="hud-btn secondary glass" 
+               style={{ padding: '1rem 3rem' }}
+             >
+               ← RETURN TO MISSION CONTROL
+             </button>
          </div>
       </div>
     )

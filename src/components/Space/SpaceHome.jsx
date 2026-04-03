@@ -97,9 +97,13 @@ function SpaceHome() {
   const [quickQuizMode, setQuickQuizMode] = useState(null) // New: Mode for quick quiz
 
   const handleBackFromMission = useCallback(() => {
+    // Logic: Mission Control -> Chapter Selection (Units List -> Chapters List)
     updateSelectedUnitDocId(null);
     setQuickQuizUnitId(null);
     setQuickQuizMode(null);
+    
+    // Deterministic hierarchy: If we were deep-linked, ensure we show the Chapter view
+    // SpaceHome rendering logic handles the rest based on selectedChapterDocId
   }, []);
   // Region Access State
   const [pendingRegion, setPendingRegion] = useState(null)
@@ -219,12 +223,23 @@ function SpaceHome() {
 
   usePresence(user?.uid, selectedClusterId, currentLocationString, activeUnit?.docId);
 
-  // Auto-skip single chapter
+  // Auto-skip single chapter OR Auto-resolve Parent Chapter if jumping directly to a unit
   useEffect(() => {
+    // 1. Resolve Chapter from activeUnit if it's missing (for direct link jumps)
+    if (activeUnit?.chapterId && !selectedChapterDocId) {
+       updateSelectedChapterDocId(activeUnit.chapterId);
+    }
+    
+    // 2. Resolve Region from activeChapter if it's missing (for direct link jumps)
+    if (activeChapter?.regionId && !selectedRegionId) {
+       updateSelectedRegionId(activeChapter.regionId);
+    }
+
+    // 3. Auto-skip single chapter (if we just opened a region)
     if (chapters && chapters.length === 1 && !selectedChapterDocId) {
       updateSelectedChapterDocId(chapters[0].docId)
     }
-  }, [chapters, selectedChapterDocId])
+  }, [chapters, activeUnit, activeChapter, selectedChapterDocId, selectedRegionId])
 
   const fetchDarkMatterQuestions = async () => {
     if (!user) return []
@@ -1909,12 +1924,7 @@ function SpaceHome() {
                   className="space-nav-link font-tech"
                   onClick={() => {
                     soundManager.playClick()
-                    if (chapters?.length === 1) {
-                      updateSelectedChapterDocId(null)
-                      updateSelectedRegionId(null)
-                    } else {
-                      updateSelectedChapterDocId(null)
-                    }
+                    updateSelectedChapterDocId(null)
                   }}
                   style={{ marginBottom: '1rem' }}
                 >
