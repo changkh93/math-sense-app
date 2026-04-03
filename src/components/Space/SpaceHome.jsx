@@ -98,6 +98,17 @@ function SpaceHome() {
 
   const handleBackFromMission = useCallback(() => {
     // Logic: Mission Control -> Chapter Selection (Units List -> Chapters List)
+    
+    // Explicitly preserve hierarchy before clearing unit for deep-linked scenarios
+    if (activeUnit?.chapterId) {
+       updateSelectedChapterDocId(activeUnit.chapterId);
+    }
+    if (activeChapter?.regionId) {
+       updateSelectedRegionId(activeChapter.regionId);
+    } else if (activeUnit?.regionId) {
+       updateSelectedRegionId(activeUnit.regionId);
+    }
+
     updateSelectedUnitDocId(null);
     setQuickQuizUnitId(null);
     setQuickQuizMode(null);
@@ -105,7 +116,7 @@ function SpaceHome() {
     // Ensure we transition into the hierarchy view (Planet view)
     // regardless of where we came from (e.g. assignment hub)
     setCurrentView('planet');
-  }, []);
+  }, [activeUnit, activeChapter]);
   // Region Access State
   const [pendingRegion, setPendingRegion] = useState(null)
   const [accessError, setAccessError] = useState(null)
