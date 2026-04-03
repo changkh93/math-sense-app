@@ -570,17 +570,8 @@ export default function MissionHub({
           initialProgressRef.current = data
         }
 
-        // Restore completion states
+        // Restore global completion states (Data Log)
         if (data.logRead) setLogRewardClaimed(true)
-        
-        if (data.videoProgress) {
-          // Robust check for completion across any transmission
-          const anyCompleted = Object.values(data.videoProgress).some(v => v.completed || v.completionBonusGiven)
-          if (anyCompleted) {
-            setVideoCompleted(true)
-            setVideoCompletionBonusGiven(true)
-          }
-        }
       }
       setLoadingProgress(false)
     }, (err) => {
@@ -590,6 +581,62 @@ export default function MissionHub({
 
     return () => unsubscribe()
   }, [userId, unitId])
+
+  // --- Per-Transmission State Restoration ---
+  // Ensure that videoCompleted state is local to the currently selected transmission
+  useEffect(() => {
+    if (!selectedTx) {
+      setVideoCompleted(false)
+      setVideoCompletionBonusGiven(false)
+      setTotalRewardedCrystals(0)
+      stampedSetRef.current = new Set()
+      newStampCountRef.current = 0
+      totalTimeSpentRef.current = 0
+      totalRewardedCrystalsRef.current = 0
+      videoCompletedRef.current = false
+      videoCompletionBonusGivenRef.current = false
+      return
+    }
+
+    const txId = selectedTx.id || 'default'
+    const txProgress = learningProgress?.videoProgress?.[txId]
+    
+    if (txProgress) {
+      const isComp = txProgress.completed || txProgress.completionBonusGiven
+      setVideoCompleted(isComp)
+      setVideoCompletionBonusGiven(isComp)
+      
+      videoCompletedRef.current = isComp
+      videoCompletionBonusGivenRef.current = isComp
+      
+      // Restore stamps and reward stats for the specific video
+      if (txProgress.stampedSeconds) {
+        stampedSetRef.current = new Set(txProgress.stampedSeconds)
+        setStampCount(txProgress.stampedSeconds.length)
+      }
+      
+      if (txProgress.totalRewardedCrystals) {
+        setTotalRewardedCrystals(txProgress.totalRewardedCrystals)
+        totalRewardedCrystalsRef.current = txProgress.totalRewardedCrystals
+      }
+
+      if (txProgress.totalTimeSpent) {
+        totalTimeSpentRef.current = txProgress.totalTimeSpent
+      }
+    } else {
+      // New transmission entry
+      setVideoCompleted(false)
+      setVideoCompletionBonusGiven(false)
+      setTotalRewardedCrystals(0)
+      stampedSetRef.current = new Set()
+      setStampCount(0)
+      newStampCountRef.current = 0
+      totalTimeSpentRef.current = 0
+      totalRewardedCrystalsRef.current = 0
+      videoCompletedRef.current = false
+      videoCompletionBonusGivenRef.current = false
+    }
+  }, [selectedTx, learningProgress])
 
   // Load mission data
   useEffect(() => {
@@ -861,13 +908,14 @@ export default function MissionHub({
     videoAlreadySavedRef.current = false // Reset flag for next entry
     setSelectedTx(null) // Reset transmission selection
     setShowFieldTestModal(false) // Reset quiz modal
-    setVideoCompleted(false)
-    setVideoCompletionBonusGiven(false)
+    // No longer reset currentMode to 'briefing' automatically.
+    // If they were manually in 'video' category, stay in 'video' category (shows the tape selection list).
     if (initialMode !== 'briefing') {
       // Single-content unit — go directly back to SpaceHome
       onBack()
     } else {
-      updateCurrentMode('briefing')
+      // Unit with multiple categories. Stay in current category (video selection list).
+      // If we really want to go to briefing, we can manually click the breadcrumbs/back btn.
     }
   }, [initialMode, onBack, selectedTx, onNonQuizActivityComplete, showSilentToast])
 
