@@ -554,19 +554,21 @@ function resolveTitle(act) {
 /** Check if a string looks like a machine-generated ID (contains underscores + numbers pattern) */
 function looksLikeId(str) {
   if (!str) return true;
-  // Patterns like: unit_gameproj_13, reg_177340..., chap_177383...
+  // Patterns like: unit_gameproj_13, reg_177340..., chap_177383... ratios_ratio_chap3_unit3
   return /^(unit|reg|chap|prob|cluster)_\d/.test(str) || 
+         /\w+_\w+_chap\d+/.test(str) ||  // Complex IDs like ratios_ratio_chap3_unit3
          /^\w+_\d{10,}/.test(str) ||
          /^[a-f0-9]{24,}$/.test(str);
 }
 
 /** Convert a raw ID like "unit_gameproj_13" to something slightly more readable */
 function humanizeId(id) {
+  if (!id) return '학습 활동';
   return id
-    .replace(/^(unit|reg|chap|prob|cluster)_/g, '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase())
-    .trim() || '학습 활동';
+    .split('_')
+    .filter(part => part !== 'unit' && part !== 'chap' && part !== 'reg' && part !== 'cluster')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ') || '학습 활동';
 }
 
 /**

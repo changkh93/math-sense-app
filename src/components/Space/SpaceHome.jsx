@@ -1151,6 +1151,7 @@ function SpaceHome() {
           transaction.set(progressDocRef, {
             logRead: true,
             logReadAt: serverTimestamp(),
+            unitTitle: activeUnit?.title || "",
             updatedAt: serverTimestamp()
           }, { merge: true })
         } else if (isVideoActivity && transmissionId) {
