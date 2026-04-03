@@ -482,6 +482,7 @@ export default function MissionHub({
   const idTokenRef = useRef(null)
   const isVideoProcessingRef = useRef(false)
   const lastActivityTimeRef = useRef(Date.now())
+  const loadedTxIdRef = useRef(null) // Track which video was last loaded to prevent overwrite loops
   
   // Re-consolidate remaining scattered refs
   const timerRef = useRef(null)
@@ -584,21 +585,29 @@ export default function MissionHub({
 
   // --- Per-Transmission State Restoration ---
   // Ensure that videoCompleted state is local to the currently selected transmission
+  // This must only restore once per video session (not on every snapshot)
   useEffect(() => {
     if (!selectedTx) {
       setVideoCompleted(false)
       setVideoCompletionBonusGiven(false)
       setTotalRewardedCrystals(0)
       stampedSetRef.current = new Set()
+      setStampCount(0) // Reset UI
       newStampCountRef.current = 0
       totalTimeSpentRef.current = 0
       totalRewardedCrystalsRef.current = 0
       videoCompletedRef.current = false
       videoCompletionBonusGivenRef.current = false
+      loadedTxIdRef.current = null
       return
     }
 
     const txId = selectedTx.id || 'default'
+    
+    // Safety: If we already loaded this video's data into the local session master (stampedSetRef),
+    // do NOT let subsequent auto-save snapshots from learningProgress overwrite it.
+    if (loadedTxIdRef.current === txId) return
+
     const txProgress = learningProgress?.videoProgress?.[txId]
     
     if (txProgress) {
@@ -623,8 +632,11 @@ export default function MissionHub({
       if (txProgress.totalTimeSpent) {
         totalTimeSpentRef.current = txProgress.totalTimeSpent
       }
-    } else {
-      // New transmission entry
+      
+      // Mark as loaded ONLY if we have data or if it's explicitly done (prevents retrying empty data)
+      loadedTxIdRef.current = txId
+    } else if (loadingProgress === false) {
+      // New transmission entry (only if we've finished the initial fetch)
       setVideoCompleted(false)
       setVideoCompletionBonusGiven(false)
       setTotalRewardedCrystals(0)
@@ -635,8 +647,9 @@ export default function MissionHub({
       totalRewardedCrystalsRef.current = 0
       videoCompletedRef.current = false
       videoCompletionBonusGivenRef.current = false
+      loadedTxIdRef.current = txId
     }
-  }, [selectedTx, learningProgress])
+  }, [selectedTx, learningProgress, loadingProgress])
 
   // Load mission data
   useEffect(() => {
