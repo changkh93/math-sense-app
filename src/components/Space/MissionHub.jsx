@@ -955,6 +955,8 @@ export default function MissionHub({
         await setDoc(logRef, {
            action: actionStr,
            unitId: unitId || 'unknown_unit',
+           unitTitle: activeUnit?.title || '',
+           clusterId: clusterId || '',
            timestamp: serverTimestamp()
         })
     } catch (err) {

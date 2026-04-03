@@ -4,18 +4,29 @@ import { doc, onSnapshot, collection as fsCollection, query as fsQuery, where as
 
 /**
  * Custom hook to fetch a user's combined learning history for a specific date.
- * Aggregates data from:
- * 1. users/{uid}/history (Quiz records)
- * 2. users/{uid}/crystal_transactions (Video completions, attendance, Agora activity)
- * 3. users/{uid}/activityLogs (Data Log reads, general actions)
+ * 
+ * V2 — Redesigned for reliability and simplicity.
+ * 
+ * Data Sources (3):
+ * 1. users/{uid}/history       — Quiz/Video/Text completion records (PRIMARY)
+ * 2. users/{uid}/crystal_transactions — Rewards, purchases, streak freezes
+ * 3. users/{uid}/learning_progress   — In-progress quiz/video sessions
+ * 
+ * Removed:
+ * - activityLogs (telemetry only, not for UI rendering)
+ * - assignments (checked via simple flag only)
+ * 
+ * Key Design Decisions:
+ * - Title resolution is done at WRITE time (not READ time)
+ * - No async title fetching/caching — titles come from the stored documents
+ * - groupedActivities is derived via useMemo (no useState + useEffect loop)
  * 
  * @param {string} userId - The user's ID
  * @param {string} dateStr - The target date in YYYY-MM-DD format (KST)
- * @returns {object} { activities, dailyStats, loading, error }
+ * @returns {object} { activities, groupedActivities, dailyStats, loading, error }
  */
 export function useLearningHistory(userId, dateStr) {
   const [activities, setActivities] = useState([]);
-  const [groupedActivities, setGroupedActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dailyStats, setDailyStats] = useState({
@@ -25,23 +36,16 @@ export function useLearningHistory(userId, dateStr) {
     isAssignmentSubmitted: false
   });
 
-  // Raw data state to hold snapshots from all listeners
+  // Raw data state
   const [rawData, setRawData] = useState({
     history: [],
     tx: [],
-    logs: [],
-    assignments: [],
     lp: [],
-    loaded: {
-      history: false,
-      tx: false,
-      logs: false,
-      assignments: false,
-      lp: false
-    }
+    assignmentCount: 0,
+    loaded: { history: false, tx: false, lp: false, assignmentCount: false }
   });
 
-  // ── Date range computed once per dateStr change (shared by listener & aggregation effects) ──
+  // ── Date range (KST) ──
   const { startTime, endTime } = useMemo(() => {
     if (!dateStr) return { startTime: null, endTime: null };
     const kstStartStr = `${dateStr}T00:00:00+09:00`;
@@ -52,7 +56,7 @@ export function useLearningHistory(userId, dateStr) {
     };
   }, [dateStr]);
 
-  // SET UP LISTENERS
+  // ── SET UP LISTENERS ──
   useEffect(() => {
     if (!userId || !dateStr || !startTime || !endTime) {
       setLoading(false);
@@ -61,25 +65,25 @@ export function useLearningHistory(userId, dateStr) {
 
     setLoading(true);
 
-    const updateRaw = (key, docs) => {
+    const updateRaw = (key, value) => {
       setRawData(prev => ({
         ...prev,
-        [key]: docs,
+        [key]: value,
         loaded: { ...prev.loaded, [key]: true }
       }));
     };
 
-    // 1. History
+    // 1. History (PRIMARY source — quiz, video, text completions)
     const unsubHistory = onSnapshot(fsQuery(
       fsCollection(db, 'users', userId, 'history'),
       fsWhere('timestamp', '>=', startTime),
       fsWhere('timestamp', '<=', endTime)
     ), (snap) => updateRaw('history', snap.docs), (err) => {
       console.error("History listen error:", err);
-      updateRaw('history', []); // Still mark as loaded
+      updateRaw('history', []);
     });
 
-    // 2. Transactions
+    // 2. Transactions (rewards, purchases, streak freezes)
     const unsubTx = onSnapshot(fsQuery(
       fsCollection(db, 'users', userId, 'crystal_transactions'),
       fsWhere('timestamp', '>=', startTime),
@@ -89,51 +93,38 @@ export function useLearningHistory(userId, dateStr) {
       updateRaw('tx', []);
     });
 
-    // 3. Logs
-    const unsubLogs = onSnapshot(fsQuery(
-      fsCollection(db, 'users', userId, 'activityLogs'),
-      fsWhere('timestamp', '>=', startTime),
-      fsWhere('timestamp', '<=', endTime)
-    ), (snap) => updateRaw('logs', snap.docs), (err) => {
-      console.error("Logs listen error:", err);
-      updateRaw('logs', []);
-    });
+    // 3. Learning Progress (all docs — for in-progress sessions)
+    const unsubLP = onSnapshot(
+      fsCollection(db, 'users', userId, 'learning_progress'),
+      (snap) => updateRaw('lp', snap.docs),
+      (err) => {
+        console.error("LP listen error:", err);
+        updateRaw('lp', []);
+      }
+    );
 
-    // 4. Assignments
+    // 4. Assignments (lightweight: just check if any exist for this date)
     const unsubAssignments = onSnapshot(fsQuery(
       fsCollection(db, 'assignments'),
       fsWhere('userId', '==', userId),
       fsWhere('submittedAt', '>=', startTime),
       fsWhere('submittedAt', '<=', endTime)
-    ), (snap) => updateRaw('assignments', snap.docs), (err) => {
+    ), (snap) => updateRaw('assignmentCount', snap.size), (err) => {
       console.error("Assignments listen error:", err);
-      updateRaw('assignments', []);
-    });
-
-    // 5. LP (Fetch all progress docs for the user to ensure we catch all state)
-    const unsubLP = onSnapshot(fsCollection(db, 'users', userId, 'learning_progress'), (snap) => {
-      updateRaw('lp', snap.docs);
-    }, (err) => {
-      console.error("LP listen error:", err);
-      updateRaw('lp', []);
+      updateRaw('assignmentCount', 0);
     });
 
     return () => {
       unsubHistory();
       unsubTx();
-      unsubLogs();
-      unsubAssignments();
       unsubLP();
+      unsubAssignments();
     };
   }, [userId, dateStr, startTime, endTime]);
 
-  // AGGREGATE DATA
+  // ── AGGREGATE DATA ──
   useEffect(() => {
-    // Check if at least one essential stream is active
-    if (!rawData.loaded.history && !rawData.loaded.tx && !rawData.loaded.logs && !rawData.loaded.lp) {
-      return; 
-    }
-    // Guard: startTime/endTime must be available for LP date filtering
+    if (!rawData.loaded.history && !rawData.loaded.tx && !rawData.loaded.lp) return;
     if (!startTime || !endTime) return;
 
     const aggregated = [];
@@ -141,22 +132,65 @@ export function useLearningHistory(userId, dateStr) {
       quizCount: 0,
       logCount: 0,
       totalVideoSeconds: 0,
-      isAssignmentSubmitted: rawData.assignments.length > 0,
-      _videoTxMap: {} // Use a private map for calculating unique video time
+      isAssignmentSubmitted: (typeof rawData.assignmentCount === 'number' ? rawData.assignmentCount : rawData.assignmentCount?.length) > 0,
+      _videoTxMap: {}
     };
     const trackedDataLogs = new Set();
-
-    // Helper to generate a unique key for video activities
     const getVideoKey = (unitId, txId) => `${unitId || 'no_unit'}_${txId || 'default'}`;
 
-    // --- Process Transactions ---
+    // ── 1. Process History (PRIMARY) ──
+    rawData.history.forEach(docSnap => {
+      const data = docSnap.data();
+      const hType = data.type || 'quiz_pass';
+      let displayType = 'quiz_pass';
+      const title = data.unitTitle || formatUnitId(data.unitId);
+
+      if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
+        displayType = 'video_reward';
+        // Track video time
+        const unitId = data.unitId || 'unknown';
+        const txId = data.transmissionId || 'default';
+        const vKey = getVideoKey(unitId, txId);
+        const vTime = data.videoTime || data.stampedCount || 0;
+        if (vTime > 0) {
+          stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, Math.floor(vTime));
+        }
+      } else if (hType === 'text' || hType === 'data_log_read') {
+        const dedupeKey = `datalog_${data.unitId || title}`;
+        if (trackedDataLogs.has(dedupeKey)) return;
+        trackedDataLogs.add(dedupeKey);
+        stats.logCount++;
+        displayType = 'data_log_read';
+      } else {
+        stats.quizCount++;
+      }
+
+      const typeEmoji = displayType === 'video_reward' ? '🎬' : displayType === 'data_log_read' ? '📝' : '🚀';
+      const typeLabel = displayType === 'video_reward' ? '영상 학습' : displayType === 'data_log_read' ? '데이터 로그 열람' : '현장 탐사(퀴즈)';
+
+      aggregated.push({
+        id: `quiz_${docSnap.id}`,
+        timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
+        type: displayType,
+        title: `${typeEmoji} ${typeLabel}: ${title}`,
+        score: (displayType === 'quiz_pass' || displayType === 'quiz_in_progress') ? data.score : null,
+        crystalsEarned: data.crystalsEarned || 0,
+        metadata: {
+          ...data,
+          videoTime: data.videoTime || data.stampedCount || 0
+        }
+      });
+    });
+
+    // ── 2. Process Transactions (non-quiz/video rewards) ──
     rawData.tx.forEach(docSnap => {
       const data = docSnap.data();
       const tType = data.type || '';
       const desc = data.description || '';
       const metadata = data.metadata || {};
-      
-      if (tType === 'quiz_reward' || tType === 'mastery_bonus') return; 
+
+      // Skip types already captured by history
+      if (tType === 'quiz_reward' || tType === 'mastery_bonus' || tType === 'quiz_penalty') return;
 
       let displayType = 'general';
       let displayTitle = data.amount < 0 ? `🛒 광석 소모: ${desc}` : `💎 광석 획득: ${desc}`;
@@ -170,21 +204,18 @@ export function useLearningHistory(userId, dateStr) {
       } else if (tType === 'maintenance_compensation' || tType === 'admin_reward') {
         displayType = 'admin_reward';
         displayTitle = `🎁 운영자 선물: ${desc}`;
-      }
-
-      if (tType === 'transmission_reward' || tType === 'video_reward') {
-        if (data.amount === 20 || desc.includes('완료')) return;
+      } else if (tType === 'transmission_reward' || tType === 'video_reward') {
+        if (data.amount === 20 || desc.includes('완료')) return; // Completion bonus — already in history
         displayType = 'video_reward';
-        displayTitle = `🎬 영상 학습: ${desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '').replace('보너스', '').trim()}`;
-        
-        const videoMetadata = metadata || {};
-        const vTime = videoMetadata.stampedSeconds?.length || videoMetadata.totalTimeSpent || 0;
+        const cleanDesc = desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '').replace('보너스', '').trim();
+        displayTitle = `🎬 영상 학습: ${cleanDesc}`;
+
+        const vTime = metadata.stampedSeconds?.length || metadata.totalTimeSpent || 0;
         if (vTime > 0) {
-          const unitId = videoMetadata.unitId || 'unknown';
-          const txId = videoMetadata.transmissionId || 'default';
+          const unitId = metadata.unitId || 'unknown';
+          const txId = metadata.transmissionId || 'default';
           const vKey = getVideoKey(unitId, txId);
           stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, Math.floor(vTime));
-          metadata.videoTime = Math.floor(vTime); // Attach for UI display
         } else if (desc.includes('수신') && data.amount === 10) {
           stats.totalVideoSeconds += 180;
         }
@@ -196,10 +227,9 @@ export function useLearningHistory(userId, dateStr) {
         displayTitle = `✅ 출석: ${desc}`;
       } else if (tType === 'data_log_reward') {
         displayType = 'data_log_read';
-        // unitId-based dedup key to prevent title variations from causing duplicates
         const dedupeKey = `datalog_${metadata.unitId || desc}`;
         const cleanTitle = `📝 데이터 로그 열람: ${desc.replace('보상 (데이터 로그 학습)', '').replace('보상', '').trim()}`;
-        if (trackedDataLogs.has(dedupeKey)) return; // Skip duplicate — don't push to aggregated
+        if (trackedDataLogs.has(dedupeKey)) return;
         trackedDataLogs.add(dedupeKey);
         stats.logCount++;
         displayTitle = cleanTitle;
@@ -216,86 +246,7 @@ export function useLearningHistory(userId, dateStr) {
       });
     });
 
-    // --- Process Quiz History ---
-    rawData.history.forEach(docSnap => {
-      const data = docSnap.data();
-      const hType = data.type || 'quiz_pass';
-      let displayType = 'quiz_pass';
-      let displayTitle = `🚀 현장 탐사(퀴즈): ${data.unitTitle || '이름 없음'}`;
-
-      if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
-        displayType = 'video_reward';
-        displayTitle = `🎬 영상 학습: ${data.unitTitle || '이름 없음'}`;
-      } else if (hType === 'text' || hType === 'data_log_read') {
-        // unitId-based dedup key — consistent with transaction processing
-        const dedupeKey = `datalog_${data.unitId || data.unitTitle || '이름 없음'}`;
-        if (trackedDataLogs.has(dedupeKey)) return; // Skip duplicate entirely
-        trackedDataLogs.add(dedupeKey);
-        stats.logCount++;
-        displayType = 'data_log_read';
-        displayTitle = `📝 데이터 로그 열람: ${data.unitTitle || '이름 없음'}`;
-      } else {
-        stats.quizCount++;
-      }
-
-      if ((displayType === 'video_reward' || hType === 'video')) {
-        const unitId = data.unitId || 'unknown';
-        const txId = data.transmissionId || 'default';
-        const vKey = getVideoKey(unitId, txId);
-        const vTime = data.videoTime || data.stampedCount || 0;
-        if (vTime > 0) {
-          stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, Math.floor(vTime));
-        }
-      }
-
-      aggregated.push({
-        id: `quiz_${docSnap.id}`,
-        timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
-        type: displayType,
-        title: displayTitle,
-        score: (displayType === 'quiz_pass' || displayType === 'quiz_in_progress') ? data.score : null,
-        crystalsEarned: data.crystalsEarned || 0,
-        metadata: {
-          ...data,
-          videoTime: data.videoTime || data.stampedCount || 0
-        }
-      });
-    });
-
-    // --- Process Activity Logs ---
-    rawData.logs.forEach(docSnap => {
-      const data = docSnap.data();
-      const action = data.action || '';
-      if (action.includes('DATA LOG') || action.includes('view_text') || action.includes('data_log')) {
-        // unitId-based dedup key — consistent with other sections
-        const dedupeKey = `datalog_${data.unitId || data.unitTitle || '알 수 없는 단원'}_${action}`;
-        if (trackedDataLogs.has(dedupeKey)) return;
-        trackedDataLogs.add(dedupeKey);
-        stats.logCount++;
-        const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || data.unitId || '알 수 없는 단원'}`;
-        aggregated.push({
-          id: `log_${docSnap.id}`,
-          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
-          type: 'data_log_read',
-          title: cleanTitle,
-          score: null,
-          crystalsEarned: 0,
-          metadata: data
-        });
-      } else if (action === 'view_video' || action === 'overlay_view_video') {
-         stats._videoTxMap[getVideoKey(data.unitId, 'default')] = 1; // Mark at least 1 second to count as video view if not in LP
-         aggregated.push({
-           id: `log_vid_${docSnap.id}`,
-           timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
-           type: 'video_view',
-           title: `🎬 영상 열람: ${data.unitTitle || data.unitId || '알 수 없는 단원'}`,
-           score: null,
-           metadata: data
-         });
-      }
-    });
-
-    // --- Process Learning Progress ---
+    // ── 3. Process Learning Progress (in-progress sessions today) ──
     const dayStart = startTime.toDate();
     const dayEnd = endTime.toDate();
 
@@ -303,99 +254,87 @@ export function useLearningHistory(userId, dateStr) {
       try {
         const data = docSnap.data();
         const unitId = docSnap.id;
-        
-        // Filter for activity today using updatedAt
-        // Handle pending serverTimestamp() by defaulting to "now" for local updates
         const updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date();
         const isUpdatedToday = updatedAt >= dayStart && updatedAt <= dayEnd;
 
+        // Video progress
         if (data.videoProgress) {
           Object.entries(data.videoProgress).forEach(([txId, prog]) => {
             const stamps = prog.stampedSeconds?.length || 0;
-            if (stamps > 0) {
-              // Robust prog.updatedAt parsing: handle all serverTimestamp() states
-              let progUpdatedAt;
-              if (prog.updatedAt?.toDate) {
-                progUpdatedAt = prog.updatedAt.toDate();         // Firestore Timestamp
-              } else if (prog.updatedAt?.seconds) {
-                progUpdatedAt = new Date(prog.updatedAt.seconds * 1000); // Raw seconds obj
-              } else if (typeof prog.updatedAt === 'number') {
-                progUpdatedAt = new Date(prog.updatedAt);         // Client ms timestamp
-              } else {
-                // serverTimestamp() pending or missing
-                // Fall back to document-level updatedAt, or "now" if doc also pending
-                progUpdatedAt = isUpdatedToday ? updatedAt : new Date();
-              }
-              const isProgUpdatedToday = progUpdatedAt >= dayStart && progUpdatedAt <= dayEnd;
+            if (stamps <= 0) return;
 
-              if (isProgUpdatedToday) {
-                 const vKey = getVideoKey(unitId, txId);
-                 stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, stamps);
-                 
-                 const isAlreadyTracked = aggregated.some(a => 
-                   (a.type === 'video_reward' || a.type === 'video_view') && 
-                   (
-                      (a.metadata?.transmissionId === txId && a.metadata?.unitId === unitId) ||
-                      (a.metadata?.unitId === unitId && !a.metadata?.transmissionId && Object.keys(data.videoProgress).length === 1)
-                   )
-                 );
+            let progUpdatedAt;
+            if (prog.updatedAt?.toDate) progUpdatedAt = prog.updatedAt.toDate();
+            else if (prog.updatedAt?.seconds) progUpdatedAt = new Date(prog.updatedAt.seconds * 1000);
+            else if (typeof prog.updatedAt === 'number') progUpdatedAt = new Date(prog.updatedAt);
+            else progUpdatedAt = isUpdatedToday ? updatedAt : new Date();
 
-                 if (!isAlreadyTracked) {
-                   aggregated.push({
-                     id: `lp_p_${unitId}_${txId}`,
-                     timestamp: progUpdatedAt || new Date(),
-                     type: 'video_view',
-                     title: `🎬 영상 학습: ${prog.transmissionTitle || '영상'}`,
-                     score: null,
-                     metadata: { ...prog, unitId, transmissionId: txId, videoTime: stamps }
-                   });
-                 }
-              }
+            const isProgToday = progUpdatedAt >= dayStart && progUpdatedAt <= dayEnd;
+            if (!isProgToday) return;
+
+            const vKey = getVideoKey(unitId, txId);
+            stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, stamps);
+
+            // Only add to feed if not already tracked via history
+            const isAlreadyTracked = aggregated.some(a =>
+              (a.type === 'video_reward' || a.type === 'video_view') &&
+              ((a.metadata?.transmissionId === txId && a.metadata?.unitId === unitId) ||
+               (a.metadata?.unitId === unitId && !a.metadata?.transmissionId && Object.keys(data.videoProgress).length === 1))
+            );
+
+            if (!isAlreadyTracked) {
+              aggregated.push({
+                id: `lp_p_${unitId}_${txId}`,
+                timestamp: progUpdatedAt,
+                type: 'video_view',
+                title: `🎬 영상 학습: ${prog.transmissionTitle || data.unitTitle || formatUnitId(unitId)}`,
+                score: null,
+                metadata: { ...prog, unitId, transmissionId: txId, videoTime: stamps }
+              });
             }
-
           });
         }
 
-        if (isUpdatedToday) {
-          if (data.quizSession && data.quizSession.currentIdx > 0) {
-            const session = data.quizSession;
-            const answeredCount = Object.keys(session.userAnswers || {}).length;
-            if (answeredCount > 0 && !aggregated.some(a => a.type === 'quiz_pass' && a.metadata?.unitId === unitId)) {
-              aggregated.push({
-                id: `lp_q_${unitId}`,
-                timestamp: updatedAt || new Date(),
-                type: 'quiz_in_progress',
-                title: `🚀 퀴즈: ${data.unitTitle || "탐사 퀴즈"}`,
-                score: null,
-                metadata: { unitId, ...session }
-              });
-            }
+        // In-progress quiz session
+        if (isUpdatedToday && data.quizSession && data.quizSession.currentIdx > 0) {
+          const session = data.quizSession;
+          const answeredCount = Object.keys(session.userAnswers || {}).length;
+          if (answeredCount > 0 && !aggregated.some(a => a.type === 'quiz_pass' && a.metadata?.unitId === unitId)) {
+            aggregated.push({
+              id: `lp_q_${unitId}`,
+              timestamp: updatedAt,
+              type: 'quiz_in_progress',
+              title: `🚀 퀴즈: ${data.unitTitle || formatUnitId(unitId)}`,
+              score: null,
+              metadata: { unitId, ...session }
+            });
           }
-          if (data.logReadAt) {
-             const logReadTime = data.logReadAt.toDate ? data.logReadAt.toDate() : new Date(data.logReadAt);
-             const isReadToday = logReadTime >= dayStart && logReadTime <= dayEnd;
+        }
 
-             if (isReadToday) {
-                const cleanTitle = `📝 데이터 로그 열람: ${data.unitTitle || unitId}`;
-                if (!trackedDataLogs.has(cleanTitle)) {
-                   stats.logCount++;
-                   trackedDataLogs.add(cleanTitle);
-                   
-                   // Ensure it's in the activity feed as well
-                   const isAlreadyInFeed = aggregated.some(a => a.type === 'data_log_read' && a.title === cleanTitle);
-                   if (!isAlreadyInFeed) {
-                      aggregated.push({
-                         id: `lp_log_${unitId}`,
-                         timestamp: logReadTime,
-                         type: 'data_log_read',
-                         title: cleanTitle,
-                         score: null,
-                         crystalsEarned: 0,
-                         metadata: data
-                      });
-                   }
-                }
-             }
+        // Data log read from progress
+        if (isUpdatedToday && data.logReadAt) {
+          const logReadTime = data.logReadAt.toDate ? data.logReadAt.toDate() : new Date(data.logReadAt);
+          const isReadToday = logReadTime >= dayStart && logReadTime <= dayEnd;
+
+          if (isReadToday) {
+            const dedupeKey = `datalog_${unitId}`;
+            if (!trackedDataLogs.has(dedupeKey)) {
+              stats.logCount++;
+              trackedDataLogs.add(dedupeKey);
+              const title = data.unitTitle || formatUnitId(unitId);
+              const isAlreadyInFeed = aggregated.some(a => a.type === 'data_log_read' && a.metadata?.unitId === unitId);
+              if (!isAlreadyInFeed) {
+                aggregated.push({
+                  id: `lp_log_${unitId}`,
+                  timestamp: logReadTime,
+                  type: 'data_log_read',
+                  title: `📝 데이터 로그 열람: ${title}`,
+                  score: null,
+                  crystalsEarned: 0,
+                  metadata: { ...data, unitId }
+                });
+              }
+            }
           }
         }
       } catch (lpErr) {
@@ -403,185 +342,78 @@ export function useLearningHistory(userId, dateStr) {
       }
     });
 
+    // Finalize video seconds
     const sumVideoSeconds = Object.values(stats._videoTxMap).reduce((sum, val) => sum + val, 0);
     stats.totalVideoSeconds += sumVideoSeconds;
 
+    // Sort chronologically
     aggregated.sort((a, b) => (a.timestamp?.getTime() || 0) - (b.timestamp?.getTime() || 0));
 
     setActivities(aggregated);
-
-    // ── Grouping Pipeline: merge by unitId + activityType ──
-    const grouped = buildGroupedActivities(aggregated);
-    setGroupedActivities(grouped);
-
     setDailyStats(stats);
-    
+
     if (Object.values(rawData.loaded).every(v => v === true)) {
       setLoading(false);
     }
   }, [rawData, startTime, endTime]);
 
-  // ── Missing Title Resolution Effect ──
-  useEffect(() => {
-    if (!groupedActivities.length) return;
-
-    let mounted = true;
-    const missingIds = new Set();
-    groupedActivities.forEach(group => {
-      let title = group.unitTitle;
-      
-      // Cleanup garbage prefix like "🎬 영상 열람:" if it somehow survived
-      if (title.includes(':')) {
-        title = title.substring(title.indexOf(':') + 1).trim();
-      }
-      
-      if (!unitTitleCache.has(group.unitId)) {
-        const isUgly = !title || looksLikeId(title) || title.includes('unit_') || title.includes('영상 열람') || title === '탐사 퀴즈' || /^\d+\/\d+문항$/.test(title);
-        const isHumanized = /^(Py Math|Chap|Reg|Cluster)\b/i.test(title);
-        if (isUgly || isHumanized) {
-          missingIds.add(group.unitId);
-        }
-      }
-    });
-
-    if (missingIds.size > 0 && mounted) {
-      const fetchMissingTitles = async () => {
-        try {
-          const { getDoc, doc, query: fsQuery, collection: fsCollection, where: fsWhere, limit: fsLimit, getDocs } = await import('firebase/firestore');
-          const promises = Array.from(missingIds).map(async id => {
-            if (unitTitleCache.has(id)) return;
-            let snap = await getDoc(doc(db, 'units', id));
-            let resolvedTitle = '';
-            
-            if (snap.exists()) {
-              resolvedTitle = snap.data().title || snap.data().name || '';
-            } else {
-              // Fallback: Check 'assignments' collection for this unitId to find teacher-defined title
-              const assignQuery = fsQuery(
-                fsCollection(db, 'assignments'),
-                fsWhere('unitId', '==', id),
-                fsLimit(1)
-              );
-              const assignSnap = await getDocs(assignQuery);
-              if (!assignSnap.empty) {
-                const aData = assignSnap.docs[0].data();
-                resolvedTitle = aData.unitTitle || aData.title || '';
-              }
-            }
-            
-            if (resolvedTitle) {
-              unitTitleCache.set(id, resolvedTitle);
-            } else {
-              unitTitleCache.set(id, null); // mark as not found
-            }
-          });
-          
-          await Promise.all(promises);
-
-          if (mounted) {
-            setGroupedActivities(prev => prev.map(group => {
-              let title = group.unitTitle;
-              if (title.includes(':')) title = title.substring(title.indexOf(':') + 1).trim();
-
-              const cached = unitTitleCache.get(group.unitId);
-              if (cached) {
-                return { ...group, unitTitle: cached };
-              }
-              
-              if (looksLikeId(title) || title.includes('unit_')) title = humanizeId(group.unitId);
-              return { ...group, unitTitle: title };
-            }));
-          }
-        } catch (err) {
-          console.warn('Failed to fetch missing unit titles:', err);
-        }
-      };
-      fetchMissingTitles();
-    } else {
-      // If we don't need to fetch, we should still ensure any prefixed garbage is stripped from state
-      let updated = false;
-      const newGroups = groupedActivities.map(group => {
-         let title = group.unitTitle;
-         const cached = unitTitleCache.get(group.unitId);
-         if (cached && title !== cached) {
-           updated = true;
-           return { ...group, unitTitle: cached };
-         }
-         if (title.includes(':')) {
-           title = title.substring(title.indexOf(':') + 1).trim();
-           if (looksLikeId(title) || title.includes('unit_')) title = humanizeId(group.unitId);
-           updated = true;
-           return { ...group, unitTitle: title };
-         }
-         return group;
-      });
-      if (updated && mounted) {
-         setGroupedActivities(newGroups);
-      }
-    }
-
-    return () => { mounted = false; };
-  }, [groupedActivities, rawData]);
+  // ── GROUPED ACTIVITIES (derived via useMemo — no state loop) ──
+  const groupedActivities = useMemo(() => {
+    return buildGroupedActivities(activities);
+  }, [activities]);
 
   return { activities, groupedActivities, dailyStats, loading, error };
 }
 
-const unitTitleCache = new Map();
+// ══════════════════════════════════════════════════════════════
+// ═══ UTILITY FUNCTIONS ═══════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 
-// ── Learning-only activity types ──
+/** Learning-only activity types for grouping */
 const LEARNING_TYPES = new Set([
   'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'data_log_read'
 ]);
 
 /**
- * Resolve a human-readable title from activity metadata.
- * Falls back gracefully: unitTitle > transmissionTitle > cleaned unitId > fallback.
+ * Format a raw unitId into a human-readable string.
+ * Used as a fallback when unitTitle is missing from stored data.
+ * "ratios_ratio_chap3_unit3" → "Ratios Ratio Chap3 Unit3"
  */
-function resolveTitle(act) {
-  // 1. Direct title from metadata
-  const meta = act.metadata || {};
-  if (meta.unitTitle && !looksLikeId(meta.unitTitle)) return meta.unitTitle;
-  if (act.metadata?.metadata?.unitTitle && !looksLikeId(act.metadata.metadata.unitTitle)) return act.metadata.metadata.unitTitle;
-  
-  // 2. transmissionTitle for video activities
-  if (meta.transmissionTitle && !looksLikeId(meta.transmissionTitle)) return meta.transmissionTitle;
-  
-  // 3. regionTitle as context  
-  if (meta.regionTitle && !looksLikeId(meta.regionTitle)) return meta.regionTitle;
-  
-  // 4. Extract from the display title (strip emoji prefixes)
-  const cleaned = (act.title || '')
-    .replace(/^[🚀🎬📝⏳💎🛒🧊🎁✅🗣️📌]\s*/g, '')
-    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 열람|데이터 로그 열람)[:\s]*/g, '')
-    .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
-    .trim();
-  if (cleaned && !looksLikeId(cleaned)) return cleaned;
-  
-  // 5. unitId as absolute fallback — but try to humanize it
-  const uid = meta.unitId || '';
-  if (uid) return humanizeId(uid);
-  
-  return '학습 활동';
-}
-
-/** Check if a string looks like a machine-generated ID (contains underscores + numbers pattern) */
-function looksLikeId(str) {
-  if (!str) return true;
-  // Patterns like: unit_gameproj_13, reg_177340..., chap_177383... ratios_ratio_chap3_unit3
-  return /^(unit|reg|chap|prob|cluster)_\d/.test(str) || 
-         /\w+_\w+_chap\d+/.test(str) ||  // Complex IDs like ratios_ratio_chap3_unit3
-         /^\w+_\d{10,}/.test(str) ||
-         /^[a-f0-9]{24,}$/.test(str);
-}
-
-/** Convert a raw ID like "unit_gameproj_13" to something slightly more readable */
-function humanizeId(id) {
+function formatUnitId(id) {
   if (!id) return '학습 활동';
   return id
     .split('_')
-    .filter(part => part !== 'unit' && part !== 'chap' && part !== 'reg' && part !== 'cluster')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ') || '학습 활동';
+    .join(' ');
+}
+
+/**
+ * Extract a clean display title from an activity's metadata.
+ * Priority: unitTitle > transmissionTitle > cleaned display title > formatted unitId
+ */
+function resolveTitle(act) {
+  const meta = act.metadata || {};
+
+  // 1. Direct unitTitle (set at write time)
+  if (meta.unitTitle && meta.unitTitle.length > 0) return meta.unitTitle;
+  if (meta.metadata?.unitTitle) return meta.metadata.unitTitle;
+
+  // 2. transmissionTitle for video activities
+  if (meta.transmissionTitle) return meta.transmissionTitle;
+
+  // 3. regionTitle as context
+  if (meta.regionTitle) return meta.regionTitle;
+
+  // 4. Extract from the display title (strip emoji prefixes)
+  const cleaned = (act.title || '')
+    .replace(/^[🚀🎬📝⏳💎🛒🧊🎁✅🗣️📌]\s*/g, '')
+    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람)[:\s]*/g, '')
+    .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
+    .trim();
+  if (cleaned && cleaned.length > 0) return cleaned;
+
+  // 5. unitId fallback
+  return formatUnitId(meta.unitId || '');
 }
 
 /**
@@ -589,29 +421,25 @@ function humanizeId(id) {
  * Key: unitId + activityType (quiz | video | text)
  */
 function buildGroupedActivities(rawActivities) {
-  // 1. Filter to learning-only activities
   const learningOnly = rawActivities.filter(a => LEARNING_TYPES.has(a.type));
-  
-  // 2. Build groups by unitId + normalized type
   const groupMap = new Map();
-  
+
   learningOnly.forEach(act => {
     const meta = act.metadata || {};
-    const unitId = meta.unitId || meta.metadata?.unitId || extractUnitId(act) || 'unknown';
-    
+    const unitId = meta.unitId || meta.metadata?.unitId || 'unknown';
+
     let normalizedType = 'quiz';
     if (act.type === 'video_reward' || act.type === 'video_view') normalizedType = 'video';
     else if (act.type === 'data_log_read') normalizedType = 'text';
-    else if (act.type === 'quiz_in_progress' || act.type === 'quiz_pass') normalizedType = 'quiz';
-    
+
     const groupKey = `${unitId}_${normalizedType}`;
-    
+
     if (!groupMap.has(groupKey)) {
       groupMap.set(groupKey, {
         id: `group_${groupKey}`,
         type: normalizedType,
-        unitId: unitId,
-        unitTitle: '', // resolved below
+        unitId,
+        unitTitle: '',
         regionTitle: meta.regionTitle || '',
         chapterId: meta.chapterId || '',
         firstTimestamp: act.timestamp,
@@ -626,10 +454,10 @@ function buildGroupedActivities(rawActivities) {
         subActivities: []
       });
     }
-    
+
     const group = groupMap.get(groupKey);
     group.subActivities.push(act);
-    
+
     // Update timestamps
     if (act.timestamp && (!group.firstTimestamp || act.timestamp < group.firstTimestamp)) {
       group.firstTimestamp = act.timestamp;
@@ -637,21 +465,18 @@ function buildGroupedActivities(rawActivities) {
     if (act.timestamp && (!group.lastTimestamp || act.timestamp > group.lastTimestamp)) {
       group.lastTimestamp = act.timestamp;
     }
-    
+
     // Quiz: take best score
     if (normalizedType === 'quiz' && act.score !== null && act.score !== undefined) {
       if (group.score === null || act.score > group.score) {
         group.score = act.score;
-        // Also capture initial score and attempt count from the same entry
         if (act.metadata?.initialScore !== undefined) group.initialScore = act.metadata.initialScore;
         if (act.metadata?.attemptCount !== undefined) group.attemptCount = act.metadata.attemptCount;
       }
       group.completed = true;
     }
     if (act.type === 'quiz_in_progress' && !group.completed) {
-      // Only set in-progress if we haven't already seen a completed quiz
       group.score = null;
-      // Capture progress counts from quizSession metadata
       const answered = Object.keys(meta.userAnswers || {}).length;
       const total = meta.originalTotal || 0;
       if (answered > group.answeredCount) {
@@ -659,64 +484,37 @@ function buildGroupedActivities(rawActivities) {
         group.totalCount = total;
       }
     }
-    
-    // Also capture counts from completed quizzes if available
-    if (normalizedType === 'quiz' && act.metadata?.correctCount !== undefined) {
-      // For completed, "answered" is essentially "total" (all are answered)
-      // But we can use totalCount specifically
-      if (act.metadata.totalCount) group.totalCount = act.metadata.totalCount;
+
+    if (normalizedType === 'quiz' && meta.totalCount) {
+      group.totalCount = meta.totalCount;
     }
-    
+
     // Video: accumulate max video time
     const vTime = meta.videoTime || meta.stampedCount || meta.metadata?.videoTime || 0;
     if (vTime > 0) {
       group.totalVideoSeconds = Math.max(group.totalVideoSeconds, Math.floor(vTime));
     }
-    
+
     // Completion markers
-    if (act.completed === true || act.type === 'video_reward') {
-      group.completed = true;
-    }
-    // Fuzzy title match for non-video activities
-    if (normalizedType !== 'video' && act.title?.includes('완료') && !act.title?.includes('진행')) {
-      group.completed = true;
-    }
-    // Only inherit 'complete' word if it's explicitly about finishing
-    if (act.title?.toLowerCase().includes('complete') && !act.title?.includes('video_')) {
-      group.completed = true;
-    }
-    
-    // Data log: always counts as completed once seen
-    if (normalizedType === 'text') {
-      group.completed = true;
-    }
+    if (act.completed === true || act.type === 'video_reward') group.completed = true;
+    if (normalizedType === 'text') group.completed = true;
   });
-  
-  // 3. Resolve titles using best available info from sub-activities
+
+  // Resolve titles
   groupMap.forEach((group) => {
-    // Try each sub-activity for the best title
     let bestTitle = '';
     for (const sub of group.subActivities) {
       const candidate = resolveTitle(sub);
-      if (candidate && !looksLikeId(candidate) && candidate.length > bestTitle.length) {
+      if (candidate && candidate !== '학습 활동' && candidate.length > bestTitle.length) {
         bestTitle = candidate;
       }
-      // Also capture regionTitle if found
       const rTitle = sub.metadata?.regionTitle;
       if (rTitle && !group.regionTitle) group.regionTitle = rTitle;
     }
-    group.unitTitle = bestTitle || humanizeId(group.unitId);
+    group.unitTitle = bestTitle || formatUnitId(group.unitId);
   });
-  
-  // 4. Sort by first timestamp
+
   const result = Array.from(groupMap.values());
   result.sort((a, b) => (a.firstTimestamp?.getTime() || 0) - (b.firstTimestamp?.getTime() || 0));
-  
   return result;
-}
-
-/** Try to extract unitId from various metadata locations */
-function extractUnitId(act) {
-  const meta = act.metadata || {};
-  return meta.unitId || meta.metadata?.unitId || null;
 }
