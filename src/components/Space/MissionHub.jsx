@@ -1085,9 +1085,8 @@ export default function MissionHub({
 
     if (gap > 0 && !isScrubbing) {
       // Normal playback (including speed playback AND background throttled polls). 
-      // Safely stamp ALL seconds in range (limited to 60s max per tick safety bound)
-      const maxStamps = Math.min(gap, 60)
-      for (let s = lastSecond + 1; s <= lastSecond + maxStamps; s++) {
+      // Safely stamp ALL seconds in range (removed 60s limit to support background throttling)
+      for (let s = lastSecond + 1; s <= lastSecond + gap; s++) {
         if (!stampedSetRef.current.has(s)) {
           stampedSetRef.current.add(s)
           newStampCountRef.current++
