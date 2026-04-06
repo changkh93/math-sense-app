@@ -1,0 +1,698 @@
+Searching for Unit: reg_1774390167801_chap_1774390199371_unit_1774390267517
+Unit Document: {
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "docId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "id": "unit_1774390267517",
+  "title": "3월 평가",
+  "order": 0,
+  "workbookPages": [],
+  "learningContents": {
+    "pdfUrl": "https://drive.google.com/file/d/1HAqK4Zzoeu5CaOzJLi5HQ4I95P3lE7aO/view?usp=drive_link",
+    "text": ""
+  },
+  "contentFlags": {
+    "hasTransmission": false,
+    "hasDataLog": true,
+    "hasWorkbook": false
+  },
+  "videoConfig": {
+    "start": 0,
+    "end": 0,
+    "videoId": ""
+  },
+  "transmissions": [],
+  "lastUpdated": {
+    "_seconds": 1774855967,
+    "_nanoseconds": 281000000
+  }
+}
+
+Searching across all learning_progress...
+Found in tracking for User: 11JYuYnFJ6NxL1yZpGB1XVV5bNY2
+{
+  "logReadAt": {
+    "_seconds": 1774512341,
+    "_nanoseconds": 193000000
+  },
+  "logRead": true,
+  "bestScore": 100,
+  "initialScore": 60,
+  "attemptCount": 6,
+  "updatedAt": {
+    "_seconds": 1774600492,
+    "_nanoseconds": 781000000
+  }
+}
+Found in tracking for User: 6HJ28QzBZFW71Tl4aQUSLhbMDhD3
+{
+  "logReadAt": {
+    "_seconds": 1774512502,
+    "_nanoseconds": 689000000
+  },
+  "logRead": true,
+  "bestScore": 100,
+  "initialScore": 16,
+  "attemptCount": 8,
+  "updatedAt": {
+    "_seconds": 1774514825,
+    "_nanoseconds": 463000000
+  }
+}
+Found in tracking for User: MoRe5TNbmpNq2gs0bH191LbQOif1
+{
+  "bestScore": 80,
+  "updatedAt": {
+    "_seconds": 1774662239,
+    "_nanoseconds": 723000000
+  }
+}
+Found in tracking for User: PKodQaH5PRYPv9czq7r6YfSaeJf2
+{
+  "quizSession": {
+    "originalTotal": 25,
+    "retryCount": 0,
+    "shieldsUsed": 0,
+    "firstPassScore": null,
+    "comboCount": 7,
+    "sessionCrystals": 23,
+    "currentIdx": 18,
+    "userAnswers": {
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q1_1774394049668": {
+        "text": "$57$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q2_1774394049668": {
+        "text": "$54$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q3_1774394049668": {
+        "text": "$7$ $개$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q4_1774394049668": {
+        "text": "$6$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q5_1774394049668": {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q6_1774394049668": {
+        "text": "$18$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q7_1774394049668": {
+        "text": "$14, 28, 42$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q8_1774394049668": {
+        "text": "$17$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q9_1774394049668": {
+        "text": "$214$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q10_1774394049668": {
+        "text": "$3$ $개$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q11_1774394049668": {
+        "text": "$35$ $^\\circ C$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q12_1774394049668": {
+        "text": "$9$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q13_1774394049668": {
+        "text": "$1, 2, 8$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q14_1774394049668": {
+        "text": "$9$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q15_1774394049668": {
+        "text": "$8$ $개$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q16_1774394049668": {
+        "text": "$21$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q17_1774394049668": {
+        "text": "$17$ $개$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q18_1774394049668": {
+        "text": "$20$ $바퀴$",
+        "isCorrect": true
+      }
+    }
+  },
+  "updatedAt": {
+    "_seconds": 1775132403,
+    "_nanoseconds": 192000000
+  }
+}
+Found in tracking for User: S8EsKzRat5SW0ojuZAwxGMIfMX52
+{
+  "initialScore": 64,
+  "bestScore": 96,
+  "attemptCount": 3,
+  "updatedAt": {
+    "_seconds": 1774599939,
+    "_nanoseconds": 1000000
+  }
+}
+Found in tracking for User: W9HwPdo0CvcJCfGFMP1PIeqyxyN2
+{
+  "logReadAt": {
+    "_seconds": 1774598839,
+    "_nanoseconds": 477000000
+  },
+  "logRead": true,
+  "bestScore": 100,
+  "initialScore": 40,
+  "attemptCount": 5,
+  "updatedAt": {
+    "_seconds": 1775033666,
+    "_nanoseconds": 0
+  }
+}
+Found in tracking for User: cPW3EkkiW5Me2pLQDgAbixuRDLa2
+{
+  "logReadAt": {
+    "_seconds": 1774513617,
+    "_nanoseconds": 68000000
+  },
+  "logRead": true,
+  "bestScore": 88,
+  "initialScore": 88,
+  "attemptCount": 1,
+  "updatedAt": {
+    "_seconds": 1774514256,
+    "_nanoseconds": 338000000
+  }
+}
+Found in tracking for User: epLElAqtwxO6whd4CNOpcvn4Qea2
+{
+  "bestScore": 100,
+  "initialScore": 84,
+  "attemptCount": 5,
+  "updatedAt": {
+    "_seconds": 1774785137,
+    "_nanoseconds": 742000000
+  }
+}
+Found in tracking for User: f72mUv1Ov8frJPliTBTHFJdzaQH3
+{
+  "logReadAt": {
+    "_seconds": 1774512593,
+    "_nanoseconds": 815000000
+  },
+  "logRead": true,
+  "bestScore": 100,
+  "initialScore": 100,
+  "attemptCount": 1,
+  "updatedAt": {
+    "_seconds": 1774514786,
+    "_nanoseconds": 488000000
+  }
+}
+Found in tracking for User: gBkTtil7ylb4sXB3gCOh9UVgAfJ3
+{
+  "quizSession": {
+    "originalTotal": 25,
+    "comboCount": 0,
+    "sessionCrystals": 0,
+    "currentIdx": 0,
+    "userAnswers": {},
+    "retryCount": 0,
+    "shieldsUsed": 0,
+    "firstPassScore": null
+  },
+  "updatedAt": {
+    "_seconds": 1775119420,
+    "_nanoseconds": 606000000
+  }
+}
+Found in tracking for User: nMONl5rnU4S4dmQcZzbITrS0W2B3
+{
+  "bestScore": 100,
+  "initialScore": 96,
+  "attemptCount": 2,
+  "updatedAt": {
+    "_seconds": 1774514125,
+    "_nanoseconds": 240000000
+  }
+}
+Found in tracking for User: nspjzUAjefSoDeaN1TuaNywSFyS2
+{
+  "quizSession": {
+    "originalTotal": 25,
+    "retryCount": 0,
+    "shieldsUsed": 0,
+    "firstPassScore": null,
+    "comboCount": 1,
+    "sessionCrystals": 6,
+    "currentIdx": 20,
+    "userAnswers": {
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q1_1774394049668": {
+        "text": "$57$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q2_1774394049668": {
+        "text": "$54$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q3_1774394049668": {
+        "text": "$7$ $개$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q4_1774394049668": {
+        "text": "$6$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q5_1774394049668": {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q6_1774394049668": {
+        "text": "$18$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q7_1774394049668": {
+        "text": "$14, 21, 42$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q8_1774394049668": {
+        "text": "$15$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q9_1774394049668": {
+        "text": "$216$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q10_1774394049668": {
+        "text": "$3$ $개$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q11_1774394049668": {
+        "text": "$40$ $^\\circ C$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q12_1774394049668": {
+        "text": "$8$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q13_1774394049668": {
+        "text": "$2, 8, 10$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q14_1774394049668": {
+        "text": "$9$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q15_1774394049668": {
+        "text": "$7$ $개$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q16_1774394049668": {
+        "text": "$21$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q17_1774394049668": {
+        "text": "$17$ $개$",
+        "isCorrect": true
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q18_1774394049668": {
+        "text": "$10$ $바퀴$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q19_1774394049668": {
+        "text": "$25$ $개$",
+        "isCorrect": false
+      },
+      "reg_1774390167801_chap_1774390199371_unit_1774390267517_q20_1774394049668": {
+        "text": "$1, 2, 3$",
+        "isCorrect": true
+      }
+    }
+  },
+  "logReadAt": {
+    "_seconds": 1775205513,
+    "_nanoseconds": 364000000
+  },
+  "logRead": true,
+  "updatedAt": {
+    "_seconds": 1775205513,
+    "_nanoseconds": 364000000
+  }
+}
+Found in tracking for User: xmVoASe5O6R56EYlsROGtuRtiEg2
+{
+  "bestScore": 68,
+  "initialScore": 68,
+  "attemptCount": 1,
+  "updatedAt": {
+    "_seconds": 1774514814,
+    "_nanoseconds": 14000000
+  }
+}
+
+Searching across all history...
+History Doc: users/11JYuYnFJ6NxL1yZpGB1XVV5bNY2/history/LmIOI9fMKWppqudrvCBj
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "transmissionId": "",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "crystalsEarned": 30,
+  "type": "text",
+  "timestamp": {
+    "_seconds": 1774512341,
+    "_nanoseconds": 193000000
+  }
+}
+History Doc: users/11JYuYnFJ6NxL1yZpGB1XVV5bNY2/history/U4KsZGTiOaGlToLc3Y08
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "initialScore": 60,
+  "attemptCount": 6,
+  "crystalsEarned": -55,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774600492,
+    "_nanoseconds": 781000000
+  }
+}
+History Doc: users/6HJ28QzBZFW71Tl4aQUSLhbMDhD3/history/l6zobLWvFynQisXr0XJK
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "transmissionId": "",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "crystalsEarned": 30,
+  "type": "text",
+  "timestamp": {
+    "_seconds": 1774512502,
+    "_nanoseconds": 689000000
+  }
+}
+History Doc: users/6HJ28QzBZFW71Tl4aQUSLhbMDhD3/history/yjfXE1yzEi6Xg35wJKah
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "initialScore": 16,
+  "attemptCount": 8,
+  "crystalsEarned": -273,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774514825,
+    "_nanoseconds": 463000000
+  }
+}
+History Doc: users/MoRe5TNbmpNq2gs0bH191LbQOif1/history/n3Fn7xGwu6YTp2TZ5pqt
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 80,
+  "crystalsEarned": 35,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774662239,
+    "_nanoseconds": 723000000
+  }
+}
+History Doc: users/PKodQaH5PRYPv9czq7r6YfSaeJf2/history/da3HVhCiQF9FdxrDrwS9
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "crystalsEarned": 60,
+  "timestamp": {
+    "_seconds": 1775135740,
+    "_nanoseconds": 572000000
+  }
+}
+History Doc: users/S8EsKzRat5SW0ojuZAwxGMIfMX52/history/7gmUfTgtCa1Aiho7cuTA
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 84,
+  "initialScore": 84,
+  "attemptCount": 1,
+  "crystalsEarned": 10,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774599657,
+    "_nanoseconds": 656000000
+  }
+}
+History Doc: users/S8EsKzRat5SW0ojuZAwxGMIfMX52/history/ABeoSg3FydB5rpzBGpsG
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 96,
+  "initialScore": 96,
+  "attemptCount": 1,
+  "crystalsEarned": 7,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774599939,
+    "_nanoseconds": 1000000
+  }
+}
+History Doc: users/S8EsKzRat5SW0ojuZAwxGMIfMX52/history/qCbJ1iu3oZfO50i0SgiO
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 64,
+  "initialScore": 64,
+  "attemptCount": 1,
+  "crystalsEarned": 13,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774599321,
+    "_nanoseconds": 320000000
+  }
+}
+History Doc: users/W9HwPdo0CvcJCfGFMP1PIeqyxyN2/history/dAxd6IBnUP7eloDR5Svi
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "initialScore": 40,
+  "attemptCount": 5,
+  "crystalsEarned": -15,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1775033666,
+    "_nanoseconds": 0
+  }
+}
+History Doc: users/W9HwPdo0CvcJCfGFMP1PIeqyxyN2/history/l1Zi1oZkour6sJBTbu1I
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "transmissionId": "",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "crystalsEarned": 30,
+  "type": "text",
+  "timestamp": {
+    "_seconds": 1774598839,
+    "_nanoseconds": 477000000
+  }
+}
+History Doc: users/cPW3EkkiW5Me2pLQDgAbixuRDLa2/history/E1T7gxgKcug5Cm0nUFMq
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 88,
+  "initialScore": 88,
+  "attemptCount": 1,
+  "crystalsEarned": 51,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774514256,
+    "_nanoseconds": 338000000
+  }
+}
+History Doc: users/cPW3EkkiW5Me2pLQDgAbixuRDLa2/history/pcQYIB0KrTzVew5cpQrF
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "transmissionId": "",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "crystalsEarned": 30,
+  "type": "text",
+  "timestamp": {
+    "_seconds": 1774513617,
+    "_nanoseconds": 68000000
+  }
+}
+History Doc: users/epLElAqtwxO6whd4CNOpcvn4Qea2/history/EAsbwCbf3tvkd4DLEiHC
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "initialScore": 84,
+  "attemptCount": 5,
+  "crystalsEarned": 17,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774785137,
+    "_nanoseconds": 742000000
+  }
+}
+History Doc: users/f72mUv1Ov8frJPliTBTHFJdzaQH3/history/3ZBOH4jaYJS5IOt1s21G
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "transmissionId": "",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "crystalsEarned": 30,
+  "type": "text",
+  "timestamp": {
+    "_seconds": 1774512593,
+    "_nanoseconds": 815000000
+  }
+}
+History Doc: users/f72mUv1Ov8frJPliTBTHFJdzaQH3/history/uBVqOROQ4aeHjrT0UoJ1
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "initialScore": 100,
+  "attemptCount": 1,
+  "crystalsEarned": 80,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774514786,
+    "_nanoseconds": 488000000
+  }
+}
+History Doc: users/nMONl5rnU4S4dmQcZzbITrS0W2B3/history/XYnZSuzACTLladC2YaYR
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 100,
+  "initialScore": 96,
+  "attemptCount": 2,
+  "crystalsEarned": 73,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774514125,
+    "_nanoseconds": 240000000
+  }
+}
+History Doc: users/nspjzUAjefSoDeaN1TuaNywSFyS2/history/log_completion_reg_1774390167801_chap_1774390199371_unit_1774390267517
+{
+  "crystalsEarned": 30,
+  "stampedCount": 0,
+  "clusterId": "cluster_elementary",
+  "regionTitle": "월간평가",
+  "type": "text",
+  "unitTitle": "3월 평가",
+  "score": 100,
+  "transmissionId": "",
+  "regionId": "reg_1774390167801",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "videoTime": 0,
+  "timestamp": {
+    "_seconds": 1775205513,
+    "_nanoseconds": 364000000
+  }
+}
+History Doc: users/xmVoASe5O6R56EYlsROGtuRtiEg2/history/Qnf3vSzDhPQZAyprJeDb
+{
+  "unitId": "reg_1774390167801_chap_1774390199371_unit_1774390267517",
+  "unitTitle": "3월 평가",
+  "regionId": "reg_1774390167801",
+  "regionTitle": "월간평가",
+  "chapterId": "reg_1774390167801_chap_1774390199371",
+  "clusterId": "cluster_elementary",
+  "score": 68,
+  "initialScore": 68,
+  "attemptCount": 1,
+  "crystalsEarned": 16,
+  "type": "quiz",
+  "timestamp": {
+    "_seconds": 1774514814,
+    "_nanoseconds": 14000000
+  }
+}

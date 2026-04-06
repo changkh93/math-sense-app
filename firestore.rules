@@ -54,7 +54,12 @@ service cloud.firestore {
     match /questions/{questionId} {
       allow create: if isAuth();
       allow read: if isAuth();
-      allow update, delete: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAuth() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answerCount', 'updatedAt'])
+      );
+      allow delete: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Answers: Authenticated users can read

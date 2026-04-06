@@ -82,7 +82,6 @@ export default function QuestionDetail() {
     if (!newAnswer.trim() || addAnswer.isPending || isCooldown) return;
     
     const content = newAnswer.trim();
-    setNewAnswer(''); // Clear immediately for better UX
     setIsCooldown(true);
     
     try {
@@ -92,12 +91,15 @@ export default function QuestionDetail() {
         isTeacher: false
       });
       
+      // Clear input ONLY upon success
+      setNewAnswer(''); 
+      
       // Cooldown for 3 seconds to prevent double posting accidentally
       setTimeout(() => setIsCooldown(false), 3000);
     } catch (error) {
-      setNewAnswer(content); // Restore if failed
       setIsCooldown(false);
       console.error("Failed to post answer:", error);
+      alert('답변 전송 중 오류가 발생했습니다. 다시 시도해주세요.');
     }
   };
 
