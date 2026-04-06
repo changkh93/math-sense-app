@@ -3,7 +3,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db } from '../../firebase'
 import { signInWithPopup } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, writeBatch, increment, limit, runTransaction, Timestamp, documentId } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, where, getDocs, writeBatch, increment, limit, runTransaction, Timestamp, documentId } from 'firebase/firestore'
 import { useClusters, useRegions, useRegion, useChapters, useChapter, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { usePresence } from '../../hooks/usePresence'
@@ -478,8 +478,9 @@ function SpaceHome() {
   }, [user]);
 
   /**
-   * --- Streak Sync (Self-healing) ---
-   * Compare calculated streak from history/transactions with stored counter.
+   * --- Streak Drift Audit ---
+   * Runtime update path and history reconstruction must stay identical.
+   * We only log drift here; admin repair uses the same shared engine.
    */
   useEffect(() => {
     if (!user || !userData || loadingHistory || loadingTransactions) return;
@@ -502,14 +503,7 @@ function SpaceHome() {
     
     // Ensure we have a valid calculated value
     if (calculatedStreak !== storedStreak && (history.length > 0 || transactions.length > 0)) {
-      console.log(`[StreakSync] Detected drift. Calculated: ${calculatedStreak}, Stored: ${storedStreak}. Syncing...`);
-      const userRef = doc(db, 'users', user.uid);
-      setDoc(userRef, { 
-        currentStreak: calculatedStreak,
-        lastStreakSyncAt: serverTimestamp() 
-      }, { merge: true })
-        .then(() => console.log("[StreakSync] Successfully matched history."))
-        .catch(err => console.error("[StreakSync] Sync Error:", err));
+      console.warn(`[StreakAudit] Drift detected. Calculated: ${calculatedStreak}, Stored: ${storedStreak}.`);
     }
   }, [user, userData, history, transactions, loadingHistory, loadingTransactions]);
 
@@ -744,7 +738,7 @@ function SpaceHome() {
       soundManager.playCrystal()
 
       // --- Atomic Transaction: 모든 사용자 데이터 읽기+계산+쓰기를 하나의 트랜잭션으로 처리 ---
-      // getDoc() + setDoc() 패턴은 중간에 다른 쓰기(예: 코어 구매 increment)가 끼어들어
+      // getDoc() + client merge write 패턴은 중간에 다른 쓰기(예: 코어 구매 increment)가 끼어들어
       // streakFreezeCount를 옛날 값으로 덮어쓰는 race condition을 유발합니다.
       // runTransaction은 충돌 시 자동 재시도하여 이를 방지합니다.
       const userDocRef = doc(db, 'users', user.uid)
@@ -818,19 +812,6 @@ function SpaceHome() {
 
         // --- Atomic Logging: Streak Freeze ---
         if (streakCalc.meta?.freezeUsed) {
-          const defendedDates = []
-          const lastDate = freshUserData?.lastStreakDate
-          if (lastDate) {
-            let scanDate = new Date(lastDate)
-            scanDate.setDate(scanDate.getDate() + 1)
-            let scanKST = getTodayKST(scanDate)
-
-            while (scanKST < todayKST) {
-              defendedDates.push(scanKST)
-              scanDate.setDate(scanDate.getDate() + 1)
-              scanKST = getTodayKST(scanDate)
-            }
-          }
           recordCrystalTransaction(user.uid, {
             amount: 0,
             type: 'streak_freeze',
@@ -839,7 +820,10 @@ function SpaceHome() {
               unitId: currentUnitId,
               streakBefore: freshUserData?.currentStreak || 0,
               streakAfter: streakCalc.meta.newStreak,
-              defendedDates: defendedDates
+              defendedDates: streakCalc.meta.defendedDates || [],
+              consumedFreezeCount: streakCalc.meta.consumedFreezeCount || 0,
+              balanceBefore: freshUserData?.streakFreezeCount || 0,
+              balanceAfter: streakUpdates.streakFreezeCount ?? freshUserData?.streakFreezeCount ?? 0
             }
           }, transaction)
         }
@@ -1175,19 +1159,6 @@ function SpaceHome() {
 
         // --- Atomic Logging: Streak Freeze ---
         if (streakResult.meta?.freezeUsed) {
-          const defendedDates = []
-          const lastDate = freshUserData?.lastStreakDate
-          if (lastDate) {
-            let scanDate = new Date(lastDate)
-            scanDate.setDate(scanDate.getDate() + 1)
-            let scanKST = getTodayKST(scanDate)
-
-            while (scanKST < todayKST) {
-              defendedDates.push(scanKST)
-              scanDate.setDate(scanDate.getDate() + 1)
-              scanKST = getTodayKST(scanDate)
-            }
-          }
           recordCrystalTransaction(user.uid, {
             amount: 0,
             type: 'streak_freeze',
@@ -1196,7 +1167,10 @@ function SpaceHome() {
               unitId: currentUnitId,
               streakBefore: freshUserData?.currentStreak || 0,
               streakAfter: streakResult.meta.newStreak,
-              defendedDates: defendedDates
+              defendedDates: streakResult.meta.defendedDates || [],
+              consumedFreezeCount: streakResult.meta.consumedFreezeCount || 0,
+              balanceBefore: freshUserData?.streakFreezeCount || 0,
+              balanceAfter: streakUpdates.streakFreezeCount ?? freshUserData?.streakFreezeCount ?? 0
             }
           }, transaction)
         }

@@ -7,6 +7,7 @@
  */
 
 import admin from 'firebase-admin';
+import { getTodayKST, recalculateStreakState } from './src/utils/streakUtils.js';
 
 admin.initializeApp({
   projectId: 'math-sense-1f6a8',
@@ -14,69 +15,6 @@ admin.initializeApp({
 
 const db = admin.firestore();
 const FIX_MODE = process.argv.includes('--fix');
-
-function getTodayKST() {
-  const kstNow = new Date(Date.now() + 9 * 3600000);
-  return kstNow.toISOString().split('T')[0];
-}
-
-function daysBetween(d1, d2) {
-  const a = new Date(d1 + 'T00:00:00+09:00');
-  const b = new Date(d2 + 'T00:00:00+09:00');
-  return Math.floor((b - a) / 86400000);
-}
-
-/**
- * 전체 활동 기록 + 코어 예산으로 올바른 스트릭 재계산
- */
-function recalculateStreak(activeDates, totalCoresAvailable) {
-  if (activeDates.length === 0) {
-    return { correctStreak: 0, correctLastDate: '', coresUsed: 0, defendedDates: [] };
-  }
-
-  const sorted = [...activeDates].sort();
-  let coresRemaining = totalCoresAvailable;
-  const defendedDates = [];
-  const allDates = new Set(sorted);
-
-  // 갭 분석: 활동일 사이의 작은 갭을 코어로 방어
-  for (let i = 0; i < sorted.length - 1 && coresRemaining > 0; i++) {
-    const gap = daysBetween(sorted[i], sorted[i + 1]) - 1;
-    if (gap > 0 && gap <= coresRemaining) {
-      const scanObj = new Date(sorted[i] + 'T12:00:00Z');
-      for (let j = 0; j < gap; j++) {
-        scanObj.setUTCDate(scanObj.getUTCDate() + 1);
-        const dStr = scanObj.toISOString().split('T')[0];
-        defendedDates.push(dStr);
-        allDates.add(dStr);
-        coresRemaining--;
-      }
-    }
-  }
-
-  // 끝에서부터 역방향으로 가장 최근 연속 체인 구성
-  const allSorted = Array.from(allDates).sort();
-  let chainDates = [allSorted[allSorted.length - 1]];
-  for (let i = allSorted.length - 2; i >= 0; i--) {
-    if (daysBetween(allSorted[i], allSorted[i + 1]) === 1) {
-      chainDates.push(allSorted[i]);
-    } else {
-      break;
-    }
-  }
-
-  // 체인 내에서 코어로 보충된 날짜를 제외하고, 실제 학습일만 센다
-  const streakCount = chainDates.filter(d => activeDates.includes(d)).length;
-
-  const lastDate = allSorted[allSorted.length - 1];
-  return {
-    correctStreak: streakCount,
-    correctLastDate: lastDate,
-    coresUsed: totalCoresAvailable - coresRemaining,
-    coresRemaining,
-    defendedDates,
-  };
-}
 
 async function auditAndFix() {
   console.log(`\n${'='.repeat(60)}`);
@@ -102,10 +40,15 @@ async function auditAndFix() {
       .collection('crystal_transactions').orderBy('timestamp', 'asc').get();
     const transactions = txSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    const corePurchases = transactions.filter(t =>
-      t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core'
-    ).length;
-    const freezeEvents = transactions.filter(t => t.type === 'streak_freeze').length;
+    const corePurchaseDates = transactions
+      .filter(t => t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core' && t.timestamp)
+      .map(t => getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp)));
+    const freezeUsageDates = transactions
+      .filter(t => t.type === 'streak_freeze' && t.timestamp)
+      .map(t => getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp)))
+      .sort();
+    const corePurchases = corePurchaseDates.length;
+    const freezeEvents = freezeUsageDates.length;
     const currentFreezeCount = userData.streakFreezeCount || 0;
 
     if (corePurchases === 0 && currentFreezeCount === 0 && freezeEvents === 0) {
@@ -113,7 +56,23 @@ async function auditAndFix() {
       continue;
     }
 
-    const totalCoresEverHad = Math.max(corePurchases, freezeEvents + currentFreezeCount);
+    const coreEvidenceDates = [...corePurchaseDates];
+
+    const simulatedInventory = [...corePurchaseDates].sort();
+    freezeUsageDates.forEach(usageDate => {
+      const idx = simulatedInventory.findIndex(purchaseDate => purchaseDate <= usageDate);
+      if (idx !== -1) simulatedInventory.splice(idx, 1);
+      else coreEvidenceDates.push(usageDate);
+    });
+
+    const currentlyExpected = coreEvidenceDates.length - freezeUsageDates.length;
+    if (currentFreezeCount > currentlyExpected) {
+      for (let i = 0; i < currentFreezeCount - currentlyExpected; i++) {
+        coreEvidenceDates.push(todayKST);
+      }
+    }
+
+    const totalCoresEverHad = coreEvidenceDates.length;
 
     // 히스토리
     const histSnap = await db.collection('users').doc(uid)
@@ -130,13 +89,16 @@ async function auditAndFix() {
 
     if (activeDates.size === 0) continue;
 
-    const result = recalculateStreak(Array.from(activeDates), totalCoresEverHad);
+    const result = recalculateStreakState(Array.from(activeDates), coreEvidenceDates, todayKST);
 
     const dbStreak = userData.currentStreak || 0;
     const dbLongest = userData.longestStreak || 0;
     const dbLastDate = userData.lastStreakDate || '';
     const longestShouldBe = Math.max(dbLongest, result.correctStreak);
-    const shouldFix = result.correctStreak !== dbStreak || result.correctLastDate !== dbLastDate;
+    const shouldFix =
+      result.correctStreak !== dbStreak ||
+      result.correctLastDate !== dbLastDate ||
+      result.coresRemaining !== currentFreezeCount;
 
     if (shouldFix) {
       affectedUsers.push({
@@ -148,13 +110,14 @@ async function auditAndFix() {
         coresUsed: result.coresUsed,
         defendedDates: result.defendedDates,
         totalCoresEverHad, currentFreezeCount,
+        correctFreezeCount: result.coresRemaining,
       });
 
       console.log(`\n⚠️  ${displayName}`);
       console.log(`   DB 스트릭: ${dbStreak}일 → 올바른 스트릭: ${result.correctStreak}일`);
       console.log(`   DB 최장: ${dbLongest}일 → 올바른 최장: ${longestShouldBe}일`);
       console.log(`   마지막 학습일: ${dbLastDate} → ${result.correctLastDate}`);
-      console.log(`   코어: ${totalCoresEverHad}개 / 사용: ${result.coresUsed}개`);
+      console.log(`   코어: ${totalCoresEverHad}개 / 사용: ${result.coresUsed}개 / 잔여: ${result.coresRemaining}개`);
       console.log(`   방어 날짜: [${result.defendedDates.join(', ')}]`);
     } else {
       console.log(`✅ ${displayName} — 정상 (스트릭: ${dbStreak}일)`);
@@ -181,10 +144,9 @@ async function auditAndFix() {
       const updates = {
         currentStreak: user.correctStreak,
         longestStreak: user.correctLongest,
+        streakFreezeCount: user.correctFreezeCount,
       };
-      if (!user.dbLastDate || user.correctLastDate > user.dbLastDate) {
-        updates.lastStreakDate = user.correctLastDate;
-      }
+      updates.lastStreakDate = user.correctLastDate;
       await db.collection('users').doc(user.uid).set(updates, { merge: true });
       console.log(`✅ ${user.displayName}: ${user.dbStreak} → ${user.correctStreak}일`);
     } catch (err) {

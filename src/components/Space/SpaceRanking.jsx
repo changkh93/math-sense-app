@@ -8,7 +8,7 @@ import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
-import { getEffectiveStreak, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
+import { getEffectiveStreak, getTodayKST, getKSTComponents, recalculateStreakState } from '../../utils/streakUtils'
 import { calculateSEI } from '../../utils/rankingUtils'
 import { useAdmin } from '../../hooks/useAdmin'
 
@@ -24,33 +24,52 @@ export default function SpaceRanking({ user, userData }) {
     try {
       const repairPromises = topUsers.map(async (u) => {
         const histQ = query(collection(db, 'users', u.id, 'history'), orderBy('timestamp', 'desc'), limit(100));
-        const snap = await getDocs(histQ);
+        const txQ = query(collection(db, 'users', u.id, 'crystal_transactions'), orderBy('timestamp', 'asc'));
+        const [snap, txSnap] = await Promise.all([getDocs(histQ), getDocs(txQ)]);
         const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
         if (docs.length === 0) return null;
-        const historyDates = docs.map(h => {
+
+        const activeDates = docs.map(h => {
           if (!h.timestamp) return null;
-          const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
-          const kst = getKSTComponents(d);
-          return `${kst.year}-${String(kst.month).padStart(2, '0')}-${String(kst.day).padStart(2, '0')}`;
+          return getTodayKST(h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp));
         }).filter(Boolean);
-        const uniqueDates = [...new Set(historyDates)].sort().reverse();
-        let calculatedStreak = 0; let lastDate = "";
-        if (uniqueDates.length > 0) {
-          lastDate = uniqueDates[0];
-          let currDate = uniqueDates[0];
-          calculatedStreak = 1;
-          for (let i = 1; i < uniqueDates.length; i++) {
-            const prevDate = uniqueDates[i];
-            const d1 = new Date(currDate)
-            const d2 = new Date(prevDate)
-            const diff = Math.round((d1.getTime() - d2.getTime()) / 86400000);
-            if (diff === 1) { calculatedStreak++; currDate = prevDate; } else { break; }
+
+        const transactions = txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const coreEvidenceDates = transactions
+          .filter(t => t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core' && t.timestamp)
+          .map(t => getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp)));
+
+        const usageDates = transactions
+          .filter(t => t.type === 'streak_freeze' && t.timestamp)
+          .map(t => getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp)))
+          .sort();
+
+        const currentOwned = u.streakFreezeCount || 0;
+        const simulatedInventory = [...coreEvidenceDates].sort();
+        usageDates.forEach(usageDate => {
+          const idx = simulatedInventory.findIndex(purchaseDate => purchaseDate <= usageDate);
+          if (idx !== -1) simulatedInventory.splice(idx, 1);
+          else coreEvidenceDates.push(usageDate);
+        });
+
+        const currentlyExpected = coreEvidenceDates.length - usageDates.length;
+        if (currentOwned > currentlyExpected) {
+          for (let i = 0; i < currentOwned - currentlyExpected; i++) {
+            coreEvidenceDates.push(getTodayKST());
           }
         }
-        if (calculatedStreak !== (u.currentStreak || 0) || lastDate !== (u.lastStreakDate || "")) {
+
+        const streakState = recalculateStreakState(activeDates, coreEvidenceDates, getTodayKST());
+        if (
+          streakState.correctStreak !== (u.currentStreak || 0) ||
+          streakState.correctLastDate !== (u.lastStreakDate || "") ||
+          streakState.coresRemaining !== currentOwned
+        ) {
           await setDoc(doc(db, 'users', u.id), {
-            currentStreak: calculatedStreak, lastStreakDate: lastDate,
-            longestStreak: Math.max(u.longestStreak || 0, calculatedStreak)
+            currentStreak: streakState.correctStreak,
+            lastStreakDate: streakState.correctLastDate,
+            longestStreak: Math.max(u.longestStreak || 0, streakState.correctStreak),
+            streakFreezeCount: streakState.coresRemaining
           }, { merge: true });
           return u.id;
         }

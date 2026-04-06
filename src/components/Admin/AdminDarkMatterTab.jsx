@@ -235,7 +235,7 @@ export default function AdminDarkMatterTab({ userId }) {
                     {parseInlineFormatting(q.question, { keyPrefix: `q-${q.id}` })}
                   </div>
 
-                  {q.type === 'multiple_choice' && q.options && (
+                  {q.options && q.options.length > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '0.8rem', marginBottom: '1.5rem' }}>
                       {q.options.map((opt, i) => {
                         const isCorrect = (i + 1).toString() === q.answer;

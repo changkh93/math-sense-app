@@ -19,9 +19,21 @@ export function getTodayKST(date = new Date()) {
 /**
  * KST 기준 어제 날짜를 YYYY-MM-DD 형식으로 반환
  */
-export function getYesterdayKST() {
-  const date = new Date();
-  date.setDate(date.getDate() - 1); // Subtract 24 hours approximately
+export function getYesterdayKST(date = new Date()) {
+  const baseDate = new Date(date);
+  baseDate.setDate(baseDate.getDate() - 1); // Subtract 24 hours approximately
+  return getTodayKST(baseDate);
+}
+
+/**
+ * KST 기준 날짜 문자열에 일수를 더하거나 뺍니다.
+ * @param {string} dateStr - YYYY-MM-DD
+ * @param {number} dayOffset
+ * @returns {string}
+ */
+export function shiftKSTDate(dateStr, dayOffset) {
+  const date = new Date(dateStr + 'T00:00:00+09:00');
+  date.setDate(date.getDate() + dayOffset);
   return getTodayKST(date);
 }
 
@@ -66,6 +78,85 @@ function daysBetween(dateStr1, dateStr2) {
   const d1 = new Date(dateStr1 + 'T00:00:00+09:00')
   const d2 = new Date(dateStr2 + 'T00:00:00+09:00')
   return Math.floor((d2 - d1) / 86400000)
+}
+
+function listGapDatesExclusive(startDate, endDate) {
+  const gapDates = [];
+  const gapSize = daysBetween(startDate, endDate) - 1;
+
+  if (gapSize <= 0) return gapDates;
+
+  let cursor = shiftKSTDate(startDate, 1);
+  while (cursor < endDate) {
+    gapDates.push(cursor);
+    cursor = shiftKSTDate(cursor, 1);
+  }
+
+  return gapDates;
+}
+
+function normalizeDateSet(dates) {
+  return new Set(Array.from(dates || []).filter(Boolean));
+}
+
+function getLatestDate(dates) {
+  const normalized = Array.from(normalizeDateSet(dates)).sort();
+  return normalized.length > 0 ? normalized[normalized.length - 1] : '';
+}
+
+export function getCurrentGapDefendedDates(lastActiveDate, freezeCount, todayKST = getTodayKST()) {
+  if (!lastActiveDate || freezeCount <= 0) return [];
+
+  const missedDates = listGapDatesExclusive(lastActiveDate, todayKST);
+  if (missedDates.length === 0 || missedDates.length > freezeCount) return [];
+  return missedDates;
+}
+
+export function getCurrentStreakWindow(activeDates, defendedDates, todayKST = getTodayKST()) {
+  const activeSet = normalizeDateSet(activeDates);
+  const defendedSet = normalizeDateSet(defendedDates);
+  const participatedSet = new Set([...activeSet, ...defendedSet]);
+  const yesterdayKST = shiftKSTDate(todayKST, -1);
+
+  let anchorDate = null;
+  if (participatedSet.has(todayKST)) {
+    anchorDate = todayKST;
+  } else if (participatedSet.has(yesterdayKST)) {
+    anchorDate = yesterdayKST;
+  } else {
+    return {
+      activeCount: 0,
+      participatedCount: 0,
+      chainDates: [],
+      defendedDatesInWindow: [],
+      lastParticipatedDate: getLatestDate(participatedSet),
+      lastActiveDate: getLatestDate(activeSet),
+    };
+  }
+
+  const chainDates = [];
+  const defendedDatesInWindow = [];
+  let activeCount = 0;
+  let cursor = anchorDate;
+
+  while (participatedSet.has(cursor)) {
+    chainDates.push(cursor);
+    if (activeSet.has(cursor)) {
+      activeCount += 1;
+    } else if (defendedSet.has(cursor)) {
+      defendedDatesInWindow.push(cursor);
+    }
+    cursor = shiftKSTDate(cursor, -1);
+  }
+
+  return {
+    activeCount,
+    participatedCount: chainDates.length,
+    chainDates,
+    defendedDatesInWindow,
+    lastParticipatedDate: chainDates[0] || getLatestDate(participatedSet),
+    lastActiveDate: getLatestDate(activeSet),
+  };
 }
 
 /**
@@ -177,6 +268,8 @@ export function calculateStreakUpdate(userData, todayOverride) {
       streakUpdate: {},
       meta: {
         freezeUsed: false,
+        consumedFreezeCount: 0,
+        defendedDates: [],
         justReachedMilestone: null,
         isNewRecord: false,
         alreadyDoneToday: true,
@@ -185,14 +278,13 @@ export function calculateStreakUpdate(userData, todayOverride) {
     }
   }
   
-  // 어제 날짜
-  const yesterdayKST = todayOverride 
-    ? new Date(new Date(todayOverride + 'T00:00:00+09:00').getTime() - 86400000).toISOString().split('T')[0]
-    : getYesterdayKST()
+  const yesterdayKST = shiftKSTDate(todayKST, -1)
   
   let newStreak = currentStreak
   let newFreezeCount = freezeCount
   let freezeUsed = false
+  let consumedFreezeCount = 0
+  let defendedDates = []
   
   if (lastDate === "") {
     // Case 2: 첫 학습
@@ -207,9 +299,11 @@ export function calculateStreakUpdate(userData, todayOverride) {
     
     if (missedDays > 0 && freezeCount >= missedDays) {
       // 결석일 수 만큼 크라이오 코어 보유 중 → 모두 소모 방어 성공
+      defendedDates = listGapDatesExclusive(lastDate, todayKST)
+      consumedFreezeCount = defendedDates.length
       newStreak = currentStreak + 1
-      newFreezeCount = freezeCount - missedDays
-      freezeUsed = true
+      newFreezeCount = freezeCount - consumedFreezeCount
+      freezeUsed = consumedFreezeCount > 0
     } else {
       // 크라이오 코어가 부족하거나 0개임 → 스트릭 초기화
       newStreak = 1
@@ -240,6 +334,8 @@ export function calculateStreakUpdate(userData, todayOverride) {
     },
     meta: {
       freezeUsed,
+      consumedFreezeCount,
+      defendedDates,
       justReachedMilestone,
       isNewRecord: newStreak > longestStreak,
       alreadyDoneToday: false,
@@ -257,36 +353,7 @@ export function calculateStreakUpdate(userData, todayOverride) {
  * @returns {number} 계산된 연속 학습 일수
  */
 export function calculateStreakFromHistory(activeDates, defendedDates, todayKST = getTodayKST()) {
-  const activeSet = activeDates instanceof Set ? activeDates : new Set(activeDates);
-  const defendedSet = defendedDates instanceof Set ? defendedDates : new Set(defendedDates);
-  
-  // 오늘 또는 어제 마지막 활동이 있어야 스트릭이 유지됨
-  const yesterdayKST = getTodayKST(new Date(new Date(todayKST + 'T12:00:00Z').getTime() - 86400000));
-  
-  let startTrackingDate = null;
-  if (activeSet.has(todayKST) || defendedSet.has(todayKST)) {
-    startTrackingDate = todayKST;
-  } else if (activeSet.has(yesterdayKST) || defendedSet.has(yesterdayKST)) {
-    startTrackingDate = yesterdayKST;
-  } else {
-    // 오늘/어제 둘 다 기록 없으면 스트릭 종료
-    return 0;
-  }
-
-  let streak = 0;
-  let checkDate = new Date(startTrackingDate + 'T12:00:00Z');
-  
-  while (true) {
-    const dateStr = getTodayKST(checkDate);
-    if (activeSet.has(dateStr) || defendedSet.has(dateStr)) {
-      streak++;
-      checkDate.setUTCDate(checkDate.getUTCDate() - 1);
-    } else {
-      break;
-    }
-  }
-  
-  return streak;
+  return getCurrentStreakWindow(activeDates, defendedDates, todayKST).activeCount;
 }
 
 /**
@@ -372,18 +439,70 @@ export function extractDefendedDates(transactions, userData, dailyStats) {
   const freezeCount = userData?.streakFreezeCount || 0;
 
   if (dbStreakDate && freezeCount > 0) {
-    const diffMs = new Date(todayKST + 'T00:00:00+09:00').getTime() - new Date(dbStreakDate + 'T00:00:00+09:00').getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
-    const missed = diffDays - 1;
-
-    if (missed > 0 && freezeCount >= missed) {
-      const gapScanObj = new Date(dbStreakDate + 'T12:00:00Z');
-      for (let i = 0; i < missed; i++) {
-        gapScanObj.setUTCDate(gapScanObj.getUTCDate() + 1);
-        protectionSet.add(gapScanObj.toISOString().split('T')[0]);
-      }
-    }
+    getCurrentGapDefendedDates(dbStreakDate, freezeCount, todayKST).forEach(d => protectionSet.add(d));
   }
 
   return protectionSet;
+}
+
+export function recalculateStreakState(activeDates, coreEvidenceDates = [], todayKST = getTodayKST()) {
+  const sortedActive = [...new Set((activeDates || []).filter(Boolean))].sort();
+  const sortedCores = [...(coreEvidenceDates || []).filter(Boolean)].sort();
+
+  if (sortedActive.length === 0) {
+    return {
+      correctStreak: 0,
+      correctLastDate: '',
+      effectiveLastDate: '',
+      coresUsed: 0,
+      coresRemaining: sortedCores.length,
+      defendedDates: [],
+    };
+  }
+
+  const defendedDates = [];
+  const inventory = [];
+  let coreIndex = 0;
+
+  const pushAvailableCores = (cutoffDate) => {
+    while (coreIndex < sortedCores.length && sortedCores[coreIndex] <= cutoffDate) {
+      inventory.push(sortedCores[coreIndex]);
+      coreIndex += 1;
+    }
+  };
+
+  for (let i = 0; i < sortedActive.length - 1; i++) {
+    const currentDate = sortedActive[i];
+    const nextActiveDate = sortedActive[i + 1];
+    pushAvailableCores(nextActiveDate);
+
+    const gapDates = listGapDatesExclusive(currentDate, nextActiveDate);
+    if (gapDates.length > 0 && gapDates.length <= inventory.length) {
+      gapDates.forEach(d => {
+        defendedDates.push(d);
+        inventory.shift();
+      });
+    }
+  }
+
+  pushAvailableCores(todayKST);
+
+  const currentGapDates = listGapDatesExclusive(sortedActive[sortedActive.length - 1], todayKST);
+  if (currentGapDates.length > 0 && currentGapDates.length <= inventory.length) {
+    currentGapDates.forEach(d => {
+      defendedDates.push(d);
+      inventory.shift();
+    });
+  }
+
+  const window = getCurrentStreakWindow(sortedActive, defendedDates, todayKST);
+
+  return {
+    correctStreak: window.activeCount,
+    correctLastDate: sortedActive[sortedActive.length - 1] || '',
+    effectiveLastDate: window.lastParticipatedDate || '',
+    coresUsed: sortedCores.length - inventory.length,
+    coresRemaining: inventory.length,
+    defendedDates,
+  };
 }

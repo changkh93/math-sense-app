@@ -3,96 +3,7 @@ import { collection, getDocs, doc as firestoreDoc, setDoc, query, orderBy, where
 import { db } from '../../firebase';
 import { Wrench, ShieldAlert, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 
-import { getTodayKST } from '../../utils/streakUtils';
-
-function daysBetween(d1, d2) {
-  const a = new Date(d1 + 'T00:00:00+09:00');
-  const b = new Date(d2 + 'T00:00:00+09:00');
-  return Math.floor((b - a) / 86400000);
-}
-
-/**
- * 사용자의 전체 히스토리를 기반으로 올바른 스트릭을 재계산합니다.
- * 'coreEvidenceDates'는 각 코어가 발생(구매 등)한 날짜들의 리스트입니다.
- */
-function recalculateStreak(activeDates, coreEvidenceDates, todayKST) {
-  if (activeDates.length === 0) return { correctStreak: 0, coresUsed: 0, defendedDates: [] };
-
-  const sortedActive = [...new Set(activeDates)].sort();
-  const sortedCores = [...coreEvidenceDates].sort();
-  
-  let coreInventory = [];
-  let cIdx = 0;
-  
-  const defendedDates = [];
-  const participatedDates = new Set(sortedActive);
-
-  // 1. 활동 사이의 간격 처리
-  for (let i = 0; i < sortedActive.length - 1; i++) {
-    const bridgeDate = sortedActive[i+1];
-    
-    // 이 활동 시점까지 확보된 코어들을 인벤토리에 추가
-    while (cIdx < sortedCores.length && sortedCores[cIdx] <= bridgeDate) {
-      coreInventory.push(sortedCores[cIdx]);
-      cIdx++;
-    }
-    
-    const gap = daysBetween(sortedActive[i], bridgeDate) - 1;
-    // 간격이 있고, 인벤토리에 코어가 충분하면 방어 시도
-    if (gap > 0 && gap <= coreInventory.length) {
-      const scanDate = new Date(sortedActive[i] + 'T12:00:00Z');
-      for (let g = 0; g < gap; g++) {
-        scanDate.setUTCDate(scanDate.getUTCDate() + 1);
-        const dStr = scanDate.toISOString().split('T')[0];
-        defendedDates.push(dStr);
-        participatedDates.add(dStr);
-        coreInventory.shift(); // 가장 오래된 코어부터 소모
-      }
-    }
-  }
-  
-  // 2. 마지막 활동 이후 오늘까지의 코어 추가
-  while (cIdx < sortedCores.length) {
-    coreInventory.push(sortedCores[cIdx]);
-    cIdx++;
-  }
-
-  // 3. 오늘 기준 미해결 간격(어제/오늘) 방어 시도
-  const sortedFinalDates = Array.from(participatedDates).sort();
-  const lastActiveDate = sortedFinalDates[sortedFinalDates.length - 1];
-  const currentGap = daysBetween(lastActiveDate, todayKST) - 1;
-
-  if (currentGap > 0 && currentGap <= coreInventory.length) {
-    const scanDate = new Date(lastActiveDate + 'T12:00:00Z');
-    for (let g = 0; g < currentGap; g++) {
-      scanDate.setUTCDate(scanDate.getUTCDate() + 1);
-      const dStr = scanDate.toISOString().split('T')[0];
-      defendedDates.push(dStr);
-      participatedDates.add(dStr);
-      coreInventory.shift();
-    }
-  }
-
-  // 4. 최종 스트릭 계산
-  const finalSorted = Array.from(participatedDates).sort();
-  let streak = 0;
-  // 마지막 활동이 오늘 혹은 어제여야 스트릭 유지로 간주
-  if (finalSorted.length > 0 && daysBetween(finalSorted[finalSorted.length - 1], todayKST) <= 1) {
-    streak = 1;
-    for (let i = finalSorted.length - 2; i >= 0; i--) {
-      if (daysBetween(finalSorted[i], finalSorted[i+1]) === 1) streak++;
-      else break;
-    }
-  }
-
-  return {
-    correctStreak: streak,
-    correctLastDate: finalSorted[finalSorted.length - 1] || '',
-    coresUsed: coreEvidenceDates.length - coreInventory.length,
-    coresRemaining: coreInventory.length,
-    defendedDates
-  };
-}
+import { getTodayKST, recalculateStreakState } from '../../utils/streakUtils';
 
 const StreakFixer = () => {
   const [targetUid, setTargetUid] = useState('');
@@ -112,7 +23,7 @@ const StreakFixer = () => {
     const txSnap = await getDocs(query(collection(db, 'users', uid, 'crystal_transactions'), orderBy('timestamp', 'asc')));
     const transactions = txSnap.docs.map(d => ({ 
       ...d.data(), 
-      date: (d.data().timestamp?.toDate ? d.data().timestamp.toDate() : new Date(d.data().timestamp)).toISOString().split('T')[0] 
+      date: getTodayKST(d.data().timestamp?.toDate ? d.data().timestamp.toDate() : new Date(d.data().timestamp))
     }));
 
     const coreEvidence = transactions
@@ -151,17 +62,22 @@ const StreakFixer = () => {
     if (activeDates.length === 0) return null;
 
     // 4. 시간순 재계산 실행
-    const result = recalculateStreak(activeDates, coreEvidence, todayKST);
+    const result = recalculateStreakState(activeDates, coreEvidence, todayKST);
     const dbStreak = userData.currentStreak || 0;
-    const shouldFix = result.correctStreak !== dbStreak || result.coresRemaining !== currentOwned;
+    const dbLastDate = userData.lastStreakDate || '';
+    const shouldFix =
+      result.correctStreak !== dbStreak ||
+      result.coresRemaining !== currentOwned ||
+      result.correctLastDate !== dbLastDate;
 
     if (shouldFix) {
       return {
         uid, displayName, dbStreak,
         dbLongest: userData.longestStreak || 0,
-        dbLastDate: userData.lastStreakDate || '',
+        dbLastDate,
         correctStreak: result.correctStreak,
         correctLastDate: result.correctLastDate,
+        effectiveLastDate: result.effectiveLastDate,
         correctLongest: Math.max(userData.longestStreak || 0, result.correctStreak),
         coresUsed: result.coresUsed,
         defendedDates: result.defendedDates,
@@ -247,11 +163,8 @@ const StreakFixer = () => {
           currentStreak: user.correctStreak,
           longestStreak: user.correctLongest,
           streakFreezeCount: user.correctFreezeCount, // Restore/fix core count
+          lastStreakDate: user.correctLastDate,
         };
-        
-        if (!user.dbLastDate || user.correctLastDate > user.dbLastDate) {
-          updates.lastStreakDate = user.correctLastDate;
-        }
 
         await setDoc(firestoreDoc(db, 'users', user.uid), updates, { merge: true });
         addLog(`✅ Fixed ${user.displayName}: Data restored successfully.`);
