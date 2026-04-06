@@ -1563,7 +1563,7 @@ function SpaceHome() {
     // We ONLY need flags for hasQuiz, because quizzes are fetched async later.
     const hasQuiz = (unit.contentFlags && unit.contentFlags.hasQuiz !== undefined) 
       ? unit.contentFlags.hasQuiz 
-      : false; // Default to false if unknown to avoid quiz popups
+      : true; // Default to true if unknown to ensure Mission Control loads
 
     let initialMode = 'briefing' // default: show Mission Control
     
