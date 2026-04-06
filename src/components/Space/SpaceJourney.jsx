@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, auth } from '../../firebase';
-import { collection, query, where, orderBy, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { getTodayKST, getCometTier, getEffectiveStreak, extractDefendedDates } from '../../utils/streakUtils';
 import './SpaceJourney.css';
+
+function hasLearningActivity(stats) {
+  if (!stats) return false;
+  return (stats.quizzes || 0) > 0 || (stats.videos || 0) > 0 || (stats.texts || 0) > 0 || (stats.workbooks || 0) > 0;
+}
 
 export default function SpaceJourney({ userData }) {
   const [history, setHistory] = useState([]);
@@ -53,7 +58,7 @@ export default function SpaceJourney({ userData }) {
       
       const existing = map.get(dateStr) || { 
         quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0,
-        videos: 0, texts: 0, workbooks: 0, isProtected: false
+        videos: 0, texts: 0, workbooks: 0
       };
 
       const hType = h.type || 'quiz';
@@ -81,11 +86,11 @@ export default function SpaceJourney({ userData }) {
       
       const existing = map.get(dateStr) || { 
         quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0,
-        videos: 0, texts: 0, workbooks: 0, isProtected: false
+        videos: 0, texts: 0, workbooks: 0
       };
 
       if (t.type === 'streak_freeze') {
-        existing.isProtected = true;
+        return;
       } else if (t.type === 'transmission_reward' || t.type === 'data_log_reward') {
         // Fallback for missing history logs
         // Note: We use a simple count if history didn't record it
@@ -150,7 +155,7 @@ export default function SpaceJourney({ userData }) {
       const stats = dailyStats.get(dStr);
       days.push({
         date: dStr,
-        isActive: !!stats,
+        isActive: hasLearningActivity(stats),
         stats: stats || null,
         isToday: dStr === todayKST,
       });
@@ -208,7 +213,7 @@ export default function SpaceJourney({ userData }) {
         const stats = dailyStats.get(dStr);
         cDays.push({
           date: dStr,
-          isActive: !!stats,
+          isActive: hasLearningActivity(stats),
           isProtected: nodesWithProtection.has(dStr),
           stats: stats || null,
           isToday: dStr === todayKST
@@ -356,7 +361,11 @@ export default function SpaceJourney({ userData }) {
               {(popover.day.isActive || popover.day.isProtected) ? (
                 <>
                   <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '10px' }}>
-                    {popover.day.isProtected ? '🧊 코어 보호 활성화' : '✨ 탐사항해 완료'}
+                    {popover.day.isActive && popover.day.isProtected
+                      ? '✨ 탐사항해 완료 + 🧊 코어 사용 기록'
+                      : popover.day.isActive
+                        ? '✨ 탐사항해 완료'
+                        : '🧊 코어 보호 활성화'}
                   </div>
                   <ul className="hologram-details">
                     {popover.day.isActive ? (
@@ -375,9 +384,9 @@ export default function SpaceJourney({ userData }) {
                         )}
                         <li>획득 광석: <strong style={{ color: '#00f3ff' }}>💎{popover.day.stats.crystals}</strong></li>
                       </>
-                    ) : (
+                    ) : popover.day.isProtected ? (
                       <li>크라이오 코어로 궤도 유지됨</li>
-                    )}
+                    ) : null}
                   </ul>
                   {popover.day.streakRun > 0 && (
                     <div style={{ background: 'rgba(0, 243, 255, 0.1)', padding: '5px', textAlign: 'center', marginTop: '10px', color: '#00f3ff', fontWeight: 'bold' }}>

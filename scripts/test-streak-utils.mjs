@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {
   calculateStreakFromHistory,
   calculateStreakUpdate,
+  extractLearningActivityDates,
+  getEffectiveStreak,
   getCurrentGapDefendedDates,
   recalculateStreakState,
 } from '../src/utils/streakUtils.js';
@@ -31,6 +33,12 @@ function run() {
   const currentGapDefense = getCurrentGapDefendedDates('2026-04-03', 1, '2026-04-05');
   assert.deepEqual(currentGapDefense, ['2026-04-04']);
 
+  const derivedActiveDates = Array.from(extractLearningActivityDates(
+    [],
+    [{ type: 'transmission_reward', timestamp: '2026-04-05T01:00:00+09:00' }]
+  )).sort();
+  assert.deepEqual(derivedActiveDates, ['2026-04-05']);
+
   const repairedState = recalculateStreakState(
     ['2026-04-03', '2026-04-05'],
     ['2026-04-04'],
@@ -49,6 +57,13 @@ function run() {
   assert.equal(idleProtectedState.correctStreak, 1);
   assert.equal(idleProtectedState.correctLastDate, '2026-04-03');
   assert.deepEqual(idleProtectedState.defendedDates, ['2026-04-04']);
+
+  const displayedProtectedStreak = getEffectiveStreak({
+    currentStreak: 25,
+    lastStreakDate: '2026-04-04',
+    streakFreezeCount: 2,
+  }, null);
+  assert.equal(displayedProtectedStreak, 25);
 
   console.log('streak utils tests passed');
 }

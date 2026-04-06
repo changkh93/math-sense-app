@@ -30,7 +30,7 @@ import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
-import { calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates } from '../../utils/streakUtils'
+import { calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
@@ -486,10 +486,7 @@ function SpaceHome() {
     if (!user || !userData || loadingHistory || loadingTransactions) return;
     
     // 1. Calculate the ground truth streak from history and transactions
-    const activeDates = new Set(history.map(h => {
-      const ts = h.timestamp?.toDate ? h.timestamp.toDate() : (h.timestamp ? new Date(h.timestamp) : null);
-      return ts ? getTodayKST(ts) : null;
-    }).filter(Boolean));
+    const activeDates = extractLearningActivityDates(history, transactions);
 
     // Simple daily stats for extractDefendedDates (Key: YYYY-MM-DD)
     const dailyStatsObj = {};

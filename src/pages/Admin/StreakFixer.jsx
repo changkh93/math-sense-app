@@ -3,7 +3,7 @@ import { collection, getDocs, doc as firestoreDoc, setDoc, query, orderBy, where
 import { db } from '../../firebase';
 import { Wrench, ShieldAlert, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 
-import { getTodayKST, recalculateStreakState } from '../../utils/streakUtils';
+import { extractLearningActivityDates, getTodayKST, recalculateStreakState } from '../../utils/streakUtils';
 
 const StreakFixer = () => {
   const [targetUid, setTargetUid] = useState('');
@@ -52,12 +52,8 @@ const StreakFixer = () => {
 
     // 3. 학습 히스토리 수집
     const histSnap = await getDocs(query(collection(db, 'users', uid, 'history'), orderBy('timestamp', 'asc')));
-    const activeDates = histSnap.docs.map(d => {
-      const h = d.data();
-      if (!h.timestamp) return null;
-      const ts = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
-      return getTodayKST(ts);
-    }).filter(d => d);
+    const historyEntries = histSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const activeDates = Array.from(extractLearningActivityDates(historyEntries, transactions)).sort();
 
     if (activeDates.length === 0) return null;
 
@@ -140,7 +136,7 @@ const StreakFixer = () => {
         setAffectedUsers([res]);
         addLog(`⚠️ Issue found for ${res.displayName}. Click Apply to fix!`);
       } else {
-        addLog(`✅ User ${targetUid} data is correct based on history.`);
+        addLog(`✅ User ${targetUid} data is consistent with activity records.`);
       }
     } catch (err) {
       console.error(err);

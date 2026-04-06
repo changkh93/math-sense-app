@@ -104,6 +104,47 @@ function getLatestDate(dates) {
   return normalized.length > 0 ? normalized[normalized.length - 1] : '';
 }
 
+function getEventDateKST(event) {
+  if (!event) return null;
+
+  if (typeof event === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event)) {
+    return event;
+  }
+
+  const rawTimestamp = event.timestamp ?? event.date ?? null;
+  if (!rawTimestamp) return null;
+
+  const jsDate = rawTimestamp?.toDate ? rawTimestamp.toDate() : new Date(rawTimestamp);
+  if (Number.isNaN(jsDate.getTime())) return null;
+  return getTodayKST(jsDate);
+}
+
+export function isLearningRewardTransactionType(type = '') {
+  return (
+    type === 'quiz_reward' ||
+    type === 'quiz_penalty' ||
+    type === 'transmission_reward' ||
+    type === 'data_log_reward'
+  );
+}
+
+export function extractLearningActivityDates(historyEntries = [], transactions = []) {
+  const activeDates = new Set();
+
+  (historyEntries || []).forEach(entry => {
+    const dateStr = getEventDateKST(entry);
+    if (dateStr) activeDates.add(dateStr);
+  });
+
+  (transactions || []).forEach(tx => {
+    if (!isLearningRewardTransactionType(tx?.type)) return;
+    const dateStr = getEventDateKST(tx);
+    if (dateStr) activeDates.add(dateStr);
+  });
+
+  return activeDates;
+}
+
 export function getCurrentGapDefendedDates(lastActiveDate, freezeCount, todayKST = getTodayKST()) {
   if (!lastActiveDate || freezeCount <= 0) return [];
 
@@ -376,10 +417,17 @@ export function getEffectiveStreak(userData, historyData = null) {
   
   const todayKST = getTodayKST()
   const lastDate = userData.lastStreakDate
+  const freezeCount = userData?.streakFreezeCount || 0
   
   // 오늘 이미 완료했거나 어제 완료한 경우 → 확실히 활성 상태로 간주
   // (어제의 경우 오늘이 아직 안 끝났으므로 스트릭이 유지되는 Duo 스타일)
   if (lastDate === todayKST || lastDate === getYesterdayKST()) {
+    return userData.currentStreak
+  }
+
+  // If the current gap can still be fully defended by owned cores,
+  // keep the streak visible until the user returns or the defense runs out.
+  if (getCurrentGapDefendedDates(lastDate, freezeCount, todayKST).length > 0) {
     return userData.currentStreak
   }
   

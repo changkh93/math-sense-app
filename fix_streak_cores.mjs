@@ -7,7 +7,7 @@
  */
 
 import admin from 'firebase-admin';
-import { getTodayKST, recalculateStreakState } from './src/utils/streakUtils.js';
+import { extractLearningActivityDates, getTodayKST, recalculateStreakState } from './src/utils/streakUtils.js';
 
 admin.initializeApp({
   projectId: 'math-sense-1f6a8',
@@ -78,14 +78,8 @@ async function auditAndFix() {
     const histSnap = await db.collection('users').doc(uid)
       .collection('history').orderBy('timestamp', 'asc').get();
 
-    const activeDates = new Set();
-    histSnap.docs.forEach(d => {
-      const h = d.data();
-      if (!h.timestamp) return;
-      const ts = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
-      const kst = new Date(ts.getTime() + 9 * 3600000);
-      activeDates.add(kst.toISOString().split('T')[0]);
-    });
+    const historyEntries = histSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const activeDates = extractLearningActivityDates(historyEntries, transactions);
 
     if (activeDates.size === 0) continue;
 

@@ -8,7 +8,7 @@ import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
-import { getEffectiveStreak, getTodayKST, getKSTComponents, recalculateStreakState } from '../../utils/streakUtils'
+import { extractLearningActivityDates, getEffectiveStreak, getTodayKST, getKSTComponents, recalculateStreakState } from '../../utils/streakUtils'
 import { calculateSEI } from '../../utils/rankingUtils'
 import { useAdmin } from '../../hooks/useAdmin'
 
@@ -29,12 +29,8 @@ export default function SpaceRanking({ user, userData }) {
         const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
         if (docs.length === 0) return null;
 
-        const activeDates = docs.map(h => {
-          if (!h.timestamp) return null;
-          return getTodayKST(h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp));
-        }).filter(Boolean);
-
         const transactions = txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+        const activeDates = Array.from(extractLearningActivityDates(docs, transactions)).sort();
         const coreEvidenceDates = transactions
           .filter(t => t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core' && t.timestamp)
           .map(t => getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp)));
