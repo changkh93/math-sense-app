@@ -261,7 +261,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           }
           await setDoc(progressRef, {
             quizSession: JSON.parse(JSON.stringify(sessionObj)),
-            unitTitle: quizData?.title || activeUnit?.title || "탐사 퀴즈",
+            unitTitle: quizData?.title || "탐사 퀴즈",
             unitId: quizData.unitId || "",
             updatedAt: serverTimestamp()
           }, { merge: true })
@@ -342,6 +342,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           }
           await setDoc(progressRef, {
             quizSession: JSON.parse(JSON.stringify(sessionObj)),
+            unitTitle: quizData?.title || "탐사 퀴즈",
+            unitId: quizData.unitId || "",
             updatedAt: serverTimestamp()
           }, { merge: true })
         } catch (e) {
