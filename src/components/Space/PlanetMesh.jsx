@@ -1,7 +1,13 @@
 import { useRef, useMemo, Suspense, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Sphere, useTexture, Text, Float } from '@react-three/drei'
+import { Sphere, useTexture, Text as DreiText, Float } from '@react-three/drei'
 import * as THREE from 'three'
+
+const Text = (props) => (
+  <Suspense fallback={null}>
+    <DreiText {...props} />
+  </Suspense>
+)
 
 /**
  * 텍스처를 사용하는 행성 재질 (Suspense 적용)

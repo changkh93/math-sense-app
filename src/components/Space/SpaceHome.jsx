@@ -30,7 +30,7 @@ import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
-import { calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates } from '../../utils/streakUtils'
+import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
@@ -163,7 +163,7 @@ function SpaceHome() {
   useEffect(() => {
     // Only auto-select if we have exactly one cluster AND it's not loading
     if (!loadingClusters && activeClusters.length === 1 && !selectedClusterId) {
-      setSelectedClusterId(activeClusters[0].docId || activeClusters[0].id);
+      updateSelectedClusterId(activeClusters[0].docId || activeClusters[0].id);
     }
   }, [activeClusters, selectedClusterId, loadingClusters]);
 
@@ -871,8 +871,7 @@ function SpaceHome() {
           updatedAt: serverTimestamp()
         }, { merge: true })
 
-        // Transaction 내에서는 increment()를 쓸 수 없으므로, 직접 계산
-        transaction.update(userDocRef, {
+        const userUpdates = {
           crystals: (freshUserData.crystals || 0) + atomicCrystalsEarned,
           totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
           totalScore: (freshUserData.totalScore || 0) + score,
@@ -886,7 +885,25 @@ function SpaceHome() {
           shieldCharges: Math.max(0, currentShieldCharges - (shieldsUsed || 0)),
           ...growthUpdates,
           ...streakUpdates
-        })
+        }
+
+        if (Object.keys(streakUpdates).length > 0) {
+          userUpdates.streakWriteAudit = buildStreakWriteAudit({
+            source: 'space_home_quiz_complete',
+            writerUid: user.uid,
+            prevState: freshUserData,
+            nextState: {
+              currentStreak: streakUpdates.currentStreak,
+              lastStreakDate: streakUpdates.lastStreakDate,
+              streakFreezeCount: streakUpdates.streakFreezeCount,
+            },
+            writtenAt: serverTimestamp(),
+            note: currentUnitId,
+          })
+        }
+
+        // Transaction 내에서는 increment()를 쓸 수 없으므로, 직접 계산
+        transaction.update(userDocRef, userUpdates)
 
         return { streakCalc, freshUserData, atomicCrystalsEarned }
       })
@@ -1125,6 +1142,21 @@ function SpaceHome() {
         } else {
           actualReward = 0 // Ensure non-negative
         }
+        if (Object.keys(streakUpdates).length > 0) {
+          userUpdates.streakWriteAudit = buildStreakWriteAudit({
+            source: 'space_home_nonquiz_complete',
+            writerUid: user.uid,
+            prevState: freshUserData,
+            nextState: {
+              currentStreak: streakUpdates.currentStreak,
+              lastStreakDate: streakUpdates.lastStreakDate,
+              streakFreezeCount: streakUpdates.streakFreezeCount,
+            },
+            writtenAt: serverTimestamp(),
+            note: `${activityType}:${currentUnitId}`,
+          })
+        }
+
         transaction.update(userDocRef, userUpdates)
 
         // Update Progress Doc (Idempotent update using dot notation to avoid overwriting maps)
@@ -1792,6 +1824,76 @@ function SpaceHome() {
                       (BOOST: SPACE BAR)
                     </Motion.p>
                   )}
+                </Motion.div>
+
+                {/* Fallback Region Navigator — 3D 장면이 보이지 않을 때 행성 선택 가능 */}
+                <Motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 2, duration: 0.8 }}
+                  style={{
+                    position: 'fixed',
+                    bottom: '100px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    pointerEvents: 'auto',
+                    zIndex: 50,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '0.6rem',
+                    justifyContent: 'center',
+                    maxWidth: '90vw',
+                    padding: '1rem 1.5rem',
+                    background: 'rgba(5, 5, 20, 0.7)',
+                    backdropFilter: 'blur(12px)',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(0, 243, 255, 0.15)',
+                  }}
+                >
+                  {loadingRegions ? (
+                    <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      행성 스캔 중...
+                    </span>
+                  ) : (!regions || regions.length === 0) ? (
+                    <span className="font-tech" style={{ color: '#ff6b6b', fontSize: '0.85rem' }}>
+                      ⚠ 등록된 행성이 없습니다
+                    </span>
+                  ) : regions.map(region => (
+                    <button
+                      key={region.id}
+                      className="font-tech"
+                      onClick={() => {
+                        if (region.isPrivate) {
+                          const accessStatus = userData?.regionAccess?.[region.id];
+                          if (accessStatus === 'suspended') {
+                            alert('이 행성에 대한 접근이 일시정지되었습니다.');
+                            return;
+                          } else if (accessStatus !== 'active') {
+                            setPendingRegion(region);
+                            soundManager.playClick();
+                            return;
+                          }
+                        }
+                        updateSelectedRegionId(region.id);
+                        soundManager.playWarp();
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: explorationStatus[region.id] === 'completed'
+                          ? 'rgba(80, 200, 120, 0.2)'
+                          : 'rgba(0, 212, 255, 0.1)',
+                        border: `1px solid ${explorationStatus[region.id] === 'completed' ? 'rgba(80, 200, 120, 0.5)' : 'rgba(0, 212, 255, 0.3)'}`,
+                        borderRadius: '10px',
+                        color: 'var(--text-bright)',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {region.title} {explorationStatus[region.id] === 'completed' ? '✅' : ''}
+                    </button>
+                  ))}
                 </Motion.div>
               </div>
             ) : !selectedChapterDocId ? (

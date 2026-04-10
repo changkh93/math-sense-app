@@ -5,6 +5,8 @@
  * 순수 함수로 분리하여 테스트 용이성을 확보합니다.
  */
 
+export const STREAK_WRITE_AUDIT_VERSION = 2;
+
 /**
  * KST 기준 날짜를 YYYY-MM-DD 형식으로 반환
  * @param {Date|number|string} [date] - 기준 날짜
@@ -197,6 +199,29 @@ export function getCurrentStreakWindow(activeDates, defendedDates, todayKST = ge
     defendedDatesInWindow,
     lastParticipatedDate: chainDates[0] || getLatestDate(participatedSet),
     lastActiveDate: getLatestDate(activeSet),
+  };
+}
+
+export function buildStreakWriteAudit({
+  source,
+  writerUid,
+  prevState = {},
+  nextState = {},
+  writtenAt,
+  note = '',
+}) {
+  return {
+    version: STREAK_WRITE_AUDIT_VERSION,
+    source,
+    writerUid,
+    writtenAt,
+    prevCurrentStreak: prevState.currentStreak ?? 0,
+    prevLastStreakDate: prevState.lastStreakDate ?? '',
+    prevFreezeCount: prevState.streakFreezeCount ?? 0,
+    nextCurrentStreak: nextState.currentStreak ?? prevState.currentStreak ?? 0,
+    nextLastStreakDate: nextState.lastStreakDate ?? prevState.lastStreakDate ?? '',
+    nextFreezeCount: nextState.streakFreezeCount ?? prevState.streakFreezeCount ?? 0,
+    note,
   };
 }
 

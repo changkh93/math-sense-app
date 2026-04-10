@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { collection, getDocs, doc as firestoreDoc, setDoc, query, orderBy, where } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { collection, getDocs, doc as firestoreDoc, setDoc, query, orderBy, where, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../../firebase';
 import { Wrench, ShieldAlert, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 
-import { extractLearningActivityDates, getTodayKST, recalculateStreakState } from '../../utils/streakUtils';
+import { buildStreakWriteAudit, extractLearningActivityDates, getTodayKST, recalculateStreakState } from '../../utils/streakUtils';
 
 const StreakFixer = () => {
   const [targetUid, setTargetUid] = useState('');
@@ -160,6 +160,22 @@ const StreakFixer = () => {
           longestStreak: user.correctLongest,
           streakFreezeCount: user.correctFreezeCount, // Restore/fix core count
           lastStreakDate: user.correctLastDate,
+          streakWriteAudit: buildStreakWriteAudit({
+            source: 'admin_streak_fixer',
+            writerUid: auth.currentUser?.uid || '',
+            prevState: {
+              currentStreak: user.dbStreak,
+              lastStreakDate: user.dbLastDate,
+              streakFreezeCount: user.currentFreezeCount,
+            },
+            nextState: {
+              currentStreak: user.correctStreak,
+              lastStreakDate: user.correctLastDate,
+              streakFreezeCount: user.correctFreezeCount,
+            },
+            writtenAt: serverTimestamp(),
+            note: user.uid,
+          }),
         };
 
         await setDoc(firestoreDoc(db, 'users', user.uid), updates, { merge: true });

@@ -1,8 +1,14 @@
-import { useRef, useMemo, useState, useEffect } from 'react'
+import React, { useRef, useMemo, useState, useEffect, Suspense } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { Stars, CameraControls, Environment, Float, Text } from '@react-three/drei'
+import { Stars, CameraControls, Environment, Float, Text as DreiText } from '@react-three/drei'
 import * as THREE from 'three'
 import PlanetMesh from './PlanetMesh'
+
+const Text = (props) => (
+  <Suspense fallback={null}>
+    <DreiText {...props} />
+  </Suspense>
+)
 
 /**
  * 워프 효과를 위한 고속 별 이동
@@ -310,16 +316,62 @@ function Line({ start, end }) {
   )
 }
 
+/**
+ * WebGL Error Boundary — Canvas 크래시 시 fallback UI 제공
+ */
+class CanvasErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    console.error('[SpaceScene] Canvas crash:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          width: '100%', height: '100vh', position: 'absolute', top: 0, left: 0,
+          background: 'radial-gradient(ellipse at center, #0a1628 0%, #020810 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexDirection: 'column', color: '#88aabb'
+        }}>
+          <p style={{ fontSize: '1.2rem', textShadow: '0 0 10px rgba(0,212,255,0.4)' }}>
+            3D 렌더링을 사용할 수 없습니다.
+          </p>
+          <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+            행성을 아래 목록에서 선택해 주세요.
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function SpaceScene(props) {
   const fov = props.isBoosting ? 60 : 45;
   return (
     <div style={{ width: '100%', height: '100vh', position: 'absolute', top: 0, left: 0 }}>
-      <Canvas
-        camera={{ position: [0, 5, 15], fov: fov }}
-        gl={{ antialias: true, alpha: true }}
-      >
-        <SceneContent {...props} />
-      </Canvas>
+      <CanvasErrorBoundary>
+        <Canvas
+          camera={{ position: [0, 5, 15], fov: fov }}
+          gl={{ antialias: true, alpha: true, failIfMajorPerformanceCaveat: false }}
+          onCreated={({ gl }) => {
+            // 안전장치: WebGL context lost 시 복구 시도
+            const canvas = gl.domElement;
+            canvas.addEventListener('webglcontextlost', (e) => {
+              e.preventDefault();
+              console.warn('[SpaceScene] WebGL context lost');
+            });
+          }}
+        >
+          <SceneContent {...props} />
+        </Canvas>
+      </CanvasErrorBoundary>
     </div>
   )
 }

@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { Trophy, Medal, Star, Target, Info, ShieldAlert, Zap, CircleHelp } from 'lucide-react'
 import { db, auth } from '../../firebase'
-import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, setDoc } from 'firebase/firestore'
+import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
-import { extractLearningActivityDates, getEffectiveStreak, getTodayKST, getKSTComponents, recalculateStreakState } from '../../utils/streakUtils'
+import { buildStreakWriteAudit, extractLearningActivityDates, getEffectiveStreak, getTodayKST, getKSTComponents, recalculateStreakState } from '../../utils/streakUtils'
 import { calculateSEI } from '../../utils/rankingUtils'
 import { useAdmin } from '../../hooks/useAdmin'
 
@@ -65,7 +65,19 @@ export default function SpaceRanking({ user, userData }) {
             currentStreak: streakState.correctStreak,
             lastStreakDate: streakState.correctLastDate,
             longestStreak: Math.max(u.longestStreak || 0, streakState.correctStreak),
-            streakFreezeCount: streakState.coresRemaining
+            streakFreezeCount: streakState.coresRemaining,
+            streakWriteAudit: buildStreakWriteAudit({
+              source: 'space_ranking_admin_repair',
+              writerUid: user?.uid || auth.currentUser?.uid || '',
+              prevState: u,
+              nextState: {
+                currentStreak: streakState.correctStreak,
+                lastStreakDate: streakState.correctLastDate,
+                streakFreezeCount: streakState.coresRemaining,
+              },
+              writtenAt: serverTimestamp(),
+              note: u.id,
+            }),
           }, { merge: true });
           return u.id;
         }

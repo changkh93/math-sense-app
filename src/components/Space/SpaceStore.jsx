@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { doc, setDoc, increment } from 'firebase/firestore'
+import { doc, setDoc, increment, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../firebase'
 import soundManager from '../../utils/SoundManager'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
+import { buildStreakWriteAudit } from '../../utils/streakUtils'
 
 export default function SpaceStore({ userData, user }) {
   const [purchasing, setPurchasing] = useState(false)
@@ -80,10 +81,39 @@ export default function SpaceStore({ userData, user }) {
 
       setPurchasing(true)
       try {
-        await setDoc(doc(db, 'users', user.uid), {
-          crystals: increment(-item.cost),
-          streakFreezeCount: increment(1),
-        }, { merge: true })
+        const userRef = doc(db, 'users', user.uid)
+        await runTransaction(db, async (transaction) => {
+          const freshSnap = await transaction.get(userRef)
+          if (!freshSnap.exists()) throw new Error('User document not found')
+
+          const freshUserData = freshSnap.data()
+          const freshCrystals = freshUserData?.crystals || 0
+          const freshFreezeCount = freshUserData?.streakFreezeCount || 0
+
+          if (freshCrystals < item.cost) {
+            throw new Error('INSUFFICIENT_CRYSTALS')
+          }
+          if (freshFreezeCount >= item.maxOwn) {
+            throw new Error('MAX_CRYO_CORE_REACHED')
+          }
+
+          transaction.set(userRef, {
+            crystals: freshCrystals - item.cost,
+            streakFreezeCount: freshFreezeCount + 1,
+            streakWriteAudit: buildStreakWriteAudit({
+              source: 'space_store_purchase_cryo_core',
+              writerUid: user.uid,
+              prevState: freshUserData,
+              nextState: {
+                currentStreak: freshUserData?.currentStreak || 0,
+                lastStreakDate: freshUserData?.lastStreakDate || '',
+                streakFreezeCount: freshFreezeCount + 1,
+              },
+              writtenAt: serverTimestamp(),
+              note: item.id,
+            }),
+          }, { merge: true })
+        })
         
         soundManager.playCrystal()
         setPurchaseMessage({ type: 'success', text: `${item.name} 구매 완료! (보유: ${currentFreezeCount + 1}/${item.maxOwn})` })
@@ -97,7 +127,13 @@ export default function SpaceStore({ userData, user }) {
         })
       } catch (err) {
         console.error('Purchase failed:', err)
-        setPurchaseMessage({ type: 'error', text: '구매에 실패했습니다. 다시 시도해주세요.' })
+        const message =
+          err.message === 'INSUFFICIENT_CRYSTALS'
+            ? `광석이 부족합니다. (필요: ${item.cost}개)`
+            : err.message === 'MAX_CRYO_CORE_REACHED'
+              ? `크라이오 코어는 최대 ${item.maxOwn}개까지 보유할 수 있습니다.`
+              : '구매에 실패했습니다. 다시 시도해주세요.'
+        setPurchaseMessage({ type: 'error', text: message })
         setTimeout(() => setPurchaseMessage(null), 3000)
       } finally {
         setPurchasing(false)

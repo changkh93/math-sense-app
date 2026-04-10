@@ -7,11 +7,25 @@
  */
 
 import admin from 'firebase-admin';
-import { extractLearningActivityDates, getTodayKST, recalculateStreakState } from './src/utils/streakUtils.js';
+import { buildStreakWriteAudit, extractLearningActivityDates, getTodayKST, recalculateStreakState } from './src/utils/streakUtils.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-admin.initializeApp({
-  projectId: 'math-sense-1f6a8',
-});
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const serviceAccountPath = path.join(__dirname, 'service-account.json');
+
+if (fs.existsSync(serviceAccountPath)) {
+  const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+} else {
+  // Fallback to Application Default Credentials
+  admin.initializeApp({
+    projectId: 'math-sense-1f6a8',
+  });
+}
 
 const db = admin.firestore();
 const FIX_MODE = process.argv.includes('--fix');
@@ -132,20 +146,57 @@ async function auditAndFix() {
     process.exit(0);
   }
 
-  console.log('🔧 보정 적용 중...\n');
+  console.log('🔧 보정 적용 중 (Batched Writes)...\n');
+  const batches = [];
+  let currentBatch = db.batch();
+  let currentBatchCount = 0;
+
   for (const user of affectedUsers) {
     try {
       const updates = {
         currentStreak: user.correctStreak,
         longestStreak: user.correctLongest,
         streakFreezeCount: user.correctFreezeCount,
+        streakWriteAudit: buildStreakWriteAudit({
+          source: 'cli_fix_streak_cores',
+          writerUid: 'admin-script',
+          prevState: {
+            currentStreak: user.dbStreak,
+            lastStreakDate: user.dbLastDate,
+            streakFreezeCount: user.currentFreezeCount,
+          },
+          nextState: {
+            currentStreak: user.correctStreak,
+            lastStreakDate: user.correctLastDate,
+            streakFreezeCount: user.correctFreezeCount,
+          },
+          writtenAt: admin.firestore.FieldValue.serverTimestamp(),
+          note: user.uid,
+        }),
       };
       updates.lastStreakDate = user.correctLastDate;
-      await db.collection('users').doc(user.uid).set(updates, { merge: true });
-      console.log(`✅ ${user.displayName}: ${user.dbStreak} → ${user.correctStreak}일`);
+      
+      const userRef = db.collection('users').doc(user.uid);
+      currentBatch.set(userRef, updates, { merge: true });
+      currentBatchCount++;
+
+      if (currentBatchCount >= 400) {
+        batches.push(currentBatch);
+        currentBatch = db.batch();
+        currentBatchCount = 0;
+      }
+      
+      console.log(`✅ Queueing update for ${user.displayName}: ${user.dbStreak} → ${user.correctStreak}일`);
     } catch (err) {
-      console.error(`❌ ${user.displayName}: 실패 —`, err.message);
+      console.error(`❌ ${user.displayName}: 큐 추가 실패 —`, err.message);
     }
+  }
+  if (currentBatchCount > 0) batches.push(currentBatch);
+
+  console.log(`\n총 ${batches.length}개의 배치를 커밋합니다...`);
+  for (let i = 0; i < batches.length; i++) {
+    await batches[i].commit();
+    console.log(`✅ Batch ${i + 1}/${batches.length} 커밋 완료.`);
   }
 
   console.log('\n🎉 보정 완료!\n');
