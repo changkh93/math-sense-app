@@ -28,6 +28,7 @@ export const sanitizeLaTeX = (text) => {
  */
 export const parseInlineFormatting = (text, options = {}) => {
   if (!text) return text;
+  if (typeof text !== 'string') return String(text);
 
   const {
     boldColor = 'var(--crystal-cyan)',
