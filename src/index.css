@@ -133,5 +133,64 @@ button:active {
 /* Firefox */
 .mission-content-view {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 243, 255, 0.25) rgba(0, 0, 0, 0.3);
 }
+
+/* Immersive Theater Mode (Cinema UI) */
+.theater-wrapper {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.theater-aspect-box {
+  width: 100vw;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Head Up Display Overlays */
+.theater-hud {
+  position: absolute;
+  left: 0; right: 0;
+  padding: 2rem;
+  opacity: 1; /* React will control inline style opacity for JS idle timer, but CSS acts as base */
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 5000;
+}
+
+.theater-hud > * {
+  pointer-events: auto;
+}
+
+.theater-hud.top-hud {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
+  padding-top: 2.5rem;
+  padding-bottom: 4rem;
+  align-items: flex-start;
+}
+
+.theater-hud.bottom-hud {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 60%, transparent 100%);
+  padding-top: 6rem;
+  padding-bottom: 2.5rem;
+  justify-content: center;
+  gap: 1.5rem;
+}
+

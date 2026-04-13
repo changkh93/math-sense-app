@@ -1,0 +1,1352 @@
+[
+  {
+    "id": "unit_middle_math_basic_31_q10_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$A > B$",
+    "question": "두 수 $A = 2\\sqrt{5}$와 $B = 3\\sqrt{2}$의 대소 관계로 옳은 것은?",
+    "hint": "대소를 비교하기 위해 $A$와 $B$를 각각 $\\sqrt{n}$ 꼴로 바꿔보세요. $A = \\sqrt{2^2 \\times 5}$입니다.",
+    "options": [
+      {
+        "text": "$A > B$",
+        "isCorrect": true
+      },
+      {
+        "text": "$A < B$",
+        "isCorrect": false
+      },
+      {
+        "text": "$A = B$",
+        "isCorrect": false
+      },
+      {
+        "text": "알 수 없다",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_31_q1_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$\\sqrt{35}$",
+    "question": "$\\sqrt{5} \\times \\sqrt{7}$과 계산 결과가 같은 값은 무엇입니까?",
+    "hint": "제곱근의 곱셈 원리인 $\\sqrt{a} \\times \\sqrt{b} = \\sqrt{ab}$를 이용해 보세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{12}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$35$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{35}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{70}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_31_q2_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$18$",
+    "question": "$(3\\sqrt{2})^2$의 값을 계산하면 얼마입니까?",
+    "hint": "지수법칙에 의해 $(ab)^2 = a^2 b^2$임을 이용하세요. $3$도 제곱하고 $\\sqrt{2}$도 제곱해야 합니다.",
+    "options": [
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$18$",
+        "isCorrect": true
+      },
+      {
+        "text": "$36$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_31_q3_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$10\\sqrt{6}$",
+    "question": "$2\\sqrt{3} \\times 5\\sqrt{2}$를 계산한 결과로 옳은 것은?",
+    "hint": "유리수는 유리수끼리, 근호 안의 수는 근호 안의 수끼리 곱합니다.",
+    "options": [
+      {
+        "text": "$10\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10\\sqrt{6}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10\\sqrt{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_31_q4_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$\\sqrt{8} \\times \\sqrt{2}$",
+    "question": "다음 중 계산 결과가 유리수인 것은 무엇입니까?",
+    "hint": "계산 결과가 $\\sqrt{a^2}$ 꼴, 즉 근호 안의 수가 제곱수가 되면 유리수가 됩니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{2} \\times \\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{8} \\times \\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{5} \\times \\sqrt{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{3} \\times \\sqrt{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_31_q5_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$6$",
+    "question": "$a = \\sqrt{3}$, $b = \\sqrt{12}$일 때, $ab$의 값은 얼마입니까?",
+    "hint": "$\\sqrt{3} \\times \\sqrt{12} = \\sqrt{36}$입니다. $36$이 어떤 수의 제곱인지 생각해보세요.",
+    "options": [
+      {
+        "text": "$6$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{15}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{36}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_31_q6_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "두 수 $(\\sqrt{a}\\sqrt{b})$와 $\\sqrt{ab}$를 각각 제곱한 결과가 $ab$로 같기 때문",
+    "question": "$\\sqrt{a}\\sqrt{b} = \\sqrt{ab}$ ($a > 0, b > 0$)가 성립하는 이유를 설명한 것 중 가장 적절한 것은?",
+    "hint": "어떤 수의 정체를 밝히기 위해 소크라테스 선생님이 제안한 방법(제곱해보기)을 떠올려 보세요.",
+    "options": [
+      {
+        "text": "두 수를 더한 값이 같기 때문에",
+        "isCorrect": false
+      },
+      {
+        "text": "수학자들이 편리함을 위해 정한 약속이기 때문에",
+        "isCorrect": false
+      },
+      {
+        "text": "두 수 $(\\sqrt{a}\\sqrt{b})$와 $\\sqrt{ab}$를 각각 제곱한 결과가 $ab$로 같기 때문",
+        "isCorrect": true
+      },
+      {
+        "text": "모든 제곱근은 곱하면 근호가 사라지기 때문",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_31_q7_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$\\sqrt{72}$ $cm^2$",
+    "question": "가로의 길이가 $\\sqrt{6}$ $cm$, 세로의 길이가 $\\sqrt{12}$ $cm$인 직사각형의 넓이는 몇 $cm^2$입니까?",
+    "hint": "직사각형의 넓이는 (가로) $\\times$ (세로)입니다. $\\sqrt{6} \\times \\sqrt{12}$를 계산하세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{18}$ $cm^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6\\sqrt{2}$ $cm^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$18$ $cm^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{72}$ $cm^2$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_31_q8_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$10$",
+    "question": "$\\sqrt{2} \\times \\sqrt{5} \\times \\sqrt{10}$을 계산한 결과는?",
+    "hint": "여러 개의 제곱근 곱셈도 근호 안의 숫자를 모두 한꺼번에 곱할 수 있습니다. $\\sqrt{100}$의 값을 찾아보세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{17}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{70}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_31_q9_1773799233614",
+    "unitId": "unit_middle_math_basic_31",
+    "score": 1,
+    "answer": "$\\sqrt{6} + 3$",
+    "question": "식 $\\sqrt{3}(\\sqrt{2} + \\sqrt{3})$을 전개하여 정리하면 무엇입니까?",
+    "hint": "분배법칙을 사용하여 $\\sqrt{3} \\times \\sqrt{2}$와 $\\sqrt{3} \\times \\sqrt{3}$을 각각 더해줍니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{5} + 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{6} + \\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{6} + 3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{15}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_32_q10_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$1$",
+    "question": "$\\frac{\\sqrt{2}}{\\sqrt{3}} \\div \\frac{\\sqrt{10}}{\\sqrt{15}}$를 계산하여 가장 간단히 나타내면?",
+    "hint": "나누는 분수의 분자와 분모를 뒤집어 곱한 뒤, 전체를 하나의 근호 안에서 약분해 보세요.",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{2}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_32_q1_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$\\sqrt{8}$",
+    "question": "$\\sqrt{48} \\div \\sqrt{6}$을 계산했을 때, 그 결과와 값이 같은 것은 무엇입니까?",
+    "hint": "$\\sqrt{a} \\div \\sqrt{b} = \\sqrt{a \\div b}$ 성질을 이용하여 근호 안의 숫자끼리 나누어 보세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{42}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{54}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{8}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_32_q2_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$\\sqrt{12} \\div \\sqrt{3}$",
+    "question": "다음 중 제곱근의 나눗셈을 계산한 결과가 유리수인 것은 무엇입니까?",
+    "hint": "나눗셈의 결과가 $\\sqrt{1}, \\sqrt{4}, \\sqrt{9}, \\dots$와 같이 제곱수의 루트 형태가 되는지 확인하세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{12} \\div \\sqrt{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{20} \\div \\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{15} \\div \\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{10} \\div \\sqrt{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_32_q3_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$6$",
+    "question": "$10\\sqrt{18} \\div 5\\sqrt{2}$를 계산하여 간단히 나타낸 값은?",
+    "hint": "유리수는 유리수끼리, 근호 안의 수는 근호 안의 수끼리 나눈 후 $\\sqrt{9}$를 정수로 바꾸어 곱하세요.",
+    "options": [
+      {
+        "text": "$2\\sqrt{9}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_32_q4_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$\\sqrt{5}$",
+    "question": "분수 형태인 $\\frac{\\sqrt{45}}{\\sqrt{5}}$와 그 값이 다른 하나는 무엇입니까?",
+    "hint": "$\\frac{\\sqrt{a}}{\\sqrt{b}} = \\sqrt{\\frac{a}{b}}$ 임을 이용하여 값을 먼저 구해보세요.",
+    "options": [
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{9}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{45 \\div 5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{5}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_32_q5_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$2$",
+    "question": "$\\sqrt{\\frac{5}{6}} \\div \\sqrt{\\frac{5}{24}}$를 계산한 결과로 옳은 것은?",
+    "hint": "하나의 근호 안에 분수의 나눗셈으로 합친 뒤, 역수의 곱셈을 이용하여 계산하세요.",
+    "options": [
+      {
+        "text": "$2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_32_q6_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$3$",
+    "question": "$x = \\sqrt{72}$, $y = \\sqrt{8}$일 때, $x \\div y$의 값은 무엇입니까?",
+    "hint": "$\\sqrt{72 \\div 8}$을 계산한 뒤, 근호 안의 숫자가 어떤 수의 제곱인지 생각해보세요.",
+    "options": [
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{64}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_32_q7_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$6$ $cm$",
+    "question": "넓이가 $\\sqrt{108}$ $cm^2$인 직사각형이 있습니다. 이 직사각형의 가로 길이가 $\\sqrt{3}$ $cm$일 때, 세로의 길이는 몇 $cm$입니까?",
+    "hint": "직사각형의 넓이를 가로 길이로 나누면 세로 길이를 구할 수 있습니다.",
+    "options": [
+      {
+        "text": "$6$ $cm$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{6}$ $cm$",
+        "isCorrect": false
+      },
+      {
+        "text": "$36$ $cm$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{105}$ $cm$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_32_q8_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$3\\sqrt{2}$",
+    "question": "$\\sqrt{90} \\div \\sqrt{5}$를 계산한 결과를 $a\\sqrt{b}$의 형태로 가장 적절하게 나타낸 것은?",
+    "hint": "계산 결과인 $\\sqrt{18}$을 $\\sqrt{a^2b} = a\\sqrt{b}$ 성질을 이용하여 변형해 보세요.",
+    "options": [
+      {
+        "text": "$3\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{85}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$18$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_32_q9_1773799301074",
+    "unitId": "unit_middle_math_basic_32",
+    "score": 1,
+    "answer": "$m\\sqrt{a} \\div n\\sqrt{b} = \\frac{m}{n}\\sqrt{\\frac{a}{b}}$",
+    "question": "$4\\sqrt{10} \\div 2\\sqrt{5} = 2\\sqrt{10 \\div 5} = 2\\sqrt{2}$의 계산 과정에서 핵심적으로 사용된 원리는 무엇입니까?",
+    "hint": "바깥의 유리수 계수와 근호 안의 숫자가 각각 어떻게 처리되었는지 관찰하세요.",
+    "options": [
+      {
+        "text": "$m\\sqrt{a} \\div n\\sqrt{b} = \\frac{m}{n}\\sqrt{\\frac{a}{b}}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{a} \\times \\sqrt{b} = \\sqrt{ab}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a\\sqrt{b} = \\sqrt{a^2b}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(\\sqrt{a})^2 = a$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_33_q10_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "분모와 분자에 똑같이 $\\sqrt{b}$를 곱하여 식의 전체 비율을 유지한다.",
+    "question": "알렉스가 말한 '균형 맞추기'의 관점에서, $\\frac{a}{\\sqrt{b}}$를 유리화하는 과정에 대한 설명으로 옳은 것은?",
+    "hint": "분수의 값이 변하지 않으려면 분모와 분자에 0이 아닌 같은 수를 곱해야 합니다.",
+    "options": [
+      {
+        "text": "분모에만 $\\sqrt{b}$를 곱한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "분자에만 $\\sqrt{b}$를 곱한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "분모와 분자에 똑같이 $\\sqrt{b}$를 곱하여 식의 전체 비율을 유지한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "분모와 분자에서 루트를 그냥 지운다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_33_q1_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "분모에 있는 무리수를 유리수로 바꾸는 것",
+    "question": "소크라테스 선생님의 설명에 따를 때, '분모의 유리화'의 정의로 가장 적절한 것은 무엇인가요?",
+    "hint": "단어의 의미를 생각해보세요. '유리화'는 '유리수로 만든다'는 뜻입니다.",
+    "options": [
+      {
+        "text": "분모에 있는 무리수를 유리수로 바꾸는 것",
+        "isCorrect": true
+      },
+      {
+        "text": "분자에 있는 무리수를 제거하는 것",
+        "isCorrect": false
+      },
+      {
+        "text": "분수의 값을 더 크게 만드는 것",
+        "isCorrect": false
+      },
+      {
+        "text": "분모와 분자를 서로 바꾸는 것",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_33_q2_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "$\\frac{\\sqrt{3}}{3}$",
+    "question": "$\\frac{1}{\\sqrt{3}}$의 분모를 유리화한 결과로 옳은 것은 무엇인가요?",
+    "hint": "분모와 분자에 똑같이 $\\sqrt{3}$을 곱해보세요.",
+    "options": [
+      {
+        "text": "$\\frac{\\sqrt{3}}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{3}{\\sqrt{3}}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_33_q3_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "$\\sqrt{7}$",
+    "question": "알렉스는 $\\frac{5}{\\sqrt{7}}$를 유리화하려고 합니다. 이때 분모와 분자에 공통으로 곱해야 할 가장 적절한 수는?",
+    "hint": "분모의 루트를 벗기기 위해 자기 자신과 똑같은 무리수를 곱해야 합니다.",
+    "options": [
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{7}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_33_q4_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "$3\\sqrt{2}$",
+    "question": "$\\frac{6}{\\sqrt{2}}$를 유리화한 후 약분하여 가장 간단히 나타낸 것은?",
+    "hint": "유리화하면 $\\frac{6\\sqrt{2}}{2}$가 됩니다. 여기서 $6$과 $2$를 약분해보세요.",
+    "options": [
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3\\sqrt{2}}{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_33_q5_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "$\\frac{\\sqrt{6}}{3}$",
+    "question": "베일리는 '당근 뿌리' 비유를 통해 유리화를 이해했습니다. $\\sqrt{a} \\times \\sqrt{a} = a$가 성립할 때, $\\frac{2}{\\sqrt{6}}$을 유리화한 결과는?",
+    "hint": "$\\frac{2\\sqrt{6}}{6}$에서 분모와 분자를 $2$로 나누어 보세요.",
+    "options": [
+      {
+        "text": "$\\frac{\\sqrt{6}}{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{\\sqrt{6}}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{2\\sqrt{6}}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{6}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_33_q6_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "분모가 무리수이면 덧셈과 뺄셈 등의 계산이 복잡하기 때문에",
+    "question": "본문 대화에서 소크라테스 선생님이 언급한 '분모 유리화를 하는 이유'로 가장 적절한 것은?",
+    "hint": "분모가 유리수일 때 다른 분수와 통분하거나 계산하기가 훨씬 수월해집니다.",
+    "options": [
+      {
+        "text": "분수를 정수로 만들기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "분모가 무리수이면 덧셈과 뺄셈 등의 계산이 복잡하기 때문에",
+        "isCorrect": true
+      },
+      {
+        "text": "무리수의 값을 정확히 구하기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "분자의 크기를 줄이기 위해",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_33_q7_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "$\\frac{\\sqrt{15}}{5}$",
+    "question": "$\\frac{\\sqrt{3}}{\\sqrt{5}}$를 유리화한 결과로 옳은 것은 무엇인가요?",
+    "hint": "분모인 $\\sqrt{5}$를 없애기 위해 분모와 분자에 $\\sqrt{5}$를 곱하세요.",
+    "options": [
+      {
+        "text": "$\\frac{\\sqrt{15}}{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{\\sqrt{15}}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3}{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{\\sqrt{3}}{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_33_q8_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "$\\frac{1}{\\sqrt{10}}$",
+    "question": "다음 중 분모를 유리화했을 때 분모의 값이 가장 큰 것은?",
+    "hint": "각 분수를 유리화했을 때 분모는 원래 루트 안에 있던 숫자가 됩니다.",
+    "options": [
+      {
+        "text": "$\\frac{1}{\\sqrt{2}}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{\\sqrt{5}}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{\\sqrt{8}}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{\\sqrt{10}}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_33_q9_1773799420428",
+    "unitId": "unit_middle_math_basic_33",
+    "score": 1,
+    "answer": "$\\sqrt{2}$",
+    "question": "$\\frac{4}{\\sqrt{8}}$을 유리화하여 가장 간단한 형태로 나타내면?",
+    "hint": "$\\sqrt{8}$은 $2\\sqrt{2}$로 바꿀 수 있습니다. 또는 유리화 후 $\\frac{4\\sqrt{8}}{8}$을 약분해보세요.",
+    "options": [
+      {
+        "text": "$\\frac{\\sqrt{8}}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{\\sqrt{2}}{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_34_q10_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "$6\\sqrt{6}$",
+    "question": "$3\\sqrt{6} + 5\\sqrt{6} - 2\\sqrt{6}$을 계산하면 얼마입니까?",
+    "hint": "모두 동류항이므로 계수들을 순서대로 계산하세요. ($3 + 5 - 2$)",
+    "options": [
+      {
+        "text": "$6\\sqrt{6}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4\\sqrt{6}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_34_q1_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "루트 안의 숫자가 같은 항",
+    "question": "무리수의 덧셈에서 '동류항'에 대한 설명으로 가장 옳은 것은 무엇입니까?",
+    "hint": "알렉스가 말한 '같은 뿌리'를 가진 항이 무엇인지 생각해보세요.",
+    "options": [
+      {
+        "text": "루트 안의 숫자가 같은 항",
+        "isCorrect": true
+      },
+      {
+        "text": "앞에 곱해진 유리수가 같은 항",
+        "isCorrect": false
+      },
+      {
+        "text": "루트 밖으로 숫자를 꺼낼 수 없는 항",
+        "isCorrect": false
+      },
+      {
+        "text": "항의 개수가 $2$개 이상인 식",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_34_q2_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "$6\\sqrt{5}$",
+    "question": "$4\\sqrt{5} + 2\\sqrt{5}$를 계산한 결과로 옳은 것은 무엇입니까?",
+    "hint": "루트 안의 숫자는 유지하고 앞에 있는 계수 $4$와 $2$를 더합니다.",
+    "options": [
+      {
+        "text": "$6\\sqrt{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6\\sqrt{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8\\sqrt{10}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_34_q3_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "$3 \\times \\sqrt{7}$을 의미하며 곱셈 기호가 생략된 것이다.",
+    "question": "식 $3\\sqrt{7}$에서 숫자 $3$과 $\\sqrt{7}$ 사이의 관계를 가장 잘 설명한 것은 무엇입니까?",
+    "hint": "소크라테스 선생님이 $2\\sqrt{3}$은 $\\sqrt{3}$이 $2$번 있는 것이라고 하셨습니다.",
+    "options": [
+      {
+        "text": "$3 + \\sqrt{7}$을 의미한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$3 - \\sqrt{7}$을 의미한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$3 \\times \\sqrt{7}$을 의미하며 곱셈 기호가 생략된 것이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$3$의 제곱이 $\\sqrt{7}$이라는 의미이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_34_q4_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "$3 \\times \\sqrt{2} = 3\\sqrt{2}$",
+    "question": "다음 중 제곱근의 곱셈 기호 생략 원칙에 따라 바르게 표현된 것은 무엇입니까?",
+    "hint": "곱셈 기호는 유리수와 무리수 사이에서 생략하여 간단히 씁니다.",
+    "options": [
+      {
+        "text": "$5 \\times 2 = 52$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3 \\times \\sqrt{2} = 3\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{5} \\times \\sqrt{3} = \\sqrt{5}\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7 + \\sqrt{3} = 7\\sqrt{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_34_q5_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "$7\\sqrt{3}$",
+    "question": "$8\\sqrt{3} - \\sqrt{3}$의 값을 구하면 얼마입니까?",
+    "hint": "$\\sqrt{3}$ 앞에는 계수 $1$이 생략되어 있음을 기억하세요. ($8-1$)",
+    "options": [
+      {
+        "text": "$8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7\\sqrt{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$9\\sqrt{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_34_q6_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "$\\sqrt{5}$와 $4\\sqrt{5}$",
+    "question": "다음 중 서로 '동류항'인 것끼리 짝지어진 것을 고르세요.",
+    "hint": "루트 기호 안의 숫자가 완벽히 일치해야 동류항입니다.",
+    "options": [
+      {
+        "text": "$2\\sqrt{3}$과 $3\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{5}$와 $4\\sqrt{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5$와 $\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{7}$과 $\\sqrt{11}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_34_q7_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "$4\\sqrt{2}$",
+    "question": "$\\sqrt{2} + \\sqrt{2} + \\sqrt{2} + \\sqrt{2}$를 곱셈 기호를 사용하여 간단히 나타낸 것은 무엇입니까?",
+    "hint": "같은 무리수를 $4$번 더하는 것은 그 무리수에 $4$를 곱하는 것과 같습니다.",
+    "options": [
+      {
+        "text": "$2\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{8}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$16$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_34_q8_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "더 이상 간단히 할 수 없다.",
+    "question": "베일리가 사과 뿌리 $\\sqrt{2}$개와 당근 뿌리 $\\sqrt{3}$개를 모았습니다. 이 식 $\\sqrt{2} + \\sqrt{3}$을 계산한 결과는 무엇입니까?",
+    "hint": "서로 다른 종류의 뿌리(다른 루트 숫자)는 하나로 합쳐서 더할 수 없습니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "더 이상 간단히 할 수 없다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{6}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_34_q9_1773799806524",
+    "unitId": "unit_middle_math_basic_34",
+    "score": 1,
+    "answer": "$\\sqrt{11}$이 $5$번 더해진 것",
+    "question": "$5\\sqrt{11}$의 의미로 가장 적절한 설명은 무엇입니까?",
+    "hint": "계수 $5$는 해당 무리수가 몇 번 모였는지를 나타내는 '개수'와 같습니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{11}$이 $5$번 더해진 것",
+        "isCorrect": true
+      },
+      {
+        "text": "$11$이 $5$번 더해진 것",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{5}$가 $11$번 더해진 것",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$가 $11$번 곱해진 것",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_35_q10_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$2\\sqrt{3} < \\sqrt{11}$",
+    "question": "다음 중 계산 결과의 대소 관계가 옳은 것은?",
+    "hint": "$2\\sqrt{3} = \\sqrt{4 \\times 3} = \\sqrt{12}$입니다. $\\sqrt{12}$와 $\\sqrt{11}$을 비교해 보세요[cite: 79, 81].",
+    "options": [
+      {
+        "text": "$3\\sqrt{2} > \\sqrt{20}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{3} < \\sqrt{11}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4\\sqrt{2} = \\sqrt{24}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{6} > \\sqrt{25}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_35_q1_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$2\\sqrt{5} + 3\\sqrt{5} = 5\\sqrt{5}$",
+    "question": "다음 중 무리수의 계산 결과가 옳은 것은?",
+    "hint": "근호 안의 숫자가 같은 것끼리만 더하거나 뺄 수 있습니다[cite: 11].",
+    "options": [
+      {
+        "text": "$\\sqrt{3} + \\sqrt{2} = \\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{5} + 3\\sqrt{5} = 5\\sqrt{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5\\sqrt{7} - 2\\sqrt{7} = 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{10} - \\sqrt{2} = \\sqrt{8}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_35_q2_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$\\sqrt{7}$와 $10\\sqrt{7}$",
+    "question": "알렉스와 베일리의 대화에서 '동류항'의 개념을 사과와 배에 비유했습니다. 다음 중 동류항끼리 짝지어진 것은?",
+    "hint": "근호($\\sqrt{\\quad}$) 안의 숫자가 정확히 일치해야 동류항입니다[cite: 12, 46].",
+    "options": [
+      {
+        "text": "$2\\sqrt{3}$와 $3\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{7}$와 $10\\sqrt{7}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4\\sqrt{5}$와 $4\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{2}$와 $2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_35_q3_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "2차원적인 직사각형의 넓이를 구하는 개념",
+    "question": "소크라테스 선생님의 설명에 따르면, 무리수의 곱셈 $\\sqrt{2} \\times \\sqrt{3} = \\sqrt{6}$은 어떤 개념으로 이해하면 쉽습니까?",
+    "hint": "곱셈은 '차원'을 확장하는 개념으로 생각할 수 있습니다[cite: 23, 25].",
+    "options": [
+      {
+        "text": "1차원적인 선의 길이를 이어 붙이는 개념",
+        "isCorrect": false
+      },
+      {
+        "text": "2차원적인 직사각형의 넓이를 구하는 개념",
+        "isCorrect": true
+      },
+      {
+        "text": "사과와 배를 한 바구니에 담는 개념",
+        "isCorrect": false
+      },
+      {
+        "text": "수직선 위에서 점의 위치를 이동하는 개념",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_35_q4_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$7\\sqrt{2} - 2\\sqrt{3}$",
+    "question": "식 $5\\sqrt{2} - 3\\sqrt{3} + 2\\sqrt{2} + \\sqrt{3}$을 간단히 계산한 결과는 무엇입니까?",
+    "hint": "$\\sqrt{2}$는 $\\sqrt{2}$끼리, $\\sqrt{3}$은 $\\sqrt{3}$끼리 모아서 계산하세요[cite: 52].",
+    "options": [
+      {
+        "text": "$7\\sqrt{2} - 2\\sqrt{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$7\\sqrt{2} - 4\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3\\sqrt{2} - 2\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5\\sqrt{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_35_q5_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$\\sqrt{18} - \\sqrt{3}$의 결과는 $\\sqrt{15}$이다.",
+    "question": "다음 중 무리수에 대한 설명으로 옳지 않은 것은?",
+    "hint": "뺄셈은 근호 안의 숫자가 다르면 그대로 두어야 하며, 안의 숫자끼리 뺄 수 없습니다[cite: 70].",
+    "options": [
+      {
+        "text": "$\\sqrt{2} + \\sqrt{3}$은 더 이상 간단히 할 수 없다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$a\\sqrt{m} + b\\sqrt{m} = (a+b)\\sqrt{m}$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "무리수의 곱셈은 근호 안의 숫자가 달라도 할 수 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{18} - \\sqrt{3}$의 결과는 $\\sqrt{15}$이다.",
+        "isCorrect": true
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_35_q6_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$8\\sqrt{2}\\text{ cm}$",
+    "question": "가로의 길이가 $3\\sqrt{2}\\text{ cm}$이고 세로의 길이가 $\\sqrt{2}\\text{ cm}$인 직사각형의 둘레의 길이는 얼마입니까?",
+    "hint": "둘레의 길이는 (가로 $+$ 세로) $\\times 2$입니다[cite: 71, 78].",
+    "options": [
+      {
+        "text": "$4\\sqrt{2}\\text{ cm}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8\\sqrt{2}\\text{ cm}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6\\text{ cm}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4\\sqrt{4}\\text{ cm}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_35_q7_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$3 + \\sqrt{15}$",
+    "question": "분배법칙을 이용하여 $\\sqrt{3}(\\sqrt{3} + \\sqrt{5})$를 계산한 결과로 옳은 것은?",
+    "hint": "$\\sqrt{3} \\times \\sqrt{3} = 3$임을 이용하세요[cite: 59, 61].",
+    "options": [
+      {
+        "text": "$\\sqrt{24}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3 + \\sqrt{15}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3 + \\sqrt{8}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{9} + \\sqrt{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_35_q8_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$3\\sqrt{3}$",
+    "question": "$\\sqrt{12} + \\sqrt{3}$을 간단히 계산하려고 합니다. $\\sqrt{12} = 2\\sqrt{3}$임을 이용할 때, 정답은 무엇입니까?",
+    "hint": "$\\sqrt{12}$를 $2\\sqrt{3}$으로 바꾼 뒤 동류항인 $\\sqrt{3}$과 더합니다[cite: 98, 100].",
+    "options": [
+      {
+        "text": "$\\sqrt{15}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3\\sqrt{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5\\sqrt{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_35_q9_1773799692200",
+    "unitId": "unit_middle_math_basic_35",
+    "score": 1,
+    "answer": "$3\\sqrt{5} + 2\\sqrt{2}$",
+    "question": "$A = 4\\sqrt{5} - \\sqrt{2}$이고 $B = \\sqrt{5} - 3\\sqrt{2}$일 때, $A - B$의 값은?",
+    "hint": "괄호를 풀 때 $B$항의 부호가 $-(\\sqrt{5} - 3\\sqrt{2})$가 됨에 주의하세요[cite: 85].",
+    "options": [
+      {
+        "text": "$3\\sqrt{5} - 4\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5\\sqrt{5} - 4\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3\\sqrt{5} + 2\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5\\sqrt{5} + 2\\sqrt{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

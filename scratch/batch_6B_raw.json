@@ -1,0 +1,1352 @@
+[
+  {
+    "id": "unit_middle_math_basic_21_q10_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "$3$",
+    "question": "분수 $\\frac{4}{33}$를 소수로 나타낼 때, 순환마디를 이루는 숫자들의 합은 얼마인가요?",
+    "hint": "$\\frac{4}{33}$를 소수로 바꾸면 $0.\\dot{1}\\dot{2}$가 됩니다. 순환마디인 $1$과 $2$를 더해보세요.",
+    "options": [
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_21_q1_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "$\\frac{3}{12}$",
+    "question": "다음 분수 중에서 소수로 나타냈을 때, '유한소수'가 되는 것은 무엇인가요? (단, 기약분수로 나타내어 확인합니다.)",
+    "hint": "기약분수로 약분한 후, 분모의 소인수가 $2$나 $5$뿐인지 확인해 보세요. $\\frac{3}{12}$는 $\\frac{1}{4}$로 약분됩니다.",
+    "options": [
+      {
+        "text": "$\\frac{1}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3}{12}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{7}{30}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{5}{14}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_21_q2_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "$6$",
+    "question": "분수 $\\frac{1}{6}$을 소수로 나타낼 때, 반복되는 구간인 '순환마디'는 무엇인가요?",
+    "hint": "$1$을 $6$으로 나누면 $0.1666...$이 됩니다. 소수점 아래에서 끝없이 반복되는 숫자를 찾아보세요.",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": true
+      },
+      {
+        "text": "$16$",
+        "isCorrect": false
+      },
+      {
+        "text": "$61$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_21_q3_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "$0.\\dot{1}\\dot{5}$",
+    "question": "순환소수 $0.151515...$를 순환마디 위에 점을 찍어 올바르게 표현한 것은 무엇인가요?",
+    "hint": "순환마디가 시작되는 숫자와 끝나는 숫자 위에 점을 찍습니다. 여기서는 $15$가 반복됩니다.",
+    "options": [
+      {
+        "text": "$0.\\dot{1}5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0.1\\dot{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0.\\dot{1}\\dot{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0.\\dot{1}5\\dot{1}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_21_q4_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "$2.\\dot{3}$",
+    "question": "다음 중 소수점 첫째 자리부터 순환마디가 바로 시작되는 '순수 순환소수'는 무엇인가요?",
+    "hint": "소수점 첫째 자리와 순환마디의 시작점이 일치하는 것을 고르세요. $2.\\dot{3}$은 $2.333...$으로 소수 첫째 자리부터 반복됩니다.",
+    "options": [
+      {
+        "text": "$0.1\\dot{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2.\\dot{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0.5\\dot{1}\\dot{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1.0\\dot{7}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_21_q5_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "유한소수",
+    "question": "분수 $\\frac{21}{2 \\times 3 \\times 5^2}$을 소수로 나타내면 어떤 소수가 되나요?",
+    "hint": "먼저 분자와 분모를 약분하세요. 분자의 $21$과 분모의 $3$이 약분되어 분모에는 $2$와 $5$만 남게 됩니다.",
+    "options": [
+      {
+        "text": "유한소수",
+        "isCorrect": true
+      },
+      {
+        "text": "순수 순환소수",
+        "isCorrect": false
+      },
+      {
+        "text": "혼합 순환소수",
+        "isCorrect": false
+      },
+      {
+        "text": "무한하지만 순환하지 않는 소수",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_21_q6_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "소수 둘째 자리부터 순환마디가 시작되는 혼합 순환소수이다.",
+    "question": "순환소수 $0.5\\dot{3}$에 대한 설명으로 옳은 것은 무엇인가요?",
+    "hint": "점의 위치를 보세요. $5$는 반복되지 않고 $3$만 반복되는 $0.5333...$ 형태입니다.",
+    "options": [
+      {
+        "text": "순환마디는 $53$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$0.535353...$을 의미한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "순수 순환소수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "소수 둘째 자리부터 순환마디가 시작되는 혼합 순환소수이다.",
+        "isCorrect": true
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_21_q7_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "$6$개",
+    "question": "분수 $\\frac{1}{7}$을 소수로 나타낼 때, 순환마디를 이루는 숫자의 개수는 몇 개인가요?",
+    "hint": "$\\frac{1}{7}$은 $0.\\dot{1}4285\\dot{7}$로 계산됩니다. 점 사이의 숫자 개수를 세어보세요.",
+    "options": [
+      {
+        "text": "$3$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$개",
+        "isCorrect": true
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_21_q8_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "$3$",
+    "question": "분수 $\\frac{x}{30}$이 유한소수가 되도록 하는 한 자리 자연수 $x$의 값은 무엇인가요?",
+    "hint": "$30 = 2 \\times 3 \\times 5$입니다. 유한소수가 되려면 분모에서 $3$이 제거되어야 하므로 $x$는 $3$의 배수여야 합니다.",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_21_q9_1773798305661",
+    "unitId": "unit_middle_math_basic_21",
+    "score": 1,
+    "answer": "$7$",
+    "question": "순환소수 $0.\\dot{3}\\dot{7}$의 소수점 아래 $100$번째 자리의 숫자는 무엇인가요?",
+    "hint": "순환마디가 $3, 7$로 $2$개씩 반복됩니다. $100$을 $2$로 나누었을 때 나머지가 얼마인지 생각해보세요.",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7$",
+        "isCorrect": true
+      },
+      {
+        "text": "알 수 없다",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_22_q10_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "소수점 아래의 반복되는 패턴을 일치시켜 뺄셈으로 제거하는 것이다.",
+    "question": "순환소수를 분수로 바꾸는 마법의 핵심 통찰은 무엇입니까?",
+    "hint": "알렉스와 소크라테스 선생님이 왜 $10$이나 $100$을 곱해서 서로 뺐는지 생각해보세요.",
+    "options": [
+      {
+        "text": "순환마디를 적절히 곱해 정수로 만드는 것이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "소수점 아래의 반복되는 패턴을 일치시켜 뺄셈으로 제거하는 것이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "모든 순환소수는 항상 분모가 $10, 100, 1000$인 분수가 된다.",
+        "isCorrect": false
+      },
+      {
+        "text": "순환마디의 숫자를 모두 더해 분자로 만드는 것이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_22_q1_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$67$",
+    "question": "순환소수 $32.5676767...$에서 반복되는 부분인 '순환마디'는 무엇입니까?",
+    "hint": "소수점 아래에서 일정하게 되풀이되는 숫자의 배열을 찾아보세요.",
+    "options": [
+      {
+        "text": "$567$",
+        "isCorrect": false
+      },
+      {
+        "text": "$67$",
+        "isCorrect": true
+      },
+      {
+        "text": "$56$",
+        "isCorrect": false
+      },
+      {
+        "text": "$76$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_22_q2_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$\\frac{1}{3}$",
+    "question": "순환소수 $x = 0.333...$을 분수로 바꾸기 위해 $10x - x$를 계산하면 $9x = 3$이 됩니다. 이때 $x$를 기약분수로 나타내면?",
+    "hint": "$\\frac{3}{9}$를 더 이상 나누어지지 않는 형태로 약분해 보세요.",
+    "options": [
+      {
+        "text": "$\\frac{1}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{3}{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{9}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3}{9}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_22_q3_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$1000$",
+    "question": "알렉스는 순환마디의 길이에 따라 $10^n$을 곱해야 한다고 설명했습니다. 순환소수 $0.123123123...$을 분수로 바꾸기 위해 양변에 곱해야 할 가장 적절한 수는?",
+    "hint": "순환마디인 $123$의 자릿수가 몇 개인지 확인해 보세요.",
+    "options": [
+      {
+        "text": "$10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1000$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10000$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_22_q4_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$\\frac{1}{11}$",
+    "question": "순환소수 $0.090909...$을 분수로 나타내면 다음과 같습니다. 빈칸에 알맞은 수는?\n$x = 0.090909..., 100x = 9.090909...$ 이므로 $99x = 9, x = (\\quad)$",
+    "hint": "$x = \\frac{9}{99}$를 약분하면 어떤 분수가 될까요?",
+    "options": [
+      {
+        "text": "$\\frac{1}{11}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{9}{100}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{9}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{9}{90}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_22_q5_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$100x - x$",
+    "question": "소크라테스 선생님의 설명에 등장한 $1.272727...$을 분수로 변환하면 $\\frac{14}{11}$가 됩니다. 이 과정에서 순환 부분을 없애기 위해 사용한 계산식으로 옳은 것은?",
+    "hint": "소수점 아래의 순환마디 $27$을 완전히 일치시켜 빼려면 소수점을 몇 칸 옮겨야 할까요?",
+    "options": [
+      {
+        "text": "$10x - x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100x - x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1000x - 10x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100x - 10x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_22_q6_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$16$",
+    "question": "순환소수 $0.454545...$을 분수로 나타냈을 때, 분자와 분모의 합은 얼마입니까? (단, 기약분수로 나타내었을 때 기준)",
+    "hint": "$0.4545... = \\frac{45}{99}$입니다. 이를 먼저 약분한 뒤 분자와 분모를 더해 보세요.",
+    "options": [
+      {
+        "text": "$16$",
+        "isCorrect": true
+      },
+      {
+        "text": "$144$",
+        "isCorrect": false
+      },
+      {
+        "text": "$56$",
+        "isCorrect": false
+      },
+      {
+        "text": "$49$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_22_q7_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$\\frac{1}{7}$",
+    "question": "베일리는 순환마디가 $6$자리인 $0.142857142857...$을 보고 놀랐습니다. 이 소수를 분수로 나타내면?",
+    "hint": "이 값은 $999999$분의 $142857$을 약분한 결과와 같습니다.",
+    "options": [
+      {
+        "text": "$\\frac{1}{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{7}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{1}{8}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{2}{7}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_22_q8_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$x = 0.833..., 10x = 8.33..., 100x = 83.33...$ 이므로 $100x - 10x = 75$",
+    "question": "순환소수 $0.8333...$과 같이 순환하지 않는 부분이 섞여 있는 경우, 분수로 고치는 과정으로 옳은 것은?",
+    "hint": "소수점 아래에 순환마디 $3$만 남기려면 $10$을 곱한 식과 $100$을 곱한 식을 활용해야 합니다.",
+    "options": [
+      {
+        "text": "$x = 0.833..., 10x = 8.33..., 100x = 83.33...$ 이므로 $100x - 10x = 75$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x = 0.833..., 10x = 8.33...$ 이므로 $10x - x = 7.5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x = 0.833..., 100x = 83.33...$ 이므로 $100x - x = 82.5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x = 0.833..., 1000x = 833.3...$ 이므로 $1000x - x = 832.5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_22_q9_1773798382947",
+    "unitId": "unit_middle_math_basic_22",
+    "score": 1,
+    "answer": "$562$",
+    "question": "문제에서 제시된 $32.5676767... = 32 + \\frac{281}{495}$의 과정 중, 소수 부분 $y = 0.5676767...$을 분수로 바꿀 때 $990y$의 값은?",
+    "hint": "$1000y(567.67...) - 10y(5.67...)$의 결과값을 계산해 보세요.",
+    "options": [
+      {
+        "text": "$562$",
+        "isCorrect": true
+      },
+      {
+        "text": "$567$",
+        "isCorrect": false
+      },
+      {
+        "text": "$511$",
+        "isCorrect": false
+      },
+      {
+        "text": "$565$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_23_q10_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$1.\\overline{5} = \\frac{15-1}{9}$",
+    "question": "다음 중 순환소수를 분수로 나타낸 식 중 옳은 것은 무엇입니까?",
+    "hint": "각 유형별로 분모의 $9$와 $0$의 개수, 그리고 분자의 뺄셈이 맞는지 확인하세요.",
+    "options": [
+      {
+        "text": "$0.\\overline{6} = \\frac{6}{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1.\\overline{5} = \\frac{15-1}{9}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0.1\\overline{2} = \\frac{12-1}{99}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3.\\overline{14} = \\frac{314-31}{90}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_23_q1_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$\\frac{7}{9}$",
+    "question": "순환소수 $0.\\overline{7}$을 분수로 나타내면 다음 중 무엇입니까?",
+    "hint": "순환마디의 숫자 개수만큼 분모에 $9$를 씁니다.",
+    "options": [
+      {
+        "text": "$\\frac{7}{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{7}{9}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{7}{90}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{77}{99}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_23_q2_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$\\frac{45}{99}$",
+    "question": "순환소수 $0.\\overline{45}$를 분수로 바르게 나타낸 것은 무엇입니까?",
+    "hint": "순환마디가 $45$이므로 분모에 $9$를 두 번 써서 $99$를 만듭니다.",
+    "options": [
+      {
+        "text": "$\\frac{45}{99}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{45}{90}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{45}{100}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{4}{9}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_23_q3_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$\\frac{13-1}{9}$",
+    "question": "순환소수 $1.\\overline{3}$을 분수로 나타내기 위한 식으로 옳은 것은 무엇입니까?",
+    "hint": "분자는 (전체 수)에서 (순환하지 않는 정수 부분)을 뺀 값입니다.",
+    "options": [
+      {
+        "text": "$\\frac{13}{9}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{13-1}{99}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{13-1}{9}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{13-3}{9}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_23_q4_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$216-2$",
+    "question": "순환소수 $2.\\overline{16}$을 분수로 나타낼 때, 분자에 들어갈 계산식으로 옳은 것은?",
+    "hint": "소수점을 무시한 전체 수 $216$에서 순환하지 않는 부분인 $2$를 빼야 합니다.",
+    "options": [
+      {
+        "text": "$216-16$",
+        "isCorrect": false
+      },
+      {
+        "text": "$216-21$",
+        "isCorrect": false
+      },
+      {
+        "text": "$216-2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$16-2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_23_q5_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$90$",
+    "question": "순환소수 $0.1\\overline{5}$를 분수로 나타낼 때, 분모로 적절한 값은 무엇입니까?",
+    "hint": "순환하는 숫자의 개수만큼 $9$를 쓰고, 소수점 아래 순환하지 않는 숫자 개수만큼 $0$을 붙입니다.",
+    "options": [
+      {
+        "text": "$9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$90$",
+        "isCorrect": true
+      },
+      {
+        "text": "$99$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_23_q6_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$\\frac{512-5}{990}$",
+    "question": "순환소수 $0.5\\overline{12}$를 분수로 나타내는 식으로 옳은 것을 고르세요.",
+    "hint": "순환마디는 $12$로 2개이므로 $99$, 순환하지 않는 소수점 아래는 $5$로 1개이므로 $0$을 붙여 분모는 $990$이 됩니다.",
+    "options": [
+      {
+        "text": "$\\frac{512-5}{990}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{512-51}{990}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{512-5}{900}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{512}{990}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_23_q7_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$100x - x$",
+    "question": "순환소수 $x=0.\\overline{32}$를 분수로 나타내기 위해 이용할 수 있는 가장 적절한 계산식은?",
+    "hint": "순환마디 전체를 소수점 위로 올리기 위해 $100$을 곱한 뒤 원래의 식을 뺍니다.",
+    "options": [
+      {
+        "text": "$10x - x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100x - 10x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100x - x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1000x - x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_23_q8_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$100x - 10x$",
+    "question": "순환소수 $x=1.2\\overline{7}$을 분수로 나타낼 때, 순환하는 소수 부분을 없애기 위한 가장 적절한 계산식은?",
+    "hint": "순환마디 앞까지 소수점을 옮기는 $10x$와 순환마디 끝까지 옮기는 $100x$를 이용합니다.",
+    "options": [
+      {
+        "text": "$100x - 10x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$100x - x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10x - x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1000x - 10x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_23_q9_1773798463520",
+    "unitId": "unit_middle_math_basic_23",
+    "score": 1,
+    "answer": "$\\frac{8}{33}$",
+    "question": "순환소수 $0.\\overline{24}$를 분수로 나타낸 후, 기약분수로 고치면 무엇입니까?",
+    "hint": "$\\frac{24}{99}$를 구한 뒤 분자와 분모를 $3$으로 나눕니다.",
+    "options": [
+      {
+        "text": "$\\frac{24}{99}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{8}{33}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{12}{50}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{4}{11}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_24_q10_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "$-3$",
+    "question": "$\\sqrt{81}$의 음의 제곱근을 $A$라고 할 때, $A$의 값은?",
+    "hint": "먼저 $\\sqrt{81}$의 값을 구한 뒤, 그 결과값의 음의 제곱근을 다시 한 번 구해야 합니다.",
+    "options": [
+      {
+        "text": "$-9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\pm 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_24_q1_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "$\\pm 8$",
+    "question": "다음 중 $64$의 제곱근을 모두 바르게 나타낸 것은?",
+    "hint": "어떤 수를 제곱하여 $64$가 되는 수는 양수와 음수 두 개가 존재합니다.",
+    "options": [
+      {
+        "text": "$8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\pm 8$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{64}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_24_q2_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "$\\sqrt{13}$",
+    "question": "한 변의 길이가 $a$인 정사각형의 넓이가 $13$일 때, 이 변의 길이 $a$를 기호를 사용하여 가장 정확하게 표현한 것은?",
+    "hint": "도형의 길이는 항상 양수여야 하므로, 넓이가 $13$인 정사각형의 한 변의 길이는 $13$의 양의 제곱근입니다.",
+    "options": [
+      {
+        "text": "$6.5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{13}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$13^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\pm \\sqrt{13}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_24_q3_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "$\\sqrt{11}$",
+    "question": "다음 중 '제곱근 $11$'을 기호로 바르게 나타낸 것은?",
+    "hint": "'제곱근 $a$'는 $\\sqrt{a}$를 읽는 방법이며, 이는 $a$의 양의 제곱근만을 의미합니다.",
+    "options": [
+      {
+        "text": "$\\pm \\sqrt{11}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{11}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$11^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{11}{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_24_q4_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "$17$",
+    "question": "소크라테스 선생님의 설명에 따르면, $(\\sqrt{17})^2$의 값은 얼마입니까?",
+    "hint": "루트 기호($\\sqrt{}$)는 '나를 제곱하면 기호 안의 숫자가 될 것이다'라는 약속을 담고 있습니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{17}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$17$",
+        "isCorrect": true
+      },
+      {
+        "text": "$289$",
+        "isCorrect": false
+      },
+      {
+        "text": "$34$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_24_q5_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "$\\frac{9}{2}$",
+    "question": "다음 수 중 그 값이 가장 큰 것은?",
+    "hint": "모든 보기를 루트 기호 안으로 넣거나($4 = \\sqrt{16}$), 제곱하여 크기를 비교해 보세요.",
+    "options": [
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{15}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{18}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{9}{2}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_24_q6_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "음수의 제곱근은 양수이다.",
+    "question": "다음 중 제곱근에 대한 설명으로 옳지 않은 것은?",
+    "hint": "어떤 실수를 제곱해도 음수가 될 수 없으므로, 음수의 제곱근은 생각하지 않습니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{25}$는 $5$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$의 제곱근은 $0$ 하나뿐이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "음수의 제곱근은 양수이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "모든 양수의 제곱근은 절대값이 같고 부호가 반대인 두 개가 있다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_24_q7_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "$4$",
+    "question": "$\\sqrt{48}$을 $a\\sqrt{b}$ ($a, b$는 자연수) 형태로 나타낼 때, $a$의 값으로 옳은 것은?",
+    "hint": "$48$을 소인수분해하여 제곱수인 인수를 루트 밖으로 꺼내 보세요. $48 = 16 \\times 3$입니다.",
+    "options": [
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$16$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_24_q8_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "$13$",
+    "question": "다음 식을 계산한 결과값은 얼마입니까? $\\sqrt{100} + (-\\sqrt{3})^2$",
+    "hint": "$\\sqrt{100}$은 제곱해서 $100$이 되는 양수이고, $(-\\sqrt{3})^2$은 $-\\sqrt{3}$을 두 번 곱한 값입니다.",
+    "options": [
+      {
+        "text": "$7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$13$",
+        "isCorrect": true
+      },
+      {
+        "text": "$103$",
+        "isCorrect": false
+      },
+      {
+        "text": "$19$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_24_q9_1773798533039",
+    "unitId": "unit_middle_math_basic_24",
+    "score": 1,
+    "answer": "넓이가 $10$인 정사각형의 한 변의 길이",
+    "question": "베일리가 궁금해한 '유리수로 딱 떨어지지 않는 정확한 이름표'가 반드시 필요한 경우는?",
+    "hint": "제곱해서 기호 안의 수가 되는 유리수가 존재하지 않을 때 무리수인 루트 표현이 필수적입니다.",
+    "options": [
+      {
+        "text": "넓이가 $16$인 정사각형의 한 변의 길이",
+        "isCorrect": false
+      },
+      {
+        "text": "넓이가 $0.49$인 정사각형의 한 변의 길이",
+        "isCorrect": false
+      },
+      {
+        "text": "넓이가 $10$인 정사각형의 한 변의 길이",
+        "isCorrect": true
+      },
+      {
+        "text": "넓이가 $\\frac{4}{9}$인 정사각형의 한 변의 길이",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_25_q10_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$(-\\sqrt{6})^2$",
+    "question": "다음 중 그 값이 가장 큰 것은 무엇입니까?",
+    "hint": "각 보기를 수로 바꾸면 $1$, $5$, $6$, $0$이 됩니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{1^2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{(-5)^2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-\\sqrt{6})^2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{0^2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_25_q1_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "선물을 포장하는 것과 포장을 푸는 것",
+    "question": "소크라테스 선생님의 설명에 따르면, 제곱근 기호($\\sqrt{ }$)와 제곱($^2$)의 관계를 가장 잘 비유한 것은?",
+    "hint": "자료에서 제곱은 '포장', 제곱근은 '포장을 푸는 행위'로 설명되었습니다.",
+    "options": [
+      {
+        "text": "선물을 포장하는 것과 포장을 푸는 것",
+        "isCorrect": true
+      },
+      {
+        "text": "서로 아무런 관련이 없는 독립적인 관계",
+        "isCorrect": false
+      },
+      {
+        "text": "항상 똑같은 결과만 나오는 복사 관계",
+        "isCorrect": false
+      },
+      {
+        "text": "더하기와 곱하기처럼 계산 순서만 바뀐 관계",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_25_q2_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$23$",
+    "question": "$\\sqrt{23^2}$의 값을 계산하면 얼마입니까?",
+    "hint": "양수를 제곱한 후 다시 제곱근을 씌우면 원래의 양수가 그대로 나옵니다.",
+    "options": [
+      {
+        "text": "$-23$",
+        "isCorrect": false
+      },
+      {
+        "text": "$23$",
+        "isCorrect": true
+      },
+      {
+        "text": "$46$",
+        "isCorrect": false
+      },
+      {
+        "text": "$529$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_25_q3_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$15$",
+    "question": "$\\sqrt{(-15)^2}$의 값을 구하시오.",
+    "hint": "제곱근의 결과는 항상 양수(절댓값)로 정의되어 있다는 점을 기억하세요.",
+    "options": [
+      {
+        "text": "$-15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-225$",
+        "isCorrect": false
+      },
+      {
+        "text": "$225$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_25_q4_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$-\\sqrt{8^2}$",
+    "question": "다음 중 그 계산 결과가 나머지 셋과 다른 하나는 무엇입니까?",
+    "hint": "제곱근 기호 앞에 마이너스($-$) 부호가 있는지 확인해 보세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{8^2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{(-8)^2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(\\sqrt{8})^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\sqrt{8^2}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_25_q5_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$a$",
+    "question": "$a > 0$일 때, $\\sqrt{(-a)^2}$을 간단히 하면?",
+    "hint": "$\\\\sqrt{a^2} = |a|$ 성질에 따라, 안의 수가 음수여도 결과는 양수가 되어야 합니다.",
+    "options": [
+      {
+        "text": "$a$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_25_q6_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$-x$",
+    "question": "$x < 0$일 때, $\\sqrt{x^2}$을 간단히 한 결과로 옳은 것은?",
+    "hint": "$x$ 자체가 음수이므로, 결과가 양수가 되려면 앞에 마이너스($-$)를 붙여야 합니다.",
+    "options": [
+      {
+        "text": "$x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-x^2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_25_q7_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$7$",
+    "question": "$\\sqrt{(5-12)^2}$의 값을 계산하시오.",
+    "hint": "괄호 안의 계산 결과인 $-7$의 절댓값을 생각하면 쉽습니다.",
+    "options": [
+      {
+        "text": "$-7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-17$",
+        "isCorrect": false
+      },
+      {
+        "text": "$17$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_25_q8_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$3a$",
+    "question": "$\\sqrt{a^2} + \\sqrt{(-2a)^2}$을 간단히 하려고 합니다. $a > 0$일 때의 결과는?",
+    "hint": "각각의 제곱근을 양수 형태로 풀어서 더해 보세요.",
+    "options": [
+      {
+        "text": "$-a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3a$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-3a$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_25_q9_1773798611501",
+    "unitId": "unit_middle_math_basic_25",
+    "score": 1,
+    "answer": "$0$",
+    "question": "$\\sqrt{x^2} = 11$을 만족하는 모든 $x$의 값을 더한 값은 얼마입니까?",
+    "hint": "$x$는 $11$이 될 수도 있지만, $-11$이 될 수도 있습니다.",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$11$",
+        "isCorrect": false
+      },
+      {
+        "text": "$22$",
+        "isCorrect": false
+      },
+      {
+        "text": "$121$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

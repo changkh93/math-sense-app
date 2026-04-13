@@ -1,0 +1,1352 @@
+[
+  {
+    "id": "unit_middle_math_basic_36_q10_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$6\\sqrt{7}$과 같은 값이다.",
+    "question": "다음 중 $\\sqrt{252}$에 대한 설명으로 옳은 것은?",
+    "hint": "$252$를 소인수분해하면 $36 \\times 7$이 됨을 이용해 보세요.",
+    "options": [
+      {
+        "text": "$6\\sqrt{7}$과 같은 값이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$3\\sqrt{28}$로 나타낼 수 없다.",
+        "isCorrect": false
+      },
+      {
+        "text": "소인수분해하면 $2^2 \\times 3 \\times 7$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{200} + \\sqrt{52}$와 값이 같다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_36_q1_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$9$",
+    "question": "$\\sqrt{80}$을 $a\\sqrt{b}$ 꼴로 나타낼 때, $a+b$의 값은? (단, $b$는 가장 작은 자연수)",
+    "hint": "$80$을 소인수분해하여 $80 = 16 \\times 5$임을 이용해 보세요.",
+    "options": [
+      {
+        "text": "$9$",
+        "isCorrect": true
+      },
+      {
+        "text": "$13$",
+        "isCorrect": false
+      },
+      {
+        "text": "$21$",
+        "isCorrect": false
+      },
+      {
+        "text": "$24$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_36_q2_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$4\\sqrt{6}$",
+    "question": "다음 중 그 값이 나머지 셋과 다른 하나는?",
+    "hint": "각 보기를 $a\\sqrt{b}$ 또는 $\\sqrt{A}$ 형태로 통일하여 비교해 보세요.",
+    "options": [
+      {
+        "text": "$3\\sqrt{12}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{108}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4\\sqrt{6}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_36_q3_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$-4$",
+    "question": "$\\sqrt{54} = a\\sqrt{6}$이고 $\\sqrt{98} = b\\sqrt{2}$일 때, $a-b$의 값은?",
+    "hint": "$54 = 9 \\times 6$, $98 = 49 \\times 2$임을 이용하여 $a$와 $b$를 구하세요.",
+    "options": [
+      {
+        "text": "$-4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_36_q4_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$\\sqrt{20} = 5\\sqrt{2}$",
+    "question": "다음 중 근호를 사용한 식의 변형이 옳지 않은 것은?",
+    "hint": "$\\sqrt{20} = \\sqrt{4 \\times 5}$이므로 밖으로 나올 숫자를 다시 확인해 보세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{45} = 3\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{24} = 2\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{72} = 6\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{20} = 5\\sqrt{2}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_36_q5_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$5\\sqrt{2}$",
+    "question": "$\\sqrt{10} \\times \\sqrt{5}$를 계산하여 간단히 나타내면?",
+    "hint": "$\\sqrt{10} \\times \\sqrt{5} = \\sqrt{50}$이며, $50 = 25 \\times 2$입니다.",
+    "options": [
+      {
+        "text": "$5\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{15}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_36_q6_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$8\\sqrt{2}$",
+    "question": "$\\sqrt{18} + \\sqrt{50}$을 계산한 결과로 옳은 것은?",
+    "hint": "$\\sqrt{18}$과 $\\sqrt{50}$을 각각 $a\\sqrt{2}$ 꼴로 바꾼 뒤 더해 보세요.",
+    "options": [
+      {
+        "text": "$8\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{68}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{17}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_36_q7_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$6\\sqrt{3}$",
+    "question": "넓이가 $108$인 정사각형의 한 변의 길이를 $a\\sqrt{b}$ 꼴로 나타내면? (단, $b$는 가장 작은 자연수)",
+    "hint": "한 변의 길이는 $\\sqrt{108}$이며, $108 = 36 \\times 3$입니다.",
+    "options": [
+      {
+        "text": "$6\\sqrt{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{27}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$18\\sqrt{6}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_36_q8_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$52$",
+    "question": "$2\\sqrt{13} = \\sqrt{A}$일 때, 자연수 $A$의 값은?",
+    "hint": "근호 밖의 $2$가 근호 안으로 들어갈 때는 제곱인 $2^2$이 되어 곱해집니다.",
+    "options": [
+      {
+        "text": "$26$",
+        "isCorrect": false
+      },
+      {
+        "text": "$39$",
+        "isCorrect": false
+      },
+      {
+        "text": "$52$",
+        "isCorrect": true
+      },
+      {
+        "text": "$169$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_36_q9_1773799887039",
+    "unitId": "unit_middle_math_basic_36",
+    "score": 1,
+    "answer": "$9$",
+    "question": "$\\frac{\\sqrt{54}}{\\sqrt{6}} + \\sqrt{3} \\times \\sqrt{12}$를 계산한 값은?",
+    "hint": "나눗셈과 곱셈을 먼저 계산하여 각각 유리수 정수로 풀리는지 확인하세요.",
+    "options": [
+      {
+        "text": "$9$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3+2\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3\\sqrt{6}+6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_37_q10_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$13 - 2\\sqrt{5}$",
+    "question": "다음 식을 계산하여라.\n$\\sqrt{5}(2\\sqrt{5} - 1) + \\frac{\\sqrt{45} - 5}{\\sqrt{5}}$",
+    "hint": "왼쪽 항은 분배법칙을, 오른쪽 항은 하트 모양으로 쪼개거나 유리화하여 계산해 보세요.",
+    "options": [
+      {
+        "text": "$13 - 2\\sqrt{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$13 - \\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10 - 2\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8\\sqrt{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_37_q1_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$9 - 4\\sqrt{3}$",
+    "question": "다음 식을 계산한 결과로 옳은 것은?\n$\\sqrt{3}(\\sqrt{12} + \\sqrt{3}) - \\sqrt{48}$",
+    "hint": "$\\sqrt{12}$와 $\\sqrt{48}$을 $a\\sqrt{b}$ 꼴로 먼저 바꾼 뒤 분배법칙을 사용해 보세요.",
+    "options": [
+      {
+        "text": "$9 - 4\\sqrt{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3 + 4\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9 - 2\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_37_q2_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$2 - \\sqrt{2}$",
+    "question": "다음 식을 계산한 값은?\n$\\frac{4}{\\sqrt{2}} + \\sqrt{2}(\\sqrt{2} - 3)$",
+    "hint": "$\\frac{4}{\\sqrt{2}}$를 유리화하고, 분배법칙을 적용한 후 유리수는 유리수끼리, 무리수는 무리수끼리 계산하세요.",
+    "options": [
+      {
+        "text": "$2 - \\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2 + \\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2 - 5\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4\\sqrt{2} + 2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_37_q3_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$2\\sqrt{3}$",
+    "question": "$A = \\sqrt{18} - \\sqrt{8}$, $B = \\frac{\\sqrt{12}}{\\sqrt{2}}$ 일 때, $A \\times B$의 값은?",
+    "hint": "$A$를 먼저 간단히 한 후 $B$와 곱하고, 마지막에 루트 밖으로 꺼낼 수 있는 수를 확인하세요.",
+    "options": [
+      {
+        "text": "$2\\sqrt{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4\\sqrt{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_37_q4_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$5\\sqrt{5} - 2$",
+    "question": "다음 식을 계산한 결과는?\n$\\sqrt{2}(\\sqrt{10} - \\sqrt{2}) + \\frac{\\sqrt{20} + \\sqrt{80}}{\\sqrt{4}}$",
+    "hint": "괄호 부분은 분배법칙을, 분수 부분은 분자를 먼저 정리한 뒤 나누기를 해보세요.",
+    "options": [
+      {
+        "text": "$5\\sqrt{5} - 2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3\\sqrt{5} - 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5\\sqrt{5} + 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4\\sqrt{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_37_q5_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$\\frac{15}{2}$",
+    "question": "어떤 사다리꼴의 윗변의 길이가 $\\sqrt{12}$, 아랫변의 길이가 $\\sqrt{27}$, 높이가 $\\sqrt{3}$일 때, 이 사다리꼴의 넓이는?",
+    "hint": "사다리꼴의 넓이 공식은 $\\frac{1}{2} \\times (\\text{윗변} + \\text{아랫변}) \\times \\text{높이}$입니다.",
+    "options": [
+      {
+        "text": "$\\frac{15}{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{5\\sqrt{3}}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_37_q6_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$1$",
+    "question": "$\\frac{\\sqrt{24} - \\sqrt{6}}{\\sqrt{3}}$을 계산하여 $a\\sqrt{2}$ 꼴로 나타낼 때, 유리수 $a$의 값은?",
+    "hint": "분수를 $\\frac{\\sqrt{24}}{\\sqrt{3}} - \\frac{\\sqrt{6}}{\\sqrt{3}}$으로 쪼개서 각각 나누어 보세요.",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_37_q7_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$2 - \\sqrt{5}$",
+    "question": "다음 식을 계산한 결과로 옳은 것은?\n$3\\sqrt{5} - \\sqrt{2}(2\\sqrt{10} - \\sqrt{2})$",
+    "hint": "괄호 앞에 마이너스($-$) 부호가 있음에 주의하며 분배법칙을 적용하세요.",
+    "options": [
+      {
+        "text": "$2 - \\sqrt{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2 + \\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7\\sqrt{5} - 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3\\sqrt{5} - 2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_37_q8_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$\\sqrt{18} - \\sqrt{2} = 2\\sqrt{2}$",
+    "question": "다음 보기 중 계산 결과가 옳은 것은?",
+    "hint": "무리수의 덧셈과 뺄셈은 근호 안의 숫자가 같을 때만 동류항처럼 계산할 수 있습니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{18} - \\sqrt{2} = 2\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{2} + \\sqrt{3} = \\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{\\sqrt{3}} + \\sqrt{3} = 2\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{2}(\\sqrt{2} + 1) = 3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_37_q9_1773799967255",
+    "unitId": "unit_middle_math_basic_37",
+    "score": 1,
+    "answer": "$-7\\sqrt{2}$",
+    "question": "다음 식을 계산한 값은?\n$\\sqrt{3} \\times \\sqrt{6} - \\frac{10}{\\sqrt{5}} \\times \\sqrt{10}$",
+    "hint": "각 항을 먼저 간단히 한 뒤 뺄셈을 하세요. $\\frac{\\sqrt{10}}{\\sqrt{5}}$는 바로 약분이 가능합니다.",
+    "options": [
+      {
+        "text": "$-7\\sqrt{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$7\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-13\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3\\sqrt{2} - 2\\sqrt{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_38_q10_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$12ab$",
+    "question": "식 $(a+3b)^{2} - (a-3b)^{2}$을 간단히 정리한 결과는?",
+    "hint": "두 공식을 각각 전개한 후 뺄셈을 하면 $a^{2}$과 $b^{2}$항이 사라집니다. [cite: 1, 94]",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6ab$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12ab$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2a^{2}+18b^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_38_q1_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$x^{2}+12x+36$",
+    "question": "다음 중 곱셈 공식을 이용하여 $(x+6)^{2}$을 바르게 전개한 식은 무엇입니까?",
+    "hint": "곱셈 공식 $(a+b)^{2}=a^{2}+2ab+b^{2}$에서 $a$ 대신 $x$를, $b$ 대신 $6$을 대입해 보세요. [cite: 1, 24]",
+    "options": [
+      {
+        "text": "$x^{2}+36$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}+6x+36$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}+12x+12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}+12x+36$",
+        "isCorrect": true
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_38_q2_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$-24$",
+    "question": "식 $(3a-4b)^{2}$을 전개했을 때, $ab$항의 계수는 얼마입니까?",
+    "hint": "가운데 항은 $2 \\times (앞의 항) \\times (뒤의 항)$으로 계산되며, 부호에 주의해야 합니다. [cite: 1, 25, 34]",
+    "options": [
+      {
+        "text": "$-12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-24$",
+        "isCorrect": true
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$24$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_38_q3_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$10+4\\sqrt{6}$",
+    "question": "$(\\sqrt{6}+2)^{2}$을 계산한 결과로 옳은 것은 무엇입니까?",
+    "hint": "$(\\sqrt{6})^{2}$과 $2^{2}$을 더한 값에, 둘을 곱해서 $2$배 한 값을 추가해야 합니다. [cite: 1, 26, 33]",
+    "options": [
+      {
+        "text": "$8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10+4\\sqrt{6}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$8+4\\sqrt{6}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_38_q4_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$22-4\\sqrt{10}$",
+    "question": "다음 중 $(2\\sqrt{5}-\\sqrt{2})^{2}$을 계산한 값은?",
+    "hint": "$(a-b)^{2}=a^{2}-2ab+b^{2}$ 공식을 사용하며, $(\\sqrt{a})^{2}=a$임을 이용하세요. [cite: 1, 25, 57]",
+    "options": [
+      {
+        "text": "$18$",
+        "isCorrect": false
+      },
+      {
+        "text": "$22-4\\sqrt{10}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$22-2\\sqrt{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$18-4\\sqrt{10}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_38_q5_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$10$",
+    "question": "등식 $(x-A)^{2} = x^{2}-20x+100$이 성립할 때, 양수 $A$의 값은?",
+    "hint": "$x$항의 계수인 $-20$은 $-2 \\times x \\times A$와 같아야 합니다. [cite: 1, 63]",
+    "options": [
+      {
+        "text": "$10$",
+        "isCorrect": true
+      },
+      {
+        "text": "$20$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_38_q6_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$(100-3)^{2}$",
+    "question": "곱셈 공식을 이용하여 $97^{2}$을 가장 편리하게 계산할 수 있는 식은?",
+    "hint": "$100$과 같이 계산하기 쉬운 숫자를 기준으로 차이를 이용하는 것이 빠릅니다. [cite: 1, 69]",
+    "options": [
+      {
+        "text": "$(90+7)^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(100-3)^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(95+2)^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(100+3)(100-3)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_38_q7_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$26$",
+    "question": "$x+y=6$이고 $xy=5$일 때, $x^{2}+y^{2}$의 값은?",
+    "hint": "$x^{2}+y^{2}$은 $(x+y)^{2}$에서 $2xy$를 뺀 것과 같습니다. [cite: 1, 75]",
+    "options": [
+      {
+        "text": "$26$",
+        "isCorrect": true
+      },
+      {
+        "text": "$31$",
+        "isCorrect": false
+      },
+      {
+        "text": "$36$",
+        "isCorrect": false
+      },
+      {
+        "text": "$46$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_38_q8_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$9$",
+    "question": "$(2\\sqrt{3}-1)^{2}$을 계산하여 $a+b\\sqrt{3}$ 꼴로 나타낼 때, $a+b$의 값은? (단, $a, b$는 정수)",
+    "hint": "먼저 식을 전개하여 유리수 부분 $a$와 무리수 부분의 계수 $b$를 각각 구해보세요. [cite: 1, 82]",
+    "options": [
+      {
+        "text": "$9$",
+        "isCorrect": true
+      },
+      {
+        "text": "$11$",
+        "isCorrect": false
+      },
+      {
+        "text": "$13$",
+        "isCorrect": false
+      },
+      {
+        "text": "$17$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_38_q9_1773800166292",
+    "unitId": "unit_middle_math_basic_38",
+    "score": 1,
+    "answer": "$49$",
+    "question": "$(x+a)^{2}$의 전개식에서 $x$의 계수가 $14$일 때, 이 식의 상수항은 얼마입니까?",
+    "hint": "$x$의 계수는 $2a$이므로 먼저 $a$의 값을 구한 뒤, 상수항인 $a^{2}$을 계산하세요. [cite: 1, 88]",
+    "options": [
+      {
+        "text": "$7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$14$",
+        "isCorrect": false
+      },
+      {
+        "text": "$28$",
+        "isCorrect": false
+      },
+      {
+        "text": "$49$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_39_q10_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$99.99$",
+    "question": "합차 공식을 이용하여 소수의 곱셈 $10.1 \\times 9.9$를 계산한 값은?",
+    "hint": "$(10+0.1)(10-0.1)$로 변형하여 $10^{2} - (0.1)^{2}$을 계산해 보세요.",
+    "options": [
+      {
+        "text": "$99.9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$99.99$",
+        "isCorrect": true
+      },
+      {
+        "text": "$99.01$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100.01$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_39_q1_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$x^{2}-64$",
+    "question": "식 $(x+8)(x-8)$을 합차 공식을 이용하여 전개했을 때 올바른 결과는 무엇입니까?",
+    "hint": "합차 공식 $(a+b)(a-b) = a^{2}-b^{2}$에서 $a=x$, $b=8$을 대입해 보세요.",
+    "options": [
+      {
+        "text": "$x^{2}-16$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}-64$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x^{2}+64$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}-16x+64$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_39_q2_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$4a^{2}-9b^{2}$",
+    "question": "식 $(-2a+3b)(-2a-3b)$를 간단히 정리하면 무엇입니까?",
+    "hint": "공통된 항인 $-2a$를 $A$로, 뒤의 항 $3b$를 $B$로 생각하여 $(A+B)(A-B)$ 형태를 적용해 보세요.",
+    "options": [
+      {
+        "text": "$4a^{2}-9b^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-4a^{2}+9b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4a^{2}+9b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4a^{2}-9b^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_39_q3_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$(50+2)(50-2) = 2500-4$",
+    "question": "합차 공식을 이용하여 $52 \\times 48$을 계산하려고 합니다. 다음 중 가장 적절한 계산 과정은 무엇입니까?",
+    "hint": "$52$와 $48$의 중간값인 $50$을 기준으로 두 수의 합과 차의 곱으로 나타내 보세요.",
+    "options": [
+      {
+        "text": "$(50+2)^{2} = 2500+200+4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(50+2)(50-2) = 2500-4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(50+2)(50-2) = 2500-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(40+12)(60-12) = 2400-144$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_39_q4_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$9$",
+    "question": "식 $(\\sqrt{13}+2)(\\sqrt{13}-2)$를 계산한 결과로 옳은 것은 무엇입니까?",
+    "hint": "$(\\sqrt{13})^{2} - 2^{2}$을 계산하면 루트가 사라지는 마법을 볼 수 있습니다.",
+    "options": [
+      {
+        "text": "$11$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9$",
+        "isCorrect": true
+      },
+      {
+        "text": "$7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_39_q5_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$3(\\sqrt{7}+\\sqrt{5})$",
+    "question": "분수 $\\frac{6}{\\sqrt{7}-\\sqrt{5}}$의 분모를 유리화했을 때의 결과는?",
+    "hint": "분모와 분자에 분모의 '짝꿍'인 $(\\sqrt{7}+\\sqrt{5})$를 곱하고 분모를 계산해 보세요.",
+    "options": [
+      {
+        "text": "$3(\\sqrt{7}+\\sqrt{5})$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6(\\sqrt{7}+\\sqrt{5})$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{7}+\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3(\\sqrt{7}-\\sqrt{5})$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_39_q6_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$(x-11)(x+11)$",
+    "question": "다항식 $x^{2}-121$을 두 일차식의 곱으로 나타낸 것으로 옳은 것은?",
+    "hint": "$121$은 $11$의 제곱입니다. $a^{2}-b^{2}$ 꼴을 $(a+b)(a-b)$로 바꾸어 보세요.",
+    "options": [
+      {
+        "text": "$(x-11)^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(x+11)^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(x-11)(x+11)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(x-121)(x+1)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_39_q7_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$x^{4}-1$",
+    "question": "식 $(x-1)(x+1)(x^{2}+1)$을 전개하여 가장 간단히 나타내면?",
+    "hint": "먼저 앞의 두 괄호 $(x-1)(x+1)$을 합차 공식으로 계산한 후, 그 결과와 마지막 괄호를 다시 계산해 보세요.",
+    "options": [
+      {
+        "text": "$x^{2}-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{4}-1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x^{4}+1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}+1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_39_q8_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$-11$",
+    "question": "$x = \\sqrt{5}$일 때, 식 $(x+4)(x-4)$의 값은?",
+    "hint": "먼저 식을 $x^{2}-16$으로 전개한 뒤에 $x$ 값을 대입하면 계산이 훨씬 빠릅니다.",
+    "options": [
+      {
+        "text": "$-11$",
+        "isCorrect": true
+      },
+      {
+        "text": "$11$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_39_q9_1773800220518",
+    "unitId": "unit_middle_math_basic_39",
+    "score": 1,
+    "answer": "$6$",
+    "question": "$(\\sqrt{3}+\\sqrt{2})(\\sqrt{3}-\\sqrt{2}) + (\\sqrt{6}-1)(\\sqrt{6}+1)$을 계산한 값은?",
+    "hint": "각각의 괄호 묶음을 합차 공식으로 계산하여 더해 보세요. 첫 번째 묶음은 $3-2$가 됩니다.",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": true
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_40_q10_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$2\\sqrt{3}$",
+    "question": "$x = \\frac{1}{\\sqrt{3}+\\sqrt{2}}$, $y = \\frac{1}{\\sqrt{3}-\\sqrt{2}}$일 때, $x+y$의 값은?",
+    "hint": "$x$와 $y$를 각각 유리화하면 소거되는 항이 보입니다.",
+    "options": [
+      {
+        "text": "$2\\sqrt{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_40_q1_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$\\sqrt{7}+2$",
+    "question": "$\\frac{1}{\\sqrt{7}-2}$의 분모를 유리화하기 위해 분자와 분모에 곱해야 하는 가장 적절한 '짝꿍(켤레)' 식은 무엇인가요?",
+    "hint": "합차 공식 $(a-b)(a+b)=a^2-b^2$을 이용하여 분모의 루트를 없애야 합니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{7}-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{7}+2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$7+2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{7}+4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_40_q2_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$\\sqrt{5}-2$",
+    "question": "$\\frac{1}{\\sqrt{5}+2}$를 유리화하여 간단히 나타낸 것은?",
+    "hint": "분모와 분자에 $\\sqrt{5}-2$를 곱하면 분모가 $5-4=1$이 됩니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{5}+2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{5}-2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{\\sqrt{5}-2}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2-\\sqrt{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_40_q3_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$3\\sqrt{3}-3$",
+    "question": "$\\frac{6}{\\sqrt{3}+1}$을 유리화한 결과로 옳은 것은?",
+    "hint": "분모가 $(\\sqrt{3})^2-1^2=2$가 되므로, 분자의 $6$과 약분됩니다.",
+    "options": [
+      {
+        "text": "$3\\sqrt{3}-3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3\\sqrt{3}+3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6\\sqrt{3}-6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{3}-1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_40_q4_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$\\frac{\\sqrt{15}+\\sqrt{6}}{3}$",
+    "question": "$\\frac{\\sqrt{3}}{\\sqrt{5}-\\sqrt{2}}$의 분모를 유리화한 식은?",
+    "hint": "분자에 $\\sqrt{3}$을 분배법칙으로 곱할 때 $\\sqrt{3} \\times \\sqrt{5} = \\sqrt{15}$가 됨을 유의하세요.",
+    "options": [
+      {
+        "text": "$\\frac{\\sqrt{15}+\\sqrt{6}}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{\\sqrt{15}-\\sqrt{6}}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{15}+\\sqrt{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{\\sqrt{15}+\\sqrt{6}}{7}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_40_q5_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$3$",
+    "question": "$\\frac{2}{3-\\sqrt{7}}$를 유리화하여 $a+\\sqrt{7}$ 꼴로 나타낼 때, 유리수 $a$의 값은?",
+    "hint": "분모와 분자에 $3+\\sqrt{7}$을 곱한 뒤 분모의 값인 $9-7=2$와 분자의 $2$를 약분해 보세요.",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_40_q6_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$4+\\sqrt{15}$",
+    "question": "$x=4-\\sqrt{15}$일 때, $\\frac{1}{x}$의 값을 구하면?",
+    "hint": "역수를 취한 뒤 분모 $4-\\sqrt{15}$의 켤레인 $4+\\sqrt{15}$를 곱해 유리화합니다.",
+    "options": [
+      {
+        "text": "$4+\\sqrt{15}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4-\\sqrt{15}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4+\\sqrt{15}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4-\\sqrt{15}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_40_q7_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$\\frac{7-2\\sqrt{10}}{3}$",
+    "question": "$\\frac{\\sqrt{5}-\\sqrt{2}}{\\sqrt{5}+\\sqrt{2}}$를 유리화하여 간단히 하면?",
+    "hint": "분자는 $(\\sqrt{5}-\\sqrt{2})^2$이 되므로 곱셈공식 $(a-b)^2 = a^2-2ab+b^2$을 사용합니다.",
+    "options": [
+      {
+        "text": "$\\frac{7-2\\sqrt{10}}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{7+2\\sqrt{10}}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7-2\\sqrt{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_40_q8_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$1$",
+    "question": "$\\frac{1}{1+\\sqrt{2}} + \\frac{1}{\\sqrt{2}+\\sqrt{3}} + \\frac{1}{\\sqrt{3}+2}$를 계산한 값은?",
+    "hint": "각 항을 유리화하면 중간 항들이 서로 소거되는 규칙을 발견할 수 있습니다.",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{3}-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{2}+2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_40_q9_1773800282341",
+    "unitId": "unit_middle_math_basic_40",
+    "score": 1,
+    "answer": "$\\sqrt{10}+3$",
+    "question": "$\\sqrt{10}-3$의 역수를 유리화한 값은?",
+    "hint": "역수는 $\\frac{1}{\\sqrt{10}-3}$이며, 분모의 제곱 차가 $10-9=1$임을 이용합니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{10}+3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{10}-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3-\\sqrt{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{\\sqrt{10}+3}{7}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

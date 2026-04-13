@@ -1,0 +1,1352 @@
+[
+  {
+    "id": "unit_middle_math_basic_26_q10_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$2x-6$",
+    "question": "$x > 3$일 때, $\\sqrt{(3-x)^2} + |x-3|$을 간단히 하면?",
+    "hint": "$3-x$와 $x-3$은 서로 부호가 반대입니다. 각각의 절댓값이 어떻게 풀리는지 확인하세요.",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x-6$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6-2x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_26_q1_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$x-7$",
+    "question": "$x > 7$일 때, $\\sqrt{(x-7)^2}$을 간단히 하면 무엇입니까?",
+    "hint": "$x > 7$이므로 $x-7$의 부호가 양수인지 음수인지 먼저 판단해 보세요.",
+    "options": [
+      {
+        "text": "$x-7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-x+7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x+7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-x-7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_26_q2_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$-a+3$",
+    "question": "$a < 3$일 때, $\\sqrt{(a-3)^2}$을 간단히 한 결과로 옳은 것은?",
+    "hint": "$a$가 $3$보다 작을 때, $a-3$은 $0$보다 큰지 작은지 생각하며 마이너스 부호의 필요성을 확인하세요.",
+    "options": [
+      {
+        "text": "$a-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-a+3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a+3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_26_q3_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$5-x$",
+    "question": "$x < 5$일 때, $\\sqrt{(5-x)^2}$을 간단히 정리하면?",
+    "hint": "$x < 5$이면 $5-x$는 양수일까요, 음수일까요?",
+    "options": [
+      {
+        "text": "$x-5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-x-5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5-x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-5+x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_26_q4_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$3$",
+    "question": "$2 < x < 5$일 때, $\\sqrt{(x-2)^2} + \\sqrt{(x-5)^2}$을 간단히 하면?",
+    "hint": "$x-2$와 $x-5$의 부호를 각각 결정한 뒤 절댓값을 풀어 더해 보세요.",
+    "options": [
+      {
+        "text": "$2x-7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7-2x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_26_q5_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$a+b$",
+    "question": "$a > 0, b < 0$일 때, $\\sqrt{a^2} - \\sqrt{(-b)^2}$을 간단히 하면?",
+    "hint": "$b < 0$이면 $-b$는 양수입니다. 각 근호를 절댓값으로 바꾼 뒤 부호를 적용하세요.",
+    "options": [
+      {
+        "text": "$a-b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a+b$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-a+b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-a-b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_26_q6_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$4$",
+    "question": "$-2 < a < 2$일 때, $|a-2| + \\sqrt{(a+2)^2}$을 간단히 한 값은?",
+    "hint": "$-2 < a < 2$ 범위 내의 숫자 하나(예: $0$)를 대입해 각 식의 부호를 짐작해 보세요.",
+    "options": [
+      {
+        "text": "$2a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_26_q7_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$-x-4$",
+    "question": "$x < -4$일 때, $\\sqrt{(x+4)^2}$을 간단히 하면?",
+    "hint": "$x$가 $-4$보다 작은 수일 때 $x+4$의 부호를 확인하세요.",
+    "options": [
+      {
+        "text": "$x+4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-x-4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x-4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-x+4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_26_q8_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$-ab$",
+    "question": "$a < 0, b > 0$일 때, $\\sqrt{a^2b^2}$을 간단히 정리한 결과는?",
+    "hint": "$\\sqrt{a^2b^2}$은 $|ab|$와 같습니다. $a$와 $b$의 부호가 다를 때 곱의 부호를 생각하세요.",
+    "options": [
+      {
+        "text": "$ab$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-ab$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a+b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-a-b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_26_q9_1773798685407",
+    "unitId": "unit_middle_math_basic_26",
+    "score": 1,
+    "answer": "$-b$",
+    "question": "$a < b < 0$일 때, $\\sqrt{a^2} - \\sqrt{(a-b)^2}$을 간단히 하면?",
+    "hint": "$a < b$이므로 $a-b$는 음수입니다. 각 식을 절댓값 기호로 바꾼 뒤 신중히 계산하세요.",
+    "options": [
+      {
+        "text": "$b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-b$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2a-b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2a+b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_27_q10_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$3$",
+    "question": "$5 - \\sqrt{3}$의 정수 부분은 무엇입니까?",
+    "hint": "$1 < \\sqrt{3} < 2$이므로 $5$에서 이 값을 빼면 어떤 범위가 되는지 생각해보세요.",
+    "options": [
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_27_q1_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$4$와 $5$",
+    "question": "$\\sqrt{22}$는 다음 중 어느 두 정수 사이에 있습니까?",
+    "hint": "$22$보다 작은 가장 큰 제곱수인 $16$과 $22$보다 큰 가장 작은 제곱수인 $25$를 생각해보세요.",
+    "options": [
+      {
+        "text": "$3$과 $4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$와 $5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5$와 $6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$과 $7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_27_q2_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$\\sqrt{37}$",
+    "question": "다음 수 중에서 가장 큰 값은 무엇입니까?",
+    "hint": "모든 수를 제곱근 기호 안의 수로 바꾸어 비교하면 쉽습니다. $6 = \\sqrt{36}$임을 활용하세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{35}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{37}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5.9$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_27_q3_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$8$개",
+    "question": "부등식 $4 < \\sqrt{x} < 5$를 만족시키는 자연수 $x$의 개수는?",
+    "hint": "부등식의 각 변을 제곱하면 $16 < x < 25$가 됩니다. 이 범위에 속하는 자연수를 세어보세요.",
+    "options": [
+      {
+        "text": "$7$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$9$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_27_q4_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$8$",
+    "question": "$\\sqrt{60}$에 가장 가까운 정수는 무엇입니까?",
+    "hint": "$\\sqrt{49} = 7$이고 $\\sqrt{64} = 8$입니다. $60$이 $49$와 $64$ 중 어느 쪽에 더 가까운지 비교해보세요.",
+    "options": [
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$",
+        "isCorrect": true
+      },
+      {
+        "text": "$9$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_27_q5_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$-3$와 $-4$ 사이에 있다.",
+    "question": "$-\\sqrt{12}$의 위치에 대한 설명으로 옳은 것은?",
+    "hint": "$\\sqrt{9} < \\sqrt{12} < \\sqrt{16}$이므로 $3 < \\sqrt{12} < 4$입니다. 음수가 붙으면 부동호 방향이 바뀝니다.",
+    "options": [
+      {
+        "text": "$-2$와 $-3$ 사이에 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3$와 $-4$ 사이에 있다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$-4$와 $-5$ 사이에 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$과 $4$ 사이에 있다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_27_q6_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$4 > \\sqrt{15}$",
+    "question": "다음 중 두 수의 대소 관계가 옳은 것은?",
+    "hint": "정수를 제곱근 꼴로 바꾸면 $4 = \\sqrt{16}$입니다. 따라서 $\\sqrt{16}$과 $\\sqrt{15}$를 비교해 보세요.",
+    "options": [
+      {
+        "text": "$5 < \\sqrt{24}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{10} < 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4 > \\sqrt{15}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{50} < 7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_27_q7_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$49$",
+    "question": "$\\sqrt{a}$의 정수 부분이 $6$일 때, 자연수 $a$가 될 수 없는 것은?",
+    "hint": "정수 부분이 $6$이라면 $6 \\le \\sqrt{a} < 7$이어야 하므로, $36 \\le a < 49$ 범위를 만족해야 합니다.",
+    "options": [
+      {
+        "text": "$36$",
+        "isCorrect": false
+      },
+      {
+        "text": "$40$",
+        "isCorrect": false
+      },
+      {
+        "text": "$45$",
+        "isCorrect": false
+      },
+      {
+        "text": "$49$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_27_q8_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$0$",
+    "question": "다음 수들을 작은 것부터 순서대로 나열할 때, 세 번째에 오는 수는?\n$-\\sqrt{2}, -1, 0, \\sqrt{3}, 2$",
+    "hint": "음수, $0$, 양수 순으로 정렬합니다. $-1 = -\\sqrt{1}$이므로 $-\\sqrt{2} < -1 < 0$ 순서가 됩니다.",
+    "options": [
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\sqrt{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_27_q9_1773798786440",
+    "unitId": "unit_middle_math_basic_27",
+    "score": 1,
+    "answer": "$4$와 $5$",
+    "question": "$2 + \\sqrt{5}$는 어떤 두 정수 사이에 있습니까?",
+    "hint": "$\\sqrt{4} < \\sqrt{5} < \\sqrt{9}$이므로 $2 < \\sqrt{5} < 3$입니다. 이 식의 각 변에 $2$를 더해 보세요.",
+    "options": [
+      {
+        "text": "$3$과 $4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$와 $5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5$와 $6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$와 $3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_28_q10_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$0$",
+    "question": "다음 수들을 작은 것부터 순서대로 나열할 때, 세 번째에 오는 수는?\n\n$-2, \\sqrt{5}, 0, -\\sqrt{3}, 2$",
+    "hint": "모든 유리수를 제곱근 형태로 바꾸면 $-\\sqrt{4}, \\sqrt{5}, 0, -\\sqrt{3}, \\sqrt{4}$가 됩니다. 음수, 0, 양수 순으로 나열해 보세요.",
+    "options": [
+      {
+        "text": "$-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_28_q1_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$-\\sqrt{5} > -3$",
+    "question": "다음 중 두 수의 대소 관계가 옳은 것은?",
+    "hint": "음수는 절댓값이 작을수록 수직선의 오른쪽에 위치하여 더 큰 수가 됩니다. $-3$을 $-\\sqrt{9}$로 바꾸어 비교해 보세요.",
+    "options": [
+      {
+        "text": "$-\\sqrt{7} < -\\sqrt{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{0.5} < 0.5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3 < \\sqrt{8}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\sqrt{5} > -3$",
+        "isCorrect": true
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_28_q2_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$-\\sqrt{17}$",
+    "question": "다음 네 수 중에서 수직선 가장 왼쪽에 위치하여 값이 가장 작은 수는?",
+    "hint": "음수는 근호 안의 숫자가 클수록 0에서 멀어져 더 작은 값이 됩니다. $-4$는 $-\\sqrt{16}$, $-3.5$는 $-\\sqrt{12.25}$와 같습니다.",
+    "options": [
+      {
+        "text": "$-\\sqrt{15}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\sqrt{17}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-3.5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_28_q3_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$C < B < A$",
+    "question": "세 수 $A = \\sqrt{6} + 1$, $B = 3$, $C = \\sqrt{6} - 1$의 대소 관계를 바르게 나타낸 것은?",
+    "hint": "$\\sqrt{4} < \\sqrt{6} < \\sqrt{9}$이므로 $\\sqrt{6}$은 약 $2.4$ 정도의 값을 가집니다. 이를 각 식에 대입하여 비교해 보세요.",
+    "options": [
+      {
+        "text": "$A < B < C$",
+        "isCorrect": false
+      },
+      {
+        "text": "$C < B < A$",
+        "isCorrect": true
+      },
+      {
+        "text": "$B < C < A$",
+        "isCorrect": false
+      },
+      {
+        "text": "$C < A < B$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_28_q4_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$7$개",
+    "question": "부등식 $3 < \\sqrt{x} \\le 4$를 만족하는 자연수 $x$의 개수는?",
+    "hint": "모든 항을 제곱하여 근호를 벗겨내면 $3^2 < x \\le 4^2$이 됩니다. 이 범위에 속하는 자연수를 세어 보세요.",
+    "options": [
+      {
+        "text": "$6$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$7$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$8$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$9$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_28_q5_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$6$개",
+    "question": "$-\\sqrt{10}$과 $\\sqrt{5}$ 사이에 있는 정수의 개수는?",
+    "hint": "$-\\sqrt{16} < -\\sqrt{10} < -\\sqrt{9}$이므로 $-\\sqrt{10}$은 약 $-3.1$입니다. 양수 쪽도 같은 방식으로 범위를 찾아보세요.",
+    "options": [
+      {
+        "text": "$4$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$7$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_28_q6_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$\\frac{1}{a}$",
+    "question": "$0 < a < 1$일 때, 다음 중 가장 큰 값을 갖는 것은?",
+    "hint": "$0 < a < 1$인 경우, $a$의 값을 $0.25$와 같은 분수로 가정하여 대입해 보면 비교가 쉬워집니다.",
+    "options": [
+      {
+        "text": "$a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{a}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{a}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_28_q7_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$\\sqrt{15}$",
+    "question": "다음 중 수직선 위에서 $4$에 가장 가까운 점에 대응하는 수는?",
+    "hint": "$4$는 $\\sqrt{16}$과 같습니다. 근호 안의 숫자가 $16$과 가장 적게 차이 나는 수를 찾으세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{13}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{15}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{18}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{20}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_28_q8_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "음의 제곱근은 절댓값이 클수록 수직선에서 오른쪽에 위치한다.",
+    "question": "제곱근의 성질에 대한 다음 설명 중 옳지 않은 것은?",
+    "hint": "수직선에서 '오른쪽'은 '더 큰 수'를 의미합니다. 음수는 절댓값이 클수록 더 왼쪽으로 이동하게 됩니다.",
+    "options": [
+      {
+        "text": "$a < b$이면 $\\sqrt{a} < \\sqrt{b}$이다. (단, $a, b$는 양수)",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{a} < \\sqrt{b}$이면 $-\\sqrt{a} > -\\sqrt{b}$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "음의 제곱근은 절댓값이 클수록 수직선에서 오른쪽에 위치한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "음의 제곱근은 $0$에서 멀어질수록 값이 작아진다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_28_q9_1773798861065",
+    "unitId": "unit_middle_math_basic_28",
+    "score": 1,
+    "answer": "$10$개",
+    "question": "부등식 $2 < \\sqrt{n} < \\sqrt{15}$를 만족하는 모든 자연수 $n$의 개수는?",
+    "hint": "$2$를 $\\sqrt{4}$로 바꾸면 $\\sqrt{4} < \\sqrt{n} < \\sqrt{15}$가 됩니다. 즉, $4 < n < 15$를 만족하는 자연수를 찾으면 됩니다.",
+    "options": [
+      {
+        "text": "$9$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$11$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$12$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_29_q10_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "실수는 유리수와 무리수를 통틀어 일컫는 말이다.",
+    "question": "실수의 분류 체계에 대한 설명으로 가장 적절한 것은?",
+    "hint": "우리가 수직선에서 다루는 모든 '실재하는 수'는 유리수와 무리수를 합친 실수입니다.",
+    "options": [
+      {
+        "text": "실수는 유리수와 무리수를 통틀어 일컫는 말이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "실수는 정수와 분수로만 구분된다.",
+        "isCorrect": false
+      },
+      {
+        "text": "실수는 자연수, $0$, 음의 정수로 구성된다.",
+        "isCorrect": false
+      },
+      {
+        "text": "실수는 유한소수와 순환소수로만 이루어져 있다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_29_q1_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "모든 정수는 유리수이다.",
+    "question": "다음 중 수의 체계에 대한 설명으로 옳은 것은?",
+    "hint": "정수는 분모가 $1$인 분수 꼴로 나타낼 수 있으므로 유리수의 범위에 포함됩니다.",
+    "options": [
+      {
+        "text": "모든 실수는 유리수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 정수는 유리수이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "유리수는 정수와 자연수로만 이루어져 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "정수가 아닌 유리수는 모두 무리수이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_29_q2_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "제곱하면 $2$가 되는 무리수이다.",
+    "question": "한 변의 길이가 $1$인 정사각형의 대각선 길이에 대한 설명으로 가장 적절한 것은?",
+    "hint": "피타고라스 정리에 의해 대각선 길이는 $\\sqrt{2}$이며, 이는 분수 꼴로 나타낼 수 없는 무리수입니다.",
+    "options": [
+      {
+        "text": "유리수로 정확히 표현할 수 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "순환하는 무한소수로 나타낼 수 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "제곱하면 $2$가 되는 무리수이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "수직선 위에 점으로 나타낼 수 없는 수이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_29_q3_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "$2$개",
+    "question": "다음 중 무리수인 것의 개수는 몇 개인가?\n보기: $\\sqrt{9}$, $\\pi$, $0.123$, $\\sqrt{5}$, $-\\frac{1}{2}$",
+    "hint": "$\\sqrt{9}$는 $3$으로 유리수이며, $\\pi$와 제곱근을 벗길 수 없는 $\\sqrt{5}$가 무리수입니다.",
+    "options": [
+      {
+        "text": "$1$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$3$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_29_q4_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "수직선 위의 모든 점은 하나의 실수와 일대일로 대응한다.",
+    "question": "수직선과 실수의 관계에 대한 설명으로 옳은 것은?",
+    "hint": "유리수와 무리수를 모두 합친 '실수' 체계가 완성되어야 수직선의 모든 점을 빈틈없이 채울 수 있습니다.",
+    "options": [
+      {
+        "text": "수직선은 유리수만으로 완전히 메울 수 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "수직선 위의 모든 점은 하나의 실수와 일대일로 대응한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "무리수는 실제로 존재하는 길이가 아니므로 수직선에 나타낼 수 없다.",
+        "isCorrect": false
+      },
+      {
+        "text": "유리수와 무리수 사이에는 숫자가 없는 빈틈이 존재한다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_29_q5_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "무리수 - 순환하지 않는 무한소수",
+    "question": "유리수가 아닌 실수를 부르는 명칭과 그 특징으로 올바르게 짝지어진 것은?",
+    "hint": "유리수는 분수 꼴로 나타낼 수 있는 수이며, 무리수는 소수로 나타냈을 때 끝없이 계속되지만 반복되지 않는 소수입니다.",
+    "options": [
+      {
+        "text": "무리수 - 순환하지 않는 무한소수",
+        "isCorrect": true
+      },
+      {
+        "text": "정수 - 분수 꼴로 나타낼 수 없는 수",
+        "isCorrect": false
+      },
+      {
+        "text": "자연수 - 양의 부호를 가진 모든 수",
+        "isCorrect": false
+      },
+      {
+        "text": "순환소수 - 유리수가 아닌 수",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_29_q6_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "유리수가 아니므로 수직선 위에 점으로 표현할 수 없다.",
+    "question": "원주율 $\\pi$에 대한 설명 중 옳지 않은 것은?",
+    "hint": "무리수도 실수의 일종이므로 수직선 위의 한 점으로 반드시 대응됩니다.",
+    "options": [
+      {
+        "text": "원의 둘레(원주)를 지름으로 나눈 비율이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "순환하지 않는 무한소수이므로 무리수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "유리수가 아니므로 수직선 위에 점으로 표현할 수 없다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$3.14$는 $\\pi$의 정확한 값이 아닌 근삿값이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_29_q7_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "두 수 사이에는 무수히 많은 무리수가 존재한다.",
+    "question": "두 실수 $0.1$과 $0.2$ 사이의 숫자에 대한 설명으로 옳은 것은?",
+    "hint": "서로 다른 두 실수 사이에는 무수히 많은 유리수와 무수히 많은 무리수가 빽빽하게 존재합니다.",
+    "options": [
+      {
+        "text": "두 수 사이에는 유리수만 존재한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "두 수 사이에는 무수히 많은 무리수가 존재한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "두 수 사이에는 정수가 $1$개 존재한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "두 수 사이의 숫자는 유한개이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_29_q8_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "두 유리수의 합은 항상 유리수이다.",
+    "question": "다음 중 실수의 성질에 대한 설명으로 항상 옳은 것은?",
+    "hint": "유리수끼리의 연산 결과는 항상 유리수이지만, 무리수끼리는 더했을 때 유리수가 될 수도 있습니다(예: $\\sqrt{2} + (-\\sqrt{2}) = 0$).",
+    "options": [
+      {
+        "text": "두 유리수의 합은 항상 유리수이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "두 무리수의 합은 항상 무리수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 무한소수는 무리수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "실수는 양수와 음수로만 이루어져 있다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_29_q9_1773798932006",
+    "unitId": "unit_middle_math_basic_29",
+    "score": 1,
+    "answer": "한 변의 길이는 무리수이다.",
+    "question": "정사각형의 넓이가 $5$일 때, 이 정사각형의 한 변의 길이에 대한 설명으로 옳은 것은?",
+    "hint": "제곱해서 $5$가 되는 수는 $\\sqrt{5}$이며, 이는 유리수로 나타낼 수 없는 무리수입니다.",
+    "options": [
+      {
+        "text": "한 변의 길이는 자연수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "한 변의 길이는 유리수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "한 변의 길이는 무리수이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "한 변의 길이는 순환소수이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_30_q10_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$a+b$",
+    "question": "$a = \\sqrt{2}$, $b = 2$일 때, 다음 중 가장 큰 값을 갖는 식은?",
+    "hint": "$a \\approx 1.414$임을 이용하거나, 각 식들끼리 서로 빼서 어느 것이 가장 큰지 비교해 보세요.",
+    "options": [
+      {
+        "text": "$a+b$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2a+1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3b-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a+2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_30_q1_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$a < b$",
+    "question": "두 실수 $a$, $b$에 대하여 '차의 저울'을 이용해 $a-b$를 계산한 결과가 음수($-$)일 때, 두 수의 대소 관계를 바르게 나타낸 것은?",
+    "hint": "$a-b < 0$이면 빼지는 수 $a$보다 빼는 수 $b$가 더 크다는 것을 의미합니다.",
+    "options": [
+      {
+        "text": "$a > b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a < b$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a = b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a \\le b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_30_q2_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$\\sqrt{7}-1 > 1$",
+    "question": "실수 $\\sqrt{7}-1$과 $1$의 대소 관계를 바르게 나타낸 것은?",
+    "hint": "두 수의 차를 구하면 $\\sqrt{7}-2$가 됩니다. $2$를 제곱근 형태인 $\\sqrt{4}$로 바꾸어 비교해 보세요.",
+    "options": [
+      {
+        "text": "$\\sqrt{7}-1 > 1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{7}-1 < 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{7}-1 = 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{7}-1 \\le 1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_30_q3_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$4 > 6-\\sqrt{5}$",
+    "question": "$4$와 $6-\\sqrt{5}$의 대소 관계를 '차의 저울' 원리를 이용하여 비교하고자 한다. 다음 중 옳은 것은?",
+    "hint": "$4-(6-\\sqrt{5})$를 계산하면 $\\sqrt{5}-2$가 됩니다. $\\sqrt{5}$와 $2$의 크기를 비교해 부호를 결정하세요.",
+    "options": [
+      {
+        "text": "$4 > 6-\\sqrt{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4 < 6-\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4 = 6-\\sqrt{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4 \\le 6-\\sqrt{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_30_q4_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$\\sqrt{3}+2 < \\sqrt{3}+\\sqrt{5}$",
+    "question": "다음 두 수의 대소 관계가 옳은 것을 고르시오.",
+    "hint": "양변에 공통으로 들어있는 수는 제외하고, 나머지 부분인 $2$와 $\\sqrt{5}$의 크기만 비교하면 됩니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{3}+2 < \\sqrt{3}+\\sqrt{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\sqrt{10}-1 > \\sqrt{10}-\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5+\\sqrt{2} < 4+\\sqrt{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{6}+3 < \\sqrt{6}+\\sqrt{8}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_30_q5_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$B < A < C$",
+    "question": "세 수 $A = \\sqrt{5}+3$, $B = \\sqrt{5}+\\sqrt{10}$, $C = 5+\\sqrt{2}$의 대소 관계로 옳은 것은?",
+    "hint": "$A$와 $B$는 $\\sqrt{5}$가 공통이므로 $3$과 $\\sqrt{10}$을 비교하고, 그 후 $A$와 $C$의 차를 구해 보세요.",
+    "options": [
+      {
+        "text": "$A < B < C$",
+        "isCorrect": false
+      },
+      {
+        "text": "$B < A < C$",
+        "isCorrect": true
+      },
+      {
+        "text": "$C < A < B$",
+        "isCorrect": false
+      },
+      {
+        "text": "$B < C < A$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_30_q6_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$4-\\sqrt{10} < 0$",
+    "question": "다음 중 부등식의 방향이 옳지 않은 것은?",
+    "hint": "$4$는 $\\sqrt{16}$입니다. $\\sqrt{16}$에서 $\\sqrt{10}$을 빼면 결과가 양수인지 음수인지 확인하세요.",
+    "options": [
+      {
+        "text": "$3-\\sqrt{2} > 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{12}+1 < 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2\\sqrt{3}-1 > \\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4-\\sqrt{10} < 0$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_30_q7_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$a-b > 0$ 이므로 $a > b$",
+    "question": "두 실수 $a = 2\\sqrt{3}-1$, $b = \\sqrt{3}+1$에 대하여 $a-b$의 부호와 대소 관계를 바르게 짝지은 것은?",
+    "hint": "$a-b$를 계산하면 $\\sqrt{3}-2$가 나옵니다. $\\sqrt{3}$과 $2$ 중 어느 쪽이 더 큰지 생각해 보세요.",
+    "options": [
+      {
+        "text": "$a-b > 0$ 이므로 $a > b$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a-b < 0$ 이므로 $a < b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a-b > 0$ 이므로 $a < b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a-b = 0$ 이므로 $a = b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_30_q8_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$\\sqrt{3}-0.8$",
+    "question": "$\\sqrt{3}$의 값을 약 $1.732$라고 할 때, 다음 중 그 값이 $1$보다 큰 것은?",
+    "hint": "각 보기의 식에서 $1$을 뺀 결과($A-1$)가 양수($+$)가 되는 것을 찾으면 됩니다.",
+    "options": [
+      {
+        "text": "$\\sqrt{3}-0.8$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3-2\\sqrt{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\sqrt{3}-1.1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2-\\sqrt{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_30_q9_1773799159906",
+    "unitId": "unit_middle_math_basic_30",
+    "score": 1,
+    "answer": "$2$과 $3$ 사이",
+    "question": "수직선 위에서 $\\sqrt{10}-1$에 대응하는 점이 위치하는 구간으로 옳은 것은? (단, 각 구간은 정수 사이를 의미함)",
+    "hint": "$\\sqrt{9} < \\sqrt{10} < \\sqrt{16}$임을 이용하여 $\\sqrt{10}$의 범위를 먼저 구한 뒤 $1$을 빼보세요.",
+    "options": [
+      {
+        "text": "$1$과 $2$ 사이",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$과 $3$ 사이",
+        "isCorrect": true
+      },
+      {
+        "text": "$3$과 $4$ 사이",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$과 $1$ 사이",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

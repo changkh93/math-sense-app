@@ -1,0 +1,1352 @@
+[
+  {
+    "id": "unit_middle_math_basic_06_q10_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "(가), (다)",
+    "question": "다음 중 두 수의 관계에 대한 설명으로 옳은 것만을 모두 고른 것은? <br> (가) 두 수의 곱은 최대공약수와 최소공배수의 곱과 같다. <br> (나) 최소공배수는 항상 두 수의 곱보다 크거나 같다. <br> (다) 최대공약수와 최소공배수를 알면 두 수의 곱을 항상 알 수 있다.",
+    "hint": "$A \\times B = G \\times L$은 항상 성립하며, $L$은 두 수의 곱을 $G$로 나눈 것이므로 항상 작거나 같습니다. [cite: 35, 36]",
+    "options": [
+      {
+        "text": "(가)",
+        "isCorrect": false
+      },
+      {
+        "text": "(가), (나)",
+        "isCorrect": false
+      },
+      {
+        "text": "(가), (다)",
+        "isCorrect": true
+      },
+      {
+        "text": "(가), (나), (다)",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_06_q1_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$A \\times B = G \\times L$",
+    "question": "탐정 소피는 두 자연수 $A$, $B$와 그들의 파트너인 최대공약수 $G$, 최소공배수 $L$ 사이의 '비밀 공식'을 발견했습니다. 다음 중 항상 성립하는 식은 무엇입니까?",
+    "hint": "두 수의 곱은 그 두 수의 최대공약수와 최소공배수의 곱과 항상 같습니다. [cite: 35]",
+    "options": [
+      {
+        "text": "$A + B = G + L$",
+        "isCorrect": false
+      },
+      {
+        "text": "$A \\times B = G \\times L$",
+        "isCorrect": true
+      },
+      {
+        "text": "$A \\times G = B \\times L$",
+        "isCorrect": false
+      },
+      {
+        "text": "$A \\div G = B \\div L$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_06_q2_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$A \\times B$와 $G \\times L$은 $2^{4} \\times 3^{3}$으로 서로 같다.",
+    "question": "두 수 $A = 2^{3} \\times 3^{1}$과 $B = 2^{1} \\times 3^{2}$이 있습니다. 이 두 수의 곱 $A \\times B$를 소인수의 지수 합으로 표현할 때, $G \\times L$의 결과와 비교하면 어떠합니까?",
+    "hint": "$G$는 지수 중 작은 것을, $L$은 지수 중 큰 것을 택하므로 곱하면 결국 지수의 합은 원래 두 수의 지수 합과 같아집니다. [cite: 28, 30]",
+    "options": [
+      {
+        "text": "$A \\times B$가 $G \\times L$보다 더 크다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$A \\times B$가 $G \\times L$보다 더 작다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$A \\times B$와 $G \\times L$은 $2^{4} \\times 3^{3}$으로 서로 같다.",
+        "isCorrect": true
+      },
+      {
+        "text": "두 결과는 소인수의 종류가 달라서 비교할 수 없다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_06_q3_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$60$",
+    "question": "어떤 두 자연수의 곱이 $120$이고, 이 두 수의 최대공약수가 $2$일 때, 최소공배수 $L$의 값은 얼마입니까?",
+    "hint": "$120 = 2 \\times L$ 이라는 식을 세워 $L$을 구할 수 있습니다. [cite: 35, 36]",
+    "options": [
+      {
+        "text": "$30$",
+        "isCorrect": false
+      },
+      {
+        "text": "$60$",
+        "isCorrect": true
+      },
+      {
+        "text": "$120$",
+        "isCorrect": false
+      },
+      {
+        "text": "$240$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_06_q4_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$384$",
+    "question": "두 자연수의 최대공약수가 $8$이고 최소공배수가 $48$입니다. 이 두 수의 곱 $A \\times B$의 값으로 옳은 것은?",
+    "hint": "$A \\times B = G \\times L$ 이므로 $8 \\times 48$을 계산합니다. [cite: 35]",
+    "options": [
+      {
+        "text": "$56$",
+        "isCorrect": false
+      },
+      {
+        "text": "$192$",
+        "isCorrect": false
+      },
+      {
+        "text": "$384$",
+        "isCorrect": true
+      },
+      {
+        "text": "$400$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_06_q5_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$20$",
+    "question": "두 자연수 $15$와 $A$의 최대공약수는 $5$이고, 최소공배수는 $60$입니다. 이때 자연수 $A$의 값은 무엇입니까?",
+    "hint": "$15 \\times A = 5 \\times 60$ 공식을 사용하여 $A$를 추리해 보세요. [cite: 36, 64]",
+    "options": [
+      {
+        "text": "$15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$20$",
+        "isCorrect": true
+      },
+      {
+        "text": "$30$",
+        "isCorrect": false
+      },
+      {
+        "text": "$40$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_06_q6_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$2^{3} \\times 3^{3} \\times 5^{1}$",
+    "question": "두 수 $A = 2^{2} \\times 3^{1} \\times 5^{1}$과 $B = 2^{1} \\times 3^{2}$이 있을 때, 최대공약수 $G$와 최소공배수 $L$의 곱을 소인수분해한 형태로 옳은 것은?",
+    "hint": "$G \\times L$은 원래 두 수 $A \\times B$와 같으므로, 모든 소인수의 지수를 더하면 됩니다. [cite: 17, 19]",
+    "options": [
+      {
+        "text": "$2^{1} \\times 3^{1}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2^{2} \\times 3^{2} \\times 5^{1}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2^{3} \\times 3^{3} \\times 5^{1}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2^{4} \\times 3^{4} \\times 5^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_06_q7_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$5$",
+    "question": "두 자연수의 곱이 $300$이고 최소공배수가 $60$일 때, 이 두 수의 최대공약수 $G$는 얼마입니까?",
+    "hint": "$300 = G \\times 60$ 관계를 이용하세요. [cite: 58]",
+    "options": [
+      {
+        "text": "$5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_06_q8_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$12$",
+    "question": "두 자리 자연수 $A$와 $18$의 최대공약수가 $6$이고 최소공배수가 $36$일 때, $A$의 값으로 알맞은 것은?",
+    "hint": "$A \\times 18 = 6 \\times 36$을 만족하는 $A$를 찾으세요. [cite: 80]",
+    "options": [
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12$",
+        "isCorrect": true
+      },
+      {
+        "text": "$18$",
+        "isCorrect": false
+      },
+      {
+        "text": "$24$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_06_q9_1773667841393",
+    "unitId": "unit_middle_math_basic_06",
+    "score": 1,
+    "answer": "$A \\times B$",
+    "question": "두 자연수 $A, B$의 최대공약수가 $1$인 경우(서로소), 이 두 수의 최소공배수 $L$은 무엇과 같습니까?",
+    "hint": "$G = 1$일 때 $A \\times B = 1 \\times L$이 성립하므로 $L = A \\times B$가 됩니다. [cite: 35]",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$A + B$",
+        "isCorrect": false
+      },
+      {
+        "text": "$A \\times B$",
+        "isCorrect": true
+      },
+      {
+        "text": "알 수 없다",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_07_q10_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$72$",
+    "question": "두 자연수 $A$, $B$의 곱이 $432$이고 최대공약수가 $6$입니다. $A < B$라고 할 때, $B$의 값이 될 수 있는 가장 큰 수는 무엇입니까? [cite: 14, 83]",
+    "hint": "최소공배수는 $432 \\div 6 = 72$입니다. $A \\times B = 6 \\times 72$인 경우 등을 고려해 보세요. [cite: 14, 21]",
+    "options": [
+      {
+        "text": "$24$",
+        "isCorrect": false
+      },
+      {
+        "text": "$36$",
+        "isCorrect": false
+      },
+      {
+        "text": "$72$",
+        "isCorrect": true
+      },
+      {
+        "text": "$108$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_07_q1_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$42$",
+    "question": "탐정 소피는 새로운 암호를 발견했습니다. \"어떤 자연수 $A$와 $28$의 최대공약수는 $14$이고, 최소공배수는 $84$이다.\" 이 '비밀 계약'을 만족하는 용의자 $A$의 값은 무엇입니까? [cite: 14]",
+    "hint": "두 수의 곱은 최대공약수와 최소공배수의 곱과 같으므로 $A \\times 28 = 14 \\times 84$를 풀어보세요. [cite: 14]",
+    "options": [
+      {
+        "text": "$14$",
+        "isCorrect": false
+      },
+      {
+        "text": "$28$",
+        "isCorrect": false
+      },
+      {
+        "text": "$42$",
+        "isCorrect": true
+      },
+      {
+        "text": "$56$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_07_q2_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$180$",
+    "question": "두 자연수의 곱이 $1080$이고, 최대공약수가 $6$일 때, 이 두 수의 최소공배수로 옳은 것은? [cite: 14]",
+    "hint": "곱 $1080$을 최대공약수 $6$으로 나누면 최소공배수를 구할 수 있습니다. [cite: 14, 21]",
+    "options": [
+      {
+        "text": "$90$",
+        "isCorrect": false
+      },
+      {
+        "text": "$120$",
+        "isCorrect": false
+      },
+      {
+        "text": "$180$",
+        "isCorrect": true
+      },
+      {
+        "text": "$240$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_07_q3_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$1728$",
+    "question": "두 자연수 $A$, $B$의 최대공약수는 $12$이고 최소공배수는 $144$입니다. '비밀 계약서'에 따라 두 수의 곱 $A \\times B$의 값을 구하면? [cite: 14, 15]",
+    "hint": "최대공약수($G$)와 최소공배수($L$)를 서로 곱하면 두 수의 곱($A \\times B$)이 됩니다. [cite: 14]",
+    "options": [
+      {
+        "text": "$156$",
+        "isCorrect": false
+      },
+      {
+        "text": "$172$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1440$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1728$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_07_q4_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$54$",
+    "question": "자연수 $A$와 $45$의 최대공약수는 $9$이고, 최소공배수는 $270$입니다. 이때 용의자 $A$의 정체는 무엇입니까? [cite: 14]",
+    "hint": "$A \\times 45 = 9 \\times 270$ 식을 세워 $A$를 구해보세요. [cite: 17, 21]",
+    "options": [
+      {
+        "text": "$18$",
+        "isCorrect": false
+      },
+      {
+        "text": "$27$",
+        "isCorrect": false
+      },
+      {
+        "text": "$54$",
+        "isCorrect": true
+      },
+      {
+        "text": "$108$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_07_q5_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$150$",
+    "question": "두 자연수의 곱이 $2250$이고 최대공약수가 $15$일 때, 두 수의 최소공배수를 구하시오. [cite: 14, 60]",
+    "hint": "$L = (A \\times B) \\div G$ 관계를 이용하세요. [cite: 14, 21]",
+    "options": [
+      {
+        "text": "$75$",
+        "isCorrect": false
+      },
+      {
+        "text": "$150$",
+        "isCorrect": true
+      },
+      {
+        "text": "$225$",
+        "isCorrect": false
+      },
+      {
+        "text": "$450$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_07_q6_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$2^{5} \\times 3^{3} \\times 7$",
+    "question": "두 자연수 $A$와 $B$의 최대공약수가 $2^{2} \\times 3$이고, 최소공배수가 $2^{3} \\times 3^{2} \\times 7$입니다. 두 수의 곱 $A \\times B$를 소인수분해한 결과로 옳은 것은? [cite: 31, 32, 73]",
+    "hint": "지수 법칙에 따라 $(2^{2} \\times 3) \\times (2^{3} \\times 3^{2} \\times 7)$의 지수들을 각각 더해줍니다. [cite: 31, 32]",
+    "options": [
+      {
+        "text": "$2^{5} \\times 3^{3} \\times 7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2^{6} \\times 3^{3} \\times 7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2^{5} \\times 3^{2} \\times 7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2^{6} \\times 3^{2} \\times 7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_07_q7_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$36$",
+    "question": "톱니 수가 $24$개인 톱니바퀴 $A$와 톱니 수가 $B$개인 톱니바퀴가 맞물려 돌아갑니다. 처음으로 다시 같은 톱니에서 맞물릴 때까지 돌아간 톱니 수가 $72$개라면, $B$가 될 수 있는 수 중 $30$보다 큰 수는? [cite: 61, 62]",
+    "hint": "$24$와 $B$의 최소공배수가 $72$가 되는 $B$를 찾아보세요. [cite: 61]",
+    "options": [
+      {
+        "text": "$32$",
+        "isCorrect": false
+      },
+      {
+        "text": "$36$",
+        "isCorrect": true
+      },
+      {
+        "text": "$48$",
+        "isCorrect": false
+      },
+      {
+        "text": "$60$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_07_q8_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$36$",
+    "question": "두 자리 자연수 $A$와 $60$의 최대공약수가 $12$이고, 최소공배수가 $180$일 때, $A$의 값을 구하시오. [cite: 79]",
+    "hint": "$A = (12 \\times 180) \\div 60$을 계산하여 나온 수가 두 자리 자연수인지 확인합니다. [cite: 14, 21]",
+    "options": [
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$24$",
+        "isCorrect": false
+      },
+      {
+        "text": "$36$",
+        "isCorrect": true
+      },
+      {
+        "text": "$48$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_07_q9_1773667966186",
+    "unitId": "unit_middle_math_basic_07",
+    "score": 1,
+    "answer": "$40$",
+    "question": "두 수 $20$과 $A$의 최소공배수가 $100$일 때, 다음 중 용의자 $A$가 될 수 없는 값은? [cite: 68]",
+    "hint": "$20$과 보기의 수들을 각각 비교하여 최소공배수가 $100$이 나오지 않는 것을 찾습니다. [cite: 32]",
+    "options": [
+      {
+        "text": "$25$",
+        "isCorrect": false
+      },
+      {
+        "text": "$40$",
+        "isCorrect": true
+      },
+      {
+        "text": "$50$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_08_q10_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "$-5000$원",
+    "question": "다음 문장을 부호를 사용하여 바르게 나타낸 것은 무엇인가요?\n\n\"용돈 $5000$원을 받은 상황의 반대 상황이 발생했다.\"",
+    "hint": "받는 것이 $+$라면, 그 반대인 '주는 것'이나 '잃는 것'은 어떤 부호를 써야 할까요?",
+    "options": [
+      {
+        "text": "$+5000$원",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5000$원",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$원",
+        "isCorrect": false
+      },
+      {
+        "text": "$-10000$원",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_08_q1_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "분수 $\\frac{1}{2}$이나 소수 $0.5$도 깨끗하게 딱 떨어지므로 정수입니다.",
+    "question": "다음 중 '정수'에 대한 설명으로 가장 적절하지 않은 것은 무엇인가요?",
+    "hint": "본문에서 정수(整)의 의미는 '소수점 아래 지저분한 꼬리가 없는 수'라고 설명되어 있습니다.",
+    "options": [
+      {
+        "text": "양의 정수, $0$, 음의 정수를 통틀어 정수라고 합니다.",
+        "isCorrect": false
+      },
+      {
+        "text": "정수는 수직선 위에서 일정한 간격으로 가지런히 놓여 있는 수입니다.",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 자연수는 양의 정수에 해당합니다.",
+        "isCorrect": false
+      },
+      {
+        "text": "분수 $\\frac{1}{2}$이나 소수 $0.5$도 깨끗하게 딱 떨어지므로 정수입니다.",
+        "isCorrect": true
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_08_q2_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "어제보다 $2$kg 감소 $\\rightarrow$ $-2$kg",
+    "question": "다음 중 밑줄 친 부분을 부호 $+$ 또는 $-$를 사용하여 나타낸 것으로 옳은 것은 무엇인가요?",
+    "hint": "기준인 $0$보다 작아지거나 부족한 상태, 반대 방향일 때 $-$ 부호를 사용합니다.",
+    "options": [
+      {
+        "text": "해발 $500m$ $\\rightarrow$ $-500m$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3000$원 손해 $\\rightarrow$ $+3000$원",
+        "isCorrect": false
+      },
+      {
+        "text": "어제보다 $2$kg 감소 $\\rightarrow$ $-2$kg",
+        "isCorrect": true
+      },
+      {
+        "text": "시험 점수 $10$점 상승 $\\rightarrow$ $-10$점",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_08_q3_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "$2$개",
+    "question": "다음 수들 중에서 '음의 정수'는 모두 몇 개인가요?\n\n$[ +5, -1.2, 0, -3, \\frac{4}{2}, -7 ]$",
+    "hint": "$-$ 부호가 붙어 있으면서 소수점 꼬리가 없는 '가지런한 수'를 찾아보세요. $-1.2$는 정수가 아닙니다.",
+    "options": [
+      {
+        "text": "$1$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$3$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_08_q4_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "$-4$",
+    "question": "수직선 위에서 기준점인 $0$으로부터 왼쪽으로 $4$칸 이동한 지점에 있는 숫자를 바르게 표현한 것은 무엇인가요?",
+    "hint": "수직선에서 '오른쪽'은 얻는 방향($+$), '왼쪽'은 잃는 방향($-$)을 의미합니다.",
+    "options": [
+      {
+        "text": "$+4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_08_q5_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "$0$은 양의 정수도 아니고 음의 정수도 아닌 기준점이다.",
+    "question": "숫자 $0$에 대한 탐정 소피의 설명으로 옳은 것을 고르세요.",
+    "hint": "본문에서 $0$은 양수 가족도, 음수 가족도 아닌 특별한 '기준점'이라고 언급되었습니다.",
+    "options": [
+      {
+        "text": "$0$은 가장 작은 양의 정수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$은 음의 정수에 포함된다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$은 양의 정수도 아니고 음의 정수도 아닌 기준점이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$은 자연수 중 하나이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_08_q6_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "$6$",
+    "question": "다음 중 양의 정수 $+6$과 그 값이 같은 것은 무엇인가요?",
+    "hint": "양수는 평소에 부호 $+$를 생략하여 자연수처럼 쓰기도 합니다.",
+    "options": [
+      {
+        "text": "$-6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-(+6)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_08_q7_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "$-10$",
+    "question": "다음 중 수직선에서 가장 왼쪽에 위치하여 가장 작은 값을 나타내는 수는 무엇인가요?",
+    "hint": "음수에서는 $0$에서 멀리 왼쪽으로 갈수록(숫자의 절대적인 크기가 커질수록) 더 작은 수입니다.",
+    "options": [
+      {
+        "text": "$-10$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_08_q8_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "가지런하다",
+    "question": "지혜는 '정수'라는 이름의 뜻을 배우고 나서 다음과 같이 정리했습니다. 빈칸에 알맞은 말은?\n\n\"정수의 '정(整)'자는 (      )라는 뜻으로, 소수점 아래 꼬리 없이 딱 떨어지는 수를 말해.\"",
+    "hint": "본문 $26$번 문장에서 '정(整)'자의 한자 의미를 찾아보세요.",
+    "options": [
+      {
+        "text": "복잡하다",
+        "isCorrect": false
+      },
+      {
+        "text": "가지런하다",
+        "isCorrect": true
+      },
+      {
+        "text": "거대하다",
+        "isCorrect": false
+      },
+      {
+        "text": "어렵다",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_08_q9_1773668066128",
+    "unitId": "unit_middle_math_basic_08",
+    "score": 1,
+    "answer": "$3$개",
+    "question": "수직선 위에서 $-2$와 $+2$ 사이에 존재하는 '정수'는 모두 몇 개인가요?",
+    "hint": "$-2$와 $+2$를 제외하고 그 사이에 있는 $-1, 0, +1$을 세어보세요.",
+    "options": [
+      {
+        "text": "$2$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_09_q10_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "$-2.1$",
+    "question": "유리수 세계 지도의 가장 바깥쪽 영역인 '정수가 아닌 유리수'에만 속하는 수를 보기에서 고르면 무엇입니까?",
+    "hint": "정수(자연수, $0$, 음의 정수)를 제외하고 소수나 분수 형태로만 남는 수를 찾아보세요.",
+    "options": [
+      {
+        "text": "$-5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{8}{4}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2.1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_09_q1_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "분수 $\\frac{a}{b}$ ($a$, $b$는 정수, $b \\ne 0$) 꼴로 나타낼 수 있는 수",
+    "question": "유리수($Rational\\ Number$)의 이름은 '비율'을 뜻하는 '$Ratio$'에서 유래되었습니다. 다음 중 유리수의 정의를 가장 올바르게 설명한 것은 무엇입니까?",
+    "hint": "유리수는 두 정수의 '비율'로 나타낼 수 있는 '이치가 있는 수'임을 기억하세요.",
+    "options": [
+      {
+        "text": "분수 $\\frac{a}{b}$ ($a$, $b$는 정수, $b \\ne 0$) 꼴로 나타낼 수 있는 수",
+        "isCorrect": true
+      },
+      {
+        "text": "수직선 위의 $1$, $2$, $3$과 같이 징검다리 역할을 하는 수",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$보다 큰 양수들로만 이루어진 수",
+        "isCorrect": false
+      },
+      {
+        "text": "소수점 아래가 끝이 없는 무한한 수",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_09_q2_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "$-1.5$, $\\frac{1}{3}$",
+    "question": "다음 수 중에서 '정수가 아닌 유리수'를 모두 고른 것은 무엇입니까?\n[ $-3$, $0$, $\\frac{4}{2}$, $-1.5$, $\\frac{1}{3}$ ]",
+    "hint": "$\\frac{4}{2}$는 약분하면 $2$가 되어 정수가 된다는 점에 주의하세요.",
+    "options": [
+      {
+        "text": "$-3$, $0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-1.5$, $\\frac{1}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{4}{2}$, $-1.5$, $\\frac{1}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3$, $\\frac{4}{2}$, $-1.5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_09_q3_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "$\\frac{1}{5}$",
+    "question": "소피 소장은 모든 정수를 분수 꼴로 나타낼 수 있다고 설명했습니다. 정수 $5$를 유리수의 형태(분수)로 바르게 나타내지 못한 것은 무엇입니까?",
+    "hint": "분자를 분모로 나누었을 때 몫이 $5$가 되는지 확인해보세요.",
+    "options": [
+      {
+        "text": "$\\frac{5}{1}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{10}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{15}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{5}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_09_q4_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "모든 유리수는 자연수이다.",
+    "question": "다음 중 수의 포함 관계를 설명한 것으로 옳지 않은 것은 무엇입니까?",
+    "hint": "유리수는 자연수보다 훨씬 넓은 범위를 포함하는 '거대한 세계'입니다.",
+    "options": [
+      {
+        "text": "모든 자연수는 정수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 정수는 유리수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "유리수는 정수와 정수가 아닌 유리수로 이루어져 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 유리수는 자연수이다.",
+        "isCorrect": true
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_09_q5_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "$\\frac{3}{4}$",
+    "question": "지혜 탐정은 $0.75$가 유리수인지 고민하고 있습니다. $0.75$를 유리수임을 증명하기 위해 분수로 고친 것으로 옳은 것은 무엇입니까?",
+    "hint": "$0.75$는 $\\frac{75}{100}$이며, 이를 가장 간단한 기약분수로 약분해보세요.",
+    "options": [
+      {
+        "text": "$\\frac{75}{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3}{4}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{7}{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{75}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_09_q6_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "정수와 정수 사이에는 무수히 많은 유리수가 존재한다.",
+    "question": "수직선 위에서 두 정수 $1$과 $2$ 사이의 공간에 대한 설명으로 옳은 것은 무엇입니까?",
+    "hint": "피자를 $2$조각, $3$조각, $100$조각으로 나누는 것을 상상해보면 사이를 채우는 수는 끝이 없습니다.",
+    "options": [
+      {
+        "text": "정수와 정수 사이에는 아무런 숫자가 없다.",
+        "isCorrect": false
+      },
+      {
+        "text": "정수와 정수 사이에는 오직 $0.5$ 단위의 소수만 존재한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "정수와 정수 사이에는 무수히 많은 유리수가 존재한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "정수와 정수 사이에는 유리수가 존재할 수 없다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_09_q7_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "$-0.5$",
+    "question": "다음 중 수의 분류가 나머지 셋과 다른 하나는 무엇입니까?",
+    "hint": "앞의 세 숫자는 모두 '정수'의 범위에 포함될 수 있는지 확인해보세요.",
+    "options": [
+      {
+        "text": "$-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{12}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-0.5$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_09_q8_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "$0$",
+    "question": "유리수의 정의 '$\\frac{b}{a}$ ($a$, $b$는 정수)'에서 분모 $a$에 절대 들어갈 수 없는 숫자는 무엇입니까?",
+    "hint": "수학에서 어떤 수를 '영($0$)'으로 나누는 것은 정의되지 않습니다.",
+    "options": [
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_09_q9_1773668133760",
+    "unitId": "unit_middle_math_basic_09",
+    "score": 1,
+    "answer": "탐정: \"양의 정수 $1, 2, 3...$은 자연수라고도 불러.\"",
+    "question": "다음 네 사람의 설명 중 옳은 말을 한 사람은 누구입니까?",
+    "hint": "$0$과 음수도 분수 꼴로 나타낼 수 있다면 모두 유리수 가족입니다.",
+    "options": [
+      {
+        "text": "소피: \"$0$은 유리수가 아니야.\"",
+        "isCorrect": false
+      },
+      {
+        "text": "지혜: \"음수는 유리수에 포함되지 않아.\"",
+        "isCorrect": false
+      },
+      {
+        "text": "탐정: \"양의 정수 $1, 2, 3...$은 자연수라고도 불러.\"",
+        "isCorrect": true
+      },
+      {
+        "text": "범인: \"모든 분수는 정수로 바꿀 수 있어.\"",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_10_q10_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$13$",
+    "question": "두 수 $a, b$에 대하여 $|a| = 4, |b| = 9$일 때, $|a| + |b|$의 계산 결과는?",
+    "hint": "$|a|$는 $4$이고 $|b|$는 $9$이므로, 단순히 두 양수 값을 더하면 됩니다. [cite: 18, 94]",
+    "options": [
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$13$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-13$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_10_q1_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$-5$를 수직선에 나타냈을 때, 원점에서부터 떨어진 거리이다.",
+    "question": "절댓값 $|-5|$에 대한 설명으로 가장 적절한 것은?",
+    "hint": "절댓값의 정의는 수직선 위에서 원점($0$)으로부터 해당 숫자까지 떨어진 '거리'를 의미합니다. [cite: 6, 14]",
+    "options": [
+      {
+        "text": "$-5$를 수직선에 나타냈을 때, 원점에서부터 떨어진 거리이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$-5$보다 $5$만큼 더 큰 수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "수직선에서 $-5$의 오른쪽에 위치한 수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "원점에서 왼쪽으로 $5$만큼 이동한 좌표이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_10_q2_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$|-7|$",
+    "question": "다음 중 수의 값이 가장 큰 것은?",
+    "hint": "절댓값 기호를 먼저 계산하여 부호를 떼어낸 후 크기를 비교해 보세요. $|-7|=7$, $|-3.5|=3.5$입니다. [cite: 18, 51]",
+    "options": [
+      {
+        "text": "$|-7|$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$|-3.5|$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_10_q3_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$0$",
+    "question": "수직선 위에서 원점으로부터의 거리가 $6$인 두 점이 나타내는 수의 합은?",
+    "hint": "거리가 $6$인 두 수는 $+6$과 $-6$입니다. 이 두 수를 더한 값을 구하세요. [cite: 13, 14, 56]",
+    "options": [
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-12$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_10_q4_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$|-9| > |-3|$",
+    "question": "다음 중 두 수의 대소 관계를 옳게 나타낸 것은?",
+    "hint": "절댓값 기호가 있는 경우 먼저 양수로 바꾼 뒤 비교하세요. $|-9|=9$, $|-3|=3$입니다. [cite: 18, 62]",
+    "options": [
+      {
+        "text": "$-8 > -2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$|-4| < |2|$",
+        "isCorrect": false
+      },
+      {
+        "text": "$|-9| > |-3|$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-5 > |-1|$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_10_q5_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$a + 2$",
+    "question": "$a > 0$일 때, $|a| + |-2|$를 간단히 한 결과는?",
+    "hint": "$a$가 양수이면 $|a|$는 그대로 $a$가 되고, $|-2|$는 부호를 떼어 $2$가 됩니다. [cite: 29, 41]",
+    "options": [
+      {
+        "text": "$a - 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a + 2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-a + 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-a - 2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_10_q6_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$-x$",
+    "question": "$x < 0$일 때, $|x|$와 항상 같은 값을 나타내는 식은?",
+    "hint": "음수의 절댓값을 구할 때는 부호를 반대로 바꾸기 위해 앞에 $-$를 붙여 양수로 만듭니다. [cite: 34, 42]",
+    "options": [
+      {
+        "text": "$x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_10_q7_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$5$개",
+    "question": "절댓값이 $2.5$보다 작은 정수는 모두 몇 개인가?",
+    "hint": "절댓값이 $2.5$보다 작으려면 원점에서의 거리가 $2.5$ 미만이어야 합니다. 해당하는 정수는 $-2, -1, 0, 1, 2$입니다. [cite: 77]",
+    "options": [
+      {
+        "text": "$2$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$개",
+        "isCorrect": true
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_10_q8_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$-\\frac{3}{2}$",
+    "question": "다음 조건을 모두 만족하는 수 $x$의 값은? \n(가) $|x| = \\frac{3}{2}$ \n(나) $x < 0$",
+    "hint": "절댓값이 $\\frac{3}{2}$인 수는 $\\frac{3}{2}$와 $-\\frac{3}{2}$가 있는데, 그중 음수를 찾으세요. [cite: 82, 83, 84]",
+    "options": [
+      {
+        "text": "$\\frac{3}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{3}{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{2}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{2}{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_10_q9_1773668271550",
+    "unitId": "unit_middle_math_basic_10",
+    "score": 1,
+    "answer": "$-b$",
+    "question": "$b < 0$일 때, 다음 중 그 값이 항상 양수인 것은?",
+    "hint": "음수 $b$ 앞에 $-$ 부호를 붙이면 양수가 됩니다. 탐정 소피가 말한 '명령어'를 기억하세요. [cite: 37, 38, 89]",
+    "options": [
+      {
+        "text": "$b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$b - 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-b$",
+        "isCorrect": true
+      },
+      {
+        "text": "$b + b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

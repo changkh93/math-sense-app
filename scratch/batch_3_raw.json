@@ -1,0 +1,1353 @@
+[
+  {
+    "id": "unit_middle_math_basic_11_q10_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$0$",
+    "question": "다음 세 유리수의 혼합 계산 결과는? $\\frac{1}{2} - \\frac{3}{4} + \\frac{1}{4}$",
+    "hint": "앞의 두 수부터 차례대로 통분하여 계산하거나, 뒤의 두 분수를 먼저 계산해 보세요.",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{1}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{1}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_11_q1_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$+13$",
+    "question": "사건 파일 $#1$의 원리를 적용해 봅시다. $(+4) + (+9)$의 계산 결과로 옳은 것은?",
+    "hint": "부호가 같은 두 수를 더할 때는 두 수의 절댓값을 더한 후 공통 부호를 붙입니다.",
+    "options": [
+      {
+        "text": "$-13$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+13$",
+        "isCorrect": true
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_11_q2_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$(-3) + (-7) = -10$",
+    "question": "수직선 위의 점 $-3$에서 '왼쪽으로 $7$만큼 이동'하는 행동을 수식으로 바르게 나타내고 계산한 것은?",
+    "hint": "왼쪽으로 이동하는 것은 음수를 더하는 것과 같습니다.",
+    "options": [
+      {
+        "text": "$(-3) + (-7) = -10$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(-3) + (+7) = +4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(+3) + (-7) = -4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-3) - (-7) = +4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_11_q3_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$-(12 - 8) = -4$",
+    "question": "사건 파일 $#2$의 '힘겨루기' 원리를 이용할 때, $(-12) + (+8)$의 계산 과정으로 옳은 것은?",
+    "hint": "부호가 다른 두 수의 합은 절댓값이 큰 수의 부호를 따르고, 거리의 차만큼 이동합니다.",
+    "options": [
+      {
+        "text": "$+(12 + 8) = +20$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-(12 + 8) = -20$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+(12 - 8) = +4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-(12 - 8) = -4$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_11_q4_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$(-5) + (-3)$",
+    "question": "탐정 소피가 알려준 '뺄셈의 비밀'에 따라, $(-5) - (+3)$을 덧셈식으로 바르게 고친 것은?",
+    "hint": "빼는 수의 부호를 바꾸어 더하면 모든 뺄셈을 덧셈처럼 풀 수 있습니다.",
+    "options": [
+      {
+        "text": "$(-5) + (+3)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-5) + (-3)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(+5) + (+3)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(+5) + (-3)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_11_q5_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$+10$",
+    "question": "암호 $(+6) - (-4)$를 해독한 결과는 무엇입니까? (힌트: 왼쪽으로 가려던 것을 취소하는 상황)",
+    "hint": "음수를 빼는 것은 양수를 더하는 것과 결과가 같습니다.",
+    "options": [
+      {
+        "text": "$-10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+10$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_11_q6_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$(-1.2) + (+2.5) = +1.3$",
+    "question": "유리수의 계산 결과가 옳은 것을 고르세요.",
+    "hint": "소수의 계산도 정수와 마찬가지로 부호 결정 후 절댓값의 합이나 차를 구합니다.",
+    "options": [
+      {
+        "text": "$(-1.2) + (+2.5) = +1.3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(+3.7) + (-4.7) = +1.0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-0.5) - (+0.5) = 0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-2.4) - (-1.4) = -3.8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_11_q7_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$\\frac{1}{6}$",
+    "question": "다음 분수의 계산 결과로 옳은 것은? $\\frac{2}{3} + (-\\frac{1}{2})$",
+    "hint": "분모를 $6$으로 통분하여 계산하세요. $\\frac{4}{6} + (-\\frac{3}{6})$이 됩니다.",
+    "options": [
+      {
+        "text": "$\\frac{1}{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{6}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-\\frac{1}{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{7}{6}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_11_q8_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$+3$",
+    "question": "어떤 수 $\\square$에서 $-2$를 뺐더니 그 결과가 $+5$가 되었습니다. 이때 $\\square$에 알맞은 수는?",
+    "hint": "$\\square - (-2) = +5$는 $\\square + 2 = 5$와 같습니다.",
+    "options": [
+      {
+        "text": "$-7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$+7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_11_q9_1773668457480",
+    "unitId": "unit_middle_math_basic_11",
+    "score": 1,
+    "answer": "$(-2) + (-3)$",
+    "question": "다음 중 계산 결과가 가장 작은 것은?",
+    "hint": "각 식을 계산하면 차례대로 $-5, +1, -1, +5$가 됩니다.",
+    "options": [
+      {
+        "text": "$(-2) + (-3)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(-2) - (-3)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(+2) + (-3)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(+2) - (-3)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_12_q10_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$7 - (+2)$",
+    "question": "다음 중 뺄셈 부호가 덧셈 부호로 바뀌어 계산되는 '마이너스의 이중생활'이 나타나지 않는 계산은?",
+    "hint": "마이너스와 마이너스가 연속해서 만나는 경우를 찾으세요. [cite: 93, 95]",
+    "options": [
+      {
+        "text": "$12 - (-1)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-5) - (-3)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7 - (+2)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0 - (-9)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_12_q1_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$-(-2)$",
+    "question": "사건 파일 #1의 원리에 따라, 자동차 장난감이 '뒤로 $2$칸 이동($-2$)'하라는 명령을 받았으나 소피가 이를 '취소($-$)'했습니다. 이 자동차의 최종적인 움직임을 수식으로 바르게 나타낸 것은 무엇입니까?",
+    "hint": "어떤 행동을 빼앗거나 취소하는 것은 그 행동 앞에 마이너스($-$) 부호를 붙이는 것과 같습니다. [cite: 10, 15]",
+    "options": [
+      {
+        "text": "$+(-2)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-(+2)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-(-2)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-2-2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_12_q2_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$3 + 2 = 5$만원",
+    "question": "사건 파일 #2에서 '빛(부채)'을 빼앗아가는 것은 재산의 증가로 해석됩니다. 현재 재산이 $3$만원일 때, '$2$만원의 빚($-2$)'을 '빼앗는($-$)' 행위의 결과는 무엇입니까?",
+    "hint": "빚($-$)을 없애주는($-$) 것은 결국 재산이 늘어나는 것과 같습니다. [cite: 25, 28]",
+    "options": [
+      {
+        "text": "$3 - 2 = 1$만원",
+        "isCorrect": false
+      },
+      {
+        "text": "$3 + 2 = 5$만원",
+        "isCorrect": true
+      },
+      {
+        "text": "$-3 - 2 = -5$만원",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3 + 2 = -1$만원",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_12_q3_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "위로 $2$칸 이동하여 $5$층 도착",
+    "question": "사건 파일 #3의 수직선 엘리베이터에는 괄호 안의 행동을 거꾸로 실행하는 $-(\\quad)$ 버튼이 있습니다. $3$층에서 $-(-2)$ 버튼을 눌렀을 때의 결과로 옳은 것은?",
+    "hint": "'아래로 $2$칸($-2$)'의 거꾸로($-$)는 '위로 $2$칸($+2$)'이 됩니다. [cite: 38, 39]",
+    "options": [
+      {
+        "text": "아래로 $2$칸 이동하여 $1$층 도착",
+        "isCorrect": false
+      },
+      {
+        "text": "위로 $2$칸 이동하여 $5$층 도착",
+        "isCorrect": true
+      },
+      {
+        "text": "위로 $3$칸 이동하여 $6$층 도착",
+        "isCorrect": false
+      },
+      {
+        "text": "변화 없이 $3$층에 머물기",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_12_q4_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$10 + 5$",
+    "hint": "마이너스와 마이너스가 만나면 플러스($+$)로 바뀝니다. [cite: 44, 46]",
+    "options": [
+      {
+        "text": "$10 - 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10 + 5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-10 + 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-10 - 5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002,
+    "question": "다음 중 계산 결과가 $10 - (-5)$와 같은 식은?",
+    "docId": "unit_middle_math_basic_12_q4_1773668652665"
+  },
+  {
+    "id": "unit_middle_math_basic_12_q5_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$3$",
+    "question": "수직선에서 $-2$를 나타내는 점에서 '왼쪽으로 $5$만큼 이동($-5$)'하려던 계획을 '취소($-$)'했을 때 도착하는 점의 위치는 어디입니까?",
+    "hint": "$-2 - (-5)$를 계산하면 $-2 + 5$가 되어 결과는 $3$이 됩니다. [cite: 18, 65]",
+    "options": [
+      {
+        "text": "$-7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_12_q6_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$11$",
+    "question": "$a = -3$일 때, 식 $8 - a$의 값을 구하면 얼마입니까?",
+    "hint": "$a$ 자리에 $-3$을 대입하면 $8 - (-3)$이 됩니다. [cite: 70, 73]",
+    "options": [
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$11$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-11$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_12_q7_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$=$",
+    "question": "다음 빈칸에 들어갈 알맞은 부등호는 무엇입니까? \n $(-5) - (-2) \\quad [\\quad] \\quad (-5) + 2$",
+    "hint": "음수를 빼는 것은 같은 수의 양수를 더하는 것과 결과가 같습니다. [cite: 12, 76]",
+    "options": [
+      {
+        "text": "$>$",
+        "isCorrect": false
+      },
+      {
+        "text": "$<$",
+        "isCorrect": false
+      },
+      {
+        "text": "$=$",
+        "isCorrect": true
+      },
+      {
+        "text": "알 수 없음",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_12_q8_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$-5$",
+    "question": "어떤 수에서 $-6$을 뺐더니 결과가 $1$이 되었습니다. 이 '어떤 수'는 무엇입니까?",
+    "hint": "$\\square - (-6) = 1$은 $\\square + 6 = 1$과 같습니다. [cite: 81, 83]",
+    "options": [
+      {
+        "text": "$7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_12_q9_1773668652665",
+    "unitId": "unit_middle_math_basic_12",
+    "score": 1,
+    "answer": "$A$에서 $B$를 더한 값은 $15$이다.",
+    "question": "$A - (-B) = 15$라는 식이 항상 성립할 때, 다음 중 옳은 설명은 무엇입니까?",
+    "hint": "$-(-B)$는 $+B$로 변환됩니다. [cite: 90, 92]",
+    "options": [
+      {
+        "text": "$A$와 $B$의 차는 $15$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$A$에서 $B$를 더한 값은 $15$이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$A$에서 $B$를 뺀 값은 $15$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$B$에서 $A$를 뺀 값은 $15$이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_13_q10_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$-16$",
+    "question": "다음 식을 계산하세요.\n$-20.5 - 5.5 + 10$",
+    "hint": "$-20.5$와 $-5.5$를 먼저 계산하면 정수값이 나옵니다.",
+    "options": [
+      {
+        "text": "$-36$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-16$",
+        "isCorrect": true
+      },
+      {
+        "text": "$16$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_13_q1_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$-5$",
+    "question": "다음 식을 계산한 결과로 옳은 것을 고르세요.\n$(-12) + (+7)$",
+    "hint": "부호가 다른 두 수의 덧셈은 두 수의 절댓값의 차에 절댓값이 큰 수의 부호를 붙입니다.",
+    "options": [
+      {
+        "text": "$-19$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$19$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_13_q2_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$-\\frac{7}{12}$",
+    "question": "다음 분수의 합을 계산하세요.\n$(+\\frac{1}{4}) + (-\\frac{5}{6})$",
+    "hint": "분모를 $12$로 통분한 후, 분자의 부호를 고려하여 계산하세요.",
+    "options": [
+      {
+        "text": "$\\frac{13}{12}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{7}{12}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{7}{12}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{13}{12}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_13_q3_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$-6.2$",
+    "question": "다음 소수의 덧셈 결과는 무엇입니까?\n$(-3.8) + (-2.4)$",
+    "hint": "부호가 같은 두 수의 합은 두 수의 절댓값의 합에 공통인 부호를 붙입니다.",
+    "options": [
+      {
+        "text": "$-1.4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1.4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-6.2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6.2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_13_q4_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$16$",
+    "question": "다음 뺄셈 식의 결과로 옳은 것은?\n$(+5) - (-11)$",
+    "hint": "뺄셈은 빼는 수의 부호를 바꾸어 덧셈으로 고쳐서 계산합니다. 즉, $-(-11)$은 $+(+11)$이 됩니다.",
+    "options": [
+      {
+        "text": "$-6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-16$",
+        "isCorrect": false
+      },
+      {
+        "text": "$16$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_13_q5_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$-\\frac{11}{6}$",
+    "question": "다음 유리수의 뺄셈을 계산하세요.\n$(-\\frac{3}{2}) - (+\\frac{1}{3})$",
+    "hint": "뺄셈을 덧셈으로 바꾼 후 통분하여 계산하세요. $(-\\frac{3}{2}) + (-\\frac{1}{3})$로 바꿀 수 있습니다.",
+    "options": [
+      {
+        "text": "$-\\frac{11}{6}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-\\frac{7}{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{7}{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{11}{6}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_13_q6_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$-5$",
+    "question": "다음 세 수의 혼합 계산을 하세요.\n$(+1.5) + (-8.5) - (-2)$",
+    "hint": "앞의 두 수를 먼저 계산한 후, 뺄셈을 덧셈으로 바꾸어 마지막 수를 계산하세요.",
+    "options": [
+      {
+        "text": "$-9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_13_q7_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$-1.8$",
+    "question": "다음 식의 계산 결과로 옳은 것은?\n$(-2.4) - (+\\frac{3}{5}) + (+1.2)$",
+    "hint": "$\\frac{3}{5}$을 소수 $0.6$으로 바꾸어 계산하면 편리합니다.",
+    "options": [
+      {
+        "text": "$-1.8$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-0.6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0.6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3.0$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_13_q8_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$-8$",
+    "question": "양수의 부호가 생략된 다음 식을 계산하세요.\n$-9 + 4.5 - 3.5$",
+    "hint": "왼쪽부터 순서대로 계산하거나, 소수 부분끼리 먼저 계산하면 편리합니다.",
+    "options": [
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-8$",
+        "isCorrect": true
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_13_q9_1773668762001",
+    "unitId": "unit_middle_math_basic_13",
+    "score": 1,
+    "answer": "$0$",
+    "question": "다음 식을 계산한 결과는?\n$12.8 - 5.3 - 7.5$",
+    "hint": "뺄셈 기호 뒤의 숫자들을 먼저 합친 후 $12.8$에서 빼보세요.",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_14_q10_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$a < 0, b < 0$",
+    "question": "두 유리수 $a, b$에 대하여 $a \\times b > 0$이고 $a + b < 0$일 때, $a$와 $b$의 부호로 옳은 것은?",
+    "hint": "곱해서 양수이면 두 수의 부호가 같고, 더해서 음수이면 두 수 모두 음수여야 합니다.",
+    "options": [
+      {
+        "text": "$a > 0, b > 0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a > 0, b < 0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a < 0, b > 0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a < 0, b < 0$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_14_q1_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$-18$",
+    "question": "$(-6) \\times (+3)$의 계산 결과로 옳은 것은?",
+    "hint": "곱해지는 두 수의 부호가 다르면 결과는 항상 음수($-$)가 됩니다.",
+    "options": [
+      {
+        "text": "$-18$",
+        "isCorrect": true
+      },
+      {
+        "text": "$18$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_14_q2_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$(-5) \\times 3$",
+    "question": "수직선 위에서 '왼쪽 방향으로 $5$칸씩 $3$번 점프하는 상황'을 바르게 나타낸 곱셈식은?",
+    "hint": "왼쪽 방향은 부호 $-$로, 점프하는 횟수는 양수로 표현합니다.",
+    "options": [
+      {
+        "text": "$(+5) \\times 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-5) \\times 3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(+5) \\times (-3)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-5) \\times (-3)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_14_q3_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$(-8) \\times (+3)$",
+    "question": "다음 중 계산 결과의 부호가 나머지 셋과 다른 하나는?",
+    "hint": "마이너스($-$)의 개수가 짝수 개이면 $+$, 홀수 개이면 $-$가 됩니다.",
+    "options": [
+      {
+        "text": "$(-4) \\times (-7)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(+2) \\times (+9)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-1) \\times (-15)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-8) \\times (+3)$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_14_q4_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$12$",
+    "question": "$(-2) \\times (-1) \\times (-3) \\times (-2)$의 계산 결과는?",
+    "hint": "음수가 $4$개(짝수 개)이므로 부호는 $+$이며, 각 수의 절댓값을 모두 곱하면 됩니다.",
+    "options": [
+      {
+        "text": "$12$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_14_q5_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$(-4) \\times (-4)$",
+    "question": "$(-4)^2$을 곱셈식으로 바르게 풀어쓴 것은?",
+    "hint": "거듭제곱은 밑에 있는 수를 지수만큼 반복해서 곱하는 것을 의미합니다.",
+    "options": [
+      {
+        "text": "$(-4) \\times 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-4) + (-4)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-4) \\times (-4)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(-4) \\times 4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_14_q6_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$15$",
+    "question": "$a = -5$일 때, $-3a$의 값으로 옳은 것은?",
+    "hint": "$-3 \\times (-5)$를 계산할 때, 마이너스와 마이너스가 만나면 어떤 부호가 되는지 생각해보세요.",
+    "options": [
+      {
+        "text": "$-15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_14_q7_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$(-2) \\times 7$",
+    "question": "다음 중 계산 결과가 가장 작은 수는?",
+    "hint": "각각의 값을 계산하면 $-14, 16, -15, -9$입니다. 음수끼리는 절댓값이 클수록 작습니다.",
+    "options": [
+      {
+        "text": "$(-2) \\times 7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(-4) \\times (-4)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(+3) \\times (-5)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-9) \\times (+1)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_14_q8_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$-18$",
+    "question": "$A = (-\\frac{3}{4}) \\times (+12)$, $B = (-5) \\times (-\\frac{2}{5})$일 때, $A \\times B$의 값은?",
+    "hint": "$A$와 $B$를 각각 먼저 계산한 뒤, 두 결과값을 다시 곱해보세요.",
+    "options": [
+      {
+        "text": "$-18$",
+        "isCorrect": true
+      },
+      {
+        "text": "$18$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_14_q9_1773668929773",
+    "unitId": "unit_middle_math_basic_14",
+    "score": 1,
+    "answer": "$-$",
+    "question": "음수 $2025$개를 모두 곱했을 때, 계산 결과의 부호는?",
+    "hint": "$2025$는 홀수입니다. 곱해진 음수의 개수가 홀수 개일 때의 부호 규칙을 떠올려보세요.",
+    "options": [
+      {
+        "text": "$+$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "알 수 없음",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_15_q10_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$(-2)^3 = -2^3$",
+    "question": "다음 중 좌변과 우변의 값이 같은 식은 무엇입니까?",
+    "hint": "지수가 홀수일 때는 괄호가 있어도 결과의 부호가 바뀌지 않는 경우가 있습니다.",
+    "options": [
+      {
+        "text": "$(-1)^2 = -1^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-2)^3 = -2^3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(-3)^4 = -3^4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-4)^2 = -4^2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_15_q1_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$(-1)^{10}$",
+    "question": "다음 중 계산 결과의 부호가 양수($+$)인 것은?",
+    "hint": "음수를 거듭제곱할 때 지수가 짝수이면 결과는 양수가 됩니다.",
+    "options": [
+      {
+        "text": "$(-3)^3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-1)^{10}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-(-2)^2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_15_q2_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$-2^4$",
+    "question": "괄호의 유무에 따른 계산 결과의 차이를 탐구하고 있습니다. 다음 중 계산 결과가 $-16$인 것은?",
+    "hint": "괄호가 없으면 지수는 바로 밑에 있는 숫자에게만 영향을 미칩니다.",
+    "options": [
+      {
+        "text": "$(-2)^4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2^4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(-4)^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2^4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_15_q3_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$0$",
+    "question": "$(-1)^{2024} + (-1)^{2025}$의 값을 구하면?",
+    "hint": "$2024$는 짝수이고 $2025$는 홀수임을 이용하여 각각의 부호를 결정하세요.",
+    "options": [
+      {
+        "text": "$-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_15_q4_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$-\\frac{8}{27}$",
+    "question": "다음 분수의 거듭제곱을 계산한 결과로 옳은 것은?\n$(-\\frac{2}{3})^3$",
+    "hint": "음수 기호와 분수 전체가 괄호 안에 있으므로, 지수 $3$을 부호와 분모, 분자 모두에 적용해야 합니다.",
+    "options": [
+      {
+        "text": "$\\frac{8}{27}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{8}{27}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{6}{9}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{6}{9}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_15_q5_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$-9$",
+    "question": "$a = -3$일 때, $-a^2$의 값은 얼마입니까?",
+    "hint": "$a$ 자리에 $-3$을 대입할 때는 반드시 괄호를 사용하여 $-(-3)^2$으로 계산해야 합니다.",
+    "options": [
+      {
+        "text": "$9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-9$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_15_q6_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$-2^4$",
+    "question": "다음 네 수 중에서 계산 결과가 가장 작은 값은 무엇입니까?",
+    "hint": "먼저 각 수의 부호를 결정한 뒤, 음수 중에서 절대값이 가장 큰 수를 찾으세요.",
+    "options": [
+      {
+        "text": "$(-2)^4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2^4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(-3)^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3^2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_15_q7_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$2$",
+    "question": "$n$이 짝수일 때, $(-1)^n - (-1)^{n+1}$의 값은?",
+    "hint": "$n$이 짝수이면 $n+1$은 항상 홀수입니다.",
+    "options": [
+      {
+        "text": "$-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_15_q8_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$-\\frac{1}{2}$",
+    "question": "다음 식을 계산한 결과를 고르세요.\n$(-2)^2 \\times (-\\frac{1}{2})^3$",
+    "hint": "각각의 거듭제곱을 먼저 계산한 뒤 곱셈($4 \\times (-\\frac{1}{8})$)을 진행하세요.",
+    "options": [
+      {
+        "text": "$\\frac{1}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{1}{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_15_q9_1773669005349",
+    "unitId": "unit_middle_math_basic_15",
+    "score": 1,
+    "answer": "$(-a)^3$",
+    "question": "$a < 0$일 때, 다음 중 항상 양수($+$)인 것은?",
+    "hint": "$a$가 음수일 때, $-a$의 부호가 무엇이 될지 먼저 생각해보세요.",
+    "options": [
+      {
+        "text": "$a^3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-a^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-a)^3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

@@ -1,0 +1,1356 @@
+[
+  {
+    "id": "unit_middle_math_basic_41_q10_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$-1$",
+    "question": "$x = 3, y = -1$일 때, $\\frac{x^{2}}{3} + 4y$의 값을 구하면?",
+    "hint": "$\\frac{3^{2}}{3} + 4 \\times (-1)$을 계산 순서에 맞게 풀어보세요.",
+    "options": [
+      {
+        "text": "$-1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_41_q1_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "구체적인 숫자 대신 일반적인 원리나 규칙을 간결하게 표현하기 위해",
+    "question": "알렉스는 문자를 '모든 것을 담는 그릇'이라고 표현했습니다. 다음 중 수학에서 문자를 사용하는 이유로 가장 적절한 것은 무엇입니까?",
+    "hint": "소크라테스 선생님이 삼각형의 넓이 공식을 $\\frac{bh}{2}$로 나타낸 이유를 생각해보세요.",
+    "options": [
+      {
+        "text": "계산 과정을 더 복잡하고 어렵게 만들기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "구체적인 숫자 대신 일반적인 원리나 규칙을 간결하게 표현하기 위해",
+        "isCorrect": true
+      },
+      {
+        "text": "수학 기호를 최대한 많이 사용하여 화려하게 보이기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "정해진 하나의 숫자만 대입할 수 있는 특별한 수식을 만들기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "암산 능력을 향상시키기 위해",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_41_q2_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$-5xy$",
+    "question": "$y \\times (-5) \\times x$를 곱셈 기호를 생략하여 올바르게 나타낸 것은?",
+    "hint": "숫자를 문자 앞에 쓰고, 문자는 알파벳 순서대로 나열하는 것이 규칙입니다.",
+    "options": [
+      {
+        "text": "$-5yx$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5xy$",
+        "isCorrect": true
+      },
+      {
+        "text": "$xy-5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5(x+y)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_41_q3_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$0.1 \\times y = 0.y$",
+    "question": "다음 중 곱셈 기호의 생략 규칙을 적용했을 때 옳지 않은 것은?",
+    "hint": "$1$은 생략할 수 있지만, $0.1$에서 $1$은 수의 일부분이므로 생략하지 않고 $0.1y$라고 씁니다.",
+    "options": [
+      {
+        "text": "$1 \\times a = a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-1 \\times x = -x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0.1 \\times y = 0.y$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x \\times x \\times x = x^{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_41_q4_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$\\frac{a+b}{3}$",
+    "question": "나눗셈 식 $(a + b) \\div 3$을 나눗셈 기호를 생략하여 분수 형태로 올바르게 나타낸 것은?",
+    "hint": "나눗셈 기호 뒤에 있는 숫자가 분모로 내려가며, 괄호가 있는 식은 하나의 덩어리로 취급합니다.",
+    "options": [
+      {
+        "text": "$a + \\frac{b}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{a+b}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3(a+b)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3}{a+b}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_41_q5_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$\\frac{x}{yz}$",
+    "question": "$x \\div y \\div z$를 기호를 생략하여 간단히 나타낸 것은?",
+    "hint": "$x \\div y \\div z$는 $x \\times \\frac{1}{y} \\times \\frac{1}{z}$와 같습니다.",
+    "options": [
+      {
+        "text": "$\\frac{xz}{y}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{x}{yz}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$xyz$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{yz}{x}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_41_q6_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$10000 - 800x$ 원",
+    "question": "한 자루에 $800$원인 볼펜 $x$자루를 사고 $10000$원을 냈을 때, 거스름돈을 문자를 사용한 식으로 올바르게 나타낸 것은?",
+    "hint": "거스름돈은 (낸 돈)에서 (물건의 총 가격)을 뺀 금액입니다.",
+    "options": [
+      {
+        "text": "$800x - 10000$ 원",
+        "isCorrect": false
+      },
+      {
+        "text": "$10000 - 800x$ 원",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{10000}{800x}$ 원",
+        "isCorrect": false
+      },
+      {
+        "text": "$10800x$ 원",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_41_q7_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$0.8x$ 원",
+    "question": "정가가 $x$원인 티셔츠를 $20 \\%$ 할인된 가격으로 구매했을 때, 지불해야 할 금액을 나타내는 식은?",
+    "hint": "$20 \\%$를 할인해주면 전체 가격의 $80 \\%$만 내면 됩니다. $80 \\%$를 소수로 바꾸어 보세요.",
+    "options": [
+      {
+        "text": "$0.2x$ 원",
+        "isCorrect": false
+      },
+      {
+        "text": "$x - 20$ 원",
+        "isCorrect": false
+      },
+      {
+        "text": "$0.8x$ 원",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{x}{20}$ 원",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_41_q8_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$11$",
+    "question": "$a = -2$일 때, 식 $5 - 3a$의 값으로 옳은 것은?",
+    "hint": "$a$ 자리에 $-2$를 대입할 때, 음수이므로 괄호를 사용하여 $5 - 3 \\times (-2)$로 계산하세요.",
+    "options": [
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$11$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-11$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_41_q9_1773800347337",
+    "unitId": "unit_middle_math_basic_41",
+    "score": 1,
+    "answer": "$-xy^{2}$과 $5y^{2}x$",
+    "question": "다음 중 동류항끼리 짝지어진 것을 고르세요.",
+    "hint": "동류항은 문자와 차수가 모두 같아야 합니다. 문자의 순서가 바뀌어도 차수가 같다면 동류항입니다.",
+    "options": [
+      {
+        "text": "$2x$와 $2y$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{2}$과 $3a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-xy^{2}$과 $5y^{2}x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$7$과 $x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_42_q10_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$7$",
+    "question": "$a = -2, b = 5$일 때, 식 $|a - b|$의 값은? (단, $|x|$는 $x$의 절댓값) [cite: 93]",
+    "hint": "$a - b$의 값을 먼저 구한 뒤, 그 결과의 절댓값(원점으로부터의 거리)을 구합니다. [cite: 93]",
+    "options": [
+      {
+        "text": "$7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_42_q1_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$대입$",
+    "question": "문자 $x$가 들어 있는 식에서 $x$에 어떤 수를 대신 넣는 것을 무엇이라고 하나요? [cite: 14]",
+    "hint": "'대신 들어간다'는 의미를 가진 한자어를 생각해보세요. [cite: 14]",
+    "options": [
+      {
+        "text": "$대입$",
+        "isCorrect": true
+      },
+      {
+        "text": "$상수$",
+        "isCorrect": false
+      },
+      {
+        "text": "$변수$",
+        "isCorrect": false
+      },
+      {
+        "text": "$결과$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_42_q2_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$17$",
+    "question": "$x = 4$일 때, 식 $5x - 3$의 값으로 옳은 것은? [cite: 35]",
+    "hint": "$x$ 자리에 $4$를 대입하여 $5 \\times 4 - 3$을 계산해보세요. [cite: 11]",
+    "options": [
+      {
+        "text": "$17$",
+        "isCorrect": true
+      },
+      {
+        "text": "$23$",
+        "isCorrect": false
+      },
+      {
+        "text": "$13$",
+        "isCorrect": false
+      },
+      {
+        "text": "$20$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_42_q3_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$3$",
+    "question": "$a = -3$일 때, $-a$의 값은 얼마인가요? [cite: 22, 27]",
+    "hint": "음수를 대입할 때는 '보호막'인 괄호를 사용하여 $-(-3)$으로 계산합니다. [cite: 26, 27]",
+    "options": [
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_42_q4_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$-4$",
+    "question": "$a = -2$일 때, $-a^{2}$의 값으로 옳은 것은? [cite: 28, 30]",
+    "hint": "$a$를 먼저 제곱한 결과에 $-$ 부호를 붙여야 합니다. 즉, $-(-2)^{2}$을 계산하세요. [cite: 30]",
+    "options": [
+      {
+        "text": "$-4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_42_q5_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$0$",
+    "question": "$x = 3, y = -2$일 때, 식 $2x + 3y$의 값은? [cite: 47]",
+    "hint": "$2 \\times 3 + 3 \\times (-2)$를 순서대로 계산해보세요. [cite: 11, 26]",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_42_q6_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$-3$",
+    "question": "$a = -\\frac{1}{3}$일 때, $\\frac{1}{a}$의 값은? [cite: 60]",
+    "hint": "분모에 분수를 대입할 때는 역수의 개념을 이용하거나 $1 \\div a$로 생각해보세요. [cite: 60]",
+    "options": [
+      {
+        "text": "$-3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{1}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_42_q7_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$337 m$",
+    "question": "기온이 $x$ ℃일 때 소리의 속력은 초속 $(331 + 0.6x) m$라고 합니다. 기온이 $10$ ℃일 때 소리의 속력은? [cite: 54]",
+    "hint": "$x$에 $10$을 대입하여 $331 + 0.6 \\times 10$을 계산합니다. [cite: 54]",
+    "options": [
+      {
+        "text": "$337 m$",
+        "isCorrect": true
+      },
+      {
+        "text": "$341 m$",
+        "isCorrect": false
+      },
+      {
+        "text": "$331 m$",
+        "isCorrect": false
+      },
+      {
+        "text": "$340 m$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_42_q8_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$4$",
+    "question": "$x = -1$일 때, 식 $x^{2} - 2x + 1$의 값은? [cite: 66]",
+    "hint": "$(-1)^{2} - 2 \\times (-1) + 1$에서 음수의 제곱과 곱셈 부호에 주의하세요. [cite: 26, 66]",
+    "options": [
+      {
+        "text": "$4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_42_q9_1773800406298",
+    "unitId": "unit_middle_math_basic_42",
+    "score": 1,
+    "answer": "$20$",
+    "question": "윗변의 길이가 $a$, 아랫변의 길이가 $b$, 높이가 $h$인 사다리꼴의 넓이는 $\\frac{(a+b)h}{2}$입니다. $a=3, b=7, h=4$일 때 넓이는? [cite: 78, 80]",
+    "hint": "공식의 각 문자에 숫자를 대입한 후 괄호 안을 먼저 계산하세요. [cite: 11, 79]",
+    "options": [
+      {
+        "text": "$20$",
+        "isCorrect": true
+      },
+      {
+        "text": "$40$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$14$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_43_q10_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "$2$개",
+    "question": "두 다항식 $(3x + 2)$와 $(2x - 5)$를 더하여 식을 정리했을 때, 나타나는 새로운 다항식의 항의 개수는 몇 개입니까?",
+    "hint": "동류항($3x$와 $2x$, $2$와 $-5$)끼리 계산하여 식을 최대한 간단히 줄여보세요.",
+    "options": [
+      {
+        "text": "$1$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$3$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_43_q1_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "덧셈과 뺄셈이라는 구분선으로 나뉜 식의 각 구성 항목",
+    "question": "수학에서 '항($term$)'의 정의에 대한 설명으로 가장 적절한 것은 무엇입니까?",
+    "hint": "PDF $1$페이지에서 소크라테스 선생님은 항을 '조목', '목록'과 같은 의미로 설명하셨습니다.",
+    "options": [
+      {
+        "text": "곱셈 기호로만 복잡하게 연결된 식의 전체 값",
+        "isCorrect": false
+      },
+      {
+        "text": "덧셈과 뺄셈이라는 구분선으로 나뉜 식의 각 구성 항목",
+        "isCorrect": true
+      },
+      {
+        "text": "식에서 문자를 제외하고 숫자만으로 이루어진 부분",
+        "isCorrect": false
+      },
+      {
+        "text": "다항식에서 문자가 곱해진 횟수를 나타내는 수",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_43_q2_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "$3x^{2}$, $-2xy$, $5$",
+    "question": "다음 식 $3x^{2} - 2xy + 5$에서 각 '항'을 바르게 나열한 것은 무엇입니까?",
+    "hint": "뺄셈 기호($-$)는 뒤에 오는 항의 부호로 포함하여 생각해야 합니다.",
+    "options": [
+      {
+        "text": "$3x^{2}$, $2xy$, $5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x^{2}$, $-2xy$, $5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3$, $-2$, $5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}$, $xy$, $5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_43_q3_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "$3$개",
+    "question": "소크라테스 선생님은 '곱셈은 강력한 접착제'와 같다고 비유하셨습니다. 이에 근거할 때, 식 $3 + 2 \\times a - 5$에서 항의 개수는 몇 개입니까?",
+    "hint": "곱셈으로 연결된 $2 \\times a$는 하나의 덩어리(항)로 묶입니다.",
+    "options": [
+      {
+        "text": "$2$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$개",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$개",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$개",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_43_q4_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "정사각형이 직사각형의 일종이듯, 단항식은 다항식의 한 종류이다.",
+    "question": "단항식($Monomial$)과 다항식($Polynomial$)의 관계에 대한 설명으로 옳은 것은 무엇입니까?",
+    "hint": "PDF $2$페이지의 도형 비유를 떠올려 보세요. '다항'의 '다'는 수학에서 '$1$ 이상'의 의미를 내포하기도 합니다.",
+    "options": [
+      {
+        "text": "단항식은 항이 하나뿐이므로 다항식에 포함되지 않는다.",
+        "isCorrect": false
+      },
+      {
+        "text": "항이 $2$개 이상인 경우에만 다항식이라고 부를 수 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "정사각형이 직사각형의 일종이듯, 단항식은 다항식의 한 종류이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "단항식과 다항식은 서로 공통부분이 없는 완전히 다른 개념이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_43_q5_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "$\\frac{1}{4}$",
+    "question": "다항식 $-x^{2} + \\frac{y}{4} - 8$에서 $y$의 계수는 무엇입니까?",
+    "hint": "$\\frac{y}{4}$는 $\\frac{1}{4} \\times y$와 같으므로 문자에 곱해진 숫자를 찾으세요.",
+    "options": [
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{4}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_43_q6_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "$5x$, $-3a^{2}b$",
+    "question": "다음 중 '단항식'인 것만을 모두 고른 것은 무엇입니까?",
+    "hint": "단항식은 숫자나 문자의 곱으로만 이루어져 하나의 덩어리로 된 식입니다.",
+    "options": [
+      {
+        "text": "$5x$, $-3a^{2}b$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2x+1$, $y$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a-b$, $7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{x}$, $4x^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_43_q7_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "곱셈과 나눗셈으로 연결된 부분은 각각 하나의 항이 되어 총 $3$개이다.",
+    "question": "식 $2 \\times a + 6 \\div b - 1$을 항의 관점에서 분석했을 때, 옳은 설명은 무엇입니까?",
+    "hint": "곱셈과 나눗셈은 숫자와 문자를 끈끈하게 결합시킵니다.",
+    "options": [
+      {
+        "text": "나눗셈은 접착제 역할이 아니므로 항은 총 $4$개이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "곱셈과 나눗셈으로 연결된 부분은 각각 하나의 항이 되어 총 $3$개이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "문자가 $2$개 쓰였으므로 항은 $2$개이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 연산 기호가 칸막이 역할을 하므로 항은 $5$개이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_43_q8_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "$7$",
+    "question": "다항식 $5a - 3b + 2$에서 상수항과 $a$의 계수의 합은 얼마입니까?",
+    "hint": "$a$ 앞에 곱해진 숫자와 문자 없이 숫자만 있는 항을 찾아 더해보세요.",
+    "options": [
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_43_q9_1773800486860",
+    "unitId": "unit_middle_math_basic_43",
+    "score": 1,
+    "answer": "상수항은 $9$이다.",
+    "question": "다항식 $-2x^{2} + 4x - 9$에 대한 설명으로 옳지 않은 것은 무엇입니까?",
+    "hint": "항을 구분할 때는 숫자 앞의 부호($+$ 또는 $-$)를 반드시 포함해야 합니다.",
+    "options": [
+      {
+        "text": "항은 모두 $3$개이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "상수항은 $9$이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$x^{2}$의 계수는 $-2$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$x$의 계수는 $4$이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_44_q10_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "$-\\frac{1}{4}$",
+    "question": "다항식 $x^2 - \\frac{x}{4} + 2$에서 $x$의 계수는 무엇입니까?",
+    "hint": "$\\frac{x}{4}$는 $\\frac{1}{4} \\times x$와 같으므로, 그 앞의 부호까지 고려하여 계수를 찾으세요.",
+    "options": [
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{1}{4}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{1}{4}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_44_q1_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "상수항은 $7$이다.",
+    "question": "다항식 $5x^2 - 2x + 7$에 대한 설명으로 옳은 것은?",
+    "hint": "항은 부호($+$ 또는 $-$)로 연결된 각 덩어리이며, 문자가 없는 항이 상수항입니다.",
+    "options": [
+      {
+        "text": "항은 모두 $2$개이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$x$의 계수는 $2$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "상수항은 $7$이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "이 식은 $x$에 대한 $3$차식이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_44_q2_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "$0$",
+    "question": "다항식 $-x^2 + x$에서 $x^2$의 계수를 $a$, $x$의 계수를 $b$라고 할 때, $a+b$의 값은?",
+    "hint": "문자 앞에 숫자가 보이지 않을 때는 $1$ 또는 $-1$이 '투명인간'처럼 생략된 것입니다.",
+    "options": [
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_44_q3_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "$3$차",
+    "question": "다항식 $3x^2 - 4x^3 + x - 1$의 차수는 얼마입니까?",
+    "hint": "다항식의 차수는 포함된 각 항의 차수 중에서 가장 높은 것을 선택합니다.",
+    "options": [
+      {
+        "text": "$1$차",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$차",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$차",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$차",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_44_q4_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "$\\frac{x-1}{3}$",
+    "question": "다음 중 $x$에 대한 일차식인 것을 고르세요.",
+    "hint": "일차식은 문자의 지수가 $1$인 항이 가장 높은 차수여야 하며, 문자가 분모에 있으면 안 됩니다.",
+    "options": [
+      {
+        "text": "$x^2 + 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{x-1}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{5}{x}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x^2 - x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_44_q5_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "$-\\frac{5}{6}$",
+    "question": "다항식 $\\frac{x^2}{3} - 5x + \\frac{1}{2}$에서 $x^2$의 계수($a$), $x$의 계수($b$), 상수항($c$)을 모두 곱한 값($a \\times b \\times c$)은?",
+    "hint": "계수와 상수항을 찾을 때는 앞에 붙은 부호($+$ 또는 $-$)를 반드시 포함해야 합니다.",
+    "options": [
+      {
+        "text": "$-\\frac{5}{6}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{5}{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{15}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{15}{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_44_q6_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "$2x^2$",
+    "question": "다음 중 항의 차수가 나머지 셋과 다른 하나는 무엇입니까?",
+    "hint": "항의 차수는 그 항에 곱해진 문자의 총 개수(지수의 합)를 의미합니다.",
+    "options": [
+      {
+        "text": "$x^2y$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5a^3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$abc$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x^2$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_44_q7_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "$k=3$",
+    "question": "다항식 $(k-3)x^2 + 5x - 2$가 $x$에 대한 일차식이 되기 위한 상수 $k$의 값은?",
+    "hint": "일차식이 되려면 $2$차항인 $x^2$ 항이 없어져야 하므로, 그 계수가 $0$이 되어야 합니다.",
+    "options": [
+      {
+        "text": "$k=0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$k=-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$k=3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$k=5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_44_q8_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "다항식의 차수는 각 항의 차수를 모두 더한 값으로 정한다.",
+    "question": "다항식의 용어에 대한 설명으로 옳지 않은 것은?",
+    "hint": "다항식의 등급(차수)은 모든 항의 합이 아니라 가장 높은 등급의 항 하나가 결정합니다.",
+    "options": [
+      {
+        "text": "항이 하나뿐인 다항식은 단항식이라고도 부른다.",
+        "isCorrect": false
+      },
+      {
+        "text": "문자를 포함하지 않고 수로만 이루어진 항을 상수항이라 한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "계수는 항에서 문자 부분에 곱해진 수이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "다항식의 차수는 각 항의 차수를 모두 더한 값으로 정한다.",
+        "isCorrect": true
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_44_q9_1773800585403",
+    "unitId": "unit_middle_math_basic_44",
+    "score": 1,
+    "answer": "$1$",
+    "question": "다항식 $\\frac{3x-1}{2}$에서 $x$의 계수와 상수항의 합은?",
+    "hint": "분수 형태의 식은 $\\frac{3}{2}x - \\frac{1}{2}$과 같이 각각의 항으로 분리하여 생각하면 쉽습니다.",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-\\frac{1}{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_basic_45_q10_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$2x$",
+    "question": "$A = 3 \\times 4x$, $B = -2x \\times (-5)$일 때, $A - B$의 값은 무엇인가요?",
+    "hint": "$A$와 $B$를 각각 먼저 계산한 후, 동류항끼리 뺄셈을 진행하세요. [cite: 87]",
+    "options": [
+      {
+        "text": "$22x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-2x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12x-10x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_basic_45_q1_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "곱셈의 결합법칙",
+    "question": "$5 \\times 4a$를 계산할 때, $(5 \\times 4) \\times a$와 같이 숫자를 먼저 묶어 계산할 수 있도록 해주는 연산 법칙은 무엇인가요?",
+    "hint": "세 수의 곱셈에서 어떤 것을 먼저 묶어 계산해도 결과가 같다는 법칙을 떠올려 보세요. [cite: 17, 20]",
+    "options": [
+      {
+        "text": "덧셈의 교환법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "곱셈의 결합법칙",
+        "isCorrect": true
+      },
+      {
+        "text": "분배법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "곱셈에 대한 역원 법칙",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_basic_45_q2_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$3 \\times 8x$",
+    "question": "$8x + 8x + 8x$를 곱셈의 정의를 이용하여 하나의 식으로 바르게 나타낸 것은 무엇인가요?",
+    "hint": "곱셈은 '반복된 더하기'를 줄여서 표현한 것입니다. [cite: 10]",
+    "options": [
+      {
+        "text": "$3 \\times 8x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$8 \\times 3x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$24 + x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8x^3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_basic_45_q3_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$-27a$",
+    "question": "$9 \\times (-3a)$를 계산한 결과로 옳은 것은 무엇인가요?",
+    "hint": "양수와 음수의 곱은 음수이며, 숫자는 숫자끼리 곱합니다. [cite: 26, 32]",
+    "options": [
+      {
+        "text": "$6a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-12a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-27a$",
+        "isCorrect": true
+      },
+      {
+        "text": "$27a$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_basic_45_q4_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$-9x$",
+    "question": "$12 \\times (-\\frac{3}{4}x)$를 계산한 값은 얼마인가요?",
+    "hint": "$12$와 분모 $4$를 먼저 약분한 뒤 분자와 곱해 보세요. [cite: 57]",
+    "options": [
+      {
+        "text": "$-9x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$9x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-16x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12-\\frac{3}{4}x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_basic_45_q5_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$5a \\times (-4b)$",
+    "question": "다음 중 계산 결과가 $-20ab$가 되는 식은 무엇인가요?",
+    "hint": "결과가 음수가 되려면 곱하는 두 수의 부호가 달라야 합니다. [cite: 38, 39]",
+    "options": [
+      {
+        "text": "$4a \\times 5b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2a \\times (-10b)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5a \\times (-4b)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-20a + b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_basic_45_q6_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$42a$",
+    "question": "가로의 길이가 $7a$이고 세로의 길이가 $6$인 직사각형의 넓이를 식으로 바르게 나타낸 것은 무엇인가요?",
+    "hint": "직사각형의 넓이는 (가로의 길이) $\\times$ (세로의 길이)입니다. [cite: 68]",
+    "options": [
+      {
+        "text": "$13a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$42a$",
+        "isCorrect": true
+      },
+      {
+        "text": "$42a^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7a + 6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_basic_45_q7_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$32xy$",
+    "question": "$(-4x) \\times (-8y)$를 계산하여 간단히 나타내면 무엇인가요?",
+    "hint": "음수와 음수를 곱하면 양수가 됩니다. [cite: 44, 46]",
+    "options": [
+      {
+        "text": "$-32xy$",
+        "isCorrect": false
+      },
+      {
+        "text": "$32xy$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-12xy$",
+        "isCorrect": false
+      },
+      {
+        "text": "$32x+y$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_basic_45_q8_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$-5x \\times 3 = -15x$",
+    "question": "다음 중 계산 결과가 옳은 것을 고르세요.",
+    "hint": "수와 문자의 곱셈에서는 계수(숫자)끼리 곱하여 문자 앞에 씁니다. [cite: 74, 77]",
+    "options": [
+      {
+        "text": "$3x + 2x = 5x^2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4a \\times 2a = 8a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5x \\times 3 = -15x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-b \\times (-b) = -b^2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_basic_45_q9_1773800662800",
+    "unitId": "unit_middle_math_basic_45",
+    "score": 1,
+    "answer": "$3x+4$",
+    "question": "어떤 식 $A$에 $4$를 더해야 할 것을 잘못하여 곱했더니 $12x$가 되었습니다. 이때 식 $A$를 구하고, 원래 하려던 계산($A+4$)의 결과를 바르게 구하면?",
+    "hint": "먼저 $A \\times 4 = 12x$를 통해 $A$가 무엇인지 찾아보세요. [cite: 63]",
+    "options": [
+      {
+        "text": "$3x+4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$12x+4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$48x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

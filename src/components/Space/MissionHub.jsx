@@ -490,6 +490,35 @@ export default function MissionHub({
   const toastTimeoutRef = useRef(null)
   const rewardLockRef = useRef(false)
 
+  // ─── Theater Mode HUD Timer ───
+  const [isUiVisible, setIsUiVisible] = useState(true);
+  const idleTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (currentMode !== 'video') return;
+    
+    const handleUserActivity = () => {
+      setIsUiVisible(true);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        setIsUiVisible(false);
+      }, 3500);
+    };
+
+    handleUserActivity();
+
+    window.addEventListener('mousemove', handleUserActivity);
+    window.addEventListener('touchstart', handleUserActivity);
+    window.addEventListener('keydown', handleUserActivity);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleUserActivity);
+      window.removeEventListener('touchstart', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [currentMode]);
+
   const handleOpenQuestionModal = (contextType) => {
     // If opening from video, pause the player
     if (contextType === 'video' && videoPlayerRef.current) {
@@ -1712,138 +1741,134 @@ export default function MissionHub({
       const txId = selectedTx.id || 'default'
 
       return (
-        <div className="mission-content-view fade-in" style={{ 
-          width: '100%', 
-          height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'flex-start', 
-          overflowY: 'auto', 
-          padding: '1.5rem 0 4rem', 
-          boxSizing: 'border-box' 
-        }}>
-          <div style={{ width: '90%', maxWidth: '1000px', display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-             <h3 className="font-title" style={{ margin: 0, color: 'var(--planet-green)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.5rem' }}>📡</span> {selectedTx.title}
-             </h3>
-             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-               {/* Cloud Save Micro-interaction */}
-               <AnimatePresence>
-                 {saveStatus && (
-                   <motion.div 
-                     initial={{ opacity: 0, scale: 0.8 }}
-                     animate={{ opacity: 1, scale: 1 }}
-                     exit={{ opacity: 0 }}
-                     style={{ color: saveStatus === 'saved' ? 'var(--planet-green)' : 'var(--crystal-cyan)', fontSize: '1rem', marginRight: '0.5rem' }}
-                     title="데이터 안전하게 동기화 중"
-                   >
-                     {saveStatus === 'saved' ? '✔' : '☁️'}
-                   </motion.div>
-                 )}
-                 {resumePosStr && (
-                   <motion.div
-                     initial={{ opacity: 0, x: 20 }}
-                     animate={{ opacity: 1, x: 0 }}
-                     exit={{ opacity: 0 }}
-                     style={{ color: 'var(--star-gold)', fontSize: '0.85rem', marginRight: '0.5rem', fontStyle: 'italic', fontFamily: 'var(--font-tech)' }}
-                   >
-                     {resumePosStr}
-                   </motion.div>
-                 )}
-               </AnimatePresence>
-               {/* Watch progress indicator */}
-               {stampCount > 0 && (
-                 <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                   학습: {Math.floor(stampCount / 60)}분 {stampCount % 60}초
-                 </span>
+          <div className="theater-wrapper">
+             <div className="theater-aspect-box">
+               {initialStartPosition !== null ? (
+                 <YoutubePlayer 
+                    ref={videoPlayerRef}
+                    key={`${selectedTx.videoId}_${initialStartPosition}`}
+                    videoId={selectedTx.videoId}
+                    start={initialStartPosition}
+                    end={selectedTx.end}
+                    onTimeUpdate={handleVideoTimeUpdate}
+                    onComplete={() => setIsAtEnd(true)}
+                 />
+               ) : (
+                 <div className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                   🚀 데이터 동기화 중...
+                 </div>
                )}
-               <button 
-                 onClick={returnFromContent} 
-                 style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-muted)', padding: '0.4rem 0.8rem', borderRadius: '4px', cursor: 'pointer', fontFamily: 'var(--font-tech)', fontSize: '0.85rem' }}
-               >
-                 ← BACK
-               </button>
+             </div>
+
+             {/* Top HUD Overlay */}
+             <div className="theater-hud top-hud" style={{ opacity: isUiVisible ? 1 : 0 }}>
+               <div>
+                  {/* Global Back Button Integrated into Top HUD */}
+                  <button 
+                    className="space-nav-link font-tech"
+                    onClick={() => {
+                      soundManager.playClick()
+                      onBack()
+                    }}
+                    style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      background: 'none',
+                      color: 'white',
+                      padding: '0.5rem 1rem 1rem 0',
+                      marginBottom: '0.5rem',
+                      border: 'none',
+                      boxShadow: 'none'
+                    }}
+                  >
+                    ← RETURN TO MISSION SELECT
+                  </button>
+                  <h3 className="font-title" style={{ margin: 0, color: '#fff', fontSize: '1.4rem', textShadow: '0 2px 5px rgba(0,0,0,0.8)' }}>
+                     <span style={{ color: 'var(--planet-green)' }}>📡 {selectedTx.title}</span>
+                  </h3>
+               </div>
+               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                 <AnimatePresence>
+                   {saveStatus && (
+                     <motion.div 
+                       initial={{ opacity: 0, scale: 0.8 }}
+                       animate={{ opacity: 1, scale: 1 }}
+                       exit={{ opacity: 0 }}
+                       style={{ color: saveStatus === 'saved' ? 'var(--planet-green)' : 'var(--crystal-cyan)', fontSize: '1.2rem', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+                       title="데이터 안전하게 동기화 중"
+                     >
+                       {saveStatus === 'saved' ? '✔' : '☁️'}
+                     </motion.div>
+                   )}
+                 </AnimatePresence>
+                 {stampCount > 0 && (
+                   <span className="font-tech" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                     학습: {Math.floor(stampCount / 60)}분 {stampCount % 60}초
+                   </span>
+                 )}
+                 <button 
+                   onClick={returnFromContent} 
+                   className="hud-btn glass"
+                   style={{ background: 'rgba(255,255,255,0.1)', color: 'white', padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.9rem' }}
+                 >
+                   ← BACK
+                 </button>
+               </div>
+             </div>
+
+             {/* Bottom HUD Overlay */}
+             <div className="theater-hud bottom-hud" style={{ opacity: isUiVisible ? 1 : 0, flexDirection: 'column' }}>
+               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                 <button 
+                   onClick={handleSaveVideoPosition}
+                   className="hud-btn secondary glass"
+                   style={{ 
+                     padding: '0.8rem 2.5rem', 
+                     fontSize: '1rem',
+                     borderColor: videoCompleted ? 'var(--planet-green)' : (isAtEnd ? 'var(--alert-red)' : undefined),
+                     background: videoCompleted ? 'rgba(0, 255, 136, 0.2)' : (isAtEnd ? 'rgba(255, 77, 77, 0.2)' : 'rgba(0,0,0,0.5)'),
+                     color: isAtEnd && !videoCompleted ? '#ffb3b3' : 'white',
+                     boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                   }}
+                 >
+                   {videoCompleted ? (
+                     learningProgress?.videoProgress?.[txId]?.completed ? (
+                       <>✅ 탐사 완료 (돌아가기)</>
+                     ) : (
+                       <>✨ 데이터 수신 완료! (총 {totalRewardedCrystals + (videoCompletionBonusGiven ? 20 : 0)}광석 획득) · 돌아가기</>
+                     )
+                   ) : isAtEnd ? (
+                       <>☑️ 수동 완료 처리 (완료 보너스 제외) - 수신율 {Math.min(100, Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100))}%</>
+                   ) : (
+                     <>📋 오늘은 여기까지</>
+                   )}
+                 </button>
+
+                 <button
+                   onClick={() => handleOpenQuestionModal('video')}
+                   className="hud-btn primary glass capture-hide"
+                   style={{
+                     padding: '0.8rem 2rem',
+                     fontSize: '1rem',
+                     borderRadius: '10px',
+                     background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.3), rgba(34, 211, 238, 0.3))',
+                     borderColor: 'var(--crystal-cyan)',
+                     color: 'white',
+                     boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                   }}
+                 >
+                   🙋 선생님께 질문하기
+                 </button>
+               </div>
+               
+               {isAtEnd && !videoCompleted && (
+                 <motion.p initial={{opacity:0}} animate={{opacity:1}} className="font-tech" style={{ color: '#ffb3b3', margin: 0, fontSize: '0.85rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                   통신 장애! 영상의 90% 이상을 탐사해야 보너스 수신이 가능합니다.
+                 </motion.p>
+               )}
              </div>
           </div>
-          <div className="glass-card" style={{ 
-            width: '100%', 
-            maxWidth: 'min(1000px, 90vw, calc((100vh - 280px) * 1.7778))', 
-            aspectRatio: '16/9', 
-            padding: '5px', 
-            background: 'rgba(0,0,0,0.5)',
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-             {initialStartPosition !== null ? (
-               <YoutubePlayer 
-                  ref={videoPlayerRef}
-                  key={`${selectedTx.videoId}_${initialStartPosition}`}
-                  videoId={selectedTx.videoId}
-                  start={initialStartPosition}
-                  end={selectedTx.end}
-                  onTimeUpdate={handleVideoTimeUpdate}
-                  onComplete={() => setIsAtEnd(true)}
-               />
-             ) : (
-               <div className="font-tech" style={{ color: 'var(--text-muted)' }}>
-                 🚀 데이터 동기화 중...
-               </div>
-             )}
-          </div>
-          <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button 
-              onClick={handleSaveVideoPosition}
-              className="hud-btn secondary glass"
-              style={{ 
-                padding: '1rem 3rem', 
-                fontSize: '1.1rem',
-                borderColor: videoCompleted ? 'var(--planet-green)' : (isAtEnd ? 'var(--alert-red)' : undefined),
-                background: videoCompleted ? 'rgba(0, 255, 136, 0.1)' : (isAtEnd ? 'rgba(255, 77, 77, 0.1)' : undefined),
-                color: isAtEnd && !videoCompleted ? '#ffb3b3' : 'white'
-              }}
-            >
-              {videoCompleted ? (
-                learningProgress?.videoProgress?.[txId]?.completed ? (
-                  <>✅ 탐사 완료 (돌아가기)</>
-                ) : (
-                  <>✨ 데이터 수신 완료! (총 {totalRewardedCrystals + (videoCompletionBonusGiven ? 20 : 0)}광석 획득) · 돌아가기</>
-                )
-              ) : isAtEnd ? (
-                  <>☑️ 수동 완료 처리 (완료 보너스 제외) - 수신율 {Math.min(100, Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100))}%</>
-              ) : (
-                <>📋 오늘은 여기까지</>
-              )}
-            </button>
-
-            <button
-              onClick={() => handleOpenQuestionModal('video')}
-              className="hud-btn primary glass capture-hide"
-              style={{
-                padding: '1rem 2rem',
-                fontSize: '1.1rem',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.2), rgba(34, 211, 238, 0.2))',
-                borderColor: 'var(--crystal-cyan)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.8rem'
-              }}
-            >
-              🙋 선생님께 질문하기
-            </button>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            {isAtEnd && !videoCompleted && (
-              <p className="font-tech" style={{ color: 'var(--alert-red)', marginTop: '1rem', fontSize: '0.9rem' }}>
-                통신 장애! 영상의 90% 이상을 탐사해야 보너스 수신이 가능합니다.
-              </p>
-            )}
-          </div>
-        </div>
       )
     }
 
@@ -2174,24 +2199,26 @@ export default function MissionHub({
       display: 'flex', flexDirection: 'column', overflow: 'hidden'
     }}>
         {/* Global Back Button (Top-Left) */}
-        <button 
-          className="space-nav-link font-tech"
-          onClick={() => {
-            soundManager.playClick()
-            onBack()
-          }}
-          style={{ 
-            position: 'absolute', 
-            top: '2rem', 
-            left: '2rem', 
-            zIndex: 3000,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          ← RETURN TO MISSION SELECT
-        </button>
+        {currentMode !== 'video' && (
+          <button 
+            className="space-nav-link font-tech"
+            onClick={() => {
+              soundManager.playClick()
+              onBack()
+            }}
+            style={{ 
+              position: 'absolute', 
+              top: '2rem', 
+              left: '2rem', 
+              zIndex: 3000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            ← RETURN TO MISSION SELECT
+          </button>
+        )}
 
         <AnimatePresence mode='wait'>
            {currentMode === 'briefing' && (

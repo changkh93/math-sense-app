@@ -1,0 +1,1352 @@
+[
+  {
+    "id": "unit_middle_math_eq_17_q10_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "$-3x-6=9 \\rightarrow -3x=15 \\rightarrow x=-5$",
+    "question": "방정식 $-3(x+2)=9$의 해 $x$를 구하는 과정으로 옳은 것은?",
+    "hint": "$-3$을 $x$와 $+2$에 각각 곱하면 $-3x-6$이 됩니다. 그 후 $-6$을 우변으로 이항하면 $+6$이 됩니다.",
+    "options": [
+      {
+        "text": "$-3x+2=9 \\rightarrow -3x=7 \\rightarrow x=-\\frac{7}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3x-6=9 \\rightarrow -3x=15 \\rightarrow x=-5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-3x-2=9 \\rightarrow -3x=11 \\rightarrow x=-\\frac{11}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-3x+6=9 \\rightarrow -3x=3 \\rightarrow x=-1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_17_q1_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "분배법칙",
+    "question": "일차방정식 $4(x+1)=2(x+5)$를 풀기 위해 가장 먼저 적용해야 하는 법칙은 무엇입니까?",
+    "hint": "괄호를 풀어서 '잠금 해제'를 하기 위해 괄호 앞의 숫자를 안쪽 항들에 골고루 곱해주는 법칙을 생각해보세요.",
+    "options": [
+      {
+        "text": "결합법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "교환법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "분배법칙",
+        "isCorrect": true
+      },
+      {
+        "text": "동류항 정리",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_17_q2_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "$3x-6$",
+    "question": "식 $3(x-2)$를 분배법칙을 이용하여 바르게 전개한 것은 무엇입니까?",
+    "hint": "괄호 앞의 숫자 $3$을 $x$와 $-2$ 모두에 각각 곱해 주어야 합니다.",
+    "options": [
+      {
+        "text": "$3x-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x-5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x-6$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x-6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_17_q3_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "$2x+6$",
+    "question": "방정식 $2(x+3)=10$의 괄호를 풀었을 때 얻어지는 식은 무엇입니까?",
+    "hint": "숫자 $2$를 괄호 안의 모든 항인 $x$와 $3$에 공평하게 곱해 보세요.",
+    "options": [
+      {
+        "text": "$2x+3=10$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2x+6=10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x+6=10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x+5=10$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_17_q4_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "$5x-2x=10-4$",
+    "question": "일차방정식 $5x+4=2x+10$에서 항은 좌변으로, 상수항은 우변으로 바르게 이항한 것은 무엇입니까?",
+    "hint": "등호라는 '국경'을 넘을 때는 항의 부호가 반대로 바뀌어야 한다는 점을 기억하세요.",
+    "options": [
+      {
+        "text": "$5x+2x=10+4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5x-2x=10+4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5x+2x=10-4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5x-2x=10-4$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_17_q5_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "$x=4$",
+    "question": "일차방정식 $3(x-1)=9$의 해 $x$의 값은 얼마입니까?",
+    "hint": "먼저 괄호를 풀면 $3x-3=9$가 됩니다. 그 다음 $-3$을 이항하여 계산해 보세요.",
+    "options": [
+      {
+        "text": "$x=2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=10$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_17_q6_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "$ax=b$",
+    "question": "일차방정식의 풀이 단계 중 '정리' 단계에서 식을 어떤 꼴로 만들어야 합니까? (단, $a, b$는 상수)",
+    "hint": "이항과 동류항 계산을 마친 후, 최종적으로 $x$의 계수와 상수가 정리된 형태를 떠올려 보세요.",
+    "options": [
+      {
+        "text": "$x=a+b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$ax=b$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x+a=b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{x}{a}=b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_17_q7_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "$x=3$",
+    "question": "방정식 $2x=6$의 양변을 $x$의 계수로 나누어 해를 구하면 $x$는 얼마입니까?",
+    "hint": "$x$ 앞에 붙은 숫자 $2$로 양변을 똑같이 나누어 보세요.",
+    "options": [
+      {
+        "text": "$x=2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=12$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_17_q8_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "$x=10$",
+    "question": "일차방정식 $2(x-4)=x+2$를 풀었을 때 $x$의 값으로 옳은 것은?",
+    "hint": "괄호를 풀면 $2x-8=x+2$가 됩니다. $x$가 포함된 항과 숫자를 각각 이항해 보세요.",
+    "options": [
+      {
+        "text": "$x=6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=10$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=12$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_17_q9_1773802531144",
+    "unitId": "unit_middle_math_eq_17",
+    "score": 1,
+    "answer": "괄호 앞의 숫자를 앞의 항에만 곱하고 뒤의 숫자는 그대로 두는 것",
+    "question": "다음 중 분배법칙을 사용할 때 가장 많이 하는 실수로 지적된 행동은 무엇입니까?",
+    "hint": "시소의 평형을 유지하려면 괄호 안의 모든 항에 '공평하게' 곱해주어야 합니다.",
+    "options": [
+      {
+        "text": "괄호 안의 모든 항에 숫자를 곱하는 것",
+        "isCorrect": false
+      },
+      {
+        "text": "괄호 앞의 숫자를 앞의 항에만 곱하고 뒤의 숫자는 그대로 두는 것",
+        "isCorrect": true
+      },
+      {
+        "text": "이항할 때 부호를 반대로 바꾸는 것",
+        "isCorrect": false
+      },
+      {
+        "text": "양변을 $x$의 계수로 나누는 것",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq_18_q10_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "등식의 성질",
+    "question": "방정식 $x + 3 = 10$을 풀기 위해 양변에서 $3$을 빼는 과정은 '단계별 개념 학습'의 어떤 원리를 활용한 것입니까?",
+    "hint": "양변에 같은 수를 더하거나 빼도 등식은 성립한다는 원리입니다.",
+    "options": [
+      {
+        "text": "분배법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "결합법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "등식의 성질",
+        "isCorrect": true
+      },
+      {
+        "text": "교환법칙",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_18_q1_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "$x = (상수)$",
+    "question": "일차방정식의 풀이 과정에서 우리가 도달해야 하는 최종적인 목표는 어떤 꼴로 식을 만드는 것입니까?",
+    "hint": "미지수 $x$의 값을 구하기 위해 $x$만 홀로 남겨야 합니다.",
+    "options": [
+      {
+        "text": "$x = (상수)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a = x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$ax + b = 0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x + a = b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_18_q2_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "$3x - x = 7 + 5$",
+    "question": "방정식 $3x - 5 = x + 7$에서 상수항 $-5$를 우변으로, 일차항 $x$를 좌변으로 바르게 이항한 식은 무엇입니까?",
+    "hint": "이항할 때는 옮겨지는 항의 부호를 반드시 반대로 바꿔야 합니다.",
+    "options": [
+      {
+        "text": "$3x + x = 7 - 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x - x = 7 + 5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3x - x = 7 - 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x + x = 7 + 5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_18_q3_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "$2$",
+    "question": "일차방정식 $2x = 12$의 양변을 정리하여 해를 구할 때, 등식의 성질을 이용하여 양변을 나누어야 하는 숫자는 무엇입니까?",
+    "hint": "$x$ 앞에 붙어 있는 숫자(계수)를 확인해 보세요.",
+    "options": [
+      {
+        "text": "$x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_18_q4_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "$+5$가 등호 너머로 이항하면 $-5$가 된다.",
+    "question": "다음 중 이항의 규칙에 대해 '실수 방지 Note'의 내용을 바탕으로 올바르게 설명한 것은 무엇입니까?",
+    "hint": "시소의 평형을 유지하기 위해 부호 반전은 필수 매너입니다.",
+    "options": [
+      {
+        "text": "항을 옮길 때 부호를 그대로 유지해야 한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$+5$가 등호 너머로 이항하면 $-5$가 된다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$x$항은 항상 우변으로만 모아야 한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "곱셈을 덧셈으로 바꾸는 과정이 이항이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_18_q5_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "$x = \\frac{10}{5}$",
+    "question": "일차방정식 $5x = 10$에서 $x$의 값을 구하기 위해 식을 세울 때, 숫자의 위치가 올바른 것은 무엇입니까?",
+    "hint": "없애고 싶은 미지수 앞의 숫자가 분모로 내려갑니다.",
+    "options": [
+      {
+        "text": "$x = \\frac{10}{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x = \\frac{5}{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x = 10 - 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x = 10 \\times 5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_18_q6_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "$4x = 8$",
+    "question": "방정식 $4x - 8 = 0$을 '끼리끼리' 이사시키기(이항) 단계를 거쳐 $ax = b$ 꼴로 바르게 정리한 것은 무엇입니까?",
+    "hint": "상수항 $-8$을 우변으로 이항하여 부호를 바꿔보세요.",
+    "options": [
+      {
+        "text": "$4x = 8$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4x = -8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-8x = 4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8x = 4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_18_q7_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "$2 \\times 3 = 6$",
+    "question": "방정식 $2x = 6$을 풀어 얻은 해가 $x = 3$일 때, 이 값이 맞는지 확인하는 '검산' 과정으로 옳은 식은 무엇입니까?",
+    "hint": "구한 해 $x$의 값을 원래의 식에 대입하여 등식이 성립하는지 확인합니다.",
+    "options": [
+      {
+        "text": "$2 + 3 = 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2 \\times 3 = 6$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6 \\div 3 = 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3 \\times 3 = 9$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_18_q8_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "이항 $\\rightarrow$ 정리 $\\rightarrow$ 나누기",
+    "question": "다음 중 학습 자료에서 제시한 일차방정식의 풀이 $3$단계를 순서대로 바르게 나열한 것은 무엇입니까?",
+    "hint": "먼저 '끼리끼리' 모으고, 식을 간단히 한 뒤, 계수로 나눕니다.",
+    "options": [
+      {
+        "text": "정리 $\\rightarrow$ 이항 $\\rightarrow$ 나누기",
+        "isCorrect": false
+      },
+      {
+        "text": "이항 $\\rightarrow$ 정리 $\\rightarrow$ 나누기",
+        "isCorrect": true
+      },
+      {
+        "text": "나누기 $\\rightarrow$ 이항 $\\rightarrow$ 정리",
+        "isCorrect": false
+      },
+      {
+        "text": "정리 $\\rightarrow$ 나누기 $\\rightarrow$ 이항",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_18_q9_1773802444862",
+    "unitId": "unit_middle_math_eq_18",
+    "score": 1,
+    "answer": "$0$",
+    "question": "일차방정식 $ax = b$에서 해를 구하기 위해 양변을 $a$로 나눌 때, '오늘의 핵심 체크'에 따라 $a$가 절대로 되어서는 안 되는 숫자는 무엇입니까?",
+    "hint": "나눗셈에서 분모가 되는 숫자는 결코 이 숫자가 될 수 없습니다.",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq_19_q10_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$x = 11$",
+    "question": "비례식 $2:(x+3) = 3:(2x-1)$의 해를 구하면?",
+    "hint": "$2(2x-1) = 3(x+3)$ 식을 세운 뒤 분배법칙과 이항을 차근차근 적용하세요.",
+    "options": [
+      {
+        "text": "$x = 7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x = 9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x = 11$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x = 13$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_19_q1_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$\\frac{a}{b}$",
+    "question": "비 $a:b$를 분수 형태로 올바르게 나타낸 것은 무엇입니까?",
+    "hint": "비에서 기호 $:$ 뒤에 있는 항이 분모(기준량)가 됩니다.",
+    "options": [
+      {
+        "text": "$\\frac{a}{b}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{b}{a}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a \\times b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a + b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_19_q2_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$8, 15$",
+    "question": "비례식 $5:8 = 15:24$에서 '내항'에 해당하는 숫자들을 고르세요.",
+    "hint": "비례식에서 안쪽에 위치한 두 항을 내항이라고 부릅니다.",
+    "options": [
+      {
+        "text": "$5, 24$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8, 15$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5, 15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8, 24$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_19_q3_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$a \\times d = b \\times c$",
+    "question": "비례식 $a:b = c:d$가 성립할 때, 항상 참인 식은 무엇입니까?",
+    "hint": "비례식의 가장 중요한 성질인 '외항의 곱은 내항의 곱과 같다'를 떠올려 보세요.",
+    "options": [
+      {
+        "text": "$a + d = b + c$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a \\times c = b \\times d$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a \\times d = b \\times c$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{a}{c} = \\frac{b}{d}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_19_q4_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$4$",
+    "question": "비례식 $3:x = 9:12$를 만족하는 $x$의 값은 얼마입니까?",
+    "hint": "내항의 곱 $9 \\times x$와 외항의 곱 $3 \\times 12$가 같음을 이용하세요.",
+    "options": [
+      {
+        "text": "$4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$36$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_19_q5_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$4:7$",
+    "question": "분수 $\\frac{4}{7}$와 같은 값을 갖는 비를 찾으세요.",
+    "hint": "분자는 비교하는 양, 분모는 기준량이 되어 $분자:분모$의 형태로 바뀝니다.",
+    "options": [
+      {
+        "text": "$7:4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4:7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4:11$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7:11$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_19_q6_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$2 \\times 10 = 4 \\times (x+1)$",
+    "question": "방정식 $2:(x+1) = 4:10$을 풀기 위해 '외항의 곱 = 내항의 곱' 성질을 이용하여 세운 식으로 옳은 것은?",
+    "hint": "바깥쪽의 $2$와 $10$, 안쪽의 $(x+1)$과 $4$를 각각 곱해야 합니다.",
+    "options": [
+      {
+        "text": "$2 \\times (x+1) = 4 \\times 10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2 \\times 4 = 10 \\times (x+1)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2 \\times 10 = 4 \\times (x+1)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2 + 10 = 4 + (x+1)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_19_q7_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$9$",
+    "question": "비례식 $5:(2x-3) = 1:3$에서 $x$의 값을 구하면?",
+    "hint": "$1 \\times (2x-3) = 5 \\times 3$ 식을 세워 $x$에 대해 정리해 보세요.",
+    "options": [
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9$",
+        "isCorrect": true
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$18$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_19_q8_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "반드시 괄호를 사용한다.",
+    "question": "비례식 형태의 방정식을 풀 때, $2x-1$과 같이 항이 여러 개인 식에 숫자를 곱할 때 반드시 주의해야 할 점은?",
+    "hint": "괄호를 치지 않으면 식 전체가 아닌 앞의 항에만 숫자가 곱해지는 실수를 할 수 있습니다.",
+    "options": [
+      {
+        "text": "항상 분수로 바꾼다.",
+        "isCorrect": false
+      },
+      {
+        "text": "반드시 괄호를 사용한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "뒤의 숫자는 무시한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "곱하기 기호를 생략한다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_19_q9_1773802600558",
+    "unitId": "unit_middle_math_eq_19",
+    "score": 1,
+    "answer": "$8$",
+    "question": "비례식 $3:4 = (x-2):8$을 만족하는 $x$의 값은?",
+    "hint": "$4(x-2) = 24$에서 분배법칙을 사용하여 괄호를 먼저 풀어보세요.",
+    "options": [
+      {
+        "text": "$6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq_20_q10_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$100$",
+    "question": "방정식 $0.25x - 0.1 = 0.4$를 정수 계수로 고치기 위해 양변에 곱해야 할 가장 작은 $10$의 거듭제곱은?",
+    "hint": "소수점 아래 자릿수가 가장 많은 항($0.25$)을 기준으로 생각하세요.",
+    "options": [
+      {
+        "text": "$10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$100$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1000$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10000$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_20_q1_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$x=4$",
+    "question": "일차방정식 $0.3x - 0.5 = 0.7$의 해를 구하시오.",
+    "hint": "양변에 $10$을 곱하여 소수점을 없앤 뒤 정수의 방정식으로 만들어 보세요.",
+    "options": [
+      {
+        "text": "$x=1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_20_q2_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$x + 20 = 5$",
+    "question": "방정식 $0.1x + 2 = 0.5$를 풀기 위해 양변에 $10$을 곱하여 정수 계수로 바르게 나타낸 것은?",
+    "hint": "소수가 아닌 상수항 $2$에도 반드시 $10$을 곱해야 합니다.",
+    "options": [
+      {
+        "text": "$x + 2 = 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x + 20 = 5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10x + 20 = 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x + 20 = 50$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_20_q3_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$x=2$",
+    "question": "일차방정식 $\\frac{x}{2} = \\frac{x+1}{3}$의 해를 구하시오.",
+    "hint": "분수가 양변에 하나씩 있을 때는 'X자(대각선) 곱하기' 비법을 사용하면 편리합니다.",
+    "options": [
+      {
+        "text": "$x=1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=4$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_20_q4_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$x=5$",
+    "question": "일차방정식 $\\frac{2x-1}{3} = 3$의 해를 구하시오.",
+    "hint": "양변에 분모인 $3$을 곱하여 분수를 정수로 바꾸어 보세요.",
+    "options": [
+      {
+        "text": "$x=2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=5$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_20_q5_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$10$",
+    "question": "계수가 소수인 방정식을 풀 때, 소수점 아래 첫째 자리까지 있다면 양변에 어떤 수를 곱하는 것이 가장 적절합니까?",
+    "hint": "$10$의 거듭제곱 중 소수점을 한 칸 뒤로 밀 수 있는 수를 선택하세요.",
+    "options": [
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10$",
+        "isCorrect": true
+      },
+      {
+        "text": "$100$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_20_q6_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$x=4$",
+    "question": "일차방정식 $\\frac{x+2}{4} = \\frac{x-1}{2}$의 해를 구하시오.",
+    "hint": "양변에 분모의 최소공배수인 $4$를 곱할 때, 분자가 다항식이면 반드시 괄호를 쳐야 합니다.",
+    "options": [
+      {
+        "text": "$x=1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_20_q7_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$x=4$",
+    "question": "방정식 $1.2x - 0.4 = 0.8x + 1.2$의 해를 구하시오.",
+    "hint": "모든 항에 $10$을 곱하여 $12x - 4 = 8x + 12$로 만든 뒤 이항하여 정리하세요.",
+    "options": [
+      {
+        "text": "$x=2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_20_q8_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "분모를 $1$로 만들어 정수 방정식으로 바꾸기 위해",
+    "question": "분수 계수의 방정식을 풀 때 '분모의 최소공배수'를 곱하는 가장 큰 목적은 무엇인가요?",
+    "hint": "우리의 목표는 복잡한 수를 계산하기 편한 '정수'로 바꾸는 것입니다.",
+    "options": [
+      {
+        "text": "분모를 $1$로 만들어 정수 방정식으로 바꾸기 위해",
+        "isCorrect": true
+      },
+      {
+        "text": "소수로 바꾸어 계산하기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "상수항을 모두 없애기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "미지수 $x$의 부호를 바꾸기 위해",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_20_q9_1773802696175",
+    "unitId": "unit_middle_math_eq_20",
+    "score": 1,
+    "answer": "$4(2x-1) = 3(3x+1)$",
+    "question": "방정식 $\\frac{2x-1}{3} = \\frac{3x+1}{4}$를 풀기 위해 'X자 곱하기'를 바르게 적용한 식은?",
+    "hint": "좌변의 분자와 우변의 분모를 곱한 값은, 좌변의 분모와 우변의 분자를 곱한 값과 같습니다.",
+    "options": [
+      {
+        "text": "$4(2x-1) = 3(3x+1)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3(2x-1) = 4(3x+1)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4 \\times 2x - 1 = 3 \\times 3x + 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12(2x-1) = 12(3x+1)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq_21_q10_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "거리는 속력을 시간으로 나누어 구한다.",
+    "question": "다음 중 속력의 정의와 공식에 대한 설명으로 틀린 것은 무엇입니까?",
+    "hint": "거리는 '속력'과 '시간'의 곱 ($d = s \\times t$)으로 구해야 합니다.",
+    "options": [
+      {
+        "text": "속력은 단위 시간당 이동한 거리이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "시간은 거리를 속력으로 나누어 구한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "거리는 속력을 시간으로 나누어 구한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "분수가 포함된 방정식은 분모의 최소공배수를 곱해 정수로 만든다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_21_q1_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$d = s \\times t$",
+    "question": "거리를 $d$, 속력을 $s$, 시간을 $t$라고 할 때, 세 요소 사이의 관계를 나타낸 공식 중 옳은 것은 무엇입니까?",
+    "hint": "거리는 '얼마나 빠른 속력으로 얼마 동안 이동했는가'를 곱하여 구합니다.",
+    "options": [
+      {
+        "text": "$d = s \\times t$",
+        "isCorrect": true
+      },
+      {
+        "text": "$s = d \\times t$",
+        "isCorrect": false
+      },
+      {
+        "text": "$t = d \\times s$",
+        "isCorrect": false
+      },
+      {
+        "text": "$d = \\frac{s}{t}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_21_q2_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$15 km$",
+    "question": "시속 $5 km$의 속력으로 $3$시간 동안 걸어갔을 때, 이동한 총 거리는 몇 $km$입니까?",
+    "hint": "거리 ($d$)는 속력 ($s$)과 시간 ($t$)의 곱으로 계산합니다.",
+    "options": [
+      {
+        "text": "$8 km$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10 km$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15 km$",
+        "isCorrect": true
+      },
+      {
+        "text": "$20 km$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_21_q3_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$60 km/h$",
+    "question": "$120 km$의 거리를 자동차로 이동하는 데 $2$시간이 걸렸습니다. 이 자동차의 속력은 시속 몇 $km$입니까?",
+    "hint": "속력 ($s$)은 이동한 거리 ($d$)를 걸린 시간 ($t$)으로 나누어 구합니다.",
+    "options": [
+      {
+        "text": "$40 km/h$",
+        "isCorrect": false
+      },
+      {
+        "text": "$60 km/h$",
+        "isCorrect": true
+      },
+      {
+        "text": "$80 km/h$",
+        "isCorrect": false
+      },
+      {
+        "text": "$240 km/h$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_21_q4_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$\\frac{3}{4}$시간",
+    "question": "문제에서 시간이 '$45$분'으로 주어졌을 때, 이를 '시속' 계산을 위해 '시간' 단위로 바르게 고친 것은 무엇입니까?",
+    "hint": "$1$시간은 $60$분이므로, $45$를 $60$으로 나눈 뒤 약분해 보세요.",
+    "options": [
+      {
+        "text": "$\\frac{1}{4}$시간",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{2}{3}$시간",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3}{4}$시간",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{4}{5}$시간",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_21_q5_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$\\frac{x}{4} + \\frac{x}{6} = 5$",
+    "question": "A지점에서 B지점까지 갈 때는 시속 $4 km$, 올 때는 시속 $6 km$로 걸어서 총 $5$시간이 걸렸습니다. 두 지점 사이의 거리를 $x km$라고 할 때, '시간'을 기준으로 세운 올바른 방정식은?",
+    "hint": "(가는 시간) + (오는 시간) = (총 시간)이 되어야 하며, 시간은 '거리 ÷ 속력'입니다.",
+    "options": [
+      {
+        "text": "$\\frac{x}{4} + \\frac{x}{6} = 5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4x + 6x = 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{4}{x} + \\frac{6}{x} = 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x = 4 + 6 + 5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_21_q6_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$24$",
+    "question": "방정식 $\\frac{x}{8} + \\frac{x}{6} = 7$을 풀기 위해 양변에 곱해야 할 두 분모 $8$과 $6$의 최소공배수는 무엇입니까?",
+    "hint": "$8$과 $6$으로 나누어떨어지는 가장 작은 정수를 찾으세요.",
+    "options": [
+      {
+        "text": "$14$",
+        "isCorrect": false
+      },
+      {
+        "text": "$24$",
+        "isCorrect": true
+      },
+      {
+        "text": "$48$",
+        "isCorrect": false
+      },
+      {
+        "text": "$56$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_21_q7_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$\\frac{10}{x}$",
+    "question": "시속 $x km$의 속력으로 $10 km$의 거리를 이동할 때 걸리는 시간을 식으로 바르게 나타낸 것은 무엇입니까?",
+    "hint": "시간 ($t$)은 거리 ($d$)를 속력 ($s$)으로 나눈 값입니다.",
+    "options": [
+      {
+        "text": "$10x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{10}{x}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{x}{10}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10 + x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_21_q8_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$\\frac{x}{3} + \\frac{y}{4}$",
+    "question": "집에서 학교까지 시속 $3 km$로 $x km$를 가고, 학교에서 도서관까지 시속 $4 km$로 $y km$를 갔습니다. 전체 이동 시간을 나타낸 식은?",
+    "hint": "각 구간에서 걸린 시간을 각각 구한 뒤 서로 더해 보세요.",
+    "options": [
+      {
+        "text": "$3x + 4y$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{x}{3} + \\frac{y}{4}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{3}{x} + \\frac{4}{y}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x + y + 7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_21_q9_1773802779977",
+    "unitId": "unit_middle_math_eq_21",
+    "score": 1,
+    "answer": "$5 km$",
+    "question": "시속 $20 km$로 달리는 자전거가 $15$분 동안 이동한 거리는 몇 $km$입니까?",
+    "hint": "먼저 $15$분을 시간 단위인 $\\frac{15}{60} = \\frac{1}{4}$시간으로 바꾼 뒤 속력을 곱하세요.",
+    "options": [
+      {
+        "text": "$3 km$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5 km$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10 km$",
+        "isCorrect": false
+      },
+      {
+        "text": "$300 km$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

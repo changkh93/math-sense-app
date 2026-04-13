@@ -1,0 +1,1352 @@
+[
+  {
+    "id": "chap_1773926956828_geo1_06_q10_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "모든 명제는 별도의 증명 과정 없이 항상 '정리'가 된다.",
+    "question": "유클리드 기하학의 구성 요소에 대한 설명 중 옳지 않은 것은 무엇입니까?",
+    "hint": "명제가 정리가 되기 위해서는 반드시 거쳐야 하는 논리적 과정이 있습니다.",
+    "options": [
+      {
+        "text": "점, 선, 면은 기하학의 가장 기본적인 요소이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "공준은 너무나 당연하여 증명할 필요가 없는 규칙이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "공리와 공준은 모두 증명 없이 참으로 받아들인다.",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 명제는 별도의 증명 과정 없이 항상 '정리'가 된다.",
+        "isCorrect": true
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q1_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "정의",
+    "question": "수학에서 용어의 정확한 뜻을 정하여 누구나 똑같이 이해할 수 있도록 정한 '약속'을 무엇이라 합니까?",
+    "hint": "삼각형이나 점, 선, 면의 의미를 명확히 하는 '이름표'와 같습니다.",
+    "options": [
+      {
+        "text": "정의",
+        "isCorrect": true
+      },
+      {
+        "text": "공리",
+        "isCorrect": false
+      },
+      {
+        "text": "공준",
+        "isCorrect": false
+      },
+      {
+        "text": "증명",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q2_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "제$1$공준",
+    "question": "유클리드 기하학에서 '임의의 점 $2$개가 있다면, 그 두 점을 연결하는 직선을 딱 $1$개 그을 수 있다'는 규칙은 무엇에 해당합니까?",
+    "hint": "기하학에서 가장 먼저 언급되는 선긋기에 관한 규칙입니다.",
+    "options": [
+      {
+        "text": "제$1$공준",
+        "isCorrect": true
+      },
+      {
+        "text": "제$3$공준",
+        "isCorrect": false
+      },
+      {
+        "text": "제$1$공리",
+        "isCorrect": false
+      },
+      {
+        "text": "제$5$공리",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q3_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "제$3$공준",
+    "question": "기하학적 도구 중 '컴퍼스'의 역할을 이론적으로 뒷받침하며, 임의의 점과 거리를 이용해 도형을 그릴 수 있게 하는 규칙은?",
+    "hint": "원을 그리는 행위와 관련된 약속입니다.",
+    "options": [
+      {
+        "text": "제$2$공준",
+        "isCorrect": false
+      },
+      {
+        "text": "제$3$공준",
+        "isCorrect": true
+      },
+      {
+        "text": "제$4$공준",
+        "isCorrect": false
+      },
+      {
+        "text": "제$5$공준",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q4_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "$180^{\\circ}$",
+    "question": "제$5$공준(평행선 공준)에 따르면, 한 직선이 두 직선과 만날 때 어느 한쪽 안쪽 각의 합이 몇 도($^{\\circ}$)보다 작으면 그 방향에서 두 직선이 만나게 됩니까?",
+    "hint": "두 직각의 합과 관련된 기준 숫자를 생각해보세요.",
+    "options": [
+      {
+        "text": "$90^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$180^{\\circ}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$270^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$360^{\\circ}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q5_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "수학의 모든 분야와 일반적인 논리에서 통용되는 상식이다.",
+    "question": "다음 중 '공리(Axiom)'에 대한 설명으로 가장 적절한 것은 무엇입니까?",
+    "hint": "공준은 기하학 전용이지만, 공리는 더 보편적인 규칙입니다.",
+    "options": [
+      {
+        "text": "기하학적 도형 문제에서만 사용되는 특별한 약속이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "수학의 모든 분야와 일반적인 논리에서 통용되는 상식이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "반드시 증명을 거쳐야만 참으로 인정받을 수 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "용어의 뜻을 정하는 이름표 역할을 한다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q6_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "똑같은 것끼리는 서로 같다.",
+    "question": "공리 중에서 '$A=C$ 이고 $B=C$ 이면, $A=B$ 이다'라는 규칙이 의미하는 바는 무엇입니까?",
+    "hint": "매개체인 $C$를 통해 $A$와 $B$의 관계를 설명하고 있습니다.",
+    "options": [
+      {
+        "text": "전체는 부분보다 크다.",
+        "isCorrect": false
+      },
+      {
+        "text": "양변에 같은 수를 더해도 결과는 같다.",
+        "isCorrect": false
+      },
+      {
+        "text": "똑같은 것끼리는 서로 같다.",
+        "isCorrect": true
+      },
+      {
+        "text": "서로 포개어지는 것은 일치한다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q7_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "제$2$공준: 유한한 직선은 얼마든지 길게 연장할 수 있다.",
+    "question": "다음 중 성격이 다른 하나는 무엇입니까? (힌트: 공리와 공준의 구분)",
+    "hint": "기하학(도형)에만 국한된 규칙인지, 일반적인 수치 관계인지 확인하세요.",
+    "options": [
+      {
+        "text": "제$4$공리: 서로 완전히 포개어지는 것은 서로 같다.",
+        "isCorrect": false
+      },
+      {
+        "text": "제$5$공리: 전체는 부분보다 크다.",
+        "isCorrect": false
+      },
+      {
+        "text": "제$2$공준: 유한한 직선은 얼마든지 길게 연장할 수 있다.",
+        "isCorrect": true
+      },
+      {
+        "text": "제$1$공리: $A=C, B=C$ 이면 $A=B$ 이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q8_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "증명",
+    "question": "정의, 공리, 공준을 논리적으로 조립하여 어떤 문장이 참인지 거짓인지 밝혀내는 과정을 무엇이라 합니까?",
+    "hint": "수학에서 \"왜?\"라는 질문에 답을 찾아가는 추론 과정입니다.",
+    "options": [
+      {
+        "text": "명제",
+        "isCorrect": false
+      },
+      {
+        "text": "정리",
+        "isCorrect": false
+      },
+      {
+        "text": "증명",
+        "isCorrect": true
+      },
+      {
+        "text": "약속",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "chap_1773926956828_geo1_06_q9_1774681930654",
+    "unitId": "chap_1773926956828_geo1_06",
+    "score": 1,
+    "answer": "정리",
+    "question": "참과 거짓을 판별할 수 있는 문장을 '명제'라고 합니다. 그렇다면 증명을 통해 참임이 밝혀진 명제는 무엇이 됩니까?",
+    "hint": "논리의 꽃이라 불리며, 증명된 사실을 바탕으로 확립된 개념입니다.",
+    "options": [
+      {
+        "text": "정의",
+        "isCorrect": false
+      },
+      {
+        "text": "공리",
+        "isCorrect": false
+      },
+      {
+        "text": "공준",
+        "isCorrect": false
+      },
+      {
+        "text": "정리",
+        "isCorrect": true
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q10_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "직선, 선분",
+    "question": "다음 중 방향이 바뀌어도 의미가 변하지 않아 기호의 순서를 서로 바꿀 수 있는 것끼리 짝지어진 것은?",
+    "hint": "반직선은 시작점이 중요하기 때문에 순서를 바꾸면 전혀 다른 선이 됩니다.",
+    "options": [
+      {
+        "text": "직선, 선분",
+        "isCorrect": true
+      },
+      {
+        "text": "직선, 반직선",
+        "isCorrect": false
+      },
+      {
+        "text": "선분, 반직선",
+        "isCorrect": false
+      },
+      {
+        "text": "반직선, 맞꼭지각",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q1_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "$\\overleftrightarrow{AB}$",
+    "question": "다음 중 점 $A$와 $B$를 지나며 양쪽으로 끝없이 길게 늘어지는 '직선'을 나타내는 올바른 기호는 무엇입니까?",
+    "hint": "직선은 양방향으로 무한히 뻗어 나가는 선을 의미하며 기호 양쪽에 화살표가 있습니다.",
+    "options": [
+      {
+        "text": "$\\overleftrightarrow{AB}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\overline{AB}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\vec{AB}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\triangle AB$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q2_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "점 $A$에서 시작하여 점 $B$ 방향으로 뻗어 나간다.",
+    "question": "반직선 $\\vec{AB}$에 대한 설명으로 옳은 것을 고르세요.",
+    "hint": "반직선 기호에서 왼쪽에 써진 문자가 시작점, 오른쪽에 써진 문자가 방향을 나타냅니다.",
+    "options": [
+      {
+        "text": "점 $B$에서 시작하여 점 $A$ 방향으로 뻗어 나간다.",
+        "isCorrect": false
+      },
+      {
+        "text": "점 $A$에서 시작하여 점 $B$ 방향으로 뻗어 나간다.",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\vec{AB}$와 $\\vec{BA}$는 항상 같은 도형이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "양쪽 끝이 막혀 있어 길이를 잴 수 있다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q3_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "$l \\parallel m$",
+    "question": "두 직선 $l$과 $m$이 아무리 길게 늘려도 절대 만나지 않을 때, 이를 나타내는 수학적 기호는 무엇입니까?",
+    "hint": "철길처럼 평행한 상태를 나타내는 기호를 찾아보세요.",
+    "options": [
+      {
+        "text": "$l \\perp m$",
+        "isCorrect": false
+      },
+      {
+        "text": "$l \\parallel m$",
+        "isCorrect": true
+      },
+      {
+        "text": "$l = m$",
+        "isCorrect": false
+      },
+      {
+        "text": "$l \\triangle m$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q4_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "변 $a$",
+    "question": "삼각형 $\\triangle ABC$에서 각 $A$($\\angle A$)와 마주 보고 있는 변(대변)의 이름을 지을 때 가장 적절한 표기법은?",
+    "hint": "수학에서는 각의 이름을 나타내는 대문자에 대응하여 마주 보는 변을 소문자로 표기하는 관례가 있습니다.",
+    "options": [
+      {
+        "text": "변 $A$",
+        "isCorrect": false
+      },
+      {
+        "text": "변 $a$",
+        "isCorrect": true
+      },
+      {
+        "text": "변 $\\alpha$",
+        "isCorrect": false
+      },
+      {
+        "text": "변 $BC$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q5_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "수직(직교)",
+    "question": "두 직선이 만나서 이루는 각이 $90^{\\circ}$일 때, 두 직선의 관계를 무엇이라고 합니까?",
+    "hint": "두 선이 직각으로 만나는 상태를 의미하는 단어를 선택하세요.",
+    "options": [
+      {
+        "text": "평행",
+        "isCorrect": false
+      },
+      {
+        "text": "수직(직교)",
+        "isCorrect": true
+      },
+      {
+        "text": "일치",
+        "isCorrect": false
+      },
+      {
+        "text": "맞꼭지각",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q6_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "선분",
+    "question": "다음 중 시작점과 끝점이 정해져 있어 길이를 측정할 수 있는 선의 종류는?",
+    "hint": "일상생활에서 말하는 '선'으로, 점 $A$에서 점 $B$까지 딱 끊어진 선을 말합니다.",
+    "options": [
+      {
+        "text": "직선",
+        "isCorrect": false
+      },
+      {
+        "text": "반직선",
+        "isCorrect": false
+      },
+      {
+        "text": "선분",
+        "isCorrect": true
+      },
+      {
+        "text": "곡선",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q7_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "두 각의 크기는 항상 서로 같다.",
+    "question": "두 직선이 교차할 때 서로 마주 보고 있는 '맞꼭지각'의 성질에 대한 설명으로 옳은 것은?",
+    "hint": "두 직선이 만날 때 생기는 마주 보는 각들 사이의 크기 관계를 떠올려 보세요.",
+    "options": [
+      {
+        "text": "두 각의 합은 항상 $90^{\\circ}$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "두 각의 합은 항상 $180^{\\circ}$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "두 각의 크기는 항상 서로 같다.",
+        "isCorrect": true
+      },
+      {
+        "text": "두 각은 항상 예각이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q8_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "$180^{\\circ}$",
+    "question": "일직선을 이루는 '평각'의 크기는 몇 도($^{\\circ}$)입니까?",
+    "hint": "각도기의 한쪽 끝에서 반대쪽 끝까지의 전체 각도를 생각해보세요.",
+    "options": [
+      {
+        "text": "$90^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$180^{\\circ}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$270^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$360^{\\circ}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "chap_1773926956828_geo1_07_q9_1774682126233",
+    "unitId": "chap_1773926956828_geo1_07",
+    "score": 1,
+    "answer": "점은 대문자($A, B$), 직선은 소문자($l, m$)",
+    "question": "기하학의 표기 관례에 따라 점과 직선을 이름을 붙일 때 주로 사용하는 방식은?",
+    "hint": "점은 주로 대문자 알파벳을, 직선 자체를 부를 때는 소문자 알파벳을 주로 사용합니다.",
+    "options": [
+      {
+        "text": "점은 대문자($A, B$), 직선은 소문자($l, m$)",
+        "isCorrect": true
+      },
+      {
+        "text": "점은 소문자($a, b$), 직선은 대문자($L, M$)",
+        "isCorrect": false
+      },
+      {
+        "text": "점과 직선 모두 대문자로 쓴다.",
+        "isCorrect": false
+      },
+      {
+        "text": "점과 직선 모두 소문자로 쓴다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q10_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "수학이 눈짐작이 아닌 철저한 논리 체계임을 보여주기 위해서",
+    "question": "유클리드가 정의, 공준, 공리를 통해 수학 체계를 세운 궁극적인 목적은 무엇입니까?",
+    "hint": "수학의 시작인 '약속'부터 '논리적 전개'까지의 전체적인 흐름을 생각해보세요.",
+    "options": [
+      {
+        "text": "복잡한 계산 문제를 빨리 풀기 위해서",
+        "isCorrect": false
+      },
+      {
+        "text": "수학이 눈짐작이 아닌 철저한 논리 체계임을 보여주기 위해서",
+        "isCorrect": true
+      },
+      {
+        "text": "실생활에서 각도를 정확히 재기 위해서",
+        "isCorrect": false
+      },
+      {
+        "text": "새로운 기하학적 도형을 많이 만들어내기 위해서",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q1_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "한 직선이 다른 직선과 만날 때 생기는 두 이웃한 각의 크기가 서로 같을 때의 각",
+    "question": "'직각'의 수학적 정의로 가장 올바른 것은 무엇입니까?",
+    "hint": "자료에서는 직각을 단순히 숫자로 정의하지 않고, 두 이웃한 각($인접각$)의 관계를 통해 정의하고 있습니다.",
+    "options": [
+      {
+        "text": "각도기로 측정했을 때 $90^\\circ$가 되는 각",
+        "isCorrect": false
+      },
+      {
+        "text": "한 직선이 다른 직선과 만날 때 생기는 두 이웃한 각의 크기가 서로 같을 때의 각",
+        "isCorrect": true
+      },
+      {
+        "text": "직사각형이나 정사각형에서 볼 수 있는 네 개의 각",
+        "isCorrect": false
+      },
+      {
+        "text": "두 직선이 서로 수직으로 교차하여 만들어지는 모든 각",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q2_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "정의($Definition$)",
+    "question": "수학의 기초가 되는 세 가지 요소 중, 용어의 뜻을 명확하게 정하여 '이름표'를 붙이는 것과 같은 약속을 무엇이라 합니까?",
+    "hint": "이것은 대상이 무엇인지 그 정체를 밝히는 첫 번째 단계의 약속입니다.",
+    "options": [
+      {
+        "text": "정의($Definition$)",
+        "isCorrect": true
+      },
+      {
+        "text": "공준($Postulate$)",
+        "isCorrect": false
+      },
+      {
+        "text": "공리($Common\\ Notion$)",
+        "isCorrect": false
+      },
+      {
+        "text": "정리($Theorem$)",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q3_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "제$4$공준",
+    "question": "유클리드가 제시한 $5$가지 공준 중, \"모든 직각은 서로 같다\"라고 명시한 것은 제 몇 공준입니까?",
+    "hint": "자료의 단계별 개념 학습 중 기하학만의 특별한 규칙을 다루는 부분에서 확인할 수 있습니다.",
+    "options": [
+      {
+        "text": "제$1$공준",
+        "isCorrect": false
+      },
+      {
+        "text": "제$2$공준",
+        "isCorrect": false
+      },
+      {
+        "text": "제$3$공준",
+        "isCorrect": false
+      },
+      {
+        "text": "제$4$공준",
+        "isCorrect": true
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q4_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "모든 학문과 일상 논리에서 통용되는 일반적인 진리이다.",
+    "question": "다음 중 '공리($Common\\ Notion$)'에 대한 설명으로 가장 적절한 것은 무엇입니까?",
+    "hint": "공리는 기하학뿐만 아니라 범용적으로 사용되는 상식적인 논리의 기본입니다.",
+    "options": [
+      {
+        "text": "기하학 영역에서만 통용되는 특별한 약속이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "대상의 정체를 밝히기 위해 용어의 뜻을 정한 것이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 학문과 일상 논리에서 통용되는 일반적인 진리이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "실험과 관찰을 통해 증명해야만 믿을 수 있는 사실이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q5_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "공통 개념($공리$)",
+    "question": "\"서로 완전히 포개어지는 것들은 서로 같다\"라는 논리는 어디에 해당합니까?",
+    "hint": "일치하는 것은 같다는 원리는 기하학을 포함한 모든 논리의 기초가 되는 공통적인 개념입니다.",
+    "options": [
+      {
+        "text": "직각의 정의",
+        "isCorrect": false
+      },
+      {
+        "text": "유클리드 제$4$공준",
+        "isCorrect": false
+      },
+      {
+        "text": "공통 개념($공리$)",
+        "isCorrect": true
+      },
+      {
+        "text": "수학적 증명",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q6_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "정의는 대상의 정체를 밝히는 약속이고, 공준은 대상의 성질이나 관계를 인정하는 약속이다.",
+    "question": "정의($Definition$)와 공준($Postulate$)의 차이점에 대한 설명으로 옳은 것을 고르세요.",
+    "hint": "정의는 \"무엇인가?\"에 대한 답이고, 공준은 \"어떠한 성질을 당연히 가지는가?\"에 대한 답입니다.",
+    "options": [
+      {
+        "text": "정의는 성질을 다루고, 공준은 용어의 뜻을 다룬다.",
+        "isCorrect": false
+      },
+      {
+        "text": "정의는 대상의 정체를 밝히는 약속이고, 공준은 대상의 성질이나 관계를 인정하는 약속이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "정의는 기하학에서만 쓰이고, 공준은 모든 학문에서 쓰인다.",
+        "isCorrect": false
+      },
+      {
+        "text": "두 개념은 이름만 다를 뿐 수학적으로 완전히 동일한 의미를 갖는다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q7_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "유클리드 제$4$공준",
+    "question": "서로 다른 위치나 방향에 있는 두 직각 $HG$와 $DC$가 크기가 같음을 논리적으로 확정 짓기 위해 반드시 필요한 유클리드의 약속은 무엇입니까?",
+    "hint": "위치가 달라도 모든 직각이 같다는 것을 보장해주는 기하학적 전용 약속을 찾아보세요.",
+    "options": [
+      {
+        "text": "삼각형의 합동 조건",
+        "isCorrect": false
+      },
+      {
+        "text": "유클리드 제$4$공준",
+        "isCorrect": true
+      },
+      {
+        "text": "평행선의 성질",
+        "isCorrect": false
+      },
+      {
+        "text": "원의 정의",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q8_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "모든 학문 영역",
+    "question": "자료의 [정리용 표]에 근거할 때, 공리($Common\\ Notion$)의 적용 범위로 옳은 것은?",
+    "hint": "공리는 일반적인 논리적 자명성을 가지므로 적용 범위가 가장 넓습니다.",
+    "options": [
+      {
+        "text": "해당 용어에만 국한됨",
+        "isCorrect": false
+      },
+      {
+        "text": "기하학 영역에만 국한됨",
+        "isCorrect": false
+      },
+      {
+        "text": "모든 학문 영역",
+        "isCorrect": true
+      },
+      {
+        "text": "중등 수학 과정",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "chap_1773926956828_geo1_08_q9_1774682215505",
+    "unitId": "chap_1773926956828_geo1_08",
+    "score": 1,
+    "answer": "정의($Definition$)",
+    "question": "$\\angle CAM$이 점점 커져서 $\\angle BAM$과 같아지는 순간의 각을 '직각'이라고 부르는 과정은 다음 중 무엇에 해당합니까?",
+    "hint": "특정한 조건을 만족할 때 이름을 붙이는 과정이므로 용어의 뜻을 정하는 단계입니다.",
+    "options": [
+      {
+        "text": "정의($Definition$)",
+        "isCorrect": true
+      },
+      {
+        "text": "공준($Postulate$)",
+        "isCorrect": false
+      },
+      {
+        "text": "공리($Common\\ Notion$)",
+        "isCorrect": false
+      },
+      {
+        "text": "증명($Proof$)",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q10_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "$\\overline{AB} = \\overline{AD} = \\overline{BD}$",
+    "question": "작도를 통해 선분 $AB$를 한 변으로 하는 정삼각형 $ABD$를 완성했을 때, 세 변의 관계를 옳게 나타낸 것은 무엇입니까?",
+    "hint": "정삼각형은 모든 변의 길이가 똑같은 삼각형입니다.",
+    "options": [
+      {
+        "text": "$\\overline{AB} = \\overline{AD} = \\overline{BD}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\overline{AB} > \\overline{AD} > \\overline{BD}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\overline{AB} + \\overline{AD} = \\overline{BD}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\overline{AB} = \\overline{AD} \\neq \\overline{BD}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q1_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "$180^{\\circ}$",
+    "question": "수학에서 직선이 이루는 각도인 '평각'의 크기는 몇 $degree$입니까?",
+    "hint": "평평한 직선이 이루는 전체 각도를 생각해보세요.",
+    "options": [
+      {
+        "text": "$45^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$90^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$180^{\\circ}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$360^{\\circ}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q2_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "$90^{\\circ}$",
+    "question": "평각을 정확히 반으로 나누었을 때 생기는 각인 '직각'의 크기는 얼마입니까?",
+    "hint": "$180^{\\circ}$를 $2$로 나누면 결과가 나옵니다.",
+    "options": [
+      {
+        "text": "$60^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$90^{\\circ}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$120^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$180^{\\circ}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q3_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "$65^{\\circ}$",
+    "question": "직각($90^{\\circ}$) 안에서 한쪽 각의 크기가 $25^{\\circ}$일 때, 나머지 한쪽 각의 크기는 얼마입니까?",
+    "hint": "전체인 $90^{\\circ}$에서 알고 있는 각 $25^{\\circ}$를 빼보세요.",
+    "options": [
+      {
+        "text": "$55^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$65^{\\circ}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$75^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$155^{\\circ}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q4_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "$125^{\\circ}$",
+    "question": "직선 위에서 한쪽 각의 크기가 $55^{\\circ}$라면, 그 반대편에 인접한 각의 크기는 몇 $degree$입니까?",
+    "hint": "직선은 평각이므로 합이 $180^{\\circ}$가 되어야 합니다.",
+    "options": [
+      {
+        "text": "$35^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$45^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$125^{\\circ}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$135^{\\circ}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q5_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "컴퍼스",
+    "question": "작도에서 '눈금 없는 자'와 함께 사용하며, 원을 그리거나 길이를 옮기는 데 필수적인 도구는 무엇입니까?",
+    "hint": "한 원에서 반지름의 길이가 모두 같다는 성질을 활용하는 도구입니다.",
+    "options": [
+      {
+        "text": "각도기",
+        "isCorrect": false
+      },
+      {
+        "text": "컴퍼스",
+        "isCorrect": true
+      },
+      {
+        "text": "삼각자",
+        "isCorrect": false
+      },
+      {
+        "text": "계산기",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q6_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "한 원의 반지름 길이는 모두 같다.",
+    "question": "정삼각형 작도의 핵심이 되는 컴퍼스의 성질로 가장 적절한 것은 무엇입니까?",
+    "hint": "원 위의 모든 점은 중심으로부터 같은 거리에 있다는 점을 이용합니다.",
+    "options": [
+      {
+        "text": "컴퍼스로는 직선을 그릴 수 있다.",
+        "isCorrect": false
+      },
+      {
+        "text": "한 원의 반지름 길이는 모두 같다.",
+        "isCorrect": true
+      },
+      {
+        "text": "컴퍼스의 중심은 항상 변하지 않는다.",
+        "isCorrect": false
+      },
+      {
+        "text": "원의 둘레는 반지름의 $2$배이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q7_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "선분 $AB$의 길이",
+    "question": "선분 $AB$를 한 변으로 하는 정삼각형을 작도할 때, 점 $A$와 점 $B$를 각각 중심으로 하여 그리는 원의 반지름 길이는 무엇으로 설정해야 합니까?",
+    "hint": "세 변의 길이가 모두 같아야 하므로 기준이 되는 변의 길이를 반지름으로 사용합니다.",
+    "options": [
+      {
+        "text": "$\\frac{1}{2} \\times \\text{선분 } AB$의 길이",
+        "isCorrect": false
+      },
+      {
+        "text": "선분 $AB$의 길이",
+        "isCorrect": true
+      },
+      {
+        "text": "$2 \\times \\text{선분 } AB$의 길이",
+        "isCorrect": false
+      },
+      {
+        "text": "사용자가 원하는 임의의 길이",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q8_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "매개체 원리",
+    "question": "정삼각형 작도 원리 중 '$A=C$이고 $B=C$이면 $A=B$이다'라는 논리를 무엇이라고 부릅니까?",
+    "hint": "두 대상이 같은 매개체와 같으면 서로 같아진다는 논리입니다.",
+    "options": [
+      {
+        "text": "평각의 원리",
+        "isCorrect": false
+      },
+      {
+        "text": "직각의 원리",
+        "isCorrect": false
+      },
+      {
+        "text": "매개체 원리",
+        "isCorrect": true
+      },
+      {
+        "text": "반지름의 원리",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "chap_1773926956828_geo1_09_q9_1774682336632",
+    "unitId": "chap_1773926956828_geo1_09",
+    "score": 1,
+    "answer": "문제에서 직각 표시('ㄱ')나 $90^{\\circ}$라는 명시가 있을 때",
+    "question": "도형 문제를 풀 때 '직각'으로 판단하고 계산할 수 있는 가장 정확한 근거는 무엇입니까?",
+    "hint": "시각적인 추측보다는 문제에 주어진 기호나 수치를 믿어야 합니다.",
+    "options": [
+      {
+        "text": "눈으로 보기에 정확히 수직인 것 같을 때",
+        "isCorrect": false
+      },
+      {
+        "text": "주변의 다른 각들이 예각일 때",
+        "isCorrect": false
+      },
+      {
+        "text": "문제에서 직각 표시('ㄱ')나 $90^{\\circ}$라는 명시가 있을 때",
+        "isCorrect": true
+      },
+      {
+        "text": "직선처럼 보일 때",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q10_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "정리($Theorem$)",
+    "question": "논리적으로 밝혀낸 새로운 성질로서 문제 풀이의 도구(열매)가 되는 것을 무엇이라고 하나요?",
+    "hint": "증명을 통해 참임이 밝혀진 성질을 의미합니다.",
+    "options": [
+      {
+        "text": "공리",
+        "isCorrect": false
+      },
+      {
+        "text": "정의",
+        "isCorrect": false
+      },
+      {
+        "text": "정리($Theorem$)",
+        "isCorrect": true
+      },
+      {
+        "text": "가설",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q1_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "논리적으로 생각하는 힘",
+    "question": "수학의 뿌리가 철학에 있다고 하는 이유는 수학이 인간이 가진 어떤 능력을 가장 완벽하게 보여주기 때문인가요?",
+    "hint": "수학은 단순한 계산보다 '왜?'라는 질문에 답하는 과정을 중요하게 여깁니다.",
+    "options": [
+      {
+        "text": "빠른 계산 능력",
+        "isCorrect": false
+      },
+      {
+        "text": "방대한 공식 암기력",
+        "isCorrect": false
+      },
+      {
+        "text": "논리적으로 생각하는 힘",
+        "isCorrect": true
+      },
+      {
+        "text": "도형을 그리는 예술적 감각",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q2_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "소크라테스는 죽는다.",
+    "question": "삼단논법의 원리에 따라 '모든 인간은 죽는다'라는 전제와 '소크라테스는 인간이다'라는 사실을 결합했을 때 얻을 수 있는 결론은 무엇인가요?",
+    "hint": "큰 전제와 개별 사실을 논리적으로 연결해 보세요.",
+    "options": [
+      {
+        "text": "소크라테스는 철학자이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "소크라테스는 죽는다.",
+        "isCorrect": true
+      },
+      {
+        "text": "모든 인간은 소크라테스이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "수학은 논리의 기초이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q3_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "공리($Axiom$)",
+    "question": "수학에서 '증명하지 않아도 당연히 참으로 받아들이는 가장 기초적인 약속'을 무엇이라고 부르나요?",
+    "hint": "논리의 시작점이 되는 '뿌리'와 같은 역할을 하는 용어를 찾아보세요.",
+    "options": [
+      {
+        "text": "공리($Axiom$)",
+        "isCorrect": true
+      },
+      {
+        "text": "정의($Definition$)",
+        "isCorrect": false
+      },
+      {
+        "text": "정리($Theorem$)",
+        "isCorrect": false
+      },
+      {
+        "text": "명제($Proposition$)",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q4_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "두 점을 잇는 직선은 단 하나뿐이다.",
+    "question": "다음 중 '공리'의 예시로 가장 적절한 문장은 무엇인가요?",
+    "hint": "별도의 증명 없이도 누구나 당연하게 인정하는 기초적인 약속을 고르세요.",
+    "options": [
+      {
+        "text": "맞꼭지각의 크기는 서로 같다.",
+        "isCorrect": false
+      },
+      {
+        "text": "두 점을 잇는 직선은 단 하나뿐이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "삼각형 세 내각의 합은 $180^{\\circ}$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "정사각형의 네 변의 길이는 모두 같다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q5_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "증명($Proof$)",
+    "question": "공리나 이미 알려진 성질을 근거로 어떤 명제가 참임을 논리적으로 밝히는 과정을 무엇이라고 하나요?",
+    "hint": "수학의 핵심이며 '왜?'라는 질문에 논리적으로 답하는 단계별 과정입니다.",
+    "options": [
+      {
+        "text": "암기",
+        "isCorrect": false
+      },
+      {
+        "text": "계산",
+        "isCorrect": false
+      },
+      {
+        "text": "증명($Proof$)",
+        "isCorrect": true
+      },
+      {
+        "text": "시각화",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q6_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "평각은 $180^{\\circ}$이다.",
+    "question": "맞꼭지각의 성질을 증명할 때, 가장 핵심적으로 활용되는 개념은 무엇인가요?",
+    "hint": "평평한 직선 위의 각도를 활용하여 수식을 세웁니다.",
+    "options": [
+      {
+        "text": "직각은 $90^{\\circ}$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "평각은 $180^{\\circ}$이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "원 한 바퀴는 $360^{\\circ}$이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "삼각형의 외각은 $120^{\\circ}$이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q7_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "$180^{\\circ}$",
+    "question": "그림에서 두 직선이 교차할 때, 서로 이웃한 두 각 $a$와 $b$의 합($a+b$)은 몇 도인가요?",
+    "hint": "두 각이 합쳐져서 하나의 직선(평각)을 이루는 경우를 생각하세요.",
+    "options": [
+      {
+        "text": "$90^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$180^{\\circ}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$270^{\\circ}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$360^{\\circ}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q8_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "정의",
+    "question": "수학 용어 중 '용어에 대한 명확한 약속'을 의미하며 의사소통의 기준(줄기)이 되는 것은 무엇인가요?",
+    "hint": "정리용 표에서 '줄기' 역할을 하는 항목을 확인해 보세요.",
+    "options": [
+      {
+        "text": "공리",
+        "isCorrect": false
+      },
+      {
+        "text": "정의",
+        "isCorrect": true
+      },
+      {
+        "text": "정리",
+        "isCorrect": false
+      },
+      {
+        "text": "증명",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "chap_1773926956828_geo1_10_q9_1774682401813",
+    "unitId": "chap_1773926956828_geo1_10",
+    "score": 1,
+    "answer": "수학은 반드시 논리적인 근거가 필요하기 때문에",
+    "question": "수학 문제를 풀 때 '눈으로 보기에 같아 보인다'라고 판단해서는 안 되는 이유는 무엇인가요?",
+    "hint": "수학에서는 '당연해 보이는 사실'도 명확한 근거를 바탕으로 밝혀내야 합니다.",
+    "options": [
+      {
+        "text": "눈의 착시 현상이 심하기 때문에",
+        "isCorrect": false
+      },
+      {
+        "text": "수학은 반드시 논리적인 근거가 필요하기 때문에",
+        "isCorrect": true
+      },
+      {
+        "text": "도형을 그릴 때마다 각도가 달라지기 때문에",
+        "isCorrect": false
+      },
+      {
+        "text": "수식으로만 답을 적어야 점수를 받기 때문에",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]

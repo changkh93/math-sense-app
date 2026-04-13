@@ -1,0 +1,1362 @@
+[
+  {
+    "id": "unit_middle_math_eq_12_q10_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$x + 5$",
+    "question": "$A = x + 1, B = x - 1$일 때, $3A - 2B$를 계산한 결과는?",
+    "hint": "$3(x + 1) - 2(x - 1)$의 괄호를 풀 때 두 번째 괄호 앞의 $-2$ 분배에 주의하세요.",
+    "options": [
+      {
+        "text": "$x + 5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x + 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5x + 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5x + 5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_12_q1_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "괄호 $()$",
+    "question": "다항식을 다른 문자에 대입할 때, 식이 하나의 '덩어리'로 취급되도록 반드시 사용해야 하는 부호는 무엇입니까?",
+    "hint": "PDF의 [핵심 요약]과 [실수 방지 Note]에서 '생명줄'이라고 강조된 것을 떠올려 보세요.",
+    "options": [
+      {
+        "text": "괄호 $()$",
+        "isCorrect": true
+      },
+      {
+        "text": "절댓값 $| |$",
+        "isCorrect": false
+      },
+      {
+        "text": "부등호 $ < $",
+        "isCorrect": false
+      },
+      {
+        "text": "등호 $=$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_12_q2_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$2(x + 3)$",
+    "question": "$A = x + 3$일 때, $2A$를 $x$에 관한 식으로 나타내기 위해 바르게 대입한 형태는?",
+    "hint": "대입할 때는 원래 있던 숫자 $2$가 식 전체에 곱해질 수 있도록 식을 통째로 감싸야 합니다.",
+    "options": [
+      {
+        "text": "$2x + 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2(x + 3)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2 + x + 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x + (3)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_12_q3_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$-6x + 12$",
+    "question": "$-3(2x - 4)$를 분배법칙을 사용하여 괄호를 풀었을 때, 올바른 결과는 무엇입니까?",
+    "hint": "괄호 앞의 $-3$을 괄호 안의 모든 항에 곱해야 하며, 음수와 음수의 곱은 양수가 됩니다.",
+    "options": [
+      {
+        "text": "$-6x - 12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-6x + 12$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6x - 12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6x + 12$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_12_q4_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$4x + 3$",
+    "question": "$A = 3x - 2, B = x + 5$일 때, 두 식의 합 $A + B$를 계산하여 동류항을 정리하면?",
+    "hint": "$x$는 $x$끼리, 숫자는 숫자끼리(동류항 정리) 계산해 보세요.",
+    "options": [
+      {
+        "text": "$4x + 3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4x - 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x + 7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x - 7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_12_q5_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$6x - 8$",
+    "question": "$A = 2x - 1$일 때, $3A - 5$를 $x$에 관한 식으로 나타낸 결과로 옳은 것은?",
+    "hint": "$3(2x - 1) - 5$를 먼저 쓴 뒤, 분배법칙을 사용하여 괄호를 풀어보세요.",
+    "options": [
+      {
+        "text": "$6x - 3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6x - 8$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6x - 6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6x + 2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_12_q6_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$(6x - 4x) + (-12 - 8)$",
+    "question": "PDF 자료의 예제에서 $6x - 12 - 4x - 8$을 계산할 때, 동류항끼리 바르게 모은 식은?",
+    "hint": "$x$항은 $x$항끼리, 상수항은 상수항끼리 부호를 포함하여 묶어줍니다.",
+    "options": [
+      {
+        "text": "$(6x - 4x) + (-12 - 8)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(6x + 4x) + (-12 + 8)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(6x - 4x) - (-12 - 8)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(6x - 12) - (4x - 8)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_12_q7_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$-7$",
+    "question": "$A = x - 2, B = 2x + 3$일 때, $2A - B$를 계산한 결과는?",
+    "hint": "$2(x - 2) - (2x + 3)$에서 빼기 기호가 $B$의 모든 항에 영향을 주는지 확인하세요.",
+    "options": [
+      {
+        "text": "$-7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x - 7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4x - 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_12_q8_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$-4x - 8$",
+    "question": "$-4(x + 2)$를 계산할 때, 뒤의 상수항을 $+2$로 그대로 두는 실수를 방지하고 올바르게 계산한 결과는?",
+    "hint": "$-4$가 $+2$와 만나면 부호가 어떻게 변하는지 주의하세요.",
+    "options": [
+      {
+        "text": "$-4x + 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4x - 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4x + 8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4x - 8$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_12_q9_1773802077456",
+    "unitId": "unit_middle_math_eq_12",
+    "score": 1,
+    "answer": "$3x$",
+    "question": "$A = 6x - 2$일 때, $\\frac{1}{2}A + 1$을 $x$에 관한 식으로 나타내면?",
+    "hint": "$\\frac{1}{2}(6x - 2) + 1$에서 분수 계수도 괄호 안의 모든 항에 골고루 곱해줍니다.",
+    "options": [
+      {
+        "text": "$3x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3x - 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x + 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x - 2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq_13_q10_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "$3x-1=5$",
+    "question": "다음 문장을 등식으로 바르게 나타낸 것은?\n[어떤 수 $x$의 $3$배에서 $1$을 뺀 값은 $5$와 같다.]",
+    "hint": "$x$의 $3$배는 $3x$로 표현하며, '~와 같다'는 등호($=$)를 사용합니다.",
+    "options": [
+      {
+        "text": "$3x+1=5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x-3=5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3(x-1)=5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x-1=5$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_13_q1_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "$2x=10$",
+    "question": "다음 중 등식인 것을 고르시오.",
+    "hint": "등식은 반드시 등호($=$)를 사용하여 두 식이 같음을 나타내야 합니다.",
+    "options": [
+      {
+        "text": "$3x+5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x-2 < 7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x=10$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5+2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_13_q2_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "좌변",
+    "question": "등식 $4x-3=5$에서 등호의 왼쪽 부분인 $4x-3$을 무엇이라 부릅니까?",
+    "hint": "등호를 중심으로 왼쪽은 좌측, 오른쪽은 우측을 의미하는 용어를 사용합니다.",
+    "options": [
+      {
+        "text": "우변",
+        "isCorrect": false
+      },
+      {
+        "text": "좌변",
+        "isCorrect": true
+      },
+      {
+        "text": "양변",
+        "isCorrect": false
+      },
+      {
+        "text": "미지수",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_13_q3_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "방정식",
+    "question": "미지수 $x$의 값에 따라 참이 되기도 하고 거짓이 되기도 하는 등식을 무엇이라 합니까?",
+    "hint": "특정한 답(해)을 가질 때만 참이 되는 식의 이름입니다.",
+    "options": [
+      {
+        "text": "항등식",
+        "isCorrect": false
+      },
+      {
+        "text": "부등식",
+        "isCorrect": false
+      },
+      {
+        "text": "방정식",
+        "isCorrect": true
+      },
+      {
+        "text": "다항식",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_13_q4_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "$x+x=2x$",
+    "question": "다음 중 $x$에 어떤 값을 대입해도 항상 참이 되는 '항등식'은 무엇입니까?",
+    "hint": "좌변과 우변을 정리했을 때 모양이 완전히 똑같은 식을 찾아보세요.",
+    "options": [
+      {
+        "text": "$x+1=3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x=4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x+x=2x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3x-1=5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_13_q5_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "어떤 $x$를 넣어도 항상 참인 항등식이다.",
+    "question": "등식 $2x+6 = 2(x+3)$에 대한 설명으로 옳은 것은?",
+    "hint": "우변의 괄호를 풀어서 $2(x+3)$이 $2x+6$과 같은지 확인해 보세요.",
+    "options": [
+      {
+        "text": "$x=3$일 때만 참인 방정식이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "등호가 없으므로 등식이 아니다.",
+        "isCorrect": false
+      },
+      {
+        "text": "어떤 $x$를 넣어도 항상 참인 항등식이다.",
+        "isCorrect": true
+      },
+      {
+        "text": "부등호를 사용한 부등식이다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_13_q6_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "$7$",
+    "question": "방정식 $x+5=12$가 참이 되게 하는 미지수 $x$의 값은 얼마입니까?",
+    "hint": "어떤 수에 $5$를 더해야 $12$가 되는지 생각해 보세요.",
+    "options": [
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$17$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_13_q7_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "$x+1 > 5$",
+    "question": "다음 중 등식이 '아닌' 것을 고르시오.",
+    "hint": "부등호($<, >$)가 있는 식은 등식이 아니라 부등식이라고 부릅니다.",
+    "options": [
+      {
+        "text": "$0 \\times x = 0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x+1 > 5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=0$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3+2=5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_13_q8_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "$5$",
+    "question": "등식 $ax+2 = 5x+2$가 $x$에 대한 항등식이 되기 위한 $a$의 값은?",
+    "hint": "항등식은 좌변과 우변의 모양이 '복사 붙여넣기'처럼 완벽히 똑같아야 합니다.",
+    "options": [
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_13_q9_1773802129711",
+    "unitId": "unit_middle_math_eq_13",
+    "score": 1,
+    "answer": "양변",
+    "question": "좌변과 우변을 통틀어 부르는 수학적 용어는 무엇입니까?",
+    "hint": "왼쪽과 오른쪽 양쪽 모두를 포함하는 말입니다.",
+    "options": [
+      {
+        "text": "밑변",
+        "isCorrect": false
+      },
+      {
+        "text": "양변",
+        "isCorrect": true
+      },
+      {
+        "text": "공통변",
+        "isCorrect": false
+      },
+      {
+        "text": "주변",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq_14_q10_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "$7$",
+    "question": "항등식 $ax + 2 = 5x + b$에서 $a + b$의 값은 얼마입니까?",
+    "hint": "$a$와 $b$의 값을 각각 구한 뒤 더해 보세요.",
+    "options": [
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_14_q1_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "문자에 어떤 값을 대입하여도 항상 참이 되는 등식",
+    "question": "다음 중 '항등식'의 정의로 가장 올바른 설명은 무엇입니까?",
+    "hint": "항등식의 '항(恒)'은 '항상'이라는 의미를 담고 있습니다.",
+    "options": [
+      {
+        "text": "특정한 $x$의 값에 대해서만 참이 되는 등식",
+        "isCorrect": false
+      },
+      {
+        "text": "문자에 어떤 값을 대입하여도 항상 참이 되는 등식",
+        "isCorrect": true
+      },
+      {
+        "text": "우변의 모든 항을 좌변으로 옮겼을 때 $0$이 되지 않는 식",
+        "isCorrect": false
+      },
+      {
+        "text": "미지수 $x$의 값을 구하는 것이 목적인 식",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_14_q2_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "$x + 2x = 3x$",
+    "question": "다음 중 $x$에 관한 항등식인 것을 고르세요.",
+    "hint": "좌변과 우변을 정리했을 때 모양이 완전히 똑같은 식을 찾아보세요.",
+    "options": [
+      {
+        "text": "$2x = 4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x + 3 = 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x + 2x = 3x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3x - 1 = x + 1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_14_q3_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "$a = c, b = d$",
+    "question": "$ax + b = cx + d$가 $x$에 관한 항등식이 되기 위한 조건으로 옳은 것은?",
+    "hint": "$x$ 앞의 계수는 계수끼리, 상수항은 상수항끼리 서로 같아야 합니다.",
+    "options": [
+      {
+        "text": "$a = b, c = d$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a = c, b = d$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a = d, b = c$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a + b = c + d$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_14_q4_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "특정한 $x$의 값에서만 참이 되는 등식",
+    "question": "다음 중 항등식을 나타내는 표현이 아닌 것은?",
+    "hint": "항등식은 '모든', '관계없이' 등의 표현과 친합니다.",
+    "options": [
+      {
+        "text": "모든 $x$의 값에 대하여 성립하는 등식",
+        "isCorrect": false
+      },
+      {
+        "text": "$x$의 값에 관계없이 항상 성립하는 등식",
+        "isCorrect": false
+      },
+      {
+        "text": "임의의 $x$의 값에 대하여 성립하는 등식",
+        "isCorrect": false
+      },
+      {
+        "text": "특정한 $x$의 값에서만 참이 되는 등식",
+        "isCorrect": true
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_14_q5_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "$b = 3$",
+    "question": "등식 $3x + 6a = bx - 10$이 $x$에 관한 항등식일 때, 상수 $b$의 값은?",
+    "hint": "좌변의 $x$항 계수와 우변의 $x$항 계수를 비교해 보세요.",
+    "options": [
+      {
+        "text": "$b = -10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$b = 6$",
+        "isCorrect": false
+      },
+      {
+        "text": "$b = 3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$b = -3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_14_q6_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "$a = -\\frac{5}{3}$",
+    "question": "등식 $3x + 6a = bx - 10$이 $x$에 관한 항등식일 때, 상수 $a$의 값은?",
+    "hint": "좌변의 상수항 $6a$와 우변의 상수항 $-10$이 같아야 합니다.",
+    "options": [
+      {
+        "text": "$a = -\\frac{5}{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a = \\frac{5}{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a = -10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a = 6$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_14_q7_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "항등식은 특정한 값에서만 참이 된다.",
+    "question": "방정식과 항등식의 차이점에 대한 설명으로 옳지 않은 것은?",
+    "hint": "어떤 값을 넣어도 평형을 유지하는 저울을 떠올려 보세요.",
+    "options": [
+      {
+        "text": "방정식은 해(미지수의 값)를 구하는 것이 목표이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "항등식은 좌변과 우변이 본질적으로 똑같은 식이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "항등식은 특정한 값에서만 참이 된다.",
+        "isCorrect": true
+      },
+      {
+        "text": "방정식은 좌변과 우변이 항상 같지는 않다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_14_q8_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "내림차순으로 예쁘게 정리한다.",
+    "question": "복잡하게 섞여 있는 식이 항등식인지 확인할 때, 실수를 줄이기 위해 가장 먼저 해야 할 일은?",
+    "hint": "$x$가 있는 항과 없는 항으로 나누어 정리하면 비교가 쉬워집니다.",
+    "options": [
+      {
+        "text": "양변에 $0$을 대입한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "내림차순으로 예쁘게 정리한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "상수항을 모두 우변으로 넘긴다.",
+        "isCorrect": false
+      },
+      {
+        "text": "미지수 $x$를 소거한다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_14_q9_1773802219527",
+    "unitId": "unit_middle_math_eq_14",
+    "score": 1,
+    "answer": "$a = 2$",
+    "question": "등식 $a(x - 1) = 2x - 2$가 $x$에 관한 항등식일 때, $a$의 값은?",
+    "hint": "좌변의 괄호를 풀어서 우변과 모양을 똑같이 맞춰보세요.",
+    "options": [
+      {
+        "text": "$a = 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a = 2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a = -1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a = 0$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq_15_q10_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "좌변에 미지수 $x$만 남기고 우변에 숫자만 남기는 것",
+    "options": [
+      {
+        "text": "모든 숫자를 좌변으로 옮기는 것",
+        "isCorrect": false
+      },
+      {
+        "text": "좌변에 미지수 $x$만 남기고 우변에 숫자만 남기는 것",
+        "isCorrect": true
+      },
+      {
+        "text": "등호($=$)를 제거하여 식을 단순하게 만드는 것",
+        "isCorrect": false
+      },
+      {
+        "text": "양변을 항상 $0$으로 나누어 식을 정리하는 것",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008,
+    "question": "등식의 성질을 이용하여 방정식을 푸는 궁극적인 목표는 무엇인가요?",
+    "docId": "unit_middle_math_eq_15_q10_1773802276679",
+    "hint": "미지수 $x$의 '홀로서기' 대작전이라는 말을 떠올려보세요."
+  },
+  {
+    "id": "unit_middle_math_eq_15_q1_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "$\\frac{a}{c}=\\frac{b}{c}$",
+    "order": 999,
+    "question": "등식 $a=b$가 성립할 때, 등식의 성질을 이용하여 항상 성립한다고 볼 수 없는 식은 무엇인가요?",
+    "docId": "unit_middle_math_eq_15_q1_1773802276679",
+    "hint": "0이 아닌 같은 수를 양변에 나눠야 등식이 성립합니다.",
+    "options": [
+      {
+        "isCorrect": false,
+        "text": "$a+3=b+3$"
+      },
+      {
+        "isCorrect": false,
+        "text": "$a-c=b-c$"
+      },
+      {
+        "isCorrect": false,
+        "text": "$ac=bc$"
+      },
+      {
+        "isCorrect": true,
+        "text": "$\\frac{a}{c}=\\frac{b}{d}$"
+      }
+    ]
+  },
+  {
+    "id": "unit_middle_math_eq_15_q2_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "$x-3=7$",
+    "options": [
+      {
+        "text": "$x+5=10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x-3=7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$2x=8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{x}{4}=2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000,
+    "question": "다음 중 등식의 양변에 같은 수를 더하는 성질($a=b$ 이면 $a+c=b+c$)을 이용하여 풀기에 가장 적절한 방정식은 무엇인가요?",
+    "docId": "unit_middle_math_eq_15_q2_1773802276679",
+    "hint": "좌변에 미지수 $x$만 남기기 위해 $-3$을 없앨 수 있는 덧셈 연산을 생각해보세요. "
+  },
+  {
+    "id": "unit_middle_math_eq_15_q3_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "등식의 양변에서 같은 수를 빼도 등식은 성립한다.",
+    "options": [
+      {
+        "text": "등식의 양변에 같은 수를 더해도 등식은 성립한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "등식의 양변에서 같은 수를 빼도 등식은 성립한다.",
+        "isCorrect": true
+      },
+      {
+        "text": "등식의 양변에 같은 수를 곱해도 등식은 성립한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "등식의 양변을 $0$이 아닌 같은 수로 나누어도 등식은 성립한다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001,
+    "question": "방정식 $2x+4=10$을 푸는 과정 중, 양변에서 $4$를 빼서 $2x=6$을 만드는 단계에서 사용된 등식의 성질은 무엇인가요? ",
+    "docId": "unit_middle_math_eq_15_q3_1773802276679",
+    "hint": "수식 $2x+4-4=10-4$에서 어떤 연산이 공통으로 일어났는지 확인해보세요. "
+  },
+  {
+    "id": "unit_middle_math_eq_15_q4_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "항이 등호를 건너가면 부호가 반대로 바뀐다.",
+    "options": [
+      {
+        "text": "항이 이동해도 부호는 변하지 않는다.",
+        "isCorrect": false
+      },
+      {
+        "text": "항이 등호를 건너가면 부호가 반대로 바뀐다.",
+        "isCorrect": true
+      },
+      {
+        "text": "이항은 곱셈과 나눗셈에만 적용되는 규칙이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "좌변의 항은 항상 우변으로만 이항해야 한다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002,
+    "question": "이항(Transposition)에 대한 설명으로 옳은 것은 무엇인가요?",
+    "docId": "unit_middle_math_eq_15_q4_1773802276679",
+    "hint": "등호라는 '국경'을 넘을 때 부호라는 '옷'이 어떻게 변하는지 떠올려보세요."
+  },
+  {
+    "id": "unit_middle_math_eq_15_q5_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "$x=12-7$",
+    "options": [
+      {
+        "text": "$x=12+7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=12-7$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=12 \\times 7$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=12 \\div 7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003,
+    "question": "방정식 $x+7=12$에서 $+7$을 우변으로 이항했을 때의 올바른 식은 무엇인가요?",
+    "docId": "unit_middle_math_eq_15_q5_1773802276679",
+    "hint": "양수($+$)가 등호를 넘어가면 어떤 부호로 바뀌는지 생각해보세요."
+  },
+  {
+    "id": "unit_middle_math_eq_15_q6_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "$a=b, c \\ne 0$ 이면 $\\frac{a}{c}=\\frac{b}{c}$",
+    "options": [
+      {
+        "text": "$a=b$ 이면 $a+c=b+c$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a=b$ 이면 $a-c=b-c$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a=b$ 이면 $ac=bc$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a=b, c \\ne 0$ 이면 $\\frac{a}{c}=\\frac{b}{c}$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1004,
+    "question": "방정식 $2x=6$의 해를 구하기 위해 양변을 $2$로 나누는 과정은 등식의 어떤 성질을 이용한 것인가요? ",
+    "docId": "unit_middle_math_eq_15_q6_1773802276679",
+    "hint": "계수 $2$를 $1$로 만들기 위해 필요한 연산을 생각해보세요."
+  },
+  {
+    "id": "unit_middle_math_eq_15_q7_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "양변에 똑같은 처리를 해야 평형(등호)이 유지되기 때문에",
+    "options": [
+      {
+        "text": "방정식은 항상 놀이터에서 풀어야 하기 때문에",
+        "isCorrect": false
+      },
+      {
+        "text": "양변에 똑같은 처리를 해야 평형(등호)이 유지되기 때문에",
+        "isCorrect": true
+      },
+      {
+        "text": "한쪽 변이 무거우면 등식이 성립하지 않기 때문에",
+        "isCorrect": false
+      },
+      {
+        "text": "미지수 $x$의 값을 시소처럼 왔다 갔다 하며 찾기 때문에",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005,
+    "question": "등식의 성질을 설명할 때 '시소(Seesaw)의 원리'를 비유로 드는 이유는 무엇인가요?",
+    "docId": "unit_middle_math_eq_15_q7_1773802276679",
+    "hint": "시소가 수평을 유지하기 위해 왼쪽과 오른쪽에 어떤 일을 해줘야 하는지 생각해보세요."
+  },
+  {
+    "id": "unit_middle_math_eq_15_q8_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "$3$",
+    "options": [
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006,
+    "question": "방정식 $\\frac{x}{3}=5$의 해를 구하기 위해 등식의 성질을 이용할 때, 양변에 곱해야 할 가장 적절한 수는 무엇인가요?",
+    "docId": "unit_middle_math_eq_15_q8_1773802276679",
+    "hint": "분모에 있는 $3$을 없애고 $x$만 남기려면 어떤 수를 곱해야 할까요? "
+  },
+  {
+    "id": "unit_middle_math_eq_15_q9_1773802276679",
+    "unitId": "unit_middle_math_eq_15",
+    "score": 1,
+    "answer": "$x+1=8 \\rightarrow x=8+1$",
+    "options": [
+      {
+        "text": "$x-2=5 \\rightarrow x=5+2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x+4=10 \\rightarrow 3x=10-4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x+1=8 \\rightarrow x=8+1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-2x-3=7 \\rightarrow -2x=7+3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007,
+    "question": "다음 중 이항을 잘못 적용한 것은 무엇인가요?",
+    "docId": "unit_middle_math_eq_15_q9_1773802276679",
+    "hint": "$+1$이 등호를 건너가면 부호가 어떻게 바뀌어야 하는지 확인해보세요."
+  },
+  {
+    "id": "unit_middle_math_eq_16_q10_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "$3x-x=4+2$",
+    "question": "등식 $3x-2=x+4$에서 $x$가 포함된 항은 좌변으로, 상수항은 우변으로 모두 바르게 이항한 식은 무엇인가요?",
+    "hint": "좌변의 $-2$는 우변으로, 우변의 $x$는 좌변으로 옮기며 부호를 각각 바꿔보세요.",
+    "options": [
+      {
+        "text": "$3x+x=4+2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x-x=4-2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x-x=4+2$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3x+x=4-2$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq_16_q1_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "이항",
+    "question": "등식의 성질을 이용하여 등식의 한 변에 있는 항을 부호를 바꾸어 다른 변으로 옮기는 것을 무엇이라 하나요?",
+    "hint": "한자어로 '항을 옮긴다($移項$)'는 뜻을 가지고 있습니다.",
+    "options": [
+      {
+        "text": "대입",
+        "isCorrect": false
+      },
+      {
+        "text": "이항",
+        "isCorrect": true
+      },
+      {
+        "text": "약분",
+        "isCorrect": false
+      },
+      {
+        "text": "통분",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq_16_q2_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "등식의 성질",
+    "question": "다음 중 '이항'의 원리가 되는 수학적 성질은 무엇인가요?",
+    "hint": "양변에 같은 수를 더하거나 빼도 등식이 성립한다는 성질을 간소화한 것입니다.",
+    "options": [
+      {
+        "text": "분배법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "결합법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "등식의 성질",
+        "isCorrect": true
+      },
+      {
+        "text": "교환법칙",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq_16_q3_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "$x=10-5$",
+    "question": "등식 $x+5=10$에서 $+5$를 우변으로 바르게 이항한 식은 무엇인가요?",
+    "hint": "플러스($+$) 항이 등호라는 국경을 넘으면 부호가 어떻게 바뀔까요?",
+    "options": [
+      {
+        "text": "$x=10+5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=10-5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=10 \\times 5$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=10 \\div 5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq_16_q4_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "항이 등호를 건너가면 부호가 반대로 바뀐다.",
+    "question": "다음 중 이항을 설명한 내용으로 옳은 것은 무엇인가요?",
+    "hint": "마치 거울 세계로 넘어가는 것처럼 부호가 바뀐다는 점을 기억하세요.",
+    "options": [
+      {
+        "text": "항을 옮길 때 부호는 그대로 둔다.",
+        "isCorrect": false
+      },
+      {
+        "text": "항이 등호를 건너가면 부호가 반대로 바뀐다.",
+        "isCorrect": true
+      },
+      {
+        "text": "곱해져 있는 숫자를 넘기는 것도 이항이다.",
+        "isCorrect": false
+      },
+      {
+        "text": "상수항만 옮길 수 있으며 미지수항은 옮길 수 없다.",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq_16_q5_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "$x=7+3$",
+    "question": "등식 $x-3=7$에서 $-3$을 우변으로 이항했을 때의 결과로 옳은 것은 무엇인가요?",
+    "hint": "마이너스($-$) 항이 이항하면 플러스($+$)가 됩니다.",
+    "options": [
+      {
+        "text": "$x=7-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=7+3$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x=-7-3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=-3+7$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq_16_q6_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "$x=$ 꼴을 만들어 해를 구하기 위해",
+    "question": "방정식을 풀 때 이항을 사용하는 가장 주요한 목적은 무엇인가요?",
+    "hint": "$x$의 홀로서기를 위해 미지수항과 상수항을 분리해야 합니다.",
+    "options": [
+      {
+        "text": "숫자를 더 크게 만들기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "등호($=$)를 없애기 위해",
+        "isCorrect": false
+      },
+      {
+        "text": "$x=$ 꼴을 만들어 해를 구하기 위해",
+        "isCorrect": true
+      },
+      {
+        "text": "항의 개수를 늘리기 위해",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq_16_q7_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "$x+1=4 \\rightarrow x=4-1$",
+    "question": "다음 중 이항이 바르게 이루어진 식은 무엇인가요?",
+    "hint": "이항할 때 부호가 반대로 바뀌었는지 확인해 보세요.",
+    "options": [
+      {
+        "text": "$3x+2=8 \\rightarrow 3x=8+2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x-4=6 \\rightarrow 2x=6-4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x+1=4 \\rightarrow x=4-1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$5x=10 \\rightarrow x=10-5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq_16_q8_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "$5-2x=1$",
+    "question": "등식 $5=2x+1$에서 미지수가 포함된 항 $2x$를 좌변으로 바르게 이항한 식은 무엇인가요?",
+    "hint": "미지수항도 상수항과 마찬가지로 이항할 때 부호가 바뀝니다.",
+    "options": [
+      {
+        "text": "$5+2x=1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5-2x=1$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-5+2x=1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x-5=1$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq_16_q9_1773802324742",
+    "unitId": "unit_middle_math_eq_16",
+    "score": 1,
+    "answer": "플러스($+$) 항은 이항해도 플러스($+$) 부호를 유지한다.",
+    "question": "다음 중 이항에 대한 설명으로 틀린 것은 무엇인가요?",
+    "hint": "등호라는 국경을 넘을 때는 '부호'라는 옷을 갈아입어야 합니다.",
+    "options": [
+      {
+        "text": "이항은 더해져 있거나 빼져 있는 항을 옮길 때 사용한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x=6$에서 양변을 $2$로 나누는 것은 이항이 아니다.",
+        "isCorrect": false
+      },
+      {
+        "text": "이항을 할 때는 반드시 부호를 반대로 바꿔야 한다.",
+        "isCorrect": false
+      },
+      {
+        "text": "플러스($+$) 항은 이항해도 플러스($+$) 부호를 유지한다.",
+        "isCorrect": true
+      }
+    ],
+    "order": 1007
+  }
+]

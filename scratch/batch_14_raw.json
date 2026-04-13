@@ -1,0 +1,1352 @@
+[
+  {
+    "id": "unit_middle_math_eq3_01_q10_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$5$",
+    "question": "다음 식을 만족하는 $n$의 값을 구하세요. $3^{4} \\times 3 = 3^{n}$",
+    "hint": "지수가 없는 $3$은 $3^{1}$과 같습니다. 지수법칙 제1탄을 적용해 보세요.",
+    "options": [
+      {
+        "text": "$5$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q1_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "밑: $5$, 지수: $3$",
+    "question": "$5^{3}$에서 밑과 지수를 바르게 짝지은 것은?",
+    "hint": "아래에 위치한 큰 숫자가 '밑'이고, 오른쪽 위에 작게 적힌 숫자가 '지수'입니다.",
+    "options": [
+      {
+        "text": "밑: $5$, 지수: $3$",
+        "isCorrect": true
+      },
+      {
+        "text": "밑: $3$, 지수: $5$",
+        "isCorrect": false
+      },
+      {
+        "text": "밑: $5$, 지수: $15$",
+        "isCorrect": false
+      },
+      {
+        "text": "밑: $15$, 지수: $5$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q2_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$x^{9}$",
+    "question": "$x^{4} \\times x^{5}$를 지수법칙을 이용하여 간단히 나타내면?",
+    "hint": "밑이 같은 거듭제곱의 곱셈에서는 지수끼리 더해줍니다.",
+    "options": [
+      {
+        "text": "$x^{9}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x^{20}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{1}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x^{9}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q3_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$a^{7}$",
+    "question": "$a^{2} \\times a \\times a^{4}$를 계산한 결과로 옳은 것은?",
+    "hint": "지수가 써 있지 않은 문자 $a$는 사실 $a^{1}$임을 기억하세요.",
+    "options": [
+      {
+        "text": "$a^{7}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a^{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{8}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q4_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$3^{10}$",
+    "question": "$(3^{2})^{5}$를 지수법칙을 사용하여 간단히 하면?",
+    "hint": "거듭제곱의 거듭제곱(괄호가 있는 경우)은 지수끼리 곱해줍니다.",
+    "options": [
+      {
+        "text": "$3^{10}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3^{7}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3^{25}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9^{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q5_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$(a^{2})^{3}$",
+    "question": "다음 중 계산 결과가 $a^{6}$인 것만을 고른 것은?",
+    "hint": "$a^{m} \\times a^{n}$은 지수합($m+n$)이고, $(a^{m})^{n}$은 지수곱($m \\times n$)입니다.",
+    "options": [
+      {
+        "text": "$(a^{2})^{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a^{2} \\times a^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{3} + a^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{12} \\times a^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q6_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$6$",
+    "question": "$2^{3} \\times 2^{x} = 2^{9}$일 때, 자연수 $x$의 값은?",
+    "hint": "지수의 합이 $3 + x = 9$가 되어야 합니다.",
+    "options": [
+      {
+        "text": "$6$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3$",
+        "isCorrect": false
+      },
+      {
+        "text": "$12$",
+        "isCorrect": false
+      },
+      {
+        "text": "$27$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q7_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$4$",
+    "question": "$(x^{a})^{3} = x^{12}$일 때, 자연수 $a$의 값은?",
+    "hint": "지수의 곱이 $a \\times 3 = 12$가 되어야 합니다.",
+    "options": [
+      {
+        "text": "$4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$15$",
+        "isCorrect": false
+      },
+      {
+        "text": "$36$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q8_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$a^{9}$",
+    "question": "$a^{2} \\times a^{3} \\times a^{4}$를 간단히 한 결과는?",
+    "hint": "밑이 모두 같으므로 세 지수를 모두 더해주면 됩니다.",
+    "options": [
+      {
+        "text": "$a^{9}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a^{24}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3a^{9}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq3_01_q9_1773802883422",
+    "unitId": "unit_middle_math_eq3_01",
+    "score": 1,
+    "answer": "$a^{10}$",
+    "question": "$(a^{3})^{2} \\times a^{4}$를 계산하여 간단히 나타내면?",
+    "hint": "먼저 괄호를 풀어 $(a^{3})^{2}$을 계산한 뒤, $a^{4}$과 곱하세요.",
+    "options": [
+      {
+        "text": "$a^{10}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a^{9}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{24}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{11}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q10_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$x^{5}$",
+    "question": "다음 식을 간단히 하시오. \n$x^{10} \\div x^{2} \\div x^{3}$",
+    "hint": "나눗셈이 연속될 때는 지수를 차례대로 빼주면 됩니다. $10-2-3$을 계산해 보세요.",
+    "options": [
+      {
+        "text": "$x^{15}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{5}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x^{8}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{1}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q1_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$a^{8}$",
+    "question": "다음 식을 지수법칙을 사용하여 간단히 나타낸 것으로 옳은 것은? \n$a^{12} \\div a^{4}$",
+    "hint": "밑이 같은 거듭제곱의 나눗셈에서는 지수끼리 뺍니다. $12-4$를 계산해 보세요.",
+    "options": [
+      {
+        "text": "$a^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{8}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a^{16}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{48}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q2_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$2^{0}$",
+    "question": "다음 중 계산 결과가 $1$인 것은?",
+    "hint": "지수법칙에서 $0$이 아닌 모든 수의 $0$제곱은 항상 $1$로 약속합니다.",
+    "options": [
+      {
+        "text": "$2^{0}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$0^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2^{1}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q3_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$3^{-4}$",
+    "question": "다음 식을 분수 형태가 아닌 지수를 사용하여 나타내면 무엇입니까? \n$\\frac{1}{3^{4}}$",
+    "hint": "마이너스 지수는 '역수'를 의미합니다. 분모에 있는 지수를 분자로 올리면서 부호를 바꿔보세요.",
+    "options": [
+      {
+        "text": "$3^{4}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3^{\\frac{1}{4}}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3^{-4}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-3^{4}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q4_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$8x^{3}$",
+    "question": "다음 식을 전개하여 간단히 하시오. \n$(2x)^{3}$",
+    "hint": "괄호 밖의 지수는 괄호 안의 숫자 $2$와 문자 $x$ 모두에게 분배되어야 합니다.",
+    "options": [
+      {
+        "text": "$2x^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6x^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8x^{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$8x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q5_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$a^{8}b^{12}$",
+    "question": "다음 식을 간단히 한 결과로 옳은 것은? \n$(a^{2}b^{3})^{4}$",
+    "hint": "괄호 안에 지수가 있는 경우, 괄호 밖의 지수와 서로 곱해줍니다.",
+    "options": [
+      {
+        "text": "$a^{6}b^{7}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{8}b^{12}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a^{16}b^{81}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{8}b^{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q6_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$5^{-3}$",
+    "question": "다음 식의 계산 결과로 옳은 것은? \n$5^{2} \\div 5^{5}$",
+    "hint": "지수끼리 빼면 $2-5 = -3$이 됩니다. 지수가 음수이면 분수 형태로도 쓸 수 있습니다.",
+    "options": [
+      {
+        "text": "$5^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$5^{-3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{1}{5^{-3}}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-5^{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q7_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "철수: $2^{3} \\div 3^{2} = (\\frac{2}{3})^{1}$",
+    "question": "다음 중 식의 계산이 잘못된 학생은 누구입니까?",
+    "hint": "밑이 다르면 지수법칙을 사용하여 지수를 뺄 수 없습니다. 각각 따로 계산해야 합니다.",
+    "options": [
+      {
+        "text": "민수: $(-3x)^{2} = 9x^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "영희: $a^{0} = 1$",
+        "isCorrect": false
+      },
+      {
+        "text": "철수: $2^{3} \\div 3^{2} = (\\frac{2}{3})^{1}$",
+        "isCorrect": true
+      },
+      {
+        "text": "지수: $a^{-2} = \\frac{1}{a^{2}}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q8_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$0$",
+    "question": "다음 식을 간단히 하였을 때 $x$의 지수는 얼마입니까? \n$(x^{4}y^{2})^{0}$",
+    "hint": "괄호 전체의 $0$제곱은 결과가 $1$이 됩니다. 모든 문자의 지수는 결과적으로 $0$이 됩니다.",
+    "options": [
+      {
+        "text": "$0$",
+        "isCorrect": true
+      },
+      {
+        "text": "$1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq3_02_q9_1773802943547",
+    "unitId": "unit_middle_math_eq3_02",
+    "score": 1,
+    "answer": "$4a^{6}$",
+    "question": "다음 식을 전개했을 때 올바른 결과는? \n$(-2a^{3})^{2}$",
+    "hint": "부호 $(-)$도 제곱이 되면 $(+)$가 됩니다. 숫자와 문자의 지수를 각각 계산하세요.",
+    "options": [
+      {
+        "text": "$-4a^{6}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4a^{6}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4a^{5}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-4a^{5}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q10_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$(2ab^{2})^{2} \\times 3a \\div 6a^{2}b = 2ab^{3}$",
+    "question": "다음 중 계산 과정과 결과가 모두 올바른 것은?",
+    "hint": "거듭제곱 $\\rightarrow$ 곱셈 $\\rightarrow$ 나눗셈(역수 곱) 순서로 차근차근 계산하세요. [cite: 15, 20, 31]",
+    "options": [
+      {
+        "text": "$(2ab^{2})^{2} \\times 3a \\div 6a^{2}b = 2ab^{3}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(2ab^{2})^{2} \\times 3a \\div 6a^{2}b = 2a^{2}b^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(2ab^{2})^{2} \\times 3a \\div 6a^{2}b = ab^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(2ab^{2})^{2} \\times 3a \\div 6a^{2}b = 4ab^{3}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q1_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$-10a^{4}$",
+    "question": "다음 식을 간단히 계산한 결과로 옳은 것은?\n$(-2a) \\times (5a^{3})$",
+    "hint": "부호를 먼저 결정하고, 같은 문자끼리 곱할 때는 지수법칙을 사용하여 지수를 더합니다. [cite: 10, 12]",
+    "options": [
+      {
+        "text": "$-10a^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-10a^{4}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$10a^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$10a^{4}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q2_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$x^{12}$",
+    "question": "지수법칙을 이용하여 $(x^{4})^{3}$을 간단히 나타내면?",
+    "hint": "괄호 밖의 지수는 괄호 안의 지수와 서로 곱해줍니다. [cite: 16]",
+    "options": [
+      {
+        "text": "$x^{7}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{12}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x^{64}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3x^{4}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q3_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$9a^{2}b^{4}$",
+    "question": "다음 식의 계산 결과가 옳은 것을 고르세요.\n$(-3ab^{2})^{2}$",
+    "hint": "괄호 밖의 지수는 숫자와 각 문자에 모두 공평하게 나눠줘야 하며, 음수를 제곱하면 양수가 됩니다. [cite: 15, 18]",
+    "options": [
+      {
+        "text": "$-6a^{2}b^{4}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-9a^{2}b^{4}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9a^{2}b^{4}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$6a^{2}b^{4}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q4_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$(-3x) \\times (2x^{2}y)$",
+    "question": "다음 중 계산 결과가 $-6x^{3}y$인 식은 무엇입니까?",
+    "hint": "계수는 계수끼리, 문자는 문자끼리 곱하고 결과는 알파벳 순서대로 나열합니다. [cite: 11, 13]",
+    "options": [
+      {
+        "text": "$(3y) \\times (-2x^{2})$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(-3x) \\times (2x^{2}y)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(-6x) \\times (x^{2}) \\times (-y)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(2x) \\times (3x^{2}) \\times (y)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q5_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$3a^{4}$",
+    "question": "다음 나눗셈의 결과로 옳은 것은?\n$18a^{6} \\div 6a^{2}$",
+    "hint": "숫자는 숫자로 나누고, 같은 문자의 나눗셈은 지수법칙에 따라 지수를 빼줍니다. [cite: 11, 23]",
+    "options": [
+      {
+        "text": "$3a^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$3a^{4}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$12a^{4}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$108a^{8}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q6_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$\\frac{3}{2x^{3}}$",
+    "question": "식 $\\frac{2}{3}x^{3}$을 역수로 바르게 나타낸 것은?",
+    "hint": "분수 옆에 붙은 문자는 사실 분자와 함께 있는 것이므로, 역수를 취할 때 분모로 내려가야 합니다. [cite: 26, 27]",
+    "options": [
+      {
+        "text": "$\\frac{3}{2x^{3}}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{3}{2}x^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{2}{3x^{3}}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{3x^{3}}{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q7_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$8x$",
+    "question": "다음 식을 계산하여 간단히 하세요.\n$6x^{2} \\div \\frac{3}{4}x$",
+    "hint": "나눗셈을 '곱하기 역수'로 바꾸어 계산하고 약분할 수 있는 것은 약분합니다. [cite: 20, 22]",
+    "options": [
+      {
+        "text": "$8x^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{9}{2}x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$\\frac{9}{2}x^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q8_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$-\\frac{a^{2}}{2}$",
+    "question": "다음 식의 계산 결과는?\n$(-a^{2})^{3} \\div 2a^{4}$",
+    "hint": "거듭제곱을 먼저 처리한 후, 나눗셈은 분수 형태나 역수의 곱으로 바꾸어 정리합니다. [cite: 14, 23]",
+    "options": [
+      {
+        "text": "$-\\frac{a^{2}}{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$\\frac{a^{2}}{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-2a^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2a^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq3_03_q9_1773803011354",
+    "unitId": "unit_middle_math_eq3_03",
+    "score": 1,
+    "answer": "$3x^{2}y$",
+    "question": "다음 빈칸 $\\square$에 알맞은 식은?\n$12x^{3}y^{2} \\div \\square = 4xy$",
+    "hint": "나누어지는 식을 결과값으로 나누면 빈칸에 들어갈 식을 찾을 수 있습니다. [cite: 30]",
+    "options": [
+      {
+        "text": "$3x^{2}y$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3xy$",
+        "isCorrect": false
+      },
+      {
+        "text": "$48x^{4}y^{3}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8x^{2}y$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q10_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$(x+4)^{2} = x^{2}+16$",
+    "question": "다음 중 완전제곱식의 전개 과정이 틀린 것은 무엇입니까?",
+    "hint": "가운데 항인 $2ab$가 누락되지 않았는지 확인해 보세요.",
+    "options": [
+      {
+        "text": "$(x+1)^{2} = x^{2}+2x+1$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(x+2)^{2} = x^{2}+4x+4$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(2x+3)^{2} = 4x^{2}+12x+9$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(x+4)^{2} = x^{2}+16$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q1_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$곱셈공식$",
+    "question": "다항식의 곱셈을 일일이 전개하지 않고 빠르고 정확하게 계산할 수 있도록 정리한 공식을 무엇이라 합니까?",
+    "hint": "PDF $1$페이지 핵심 요약 부분을 참고하세요. 다항식의 곱셈을 정리한 식을 의미합니다.",
+    "options": [
+      {
+        "text": "$결합법칙$",
+        "isCorrect": false
+      },
+      {
+        "text": "$곱셈공식$",
+        "isCorrect": true
+      },
+      {
+        "text": "$지수법칙$",
+        "isCorrect": false
+      },
+      {
+        "text": "$인수분해$",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q2_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$완전제곱식$",
+    "question": "다음 중 $(a+b)^{2}$과 같이 같은 식을 두 번 곱한 형태의 식을 부르는 명칭은 무엇입니까?",
+    "hint": "같은 식을 제곱한 형태를 뜻하는 용어입니다.",
+    "options": [
+      {
+        "text": "$이차방정식$",
+        "isCorrect": false
+      },
+      {
+        "text": "$완전제곱식$",
+        "isCorrect": true
+      },
+      {
+        "text": "$일차결합$",
+        "isCorrect": false
+      },
+      {
+        "text": "$분배식$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q3_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$2ab$",
+    "question": "곱셈공식 $(a+b)^{2} = a^{2} + 2ab + b^{2}$의 유도 과정 중, $(a+b)(a+b)$를 전개했을 때 나오는 동류항 $ab$와 $ba$를 합친 결과는 무엇입니까?",
+    "hint": "$ab$와 $ba$는 곱셈의 교환법칙에 의해 같은 항(동류항)입니다.",
+    "options": [
+      {
+        "text": "$ab$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2ab$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a^{2}b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2(a+b)$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q4_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$6x$",
+    "question": "PDF에서 강조한 '앞·$2$·뒤' 법칙을 적용하여 $(x+3)^{2}$을 전개할 때, 가운데 항의 값은 얼마입니까?",
+    "hint": "$2 \\times (앞의 항) \\times (뒤의 항)$을 계산해 보세요.",
+    "options": [
+      {
+        "text": "$3x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$6x$",
+        "isCorrect": true
+      },
+      {
+        "text": "$9x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2x$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q5_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$x^{2}+10x+25$",
+    "question": "$(x+5)^{2}$을 바르게 전개한 식을 고르세요.",
+    "hint": "$5$의 제곱은 $25$이며, 가운데 항은 $2 \\times x \\times 5$입니다.",
+    "options": [
+      {
+        "text": "$x^{2}+25$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}+5x+25$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}+10x+10$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}+10x+25$",
+        "isCorrect": true
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q6_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$4x^{2}$",
+    "question": "$(2x+1)^{2}$을 전개할 때, 많은 학생들이 하는 실수 중 하나인 $(2x)^{2}$을 $2x^{2}$으로 쓰는 것을 방지해야 합니다. $(2x)^{2}$의 올바른 계산 결과는 무엇입니까?",
+    "hint": "괄호 안의 숫자 계수 $2$도 반드시 제곱해야 합니다.",
+    "options": [
+      {
+        "text": "$2x^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4x^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$4x$",
+        "isCorrect": false
+      },
+      {
+        "text": "$8x^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q7_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$9a^{2}+12ab+4b^{2}$",
+    "question": "$(3a+2b)^{2}$을 전개한 식으로 옳은 것은 무엇입니까?",
+    "hint": "가운데 항은 $2 \\times 3a \\times 2b$를 계산한 결과입니다.",
+    "options": [
+      {
+        "text": "$9a^{2}+6ab+4b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9a^{2}+12ab+4b^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$3a^{2}+12ab+2b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$9a^{2}+4b^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q8_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$2ab$",
+    "question": "많은 학생들이 $(a+b)^{2}$을 $a^{2}+b^{2}$으로 계산하는 치명적인 실수를 합니다. 이 오류에서 누락된 항은 공식의 어느 부분입니까?",
+    "hint": "완전제곱식 전개 시에는 반드시 '두 항을 곱한 것의 $2$배'가 포함되어야 합니다.",
+    "options": [
+      {
+        "text": "$a^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$2ab$",
+        "isCorrect": true
+      },
+      {
+        "text": "$ab$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq3_04_q9_1773803064150",
+    "unitId": "unit_middle_math_eq3_04",
+    "score": 1,
+    "answer": "$4$",
+    "question": "$(x+a)^{2} = x^{2} + 8x + 16$일 때, 상수 $a$의 값은 얼마입니까?",
+    "hint": "가운데 항인 $8x$가 $2 \\times x \\times a$와 같아야 합니다.",
+    "options": [
+      {
+        "text": "$2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$4$",
+        "isCorrect": true
+      },
+      {
+        "text": "$8$",
+        "isCorrect": false
+      },
+      {
+        "text": "$16$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q10_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "$x^{2}-2xy+y^{2}$",
+    "question": "차의 제곱 공식을 이용하여 $(x-y)^{2}$을 바르게 전개한 것은 무엇인가요?",
+    "hint": "공식의 $a, b$ 자리에 $x, y$를 대입하여 생각해 보세요. [cite: 23, 46]",
+    "options": [
+      {
+        "text": "$x^{2}-2xy-y^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}-y^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$x^{2}-2xy+y^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$x^{2}+2xy+y^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1008
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q1_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "분배법칙",
+    "question": "$(a-b)^{2}$의 전개 원리를 이해하기 위해 가장 먼저 적용해야 하는 수학적 법칙은 무엇인가요?",
+    "hint": "괄호 안의 각 항을 하나씩 짝지어 곱해주는 원리를 생각해보세요. [cite: 6, 11]",
+    "options": [
+      {
+        "text": "교환법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "결합법칙",
+        "isCorrect": false
+      },
+      {
+        "text": "분배법칙",
+        "isCorrect": true
+      },
+      {
+        "text": "이항법칙",
+        "isCorrect": false
+      }
+    ],
+    "order": 999
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q2_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "$(a-b)(a-b)$",
+    "question": "제곱의 의미에 따라 $(a-b)^{2}$을 곱셈식으로 바르게 나타낸 것은 무엇인가요?",
+    "hint": "어떤 식의 제곱은 그 식을 두 번 곱한다는 뜻입니다. [cite: 8, 9]",
+    "options": [
+      {
+        "text": "$(a-b) \\times 2$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(a-b)(a-b)$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(a-b)(a+b)$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{2}-b^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1000
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q3_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "$a^{2}$",
+    "question": "$(a-b)(a-b)$를 전개할 때, 분배법칙에 의한 첫 번째 곱셈 $a \\times a$의 결과는 무엇인가요?",
+    "hint": "앞 괄호의 $a$와 뒤 괄호의 $a$를 곱한 결과입니다. [cite: 13]",
+    "options": [
+      {
+        "text": "$2a$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-a^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1001
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q4_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "$-ab$",
+    "question": "$(a-b)(a-b)$ 전개 과정 중, 앞 괄호의 $a$와 뒤 괄호의 $-b$를 곱했을 때의 결과로 옳은 것은 무엇인가요?",
+    "hint": "양수와 음수의 곱이므로 부호에 주의해야 합니다. [cite: 14]",
+    "options": [
+      {
+        "text": "$ab$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-ab$",
+        "isCorrect": true
+      },
+      {
+        "text": "$b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$-ba^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1002
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q5_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "동류항이기 때문에",
+    "question": "$(a-b)(a-b)$를 전개하면 $a^{2}-ab-ba+b^{2}$이 됩니다. 여기서 $-ab$와 $-ba$를 하나로 합칠 수 있는 이유는 무엇인가요?",
+    "hint": "문자와 차수가 같은 항들을 일컫는 용어를 떠올려 보세요. [cite: 17, 20]",
+    "options": [
+      {
+        "text": "상수항이기 때문에",
+        "isCorrect": false
+      },
+      {
+        "text": "계수가 같기 때문에",
+        "isCorrect": false
+      },
+      {
+        "text": "동류항이기 때문에",
+        "isCorrect": true
+      },
+      {
+        "text": "부호가 반대이기 때문에",
+        "isCorrect": false
+      }
+    ],
+    "order": 1003
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q6_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "$+b^{2}$",
+    "question": "분배법칙의 마지막 단계인 $(-b) \\times (-b)$의 결과는 무엇인가요?",
+    "hint": "마이너스 부호를 가진 두 항을 곱하면 플러스가 됩니다. [cite: 16, 26]",
+    "options": [
+      {
+        "text": "$-b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$+b^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$-2b$",
+        "isCorrect": false
+      },
+      {
+        "text": "$b$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1004
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q7_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "$a^{2}-2ab+b^{2}$",
+    "question": "$(a-b)^{2}$을 전개했을 때의 최종 공식으로 옳은 것은 무엇인가요?",
+    "hint": "동류항을 정리한 결과와 마지막 항의 부호를 확인하세요. [cite: 22, 23]",
+    "options": [
+      {
+        "text": "$a^{2}-b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{2}+2ab+b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$a^{2}-2ab+b^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$a^{2}-2ab-b^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1005
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q8_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "$(a-b)^{2} = a^{2}-b^{2}$",
+    "question": "$(a-b)^{2}$을 전개할 때 학생들이 가장 많이 하는 실수 중 하나는 가운데 항을 빠뜨리는 것입니다. 다음 중 틀린 전개식은 무엇인가요?",
+    "hint": "반드시 가운데 섞여 있는 항인 $-2ab$를 챙겨주어야 합니다. [cite: 28, 29]",
+    "options": [
+      {
+        "text": "$(a-b)^{2} = a^{2}-b^{2}$",
+        "isCorrect": true
+      },
+      {
+        "text": "$(a-b)^{2} = a^{2}-2ab+b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(a+b)^{2} = a^{2}+2ab+b^{2}$",
+        "isCorrect": false
+      },
+      {
+        "text": "$(a-b)(a-b) = a^{2}-2ab+b^{2}$",
+        "isCorrect": false
+      }
+    ],
+    "order": 1006
+  },
+  {
+    "id": "unit_middle_math_eq3_05_q9_1773803130542",
+    "unitId": "unit_middle_math_eq3_05",
+    "score": 1,
+    "answer": "가운데 항 $2ab$의 부호",
+    "question": "합의 제곱 공식 $(a+b)^{2}$과 차의 제곱 공식 $(a-b)^{2}$의 전개 결과에서 서로 다른 부분은 무엇인가요?",
+    "hint": "정리용 표의 '비고'란을 보면 차이점을 알 수 있습니다. [cite: 30, 42]",
+    "options": [
+      {
+        "text": "$a^{2}$의 부호",
+        "isCorrect": false
+      },
+      {
+        "text": "$b^{2}$의 부호",
+        "isCorrect": false
+      },
+      {
+        "text": "가운데 항 $2ab$의 부호",
+        "isCorrect": true
+      },
+      {
+        "text": "항의 개수",
+        "isCorrect": false
+      }
+    ],
+    "order": 1007
+  }
+]
