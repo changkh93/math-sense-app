@@ -1,13 +1,7 @@
 import { useRef, useMemo, Suspense, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Sphere, useTexture, Text as DreiText, Float } from '@react-three/drei'
+import { Sphere, useTexture, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
-
-const Text = (props) => (
-  <Suspense fallback={null}>
-    <DreiText {...props} />
-  </Suspense>
-)
 
 /**
  * 텍스처를 사용하는 행성 재질 (Suspense 적용)
@@ -133,19 +127,21 @@ function FloatingFormulas({ size, color }) {
         const z = Math.sin(angle) * radius
         
         return (
-          <Text
+          <Html
             key={i}
             position={[x, (Math.random() - 0.5) * size, z]}
-            fontSize={0.3}
-            color={color}
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.01}
-            outlineColor="#000000"
-            lookAt={[0,0,0]} // 항상 중심(행성)을 바라보게 하거나, 카메라를 바라보게 수정 가능
+            center
+            style={{
+              color: color,
+              fontSize: '1rem',
+              fontWeight: 'bold',
+              textShadow: '0 0 3px #000, 0 0 6px #000',
+              pointerEvents: 'none',
+              fontFamily: 'serif'
+            }}
           >
             {sym}
-          </Text>
+          </Html>
         )
       })}
     </group>

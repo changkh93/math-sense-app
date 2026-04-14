@@ -161,8 +161,19 @@ function SpaceHome() {
   }, [clusters, userData, loadingClusters]);
 
   useEffect(() => {
-    // Only auto-select if we have exactly one cluster AND it's not loading
-    if (!loadingClusters && activeClusters.length === 1 && !selectedClusterId) {
+    if (loadingClusters) return;
+
+    // 1. Validate if the currently selected cluster still exists in activeClusters
+    if (selectedClusterId && activeClusters.length > 0) {
+      const isValid = activeClusters.some(c => c.docId === selectedClusterId || c.id === selectedClusterId);
+      if (!isValid) {
+        // If not valid anymore (e.g. access revoked), clear it
+        updateSelectedClusterId(null);
+      }
+    }
+
+    // 2. Only auto-select if we have exactly one cluster AND it's not loading
+    if (activeClusters.length === 1 && !selectedClusterId) {
       updateSelectedClusterId(activeClusters[0].docId || activeClusters[0].id);
     }
   }, [activeClusters, selectedClusterId, loadingClusters]);

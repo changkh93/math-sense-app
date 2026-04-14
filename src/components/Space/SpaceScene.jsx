@@ -1,14 +1,8 @@
 import React, { useRef, useMemo, useState, useEffect, Suspense } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { Stars, CameraControls, Environment, Float, Text as DreiText } from '@react-three/drei'
+import { Stars, CameraControls, Environment, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import PlanetMesh from './PlanetMesh'
-
-const Text = (props) => (
-  <Suspense fallback={null}>
-    <DreiText {...props} />
-  </Suspense>
-)
 
 /**
  * 워프 효과를 위한 고속 별 이동
@@ -179,19 +173,23 @@ function SceneContent({
                onPointerOut={() => { document.body.style.cursor = 'auto' }}
              />
             
-            {/* 3D Text Label */}
-            <Text
+            {/* DOM HTML Label */}
+            <Html
               position={[0, 1.8, 0]}
-              fontSize={0.4}
-              color={planet.isLocked ? "#888888" : "white"}
-              anchorX="center"
-              anchorY="middle"
-              // font="/fonts/Orbitron-Bold.ttf" // 폰트 로드 문제 발생 가능성 있으므로 기본값 사용 또는 생략
-              outlineWidth={0.02}
-              outlineColor="#000000"
+              center
+              zIndexRange={[100, 0]}
+              style={{
+                color: planet.isLocked ? "#888888" : "white",
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                fontFamily: 'var(--font-title, sans-serif)',
+                whiteSpace: 'nowrap',
+                textShadow: '0px 2px 4px rgba(0,0,0,0.8), 0 0 10px #000',
+                pointerEvents: 'none'
+              }}
             >
               {planet.title} {planet.isLocked ? "(LOCKED)" : ""}
-            </Text>
+            </Html>
           </Float>
           
           {/* Connection Line */}
@@ -225,28 +223,25 @@ function SceneContent({
               onPointerOut={() => { document.body.style.cursor = 'auto' }}
             />
             {/* Assignment Label */}
-            <Text
-              position={[0, 1.2, 0]}
-              fontSize={0.4}
-              color="#ffd700"
-              anchorX="center"
-              anchorY="middle"
-              outlineWidth={0.03}
-              outlineColor="#000000"
+            <Html
+              position={[0, 1.3, 0]}
+              center
+              zIndexRange={[100, 0]}
+              style={{
+                color: "#ffd700",
+                fontSize: '1.1rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-title, sans-serif)',
+                whiteSpace: 'nowrap',
+                textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 12px #000',
+                pointerEvents: 'none',
+                textAlign: 'center',
+                lineHeight: '1.3'
+              }}
             >
-              과제 기록소
-            </Text>
-            <Text
-              position={[0, 0.7, 0]}
-              fontSize={0.2}
-              color="#ffffff"
-              anchorX="center"
-              anchorY="middle"
-              outlineWidth={0.01}
-              outlineColor="#000000"
-            >
-              Stellar Archive
-            </Text>
+              과제 기록소<br/>
+              <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: '500' }}>Stellar Archive</span>
+            </Html>
           </Float>
         </group>
       )}
@@ -269,28 +264,26 @@ function SceneContent({
               onPointerOver={() => { document.body.style.cursor = 'pointer' }}
               onPointerOut={() => { document.body.style.cursor = 'auto' }}
             />
-            <Text
-              position={[0, 1.2, 0]}
-              fontSize={0.35}
-              color="#c084fc"
-              anchorX="center"
-              anchorY="middle"
-              outlineWidth={0.03}
-              outlineColor="#000000"
+            {/* Dark Matter Label */}
+            <Html
+              position={[0, 1.3, 0]}
+              center
+              zIndexRange={[100, 0]}
+              style={{
+                color: "#c084fc",
+                fontSize: '1.1rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-title, sans-serif)',
+                whiteSpace: 'nowrap',
+                textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 12px #000',
+                pointerEvents: 'none',
+                textAlign: 'center',
+                lineHeight: '1.3'
+              }}
             >
-              다크 매터
-            </Text>
-            <Text
-              position={[0, 0.7, 0]}
-              fontSize={0.2}
-              color="#a78bfa"
-              anchorX="center"
-              anchorY="middle"
-              outlineWidth={0.01}
-              outlineColor="#000000"
-            >
-              Dark Matter
-            </Text>
+              다크 매터<br/>
+              <span style={{ fontSize: '0.75rem', color: '#a78bfa', fontWeight: '500' }}>Dark Matter</span>
+            </Html>
           </Float>
         </group>
       )}

@@ -125,9 +125,41 @@ export default function SpaceJourney({ userData }) {
   }, [transactions, userData?.streakFreezeCount]);
 
   // Helper: Identify nodes that SHOULD be protected (historical + current gap)
-  const nodesWithProtection = useMemo(() => {
+  const baseNodesWithProtection = useMemo(() => {
     return extractDefendedDates(transactions, userData, dailyStats);
   }, [dailyStats, transactions, userData]);
+
+  // DB Source-of-truth correction:
+  // If the DB says the streak is higher than what raw history proves (due to an admin or system override),
+  // we conceptually "protect" the missing days backwards from lastStreakDate so the visual graph connects.
+  const nodesWithProtection = useMemo(() => {
+    const activeDatesArray = Array.from(dailyStats.keys());
+    
+    // Use the base calculation to see what the raw history yields
+    // Important: Don't import calculateStreakFromHistory since not imported directly, just use logic or getEffectiveStreak
+    const rawCalcStreak = getEffectiveStreak(userData, { activeDates: new Set(activeDatesArray), defendedDates: baseNodesWithProtection });
+    const dbStreak = getEffectiveStreak(userData); // Calculates pure DB value from header logic
+
+    if (dbStreak > rawCalcStreak && userData?.lastStreakDate) {
+      const newDefended = new Set(baseNodesWithProtection);
+      let cursor = userData.lastStreakDate;
+      let count = 0;
+      let failsafe = 0;
+
+      // Bridging backwards from the last logged streak date
+      while (count < dbStreak && failsafe < 365) {
+        if (!dailyStats.has(cursor)) {
+          newDefended.add(cursor); // Missing day -> Virtual Protection (🧊)
+        }
+        // Keep moving backwards. Even if it was active or newly defended, it counts towards the streak run
+        count++;
+        cursor = getTodayKST(new Date(new Date(cursor + 'T12:00:00Z').getTime() - 86400000));
+        failsafe++;
+      }
+      return newDefended;
+    }
+    return baseNodesWithProtection;
+  }, [userData, dailyStats, baseNodesWithProtection]);
 
   // 기간 노드 생성 (기록 시작일 ~ 오늘)
   const timelineData = useMemo(() => {
@@ -234,14 +266,10 @@ export default function SpaceJourney({ userData }) {
     }
   }, [loading, viewMode]);
 
-  // 스트릭 소스 (헤더와 동일한 로직 사용으로 완벽한 일치 보장)
+  // 스트릭 소스 (헤더와 똑같이 DB 우선 로직 사용 후, UI 패치를 위해 계산된 패치 버전의 historyData 주입)
   const streak = useMemo(() => {
-    const historyData = {
-      activeDates: new Set(Array.from(dailyStats.keys())),
-      defendedDates: nodesWithProtection
-    };
-    return getEffectiveStreak(userData, historyData);
-  }, [userData, dailyStats, nodesWithProtection]);
+    return getEffectiveStreak(userData);
+  }, [userData]);
 
   const tier = getCometTier(streak);
   const activeColor = streak > 0 ? tier.color : '#FF9F43';

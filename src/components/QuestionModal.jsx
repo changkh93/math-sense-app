@@ -167,10 +167,13 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
             pixelRatio: 2,
             backgroundColor: '#050a19',
             cacheBust: true,
+            useCORS: true,
             filter: (node) => {
               // Skip problematic modal/UI elements
               if (node.classList?.contains('modal-overlay')) return false;
               if (node.classList?.contains('capture-hide')) return false;
+              // Skip IFRAMEs (like YouTube) to prevent SecurityError
+              if (node.tagName === 'IFRAME') return false;
               // Skip style/link nodes that might trigger SecurityError if crossorigin fails
               // We keep it broad but usually cross-origin links are the culprit
               if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
