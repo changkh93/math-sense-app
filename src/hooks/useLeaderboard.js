@@ -13,7 +13,7 @@ import { collection, collectionGroup, query, where, limit, getDocs, onSnapshot }
  * @returns {{ rankings, myRank, myData, loading, totalCount }}
  */
 export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
-  const [rankings, setRankings] = useState([])
+  const [rawRankings, setRawRankings] = useState([])
   const [loading, setLoading] = useState(true)
   const [userNameMap, setUserNameMap] = useState({})
 
@@ -22,7 +22,7 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
     let unsubscribe = null
     let cleanupTimeout = null
 
-    const q = query(collection(db, 'users'), limit(200))
+    const q = query(collection(db, 'users'), limit(500))
     unsubscribe = onSnapshot(q, (snapshot) => {
       const map = {}
       snapshot.docs.forEach(doc => {
@@ -49,16 +49,18 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
   // 2. 범위별 퀴즈 기록 조회 (collection group query on history)
   useEffect(() => {
     if (!regionId && !chapterId && !unitId) {
-      setRankings([])
+      setRawRankings([])
       setLoading(false)
       return
     }
 
-    setLoading(true)
+    // Soft Loading: Only set loading=true if we have no rankings yet
+    if (rawRankings.length === 0) {
+      setLoading(true)
+    }
 
     const fetchScopedRankings = async () => {
       try {
-        // Build collection group query
         const historyGroup = collectionGroup(db, 'history')
         let q
         if (unitId) {
@@ -70,20 +72,12 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
         }
 
         const snap = await getDocs(q)
-
-        // Aggregate: userId → { units, totalCrystals, firstTimestamp }
         const userScores = {} 
 
         snap.docs.forEach(doc => {
           const d = doc.data()
-
-          // Quiz entries only (no type field or type === 'quiz')
           if (d.type && d.type !== 'quiz') return
-
-          // Skip entries with no score
           if (d.score === undefined || d.score === null) return
-
-          // Extract userId from doc path: users/{userId}/history/{historyId}
           const uid = doc.ref.parent.parent?.id
           if (!uid) return
 
@@ -97,8 +91,6 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
 
           const uId = d.unitId
           if (!uId) return
-
-          // Track metrics per unit
           const ts = d.timestamp?.toMillis() || Date.now()
           
           if (!userScores[uid].units[uId]) {
@@ -111,29 +103,21 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
           } else {
             const unitData = userScores[uid].units[uId]
             unitData.bestScore = Math.max(unitData.bestScore, d.score)
-            
-            // Lock initialScore to the chronologically first ever attempt
             if (ts < unitData.firstTimestamp) {
               unitData.firstTimestamp = ts
               unitData.initialScore = d.initialScore !== undefined ? d.initialScore : d.score
             }
-            
-            // Sum attempt counts across multiple history records (sessions)
             unitData.attemptCount += (d.attemptCount || 1)
           }
 
-          // Accumulate total crystals earned in this scope
           if (d.crystalsEarned) {
             userScores[uid].totalCrystals += d.crystalsEarned
           }
-
-          // Track earliest achievement in this scope
           if (ts && ts < userScores[uid].firstTimestamp) {
             userScores[uid].firstTimestamp = ts
           }
         })
 
-        // Calculate average best score per user
         const ranked = Object.entries(userScores).map(([uid, data]) => {
           const scores = Object.values(data.units).map(u => u.bestScore)
           const totalScoreSum = scores.reduce((sum, s) => sum + s, 0)
@@ -143,7 +127,6 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
 
           return {
             id: uid,
-            name: userNameMap[uid] || '무명 탐험가',
             avgScore: Math.round(avgScore * 10) / 10,
             avgInitialScore: Math.round((unitCount > 0 ? Object.values(data.units).reduce((sum, u) => sum + u.initialScore, 0) / unitCount : 0) * 10) / 10,
             totalAttemptCount: Object.values(data.units).reduce((sum, u) => sum + (u.attemptCount || 1), 0),
@@ -156,48 +139,49 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
           }
         })
 
-        /**
-         * Tie-breaking Sort:
-         * 1. avgScore (desc)
-         * 2. unitCount (desc)
-         * 3. totalCrystals (desc)
-         * 4. firstTimestamp (asc)
-         */
         ranked.sort((a, b) => {
           if (b.avgScore !== a.avgScore) return b.avgScore - a.avgScore
-          if (b.unitCount !== a.unitCount) return b.unitCount - a.unitCount
+          if (b.avgInitialScore !== a.avgInitialScore) return b.avgInitialScore - a.avgInitialScore
           if (b.totalCrystals !== a.totalCrystals) return b.totalCrystals - a.totalCrystals
+          if (b.totalAttemptCount !== a.totalAttemptCount) return b.totalAttemptCount - a.totalAttemptCount
+          if (b.unitCount !== a.unitCount) return b.unitCount - a.unitCount
           return a.firstTimestamp - b.firstTimestamp
         })
 
-        // Dense ranking
         let currentRank = 1
         for (let i = 0; i < ranked.length; i++) {
           if (i > 0) {
             const prev = ranked[i - 1]
             const curr = ranked[i]
             const isTie = prev.avgScore === curr.avgScore &&
-                          prev.unitCount === curr.unitCount &&
+                          prev.avgInitialScore === curr.avgInitialScore &&
                           prev.totalCrystals === curr.totalCrystals &&
+                          prev.totalAttemptCount === curr.totalAttemptCount &&
+                          prev.unitCount === curr.unitCount &&
                           prev.firstTimestamp === curr.firstTimestamp
             if (!isTie) currentRank = i + 1
           }
           ranked[i].rank = currentRank
         }
 
-        setRankings(ranked)
+        setRawRankings(ranked)
       } catch (error) {
         console.error('useLeaderboard: collection group query error:', error)
-        setRankings([])
       } finally {
         setLoading(false)
       }
     }
 
     fetchScopedRankings()
-  }, [regionId, chapterId, unitId, userNameMap])
+  }, [regionId, chapterId, unitId])
 
   const result = useMemo(() => {
+    // Map names dynamically
+    const rankings = rawRankings.map(r => ({
+      ...r,
+      name: userNameMap[r.id] || '무명 탐험가'
+    }))
+
     const myData = rankings.find(u => u.id === userId) || null
     const myRank = myData?.rank || null
 
@@ -208,7 +192,8 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
       loading,
       totalCount: rankings.length,
     }
-  }, [rankings, userId, loading])
+  }, [rawRankings, userNameMap, userId, loading])
 
   return result
 }
+

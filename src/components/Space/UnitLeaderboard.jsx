@@ -10,8 +10,19 @@ import '../../styles/leaderboard.css'
  * Top 10을 표시하며, 기본적으로 닫힌 상태로 시작합니다.
  */
 export default function UnitLeaderboard({ user, unitId, unitTitle }) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(() => {
+    // Preserve open state for this unit session
+    const saved = sessionStorage.getItem(`metasense_lb_open_${unitId}`)
+    return saved === 'true'
+  })
+
   const { rankings, myRank, myData, loading, totalCount } = useLeaderboard(user?.uid, { unitId })
+
+  const toggleOpen = () => {
+    const next = !isOpen
+    setIsOpen(next)
+    sessionStorage.setItem(`metasense_lb_open_${unitId}`, next)
+  }
 
   const top10 = rankings.slice(0, 10)
   const myInTop10 = top10.some(u => u.id === user?.uid)
@@ -73,7 +84,7 @@ export default function UnitLeaderboard({ user, unitId, unitTitle }) {
     <div className="leaderboard-container">
       <button
         className="leaderboard-toggle"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
       >
         <span>🛰️ MISSION RANKING ({totalCount}명 참여){unitTitle ? ` — ${unitTitle}` : ''}</span>
         <span className={`toggle-icon ${isOpen ? 'open' : ''}`}>▼</span>
@@ -89,14 +100,14 @@ export default function UnitLeaderboard({ user, unitId, unitTitle }) {
             style={{ overflow: 'hidden' }}
           >
             <div className="leaderboard-panel">
-              {loading ? (
+              {loading && rankings.length === 0 ? (
                 <div className="lb-loading">순위 데이터 수신 중...</div>
               ) : rankings.length === 0 ? (
                 <div className="lb-empty">이 단원에서 아직 퀴즈를 완료한 탐험가가 없습니다.</div>
               ) : (
                 <>
                   <div className="lb-tiebreaker-info" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', textAlign: 'center' }}>
-                    * 동점 시: 획득 광석(콤보/속도 보너스)이 많을수록 &gt; 먼저 도달한 순으로 랭킹 산정
+                    * 동점 시: 최고 점수 &gt; 최초 점수 &gt; 광석 수 &gt; 시도 횟수(많은 순) &gt; 먼저 달성한 순으로 랭킹 산정
                   </div>
 
                   {/* Top 10 */}

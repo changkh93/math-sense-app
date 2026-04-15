@@ -107,14 +107,14 @@ export default function MissionLeaderboard({ user, chapterId, chapterTitle }) {
             style={{ overflow: 'hidden' }}
           >
             <div className="leaderboard-panel">
-              {loading ? (
+              {loading && rankings.length === 0 ? (
                 <div className="lb-loading">순위 데이터 수신 중...</div>
               ) : rankings.length === 0 ? (
                 <div className="lb-empty">이 챕터에서 아직 퀴즈를 완료한 탐험가가 없습니다.</div>
               ) : (
                 <>
                   <div className="lb-tiebreaker-info" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem', textAlign: 'center' }}>
-                    * 동점 시: 탐사 단원이 많을수록 &gt; 획득 광석이 많을수록 &gt; 먼저 시작한 순으로 랭킹 산정
+                    * 동점 시: 최고 점수 &gt; 최초 점수 &gt; 광석 수 &gt; 시도 횟수(많은 순) &gt; 먼저 달성한 순으로 랭킹 산정
                   </div>
 
                   {/* Top 10 with progress bars */}

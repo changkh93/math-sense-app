@@ -1570,7 +1570,7 @@ export default function MissionHub({
   )
   }
   const renderTextView = () => (
-    <div className="mission-content-view fade-in" style={{ maxWidth: '960px', width: '95%', margin: '0 auto', padding: '1.5rem', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
+    <div className="mission-content-view fade-in" style={{ maxWidth: '1200px', width: '95%', margin: '0 auto', padding: '1.5rem', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
       <div className="glass-card" style={{ padding: '2.5rem 3rem', background: 'rgba(5, 10, 25, 0.9)', minHeight: 'fit-content' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
           <h2 className="font-title" style={{ fontSize: '1.8rem', color: 'var(--crystal-cyan)' }}>DATA LOG: {activeUnit?.title}</h2>
@@ -1874,7 +1874,7 @@ export default function MissionHub({
 
     // Render list
     return (
-      <div className="mission-content-view fade-in" style={{ width: '100%', maxWidth: '1000px', margin: '0 auto', paddingTop: '2rem' }}>
+      <div className="mission-content-view fade-in" style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', paddingTop: '2rem' }}>
          <h2 className="font-title" style={{ textAlign: 'center', color: 'var(--planet-green)', marginBottom: '2rem', fontSize: '2rem' }}>TRANSMISSION DATA CHIPS</h2>
          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
              {txList.map((tx, idx) => {
