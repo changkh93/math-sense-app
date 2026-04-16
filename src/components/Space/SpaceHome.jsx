@@ -14,7 +14,7 @@ import { motion as Motion, AnimatePresence } from 'framer-motion' // Added Frame
 import StarField from './StarField'
 import ClusterSelector from './ClusterSelector'
 import Planet3D from './Planet3D' // Keep for Login Screen
-import SpaceScene from './SpaceScene' // New 3D Scene
+import SpaceScene, { checkWebGLSupport } from './SpaceScene' // New 3D Scene
 import SpaceQuizView from './SpaceQuizView'
 import MissionHub from './MissionHub' // New Integration
 import SpaceDashboard from './SpaceDashboard'
@@ -57,6 +57,27 @@ function SpaceHome() {
     return sessionStorage.getItem('metasense_cluster_id') || null;
   });
   
+  // --- 2D Mode Setup ---
+  const [is2DMode, setIs2DMode] = useState(() => {
+    return localStorage.getItem('metasense_2d_mode') === 'true';
+  });
+
+  useEffect(() => {
+    if (!checkWebGLSupport()) {
+      setIs2DMode(true);
+      localStorage.setItem('metasense_2d_mode', 'true');
+    }
+  }, []);
+
+  const toggle2DMode = useCallback(() => {
+    setIs2DMode(prev => {
+      const next = !prev;
+      localStorage.setItem('metasense_2d_mode', next);
+      if (soundManager?.playClick) soundManager.playClick();
+      return next;
+    });
+  }, []);
+
   const [selectedRegionId, internalSetSelectedRegionId] = useState(() => {
     return sessionStorage.getItem('metasense_region_id') || null;
   });
@@ -1672,7 +1693,7 @@ function SpaceHome() {
     <div className="space-bg">
       {/* 3D Background Scene - Always Visible but controlled by state */}
       <AnimatePresence>
-        {currentView === 'planet' && selectedClusterId && (
+        {currentView === 'planet' && selectedClusterId && !is2DMode && (
           <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1813,6 +1834,32 @@ function SpaceHome() {
                     🚀 행성 군집 목록 (Multi-Verse)
                   </button>
                 )}
+
+                {/* 2D/3D Mode Toggle Button */}
+                <button
+                  className="space-btn cosmic-btn"
+                  onClick={toggle2DMode}
+                  style={{ 
+                    position: 'fixed', 
+                    right: '25px', 
+                    top: '120px', 
+                    padding: '12px 24px', 
+                    fontSize: '1.05rem', 
+                    fontWeight: 'bold',
+                    pointerEvents: 'auto',
+                    background: is2DMode ? 'rgba(80, 200, 120, 0.2)' : 'rgba(0, 212, 255, 0.15)',
+                    border: `1px solid ${is2DMode ? 'var(--neon-green)' : 'var(--neon-blue)'}`,
+                    boxShadow: `0 0 15px ${is2DMode ? 'rgba(80, 200, 120, 0.3)' : 'rgba(0, 243, 255, 0.3)'}`,
+                    zIndex: 100,
+                    color: is2DMode ? '#4ade80' : 'white',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: '12px',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {is2DMode ? '🌌 2D 지도 뷰 (3D로 전환)' : '🚀 3D 행성 뷰 (2D로 전환)'}
+                </button>
+
                 <Motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -1837,74 +1884,124 @@ function SpaceHome() {
                   )}
                 </Motion.div>
 
-                {/* Fallback Region Navigator — 3D 장면이 보이지 않을 때 행성 선택 가능 */}
+                {/* Region Navigator — 2D 모드 메인 UI 또는 3D Fallback */}
                 <Motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 2, duration: 0.8 }}
+                  transition={{ delay: is2DMode ? 0.1 : 0.8, duration: 0.8 }} // 2D 모드일 때는 즉시 렌더링, 3D 에러 대비용은 비교적 짧은 대기 후 렌더링
                   style={{
-                    position: 'fixed',
-                    bottom: '100px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
+                    position: is2DMode ? 'relative' : 'fixed',
+                    bottom: is2DMode ? 'auto' : '100px',
+                    left: is2DMode ? 'auto' : '50%',
+                    transform: is2DMode ? 'none' : 'translateX(-50%)',
+                    marginTop: is2DMode ? '150px' : '0',
                     pointerEvents: 'auto',
                     zIndex: 50,
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: '0.6rem',
+                    gap: is2DMode ? '2rem' : '0.6rem',
                     justifyContent: 'center',
-                    maxWidth: '90vw',
-                    padding: '1rem 1.5rem',
-                    background: 'rgba(5, 5, 20, 0.7)',
-                    backdropFilter: 'blur(12px)',
+                    maxWidth: is2DMode ? '1200px' : '90vw',
+                    padding: is2DMode ? '2rem' : '1rem 1.5rem',
+                    background: is2DMode ? 'transparent' : 'rgba(5, 5, 20, 0.7)',
+                    backdropFilter: is2DMode ? 'none' : 'blur(12px)',
                     borderRadius: '16px',
-                    border: '1px solid rgba(0, 243, 255, 0.15)',
+                    border: is2DMode ? 'none' : '1px solid rgba(0, 243, 255, 0.15)',
+                    margin: is2DMode ? '150px auto 50px' : undefined
                   }}
                 >
                   {loadingRegions ? (
-                    <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      행성 스캔 중...
+                    <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>
+                      행성 맵 스캔 중...
                     </span>
                   ) : (!regions || regions.length === 0) ? (
-                    <span className="font-tech" style={{ color: '#ff6b6b', fontSize: '0.85rem' }}>
-                      ⚠ 등록된 행성이 없습니다
+                    <span className="font-tech" style={{ color: '#ff6b6b', fontSize: '1.2rem' }}>
+                      ⚠ 탐사가능한 행성이 없습니다
                     </span>
-                  ) : regions.map(region => (
-                    <button
+                  ) : regions.map((region, idx) => {
+                    const isRegionLocked = region.isPrivate && userData?.regionAccess?.[region.id] !== 'active' && userData?.regionAccess?.[region.id] !== 'completed';
+                    const isCompleted = explorationStatus[region.id] === 'completed';
+                    
+                    return (
+                    <Motion.div
                       key={region.id}
-                      className="font-tech"
+                      initial={is2DMode ? { opacity: 0, scale: 0.8 } : false}
+                      animate={is2DMode ? { opacity: 1, scale: 1, transition: { delay: idx * 0.05 + 0.2 } } : false}
+                      whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => {
                         if (region.isPrivate) {
                           const accessStatus = userData?.regionAccess?.[region.id];
                           if (accessStatus === 'suspended') {
                             alert('이 행성에 대한 접근이 일시정지되었습니다.');
                             return;
-                          } else if (accessStatus !== 'active') {
+                          } else if (accessStatus !== 'active' && accessStatus !== 'completed') {
                             setPendingRegion(region);
-                            soundManager.playClick();
+                            if (soundManager?.playClick) soundManager.playClick();
                             return;
                           }
                         }
                         updateSelectedRegionId(region.id);
-                        soundManager.playWarp();
+                        if (soundManager?.playWarp) soundManager.playWarp();
                       }}
                       style={{
-                        padding: '0.5rem 1rem',
-                        background: explorationStatus[region.id] === 'completed'
-                          ? 'rgba(80, 200, 120, 0.2)'
-                          : 'rgba(0, 212, 255, 0.1)',
-                        border: `1px solid ${explorationStatus[region.id] === 'completed' ? 'rgba(80, 200, 120, 0.5)' : 'rgba(0, 212, 255, 0.3)'}`,
-                        borderRadius: '10px',
-                        color: 'var(--text-bright)',
-                        fontSize: '0.85rem',
+                        padding: is2DMode ? '1.5rem' : '0.5rem 1rem',
+                        width: is2DMode ? '250px' : 'auto',
+                        background: is2DMode 
+                          ? (isCompleted ? 'rgba(80, 200, 120, 0.15)' : 'rgba(5, 20, 40, 0.8)') 
+                          : (isCompleted ? 'rgba(80, 200, 120, 0.2)' : 'rgba(0, 212, 255, 0.1)'),
+                        border: is2DMode 
+                          ? `1px solid ${isCompleted ? 'rgba(80, 200, 120, 0.6)' : 'rgba(0, 243, 255, 0.4)'}`
+                          : `1px solid ${isCompleted ? 'rgba(80, 200, 120, 0.5)' : 'rgba(0, 212, 255, 0.3)'}`,
+                        borderRadius: is2DMode ? '20px' : '10px',
+                        color: 'white',
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap'
+                        display: 'flex',
+                        flexDirection: is2DMode ? 'column' : 'row',
+                        alignItems: 'center',
+                        gap: is2DMode ? '1rem' : '0.5rem',
+                        boxShadow: is2DMode ? (isCompleted ? '0 8px 32px rgba(80,200,120,0.3)' : '0 8px 32px rgba(0,0,0,0.6)') : 'none',
+                        position: 'relative',
+                        overflow: 'hidden'
                       }}
                     >
-                      {region.title} {explorationStatus[region.id] === 'completed' ? '✅' : ''}
-                    </button>
-                  ))}
+                      {/* Subdued background effect for 2D Mode */}
+                      {is2DMode && (
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                          background: region.color ? `radial-gradient(circle at top right, ${region.color}40, transparent 70%)` : 'none',
+                          zIndex: 0
+                        }}/>
+                      )}
+                      
+                      <div style={{ position: 'relative', zIndex: 1 }}>
+                        {is2DMode && (
+                          <div style={{ 
+                            fontSize: '4rem', 
+                            marginBottom: '0.5rem', 
+                            filter: isRegionLocked ? 'grayscale(100%) opacity(50%)' : 'drop-shadow(0 0 15px rgba(255,255,255,0.4))' 
+                          }}>
+                            {region.icon || '🌍'}
+                          </div>
+                        )}
+                        <span className="font-tech" style={{ 
+                          fontSize: is2DMode ? '1.3rem' : '0.85rem',
+                          fontWeight: is2DMode ? 'bold' : 'normal',
+                          color: isRegionLocked ? '#88aabb' : 'white'
+                        }}>
+                          {isRegionLocked && !is2DMode ? '🔒 ' : ''}
+                          {region.title}
+                        </span>
+                        
+                        {is2DMode && (
+                          <div style={{ marginTop: '0.8rem', fontSize: '0.9rem', color: isRegionLocked ? '#ff6b6b' : 'var(--crystal-cyan)', fontWeight: 'bold' }}>
+                            {isRegionLocked ? '🔒 접근 제한' : (isCompleted ? '⭐ 탐사 완료' : '진입 가능')}
+                          </div>
+                        )}
+                      </div>
+                    </Motion.div>
+                    )
+                  })}
                 </Motion.div>
               </div>
             ) : !selectedChapterDocId ? (

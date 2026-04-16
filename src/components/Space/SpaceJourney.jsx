@@ -23,8 +23,14 @@ export default function SpaceJourney({ userData }) {
 
   useEffect(() => {
     const fetchHistory = async () => {
-      if (!auth.currentUser) return;
+      if (!auth.currentUser) {
+        // If auth isn't ready yet, we wait. 
+        // Component will re-run when auth.currentUser changes.
+        return;
+      }
+      
       try {
+        setLoading(true);
         const hQ = query(
           collection(db, 'users', auth.currentUser.uid, 'history'),
           orderBy('timestamp', 'asc')
@@ -46,7 +52,7 @@ export default function SpaceJourney({ userData }) {
       }
     };
     fetchHistory();
-  }, []);
+  }, [auth.currentUser?.uid]);
 
   // 집계 스탯
   const dailyStats = useMemo(() => {
@@ -167,6 +173,7 @@ export default function SpaceJourney({ userData }) {
     history.forEach(h => {
       if (!h.timestamp) return;
       const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
+      if (isNaN(d.getTime())) return;
       const dateStr = getTodayKST(d);
       if (dateStr < minDate) minDate = dateStr;
     });
@@ -288,7 +295,30 @@ export default function SpaceJourney({ userData }) {
     setPopover({ day, x, y });
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '5rem', color: '#94a3b8' }}>탐사 기록 다운로드 중...</div>;
+  if (loading) {
+    return (
+      <div className="journey-loading-container">
+        <div className="journey-loader"></div>
+        <div className="journey-loading-text">탐선 항로 데이터 복구 중...</div>
+      </div>
+    );
+  }
+
+  const activeHistory = history.filter(h => h.timestamp);
+  if (activeHistory.length === 0 && transactions.length === 0) {
+    return (
+      <div className="space-journey-container empty-journey">
+        <div className="journey-empty-card glass-card hud-border">
+          <div className="empty-icon">🌑</div>
+          <h3>아직 탐사 기록이 없습니다</h3>
+          <p>첫 단원을 완료하고 지식의 혜성 궤도를 활성화해보세요!</p>
+          <button className="font-tech" onClick={() => (window.location.href = '/')}>
+            탐사 시작하기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const activeDaysCount = timelineData.days.filter(d => d.isActive).length;
 
@@ -722,7 +752,8 @@ function TraditionalCalendarView({ months, tier, activeColor, onDayClick }) {
               if (!day) return <div key={`empty-${i}`} className="cal-cell empty"></div>;
               
               // 색상 투명도로 활동 강도 표시 (히트맵)
-              const intensity = day.isActive ? 0.3 + Math.min((day.stats?.crystals || 0) / 100, 0.7) : 0;
+              const crystalsEarned = day.stats?.crystals || 0;
+              const intensity = day.isActive ? 0.3 + Math.min(crystalsEarned / 100, 0.7) : 0;
 
                return (
                 <div 

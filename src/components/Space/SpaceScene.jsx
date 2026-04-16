@@ -345,8 +345,39 @@ class CanvasErrorBoundary extends React.Component {
   }
 }
 
+export function checkWebGLSupport() {
+  try {
+    const canvas = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext && 
+      (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+  } catch (e) {
+    return false;
+  }
+}
+
 export default function SpaceScene(props) {
   const fov = props.isBoosting ? 60 : 45;
+  const [hasWebGL, setHasWebGL] = useState(true);
+
+  useEffect(() => {
+    if (!checkWebGLSupport()) {
+      console.warn('[SpaceScene] WebGL not supported on this device.');
+      setHasWebGL(false);
+    }
+  }, []);
+
+  if (!hasWebGL) {
+    // WebGL 지원 안됨 - 빈 배경 (SpaceHome에서 2D 모드로 강제 전환할 수 있도록 처리)
+    return (
+      <div style={{ width: '100%', height: '100vh', position: 'absolute', top: 0, left: 0, 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+         <p style={{ color: '#88aabb', textShadow: '0 0 10px rgba(0,212,255,0.4)' }}>
+           3D 렌더링을 지원하지 않는 기기입니다. 2D 모드를 사용해 주세요.
+         </p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ width: '100%', height: '100vh', position: 'absolute', top: 0, left: 0 }}>
       <CanvasErrorBoundary>
@@ -354,11 +385,11 @@ export default function SpaceScene(props) {
           camera={{ position: [0, 5, 15], fov: fov }}
           gl={{ antialias: true, alpha: true, failIfMajorPerformanceCaveat: false }}
           onCreated={({ gl }) => {
-            // 안전장치: WebGL context lost 시 복구 시도
             const canvas = gl.domElement;
             canvas.addEventListener('webglcontextlost', (e) => {
               e.preventDefault();
               console.warn('[SpaceScene] WebGL context lost');
+              setHasWebGL(false);
             });
           }}
         >
