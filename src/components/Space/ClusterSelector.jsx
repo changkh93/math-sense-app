@@ -11,7 +11,7 @@ const CLUSTER_IMAGES = {
 
 function ClusterSelector({ clusters, onSelect }) {
   return (
-    <div className="space-bg" style={{ minHeight: '100vh', position: 'relative', overflow: 'hidden', padding: '20px' }}>
+    <div className="space-bg" style={{ minHeight: '100vh', position: 'relative', padding: '20px' }}>
       <StarField count={200} />
       
       <div style={{ position: 'relative', zIndex: 10, maxWidth: '1400px', margin: '0 auto', textAlign: 'center', paddingTop: '10vh' }}>

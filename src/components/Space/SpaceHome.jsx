@@ -22,12 +22,13 @@ import SpaceCollection from './SpaceCollection'
 import SpaceStore from './SpaceStore'
 import SpaceRanking from './SpaceRanking'
 import SpaceJourney from './SpaceJourney'
-import CrystalLedger from './CrystalLedger'
 import RegionAccessModal from './RegionAccessModal' // New Integration
 import AssignmentHub from './AssignmentHub' // New Integration
+import ProfileEditView from './ProfileEditView' // Profile Management
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
+import CrystalLedger from './CrystalLedger'
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates } from '../../utils/streakUtils'
@@ -1651,6 +1652,21 @@ function SpaceHome() {
     )
   }
 
+  // --- Profile View ---
+  if (currentView === 'profile') {
+    return (
+      <div className="space-bg" style={{ overflowY: 'auto' }}>
+        <SpaceNavbar 
+          currentView={currentView} 
+          onViewChange={(view) => {
+            setCurrentView(view)
+          }} 
+        />
+        <ProfileEditView onBack={() => { setCurrentView('planet'); soundManager.playWarp(); }} />
+      </div>
+    )
+  }
+
   // --- Dark Matter View ---
   if (isDarkMatterMode && darkMatterQuestions.length > 0) {
     // Stage 1: Dashboard
@@ -1691,20 +1707,18 @@ function SpaceHome() {
   // Main App
   return (
     <div className="space-bg" style={{ 
-      overflowY: is2DMode && !selectedRegionId ? 'auto' : 'hidden',
-      height: '100vh',
-      height: '100dvh'
+      overflowX: 'hidden'
     }}>
       {/* 3D Background Scene - Always Visible but controlled by state */}
       <AnimatePresence>
         {currentView === 'planet' && selectedClusterId && !is2DMode && (
-          <Motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}
-          >
+            <Motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1 }}
+              style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}
+            >
             <SpaceScene 
               regions={regions} 
               selectedRegionId={selectedRegionId}
@@ -1795,8 +1809,6 @@ function SpaceHome() {
       {/* Main Content Overlay */}
       <main className="space-container" style={{ 
         pointerEvents: 'none',
-        height: is2DMode && !selectedRegionId ? 'auto' : '100%',
-        minHeight: is2DMode && !selectedRegionId ? '100vh' : 'auto',
         overflowY: 'visible'
       }}>
         {currentView === 'planet' && !selectedClusterId && (

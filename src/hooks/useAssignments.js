@@ -346,3 +346,23 @@ export const useAdminUserAllAttendance = (userId) => {
     staleTime: 1000 * 60 * 5,
   });
 };
+
+/**
+ * Admin: Get all attendance records for a specific date across all clusters
+ */
+export const useAdminTodayAttendance = (dateStr) => {
+  return useQuery({
+    queryKey: ['admin', 'todayAttendance', dateStr],
+    queryFn: async () => {
+      if (!dateStr) return [];
+      const q = query(
+        collection(db, 'attendance'),
+        where('date', '==', dateStr)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+    enabled: !!dateStr,
+    refetchInterval: 60000, // refresh every minute since it is used for live monitoring
+  });
+};
