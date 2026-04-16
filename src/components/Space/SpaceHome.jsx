@@ -1918,7 +1918,80 @@ function SpaceHome() {
                     <span className="font-tech" style={{ color: '#ff6b6b', fontSize: '1.2rem' }}>
                       ⚠ 탐사가능한 행성이 없습니다
                     </span>
-                  ) : regions.map((region, idx) => {
+                  ) : (
+                    <>
+                    {is2DMode && (
+                      <>
+                        {/* Special Card: Assignment Hub */}
+                        <Motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1, transition: { delay: 0.1 } }}
+                          whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            setCurrentView('assignment_hub');
+                            if (soundManager?.playWarp) soundManager.playWarp();
+                          }}
+                          style={{
+                            padding: '1.5rem',
+                            width: '250px',
+                            background: 'rgba(255, 215, 0, 0.1)',
+                            border: '1px solid rgba(255, 215, 0, 0.4)',
+                            borderRadius: '20px',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            boxShadow: '0 8px 32px rgba(255, 215, 0, 0.2)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <div style={{ position: 'relative', zIndex: 1 }}>
+                            <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>🛰️</div>
+                            <span className="font-tech" style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>과제 기록소</span>
+                            <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#ffd700', fontWeight: 'bold' }}>Stellar Archive</div>
+                          </div>
+                        </Motion.div>
+
+                        {/* Special Card: Dark Matter */}
+                        <Motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1, transition: { delay: 0.15 } }}
+                          whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            startDarkMatterMode();
+                            if (soundManager?.playWarp) soundManager.playWarp();
+                          }}
+                          style={{
+                            padding: '1.5rem',
+                            width: '250px',
+                            background: 'rgba(168, 85, 247, 0.1)',
+                            border: '1px solid rgba(168, 85, 247, 0.4)',
+                            borderRadius: '20px',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            boxShadow: '0 8px 32px rgba(168, 85, 247, 0.2)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <div style={{ position: 'relative', zIndex: 1 }}>
+                            <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>🌑</div>
+                            <span className="font-tech" style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>다크 매터</span>
+                            <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#a78bfa', fontWeight: 'bold' }}>Review Needed: {darkMatterCount}</div>
+                          </div>
+                        </Motion.div>
+                      </>
+                    )}
+                    {regions.map((region, idx) => {
                     const isRegionLocked = region.isPrivate && userData?.regionAccess?.[region.id] !== 'active' && userData?.regionAccess?.[region.id] !== 'completed';
                     const isCompleted = explorationStatus[region.id] === 'completed';
                     
@@ -2002,6 +2075,8 @@ function SpaceHome() {
                     </Motion.div>
                     )
                   })}
+                  </>
+                  )}
                 </Motion.div>
               </div>
             ) : !selectedChapterDocId ? (
