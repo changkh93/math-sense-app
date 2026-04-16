@@ -1690,7 +1690,11 @@ function SpaceHome() {
 
   // Main App
   return (
-    <div className="space-bg">
+    <div className="space-bg" style={{ 
+      overflowY: is2DMode && !selectedRegionId ? 'auto' : 'hidden',
+      height: '100vh',
+      height: '100dvh'
+    }}>
       {/* 3D Background Scene - Always Visible but controlled by state */}
       <AnimatePresence>
         {currentView === 'planet' && selectedClusterId && !is2DMode && (
@@ -1789,7 +1793,12 @@ function SpaceHome() {
       />
 
       {/* Main Content Overlay */}
-      <main className="space-container" style={{ pointerEvents: 'none' }}>
+      <main className="space-container" style={{ 
+        pointerEvents: 'none',
+        height: is2DMode && !selectedRegionId ? 'auto' : '100%',
+        minHeight: is2DMode && !selectedRegionId ? '100vh' : 'auto',
+        overflowY: 'visible'
+      }}>
         {currentView === 'planet' && !selectedClusterId && (
           <div style={{ pointerEvents: 'auto', width: '100%' }}>
             <ClusterSelector 
@@ -1806,13 +1815,17 @@ function SpaceHome() {
             {!selectedRegionId ? (
               // Region Selection (Overlay only)
               <div style={{ 
-                position: 'absolute', 
-                top: '100px', 
-                left: '50%', 
-                transform: 'translateX(-50%)', 
+                position: is2DMode ? 'relative' : 'absolute', 
+                top: is2DMode ? '0' : '100px', 
+                left: is2DMode ? '0' : '50%', 
+                transform: is2DMode ? 'none' : 'translateX(-50%)', 
                 textAlign: 'center',
                 width: '100%',
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                minHeight: is2DMode ? '100vh' : 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
               }}>
                 {activeClusters.length > 1 && (
                   <button 
@@ -1907,7 +1920,7 @@ function SpaceHome() {
                     backdropFilter: is2DMode ? 'none' : 'blur(12px)',
                     borderRadius: '16px',
                     border: is2DMode ? 'none' : '1px solid rgba(0, 243, 255, 0.15)',
-                    margin: is2DMode ? '150px auto 50px' : undefined
+                    margin: is2DMode ? '180px auto 100px' : undefined // Added more bottom margin for scrolling
                   }}
                 >
                   {loadingRegions ? (
