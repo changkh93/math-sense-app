@@ -407,7 +407,7 @@ export default function SpaceRanking({ user, userData }) {
                               fontWeight: isMe ? 800 : 500,
                               color: isMe ? '#ffffff' : 'rgba(255,255,255,0.9)'
                             }}>
-                              {u.name || '무명 탐험가'}
+                              {u.studentName || u.name || '무명 탐험가'}
                             </span>
                             {isMe && <span style={{ 
                               fontSize: '0.7rem', 
