@@ -186,6 +186,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
         <WarpGateDocking 
           clusterData={clusterData} 
           user={user} 
+          userData={userData}
           attendanceMutation={attendanceMutation}
           todayAttendance={attendanceRecords?.find(a => a.date === getTodayKST())}
         />
@@ -326,6 +327,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               dateStr={selectedDateStr}
               assignment={assignments?.find(a => a.date === selectedDateStr)} 
               user={user}
+              userData={userData}
               submitMutation={submitMutation}
               onCancel={() => setSelectedDateStr(null)}
               onNavigateToUnit={onNavigateToUnit}
@@ -341,7 +343,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
 /**
  * Warp Gate Docking Button (Attendance)
  */
-function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendance }) {
+function WarpGateDocking({ clusterData, user, userData, attendanceMutation, todayAttendance }) {
   const [status, setStatus] = useState({ state: 'invalid', message: '', countdown: null });
 
   useEffect(() => {
@@ -478,7 +480,7 @@ function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendanc
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import DailyLearningTimeline from './DailyLearningTimeline';
 
-function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submitMutation, onCancel, onNavigateToUnit }) {
+function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userData, submitMutation, onCancel, onNavigateToUnit }) {
   const [activeTab, setActiveTab] = useState('report'); // 'report' or 'timeline'
   
   const [content, setContent] = useState(assignment?.content || '');
