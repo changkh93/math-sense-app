@@ -106,6 +106,100 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     { id: 'other', label: '기타', icon: '💬' }
   ];
 
+  // ─── PDF Capture Helper: Render PDF page to canvas via pdf.js CDN ───
+  const capturePdfPageToDataUrl = async (pdfUrl, pageNum = 1) => {
+    // Extract Google Drive file ID if applicable
+    let fetchUrl = pdfUrl;
+    const driveMatch = pdfUrl.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
+    if (driveMatch && driveMatch[1]) {
+      // Use export=download for direct file access
+      fetchUrl = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+    }
+
+    // Dynamically load pdf.js from CDN (only when needed)
+    if (!window.pdfjsLib) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs';
+        script.type = 'module';
+        script.onload = resolve;
+        script.onerror = reject;
+
+        // Fallback: use legacy build for broader compatibility
+        const legacyScript = document.createElement('script');
+        legacyScript.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.js';
+        legacyScript.onload = resolve;
+        legacyScript.onerror = reject;
+
+        // Try legacy (non-module) first for wider browser support
+        document.head.appendChild(legacyScript);
+      });
+    }
+
+    const pdfjsLib = window.pdfjsLib;
+    if (!pdfjsLib) throw new Error('pdf.js failed to load');
+    
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.js';
+
+    const loadingTask = pdfjsLib.getDocument({
+      url: fetchUrl,
+      withCredentials: false,
+      disableAutoFetch: false,
+      disableStream: false
+    });
+
+    const pdf = await loadingTask.promise;
+    const clampedPage = Math.min(Math.max(pageNum, 1), pdf.numPages);
+    const page = await pdf.getPage(clampedPage);
+
+    const scale = 2; // High-res for annotation clarity
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    
+    return {
+      dataUrl: canvas.toDataURL('image/png'),
+      numPages: pdf.numPages,
+      pageNum: clampedPage
+    };
+  };
+
+  // ─── Extension Capture Helper (shared between video & PDF) ───
+  const attemptExtensionCapture = async () => {
+    setIsCapturing(true);
+    document.body.classList.add('is-capturing');
+    document.body.classList.add('is-extension-capturing');
+
+    const capturePromise = new Promise(resolve => {
+      captureResolveRef.current = resolve;
+
+      // CRITICAL: Wait for modal to hide via framer-motion
+      setTimeout(() => {
+        window.postMessage({ type: 'AGORA_CAPTURE_REQUEST' }, window.location.origin);
+      }, 300);
+
+      // Timeout fallback
+      setTimeout(() => {
+        if (captureResolveRef.current === resolve) {
+          resolve({ error: 'Extension response timeout' });
+          captureResolveRef.current = null;
+        }
+      }, 6000);
+    });
+
+    const result = await capturePromise;
+    if (result.dataUrl) {
+      setBackgroundImage(result.dataUrl);
+      return true; // Success
+    }
+    console.warn('Extension capture failed, falling back:', result.error);
+    return false; // Fell through
+  };
+
   const handleToggleDrawMode = async () => {
     if (isDrawMode) {
       // Exit drawing mode without automatic saving (user must click Complete Attachment)
@@ -113,125 +207,187 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     } else {
       // Turn ON: Capture Background
       try {
-        // 혁신적 해결책: 영상 캡처 시 확장 프로그램 사용 시도
-        if (activeContext?.type === 'video') {
-          if (extensionStatus === 'not_found') {
+        const isPdfDatalog = activeContext?.type === 'datalog' && activeContext?.pdfUrl;
+        const isVideo = activeContext?.type === 'video';
+
+        // ── 1. Extension Capture Path (works for BOTH video and PDF iframes) ──
+        if (isVideo || isPdfDatalog) {
+          if (extensionStatus === 'not_found' && isVideo) {
+             // Only show extension prompt for video (PDF has its own fallback)
              setShowExtensionPrompt(true);
-             return; // Don't proceed to draw mode if user needs extension for accuracy
+             return;
           }
           
           if (extensionStatus === 'detected') {
-            setIsCapturing(true);
-            document.body.classList.add('is-capturing');
-            document.body.classList.add('is-extension-capturing');
-            
-            // Request capture from bridge with a small delay to ensure modal is hidden
-            const capturePromise = new Promise(resolve => {
-              captureResolveRef.current = resolve;
-              
-              // CRITICAL: Wait for modal to hide via framer-motion
-              setTimeout(() => {
-                window.postMessage({ type: 'AGORA_CAPTURE_REQUEST' }, window.location.origin);
-              }, 300);
-
-              // Timeout fallback
-              setTimeout(() => {
-                if (captureResolveRef.current === resolve) {
-                  resolve({ error: 'Extension response timeout' });
-                  captureResolveRef.current = null;
-                }
-              }, 6000);
-            });
-
-            const result = await capturePromise;
-            if (result.dataUrl) {
-              setBackgroundImage(result.dataUrl);
-               // Success! Skip html2image logic
-              return; 
-            }
-            console.warn('Extension capture failed, falling back to legacy capture:', result.error);
+            const success = await attemptExtensionCapture();
+            if (success) return; // Extension captured the full screen including iframe
           }
         }
 
-        setBackgroundImage(null); 
-        setIsCapturing(true); 
-        document.body.classList.add('is-capturing');
-        
-        // Wait for class change / UI state to settle
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-        const element = document.getElementById('quiz-capture-area');
-        if (element) {
-          const captureOptions = {
-            quality: 0.9,
-            pixelRatio: 2,
-            backgroundColor: '#050a19',
-            cacheBust: true,
-            useCORS: true,
-            filter: (node) => {
-              // Skip problematic modal/UI elements
-              if (node.classList?.contains('modal-overlay')) return false;
-              if (node.classList?.contains('capture-hide')) return false;
-              // Skip IFRAMEs (like YouTube) to prevent SecurityError
-              if (node.tagName === 'IFRAME') return false;
-              // Skip style/link nodes that might trigger SecurityError if crossorigin fails
-              // We keep it broad but usually cross-origin links are the culprit
-              if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
-                try {
-                  // If we can't access rules, it's a security risk to keep it during capture
-                  if (node.sheet && !node.sheet.cssRules) return false;
-                } catch (e) {
-                  console.warn('Skipping stylesheet due to potential SecurityError:', node.href);
-                  return false;
-                }
-              }
-              return true;
-            }
-          };
+        // ── 2. PDF-specific Capture Path (pdf.js canvas rendering) ──
+        if (isPdfDatalog) {
+          setBackgroundImage(null);
+          setIsCapturing(true);
+          document.body.classList.add('is-capturing');
 
           try {
-            // Precise Viewport Capture for Data Log
-            const scrollEl = element.querySelector('.mission-content-view');
-            const cardEl = scrollEl?.querySelector('.glass-card');
+            console.log('📄 Attempting PDF capture via pdf.js for:', activeContext.pdfUrl);
+            const result = await capturePdfPageToDataUrl(activeContext.pdfUrl, 1);
+            console.log(`📄 PDF page ${result.pageNum}/${result.numPages} captured successfully`);
+            setBackgroundImage(result.dataUrl);
+          } catch (pdfErr) {
+            console.warn('📄 PDF direct capture failed (CORS or network):', pdfErr.message);
             
-            if (scrollEl && cardEl && activeContext?.type === 'datalog') {
-              const scrollTop = scrollEl.scrollTop;
-              const viewportHeight = scrollEl.clientHeight;
-              const viewportWidth = scrollEl.clientWidth;
-              const ratio = 2; // Capture at 2x for clarity
+            // ── 3. Fallback: Capture non-iframe content with a styled PDF placeholder ──
+            try {
+              await new Promise(resolve => setTimeout(resolve, 200));
+              const element = document.getElementById('quiz-capture-area');
+              if (element) {
+                // Temporarily replace the iframe area with a visible placeholder
+                const iframes = element.querySelectorAll('iframe');
+                const placeholders = [];
+                iframes.forEach(iframe => {
+                  const placeholder = document.createElement('div');
+                  placeholder.style.cssText = `
+                    width: 100%; height: ${iframe.clientHeight}px;
+                    display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    background: linear-gradient(135deg, #1a1a2e, #16213e);
+                    border: 2px dashed rgba(0, 243, 255, 0.4); border-radius: 12px;
+                    color: rgba(0, 243, 255, 0.8); font-size: 1.5rem; font-family: monospace;
+                  `;
+                  placeholder.innerHTML = '<div style="font-size:3rem;margin-bottom:1rem">📄</div><div>PDF 문서 영역</div><div style="font-size:0.8rem;margin-top:0.5rem;color:rgba(255,255,255,0.4)">그림 위에 질문 내용을 그려주세요</div>';
+                  iframe.parentNode.insertBefore(placeholder, iframe);
+                  iframe.style.display = 'none';
+                  placeholders.push({ iframe, placeholder });
+                });
 
-              // Capture the full content card first
-              const fullCanvas = await htmlToImage.toCanvas(cardEl, {
-                ...captureOptions,
-                quality: 1,
-                pixelRatio: ratio
-              });
+                const captureOptions = {
+                  quality: 0.9, pixelRatio: 2, backgroundColor: '#050a19',
+                  cacheBust: true, useCORS: true,
+                  filter: (node) => {
+                    if (node.classList?.contains('modal-overlay')) return false;
+                    if (node.classList?.contains('capture-hide')) return false;
+                    if (node.tagName === 'IFRAME') return false;
+                    if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+                      try { if (node.sheet && !node.sheet.cssRules) return false; }
+                      catch (e) { return false; }
+                    }
+                    return true;
+                  }
+                };
 
-              // Crop the visible part onto a new canvas
-              const cropCanvas = document.createElement('canvas');
-              cropCanvas.width = viewportWidth * ratio;
-              cropCanvas.height = viewportHeight * ratio;
-              const ctx = cropCanvas.getContext('2d');
-              
-              if (ctx) {
-                ctx.drawImage(
-                  fullCanvas,
-                  0, scrollTop * ratio, cardEl.clientWidth * ratio, viewportHeight * ratio,
-                  0, 0, viewportWidth * ratio, viewportHeight * ratio
-                );
-                setBackgroundImage(cropCanvas.toDataURL('image/png'));
+                const scrollEl = element.querySelector('.mission-content-view');
+                const cardEl = scrollEl?.querySelector('.glass-card');
+                if (scrollEl && cardEl) {
+                  const scrollTop = scrollEl.scrollTop;
+                  const viewportHeight = scrollEl.clientHeight;
+                  const viewportWidth = scrollEl.clientWidth;
+                  const ratio = 2;
+                  const fullCanvas = await htmlToImage.toCanvas(cardEl, { ...captureOptions, quality: 1, pixelRatio: ratio });
+                  const cropCanvas = document.createElement('canvas');
+                  cropCanvas.width = viewportWidth * ratio;
+                  cropCanvas.height = viewportHeight * ratio;
+                  const ctx = cropCanvas.getContext('2d');
+                  if (ctx) {
+                    ctx.drawImage(fullCanvas, 0, scrollTop * ratio, cardEl.clientWidth * ratio, viewportHeight * ratio, 0, 0, viewportWidth * ratio, viewportHeight * ratio);
+                    setBackgroundImage(cropCanvas.toDataURL('image/png'));
+                  }
+                }
+
+                // Restore iframes
+                placeholders.forEach(({ iframe, placeholder }) => {
+                  iframe.style.display = '';
+                  placeholder.remove();
+                });
               }
-            } else {
-              // Fallback for types without special scrolling needs (like video or quiz)
-              const dataUrl = await htmlToImage.toPng(element, captureOptions);
-              setBackgroundImage(dataUrl);
+            } catch (fallbackErr) {
+              console.error('Fallback capture also failed:', fallbackErr);
+              setError('PDF 화면을 캡처할 수 없습니다. 대신 📎 이미지 첨부 기능을 사용해주세요.');
             }
-          } catch (captureErr) {
-            console.error('Screen capture failed with Error:', captureErr);
-            setError('화면을 캡처하는 중 보안 오류가 발생했습니다. 브라우저 설정이나 확장 프로그램을 확인해 주세요.');
           }
+          // Continue to finally block → enter draw mode
         } else {
-          console.warn('Capture target element #quiz-capture-area not found.');
+          // ── Original html-to-image capture for non-PDF content ──
+          setBackgroundImage(null); 
+          setIsCapturing(true); 
+          document.body.classList.add('is-capturing');
+          
+          // Wait for class change / UI state to settle
+          await new Promise(resolve => setTimeout(resolve, 200));
+
+          const element = document.getElementById('quiz-capture-area');
+          if (element) {
+            const captureOptions = {
+              quality: 0.9,
+              pixelRatio: 2,
+              backgroundColor: '#050a19',
+              cacheBust: true,
+              useCORS: true,
+              filter: (node) => {
+                // Skip problematic modal/UI elements
+                if (node.classList?.contains('modal-overlay')) return false;
+                if (node.classList?.contains('capture-hide')) return false;
+                // Skip IFRAMEs (like YouTube) to prevent SecurityError
+                if (node.tagName === 'IFRAME') return false;
+                // Skip style/link nodes that might trigger SecurityError if crossorigin fails
+                // We keep it broad but usually cross-origin links are the culprit
+                if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+                  try {
+                    // If we can't access rules, it's a security risk to keep it during capture
+                    if (node.sheet && !node.sheet.cssRules) return false;
+                  } catch (e) {
+                    console.warn('Skipping stylesheet due to potential SecurityError:', node.href);
+                    return false;
+                  }
+                }
+                return true;
+              }
+            };
+
+            try {
+              // Precise Viewport Capture for Data Log
+              const scrollEl = element.querySelector('.mission-content-view');
+              const cardEl = scrollEl?.querySelector('.glass-card');
+              
+              if (scrollEl && cardEl && activeContext?.type === 'datalog') {
+                const scrollTop = scrollEl.scrollTop;
+                const viewportHeight = scrollEl.clientHeight;
+                const viewportWidth = scrollEl.clientWidth;
+                const ratio = 2; // Capture at 2x for clarity
+
+                // Capture the full content card first
+                const fullCanvas = await htmlToImage.toCanvas(cardEl, {
+                  ...captureOptions,
+                  quality: 1,
+                  pixelRatio: ratio
+                });
+
+                // Crop the visible part onto a new canvas
+                const cropCanvas = document.createElement('canvas');
+                cropCanvas.width = viewportWidth * ratio;
+                cropCanvas.height = viewportHeight * ratio;
+                const ctx = cropCanvas.getContext('2d');
+                
+                if (ctx) {
+                  ctx.drawImage(
+                    fullCanvas,
+                    0, scrollTop * ratio, cardEl.clientWidth * ratio, viewportHeight * ratio,
+                    0, 0, viewportWidth * ratio, viewportHeight * ratio
+                  );
+                  setBackgroundImage(cropCanvas.toDataURL('image/png'));
+                }
+              } else {
+                // Fallback for types without special scrolling needs (like video or quiz)
+                const dataUrl = await htmlToImage.toPng(element, captureOptions);
+                setBackgroundImage(dataUrl);
+              }
+            } catch (captureErr) {
+              console.error('Screen capture failed with Error:', captureErr);
+              setError('화면을 캡처하는 중 보안 오류가 발생했습니다. 브라우저 설정이나 확장 프로그램을 확인해 주세요.');
+            }
+          } else {
+            console.warn('Capture target element #quiz-capture-area not found.');
+          }
         }
       } catch (err) {
         console.error('General error entering draw mode:', err);

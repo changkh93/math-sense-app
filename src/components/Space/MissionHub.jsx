@@ -531,7 +531,8 @@ export default function MissionHub({
       unitTitle: activeUnit?.title,
       transmissionTitle: selectedTx?.title,
       videoId: contextType === 'video' ? selectedTx?.videoId : null,
-      startTime: contextType === 'video' ? Math.floor(lastVideoTimeRef.current || 0) : null
+      startTime: contextType === 'video' ? Math.floor(lastVideoTimeRef.current || 0) : null,
+      pdfUrl: contextType === 'datalog' ? missionData?.learningContents?.pdfUrl : null
     })
     setIsQuestionModalOpen(true)
   }
