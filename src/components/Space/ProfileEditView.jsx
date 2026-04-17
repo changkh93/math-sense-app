@@ -14,7 +14,6 @@ export default function ProfileEditView({ onBack }) {
   const [formData, setFormData] = useState({
     studentName: '',
     studentPhone: '',
-    parentPhone: '',
     participation: {} // { clusterId: ['월', '화'] }
   });
 
@@ -23,7 +22,6 @@ export default function ProfileEditView({ onBack }) {
       setFormData({
         studentName: userData.studentName || user?.displayName || '',
         studentPhone: userData.studentPhone || '',
-        parentPhone: userData.parentPhone || '',
         participation: userData.participation || {}
       });
     }
@@ -90,7 +88,6 @@ export default function ProfileEditView({ onBack }) {
       await updateDoc(userRef, {
         studentName: formData.studentName.trim(),
         studentPhone: formData.studentPhone.trim(),
-        parentPhone: formData.parentPhone.trim(),
         participation: formData.participation,
         profileUpdatedAt: serverTimestamp()
       });
@@ -168,18 +165,6 @@ export default function ProfileEditView({ onBack }) {
                     value={formData.studentPhone}
                     onChange={(e) => setFormData({...formData, studentPhone: e.target.value.replace(/[^0-9]/g, '')})}
                     placeholder="01012345678"
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.9rem' }}>관제탑(학부모) 전화번호 ("-" 제외)</label>
-                  <input 
-                    type="tel" 
-                    className="space-input" 
-                    value={formData.parentPhone}
-                    onChange={(e) => setFormData({...formData, parentPhone: e.target.value.replace(/[^0-9]/g, '')})}
-                    placeholder="01087654321"
-                    required
                   />
                 </div>
               </div>

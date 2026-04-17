@@ -155,8 +155,25 @@ export default function LiveStatus() {
 
   const [selectedClusterId, setSelectedClusterId] = useState('all');
   const [users, setUsers] = useState([]);
+  const [parentsMap, setParentsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [nowDate, setNowDate] = useState(new Date());
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'parents'), (snap) => {
+      const map = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (!data.isDeleted && data.childrenUids) {
+          data.childrenUids.forEach(childUid => {
+            map[childUid] = data.phone;
+          });
+        }
+      });
+      setParentsMap(map);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setNowDate(new Date()), 60000);
@@ -289,7 +306,7 @@ export default function LiveStatus() {
                      name: u.studentName || u.name || '알 수 없음',
                      clusterName: cluster.name,
                      studentPhone: u.studentPhone || '',
-                     parentPhone: u.parentPhone || ''
+                     parentPhone: parentsMap[u.uid] || ''
                    });
                  }
                }
@@ -300,7 +317,7 @@ export default function LiveStatus() {
     });
 
     return missingList;
-  }, [clusters, users, nowDate, todayAttendance]);
+  }, [clusters, users, nowDate, todayAttendance, parentsMap]);
 
   return (
     <div className="admin-page position-relative" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
