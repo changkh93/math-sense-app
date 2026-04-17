@@ -288,6 +288,12 @@ export default function LiveStatus() {
           // Check which users have this cluster & day in participation
           users.forEach(u => {
             if (!u.participation) return;
+            // 비공개 클러스터는 수강 권한(clusterAccess)이 있는 학생만 체크
+            const cid = cluster.docId || cluster.id;
+            if (cluster.isPrivate) {
+              const access = u.clusterAccess || {};
+              if (access[cid] !== 'active') return;
+            }
             const userDays = u.participation[cluster.docId || cluster.id] || [];
             
             if (userDays.includes(currentDayStr)) {

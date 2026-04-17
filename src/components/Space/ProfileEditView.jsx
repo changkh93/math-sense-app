@@ -84,11 +84,22 @@ export default function ProfileEditView({ onBack }) {
     soundManager.playClick();
 
     try {
+      // 접근 권한 없는 비공개 클러스터의 participation 데이터 정리
+      const cleanedParticipation = {};
+      const access = userData?.clusterAccess || {};
+      Object.keys(formData.participation).forEach(cid => {
+        const cluster = clusters?.find(c => c.docId === cid || c.id === cid);
+        // 공개 클러스터이거나, 비공개이면서 접근 권한이 있는 경우만 유지
+        if (!cluster || !cluster.isPrivate || access[cid] === 'active') {
+          cleanedParticipation[cid] = formData.participation[cid];
+        }
+      });
+
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         studentName: formData.studentName.trim(),
         studentPhone: formData.studentPhone.trim(),
-        participation: formData.participation,
+        participation: cleanedParticipation,
         profileUpdatedAt: serverTimestamp()
       });
       alert('🌟 프로필이 성공적으로 저장되었습니다!');
@@ -181,7 +192,12 @@ export default function ProfileEditView({ onBack }) {
               </h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                {!isClustersLoading && clusters?.map((cluster) => {
+                {!isClustersLoading && clusters?.filter(cluster => {
+                  // 공개 클러스터는 모두 표시, 비공개는 수강 권한 확인
+                  if (!cluster.isPrivate) return true;
+                  const access = userData?.clusterAccess || {};
+                  return access[cluster.docId] === 'active' || access[cluster.id] === 'active';
+                }).map((cluster) => {
                   const availableDays = extractAvailableDays(cluster.classSchedule);
                   if (availableDays.length === 0) return null; // 운영툴에 설정된 스케줄이 없으면 표시하지 않음
 
