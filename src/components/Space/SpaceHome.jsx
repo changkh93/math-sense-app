@@ -321,12 +321,15 @@ function SpaceHome() {
           const rmItem = rmMeta.find(m => m.id === id)
           const iqItem = iqMeta.find(m => m.id === id)
           
+          // Determine the most recent activity timestamp for this particular question
+          const activeAt = iqItem?.lastFailedAt || rmItem?.markedAt || rmItem?.masteredAt || null
+
           freshQuestions.push({
             ...qData,
             id,
             _source: iqItem ? 'incorrect' : 'review',
             _reviewMark: !!rmItem,
-            // Temporary, will be updated with unitTitle below
+            _activeAt: activeAt, // Add physical timestamp for sorting
             unitId: qData.unitId || iqItem?.unitId || rmItem?.unitId
           })
         })

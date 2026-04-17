@@ -23,13 +23,23 @@ export default function DarkMatterView({
           unitId: key,
           unitTitle: q.unitTitle || q.question?.replace(/\[재검토\]\s*/, '') || key,
           questions: [],
-          hasReviewMarks: false
+          hasReviewMarks: false,
+          maxActiveAt: 0 // Track the latest activity timestamp in this group
         }
       }
+
+      // Convert Firestore timestamp or Date to number for comparison
+      const qTime = q._activeAt?.toMillis ? q._activeAt.toMillis() : (q._activeAt instanceof Date ? q._activeAt.getTime() : 0)
+      if (qTime > map[key].maxActiveAt) {
+        map[key].maxActiveAt = qTime
+      }
+
       map[key].questions.push(q)
       if (q._reviewMark) map[key].hasReviewMarks = true
     })
-    return Object.values(map).sort((a, b) => b.questions.length - a.questions.length)
+    
+    // Sort by maxActiveAt descending (Newest first)
+    return Object.values(map).sort((a, b) => b.maxActiveAt - a.maxActiveAt)
   }, [questions])
 
   // Dark Energy percentage
