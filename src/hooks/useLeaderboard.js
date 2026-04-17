@@ -27,7 +27,7 @@ export function useLeaderboard(userId, { regionId, chapterId, unitId } = {}) {
       const map = {}
       snapshot.docs.forEach(doc => {
         const d = doc.data()
-        map[doc.id] = d.name || '무명 탐험가'
+        map[doc.id] = d.studentName || d.name || '무명 탐험가'
       })
       setUserNameMap(map)
     }, (error) => {

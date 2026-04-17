@@ -151,6 +151,7 @@ export const useAdminUserSearch = (searchTerm) => {
       
       const term = searchTerm.toLowerCase();
       return allUsers.filter(u => 
+        (u.studentName && u.studentName.toLowerCase().includes(term)) ||
         (u.name && u.name.toLowerCase().includes(term)) ||
         (u.email && u.email.toLowerCase().includes(term)) ||
         (u.id && u.id.toLowerCase().includes(term))

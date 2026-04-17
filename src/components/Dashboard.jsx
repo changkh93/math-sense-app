@@ -39,7 +39,7 @@ export default function Dashboard({ user, userData }) {
   return (
     <div className="dashboard-view fadeIn">
       <div className="dashboard-header glass">
-        <h2>🧑‍🎓 {user.displayName} 학생의 성장 기록</h2>
+        <h2>🧑‍🎓 {userData?.studentName || user.displayName} 학생의 성장 기록</h2>
         <p>지금까지의 노력이 광석처럼 차곡차곡 쌓이고 있어요!</p>
       </div>
 

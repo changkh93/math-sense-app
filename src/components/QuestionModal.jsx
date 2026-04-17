@@ -311,6 +311,17 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       const user = auth.currentUser;
       if (!user) throw new Error('로그인이 필요합니다.');
 
+      // Fetch studentName from profile for correct display
+      let resolvedName = user.displayName || '익명 학생';
+      try {
+        const { getDoc, doc: firestoreDoc } = await import('firebase/firestore');
+        const userSnap = await getDoc(firestoreDoc(db, 'users', user.uid));
+        if (userSnap.exists()) {
+          const ud = userSnap.data();
+          resolvedName = ud.studentName || ud.name || resolvedName;
+        }
+      } catch (e) { /* fallback to displayName */ }
+
       let drawingUrl = null;
 
       // Handle Final Upload to Firebase (drawing OR uploaded image)
@@ -327,7 +338,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
 
       const questionData = {
         userId: user.uid,
-        userName: user.displayName || '익명 학생',
+        userName: resolvedName,
         content,
         type: activeContext?.type || type,
         category: 'general', 

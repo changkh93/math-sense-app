@@ -17,7 +17,7 @@ const StreakFixer = () => {
   };
 
   const processUser = async (uid, userData, todayKST) => {
-    const displayName = userData.displayName || userData.name || uid.slice(0, 8);
+    const displayName = userData.studentName || userData.displayName || userData.name || uid.slice(0, 8);
 
     // 1. 코어 확보 증거 수집 (구매 기록)
     const txSnap = await getDocs(query(collection(db, 'users', uid, 'crystal_transactions'), orderBy('timestamp', 'asc')));

@@ -80,7 +80,7 @@ const LiveUserRow = ({ user, onViewDetails }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
            <div style={{ width: 10, height: 10, borderRadius: '50%', background: badgeColor, boxShadow: `0 0 8px ${badgeColor}` }}></div>
            <div>
-             <div style={{ fontWeight: 'bold' }}>{user.name || '알 수 없음'}</div>
+             <div style={{ fontWeight: 'bold' }}>{user.studentName || user.name || '알 수 없음'}</div>
              <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>{user.email}</div>
            </div>
         </div>
@@ -502,7 +502,7 @@ export default function LiveStatus() {
          <div className="drawer-overlay" onClick={(e) => { if(e.target === e.currentTarget) setSelectedUser(null) }}>
             <div className="drawer-panel">
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px' }}>
-                  <h3 style={{ margin: 0 }}>{selectedUser.name} <span style={{fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)'}}>학습 타임라인</span></h3>
+                  <h3 style={{ margin: 0 }}>{selectedUser.studentName || selectedUser.name} <span style={{fontSize: '0.9rem', color: 'rgba(255,255,255,0.5)'}}>학습 타임라인</span></h3>
                   <button onClick={() => setSelectedUser(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20}/></button>
                </div>
                

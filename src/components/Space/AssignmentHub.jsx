@@ -14,7 +14,7 @@ import { getTodayKST, getNowKST, getKSTComponents } from '../../utils/streakUtil
  * The main interface for students to view their assignments map (calendar) and submit work.
  */
 export default function AssignmentHub({ clusterId, regionId, onClose, onNavigateToUnit }) {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(null); // The date the user clicked on
   const [showChronicle, setShowChronicle] = useState(false);
@@ -406,7 +406,7 @@ function WarpGateDocking({ clusterData, user, attendanceMutation, todayAttendanc
     try {
       await attendanceMutation.mutateAsync({
         userId: user.uid,
-        userName: user.displayName || user.email?.split('@')[0],
+        userName: userData?.studentName || user.displayName || user.email?.split('@')[0],
         clusterId: clusterData.id,
         clusterName: clusterData.name,
         date: getTodayKST(),
@@ -647,7 +647,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, submi
         docId: assignment?.id,
         assignmentData: {
           userId: user.uid,
-          userName: user.displayName || user.email?.split('@')[0] || 'Unknown Explorer',
+          userName: userData?.studentName || user.displayName || user.email?.split('@')[0] || 'Unknown Explorer',
           clusterId: normalizedClusterId,
           regionId: regionId || null,
           date: dateStr,

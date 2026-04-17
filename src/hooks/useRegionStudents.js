@@ -14,7 +14,7 @@ export function useRegionStudents(regionId) {
       userSnaps.forEach((userSnap, i) => {
         if (userSnap.exists()) {
           const uData = userSnap.data();
-          studentsData[i].name = uData.name || uData.displayName || uData.profileName || studentsData[i].displayName;
+          studentsData[i].name = uData.studentName || uData.name || uData.displayName || uData.profileName || studentsData[i].displayName;
         }
       });
       

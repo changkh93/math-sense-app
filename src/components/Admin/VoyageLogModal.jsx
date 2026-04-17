@@ -64,7 +64,7 @@ export default function VoyageLogModal({ user, onClose }) {
         {/* Header */}
         <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 style={{ margin: 0, color: 'var(--text-bright)' }}>📖 {user.name} 대원의 항해 일지</h2>
+            <h2 style={{ margin: 0, color: 'var(--text-bright)' }}>📖 {user.studentName || user.name} 대원의 항해 일지</h2>
             <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>과목을 선택하고 항해 일지를 열어보세요</p>
           </div>
           <button className="admin-btn danger" onClick={onClose} style={{ flexShrink: 0 }}>X 닫기</button>

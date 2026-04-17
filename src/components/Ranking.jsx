@@ -62,7 +62,7 @@ export default function Ranking({ user }) {
             <span className="rank">
               {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
             </span>
-            <span className="name">{u.name || '무명탐험가'}</span>
+            <span className="name">{u.studentName || u.name || '무명탐험가'}</span>
             <span className="orbs">💎 {u.crystals || 0}</span>
             <span className="avg">{u.averageScore ? u.averageScore.toFixed(1) : '0.0'}점</span>
           </div>

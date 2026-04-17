@@ -46,7 +46,7 @@ export default function AdminAssignmentsUser({ onSelectDate }) {
                     onSelectDate([]); // Clear right panel
                   }}
                 >
-                  {u.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>({u.email})</span>
+                  {u.studentName || u.name} <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>({u.email})</span>
                 </div>
               ))
             ) : (
@@ -58,7 +58,7 @@ export default function AdminAssignmentsUser({ onSelectDate }) {
         {selectedUser && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0, 212, 255, 0.1)', padding: '0.8rem', borderRadius: '4px', border: '1px solid var(--crystal-cyan)' }}>
             <div>
-              <strong style={{ color: 'var(--text-bright)' }}>선택된 학생: {selectedUser.name}</strong>
+              <strong style={{ color: 'var(--text-bright)' }}>선택된 학생: {selectedUser.studentName || selectedUser.name}</strong>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{selectedUser.email}</div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -81,7 +81,7 @@ export default function AdminAssignmentsUser({ onSelectDate }) {
         ) : (
           <AdminStudentCalendar 
             userId={selectedUser.id} 
-            userName={selectedUser.name} 
+            userName={selectedUser.studentName || selectedUser.name} 
             onSelectDate={onSelectDate} 
           />
         )}

@@ -118,7 +118,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
               <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <div style={{ width: '100%', height: '100%', background: 'var(--crystal-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 'bold' }}>
-                {user?.displayName?.[0] || '?'}
+                {(userData?.studentName || user?.displayName)?.[0] || '?'}
               </div>
             )}
           </div>

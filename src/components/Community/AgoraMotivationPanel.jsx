@@ -73,7 +73,7 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
             ranking.map((hero, i) => (
               <div key={hero.id} className="hall-item">
                 <span className="badge">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '✨'}</span>
-                <span className="name">{hero.name || '익명 탐험가'}</span>
+                <span className="name">{hero.studentName || hero.name || '익명 탐험가'}</span>
                 <span className="count font-tech">{hero.helpCount} 도움</span>
               </div>
             ))

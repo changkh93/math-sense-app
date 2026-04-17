@@ -241,10 +241,20 @@ export function useQAMutations() {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
 
+        // Fetch studentName from profile for correct display
+        let resolvedName = user.displayName || '익명 학생';
+        try {
+          const userSnap = await getDoc(doc(db, 'users', user.uid));
+          if (userSnap.exists()) {
+            const ud = userSnap.data();
+            resolvedName = ud.studentName || ud.name || resolvedName;
+          }
+        } catch (e) { /* fallback to displayName */ }
+
         const answerData = {
           questionId,
           userId: user.uid,
-          userName: user.displayName || '익명 학생',
+          userName: resolvedName,
           isTeacher,
           content,
           isAccepted: false,
@@ -483,10 +493,20 @@ export function useStarMessages() {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
 
+        // Fetch studentName from profile for correct display
+        let resolvedName = user.displayName || '탐험가';
+        try {
+          const userSnap = await getDoc(doc(db, 'users', user.uid));
+          if (userSnap.exists()) {
+            const ud = userSnap.data();
+            resolvedName = ud.studentName || ud.name || resolvedName;
+          }
+        } catch (e) { /* fallback to displayName */ }
+
         // Get user data for level/tier if possible
         const msgData = {
           userId: user.uid,
-          userName: user.displayName || '탐험가', // Now showing name
+          userName: resolvedName,
           content: content.trim(),
           type,
           category,

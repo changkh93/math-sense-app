@@ -238,10 +238,10 @@ const ChildCard = ({ childUid }) => {
               border: `2px solid ${statusColor}`,
               fontSize: '1.3rem'
             }}>
-              {(childData.name || '?')[0]}
+              {(childData.studentName || childData.name || '?')[0]}
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'white' }}>{childData.name || '알 수 없음'}</h3>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'white' }}>{childData.studentName || childData.name || '알 수 없음'}</h3>
               <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
                 {childData.email}
               </div>
@@ -602,7 +602,7 @@ export default function ParentDashboard() {
                   }}>
                     {parentData.childrenUids.map(uid => {
                       const profile = childrenProfiles[uid] || {};
-                      const name = profile.name || '불러오는 중...';
+                      const name = profile.studentName || profile.name || '불러오는 중...';
                       const isActive = selectedChildUid === uid;
                       
                       return (

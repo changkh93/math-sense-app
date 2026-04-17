@@ -142,7 +142,7 @@ function UserAccessManager() {
                     <UserIcon size={30} color="#00f3ff" />
                   </div>
                   <div>
-                    <h3 style={{ margin: '0 0 5px 0', color: 'white', fontSize: '1.4rem' }}>{user.name || '이름 없음'}</h3>
+                    <h3 style={{ margin: '0 0 5px 0', color: 'white', fontSize: '1.4rem' }}>{user.studentName || user.name || '이름 없음'}</h3>
                     <p style={{ margin: 0, color: '#88aabb', fontSize: '1rem' }}>{user.email} <span style={{fontSize: '0.8rem', opacity: 0.6}}>(UID: {user.uid})</span></p>
                   </div>
                 </div>

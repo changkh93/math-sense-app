@@ -303,7 +303,7 @@ export default function ParentManager() {
         const q = query(collection(db, 'users'), where('__name__', 'in', batch));
         const snap = await getDocs(q);
         snap.docs.forEach(d => {
-          names[d.id] = d.data().name || d.data().email || d.id;
+          names[d.id] = d.data().studentName || d.data().name || d.data().email || d.id;
         });
       }
       setChildNames(names);
@@ -432,8 +432,8 @@ export default function ParentManager() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             {childSearchResults.map(child => (
                               <div key={child.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px' }}>
-                                <span>{child.name || '이름 없음'} <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>({child.email})</span></span>
-                                <button onClick={() => handleLinkChild(parent.id, child.uid, child.name)} className="primary-btn" style={{ padding: '6px 14px', fontSize: '0.85rem' }}>
+                                <span>{child.studentName || child.name || '이름 없음'} <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>({child.email})</span></span>
+                                <button onClick={() => handleLinkChild(parent.id, child.uid, child.studentName || child.name)} className="primary-btn" style={{ padding: '6px 14px', fontSize: '0.85rem' }}>
                                   <Link2 size={14} style={{ marginRight: 4 }} /> 연결
                                 </button>
                               </div>
