@@ -1,5 +1,5 @@
 import React from 'react';
-import { InlineMath } from 'react-katex';
+import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
 
 /**
@@ -37,10 +37,23 @@ export const parseInlineFormatting = (text, options = {}) => {
     keyPrefix = 'fmt'
   } = options;
   
-  // 1. Split by Links: [text](url)
-  const linkParts = text.split(/(\[.*?\]\(.*?\))/g);
+  // 1. Split by Block Math: $$math$$
+  const blockMathParts = text.split(/(\$\$.*?\$\$)/gs);
   
-  return linkParts.flatMap((lPart, lIndex) => {
+  return blockMathParts.flatMap((bmPart, bmIndex) => {
+    // Check if it's a block math match
+    if (bmPart.startsWith('$$') && bmPart.endsWith('$$') && bmPart.length >= 4) {
+      return (
+        <div key={`${keyPrefix}-block-math-${bmIndex}`} style={{ margin: '1rem 0', width: '100%', textAlign: 'center' }}>
+          <BlockMath math={sanitizeLaTeX(bmPart.slice(2, -2))} />
+        </div>
+      );
+    }
+
+    // 2. Split by Links: [text](url)
+    const linkParts = bmPart.split(/(\[.*?\]\(.*?\))/g);
+    
+    return linkParts.flatMap((lPart, lIndex) => {
     // Check if it's a link match
     const linkMatch = lPart.match(/^\[(.*?)\]\((.*?)\)$/);
     if (linkMatch) {
@@ -71,12 +84,18 @@ export const parseInlineFormatting = (text, options = {}) => {
       // If it's a bold part
       if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length >= 4) {
         const innerBold = bPart.slice(2, -2);
-        // parse inner for math
-        const mathParts = innerBold.split(/(\$.*?\$)/g);
+        const mathParts = innerBold.split(/(\$\$.*?\$\$|\$.*?\$)/g);
         
         const innerContent = mathParts.map((mPart, mIndex) => {
+            if (mPart.startsWith('$$') && mPart.endsWith('$$') && mPart.length >= 4) {
+                return (
+                  <div key={`${keyPrefix}-bold-block-math-${lIndex}-${bIndex}-${mIndex}`} style={{ margin: '0.5rem 0', textAlign: 'center' }}>
+                    <BlockMath math={sanitizeLaTeX(mPart.slice(2, -2))} />
+                  </div>
+                );
+            }
             if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
-                return <InlineMath key={`${keyPrefix}-math-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
+                return <InlineMath key={`${keyPrefix}-bold-math-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
             }
             return mPart;
         });
@@ -84,9 +103,16 @@ export const parseInlineFormatting = (text, options = {}) => {
         return <strong key={`${keyPrefix}-bold-${lIndex}-${bIndex}`} style={{ color: boldColor }}>{innerContent}</strong>;
       }
       
-      // 3. Check math: $math$
-      const mathParts = bPart.split(/(\$.*?\$)/g);
+      // 4. Check math: $$math$$ or $math$
+      const mathParts = bPart.split(/(\$\$.*?\$\$|\$.*?\$)/g);
       return mathParts.map((mPart, mIndex) => {
+          if (mPart.startsWith('$$') && mPart.endsWith('$$') && mPart.length >= 4) {
+              return (
+                <div key={`${keyPrefix}-block-math-out-${lIndex}-${bIndex}-${mIndex}`} style={{ margin: '1rem 0', width: '100%', textAlign: 'center' }}>
+                  <BlockMath math={sanitizeLaTeX(mPart.slice(2, -2))} />
+                </div>
+              );
+          }
           if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
               return <InlineMath key={`${keyPrefix}-math-out-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
           }
@@ -114,4 +140,5 @@ export const parseInlineFormatting = (text, options = {}) => {
       });
     });
   });
+});
 };
