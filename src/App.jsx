@@ -24,6 +24,7 @@ import TeacherQA from './pages/Admin/TeacherQA'
 import PythonCourseBuilder from './pages/Admin/PythonCourseBuilder'
 import MiddleSchoolMathBuilder from './pages/Admin/MiddleSchoolMathBuilder'
 import AdminAssignments from './pages/Admin/AdminAssignments'
+import AdminStudentReport from './pages/Admin/AdminStudentReport'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
@@ -56,6 +57,7 @@ function App() {
         <Route path="parents" element={<ParentManager />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="assignments" element={<AdminAssignments />} />
+        <Route path="student-report" element={<AdminStudentReport />} />
         <Route path="mission/:unitId" element={<MissionContentEditor />} />
         <Route path="mission/:unitId/ai-tagging" element={<AITaggingEditor />} />
         <Route path="quizzes/:unitId" element={<QuizEditor />} />

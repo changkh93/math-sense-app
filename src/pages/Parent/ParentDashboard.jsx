@@ -8,6 +8,7 @@ import { useAdminUserAllAssignments, useAdminUserAllAttendance } from '../../hoo
 import { getTodayKST } from '../../utils/streakUtils';
 import { Rocket, LogOut, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import StudentReport from '../../components/Report/StudentReport';
 
 // -------------------------------------------------------------
 // Helper: format relative time
@@ -157,6 +158,8 @@ const ChildCard = ({ childUid }) => {
   const [now, setNow] = useState(Date.now());
   const [expanded, setExpanded] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportDays, setReportDays] = useState(30);
   const [selectedDate, setSelectedDate] = useState(getTodayKST());
   
   const isToday = selectedDate === getTodayKST();
@@ -431,6 +434,43 @@ const ChildCard = ({ childUid }) => {
             </div>
           )}
         </div>
+
+        {/* Report Button */}
+        <div style={{ padding: '0 20px 18px' }}>
+          <button
+            onClick={() => setShowReport(!showReport)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: showReport ? 'rgba(165, 94, 234, 0.15)' : 'linear-gradient(135deg, rgba(165, 94, 234, 0.12), rgba(69, 170, 242, 0.08))',
+              border: '1px solid rgba(165, 94, 234, 0.25)',
+              borderRadius: '12px',
+              color: '#a55eea',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              transition: 'all 0.2s'
+            }}
+          >
+            📊 {showReport ? '리포트 닫기' : '성장 리포트 보기'}
+          </button>
+        </div>
+
+        {/* Full Report */}
+        {showReport && (
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <StudentReport
+              userId={childUid}
+              days={reportDays}
+              onDaysChange={setReportDays}
+              isParentView={true}
+            />
+          </div>
+        )}
     </div>
   );
 };
