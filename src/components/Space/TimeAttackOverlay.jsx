@@ -140,25 +140,38 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
 
   useEffect(() => {
     // Determine random safe zone position
-    const containerW = window.innerWidth * 0.8; 
-    const containerH = window.innerHeight * 0.7; 
+    // Use window dimensions but with strict margins to avoid HUD elements
+    const containerW = window.innerWidth; 
+    const containerH = window.innerHeight; 
     
+    // Safety Margins:
+    // - Top: 120px (Title, Back button)
+    // - Bottom: 100px (Video controls)
+    // - Sides: 60px
+    const marginT = 120;
+    const marginB = 100;
+    const marginL = 60;
+    const marginR = 60;
+
+    const safeW = Math.max(200, containerW - marginL - marginR - width);
+    const safeH = Math.max(200, containerH - marginT - marginB - height);
+
     const zone = Math.floor(Math.random() * 3);
     let x, y;
 
-    if (zone === 0) { // Top 15%
-      x = Math.random() * (containerW - width);
-      y = Math.random() * (containerH * 0.15 - height);
-    } else if (zone === 1) { // Bottom 15%
-      x = Math.random() * (containerW - width);
-      y = containerH * 0.85 + Math.random() * (containerH * 0.15 - height);
-    } else { // Right Center
-      x = containerW * 0.8 + Math.random() * (containerW * 0.2 - width);
-      y = containerH * 0.3 + Math.random() * (containerH * 0.4 - height);
+    if (zone === 0) { // Top-ish area (but below HUD)
+      x = marginL + Math.random() * safeW;
+      y = marginT + Math.random() * (safeH * 0.2);
+    } else if (zone === 1) { // Bottom-ish area (but above controls)
+      x = marginL + Math.random() * safeW;
+      y = marginT + safeH * 0.8 + Math.random() * (safeH * 0.2);
+    } else { // Center-Right area
+      x = marginL + safeW * 0.6 + Math.random() * (safeW * 0.4);
+      y = marginT + safeH * 0.2 + Math.random() * (safeH * 0.6);
     }
 
     if (x < 0 || y < 0) {
-      x = 50; y = 50;
+      x = 100; y = 200;
     }
 
     setPosition({ x, y });
