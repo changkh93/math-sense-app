@@ -1204,11 +1204,17 @@ export default function MissionHub({
       setStampCount(stampedSetRef.current.size)
     }
 
-    // Check completion: 90%+ of video seconds stamped
+    // Check completion: dynamic threshold based on duration
     if (duration > 0) {
       const totalSeconds = Math.floor(duration)
       const coverage = stampedSetRef.current.size / totalSeconds
-      if (coverage >= 0.99) {
+      
+      // Dynamic Threshold:
+      // - Long Videos (>40m): 85% (Allows for ~6min break skip)
+      // - Standard: 95% (Safe margin for minor skips/buffering)
+      const threshold = duration > 2400 ? 0.85 : 0.95;
+
+      if (coverage >= threshold) {
         setVideoCompleted(true)
         if (!completionTimerStartedRef.current && !learningProgress?.videoProgress?.[selectedTx.id]?.completed) {
            completionTimerStartedRef.current = true;
