@@ -20,7 +20,7 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   const helpCount = user.helpCount || 0;
   const questionCount = user.questionCount || 0;
   const agoraScoreRaw = (questionCount * 5) + (helpCount * 20); // 질문 5점, 답변 채택 20점
-  const agoraScore = Math.min(100, agoraScoreRaw);
+  const agoraScore = agoraScoreRaw;
 
   const totalSEI = wealthScore + skillScore + diligenceScore + growthScore + agoraScore;
   

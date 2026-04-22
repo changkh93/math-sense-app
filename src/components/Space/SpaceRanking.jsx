@@ -490,7 +490,7 @@ export default function SpaceRanking({ user, userData }) {
                                   { subject: '능력(부)', value: Math.min(100, (u.seiData?.wealth / 50) * 100) || 0, raw: u.seiData?.wealth || 0 },
                                   { subject: '끈기(성실)', value: Math.min(100, (u.seiData?.diligence / 300) * 100) || 0, raw: u.seiData?.diligence || 0 },
                                   { subject: '잠재력(성장)', value: Math.min(100, (u.seiData?.growth / 200) * 100) || 0, raw: u.seiData?.growth || 0 },
-                                  { subject: '소통(아고라)', value: u.seiData?.agora || 0, raw: u.seiData?.agora || 0 },
+                                  { subject: '소통(아고라)', value: Math.min(100, (u.seiData?.agora / 200) * 100) || 0, raw: u.seiData?.agora || 0 },
                                   { subject: '전문성(실력)', value: Math.min(100, (u.seiData?.skill / 1000) * 100) || 0, raw: u.seiData?.skill || 0 },
                                 ]}>
                                   <PolarGrid stroke="rgba(255,255,255,0.2)" />
