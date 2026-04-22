@@ -9,6 +9,7 @@ import { InlineMath } from 'react-katex'
 import 'katex/dist/katex.min.css'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import UnitLeaderboard from './UnitLeaderboard'
+import TimeAttackOverlay from './TimeAttackOverlay'
 import { db } from '../../firebase'
 import { doc, setDoc, getDoc, onSnapshot, serverTimestamp, increment } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
@@ -483,7 +484,28 @@ export default function MissionHub({
   const isVideoProcessingRef = useRef(false)
   const lastActivityTimeRef = useRef(Date.now())
   const loadedTxIdRef = useRef(null) // Track which video was last loaded to prevent overwrite loops
+  const lastInitializedTxIdRef = useRef(null)
   
+  // ─── Time Attack State ───
+  const [showTimeAttack, setShowTimeAttack] = useState(false);
+  const showTimeAttackRef = useRef(false);
+  const [timeAttackCombo, setTimeAttackCombo] = useState(0);
+  const nextAttackTimeRef = useRef(null);
+  const sessionStartTimeRef = useRef(Date.now());
+  const completionCrystalTriggeredRef = useRef(false);
+  const timeAttackComboRef = useRef(0);
+  const timeAttackCrystalsSessionRef = useRef(0);
+  const [completionBonusTimeLeft, setCompletionBonusTimeLeft] = useState(null);
+  const completionTimerStartedRef = useRef(false);
+  
+  useEffect(() => {
+    if (completionBonusTimeLeft === null || completionBonusTimeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setCompletionBonusTimeLeft(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [completionBonusTimeLeft]);
+
   // Re-consolidate remaining scattered refs
   const timerRef = useRef(null)
   const videoDurationRef = useRef(0)
@@ -629,6 +651,14 @@ export default function MissionHub({
       videoCompletedRef.current = false
       videoCompletionBonusGivenRef.current = false
       loadedTxIdRef.current = null
+
+      // Reset Time Attack
+      setShowTimeAttack(false);
+      showTimeAttackRef.current = false;
+      setTimeAttackCombo(0);
+      timeAttackComboRef.current = 0;
+      timeAttackCrystalsSessionRef.current = 0;
+      nextAttackTimeRef.current = null;
       return
     }
 
@@ -678,6 +708,14 @@ export default function MissionHub({
       videoCompletedRef.current = false
       videoCompletionBonusGivenRef.current = false
       loadedTxIdRef.current = txId
+
+      // Reset Time Attack
+      setShowTimeAttack(false);
+      showTimeAttackRef.current = false;
+      setTimeAttackCombo(0);
+      timeAttackComboRef.current = 0;
+      timeAttackCrystalsSessionRef.current = 0;
+      nextAttackTimeRef.current = null;
     }
   }, [selectedTx, learningProgress, loadingProgress])
 
@@ -810,6 +848,20 @@ export default function MissionHub({
       setInitialStartPosition(selectedTx.start || 0)
       lastVideoTimeRef.current = -1
       setIsAtEnd(false)
+
+      // Reset Time Attack (only when tx changes)
+      if (lastInitializedTxIdRef.current !== selectedTx.id) {
+        lastInitializedTxIdRef.current = selectedTx.id;
+        setShowTimeAttack(false);
+        showTimeAttackRef.current = false;
+        setTimeAttackCombo(0);
+        timeAttackComboRef.current = 0;
+        timeAttackCrystalsSessionRef.current = 0;
+        nextAttackTimeRef.current = null;
+        sessionStartTimeRef.current = Date.now();
+        setCompletionBonusTimeLeft(null);
+        completionTimerStartedRef.current = false;
+      }
     }
   }, [userId, selectedTx, loadingProgress, learningProgress, unitId])
 
@@ -1088,6 +1140,21 @@ export default function MissionHub({
     if (!selectedTx || !userId) return
 
     const now = Date.now()
+    
+    // Time Attack Logic
+    if (duration > 0 && !videoCompletedRef.current) {
+      const sessionElapsedMs = now - sessionStartTimeRef.current;
+      
+      if (nextAttackTimeRef.current === null) {
+         // Initialize first attack time (at least 2 mins from session start/current pos)
+         nextAttackTimeRef.current = currentTime + Math.floor(Math.random() * 60) + 120;
+      } else if (currentTime >= nextAttackTimeRef.current && !showTimeAttackRef.current && sessionElapsedMs > 15000) {
+         // Avoid triggering in the first 15 seconds of a session
+         showTimeAttackRef.current = true;
+         setShowTimeAttack(true);
+      }
+    }
+
     const lastPollTime = lastPollTimeRef.current || now
     lastPollTimeRef.current = now
 
@@ -1143,24 +1210,28 @@ export default function MissionHub({
       const coverage = stampedSetRef.current.size / totalSeconds
       if (coverage >= 0.9) {
         setVideoCompleted(true)
+        if (!completionTimerStartedRef.current && !learningProgress?.videoProgress?.[selectedTx.id]?.completed) {
+           completionTimerStartedRef.current = true;
+           setCompletionBonusTimeLeft(30);
+        }
       }
     }
 
+    /* 
     // Auto-reward: every 180 NEW stamps = 10 crystals (with cap)
+    // DISABLED as per user request: only click-based rewards should exist
     if (newStampCountRef.current >= 180) {
-      if (rewardLockRef.current) return // Prevent concurrent award
+      if (rewardLockRef.current) return 
       
-      // Reward cap: max crystals = Math.floor(duration / 180) * 10
       const maxIntervalRewards = duration > 0 ? Math.floor(duration / 180) * 10 : Infinity
       if (totalRewardedCrystalsRef.current >= maxIntervalRewards) {
-        newStampCountRef.current = 0 // Reset but don't reward
+        newStampCountRef.current = 0 
         return
       }
 
       const reward = 10
       newStampCountRef.current -= 180
       
-      // OPTIMISTIC UPDATE: Set state/refs immediately before async
       rewardLockRef.current = true
       totalRewardedCrystalsRef.current += reward
       setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
@@ -1191,18 +1262,75 @@ export default function MissionHub({
       }
       awardReward()
     }
+    */
   }, [selectedTx, userId, unitId, activeUnit?.title, onNonQuizActivityComplete, showSilentToast, userDataRef])
 
+  // ─── Time Attack Handlers ───
+  const handleTimeAttackHit = useCallback(async () => {
+    setShowTimeAttack(false);
+    showTimeAttackRef.current = false;
+    
+    // Update next time synchronously BEFORE any await to prevent race conditions with video timer
+    const rawTime = videoPlayerRef.current?.getCurrentTime() || 0;
+    const currentTime = Math.max(rawTime, lastVideoTimeRef.current || 0);
+    nextAttackTimeRef.current = currentTime + Math.floor(Math.random() * 180) + 120;
+    
+    let reward = 10;
+    if (timeAttackComboRef.current >= 2) reward = 20; // Fever mode
+    else if (timeAttackComboRef.current >= 1) reward = 15;
+    
+    if (timeAttackCrystalsSessionRef.current + reward > 100) {
+      reward = Math.max(0, 100 - timeAttackCrystalsSessionRef.current);
+    }
+
+    timeAttackComboRef.current += 1;
+    setTimeAttackCombo(timeAttackComboRef.current);
+
+    if (reward > 0) {
+      timeAttackCrystalsSessionRef.current += reward;
+      totalRewardedCrystalsRef.current += reward;
+      setTotalRewardedCrystals(totalRewardedCrystalsRef.current);
+      
+      try {
+        if (onNonQuizActivityComplete && selectedTx) {
+          const txId = selectedTx.id || 'default';
+          await onNonQuizActivityComplete(`타임어택 보상 (${timeAttackComboRef.current}연속)`, reward, {
+            transmissionId: txId,
+            transmissionTitle: selectedTx?.title || "Main Video",
+            videoTime: currentTime
+          });
+        }
+        showSilentToast(reward);
+      } catch (err) {
+        console.error("Failed to award time attack:", err);
+      }
+    }
+  }, [onNonQuizActivityComplete, selectedTx, showSilentToast]);
+
+  const handleTimeAttackMiss = useCallback(() => {
+    setShowTimeAttack(false);
+    showTimeAttackRef.current = false;
+    timeAttackComboRef.current = 0;
+    setTimeAttackCombo(0);
+    
+    // Update next time synchronously BEFORE any await to prevent race conditions with video timer
+    const rawTime = videoPlayerRef.current?.getCurrentTime() || 0;
+    const currentTime = Math.max(rawTime, lastVideoTimeRef.current || 0);
+    nextAttackTimeRef.current = currentTime + Math.floor(Math.random() * 180) + 120;
+  }, []);
+
+  /* 
   // ─── Transmission: Completion bonus ───
+  // DISABLED as per user request: completion reward should also be a crystal click
   useEffect(() => {
     if (!videoCompleted || videoCompletionBonusGiven || !userId || !selectedTx) return
-    if (rewardLockRef.current) return // Prevent concurrent award
+    if (rewardLockRef.current) return 
 
     const txId = selectedTx.id || 'default'
     const savedProgress = learningProgress?.videoProgress?.[txId]
     if (savedProgress?.completionBonusGiven) {
       setVideoCompletionBonusGiven(true)
-      return // Already given
+      return 
     }
 
     const awardCompletion = async () => {
@@ -1230,6 +1358,7 @@ export default function MissionHub({
     }
     awardCompletion()
   }, [videoCompleted, videoCompletionBonusGiven, userId, selectedTx, learningProgress?.videoProgress, unitId, activeUnit?.title, onNonQuizActivityComplete, showSilentToast, userDataRef])
+  */
 
   // ─── Transmission: Save position ("오늘은 여기까지") ───
   const handleSaveVideoPosition = async () => {
@@ -1279,11 +1408,25 @@ export default function MissionHub({
          videoCompletedRef.current = true
          videoCompletionBonusGivenRef.current = true
          
+         const wasAlreadyCompleted = learningProgress?.videoProgress?.[txId]?.completed;
+         let rewardAmount = 0;
+         if (videoCompleted && !wasAlreadyCompleted) {
+             if (completionBonusTimeLeft !== null && completionBonusTimeLeft > 0) {
+                 rewardAmount = 20;
+             }
+         }
+         
+         if (rewardAmount > 0) {
+             totalRewardedCrystalsRef.current += rewardAmount;
+             updateData.videoProgress[txId].totalRewardedCrystals = totalRewardedCrystalsRef.current;
+             setTotalRewardedCrystals(totalRewardedCrystalsRef.current);
+         }
+         
          // Trigger history log creation and dashboard ring update
          if (onNonQuizActivityComplete) {
             await onNonQuizActivityComplete(
-              isManualComplete ? '영상 수동 완료 (크리스탈 제외)' : '영상 교신 완료', 
-              isManualComplete ? 0 : 20, 
+              '영상 교신 완료', 
+              rewardAmount, 
               {
                 transmissionId: txId,
                 transmissionTitle: selectedTx?.title || "Main Video",
@@ -1819,7 +1962,7 @@ export default function MissionHub({
              </div>
 
              {/* Bottom HUD Overlay */}
-             <div className="theater-hud bottom-hud" style={{ opacity: isUiVisible ? 1 : 0, flexDirection: 'column' }}>
+             <div className="theater-hud bottom-hud" style={{ opacity: (isUiVisible || videoCompleted || isAtEnd) ? 1 : 0, flexDirection: 'column' }}>
                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
                  <button 
                    onClick={handleSaveVideoPosition}
@@ -1837,7 +1980,11 @@ export default function MissionHub({
                      learningProgress?.videoProgress?.[txId]?.completed ? (
                        <>✅ 탐사 완료 (돌아가기)</>
                      ) : (
-                       <>✨ 데이터 수신 완료! (총 {totalRewardedCrystals + (videoCompletionBonusGiven ? 20 : 0)}광석 획득) · 돌아가기</>
+                        completionBonusTimeLeft > 0 ? (
+                          <>✨ 데이터 수신 완료! (총 {totalRewardedCrystals + 20}광석 획득) ⏳ {completionBonusTimeLeft}초 · 돌아가기</>
+                        ) : (
+                          <>☑️ 수신 지연! (완료 보너스 소멸) · 돌아가기</>
+                        )
                      )
                    ) : isAtEnd ? (
                        <>☑️ 수동 완료 처리 (완료 보너스 제외) - 수신율 {Math.min(100, Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100))}%</>
@@ -1869,6 +2016,15 @@ export default function MissionHub({
                  </motion.p>
                )}
              </div>
+
+             {/* Time Attack Overlay */}
+             {showTimeAttack && (
+               <TimeAttackOverlay 
+                 onHit={handleTimeAttackHit} 
+                 onMiss={handleTimeAttackMiss} 
+                 currentCombo={timeAttackCombo} 
+               />
+             )}
           </div>
       )
     }
