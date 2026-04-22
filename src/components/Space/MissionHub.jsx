@@ -1208,11 +1208,11 @@ export default function MissionHub({
     if (duration > 0) {
       const totalSeconds = Math.floor(duration)
       const coverage = stampedSetRef.current.size / totalSeconds
-      if (coverage >= 0.9) {
+      if (coverage >= 0.99) {
         setVideoCompleted(true)
         if (!completionTimerStartedRef.current && !learningProgress?.videoProgress?.[selectedTx.id]?.completed) {
            completionTimerStartedRef.current = true;
-           setCompletionBonusTimeLeft(30);
+           setCompletionBonusTimeLeft(60);
         }
       }
     }
@@ -1401,7 +1401,7 @@ export default function MissionHub({
         updatedAt: serverTimestamp()
       }
       
-      // Save completion if threshold met (coverage >= 0.9) OR manually triggered (isAtEnd)
+      // Save completion if threshold met (coverage >= 0.99) OR manually triggered (isAtEnd)
       if (videoCompleted || isManualComplete) {
          updateData.videoProgress[txId].completed = true
          updateData.videoProgress[txId].completionBonusGiven = true
@@ -2012,7 +2012,7 @@ export default function MissionHub({
                
                {isAtEnd && !videoCompleted && (
                  <motion.p initial={{opacity:0}} animate={{opacity:1}} className="font-tech" style={{ color: '#ffb3b3', margin: 0, fontSize: '0.85rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                   통신 장애! 영상의 90% 이상을 탐사해야 보너스 수신이 가능합니다.
+                   통신 장애! 영상의 99% 이상을 탐사해야 보너스 수신이 가능합니다.
                  </motion.p>
                )}
              </div>
@@ -2023,6 +2023,7 @@ export default function MissionHub({
                  onHit={handleTimeAttackHit} 
                  onMiss={handleTimeAttackMiss} 
                  currentCombo={timeAttackCombo} 
+                 userName={userData?.studentName || user?.displayName}
                />
              )}
           </div>
