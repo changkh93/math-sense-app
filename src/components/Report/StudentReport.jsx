@@ -108,6 +108,10 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
 
   const displayAssignments = isAll ? assignments.totalCount : (cAssignments.count || 0);
   const displayReviewed = isAll ? assignments.reviewedCount : (cAssignments.reviewed || 0);
+  const assignmentAttendanceRatio = displayAttendanceDays > 0
+    ? Math.round((displayAssignments / displayAttendanceDays) * 100)
+    : 0;
+  const assignmentAttendanceLabel = `${assignmentAttendanceRatio}%(${displayAssignments}/${displayAttendanceDays})`;
 
   return (
     <div className="report-container" ref={reportRef}>
@@ -184,7 +188,11 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
               <div className="report-stat-card stat-pink">
                 <div className="report-stat-value">{focusIndex.score}</div>
                 <div className="report-stat-label">집중도 점수</div>
-                <div className="report-stat-sub">{focusIndex.label}</div>
+                <div className="report-stat-sub">
+                  {focusIndex.totalOpportunities > 0
+                    ? `${focusIndex.hitCount}/${focusIndex.totalOpportunities} 광석 획득 · ${focusIndex.label}`
+                    : focusIndex.label}
+                </div>
               </div>
             </div>
           </div>
@@ -258,7 +266,7 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
         </div>
 
         {/* ─── Section 4: Peer Comparison ─── */}
-        {Object.keys(peerComparison).length > 0 && (
+        {Object.values(peerComparison).some(comp => comp.available) && (
           <div className="report-section">
             <div className="report-section-header">
               <span className="report-section-icon">👥</span>
@@ -266,7 +274,7 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
             </div>
             <div className="report-section-body">
               <div className="report-peer-grid">
-                {Object.entries(peerComparison).map(([clusterId, comp]) => (
+                {Object.entries(peerComparison).filter(([, comp]) => comp.available).map(([clusterId, comp]) => (
                   <PeerComparisonCard key={clusterId} comp={comp} />
                 ))}
               </div>
@@ -314,8 +322,13 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
         {assignments.recentList.length > 0 && (
           <div className="report-section">
             <div className="report-section-header">
-              <span className="report-section-icon">📝</span>
-              <h2 className="report-section-title">최근 과제 하이라이트</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span className="report-section-icon">📝</span>
+                <h2 className="report-section-title">최근 과제 하이라이트</h2>
+                <span className="report-badge" style={{ color: '#45aaf2' }}>
+                  출석 대비 과제 제출 {assignmentAttendanceLabel}
+                </span>
+              </div>
             </div>
             <div className="report-section-body">
               {assignments.recentList.map(a => (

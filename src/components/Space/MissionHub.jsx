@@ -495,6 +495,7 @@ export default function MissionHub({
   const completionCrystalTriggeredRef = useRef(false);
   const timeAttackComboRef = useRef(0);
   const timeAttackCrystalsSessionRef = useRef(0);
+  const timeAttackOpportunityRef = useRef(null);
   const [completionBonusTimeLeft, setCompletionBonusTimeLeft] = useState(null);
   const completionTimerStartedRef = useRef(false);
   
@@ -1150,6 +1151,10 @@ export default function MissionHub({
          nextAttackTimeRef.current = currentTime + Math.floor(Math.random() * 60) + 120;
       } else if (currentTime >= nextAttackTimeRef.current && !showTimeAttackRef.current && sessionElapsedMs > 15000) {
          // Avoid triggering in the first 15 seconds of a session
+         timeAttackOpportunityRef.current = {
+           id: `ta_${Date.now()}_${Math.floor(currentTime)}`,
+           videoTime: Math.floor(currentTime)
+         };
          showTimeAttackRef.current = true;
          setShowTimeAttack(true);
       }
@@ -1275,6 +1280,8 @@ export default function MissionHub({
   const handleTimeAttackHit = useCallback(async () => {
     setShowTimeAttack(false);
     showTimeAttackRef.current = false;
+    const opportunity = timeAttackOpportunityRef.current;
+    timeAttackOpportunityRef.current = null;
     
     // Update next time synchronously BEFORE any await to prevent race conditions with video timer
     const rawTime = videoPlayerRef.current?.getCurrentTime() || 0;
@@ -1300,10 +1307,15 @@ export default function MissionHub({
       try {
         if (onNonQuizActivityComplete && selectedTx) {
           const txId = selectedTx.id || 'default';
-          await onNonQuizActivityComplete(`타임어택 보상 (${timeAttackComboRef.current}연속)`, reward, {
+          await onNonQuizActivityComplete(`영상 광석 획득 (${timeAttackComboRef.current}연속)`, reward, {
+            activityCategory: 'video',
             transmissionId: txId,
             transmissionTitle: selectedTx?.title || "Main Video",
-            videoTime: currentTime
+            videoTime: currentTime,
+            attentionSource: 'time_attack',
+            attentionResult: 'hit',
+            attentionOpportunityId: opportunity?.id || `ta_${Date.now()}_${Math.floor(currentTime)}`,
+            attentionWindowSeconds: 30
           });
         }
         showSilentToast(reward);
@@ -1313,17 +1325,36 @@ export default function MissionHub({
     }
   }, [onNonQuizActivityComplete, selectedTx, showSilentToast]);
 
-  const handleTimeAttackMiss = useCallback(() => {
+  const handleTimeAttackMiss = useCallback(async () => {
     setShowTimeAttack(false);
     showTimeAttackRef.current = false;
     timeAttackComboRef.current = 0;
     setTimeAttackCombo(0);
+    const opportunity = timeAttackOpportunityRef.current;
+    timeAttackOpportunityRef.current = null;
     
     // Update next time synchronously BEFORE any await to prevent race conditions with video timer
     const rawTime = videoPlayerRef.current?.getCurrentTime() || 0;
     const currentTime = Math.max(rawTime, lastVideoTimeRef.current || 0);
     nextAttackTimeRef.current = currentTime + Math.floor(Math.random() * 180) + 120;
-  }, []);
+    
+    try {
+      if (onNonQuizActivityComplete && selectedTx && opportunity?.id) {
+        await onNonQuizActivityComplete('영상 광석 놓침', 0, {
+          activityCategory: 'video',
+          transmissionId: selectedTx.id || 'default',
+          transmissionTitle: selectedTx?.title || "Main Video",
+          videoTime: currentTime,
+          attentionSource: 'time_attack',
+          attentionResult: 'miss',
+          attentionOpportunityId: opportunity.id,
+          attentionWindowSeconds: 30
+        });
+      }
+    } catch (err) {
+      console.error("Failed to record time attack miss:", err);
+    }
+  }, [onNonQuizActivityComplete, selectedTx]);
 
   /* 
   // ─── Transmission: Completion bonus ───
@@ -1430,13 +1461,23 @@ export default function MissionHub({
          
          // Trigger history log creation and dashboard ring update
          if (onNonQuizActivityComplete) {
+            const completionAttentionMeta = videoCompleted && !wasAlreadyCompleted
+              ? {
+                  attentionSource: 'completion_bonus',
+                  attentionResult: rewardAmount > 0 ? 'hit' : 'miss',
+                  attentionOpportunityId: `completion_${txId}`,
+                  attentionWindowSeconds: 60
+                }
+              : {};
             await onNonQuizActivityComplete(
               '영상 교신 완료', 
               rewardAmount, 
               {
+                activityCategory: 'video',
                 transmissionId: txId,
                 transmissionTitle: selectedTx?.title || "Main Video",
-                videoTime: savedPosition
+                videoTime: savedPosition,
+                ...completionAttentionMeta
               }
             );
          }

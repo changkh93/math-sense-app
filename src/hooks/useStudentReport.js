@@ -49,6 +49,7 @@ async function fetchStudentReport(userId, days) {
     longestStreak: userData.longestStreak || 0,
     joinedAt: userData.createdAt?.toDate?.() || null,
     clusterAccess: userData.clusterAccess || {},
+    regionAccess: userData.regionAccess || {},
     participation: userData.participation || {},
   };
 
@@ -103,6 +104,11 @@ async function fetchStudentReport(userId, days) {
   });
   assignments.forEach(a => {
     if (a.regionId) regionSet.add(a.regionId);
+  });
+  Object.entries(student.regionAccess || {}).forEach(([regionId, status]) => {
+    if (status === 'active' || status === 'completed') {
+      regionSet.add(regionId);
+    }
   });
   const activeRegions = Array.from(regionSet);
   
@@ -174,8 +180,6 @@ async function fetchStudentReport(userId, days) {
   const learningAnalysis = analyzeLearning(history, days);
   const assignmentAnalysis = analyzeAssignments(assignments, days, startDate);
   const progressAnalysis = analyzeProgress(progress, unitToRegion, chapToRegion, allHistory);
-  const peerComparison = buildPeerComparison(learningAnalysis, peerData, activeRegions, REGION_NAMES);
-
   const regionEarliestTs = {};
   allHistory.forEach(h => {
      const clusterId = h.regionId || h.clusterId || 'unknown';
@@ -188,8 +192,34 @@ async function fetchStudentReport(userId, days) {
      }
   });
 
+  const manuallyCompletedRegions = new Set(
+    Object.entries(student.regionAccess || {})
+      .filter(([, status]) => status === 'completed')
+      .map(([regionId]) => regionId)
+  );
+
+  const peerComparison = buildPeerComparison(
+    learningAnalysis,
+    progressAnalysis,
+    peerData,
+    activeRegions,
+    REGION_NAMES,
+    regionStructure,
+    manuallyCompletedRegions
+  );
+
   // ── Predicted Completion ──
-  const predictions = calculatePredictions(learningAnalysis, progressAnalysis, activeRegions, regionStructure, REGION_NAMES, regionEarliestTs, peerData);
+  const predictions = calculatePredictions(
+    learningAnalysis,
+    progressAnalysis,
+    activeRegions,
+    regionStructure,
+    REGION_NAMES,
+    REGION_TO_CLUSTER,
+    regionEarliestTs,
+    peerData,
+    manuallyCompletedRegions
+  );
 
   // ── Focus Index ──
   const focusIndex = calculateFocusIndex(history);
@@ -571,10 +601,39 @@ function analyzeProgress(progressDocs, unitToRegion, chapToRegion, allHistory = 
 // Peer Comparison Builder
 // ══════════════════════════════════════════════════
 
-function buildPeerComparison(learningAnalysis, peerData, activeRegions, REGION_NAMES) {
+function buildPeerComparison(
+  learningAnalysis,
+  progressAnalysis,
+  peerData,
+  activeRegions,
+  REGION_NAMES,
+  regionStructure,
+  manuallyCompletedRegions = new Set()
+) {
   const result = {};
 
+  const completedCountByRegion = {};
+  (progressAnalysis?.units || []).forEach(unit => {
+    if (unit.status === 'completed' || unit.status === 'mastered') {
+      completedCountByRegion[unit.regionId] = (completedCountByRegion[unit.regionId] || 0) + 1;
+    }
+  });
+
   activeRegions.forEach(regionId => {
+    const my = learningAnalysis.byCluster[regionId] || {};
+    const myQuizCount = my.quizCount || 0;
+    const myVideoSeconds = my.videoSeconds || 0;
+    const myQuizScoreCount = my.quizScoreCount || 0;
+    const hasPeriodActivity = myQuizCount > 0 || myVideoSeconds > 0 || myQuizScoreCount > 0;
+
+    const totalUnits = regionStructure?.[regionId]?.orderedUnits?.length || 0;
+    const progressCompleted = totalUnits > 0 && (completedCountByRegion[regionId] || 0) >= totalUnits;
+    const isCompletedRegion = manuallyCompletedRegions.has(regionId) || progressCompleted;
+
+    if (!hasPeriodActivity && isCompletedRegion) {
+      return;
+    }
+
     const peers = peerData[regionId] || {};
     const peerList = Object.values(peers);
     if (peerList.length === 0) {
@@ -589,10 +648,8 @@ function buildPeerComparison(learningAnalysis, peerData, activeRegions, REGION_N
     const classAvgQuizCount = peerList.reduce((sum, p) => sum + p.quizCount, 0) / totalStudents;
 
     // My stats for this region
-    const my = learningAnalysis.byCluster[regionId] || {};
     const myAvgScore = my.quizScoreCount > 0 ? my.quizScoreSum / my.quizScoreCount : 0;
     const myVideoHours = (my.videoSeconds || 0) / 3600;
-    const myQuizCount = my.quizCount || 0;
 
     // Percentile (how many peers I beat)
     const myTotalMetric = myAvgScore * 0.4 + (myVideoHours / Math.max(classAvgVideoHours, 0.1)) * 30 + (myQuizCount / Math.max(classAvgQuizCount, 1)) * 30;
@@ -626,11 +683,28 @@ function buildPeerComparison(learningAnalysis, peerData, activeRegions, REGION_N
 // Predictions
 // ══════════════════════════════════════════════════
 
-function calculatePredictions(learning, progress, activeRegions, regionStructure, REGION_NAMES, regionEarliestTs, peerData) {
+function calculatePredictions(
+  learning,
+  progress,
+  activeRegions,
+  regionStructure,
+  REGION_NAMES,
+  REGION_TO_CLUSTER,
+  regionEarliestTs,
+  peerData,
+  manuallyCompletedRegions = new Set()
+) {
   const result = {};
 
   activeRegions.forEach(regionId => {
     const title = REGION_NAMES[regionId] || regionId;
+    const parentClusterId = REGION_TO_CLUSTER?.[regionId] || '';
+
+    // western-classic은 정해진 커리큘럼 기반 완강일 예측을 제공하지 않는다.
+    if (parentClusterId === 'western-classic') {
+      return;
+    }
+
     // Skip event-based or evaluation regions
     if (title.includes('평가') || title.includes('월간') || title.includes('테스트') || title.includes('진단')) {
       return;
@@ -643,6 +717,26 @@ function calculatePredictions(learning, progress, activeRegions, regionStructure
 
     const orderedUnits = regionStructure[regionId]?.orderedUnits || [];
     const exactTotalUnits = orderedUnits.length;
+
+    const isManualCompleted = manuallyCompletedRegions.has(regionId);
+    if (isManualCompleted && exactTotalUnits > 0) {
+      const lastUnit = orderedUnits[exactTotalUnits - 1];
+      result[regionId] = {
+        available: true,
+        clusterName: REGION_NAMES[regionId] || regionId,
+        completedUnits: exactTotalUnits,
+        remainingUnits: 0,
+        isCompleted: true,
+        daysToComplete: 0,
+        predictedDate: null,
+        dailyVelocity: 0,
+        frontierIndex: exactTotalUnits - 1,
+        frontierChapterTitle: lastUnit?.chapterTitle || '',
+        frontierUnitTitle: lastUnit?.title || lastUnit?.id || '',
+        progressPercentage: 100
+      };
+      return;
+    }
 
     const completedUnits = progress.units.filter(u =>
       u.regionId === regionId && (u.status === 'completed' || u.status === 'mastered')
@@ -781,24 +875,30 @@ function calculatePredictions(learning, progress, activeRegions, regionStructure
 // ══════════════════════════════════════════════════
 
 function calculateFocusIndex(history) {
-  // Focus = ratio of meaningful activity (quiz attempts, video completions)
-  // to total records (includes intervals, partial views)
-  const totalRecords = history.length;
-  if (totalRecords === 0) return { score: 0, label: '데이터 없음', totalRecords: 0 };
+  const attentionEvents = history.filter(h =>
+    h.attentionSource && (h.attentionResult === 'hit' || h.attentionResult === 'miss')
+  );
+  const totalOpportunities = attentionEvents.length;
+  if (totalOpportunities === 0) {
+    return {
+      score: 0,
+      label: '데이터 없음',
+      totalOpportunities: 0,
+      hitCount: 0,
+      missCount: 0
+    };
+  }
 
-  const meaningful = history.filter(h =>
-    h.type === 'quiz' ||
-    (h.type === 'video' && h.id?.includes('completion'))
-  ).length;
-
-  const score = Math.round(meaningful / totalRecords * 100);
+  const hitCount = attentionEvents.filter(h => h.attentionResult === 'hit').length;
+  const missCount = totalOpportunities - hitCount;
+  const score = Math.round((hitCount / totalOpportunities) * 100);
   let label = '집계 중';
-  if (score >= 70) label = '매우 높음 🔥';
-  else if (score >= 50) label = '양호 👍';
+  if (score >= 85) label = '매우 높음 🔥';
+  else if (score >= 65) label = '양호 👍';
   else if (score >= 30) label = '보통';
-  else if (totalRecords > 0) label = '개선 필요';
+  else label = '개선 필요';
 
-  return { score, label, totalRecords, meaningfulCount: meaningful };
+  return { score, label, totalOpportunities, hitCount, missCount };
 }
 
 // ══════════════════════════════════════════════════
@@ -898,11 +998,11 @@ function extractInsights(student, attendance, learning, assignments, peerCompari
   });
 
   // ── Focus Insights ──
-  if (focusIndex.score >= 60) {
+  if (focusIndex.totalOpportunities > 0 && focusIndex.score >= 60) {
     strengths.push({
       icon: '🎯',
       title: '높은 학습 집중도',
-      detail: `집중도 점수 ${focusIndex.score}점 (${focusIndex.label}). 학습 시간을 효율적으로 활용하고 있습니다.`
+      detail: `광석 획득 ${focusIndex.hitCount}/${focusIndex.totalOpportunities}회로 집중도 점수 ${focusIndex.score}점 (${focusIndex.label})을 기록했습니다.`
     });
   }
 

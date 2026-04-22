@@ -479,9 +479,11 @@ function WarpGateDocking({ clusterData, user, userData, attendanceMutation, toda
 // Detailed Submission Panel
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import DailyLearningTimeline from './DailyLearningTimeline';
+import StudentReport from '../Report/StudentReport';
 
 function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userData, submitMutation, onCancel, onNavigateToUnit }) {
-  const [activeTab, setActiveTab] = useState('report'); // 'report' or 'timeline'
+  const [activeTab, setActiveTab] = useState('report'); // 'report' | 'timeline' | 'growth'
+  const [reportDays, setReportDays] = useState(30);
   
   const [content, setContent] = useState(assignment?.content || '');
   const [links, setLinks] = useState(assignment?.links || []);
@@ -710,6 +712,18 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
           >
             ⏱️ 일일 학습 기록
           </button>
+          <button
+            className={`space-btn font-tech ${activeTab === 'growth' ? 'cosmic-btn active' : ''}`}
+            onClick={() => setActiveTab('growth')}
+            style={{
+              padding: '0.6rem 1.5rem',
+              fontSize: '0.9rem',
+              background: activeTab === 'growth' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(255,255,255,0.05)',
+              borderColor: activeTab === 'growth' ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.1)'
+            }}
+          >
+            📊 학생 성장 리포트
+          </button>
         </div>
       </div>
       
@@ -723,6 +737,16 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
             loading={timelineLoading} 
             error={timelineError}
             onActivityClick={onNavigateToUnit}
+          />
+        </div>
+      )}
+
+      {activeTab === 'growth' && (
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          <StudentReport
+            userId={user?.uid}
+            days={reportDays}
+            onDaysChange={setReportDays}
           />
         </div>
       )}

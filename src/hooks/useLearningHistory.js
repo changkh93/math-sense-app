@@ -33,7 +33,15 @@ export function useLearningHistory(userId, dateStr) {
     quizCount: 0,
     logCount: 0,
     totalVideoSeconds: 0,
-    isAssignmentSubmitted: false
+    isAssignmentSubmitted: false,
+    attentionHits: 0,
+    attentionMisses: 0,
+    attentionOpportunities: 0,
+    timeAttackHits: 0,
+    timeAttackMisses: 0,
+    completionCrystalHits: 0,
+    completionCrystalMisses: 0,
+    focusScore: null
   });
 
   // Raw data state
@@ -133,23 +141,53 @@ export function useLearningHistory(userId, dateStr) {
       logCount: 0,
       totalVideoSeconds: 0,
       isAssignmentSubmitted: (typeof rawData.assignmentCount === 'number' ? rawData.assignmentCount : rawData.assignmentCount?.length) > 0,
+      attentionHits: 0,
+      attentionMisses: 0,
+      attentionOpportunities: 0,
+      timeAttackHits: 0,
+      timeAttackMisses: 0,
+      completionCrystalHits: 0,
+      completionCrystalMisses: 0,
+      focusScore: null,
       _videoTxMap: {}
     };
     const trackedDataLogs = new Set();
+    const trackedAttention = new Set();
     const getVideoKey = (unitId, txId) => `${unitId || 'no_unit'}_${txId || 'default'}`;
 
     // ── 1. Process History (PRIMARY) ──
     rawData.history.forEach(docSnap => {
       const data = docSnap.data();
       const hType = data.type || 'quiz_pass';
+      const attentionSource = data.attentionSource || '';
+      const attentionResult = data.attentionResult || '';
+      const isAttentionEvent = !!attentionSource && (attentionResult === 'hit' || attentionResult === 'miss');
+      const unitId = data.unitId || 'unknown';
+      const txId = data.transmissionId || 'default';
+
+      if (isAttentionEvent && !trackedAttention.has(docSnap.id)) {
+        trackedAttention.add(docSnap.id);
+        stats.attentionOpportunities++;
+        if (attentionResult === 'hit') stats.attentionHits++;
+        if (attentionResult === 'miss') stats.attentionMisses++;
+        if (attentionSource === 'time_attack') {
+          if (attentionResult === 'hit') stats.timeAttackHits++;
+          if (attentionResult === 'miss') stats.timeAttackMisses++;
+        }
+        if (attentionSource === 'completion_bonus') {
+          if (attentionResult === 'hit') stats.completionCrystalHits++;
+          if (attentionResult === 'miss') stats.completionCrystalMisses++;
+        }
+      }
+
       let displayType = 'quiz_pass';
       const title = data.unitTitle || formatUnitId(data.unitId);
 
-      if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
+      if (hType === 'attention' && isAttentionEvent) {
+        displayType = 'video_attention';
+      } else if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
         displayType = 'video_reward';
         // Track video time
-        const unitId = data.unitId || 'unknown';
-        const txId = data.transmissionId || 'default';
         const vKey = getVideoKey(unitId, txId);
         const vTime = data.videoTime || data.stampedCount || 0;
         if (vTime > 0) {
@@ -165,8 +203,20 @@ export function useLearningHistory(userId, dateStr) {
         stats.quizCount++;
       }
 
-      const typeEmoji = displayType === 'video_reward' ? '🎬' : displayType === 'data_log_read' ? '📝' : '🚀';
-      const typeLabel = displayType === 'video_reward' ? '영상 학습' : displayType === 'data_log_read' ? '데이터 로그 열람' : '현장 탐사(퀴즈)';
+      const typeEmoji =
+        displayType === 'video_reward' || displayType === 'video_attention'
+          ? '🎬'
+          : displayType === 'data_log_read'
+            ? '📝'
+            : '🚀';
+      const typeLabel =
+        displayType === 'video_attention'
+          ? '집중도 기록'
+          : displayType === 'video_reward'
+            ? '영상 학습'
+            : displayType === 'data_log_read'
+              ? '데이터 로그 열람'
+              : '현장 탐사(퀴즈)';
 
       aggregated.push({
         id: `quiz_${docSnap.id}`,
@@ -177,7 +227,9 @@ export function useLearningHistory(userId, dateStr) {
         crystalsEarned: data.crystalsEarned || 0,
         metadata: {
           ...data,
-          videoTime: data.videoTime || data.stampedCount || 0
+          videoTime: data.videoTime || data.stampedCount || 0,
+          attentionSource,
+          attentionResult
         }
       });
     });
@@ -345,6 +397,9 @@ export function useLearningHistory(userId, dateStr) {
     // Finalize video seconds
     const sumVideoSeconds = Object.values(stats._videoTxMap).reduce((sum, val) => sum + val, 0);
     stats.totalVideoSeconds += sumVideoSeconds;
+    stats.focusScore = stats.attentionOpportunities > 0
+      ? Math.round((stats.attentionHits / stats.attentionOpportunities) * 100)
+      : null;
 
     // Sort chronologically
     aggregated.sort((a, b) => (a.timestamp?.getTime() || 0) - (b.timestamp?.getTime() || 0));
@@ -371,7 +426,7 @@ export function useLearningHistory(userId, dateStr) {
 
 /** Learning-only activity types for grouping */
 const LEARNING_TYPES = new Set([
-  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'data_log_read'
+  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read'
 ]);
 
 /**
@@ -429,7 +484,7 @@ function buildGroupedActivities(rawActivities) {
     const unitId = meta.unitId || meta.metadata?.unitId || 'unknown';
 
     let normalizedType = 'quiz';
-    if (act.type === 'video_reward' || act.type === 'video_view') normalizedType = 'video';
+    if (act.type === 'video_reward' || act.type === 'video_view' || act.type === 'video_attention') normalizedType = 'video';
     else if (act.type === 'data_log_read') normalizedType = 'text';
 
     const groupKey = `${unitId}_${normalizedType}`;
@@ -451,6 +506,13 @@ function buildGroupedActivities(rawActivities) {
         totalCount: 0,
         totalVideoSeconds: 0,
         completed: false,
+        attentionHits: 0,
+        attentionMisses: 0,
+        attentionOpportunities: 0,
+        timeAttackHits: 0,
+        timeAttackMisses: 0,
+        completionCrystalHits: 0,
+        completionCrystalMisses: 0,
         subActivities: []
       });
     }
@@ -495,8 +557,24 @@ function buildGroupedActivities(rawActivities) {
       group.totalVideoSeconds = Math.max(group.totalVideoSeconds, Math.floor(vTime));
     }
 
+    if (meta.attentionSource && (meta.attentionResult === 'hit' || meta.attentionResult === 'miss')) {
+      group.attentionOpportunities += 1;
+      if (meta.attentionResult === 'hit') group.attentionHits += 1;
+      if (meta.attentionResult === 'miss') group.attentionMisses += 1;
+      if (meta.attentionSource === 'time_attack') {
+        if (meta.attentionResult === 'hit') group.timeAttackHits += 1;
+        if (meta.attentionResult === 'miss') group.timeAttackMisses += 1;
+      }
+      if (meta.attentionSource === 'completion_bonus') {
+        if (meta.attentionResult === 'hit') group.completionCrystalHits += 1;
+        if (meta.attentionResult === 'miss') group.completionCrystalMisses += 1;
+      }
+    }
+
     // Completion markers
-    if (act.completed === true || act.type === 'video_reward') group.completed = true;
+    if (normalizedType === 'video' && (act.completed === true || meta.activityType?.includes('완료'))) {
+      group.completed = true;
+    }
     if (normalizedType === 'text') group.completed = true;
   });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { collection, query, where, getDocs, doc, setDoc, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useClusters } from '../../hooks/useContent';
@@ -9,7 +9,48 @@ function UserAccessManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [allRegions, setAllRegions] = useState([]);
+  const [regionsLoading, setRegionsLoading] = useState(false);
   const { data: clusters = [], isLoading: clustersLoading } = useClusters();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchRegions = async () => {
+      setRegionsLoading(true);
+      try {
+        const snap = await getDocs(collection(db, 'regions'));
+        const rows = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const aCluster = a.clusterId || 'cluster_elementary';
+            const bCluster = b.clusterId || 'cluster_elementary';
+            if (aCluster !== bCluster) return aCluster.localeCompare(bCluster);
+            return (a.order || 0) - (b.order || 0);
+          });
+        if (mounted) setAllRegions(rows);
+      } catch (err) {
+        console.error('regions fetch failed:', err);
+      } finally {
+        if (mounted) setRegionsLoading(false);
+      }
+    };
+
+    fetchRegions();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const regionsByCluster = useMemo(() => {
+    const grouped = {};
+    allRegions.forEach((region) => {
+      const cid = region.clusterId || 'cluster_elementary';
+      if (!grouped[cid]) grouped[cid] = [];
+      grouped[cid].push(region);
+    });
+    return grouped;
+  }, [allRegions]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -30,14 +71,25 @@ function UserAccessManager() {
         limit(20)
       );
 
-      // 2. Search by email (Starts with)
+      // 2. Search by studentName (프로필 수정 탐사원 이름, Starts with)
+      const studentNameQ = query(usersRef,
+        where('studentName', '>=', term),
+        where('studentName', '<=', term + '\uf8ff'),
+        limit(20)
+      );
+
+      // 3. Search by email (Starts with)
       const emailQ = query(usersRef, 
         where('email', '>=', termLower), 
         where('email', '<=', termLower + '\uf8ff'),
         limit(20)
       );
 
-      const [nameSnap, emailSnap] = await Promise.all([getDocs(nameQ), getDocs(emailQ)]);
+      const [nameSnap, studentNameSnap, emailSnap] = await Promise.all([
+        getDocs(nameQ),
+        getDocs(studentNameQ),
+        getDocs(emailQ)
+      ]);
       
       const resultsMap = new Map();
       
@@ -48,6 +100,7 @@ function UserAccessManager() {
       };
 
       processSnap(nameSnap);
+      processSnap(studentNameSnap);
       processSnap(emailSnap);
 
       // 3. Fallback: extract email pattern and search exact
@@ -97,7 +150,7 @@ function UserAccessManager() {
       await setDoc(userRef, { clusterAccess: newAccess }, { merge: true });
       
       // Update local state
-      setUsers(users.map(u => {
+      setUsers(prev => prev.map(u => {
         if (u.uid === userId) {
           return { ...u, clusterAccess: newAccess };
         }
@@ -111,7 +164,34 @@ function UserAccessManager() {
     }
   };
 
-  if (clustersLoading) return <div>Loading DB...</div>;
+  const handleRegionAccessChange = async (userId, regionId, newStatus) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const targetUser = users.find(u => u.uid === userId);
+      const currentRegionAccess = targetUser?.regionAccess || {};
+      const nextRegionAccess = { ...currentRegionAccess };
+
+      if (newStatus === 'none') {
+        delete nextRegionAccess[regionId];
+      } else {
+        nextRegionAccess[regionId] = newStatus; // active | completed | suspended
+      }
+
+      await setDoc(userRef, { regionAccess: nextRegionAccess }, { merge: true });
+
+      setUsers(prev => prev.map(u => {
+        if (u.uid === userId) {
+          return { ...u, regionAccess: nextRegionAccess };
+        }
+        return u;
+      }));
+    } catch (err) {
+      console.error(err);
+      alert('과정 상태 수정 실패');
+    }
+  };
+
+  if (clustersLoading || regionsLoading) return <div>Loading DB...</div>;
 
   return (
     <div className="admin-page">
@@ -195,6 +275,89 @@ function UserAccessManager() {
                             </td>
                           </tr>
                         );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: 'var(--neon-blue)' }}>과정 접근/완료 처리 (Region)</h4>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left', background: 'rgba(0,0,0,0.2)' }}>
+                        <th style={{ padding: '12px 15px', width: '20%' }}>소속 군집</th>
+                        <th style={{ padding: '12px 15px', width: '35%' }}>과정(Region)</th>
+                        <th style={{ padding: '12px 15px', width: '25%' }}>속성</th>
+                        <th style={{ padding: '12px 15px', width: '20%' }}>상태</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clusters.flatMap((cluster) => {
+                        const clusterId = cluster.docId || cluster.id;
+                        const regions = regionsByCluster[clusterId] || [];
+                        return regions.map((region) => {
+                          const regionId = region.id || region.docId;
+                          const regionState = user.regionAccess?.[regionId] || 'none';
+                          const bg =
+                            regionState === 'active'
+                              ? 'rgba(0, 200, 100, 0.2)'
+                              : regionState === 'completed'
+                                ? 'rgba(251, 191, 36, 0.2)'
+                                : regionState === 'suspended'
+                                  ? 'rgba(255, 50, 50, 0.2)'
+                                  : 'rgba(255, 255, 255, 0.1)';
+                          const color =
+                            regionState === 'active'
+                              ? '#00ffa0'
+                              : regionState === 'completed'
+                                ? '#fbbf24'
+                                : regionState === 'suspended'
+                                  ? '#ff6060'
+                                  : 'white';
+                          const border =
+                            regionState === 'active'
+                              ? '#00ffa0'
+                              : regionState === 'completed'
+                                ? '#fbbf24'
+                                : regionState === 'suspended'
+                                  ? '#ff6060'
+                                  : 'rgba(255,255,255,0.2)';
+
+                          return (
+                            <tr key={`${user.uid}_${regionId}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '12px 15px', color: '#88aabb' }}>{cluster.name}</td>
+                              <td style={{ padding: '12px 15px', fontWeight: 'bold' }}>{region.title || regionId}</td>
+                              <td style={{ padding: '12px 15px', color: '#88aabb', fontSize: '0.9rem' }}>
+                                {regionId} <br />
+                                <span style={{ color: region.isPrivate ? '#ffb703' : '#00f3ff' }}>
+                                  {region.isPrivate ? '비공개 (코드 필요)' : '공개'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 15px' }}>
+                                <select
+                                  value={regionState}
+                                  onChange={(e) => handleRegionAccessChange(user.uid, regionId, e.target.value)}
+                                  style={{
+                                    padding: '10px',
+                                    borderRadius: '6px',
+                                    background: bg,
+                                    color,
+                                    border: `1px solid ${border}`,
+                                    outline: 'none',
+                                    width: '100%',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                  }}
+                                >
+                                  <option value="none" style={{ background: '#1a1b26', color: 'white' }}>미지정 (None)</option>
+                                  <option value="active" style={{ background: '#1a1b26', color: '#00ffa0' }}>접근 허용 (Active)</option>
+                                  <option value="completed" style={{ background: '#1a1b26', color: '#fbbf24' }}>완료 처리 (Completed)</option>
+                                  <option value="suspended" style={{ background: '#1a1b26', color: '#ff6060' }}>접근 정지 (Suspended)</option>
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        });
                       })}
                     </tbody>
                   </table>

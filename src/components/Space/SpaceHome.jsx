@@ -1063,14 +1063,30 @@ function SpaceHome() {
     if (!user || isProcessingNonQuiz.current) return
     isProcessingNonQuiz.current = true
 
-    const { transmissionId, transmissionTitle, stampedSeconds } = activityMetadata
+    const {
+      transmissionId,
+      transmissionTitle,
+      stampedSeconds,
+      activityCategory,
+      attentionSource,
+      attentionResult,
+      attentionOpportunityId,
+      attentionWindowSeconds
+    } = activityMetadata
     const currentUnitId = selectedUnitDocId || quickQuizUnitId || 'unknown'
     
     const userDocRef = doc(db, 'users', user.uid)
     const progressDocRef = doc(db, 'users', user.uid, 'learning_progress', currentUnitId)
 
-    const isVideoActivity = activityType.includes('영상')
-    const isLogActivity = activityType.includes('로그')
+    const isVideoActivity =
+      activityCategory === 'video' ||
+      activityType.includes('영상') ||
+      activityType.includes('타임어택') ||
+      !!transmissionId ||
+      !!attentionSource
+    const isLogActivity = activityCategory === 'text' || activityType.includes('로그')
+    const isAttentionEvent = !!attentionSource
+    const isAttentionMiss = isAttentionEvent && attentionResult === 'miss'
 
     try {
       const txResult = await runTransaction(db, async (transaction) => {
@@ -1245,7 +1261,9 @@ function SpaceHome() {
           if (isLogActivity) {
             stableTxId = `log_${currentUnitId}`;
           } else if (isVideoActivity) {
-            if (activityType.includes('완료')) {
+            if (attentionSource === 'time_attack' && attentionOpportunityId) {
+              stableTxId = `video_attention_${currentUnitId}_${transmissionId}_${attentionOpportunityId}`;
+            } else if (activityType.includes('완료')) {
               stableTxId = `video_bonus_${currentUnitId}_${transmissionId}`;
             } else if (activityType.includes('수신')) {
               // Extract minutes for interval reward stable ID
@@ -1266,15 +1284,17 @@ function SpaceHome() {
         // --- Atomic Logging: History ---
         const isCompletionActivity = activityType.includes('완료') || isLogActivity
         const streakDateUpdated = !!streakResult.streakUpdate?.lastStreakDate
-        const shouldLogHistory = isCompletionActivity || streakDateUpdated || actualReward > 0
+        const shouldLogHistory = isCompletionActivity || streakDateUpdated || actualReward > 0 || isAttentionMiss
 
         if (shouldLogHistory) {
           // Use stable ID to prevent duplicates. For non-completion intervals, include the time marker.
-          let stableHistoryId = isLogActivity 
+          let stableHistoryId = isLogActivity
             ? `log_completion_${currentUnitId}`
             : `video_completion_${currentUnitId}_${transmissionId || 'default'}`;
-          
-          if (!isCompletionActivity && isVideoActivity) {
+
+          if (isAttentionEvent && attentionOpportunityId) {
+            stableHistoryId = `video_attention_${currentUnitId}_${transmissionId || 'default'}_${attentionSource}_${attentionOpportunityId}`;
+          } else if (!isCompletionActivity && isVideoActivity) {
             const minMatch = activityType.match(/\((\d+)분/);
             const minutes = minMatch ? minMatch[1] : 'int';
             stableHistoryId = `video_interval_${currentUnitId}_${transmissionId || 'default'}_${minutes}min`;
@@ -1292,10 +1312,15 @@ function SpaceHome() {
             score: 100,
             crystalsEarned: actualReward,
             timestamp: serverTimestamp(),
-            type: isLogActivity ? 'text' : 'video',
+            type: isLogActivity ? 'text' : (isAttentionMiss ? 'attention' : 'video'),
+            activityType,
             // Include video duration and stamp count in metadata for summary calculation
             videoTime: activityMetadata.videoTime || 0,
-            stampedCount: stampedSeconds?.length || 0
+            stampedCount: stampedSeconds?.length || 0,
+            attentionSource: attentionSource || "",
+            attentionResult: attentionResult || "",
+            attentionOpportunityId: attentionOpportunityId || "",
+            attentionWindowSeconds: attentionWindowSeconds || null
           }, { merge: true })
         }
 
@@ -1734,7 +1759,7 @@ function SpaceHome() {
                    if (accessStatus === 'suspended') {
                       alert('이 행성에 대한 접근이 일시정지되었습니다. 선생님께 문의하세요.');
                       return;
-                   } else if (accessStatus !== 'active') {
+                   } else if (accessStatus !== 'active' && accessStatus !== 'completed') {
                       setPendingRegion(region);
                       soundManager.playClick();
                       return;

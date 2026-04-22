@@ -81,6 +81,11 @@ const formatTime = (date) => {
   return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 };
 
+const formatFocusScore = (score) => {
+  if (score === null || score === undefined) return '기록 없음';
+  return `${score}점`;
+};
+
 // ── Type config ──
 const TYPE_CONFIG = {
   quiz: {
@@ -169,6 +174,22 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
             value={dailyStats?.isAssignmentSubmitted ? '제출됨' : '미작성'}
             color={dailyStats?.isAssignmentSubmitted ? 'var(--text-bright)' : 'rgba(255,255,255,0.3)'}
           />
+
+          <StatChip
+            icon="💎"
+            label="집중도"
+            value={formatFocusScore(dailyStats?.focusScore)}
+            subValue={dailyStats?.attentionOpportunities > 0 ? `${dailyStats.attentionHits}/${dailyStats.attentionOpportunities} 획득` : null}
+            color={
+              dailyStats?.focusScore == null
+                ? 'rgba(255,255,255,0.45)'
+                : dailyStats.focusScore >= 80
+                  ? '#22c55e'
+                  : dailyStats.focusScore >= 50
+                    ? '#fbbf24'
+                    : '#f87171'
+            }
+          />
         </div>
       </div>
 
@@ -225,6 +246,9 @@ function StatChip({ icon, label, value, subValue, color }) {
 function GroupedCard({ item, index, onClick }) {
   const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.quiz;
   const isClickable = !!onClick;
+  const attentionScore = item.attentionOpportunities > 0
+    ? Math.round((item.attentionHits / item.attentionOpportunities) * 100)
+    : null;
   
   const timeRange = (() => {
     const start = formatTime(item.firstTimestamp);
@@ -358,6 +382,32 @@ function GroupedCard({ item, index, onClick }) {
             borderRadius: '4px'
           }}>
             총 {formatSeconds(item.totalVideoSeconds)} 시청
+          </span>
+        )}
+
+        {item.type === 'video' && item.attentionOpportunities > 0 && (
+          <span className="font-tech" style={{
+            color: attentionScore >= 80 ? '#22c55e' : attentionScore >= 50 ? '#fbbf24' : '#f87171',
+            fontWeight: 'bold',
+            background: 'rgba(0,0,0,0.3)',
+            padding: '0.15rem 0.5rem',
+            borderRadius: '4px'
+          }}>
+            광석 {item.attentionHits}/{item.attentionOpportunities} 획득
+          </span>
+        )}
+
+        {item.type === 'video' && item.timeAttackHits + item.timeAttackMisses > 0 && (
+          <span className="font-tech" style={{ color: 'var(--text-muted)' }}>
+            타임어택 {item.timeAttackHits}/{item.timeAttackHits + item.timeAttackMisses}
+          </span>
+        )}
+
+        {item.type === 'video' && item.completionCrystalHits + item.completionCrystalMisses > 0 && (
+          <span className="font-tech" style={{
+            color: item.completionCrystalMisses > 0 ? '#f87171' : '#22c55e'
+          }}>
+            완료 보너스 {item.completionCrystalMisses > 0 ? '놓침' : '획득'}
           </span>
         )}
         
