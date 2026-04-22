@@ -77,7 +77,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0 }) {
     
     setTimeout(() => {
       onHit();
-    }, 1500); // give time for animation
+    }, 3000); // 1.5s -> 3s 연장
   };
 
   const handleMiss = () => {
@@ -87,7 +87,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0 }) {
     
     setTimeout(() => {
       onMiss();
-    }, 2000); // give time for dust animation
+    }, 3000); // 2s -> 3s 연장
   };
 
   if (!position) return null;
@@ -154,7 +154,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0 }) {
           <motion.div 
             initial={{ y: 0, opacity: 1 }}
             animate={{ y: status === 'hit' ? -30 : 20, opacity: 0 }}
-            transition={{ duration: 1.5 }}
+            transition={{ duration: 3.0 }}
             className="time-attack-feedback"
             style={{
               background: status === 'hit' ? 'rgba(5, 10, 25, 0.9)' : 'rgba(255, 77, 77, 0.9)',
