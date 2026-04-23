@@ -7,8 +7,9 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   // 1. 기초 체급 (Wealth): 보유 광석 / 2 -> 누적 핵심 지표로 가중치 대폭 강화 (기존 / 10)
   const wealthScore = Math.floor(crystals / 2);
   
-  // 2. 전문성 (Skill): 평균 점수 * 5 -> 가중치 유지 (100점 만점 시 500점)
-  const skillScore = Math.floor(avgScore * 5);
+  // 2. 전문성 (Skill): (평균 점수 * 5) + (백점 횟수 * 10) -> 실력과 마스터리 동시 반영
+  const perfectCount = user.perfectCount || 0;
+  const skillScore = Math.floor(avgScore * 5) + (perfectCount * 10);
   
   // 3. 성실도 (Diligence): 연속 학습일 * 10 -> 선형 누적으로 꾸준함 강력 보상 (기존 log2)
   const diligenceScore = Math.floor(streak * 10);

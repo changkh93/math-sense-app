@@ -17,7 +17,31 @@ export default function SpaceRanking({ user, userData }) {
   const [loading, setLoading] = useState(true)
   const [rankMode, setRankMode] = useState('sei') 
   const [inspectUserId, setInspectUserId] = useState(null)
+  const [hoveredMetric, setHoveredMetric] = useState(null)
   const { isAdmin } = useAdmin();
+
+  const SEI_TIPS = {
+    skill: {
+      title: '전문성(실력)',
+      tip: '평균 점수를 높게 유지하며, 최대한 많은 단원에서 **백점 만점(Perfect)**을 달성하세요!'
+    },
+    diligence: {
+      title: '끈기(성실)',
+      tip: '매일 조금씩이라도 거르지 않고 학습하여 **연속 학습(Streak)** 기록을 이어가는 것이 핵심입니다.'
+    },
+    wealth: {
+      title: '능력(부)',
+      tip: '다양한 탐사와 퀴즈를 통해 **보유 광석(Crystals)** 총량을 늘려 기초 체급을 강화하세요.'
+    },
+    growth: {
+      title: '잠재력(성장)',
+      tip: '매주 새로운 탐사를 통해 **주간 획득 광석량**을 높여 당신의 성장 속도를 증명하세요.'
+    },
+    agora: {
+      title: '소통(아고라)',
+      tip: '아고라 커뮤니티에서 질문하고 답변하며 **지식을 공유**하여 보너스 점수를 획득하세요.'
+    }
+  };
 
   const handleRepairStreaks = async () => {
     if (!window.confirm("모든 랭킹 사용자의 스트릭 데이터를 분석하여 복구하시겠습니까?\n(Firestore 읽기가 다수 발생합니다)")) return;
@@ -501,22 +525,72 @@ export default function SpaceRanking({ user, userData }) {
                               <div style={{ flex: 1, maxWidth: '300px' }}>
                                 <h4 style={{ color: tier.color, marginBottom: '1rem' }}>{tier.icon} {tier.name}</h4>
                                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <li 
+                                    onMouseEnter={() => setHoveredMetric('skill')}
+                                    onMouseLeave={() => setHoveredMetric(null)}
+                                    style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '4px', transition: 'background 0.2s', background: hoveredMetric === 'skill' ? 'rgba(0, 243, 255, 0.1)' : 'transparent' }}
+                                  >
                                     <span>전문성(실력)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.skill || 0} pts</strong>
                                   </li>
-                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <li 
+                                    onMouseEnter={() => setHoveredMetric('diligence')}
+                                    onMouseLeave={() => setHoveredMetric(null)}
+                                    style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '4px', transition: 'background 0.2s', background: hoveredMetric === 'diligence' ? 'rgba(0, 243, 255, 0.1)' : 'transparent' }}
+                                  >
                                     <span>끈기(성실)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.diligence || 0} pts</strong>
                                   </li>
-                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <li 
+                                    onMouseEnter={() => setHoveredMetric('wealth')}
+                                    onMouseLeave={() => setHoveredMetric(null)}
+                                    style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '4px', transition: 'background 0.2s', background: hoveredMetric === 'wealth' ? 'rgba(0, 243, 255, 0.1)' : 'transparent' }}
+                                  >
                                     <span>능력(광석)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.wealth || 0} pts</strong>
                                   </li>
-                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <li 
+                                    onMouseEnter={() => setHoveredMetric('growth')}
+                                    onMouseLeave={() => setHoveredMetric(null)}
+                                    style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '4px', transition: 'background 0.2s', background: hoveredMetric === 'growth' ? 'rgba(0, 243, 255, 0.1)' : 'transparent' }}
+                                  >
                                     <span>잠재력(성장)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.growth || 0} pts</strong>
                                   </li>
-                                  <li style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <li 
+                                    onMouseEnter={() => setHoveredMetric('agora')}
+                                    onMouseLeave={() => setHoveredMetric(null)}
+                                    style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '4px', transition: 'background 0.2s', background: hoveredMetric === 'agora' ? 'rgba(0, 243, 255, 0.1)' : 'transparent' }}
+                                  >
                                     <span>소통(아고라)</span><strong style={{ color: 'var(--crystal-cyan)' }}>{u.seiData?.agora || 0} pts</strong>
                                   </li>
                                 </ul>
+                                <div style={{ 
+                                  marginTop: '1.2rem', 
+                                  padding: '0.8rem', 
+                                  background: 'rgba(0, 243, 255, 0.05)', 
+                                  borderRadius: '8px',
+                                  border: '1px dashed rgba(0, 243, 255, 0.2)',
+                                  fontSize: '0.75rem',
+                                  color: 'rgba(255,255,255,0.5)',
+                                  lineHeight: '1.4',
+                                  minHeight: '75px', // 고정 높이로 레이아웃 흔들림 방지
+                                  transition: 'all 0.3s ease'
+                                }}>
+                                  <AnimatePresence mode="wait">
+                                    <motion.div
+                                      key={hoveredMetric || 'default'}
+                                      initial={{ opacity: 0, y: 5 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -5 }}
+                                      transition={{ duration: 0.2 }}
+                                    >
+                                      <strong style={{ color: 'var(--crystal-cyan)', display: 'block', marginBottom: '4px' }}>
+                                        💡 {hoveredMetric ? SEI_TIPS[hoveredMetric].title : '전문가의 팁'}
+                                      </strong>
+                                      {hoveredMetric ? 
+                                        SEI_TIPS[hoveredMetric].tip.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} style={{ color: 'rgba(255,255,255,0.9)' }}>{part}</strong> : part) : 
+                                        "항목을 호버하여 점수를 올리는 비결을 확인하세요!"
+                                      }
+                                    </motion.div>
+                                  </AnimatePresence>
+                                </div>
                               </div>
                             </div>
                           </motion.div>
