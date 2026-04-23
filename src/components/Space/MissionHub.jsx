@@ -75,7 +75,7 @@ const SilentCrystalToast = ({ amount, visible }) => (
 
 // ─── YouTube Player Component ───
 // Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
-const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, isOverlay = false, autoPlay = true }, ref) => {
+const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, isOverlay = false, autoPlay = true }, ref) => {
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
   const [hasError, setHasError] = useState(false)
@@ -204,6 +204,9 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
             }, 200) 
           },
           'onStateChange': (event) => {
+            if (onPlaybackStateChange) {
+              onPlaybackStateChange(event.data)
+            }
             if (event.data === window.YT.PlayerState.PLAYING) {
               if (channelRef.current) {
                 channelRef.current.postMessage({ type: 'START_PLAYING', tabId: tabIdRef.current })
@@ -490,6 +493,7 @@ export default function MissionHub({
   const [showTimeAttack, setShowTimeAttack] = useState(false);
   const showTimeAttackRef = useRef(false);
   const [timeAttackCombo, setTimeAttackCombo] = useState(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const nextAttackTimeRef = useRef(null);
   const sessionStartTimeRef = useRef(Date.now());
   const completionCrystalTriggeredRef = useRef(false);
@@ -598,6 +602,8 @@ export default function MissionHub({
   // ─── Silent Toast ───
   const [toastVisible, setToastVisible] = useState(false)
   const [toastAmount, setToastAmount] = useState(0)
+  const [rewardLimitNotice, setRewardLimitNotice] = useState("")
+  const rewardLimitNoticeTimeoutRef = useRef(null)
 
   // ─── Learning Progress (Firestore) ───
   const [learningProgress, setLearningProgress] = useState(null)
@@ -765,6 +771,7 @@ export default function MissionHub({
     if (videoPrevTxIdRef.current) videoPrevTxIdRef.current = null
     setIsAtEnd(false)
     setSaveStatus(null)
+    setIsVideoPlaying(false)
   }, [selectedTx?.id])
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
@@ -970,6 +977,14 @@ export default function MissionHub({
     }, 2500)
   }, [])
 
+  const showRewardLimitNotice = useCallback((message) => {
+    if (rewardLimitNoticeTimeoutRef.current) clearTimeout(rewardLimitNoticeTimeoutRef.current)
+    setRewardLimitNotice(message)
+    rewardLimitNoticeTimeoutRef.current = setTimeout(() => {
+      setRewardLimitNotice("")
+    }, 3500)
+  }, [])
+
   const videoAlreadySavedRef = useRef(false) // Flag to prevent double-save via returnFromContent
 
   // Helper: when exiting content, go back to SpaceHome if single-content unit
@@ -983,13 +998,17 @@ export default function MissionHub({
       // Check if we hit a milestone JUST before exiting
       if (newStampCountRef.current >= 180 && !rewardLockRef.current) {
         const minutes = Math.floor(stampedSetRef.current.size / 60);
-        await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
+        const rewardOutcome = await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
           transmissionId: txId,
           transmissionTitle: selectedTx?.title || "Main Video",
           stampedSeconds: Array.from(stampedSetRef.current),
           videoTime: currentTime
         });
-        showSilentToast(10);
+        if (rewardOutcome?.actualReward > 0) {
+          showSilentToast(rewardOutcome.actualReward);
+        } else if (rewardOutcome?.rewardBlockedReason === 'daily_cap') {
+          showRewardLimitNotice('광석 지급은 리밋에 걸렸지만, 집중도 기록에는 반영됩니다.')
+        }
       } else {
         // Just sync progress without reward
         await onNonQuizActivityComplete('영상 학습 기록 동기화', 0, {
@@ -1010,6 +1029,7 @@ export default function MissionHub({
     // If only one, return to briefing.
     if (selectedTx) {
         setSelectedTx(null)
+        setIsVideoPlaying(false)
         if (txList.length <= 1) {
             updateCurrentMode('briefing')
         }
@@ -1028,7 +1048,7 @@ export default function MissionHub({
       // Return to Mission Control (Briefing)
       updateCurrentMode('briefing')
     }
-  }, [initialMode, onBack, selectedTx, onNonQuizActivityComplete, showSilentToast])
+  }, [initialMode, onBack, selectedTx, missionData, onNonQuizActivityComplete, showSilentToast, showRewardLimitNotice])
 
   const logActivity = async (actionStr) => {
     if (!userId) return;
@@ -1438,49 +1458,74 @@ export default function MissionHub({
         updatedAt: serverTimestamp()
       }
       
-      // Save completion if threshold met (coverage >= 0.99) OR manually triggered (isAtEnd)
+      // Finalize progress exactly once: completion bonus, eligible interval reward, or sync-only save
+      let exitRewardOutcome = null
       if (videoCompleted || isManualComplete) {
-         updateData.videoProgress[txId].completed = true
-         updateData.videoProgress[txId].completionBonusGiven = true
-         videoCompletedRef.current = true
-         videoCompletionBonusGivenRef.current = true
-         
-         const wasAlreadyCompleted = learningProgress?.videoProgress?.[txId]?.completed;
-         let rewardAmount = 0;
-         if (videoCompleted && !wasAlreadyCompleted) {
-             if (completionBonusTimeLeft !== null && completionBonusTimeLeft > 0) {
-                 rewardAmount = 20;
-             }
-         }
-         
-         if (rewardAmount > 0) {
-             totalRewardedCrystalsRef.current += rewardAmount;
-             updateData.videoProgress[txId].totalRewardedCrystals = totalRewardedCrystalsRef.current;
-             setTotalRewardedCrystals(totalRewardedCrystalsRef.current);
-         }
-         
-         // Trigger history log creation and dashboard ring update
-         if (onNonQuizActivityComplete) {
-            const completionAttentionMeta = videoCompleted && !wasAlreadyCompleted
-              ? {
-                  attentionSource: 'completion_bonus',
-                  attentionResult: rewardAmount > 0 ? 'hit' : 'miss',
-                  attentionOpportunityId: `completion_${txId}`,
-                  attentionWindowSeconds: 60
-                }
-              : {};
-            await onNonQuizActivityComplete(
-              '영상 교신 완료', 
-              rewardAmount, 
-              {
-                activityCategory: 'video',
-                transmissionId: txId,
-                transmissionTitle: selectedTx?.title || "Main Video",
-                videoTime: savedPosition,
-                ...completionAttentionMeta
+        updateData.videoProgress[txId].completed = true
+        updateData.videoProgress[txId].completionBonusGiven = true
+        videoCompletedRef.current = true
+        videoCompletionBonusGivenRef.current = true
+        
+        const wasAlreadyCompleted = learningProgress?.videoProgress?.[txId]?.completed
+        let rewardAmount = 0
+        if (videoCompleted && !wasAlreadyCompleted && completionBonusTimeLeft !== null && completionBonusTimeLeft > 0) {
+          rewardAmount = 20
+        }
+        
+        if (rewardAmount > 0) {
+          totalRewardedCrystalsRef.current += rewardAmount
+          updateData.videoProgress[txId].totalRewardedCrystals = totalRewardedCrystalsRef.current
+          setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
+        }
+        
+        if (onNonQuizActivityComplete) {
+          const completionAttentionMeta = videoCompleted && !wasAlreadyCompleted
+            ? {
+                attentionSource: 'completion_bonus',
+                attentionResult: rewardAmount > 0 ? 'hit' : 'miss',
+                attentionOpportunityId: `completion_${txId}`,
+                attentionWindowSeconds: 60
               }
-            );
-         }
+            : {}
+          exitRewardOutcome = await onNonQuizActivityComplete(
+            '영상 교신 완료',
+            rewardAmount,
+            {
+              activityCategory: 'video',
+              transmissionId: txId,
+              transmissionTitle: selectedTx?.title || "Main Video",
+              videoTime: savedPosition,
+              ...completionAttentionMeta
+            }
+          )
+        }
+      } else if (onNonQuizActivityComplete) {
+        if (newStampCountRef.current >= 180 && !rewardLockRef.current) {
+          const minutes = Math.floor(stampedSetRef.current.size / 60)
+          exitRewardOutcome = await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
+            transmissionId: txId,
+            transmissionTitle: selectedTx?.title || "Main Video",
+            stampedSeconds: stamps,
+            videoTime: savedPosition,
+            attentionSource: 'video_exit',
+            attentionResult: 'hit',
+            attentionOpportunityId: `video_exit_${txId}_${savedPosition}`,
+            attentionWindowSeconds: 60
+          })
+        } else {
+          exitRewardOutcome = await onNonQuizActivityComplete('영상 학습 기록 동기화', 0, {
+            transmissionId: txId,
+            transmissionTitle: selectedTx?.title || "Main Video",
+            stampedSeconds: stamps,
+            videoTime: savedPosition
+          })
+        }
+      }
+      
+      if (exitRewardOutcome?.actualReward > 0) {
+        showSilentToast(exitRewardOutcome.actualReward)
+      } else if (exitRewardOutcome?.rewardBlockedReason === 'daily_cap') {
+        showRewardLimitNotice('광석 지급은 리밋에 걸렸지만, 집중도 기록에는 반영됩니다.')
       }
       
       await setDoc(progressRef, updateData, { merge: true })
@@ -1512,7 +1557,8 @@ export default function MissionHub({
         };
       })
 
-      showSilentToast(0)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus(null), 2000)
     } catch (err) {
       console.error("Failed to save video position:", err)
     }
@@ -1943,6 +1989,9 @@ export default function MissionHub({
                     end={selectedTx.end}
                     onTimeUpdate={handleVideoTimeUpdate}
                     onComplete={() => setIsAtEnd(true)}
+                    onPlaybackStateChange={(state) => {
+                      setIsVideoPlaying(state === window.YT?.PlayerState?.PLAYING)
+                    }}
                  />
                ) : (
                  <div className="font-tech" style={{ color: 'var(--text-muted)' }}>
@@ -2057,6 +2106,26 @@ export default function MissionHub({
                  </button>
                </div>
                
+               <AnimatePresence>
+                 {rewardLimitNotice && (
+                   <motion.p
+                     initial={{ opacity: 0, y: 8 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     exit={{ opacity: 0, y: -4 }}
+                     className="font-tech"
+                     style={{
+                       margin: '0.75rem 0 0',
+                       color: '#ffd166',
+                       fontSize: '0.85rem',
+                       textAlign: 'center',
+                       textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+                     }}
+                   >
+                     {rewardLimitNotice}
+                   </motion.p>
+                 )}
+               </AnimatePresence>
+               
                {isAtEnd && !videoCompleted && (
                  <motion.p initial={{opacity:0}} animate={{opacity:1}} className="font-tech" style={{ color: '#ffb3b3', margin: 0, fontSize: '0.85rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                    통신 장애! 영상의 99% 이상을 탐사해야 보너스 수신이 가능합니다.
@@ -2071,8 +2140,9 @@ export default function MissionHub({
                  onMiss={handleTimeAttackMiss} 
                  currentCombo={timeAttackCombo} 
                  userName={userData?.studentName || user?.displayName}
+                 isVideoPaused={!isVideoPlaying}
                />
-             )}
+              )}
           </div>
       )
     }

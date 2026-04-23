@@ -1139,6 +1139,7 @@ function SpaceHome() {
 
         // --- Duplicate Reward Prevention ---
         let actualReward = crystalsEarned
+        let rewardBlockedReason = null
 
         if (isVideoActivity && transmissionId) {
           const videoProg = freshProgressData.videoProgress?.[transmissionId] || {}
@@ -1158,6 +1159,7 @@ function SpaceHome() {
               // --- Relaxed Cooldown (Accommodates 2x playback speed) ---
               if (diffSeconds < 60) {
                 actualReward = 0
+                rewardBlockedReason = 'cooldown'
               }
             }
           }
@@ -1165,12 +1167,14 @@ function SpaceHome() {
           if (actualReward > 0) {
             if (isCompletion && videoProg.completionBonusGiven) {
               actualReward = 0 // Already got completion bonus
+              rewardBlockedReason = 'duplicate'
             } else if (isInterval) {
               // Check based on rewardedStampCount
               const rewardedCount = videoProg.rewardedStampCount || 0
               const currentTotalStamps = stampedSeconds?.length || 0
               if (currentTotalStamps <= rewardedCount) {
                 actualReward = 0 // No new stamps to reward
+                rewardBlockedReason = 'duplicate'
               }
             }
           }
@@ -1203,8 +1207,12 @@ function SpaceHome() {
           const DAILY_VIDEO_CAP = 300 // Max 300 crystals per day from video activities
           if (dailyVideoCrystals >= DAILY_VIDEO_CAP) {
             actualReward = 0
+            rewardBlockedReason = 'daily_cap'
           } else if (dailyVideoCrystals + actualReward > DAILY_VIDEO_CAP) {
             actualReward = DAILY_VIDEO_CAP - dailyVideoCrystals
+            if (actualReward <= 0) {
+              rewardBlockedReason = 'daily_cap'
+            }
           }
 
           if (actualReward > 0) {
@@ -1220,6 +1228,11 @@ function SpaceHome() {
           console.warn("SpaceHome: actualReward is NaN or undefined in handleNonQuizActivityComplete, resetting to 0")
           actualReward = 0
         }
+
+        const shouldLogFocusOnly = isVideoActivity && rewardBlockedReason === 'daily_cap'
+        const isCompletionActivity = activityType.includes('완료') || isLogActivity
+        const shouldLogHistory = isCompletionActivity || streakResult.streakUpdate?.lastStreakDate || actualReward > 0 || isAttentionMiss || shouldLogFocusOnly
+        const effectiveAttentionOpportunityId = attentionOpportunityId || (shouldLogFocusOnly ? `video_limit_${Math.floor(Date.now() / 1000)}` : "")
 
         if (actualReward > 0) {
           userUpdates.crystals = (freshUserData.crystals || 0) + actualReward
@@ -1322,18 +1335,14 @@ function SpaceHome() {
         }
 
         // --- Atomic Logging: History ---
-        const isCompletionActivity = activityType.includes('완료') || isLogActivity
-        const streakDateUpdated = !!streakResult.streakUpdate?.lastStreakDate
-        const shouldLogHistory = isCompletionActivity || streakDateUpdated || actualReward > 0 || isAttentionMiss
-
         if (shouldLogHistory) {
           // Use stable ID to prevent duplicates. For non-completion intervals, include the time marker.
           let stableHistoryId = isLogActivity
             ? `log_completion_${currentUnitId}`
             : `video_completion_${currentUnitId}_${transmissionId || 'default'}`;
 
-          if (isAttentionEvent && attentionOpportunityId) {
-            stableHistoryId = `video_attention_${currentUnitId}_${transmissionId || 'default'}_${attentionSource}_${attentionOpportunityId}`;
+          if ((isAttentionEvent || shouldLogFocusOnly) && effectiveAttentionOpportunityId) {
+            stableHistoryId = `video_attention_${currentUnitId}_${transmissionId || 'default'}_${attentionSource || 'video_limit'}_${effectiveAttentionOpportunityId}`;
           } else if (!isCompletionActivity && isVideoActivity) {
             const minMatch = activityType.match(/\((\d+)분/);
             const minutes = minMatch ? minMatch[1] : 'int';
@@ -1352,22 +1361,22 @@ function SpaceHome() {
             score: 100,
             crystalsEarned: actualReward,
             timestamp: serverTimestamp(),
-            type: isLogActivity ? 'text' : (isAttentionMiss ? 'attention' : 'video'),
+            type: isLogActivity ? 'text' : ((isAttentionMiss || shouldLogFocusOnly) ? 'attention' : 'video'),
             activityType,
             // Include video duration and stamp count in metadata for summary calculation
             videoTime: activityMetadata.videoTime || 0,
             stampedCount: stampedSeconds?.length || 0,
-            attentionSource: attentionSource || "",
-            attentionResult: attentionResult || "",
-            attentionOpportunityId: attentionOpportunityId || "",
+            attentionSource: attentionSource || (shouldLogFocusOnly ? 'video_limit' : ""),
+            attentionResult: attentionResult || (shouldLogFocusOnly ? 'hit' : ""),
+            attentionOpportunityId: effectiveAttentionOpportunityId,
             attentionWindowSeconds: attentionWindowSeconds || null
           }, { merge: true })
         }
 
-        return { streakCalcResult: streakResult, streakUpdates, txUserData: freshUserData, actualReward }
+        return { streakCalcResult: streakResult, streakUpdates, txUserData: freshUserData, actualReward, rewardBlockedReason }
       })
 
-      const { streakCalcResult, streakUpdates, txUserData, actualReward } = txResult
+      const { streakCalcResult, streakUpdates, txUserData, actualReward, rewardBlockedReason } = txResult
 
       // Trigger milestone celebration
       if (streakCalcResult.meta?.justReachedMilestone) {
@@ -1401,8 +1410,11 @@ function SpaceHome() {
           })
         }
       }
+
+      return { actualReward, rewardBlockedReason, streakCalcResult, streakUpdates, txUserData }
     } catch (err) {
       console.error("Error in activity completion:", err)
+      return { actualReward: 0, rewardBlockedReason: 'error' }
     } finally {
       isProcessingNonQuiz.current = false
     }

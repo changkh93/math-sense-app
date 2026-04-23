@@ -129,7 +129,7 @@ const FAIL_MESSAGES = [
   "조금만 더 빨리! 집중력 부스터 온! 🚀"
 ];
 
-export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, userName = "" }) {
+export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, userName = "", isVideoPaused = false }) {
   const [position, setPosition] = useState(null);
   const [timeLeft, setTimeLeft] = useState(30);
   const [status, setStatus] = useState('active'); // 'active', 'hit', 'miss'
@@ -178,7 +178,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
   }, []);
 
   useEffect(() => {
-    if (status !== 'active') return;
+    if (status !== 'active' || isVideoPaused) return;
 
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -192,7 +192,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [status]);
+  }, [status, isVideoPaused]);
 
   const getRandomSuccessMessage = () => {
     const now = new Date();
