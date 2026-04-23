@@ -10,19 +10,28 @@ function hasLearningActivity(stats) {
   return (stats.quizzes || 0) > 0 || (stats.videos || 0) > 0 || (stats.texts || 0) > 0 || (stats.workbooks || 0) > 0;
 }
 
-export default function SpaceJourney({ userData }) {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function SpaceJourney({ userData, initialHistory, initialTransactions }) {
+  const [history, setHistory] = useState(initialHistory || []);
+  const [loading, setLoading] = useState(!initialHistory);
   
   const [viewMode, setViewMode] = useState('constellation');
   const [popover, setPopover] = useState(null); // { dayData, x, y }
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState(initialTransactions || []);
 
   const scrollContainerRef = useRef(null);
   const todayKST = getTodayKST();
 
   useEffect(() => {
+    // Debug log for production monitoring
+    console.log("[SpaceJourney] Mounted. userData:", !!userData, "history:", history?.length, "transactions:", transactions?.length);
+
     const fetchHistory = async () => {
+      // If props were provided, we don't need to fetch again
+      if (initialHistory && initialTransactions) {
+        setLoading(false);
+        return;
+      }
+
       if (!auth.currentUser) {
         // If auth isn't ready yet, we wait. 
         // Component will re-run when auth.currentUser changes.
@@ -169,6 +178,8 @@ export default function SpaceJourney({ userData }) {
 
   // 기간 노드 생성 (기록 시작일 ~ 오늘)
   const timelineData = useMemo(() => {
+    if (!todayKST) return { minDate: '', days: [] };
+
     let minDate = todayKST;
     history.forEach(h => {
       if (!h.timestamp) return;

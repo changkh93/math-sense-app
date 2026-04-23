@@ -188,6 +188,10 @@ function SpaceHome() {
       setCurrentView(location.state.view)
       updateSelectedRegionId(null)
       updateSelectedChapterDocId(null)
+      updateSelectedUnitDocId(null) // Clear stuck mission ID
+      setQuickQuizUnitId(null)      // Clear quick quiz
+      if (isDarkMatterMode) stopDarkMatterMode() // Exit dark matter if active
+      
       // Clear state to prevent re-triggering
       window.history.replaceState({}, document.title)
     }
@@ -1828,6 +1832,9 @@ function SpaceHome() {
           setCurrentView(view)
           updateSelectedRegionId(null)
           updateSelectedChapterDocId(null)
+          updateSelectedUnitDocId(null) // Reset mission when navigating via navbar
+          setQuickQuizUnitId(null)
+          if (isDarkMatterMode) stopDarkMatterMode()
         }} 
       />
 
@@ -2530,7 +2537,13 @@ function SpaceHome() {
           )}
           
           {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}
-          {currentView === 'journey' && <SpaceJourney userData={userData} />}
+          {currentView === 'journey' && (
+            <SpaceJourney 
+              userData={userData} 
+              initialHistory={history} 
+              initialTransactions={transactions}
+            />
+          )}
           {currentView === 'ledger' && <CrystalLedger userData={userData} />}
           {/* AssignmentHub moved to root level */}
 

@@ -124,7 +124,24 @@ const LiveUserRow = ({ user, onViewDetails }) => {
                ) : (
                  <>
                    {dailyStats.quizCount > 0 && <span>✅ 퀴즈 완료: {dailyStats.quizCount}회</span>}
-                   {dailyStats.totalVideoSeconds > 0 && <span>🎬 영상 시청: {Math.floor(dailyStats.totalVideoSeconds / 60)}분</span>}
+                    {dailyStats.totalVideoSeconds > 0 && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>🎬 영상 시청: {Math.floor(dailyStats.totalVideoSeconds / 60)}분</span>
+                        {dailyStats.attentionOpportunities > 0 && (
+                          <span style={{ 
+                            fontSize: '0.75rem', 
+                            color: 'var(--crystal-cyan)', 
+                            background: 'rgba(0, 243, 255, 0.1)', 
+                            padding: '2px 6px', 
+                            borderRadius: '4px',
+                            border: '1px solid rgba(0, 243, 255, 0.2)',
+                            fontWeight: 'bold'
+                          }}>
+                            집중도(광석): {dailyStats.attentionHits}/{dailyStats.attentionOpportunities}
+                          </span>
+                        )}
+                      </span>
+                    )}
                    {dailyStats.logCount > 0 && <span>📝 데이터 로그: {dailyStats.logCount}회 열람</span>}
                  </>
                )}
@@ -536,6 +553,19 @@ export default function LiveStatus() {
                          {act.score !== null && (
                             <div style={{ fontSize: '0.85rem', color: '#00ffa0', marginTop: 5 }}>
                                점수: {act.score}점 {act.attemptCount > 1 && <span style={{color: 'rgba(255,255,255,0.5)'}}>({act.attemptCount}번째 시도)</span>}
+                            </div>
+                         )}
+                         {act.type === 'video_attention' && (
+                            <div style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', marginTop: 5 }}>
+                               <span style={{ 
+                                 color: act.metadata?.attentionResult === 'hit' ? '#00ffa0' : '#ff4757',
+                                 fontWeight: 'bold'
+                               }}>
+                                 {act.metadata?.attentionResult === 'hit' ? '💎 광석 클릭 성공' : '❌ 광석 클릭 놓침'}
+                               </span>
+                               <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
+                                 ({act.metadata?.attentionSource === 'time_attack' ? '타임어택' : '완료 보너스'})
+                               </span>
                             </div>
                          )}
                       </div>
