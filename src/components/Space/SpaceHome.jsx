@@ -61,6 +61,24 @@ function getMiddleMathRegionImage(region) {
   return MIDDLE_MATH_REGION_IMAGES.core
 }
 
+const PYTHON_REGION_IMAGES = {
+  foundation: '/assets/planets/python-foundation.png',
+  advanced: '/assets/planets/python-advanced.png',
+  data: '/assets/planets/python-data.png',
+  project: '/assets/planets/python-project.png'
+}
+
+function getPythonRegionImage(region) {
+  const title = region?.title || ''
+
+  if (title.includes('수학') || title.includes('기초') || title.includes('입문')) return PYTHON_REGION_IMAGES.foundation
+  if (title.includes('심화') || title.includes('반복') || title.includes('함수') || title.includes('클래스') || title.includes('알고리즘')) return PYTHON_REGION_IMAGES.advanced
+  if (title.includes('데이터') || title.includes('시각화') || title.includes('분석') || title.includes('pandas') || title.includes('matplotlib')) return PYTHON_REGION_IMAGES.data
+  if (title.includes('게임') || title.includes('프로젝트') || title.includes('turtle') || title.includes('창작')) return PYTHON_REGION_IMAGES.project
+
+  return PYTHON_REGION_IMAGES.foundation
+}
+
 function SpaceHome() {
   // const navigate = useNavigate()
   const location = useLocation()
@@ -2066,6 +2084,7 @@ function SpaceHome() {
                     const isRegionLocked = region.isPrivate && userData?.regionAccess?.[region.id] !== 'active' && userData?.regionAccess?.[region.id] !== 'completed';
                     const isCompleted = explorationStatus[region.id] === 'completed';
                     const middleMathRegionImage = selectedClusterId === 'middle-math' ? getMiddleMathRegionImage(region) : null;
+                    const pythonRegionImage = selectedClusterId === 'python' ? getPythonRegionImage(region) : null;
                     
                     return (
                     <Motion.div
@@ -2121,9 +2140,9 @@ function SpaceHome() {
                       
                       <div style={{ position: 'relative', zIndex: 1 }}>
                         {is2DMode && (
-                          middleMathRegionImage ? (
+                          middleMathRegionImage || pythonRegionImage ? (
                             <img
-                              src={middleMathRegionImage}
+                              src={middleMathRegionImage || pythonRegionImage}
                               alt={region.title}
                               style={{
                                 width: '112px',

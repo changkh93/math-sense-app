@@ -30,6 +30,32 @@ function getMiddleMathPlanetStyle(region, index) {
   return MIDDLE_MATH_PLANET_STYLES[index % MIDDLE_MATH_PLANET_STYLES.length]
 }
 
+const PYTHON_PLANET_STYLES = [
+  { planetType: 'python_foundation', planetColor: '#63b3ff' },
+  { planetType: 'python_advanced', planetColor: '#34d3ff' },
+  { planetType: 'python_data', planetColor: '#7f8cff' },
+  { planetType: 'python_project', planetColor: '#b159ff' }
+]
+
+function getPythonPlanetStyle(region, index) {
+  const title = region?.title || ''
+
+  if (title.includes('수학') || title.includes('기초') || title.includes('입문')) {
+    return { planetType: 'python_foundation', planetColor: '#63b3ff' }
+  }
+  if (title.includes('심화') || title.includes('반복') || title.includes('함수') || title.includes('클래스') || title.includes('알고리즘')) {
+    return { planetType: 'python_advanced', planetColor: '#34d3ff' }
+  }
+  if (title.includes('데이터') || title.includes('시각화') || title.includes('분석') || title.includes('pandas') || title.includes('matplotlib')) {
+    return { planetType: 'python_data', planetColor: '#7f8cff' }
+  }
+  if (title.includes('게임') || title.includes('프로젝트') || title.includes('turtle') || title.includes('창작')) {
+    return { planetType: 'python_project', planetColor: '#b159ff' }
+  }
+
+  return PYTHON_PLANET_STYLES[index % PYTHON_PLANET_STYLES.length]
+}
+
 /**
  * 워프 효과를 위한 고속 별 이동
  */
@@ -108,6 +134,10 @@ function SceneContent({
         const middleMathStyle = getMiddleMathPlanetStyle(region, i)
         planetType = middleMathStyle.planetType
         planetColor = middleMathStyle.planetColor
+      } else if (region.clusterId === 'python' || region.clusterId === '파이썬' || region.title?.includes('파이썬')) {
+        const pythonStyle = getPythonPlanetStyle(region, i)
+        planetType = pythonStyle.planetType
+        planetColor = pythonStyle.planetColor
       } else if (region.title.includes('아디테라')) {
         planetType = 'forest'; planetColor = '#348c31'
       } else if (region.title.includes('디비디아')) {

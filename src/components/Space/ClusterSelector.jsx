@@ -5,7 +5,7 @@ import StarField from './StarField';
 const CLUSTER_IMAGES = {
   '중등수학': '/images/clusters/middle_math_hero.png',
   '고전 읽기': '/images/clusters/reading.png',
-  '파이썬': '/images/clusters/python.png',
+  '파이썬': '/images/clusters/python_hero.png',
   '초등수학': '/images/clusters/elementary_math.png'
 };
 

@@ -3,11 +3,15 @@ import { useFrame } from '@react-three/fiber'
 import { Sphere, useTexture, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
 
-const MIDDLE_MATH_PLANET_TYPES = new Set([
+const IMAGE_PLANET_TYPES = new Set([
   'middle_math_core',
   'middle_math_analytics',
   'middle_math_geometry',
-  'middle_math_exam'
+  'middle_math_exam',
+  'python_foundation',
+  'python_advanced',
+  'python_data',
+  'python_project'
 ])
 
 function getTexturePathForPlanetType(planetType) {
@@ -21,6 +25,10 @@ function getTexturePathForPlanetType(planetType) {
   if (planetType === 'middle_math_analytics') return '/assets/planets/middle-math-analytics.png'
   if (planetType === 'middle_math_geometry') return '/assets/planets/middle-math-geometry.png'
   if (planetType === 'middle_math_exam') return '/assets/planets/middle-math-exam.png'
+  if (planetType === 'python_foundation') return '/assets/planets/python-foundation.png'
+  if (planetType === 'python_advanced') return '/assets/planets/python-advanced.png'
+  if (planetType === 'python_data') return '/assets/planets/python-data.png'
+  if (planetType === 'python_project') return '/assets/planets/python-project.png'
   return null
 }
 
@@ -369,6 +377,18 @@ export default function PlanetMesh({
     } else if (planetType === 'middle_math_exam') {
       baseColor = '#b05cff'
       secondaryColor = '#240021'
+    } else if (planetType === 'python_foundation') {
+      baseColor = '#2f8fff'
+      secondaryColor = '#08132d'
+    } else if (planetType === 'python_advanced') {
+      baseColor = '#2cc7ff'
+      secondaryColor = '#071a2f'
+    } else if (planetType === 'python_data') {
+      baseColor = '#6a7dff'
+      secondaryColor = '#140c35'
+    } else if (planetType === 'python_project') {
+      baseColor = '#a043ff'
+      secondaryColor = '#1a0028'
     } else if (planetType === 'dark_matter') {
       baseColor = '#1a0033'
       secondaryColor = '#6b21a8'
@@ -418,7 +438,7 @@ export default function PlanetMesh({
   }
 
   const texturePath = useMemo(() => getTexturePathForPlanetType(planetType), [planetType])
-  const usesImageSprite = texturePath && MIDDLE_MATH_PLANET_TYPES.has(planetType)
+  const usesImageSprite = texturePath && IMAGE_PLANET_TYPES.has(planetType)
 
   return (
     <group 
