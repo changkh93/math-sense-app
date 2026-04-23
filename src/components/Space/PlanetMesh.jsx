@@ -3,6 +3,27 @@ import { useFrame } from '@react-three/fiber'
 import { Sphere, useTexture, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
 
+const MIDDLE_MATH_PLANET_TYPES = new Set([
+  'middle_math_core',
+  'middle_math_analytics',
+  'middle_math_geometry',
+  'middle_math_exam'
+])
+
+function getTexturePathForPlanetType(planetType) {
+  if (planetType === 'forest') return '/assets/planets/forest.png'
+  if (planetType === 'ice') return '/assets/planets/ice.png'
+  if (planetType === 'lava') return '/assets/planets/lava.png'
+  if (planetType === 'ocean') return '/assets/planets/ocean.png'
+  if (planetType === 'castle') return '/assets/planets/castle.png'
+  if (planetType === 'cloud') return '/assets/planets/cloud.png'
+  if (planetType === 'middle_math_core') return '/assets/planets/middle-math-core.png'
+  if (planetType === 'middle_math_analytics') return '/assets/planets/middle-math-analytics.png'
+  if (planetType === 'middle_math_geometry') return '/assets/planets/middle-math-geometry.png'
+  if (planetType === 'middle_math_exam') return '/assets/planets/middle-math-exam.png'
+  return null
+}
+
 /**
  * 텍스처를 사용하는 행성 재질 (Suspense 적용)
  */
@@ -40,18 +61,72 @@ function ProceduralPlanetMaterial({ planetTexture, color, isLocked, planetType }
 }
 
 /**
+ * 완성형 이미지 행성을 3D 장면 안에 그대로 보이게 하는 스프라이트 렌더러
+ */
+function ImageSpritePlanet({ texturePath, size, isLocked }) {
+  const activeTexture = useTexture(texturePath)
+
+  const spriteTexture = useMemo(() => {
+    const image = activeTexture?.image
+    if (!image || typeof document === 'undefined') return activeTexture
+
+    const canvas = document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(image, 0, 0)
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const { data, width, height } = imageData
+    const cx = width / 2
+    const cy = height / 2
+    const baseRadius = Math.min(width, height) * 0.39
+    const featherRadius = Math.min(width, height) * 0.10
+
+    for (let i = 0; i < data.length; i += 4) {
+      const x = (i / 4) % width
+      const y = Math.floor(i / 4 / width)
+      const dx = x - cx
+      const dy = y - cy
+      const distance = Math.sqrt((dx * dx) + (dy * dy))
+      const radialAlpha = THREE.MathUtils.clamp(
+        1 - ((distance - baseRadius) / featherRadius),
+        0,
+        1
+      )
+
+      const brightness = Math.max(data[i], data[i + 1], data[i + 2]) / 255
+      const glowAlpha = THREE.MathUtils.clamp((brightness - 0.06) / 0.22, 0, 1)
+      data[i + 3] = Math.round(Math.max(radialAlpha, glowAlpha) * 255)
+    }
+
+    ctx.putImageData(imageData, 0, 0)
+
+    const processedTexture = new THREE.CanvasTexture(canvas)
+    processedTexture.colorSpace = THREE.SRGBColorSpace
+    processedTexture.needsUpdate = true
+    return processedTexture
+  }, [activeTexture])
+
+  return (
+    <sprite scale={[size * 2.55, size * 2.55, 1]}>
+      <spriteMaterial
+        map={spriteTexture}
+        transparent
+        opacity={isLocked ? 0.42 : 1}
+        color={isLocked ? '#8893a8' : '#ffffff'}
+        depthWrite={false}
+      />
+    </sprite>
+  )
+}
+
+/**
  * 재질 선택기 (Suspense Wrapper)
  */
 function PlanetMaterialKey({ planetType, planetTexture, color, isLocked }) {
-  const texturePath = useMemo(() => {
-    if (planetType === 'forest') return '/assets/planets/forest.png'
-    if (planetType === 'ice') return '/assets/planets/ice.png'
-    if (planetType === 'lava') return '/assets/planets/lava.png'
-    if (planetType === 'ocean') return '/assets/planets/ocean.png'
-    if (planetType === 'castle') return '/assets/planets/castle.png'
-    if (planetType === 'cloud') return '/assets/planets/cloud.png'
-    return null
-  }, [planetType])
+  const texturePath = useMemo(() => getTexturePathForPlanetType(planetType), [planetType])
 
   if (texturePath) {
     return (
@@ -282,6 +357,18 @@ export default function PlanetMesh({
     } else if (planetType === 'cloud') {
       baseColor = '#a7ffeb'
       secondaryColor = '#e0f2f1'
+    } else if (planetType === 'middle_math_core') {
+      baseColor = '#4aa8ff'
+      secondaryColor = '#123b7a'
+    } else if (planetType === 'middle_math_analytics') {
+      baseColor = '#7c4dff'
+      secondaryColor = '#09183b'
+    } else if (planetType === 'middle_math_geometry') {
+      baseColor = '#8d63ff'
+      secondaryColor = '#16102f'
+    } else if (planetType === 'middle_math_exam') {
+      baseColor = '#b05cff'
+      secondaryColor = '#240021'
     } else if (planetType === 'dark_matter') {
       baseColor = '#1a0033'
       secondaryColor = '#6b21a8'
@@ -330,6 +417,9 @@ export default function PlanetMesh({
     if (props.onPointerOut) props.onPointerOut(e)
   }
 
+  const texturePath = useMemo(() => getTexturePathForPlanetType(planetType), [planetType])
+  const usesImageSprite = texturePath && MIDDLE_MATH_PLANET_TYPES.has(planetType)
+
   return (
     <group 
       ref={groupRef} 
@@ -355,35 +445,51 @@ export default function PlanetMesh({
       {status === 'completed' && <ExplorationSuccessParticles size={size} />}
 
       <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.2}>
-        <Sphere args={[size, 64, 64]}>
-          <Suspense fallback={
-            <meshStandardMaterial map={planetTexture} roughness={0.8} />
-          }>
-            <PlanetMaterialKey
-              planetType={planetType} 
-              planetTexture={planetTexture} 
-              color={adjustedColor} 
-              isLocked={isLocked} // Removed '|| status === "not_started"'
+        {usesImageSprite ? (
+          <Suspense fallback={null}>
+            <ImageSpritePlanet
+              texturePath={texturePath}
+              size={size}
+              isLocked={isLocked}
             />
           </Suspense>
-        </Sphere>
+        ) : (
+          <Sphere args={[size, 64, 64]}>
+            <Suspense fallback={
+              <meshStandardMaterial map={planetTexture} roughness={0.8} />
+            }>
+              <PlanetMaterialKey
+                planetType={planetType} 
+                planetTexture={planetTexture} 
+                color={adjustedColor} 
+                isLocked={isLocked} // Removed '|| status === "not_started"'
+              />
+            </Suspense>
+          </Sphere>
+        )}
       </Float>
       
 
       
-      <Sphere args={[size * 1.05, 32, 32]}>
-        <meshBasicMaterial
-          color={isLocked ? '#000000' : (planetType === 'lava' ? '#ff4500' : 
-                 planetType === 'forest' ? '#4ade80' : 
-                 planetType === 'castle' ? '#fbbf24' : 
-                 planetType === 'ice' ? '#00d4ff' : color)}
-          transparent
-          opacity={isLocked ? 0.5 : 0.25} // Increased opacity for better aura
-          side={THREE.BackSide}
-        />
-      </Sphere>
+      {!usesImageSprite && (
+        <Sphere args={[size * 1.05, 32, 32]}>
+          <meshBasicMaterial
+            color={isLocked ? '#000000' : (planetType === 'lava' ? '#ff4500' : 
+                   planetType === 'forest' ? '#4ade80' : 
+                   planetType === 'castle' ? '#fbbf24' : 
+                   planetType === 'ice' ? '#00d4ff' :
+                   planetType === 'middle_math_core' ? '#68d9ff' :
+                   planetType === 'middle_math_analytics' ? '#a56bff' :
+                   planetType === 'middle_math_geometry' ? '#b98dff' :
+                   planetType === 'middle_math_exam' ? '#ffb357' : color)}
+            transparent
+            opacity={isLocked ? 0.5 : 0.25} // Increased opacity for better aura
+            side={THREE.BackSide}
+          />
+        </Sphere>
+      )}
       
-      {(!isLocked && (planetType === 'default' || planetType === 'cloud')) && (
+      {(!isLocked && !usesImageSprite && (planetType === 'default' || planetType === 'cloud')) && (
         <Sphere ref={cloudsRef} args={[size * 1.02, 32, 32]}>
           <meshBasicMaterial
             color="white"

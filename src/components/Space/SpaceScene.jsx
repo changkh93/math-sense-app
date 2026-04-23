@@ -4,6 +4,32 @@ import { Stars, CameraControls, Environment, Float, Html } from '@react-three/dr
 import * as THREE from 'three'
 import PlanetMesh from './PlanetMesh'
 
+const MIDDLE_MATH_PLANET_STYLES = [
+  { planetType: 'middle_math_core', planetColor: '#59c8ff' },
+  { planetType: 'middle_math_analytics', planetColor: '#8f64ff' },
+  { planetType: 'middle_math_geometry', planetColor: '#b08cff' },
+  { planetType: 'middle_math_exam', planetColor: '#ffbf66' }
+]
+
+function getMiddleMathPlanetStyle(region, index) {
+  const title = region?.title || ''
+
+  if (title.includes('기본개념')) {
+    return { planetType: 'middle_math_core', planetColor: '#59c8ff' }
+  }
+  if (title.includes('함수') || title.includes('확률') || title.includes('통계')) {
+    return { planetType: 'middle_math_analytics', planetColor: '#9a73ff' }
+  }
+  if (title.includes('기하')) {
+    return { planetType: 'middle_math_geometry', planetColor: '#bc8fff' }
+  }
+  if (title.includes('평가') || title.includes('모의')) {
+    return { planetType: 'middle_math_exam', planetColor: '#ffbe72' }
+  }
+
+  return MIDDLE_MATH_PLANET_STYLES[index % MIDDLE_MATH_PLANET_STYLES.length]
+}
+
 /**
  * 워프 효과를 위한 고속 별 이동
  */
@@ -78,7 +104,11 @@ function SceneContent({
       let planetType = 'default'
       let planetColor = '#4a90e2'
       
-      if (region.title.includes('아디테라')) {
+      if (region.clusterId === 'middle-math' || region.clusterId === '중등수학') {
+        const middleMathStyle = getMiddleMathPlanetStyle(region, i)
+        planetType = middleMathStyle.planetType
+        planetColor = middleMathStyle.planetColor
+      } else if (region.title.includes('아디테라')) {
         planetType = 'forest'; planetColor = '#348c31'
       } else if (region.title.includes('디비디아')) {
         planetType = 'lava'; planetColor = '#eb4d4b'

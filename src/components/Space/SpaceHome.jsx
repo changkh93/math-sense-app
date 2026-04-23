@@ -43,6 +43,24 @@ import Footer from '../common/Footer'
 // Styles
 import '../../styles/space-theme.css'
 
+const MIDDLE_MATH_REGION_IMAGES = {
+  core: '/assets/planets/middle-math-core.png',
+  analytics: '/assets/planets/middle-math-analytics.png',
+  geometry: '/assets/planets/middle-math-geometry.png',
+  exam: '/assets/planets/middle-math-exam.png'
+}
+
+function getMiddleMathRegionImage(region) {
+  const title = region?.title || ''
+
+  if (title.includes('기본개념')) return MIDDLE_MATH_REGION_IMAGES.core
+  if (title.includes('함수') || title.includes('확률') || title.includes('통계')) return MIDDLE_MATH_REGION_IMAGES.analytics
+  if (title.includes('기하')) return MIDDLE_MATH_REGION_IMAGES.geometry
+  if (title.includes('평가') || title.includes('모의')) return MIDDLE_MATH_REGION_IMAGES.exam
+
+  return MIDDLE_MATH_REGION_IMAGES.core
+}
+
 function SpaceHome() {
   // const navigate = useNavigate()
   const location = useLocation()
@@ -2047,6 +2065,7 @@ function SpaceHome() {
                     {regions.map((region, idx) => {
                     const isRegionLocked = region.isPrivate && userData?.regionAccess?.[region.id] !== 'active' && userData?.regionAccess?.[region.id] !== 'completed';
                     const isCompleted = explorationStatus[region.id] === 'completed';
+                    const middleMathRegionImage = selectedClusterId === 'middle-math' ? getMiddleMathRegionImage(region) : null;
                     
                     return (
                     <Motion.div
@@ -2102,13 +2121,32 @@ function SpaceHome() {
                       
                       <div style={{ position: 'relative', zIndex: 1 }}>
                         {is2DMode && (
-                          <div style={{ 
-                            fontSize: '4rem', 
-                            marginBottom: '0.5rem', 
-                            filter: isRegionLocked ? 'grayscale(100%) opacity(50%)' : 'drop-shadow(0 0 15px rgba(255,255,255,0.4))' 
-                          }}>
-                            {region.icon || '🌍'}
-                          </div>
+                          middleMathRegionImage ? (
+                            <img
+                              src={middleMathRegionImage}
+                              alt={region.title}
+                              style={{
+                                width: '112px',
+                                height: '112px',
+                                objectFit: 'cover',
+                                marginBottom: '0.75rem',
+                                borderRadius: '999px',
+                                border: '1px solid rgba(255,255,255,0.16)',
+                                boxShadow: isRegionLocked
+                                  ? 'none'
+                                  : '0 0 24px rgba(92, 216, 255, 0.22)',
+                                filter: isRegionLocked ? 'grayscale(100%) opacity(45%)' : 'none'
+                              }}
+                            />
+                          ) : (
+                            <div style={{ 
+                              fontSize: '4rem', 
+                              marginBottom: '0.5rem', 
+                              filter: isRegionLocked ? 'grayscale(100%) opacity(50%)' : 'drop-shadow(0 0 15px rgba(255,255,255,0.4))' 
+                            }}>
+                              {region.icon || '🌍'}
+                            </div>
+                          )
                         )}
                         <span className="font-tech" style={{ 
                           fontSize: is2DMode ? '1.3rem' : '0.85rem',
