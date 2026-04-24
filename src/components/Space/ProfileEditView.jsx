@@ -1,14 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { motion as Motion } from 'framer-motion';
+import { collection, doc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
 import {
-  PROFILE_FRAMES,
   PROFILE_TITLES,
-  createCrewInviteCode,
   getProfileFrame,
   getPublicProfile,
   normalizeOwnedFrames
@@ -36,10 +34,6 @@ export default function ProfileEditView({ onBack }) {
   const { data: clusters, isLoading: isClustersLoading } = useClusters();
 
   const [saving, setSaving] = useState(false);
-  const [crewBusy, setCrewBusy] = useState(false);
-  const [crewMessage, setCrewMessage] = useState('');
-  const [crewPreview, setCrewPreview] = useState(null);
-  const [joinCrewCode, setJoinCrewCode] = useState('');
   const [formData, setFormData] = useState({
     studentName: '',
     studentPhone: '',
@@ -48,10 +42,7 @@ export default function ProfileEditView({ onBack }) {
     publicDisplayName: '',
     publicTitle: PROFILE_TITLES[0],
     publicSignature: '',
-    selectedProfileFrame: 'starter',
-    crewName: '',
-    crewMotto: '',
-    crewColor: '#00f3ff'
+    selectedProfileFrame: 'starter'
   });
 
   const ownedFrames = useMemo(() => normalizeOwnedFrames(userData), [userData]);
@@ -64,13 +55,13 @@ export default function ProfileEditView({ onBack }) {
         publicTitle: formData.publicTitle,
         publicSignature: formData.publicSignature,
         selectedProfileFrame: formData.selectedProfileFrame,
-        crewName: crewPreview?.name || userData?.crewName,
+        crewName: userData?.crewName,
         crewRole: userData?.crewRole,
-        crewColor: crewPreview?.color || formData.crewColor || userData?.crewColor
+        crewColor: userData?.crewColor
       },
       formData.studentName || user?.displayName || '탐험가'
     ),
-    [crewPreview, formData, user?.displayName, userData]
+    [formData, user?.displayName, userData]
   );
 
   useEffect(() => {
@@ -85,51 +76,10 @@ export default function ProfileEditView({ onBack }) {
         publicSignature: userData.publicSignature || '',
         selectedProfileFrame: normalizeOwnedFrames(userData).includes(userData.selectedProfileFrame)
           ? userData.selectedProfileFrame
-          : normalizeOwnedFrames(userData)[0],
-        crewName: userData.crewName || '',
-        crewMotto: '',
-        crewColor: userData.crewColor || '#00f3ff'
+          : normalizeOwnedFrames(userData)[0]
       });
     }
   }, [userData, user]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadCrew() {
-      if (!userData?.crewId) {
-        setCrewPreview(null);
-        return;
-      }
-
-      try {
-        const snap = await getDoc(doc(db, 'crews', userData.crewId));
-        if (!ignore) {
-          setCrewPreview(snap.exists() ? { id: snap.id, ...snap.data() } : null);
-        }
-      } catch (err) {
-        if (!ignore) {
-          console.error('Failed to load crew:', err);
-          setCrewPreview(null);
-        }
-      }
-    }
-
-    loadCrew();
-    return () => {
-      ignore = true;
-    };
-  }, [userData?.crewId]);
-
-  useEffect(() => {
-    if (!crewPreview) return;
-    setFormData(prev => ({
-      ...prev,
-      crewName: crewPreview.name || prev.crewName,
-      crewMotto: crewPreview.motto || prev.crewMotto,
-      crewColor: crewPreview.color || prev.crewColor
-    }));
-  }, [crewPreview]);
 
   const handleDaySelect = (clusterId, day) => {
     setFormData(prev => {
@@ -153,8 +103,7 @@ export default function ProfileEditView({ onBack }) {
     if (!classSchedule || !Array.isArray(classSchedule)) return [];
 
     const dayMap = {
-      '1': '월', '2': '화', '3': '수', '4': '목', '5': '금', '6': '토', '7': '일',
-      1: '월', 2: '화', 3: '수', 4: '목', 5: '금', 6: '토', 7: '일'
+      '1': '월', '2': '화', '3': '수', '4': '목', '5': '금', '6': '토', '7': '일'
     };
 
     const daysSet = new Set();
@@ -198,7 +147,6 @@ export default function ProfileEditView({ onBack }) {
         ? formData.publicSignature.trim().slice(0, 28)
         : (userData?.publicSignature || '');
       const selectedFrame = ownedFrames.includes(formData.selectedProfileFrame) ? formData.selectedProfileFrame : ownedFrames[0];
-      const crewName = formData.crewName.trim() || crewPreview?.name || userData?.crewName || '';
       const mergedProfileData = {
         ...userData,
         studentName: formData.studentName.trim(),
@@ -208,10 +156,10 @@ export default function ProfileEditView({ onBack }) {
         publicTitle: formData.publicTitle.trim(),
         publicSignature,
         selectedProfileFrame: selectedFrame,
-        crewId: crewPreview?.id || userData?.crewId || '',
-        crewName,
+        crewId: userData?.crewId || '',
+        crewName: userData?.crewName || '',
         crewRole: userData?.crewRole || '',
-        crewColor: formData.crewColor || crewPreview?.color || userData?.crewColor || '#00f3ff',
+        crewColor: userData?.crewColor || '#00f3ff',
       };
       const updatedProfileSnapshot = getPublicProfile(mergedProfileData, mergedProfileData.publicDisplayName || mergedProfileData.studentName || user?.displayName || '탐험가');
 
@@ -225,8 +173,6 @@ export default function ProfileEditView({ onBack }) {
         publicTitle: formData.publicTitle.trim(),
         publicSignature,
         selectedProfileFrame: selectedFrame,
-        crewName,
-        crewColor: mergedProfileData.crewColor,
         profileUpdatedAt: serverTimestamp()
       });
 
@@ -252,186 +198,6 @@ export default function ProfileEditView({ onBack }) {
       alert('프로필 저장 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleCreateCrew = async () => {
-    if (!user?.uid || crewBusy) return;
-    if (!formData.crewName.trim()) {
-      alert('크루 이름을 입력해주세요.');
-      return;
-    }
-
-    setCrewBusy(true);
-    setCrewMessage('');
-
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      const crewRef = doc(collection(db, 'crews'));
-      const inviteCode = createCrewInviteCode(`${user.uid}-${formData.crewName}`);
-
-      await runTransaction(db, async (transaction) => {
-        const userSnap = await transaction.get(userRef);
-        if (!userSnap.exists()) throw new Error('USER_NOT_FOUND');
-
-        const liveUser = userSnap.data();
-        if (liveUser?.crewId) throw new Error('ALREADY_IN_CREW');
-        if ((liveUser?.crewCreationPasses || 0) < 1) throw new Error('NO_CREATION_PASS');
-
-        const payload = {
-          name: formData.crewName.trim(),
-          motto: formData.crewMotto.trim(),
-          color: formData.crewColor,
-          leaderId: user.uid,
-          inviteCode,
-          memberIds: [user.uid],
-          memberCount: 1,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        };
-
-        transaction.set(crewRef, payload);
-        transaction.set(userRef, {
-          crewId: crewRef.id,
-          crewName: payload.name,
-          crewRole: 'leader',
-          crewColor: payload.color,
-          crewCreationPasses: (liveUser?.crewCreationPasses || 0) - 1
-        }, { merge: true });
-      });
-
-      setCrewPreview({
-        id: crewRef.id,
-        name: formData.crewName.trim(),
-        motto: formData.crewMotto.trim(),
-        color: formData.crewColor,
-        inviteCode,
-        memberCount: 1
-      });
-      setCrewMessage('스터디 크루가 창설되었습니다.');
-    } catch (err) {
-      console.error('Failed to create crew:', err);
-      setCrewMessage(
-        err.message === 'NO_CREATION_PASS'
-          ? '크루 창설권이 필요합니다. 상점에서 먼저 구매해주세요.'
-          : err.message === 'ALREADY_IN_CREW'
-            ? '이미 다른 크루에 속해 있습니다.'
-            : '크루 생성에 실패했습니다.'
-      );
-    } finally {
-      setCrewBusy(false);
-    }
-  };
-
-  const handleJoinCrew = async () => {
-    if (!user?.uid || crewBusy) return;
-    if (!joinCrewCode.trim()) {
-      alert('초대 코드를 입력해주세요.');
-      return;
-    }
-
-    setCrewBusy(true);
-    setCrewMessage('');
-
-    try {
-      const crewQuery = query(collection(db, 'crews'), where('inviteCode', '==', joinCrewCode.trim().toUpperCase()));
-      const crewSnap = await getDocs(crewQuery);
-      if (crewSnap.empty) throw new Error('CREW_NOT_FOUND');
-
-      const targetCrew = crewSnap.docs[0];
-      const crewRef = doc(db, 'crews', targetCrew.id);
-      const userRef = doc(db, 'users', user.uid);
-
-      await runTransaction(db, async (transaction) => {
-        const userSnap = await transaction.get(userRef);
-        const freshCrewSnap = await transaction.get(crewRef);
-        if (!userSnap.exists() || !freshCrewSnap.exists()) throw new Error('CREW_NOT_FOUND');
-
-        const liveUser = userSnap.data();
-        const liveCrew = freshCrewSnap.data();
-        if (liveUser?.crewId) throw new Error('ALREADY_IN_CREW');
-
-        const nextMemberIds = Array.from(new Set([...(liveCrew.memberIds || []), user.uid]));
-        transaction.set(crewRef, {
-          memberIds: nextMemberIds,
-          memberCount: nextMemberIds.length,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-
-        transaction.set(userRef, {
-          crewId: crewRef.id,
-          crewName: liveCrew.name,
-          crewRole: 'member',
-          crewColor: liveCrew.color || '#00f3ff'
-        }, { merge: true });
-      });
-
-      setCrewPreview({ id: targetCrew.id, ...targetCrew.data() });
-      setJoinCrewCode('');
-      setCrewMessage('크루에 합류했습니다.');
-    } catch (err) {
-      console.error('Failed to join crew:', err);
-      setCrewMessage(
-        err.message === 'CREW_NOT_FOUND'
-          ? '해당 초대 코드를 가진 크루를 찾지 못했습니다.'
-          : err.message === 'ALREADY_IN_CREW'
-            ? '이미 다른 크루에 속해 있습니다.'
-            : '크루 합류에 실패했습니다.'
-      );
-    } finally {
-      setCrewBusy(false);
-    }
-  };
-
-  const handleUpdateCrewStyle = async () => {
-    if (!user?.uid || !crewPreview?.id || crewBusy) return;
-    if (userData?.crewRole !== 'leader') return;
-
-    setCrewBusy(true);
-    setCrewMessage('');
-
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      const crewRef = doc(db, 'crews', crewPreview.id);
-
-      await runTransaction(db, async (transaction) => {
-        const userSnap = await transaction.get(userRef);
-        const crewSnap = await transaction.get(crewRef);
-        if (!userSnap.exists() || !crewSnap.exists()) throw new Error('CREW_NOT_FOUND');
-
-        const liveUser = userSnap.data();
-        if ((liveUser?.crewEmblemCredits || 0) < 1) throw new Error('NO_EMBLEM_CREDIT');
-
-        transaction.set(crewRef, {
-          name: formData.crewName.trim() || crewPreview.name,
-          motto: formData.crewMotto.trim(),
-          color: formData.crewColor,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-
-        transaction.set(userRef, {
-          crewName: formData.crewName.trim() || crewPreview.name,
-          crewColor: formData.crewColor,
-          crewEmblemCredits: (liveUser?.crewEmblemCredits || 0) - 1
-        }, { merge: true });
-      });
-
-      setCrewPreview(prev => prev ? ({
-        ...prev,
-        name: formData.crewName.trim() || prev.name,
-        motto: formData.crewMotto.trim(),
-        color: formData.crewColor
-      }) : prev);
-      setCrewMessage('크루 엠블럼과 모토를 업데이트했습니다.');
-    } catch (err) {
-      console.error('Failed to update crew style:', err);
-      setCrewMessage(
-        err.message === 'NO_EMBLEM_CREDIT'
-          ? '엠블럼 변경권이 부족합니다. 상점에서 먼저 구매해주세요.'
-          : '크루 정보를 업데이트하지 못했습니다.'
-      );
-    } finally {
-      setCrewBusy(false);
     }
   };
 
@@ -462,7 +228,7 @@ export default function ProfileEditView({ onBack }) {
           </h2>
         </div>
 
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="glass-card hud-border"
@@ -675,153 +441,6 @@ export default function ProfileEditView({ onBack }) {
               </div>
             </section>
 
-            <section>
-              <h3 className="font-tech" style={sectionTitleStyle}>🛰️ 스터디 크루</h3>
-
-              {crewPreview ? (
-                <div style={{ display: 'grid', gap: '1rem' }}>
-                  <div style={{
-                    padding: '1.4rem',
-                    borderRadius: '18px',
-                    border: `1px solid ${(crewPreview.color || '#00f3ff')}55`,
-                    background: 'rgba(10, 15, 30, 0.85)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
-                      <div>
-                        <h4 className="font-title" style={{ margin: 0, color: 'var(--text-bright)' }}>
-                          {crewPreview.name}
-                        </h4>
-                        <p style={{ margin: '0.45rem 0 0', color: 'rgba(255,255,255,0.7)' }}>
-                          {crewPreview.motto || '아직 설정된 크루 모토가 없습니다.'}
-                        </p>
-                      </div>
-                      <div className="font-tech" style={{ color: crewPreview.color || '#00f3ff', textAlign: 'right' }}>
-                        <div>{userData?.crewRole === 'leader' ? '리더' : '멤버'}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>초대코드 {crewPreview.inviteCode || '-'}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.84rem', color: 'rgba(255,255,255,0.62)' }}>
-                      현재 인원 {crewPreview.memberCount || crewPreview.memberIds?.length || 1}명
-                    </div>
-                  </div>
-
-                  {userData?.crewRole === 'leader' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                      <Field label="크루 이름">
-                        <input
-                          type="text"
-                          className="space-input"
-                          value={formData.crewName}
-                          onChange={(e) => setFormData({ ...formData, crewName: e.target.value })}
-                          placeholder={crewPreview.name}
-                        />
-                      </Field>
-                      <Field label="크루 모토">
-                        <input
-                          type="text"
-                          className="space-input"
-                          value={formData.crewMotto}
-                          onChange={(e) => setFormData({ ...formData, crewMotto: e.target.value })}
-                          placeholder={crewPreview.motto || '서로의 설명을 더 선명하게'}
-                        />
-                      </Field>
-                      <Field label="엠블럼 색상" hint={`보유 변경권 ${userData?.crewEmblemCredits || 0}개`}>
-                        <input
-                          type="color"
-                          className="space-input"
-                          value={formData.crewColor}
-                          onChange={(e) => setFormData({ ...formData, crewColor: e.target.value })}
-                          style={{ height: '48px', padding: '0.4rem' }}
-                        />
-                      </Field>
-                    </div>
-                  )}
-
-                  {userData?.crewRole === 'leader' && (
-                    <button
-                      type="button"
-                      className="space-btn cosmic-btn font-tech"
-                      disabled={crewBusy || (userData?.crewEmblemCredits || 0) < 1}
-                      onClick={handleUpdateCrewStyle}
-                      style={{ alignSelf: 'flex-start' }}
-                    >
-                      {crewBusy ? '업데이트 중...' : `크루 스타일 업데이트 (${userData?.crewEmblemCredits || 0}회권)`}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: '1.4rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                    <Field label="새 크루 이름" hint={`보유 창설권 ${userData?.crewCreationPasses || 0}개`}>
-                      <input
-                        type="text"
-                        className="space-input"
-                        value={formData.crewName}
-                        onChange={(e) => setFormData({ ...formData, crewName: e.target.value })}
-                        placeholder="예: 오메가 증명단"
-                      />
-                    </Field>
-                    <Field label="크루 모토">
-                      <input
-                        type="text"
-                        className="space-input"
-                        value={formData.crewMotto}
-                        onChange={(e) => setFormData({ ...formData, crewMotto: e.target.value })}
-                        placeholder="서로의 설명을 끝까지 듣는다"
-                      />
-                    </Field>
-                    <Field label="엠블럼 색상">
-                      <input
-                        type="color"
-                        className="space-input"
-                        value={formData.crewColor}
-                        onChange={(e) => setFormData({ ...formData, crewColor: e.target.value })}
-                        style={{ height: '48px', padding: '0.4rem' }}
-                      />
-                    </Field>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className="space-btn cosmic-btn font-tech"
-                      disabled={crewBusy || (userData?.crewCreationPasses || 0) < 1}
-                      onClick={handleCreateCrew}
-                    >
-                      {crewBusy ? '창설 중...' : `스터디 크루 창설 (${userData?.crewCreationPasses || 0}개 보유)`}
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.8rem', alignItems: 'end' }}>
-                    <Field label="초대 코드로 크루 참가">
-                      <input
-                        type="text"
-                        className="space-input"
-                        value={joinCrewCode}
-                        onChange={(e) => setJoinCrewCode(e.target.value.toUpperCase())}
-                        placeholder="예: AB7Q2X"
-                      />
-                    </Field>
-                    <button
-                      type="button"
-                      className="space-nav-link font-tech"
-                      disabled={crewBusy}
-                      onClick={handleJoinCrew}
-                      style={{ height: '48px' }}
-                    >
-                      크루 참가
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {crewMessage && (
-                <p className="font-tech" style={{ color: crewMessage.includes('실패') || crewMessage.includes('부족') ? '#f87171' : 'var(--planet-green)', marginTop: '1rem' }}>
-                  {crewMessage}
-                </p>
-              )}
-            </section>
-
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
               <button
                 type="submit"
@@ -838,7 +457,7 @@ export default function ProfileEditView({ onBack }) {
               </button>
             </div>
           </form>
-        </motion.div>
+        </Motion.div>
       </div>
     </div>
   );

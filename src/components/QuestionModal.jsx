@@ -768,7 +768,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
                     checked={isPublic} 
                     onChange={(e) => setIsPublic(e.target.checked)} 
                   />
-                  <span>다른 친구들도 볼 수 있게 공개 (질문자는 항상 익명)</span>
+                  <span>누구나 볼 수 있게 공개 (질문자는 항상 익명)</span>
                 </label>
 
                 <button 

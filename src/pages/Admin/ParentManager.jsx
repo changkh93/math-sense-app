@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, getDocs, doc, setDoc, deleteDoc, where, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, getDocs, doc, setDoc, where, onSnapshot, limit } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, getAuth } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
-import { db } from '../../firebase';
+import { db, functions } from '../../firebase';
 import { Phone, UserPlus, Search, Trash2, Link2, Users, Eye, EyeOff, Key } from 'lucide-react';
 import './Admin.css';
 
@@ -58,6 +58,7 @@ export default function ParentManager() {
   const handleCreateParent = async (e) => {
     e.preventDefault();
     const digits = newPhone.replace(/[^0-9]/g, '');
+    const email = phoneToEmail(digits);
     if (digits.length < 10) return alert('유효한 전화번호를 입력하세요.');
     if (newPassword.length < 6) return alert('비밀번호는 6자 이상이어야 합니다.');
 
@@ -129,7 +130,7 @@ export default function ParentManager() {
           alert('기존 인증 정보(Auth)가 남아 있어 계정을 성공적으로 연결하고 정보를 복구했습니다! ✅');
           setNewPhone('');
           setNewPassword('');
-        } catch (authErr) {
+        } catch {
           // If sign in fails, it means the account exists but with a different password
           alert('이미 등록된 번호이지만, 입력하신 비밀번호가 기존과 다릅니다. (기존 비밀번호를 입력하시거나, 관리를 위해 수동 조치가 필요합니다.)');
         }
@@ -260,7 +261,6 @@ export default function ParentManager() {
     if (!confirm(`정말로 해당 계정의 비밀번호를 '${newPassword}'(으)로 변경하시겠습니까?`)) return;
 
     try {
-      const functions = getFunctions();
       const resetFn = httpsCallable(functions, 'adminResetUserPassword');
       await resetFn({ targetUid: parentId, newPassword });
       alert('비밀번호가 성공적으로 변경되었습니다! ✅');

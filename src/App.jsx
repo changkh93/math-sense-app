@@ -8,6 +8,7 @@ import AdminDashboard from './pages/Admin/Dashboard'
 import AdminRoute from './components/AdminRoute'
 import LiveStatus from './pages/Admin/LiveStatus'
 import ParentManager from './pages/Admin/ParentManager'
+import CrewApproval from './pages/Admin/CrewApproval'
 
 import ParentLogin from './pages/Parent/ParentLogin'
 import ParentDashboard from './pages/Parent/ParentDashboard'
@@ -55,6 +56,7 @@ function App() {
         <Route path="clusters" element={<ClusterManager />} />
         <Route path="users" element={<UserAccessManager />} />
         <Route path="parents" element={<ParentManager />} />
+        <Route path="crews" element={<CrewApproval />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="assignments" element={<AdminAssignments />} />
         <Route path="student-report" element={<AdminStudentReport />} />

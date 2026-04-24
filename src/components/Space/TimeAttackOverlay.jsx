@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 
 const MESSAGE_DATABASE = {
   humor: [
@@ -130,19 +130,11 @@ const FAIL_MESSAGES = [
 ];
 
 export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, userName = "", isVideoPaused = false }) {
-  const [position, setPosition] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [status, setStatus] = useState('active'); // 'active', 'hit', 'miss'
-  const [message, setMessage] = useState('');
-  
-  const width = 180;
-  const height = 100;
-
-  useEffect(() => {
-    // Determine random safe zone position
+  const [position] = useState(() => {
+    // Determine random safe zone position once on mount
     // Use window dimensions but with strict margins to avoid HUD elements
-    const containerW = window.innerWidth; 
-    const containerH = window.innerHeight; 
+    const containerW = window.innerWidth;
+    const containerH = window.innerHeight;
     
     // Safety Margins:
     // - Top: 120px (Title, Back button)
@@ -153,29 +145,44 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
     const marginL = 60;
     const marginR = 60;
 
-    const safeW = Math.max(200, containerW - marginL - marginR - width);
-    const safeH = Math.max(200, containerH - marginT - marginB - height);
+    const safeW = Math.max(200, containerW - marginL - marginR - 180);
+    const safeH = Math.max(200, containerH - marginT - marginB - 100);
 
     const zone = Math.floor(Math.random() * 3);
-    let x, y;
+    let x;
+    let y;
 
-    if (zone === 0) { // Top-ish area (but below HUD)
+    if (zone === 0) {
       x = marginL + Math.random() * safeW;
       y = marginT + Math.random() * (safeH * 0.2);
-    } else if (zone === 1) { // Bottom-ish area (but above controls)
+    } else if (zone === 1) {
       x = marginL + Math.random() * safeW;
       y = marginT + safeH * 0.8 + Math.random() * (safeH * 0.2);
-    } else { // Center-Right area
+    } else {
       x = marginL + safeW * 0.6 + Math.random() * (safeW * 0.4);
       y = marginT + safeH * 0.2 + Math.random() * (safeH * 0.6);
     }
 
     if (x < 0 || y < 0) {
-      x = 100; y = 200;
+      x = 100;
+      y = 200;
     }
 
-    setPosition({ x, y });
-  }, []);
+    return { x, y };
+  });
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [status, setStatus] = useState('active'); // 'active', 'hit', 'miss'
+  const [message, setMessage] = useState('');
+
+  const handleMiss = useCallback(() => {
+    if (status !== 'active') return;
+    setStatus('miss');
+    setMessage(FAIL_MESSAGES[Math.floor(Math.random() * FAIL_MESSAGES.length)]);
+    
+    setTimeout(() => {
+      onMiss();
+    }, 3000); 
+  }, [status, onMiss]);
 
   useEffect(() => {
     if (status !== 'active' || isVideoPaused) return;
@@ -192,7 +199,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [status, isVideoPaused]);
+  }, [status, isVideoPaused, handleMiss]);
 
   const getRandomSuccessMessage = () => {
     const now = new Date();
@@ -237,21 +244,11 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
     }, 3000); 
   };
 
-  const handleMiss = () => {
-    if (status !== 'active') return;
-    setStatus('miss');
-    setMessage(FAIL_MESSAGES[Math.floor(Math.random() * FAIL_MESSAGES.length)]);
-    
-    setTimeout(() => {
-      onMiss();
-    }, 3000); 
-  };
-
   if (!position) return null;
 
   return (
     <AnimatePresence>
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, scale: 0 }}
         animate={{ 
           opacity: status === 'miss' ? 0.3 : 1, 
@@ -269,7 +266,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
         }}
       >
         {status === 'active' ? (
-          <motion.div 
+          <Motion.div 
             className="time-attack-crystal"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -292,7 +289,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
             </div>
             
             <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.2)', borderRadius: '2px', overflow: 'hidden' }}>
-              <motion.div 
+              <Motion.div 
                 initial={{ width: '100%' }}
                 animate={{ width: `${(timeLeft / 30) * 100}%` }}
                 transition={{ duration: 0.5 }}
@@ -305,9 +302,9 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
             <div className="font-tech" style={{ color: 'var(--text-bright)', fontSize: '0.8rem', marginTop: '5px' }}>
               {timeLeft}초
             </div>
-          </motion.div>
+          </Motion.div>
         ) : (
-          <motion.div 
+          <Motion.div 
             initial={{ y: 0, opacity: 1 }}
             animate={{ y: status === 'hit' ? -30 : 20, opacity: 0 }}
             transition={{ duration: 3.0 }}
@@ -325,14 +322,13 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
               boxShadow: '0 0 20px rgba(0,0,0,0.5)',
               textShadow: '0 2px 4px rgba(0,0,0,1)',
               maxWidth: '300px',
-              whiteSpace: 'normal',
               lineHeight: '1.4'
             }}
           >
             {message}
-          </motion.div>
+          </Motion.div>
         )}
-      </motion.div>
+      </Motion.div>
     </AnimatePresence>
   );
 }

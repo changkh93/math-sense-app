@@ -4,7 +4,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import NotificationMenu from './NotificationMenu';
 import CometBadge from './CometBadge';
 import { getEffectiveStreak } from '../../utils/streakUtils';
@@ -49,12 +49,6 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           🪐 NAV
         </button>
         <button 
-          className={`space-nav-link ${currentView === 'dashboard' ? 'active' : ''}`}
-          onClick={() => handleNavClick('dashboard', '/')}
-        >
-          📊 LOGS
-        </button>
-        <button 
           className={`space-nav-link ${currentView === 'collection' ? 'active' : ''}`}
           onClick={() => handleNavClick('collection', '/')}
         >
@@ -71,6 +65,12 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           onClick={() => handleNavClick('store', '/')}
         >
           🎨 STORE
+        </button>
+        <button 
+          className={`space-nav-link ${currentView === 'crew' ? 'active' : ''}`}
+          onClick={() => handleNavClick('crew', '/')}
+        >
+          🛰️ STUDY CREW
         </button>
         <button 
           className={`space-nav-link agora-nav-btn ${window.location.pathname.startsWith('/agora') ? 'active' : ''}`}
@@ -125,7 +125,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
 
           <AnimatePresence>
             {isProfileMenuOpen && (
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, y: -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -162,6 +162,17 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
                 >
                   📝 프로필 수정
                 </button>
+
+                <button
+                  className="space-nav-link font-tech"
+                  style={{ textAlign: 'left', padding: '0.8rem', width: '100%', borderRadius: '8px' }}
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    handleNavClick('dashboard', '/');
+                  }}
+                >
+                  📊 LOGS
+                </button>
                 
                 <button 
                   className="space-nav-link font-tech"
@@ -173,7 +184,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
                 >
                   출구 (로그아웃)
                 </button>
-              </motion.div>
+              </Motion.div>
             )}
           </AnimatePresence>
         </div>

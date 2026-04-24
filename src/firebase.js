@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAn1TdeM6XArdnf82bOk1BTQMIfkh7kXvQ",
@@ -14,9 +15,20 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const functions = getFunctions(app);
+
+const shouldUseFunctionsEmulator =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1');
+
+if (shouldUseFunctionsEmulator && !globalThis.__METASENSE_FUNCTIONS_EMULATOR_CONNECTED__) {
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+  globalThis.__METASENSE_FUNCTIONS_EMULATOR_CONNECTED__ = true;
+}
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export { functions };
 export default app;

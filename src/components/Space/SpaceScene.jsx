@@ -446,11 +446,14 @@ export default function SpaceScene(props) {
           gl={{ antialias: true, alpha: true, failIfMajorPerformanceCaveat: false }}
           onCreated={({ gl }) => {
             const canvas = gl.domElement;
+            const handleContextRestored = () => {
+              setHasWebGL(true);
+            };
             canvas.addEventListener('webglcontextlost', (e) => {
               e.preventDefault();
-              console.warn('[SpaceScene] WebGL context lost');
               setHasWebGL(false);
             });
+            canvas.addEventListener('webglcontextrestored', handleContextRestored);
           }}
         >
           <SceneContent {...props} />

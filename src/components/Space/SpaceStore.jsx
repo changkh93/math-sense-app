@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion as Motion } from 'framer-motion'
 import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { db } from '../../firebase'
 import soundManager from '../../utils/SoundManager'
@@ -207,14 +207,14 @@ export default function SpaceStore({ userData, user }) {
           return { purchasedCount: currentPasses + 1 }
         }
 
-        if (item.id === 'crew_emblem_credit') {
-          const currentCredits = freshUserData?.crewEmblemCredits || 0
+        if (item.id === 'crew_join_pass') {
+          const currentPasses = freshUserData?.crewJoinPasses || 0
           transaction.set(userRef, {
             crystals: freshCrystals - item.cost,
-            crewEmblemCredits: currentCredits + 1,
+            crewJoinPasses: currentPasses + 1,
           }, { merge: true })
 
-          return { purchasedCount: currentCredits + 1 }
+          return { purchasedCount: currentPasses + 1 }
         }
 
         throw new Error('UNSUPPORTED_ITEM')
@@ -257,10 +257,10 @@ export default function SpaceStore({ userData, user }) {
           type: 'success',
           text: `스터디 크루 창설권 ${txResult.purchasedCount}개 보유 중입니다.`
         })
-      } else if (item.id === 'crew_emblem_credit') {
+      } else if (item.id === 'crew_join_pass') {
         setPurchaseMessage({
           type: 'success',
-          text: `크루 엠블럼 변경권 ${txResult.purchasedCount}개 보유 중입니다.`
+          text: `스터디 크루 참여권 ${txResult.purchasedCount}개 보유 중입니다.`
         })
       }
 
@@ -341,7 +341,7 @@ export default function SpaceStore({ userData, user }) {
 
       {/* 구매 알림 메시지 */}
       {purchaseMessage && (
-        <motion.div 
+        <Motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
@@ -359,7 +359,7 @@ export default function SpaceStore({ userData, user }) {
           }}
         >
           {purchaseMessage.text}
-        </motion.div>
+        </Motion.div>
       )}
 
       {/* ⏳ 기간제 탐사 장비 */}
@@ -630,7 +630,7 @@ export default function SpaceStore({ userData, user }) {
             <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', marginBottom: '1rem' }}>
               {item.id === 'crew_creation_pass'
                 ? `보유 창설권: ${userData?.crewCreationPasses || 0}개`
-                : `보유 엠블럼 변경권: ${userData?.crewEmblemCredits || 0}개`}
+                : `보유 참여권: ${userData?.crewJoinPasses || 0}개`}
             </div>
             <button
               className="space-nav-link"

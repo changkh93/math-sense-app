@@ -25,6 +25,7 @@ import SpaceJourney from './SpaceJourney'
 import RegionAccessModal from './RegionAccessModal' // New Integration
 import AssignmentHub from './AssignmentHub' // New Integration
 import ProfileEditView from './ProfileEditView' // Profile Management
+import StudyCrewView from './StudyCrewView'
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
@@ -166,6 +167,12 @@ function SpaceHome() {
   const [darkMatterCount, setDarkMatterCount] = useState(0)
   const [activeDarkMatterQuizQs, setActiveDarkMatterQuizQs] = useState(null)
 
+  const stopDarkMatterMode = useCallback(() => {
+    setIsDarkMatterMode(false)
+    setActiveDarkMatterQuizQs(null)
+    setDarkMatterQuestions([])
+  }, [])
+
   // Load initial dark matter count
   useEffect(() => {
     if (!user) return
@@ -195,7 +202,7 @@ function SpaceHome() {
       // Clear state to prevent re-triggering
       window.history.replaceState({}, document.title)
     }
-  }, [location])
+  }, [location, isDarkMatterMode, stopDarkMatterMode])
 
   // Data Hooks
   const { data: clusters, isLoading: loadingClusters } = useClusters()
@@ -307,6 +314,7 @@ function SpaceHome() {
     if (isDarkMatterMode) return '다크 매터(오답 노트) 정화 중';
     if (currentView === 'dashboard') return '대시보드 방문 중';
     if (currentView === 'collection') return '도감 방문 중';
+    if (currentView === 'crew') return '스터디 크루 방문 중';
     if (currentView === 'assignment_hub') return '항행 일지(과제) 작성 중';
     return '우주 공간(메인) 대기 중';
   }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode]);
@@ -1743,6 +1751,20 @@ function SpaceHome() {
           }} 
         />
         <ProfileEditView onBack={() => { setCurrentView('planet'); soundManager.playWarp(); }} />
+      </div>
+    )
+  }
+
+  if (currentView === 'crew') {
+    return (
+      <div className="space-bg" style={{ overflowY: 'auto' }}>
+        <SpaceNavbar
+          currentView={currentView}
+          onViewChange={(view) => {
+            setCurrentView(view)
+          }}
+        />
+        <StudyCrewView onBack={() => { setCurrentView('planet'); soundManager.playWarp(); }} />
       </div>
     )
   }
