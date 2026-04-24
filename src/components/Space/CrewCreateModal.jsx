@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { Palette, ShoppingBag, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Palette, ShoppingBag, Sparkles, X } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
@@ -29,7 +29,7 @@ function getFunctionsErrorMessage(err, fallback) {
   return fallback;
 }
 
-export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
+export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, rejectedCrew }) {
   const { user, userData } = useAuth();
   const { data: clusters, isLoading: loadingClusters } = useClusters();
   const [busy, setBusy] = useState(false);
@@ -38,6 +38,26 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
   const [formData, setFormData] = useState({
     name: '', motto: '', color: '#00d4ff', groupId: 'none'
   });
+
+  const isResubmit = !!rejectedCrew;
+
+  // Pre-fill form with rejected crew data when opening in resubmit mode
+  useEffect(() => {
+    if (isOpen && rejectedCrew) {
+      setFormData({
+        name: rejectedCrew.name || '',
+        motto: rejectedCrew.motto || '',
+        color: rejectedCrew.color || '#00d4ff',
+        groupId: rejectedCrew.groupId || 'none'
+      });
+      setMessage('');
+      setSuccess(false);
+    } else if (isOpen && !rejectedCrew) {
+      setFormData({ name: '', motto: '', color: '#00d4ff', groupId: 'none' });
+      setMessage('');
+      setSuccess(false);
+    }
+  }, [isOpen, rejectedCrew]);
 
   const creationPasses = userData?.crewCreationPasses || 0;
   const hasPass = creationPasses > 0;
@@ -62,7 +82,7 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
 
   const selectedGroup = groupOptions.find(o => o.id === formData.groupId) || groupOptions[0];
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     if (!user?.uid || busy) return;
     if (!formData.name.trim()) {
       setMessage('크루 이름을 입력해주세요.');
@@ -73,7 +93,6 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
     soundManager.playClick();
 
     try {
-      const createCrew = httpsCallable(functions, 'createStudyCrew');
       const nextGroup = selectedGroup?.id === 'none'
         ? { groupId: 'none', groupName: '자유 스터디', clusterId: '', clusterName: '' }
         : {
@@ -83,22 +102,38 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
             clusterName: selectedGroup.clusterId ? selectedGroup.name : ''
           };
 
-      await createCrew({
-        name: formData.name.trim(),
-        motto: formData.motto.trim(),
-        color: formData.color,
-        ...nextGroup
-      });
+      if (isResubmit) {
+        // Resubmit rejected crew
+        const resubmitFn = httpsCallable(functions, 'resubmitStudyCrew');
+        await resubmitFn({
+          crewId: rejectedCrew.id,
+          name: formData.name.trim(),
+          motto: formData.motto.trim(),
+          color: formData.color,
+          ...nextGroup
+        });
+        setSuccess(true);
+        setMessage('크루가 재신청되었습니다! 운영자 인증을 기다려주세요.');
+      } else {
+        // Create new crew
+        const createCrew = httpsCallable(functions, 'createStudyCrew');
+        await createCrew({
+          name: formData.name.trim(),
+          motto: formData.motto.trim(),
+          color: formData.color,
+          ...nextGroup
+        });
+        setSuccess(true);
+        setMessage('크루가 생성되었습니다! 운영자 인증 후 Study Stream이 열립니다.');
+      }
 
-      setSuccess(true);
-      setMessage('크루가 생성되었습니다! 운영자 인증 후 Study Stream이 열립니다.');
       soundManager.playLevelUp();
       setTimeout(() => {
         onClose(true);
       }, 1800);
     } catch (err) {
-      console.error('Failed to create crew:', err);
-      setMessage(getFunctionsErrorMessage(err, '크루 생성에 실패했습니다.'));
+      console.error('Failed to create/resubmit crew:', err);
+      setMessage(getFunctionsErrorMessage(err, isResubmit ? '재신청에 실패했습니다.' : '크루 생성에 실패했습니다.'));
     } finally {
       setBusy(false);
     }
@@ -127,7 +162,7 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
           style={{
             width: '100%', maxWidth: 500,
             background: 'rgba(7, 13, 30, 0.96)',
-            border: '1px solid rgba(0, 243, 255, 0.22)',
+            border: isResubmit ? '1px solid rgba(251, 191, 36, 0.25)' : '1px solid rgba(0, 243, 255, 0.22)',
             borderRadius: 14, padding: '1.6rem',
             boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5)',
             maxHeight: '90vh', overflowY: 'auto'
@@ -136,15 +171,35 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.2rem' }}>
             <div>
-              <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.82rem' }}>NEW CREW</div>
+              <div className="font-tech" style={{ color: isResubmit ? '#fbbf24' : 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.82rem' }}>
+                {isResubmit ? 'RESUBMIT CREW' : 'NEW CREW'}
+              </div>
               <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.25rem 0 0', fontSize: '1.3rem' }}>
-                새 크루 만들기
+                {isResubmit ? '크루 재신청' : '새 크루 만들기'}
               </h3>
             </div>
             <button onClick={() => !busy && onClose()} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
               <X size={20} />
             </button>
           </div>
+
+          {/* Show rejection reason in resubmit mode */}
+          {isResubmit && rejectedCrew.rejectionReason && (
+            <div style={{
+              padding: '1rem', borderRadius: 10,
+              background: 'rgba(239, 68, 68, 0.06)',
+              border: '1px solid rgba(239, 68, 68, 0.18)',
+              marginBottom: '1.2rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+                <AlertTriangle size={14} style={{ color: '#fca5a5' }} />
+                <span className="font-tech" style={{ color: '#fca5a5', fontWeight: 700, fontSize: '0.8rem' }}>이전 반려 사유</span>
+              </div>
+              <div className="font-tech" style={{ color: '#fecaca', lineHeight: 1.55, fontSize: '0.88rem' }}>
+                {rejectedCrew.rejectionReason}
+              </div>
+            </div>
+          )}
 
           {/* Pass check */}
           {!hasPass ? (
@@ -175,7 +230,7 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
             <>
               <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '1rem' }}>
                 보유 창설권: <strong style={{ color: 'var(--crystal-cyan)' }}>{creationPasses}개</strong>
-                <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>· 생성 시 1개 차감</span>
+                <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>· 승인 시 1개 차감</span>
               </div>
 
               {/* Form */}
@@ -247,11 +302,11 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore }) {
               <button
                 className="space-btn cosmic-btn font-tech"
                 disabled={busy || !formData.name.trim() || success}
-                onClick={handleCreate}
+                onClick={handleSubmit}
                 style={{ width: '100%', padding: '0.9rem 1.2rem', borderRadius: 8, fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}
               >
                 <Sparkles size={16} />
-                {busy ? '생성 중...' : success ? '✅ 생성 완료!' : '창설권으로 크루 생성'}
+                {busy ? '처리 중...' : success ? '✅ 완료!' : isResubmit ? '수정하여 재신청' : '창설권으로 크루 생성'}
               </button>
             </>
           )}

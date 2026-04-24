@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { ChevronDown, Crown, Lock, Plus, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Crown, Edit3, Lock, Plus, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
@@ -99,11 +99,20 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [detailView, setDetailView] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState('');
   const [openFaq, setOpenFaq] = useState(null);
+  const [resubmitCrew, setResubmitCrew] = useState(null); // rejected crew data for resubmission
 
   const crew = userData?.crewSnapshot || null;
   const crewId = crew?.id || userData?.crewId || '';
   const hasCrew = !!crewId;
   const greetings = useMemo(() => crew?.recentGreetings || [], [crew?.recentGreetings]);
+
+  // Check for rejected crew (leader's snapshot preserved with rejection info)
+  const rejectedCrew = useMemo(() => {
+    if (hasCrew) return null; // has active crew, no rejected
+    const snapshot = userData?.crewSnapshot;
+    if (snapshot && snapshot.status === 'rejected') return snapshot;
+    return null;
+  }, [userData?.crewSnapshot, hasCrew]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'crews'), snap => {
@@ -233,6 +242,85 @@ export default function StudyCrewView({ onNavigateStore }) {
             </div>
           </div>
 
+          {/* Rejected Crew Alert */}
+          {rejectedCrew && (
+            <Motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                marginBottom: '2.5rem', padding: '1.4rem', borderRadius: 14,
+                background: 'rgba(239, 68, 68, 0.06)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                boxShadow: '0 4px 20px rgba(239, 68, 68, 0.08)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '0.8rem' }}>
+                <AlertTriangle size={20} style={{ color: '#f87171', flexShrink: 0 }} />
+                <div className="font-tech" style={{ color: '#fca5a5', fontWeight: 800, fontSize: '0.95rem' }}>
+                  크루 신청이 반려되었습니다
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.8rem',
+                padding: '0.8rem', borderRadius: 10,
+                background: 'rgba(7, 13, 30, 0.5)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                marginBottom: '0.8rem'
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 8, flexShrink: 0,
+                  background: rejectedCrew.color || '#00d4ff',
+                  boxShadow: `0 0 12px ${(rejectedCrew.color || '#00d4ff')}44`,
+                  opacity: 0.6
+                }} />
+                <div style={{ minWidth: 0 }}>
+                  <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1rem' }}>
+                    {rejectedCrew.name || '이름 없는 크루'}
+                  </div>
+                  <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                    {rejectedCrew.motto || '모토 없음'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Rejection reason */}
+              {rejectedCrew.rejectionReason && (
+                <div style={{
+                  padding: '0.9rem', borderRadius: 10,
+                  background: 'rgba(239, 68, 68, 0.06)',
+                  border: '1px solid rgba(239, 68, 68, 0.15)',
+                  marginBottom: '1rem'
+                }}>
+                  <div className="font-tech" style={{ color: '#fca5a5', fontWeight: 700, fontSize: '0.8rem', marginBottom: '0.3rem' }}>
+                    반려 사유
+                  </div>
+                  <div className="font-tech" style={{ color: '#fecaca', lineHeight: 1.6, fontSize: '0.92rem' }}>
+                    {rejectedCrew.rejectionReason}
+                  </div>
+                </div>
+              )}
+
+              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.5, marginBottom: '1rem' }}>
+                반려 사유를 확인하고, 크루 정보를 수정하여 다시 신청할 수 있습니다. 창설권은 차감되지 않았습니다.
+              </div>
+
+              <button
+                className="space-btn cosmic-btn font-tech"
+                onClick={() => {
+                  soundManager.playClick();
+                  setResubmitCrew(rejectedCrew);
+                }}
+                style={{
+                  padding: '0.8rem 1.5rem', fontSize: '0.95rem', borderRadius: 10,
+                  display: 'inline-flex', alignItems: 'center', gap: '0.5rem'
+                }}
+              >
+                <Edit3 size={16} /> 수정하여 재신청하기
+              </button>
+            </Motion.div>
+          )}
+
           {/* Directory Section */}
           <div style={{ marginBottom: '4rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -316,11 +404,17 @@ export default function StudyCrewView({ onNavigateStore }) {
         </div>
       </div>
 
-      {/* Modals outside fade-in to avoid transform context issues with fixed positioning */}
+      {/* Modals outside fade-in to avoid transform context issues */}
       <CrewCreateModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onNavigateStore={onNavigateStore}
+      />
+      <CrewCreateModal
+        isOpen={!!resubmitCrew}
+        onClose={() => setResubmitCrew(null)}
+        onNavigateStore={onNavigateStore}
+        rejectedCrew={resubmitCrew}
       />
       <CrewJoinModal
         isOpen={!!joinTarget}

@@ -338,6 +338,7 @@ function buildCrewSnapshot(crewId, crewData, memberSummaries = [], greetings = [
     clusterId: crewData.clusterId || '',
     clusterName: crewData.clusterName || '',
     status: crewData.status || 'pending',
+    rejectionReason: crewData.rejectionReason || '',
     inviteCode: crewData.inviteCode || '',
     leaderId: crewData.leaderId || '',
     leaderName: crewData.leaderName || '',
@@ -393,20 +394,27 @@ async function syncCrewToMembers(crewId, crewData, greetings = []) {
   const memberSummaries = await loadMemberSummaries(memberIds);
   const crewSnapshot = buildCrewSnapshot(crewId, crewData, memberSummaries, greetings);
   const isRejected = crewData.status === "rejected";
+  const leaderId = crewData.leaderId || "";
 
   const batch = admin.firestore().batch();
   memberIds.forEach((uid) => {
+    const isLeader = uid === leaderId;
+    // On rejection: leader keeps snapshot (to see reason & resubmit), others get cleared
+    const keepSnapshot = isRejected && isLeader;
     batch.set(admin.firestore().collection("users").doc(uid), {
       crewId: isRejected ? "" : crewId,
       crewName: isRejected ? "" : (crewData.name || ""),
-      crewRole: isRejected ? "" : (uid === crewData.leaderId ? "leader" : "member"),
+      crewRole: isRejected ? "" : (isLeader ? "leader" : "member"),
       crewColor: isRejected ? "#00d4ff" : (crewData.color || "#00d4ff"),
       crewStatus: crewData.status || "pending",
       crewGroupName: isRejected ? "" : (crewData.groupName || "자유 스터디"),
       crewInviteCode: isRejected ? "" : (crewData.inviteCode || ""),
       crewActiveStudyRoomId: isRejected ? "" : (crewData.activeStudyRoomId || ""),
       crewActiveStudyRoomStatus: isRejected ? "" : (crewData.activeStudyRoomStatus || ""),
-      crewSnapshot: isRejected ? null : crewSnapshot,
+      crewSnapshot: keepSnapshot ? crewSnapshot : (isRejected ? null : crewSnapshot),
+      // Store rejected crew id on leader so they can resubmit
+      ...(keepSnapshot ? { rejectedCrewId: crewId } : {}),
+      ...(!isRejected && isLeader ? { rejectedCrewId: "" } : {}),
     }, { merge: true });
   });
   await batch.commit();
@@ -478,10 +486,8 @@ exports.createStudyCrew = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError("failed-precondition", "스터디 크루 창설권이 필요합니다. 스토어에서 1000광석으로 구매해주세요.");
     }
 
+    // Note: pass is NOT consumed here. It is consumed when admin approves the crew.
     tx.set(crewRef, crewData);
-    tx.set(userRef, {
-      crewCreationPasses: admin.firestore.FieldValue.increment(-1),
-    }, { merge: true });
   });
 
   await syncCrewToMembers(crewRef.id, {
@@ -620,6 +626,7 @@ exports.reviewStudyCrew = functions.https.onCall(async (data, context) => {
   await requireAdminUid(context);
   const crewId = String(data?.crewId || "").trim();
   const action = String(data?.action || "").trim();
+  const rejectionReason = String(data?.rejectionReason || "").trim().slice(0, 200);
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
   if (!["approve", "reject"].includes(action)) {
     throw new functions.https.HttpsError("invalid-argument", "처리 동작이 올바르지 않습니다.");
@@ -632,9 +639,23 @@ exports.reviewStudyCrew = functions.https.onCall(async (data, context) => {
 
   const crewData = crewSnap.data() || {};
   if (action === "approve") {
+    // Consume creation pass from leader on approval
+    const leaderId = crewData.leaderId;
+    if (leaderId) {
+      const leaderRef = db.collection("users").doc(leaderId);
+      const leaderSnap = await leaderRef.get();
+      if (leaderSnap.exists && (leaderSnap.data()?.crewCreationPasses || 0) >= 1) {
+        await leaderRef.set({
+          crewCreationPasses: admin.firestore.FieldValue.increment(-1),
+          rejectedCrewId: "",
+        }, { merge: true });
+      }
+    }
+
     const updatedCrew = {
       ...crewData,
       status: "approved",
+      rejectionReason: "",
       activeStudyRoomId: crewData.activeStudyRoomId || "",
       activeStudyRoomStatus: crewData.activeStudyRoomStatus || "",
       studyRoomCapacity: crewData.studyRoomCapacity || 3,
@@ -645,6 +666,7 @@ exports.reviewStudyCrew = functions.https.onCall(async (data, context) => {
     await syncCrewToMembers(crewId, {
       ...crewData,
       status: "approved",
+      rejectionReason: "",
       activeStudyRoomId: crewData.activeStudyRoomId || "",
       activeStudyRoomStatus: crewData.activeStudyRoomStatus || "",
       studyRoomCapacity: crewData.studyRoomCapacity || 3,
@@ -654,9 +676,15 @@ exports.reviewStudyCrew = functions.https.onCall(async (data, context) => {
     return { success: true };
   }
 
+  // Reject with reason
+  if (!rejectionReason) {
+    throw new functions.https.HttpsError("invalid-argument", "반려 사유를 입력해주세요.");
+  }
+
   const updatedCrew = {
     ...crewData,
     status: "rejected",
+    rejectionReason,
     activeStudyRoomId: "",
     activeStudyRoomStatus: "",
     rejectedAt: new Date(),
@@ -666,12 +694,89 @@ exports.reviewStudyCrew = functions.https.onCall(async (data, context) => {
   await syncCrewToMembers(crewId, {
     ...crewData,
     status: "rejected",
+    rejectionReason,
     activeStudyRoomId: "",
     activeStudyRoomStatus: "",
     rejectedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
   return { success: true };
+});
+
+exports.resubmitStudyCrew = functions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+
+  const {
+    name = "",
+    motto = "",
+    color = "#00d4ff",
+    groupId = "none",
+    groupName = "자유 스터디",
+    clusterId = "",
+    clusterName = "",
+  } = data || {};
+
+  const cleanName = String(name).trim().slice(0, 28);
+  const cleanMotto = String(motto).trim().slice(0, 52);
+  if (!cleanName) {
+    throw new functions.https.HttpsError("invalid-argument", "크루 이름을 입력해주세요.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const crewSnap = await crewRef.get();
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+
+  const crewData = crewSnap.data() || {};
+  if (crewData.leaderId !== uid) {
+    throw new functions.https.HttpsError("permission-denied", "크루 리더만 재신청할 수 있습니다.");
+  }
+  if (crewData.status !== "rejected") {
+    throw new functions.https.HttpsError("failed-precondition", "반려된 크루만 재신청할 수 있습니다.");
+  }
+
+  // Verify leader still has a creation pass
+  const userRef = db.collection("users").doc(uid);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+  }
+  if ((userSnap.data()?.crewCreationPasses || 0) < 1) {
+    throw new functions.https.HttpsError("failed-precondition", "스터디 크루 창설권이 필요합니다.");
+  }
+  if (userSnap.data()?.crewId) {
+    throw new functions.https.HttpsError("failed-precondition", "이미 다른 크루에 속해 있습니다.");
+  }
+
+  const updatedCrew = {
+    ...crewData,
+    name: cleanName,
+    motto: cleanMotto,
+    color,
+    groupId,
+    groupName,
+    clusterId,
+    clusterName,
+    status: "pending",
+    rejectionReason: "",
+    memberIds: [uid],
+    memberCount: 1,
+    resubmittedAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  await crewRef.set(updatedCrew, { merge: true });
+
+  // Re-associate leader with this crew
+  await syncCrewToMembers(crewId, {
+    ...updatedCrew,
+    resubmittedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  return { success: true, crewId };
 });
 
 exports.postStudyCrewGreeting = functions.https.onCall(async (data, context) => {
