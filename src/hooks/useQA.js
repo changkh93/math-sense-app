@@ -337,28 +337,42 @@ export function useQAMutations() {
           const answerRef = doc(db, 'answers', answerId);
           const askerRef = doc(db, 'users', user.uid);
 
-          const questionSnap = await transaction.get(questionRef);
-          const answerSnap = await transaction.get(answerRef);
-          const askerSnap = await transaction.get(askerRef);
+          // 1. All READS must come first
+          const [questionSnap, answerSnap, askerSnap] = await Promise.all([
+            transaction.get(questionRef),
+            transaction.get(answerRef),
+            transaction.get(askerRef)
+          ]);
 
           if (!questionSnap.exists()) throw new Error('질문을 찾을 수 없습니다.');
           if (!answerSnap.exists()) throw new Error('답변을 찾을 수 없습니다.');
 
           const questionData = questionSnap.data();
           const answerData = answerSnap.data();
+          const answererUid = answerData.userId;
 
           if (questionData.userId !== user.uid) throw new Error('질문 작성자만 답변을 채택할 수 있습니다.');
           if (questionData.status === 'resolved') throw new Error('이미 해결된 질문입니다.');
 
-          const answererUid = answerData.userId;
+          // Additional read for answerer if necessary
+          let answererSnap = null;
+          let answererRef = null;
+          if (answererUid !== user.uid && answererUid !== 'admin') {
+            answererRef = doc(db, 'users', answererUid);
+            answererSnap = await transaction.get(answererRef);
+          }
+
+          // 2. All WRITES must come after all reads
           const lockedBounty = getLockedBountyAmount(questionData);
           const totalAnswerReward = AGORA_BASE_ACCEPT_REWARD + lockedBounty;
 
+          // Answer update
           transaction.set(answerRef, {
             isAccepted: true,
             acceptedAt: serverTimestamp(),
           }, { merge: true });
 
+          // Question update
           transaction.set(questionRef, {
             status: 'resolved',
             acceptedAnswerId: answerId,
@@ -367,9 +381,8 @@ export function useQAMutations() {
             bountyAwardedToAnswerId: lockedBounty > 0 ? answerId : null,
           }, { merge: true });
 
-          if (answererUid !== user.uid && answererUid !== 'admin') {
-            const answererRef = doc(db, 'users', answererUid);
-            const answererSnap = await transaction.get(answererRef);
+          // Answerer reward
+          if (answererRef && answererSnap) {
             const answererData = answererSnap.exists() ? answererSnap.data() : {};
 
             transaction.set(answererRef, {
@@ -395,6 +408,7 @@ export function useQAMutations() {
             }
           }
 
+          // Asker bonus
           const askerData = askerSnap.exists() ? askerSnap.data() : {};
           transaction.set(askerRef, {
             crystals: (askerData?.crystals || 0) + AGORA_ASKER_RESOLVE_REWARD,
