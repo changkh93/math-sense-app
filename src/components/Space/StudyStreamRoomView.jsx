@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { collection, doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { Camera, CameraOff, Hash, Mic, MicOff, PhoneOff, Radio, Send, UserRound, Users, Video } from 'lucide-react';
+import { Camera, CameraOff, Mic, MicOff, PhoneOff, Radio, UserRound, Users, Video } from 'lucide-react';
 import Peer from 'peerjs';
 import { db, functions } from '../../firebase';
 import soundManager from '../../utils/SoundManager';
@@ -124,7 +124,7 @@ function formatRemainingLabel(room, nowMs) {
   return `${minutes}:${seconds} 남음`;
 }
 
-export default function StudyStreamRoomView({ roomId, user, userData, crew, recentGreetings = [], onPostGreeting, onLeave }) {
+export default function StudyStreamRoomView({ roomId, user, userData, crew, onLeave }) {
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [localStream, setLocalStream] = useState(null);
@@ -134,21 +134,12 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, rece
   const [focusStatus, setFocusStatus] = useState('focused');
   const [error, setError] = useState('');
   const [nowMs, setNowMs] = useState(0);
-  const [greetingDraft, setGreetingDraft] = useState('');
+  const [roomAction, setRoomAction] = useState('');
 
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callsRef = useRef(new Map());
   const leavingRef = useRef(false);
-  const latestGreetingByUser = useMemo(() => {
-    const nextMap = new Map();
-    recentGreetings.forEach((greeting) => {
-      if (!greeting?.userId || nextMap.has(greeting.userId)) return;
-      nextMap.set(greeting.userId, greeting);
-    });
-    return nextMap;
-  }, [recentGreetings]);
-
   useEffect(() => {
     const roomUnsubscribe = onSnapshot(doc(db, 'studyRooms', roomId), (snap) => {
       if (!snap.exists()) {
@@ -365,16 +356,10 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, rece
     soundManager.playClick();
   };
 
-  const handleSendGreeting = async (text = greetingDraft) => {
-    const cleanText = String(text || '').trim().slice(0, 80);
-    if (!cleanText || !onPostGreeting) return;
-    await onPostGreeting(cleanText);
-    setGreetingDraft('');
-  };
-
   const handleLeave = async () => {
-    if (leavingRef.current) return;
+    if (leavingRef.current || roomAction) return;
     leavingRef.current = true;
+    setRoomAction('leaving');
 
     try {
       callsRef.current.forEach((call) => call.close());
@@ -394,6 +379,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, rece
       console.error('Failed to leave study room:', err);
       setError('집중방을 종료하지 못했습니다.');
       leavingRef.current = false;
+      setRoomAction('');
     }
   };
 
@@ -412,7 +398,6 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, rece
         cameraOn: participant.cameraOn !== false,
         stream: remoteEntry?.stream || null,
         role: participant.role,
-        message: latestGreetingByUser.get(participant.uid)?.text || '',
       };
     });
 
@@ -444,9 +429,10 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, rece
           type="button"
           className="space-nav-link font-tech"
           onClick={handleLeave}
+          disabled={!!roomAction}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}
         >
-          <PhoneOff size={16} /> 방 나가기
+          <PhoneOff size={16} /> {roomAction === 'leaving' ? '나가는 중...' : '방 나가기'}
         </button>
       </div>
 
@@ -464,7 +450,6 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, rece
           subtitle={focusStatus === 'away' ? '자리 비움' : focusStatus === 'break' ? '쉬는 중' : '집중 중'}
           cameraOn={cameraOn}
           isLocal
-          message={latestGreetingByUser.get(user.uid)?.text || ''}
           badgeLabel={room?.hostUid === user.uid ? 'HOST' : 'ME'}
           badgeColor={room?.hostUid === user.uid ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
         />
@@ -477,7 +462,6 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, rece
             subtitle={participant.subtitle}
             cameraOn={participant.cameraOn}
             isLocal={false}
-            message={participant.message}
             badgeLabel={participant.role === 'host' ? 'HOST' : 'CREW'}
             badgeColor={participant.role === 'host' ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
           />
@@ -486,55 +470,11 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, rece
           <div key={`empty-${index}`} style={{ ...tileStyle, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.45)' }}>
             <div style={{ textAlign: 'center' }}>
               <Video size={34} />
-              <div style={{ marginTop: '0.55rem' }}>참여 대기 중</div>
+              <div style={{ marginTop: '0.55rem' }}>초대 대기 슬롯</div>
             </div>
           </div>
         ))}
       </div>
-
-      {onPostGreeting && (
-        <div style={{ marginTop: '0.95rem', display: 'grid', gap: '0.65rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {['오늘도 출석!', '집중 중입니다', '곧 문제 풉니다'].map((text) => (
-              <button
-                key={text}
-                type="button"
-                className="space-nav-link font-tech"
-                onClick={() => handleSendGreeting(text)}
-                style={{ borderRadius: '999px', padding: '0.45rem 0.72rem' }}
-              >
-                {text}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.55rem' }}>
-            <input
-              value={greetingDraft}
-              onChange={(e) => setGreetingDraft(e.target.value)}
-              placeholder="타일에 남길 짧은 인사"
-              maxLength={80}
-              style={{
-                minHeight: 42,
-                borderRadius: 8,
-                border: '1px solid rgba(0, 243, 255, 0.24)',
-                background: 'rgba(5, 10, 24, 0.78)',
-                color: 'var(--text-bright)',
-                padding: '0.7rem 0.85rem',
-                outline: 'none'
-              }}
-            />
-            <button
-              type="button"
-              className="space-btn cosmic-btn font-tech"
-              onClick={() => handleSendGreeting()}
-              disabled={!greetingDraft.trim()}
-              style={{ borderRadius: '8px', minWidth: 54, padding: '0 0.9rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-      )}
 
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
         <button type="button" className="space-nav-link font-tech" onClick={toggleCamera} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}>

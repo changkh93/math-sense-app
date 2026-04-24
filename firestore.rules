@@ -109,7 +109,8 @@ service cloud.firestore {
         (
           resource.data.leaderId == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'name', 'motto', 'color', 'groupId', 'groupName', 'clusterId', 'clusterName', 'updatedAt'
+            'name', 'motto', 'description', 'color', 'groupId', 'groupName', 'clusterId', 'clusterName',
+            'scheduleDays', 'scheduleTimes', 'updatedAt'
           ])
         ) ||
         (

@@ -9,8 +9,6 @@ import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
 import CrewDetailView from './CrewDetailView';
 import StudyStreamRoomView from './StudyStreamRoomView';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../firebase';
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '활동 중' : s === 'rejected' ? '반려됨' : '승인 대기'; }
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
@@ -18,7 +16,7 @@ function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)'
 const FAQ_ITEMS = [
   { q: '스터디 크루란 무엇인가요?', a: '스터디 크루는 최대 3명이 함께 공부하는 소규모 프리미엄 스터디 그룹입니다. 앱 안에서 바로 카메라 집중방을 열고, 서로의 학습을 응원할 수 있습니다.' },
   { q: '창설권과 참여권의 차이는 무엇인가요?', a: '창설권(1,000광석)은 새 크루를 만들 때 필요하고, 참여권(300광석)은 다른 크루에 합류할 때 필요합니다. 두 가지 모두 스토어에서 구매할 수 있습니다.' },
-  { q: '집중방은 어떻게 사용하나요?', a: '크루가 운영자 승인을 받으면, 리더가 집중방(30/50/90분)을 열 수 있습니다. 멤버는 열린 방에 바로 입장하여 카메라를 켜고 함께 공부합니다.' },
+  { q: '집중방은 어떻게 사용하나요?', a: '크루가 운영자 승인을 받으면, 리더가 10분부터 120분까지 집중 시간을 정해 방을 열 수 있습니다. 멤버는 열린 방에 바로 입장하여 카메라를 켜고 함께 공부합니다.' },
   { q: '최대 몇 명까지 참여할 수 있나요?', a: '현재 크루 당 최대 3명까지 참여할 수 있습니다. 소규모 집중 학습에 최적화된 구조입니다.' },
   { q: '크루 승인은 얼마나 걸리나요?', a: '운영자가 크루 이름과 모토를 확인한 후 승인합니다. 보통 1~2일 이내에 처리됩니다.' },
 ];
@@ -106,7 +104,6 @@ export default function StudyCrewView({ onNavigateStore }) {
   const crew = userData?.crewSnapshot || null;
   const crewId = crew?.id || userData?.crewId || '';
   const hasCrew = !!crewId;
-  const greetings = useMemo(() => crew?.recentGreetings || [], [crew?.recentGreetings]);
 
   // Check for rejected crew (leader's snapshot preserved with rejection info)
   const rejectedCrew = useMemo(() => {
@@ -203,14 +200,6 @@ export default function StudyCrewView({ onNavigateStore }) {
     setJoinTarget(crew);
   };
 
-  const handlePostGreeting = async (text) => {
-    if (!user?.uid || !crewId || !text?.trim()) return;
-    try {
-      const fn = httpsCallable(functions, 'postStudyCrewGreeting');
-      await fn({ crewId, text: text.trim().slice(0, 80) });
-    } catch (e) { console.error('Greeting error:', e); }
-  };
-
   if (activeRoomId) {
     return (
       <div className="space-bg fade-in" style={{ minHeight: '100vh', padding: '2rem 1rem 6rem' }}>
@@ -220,8 +209,6 @@ export default function StudyCrewView({ onNavigateStore }) {
             user={user}
             userData={userData}
             crew={crew}
-            recentGreetings={greetings}
-            onPostGreeting={handlePostGreeting}
             onLeave={() => setActiveRoomId('')}
           />
         </div>

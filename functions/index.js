@@ -332,11 +332,14 @@ function buildCrewSnapshot(crewId, crewData, memberSummaries = [], greetings = [
     id: crewId,
     name: crewData.name || '',
     motto: crewData.motto || '',
+    description: crewData.description || '',
     color: crewData.color || '#00d4ff',
     groupId: crewData.groupId || 'none',
     groupName: crewData.groupName || '자유 스터디',
     clusterId: crewData.clusterId || '',
     clusterName: crewData.clusterName || '',
+    scheduleDays: Array.isArray(crewData.scheduleDays) ? crewData.scheduleDays : [],
+    scheduleTimes: crewData.scheduleTimes || {},
     status: crewData.status || 'pending',
     rejectionReason: crewData.rejectionReason || '',
     inviteCode: crewData.inviteCode || '',
@@ -351,6 +354,22 @@ function buildCrewSnapshot(crewId, crewData, memberSummaries = [], greetings = [
     recentGreetings: greetings,
     updatedAt: new Date().toISOString(),
   };
+}
+
+const CREW_SCHEDULE_DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+function normalizeCrewSchedule(scheduleDays, scheduleTimes) {
+  const validDayKeys = new Set(CREW_SCHEDULE_DAY_KEYS);
+  const days = Array.isArray(scheduleDays)
+    ? scheduleDays.filter((day) => validDayKeys.has(String(day))).slice(0, 7)
+    : [];
+  const rawTimes = scheduleTimes && typeof scheduleTimes === "object" ? scheduleTimes : {};
+  const times = {};
+  days.forEach((day) => {
+    const rawTime = String(rawTimes[day] || "20:00");
+    times[day] = /^\d{2}:\d{2}$/.test(rawTime) ? rawTime : "20:00";
+  });
+  return { scheduleDays: days, scheduleTimes: times };
 }
 
 async function requireAuthUid(context) {
@@ -420,11 +439,22 @@ async function syncCrewToMembers(crewId, crewData, greetings = []) {
   await batch.commit();
 }
 
+async function refreshCrewGreetings(crewId, crewData) {
+  const recentSnap = await admin.firestore().collection("crews").doc(crewId).collection("greetings").orderBy("createdAt", "desc").limit(10).get();
+  const recentGreetings = recentSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  await syncCrewToMembers(crewId, {
+    ...crewData,
+    updatedAt: new Date().toISOString(),
+  }, recentGreetings);
+  return recentGreetings;
+}
+
 exports.createStudyCrew = functions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const {
     name = "",
     motto = "",
+    description = "",
     color = "#00d4ff",
     groupId = "none",
     groupName = "자유 스터디",
@@ -434,6 +464,8 @@ exports.createStudyCrew = functions.https.onCall(async (data, context) => {
 
   const cleanName = String(name).trim().slice(0, 28);
   const cleanMotto = String(motto).trim().slice(0, 52);
+  const cleanDescription = String(description).trim().slice(0, 500);
+  const normalizedSchedule = normalizeCrewSchedule(data?.scheduleDays, data?.scheduleTimes);
   if (!cleanName) {
     throw new functions.https.HttpsError("invalid-argument", "크루 이름을 입력해주세요.");
   }
@@ -454,11 +486,13 @@ exports.createStudyCrew = functions.https.onCall(async (data, context) => {
   const crewData = {
     name: cleanName,
     motto: cleanMotto,
+    description: cleanDescription,
     color,
     groupId,
     groupName,
     clusterId,
     clusterName,
+    ...normalizedSchedule,
     status: "pending",
     leaderId: uid,
     leaderName: userSnap.data().studentName || userSnap.data().publicDisplayName || userSnap.data().name || "탐사원",
@@ -594,21 +628,28 @@ exports.updateStudyCrew = functions.https.onCall(async (data, context) => {
 
   const nextName = String(data?.name || crewData.name || "").trim().slice(0, 28);
   const nextMotto = String(data?.motto || crewData.motto || "").trim().slice(0, 52);
+  const nextDescription = String(data?.description ?? crewData.description ?? "").trim().slice(0, 500);
   const nextColor = String(data?.color || crewData.color || "#00d4ff");
   const nextGroupId = String(data?.groupId || crewData.groupId || "none");
   const nextGroupName = String(data?.groupName || crewData.groupName || "자유 스터디");
   const nextClusterId = String(data?.clusterId || crewData.clusterId || "");
   const nextClusterName = String(data?.clusterName || crewData.clusterName || "");
+  const nextSchedule = normalizeCrewSchedule(
+    data?.scheduleDays ?? crewData.scheduleDays,
+    data?.scheduleTimes ?? crewData.scheduleTimes,
+  );
 
   const updatedCrew = {
     ...crewData,
     name: nextName,
     motto: nextMotto,
+    description: nextDescription,
     color: nextColor,
     groupId: nextGroupId,
     groupName: nextGroupName,
     clusterId: nextClusterId,
     clusterName: nextClusterName,
+    ...nextSchedule,
     updatedAt: new Date(),
   };
 
@@ -711,6 +752,7 @@ exports.resubmitStudyCrew = functions.https.onCall(async (data, context) => {
   const {
     name = "",
     motto = "",
+    description = "",
     color = "#00d4ff",
     groupId = "none",
     groupName = "자유 스터디",
@@ -720,6 +762,8 @@ exports.resubmitStudyCrew = functions.https.onCall(async (data, context) => {
 
   const cleanName = String(name).trim().slice(0, 28);
   const cleanMotto = String(motto).trim().slice(0, 52);
+  const cleanDescription = String(description).trim().slice(0, 500);
+  const normalizedSchedule = normalizeCrewSchedule(data?.scheduleDays, data?.scheduleTimes);
   if (!cleanName) {
     throw new functions.https.HttpsError("invalid-argument", "크루 이름을 입력해주세요.");
   }
@@ -754,11 +798,13 @@ exports.resubmitStudyCrew = functions.https.onCall(async (data, context) => {
     ...crewData,
     name: cleanName,
     motto: cleanMotto,
+    description: cleanDescription,
     color,
     groupId,
     groupName,
     clusterId,
     clusterName,
+    ...normalizedSchedule,
     status: "pending",
     rejectionReason: "",
     memberIds: [uid],
@@ -782,9 +828,9 @@ exports.resubmitStudyCrew = functions.https.onCall(async (data, context) => {
 exports.postStudyCrewGreeting = functions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const crewId = String(data?.crewId || "").trim();
-  const text = String(data?.text || "").trim().slice(0, 80);
+  const text = String(data?.text || "").trim().slice(0, 240);
   if (!crewId || !text) {
-    throw new functions.https.HttpsError("invalid-argument", "인사말 내용이 올바르지 않습니다.");
+    throw new functions.https.HttpsError("invalid-argument", "포스트잇 내용이 올바르지 않습니다.");
   }
 
   const db = admin.firestore();
@@ -797,7 +843,7 @@ exports.postStudyCrewGreeting = functions.https.onCall(async (data, context) => 
   if (!memberIds.includes(uid) && crewData.leaderId !== uid) {
     const adminDoc = await db.collection("users").doc(uid).get();
     if (!adminDoc.exists || adminDoc.data().role !== "admin") {
-      throw new functions.https.HttpsError("permission-denied", "크루 멤버만 인사말을 남길 수 있습니다.");
+      throw new functions.https.HttpsError("permission-denied", "크루 멤버만 포스트잇을 남길 수 있습니다.");
     }
   }
 
@@ -807,17 +853,63 @@ exports.postStudyCrewGreeting = functions.https.onCall(async (data, context) => 
     userId: uid,
     userName: context.auth.token?.name || context.auth.token?.email || "탐사원",
     text,
+    readBy: [uid],
     createdAt: new Date(),
   };
   await greetingRef.set(greeting);
 
-  const recentSnap = await crewRef.collection("greetings").orderBy("createdAt", "desc").limit(10).get();
-  const recentGreetings = recentSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
-  await syncCrewToMembers(crewId, {
-    ...crewData,
-    updatedAt: new Date().toISOString(),
-  }, recentGreetings);
+  await refreshCrewGreetings(crewId, crewData);
 
+  return { success: true };
+});
+
+exports.markStudyCrewGreetingRead = functions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  const greetingId = String(data?.greetingId || "").trim();
+  if (!crewId || !greetingId) {
+    throw new functions.https.HttpsError("invalid-argument", "포스트잇 정보를 찾을 수 없습니다.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const greetingRef = crewRef.collection("greetings").doc(greetingId);
+
+  await db.runTransaction(async (tx) => {
+    const [crewSnap, greetingSnap] = await Promise.all([tx.get(crewRef), tx.get(greetingRef)]);
+    if (!crewSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+    }
+    if (!greetingSnap.exists) {
+      return;
+    }
+
+    const crewData = crewSnap.data() || {};
+    const greetingData = greetingSnap.data() || {};
+    const memberIds = Array.isArray(crewData.memberIds) ? crewData.memberIds : [];
+    const eligibleReaders = memberIds.filter((memberId) => memberId && memberId !== greetingData.userId);
+    if (eligibleReaders.length === 0) {
+      return;
+    }
+
+    const readBy = Array.isArray(greetingData.readBy) ? greetingData.readBy : [];
+    if (!readBy.includes(uid)) {
+      readBy.push(uid);
+    }
+
+    const hasAllRead = eligibleReaders.every((memberId) => readBy.includes(memberId));
+    if (hasAllRead) {
+      tx.delete(greetingRef);
+    } else {
+      tx.set(greetingRef, {
+        readBy,
+        updatedAt: new Date(),
+      }, { merge: true });
+    }
+  });
+
+  const crewSnap = await crewRef.get();
+  await refreshCrewGreetings(crewId, crewSnap.data() || {});
   return { success: true };
 });
 
@@ -836,8 +928,8 @@ exports.createStudyRoom = functions.https.onCall(async (data, context) => {
   if (!crewId) {
     throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
   }
-  if (![30, 50, 90].includes(durationMinutes)) {
-    throw new functions.https.HttpsError("invalid-argument", "세션 시간은 30분, 50분, 90분만 가능합니다.");
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 10 || durationMinutes > 120 || durationMinutes % 10 !== 0) {
+    throw new functions.https.HttpsError("invalid-argument", "세션 시간은 10분부터 120분까지 10분 단위만 가능합니다.");
   }
 
   const db = admin.firestore();
@@ -918,12 +1010,6 @@ exports.createStudyRoom = functions.https.onCall(async (data, context) => {
     return { roomId: roomRef.id };
   });
 
-  const crewSnap = await crewRef.get();
-  await syncCrewToMembers(crewId, {
-    ...(crewSnap.data() || {}),
-    updatedAt: new Date().toISOString(),
-  });
-
   return { success: true, roomId: result.roomId };
 });
 
@@ -938,7 +1024,7 @@ exports.joinStudyRoomSession = functions.https.onCall(async (data, context) => {
   const userRef = db.collection("users").doc(uid);
   const roomRef = db.collection("studyRooms").doc(roomId);
 
-  const result = await db.runTransaction(async (tx) => {
+  await db.runTransaction(async (tx) => {
     const [userSnap, roomSnap] = await Promise.all([tx.get(userRef), tx.get(roomRef)]);
     if (!userSnap.exists) {
       throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
@@ -992,13 +1078,6 @@ exports.joinStudyRoomSession = functions.https.onCall(async (data, context) => {
       updatedAt: now,
     }, { merge: true });
 
-    return { crewId: roomData.crewId };
-  });
-
-  const crewSnap = await db.collection("crews").doc(result.crewId).get();
-  await syncCrewToMembers(result.crewId, {
-    ...(crewSnap.data() || {}),
-    updatedAt: new Date().toISOString(),
   });
 
   return { success: true, roomId };
@@ -1014,16 +1093,16 @@ exports.leaveStudyRoomSession = functions.https.onCall(async (data, context) => 
   const db = admin.firestore();
   const roomRef = db.collection("studyRooms").doc(roomId);
 
-  const result = await db.runTransaction(async (tx) => {
+  await db.runTransaction(async (tx) => {
     const roomSnap = await tx.get(roomRef);
     if (!roomSnap.exists) {
-      return { crewId: "" };
+      return;
     }
 
     const roomData = roomSnap.data() || {};
     const participantIds = Array.isArray(roomData.participantIds) ? roomData.participantIds : [];
     if (!participantIds.includes(uid)) {
-      return { crewId: roomData.crewId || "" };
+      return;
     }
 
     const nextParticipantIds = participantIds.filter((participantUid) => participantUid !== uid);
@@ -1046,7 +1125,7 @@ exports.leaveStudyRoomSession = functions.https.onCall(async (data, context) => 
           updatedAt: now,
         }, { merge: true });
       }
-      return { crewId: roomData.crewId || "" };
+      return;
     }
 
     let nextHostUid = roomData.hostUid;
@@ -1076,16 +1155,7 @@ exports.leaveStudyRoomSession = functions.https.onCall(async (data, context) => 
         updatedAt: now,
       }, { merge: true });
     }
-    return { crewId: roomData.crewId || "" };
   });
-
-  if (result.crewId) {
-    const crewSnap = await db.collection("crews").doc(result.crewId).get();
-    await syncCrewToMembers(result.crewId, {
-      ...(crewSnap.data() || {}),
-      updatedAt: new Date().toISOString(),
-    });
-  }
 
   return { success: true };
 });

@@ -1,18 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ArrowLeft, Camera, CameraOff, Clock3, Crown, Hash, Radio, Send, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Camera, CameraOff, Clock3, Crown, Radio, Send, StickyNote, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
-import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
-
-const CREW_GROUP_PRESETS = [
-  { id: 'python', name: '파이썬' },
-  { id: 'elementary_math', name: '초등수학' },
-  { id: 'middle_math', name: '중등수학' }
-];
+import CrewSettingsModal from './CrewSettingsModal';
+import { formatCrewSchedule } from './crewSchedule';
 
 const inputStyle = {
   width: '100%', minHeight: 46, boxSizing: 'border-box', borderRadius: 8,
@@ -28,6 +23,14 @@ function getCrewStatusLabel(s) { return s === 'approved' ? '인증 완료' : s =
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
 function getMemberLabel(m, f = '크루 멤버') { return m?.studentName || m?.publicDisplayName || m?.displayName || f; }
 function getTodayKey() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()); }
+function getPresenceInfo(profile) {
+  const liveStatus = profile?.liveStatus;
+  const updatedMs = liveStatus?.lastUpdatedAt?.toMillis?.() || 0;
+  const stale = !updatedMs || Date.now() - updatedMs > 120000;
+  if (stale) return { label: '오프라인', color: 'rgba(255,255,255,0.42)', dot: '#64748b' };
+  if (liveStatus?.state === 'away') return { label: '자리비움', color: '#fbbf24', dot: '#fbbf24' };
+  return { label: '온라인', color: 'var(--planet-green)', dot: '#22c55e' };
+}
 function getFunctionsErrorMessage(err, fb) {
   const c = err?.code || '';
   if (c.includes('not-found')) return '해당 크루를 찾지 못했습니다.';
@@ -37,52 +40,36 @@ function getFunctionsErrorMessage(err, fb) {
 
 export default function CrewDetailView({ onBack, onEnterRoom }) {
   const { user, userData } = useAuth();
-  const { data: clusters } = useClusters();
   const [busy, setBusy] = useState(false);
+  const [roomAction, setRoomAction] = useState('');
   const [message, setMessage] = useState('');
-  const [greetingText, setGreetingText] = useState('');
+  const [noteText, setNoteText] = useState('');
   const [roomDuration, setRoomDuration] = useState(50);
   const [crewRoom, setCrewRoom] = useState(null);
+  const [crewDocData, setCrewDocData] = useState(null);
+  const [memberProfiles, setMemberProfiles] = useState({});
   const [previewStream, setPreviewStream] = useState(null);
   const [previewCameraOn, setPreviewCameraOn] = useState(true);
   const [previewError, setPreviewError] = useState('');
-  const [formData, setFormData] = useState({ name: '', motto: '', color: '#00d4ff', groupId: 'none' });
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const previewStreamRef = useRef(null);
 
-  const crew = userData?.crewSnapshot || null;
+  const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
   const crewId = crew?.id || userData?.crewId || '';
   const members = useMemo(() => crew?.members || [], [crew?.members]);
-  const greetings = useMemo(() => crew?.recentGreetings || [], [crew?.recentGreetings]);
+  const notes = useMemo(() => crew?.recentGreetings || [], [crew?.recentGreetings]);
   const status = crew?.status || userData?.crewStatus || 'pending';
   const todayKey = getTodayKey();
   const studiedToday = members.filter(m => m.lastStreakDate === todayKey);
   const isRoomParticipant = !!crewRoom?.participantIds?.includes(user?.uid);
   const roomIsFull = (crewRoom?.participantCount || 0) >= (crewRoom?.maxParticipants || 3);
 
-  const groupOptions = useMemo(() => {
-    const co = (clusters || []).map(c => ({ id: c.docId || c.id, name: c.name || c.title || c.id, clusterId: c.docId || c.id }));
-    const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
-    const merged = [];
-    const seen = new Set();
-    const pushUnique = (option) => {
-      const key = normalizeKey(option.name) || normalizeKey(option.id);
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      merged.push(option);
-    };
-
-    CREW_GROUP_PRESETS.forEach(pushUnique);
-    co.forEach(pushUnique);
-
-    return [{ id: 'none', name: '군집 선택 없이 시작' }, ...merged];
-  }, [clusters]);
-  const selectedGroup = groupOptions.find(o => o.id === formData.groupId) || groupOptions[0];
-
-  const latestGreetingByUser = useMemo(() => {
-    const m = new Map();
-    greetings.forEach(g => { if (g?.userId && !m.has(g.userId)) m.set(g.userId, g); });
-    return m;
-  }, [greetings]);
+  const memberNameById = useMemo(() => {
+    const next = new Map();
+    members.forEach((member) => next.set(member.uid, getMemberLabel(member)));
+    if (user?.uid) next.set(user.uid, getMemberLabel(userData, user.displayName || '나'));
+    return next;
+  }, [members, user?.uid, user?.displayName, userData]);
 
   const enrichedMembers = useMemo(() => {
     const next = [...members];
@@ -93,21 +80,44 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
     return unique.sort((a, b) => { if (a.uid === user?.uid) return -1; if (b.uid === user?.uid) return 1; if (a.crewRole === 'leader') return -1; if (b.crewRole === 'leader') return 1; return (b.currentStreak || 0) - (a.currentStreak || 0); }).slice(0, 3);
   }, [members, user, userData]);
 
+  useEffect(() => {
+    const ids = enrichedMembers.map((member) => member.uid).filter(Boolean);
+    if (!ids.length) {
+      setMemberProfiles({});
+      return undefined;
+    }
+
+    const unsubscribers = ids.map((uid) => onSnapshot(doc(db, 'users', uid), (snap) => {
+      setMemberProfiles((prev) => ({
+        ...prev,
+        [uid]: snap.exists() ? snap.data() : null,
+      }));
+    }));
+
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [enrichedMembers]);
+
   // Listen to study rooms
   useEffect(() => {
     if (!crewId) { setCrewRoom(null); return; }
-    const unsub = onSnapshot(collection(db, 'studyRooms'), snap => {
-      const room = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.crewId === crewId && r.status !== 'ended').sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))[0] || null;
+    const roomQuery = query(collection(db, 'studyRooms'), where('crewId', '==', crewId));
+    const unsub = onSnapshot(roomQuery, snap => {
+      const room = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.status !== 'ended').sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))[0] || null;
       setCrewRoom(room);
     });
     return () => unsub();
   }, [crewId]);
 
-  // Sync form data from crew
   useEffect(() => {
-    const s = crew || {};
-    setFormData(p => ({ ...p, name: s.name || userData?.crewName || p.name, motto: s.motto || p.motto, color: s.color || userData?.crewColor || p.color, groupId: s.groupId || p.groupId || 'none' }));
-  }, [crew, userData?.crewColor, userData?.crewName]);
+    if (!crewId) {
+      setCrewDocData(null);
+      return undefined;
+    }
+    const unsub = onSnapshot(doc(db, 'crews', crewId), (snap) => {
+      setCrewDocData(snap.exists() ? ({ id: snap.id, ...snap.data() }) : null);
+    });
+    return () => unsub();
+  }, [crewId]);
 
   // Camera preview
   useEffect(() => {
@@ -138,52 +148,58 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
 
   useEffect(() => () => { if (previewStreamRef.current) { previewStreamRef.current.getTracks().forEach(t => t.stop()); previewStreamRef.current = null; } }, []);
 
-  const handlePostGreeting = async (text = greetingText) => {
-    const clean = text.trim().slice(0, 80);
+  const handlePostNote = async (text = noteText) => {
+    const clean = text.trim().slice(0, 240);
     if (!user?.uid || !crewId || !clean || busy) return;
     setBusy(true);
     try {
       const fn = httpsCallable(functions, 'postStudyCrewGreeting');
       await fn({ crewId, text: clean });
-      setGreetingText('');
-      setMessage('인사말을 남겼습니다.');
-    } catch { setMessage('인사말을 남기지 못했습니다.'); }
+      setNoteText('');
+      setMessage('포스트잇을 남겼습니다.');
+    } catch { setMessage('포스트잇을 남기지 못했습니다.'); }
     finally { setBusy(false); }
   };
 
-  const handleUpdateCrewBasics = async () => {
-    if (!user?.uid || !crewId || userData?.crewRole !== 'leader' || busy) return;
-    setBusy(true); setMessage('');
+  const handleReadNote = async (noteId) => {
+    if (!crewId || !noteId || busy) return;
+    setBusy(true);
     try {
-      const fn = httpsCallable(functions, 'updateStudyCrew');
-      const ng = selectedGroup?.id === 'none' ? { groupId: 'none', groupName: '자유 스터디', clusterId: '', clusterName: '' } : { groupId: selectedGroup.id, groupName: selectedGroup.name, clusterId: selectedGroup.clusterId || '', clusterName: selectedGroup.clusterId ? selectedGroup.name : '' };
-      await fn({ crewId, name: formData.name.trim(), motto: formData.motto.trim(), color: formData.color, ...ng });
-      setMessage('크루 소개가 업데이트되었습니다.');
-    } catch { setMessage('업데이트 실패.'); }
-    finally { setBusy(false); }
+      const fn = httpsCallable(functions, 'markStudyCrewGreetingRead');
+      await fn({ crewId, greetingId: noteId });
+    } catch (err) {
+      console.error('Failed to mark post-it as read:', err);
+      setMessage('포스트잇 읽음 표시에 실패했습니다.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleCreateStudyRoom = async () => {
-    if (!crewId || busy) return;
-    setBusy(true); setMessage(''); soundManager.playClick();
+    if (!crewId || roomAction) return;
+    setRoomAction('creating');
+    setMessage('집중방 여는 중...');
+    soundManager.playClick();
     try {
       const fn = httpsCallable(functions, 'createStudyRoom');
       const res = await fn({ crewId, durationMinutes: roomDuration });
       if (onEnterRoom) onEnterRoom(res?.data?.roomId || '');
       setMessage('집중방을 열었습니다.');
     } catch (e) { setMessage(getFunctionsErrorMessage(e, '집중방 생성 실패.')); }
-    finally { setBusy(false); }
+    finally { setRoomAction(''); }
   };
 
   const handleJoinStudyRoom = async () => {
-    if (!crewRoom?.id || busy) return;
-    setBusy(true); setMessage(''); soundManager.playClick();
+    if (!crewRoom?.id || roomAction) return;
+    setRoomAction('joining');
+    setMessage('집중방 입장 중...');
+    soundManager.playClick();
     try {
       const fn = httpsCallable(functions, 'joinStudyRoomSession');
       await fn({ roomId: crewRoom.id });
       if (onEnterRoom) onEnterRoom(crewRoom.id);
     } catch (e) { setMessage(getFunctionsErrorMessage(e, '입장 실패.')); }
-    finally { setBusy(false); }
+    finally { setRoomAction(''); }
   };
 
   if (!crew) return null;
@@ -219,6 +235,22 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
             </div>
           ))}
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '0.7rem', marginTop: '0.8rem' }}>
+          <div style={{ ...panelStyle, padding: '0.85rem' }}>
+            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginBottom: '0.35rem' }}>크루 설명</div>
+            <div className="font-tech" style={{ color: 'rgba(255,255,255,0.78)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+              {crew.description || '아직 자세한 크루 설명이 없습니다.'}
+            </div>
+          </div>
+          <div style={{ ...panelStyle, padding: '0.85rem' }}>
+            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <CalendarDays size={13} /> 정기 공부 일정
+            </div>
+            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', lineHeight: 1.55 }}>
+              {formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes)}
+            </div>
+          </div>
+        </div>
       </Motion.div>
 
       {/* Members */}
@@ -229,125 +261,249 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
             const isSelf = member.uid === user?.uid;
             const isLeader = member.crewRole === 'leader';
             const studied = member.lastStreakDate === todayKey;
-            const greeting = latestGreetingByUser.get(member.uid)?.text || '';
+            const presence = getPresenceInfo(memberProfiles[member.uid]);
             return (
               <div key={member.uid} className="glass-card hud-border" style={{ padding: '1rem', borderRadius: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
-                  {isLeader && <Crown size={14} style={{ color: '#fbbf24' }} />}
-                  <span className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 700 }}>{getMemberLabel(member)}{isSelf ? ' (나)' : ''}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
+                    {isLeader && <Crown size={14} style={{ color: '#fbbf24', flexShrink: 0 }} />}
+                    <span className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getMemberLabel(member)}{isSelf ? ' (나)' : ''}</span>
+                  </div>
+                  <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 999, background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
+                    {presence.label}
+                  </span>
                 </div>
                 <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
                   연속 {member.currentStreak || 0}일 · {studied ? '✅ 오늘 학습 완료' : '미학습'}
                 </div>
-                {greeting && <div className="font-tech" style={{ marginTop: '0.4rem', padding: '0.35rem 0.6rem', borderRadius: 999, background: 'rgba(148, 163, 184, 0.15)', color: 'rgba(255,255,255,0.8)', fontSize: '0.8rem' }}>"{greeting}"</div>}
-                {isSelf && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.4rem', marginTop: '0.6rem' }}>
-                    <input style={{ ...inputStyle, minHeight: 36, padding: '0.5rem 0.65rem', background: 'rgba(2,6,23,0.75)' }} value={greetingText} onChange={e => setGreetingText(e.target.value)} placeholder="짧은 인사 남기기" maxLength={80} />
-                    <button className="space-btn cosmic-btn font-tech" type="button" disabled={busy || !greetingText.trim()} onClick={() => handlePostGreeting()} style={{ borderRadius: 8, minWidth: 44, padding: '0 0.7rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Send size={14} /></button>
-                  </div>
-                )}
               </div>
             );
           })}
-          {enrichedMembers.length < 3 && (
-            <div className="glass-card" style={{ padding: '1rem', borderRadius: 10, border: '1px dashed rgba(0,243,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', minHeight: 100 }}>
-              <div className="font-tech" style={{ textAlign: 'center' }}>
-                <Users size={20} style={{ opacity: 0.5, marginBottom: '0.3rem' }} />
-                <div>초대 코드로 한 명 더 합류 가능</div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Study Stream Control */}
-      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card hud-border" style={{ padding: '1.3rem', borderRadius: 12, marginBottom: '1.2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+      {/* Post-it Board */}
+      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card hud-border" style={{ padding: '1.2rem', borderRadius: 12, marginBottom: '1.2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
           <div>
-            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>STUDY STREAM</div>
-            <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.2rem', marginTop: '0.15rem' }}>집중방 컨트롤</div>
+            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <StickyNote size={15} /> CREW POST-IT
+            </div>
+            <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.15rem', marginTop: '0.15rem' }}>함께 남기는 메모</div>
           </div>
-          <button type="button" className="space-nav-link font-tech" onClick={() => { setPreviewCameraOn(p => !p); soundManager.playClick(); }} style={{ borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-            {previewCameraOn ? <Camera size={15} /> : <CameraOff size={15} />}
-            {previewCameraOn ? '카메라 ON' : '카메라 OFF'}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.55rem', alignItems: 'end', marginBottom: '1rem' }}>
+          <textarea
+            style={{ ...inputStyle, minHeight: 72, resize: 'vertical', lineHeight: 1.45 }}
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder="나누고 싶은 글, 오늘의 약속, 먼저 들어온 사람이 남기는 말을 적어주세요."
+            maxLength={240}
+          />
+          <button
+            className="space-btn cosmic-btn font-tech"
+            type="button"
+            disabled={busy || !noteText.trim()}
+            onClick={() => handlePostNote()}
+            style={{ borderRadius: 8, minWidth: 54, minHeight: 46, padding: '0 0.9rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Send size={16} />
           </button>
         </div>
-
-        {/* Camera Preview */}
-        {previewStream && previewCameraOn && (
-          <div style={{ width: '100%', maxWidth: 320, aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,243,255,0.2)', marginBottom: '0.9rem' }}>
-            <video ref={el => { if (el) el.srcObject = previewStream; }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#020617' }} />
-          </div>
-        )}
-        {previewError && <div className="font-tech" style={{ color: '#fda4af', lineHeight: 1.45, marginBottom: '0.8rem' }}>{previewError}</div>}
-
-        {status !== 'approved' ? (
-          <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>운영자 승인 후 방을 열 수 있습니다.</div>
-        ) : crewRoom ? (
-          <div style={{ display: 'grid', gap: '0.7rem' }}>
-            <div style={{ ...panelStyle, padding: '0.9rem', background: 'rgba(2,6,23,0.62)' }}>
-              <div className="font-tech" style={{ color: crewRoom.status === 'live' ? 'var(--planet-green)' : 'var(--planet-orange)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Radio size={14} /> {crewRoom.status === 'live' ? '집중 진행 중' : '입장 대기 중'}
-              </div>
-              <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.3rem', display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Users size={14} /> {crewRoom.participantCount || 0}/{crewRoom.maxParticipants || 3}</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Clock3 size={14} /> {crewRoom.durationMinutes || 50}분</span>
-              </div>
-            </div>
-            {isRoomParticipant ? (
-              <button type="button" className="space-btn cosmic-btn font-tech" onClick={() => onEnterRoom && onEnterRoom(crewRoom.id)} style={{ borderRadius: 8, padding: '0.9rem 1.1rem' }}>집중방 다시 열기</button>
-            ) : (
-              <button type="button" className="space-btn cosmic-btn font-tech" disabled={busy || roomIsFull} onClick={handleJoinStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem' }}>{roomIsFull ? '정원 가득 참' : '집중방 입장'}</button>
-            )}
+        {notes.length ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '0.75rem' }}>
+            {notes.slice(0, 6).map((note, index) => {
+              const currentReadBy = Array.isArray(note.readBy) ? note.readBy : [];
+              const alreadyRead = currentReadBy.includes(user?.uid);
+              const noteColor = ['rgba(250, 204, 21, 0.18)', 'rgba(45, 212, 191, 0.16)', 'rgba(96, 165, 250, 0.16)', 'rgba(251, 191, 36, 0.14)'][index % 4];
+              return (
+                <div
+                  key={note.id || `${note.userId}-${index}`}
+                  style={{
+                    borderRadius: 12,
+                    padding: '0.95rem 0.95rem 0.85rem',
+                    minHeight: 132,
+                    background: `${noteColor}`,
+                    border: '1px solid rgba(255,255,255,0.16)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+                    position: 'relative',
+                    transform: `rotate(${index % 2 === 0 ? -1.2 : 1.1}deg)`,
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 12,
+                    width: 34,
+                    height: 10,
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.16)',
+                  }} />
+                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.66)', fontSize: '0.76rem', marginBottom: '0.45rem', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <span>{memberNameById.get(note.userId) || note.userName || '크루 멤버'}</span>
+                    <span style={{ color: alreadyRead ? 'var(--planet-green)' : 'rgba(255,255,255,0.45)' }}>{alreadyRead ? '읽음' : '미확인'}</span>
+                  </div>
+                  <div className="font-tech" style={{ color: 'var(--text-bright)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: '0.7rem' }}>{note.text}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.74rem' }}>
+                      {currentReadBy.length > 0 ? `읽은 사람 ${currentReadBy.length}` : '아직 읽은 사람이 없습니다'}
+                    </div>
+                    {note.userId !== user?.uid && (
+                      <button
+                        type="button"
+                        className="space-nav-link font-tech"
+                        onClick={() => handleReadNote(note.id)}
+                        disabled={busy || alreadyRead}
+                        style={{ borderRadius: 8, padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}
+                      >
+                        {alreadyRead ? '읽음' : '읽었어요'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <div style={{ display: 'grid', gap: '0.7rem' }}>
-            <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>아직 열린 집중방이 없습니다.</div>
-            {userData?.crewRole === 'leader' ? (
-              <>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {[30, 50, 90].map(d => (
-                    <button key={d} type="button" className={`space-nav-link font-tech ${roomDuration === d ? 'active' : ''}`} onClick={() => { setRoomDuration(d); soundManager.playClick(); }} style={{ borderRadius: 999, padding: '0.5rem 0.85rem' }}>{d}분</button>
-                  ))}
-                </div>
-                <button type="button" className="space-btn cosmic-btn font-tech" disabled={busy} onClick={handleCreateStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem' }}>{roomDuration}분 집중방 열기</button>
-              </>
-            ) : (
-              <div className="font-tech" style={{ color: 'var(--text-muted)' }}>리더가 방을 열면 여기서 입장할 수 있습니다.</div>
-            )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.75rem' }}>
+            <div
+              style={{
+                borderRadius: 12,
+                minHeight: 132,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px dashed rgba(255,255,255,0.14)',
+                display: 'grid',
+                placeItems: 'center',
+                color: 'rgba(255,255,255,0.5)',
+              }}
+            >
+              <div className="font-tech" style={{ textAlign: 'center', lineHeight: 1.55 }}>
+                <StickyNote size={20} style={{ marginBottom: '0.45rem', opacity: 0.6 }} />
+                <div>아직 남겨진 포스트잇이 없습니다.</div>
+              </div>
+            </div>
           </div>
         )}
       </Motion.div>
 
-      {/* Leader Settings */}
+      {/* Study Stream Control */}
+      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card hud-border" style={{ padding: '1.3rem', borderRadius: 12, marginBottom: '1.2rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>STUDY STREAM</div>
+          <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.2rem', marginTop: '0.15rem' }}>집중방 컨트롤</div>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem' }}>
+            이 제어는 각 참여자 자신의 화면에만 표시되고, 본인 카메라와 상태만 바꿉니다.
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(min(420px, 100%), 1.35fr) minmax(min(300px, 100%), 0.85fr)', gap: '1rem', alignItems: 'stretch' }}>
+          <div>
+            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,243,255,0.2)', background: '#020617', position: 'relative' }}>
+              {previewStream && previewCameraOn ? (
+                <video ref={el => { if (el) el.srcObject = previewStream; }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div className="font-tech" style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.54)' }}>
+                  {previewError || '카메라가 꺼져 있습니다.'}
+                </div>
+              )}
+              <div className="font-tech" style={{ position: 'absolute', left: 12, bottom: 12, padding: '0.32rem 0.6rem', borderRadius: 999, background: 'rgba(2,6,23,0.72)', color: 'var(--text-bright)', fontSize: '0.82rem' }}>
+                {userData?.studentName || userData?.publicDisplayName || user?.displayName || '나'}
+              </div>
+            </div>
+            {previewError && previewCameraOn && <div className="font-tech" style={{ color: '#fda4af', lineHeight: 1.45, marginTop: '0.65rem' }}>{previewError}</div>}
+          </div>
+
+          <div style={{ ...panelStyle, display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: '100%' }}>
+            <button type="button" className="space-nav-link font-tech" onClick={() => { setPreviewCameraOn(p => !p); soundManager.playClick(); }} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}>
+              {previewCameraOn ? <Camera size={15} /> : <CameraOff size={15} />}
+              {previewCameraOn ? '카메라 ON' : '카메라 OFF'}
+            </button>
+
+            {status !== 'approved' ? (
+              <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>운영자 승인 후 방을 열 수 있습니다.</div>
+            ) : crewRoom ? (
+              <>
+                <div style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(2,6,23,0.62)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div className="font-tech" style={{ color: crewRoom.status === 'live' ? 'var(--planet-green)' : 'var(--planet-orange)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Radio size={14} /> {crewRoom.status === 'live' ? '집중 진행 중' : '입장 대기 중'}
+                  </div>
+                  <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.45rem', display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Users size={14} /> {crewRoom.participantCount || 0}/{crewRoom.maxParticipants || 3}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Clock3 size={14} /> {crewRoom.durationMinutes || 50}분</span>
+                  </div>
+                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.8rem', marginTop: '0.55rem', lineHeight: 1.45 }}>
+                    이미 열린 방이 있어 새 시간 선택은 방이 종료된 뒤 가능합니다.
+                  </div>
+                </div>
+                {isRoomParticipant ? (
+                  <button type="button" className="space-btn cosmic-btn font-tech" onClick={() => onEnterRoom && onEnterRoom(crewRoom.id)} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>집중방 다시 열기</button>
+                ) : (
+                  <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction || roomIsFull} onClick={handleJoinStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'joining' ? '입장 처리 중...' : roomIsFull ? '정원 가득 참' : '집중방 입장'}</button>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>아직 열린 집중방이 없습니다.</div>
+                {userData?.crewRole === 'leader' ? (
+                  <>
+                    <div style={{ display: 'grid', gap: '0.45rem' }}>
+                      <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                        집중 시간: <strong style={{ color: 'var(--crystal-cyan)' }}>{roomDuration}분</strong>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="120"
+                        step="10"
+                        value={roomDuration}
+                        onChange={(e) => setRoomDuration(Number(e.target.value))}
+                        style={{ width: '100%' }}
+                      />
+                      <div className="font-tech" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        <span>10분</span>
+                        <span>60분</span>
+                        <span>120분</span>
+                      </div>
+                    </div>
+                    <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction} onClick={handleCreateStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'creating' ? '집중방 여는 중...' : `${roomDuration}분 집중방 열기`}</button>
+                  </>
+                ) : (
+                  <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>리더가 방을 열면 여기서 입장할 수 있습니다.</div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </Motion.div>
+
       {userData?.crewRole === 'leader' && (
         <section className="glass-card hud-border" style={{ padding: '1.2rem', borderRadius: 12 }}>
-          <h3 className="font-tech" style={{ color: 'var(--crystal-cyan)', marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}><Crown size={16} /> 리더 설정</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>크루 이름</span>
-              <input style={inputStyle} value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} maxLength={28} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>크루 모토</span>
-              <input style={inputStyle} value={formData.motto} onChange={e => setFormData(p => ({ ...p, motto: e.target.value }))} maxLength={52} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>군집</span>
-              <select style={inputStyle} value={formData.groupId} onChange={e => setFormData(p => ({ ...p, groupId: e.target.value }))}>
-                {groupOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>엠블럼 색상</span>
-              <input type="color" style={{ ...inputStyle, padding: '0.35rem' }} value={formData.color} onChange={e => setFormData(p => ({ ...p, color: e.target.value }))} />
-            </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <h3 className="font-tech" style={{ color: 'var(--crystal-cyan)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <Crown size={16} /> 리더 설정
+            </h3>
+            <button
+              type="button"
+              className="space-nav-link font-tech active"
+              onClick={() => { soundManager.playClick(); setShowSettingsModal(true); }}
+              style={{ borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+            >
+              설정 열기
+            </button>
           </div>
-          <button type="button" className="space-btn cosmic-btn font-tech" disabled={busy} onClick={handleUpdateCrewBasics} style={{ marginTop: '1rem', padding: '0.85rem 1.2rem', borderRadius: 8 }}>크루 소개 저장</button>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55, marginTop: '0.8rem' }}>
+            크루 이름, 모토, 군집, 엠블럼은 거의 수정하지 않는 값입니다. 버튼을 눌러 모달에서만 변경하세요.
+          </div>
         </section>
       )}
 
       {message && <p className="font-tech" style={{ marginTop: '1rem', color: message.includes('실패') || message.includes('못했') ? '#f87171' : 'var(--planet-green)' }}>{message}</p>}
+      <CrewSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        crew={crew}
+      />
     </div>
   );
 }

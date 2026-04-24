@@ -6,6 +6,7 @@ import { functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
+import { CREW_SCHEDULE_DAYS, getDefaultScheduleTimes, normalizeScheduleDays } from './crewSchedule';
 
 const CREW_GROUP_PRESETS = [
   { id: 'python', name: '파이썬' },
@@ -36,7 +37,13 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
-    name: '', motto: '', color: '#00d4ff', groupId: 'none'
+    name: '',
+    motto: '',
+    description: '',
+    color: '#00d4ff',
+    groupId: 'none',
+    scheduleDays: [],
+    scheduleTimes: getDefaultScheduleTimes()
   });
 
   const isResubmit = !!rejectedCrew;
@@ -47,13 +54,24 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
       setFormData({
         name: rejectedCrew.name || '',
         motto: rejectedCrew.motto || '',
+        description: rejectedCrew.description || '',
         color: rejectedCrew.color || '#00d4ff',
-        groupId: rejectedCrew.groupId || 'none'
+        groupId: rejectedCrew.groupId || 'none',
+        scheduleDays: normalizeScheduleDays(rejectedCrew.scheduleDays),
+        scheduleTimes: { ...getDefaultScheduleTimes(), ...(rejectedCrew.scheduleTimes || {}) }
       });
       setMessage('');
       setSuccess(false);
     } else if (isOpen && !rejectedCrew) {
-      setFormData({ name: '', motto: '', color: '#00d4ff', groupId: 'none' });
+      setFormData({
+        name: '',
+        motto: '',
+        description: '',
+        color: '#00d4ff',
+        groupId: 'none',
+        scheduleDays: [],
+        scheduleTimes: getDefaultScheduleTimes()
+      });
       setMessage('');
       setSuccess(false);
     }
@@ -117,7 +135,10 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
           crewId: rejectedCrew.id,
           name: formData.name.trim(),
           motto: formData.motto.trim(),
+          description: formData.description.trim(),
           color: formData.color,
+          scheduleDays: formData.scheduleDays,
+          scheduleTimes: formData.scheduleTimes,
           ...nextGroup
         });
         setSuccess(true);
@@ -128,7 +149,10 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
         await createCrew({
           name: formData.name.trim(),
           motto: formData.motto.trim(),
+          description: formData.description.trim(),
           color: formData.color,
+          scheduleDays: formData.scheduleDays,
+          scheduleTimes: formData.scheduleTimes,
           ...nextGroup
         });
         setSuccess(true);
@@ -168,7 +192,7 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
           exit={{ scale: 0.9, y: 20 }}
           onClick={e => e.stopPropagation()}
           style={{
-            width: '100%', maxWidth: 500,
+            width: '100%', maxWidth: 640,
             background: 'rgba(7, 13, 30, 0.96)',
             border: isResubmit ? '1px solid rgba(251, 191, 36, 0.25)' : '1px solid rgba(0, 243, 255, 0.22)',
             borderRadius: 14, padding: '1.6rem',
@@ -268,6 +292,18 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
                 </label>
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>크루 설명</span>
+                  <textarea
+                    style={{ ...inputStyle, minHeight: 92, resize: 'vertical', lineHeight: 1.5 }}
+                    value={formData.description}
+                    onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="어떤 학생이, 어떤 방식으로, 언제 함께 공부하는 크루인지 적어주세요."
+                    maxLength={500}
+                    disabled={busy || success}
+                  />
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>학습 군집</span>
                   <select
                     style={inputStyle}
@@ -281,6 +317,54 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
                     <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>군집 정보를 불러오는 중...</span>
                   )}
                 </label>
+
+                <div style={{ display: 'grid', gap: '0.55rem' }}>
+                  <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>정기 공부 요일과 시간</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(74px, 1fr))', gap: '0.45rem' }}>
+                    {CREW_SCHEDULE_DAYS.map(day => {
+                      const selected = formData.scheduleDays.includes(day.key);
+                      return (
+                        <button
+                          key={day.key}
+                          type="button"
+                          className={`space-nav-link font-tech ${selected ? 'active' : ''}`}
+                          disabled={busy || success}
+                          onClick={() => setFormData(prev => ({
+                            ...prev,
+                            scheduleDays: selected
+                              ? prev.scheduleDays.filter(item => item !== day.key)
+                              : [...prev.scheduleDays, day.key]
+                          }))}
+                          style={{ borderRadius: 8, padding: '0.55rem 0.45rem' }}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {formData.scheduleDays.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.55rem' }}>
+                      {formData.scheduleDays.map(dayKey => {
+                        const day = CREW_SCHEDULE_DAYS.find(item => item.key === dayKey);
+                        return (
+                          <label key={dayKey} className="font-tech" style={{ display: 'grid', gap: '0.3rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                            {day?.label || dayKey}요일
+                            <input
+                              type="time"
+                              style={{ ...inputStyle, minHeight: 42, padding: '0.55rem 0.7rem' }}
+                              value={formData.scheduleTimes[dayKey] || '20:00'}
+                              onChange={e => setFormData(prev => ({
+                                ...prev,
+                                scheduleTimes: { ...prev.scheduleTimes, [dayKey]: e.target.value }
+                              }))}
+                              disabled={busy || success}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
