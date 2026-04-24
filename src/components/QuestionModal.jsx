@@ -5,10 +5,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ReactSketchCanvas } from 'react-sketch-canvas'; // KEEP FOR NOW IF NEEDED ELSEWHERE OR REMOVE
 import * as htmlToImage from 'html-to-image';
 import { db, auth } from '../firebase';
-import { collection, addDoc, updateDoc, doc, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, updateDoc, doc, increment, serverTimestamp, getDoc, runTransaction } from 'firebase/firestore';
 import { ImageService } from '../services/imageService';
 import AnnotationCanvas from './AnnotationCanvas';
 import { useSpeechToText } from '../hooks/useSpeechToText';
+import { recordCrystalTransaction } from '../utils/crystalLedger';
+import { AGORA_BOUNTY_OPTIONS, getAnonymousLabel } from '../utils/socialUtils';
 import './QuestionModal.css';
 
 export default function QuestionModal({ isOpen, onClose, quizContext, contextData }) {
@@ -17,6 +19,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
   const [content, setContent] = useState('');
   const [type, setType] = useState('quiz');
   const [isPublic, setIsPublic] = useState(true);
+  const [selectedBounty, setSelectedBounty] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -63,6 +66,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       setIsCapturing(false);
       setError(null);
       setShowExtensionPrompt(false);
+      setSelectedBounty(0);
     }
     return () => { document.body.style.overflow = 'auto'; };
   }, [isOpen]);
@@ -466,12 +470,12 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('로그인이 필요합니다.');
+      const userRef = doc(db, 'users', user.uid);
 
       // Fetch studentName from profile for correct display
       let resolvedName = user.displayName || '익명 학생';
       try {
-        const { getDoc, doc: firestoreDoc } = await import('firebase/firestore');
-        const userSnap = await getDoc(firestoreDoc(db, 'users', user.uid));
+        const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const ud = userSnap.data();
           resolvedName = ud.studentName || ud.name || resolvedName;
@@ -492,6 +496,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         }
       }
 
+      const bountyAmount = isPublic ? selectedBounty : 0;
+      const questionRef = doc(collection(db, 'questions'));
       const questionData = {
         userId: user.uid,
         userName: resolvedName,
@@ -499,6 +505,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         type: activeContext?.type || type,
         category: 'general', 
         isPublic,
+        isAnonymous: isPublic,
+        anonymousLabel: getAnonymousLabel(user.uid),
         quizId: activeContext?.quizId || null,
         quizContext: {
           chapterId: activeContext?.chapterId || '',
@@ -512,6 +520,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         },
         drawingUrl,
         status: 'open',
+        bountyAmount,
+        bountyStatus: bountyAmount > 0 ? 'locked' : 'none',
+        bountyAwardedToAnswerId: null,
+        bountyLockedAt: bountyAmount > 0 ? serverTimestamp() : null,
         upvotes: 0,
         upvotedBy: [],
         answerCount: 0,
@@ -519,15 +531,32 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         updatedAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'questions'), questionData);
-      
-      try {
-        await updateDoc(doc(db, 'users', user.uid), {
-          questionCount: increment(1)
-        });
-      } catch (updateErr) {
-        console.warn('Failed to update question count:', updateErr);
-      }
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) throw new Error('USER_NOT_FOUND');
+
+        const freshUserData = userSnap.data();
+        const currentCrystals = freshUserData?.crystals || 0;
+
+        if (bountyAmount > currentCrystals) {
+          throw new Error('INSUFFICIENT_BOUNTY');
+        }
+
+        transaction.set(questionRef, questionData);
+        transaction.set(userRef, {
+          questionCount: (freshUserData?.questionCount || 0) + 1,
+          crystals: currentCrystals - bountyAmount
+        }, { merge: true });
+
+        if (bountyAmount > 0) {
+          recordCrystalTransaction(user.uid, {
+            amount: -bountyAmount,
+            type: 'agora_bounty_lock',
+            description: '현상금 질문 등록',
+            metadata: { questionId: questionRef.id, bountyAmount }
+          }, transaction, `agora-bounty-lock-${questionRef.id}`);
+        }
+      });
       
       queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });
       
@@ -536,11 +565,20 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       setCanvasState(null);
       setIsDrawMode(false);
       setBackgroundImage(null);
+      setSelectedBounty(0);
       onClose();
-      alert('질문이 등록되었습니다! 선생님이 확인 후 답변해주실 거예요.');
+      alert(
+        bountyAmount > 0
+          ? `질문이 등록되었습니다. 질문자는 익명으로 보호되며, 현상금 ${bountyAmount}광석이 잠금되었습니다.`
+          : '질문이 등록되었습니다! 질문자는 공개 보드에서 익명으로 표시됩니다.'
+      );
     } catch (err) {
       console.error('Error submitting question:', err);
-      setError('질문 등록에 실패했습니다. 다시 시도해주세요.');
+      setError(
+        err.message === 'INSUFFICIENT_BOUNTY'
+          ? `현상금 ${selectedBounty}광석을 걸기에는 보유 광석이 부족합니다.`
+          : '질문 등록에 실패했습니다. 다시 시도해주세요.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -586,6 +624,32 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
                   {activeContext?.type === 'datalog' && `📄 데이터 로그 - ${activeContext.unitTitle}`}
                   {activeContext?.type === 'video' && `📡 영상 학습 - ${activeContext.transmissionTitle || activeContext.unitTitle}`}
                   {(!activeContext?.type || activeContext?.type === 'quiz') && `${activeContext?.quizTitle} - ${activeContext?.questionId ? '질문 중' : '자유 질문'}`}
+                </div>
+
+                <div className="bounty-section">
+                  <div className="section-label font-tech">현상금 질문 설정</div>
+                  <p className="bounty-copy">
+                    공개 질문은 질문자 이름 대신 익명 라벨만 노출됩니다. 현상금을 걸면 채택된 답변자에게 그대로 지급됩니다.
+                  </p>
+                  <div className="bounty-options">
+                    {AGORA_BOUNTY_OPTIONS.map((amount) => (
+                      <button
+                        key={amount}
+                        type="button"
+                        className={`bounty-chip ${selectedBounty === amount ? 'active' : ''}`}
+                        onClick={() => setSelectedBounty(amount)}
+                      >
+                        {amount === 0 ? '현상금 없음' : `${amount} 광석`}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="bounty-note">
+                    {isPublic
+                      ? selectedBounty > 0
+                        ? `채택 시 ${selectedBounty}광석이 답변자에게 이동합니다.`
+                        : '현상금 없이 익명 공개 질문으로 등록됩니다.'
+                      : '비공개 질문은 현상금이 자동으로 0으로 처리됩니다.'}
+                  </div>
                 </div>
 
                 {/* 
@@ -704,7 +768,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
                     checked={isPublic} 
                     onChange={(e) => setIsPublic(e.target.checked)} 
                   />
-                  <span>다른 친구들도 볼 수 있게 공개 (익명)</span>
+                  <span>다른 친구들도 볼 수 있게 공개 (질문자는 항상 익명)</span>
                 </label>
 
                 <button 

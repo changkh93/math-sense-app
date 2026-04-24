@@ -432,7 +432,7 @@ export default function CrystalLedger({ userData }) {
                 <li>3분 학습마다 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
                 <li>90% 시청 완료 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
                 <li><span style={{color: '#f87171', fontSize: '0.85em'}}>⚠️ 다중 창 및 기기 동시재생 보상 차단 (170초 쿨타임)</span></li>
-                <li><span style={{color: '#f87171', fontSize: '0.85em'}}>⚠️ 영상 시청 보상 1일 상한선: 300 광석</span></li>
+                <li><span style={{color: '#f87171', fontSize: '0.85em'}}>⚠️ 영상 시청 보상 1일 상한선: 500 광석</span></li>
               </ul>
             </div>
             <div>

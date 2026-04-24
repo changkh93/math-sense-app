@@ -1,42 +1,142 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
+import {
+  PROFILE_FRAMES,
+  PROFILE_TITLES,
+  createCrewInviteCode,
+  getProfileFrame,
+  getPublicProfile,
+  normalizeOwnedFrames
+} from '../../utils/socialUtils';
+
+const sectionTitleStyle = {
+  color: 'var(--text-bright)',
+  borderBottom: '1px solid var(--neon-blue)',
+  paddingBottom: '0.8rem',
+  marginBottom: '1.5rem'
+};
+
+function Field({ label, children, hint }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <label className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.9rem' }}>{label}</label>
+      {children}
+      {hint && <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: '1.45', margin: 0 }}>{hint}</p>}
+    </div>
+  );
+}
 
 export default function ProfileEditView({ onBack }) {
   const { user, userData } = useAuth();
   const { data: clusters, isLoading: isClustersLoading } = useClusters();
 
   const [saving, setSaving] = useState(false);
+  const [crewBusy, setCrewBusy] = useState(false);
+  const [crewMessage, setCrewMessage] = useState('');
+  const [crewPreview, setCrewPreview] = useState(null);
+  const [joinCrewCode, setJoinCrewCode] = useState('');
   const [formData, setFormData] = useState({
     studentName: '',
     studentPhone: '',
-    participation: {} // { clusterId: ['월', '화'] }
+    participation: {},
+    publicProfileEnabled: true,
+    publicDisplayName: '',
+    publicTitle: PROFILE_TITLES[0],
+    publicSignature: '',
+    selectedProfileFrame: 'starter',
+    crewName: '',
+    crewMotto: '',
+    crewColor: '#00f3ff'
   });
+
+  const ownedFrames = useMemo(() => normalizeOwnedFrames(userData), [userData]);
+  const publicProfile = useMemo(
+    () => getPublicProfile(
+      {
+        ...userData,
+        publicProfileEnabled: formData.publicProfileEnabled,
+        publicDisplayName: formData.publicDisplayName,
+        publicTitle: formData.publicTitle,
+        publicSignature: formData.publicSignature,
+        selectedProfileFrame: formData.selectedProfileFrame,
+        crewName: crewPreview?.name || userData?.crewName,
+        crewRole: userData?.crewRole,
+        crewColor: crewPreview?.color || formData.crewColor || userData?.crewColor
+      },
+      formData.studentName || user?.displayName || '탐험가'
+    ),
+    [crewPreview, formData, user?.displayName, userData]
+  );
 
   useEffect(() => {
     if (userData) {
       setFormData({
         studentName: userData.studentName || user?.displayName || '',
         studentPhone: userData.studentPhone || '',
-        participation: userData.participation || {}
+        participation: userData.participation || {},
+        publicProfileEnabled: userData.publicProfileEnabled !== false,
+        publicDisplayName: userData.publicDisplayName || userData.studentName || user?.displayName || '',
+        publicTitle: userData.publicTitle || PROFILE_TITLES[0],
+        publicSignature: userData.publicSignature || '',
+        selectedProfileFrame: normalizeOwnedFrames(userData).includes(userData.selectedProfileFrame)
+          ? userData.selectedProfileFrame
+          : normalizeOwnedFrames(userData)[0],
+        crewName: userData.crewName || '',
+        crewMotto: '',
+        crewColor: userData.crewColor || '#00f3ff'
       });
     }
   }, [userData, user]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadCrew() {
+      if (!userData?.crewId) {
+        setCrewPreview(null);
+        return;
+      }
+
+      try {
+        const snap = await getDoc(doc(db, 'crews', userData.crewId));
+        if (!ignore) {
+          setCrewPreview(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+        }
+      } catch (err) {
+        if (!ignore) {
+          console.error('Failed to load crew:', err);
+          setCrewPreview(null);
+        }
+      }
+    }
+
+    loadCrew();
+    return () => {
+      ignore = true;
+    };
+  }, [userData?.crewId]);
+
+  useEffect(() => {
+    if (!crewPreview) return;
+    setFormData(prev => ({
+      ...prev,
+      crewName: crewPreview.name || prev.crewName,
+      crewMotto: crewPreview.motto || prev.crewMotto,
+      crewColor: crewPreview.color || prev.crewColor
+    }));
+  }, [crewPreview]);
+
   const handleDaySelect = (clusterId, day) => {
     setFormData(prev => {
       const clusterDays = prev.participation[clusterId] || [];
-      
-      let newDays;
-      if (clusterDays.includes(day)) {
-        newDays = clusterDays.filter(d => d !== day);
-      } else {
-        newDays = [...clusterDays, day];
-      }
+      const newDays = clusterDays.includes(day)
+        ? clusterDays.filter(d => d !== day)
+        : [...clusterDays, day];
 
       return {
         ...prev,
@@ -51,7 +151,7 @@ export default function ProfileEditView({ onBack }) {
 
   const extractAvailableDays = (classSchedule) => {
     if (!classSchedule || !Array.isArray(classSchedule)) return [];
-    
+
     const dayMap = {
       '1': '월', '2': '화', '3': '수', '4': '목', '5': '금', '6': '토', '7': '일',
       1: '월', 2: '화', 3: '수', 4: '목', 5: '금', 6: '토', 7: '일'
@@ -61,7 +161,7 @@ export default function ProfileEditView({ onBack }) {
     classSchedule.forEach(schedule => {
       const addDay = (val) => {
         if (!val) return;
-        const mapped = dayMap[val] || val; // Fallback to original if not in map
+        const mapped = dayMap[val] || val;
         daysSet.add(mapped);
       };
 
@@ -84,31 +184,254 @@ export default function ProfileEditView({ onBack }) {
     soundManager.playClick();
 
     try {
-      // 접근 권한 없는 비공개 클러스터의 participation 데이터 정리
       const cleanedParticipation = {};
       const access = userData?.clusterAccess || {};
       Object.keys(formData.participation).forEach(cid => {
         const cluster = clusters?.find(c => c.docId === cid || c.id === cid);
-        // 공개 클러스터이거나, 비공개이면서 접근 권한이 있는 경우만 유지
         if (!cluster || !cluster.isPrivate || access[cid] === 'active') {
           cleanedParticipation[cid] = formData.participation[cid];
         }
       });
+
+      const publicDisplayName = formData.publicDisplayName.trim().slice(0, 18);
+      const publicSignature = userData?.profileSignatureUnlocked
+        ? formData.publicSignature.trim().slice(0, 28)
+        : (userData?.publicSignature || '');
+      const selectedFrame = ownedFrames.includes(formData.selectedProfileFrame) ? formData.selectedProfileFrame : ownedFrames[0];
+      const crewName = formData.crewName.trim() || crewPreview?.name || userData?.crewName || '';
+      const mergedProfileData = {
+        ...userData,
+        studentName: formData.studentName.trim(),
+        name: formData.studentName.trim(),
+        publicProfileEnabled: formData.publicProfileEnabled,
+        publicDisplayName,
+        publicTitle: formData.publicTitle.trim(),
+        publicSignature,
+        selectedProfileFrame: selectedFrame,
+        crewId: crewPreview?.id || userData?.crewId || '',
+        crewName,
+        crewRole: userData?.crewRole || '',
+        crewColor: formData.crewColor || crewPreview?.color || userData?.crewColor || '#00f3ff',
+      };
+      const updatedProfileSnapshot = getPublicProfile(mergedProfileData, mergedProfileData.publicDisplayName || mergedProfileData.studentName || user?.displayName || '탐험가');
 
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         studentName: formData.studentName.trim(),
         studentPhone: formData.studentPhone.trim(),
         participation: cleanedParticipation,
+        publicProfileEnabled: formData.publicProfileEnabled,
+        publicDisplayName,
+        publicTitle: formData.publicTitle.trim(),
+        publicSignature,
+        selectedProfileFrame: selectedFrame,
+        crewName,
+        crewColor: mergedProfileData.crewColor,
         profileUpdatedAt: serverTimestamp()
       });
-      alert('🌟 프로필이 성공적으로 저장되었습니다!');
+
+      try {
+        const answerSnap = await getDocs(query(collection(db, 'answers'), where('userId', '==', user.uid)));
+        if (!answerSnap.empty) {
+          const batch = writeBatch(db);
+          answerSnap.docs.forEach((answerDoc) => {
+            batch.update(answerDoc.ref, {
+              publicProfileSnapshot: updatedProfileSnapshot
+            });
+          });
+          await batch.commit();
+        }
+      } catch (syncErr) {
+        console.warn('답변 프로필 스냅샷 동기화 실패:', syncErr);
+      }
+
+      alert('프로필이 저장되었습니다.');
       if (onBack) onBack();
     } catch (err) {
       console.error('Error saving profile:', err);
       alert('프로필 저장 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCreateCrew = async () => {
+    if (!user?.uid || crewBusy) return;
+    if (!formData.crewName.trim()) {
+      alert('크루 이름을 입력해주세요.');
+      return;
+    }
+
+    setCrewBusy(true);
+    setCrewMessage('');
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const crewRef = doc(collection(db, 'crews'));
+      const inviteCode = createCrewInviteCode(`${user.uid}-${formData.crewName}`);
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) throw new Error('USER_NOT_FOUND');
+
+        const liveUser = userSnap.data();
+        if (liveUser?.crewId) throw new Error('ALREADY_IN_CREW');
+        if ((liveUser?.crewCreationPasses || 0) < 1) throw new Error('NO_CREATION_PASS');
+
+        const payload = {
+          name: formData.crewName.trim(),
+          motto: formData.crewMotto.trim(),
+          color: formData.crewColor,
+          leaderId: user.uid,
+          inviteCode,
+          memberIds: [user.uid],
+          memberCount: 1,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+
+        transaction.set(crewRef, payload);
+        transaction.set(userRef, {
+          crewId: crewRef.id,
+          crewName: payload.name,
+          crewRole: 'leader',
+          crewColor: payload.color,
+          crewCreationPasses: (liveUser?.crewCreationPasses || 0) - 1
+        }, { merge: true });
+      });
+
+      setCrewPreview({
+        id: crewRef.id,
+        name: formData.crewName.trim(),
+        motto: formData.crewMotto.trim(),
+        color: formData.crewColor,
+        inviteCode,
+        memberCount: 1
+      });
+      setCrewMessage('스터디 크루가 창설되었습니다.');
+    } catch (err) {
+      console.error('Failed to create crew:', err);
+      setCrewMessage(
+        err.message === 'NO_CREATION_PASS'
+          ? '크루 창설권이 필요합니다. 상점에서 먼저 구매해주세요.'
+          : err.message === 'ALREADY_IN_CREW'
+            ? '이미 다른 크루에 속해 있습니다.'
+            : '크루 생성에 실패했습니다.'
+      );
+    } finally {
+      setCrewBusy(false);
+    }
+  };
+
+  const handleJoinCrew = async () => {
+    if (!user?.uid || crewBusy) return;
+    if (!joinCrewCode.trim()) {
+      alert('초대 코드를 입력해주세요.');
+      return;
+    }
+
+    setCrewBusy(true);
+    setCrewMessage('');
+
+    try {
+      const crewQuery = query(collection(db, 'crews'), where('inviteCode', '==', joinCrewCode.trim().toUpperCase()));
+      const crewSnap = await getDocs(crewQuery);
+      if (crewSnap.empty) throw new Error('CREW_NOT_FOUND');
+
+      const targetCrew = crewSnap.docs[0];
+      const crewRef = doc(db, 'crews', targetCrew.id);
+      const userRef = doc(db, 'users', user.uid);
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        const freshCrewSnap = await transaction.get(crewRef);
+        if (!userSnap.exists() || !freshCrewSnap.exists()) throw new Error('CREW_NOT_FOUND');
+
+        const liveUser = userSnap.data();
+        const liveCrew = freshCrewSnap.data();
+        if (liveUser?.crewId) throw new Error('ALREADY_IN_CREW');
+
+        const nextMemberIds = Array.from(new Set([...(liveCrew.memberIds || []), user.uid]));
+        transaction.set(crewRef, {
+          memberIds: nextMemberIds,
+          memberCount: nextMemberIds.length,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        transaction.set(userRef, {
+          crewId: crewRef.id,
+          crewName: liveCrew.name,
+          crewRole: 'member',
+          crewColor: liveCrew.color || '#00f3ff'
+        }, { merge: true });
+      });
+
+      setCrewPreview({ id: targetCrew.id, ...targetCrew.data() });
+      setJoinCrewCode('');
+      setCrewMessage('크루에 합류했습니다.');
+    } catch (err) {
+      console.error('Failed to join crew:', err);
+      setCrewMessage(
+        err.message === 'CREW_NOT_FOUND'
+          ? '해당 초대 코드를 가진 크루를 찾지 못했습니다.'
+          : err.message === 'ALREADY_IN_CREW'
+            ? '이미 다른 크루에 속해 있습니다.'
+            : '크루 합류에 실패했습니다.'
+      );
+    } finally {
+      setCrewBusy(false);
+    }
+  };
+
+  const handleUpdateCrewStyle = async () => {
+    if (!user?.uid || !crewPreview?.id || crewBusy) return;
+    if (userData?.crewRole !== 'leader') return;
+
+    setCrewBusy(true);
+    setCrewMessage('');
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const crewRef = doc(db, 'crews', crewPreview.id);
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        const crewSnap = await transaction.get(crewRef);
+        if (!userSnap.exists() || !crewSnap.exists()) throw new Error('CREW_NOT_FOUND');
+
+        const liveUser = userSnap.data();
+        if ((liveUser?.crewEmblemCredits || 0) < 1) throw new Error('NO_EMBLEM_CREDIT');
+
+        transaction.set(crewRef, {
+          name: formData.crewName.trim() || crewPreview.name,
+          motto: formData.crewMotto.trim(),
+          color: formData.crewColor,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        transaction.set(userRef, {
+          crewName: formData.crewName.trim() || crewPreview.name,
+          crewColor: formData.crewColor,
+          crewEmblemCredits: (liveUser?.crewEmblemCredits || 0) - 1
+        }, { merge: true });
+      });
+
+      setCrewPreview(prev => prev ? ({
+        ...prev,
+        name: formData.crewName.trim() || prev.name,
+        motto: formData.crewMotto.trim(),
+        color: formData.crewColor
+      }) : prev);
+      setCrewMessage('크루 엠블럼과 모토를 업데이트했습니다.');
+    } catch (err) {
+      console.error('Failed to update crew style:', err);
+      setCrewMessage(
+        err.message === 'NO_EMBLEM_CREDIT'
+          ? '엠블럼 변경권이 부족합니다. 상점에서 먼저 구매해주세요.'
+          : '크루 정보를 업데이트하지 못했습니다.'
+      );
+    } finally {
+      setCrewBusy(false);
     }
   };
 
@@ -119,20 +442,18 @@ export default function ProfileEditView({ onBack }) {
       flexDirection: 'column',
       padding: '2rem 1rem 6rem 1rem'
     }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-        
-        {/* Header */}
+      <div style={{ maxWidth: '880px', margin: '0 auto', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
-          <button 
+          <button
             className="space-nav-link font-tech"
-            onClick={() => { soundManager.playClick(); if(onBack) onBack(); }}
+            onClick={() => { soundManager.playClick(); if (onBack) onBack(); }}
             style={{ fontSize: '1rem', background: 'rgba(255,255,255,0.1)', padding: '0.5rem 1rem', borderRadius: '8px' }}
           >
             ← 돌아가기
           </button>
-          <h2 className="font-title" style={{ 
-            color: 'var(--crystal-cyan)', 
-            textShadow: '0 0 15px rgba(0,212,255,0.5)', 
+          <h2 className="font-title" style={{
+            color: 'var(--crystal-cyan)',
+            textShadow: '0 0 15px rgba(0,212,255,0.5)',
             margin: '0 auto 0 2rem',
             fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
             letterSpacing: '2px'
@@ -141,74 +462,175 @@ export default function ProfileEditView({ onBack }) {
           </h2>
         </div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card hud-border" 
+          className="glass-card hud-border"
           style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}
         >
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-            
-            {/* 1. Basic Info Section */}
             <section>
-              <h3 className="font-tech" style={{ color: 'var(--text-bright)', borderBottom: '1px solid var(--neon-blue)', paddingBottom: '0.8rem', marginBottom: '1.5rem' }}>
-                👤 기본 통신 제원
-              </h3>
-              
+              <h3 className="font-tech" style={sectionTitleStyle}>👤 기본 통신 제원</h3>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.9rem' }}>탐사원(학생) 이름</label>
-                  <input 
-                    type="text" 
-                    className="space-input" 
+                <Field label="탐사원(학생) 이름">
+                  <input
+                    type="text"
+                    className="space-input"
                     value={formData.studentName}
-                    onChange={(e) => setFormData({...formData, studentName: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
                     placeholder="홍길동"
                     required
                   />
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.9rem' }}>학생 전화번호 ("-" 제외)</label>
-                  <input 
-                    type="tel" 
-                    className="space-input" 
+                </Field>
+
+                <Field label='학생 전화번호 ("-" 제외)' hint="긴급 상황 안내용으로만 사용됩니다.">
+                  <input
+                    type="tel"
+                    className="space-input"
                     value={formData.studentPhone}
-                    onChange={(e) => setFormData({...formData, studentPhone: e.target.value.replace(/[^0-9]/g, '')})}
+                    onChange={(e) => setFormData({ ...formData, studentPhone: e.target.value.replace(/[^0-9]/g, '') })}
                     placeholder="01012345678"
                   />
-                </div>
+                </Field>
               </div>
-              <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '1rem', lineHeight: '1.4' }}>
-                * 연락처는 결석 등 긴급 상황 발생 시 자동으로 카카오 알림톡을 발송하는 용도로만 안전하게 활용됩니다.
-              </p>
             </section>
 
-            {/* 2. Class Participation Section */}
             <section>
-              <h3 className="font-tech" style={{ color: 'var(--text-bright)', borderBottom: '1px solid var(--neon-blue)', paddingBottom: '0.8rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                🚀 탐사 일정 수립 (Class Schedule)
+              <h3 className="font-tech" style={sectionTitleStyle}>🪪 공개 프로필 명함</h3>
+
+              <div style={{
+                padding: '1.4rem',
+                borderRadius: '20px',
+                border: `1px solid ${publicProfile.frameAccent}55`,
+                background: publicProfile.frameBackground,
+                boxShadow: `0 0 24px ${publicProfile.frameAccent}20`,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.65rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-bright)' }}>
+                      {publicProfile.publicDisplayName}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.45rem' }}>
+                      {publicProfile.publicTitle && (
+                        <span style={{ padding: '0.2rem 0.65rem', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', color: publicProfile.frameAccent, fontSize: '0.75rem', fontWeight: 700 }}>
+                          {publicProfile.publicTitle}
+                        </span>
+                      )}
+                      {publicProfile.crewName && (
+                        <span style={{ padding: '0.2rem 0.65rem', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', color: publicProfile.crewColor, fontSize: '0.75rem', fontWeight: 700 }}>
+                          🛰️ {publicProfile.crewName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="font-tech" style={{ color: publicProfile.frameAccent, fontSize: '0.82rem' }}>
+                    답변 카드 미리보기
+                  </div>
+                </div>
+                <div style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.72)' }}>
+                  도움 {userData?.helpCount || 0}회 · 질문 {userData?.questionCount || 0}회
+                </div>
+                {publicProfile.publicSignature && (
+                  <div style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', borderTop: '1px dashed rgba(255,255,255,0.12)', paddingTop: '0.8rem', fontStyle: 'italic' }}>
+                    “{publicProfile.publicSignature}”
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                <Field label="공개 프로필 사용">
+                  <label className="font-tech" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-bright)' }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.publicProfileEnabled}
+                      onChange={(e) => setFormData({ ...formData, publicProfileEnabled: e.target.checked })}
+                    />
+                    답변과 랭킹 카드에서 공개 프로필 사용
+                  </label>
+                </Field>
+
+                <Field label="공개 표시 이름" hint="질문자는 익명 처리되고, 답변/랭킹 카드에만 노출됩니다.">
+                  <input
+                    type="text"
+                    className="space-input"
+                    value={formData.publicDisplayName}
+                    onChange={(e) => setFormData({ ...formData, publicDisplayName: e.target.value })}
+                    placeholder="예: 차분한 해설가"
+                    maxLength={18}
+                  />
+                </Field>
+
+                <Field label="대표 칭호">
+                  <select
+                    className="space-input"
+                    value={formData.publicTitle}
+                    onChange={(e) => setFormData({ ...formData, publicTitle: e.target.value })}
+                  >
+                    {PROFILE_TITLES.map(title => (
+                      <option key={title} value={title}>{title}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="프로필 프레임">
+                  <select
+                    className="space-input"
+                    value={formData.selectedProfileFrame}
+                    onChange={(e) => setFormData({ ...formData, selectedProfileFrame: e.target.value })}
+                  >
+                    {ownedFrames.map(frameId => {
+                      const frame = getProfileFrame(frameId);
+                      return <option key={frame.id} value={frame.id}>{frame.name}</option>;
+                    })}
+                  </select>
+                </Field>
+
+                <Field
+                  label="한 줄 시그니처"
+                  hint={userData?.profileSignatureUnlocked ? '답변 카드 하단에 표시됩니다.' : '시그니처 해금권을 상점에서 구매해야 활성화됩니다.'}
+                >
+                  <textarea
+                    className="space-input"
+                    rows={3}
+                    value={formData.publicSignature}
+                    disabled={!userData?.profileSignatureUnlocked}
+                    onChange={(e) => setFormData({ ...formData, publicSignature: e.target.value })}
+                    placeholder="예: 막히면 그림으로 다시 생각해 봐요."
+                    maxLength={28}
+                    style={{ resize: 'vertical', opacity: userData?.profileSignatureUnlocked ? 1 : 0.5 }}
+                  />
+                </Field>
+              </div>
+            </section>
+
+            <section>
+              <h3 className="font-tech" style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                <span>🚀 탐사 일정 수립</span>
                 {isClustersLoading && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>스캔 중...</span>}
               </h3>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 {!isClustersLoading && clusters?.filter(cluster => {
-                  // 공개 클러스터는 모두 표시, 비공개는 수강 권한 확인
                   if (!cluster.isPrivate) return true;
                   const access = userData?.clusterAccess || {};
                   return access[cluster.docId] === 'active' || access[cluster.id] === 'active';
                 }).map((cluster) => {
                   const availableDays = extractAvailableDays(cluster.classSchedule);
-                  if (availableDays.length === 0) return null; // 운영툴에 설정된 스케줄이 없으면 표시하지 않음
+                  if (availableDays.length === 0) return null;
 
                   const selectedDaysForCluster = formData.participation[cluster.docId] || [];
                   const isParticipatingAny = selectedDaysForCluster.length > 0;
 
                   return (
-                    <div 
+                    <div
                       key={cluster.docId}
-                      style={{ 
-                        background: 'rgba(0,0,0,0.3)', 
+                      style={{
+                        background: 'rgba(0,0,0,0.3)',
                         border: `1px solid ${isParticipatingAny ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.1)'}`,
                         borderRadius: '12px',
                         padding: '1.5rem',
@@ -219,7 +641,7 @@ export default function ProfileEditView({ onBack }) {
                         {cluster.name}
                         {isParticipatingAny && <span style={{ fontSize: '1rem' }}>✅ 참여중</span>}
                       </h4>
-                      
+
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem' }}>
                         {availableDays.map(day => {
                           const isSelected = selectedDaysForCluster.includes(day);
@@ -251,15 +673,158 @@ export default function ProfileEditView({ onBack }) {
                   );
                 })}
               </div>
-              <p className="font-tech" style={{ color: 'var(--planet-orange)', fontSize: '0.85rem', marginTop: '1rem', lineHeight: '1.4' }}>
-                * 탐사(수업) 요일을 선택해야 정상적으로 출석체크 기능과 접속 알림이 작동합니다.
-              </p>
             </section>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
-              <button 
-                type="submit" 
+            <section>
+              <h3 className="font-tech" style={sectionTitleStyle}>🛰️ 스터디 크루</h3>
+
+              {crewPreview ? (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div style={{
+                    padding: '1.4rem',
+                    borderRadius: '18px',
+                    border: `1px solid ${(crewPreview.color || '#00f3ff')}55`,
+                    background: 'rgba(10, 15, 30, 0.85)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+                      <div>
+                        <h4 className="font-title" style={{ margin: 0, color: 'var(--text-bright)' }}>
+                          {crewPreview.name}
+                        </h4>
+                        <p style={{ margin: '0.45rem 0 0', color: 'rgba(255,255,255,0.7)' }}>
+                          {crewPreview.motto || '아직 설정된 크루 모토가 없습니다.'}
+                        </p>
+                      </div>
+                      <div className="font-tech" style={{ color: crewPreview.color || '#00f3ff', textAlign: 'right' }}>
+                        <div>{userData?.crewRole === 'leader' ? '리더' : '멤버'}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>초대코드 {crewPreview.inviteCode || '-'}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.84rem', color: 'rgba(255,255,255,0.62)' }}>
+                      현재 인원 {crewPreview.memberCount || crewPreview.memberIds?.length || 1}명
+                    </div>
+                  </div>
+
+                  {userData?.crewRole === 'leader' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <Field label="크루 이름">
+                        <input
+                          type="text"
+                          className="space-input"
+                          value={formData.crewName}
+                          onChange={(e) => setFormData({ ...formData, crewName: e.target.value })}
+                          placeholder={crewPreview.name}
+                        />
+                      </Field>
+                      <Field label="크루 모토">
+                        <input
+                          type="text"
+                          className="space-input"
+                          value={formData.crewMotto}
+                          onChange={(e) => setFormData({ ...formData, crewMotto: e.target.value })}
+                          placeholder={crewPreview.motto || '서로의 설명을 더 선명하게'}
+                        />
+                      </Field>
+                      <Field label="엠블럼 색상" hint={`보유 변경권 ${userData?.crewEmblemCredits || 0}개`}>
+                        <input
+                          type="color"
+                          className="space-input"
+                          value={formData.crewColor}
+                          onChange={(e) => setFormData({ ...formData, crewColor: e.target.value })}
+                          style={{ height: '48px', padding: '0.4rem' }}
+                        />
+                      </Field>
+                    </div>
+                  )}
+
+                  {userData?.crewRole === 'leader' && (
+                    <button
+                      type="button"
+                      className="space-btn cosmic-btn font-tech"
+                      disabled={crewBusy || (userData?.crewEmblemCredits || 0) < 1}
+                      onClick={handleUpdateCrewStyle}
+                      style={{ alignSelf: 'flex-start' }}
+                    >
+                      {crewBusy ? '업데이트 중...' : `크루 스타일 업데이트 (${userData?.crewEmblemCredits || 0}회권)`}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '1.4rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                    <Field label="새 크루 이름" hint={`보유 창설권 ${userData?.crewCreationPasses || 0}개`}>
+                      <input
+                        type="text"
+                        className="space-input"
+                        value={formData.crewName}
+                        onChange={(e) => setFormData({ ...formData, crewName: e.target.value })}
+                        placeholder="예: 오메가 증명단"
+                      />
+                    </Field>
+                    <Field label="크루 모토">
+                      <input
+                        type="text"
+                        className="space-input"
+                        value={formData.crewMotto}
+                        onChange={(e) => setFormData({ ...formData, crewMotto: e.target.value })}
+                        placeholder="서로의 설명을 끝까지 듣는다"
+                      />
+                    </Field>
+                    <Field label="엠블럼 색상">
+                      <input
+                        type="color"
+                        className="space-input"
+                        value={formData.crewColor}
+                        onChange={(e) => setFormData({ ...formData, crewColor: e.target.value })}
+                        style={{ height: '48px', padding: '0.4rem' }}
+                      />
+                    </Field>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="space-btn cosmic-btn font-tech"
+                      disabled={crewBusy || (userData?.crewCreationPasses || 0) < 1}
+                      onClick={handleCreateCrew}
+                    >
+                      {crewBusy ? '창설 중...' : `스터디 크루 창설 (${userData?.crewCreationPasses || 0}개 보유)`}
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.8rem', alignItems: 'end' }}>
+                    <Field label="초대 코드로 크루 참가">
+                      <input
+                        type="text"
+                        className="space-input"
+                        value={joinCrewCode}
+                        onChange={(e) => setJoinCrewCode(e.target.value.toUpperCase())}
+                        placeholder="예: AB7Q2X"
+                      />
+                    </Field>
+                    <button
+                      type="button"
+                      className="space-nav-link font-tech"
+                      disabled={crewBusy}
+                      onClick={handleJoinCrew}
+                      style={{ height: '48px' }}
+                    >
+                      크루 참가
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {crewMessage && (
+                <p className="font-tech" style={{ color: crewMessage.includes('실패') || crewMessage.includes('부족') ? '#f87171' : 'var(--planet-green)', marginTop: '1rem' }}>
+                  {crewMessage}
+                </p>
+              )}
+            </section>
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+              <button
+                type="submit"
                 className="space-btn cosmic-btn font-tech"
                 disabled={saving}
                 style={{
@@ -269,10 +834,9 @@ export default function ProfileEditView({ onBack }) {
                   background: 'rgba(0, 243, 255, 0.2)'
                 }}
               >
-                {saving ? '데이터 동기화 중...' : '프로필 통신 데이터 저장 🚀'}
+                {saving ? '데이터 동기화 중...' : '프로필 통신 데이터 저장'}
               </button>
             </div>
-
           </form>
         </motion.div>
       </div>

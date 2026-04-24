@@ -14,6 +14,7 @@ import { db } from '../../firebase'
 import { doc, setDoc, getDoc, onSnapshot, serverTimestamp, increment } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
+import { isRadarActive } from '../../utils/streakUtils'
 
 // Mock Data for demonstration - In production this would come from Firestore
 // (Mock data removed — use only real Firestore data)
@@ -2291,7 +2292,7 @@ export default function MissionHub({
             questions: unitQuizzes || [] 
           }}
           hasShield={userData?.shieldCharges || 0}
-          hasRadar={userData?.hasRadar || false}
+          hasRadar={isRadarActive(userData)}
           isRadarBonus={false}
           onComplete={onComplete}
           onExit={returnFromContent}

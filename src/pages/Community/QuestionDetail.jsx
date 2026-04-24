@@ -7,7 +7,8 @@ import 'katex/dist/katex.min.css';
 import { auth, db } from '../../firebase';
 import { updateDoc, doc } from 'firebase/firestore';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
-import { getRandomNickname } from '../../utils/qaUtils';
+import { buildAnswerProfileSnapshot, getAnonymousLabel, getProfileFrame } from '../../utils/socialUtils';
+import { useAuth } from '../../hooks/useAuth';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
@@ -17,6 +18,7 @@ import './QuestionDetail.css';
 export default function QuestionDetail() {
   const { questionId } = useParams();
   const navigate = useNavigate();
+  const { user: sessionUser, userData: sessionUserData } = useAuth();
   const [newAnswer, setNewAnswer] = useState('');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -121,6 +123,10 @@ export default function QuestionDetail() {
     setIsEditing(false);
   };
 
+  const questionAuthorLabel = question?.isPublic === false
+    ? (question?.userName || '비공개 질문')
+    : (question?.anonymousLabel || getAnonymousLabel(question?.userId));
+
   return (
     <div className={`question-detail-container space-bg fadeIn`}>
       <StarField />
@@ -148,7 +154,7 @@ export default function QuestionDetail() {
               <div className="question-meta">
                 <div className="author-info">
                   <div className="author-avatar"><User size={16} /></div>
-                  <span>{getRandomNickname(question.userId)}</span>
+                  <span>{questionAuthorLabel}</span>
                 </div>
                 <div className="status-container">
                   <span className={`status-badge status-${question.status}`}>
@@ -165,6 +171,13 @@ export default function QuestionDetail() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className="question-anon-banner">
+                <span>🕶️ 질문자는 공개 보드에서 익명 보호</span>
+                {(question.bountyAmount || 0) > 0 && (
+                  <span className="question-bounty-chip">💎 현상금 {question.bountyAmount}</span>
+                )}
               </div>
 
               {isEditing ? (
@@ -262,10 +275,26 @@ export default function QuestionDetail() {
                   <div className="error-msg glass">답변을 불러오는데 실패했습니다. (인덱스 생성 중일 수 있습니다)</div>
                 ) : !answers && loadingA ? (
                   Array.from({length: 2}).map((_, i) => <div key={i} className="answer-skeleton glass" />)
-                ) : answers?.length === 0 ? (
+                  ) : answers?.length === 0 ? (
                   <div className="empty-answers font-tech">아직 답변이 없어요. 첫 번째 힌트를 남겨보세요!</div>
                 ) : (
                   answers?.map((ans) => (
+                    (() => {
+                      const liveProfile = ans.userId === sessionUser?.uid
+                        ? buildAnswerProfileSnapshot(sessionUserData, sessionUserData?.studentName || sessionUser?.displayName || '탐험가')
+                        : null;
+                      const profile = ans.publicProfileSnapshot || liveProfile || {};
+                      const displayName = ans.isTeacher
+                        ? '관리자'
+                        : (profile.displayName || ans.userName || '답변자');
+                      const title = profile.publicTitle || '';
+                      const frameName = profile.frameName || getProfileFrame(profile.profileFrameId).name || '';
+                      const crewName = profile.crewName || '';
+                      const signature = profile.publicSignature || '';
+                      const frameAccent = profile.frameAccent || (ans.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)');
+                      const frameBackground = profile.frameBackground || 'rgba(255, 255, 255, 0.04)';
+
+                      return (
                     <motion.div 
                       key={ans.id} 
                       className={`answer-card glass ${ans.isTeacher ? 'teacher-answer' : ''} ${ans.isAccepted ? 'accepted' : ''}`}
@@ -275,7 +304,46 @@ export default function QuestionDetail() {
                       <div className="card-header">
                         <div className="author-info">
                           {ans.isTeacher && <span className="teacher-badge">선생님</span>}
-                          <span>{ans.isTeacher ? '관리자' : getRandomNickname(ans.userId)}</span>
+                          <div
+                            className="answer-identity-card"
+                            style={{
+                              border: `1px solid ${frameAccent}55`,
+                              background: frameBackground,
+                            }}
+                          >
+                            <div className="answer-identity-top">
+                              <span className="answer-identity-name">{displayName}</span>
+                              {signature && !ans.isTeacher && (
+                                <span style={{
+                                  maxWidth: '240px',
+                                  padding: '2px 8px',
+                                  borderRadius: '999px',
+                                  background: `${frameAccent}18`,
+                                  border: `1px solid ${frameAccent}55`,
+                                  color: frameAccent,
+                                  fontSize: '0.72rem',
+                                  lineHeight: 1.3,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {signature}
+                                </span>
+                              )}
+                              {title && <span className="answer-identity-title">{title}</span>}
+                              {frameName && (
+                                <span className="answer-identity-frame">
+                                  {frameName}
+                                </span>
+                              )}
+                            </div>
+                            {(crewName || !ans.isTeacher) && (
+                              <div className="answer-identity-meta">
+                                {crewName && <span style={{ color: profile.crewColor || frameAccent }}>🛰️ {crewName}</span>}
+                                {!crewName && !ans.isTeacher && <span>공개 답변자</span>}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         
                         <div className="header-right-actions">
@@ -311,6 +379,8 @@ export default function QuestionDetail() {
                         })}
                       </div>
                     </motion.div>
+                      );
+                    })()
                   ))
                 )}
               </div>

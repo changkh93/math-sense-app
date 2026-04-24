@@ -73,6 +73,38 @@ export function getNowKST() {
   return getKSTDate();
 }
 
+export const RADAR_DURATION_DAYS = 7;
+export const CRYO_CORE_PURCHASE_COOLDOWN_DAYS = 30;
+export const PHOTON_SHIELD_CHARGES_PER_PURCHASE = 10;
+export const PHOTON_SHIELD_MAX_CHARGES = 20;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function isRadarActive(userData, nowMs = Date.now()) {
+  if (!userData?.hasRadar) return false;
+
+  const expiresAtMs = userData?.radarExpiresAtMs || 0;
+  if (!expiresAtMs) return true;
+
+  return expiresAtMs > nowMs;
+}
+
+export function getRadarTimeRemainingMs(userData, nowMs = Date.now()) {
+  if (!userData?.hasRadar) return 0;
+
+  const expiresAtMs = userData?.radarExpiresAtMs || 0;
+  if (!expiresAtMs) return Infinity;
+
+  return Math.max(0, expiresAtMs - nowMs);
+}
+
+export function getStreakFreezePurchaseCooldownRemainingMs(userData, nowMs = Date.now()) {
+  const lastPurchasedAtMs = userData?.streakFreezeLastPurchasedAtMs || 0;
+  if (!lastPurchasedAtMs) return 0;
+
+  const cooldownMs = CRYO_CORE_PURCHASE_COOLDOWN_DAYS * DAY_MS;
+  return Math.max(0, lastPurchasedAtMs + cooldownMs - nowMs);
+}
+
 /**
  * 두 날짜 문자열(YYYY-MM-DD) 사이의 일수 차이를 계산
  */

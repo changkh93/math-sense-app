@@ -31,7 +31,7 @@ import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 import CrystalLedger from './CrystalLedger'
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
-import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates } from '../../utils/streakUtils'
+import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates, isRadarActive } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
@@ -426,7 +426,7 @@ function SpaceHome() {
 
   // --- Ore Radar Daily Bonus Logic ---
   const checkIsBonusUnit = (unitId) => {
-    if (!userData?.hasRadar || !unitId) return false
+    if (!isRadarActive(userData) || !unitId) return false
     
     // Deterministic selection based on UnitID + UID + Today's Date
     const today = getTodayKST()
@@ -455,7 +455,7 @@ function SpaceHome() {
   
   // Equipment Logic
   const equipment = {
-    radar: userData?.hasRadar || false,
+    radar: isRadarActive(userData),
     engine: userData?.hasEngine || false,
   }
 
@@ -784,7 +784,7 @@ function SpaceHome() {
         // --- Scanner Daily Bonus (+5) ---
         if (!isDarkMatterMode) {
           const isScannerBonusUnit = checkIsBonusUnit(currentUnitId)
-          if (isScannerBonusUnit && userData?.hasRadar) {
+          if (isScannerBonusUnit && isRadarActive(userData)) {
             actualCrystalsEarned += 5
             rewardMessage += " 📡 스캐너 보너스 탐사 성공! (+5 광석)"
           }
@@ -842,7 +842,7 @@ function SpaceHome() {
             atomicCrystalsEarned = Math.max(0, Math.round(baseCrystals * improvementRatio))
           }
           
-          if (!isDarkMatterMode && checkIsBonusUnit(currentUnitId) && freshUserData?.hasRadar) {
+          if (!isDarkMatterMode && checkIsBonusUnit(currentUnitId) && isRadarActive(freshUserData)) {
             atomicCrystalsEarned += 5
           }
         }
@@ -1204,7 +1204,7 @@ function SpaceHome() {
             dailyVideoCrystals = 0
           }
           
-          const DAILY_VIDEO_CAP = 300 // Max 300 crystals per day from video activities
+          const DAILY_VIDEO_CAP = 500 // Max 500 crystals per day from video activities
           if (dailyVideoCrystals >= DAILY_VIDEO_CAP) {
             actualReward = 0
             rewardBlockedReason = 'daily_cap'

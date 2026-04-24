@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X } from 'lucide-react';
 import { usePublicQuestions, useQAMutations } from '../../hooks/useQA';
-import { getRandomNickname } from '../../utils/qaUtils';
+import { getAnonymousLabel } from '../../utils/socialUtils';
 import QuestionModal from '../../components/QuestionModal';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
@@ -162,6 +162,12 @@ export default function Agora() {
           <div className="questions-grid">
             <AnimatePresence mode="popLayout">
               {questions.map((q, idx) => (
+                (() => {
+                  const anonymousLabel = q.isPublic === false
+                    ? (q.userName || '비공개 질문')
+                    : (q.anonymousLabel || getAnonymousLabel(q.userId));
+
+                  return (
                 <motion.div
                   key={q.id}
                   id={`question-${q.id}`}
@@ -182,6 +188,11 @@ export default function Agora() {
                     <span className={`status-badge status-${q.status}`}>
                       {q.status === 'open' ? '대기중' : '해결됨'}
                     </span>
+                    {(q.bountyAmount || 0) > 0 && (
+                      <span className="type-badge" style={{ background: 'rgba(245, 158, 11, 0.16)', color: '#fbbf24' }}>
+                        💎 현상금 {q.bountyAmount}
+                      </span>
+                    )}
                   </div>
 
                   <div className="card-content">
@@ -201,9 +212,9 @@ export default function Agora() {
                   <div className="card-footer">
                     <div className="author-info">
                       <div className="author-avatar">
-                        {getRandomNickname(q.userId)[0]}
+                        {anonymousLabel[0]}
                       </div>
-                      <span>{getRandomNickname(q.userId)}</span>
+                      <span>{anonymousLabel}</span>
                     </div>
                     <div className="stats-info">
                       <button 
@@ -220,6 +231,8 @@ export default function Agora() {
                     </div>
                   </div>
                 </motion.div>
+                  );
+                })()
               ))}
             </AnimatePresence>
           </div>
