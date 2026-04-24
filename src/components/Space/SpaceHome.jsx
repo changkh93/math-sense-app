@@ -89,6 +89,7 @@ function SpaceHome() {
   const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection', 'assignment_hub'
   const [transactions, setTransactions] = useState([])
   const [loadingTransactions, setLoadingTransactions] = useState(true)
+  const [shouldScrollStore, setShouldScrollStore] = useState(false)
   
   // Selection State (Persist ID in session)
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
@@ -1764,7 +1765,14 @@ function SpaceHome() {
             setCurrentView(view)
           }}
         />
-        <StudyCrewView onBack={() => { setCurrentView('planet'); soundManager.playWarp(); }} />
+        <StudyCrewView 
+          onBack={() => { setCurrentView('planet'); soundManager.playWarp(); }} 
+          onNavigateStore={(scroll) => {
+            setCurrentView('store');
+            setShouldScrollStore(!!scroll);
+            soundManager.playClick();
+          }} 
+        />
       </div>
     )
   }
@@ -1868,6 +1876,7 @@ function SpaceHome() {
           updateSelectedChapterDocId(null)
           updateSelectedUnitDocId(null) // Reset mission when navigating via navbar
           setQuickQuizUnitId(null)
+          setShouldScrollStore(false)
           if (isDarkMatterMode) stopDarkMatterMode()
         }} 
       />
@@ -2567,7 +2576,7 @@ function SpaceHome() {
           )}
           {currentView === 'collection' && <SpaceCollection userData={userData} history={history} />}
           {currentView === 'store' && (
-            <SpaceStore user={user} userData={userData} />
+            <SpaceStore user={user} userData={userData} shouldScrollToBottom={shouldScrollStore} />
           )}
           
           {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}

@@ -19,9 +19,20 @@ import { buildAnswerProfileSnapshot, normalizeOwnedFrames, SOCIAL_STORE_ITEMS } 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RADAR_DURATION_MS = RADAR_DURATION_DAYS * DAY_MS
 
-export default function SpaceStore({ userData, user }) {
-  const [purchasing, setPurchasing] = useState(false)
-  const [purchaseMessage, setPurchaseMessage] = useState(null)
+export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
+  const [purchasing, setPurchasing] = React.useState(false)
+  const [purchaseMessage, setPurchaseMessage] = React.useState(null)
+
+  React.useEffect(() => {
+    if (shouldScrollToBottom) {
+      setTimeout(() => {
+        window.scrollTo({
+          top: document.documentElement.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 100);
+    }
+  }, [shouldScrollToBottom]);
 
   const cryoCooldownRemainingMs = getStreakFreezePurchaseCooldownRemainingMs(userData)
   const cryoCooldownRemainingDays = cryoCooldownRemainingMs > 0 ? Math.ceil(cryoCooldownRemainingMs / DAY_MS) : 0
