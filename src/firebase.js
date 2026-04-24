@@ -19,7 +19,7 @@ const functions = getFunctions(app);
 
 const shouldUseFunctionsEmulator =
   typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1');
+  import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
 
 if (shouldUseFunctionsEmulator && !globalThis.__METASENSE_FUNCTIONS_EMULATOR_CONNECTED__) {
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);

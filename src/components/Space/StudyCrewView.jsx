@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { AlertTriangle, ChevronDown, Crown, Edit3, Lock, Plus, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
@@ -24,7 +24,8 @@ const FAQ_ITEMS = [
 ];
 
 function CrewCard({ crew, userUid, userCrewId, onClick }) {
-  const isMyCreated = crew.leaderUid === userUid;
+  const leaderId = crew.leaderId || crew.leaderUid || '';
+  const isMyCreated = leaderId === userUid;
   const isMyJoined = !isMyCreated && crew.memberIds?.includes(userUid);
   const isMyCrew = crew.id === userCrewId;
   const isFull = (crew.memberCount || crew.memberIds?.length || 0) >= (crew.maxMembers || 3);
@@ -94,6 +95,7 @@ function CrewCard({ crew, userUid, userCrewId, onClick }) {
 export default function StudyCrewView({ onNavigateStore }) {
   const { user, userData } = useAuth();
   const [directoryCrews, setDirectoryCrews] = useState([]);
+  const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
   const [detailView, setDetailView] = useState(false);
@@ -111,8 +113,37 @@ export default function StudyCrewView({ onNavigateStore }) {
     if (hasCrew) return null; // has active crew, no rejected
     const snapshot = userData?.crewSnapshot;
     if (snapshot && snapshot.status === 'rejected') return snapshot;
+    if (rejectedCrewFallback && rejectedCrewFallback.status === 'rejected') return rejectedCrewFallback;
     return null;
-  }, [userData?.crewSnapshot, hasCrew]);
+  }, [userData?.crewSnapshot, rejectedCrewFallback, hasCrew]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRejectedCrewFallback() {
+      if (!user?.uid || hasCrew) {
+        if (!cancelled) setRejectedCrewFallback(null);
+        return;
+      }
+
+      try {
+        const crewQuery = query(collection(db, 'crews'), where('leaderId', '==', user.uid));
+        const snap = await getDocs(crewQuery);
+        const rejected = snap.docs
+          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+          .filter((c) => c.status === 'rejected')
+          .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))[0] || null;
+
+        if (!cancelled) setRejectedCrewFallback(rejected);
+      } catch (err) {
+        console.error('Rejected crew fallback load error:', err);
+        if (!cancelled) setRejectedCrewFallback(null);
+      }
+    }
+
+    loadRejectedCrewFallback();
+    return () => { cancelled = true; };
+  }, [user?.uid, hasCrew]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'crews'), snap => {
@@ -126,8 +157,10 @@ export default function StudyCrewView({ onNavigateStore }) {
     if (!directoryCrews.length) return [];
     const uid = user?.uid || '';
     return [...directoryCrews].sort((a, b) => {
-      const aIsMyLeader = a.leaderUid === uid ? 0 : 1;
-      const bIsMyLeader = b.leaderUid === uid ? 0 : 1;
+      const aLeaderId = a.leaderId || a.leaderUid || '';
+      const bLeaderId = b.leaderId || b.leaderUid || '';
+      const aIsMyLeader = aLeaderId === uid ? 0 : 1;
+      const bIsMyLeader = bLeaderId === uid ? 0 : 1;
       if (aIsMyLeader !== bIsMyLeader) return aIsMyLeader - bIsMyLeader;
 
       const aIsMember = a.memberIds?.includes(uid) ? 0 : 1;

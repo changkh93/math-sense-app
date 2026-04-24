@@ -37,7 +37,7 @@ function getFunctionsErrorMessage(err, fb) {
 
 export default function CrewDetailView({ onBack, onEnterRoom }) {
   const { user, userData } = useAuth();
-  const { data: clusters, isLoading: loadingClusters } = useClusters();
+  const { data: clusters } = useClusters();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [greetingText, setGreetingText] = useState('');
@@ -61,9 +61,20 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
 
   const groupOptions = useMemo(() => {
     const co = (clusters || []).map(c => ({ id: c.docId || c.id, name: c.name || c.title || c.id, clusterId: c.docId || c.id }));
-    const merged = [...CREW_GROUP_PRESETS, ...co];
+    const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+    const merged = [];
     const seen = new Set();
-    return [{ id: 'none', name: '군집 선택 없이 시작' }, ...merged.filter(o => { if (!o.id || seen.has(o.id)) return false; seen.add(o.id); return true; })];
+    const pushUnique = (option) => {
+      const key = normalizeKey(option.name) || normalizeKey(option.id);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      merged.push(option);
+    };
+
+    CREW_GROUP_PRESETS.forEach(pushUnique);
+    co.forEach(pushUnique);
+
+    return [{ id: 'none', name: '군집 선택 없이 시작' }, ...merged];
   }, [clusters]);
   const selectedGroup = groupOptions.find(o => o.id === formData.groupId) || groupOptions[0];
 
@@ -111,7 +122,9 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
         previewStreamRef.current = s;
         setPreviewStream(s);
         setPreviewError('');
-      } catch (e) { if (!cancelled) { setPreviewStream(null); setPreviewError('카메라 미리보기 실패. 브라우저 권한을 확인해주세요.'); } }
+      } catch {
+        if (!cancelled) { setPreviewStream(null); setPreviewError('카메라 미리보기 실패. 브라우저 권한을 확인해주세요.'); }
+      }
     }
     setup();
     return () => { cancelled = true; };

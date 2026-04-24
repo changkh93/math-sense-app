@@ -68,15 +68,23 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
       name: cluster.name || cluster.title || cluster.id,
       clusterId: cluster.docId || cluster.id
     }));
-    const merged = [...CREW_GROUP_PRESETS, ...clusterOptions];
+
+    const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+    const merged = [];
     const seen = new Set();
+    const pushUnique = (option) => {
+      const key = normalizeKey(option.name) || normalizeKey(option.id);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      merged.push(option);
+    };
+
+    CREW_GROUP_PRESETS.forEach(pushUnique);
+    clusterOptions.forEach(pushUnique);
+
     return [
       { id: 'none', name: '군집 선택 없이 시작' },
-      ...merged.filter(option => {
-        if (!option.id || seen.has(option.id)) return false;
-        seen.add(option.id);
-        return true;
-      })
+      ...merged
     ];
   }, [clusters]);
 
