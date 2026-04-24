@@ -76,8 +76,22 @@ export default function QuestionDetail() {
     }
   }, [question, answers, loadingQ, loadingA, questionId]);
 
-  const isOwner = question && auth.currentUser && question.userId === auth.currentUser.uid;
+  const isOwner = question && sessionUser && question.userId === sessionUser.uid;
   const isResolved = question?.status === 'resolved';
+
+  // Debug log for troubleshooting adoption issues
+  React.useEffect(() => {
+    if (question && sessionUser) {
+      console.log('🔍 Question Detail Debug:', {
+        questionId,
+        questionStatus: question.status,
+        questionUserId: question.userId,
+        currentUserId: sessionUser.uid,
+        isOwner,
+        isResolved
+      });
+    }
+  }, [question, sessionUser, isOwner, isResolved, questionId]);
 
   const handleAddAnswer = async (e) => {
     e.preventDefault();
@@ -237,11 +251,11 @@ export default function QuestionDetail() {
 
               <div className="card-footer">
                 <button 
-                  className={`stat-item ${question.upvotedBy?.includes(auth.currentUser?.uid) ? 'active' : ''}`}
+                  className={`stat-item ${question.upvotedBy?.includes(sessionUser?.uid) ? 'active' : ''}`}
                   onClick={() => { if (!upvote.isPending) upvote.mutate(question.id); }}
                   disabled={upvote.isPending}
                 >
-                  <Heart size={18} fill={question.upvotedBy?.includes(auth.currentUser?.uid) ? "currentColor" : "none"} />
+                  <Heart size={18} fill={question.upvotedBy?.includes(sessionUser?.uid) ? "currentColor" : "none"} />
                   <span>나도 궁금해요 {question.upvotes || 0}</span>
                 </button>
 
