@@ -129,46 +129,42 @@ const FAIL_MESSAGES = [
   "조금만 더 빨리! 집중력 부스터 온! 🚀"
 ];
 
+const CRYSTAL_WIDTH = 156;
+const CRYSTAL_HEIGHT = 124;
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
 export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, userName = "", isVideoPaused = false }) {
   const [position] = useState(() => {
-    // Determine random safe zone position once on mount
-    // Use window dimensions but with strict margins to avoid HUD elements
-    const containerW = window.innerWidth;
-    const containerH = window.innerHeight;
-    
-    // Safety Margins:
-    // - Top: 120px (Title, Back button)
-    // - Bottom: 100px (Video controls)
-    // - Sides: 60px
-    const marginT = 120;
-    const marginB = 100;
-    const marginL = 60;
-    const marginR = 60;
+    // Keep the crystal inside the center of the theater so it does not
+    // disappear under the top/bottom HUD or tuck into the viewport edges.
+    const containerW = window.innerWidth || 1280;
+    const containerH = window.innerHeight || 720;
 
-    const safeW = Math.max(200, containerW - marginL - marginR - 180);
-    const safeH = Math.max(200, containerH - marginT - marginB - 100);
+    const marginX = Math.max(24, Math.round(containerW * 0.08));
+    const marginTop = Math.max(96, Math.round(containerH * 0.18));
+    const marginBottom = Math.max(112, Math.round(containerH * 0.18));
 
-    const zone = Math.floor(Math.random() * 3);
-    let x;
-    let y;
+    const zones = [
+      { x: [0.18, 0.38], y: [0.24, 0.40] },
+      { x: [0.62, 0.82], y: [0.24, 0.40] },
+      { x: [0.22, 0.42], y: [0.46, 0.64] },
+      { x: [0.58, 0.78], y: [0.46, 0.64] },
+      { x: [0.36, 0.64], y: [0.34, 0.56] }
+    ];
+    const zone = zones[Math.floor(Math.random() * zones.length)];
 
-    if (zone === 0) {
-      x = marginL + Math.random() * safeW;
-      y = marginT + Math.random() * (safeH * 0.2);
-    } else if (zone === 1) {
-      x = marginL + Math.random() * safeW;
-      y = marginT + safeH * 0.8 + Math.random() * (safeH * 0.2);
-    } else {
-      x = marginL + safeW * 0.6 + Math.random() * (safeW * 0.4);
-      y = marginT + safeH * 0.2 + Math.random() * (safeH * 0.6);
-    }
+    const centerX = containerW * (zone.x[0] + Math.random() * (zone.x[1] - zone.x[0]));
+    const centerY = containerH * (zone.y[0] + Math.random() * (zone.y[1] - zone.y[0]));
 
-    if (x < 0 || y < 0) {
-      x = 100;
-      y = 200;
-    }
-
-    return { x, y };
+    return {
+      x: clamp(Math.round(centerX - CRYSTAL_WIDTH / 2), marginX, containerW - marginX - CRYSTAL_WIDTH),
+      y: clamp(
+        Math.round(centerY - CRYSTAL_HEIGHT / 2),
+        marginTop,
+        containerH - marginBottom - CRYSTAL_HEIGHT
+      )
+    };
   });
   const [timeLeft, setTimeLeft] = useState(30);
   const [status, setStatus] = useState('active'); // 'active', 'hit', 'miss'
@@ -261,7 +257,7 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
           position: 'absolute',
           top: 0,
           left: 0,
-          zIndex: 50,
+          zIndex: 6001,
           pointerEvents: status === 'active' ? 'auto' : 'none'
         }}
       >
@@ -272,19 +268,25 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
             whileTap={{ scale: 0.9 }}
             onClick={handleHit}
             style={{
+              minWidth: `${CRYSTAL_WIDTH}px`,
+              minHeight: `${CRYSTAL_HEIGHT}px`,
               background: 'rgba(5, 10, 25, 0.8)',
               border: '1px solid var(--neon-blue)',
-              borderRadius: '15px',
-              padding: '10px 15px',
+              borderRadius: '18px',
+              padding: '12px 16px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
               boxShadow: currentCombo >= 2 ? '0 0 20px var(--star-gold)' : '0 0 10px var(--neon-blue)',
-              backdropFilter: 'blur(5px)'
+              backdropFilter: 'blur(5px)',
+              boxSizing: 'border-box',
+              textAlign: 'center',
+              userSelect: 'none'
             }}
           >
-            <div style={{ fontSize: '2rem', marginBottom: '5px' }}>
+            <div style={{ fontSize: '2.2rem', marginBottom: '6px', lineHeight: 1 }}>
               {currentCombo >= 2 ? '🌟' : '💎'}
             </div>
             
