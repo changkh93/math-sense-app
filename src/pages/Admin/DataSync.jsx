@@ -96,7 +96,10 @@ const ExportTab = () => {
           for (const q of quizzes) {
             // FIX: Ensure everything is string before .replace() and handle 0 correctly
             const optionsText = q.options?.map(o => `'${String(o.text ?? '').replace(/'/g, "\\'")}'`).join(', ') || '';
-            const answerText = q.options?.find(o => o.isCorrect)?.text ?? q.answer ?? '';
+            const correctOptions = q.options?.filter(o => o.isCorrect) || [];
+            const answerText = correctOptions.length > 1 
+              ? `[${correctOptions.map(o => `'${String(o.text ?? '').replace(/'/g, "\\\\'")}'`).join(', ')}]`
+              : correctOptions[0]?.text ?? q.answer ?? '';
 
             chapterOutput += `      {\n`;
             chapterOutput += `        id: '${q.id || q.docId}',\n`;

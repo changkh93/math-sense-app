@@ -64,6 +64,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
   const [isAiExplanationOpen, setIsAiExplanationOpen] = useState(false)
   const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
+  const [selectedMultiOptions, setSelectedMultiOptions] = useState(new Set()) // 멀티 정답 임시 선택
 
   const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
 
@@ -152,10 +153,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }
   }, [quizData, hasRadar, user])
 
-  // 문제 변경 시 AI 설명 패널 닫기
+  // 문제 변경 시 AI 설명 패널 닫기 + 멀티 선택 초기화
   useEffect(() => {
     setIsAiExplanationOpen(false)
     setIsDetailedExplanationOpen(false)
+    setSelectedMultiOptions(new Set())
   }, [currentIdx])
 
 
@@ -164,6 +166,184 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   const currentQuestion = currentQuestions[currentIdx]
+
+  // 멀티 정답 여부 확인
+  const getCorrectCount = (question) => question?.options?.filter(o => o.isCorrect).length || 0
+  const isMultiAnswer = (question) => getCorrectCount(question) > 1
+
+  // 멀티 정답: 옵션 토글 선택
+  const handleMultiSelect = (option) => {
+    if (isRebooting || showFeedback) return
+    setSelectedMultiOptions(prev => {
+      const next = new Set(prev)
+      const key = option.text
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // 멀티 정답: 제출 판정
+  const handleMultiSubmit = (event) => {
+    if (isRebooting || showFeedback) return
+    
+    const correctOpts = currentQuestion.options.filter(o => o.isCorrect)
+    const selectedTexts = selectedMultiOptions
+    
+    // 정답 판정: 선택 개수 일치 + 모든 정답이 선택됨
+    const isCorrect = selectedTexts.size === correctOpts.length &&
+      correctOpts.every(co => selectedTexts.has(co.text))
+    
+    // userAnswers에 멀티 정답 결과 저장
+    const answerRecord = {
+      isCorrect,
+      isMultiAnswer: true,
+      selectedTexts: Array.from(selectedTexts),
+      correctTexts: correctOpts.map(o => o.text)
+    }
+
+    // 피드백 표시
+    setShowFeedback(isCorrect ? 'correct' : 'wrong')
+
+    const newUserAnswers = {
+      ...userAnswers,
+      [currentQuestion.id]: answerRecord
+    }
+    
+    // 계산 로직
+    let newCombo = comboCount || 0
+    let newSessionCrystals = sessionCrystals
+    let newShieldsUsed = shieldsUsed
+    let newEverWrongSet = everWrongSet
+
+    const addMarker = (text, type, bonusX = 0, bonusY = 0) => {
+      const id = Date.now() + Math.random()
+      setFloatingMarkers(prev => [...prev, { 
+        id, text, type, x: event.clientX + bonusX, y: event.clientY + bonusY 
+      }])
+      setTimeout(() => {
+        setFloatingMarkers(prev => prev.filter(m => m.id !== id))
+      }, 2000)
+    }
+
+    if (isCorrect) {
+      soundManager.playCorrect()
+      createParticleBurst(event.clientX, event.clientY, 'star')
+      createParticleBurst(event.clientX, event.clientY, 'ore')
+      
+      newCombo += 1
+      let earned = 1
+      addMarker('+1', 'gain')
+
+      if (!reSolveMode) {
+        if (newCombo > 0 && newCombo % 3 === 0) {
+          earned += 5
+          setTimeout(() => addMarker('+5 COMBO!', 'gain', 40, -40), 200)
+        }
+      }
+      newSessionCrystals += earned
+    } else {
+      soundManager.playWrong()
+      createParticleBurst(event.clientX, event.clientY, 'wrong')
+      shakeScreen(300)
+      
+      newCombo = 0
+      const remainingShields = hasShield - shieldsUsed
+      if (remainingShields > 0) {
+        newShieldsUsed += 1
+        addMarker(`🛡️ DEFENDED! (-1)`, 'gain')
+      } else {
+        const currentPenalty = (retryCount + 1) * 2
+        newSessionCrystals -= currentPenalty
+        addMarker(`-${currentPenalty}`, 'loss')
+      }
+      
+      newEverWrongSet = new Set(everWrongSet)
+      newEverWrongSet.add(currentQuestion.id)
+    }
+
+    setUserAnswers(newUserAnswers)
+    setComboCount(newCombo)
+    setSessionCrystals(newSessionCrystals)
+    setShieldsUsed(newShieldsUsed)
+    setEverWrongSet(newEverWrongSet)
+
+    // 세션 자동 저장
+    const triggerAutoSave = async (willBeResultMode, computedFirstPass) => {
+      let nextIdxForSave = currentIdx
+      if (currentIdx < currentQuestions.length - 1) {
+        nextIdxForSave = currentIdx + 1
+      }
+      
+      if (user?.uid && quizData?.unitId && !reSolveMode && !willBeResultMode) {
+        try {
+          const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+          const sessionObj = {
+            currentIdx: nextIdxForSave,
+            userAnswers: newUserAnswers,
+            comboCount: newCombo,
+            sessionCrystals: newSessionCrystals,
+            retryCount: retryCount,
+            shieldsUsed: newShieldsUsed,
+            originalTotal: originalTotal,
+            firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore,
+            everWrong: Array.from(newEverWrongSet)
+          }
+          await setDoc(progressRef, {
+            quizSession: JSON.parse(JSON.stringify(sessionObj)),
+            unitTitle: quizData?.title || "탐사 퀴즈",
+            unitId: quizData.unitId || "",
+            updatedAt: serverTimestamp()
+          }, { merge: true })
+        } catch (e) { console.error("Auto save failed", e) }
+      }
+    }
+
+    let willBeResultModeImmediate = false
+    let computedFirstPassImmediate = firstPassScore
+    
+    if (currentIdx >= currentQuestions.length - 1) {
+      willBeResultModeImmediate = true
+      const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect).length
+      if (retryCount === 0 && firstPassScore === null) {
+        computedFirstPassImmediate = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
+      }
+    }
+    
+    triggerAutoSave(willBeResultModeImmediate, computedFirstPassImmediate)
+
+    const performNextStep = () => {
+      if (isQuestionModalOpen) return;
+      setShowFeedback(null)
+      setIsRebooting(false)
+      setSelectedMultiOptions(new Set())
+      
+      let nextIdx = currentIdx
+      if (currentIdx < currentQuestions.length - 1) {
+        nextIdx = currentIdx + 1
+        setCurrentIdx(nextIdx)
+      } else {
+        const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect).length
+        if (isCorrect && totalCorrectSoFar === originalTotal) {
+          setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
+        }
+        
+        if (retryCount === 0 && firstPassScore === null) {
+          const fPassScore = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
+          setFirstPassScore(fPassScore)
+        }
+        setIsResultMode(true)
+      }
+    }
+
+    if (isCorrect) {
+      setTimeout(performNextStep, 800)
+    } else {
+      const rebootDelay = Math.min((retryCount + 1) * 3000, 9000)
+      setIsRebooting(true)
+      setTimeout(performNextStep, rebootDelay)
+    }
+  }
 
   const handleSelect = (option, event) => {
     if (isRebooting || showFeedback) return
@@ -1170,24 +1350,107 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             gap: '1rem'
           }}>
             {(currentQuestion?.shuffledOptions || []).map((option, idx) => {
+              const multiMode = isMultiAnswer(currentQuestion)
               let btnClass = 'space-option-btn'
-              if (showFeedback && userAnswers[currentQuestion.id] === option) {
-                btnClass += option.isCorrect ? ' correct' : ' wrong'
+              
+              if (multiMode) {
+                // 멀티 정답 모드: 선택 상태 표시
+                if (selectedMultiOptions.has(option.text) && !showFeedback) {
+                  btnClass += ' multi-selected'
+                }
+                if (showFeedback) {
+                  const wasSelected = selectedMultiOptions.has(option.text)
+                  if (wasSelected && option.isCorrect) btnClass += ' correct'
+                  else if (wasSelected && !option.isCorrect) btnClass += ' wrong'
+                  else if (!wasSelected && option.isCorrect) btnClass += ' missed-correct'
+                }
+              } else {
+                // 단일 정답 모드: 기존 로직
+                if (showFeedback && userAnswers[currentQuestion.id] === option) {
+                  btnClass += option.isCorrect ? ' correct' : ' wrong'
+                }
               }
               
               return (
                 <button
                   key={idx}
                   className={btnClass}
-                  onClick={(e) => !showFeedback && !isRebooting && handleSelect(option, e)}
+                  onClick={(e) => {
+                    if (showFeedback || isRebooting) return
+                    if (multiMode) {
+                      handleMultiSelect(option)
+                    } else {
+                      handleSelect(option, e)
+                    }
+                  }}
                   disabled={showFeedback !== null || isRebooting}
-                  style={{ opacity: (showFeedback || isRebooting) && userAnswers[currentQuestion.id] !== option ? 0.5 : 1 }}
+                  style={{ 
+                    opacity: (showFeedback || isRebooting) && !multiMode && userAnswers[currentQuestion.id] !== option ? 0.5 : 1,
+                    ...(multiMode && selectedMultiOptions.has(option.text) && !showFeedback ? {
+                      border: '2px solid var(--crystal-cyan)',
+                      background: 'rgba(0, 243, 255, 0.15)',
+                      boxShadow: '0 0 12px rgba(0, 243, 255, 0.3)'
+                    } : {})
+                  }}
                 >
+                  {multiMode && (
+                    <span style={{ 
+                      marginRight: '0.5rem', 
+                      fontSize: '1.1rem',
+                      display: 'inline-flex',
+                      alignItems: 'center'
+                    }}>
+                      {selectedMultiOptions.has(option.text) ? '☑' : '☐'}
+                    </span>
+                  )}
                   {formatText(option.text)}
                 </button>
               )
             })}
           </div>
+
+          {/* 멀티 정답 안내 및 제출 버튼 */}
+          {isMultiAnswer(currentQuestion) && !showFeedback && !isRebooting && (
+            <div style={{ 
+              marginTop: '1.5rem', 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center', 
+              gap: '0.8rem' 
+            }}>
+              <span style={{ 
+                color: 'var(--star-gold)', 
+                fontSize: '0.9rem', 
+                fontWeight: 700,
+                background: 'rgba(255, 215, 0, 0.1)',
+                padding: '0.4rem 1rem',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 215, 0, 0.3)'
+              }}>
+                ⚡ 정답 {getCorrectCount(currentQuestion)}개를 모두 선택하세요 ({selectedMultiOptions.size}개 선택됨)
+              </span>
+              <button
+                onClick={(e) => handleMultiSubmit(e)}
+                disabled={selectedMultiOptions.size === 0}
+                style={{
+                  padding: '0.8rem 2.5rem',
+                  borderRadius: '12px',
+                  border: 'none',
+                  fontSize: '1.1rem',
+                  fontWeight: 800,
+                  cursor: selectedMultiOptions.size === 0 ? 'not-allowed' : 'pointer',
+                  background: selectedMultiOptions.size === 0 
+                    ? 'rgba(255,255,255,0.1)' 
+                    : 'linear-gradient(135deg, var(--crystal-cyan), #00b4d8)',
+                  color: selectedMultiOptions.size === 0 ? 'var(--text-muted)' : 'white',
+                  boxShadow: selectedMultiOptions.size > 0 ? '0 4px 15px rgba(0, 243, 255, 0.3)' : 'none',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                ✓ 정답 제출하기
+              </button>
+            </div>
+          )}
           
           {/* 하단 중앙 기능 버튼 (영상 학습과 통일성) */}
           {!isResultMode && (

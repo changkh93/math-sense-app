@@ -36,6 +36,12 @@ const QuizEditor = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    // Validate: at least one correct answer must be selected
+    const correctCount = editingQuiz.options.filter(o => o.isCorrect).length;
+    if (correctCount === 0) {
+      alert('정답을 최소 1개 이상 선택해주세요.');
+      return;
+    }
     saveQuiz.mutate(editingQuiz, {
       onSuccess: () => setEditingQuiz(null)
     });
@@ -165,16 +171,25 @@ const QuizEditor = () => {
           </div>
 
           <div className="form-group">
-            <label>Options (Check correct one)</label>
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Options (Check correct answers - 복수 선택 가능)</span>
+              <span style={{ 
+                fontSize: '0.8rem', 
+                color: editingQuiz.options.filter(o => o.isCorrect).length > 1 ? 'var(--star-gold)' : 'var(--planet-green)',
+                fontWeight: 'bold'
+              }}>
+                ✓ 정답 {editingQuiz.options.filter(o => o.isCorrect).length}개 선택됨
+              </span>
+            </label>
             <div className="options-list">
               {editingQuiz.options.map((opt, index) => (
                 <div key={index} className="option-item">
                   <input 
-                    type="radio" 
-                    name="correct-opt" 
+                    type="checkbox" 
                     checked={opt.isCorrect} 
                     onChange={() => {
-                      const newOpts = editingQuiz.options.map((o, i) => ({ ...o, isCorrect: i === index }));
+                      const newOpts = [...editingQuiz.options];
+                      newOpts[index] = { ...newOpts[index], isCorrect: !newOpts[index].isCorrect };
                       setEditingQuiz({ ...editingQuiz, options: newOpts });
                     }} 
                   />

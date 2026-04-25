@@ -139,13 +139,14 @@ export default function AiQuizImportModal({ isOpen, onClose, unitId }) {
       for (const [index, q] of data.questions.entries()) {
         const quizId = `${unitId}_q${index + 1}_${timestamp}`;
         
-        // Convert string options to object options
+        // Convert string options to object options (supports multi-answer)
+        const answers = Array.isArray(q.answer) ? q.answer : [q.answer];
         const formattedOptions = q.options.map(optText => ({
           text: optText,
-          isCorrect: optText === q.answer
+          isCorrect: answers.includes(optText)
         }));
 
-        // Verify one correct answer exists
+        // Verify at least one correct answer exists
         if (!formattedOptions.some(o => o.isCorrect)) {
             console.warn(`No exact match for answer "${q.answer}" in options`, q.options);
             if (formattedOptions.length > 0) formattedOptions[0].isCorrect = true; 
