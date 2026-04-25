@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
-import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ArrowLeft, CalendarDays, Camera, CameraOff, Clock3, Crown, Radio, Send, StickyNote, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Camera, CameraOff, Clock3, Crown, Loader2, LogOut, Radio, Send, StickyNote, Trash2, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
@@ -18,6 +18,7 @@ const panelStyle = {
   background: 'rgba(7, 13, 30, 0.78)', border: '1px solid rgba(255,255,255,0.11)',
   borderRadius: 8, padding: '1.2rem'
 };
+const NOTE_MAX_LENGTH = 120;
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '인증 완료' : s === 'rejected' ? '반려됨' : '운영자 승인 대기'; }
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
@@ -38,31 +39,61 @@ function getFunctionsErrorMessage(err, fb) {
   return fb;
 }
 
+function uniqueIds(ids = []) {
+  return Array.from(new Set((Array.isArray(ids) ? ids : []).filter(Boolean)));
+}
+
+function getGreetingReadMeta(note, crewMemberIds = [], currentUid = '') {
+  const normalizedReadBy = uniqueIds([note?.userId, ...(Array.isArray(note?.readBy) ? note.readBy : [])]);
+  const members = uniqueIds(crewMemberIds);
+  const totalCount = members.length || Math.max(normalizedReadBy.length, 1);
+  const readCount = members.length
+    ? members.filter((memberId) => normalizedReadBy.includes(memberId)).length
+    : normalizedReadBy.length;
+  const hasCurrentUserRead = currentUid ? normalizedReadBy.includes(currentUid) : false;
+  const isFullyRead = totalCount > 0 && readCount >= totalCount;
+  return { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead };
+}
+
 export default function CrewDetailView({ onBack, onEnterRoom }) {
   const { user, userData } = useAuth();
-  const [busy, setBusy] = useState(false);
   const [roomAction, setRoomAction] = useState('');
   const [message, setMessage] = useState('');
   const [noteText, setNoteText] = useState('');
+  const [pendingNotes, setPendingNotes] = useState([]);
+  const [activeNoteAction, setActiveNoteAction] = useState('');
   const [roomDuration, setRoomDuration] = useState(50);
   const [crewRoom, setCrewRoom] = useState(null);
   const [crewDocData, setCrewDocData] = useState(null);
+  const [liveNotes, setLiveNotes] = useState([]);
   const [memberProfiles, setMemberProfiles] = useState({});
   const [previewStream, setPreviewStream] = useState(null);
   const [previewCameraOn, setPreviewCameraOn] = useState(true);
   const [previewError, setPreviewError] = useState('');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [leaveAction, setLeaveAction] = useState('');
   const previewStreamRef = useRef(null);
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
   const crewId = crew?.id || userData?.crewId || '';
   const members = useMemo(() => crew?.members || [], [crew?.members]);
-  const notes = useMemo(() => crew?.recentGreetings || [], [crew?.recentGreetings]);
+  const crewMemberIds = useMemo(() => uniqueIds([
+    ...(Array.isArray(crew?.memberIds) ? crew.memberIds : []),
+    crew?.leaderId,
+  ]), [crew?.memberIds, crew?.leaderId]);
+  const notes = useMemo(() => liveNotes, [liveNotes]);
+  const displayNotes = useMemo(() => {
+    const serverKeys = new Set(notes.map((note) => `${note?.userId || ''}::${note?.text || ''}`));
+    const filteredPending = pendingNotes.filter((note) => !serverKeys.has(`${note?.userId || ''}::${note?.text || ''}`));
+    return [...filteredPending, ...notes].slice(0, 6);
+  }, [notes, pendingNotes]);
   const status = crew?.status || userData?.crewStatus || 'pending';
   const todayKey = getTodayKey();
   const studiedToday = members.filter(m => m.lastStreakDate === todayKey);
   const isRoomParticipant = !!crewRoom?.participantIds?.includes(user?.uid);
   const roomIsFull = (crewRoom?.participantCount || 0) >= (crewRoom?.maxParticipants || 3);
+  const isLeader = userData?.crewRole === 'leader';
+  const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
 
   const memberNameById = useMemo(() => {
     const next = new Map();
@@ -119,6 +150,30 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
     return () => unsub();
   }, [crewId]);
 
+  useEffect(() => {
+    if (!crewId) {
+      setLiveNotes([]);
+      return undefined;
+    }
+    const greetingsQuery = query(
+      collection(db, 'crews', crewId, 'greetings'),
+      orderBy('createdAt', 'desc'),
+      limit(10)
+    );
+    const unsub = onSnapshot(greetingsQuery, (snap) => {
+      setLiveNotes(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
+    }, (err) => {
+      console.error('Failed to listen to crew greetings:', err);
+      setLiveNotes([]);
+    });
+    return () => unsub();
+  }, [crewId]);
+
+  useEffect(() => {
+    if (!notes.length) return;
+    setPendingNotes((prev) => prev.filter((pending) => !notes.some((note) => note.userId === pending.userId && note.text === pending.text)));
+  }, [notes]);
+
   // Camera preview
   useEffect(() => {
     let cancelled = false;
@@ -149,21 +204,38 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
   useEffect(() => () => { if (previewStreamRef.current) { previewStreamRef.current.getTracks().forEach(t => t.stop()); previewStreamRef.current = null; } }, []);
 
   const handlePostNote = async (text = noteText) => {
-    const clean = text.trim().slice(0, 240);
-    if (!user?.uid || !crewId || !clean || busy) return;
-    setBusy(true);
+    const clean = text.trim().slice(0, NOTE_MAX_LENGTH);
+    if (!user?.uid || !crewId || !clean || activeNoteAction === 'posting') return;
+    const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimisticNote = {
+      id: tempId,
+      crewId,
+      userId: user.uid,
+      userName: userData?.studentName || userData?.publicDisplayName || user.displayName || '탐사원',
+      text: clean,
+      readBy: [user.uid],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      localPending: true,
+    };
+    setActiveNoteAction('posting');
+    setPendingNotes((prev) => [optimisticNote, ...prev].slice(0, 6));
+    setNoteText('');
     try {
       const fn = httpsCallable(functions, 'postStudyCrewGreeting');
       await fn({ crewId, text: clean });
-      setNoteText('');
       setMessage('포스트잇을 남겼습니다.');
-    } catch { setMessage('포스트잇을 남기지 못했습니다.'); }
-    finally { setBusy(false); }
+    } catch (err) {
+      setPendingNotes((prev) => prev.filter((note) => note.id !== tempId));
+      setNoteText(clean);
+      console.error('Failed to post study crew greeting:', err);
+      setMessage('포스트잇을 남기지 못했습니다.');
+    } finally { setActiveNoteAction(''); }
   };
 
   const handleReadNote = async (noteId) => {
-    if (!crewId || !noteId || busy) return;
-    setBusy(true);
+    if (!crewId || !noteId || activeNoteAction) return;
+    setActiveNoteAction(`read:${noteId}`);
     try {
       const fn = httpsCallable(functions, 'markStudyCrewGreetingRead');
       await fn({ crewId, greetingId: noteId });
@@ -171,8 +243,38 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
       console.error('Failed to mark post-it as read:', err);
       setMessage('포스트잇 읽음 표시에 실패했습니다.');
     } finally {
-      setBusy(false);
+      setActiveNoteAction('');
     }
+  };
+
+  const handleDeleteNote = async (noteId) => {
+    if (!crewId || !noteId || activeNoteAction) return;
+    const confirmed = window.confirm('이 포스트잇을 삭제할까요?\n삭제하면 되돌릴 수 없습니다.');
+    if (!confirmed) return;
+    const pendingNote = pendingNotes.find((note) => note.id === noteId);
+    if (pendingNote) {
+      setPendingNotes((prev) => prev.filter((note) => note.id !== noteId));
+      setMessage('포스트잇을 삭제했습니다.');
+      return;
+    }
+    setActiveNoteAction(`delete:${noteId}`);
+    try {
+      await deleteDoc(doc(db, 'crews', crewId, 'greetings', noteId));
+      setPendingNotes((prev) => prev.filter((note) => note.id !== noteId));
+      setMessage('포스트잇을 삭제했습니다.');
+    } catch (err) {
+      console.error('Failed to delete post-it:', err);
+      setMessage('포스트잇 삭제에 실패했습니다.');
+    } finally {
+      setActiveNoteAction('');
+    }
+  };
+
+  const handleNoteKeyDown = (event) => {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    if (!noteText.trim() || activeNoteAction === 'posting') return;
+    handlePostNote();
   };
 
   const handleCreateStudyRoom = async () => {
@@ -200,6 +302,39 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
       if (onEnterRoom) onEnterRoom(crewRoom.id);
     } catch (e) { setMessage(getFunctionsErrorMessage(e, '입장 실패.')); }
     finally { setRoomAction(''); }
+  };
+
+  const handleLeaveCrew = async () => {
+    if (!crewId || leaveAction) return;
+
+    if (isLeader && !canLeaderDeleteCrew) {
+      alert('리더는 다른 멤버가 모두 나간 뒤, 혼자 남았을 때만 크루를 삭제할 수 있습니다.');
+      return;
+    }
+
+    const confirmMessage = isLeader
+      ? '혼자 남은 리더가 탈퇴하면 크루가 삭제됩니다.\n정말 크루를 삭제할까요?'
+      : '정말 이 크루에서 탈퇴할까요?';
+    if (!window.confirm(confirmMessage)) return;
+
+    setLeaveAction('leaving');
+    setMessage(isLeader ? '크루 삭제 처리 중...' : '크루 탈퇴 처리 중...');
+
+    try {
+      const fn = httpsCallable(functions, 'leaveStudyCrew');
+      await fn({ crewId });
+      setMessage(isLeader ? '크루를 삭제했습니다.' : '크루에서 탈퇴했습니다.');
+      if (previewStreamRef.current) {
+        previewStreamRef.current.getTracks().forEach((track) => track.stop());
+        previewStreamRef.current = null;
+      }
+      onBack();
+    } catch (err) {
+      console.error('Failed to leave crew:', err);
+      setMessage(getFunctionsErrorMessage(err, isLeader ? '크루 삭제에 실패했습니다.' : '크루 탈퇴에 실패했습니다.'));
+    } finally {
+      setLeaveAction('');
+    }
   };
 
   if (!crew) return null;
@@ -298,24 +433,30 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
             style={{ ...inputStyle, minHeight: 72, resize: 'vertical', lineHeight: 1.45 }}
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
+            onKeyDown={handleNoteKeyDown}
             placeholder="나누고 싶은 글, 오늘의 약속, 먼저 들어온 사람이 남기는 말을 적어주세요."
-            maxLength={240}
+            maxLength={NOTE_MAX_LENGTH}
+            disabled={activeNoteAction === 'posting'}
           />
           <button
             className="space-btn cosmic-btn font-tech"
             type="button"
-            disabled={busy || !noteText.trim()}
+            disabled={activeNoteAction === 'posting' || !noteText.trim()}
             onClick={() => handlePostNote()}
             style={{ borderRadius: 8, minWidth: 54, minHeight: 46, padding: '0 0.9rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Send size={16} />
+            {activeNoteAction === 'posting' ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
           </button>
         </div>
-        {notes.length ? (
+        <div className="font-tech" style={{ color: 'rgba(255,255,255,0.48)', fontSize: '0.74rem', marginTop: '-0.4rem', marginBottom: '0.9rem', textAlign: 'right' }}>
+          {noteText.length}/{NOTE_MAX_LENGTH}
+        </div>
+        {displayNotes.length ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '0.75rem' }}>
-            {notes.slice(0, 6).map((note, index) => {
-              const currentReadBy = Array.isArray(note.readBy) ? note.readBy : [];
-              const alreadyRead = currentReadBy.includes(user?.uid);
+            {displayNotes.map((note, index) => {
+              const { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead } = getGreetingReadMeta(note, crewMemberIds, user?.uid);
+              const canDeleteNote = note.userId === user?.uid || userData?.role === 'admin';
+              const isPendingPost = !!note.localPending;
               const noteColor = ['rgba(250, 204, 21, 0.18)', 'rgba(45, 212, 191, 0.16)', 'rgba(96, 165, 250, 0.16)', 'rgba(251, 191, 36, 0.14)'][index % 4];
               return (
                 <div
@@ -340,26 +481,49 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
                     borderRadius: 999,
                     background: 'rgba(255,255,255,0.16)',
                   }} />
-                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.66)', fontSize: '0.76rem', marginBottom: '0.45rem', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-                    <span>{memberNameById.get(note.userId) || note.userName || '크루 멤버'}</span>
-                    <span style={{ color: alreadyRead ? 'var(--planet-green)' : 'rgba(255,255,255,0.45)' }}>{alreadyRead ? '읽음' : '미확인'}</span>
+                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.66)', fontSize: '0.76rem', marginBottom: '0.45rem', display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      {memberNameById.get(note.userId) || note.userName || '크루 멤버'}
+                      {note.userId === user?.uid && (
+                        <span style={{ padding: '0.12rem 0.45rem', borderRadius: 999, background: 'rgba(96,165,250,0.16)', color: 'var(--crystal-cyan)' }}>내 메모</span>
+                      )}
+                      {isPendingPost && (
+                        <span style={{ padding: '0.12rem 0.45rem', borderRadius: 999, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.72)' }}>저장 중</span>
+                      )}
+                    </span>
+                    <span style={{ color: isFullyRead ? 'var(--planet-green)' : 'rgba(255,255,255,0.64)' }}>
+                      읽음 {readCount}/{totalCount}명
+                    </span>
                   </div>
                   <div className="font-tech" style={{ color: 'var(--text-bright)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: '0.7rem' }}>{note.text}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                     <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.74rem' }}>
-                      {currentReadBy.length > 0 ? `읽은 사람 ${currentReadBy.length}` : '아직 읽은 사람이 없습니다'}
+                      {normalizedReadBy.length > 0 ? `읽은 사람 ${readCount}명` : '아직 읽은 사람이 없습니다'}
                     </div>
-                    {note.userId !== user?.uid && (
-                      <button
-                        type="button"
-                        className="space-nav-link font-tech"
-                        onClick={() => handleReadNote(note.id)}
-                        disabled={busy || alreadyRead}
-                        style={{ borderRadius: 8, padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}
-                      >
-                        {alreadyRead ? '읽음' : '읽었어요'}
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {note.userId !== user?.uid && (
+                        <button
+                          type="button"
+                          className="space-nav-link font-tech"
+                          onClick={() => handleReadNote(note.id)}
+                          disabled={activeNoteAction === `read:${note.id}` || activeNoteAction === 'posting' || hasCurrentUserRead}
+                          style={{ borderRadius: 8, padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}
+                        >
+                          {activeNoteAction === `read:${note.id}` ? '처리 중...' : hasCurrentUserRead ? '읽음' : '읽었어요'}
+                        </button>
+                      )}
+                      {canDeleteNote && (
+                        <button
+                          type="button"
+                          className="space-nav-link font-tech"
+                          onClick={() => handleDeleteNote(note.id)}
+                          disabled={activeNoteAction === `delete:${note.id}` || activeNoteAction === 'posting'}
+                          style={{ borderRadius: 8, padding: '0.35rem 0.6rem', fontSize: '0.78rem', color: '#fca5a5' }}
+                        >
+                          {activeNoteAction === `delete:${note.id}` ? '삭제 중...' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><Trash2 size={13} />삭제</span>}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -497,6 +661,31 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
           </div>
         </section>
       )}
+
+      <section className="glass-card hud-border" style={{ padding: '1.2rem', borderRadius: 12, marginTop: '1.2rem', borderColor: 'rgba(248,113,113,0.24)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <h3 className="font-tech" style={{ color: '#fca5a5', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <LogOut size={16} /> {isLeader ? '크루 삭제' : '크루 탈퇴'}
+          </h3>
+          <button
+            type="button"
+            className="space-nav-link font-tech"
+            onClick={handleLeaveCrew}
+            disabled={leaveAction === 'leaving' || (isLeader && !canLeaderDeleteCrew)}
+            style={{ borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#fca5a5', opacity: leaveAction === 'leaving' || (isLeader && !canLeaderDeleteCrew) ? 0.55 : 1 }}
+          >
+            <LogOut size={15} />
+            {leaveAction === 'leaving' ? '처리 중...' : isLeader ? '크루 삭제 후 탈퇴' : '크루 탈퇴'}
+          </button>
+        </div>
+        <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: '0.8rem' }}>
+          {isLeader
+            ? canLeaderDeleteCrew
+              ? '현재 리더 혼자 남아 있어 탈퇴가 가능하며, 이 경우 크루 자체가 삭제됩니다.'
+              : '리더는 다른 크루 멤버가 모두 탈퇴한 뒤, 혼자 남았을 때만 크루를 삭제할 수 있습니다.'
+            : '탈퇴하면 현재 크루에서 빠집니다. 다시 참여하려면 일반 참여 흐름으로 다시 들어와야 합니다.'}
+        </div>
+      </section>
 
       {message && <p className="font-tech" style={{ marginTop: '1rem', color: message.includes('실패') || message.includes('못했') ? '#f87171' : 'var(--planet-green)' }}>{message}</p>}
       <CrewSettingsModal

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
-import { AlertTriangle, ChevronDown, Crown, Edit3, Lock, Plus, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ChevronDown, Crown, Edit3, Lock, Plus, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
@@ -9,6 +9,7 @@ import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
 import CrewDetailView from './CrewDetailView';
 import StudyStreamRoomView from './StudyStreamRoomView';
+import { formatCrewSchedule } from './crewSchedule';
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '활동 중' : s === 'rejected' ? '반려됨' : '승인 대기'; }
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
@@ -21,7 +22,7 @@ const FAQ_ITEMS = [
   { q: '크루 승인은 얼마나 걸리나요?', a: '운영자가 크루 이름과 모토를 확인한 후 승인합니다. 보통 1~2일 이내에 처리됩니다.' },
 ];
 
-function CrewCard({ crew, userUid, userCrewId, onClick }) {
+function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0 }) {
   const leaderId = crew.leaderId || crew.leaderUid || '';
   const isMyCreated = leaderId === userUid;
   const isMyJoined = !isMyCreated && crew.memberIds?.includes(userUid);
@@ -29,6 +30,8 @@ function CrewCard({ crew, userUid, userCrewId, onClick }) {
   const isFull = (crew.memberCount || crew.memberIds?.length || 0) >= (crew.maxMembers || 3);
   const isApproved = crew.status === 'approved';
   const canJoin = isApproved && !isFull && !isMyCrew;
+  const description = crew.description || crew.motto || '상세 설명 없음';
+  const scheduleText = formatCrewSchedule(crew.scheduleDays || [], crew.scheduleTimes || {});
 
   let badgeText = '';
   let badgeColor = '';
@@ -70,14 +73,58 @@ function CrewCard({ crew, userUid, userCrewId, onClick }) {
           <h4 className="font-title" style={{ color: 'var(--text-bright)', margin: 0, fontSize: '1.05rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {crew.name || '이름 없는 크루'}
           </h4>
-          <p className="font-tech" style={{ color: 'rgba(255,255,255,0.55)', margin: '0.2rem 0 0', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {crew.motto || '모토 없음'}
-          </p>
+          <div className="font-tech" style={{
+            color: 'rgba(255,255,255,0.72)',
+            margin: '0.35rem 0 0',
+            fontSize: '0.82rem',
+            lineHeight: 1.55,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden'
+          }}>
+            {description}
+          </div>
+          <div className="font-tech" style={{
+            marginTop: '0.5rem',
+            color: 'rgba(255,255,255,0.62)',
+            fontSize: '0.78rem',
+            lineHeight: 1.45,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.4rem'
+          }}>
+            <CalendarDays size={13} style={{ color: 'var(--crystal-cyan)', flexShrink: 0, marginTop: 1 }} />
+            <span style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden'
+            }}>
+              {scheduleText}
+            </span>
+          </div>
         </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-          <Users size={13} /> {crew.memberCount || crew.memberIds?.length || 1}/{crew.maxMembers || 3}명
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap', marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Users size={13} /> {crew.memberCount || crew.memberIds?.length || 1}/{crew.maxMembers || 3}명
+          </div>
+          <div className="font-tech" style={{
+            color: 'var(--planet-green)',
+            fontSize: '0.78rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            padding: '0.18rem 0.45rem',
+            borderRadius: 999,
+            background: 'rgba(16,185,129,0.12)',
+            border: '1px solid rgba(16,185,129,0.16)'
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--planet-green)', boxShadow: '0 0 8px rgba(16,185,129,0.7)' }} />
+            온라인 {onlineCount}명
+          </div>
         </div>
         <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
           {crew.groupName || '자유 스터디'}
@@ -94,6 +141,7 @@ export default function StudyCrewView({ onNavigateStore }) {
   const { user, userData } = useAuth();
   const [directoryCrews, setDirectoryCrews] = useState([]);
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
+  const [crewOnlineCounts, setCrewOnlineCounts] = useState({});
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
   const [detailView, setDetailView] = useState(false);
@@ -147,6 +195,31 @@ export default function StudyCrewView({ onNavigateStore }) {
       const crews = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.status !== 'rejected');
       setDirectoryCrews(crews);
     }, err => console.error('Crew directory error:', err));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'users'), snap => {
+      const nextCounts = {};
+      const now = Date.now();
+
+      snap.docs.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        if (data.role === 'admin' || data.role === 'parent') return;
+        const crewId = data.crewId;
+        if (!crewId) return;
+
+        const live = data.liveStatus || {};
+        const updatedMs = live.lastUpdatedAt?.toMillis?.() || 0;
+        const isOnline = live.state === 'online' && updatedMs && (now - updatedMs < 5 * 60 * 1000);
+        if (!isOnline) return;
+
+        nextCounts[crewId] = (nextCounts[crewId] || 0) + 1;
+      });
+
+      setCrewOnlineCounts(nextCounts);
+    }, err => console.error('Crew online count error:', err));
+
     return () => unsub();
   }, []);
 
@@ -356,7 +429,14 @@ export default function StudyCrewView({ onNavigateStore }) {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
                 {sortedCrews.map(c => (
-                  <CrewCard key={c.id} crew={c} userUid={user?.uid} userCrewId={crewId} onClick={handleCrewCardClick} />
+                  <CrewCard
+                    key={c.id}
+                    crew={c}
+                    userUid={user?.uid}
+                    userCrewId={crewId}
+                    onClick={handleCrewCardClick}
+                    onlineCount={crewOnlineCounts[c.id] || 0}
+                  />
                 ))}
               </div>
             )}

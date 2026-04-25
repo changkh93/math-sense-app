@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import DOMPurify from 'dompurify';
+import { getFunctionUrl } from '../../firebase';
 
 /**
  * NotebookViewer
@@ -26,7 +27,7 @@ export default function NotebookViewer({ colabUrl, cachedData, onClose }) {
     setError(null);
 
     // Cloud Function URL (auto-detected from Firebase project)
-    const functionUrl = `https://us-central1-math-sense-1f6a8.cloudfunctions.net/fetchNotebook`;
+    const functionUrl = getFunctionUrl('fetchNotebook');
 
     fetch(functionUrl, {
       method: 'POST',

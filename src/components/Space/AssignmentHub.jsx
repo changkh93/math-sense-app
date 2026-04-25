@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments';
 import { useClusters } from '../../hooks/useContent';
-import { storage } from '../../firebase';
+import { storage, getFunctionUrl } from '../../firebase';
 import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import AssignmentChronicle from './AssignmentChronicle';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
@@ -632,7 +632,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
       
       if (colabLink) {
         try {
-          const functionUrl = `https://us-central1-math-sense-1f6a8.cloudfunctions.net/fetchNotebook`;
+          const functionUrl = getFunctionUrl('fetchNotebook');
           const response = await fetch(functionUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

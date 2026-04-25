@@ -1,9 +1,11 @@
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const { FieldPath } = require("firebase-admin/firestore");
 try { admin.initializeApp(); } catch (e) {}
 const cors = require("cors")({ origin: true });
 const fetch = require("node-fetch");
+const FUNCTIONS_REGION = "asia-northeast3";
+const regionalFunctions = functions.region(FUNCTIONS_REGION);
 
 /**
  * fetchNotebook
@@ -15,7 +17,7 @@ const fetch = require("node-fetch");
  * Usage: POST /fetchNotebook { url: "https://colab.research.google.com/drive/FILE_ID..." }
  * Returns: { cells: [ { cell_type, source, outputs }, ... ], metadata }
  */
-exports.fetchNotebook = functions.https.onRequest((req, res) => {
+exports.fetchNotebook = regionalFunctions.https.onRequest((req, res) => {
   return cors(req, res, async () => {
     try {
       // Only allow POST
@@ -234,7 +236,7 @@ function parseNotebook(notebook) {
  * HTTP endpoint for navigator.sendBeacon to securely save video progress 
  * when the user closes the tab or navigates away.
  */
-exports.syncVideoProgress = functions.https.onRequest((req, res) => {
+exports.syncVideoProgress = regionalFunctions.https.onRequest((req, res) => {
   return cors(req, res, async () => {
     try {
       if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
@@ -288,7 +290,7 @@ exports.syncVideoProgress = functions.https.onRequest((req, res) => {
  * 
  * Callable function to let Admis resetting any user's password securely.
  */
-exports.adminResetUserPassword = functions.https.onCall(async (data, context) => {
+exports.adminResetUserPassword = regionalFunctions.https.onCall(async (data, context) => {
   // 1. Ensure authenticated
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError(
@@ -372,6 +374,35 @@ function normalizeCrewSchedule(scheduleDays, scheduleTimes) {
   return { scheduleDays: days, scheduleTimes: times };
 }
 
+function uniqueIds(ids = []) {
+  return Array.from(new Set((Array.isArray(ids) ? ids : []).filter(Boolean)));
+}
+
+function getCrewMemberIds(crewData = {}) {
+  return uniqueIds([
+    ...(Array.isArray(crewData.memberIds) ? crewData.memberIds : []),
+    crewData.leaderId,
+  ]);
+}
+
+function getGreetingReadState(greetingData = {}, crewData = {}) {
+  const memberIds = getCrewMemberIds(crewData);
+  const readBy = uniqueIds([greetingData.userId, ...(Array.isArray(greetingData.readBy) ? greetingData.readBy : [])]);
+  const totalCount = memberIds.length || Math.max(readBy.length, 1);
+  const readCount = memberIds.length
+    ? memberIds.filter((memberId) => readBy.includes(memberId)).length
+    : readBy.length;
+  const eligibleReaders = memberIds.filter((memberId) => memberId && memberId !== greetingData.userId);
+  const hasAllRead = totalCount > 0 && eligibleReaders.every((memberId) => readBy.includes(memberId));
+  return {
+    readBy,
+    totalCount,
+    readCount,
+    eligibleReaders,
+    hasAllRead,
+  };
+}
+
 async function requireAuthUid(context) {
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError("unauthenticated", "이 작업을 수행하려면 로그인해야 합니다.");
@@ -408,6 +439,81 @@ function getDisplayNameFromUser(userData = {}) {
   return userData.studentName || userData.publicDisplayName || userData.name || "탐사원";
 }
 
+function buildClearedCrewUserFields() {
+  return {
+    crewId: "",
+    crewName: "",
+    crewRole: "",
+    crewColor: "#00d4ff",
+    crewStatus: "",
+    crewGroupName: "",
+    crewInviteCode: "",
+    crewActiveStudyRoomId: "",
+    crewActiveStudyRoomStatus: "",
+    crewSnapshot: null,
+    rejectedCrewId: "",
+  };
+}
+
+async function removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomData, uid) {
+  const participantIds = Array.isArray(roomData?.participantIds) ? roomData.participantIds : [];
+  if (!participantIds.includes(uid)) {
+    return;
+  }
+
+  const nextParticipantIds = participantIds.filter((participantUid) => participantUid !== uid);
+  const now = new Date();
+  const crewRef = roomData?.crewId ? db.collection("crews").doc(roomData.crewId) : null;
+
+  tx.delete(roomRef.collection("participants").doc(uid));
+
+  if (nextParticipantIds.length === 0) {
+    tx.set(roomRef, {
+      participantIds: [],
+      participantCount: 0,
+      status: "ended",
+      endedAt: now,
+      lastActivityAt: now,
+    }, { merge: true });
+    if (crewRef) {
+      tx.set(crewRef, {
+        activeStudyRoomId: "",
+        activeStudyRoomStatus: "",
+        updatedAt: now,
+      }, { merge: true });
+    }
+    return;
+  }
+
+  let nextHostUid = roomData.hostUid;
+  let nextHostName = roomData.hostName || "";
+  if (roomData.hostUid === uid) {
+    nextHostUid = nextParticipantIds[0];
+    const nextHostSnap = await tx.get(db.collection("users").doc(nextHostUid));
+    nextHostName = nextHostSnap.exists ? getDisplayNameFromUser(nextHostSnap.data()) : "탐사원";
+    tx.set(roomRef.collection("participants").doc(nextHostUid), {
+      role: "host",
+    }, { merge: true });
+  }
+
+  const nextStatus = nextParticipantIds.length >= 2 ? "live" : "waiting";
+  tx.set(roomRef, {
+    participantIds: nextParticipantIds,
+    participantCount: nextParticipantIds.length,
+    hostUid: nextHostUid,
+    hostName: nextHostName,
+    status: nextStatus,
+    lastActivityAt: now,
+  }, { merge: true });
+  if (crewRef) {
+    tx.set(crewRef, {
+      activeStudyRoomId: roomRef.id,
+      activeStudyRoomStatus: nextStatus,
+      updatedAt: now,
+    }, { merge: true });
+  }
+}
+
 async function syncCrewToMembers(crewId, crewData, greetings = []) {
   const memberIds = crewData.memberIds || [];
   const memberSummaries = await loadMemberSummaries(memberIds);
@@ -441,7 +547,42 @@ async function syncCrewToMembers(crewId, crewData, greetings = []) {
 
 async function refreshCrewGreetings(crewId, crewData) {
   const recentSnap = await admin.firestore().collection("crews").doc(crewId).collection("greetings").orderBy("createdAt", "desc").limit(10).get();
-  const recentGreetings = recentSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  const batch = admin.firestore().batch();
+  let hasWrites = false;
+  const recentGreetings = [];
+
+  recentSnap.docs.forEach((snap) => {
+    const greetingData = snap.data() || {};
+    const readState = getGreetingReadState(greetingData, crewData);
+    if (readState.hasAllRead) {
+      batch.delete(snap.ref);
+      hasWrites = true;
+      return;
+    }
+
+    const previousReadBy = uniqueIds(greetingData.readBy || []);
+    if (readState.readBy.length !== previousReadBy.length || !readState.readBy.every((uid) => previousReadBy.includes(uid))) {
+      batch.set(snap.ref, {
+        readBy: readState.readBy,
+        updatedAt: new Date(),
+      }, { merge: true });
+      hasWrites = true;
+    }
+
+    recentGreetings.push({
+      id: snap.id,
+      ...greetingData,
+      readBy: readState.readBy,
+      readCount: readState.readCount,
+      readTotalCount: readState.totalCount,
+      allRead: false,
+    });
+  });
+
+  if (hasWrites) {
+    await batch.commit();
+  }
+
   await syncCrewToMembers(crewId, {
     ...crewData,
     updatedAt: new Date().toISOString(),
@@ -449,7 +590,7 @@ async function refreshCrewGreetings(crewId, crewData) {
   return recentGreetings;
 }
 
-exports.createStudyCrew = functions.https.onCall(async (data, context) => {
+exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const {
     name = "",
@@ -533,7 +674,7 @@ exports.createStudyCrew = functions.https.onCall(async (data, context) => {
   return { success: true, crewId: crewRef.id, inviteCode };
 });
 
-exports.joinStudyCrew = functions.https.onCall(async (data, context) => {
+exports.joinStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const inviteCode = String(data?.inviteCode || "").trim().toUpperCase();
   if (!inviteCode) {
@@ -608,7 +749,7 @@ exports.joinStudyCrew = functions.https.onCall(async (data, context) => {
   return { success: true, crewId: crewSnap.id, inviteCode };
 });
 
-exports.updateStudyCrew = functions.https.onCall(async (data, context) => {
+exports.updateStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const crewId = String(data?.crewId || "").trim();
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
@@ -663,7 +804,7 @@ exports.updateStudyCrew = functions.https.onCall(async (data, context) => {
   return { success: true };
 });
 
-exports.reviewStudyCrew = functions.https.onCall(async (data, context) => {
+exports.reviewStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
   await requireAdminUid(context);
   const crewId = String(data?.crewId || "").trim();
   const action = String(data?.action || "").trim();
@@ -744,7 +885,7 @@ exports.reviewStudyCrew = functions.https.onCall(async (data, context) => {
   return { success: true };
 });
 
-exports.resubmitStudyCrew = functions.https.onCall(async (data, context) => {
+exports.resubmitStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const crewId = String(data?.crewId || "").trim();
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
@@ -825,7 +966,7 @@ exports.resubmitStudyCrew = functions.https.onCall(async (data, context) => {
   return { success: true, crewId };
 });
 
-exports.postStudyCrewGreeting = functions.https.onCall(async (data, context) => {
+exports.postStudyCrewGreeting = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const crewId = String(data?.crewId || "").trim();
   const text = String(data?.text || "").trim().slice(0, 240);
@@ -863,7 +1004,7 @@ exports.postStudyCrewGreeting = functions.https.onCall(async (data, context) => 
   return { success: true };
 });
 
-exports.markStudyCrewGreetingRead = functions.https.onCall(async (data, context) => {
+exports.markStudyCrewGreetingRead = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const crewId = String(data?.crewId || "").trim();
   const greetingId = String(data?.greetingId || "").trim();
@@ -886,26 +1027,18 @@ exports.markStudyCrewGreetingRead = functions.https.onCall(async (data, context)
 
     const crewData = crewSnap.data() || {};
     const greetingData = greetingSnap.data() || {};
-    const memberIds = Array.isArray(crewData.memberIds) ? crewData.memberIds : [];
-    const eligibleReaders = memberIds.filter((memberId) => memberId && memberId !== greetingData.userId);
-    if (eligibleReaders.length === 0) {
+    const { readBy, hasAllRead } = getGreetingReadState(greetingData, crewData);
+    if (hasAllRead) {
+      tx.delete(greetingRef);
       return;
     }
-
-    const readBy = Array.isArray(greetingData.readBy) ? greetingData.readBy : [];
     if (!readBy.includes(uid)) {
       readBy.push(uid);
     }
-
-    const hasAllRead = eligibleReaders.every((memberId) => readBy.includes(memberId));
-    if (hasAllRead) {
-      tx.delete(greetingRef);
-    } else {
-      tx.set(greetingRef, {
-        readBy,
-        updatedAt: new Date(),
-      }, { merge: true });
-    }
+    tx.set(greetingRef, {
+      readBy: uniqueIds(readBy),
+      updatedAt: new Date(),
+    }, { merge: true });
   });
 
   const crewSnap = await crewRef.get();
@@ -913,7 +1046,41 @@ exports.markStudyCrewGreetingRead = functions.https.onCall(async (data, context)
   return { success: true };
 });
 
-exports.listStudyCrews = functions.https.onCall(async (_data, context) => {
+exports.deleteStudyCrewGreeting = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  const greetingId = String(data?.greetingId || "").trim();
+  if (!crewId || !greetingId) {
+    throw new functions.https.HttpsError("invalid-argument", "포스트잇 정보를 찾을 수 없습니다.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const greetingRef = crewRef.collection("greetings").doc(greetingId);
+
+  const [crewSnap, greetingSnap] = await Promise.all([crewRef.get(), greetingRef.get()]);
+  if (!crewSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  }
+  if (!greetingSnap.exists) {
+    return { success: true };
+  }
+
+  const greetingData = greetingSnap.data() || {};
+  const adminDoc = await db.collection("users").doc(uid).get();
+  const canDelete = greetingData.userId === uid || (adminDoc.exists && adminDoc.data().role === "admin");
+  if (!canDelete) {
+    throw new functions.https.HttpsError("permission-denied", "본인이 작성한 포스트잇만 삭제할 수 있습니다.");
+  }
+
+  await greetingRef.delete();
+
+  const refreshedCrewSnap = await crewRef.get();
+  await refreshCrewGreetings(crewId, refreshedCrewSnap.data() || {});
+  return { success: true };
+});
+
+exports.listStudyCrews = regionalFunctions.https.onCall(async (_data, context) => {
   await requireAdminUid(context);
   const snap = await admin.firestore().collection("crews").orderBy("createdAt", "desc").get();
   return {
@@ -921,7 +1088,7 @@ exports.listStudyCrews = functions.https.onCall(async (_data, context) => {
   };
 });
 
-exports.createStudyRoom = functions.https.onCall(async (data, context) => {
+exports.createStudyRoom = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const crewId = String(data?.crewId || "").trim();
   const durationMinutes = Number(data?.durationMinutes || 50);
@@ -981,6 +1148,8 @@ exports.createStudyRoom = functions.https.onCall(async (data, context) => {
       participantIds: [uid],
       participantCount: 1,
       peerServerMode: "peerjs-public",
+      chatEnabled: true,
+      micsEnabled: true,
       createdAt: now,
       startedAt: null,
       endedAt: null,
@@ -996,6 +1165,8 @@ exports.createStudyRoom = functions.https.onCall(async (data, context) => {
       cameraOn: false,
       micOn: false,
       focusStatus: "focused",
+      chatMessage: "",
+      chatUpdatedAt: null,
       joinedAt: now,
       lastSeenAt: now,
       deviceLabel: "browser",
@@ -1013,7 +1184,7 @@ exports.createStudyRoom = functions.https.onCall(async (data, context) => {
   return { success: true, roomId: result.roomId };
 });
 
-exports.joinStudyRoomSession = functions.https.onCall(async (data, context) => {
+exports.joinStudyRoomSession = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const roomId = String(data?.roomId || "").trim();
   if (!roomId) {
@@ -1068,6 +1239,8 @@ exports.joinStudyRoomSession = functions.https.onCall(async (data, context) => {
       cameraOn: false,
       micOn: false,
       focusStatus: "focused",
+      chatMessage: "",
+      chatUpdatedAt: null,
       joinedAt: now,
       lastSeenAt: now,
       deviceLabel: "browser",
@@ -1083,7 +1256,7 @@ exports.joinStudyRoomSession = functions.https.onCall(async (data, context) => {
   return { success: true, roomId };
 });
 
-exports.leaveStudyRoomSession = functions.https.onCall(async (data, context) => {
+exports.leaveStudyRoomSession = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const roomId = String(data?.roomId || "").trim();
   if (!roomId) {
@@ -1100,62 +1273,105 @@ exports.leaveStudyRoomSession = functions.https.onCall(async (data, context) => 
     }
 
     const roomData = roomSnap.data() || {};
-    const participantIds = Array.isArray(roomData.participantIds) ? roomData.participantIds : [];
-    if (!participantIds.includes(uid)) {
-      return;
-    }
-
-    const nextParticipantIds = participantIds.filter((participantUid) => participantUid !== uid);
-    const now = new Date();
-    const crewRef = db.collection("crews").doc(roomData.crewId);
-    tx.delete(roomRef.collection("participants").doc(uid));
-
-    if (nextParticipantIds.length === 0) {
-      tx.set(roomRef, {
-        participantIds: [],
-        participantCount: 0,
-        status: "ended",
-        endedAt: now,
-        lastActivityAt: now,
-      }, { merge: true });
-      if (roomData.crewId) {
-        tx.set(crewRef, {
-          activeStudyRoomId: "",
-          activeStudyRoomStatus: "",
-          updatedAt: now,
-        }, { merge: true });
-      }
-      return;
-    }
-
-    let nextHostUid = roomData.hostUid;
-    let nextHostName = roomData.hostName || "";
-    if (roomData.hostUid === uid) {
-      nextHostUid = nextParticipantIds[0];
-      const nextHostSnap = await tx.get(db.collection("users").doc(nextHostUid));
-      nextHostName = nextHostSnap.exists ? getDisplayNameFromUser(nextHostSnap.data()) : "탐사원";
-      tx.set(roomRef.collection("participants").doc(nextHostUid), {
-        role: "host",
-      }, { merge: true });
-    }
-
-    const nextStatus = nextParticipantIds.length >= 2 ? "live" : "waiting";
-    tx.set(roomRef, {
-      participantIds: nextParticipantIds,
-      participantCount: nextParticipantIds.length,
-      hostUid: nextHostUid,
-      hostName: nextHostName,
-      status: nextStatus,
-      lastActivityAt: now,
-    }, { merge: true });
-    if (roomData.crewId) {
-      tx.set(crewRef, {
-        activeStudyRoomId: roomId,
-        activeStudyRoomStatus: nextStatus,
-        updatedAt: now,
-      }, { merge: true });
-    }
+    await removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomData, uid);
   });
 
   return { success: true };
+});
+
+exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) {
+    throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const userRef = db.collection("users").doc(uid);
+  const cleanup = {
+    deleteCrew: false,
+    deleteRoomIds: [],
+    nextCrewData: null,
+  };
+
+  await db.runTransaction(async (tx) => {
+    const [crewSnap, userSnap] = await Promise.all([
+      tx.get(crewRef),
+      tx.get(userRef),
+    ]);
+
+    if (!crewSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+    }
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+    }
+
+    const crewData = crewSnap.data() || {};
+    const userData = userSnap.data() || {};
+    const memberIds = Array.isArray(crewData.memberIds) ? crewData.memberIds.filter(Boolean) : [];
+
+    if (userData.crewId !== crewId || !memberIds.includes(uid)) {
+      throw new functions.https.HttpsError("permission-denied", "현재 소속된 크루만 탈퇴할 수 있습니다.");
+    }
+
+    const isLeader = crewData.leaderId === uid;
+    if (isLeader && memberIds.length > 1) {
+      throw new functions.https.HttpsError("failed-precondition", "리더는 혼자 남았을 때만 탈퇴할 수 있습니다.");
+    }
+
+    if (crewData.activeStudyRoomId) {
+      const roomRef = db.collection("studyRooms").doc(crewData.activeStudyRoomId);
+      const roomSnap = await tx.get(roomRef);
+      if (roomSnap.exists) {
+        await removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomSnap.data() || {}, uid);
+        cleanup.deleteRoomIds.push(roomRef.id);
+      }
+    }
+
+    tx.set(userRef, buildClearedCrewUserFields(), { merge: true });
+
+    if (isLeader) {
+      cleanup.deleteCrew = true;
+      const roomQuery = await db.collection("studyRooms").where("crewId", "==", crewId).get();
+      roomQuery.docs.forEach((roomDoc) => {
+        if (!cleanup.deleteRoomIds.includes(roomDoc.id)) cleanup.deleteRoomIds.push(roomDoc.id);
+      });
+      tx.delete(crewRef);
+      return;
+    }
+
+    const nextMemberIds = memberIds.filter((memberId) => memberId !== uid);
+    const nextCrewData = {
+      ...crewData,
+      memberIds: nextMemberIds,
+      memberCount: nextMemberIds.length,
+      updatedAt: new Date(),
+    };
+
+    tx.set(crewRef, {
+      memberIds: nextMemberIds,
+      memberCount: nextMemberIds.length,
+      updatedAt: nextCrewData.updatedAt,
+    }, { merge: true });
+    cleanup.nextCrewData = nextCrewData;
+  });
+
+  if (cleanup.deleteCrew) {
+    await admin.firestore().recursiveDelete(crewRef);
+    for (const roomId of cleanup.deleteRoomIds) {
+      await admin.firestore().recursiveDelete(db.collection("studyRooms").doc(roomId));
+    }
+    return { success: true, deletedCrew: true };
+  }
+
+  if (cleanup.nextCrewData) {
+    await syncCrewToMembers(crewId, {
+      ...cleanup.nextCrewData,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  return { success: true, deletedCrew: false };
 });

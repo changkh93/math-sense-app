@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { Camera, CameraOff, Mic, MicOff, PhoneOff, Radio, UserRound, Users, Video } from 'lucide-react';
+import { Camera, CameraOff, Hash, MessageSquare, MessageSquareOff, Mic, MicOff, PhoneOff, Radio, Send, UserRound, Users, Video } from 'lucide-react';
 import Peer from 'peerjs';
 import { db, functions } from '../../firebase';
 import soundManager from '../../utils/SoundManager';
+
+const CHAT_MAX_LENGTH = 48;
 
 const tileStyle = {
   position: 'relative',
@@ -73,16 +75,23 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message
             className="font-tech"
             style={{
               justifySelf: 'start',
-              maxWidth: '100%',
-              padding: '0.42rem 0.65rem',
-              borderRadius: 999,
-              background: 'rgba(148, 163, 184, 0.18)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.86)',
-              fontSize: '0.82rem',
+              maxWidth: '88%',
+              padding: '0.5rem 0.8rem',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.9))',
+              border: '1px solid rgba(125, 211, 252, 0.32)',
+              color: '#f8fafc',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              lineHeight: 1.35,
+              boxShadow: '0 10px 24px rgba(2, 6, 23, 0.42)',
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(14px)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical'
             }}
           >
             {message}
@@ -124,6 +133,14 @@ function formatRemainingLabel(room, nowMs) {
   return `${minutes}:${seconds} 남음`;
 }
 
+function normalizeChatMessage(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX_LENGTH);
+}
+
+function clampChatDraft(value) {
+  return String(value || '').slice(0, CHAT_MAX_LENGTH);
+}
+
 export default function StudyStreamRoomView({ roomId, user, userData, crew, onLeave }) {
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -135,11 +152,23 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const [error, setError] = useState('');
   const [nowMs, setNowMs] = useState(0);
   const [roomAction, setRoomAction] = useState('');
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatAction, setChatAction] = useState('');
+  const [controlAction, setControlAction] = useState('');
 
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callsRef = useRef(new Map());
   const leavingRef = useRef(false);
+
+  const localParticipant = useMemo(
+    () => participants.find((participant) => participant.uid === user.uid) || null,
+    [participants, user.uid]
+  );
+  const isHost = room?.hostUid === user.uid;
+  const isChatEnabled = room?.chatEnabled !== false;
+  const areMicsEnabled = room?.micsEnabled !== false;
+  const localChatMessage = localParticipant?.chatMessage || '';
   useEffect(() => {
     const roomUnsubscribe = onSnapshot(doc(db, 'studyRooms', roomId), (snap) => {
       if (!snap.exists()) {
@@ -326,6 +355,24 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     }, { merge: true });
   };
 
+  useEffect(() => {
+    const stream = localStreamRef.current;
+    if (!stream || areMicsEnabled || !micOn) return;
+
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+    setMicOn(false);
+    updateParticipantPresence({ micOn: false }).catch((err) => {
+      console.error('Failed to sync forced mute:', err);
+    });
+  }, [areMicsEnabled, micOn]);
+
+  useEffect(() => {
+    if (isChatEnabled) return;
+    setChatDraft('');
+  }, [isChatEnabled]);
+
   const toggleCamera = async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
@@ -341,6 +388,10 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const toggleMic = async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
+    if (!areMicsEnabled) {
+      alert('운영자가 전체 마이크를 꺼 두었습니다.');
+      return;
+    }
     const nextValue = !micOn;
     stream.getAudioTracks().forEach((track) => {
       track.enabled = nextValue;
@@ -354,6 +405,56 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     setFocusStatus(nextStatus);
     await updateParticipantPresence({ focusStatus: nextStatus });
     soundManager.playClick();
+  };
+
+  const submitChatMessage = async () => {
+    const nextMessage = normalizeChatMessage(chatDraft);
+    if (!isChatEnabled) {
+      alert('운영자가 채팅을 닫아 두었습니다.');
+      return;
+    }
+    if (!nextMessage || chatAction) return;
+
+    setChatAction('sending');
+    setError('');
+    try {
+      await updateParticipantPresence({
+        chatMessage: nextMessage,
+        chatUpdatedAt: serverTimestamp(),
+      });
+      setChatDraft('');
+      soundManager.playClick();
+    } catch (err) {
+      console.error('Failed to send stream chat:', err);
+      setError('채팅을 보내지 못했습니다.');
+    } finally {
+      setChatAction('');
+    }
+  };
+
+  const handleChatKeyDown = async (event) => {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    await submitChatMessage();
+  };
+
+  const handleRoomControl = async (partialData) => {
+    if (!isHost || controlAction) return;
+
+    setControlAction(Object.keys(partialData)[0] || 'updating');
+    setError('');
+    try {
+      await setDoc(doc(db, 'studyRooms', roomId), {
+        ...partialData,
+        lastActivityAt: serverTimestamp(),
+      }, { merge: true });
+      soundManager.playClick();
+    } catch (err) {
+      console.error('Failed to update room controls:', err);
+      setError('방 제어 상태를 바꾸지 못했습니다.');
+    } finally {
+      setControlAction('');
+    }
   };
 
   const handleLeave = async () => {
@@ -398,6 +499,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         cameraOn: participant.cameraOn !== false,
         stream: remoteEntry?.stream || null,
         role: participant.role,
+        chatMessage: participant.chatMessage || '',
       };
     });
 
@@ -422,6 +524,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
                 <Hash size={14} /> {crew.inviteCode}
               </span>
             )}
+            <span>{areMicsEnabled ? '마이크 전체 허용' : '마이크 전체 차단'}</span>
+            <span>{isChatEnabled ? '채팅 열림' : '채팅 닫힘'}</span>
           </div>
         </div>
 
@@ -450,6 +554,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           subtitle={focusStatus === 'away' ? '자리 비움' : focusStatus === 'break' ? '쉬는 중' : '집중 중'}
           cameraOn={cameraOn}
           isLocal
+          message={isChatEnabled ? localChatMessage : ''}
           badgeLabel={room?.hostUid === user.uid ? 'HOST' : 'ME'}
           badgeColor={room?.hostUid === user.uid ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
         />
@@ -462,6 +567,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
             subtitle={participant.subtitle}
             cameraOn={participant.cameraOn}
             isLocal={false}
+            message={isChatEnabled ? participant.chatMessage : ''}
             badgeLabel={participant.role === 'host' ? 'HOST' : 'CREW'}
             badgeColor={participant.role === 'host' ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
           />
@@ -476,14 +582,95 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         ))}
       </div>
 
+      <div className="hud-border" style={{ marginTop: '1rem', padding: '0.8rem', borderRadius: '10px', background: 'rgba(6, 10, 28, 0.62)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800 }}>
+              STREAM CHAT
+            </div>
+            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.18rem' }}>
+              짧게 보내면 내 화면 위 말풍선으로 보입니다.
+            </div>
+          </div>
+          {isHost && (
+            <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="space-nav-link font-tech"
+                onClick={() => handleRoomControl({ micsEnabled: !areMicsEnabled })}
+                disabled={!!controlAction}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.42rem', borderRadius: '8px' }}
+              >
+                {areMicsEnabled ? <MicOff size={15} /> : <Mic size={15} />}
+                {areMicsEnabled ? '마이크 전체 끄기' : '마이크 전체 켜기'}
+              </button>
+              <button
+                type="button"
+                className="space-nav-link font-tech"
+                onClick={() => handleRoomControl({ chatEnabled: !isChatEnabled })}
+                disabled={!!controlAction}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.42rem', borderRadius: '8px' }}
+              >
+                {isChatEnabled ? <MessageSquareOff size={15} /> : <MessageSquare size={15} />}
+                {isChatEnabled ? '채팅 닫기' : '채팅 열기'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.65rem', marginTop: '0.8rem' }}>
+          <div>
+            <input
+              type="text"
+              value={chatDraft}
+              onChange={(event) => setChatDraft(clampChatDraft(event.target.value))}
+              onKeyDown={handleChatKeyDown}
+              disabled={!isChatEnabled || chatAction === 'sending'}
+              maxLength={CHAT_MAX_LENGTH}
+              placeholder={isChatEnabled ? '짧게 한마디 남겨보세요.' : '운영자가 채팅을 닫았습니다.'}
+              className="font-tech"
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 0.9rem',
+                borderRadius: '10px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(2, 6, 23, 0.88)',
+                color: 'var(--text-bright)',
+                outline: 'none'
+              }}
+            />
+            <div className="font-tech" style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {chatDraft.length}/{CHAT_MAX_LENGTH}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="space-nav-link font-tech"
+            onClick={submitChatMessage}
+            disabled={!isChatEnabled || !chatDraft.trim() || chatAction === 'sending'}
+            style={{ minWidth: '120px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', borderRadius: '10px' }}
+          >
+            <Send size={15} />
+            {chatAction === 'sending' ? '보내는 중...' : '말하기'}
+          </button>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
         <button type="button" className="space-nav-link font-tech" onClick={toggleCamera} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}>
           {cameraOn ? <Camera size={16} /> : <CameraOff size={16} />}
           {cameraOn ? '카메라 끄기' : '카메라 켜기'}
         </button>
-        <button type="button" className="space-nav-link font-tech" onClick={toggleMic} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}>
+        <button
+          type="button"
+          className="space-nav-link font-tech"
+          onClick={toggleMic}
+          disabled={!areMicsEnabled}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: areMicsEnabled ? 1 : 0.55 }}
+        >
           {micOn ? <Mic size={16} /> : <MicOff size={16} />}
-          {micOn ? '마이크 끄기' : '마이크 켜기'}
+          {!areMicsEnabled ? '마이크 차단됨' : micOn ? '마이크 끄기' : '마이크 켜기'}
         </button>
         <button type="button" className="space-nav-link font-tech" onClick={() => updateFocusStatus('focused')} style={{ borderRadius: '8px' }}>
           집중 중

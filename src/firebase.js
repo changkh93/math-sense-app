@@ -14,16 +14,25 @@ const firebaseConfig = {
   measurementId: "G-SGWRBZ7X2E"
 };
 
-const app = initializeApp(firebaseConfig);
-const functions = getFunctions(app);
+export const FUNCTIONS_REGION = "asia-northeast3";
 
+const app = initializeApp(firebaseConfig);
 const shouldUseFunctionsEmulator =
   typeof window !== 'undefined' &&
   import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
 
+const functions = getFunctions(app, FUNCTIONS_REGION);
+
 if (shouldUseFunctionsEmulator && !globalThis.__METASENSE_FUNCTIONS_EMULATOR_CONNECTED__) {
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
   globalThis.__METASENSE_FUNCTIONS_EMULATOR_CONNECTED__ = true;
+}
+
+export function getFunctionUrl(functionName) {
+  if (shouldUseFunctionsEmulator) {
+    return `http://127.0.0.1:5001/${firebaseConfig.projectId}/${FUNCTIONS_REGION}/${functionName}`;
+  }
+  return `https://${FUNCTIONS_REGION}-${firebaseConfig.projectId}.cloudfunctions.net/${functionName}`;
 }
 
 export const auth = getAuth(app);

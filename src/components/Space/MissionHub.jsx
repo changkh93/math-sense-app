@@ -10,7 +10,7 @@ import 'katex/dist/katex.min.css'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import UnitLeaderboard from './UnitLeaderboard'
 import TimeAttackOverlay from './TimeAttackOverlay'
-import { db } from '../../firebase'
+import { db, getFunctionUrl } from '../../firebase'
 import { doc, setDoc, getDoc, onSnapshot, serverTimestamp, increment } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
@@ -954,7 +954,7 @@ export default function MissionHub({
       })
       
       if (navigator.sendBeacon) {
-        navigator.sendBeacon("https://us-central1-math-sense-1f6a8.cloudfunctions.net/syncVideoProgress", payload)
+        navigator.sendBeacon(getFunctionUrl('syncVideoProgress'), payload)
       }
     }
 

@@ -133,7 +133,16 @@ service cloud.firestore {
 
     match /studyRooms/{roomId} {
       allow read: if isAuth();
-      allow create, update, delete: if false;
+      allow create, delete: if false;
+      allow update: if isAuth() && (
+        (
+          resource.data.hostUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'chatEnabled', 'micsEnabled', 'lastActivityAt'
+          ])
+        ) ||
+        isAdmin()
+      );
 
       match /participants/{participantId} {
         allow read: if isAuth();
@@ -141,13 +150,13 @@ service cloud.firestore {
           request.auth.uid == participantId &&
           request.auth.uid in get(/databases/$(database)/documents/studyRooms/$(roomId)).data.participantIds &&
           request.resource.data.keys().hasOnly([
-            'uid', 'displayName', 'role', 'peerId', 'cameraOn', 'micOn', 'focusStatus', 'joinedAt', 'lastSeenAt', 'deviceLabel'
+            'uid', 'displayName', 'role', 'peerId', 'cameraOn', 'micOn', 'focusStatus', 'joinedAt', 'lastSeenAt', 'deviceLabel', 'chatMessage', 'chatUpdatedAt'
           ]);
         allow update: if isAuth() &&
           request.auth.uid == participantId &&
           request.auth.uid in get(/databases/$(database)/documents/studyRooms/$(roomId)).data.participantIds &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'uid', 'displayName', 'role', 'peerId', 'cameraOn', 'micOn', 'focusStatus', 'joinedAt', 'lastSeenAt', 'deviceLabel'
+            'uid', 'displayName', 'role', 'peerId', 'cameraOn', 'micOn', 'focusStatus', 'joinedAt', 'lastSeenAt', 'deviceLabel', 'chatMessage', 'chatUpdatedAt'
           ]);
         allow delete: if isAuth() && (request.auth.uid == participantId || isAdmin());
       }
