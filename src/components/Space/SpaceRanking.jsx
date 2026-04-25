@@ -11,7 +11,7 @@ import CometBadge from './CometBadge'
 import { buildStreakWriteAudit, extractLearningActivityDates, getEffectiveStreak, getTodayKST, getKSTComponents, recalculateStreakState } from '../../utils/streakUtils'
 import { calculateSEI } from '../../utils/rankingUtils'
 import { useAdmin } from '../../hooks/useAdmin'
-import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getFrameSurfaceStyles, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
+import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getAnonymousLabel, getFrameSurfaceStyles, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
 
 export default function SpaceRanking({ user, userData }) {
   const [topUsers, setTopUsers] = useState([])
@@ -269,11 +269,13 @@ export default function SpaceRanking({ user, userData }) {
           return bScore - aScore
         })[0] || null
 
-        const bestAnswer = [...answers].sort((a, b) => {
+        const bestAnswer = [...answers]
+          .filter((answer) => answer?.isTeacher !== true && answer?.userId !== 'admin')
+          .sort((a, b) => {
           const aScore = (a.isAccepted ? 18 : 0) + (a.isVerified ? 10 : 0) + Math.min((a.content || '').length, 400) / 20
           const bScore = (b.isAccepted ? 18 : 0) + (b.isVerified ? 10 : 0) + Math.min((b.content || '').length, 400) / 20
           return bScore - aScore
-        })[0] || null
+          })[0] || null
 
         if (isMounted) {
           setHallOfFame(prev => ({ ...prev, bestQuestion, bestAnswer }))
@@ -458,7 +460,9 @@ export default function SpaceRanking({ user, userData }) {
             <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
               <div style={{ color: '#60a5fa', fontWeight: 800, marginBottom: '0.35rem' }}>질문 개척상</div>
               <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>
-                {hallOfFame.bestQuestion ? '익명 질문자' : '아직 선정 중'}
+                {hallOfFame.bestQuestion
+                  ? (hallOfFame.bestQuestion.anonymousLabel || getAnonymousLabel(hallOfFame.bestQuestion.userId))
+                  : '아직 선정 중'}
               </div>
               <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem', lineHeight: 1.45 }}>
                 {hallOfFame.bestQuestion ? (hallOfFame.bestQuestion.content || '').slice(0, 72) : '질문자는 계속 익명으로 보호됩니다.'}
