@@ -17,8 +17,90 @@ const tileStyle = {
   aspectRatio: '4 / 5',
 };
 
-function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message, badgeLabel, badgeColor = 'rgba(96, 165, 250, 0.18)', locationLine, action }) {
+function AudioLevelMeter({ level = 0, muted = false, blocked = false, compact = false }) {
+  const bars = compact ? 8 : 12;
+  const activeBars = muted || blocked ? 0 : Math.min(bars, Math.ceil(level * bars));
+  const label = blocked ? '차단' : muted ? '음소거' : level > 0.04 ? '입력 중' : '대기';
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', minWidth: compact ? 0 : 132 }}>
+      <div style={{ display: 'inline-flex', alignItems: 'end', gap: 3, height: compact ? 14 : 18 }}>
+        {Array.from({ length: bars }).map((_, index) => {
+          const isActive = index < activeBars;
+          return (
+            <span
+              key={index}
+              style={{
+                width: compact ? 3 : 4,
+                height: `${5 + (index % 4) * (compact ? 2 : 3)}px`,
+                borderRadius: 999,
+                background: isActive ? 'var(--planet-green)' : 'rgba(255,255,255,0.16)',
+                boxShadow: isActive ? '0 0 8px rgba(34,197,94,0.55)' : 'none',
+                transition: 'height 80ms linear, background 120ms ease',
+              }}
+            />
+          );
+        })}
+      </div>
+      <span className="font-tech" style={{ color: muted || blocked ? 'rgba(255,255,255,0.48)' : 'var(--crystal-cyan)', fontSize: compact ? '0.68rem' : '0.76rem', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function useAudioLevel(stream, enabled = true) {
+  const [level, setLevel] = useState(0);
+  const hasAudioInput = !!stream && enabled && stream.getAudioTracks().length > 0;
+
+  useEffect(() => {
+    if (!hasAudioInput) {
+      return undefined;
+    }
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      return undefined;
+    }
+
+    let animationFrameId = 0;
+    const audioContext = new AudioContextClass();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.72;
+    const source = audioContext.createMediaStreamSource(stream);
+    const samples = new Uint8Array(analyser.frequencyBinCount);
+    source.connect(analyser);
+
+    const tick = () => {
+      analyser.getByteTimeDomainData(samples);
+      let sumSquares = 0;
+      for (let i = 0; i < samples.length; i += 1) {
+        const centered = (samples[i] - 128) / 128;
+        sumSquares += centered * centered;
+      }
+      const rms = Math.sqrt(sumSquares / samples.length);
+      setLevel(Math.min(1, Math.max(0, rms * 5)));
+      animationFrameId = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      source.disconnect();
+      analyser.disconnect();
+      audioContext.close().catch(() => {});
+    };
+  }, [hasAudioInput, stream]);
+
+  return hasAudioInput ? level : 0;
+}
+
+function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBlocked = false, isLocal, message, badgeLabel, badgeColor = 'rgba(96, 165, 250, 0.18)', locationLine, action }) {
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
+  const audioLevel = useAudioLevel(stream, !!stream);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -29,6 +111,16 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message
       });
     }
   }, [stream, cameraOn]);
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+    audioRef.current.srcObject = stream || null;
+    if (stream && !muted) {
+      audioRef.current.play().catch(() => {
+        // Remote audio can wait until the user interacts with the room.
+      });
+    }
+  }, [cameraOn, muted, stream]);
 
   return (
     <div style={tileStyle}>
@@ -97,6 +189,9 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message
           <UserMinus size={16} />
         </button>
       )}
+      {!muted && stream && !cameraOn && (
+        <audio ref={audioRef} autoPlay playsInline />
+      )}
       <div style={{
         position: 'absolute',
         inset: 'auto 0 0 0',
@@ -158,6 +253,13 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message
                 {locationLine}
               </div>
             )}
+            <div style={{ marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', color: micOn ? 'var(--planet-green)' : 'rgba(255,255,255,0.5)', fontSize: '0.74rem' }}>
+                {micOn ? <Mic size={13} /> : <MicOff size={13} />}
+                {audioBlocked ? '차단됨' : micOn ? '마이크 켜짐' : '음소거'}
+              </span>
+              <AudioLevelMeter level={audioLevel} muted={!micOn} blocked={audioBlocked} compact />
+            </div>
           </div>
           <div style={{ color: cameraOn ? 'var(--planet-green)' : 'rgba(255,255,255,0.45)' }}>
             {cameraOn ? <Camera size={18} /> : <CameraOff size={18} />}
@@ -240,6 +342,9 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const isChatEnabled = room?.chatEnabled !== false;
   const areMicsEnabled = room?.micsEnabled !== false;
   const localChatMessage = localParticipant?.chatMessage || '';
+  const localAudioLevel = useAudioLevel(localStream, !!localStream);
+  const hasLocalAudioTrack = !!localStream?.getAudioTracks().length;
+  const localMicBlocked = !areMicsEnabled || !hasLocalAudioTrack;
 
   const closeRoomResources = useCallback(() => {
     callsRef.current.forEach((call) => call.close());
@@ -312,14 +417,31 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           throw new Error('이 브라우저는 카메라 접근을 지원하지 않습니다.');
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 360 },
-            frameRate: { ideal: 24, max: 30 },
-          },
-          audio: true,
-        });
+        const videoConstraints = {
+          width: { ideal: 640 },
+          height: { ideal: 360 },
+          frameRate: { ideal: 24, max: 30 },
+        };
+        let mediaWarning = '';
+        let stream;
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: videoConstraints,
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
+        } catch (mediaErr) {
+          console.warn('Failed to open camera and microphone together:', mediaErr);
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: videoConstraints,
+            audio: false,
+          });
+          mediaWarning = '마이크를 시작하지 못했습니다. 브라우저 마이크 권한과 입력 장치를 확인해주세요.';
+        }
 
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
@@ -333,6 +455,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         setLocalStream(stream);
         setCameraOn(true);
         setMicOn(false);
+        if (mediaWarning) setError(mediaWarning);
 
         const peer = new Peer();
         peerRef.current = peer;
@@ -514,8 +637,14 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       alert('운영자가 전체 마이크를 꺼 두었습니다.');
       return;
     }
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) {
+      alert('사용 가능한 마이크 입력이 없습니다. 브라우저 권한과 마이크 장치를 확인해주세요.');
+      await updateParticipantPresence({ micOn: false });
+      return;
+    }
     const nextValue = !micOn;
-    stream.getAudioTracks().forEach((track) => {
+    audioTracks.forEach((track) => {
       track.enabled = nextValue;
     });
     setMicOn(nextValue);
@@ -629,6 +758,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
             ? '쉬는 중'
             : '집중 중',
         cameraOn: participant.cameraOn !== false,
+        micOn: participant.micOn === true,
         stream: remoteEntry?.stream || null,
         role: participant.role,
         chatMessage: participant.chatMessage || '',
@@ -686,6 +816,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           label={userData?.studentName || user.displayName || '나'}
           subtitle={focusStatus === 'away' ? '자리 비움' : focusStatus === 'break' ? '쉬는 중' : '집중 중'}
           cameraOn={cameraOn}
+          micOn={micOn && hasLocalAudioTrack && areMicsEnabled}
+          audioBlocked={localMicBlocked}
           isLocal
           message={isChatEnabled ? localChatMessage : ''}
           badgeLabel={room?.hostUid === user.uid ? 'HOST' : 'ME'}
@@ -700,6 +832,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
             label={participant.label}
             subtitle={participant.subtitle}
             cameraOn={participant.cameraOn}
+            micOn={participant.micOn && areMicsEnabled}
+            audioBlocked={!areMicsEnabled}
             isLocal={false}
             message={isChatEnabled ? participant.chatMessage : ''}
             badgeLabel={participant.role === 'host' ? 'HOST' : 'CREW'}
@@ -797,6 +931,24 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         </div>
       </div>
 
+      <div className="hud-border" style={{ marginTop: '1rem', padding: '0.8rem', borderRadius: '10px', background: 'rgba(6, 10, 28, 0.46)', display: 'flex', justifyContent: 'space-between', gap: '0.85rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.78rem' }}>
+            MICROPHONE
+          </div>
+          <div className="font-tech" style={{ color: localMicBlocked ? '#fca5a5' : micOn ? 'var(--planet-green)' : 'rgba(255,255,255,0.62)', fontSize: '0.82rem', marginTop: '0.22rem' }}>
+            {!areMicsEnabled
+              ? '운영자가 전체 마이크를 차단했습니다.'
+              : !hasLocalAudioTrack
+                ? '마이크 입력 장치를 찾지 못했습니다.'
+                : micOn
+                  ? '내 마이크가 켜져 있습니다.'
+                  : '내 마이크가 음소거되어 있습니다.'}
+          </div>
+        </div>
+        <AudioLevelMeter level={localAudioLevel} muted={!micOn} blocked={localMicBlocked} />
+      </div>
+
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
         <button type="button" className="space-nav-link font-tech" onClick={toggleCamera} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}>
           {cameraOn ? <Camera size={16} /> : <CameraOff size={16} />}
@@ -806,11 +958,11 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           type="button"
           className="space-nav-link font-tech"
           onClick={toggleMic}
-          disabled={!areMicsEnabled}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: areMicsEnabled ? 1 : 0.55 }}
+          disabled={!areMicsEnabled || !hasLocalAudioTrack}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: areMicsEnabled && hasLocalAudioTrack ? 1 : 0.55 }}
         >
           {micOn ? <Mic size={16} /> : <MicOff size={16} />}
-          {!areMicsEnabled ? '마이크 차단됨' : micOn ? '마이크 끄기' : '마이크 켜기'}
+          {!areMicsEnabled ? '마이크 차단됨' : !hasLocalAudioTrack ? '마이크 없음' : micOn ? '마이크 끄기' : '마이크 켜기'}
         </button>
         <button type="button" className="space-nav-link font-tech" onClick={() => updateFocusStatus('focused')} style={{ borderRadius: '8px' }}>
           집중 중
