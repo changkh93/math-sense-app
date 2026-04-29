@@ -477,6 +477,96 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
         </div>
       </Motion.div>
 
+      {/* Study Stream Control */}
+      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card hud-border" style={{ padding: '1.3rem', borderRadius: 12, marginBottom: '1.2rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>STUDY STREAM</div>
+          <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.2rem', marginTop: '0.15rem' }}>집중방 컨트롤</div>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem' }}>
+            이 제어는 각 참여자 자신의 화면에만 표시되고, 본인 카메라와 상태만 바꿉니다.
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(min(420px, 100%), 1.35fr) minmax(min(300px, 100%), 0.85fr)', gap: '1rem', alignItems: 'stretch' }}>
+          <div>
+            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,243,255,0.2)', background: '#020617', position: 'relative' }}>
+              {previewStream && previewCameraOn ? (
+                <video ref={el => { if (el) el.srcObject = previewStream; }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div className="font-tech" style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.54)' }}>
+                  {previewError || '카메라가 꺼져 있습니다.'}
+                </div>
+              )}
+              <div className="font-tech" style={{ position: 'absolute', left: 12, bottom: 12, padding: '0.32rem 0.6rem', borderRadius: 999, background: 'rgba(2,6,23,0.72)', color: 'var(--text-bright)', fontSize: '0.82rem' }}>
+                {userData?.studentName || userData?.publicDisplayName || user?.displayName || '나'}
+              </div>
+            </div>
+            {previewError && previewCameraOn && <div className="font-tech" style={{ color: '#fda4af', lineHeight: 1.45, marginTop: '0.65rem' }}>{previewError}</div>}
+          </div>
+
+          <div style={{ ...panelStyle, display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: '100%' }}>
+            <button type="button" className="space-nav-link font-tech" onClick={() => { setPreviewCameraOn(p => !p); soundManager.playClick(); }} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}>
+              {previewCameraOn ? <Camera size={15} /> : <CameraOff size={15} />}
+              {previewCameraOn ? '카메라 ON' : '카메라 OFF'}
+            </button>
+
+            {status !== 'approved' ? (
+              <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>운영자 승인 후 방을 열 수 있습니다.</div>
+            ) : crewRoom ? (
+              <>
+                <div style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(2,6,23,0.62)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div className="font-tech" style={{ color: crewRoom.status === 'live' ? 'var(--planet-green)' : 'var(--planet-orange)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Radio size={14} /> {crewRoom.status === 'live' ? '집중 진행 중' : '입장 대기 중'}
+                  </div>
+                  <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.45rem', display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Users size={14} /> {crewRoom.participantCount || 0}/{crewRoom.maxParticipants || 3}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Clock3 size={14} /> {crewRoom.durationMinutes || 50}분</span>
+                  </div>
+                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.8rem', marginTop: '0.55rem', lineHeight: 1.45 }}>
+                    이미 열린 방이 있어 새 시간 선택은 방이 종료된 뒤 가능합니다.
+                  </div>
+                </div>
+                {isRoomParticipant ? (
+                  <button type="button" className="space-btn cosmic-btn font-tech" onClick={() => onEnterRoom && onEnterRoom(crewRoom.id)} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>집중방 다시 열기</button>
+                ) : (
+                  <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction || roomIsFull} onClick={handleJoinStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'joining' ? '입장 처리 중...' : roomIsFull ? '정원 가득 참' : '집중방 입장'}</button>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>아직 열린 집중방이 없습니다.</div>
+                {userData?.crewRole === 'leader' ? (
+                  <>
+                    <div style={{ display: 'grid', gap: '0.45rem' }}>
+                      <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                        집중 시간: <strong style={{ color: 'var(--crystal-cyan)' }}>{roomDuration}분</strong>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="120"
+                        step="10"
+                        value={roomDuration}
+                        onChange={(e) => setRoomDuration(Number(e.target.value))}
+                        style={{ width: '100%' }}
+                      />
+                      <div className="font-tech" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        <span>10분</span>
+                        <span>60분</span>
+                        <span>120분</span>
+                      </div>
+                    </div>
+                    <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction} onClick={handleCreateStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'creating' ? '집중방 여는 중...' : `${roomDuration}분 집중방 열기`}</button>
+                  </>
+                ) : (
+                  <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>리더가 방을 열면 여기서 입장할 수 있습니다.</div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </Motion.div>
+
       {/* Members */}
       <div style={{ marginBottom: '1.2rem' }}>
         <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem', marginBottom: '0.6rem' }}>CREW MEMBERS</div>
@@ -626,96 +716,6 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
             </div>
           </div>
         )}
-      </Motion.div>
-
-      {/* Study Stream Control */}
-      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card hud-border" style={{ padding: '1.3rem', borderRadius: 12, marginBottom: '1.2rem' }}>
-        <div style={{ marginBottom: '1rem' }}>
-          <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>STUDY STREAM</div>
-          <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.2rem', marginTop: '0.15rem' }}>집중방 컨트롤</div>
-          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem' }}>
-            이 제어는 각 참여자 자신의 화면에만 표시되고, 본인 카메라와 상태만 바꿉니다.
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(min(420px, 100%), 1.35fr) minmax(min(300px, 100%), 0.85fr)', gap: '1rem', alignItems: 'stretch' }}>
-          <div>
-            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,243,255,0.2)', background: '#020617', position: 'relative' }}>
-              {previewStream && previewCameraOn ? (
-                <video ref={el => { if (el) el.srcObject = previewStream; }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div className="font-tech" style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.54)' }}>
-                  {previewError || '카메라가 꺼져 있습니다.'}
-                </div>
-              )}
-              <div className="font-tech" style={{ position: 'absolute', left: 12, bottom: 12, padding: '0.32rem 0.6rem', borderRadius: 999, background: 'rgba(2,6,23,0.72)', color: 'var(--text-bright)', fontSize: '0.82rem' }}>
-                {userData?.studentName || userData?.publicDisplayName || user?.displayName || '나'}
-              </div>
-            </div>
-            {previewError && previewCameraOn && <div className="font-tech" style={{ color: '#fda4af', lineHeight: 1.45, marginTop: '0.65rem' }}>{previewError}</div>}
-          </div>
-
-          <div style={{ ...panelStyle, display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: '100%' }}>
-            <button type="button" className="space-nav-link font-tech" onClick={() => { setPreviewCameraOn(p => !p); soundManager.playClick(); }} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}>
-              {previewCameraOn ? <Camera size={15} /> : <CameraOff size={15} />}
-              {previewCameraOn ? '카메라 ON' : '카메라 OFF'}
-            </button>
-
-            {status !== 'approved' ? (
-              <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>운영자 승인 후 방을 열 수 있습니다.</div>
-            ) : crewRoom ? (
-              <>
-                <div style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(2,6,23,0.62)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div className="font-tech" style={{ color: crewRoom.status === 'live' ? 'var(--planet-green)' : 'var(--planet-orange)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Radio size={14} /> {crewRoom.status === 'live' ? '집중 진행 중' : '입장 대기 중'}
-                  </div>
-                  <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.45rem', display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Users size={14} /> {crewRoom.participantCount || 0}/{crewRoom.maxParticipants || 3}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Clock3 size={14} /> {crewRoom.durationMinutes || 50}분</span>
-                  </div>
-                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.8rem', marginTop: '0.55rem', lineHeight: 1.45 }}>
-                    이미 열린 방이 있어 새 시간 선택은 방이 종료된 뒤 가능합니다.
-                  </div>
-                </div>
-                {isRoomParticipant ? (
-                  <button type="button" className="space-btn cosmic-btn font-tech" onClick={() => onEnterRoom && onEnterRoom(crewRoom.id)} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>집중방 다시 열기</button>
-                ) : (
-                  <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction || roomIsFull} onClick={handleJoinStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'joining' ? '입장 처리 중...' : roomIsFull ? '정원 가득 참' : '집중방 입장'}</button>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>아직 열린 집중방이 없습니다.</div>
-                {userData?.crewRole === 'leader' ? (
-                  <>
-                    <div style={{ display: 'grid', gap: '0.45rem' }}>
-                      <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                        집중 시간: <strong style={{ color: 'var(--crystal-cyan)' }}>{roomDuration}분</strong>
-                      </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="120"
-                        step="10"
-                        value={roomDuration}
-                        onChange={(e) => setRoomDuration(Number(e.target.value))}
-                        style={{ width: '100%' }}
-                      />
-                      <div className="font-tech" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                        <span>10분</span>
-                        <span>60분</span>
-                        <span>120분</span>
-                      </div>
-                    </div>
-                    <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction} onClick={handleCreateStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'creating' ? '집중방 여는 중...' : `${roomDuration}분 집중방 열기`}</button>
-                  </>
-                ) : (
-                  <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>리더가 방을 열면 여기서 입장할 수 있습니다.</div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
       </Motion.div>
 
       {userData?.crewRole === 'leader' && (
