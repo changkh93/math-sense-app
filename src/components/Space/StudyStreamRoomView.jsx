@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { collection, doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { Camera, CameraOff, Hash, MessageSquare, MessageSquareOff, Mic, MicOff, PhoneOff, Radio, Send, UserRound, Users, Video } from 'lucide-react';
+import { Camera, CameraOff, Hash, MessageSquare, MessageSquareOff, Mic, MicOff, PhoneOff, Radio, Send, UserMinus, UserRound, Users, Video } from 'lucide-react';
 import Peer from 'peerjs';
 import { db, functions } from '../../firebase';
 import soundManager from '../../utils/SoundManager';
@@ -17,7 +17,7 @@ const tileStyle = {
   aspectRatio: '4 / 5',
 };
 
-function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message, badgeLabel, badgeColor = 'rgba(96, 165, 250, 0.18)' }) {
+function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message, badgeLabel, badgeColor = 'rgba(96, 165, 250, 0.18)', locationLine, action }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -67,6 +67,36 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message
           {badgeLabel}
         </div>
       )}
+      {action && (
+        <button
+          type="button"
+          className="space-nav-link font-tech"
+          onClick={action.onClick}
+          disabled={action.disabled}
+          title={action.title}
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            minWidth: 0,
+            width: 36,
+            height: 36,
+            padding: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 8,
+            background: 'rgba(15, 23, 42, 0.72)',
+            border: '1px solid rgba(248, 113, 113, 0.36)',
+            color: '#fecaca',
+            backdropFilter: 'blur(10px)',
+            opacity: action.disabled ? 0.55 : 1,
+            zIndex: 2,
+          }}
+        >
+          <UserMinus size={16} />
+        </button>
+      )}
       <div style={{
         position: 'absolute',
         inset: 'auto 0 0 0',
@@ -110,6 +140,24 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message
             <div className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.82rem' }}>
               {subtitle}
             </div>
+            {locationLine && (
+              <div
+                className="font-tech"
+                title={locationLine}
+                style={{
+                  marginTop: '0.28rem',
+                  maxWidth: 'min(280px, 72vw)',
+                  color: 'var(--crystal-cyan)',
+                  fontSize: '0.76rem',
+                  lineHeight: 1.35,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {locationLine}
+              </div>
+            )}
           </div>
           <div style={{ color: cameraOn ? 'var(--planet-green)' : 'rgba(255,255,255,0.45)' }}>
             {cameraOn ? <Camera size={18} /> : <CameraOff size={18} />}
@@ -146,6 +194,22 @@ function clampChatDraft(value) {
   return String(value || '').slice(0, CHAT_MAX_LENGTH);
 }
 
+function formatElapsedCompact(ms) {
+  if (!Number.isFinite(ms) || ms < 60000) return '';
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 60) return `${minutes}분째`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}시간 ${remainingMinutes}분째` : `${hours}시간째`;
+}
+
+function buildLiveLocationLine(liveStatus, nowMs) {
+  const currentLocation = liveStatus?.currentLocation || '현재 위치 동기화 중';
+  const enteredMs = getTimestampMs(liveStatus?.enteredAt) || getTimestampMs(liveStatus?.lastUpdatedAt);
+  const elapsedLabel = enteredMs ? formatElapsedCompact(nowMs - enteredMs) : '';
+  return elapsedLabel ? `${currentLocation} · ${elapsedLabel}` : currentLocation;
+}
+
 export default function StudyStreamRoomView({ roomId, user, userData, crew, onLeave }) {
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -160,11 +224,13 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const [chatDraft, setChatDraft] = useState('');
   const [chatAction, setChatAction] = useState('');
   const [controlAction, setControlAction] = useState('');
+  const [participantProfiles, setParticipantProfiles] = useState({});
 
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callsRef = useRef(new Map());
   const leavingRef = useRef(false);
+  const wasAcceptedParticipantRef = useRef(false);
 
   const localParticipant = useMemo(
     () => participants.find((participant) => participant.uid === user.uid) || null,
@@ -174,6 +240,22 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const isChatEnabled = room?.chatEnabled !== false;
   const areMicsEnabled = room?.micsEnabled !== false;
   const localChatMessage = localParticipant?.chatMessage || '';
+
+  const closeRoomResources = useCallback(() => {
+    callsRef.current.forEach((call) => call.close());
+    callsRef.current.clear();
+    setRemoteStreams([]);
+    if (peerRef.current) {
+      peerRef.current.destroy();
+      peerRef.current = null;
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+    setLocalStream(null);
+  }, []);
+
   useEffect(() => {
     const roomUnsubscribe = onSnapshot(doc(db, 'studyRooms', roomId), (snap) => {
       if (!snap.exists()) {
@@ -203,6 +285,23 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     }, 1000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    const participantIds = Array.from(new Set(participants.map((participant) => participant.uid).filter(Boolean)));
+    if (!participantIds.length) {
+      setParticipantProfiles({});
+      return undefined;
+    }
+
+    const unsubscribers = participantIds.map((participantUid) => onSnapshot(doc(db, 'users', participantUid), (snap) => {
+      setParticipantProfiles((prev) => ({
+        ...prev,
+        [participantUid]: snap.exists() ? snap.data() : null,
+      }));
+    }));
+
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [participants]);
 
   useEffect(() => {
     let cancelled = false;
@@ -381,6 +480,21 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     setChatDraft('');
   }, [isChatEnabled]);
 
+  useEffect(() => {
+    if (!room || leavingRef.current) return;
+    const participantIds = Array.isArray(room.participantIds) ? room.participantIds : [];
+    if (participantIds.includes(user.uid)) {
+      wasAcceptedParticipantRef.current = true;
+      return;
+    }
+    if (!wasAcceptedParticipantRef.current) return;
+
+    leavingRef.current = true;
+    closeRoomResources();
+    alert('운영자가 집중방에서 내보냈습니다.');
+    if (onLeave) onLeave();
+  }, [closeRoomResources, onLeave, room, user.uid]);
+
   const toggleCamera = async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
@@ -465,22 +579,32 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     }
   };
 
+  const handleKickParticipant = async (participant) => {
+    if (!isHost || !participant?.uid || participant.uid === user.uid || roomAction) return;
+    const participantName = participant.label || '크루 멤버';
+    if (!window.confirm(`${participantName}님을 집중방에서 내보낼까요?`)) return;
+
+    setRoomAction(`kicking:${participant.uid}`);
+    setError('');
+    try {
+      const kickStudyRoomParticipant = httpsCallable(functions, 'kickStudyRoomParticipant');
+      await kickStudyRoomParticipant({ roomId, targetUid: participant.uid });
+      soundManager.playClick();
+    } catch (err) {
+      console.error('Failed to kick study room participant:', err);
+      setError(err?.message || '멤버를 내보내지 못했습니다.');
+    } finally {
+      setRoomAction('');
+    }
+  };
+
   const handleLeave = async () => {
     if (leavingRef.current || roomAction) return;
     leavingRef.current = true;
     setRoomAction('leaving');
 
     try {
-      callsRef.current.forEach((call) => call.close());
-      callsRef.current.clear();
-      if (peerRef.current) {
-        peerRef.current.destroy();
-        peerRef.current = null;
-      }
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => track.stop());
-        localStreamRef.current = null;
-      }
+      closeRoomResources();
       const leaveStudyRoomSession = httpsCallable(functions, 'leaveStudyRoomSession');
       await leaveStudyRoomSession({ roomId });
       if (onLeave) onLeave();
@@ -508,6 +632,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         stream: remoteEntry?.stream || null,
         role: participant.role,
         chatMessage: participant.chatMessage || '',
+        liveStatus: participantProfiles[participant.uid]?.liveStatus || null,
       };
     });
 
@@ -565,6 +690,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           message={isChatEnabled ? localChatMessage : ''}
           badgeLabel={room?.hostUid === user.uid ? 'HOST' : 'ME'}
           badgeColor={room?.hostUid === user.uid ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
+          locationLine={buildLiveLocationLine(participantProfiles[user.uid]?.liveStatus || userData?.liveStatus, nowMs)}
         />
         {remoteTiles.map((participant) => (
           <StreamTile
@@ -578,6 +704,12 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
             message={isChatEnabled ? participant.chatMessage : ''}
             badgeLabel={participant.role === 'host' ? 'HOST' : 'CREW'}
             badgeColor={participant.role === 'host' ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
+            locationLine={buildLiveLocationLine(participant.liveStatus, nowMs)}
+            action={isHost && participant.role !== 'host' ? {
+              title: `${participant.label} 내보내기`,
+              disabled: roomAction === `kicking:${participant.uid}`,
+              onClick: () => handleKickParticipant(participant),
+            } : null}
           />
         ))}
         {Array.from({ length: Math.max(0, 2 - remoteTiles.length) }).map((_, index) => (

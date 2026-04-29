@@ -464,6 +464,14 @@ async function removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomDa
   const nextParticipantIds = participantIds.filter((participantUid) => participantUid !== uid);
   const now = new Date();
   const crewRef = roomData?.crewId ? db.collection("crews").doc(roomData.crewId) : null;
+  let nextHostUid = roomData.hostUid;
+  let nextHostName = roomData.hostName || "";
+
+  if (nextParticipantIds.length > 0 && roomData.hostUid === uid) {
+    nextHostUid = nextParticipantIds[0];
+    const nextHostSnap = await tx.get(db.collection("users").doc(nextHostUid));
+    nextHostName = nextHostSnap.exists ? getDisplayNameFromUser(nextHostSnap.data()) : "탐사원";
+  }
 
   tx.delete(roomRef.collection("participants").doc(uid));
 
@@ -485,12 +493,7 @@ async function removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomDa
     return;
   }
 
-  let nextHostUid = roomData.hostUid;
-  let nextHostName = roomData.hostName || "";
   if (roomData.hostUid === uid) {
-    nextHostUid = nextParticipantIds[0];
-    const nextHostSnap = await tx.get(db.collection("users").doc(nextHostUid));
-    nextHostName = nextHostSnap.exists ? getDisplayNameFromUser(nextHostSnap.data()) : "탐사원";
     tx.set(roomRef.collection("participants").doc(nextHostUid), {
       role: "host",
     }, { merge: true });
@@ -1274,6 +1277,51 @@ exports.leaveStudyRoomSession = regionalFunctions.https.onCall(async (data, cont
 
     const roomData = roomSnap.data() || {};
     await removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomData, uid);
+  });
+
+  return { success: true };
+});
+
+exports.kickStudyRoomParticipant = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const roomId = String(data?.roomId || "").trim();
+  const targetUid = String(data?.targetUid || "").trim();
+  if (!roomId) {
+    throw new functions.https.HttpsError("invalid-argument", "방 ID가 없습니다.");
+  }
+  if (!targetUid) {
+    throw new functions.https.HttpsError("invalid-argument", "내보낼 멤버 ID가 없습니다.");
+  }
+  if (targetUid === uid) {
+    throw new functions.https.HttpsError("invalid-argument", "본인은 내보낼 수 없습니다.");
+  }
+
+  const db = admin.firestore();
+  const roomRef = db.collection("studyRooms").doc(roomId);
+
+  await db.runTransaction(async (tx) => {
+    const roomSnap = await tx.get(roomRef);
+    if (!roomSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "집중방을 찾을 수 없습니다.");
+    }
+
+    const roomData = roomSnap.data() || {};
+    if ((roomData.status || "waiting") === "ended") {
+      throw new functions.https.HttpsError("failed-precondition", "이미 종료된 집중방입니다.");
+    }
+    if (roomData.hostUid !== uid) {
+      throw new functions.https.HttpsError("permission-denied", "운영자만 멤버를 내보낼 수 있습니다.");
+    }
+    if (roomData.hostUid === targetUid) {
+      throw new functions.https.HttpsError("permission-denied", "운영자는 본인을 내보낼 수 없습니다.");
+    }
+
+    const participantIds = Array.isArray(roomData.participantIds) ? roomData.participantIds : [];
+    if (!participantIds.includes(targetUid)) {
+      throw new functions.https.HttpsError("not-found", "이미 방에 없는 멤버입니다.");
+    }
+
+    await removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomData, targetUid);
   });
 
   return { success: true };

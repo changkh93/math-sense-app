@@ -5,6 +5,7 @@ import { httpsCallable } from 'firebase/functions';
 import { ArrowLeft, CalendarDays, Camera, CameraOff, Clock3, Crown, Loader2, LogOut, Radio, Send, StickyNote, Trash2, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
+import { useLearningHistory } from '../../hooks/useLearningHistory';
 import soundManager from '../../utils/SoundManager';
 import CrewSettingsModal from './CrewSettingsModal';
 import { formatCrewSchedule } from './crewSchedule';
@@ -32,6 +33,28 @@ function getPresenceInfo(profile) {
   if (liveStatus?.state === 'away') return { label: '자리비움', color: '#fbbf24', dot: '#fbbf24' };
   return { label: '온라인', color: 'var(--planet-green)', dot: '#22c55e' };
 }
+function getTimestampMs(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+function formatElapsedCompact(ms) {
+  if (!Number.isFinite(ms) || ms < 60000) return '';
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 60) return `${minutes}분째`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}시간 ${remainingMinutes}분째` : `${hours}시간째`;
+}
+function buildTodaySummary(dailyStats) {
+  const items = [];
+  if ((dailyStats?.quizCount || 0) > 0) items.push(`퀴즈 ${dailyStats.quizCount}회`);
+  if ((dailyStats?.totalVideoSeconds || 0) > 0) items.push(`영상 ${Math.floor(dailyStats.totalVideoSeconds / 60)}분`);
+  if ((dailyStats?.logCount || 0) > 0) items.push(`로그 ${dailyStats.logCount}회`);
+  if ((dailyStats?.attentionOpportunities || 0) > 0) items.push(`집중도 ${dailyStats.attentionHits}/${dailyStats.attentionOpportunities}`);
+  return items.join(' · ');
+}
 function getFunctionsErrorMessage(err, fb) {
   const c = err?.code || '';
   if (c.includes('not-found')) return '해당 크루를 찾지 못했습니다.';
@@ -53,6 +76,72 @@ function getGreetingReadMeta(note, crewMemberIds = [], currentUid = '') {
   const hasCurrentUserRead = currentUid ? normalizedReadBy.includes(currentUid) : false;
   const isFullyRead = totalCount > 0 && readCount >= totalCount;
   return { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead };
+}
+
+function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, currentDisplayName, todayKey }) {
+  const { dailyStats, loading } = useLearningHistory(member?.uid, todayKey);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const isSelf = member.uid === currentUid;
+  const isLeader = member.crewRole === 'leader';
+  const studied = member.lastStreakDate === todayKey;
+  const presence = getPresenceInfo(profile);
+  const liveStatus = profile?.liveStatus || {};
+  const currentLocation = liveStatus.currentLocation || '접속 기록 없음';
+  const enteredMs = getTimestampMs(liveStatus.enteredAt) || getTimestampMs(liveStatus.lastUpdatedAt);
+  const elapsedLabel = enteredMs ? formatElapsedCompact(nowMs - enteredMs) : '';
+  const summaryText = buildTodaySummary(dailyStats);
+  const displayName = isSelf
+    ? getMemberLabel(currentUserData, currentDisplayName || '나')
+    : getMemberLabel(member);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setNowMs(Date.now()), 60000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
+  return (
+    <div className="glass-card hud-border" style={{ padding: '1rem', borderRadius: 10, minHeight: 204, display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
+          {isLeader && <Crown size={14} style={{ color: '#fbbf24', flexShrink: 0 }} />}
+          <span className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {displayName}{isSelf ? ' (나)' : ''}
+          </span>
+        </div>
+        <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
+          {presence.label}
+        </span>
+      </div>
+
+      <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+        연속 {member.currentStreak || 0}일 · {studied ? '오늘 학습 완료' : '오늘 학습 대기'}
+      </div>
+
+      <div style={{ padding: '0.75rem', borderRadius: 8, background: 'rgba(2,6,23,0.46)', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '0.45rem' }}>
+        <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>
+          현재 위치
+        </div>
+        <div className="font-tech" title={currentLocation} style={{ color: 'rgba(255,255,255,0.84)', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {currentLocation}
+        </div>
+        {elapsedLabel && (
+          <div className="font-tech" style={{ color: 'rgba(255,255,255,0.48)', fontSize: '0.76rem' }}>
+            {elapsedLabel} 머무름
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '0.75rem', borderRadius: 8, background: 'rgba(2,6,23,0.46)', border: '1px solid rgba(255,255,255,0.08)', marginTop: 'auto', display: 'grid', gap: '0.45rem' }}>
+        <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>
+          오늘의 요약
+        </div>
+        <div className="font-tech" style={{ color: summaryText ? 'rgba(255,255,255,0.84)' : 'rgba(255,255,255,0.45)', fontSize: '0.82rem', lineHeight: 1.45 }}>
+          {loading ? '조회 중...' : summaryText || '아직 완료된 활동 없음'}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function CrewDetailView({ onBack, onEnterRoom }) {
@@ -392,29 +481,17 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
       <div style={{ marginBottom: '1.2rem' }}>
         <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem', marginBottom: '0.6rem' }}>CREW MEMBERS</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: '0.8rem' }}>
-          {enrichedMembers.map(member => {
-            const isSelf = member.uid === user?.uid;
-            const isLeader = member.crewRole === 'leader';
-            const studied = member.lastStreakDate === todayKey;
-            const presence = getPresenceInfo(memberProfiles[member.uid]);
-            return (
-              <div key={member.uid} className="glass-card hud-border" style={{ padding: '1rem', borderRadius: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', marginBottom: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
-                    {isLeader && <Crown size={14} style={{ color: '#fbbf24', flexShrink: 0 }} />}
-                    <span className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getMemberLabel(member)}{isSelf ? ' (나)' : ''}</span>
-                  </div>
-                  <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
-                    <span style={{ width: 7, height: 7, borderRadius: 999, background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
-                    {presence.label}
-                  </span>
-                </div>
-                <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                  연속 {member.currentStreak || 0}일 · {studied ? '✅ 오늘 학습 완료' : '미학습'}
-                </div>
-              </div>
-            );
-          })}
+          {enrichedMembers.map(member => (
+            <CrewMemberStudyCard
+              key={member.uid}
+              member={member}
+              profile={memberProfiles[member.uid]}
+              currentUid={user?.uid}
+              currentUserData={userData}
+              currentDisplayName={user?.displayName}
+              todayKey={todayKey}
+            />
+          ))}
         </div>
       </div>
 
