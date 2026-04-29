@@ -23,7 +23,12 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, isLocal, message
   useEffect(() => {
     if (!videoRef.current) return;
     videoRef.current.srcObject = stream || null;
-  }, [stream]);
+    if (stream && cameraOn) {
+      videoRef.current.play().catch(() => {
+        // Autoplay can briefly fail while the element is being remounted.
+      });
+    }
+  }, [stream, cameraOn]);
 
   return (
     <div style={tileStyle}>
@@ -363,10 +368,13 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       track.enabled = false;
     });
     setMicOn(false);
-    updateParticipantPresence({ micOn: false }).catch((err) => {
+    setDoc(doc(db, 'studyRooms', roomId, 'participants', user.uid), {
+      lastSeenAt: serverTimestamp(),
+      micOn: false,
+    }, { merge: true }).catch((err) => {
       console.error('Failed to sync forced mute:', err);
     });
-  }, [areMicsEnabled, micOn]);
+  }, [areMicsEnabled, micOn, roomId, user.uid]);
 
   useEffect(() => {
     if (isChatEnabled) return;
