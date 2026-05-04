@@ -13,6 +13,8 @@
 
 ## 2. 📸 PDF 이미지 분석을 통한 교재 기반 퀴즈 생성
 
+월간평가처럼 PDF 원문 문제를 문항별 이미지로 캡처하고 Firebase Storage/Firestore에 직접 구축하는 작업은 별도 실행 절차서인 [`PDF_BASED_QUIZ_GENERATION_GUIDE.md`](./PDF_BASED_QUIZ_GENERATION_GUIDE.md)를 먼저 참고하세요.
+
 ### 2.1 이미지 추출 워크플로우
 
 교재 PDF에서 퀴즈를 생성하기 전에 반드시 이미지로 추출하여 분석해야 합니다.
@@ -283,4 +285,3 @@ const quizDataMapping = {
 - [ ] 앱에서 실제 렌더링 확인
 
 이 가이드를 준수하여 작업을 진행해 주시기 바랍니다.
-

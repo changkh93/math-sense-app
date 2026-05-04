@@ -7,6 +7,65 @@
 
 export const STREAK_WRITE_AUDIT_VERSION = 2;
 
+const KST_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
+
+const KST_WEEKDAY_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Seoul',
+  weekday: 'short',
+});
+
+export const KST_DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+
+const WEEKDAY_INDEX = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+const KOREAN_DAY_TO_INDEX = {
+  일: 0,
+  일요일: 0,
+  sun: 0,
+  sunday: 0,
+  월: 1,
+  월요일: 1,
+  mon: 1,
+  monday: 1,
+  화: 2,
+  화요일: 2,
+  tue: 2,
+  tuesday: 2,
+  수: 3,
+  수요일: 3,
+  wed: 3,
+  wednesday: 3,
+  목: 4,
+  목요일: 4,
+  thu: 4,
+  thursday: 4,
+  금: 5,
+  금요일: 5,
+  fri: 5,
+  friday: 5,
+  토: 6,
+  토요일: 6,
+  sat: 6,
+  saturday: 6,
+};
+
 /**
  * KST 기준 날짜를 YYYY-MM-DD 형식으로 반환
  * @param {Date|number|string} [date] - 기준 날짜
@@ -45,19 +104,66 @@ export function shiftKSTDate(dateStr, dayOffset) {
  */
 export function getKSTComponents(date = new Date()) {
   const d = new Date(date);
-  
-  // Calculate KST time by adding 9 hours in milliseconds to the UTC time.
-  const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
-  
+
+  if (Number.isNaN(d.getTime())) {
+    return {
+      year: NaN,
+      month: NaN,
+      day: NaN,
+      hours: NaN,
+      minutes: NaN,
+      seconds: NaN,
+      dayOfWeek: NaN
+    };
+  }
+
+  const parts = Object.fromEntries(
+    KST_DATE_TIME_FORMATTER.formatToParts(d)
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  );
+  const weekday = KST_WEEKDAY_FORMATTER.format(d);
+
   return {
-    year: kst.getUTCFullYear(),
-    month: kst.getUTCMonth() + 1,
-    day: kst.getUTCDate(),
-    hours: kst.getUTCHours(),
-    minutes: kst.getUTCMinutes(),
-    seconds: kst.getUTCSeconds(),
-    dayOfWeek: kst.getUTCDay()
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hours: Number(parts.hour),
+    minutes: Number(parts.minute),
+    seconds: Number(parts.second),
+    dayOfWeek: WEEKDAY_INDEX[weekday]
   };
+}
+
+export function normalizeScheduleDay(dayValue) {
+  if (dayValue === null || dayValue === undefined || dayValue === '') return null;
+
+  if (typeof dayValue === 'number' && Number.isInteger(dayValue)) {
+    if (dayValue >= 0 && dayValue <= 6) return dayValue;
+    if (dayValue === 7) return 0;
+    return null;
+  }
+
+  const normalized = String(dayValue).trim().toLowerCase();
+  if (/^\d+$/.test(normalized)) {
+    const numeric = Number(normalized);
+    if (numeric >= 0 && numeric <= 6) return numeric;
+    if (numeric === 7) return 0;
+    return null;
+  }
+
+  return KOREAN_DAY_TO_INDEX[normalized] ?? null;
+}
+
+export function scheduleIncludesDay(schedule, dayOfWeek) {
+  const targetDay = normalizeScheduleDay(dayOfWeek);
+  if (targetDay === null) return false;
+
+  const dayValues = Array.isArray(schedule?.days)
+    ? schedule.days
+    : [schedule?.day];
+
+  return dayValues.some(dayValue => normalizeScheduleDay(dayValue) === targetDay);
 }
 
 /**

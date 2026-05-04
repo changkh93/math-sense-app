@@ -7,7 +7,7 @@ import { storage, getFunctionUrl } from '../../firebase';
 import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import AssignmentChronicle from './AssignmentChronicle';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
-import { getTodayKST, getNowKST, getKSTComponents } from '../../utils/streakUtils';
+import { getTodayKST, getKSTComponents, scheduleIncludesDay } from '../../utils/streakUtils';
 
 /**
  * Assignment Hub (Stellar Archive)
@@ -15,14 +15,27 @@ import { getTodayKST, getNowKST, getKSTComponents } from '../../utils/streakUtil
  */
 export default function AssignmentHub({ clusterId, regionId, onClose, onNavigateToUnit }) {
   const { user, userData } = useAuth();
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [todayKST, setTodayKST] = useState(() => getTodayKST());
+  const [currentDate, setCurrentDate] = useState(() => new Date(`${getTodayKST()}T12:00:00Z`));
   const [selectedDateStr, setSelectedDateStr] = useState(null); // The date the user clicked on
   const [showChronicle, setShowChronicle] = useState(false);
+  const previousTodayRef = useRef(todayKST);
 
-  // Auto-select today
+  // Keep the archive aligned with the Korean teaching day, even across midnight.
   useEffect(() => {
-    setSelectedDateStr(getTodayKST());
+    const syncToday = () => setTodayKST(getTodayKST());
+    syncToday();
+    const timer = setInterval(syncToday, 60 * 1000);
+    return () => clearInterval(timer);
   }, []);
+
+  // Auto-select today's KST date when entering the archive.
+  useEffect(() => {
+    const previousToday = previousTodayRef.current;
+    previousTodayRef.current = todayKST;
+    setSelectedDateStr(prev => (!prev || prev === previousToday ? todayKST : prev));
+    setCurrentDate(new Date(`${todayKST}T12:00:00Z`));
+  }, [todayKST]);
   
   // Data Fetching - Fetch cluster-wide assignments (ignore regionId)
   const { data: assignments, isLoading } = useStudentAssignments(user?.uid, clusterId);
@@ -37,29 +50,29 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
 
   // Calendar Logic
   const daysInMonth = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    return new Date(year, month + 1, 0).getDate();
+    const year = currentDate.getUTCFullYear();
+    const month = currentDate.getUTCMonth();
+    return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   }, [currentDate]);
 
   const firstDayOfMonth = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    return new Date(year, month, 1).getDay();
+    const year = currentDate.getUTCFullYear();
+    const month = currentDate.getUTCMonth();
+    return new Date(Date.UTC(year, month, 1)).getUTCDay();
   }, [currentDate]);
 
   const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    setCurrentDate(new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() - 1, 1, 12)));
   };
   const handleNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    setCurrentDate(new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 1, 12)));
   };
 
   // Build the calendar array
   const calendarDays = useMemo(() => {
     const days = [];
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const year = currentDate.getUTCFullYear();
+    const month = String(currentDate.getUTCMonth() + 1).padStart(2, '0');
 
     // Padding for first week
     for (let i = 0; i < firstDayOfMonth; i++) {
@@ -188,7 +201,8 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
           user={user} 
           userData={userData}
           attendanceMutation={attendanceMutation}
-          todayAttendance={attendanceRecords?.find(a => a.date === getTodayKST())}
+          todayAttendance={attendanceRecords?.find(a => a.date === todayKST)}
+          todayKST={todayKST}
         />
       </div>
 
@@ -224,7 +238,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <button onClick={handlePrevMonth} className="cosmic-btn" style={{ padding: '0.5rem 1rem' }}>◀</button>
               <span className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--crystal-cyan)' }}>
-                {currentDate.getFullYear()} . {String(currentDate.getMonth() + 1).padStart(2, '0')}
+                {currentDate.getUTCFullYear()} . {String(currentDate.getUTCMonth() + 1).padStart(2, '0')}
               </span>
               <button onClick={handleNextMonth} className="cosmic-btn" style={{ padding: '0.5rem 1rem' }}>▶</button>
             </div>
@@ -255,7 +269,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               if (day.assignment?.status === 'needs_revision') animationClass = 'siren-pulse'; // Need to add to space-theme.css
               else if (day.assignment?.status === 'submitted') animationClass = 'pulse-slow';
               
-              const isToday = day.dateStr === getTodayKST();
+              const isToday = day.dateStr === todayKST;
 
               return (
                 <motion.div
@@ -343,7 +357,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
 /**
  * Warp Gate Docking Button (Attendance)
  */
-function WarpGateDocking({ clusterData, user, userData, attendanceMutation, todayAttendance }) {
+function WarpGateDocking({ clusterData, user, userData, attendanceMutation, todayAttendance, todayKST }) {
   const [status, setStatus] = useState({ state: 'invalid', message: '', countdown: null });
 
   useEffect(() => {
@@ -362,9 +376,7 @@ function WarpGateDocking({ clusterData, user, userData, attendanceMutation, toda
       const currentTimeInMins = hours * 60 + minutes;
 
       // Find matching schedule for today
-      const todaySchedule = clusterData.classSchedule.find(s => 
-        (s.days && s.days.includes(dayOfWeek)) || s.day === dayOfWeek
-      );
+      const todaySchedule = clusterData.classSchedule.find(s => scheduleIncludesDay(s, dayOfWeek));
 
       if (!todaySchedule) {
         setStatus({ state: 'invalid', message: '오늘은 수업이 없습니다.' });
@@ -411,7 +423,7 @@ function WarpGateDocking({ clusterData, user, userData, attendanceMutation, toda
         userName: userData?.studentName || user.displayName || user.email?.split('@')[0],
         clusterId: clusterData.id,
         clusterName: clusterData.name,
-        date: getTodayKST(),
+        date: todayKST,
         timestamp: new Date(),
         status: status.state === 'late' ? 'late' : 'present'
       });

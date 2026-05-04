@@ -5,7 +5,12 @@ import {
   extractLearningActivityDates,
   getEffectiveStreak,
   getCurrentGapDefendedDates,
+  getKSTComponents,
+  getTodayKST,
+  getYesterdayKST,
+  normalizeScheduleDay,
   recalculateStreakState,
+  scheduleIncludesDay,
 } from '../src/utils/streakUtils.js';
 
 function run() {
@@ -60,10 +65,19 @@ function run() {
 
   const displayedProtectedStreak = getEffectiveStreak({
     currentStreak: 25,
-    lastStreakDate: '2026-04-04',
+    lastStreakDate: getYesterdayKST(),
     streakFreezeCount: 2,
   }, null);
   assert.equal(displayedProtectedStreak, 25);
+
+  assert.equal(getTodayKST('2026-05-03T15:00:00.000Z'), '2026-05-04');
+  assert.equal(getKSTComponents('2026-05-03T15:00:00.000Z').dayOfWeek, 1);
+  assert.equal(normalizeScheduleDay('월'), 1);
+  assert.equal(normalizeScheduleDay('7'), 0);
+  assert.equal(scheduleIncludesDay({ days: [1, 2, 3, 4, 5] }, 1), true);
+  assert.equal(scheduleIncludesDay({ days: ['월', '화'] }, 1), true);
+  assert.equal(scheduleIncludesDay({ day: '일' }, 0), true);
+  assert.equal(scheduleIncludesDay({ days: [2, 3] }, 1), false);
 
   console.log('streak utils tests passed');
 }

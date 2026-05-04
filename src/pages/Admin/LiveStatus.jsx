@@ -5,7 +5,7 @@ import { Activity, Clock, AlertTriangle, X, Play, RefreshCw, FileText, CheckCirc
 import { useClusters } from '../../hooks/useContent';
 import { useAdminTodayAttendance } from '../../hooks/useAssignments';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
-import { getTodayKST } from '../../utils/streakUtils';
+import { getTodayKST, getKSTComponents, KST_DAY_LABELS, scheduleIncludesDay } from '../../utils/streakUtils';
 import './Admin.css';
 
 // -------------------------------------------------------------
@@ -261,10 +261,8 @@ export default function LiveStatus() {
   const lateStudentsList = useMemo(() => {
     if (!clusters || clusters.length === 0 || !users || users.length === 0) return [];
     
-    const daysArr = ['일', '월', '화', '수', '목', '금', '토'];
-    const currentDayStr = daysArr[nowDate.getDay()];
-    const currentHours = nowDate.getHours();
-    const currentMinutes = nowDate.getMinutes();
+    const { dayOfWeek, hours: currentHours, minutes: currentMinutes } = getKSTComponents(nowDate);
+    const currentDayStr = KST_DAY_LABELS[dayOfWeek];
     const currentTimeInMins = currentHours * 60 + currentMinutes;
 
     const missingList = [];
@@ -274,20 +272,7 @@ export default function LiveStatus() {
       if (!cluster.classSchedule) return;
 
       cluster.classSchedule.forEach(schedule => {
-        // Handle numeric '1' vs '월'
-        const dayMap = { '1': '월', '2': '화', '3': '수', '4': '목', '5': '금', '6': '토', '7': '일' };
-        
-        const checkDayMatch = (val) => {
-           if (!val) return false;
-           return (dayMap[val] || val) === currentDayStr;
-        };
-
-        let isToday = false;
-        if (schedule.days && Array.isArray(schedule.days)) {
-          isToday = schedule.days.some(checkDayMatch);
-        } else if (schedule.day) {
-          isToday = checkDayMatch(schedule.day);
-        }
+        const isToday = scheduleIncludesDay(schedule, dayOfWeek);
         
         if (!isToday) return;
 
@@ -579,4 +564,3 @@ export default function LiveStatus() {
     </div>
   );
 }
-
