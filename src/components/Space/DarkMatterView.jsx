@@ -1,5 +1,14 @@
-import { useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useMemo } from 'react'
+import { motion as Motion } from 'framer-motion'
+
+function getQuestionFallbackTitle(question, fallback) {
+  if (typeof question === 'string') {
+    const title = question.replace(/\[재검토\]\s*/, '').trim()
+    return title || fallback
+  }
+
+  return fallback
+}
 
 /**
  * 다크 매터 뷰 — 오답/재검토 문항을 카테고리별로 보여주고 재풀이 진입
@@ -10,9 +19,6 @@ export default function DarkMatterView({
   onStartQuiz, 
   onExit 
 }) {
-  const [selectedGroup, setSelectedGroup] = useState(null)
-  const [showCelebration, setShowCelebration] = useState(false)
-
   // Group questions by unitId
   const grouped = useMemo(() => {
     const map = {}
@@ -21,7 +27,7 @@ export default function DarkMatterView({
       if (!map[key]) {
         map[key] = {
           unitId: key,
-          unitTitle: q.unitTitle || q.question?.replace(/\[재검토\]\s*/, '') || key,
+          unitTitle: q.unitTitle || getQuestionFallbackTitle(q.question, key),
           questions: [],
           hasReviewMarks: false,
           maxActiveAt: 0 // Track the latest activity timestamp in this group
@@ -83,7 +89,7 @@ export default function DarkMatterView({
             ✕ 나가기
           </button>
 
-          <motion.h1 
+          <Motion.h1 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             style={{ 
@@ -93,14 +99,14 @@ export default function DarkMatterView({
             }}
           >
             🌌 다크 매터 영역
-          </motion.h1>
+          </Motion.h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             미지의 영역을 탐사하여 지식의 빛으로 변환하세요
           </p>
         </div>
 
         {/* Dark Energy Meter */}
-        <motion.div 
+        <Motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="glass-card"
@@ -139,7 +145,7 @@ export default function DarkMatterView({
             borderRadius: '5px',
             overflow: 'hidden'
           }}>
-            <motion.div 
+            <Motion.div 
               initial={{ width: 0 }}
               animate={{ width: `${darkEnergyPercent}%` }}
               transition={{ duration: 1, ease: 'easeOut' }}
@@ -163,10 +169,10 @@ export default function DarkMatterView({
             <span>미해결 문항: {questions.length}개</span>
             <span>{questions.length === 0 ? '✨ 완벽한 지식!' : '낮을수록 좋습니다'}</span>
           </div>
-        </motion.div>
+        </Motion.div>
 
         {questions.length === 0 ? (
-          <motion.div 
+          <Motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="glass-card"
@@ -181,11 +187,11 @@ export default function DarkMatterView({
             <p style={{ color: 'var(--text-muted)' }}>
               다크 매터가 감지되지 않습니다. 당신의 지식은 완벽하게 빛나고 있습니다.
             </p>
-          </motion.div>
+          </Motion.div>
         ) : (
           <>
             {/* Start All Button */}
-            <motion.button 
+            <Motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleStartAll}
@@ -208,7 +214,7 @@ export default function DarkMatterView({
             >
               <span>🌌</span>
               <span>전체 탐사 시작 ({questions.length}문항)</span>
-            </motion.button>
+            </Motion.button>
 
             {/* Category List */}
             <h3 style={{ 
@@ -222,7 +228,7 @@ export default function DarkMatterView({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               {grouped.map((group, idx) => (
-                <motion.div
+                <Motion.div
                   key={group.unitId}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -268,7 +274,7 @@ export default function DarkMatterView({
                       )}
                     </div>
                   </div>
-                  <motion.button 
+                  <Motion.button 
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     style={{
@@ -288,8 +294,8 @@ export default function DarkMatterView({
                     }}
                   >
                     탐사 ({group.questions.length})
-                  </motion.button>
-                </motion.div>
+                  </Motion.button>
+                </Motion.div>
               ))}
             </div>
           </>

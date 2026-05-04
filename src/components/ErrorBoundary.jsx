@@ -65,7 +65,7 @@ class ErrorBoundary extends React.Component {
                 홈으로 이동
               </button>
             </div>
-            {process.env.NODE_ENV === 'development' && (
+            {import.meta.env.DEV && (
               <pre style={{ 
                 marginTop: '2rem', 
                 padding: '1rem', 
