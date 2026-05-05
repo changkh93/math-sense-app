@@ -17,6 +17,218 @@ const tileStyle = {
   aspectRatio: '4 / 5',
 };
 
+function getParticipantLabel(userLike = {}, fallback = '크루 멤버') {
+  return userLike.publicDisplayName || userLike.studentName || userLike.displayName || userLike.name || fallback;
+}
+
+function getFocusStatusLabel(status) {
+  if (status === 'away') return '자리 비움';
+  if (status === 'break') return '쉬는 중';
+  return '집중 중';
+}
+
+function getMiniWindowDocument(pipWindow) {
+  const pipDocument = pipWindow?.document;
+  if (!pipDocument) return null;
+
+  if (!pipDocument.getElementById('study-stream-mini-root')) {
+    pipDocument.body.innerHTML = `
+      <style>
+        * { box-sizing: border-box; }
+        html, body {
+          width: 100%;
+          min-height: 100%;
+          margin: 0;
+          background: #070b1c;
+          color: #f8fafc;
+          font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          overflow: hidden;
+        }
+        body {
+          padding: 8px;
+          background:
+            radial-gradient(circle at 20% 0%, rgba(34, 211, 238, 0.16), transparent 34%),
+            linear-gradient(135deg, #070b1c 0%, #151a36 100%);
+        }
+        #study-stream-mini-root {
+          height: calc(100vh - 16px);
+        }
+        .mini-grid {
+          height: 100%;
+          min-height: 0;
+          display: grid;
+          grid-template-columns: 1fr;
+          grid-template-rows: repeat(3, minmax(0, 1fr));
+          gap: 6px;
+        }
+        .mini-tile {
+          position: relative;
+          min-width: 0;
+          min-height: 0;
+          overflow: hidden;
+          border-radius: 9px;
+          border: 1px solid rgba(255,255,255,0.12);
+          background: rgba(2, 6, 23, 0.92);
+        }
+        .mini-video {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          background: #020617;
+        }
+        .mini-placeholder {
+          width: 100%;
+          height: 100%;
+          display: grid;
+          place-items: center;
+          color: rgba(255,255,255,0.58);
+          font-size: 11px;
+          font-weight: 750;
+          text-align: center;
+          padding: 10px;
+        }
+        .mini-overlay {
+          position: absolute;
+          inset: auto 0 0 0;
+          padding: 20px 8px 7px;
+          background: linear-gradient(180deg, rgba(2,6,23,0), rgba(2,6,23,0.86) 45%, rgba(2,6,23,0.96));
+        }
+        .mini-name {
+          color: #fff;
+          font-size: 11px;
+          line-height: 1.2;
+          font-weight: 850;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .mini-status {
+          margin-top: 2px;
+          color: rgba(255,255,255,0.72);
+          font-size: 9px;
+          line-height: 1.2;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .mini-badge {
+          position: absolute;
+          top: 6px;
+          left: 6px;
+          max-width: calc(100% - 12px);
+          border-radius: 999px;
+          padding: 3px 6px;
+          background: rgba(3, 8, 20, 0.74);
+          border: 1px solid rgba(34, 211, 238, 0.28);
+          color: #67e8f9;
+          font-size: 8px;
+          line-height: 1.1;
+          font-weight: 850;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          backdrop-filter: blur(10px);
+        }
+        .mini-chat {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          max-width: 58%;
+          border-radius: 9px;
+          padding: 4px 6px;
+          background: rgba(15, 23, 42, 0.82);
+          border: 1px solid rgba(125, 211, 252, 0.28);
+          color: #f8fafc;
+          font-size: 9px;
+          line-height: 1.25;
+          font-weight: 750;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          backdrop-filter: blur(10px);
+        }
+      </style>
+      <div id="study-stream-mini-root">
+        <div id="study-stream-mini-grid" class="mini-grid"></div>
+      </div>
+    `;
+  }
+
+  return pipDocument;
+}
+
+function syncMiniStudyWindow(pipWindow, { title, tiles, onReturn }) {
+  const pipDocument = getMiniWindowDocument(pipWindow);
+  if (!pipDocument) return;
+  void title;
+  void onReturn;
+
+  const grid = pipDocument.getElementById('study-stream-mini-grid');
+  if (!grid) return;
+
+  const visibleTiles = tiles.slice(0, 3);
+  visibleTiles.forEach((tile, index) => {
+    let tileNode = pipDocument.getElementById(`study-stream-mini-tile-${index}`);
+    if (!tileNode) {
+      tileNode = pipDocument.createElement('div');
+      tileNode.id = `study-stream-mini-tile-${index}`;
+      tileNode.className = 'mini-tile';
+      tileNode.innerHTML = `
+        <video class="mini-video" autoplay playsinline muted></video>
+        <div class="mini-placeholder"></div>
+        <div class="mini-badge"></div>
+        <div class="mini-chat"></div>
+        <div class="mini-overlay">
+          <div class="mini-name"></div>
+          <div class="mini-status"></div>
+        </div>
+      `;
+      grid.appendChild(tileNode);
+    }
+
+    const video = tileNode.querySelector('video');
+    const placeholder = tileNode.querySelector('.mini-placeholder');
+    const badge = tileNode.querySelector('.mini-badge');
+    const chat = tileNode.querySelector('.mini-chat');
+    const name = tileNode.querySelector('.mini-name');
+    const status = tileNode.querySelector('.mini-status');
+    const hasVideo = !!tile.stream && tile.cameraOn !== false;
+
+    if (video) {
+      if (hasVideo) {
+        if (video.srcObject !== tile.stream) {
+          video.srcObject = tile.stream;
+        }
+        video.muted = true;
+        video.style.display = 'block';
+        video.play().catch(() => {});
+      } else {
+        video.srcObject = null;
+        video.style.display = 'none';
+      }
+    }
+    if (placeholder) {
+      placeholder.style.display = hasVideo ? 'none' : 'grid';
+      placeholder.textContent = tile.cameraOn === false ? '카메라 꺼짐' : '영상 준비 중';
+    }
+    if (badge) {
+      badge.style.display = tile.locationLine ? 'block' : 'none';
+      badge.textContent = tile.locationLine || '';
+    }
+    if (chat) {
+      chat.style.display = tile.message ? 'block' : 'none';
+      chat.textContent = tile.message || '';
+    }
+    if (name) name.textContent = tile.label || '크루 멤버';
+    if (status) status.textContent = tile.subtitle || '';
+  });
+
+  Array.from(grid.querySelectorAll('.mini-tile')).forEach((tileNode, index) => {
+    if (index >= visibleTiles.length) tileNode.remove();
+  });
+}
+
 function AudioLevelMeter({ level = 0, muted = false, blocked = false, compact = false }) {
   const bars = compact ? 8 : 12;
   const activeBars = muted || blocked ? 0 : Math.min(bars, Math.ceil(level * bars));
@@ -97,7 +309,7 @@ function useAudioLevel(stream, enabled = true) {
   return hasAudioInput ? level : 0;
 }
 
-function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBlocked = false, isLocal, message, badgeLabel, badgeColor = 'rgba(96, 165, 250, 0.18)', locationLine, action }) {
+function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBlocked = false, isLocal, message, badgeLabel, badgeColor = 'rgba(96, 165, 250, 0.18)', locationLine, liveStatusOverlay, action }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const audioLevel = useAudioLevel(stream, !!stream);
@@ -189,6 +401,39 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
           <UserMinus size={16} />
         </button>
       )}
+      {liveStatusOverlay && (
+        <div
+          className="font-tech"
+          title={liveStatusOverlay}
+          style={{
+            position: 'absolute',
+            top: 12,
+            left: badgeLabel ? 92 : 12,
+            right: action ? 54 : 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '0.42rem 0.62rem',
+            borderRadius: 999,
+            background: 'linear-gradient(135deg, rgba(3, 8, 20, 0.76), rgba(15, 23, 42, 0.66))',
+            border: '1px solid rgba(34, 211, 238, 0.34)',
+            color: 'var(--crystal-cyan)',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            lineHeight: 1.25,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            textShadow: '0 1px 2px rgba(0,0,0,0.55)',
+            boxShadow: '0 10px 28px rgba(0, 0, 0, 0.32), 0 0 18px rgba(34, 211, 238, 0.12)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 2,
+          }}
+        >
+          <Radio size={13} style={{ flex: '0 0 auto' }} />
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{liveStatusOverlay}</span>
+        </div>
+      )}
       {!muted && stream && !cameraOn && (
         <audio ref={audioRef} autoPlay playsInline />
       )}
@@ -235,7 +480,7 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
             <div className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.82rem' }}>
               {subtitle}
             </div>
-            {locationLine && (
+            {locationLine && !liveStatusOverlay && (
               <div
                 className="font-tech"
                 title={locationLine}
@@ -327,12 +572,20 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const [chatAction, setChatAction] = useState('');
   const [controlAction, setControlAction] = useState('');
   const [participantProfiles, setParticipantProfiles] = useState({});
+  const [miniWindowOpen, setMiniWindowOpen] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
+  );
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callsRef = useRef(new Map());
   const leavingRef = useRef(false);
   const wasAcceptedParticipantRef = useRef(false);
+  const miniWindowRef = useRef(null);
+  const chatAlertStateRef = useRef({ initialized: false, messages: new Map() });
+  const originalTitleRef = useRef(typeof document !== 'undefined' ? document.title : '');
 
   const localParticipant = useMemo(
     () => participants.find((participant) => participant.uid === user.uid) || null,
@@ -358,6 +611,11 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
+    if (miniWindowRef.current && !miniWindowRef.current.closed) {
+      miniWindowRef.current.close();
+    }
+    miniWindowRef.current = null;
+    setMiniWindowOpen(false);
     setLocalStream(null);
   }, []);
 
@@ -618,6 +876,70 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     if (onLeave) onLeave();
   }, [closeRoomResources, onLeave, room, user.uid]);
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) return;
+      setUnreadChatCount(0);
+      document.title = originalTitleRef.current;
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.title = originalTitleRef.current;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (document.hidden || unreadChatCount <= 0) return;
+    setUnreadChatCount(0);
+  }, [unreadChatCount]);
+
+  useEffect(() => {
+    document.title = unreadChatCount > 0
+      ? `(${unreadChatCount}) Study Stream - ${originalTitleRef.current}`
+      : originalTitleRef.current;
+  }, [unreadChatCount]);
+
+  useEffect(() => {
+    if (!isChatEnabled) return;
+
+    const nextMessages = new Map();
+    const alertState = chatAlertStateRef.current;
+
+    participants.forEach((participant) => {
+      if (!participant.uid || participant.uid === user.uid) return;
+      const message = normalizeChatMessage(participant.chatMessage);
+      if (!message) return;
+
+      const updatedMs = getTimestampMs(participant.chatUpdatedAt) || 0;
+      const key = `${message}:${updatedMs || 'no-time'}`;
+      nextMessages.set(participant.uid, key);
+
+      if (!alertState.initialized) return;
+      const previousKey = alertState.messages.get(participant.uid);
+      if (previousKey === key) return;
+
+      const senderName = participant.displayName || '크루 멤버';
+      setUnreadChatCount((count) => count + 1);
+
+      if (document.hidden && notificationPermission === 'granted' && 'Notification' in window) {
+        const notification = new Notification(`${senderName}님의 Study Stream 채팅`, {
+          body: message,
+          tag: `study-stream-${roomId}-${participant.uid}`,
+          renotify: true,
+        });
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+      }
+    });
+
+    alertState.initialized = true;
+    alertState.messages = nextMessages;
+  }, [isChatEnabled, notificationPermission, participants, roomId, user.uid]);
+
   const toggleCamera = async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
@@ -745,6 +1067,60 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     }
   };
 
+  const handleOpenMiniWindow = async () => {
+    if (!('documentPictureInPicture' in window)) {
+      setError('미니 집중방은 Chrome 계열 브라우저의 최신 버전에서 지원됩니다.');
+      return;
+    }
+
+    try {
+      if (miniWindowRef.current && !miniWindowRef.current.closed) {
+        miniWindowRef.current.focus();
+        return;
+      }
+
+      const pipWindow = await window.documentPictureInPicture.requestWindow({
+        width: 320,
+        height: 420,
+      });
+      miniWindowRef.current = pipWindow;
+      setMiniWindowOpen(true);
+      pipWindow.addEventListener('pagehide', () => {
+        miniWindowRef.current = null;
+        setMiniWindowOpen(false);
+      });
+      syncMiniStudyWindow(pipWindow, {
+        title: room?.title || crew?.name || 'Study Stream 집중방',
+        tiles: miniTiles,
+        onReturn: () => window.focus(),
+      });
+      soundManager.playClick();
+    } catch (err) {
+      console.error('Failed to open mini Study Stream window:', err);
+      setError('미니 집중방 창을 열지 못했습니다. 브라우저 권한이나 지원 여부를 확인해주세요.');
+    }
+  };
+
+  const handleEnableNotifications = async () => {
+    if (!('Notification' in window)) {
+      setError('이 브라우저는 채팅 알림을 지원하지 않습니다.');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === 'granted') {
+        soundManager.playClick();
+      } else {
+        setError('브라우저에서 알림 권한이 허용되지 않았습니다.');
+      }
+    } catch (err) {
+      console.error('Failed to request notification permission:', err);
+      setError('채팅 알림 권한을 요청하지 못했습니다.');
+    }
+  };
+
   const remoteTiles = participants
     .filter((participant) => participant.uid !== user.uid)
     .map((participant) => {
@@ -752,11 +1128,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       return {
         uid: participant.uid,
         label: participant.displayName || '크루 멤버',
-        subtitle: participant.focusStatus === 'away'
-          ? '자리 비움'
-          : participant.focusStatus === 'break'
-            ? '쉬는 중'
-            : '집중 중',
+        subtitle: getFocusStatusLabel(participant.focusStatus),
         cameraOn: participant.cameraOn !== false,
         micOn: participant.micOn === true,
         stream: remoteEntry?.stream || null,
@@ -765,6 +1137,43 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         liveStatus: participantProfiles[participant.uid]?.liveStatus || null,
       };
     });
+  const localLiveStatusLine = buildLiveLocationLine(participantProfiles[user.uid]?.liveStatus || userData?.liveStatus, nowMs);
+  const miniTiles = [
+    {
+      uid: user.uid,
+      label: getParticipantLabel(userData, user.displayName || '나'),
+      subtitle: getFocusStatusLabel(focusStatus),
+      cameraOn,
+      stream: localStream,
+      message: isChatEnabled ? localChatMessage : '',
+      locationLine: localLiveStatusLine,
+    },
+    ...remoteTiles.map((participant) => ({
+      uid: participant.uid,
+      label: participant.label,
+      subtitle: participant.subtitle,
+      cameraOn: participant.cameraOn,
+      stream: participant.stream,
+      message: isChatEnabled ? participant.chatMessage : '',
+      locationLine: buildLiveLocationLine(participant.liveStatus, nowMs),
+    })),
+  ].slice(0, 3);
+
+  useEffect(() => {
+    if (!miniWindowRef.current || miniWindowRef.current.closed) return;
+    syncMiniStudyWindow(miniWindowRef.current, {
+      title: room?.title || crew?.name || 'Study Stream 집중방',
+      tiles: miniTiles,
+      onReturn: () => window.focus(),
+    });
+  }, [crew?.name, miniTiles, room?.title]);
+  const miniWindowSupported = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+  const notificationSupported = typeof window !== 'undefined' && 'Notification' in window;
+  const notificationLabel = notificationPermission === 'granted'
+    ? '채팅 알림 켜짐'
+    : notificationPermission === 'denied'
+      ? '채팅 알림 차단됨'
+      : '채팅 알림 켜기';
 
   return (
     <div className="glass-card hud-border" style={{ padding: '1.1rem', borderRadius: '10px' }}>
@@ -792,15 +1201,37 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           </div>
         </div>
 
-        <button
-          type="button"
-          className="space-nav-link font-tech"
-          onClick={handleLeave}
-          disabled={!!roomAction}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}
-        >
-          <PhoneOff size={16} /> {roomAction === 'leaving' ? '나가는 중...' : '방 나가기'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            className="space-nav-link font-tech"
+            onClick={handleOpenMiniWindow}
+            disabled={!miniWindowSupported}
+            title={miniWindowSupported ? '다른 탭에서도 보이는 미니 집중방 창을 엽니다.' : '이 브라우저는 미니 집중방 창을 지원하지 않습니다.'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: miniWindowSupported ? 1 : 0.55 }}
+          >
+            <Video size={16} /> {miniWindowOpen ? '미니창 열림' : '미니창 열기'}
+          </button>
+          <button
+            type="button"
+            className="space-nav-link font-tech"
+            onClick={handleEnableNotifications}
+            disabled={!notificationSupported || notificationPermission === 'granted' || notificationPermission === 'denied'}
+            title="다른 탭에서 공부할 때 Study Stream 채팅을 브라우저 알림으로 받습니다."
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: notificationSupported && notificationPermission === 'default' ? 1 : 0.64 }}
+          >
+            <MessageSquare size={16} /> {notificationLabel}
+          </button>
+          <button
+            type="button"
+            className="space-nav-link font-tech"
+            onClick={handleLeave}
+            disabled={!!roomAction}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}
+          >
+            <PhoneOff size={16} /> {roomAction === 'leaving' ? '나가는 중...' : '방 나가기'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -822,7 +1253,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           message={isChatEnabled ? localChatMessage : ''}
           badgeLabel={room?.hostUid === user.uid ? 'HOST' : 'ME'}
           badgeColor={room?.hostUid === user.uid ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
-          locationLine={buildLiveLocationLine(participantProfiles[user.uid]?.liveStatus || userData?.liveStatus, nowMs)}
+          liveStatusOverlay={localLiveStatusLine}
         />
         {remoteTiles.map((participant) => (
           <StreamTile

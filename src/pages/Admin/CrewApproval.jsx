@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { collection, documentId, getDocs, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { CheckCircle2, XCircle, AlertTriangle, X } from 'lucide-react';
-import { functions } from '../../firebase';
+import { CheckCircle2, XCircle, AlertTriangle, X, Users, Crown } from 'lucide-react';
+import { db, functions } from '../../firebase';
 
 function statusLabel(status) {
   if (status === 'approved') return '승인 완료';
@@ -13,6 +14,111 @@ function statusColor(status) {
   if (status === 'approved') return '#22c55e';
   if (status === 'rejected') return '#ef4444';
   return '#f59e0b';
+}
+
+function uniqueValues(values = []) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function getPreferredProfileName(profile = {}, fallback = '') {
+  return [
+    profile.publicDisplayName,
+    profile.studentName,
+    profile.name,
+    profile.displayName,
+    fallback,
+  ]
+    .map(value => String(value || '').trim())
+    .find(Boolean) || '';
+}
+
+function getCrewMemberIdsForAdmin(crew) {
+  return uniqueValues([
+    ...(Array.isArray(crew.memberIds) ? crew.memberIds : []),
+    ...(Array.isArray(crew.members) ? crew.members.map(member => member?.uid) : []),
+    crew.leaderId,
+  ]);
+}
+
+async function loadMemberProfiles(crews = []) {
+  const memberIds = uniqueValues(crews.flatMap(getCrewMemberIdsForAdmin));
+  if (!memberIds.length) return new Map();
+
+  const profileMap = new Map();
+  for (let i = 0; i < memberIds.length; i += 30) {
+    const chunk = memberIds.slice(i, i + 30);
+    const snap = await getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)));
+    snap.docs.forEach(userDoc => {
+      const data = userDoc.data() || {};
+      profileMap.set(userDoc.id, {
+        uid: userDoc.id,
+        displayName: getPreferredProfileName(data),
+        publicDisplayName: data.publicDisplayName || '',
+        studentName: data.studentName || '',
+        name: data.name || '',
+        email: data.email || '',
+        crewRole: data.crewRole || '',
+        currentStreak: data.currentStreak || 0,
+        lastStreakDate: data.lastStreakDate || '',
+      });
+    });
+  }
+
+  return profileMap;
+}
+
+async function hydrateCrewProfiles(crews = []) {
+  const profileMap = await loadMemberProfiles(crews);
+  return crews.map(crew => {
+    const existingMembers = Array.isArray(crew.members) ? crew.members.filter(Boolean) : [];
+    const existingById = new Map(existingMembers.map(member => [member.uid, member]));
+    const memberIds = getCrewMemberIdsForAdmin(crew);
+    const members = memberIds.map(uid => {
+      const profile = profileMap.get(uid) || {};
+      const existing = existingById.get(uid) || {};
+      const displayName = getPreferredProfileName(profile, getPreferredProfileName(existing, uid === crew.leaderId ? crew.leaderName : ''));
+      return {
+        ...existing,
+        ...profile,
+        uid,
+        displayName,
+        crewRole: uid === crew.leaderId ? 'leader' : (profile.crewRole || existing.crewRole || 'member'),
+      };
+    });
+
+    return {
+      ...crew,
+      memberIds,
+      members,
+      memberCount: crew.memberCount || memberIds.length,
+      leaderName: getPreferredProfileName(profileMap.get(crew.leaderId), crew.leaderName || crew.leaderId || ''),
+    };
+  });
+}
+
+function getCrewMembers(crew) {
+  const members = Array.isArray(crew.members) ? crew.members.filter(Boolean) : [];
+  const fallbackMembers = members.length
+    ? members
+    : (Array.isArray(crew.memberIds) ? crew.memberIds : []).map(uid => ({
+      uid,
+      studentName: uid === crew.leaderId ? crew.leaderName : '',
+      crewRole: uid === crew.leaderId ? 'leader' : '',
+    }));
+
+  const withLeaderFallback = fallbackMembers.length || !crew.leaderId
+    ? fallbackMembers
+    : [{ uid: crew.leaderId, studentName: crew.leaderName || '', crewRole: 'leader' }];
+
+  return [...withLeaderFallback].sort((a, b) => {
+    if (a.uid === crew.leaderId) return -1;
+    if (b.uid === crew.leaderId) return 1;
+    return 0;
+  });
+}
+
+function getMemberName(member) {
+  return getPreferredProfileName(member) || '이름 없음';
 }
 
 function RejectModal({ crew, onConfirm, onCancel, busy }) {
@@ -108,8 +214,9 @@ export default function CrewApproval() {
       try {
         const listStudyCrews = httpsCallable(functions, 'listStudyCrews');
         const result = await listStudyCrews();
+        const hydratedCrews = await hydrateCrewProfiles(result?.data?.crews || []);
         if (cancelled) return;
-        setCrews(result?.data?.crews || []);
+        setCrews(hydratedCrews);
       } catch (err) {
         console.error('Failed to load crews:', err);
         if (!cancelled) setCrews([]);
@@ -132,7 +239,8 @@ export default function CrewApproval() {
   const refreshCrews = async () => {
     const listStudyCrews = httpsCallable(functions, 'listStudyCrews');
     const result = await listStudyCrews();
-    setCrews(result?.data?.crews || []);
+    const hydratedCrews = await hydrateCrewProfiles(result?.data?.crews || []);
+    setCrews(hydratedCrews);
   };
 
   const approveCrew = async (crew) => {
@@ -201,6 +309,8 @@ export default function CrewApproval() {
 
         {visibleCrews.map(crew => {
           const status = crew.status || 'pending';
+          const members = getCrewMembers(crew);
+          const memberCount = crew.memberCount || members.length || crew.memberIds?.length || 1;
           return (
             <div
               key={crew.id}
@@ -221,7 +331,50 @@ export default function CrewApproval() {
                   </div>
                   <p style={{ margin: '0.55rem 0 0', color: '#cbd5e1' }}>{crew.motto || '모토 없음'}</p>
                   <div style={{ marginTop: '0.7rem', color: '#94a3b8', fontSize: '0.9rem' }}>
-                    리더: {crew.leaderName || crew.leaderId || '-'} · 군집: {crew.groupName || crew.clusterName || '자유 스터디'} · 멤버 {crew.memberCount || crew.memberIds?.length || 1}명 · 초대코드 {crew.inviteCode || '-'}
+                    리더: {crew.leaderName || crew.leaderId || '-'} · 군집: {crew.groupName || crew.clusterName || '자유 스터디'} · 멤버 {memberCount}명 · 초대코드 {crew.inviteCode || '-'}
+                  </div>
+
+                  <div style={{ marginTop: '0.9rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#e2e8f0', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.55rem' }}>
+                      <Users size={16} /> 크루 멤버 전체
+                    </div>
+                    {members.length === 0 ? (
+                      <div style={{ color: '#64748b', fontSize: '0.88rem' }}>멤버 정보가 없습니다.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '0.5rem' }}>
+                        {members.map(member => {
+                          const isLeader = member.uid === crew.leaderId || member.crewRole === 'leader';
+                          return (
+                            <div
+                              key={member.uid}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.55rem',
+                                minWidth: 0,
+                                padding: '0.58rem 0.7rem',
+                                borderRadius: 8,
+                                background: 'rgba(15,23,42,0.72)',
+                                border: '1px solid rgba(148,163,184,0.18)',
+                              }}
+                            >
+                              {isLeader ? <Crown size={15} style={{ color: '#facc15', flex: '0 0 auto' }} /> : <Users size={15} style={{ color: '#38bdf8', flex: '0 0 auto' }} />}
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  <span style={{ color: '#f8fafc', fontWeight: 700, overflowWrap: 'anywhere' }}>{getMemberName(member)}</span>
+                                  <span style={{ color: isLeader ? '#fde68a' : '#bae6fd', fontSize: '0.76rem', fontWeight: 700 }}>
+                                    {isLeader ? '리더' : '멤버'}
+                                  </span>
+                                </div>
+                                <div style={{ color: '#94a3b8', fontSize: '0.78rem', overflowWrap: 'anywhere' }}>
+                                  UID {member.uid}{member.email ? ` · ${member.email}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   {/* Show rejection reason if rejected */}

@@ -420,23 +420,52 @@ async function requireAdminUid(context) {
 }
 
 async function loadMemberSummaries(memberIds = []) {
-  if (!memberIds.length) return [];
-  const docs = await admin.firestore().collection("users").where(FieldPath.documentId(), "in", memberIds.slice(0, 30)).get();
-  return docs.docs.map((snap) => {
-    const data = snap.data() || {};
-    return {
-      uid: snap.id,
-      studentName: data.studentName || data.publicDisplayName || data.name || "",
-      publicDisplayName: data.publicDisplayName || "",
-      currentStreak: data.currentStreak || 0,
-      lastStreakDate: data.lastStreakDate || "",
-      crewRole: data.crewRole || "",
-    };
+  const ids = uniqueIds(memberIds);
+  if (!ids.length) return [];
+
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 30) {
+    chunks.push(ids.slice(i, i + 30));
+  }
+
+  const snapshots = await Promise.all(
+    chunks.map((chunk) => admin.firestore().collection("users").where(FieldPath.documentId(), "in", chunk).get()),
+  );
+
+  const summariesById = new Map();
+  snapshots.forEach((docs) => {
+    docs.docs.forEach((snap) => {
+      const data = snap.data() || {};
+      const displayName = data.publicDisplayName || data.studentName || data.name || data.displayName || "";
+      summariesById.set(snap.id, {
+        uid: snap.id,
+        displayName,
+        studentName: data.studentName || "",
+        publicDisplayName: data.publicDisplayName || "",
+        name: data.name || "",
+        email: data.email || "",
+        currentStreak: data.currentStreak || 0,
+        lastStreakDate: data.lastStreakDate || "",
+        crewRole: data.crewRole || "",
+      });
+    });
+  });
+
+  return ids.map((uid) => summariesById.get(uid) || {
+    uid,
+    displayName: "",
+    studentName: "",
+    publicDisplayName: "",
+    name: "",
+    email: "",
+    currentStreak: 0,
+    lastStreakDate: "",
+    crewRole: "",
   });
 }
 
 function getDisplayNameFromUser(userData = {}) {
-  return userData.studentName || userData.publicDisplayName || userData.name || "탐사원";
+  return userData.publicDisplayName || userData.studentName || userData.name || userData.displayName || "탐사원";
 }
 
 function buildClearedCrewUserFields() {
@@ -639,7 +668,7 @@ exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) =
     ...normalizedSchedule,
     status: "pending",
     leaderId: uid,
-    leaderName: userSnap.data().studentName || userSnap.data().publicDisplayName || userSnap.data().name || "탐사원",
+    leaderName: getDisplayNameFromUser(userSnap.data() || {}),
     inviteCode,
     activeStudyRoomId: "",
     activeStudyRoomStatus: "",
@@ -1086,8 +1115,21 @@ exports.deleteStudyCrewGreeting = regionalFunctions.https.onCall(async (data, co
 exports.listStudyCrews = regionalFunctions.https.onCall(async (_data, context) => {
   await requireAdminUid(context);
   const snap = await admin.firestore().collection("crews").orderBy("createdAt", "desc").get();
+  const crews = await Promise.all(snap.docs.map(async (docSnap) => {
+    const crewData = docSnap.data() || {};
+    const memberIds = getCrewMemberIds(crewData);
+    const members = await loadMemberSummaries(memberIds);
+    return {
+      id: docSnap.id,
+      ...crewData,
+      memberIds,
+      memberCount: crewData.memberCount || memberIds.length,
+      members,
+    };
+  }));
+
   return {
-    crews: snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })),
+    crews,
   };
 });
 
