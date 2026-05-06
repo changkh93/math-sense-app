@@ -591,7 +591,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     () => participants.find((participant) => participant.uid === user.uid) || null,
     [participants, user.uid]
   );
-  const isHost = room?.hostUid === user.uid;
+  const isHost = room?.hostUid === user.uid || crew?.leaderId === user.uid || userData?.crewRole === 'leader';
   const isChatEnabled = room?.chatEnabled !== false;
   const areMicsEnabled = room?.micsEnabled !== false;
   const localChatMessage = localParticipant?.chatMessage || '';
@@ -1250,32 +1250,35 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           audioBlocked={localMicBlocked}
           isLocal
           message={isChatEnabled ? localChatMessage : ''}
-          badgeLabel={room?.hostUid === user.uid ? 'HOST' : 'ME'}
-          badgeColor={room?.hostUid === user.uid ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
+          badgeLabel={isHost ? 'HOST' : 'ME'}
+          badgeColor={isHost ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
           liveStatusOverlay={localLiveStatusLine}
         />
-        {remoteTiles.map((participant) => (
-          <StreamTile
-            key={participant.uid}
-            stream={participant.stream}
-            muted={false}
-            label={participant.label}
-            subtitle={participant.subtitle}
-            cameraOn={participant.cameraOn}
-            micOn={participant.micOn && areMicsEnabled}
-            audioBlocked={!areMicsEnabled}
-            isLocal={false}
-            message={isChatEnabled ? participant.chatMessage : ''}
-            badgeLabel={room?.hostUid === participant.uid ? 'HOST' : 'CREW'}
-            badgeColor={room?.hostUid === participant.uid ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
-            locationLine={buildLiveLocationLine(participant.liveStatus, nowMs)}
-            action={isHost && room?.hostUid !== participant.uid ? {
-              title: `${participant.label} 내보내기`,
-              disabled: roomAction === `kicking:${participant.uid}`,
-              onClick: () => handleKickParticipant(participant),
-            } : null}
-          />
-        ))}
+        {remoteTiles.map((participant) => {
+          const isRemoteHost = room?.hostUid === participant.uid || crew?.leaderId === participant.uid;
+          return (
+            <StreamTile
+              key={participant.uid}
+              stream={participant.stream}
+              muted={false}
+              label={participant.label}
+              subtitle={participant.subtitle}
+              cameraOn={participant.cameraOn}
+              micOn={participant.micOn && areMicsEnabled}
+              audioBlocked={!areMicsEnabled}
+              isLocal={false}
+              message={isChatEnabled ? participant.chatMessage : ''}
+              badgeLabel={isRemoteHost ? 'HOST' : 'CREW'}
+              badgeColor={isRemoteHost ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
+              locationLine={buildLiveLocationLine(participant.liveStatus, nowMs)}
+              action={isHost && !isRemoteHost ? {
+                title: `${participant.label} 내보내기`,
+                disabled: roomAction === `kicking:${participant.uid}`,
+                onClick: () => handleKickParticipant(participant),
+              } : null}
+            />
+          );
+        })}
         {Array.from({ length: Math.max(0, 2 - remoteTiles.length) }).map((_, index) => (
           <div key={`empty-${index}`} style={{ ...tileStyle, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.45)' }}>
             <div style={{ textAlign: 'center' }}>
