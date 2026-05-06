@@ -175,7 +175,7 @@ export default function Agora() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ delay: idx * 0.05 }}
+                  transition={{ delay: idx < 20 ? idx * 0.03 : 0 }}
                   className={`question-card glass ${highlightId === q.id ? 'highlight-glow' : ''}`}
                   onClick={() => navigate(`/agora/${q.id}`)}
                 >

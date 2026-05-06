@@ -34,28 +34,49 @@ export function usePublicQuestions(filter = 'all') {
     queryKey: ['publicQuestions', filter],
     queryFn: async () => {
       try {
-        console.log('📡 usePublicQuestions: Fetching with filter:', filter);
-        let q = query(
-          collection(db, 'questions'),
-          where('isPublic', '==', true),
-          orderBy('createdAt', 'desc')
-        );
-
-        const snap = await getDocs(q);
-        console.log(`✅ usePublicQuestions: ${snap.size} questions fetched.`);
-        let data = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        const QUERY_LIMIT = 50;
+        let q;
 
         if (filter === 'my') {
-          data = data.filter(item => item.userId === auth.currentUser?.uid);
+          // Server-side userId filter — requires composite index (isPublic + userId + createdAt)
+          const user = auth.currentUser;
+          if (!user) return [];
+          q = query(
+            collection(db, 'questions'),
+            where('userId', '==', user.uid),
+            orderBy('createdAt', 'desc'),
+            limit(QUERY_LIMIT)
+          );
         } else if (filter === 'unanswered') {
-          // Only 'open' is considered "Waiting". 'Answered' is now "Solved".
-          data = data.filter(item => item.status === 'open');
+          // Server-side status filter
+          q = query(
+            collection(db, 'questions'),
+            where('isPublic', '==', true),
+            where('status', '==', 'open'),
+            orderBy('createdAt', 'desc'),
+            limit(QUERY_LIMIT)
+          );
         } else if (filter === 'solved') {
-          // Include both 'resolved' (completely closed) and 'answered' (has answer but not closed yet)
-          // The user requested '해결됨' tab to show answered questions.
-          data = data.filter(item => item.status === 'resolved' || item.status === 'answered');
+          // Server-side status filter (resolved OR answered)
+          q = query(
+            collection(db, 'questions'),
+            where('isPublic', '==', true),
+            where('status', 'in', ['resolved', 'answered']),
+            orderBy('createdAt', 'desc'),
+            limit(QUERY_LIMIT)
+          );
+        } else {
+          // 'all' — fetch latest 50
+          q = query(
+            collection(db, 'questions'),
+            where('isPublic', '==', true),
+            orderBy('createdAt', 'desc'),
+            limit(QUERY_LIMIT)
+          );
         }
 
+        const snap = await getDocs(q);
+        const data = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         return data;
       } catch (error) {
         console.error('❌ usePublicQuestions error:', error);
@@ -602,8 +623,8 @@ export function useStarMessages() {
         const snap = await getDocs(q);
         return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       },
-      staleTime: 0, // Always check if there's new data
-      refetchInterval: 5000 // Polling as a fallback for high-traffic
+      staleTime: 1000 * 10,     // 10 seconds
+      refetchInterval: 15000     // 15 seconds (reduced from 5s to save reads)
     }),
 
     post: useMutation({
