@@ -198,6 +198,38 @@ service cloud.firestore {
       allow read, write: if isAuth();
     }
 
+    // Direct Memos: one-to-one letter style messages. Creation and scheduled delivery
+    // are handled by Cloud Functions so the 24-hour per-recipient limit cannot be bypassed.
+    match /directMemos/{memoId} {
+      allow read: if isAuth() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid
+      );
+      allow create, delete: if false;
+      allow update: if isAuth() && (
+        (
+          resource.data.recipientId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'isRead', 'readAt', 'recipientArchivedAt', 'recipientDeletedAt', 'updatedAt'
+          ])
+        ) ||
+        (
+          resource.data.senderId == request.auth.uid &&
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'senderArchivedAt', 'senderDeletedAt', 'updatedAt'
+            ]) ||
+            (
+              resource.data.isRead == false &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'senderArchivedAt', 'senderDeletedAt', 'recipientDeletedAt', 'updatedAt'
+              ])
+            )
+          )
+        )
+      );
+    }
+
     // Assignments (Stellar Archive)
     match /assignments/{assignmentId} {
       allow create: if isAuth();
