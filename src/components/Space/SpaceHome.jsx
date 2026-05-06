@@ -34,6 +34,7 @@ import CrystalLedger from './CrystalLedger'
 // import { useParticles, createParticleBurst } from './ParticleEffects'
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates, isRadarActive } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
+import { applyHolidayMultiplier, isRestDay } from '../../utils/holidayUtils'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 
@@ -854,6 +855,11 @@ function SpaceHome() {
           if (!isDarkMatterMode && checkIsBonusUnit(currentUnitId) && isRadarActive(freshUserData)) {
             atomicCrystalsEarned += 5
           }
+
+          // --- Holiday Multiplier ---
+          if (atomicCrystalsEarned > 0) {
+            atomicCrystalsEarned = applyHolidayMultiplier(atomicCrystalsEarned, getTodayKST());
+          }
         }
 
         const prevConsecutiveGood = score >= 90 ? (freshUserData.consecutiveGood || 0) + 1 : 0
@@ -1087,7 +1093,9 @@ function SpaceHome() {
         crystalsEarned: finalCrystals,
         isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
         rewardMessage: finalCrystals > 0 
-          ? `${score}점으로 최고 기록을 경신했습니다! (+${finalCrystals} 광석)`
+          ? (isDarkMatterMode 
+              ? `🌌 다크 매터 정화 성공! (+${finalCrystals} 광석)` 
+              : `${score}점으로 최고 기록을 경신했습니다! (+${finalCrystals} 광석)`) + (isRestDay(getTodayKST()) ? ' ✨ (휴일 보너스)' : '')
           : (score === 100 ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)" : `최고 점수를 넘지 못해 추가 광석을 획득할 수 없습니다.`),
         streakInfo: {
           currentStreak: finalStreakUpdates.currentStreak || streakResultsFinal?.meta?.newStreak,
@@ -1204,6 +1212,11 @@ function SpaceHome() {
         
         // Calculate KST Date
         const todayKST = getTodayKST()
+
+        // --- Holiday Multiplier ---
+        if (actualReward > 0) {
+          actualReward = applyHolidayMultiplier(actualReward, todayKST);
+        }
 
         // --- Daily Video Reward Cap (Prevent infinite farming) ---
         // Apply cap to both interval and completion rewards

@@ -5,6 +5,8 @@
  * 순수 함수로 분리하여 테스트 용이성을 확보합니다.
  */
 
+import { isRestDay } from './holidayUtils';
+
 export const STREAK_WRITE_AUDIT_VERSION = 2;
 
 const KST_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-CA', {
@@ -289,43 +291,37 @@ export function getCurrentGapDefendedDates(lastActiveDate, freezeCount, todayKST
   if (!lastActiveDate || freezeCount <= 0) return [];
 
   const missedDates = listGapDatesExclusive(lastActiveDate, todayKST);
-  if (missedDates.length === 0 || missedDates.length > freezeCount) return [];
-  return missedDates;
+  const requiredMissedDates = missedDates.filter(d => !isRestDay(d));
+  if (requiredMissedDates.length === 0 || requiredMissedDates.length > freezeCount) return [];
+  return requiredMissedDates;
 }
 
 export function getCurrentStreakWindow(activeDates, defendedDates, todayKST = getTodayKST()) {
   const activeSet = normalizeDateSet(activeDates);
   const defendedSet = normalizeDateSet(defendedDates);
-  const participatedSet = new Set([...activeSet, ...defendedSet]);
   const yesterdayKST = shiftKSTDate(todayKST, -1);
-
-  let anchorDate = null;
-  if (participatedSet.has(todayKST)) {
-    anchorDate = todayKST;
-  } else if (participatedSet.has(yesterdayKST)) {
-    anchorDate = yesterdayKST;
-  } else {
-    return {
-      activeCount: 0,
-      participatedCount: 0,
-      chainDates: [],
-      defendedDatesInWindow: [],
-      lastParticipatedDate: getLatestDate(participatedSet),
-      lastActiveDate: getLatestDate(activeSet),
-    };
-  }
 
   const chainDates = [];
   const defendedDatesInWindow = [];
   let activeCount = 0;
-  let cursor = anchorDate;
+  let cursor = todayKST;
 
-  while (participatedSet.has(cursor)) {
-    chainDates.push(cursor);
-    if (activeSet.has(cursor)) {
-      activeCount += 1;
-    } else if (defendedSet.has(cursor)) {
-      defendedDatesInWindow.push(cursor);
+  while (true) {
+    const isActive = activeSet.has(cursor);
+    const isDefended = defendedSet.has(cursor);
+    const isRest = isRestDay(cursor);
+
+    if (cursor === todayKST && !isActive && !isDefended && !isRest) {
+      // 오늘은 평일이고 아직 학습 안 함 -> 끊긴 것이 아니라 아직 기회가 있음. 패스.
+    } else if (isActive || isDefended || isRest) {
+      if (isActive || isDefended) {
+        chainDates.push(cursor);
+        if (isActive) activeCount += 1;
+        if (isDefended) defendedDatesInWindow.push(cursor);
+      }
+    } else {
+      // 평일인데 학습도 안 하고 방어도 안 됨 -> 연속일 체인 종료!
+      break;
     }
     cursor = shiftKSTDate(cursor, -1);
   }
@@ -335,7 +331,7 @@ export function getCurrentStreakWindow(activeDates, defendedDates, todayKST = ge
     participatedCount: chainDates.length,
     chainDates,
     defendedDatesInWindow,
-    lastParticipatedDate: chainDates[0] || getLatestDate(participatedSet),
+    lastParticipatedDate: chainDates[0] || getLatestDate(new Set([...activeSet, ...defendedSet])),
     lastActiveDate: getLatestDate(activeSet),
   };
 }
@@ -498,12 +494,15 @@ export function calculateStreakUpdate(userData, todayOverride) {
     newStreak = currentStreak + 1
   } else {
     // Case 4: 하루 이상 빠짐
-    const diffDays = daysBetween(lastDate, todayKST)
-    const missedDays = diffDays - 1 // 어제 했으면 0, 엊그제 했으면 1...
+    const gapDates = listGapDatesExclusive(lastDate, todayKST)
+    const requiredMissedDates = gapDates.filter(d => !isRestDay(d))
     
-    if (missedDays > 0 && freezeCount >= missedDays) {
+    if (requiredMissedDates.length === 0) {
+      // 결석한 날들이 모두 주말/휴일임! 방어 아이템 없이도 연속일 유지
+      newStreak = currentStreak + 1
+    } else if (freezeCount >= requiredMissedDates.length) {
       // 결석일 수 만큼 크라이오 코어 보유 중 → 모두 소모 방어 성공
-      defendedDates = listGapDatesExclusive(lastDate, todayKST)
+      defendedDates = requiredMissedDates
       consumedFreezeCount = defendedDates.length
       newStreak = currentStreak + 1
       newFreezeCount = freezeCount - consumedFreezeCount
@@ -688,8 +687,9 @@ export function recalculateStreakState(activeDates, coreEvidenceDates = [], toda
     pushAvailableCores(nextActiveDate);
 
     const gapDates = listGapDatesExclusive(currentDate, nextActiveDate);
-    if (gapDates.length > 0 && gapDates.length <= inventory.length) {
-      gapDates.forEach(d => {
+    const requiredGapDates = gapDates.filter(d => !isRestDay(d));
+    if (requiredGapDates.length > 0 && requiredGapDates.length <= inventory.length) {
+      requiredGapDates.forEach(d => {
         defendedDates.push(d);
         inventory.shift();
       });
@@ -699,8 +699,9 @@ export function recalculateStreakState(activeDates, coreEvidenceDates = [], toda
   pushAvailableCores(todayKST);
 
   const currentGapDates = listGapDatesExclusive(sortedActive[sortedActive.length - 1], todayKST);
-  if (currentGapDates.length > 0 && currentGapDates.length <= inventory.length) {
-    currentGapDates.forEach(d => {
+  const requiredCurrentGapDates = currentGapDates.filter(d => !isRestDay(d));
+  if (requiredCurrentGapDates.length > 0 && requiredCurrentGapDates.length <= inventory.length) {
+    requiredCurrentGapDates.forEach(d => {
       defendedDates.push(d);
       inventory.shift();
     });
