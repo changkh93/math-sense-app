@@ -723,7 +723,6 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
             await setDoc(doc(db, 'studyRooms', roomId, 'participants', user.uid), {
               uid: user.uid,
               displayName: userData?.studentName || userData?.publicDisplayName || user.displayName || '탐사원',
-              role: room?.hostUid === user.uid ? 'host' : 'member',
               peerId,
               cameraOn: true,
               micOn: false,
@@ -1267,10 +1266,10 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
             audioBlocked={!areMicsEnabled}
             isLocal={false}
             message={isChatEnabled ? participant.chatMessage : ''}
-            badgeLabel={participant.role === 'host' ? 'HOST' : 'CREW'}
-            badgeColor={participant.role === 'host' ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
+            badgeLabel={room?.hostUid === participant.uid ? 'HOST' : 'CREW'}
+            badgeColor={room?.hostUid === participant.uid ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
             locationLine={buildLiveLocationLine(participant.liveStatus, nowMs)}
-            action={isHost && participant.role !== 'host' ? {
+            action={isHost && room?.hostUid !== participant.uid ? {
               title: `${participant.label} 내보내기`,
               disabled: roomAction === `kicking:${participant.uid}`,
               onClick: () => handleKickParticipant(participant),
