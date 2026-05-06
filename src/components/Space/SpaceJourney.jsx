@@ -10,9 +10,9 @@ function hasLearningActivity(stats) {
   return (stats.quizzes || 0) > 0 || (stats.videos || 0) > 0 || (stats.texts || 0) > 0 || (stats.workbooks || 0) > 0;
 }
 
-export default function SpaceJourney({ userData, initialHistory, initialTransactions }) {
+export default function SpaceJourney({ userData, initialHistory, initialTransactions, parentLoading }) {
   const [history, setHistory] = useState(initialHistory || []);
-  const [loading, setLoading] = useState(!initialHistory);
+  const [loading, setLoading] = useState(parentLoading || !initialHistory);
   
   const [viewMode, setViewMode] = useState('constellation');
   const [popover, setPopover] = useState(null); // { dayData, x, y }
@@ -22,8 +22,10 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
   const todayKST = getTodayKST();
 
   useEffect(() => {
-    // Debug log for production monitoring
-    console.log("[SpaceJourney] Mounted. userData:", !!userData, "history:", history?.length, "transactions:", transactions?.length);
+    if (parentLoading) {
+      setLoading(true);
+      return;
+    }
 
     const fetchHistory = async () => {
       // If props were provided, we don't need to fetch again
@@ -61,7 +63,20 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
       }
     };
     fetchHistory();
-  }, [auth.currentUser?.uid]);
+  }, [parentLoading, auth.currentUser?.uid]);
+
+  // Sync props from parent when parent finishes loading
+  useEffect(() => {
+    if (!parentLoading && initialHistory) {
+      setHistory(initialHistory);
+    }
+  }, [parentLoading, initialHistory]);
+
+  useEffect(() => {
+    if (!parentLoading && initialTransactions) {
+      setTransactions(initialTransactions);
+    }
+  }, [parentLoading, initialTransactions]);
 
   // 집계 스탯
   const dailyStats = useMemo(() => {
@@ -476,7 +491,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
 
       {/* 메인 뷰 영역 (Ranking 카드 스타일과 통일) */}
       <div className="journey-view-container">
-        <div className="glass-card hud-border journey-card">
+        <div className="journey-card">
           <div className="journey-scroll-area" ref={scrollContainerRef}>
             {viewMode === 'constellation' ? (
               <ConstellationView nodes={timelineData.days} tier={tier} activeColor={activeColor} onStarClick={handleDayClick} />

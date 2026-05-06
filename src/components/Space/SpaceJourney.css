@@ -9,6 +9,40 @@
   flex-direction: column;
 }
 
+.journey-main-title {
+  margin: 0;
+  font-size: 2rem;
+  font-family: var(--font-title);
+  color: #00f3ff;
+  text-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+  letter-spacing: 2px;
+}
+
+.journey-view-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 1rem;
+  min-height: 0;
+}
+
+.journey-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(5, 10, 25, 0.6);
+  border: 1px solid rgba(0, 243, 255, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  /* No backdrop-filter — keeps inner calendar/constellation content crisp */
+}
+
+.journey-card:hover {
+  transform: none;
+  background: rgba(5, 10, 25, 0.6);
+}
+
 .space-journey-container.nebula-bg {
   background: radial-gradient(circle at 40% 60%, rgba(139, 92, 246, 0.15) 0%, #03050c 100%),
               radial-gradient(circle at 80% 20%, rgba(0, 243, 255, 0.1) 0%, transparent 60%);

@@ -2585,6 +2585,7 @@ function SpaceHome() {
               userData={userData} 
               initialHistory={history} 
               initialTransactions={transactions}
+              parentLoading={loadingHistory || loadingTransactions}
             />
           )}
           {currentView === 'ledger' && <CrystalLedger userData={userData} />}
