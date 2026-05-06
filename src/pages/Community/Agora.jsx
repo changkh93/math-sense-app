@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X } from 'lucide-react';
+import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X, ChevronDown, Loader } from 'lucide-react';
 import { usePublicQuestions, useQAMutations } from '../../hooks/useQA';
 import { getAnonymousLabel } from '../../utils/socialUtils';
 import QuestionModal from '../../components/QuestionModal';
@@ -26,25 +26,38 @@ export default function Agora() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Apply filters
-  const { data: allQuestions, isLoading, isError, error } = usePublicQuestions(filter);
+  // Apply filters — now uses useInfiniteQuery
+  const { 
+    data: paginatedData, 
+    isLoading, 
+    isError, 
+    error, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage 
+  } = usePublicQuestions(filter);
   const { upvote } = useQAMutations();
+
+  // Flatten all pages into a single array
+  const allQuestions = React.useMemo(() => {
+    if (!paginatedData?.pages) return [];
+    return paginatedData.pages.flatMap(page => page.items);
+  }, [paginatedData]);
 
   // Scroll to highlighted item when data loads
   React.useEffect(() => {
-    if (highlightId && allQuestions && !isLoading) {
+    if (highlightId && allQuestions.length > 0 && !isLoading) {
       setTimeout(() => {
         const el = document.getElementById(`question-${highlightId}`);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 500); // Wait for animation
+      }, 500);
     }
   }, [highlightId, allQuestions, isLoading]);
 
 
   const questions = React.useMemo(() => {
-    if (!allQuestions) return [];
     let filtered = allQuestions;
     
     if (searchTerm.trim()) {
@@ -55,8 +68,7 @@ export default function Agora() {
       );
     }
 
-    // If highlighting, move that item to top? 
-    // User requested "Pinning".
+    // If highlighting, move that item to top
     if (highlightId) {
       const targetIdx = filtered.findIndex(q => q.id === highlightId);
       if (targetIdx > -1) {
@@ -159,6 +171,7 @@ export default function Agora() {
             )}
           </div>
         ) : (
+          <>
           <div className="questions-grid">
             <AnimatePresence mode="popLayout">
               {questions.map((q, idx) => (
@@ -236,6 +249,50 @@ export default function Agora() {
               ))}
             </AnimatePresence>
           </div>
+
+          {/* Load More Button */}
+          {hasNextPage && !searchTerm.trim() && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0' }}>
+              <button
+                className="load-more-btn glass"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.8rem 2rem',
+                  background: 'rgba(0, 243, 255, 0.08)',
+                  border: '1px solid rgba(0, 243, 255, 0.3)',
+                  borderRadius: '12px',
+                  color: '#00f3ff',
+                  cursor: isFetchingNextPage ? 'wait' : 'pointer',
+                  fontFamily: 'var(--font-tech)',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  letterSpacing: '1px',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseOver={e => {
+                  if (!isFetchingNextPage) {
+                    e.currentTarget.style.background = 'rgba(0, 243, 255, 0.15)';
+                    e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 243, 255, 0.3)';
+                  }
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = 'rgba(0, 243, 255, 0.08)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {isFetchingNextPage ? (
+                  <><Loader size={16} className="spin-icon" /> 불러오는 중...</>
+                ) : (
+                  <><ChevronDown size={16} /> 이전 질문 더 보기</>
+                )}
+              </button>
+            </div>
+          )}
+          </>
         )}
           </main>
           

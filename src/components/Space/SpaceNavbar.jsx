@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import NotificationMenu from './NotificationMenu';
+import DirectMemoMenu from './DirectMemoMenu';
 import CometBadge from './CometBadge';
 import { getEffectiveStreak } from '../../utils/streakUtils';
 import './SpaceNavbar.css';
@@ -81,6 +82,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       </div>
       
       <div className="nav-right">
+        <DirectMemoMenu />
         <NotificationMenu />
         <div 
           onClick={() => handleNavClick('journey', '/')}

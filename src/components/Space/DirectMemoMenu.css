@@ -1,0 +1,554 @@
+.direct-memo-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.direct-memo-button {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  border-radius: 50%;
+  background: rgba(96, 165, 250, 0.12);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+  overflow: visible;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.direct-memo-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  stroke: #ffffff !important;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(147, 197, 253, 0.38));
+}
+
+.direct-memo-button:hover {
+  transform: translateY(-1px);
+  background: rgba(96, 165, 250, 0.2);
+  border-color: rgba(147, 197, 253, 0.5);
+}
+
+.direct-memo-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f43f5e;
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.48);
+}
+
+.direct-memo-dropdown {
+  position: absolute;
+  top: 50px;
+  right: -56px;
+  width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
+  max-height: min(720px, calc(100vh - 84px));
+  background: rgba(12, 18, 35, 0.97);
+  border: 1px solid rgba(147, 197, 253, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.52);
+  overflow: hidden;
+  z-index: 1100;
+  animation: directMemoDrop 0.16s ease-out;
+}
+
+@keyframes directMemoDrop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.direct-memo-header {
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.direct-memo-kicker {
+  color: var(--crystal-cyan);
+  font-family: var(--font-tech);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.direct-memo-header h4 {
+  margin: 0.15rem 0 0;
+  color: var(--text-bright);
+  font-size: 1.05rem;
+}
+
+.direct-memo-compose,
+.direct-memo-send,
+.direct-memo-archive,
+.direct-memo-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.direct-memo-compose,
+.direct-memo-send {
+  border: 1px solid rgba(0, 243, 255, 0.26);
+  border-radius: 8px;
+  background: rgba(0, 243, 255, 0.1);
+  color: var(--text-bright);
+  font-family: var(--font-tech);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.direct-memo-compose {
+  padding: 0.5rem 0.7rem;
+}
+
+.direct-memo-send {
+  padding: 0.62rem 0.85rem;
+}
+
+.direct-memo-send:disabled,
+.direct-memo-compose-panel textarea:disabled,
+.direct-memo-compose-panel input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.direct-memo-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.direct-memo-tabs button {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  padding: 0.55rem 0.35rem;
+  font-family: var(--font-tech);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.direct-memo-tabs button.active {
+  color: var(--text-bright);
+  border-color: rgba(0, 243, 255, 0.34);
+  background: rgba(0, 243, 255, 0.1);
+}
+
+.direct-memo-message {
+  margin: 0.8rem 0.9rem 0;
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  color: #bbf7d0;
+  font-family: var(--font-tech);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.direct-memo-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #fecaca;
+}
+
+.direct-memo-compose-panel {
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.direct-memo-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.direct-memo-field-label {
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--font-tech);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.direct-memo-compose-panel input,
+.direct-memo-compose-panel textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(147, 197, 253, 0.22);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.64);
+  color: var(--text-bright);
+  padding: 0.72rem 0.8rem;
+  font-family: var(--font-tech);
+  outline: none;
+}
+
+.direct-memo-recipient-combobox {
+  position: relative;
+}
+
+.direct-memo-selected-recipient {
+  width: 100%;
+  min-height: 45px;
+  box-sizing: border-box;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 8px;
+  background: rgba(8, 47, 73, 0.52);
+  color: var(--text-bright);
+  padding: 0.55rem 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.direct-memo-selected-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #67e8f9;
+  background: rgba(8, 145, 178, 0.22);
+  flex-shrink: 0;
+}
+
+.direct-memo-selected-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  flex: 1;
+}
+
+.direct-memo-selected-copy strong,
+.direct-memo-selected-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.direct-memo-selected-copy strong {
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.direct-memo-selected-copy small {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.72rem;
+}
+
+.direct-memo-selected-clear {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(15, 23, 42, 0.7);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.direct-memo-selected-clear:hover {
+  color: #ffffff;
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.direct-memo-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 230px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.42) rgba(2, 6, 23, 0.72);
+  padding: 0.35rem;
+  border: 1px solid rgba(147, 197, 253, 0.26);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42);
+  z-index: 4;
+}
+
+.direct-memo-suggestion {
+  width: 100%;
+  min-height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.86);
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  cursor: pointer;
+  font-family: var(--font-tech);
+  text-align: left;
+}
+
+.direct-memo-suggestion:hover,
+.direct-memo-suggestion.selected {
+  background: rgba(37, 99, 235, 0.55);
+  color: #ffffff;
+}
+
+.direct-memo-suggestion-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 900;
+}
+
+.direct-memo-suggestion-hint {
+  flex-shrink: 0;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.76rem;
+}
+
+.direct-memo-suggestion.selected .direct-memo-suggestion-hint,
+.direct-memo-suggestion:hover .direct-memo-suggestion-hint {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.direct-memo-suggestion-empty {
+  padding: 0.8rem 0.7rem;
+  color: rgba(255, 255, 255, 0.52);
+  font-family: var(--font-tech);
+  font-size: 0.82rem;
+}
+
+.direct-memo-compose-panel textarea {
+  min-height: 150px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.direct-memo-compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  color: rgba(255, 255, 255, 0.52);
+  font-family: var(--font-tech);
+  font-size: 0.78rem;
+}
+
+.direct-memo-rule {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.54);
+  font-family: var(--font-tech);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.direct-memo-list {
+  max-height: 440px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.42) rgba(2, 6, 23, 0.72);
+  padding: 0.8rem;
+  padding-right: 0.65rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.direct-memo-list::-webkit-scrollbar,
+.direct-memo-suggestions::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.direct-memo-list::-webkit-scrollbar-track,
+.direct-memo-suggestions::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.72);
+  border-radius: 999px;
+}
+
+.direct-memo-list::-webkit-scrollbar-thumb,
+.direct-memo-suggestions::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.58), rgba(59, 130, 246, 0.44));
+  border: 2px solid rgba(2, 6, 23, 0.72);
+  border-radius: 999px;
+}
+
+.direct-memo-list::-webkit-scrollbar-corner,
+.direct-memo-suggestions::-webkit-scrollbar-corner {
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.direct-memo-empty {
+  padding: 2.4rem 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-tech);
+}
+
+.direct-memo-card {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.48);
+  padding: 0.85rem;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.direct-memo-card.unread {
+  border-color: rgba(0, 243, 255, 0.28);
+  background: rgba(0, 243, 255, 0.08);
+}
+
+.direct-memo-card-top,
+.direct-memo-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.direct-memo-peer,
+.direct-memo-state {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.4rem;
+  font-family: var(--font-tech);
+  font-weight: 800;
+}
+
+.direct-memo-peer {
+  color: var(--text-bright);
+  flex: 1;
+  overflow: hidden;
+}
+
+.direct-memo-peer span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.direct-memo-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(147, 197, 253, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #bfdbfe;
+  flex-shrink: 0;
+}
+
+.direct-memo-state {
+  flex-shrink: 0;
+  max-width: 48%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #bbf7d0;
+  font-size: 0.75rem;
+}
+
+.direct-memo-state.scheduled {
+  color: #fde68a;
+}
+
+.direct-memo-preview {
+  margin: 0.65rem 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--font-tech);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.direct-memo-card-bottom {
+  color: rgba(255, 255, 255, 0.48);
+  font-family: var(--font-tech);
+  font-size: 0.75rem;
+}
+
+.direct-memo-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.direct-memo-archive,
+.direct-memo-delete {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.58);
+  border-radius: 7px;
+  padding: 0.25rem 0.42rem;
+  cursor: pointer;
+  font-family: var(--font-tech);
+  font-size: 0.75rem;
+}
+
+.direct-memo-delete {
+  color: rgba(254, 202, 202, 0.78);
+}
+
+.direct-memo-archive:hover,
+.direct-memo-delete:hover {
+  color: var(--text-bright);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 640px) {
+  .direct-memo-dropdown {
+    right: max(-92px, calc(24px - 100vw));
+  }
+}

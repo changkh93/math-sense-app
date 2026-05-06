@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   collection, 
   getDocs, 
@@ -15,6 +15,7 @@ import {
   arrayUnion,
   arrayRemove,
   limit,
+  startAfter,
   runTransaction
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
@@ -28,60 +29,55 @@ import {
   buildAnswerProfileSnapshot
 } from '../utils/socialUtils';
 
-// --- Fetch Public Questions (Agora Board) ---
+// --- Fetch Public Questions (Agora Board) with Cursor Pagination ---
+const PAGE_SIZE = 20;
+
 export function usePublicQuestions(filter = 'all') {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['publicQuestions', filter],
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
       try {
-        const QUERY_LIMIT = 50;
-        let q;
+        const constraints = [];
 
         if (filter === 'my') {
-          // Server-side userId filter — requires composite index (isPublic + userId + createdAt)
           const user = auth.currentUser;
-          if (!user) return [];
-          q = query(
-            collection(db, 'questions'),
-            where('userId', '==', user.uid),
-            orderBy('createdAt', 'desc'),
-            limit(QUERY_LIMIT)
-          );
+          if (!user) return { items: [], lastDoc: null };
+          constraints.push(where('userId', '==', user.uid));
         } else if (filter === 'unanswered') {
-          // Server-side status filter
-          q = query(
-            collection(db, 'questions'),
-            where('isPublic', '==', true),
-            where('status', '==', 'open'),
-            orderBy('createdAt', 'desc'),
-            limit(QUERY_LIMIT)
-          );
+          constraints.push(where('isPublic', '==', true));
+          constraints.push(where('status', '==', 'open'));
         } else if (filter === 'solved') {
-          // Server-side status filter (resolved OR answered)
-          q = query(
-            collection(db, 'questions'),
-            where('isPublic', '==', true),
-            where('status', 'in', ['resolved', 'answered']),
-            orderBy('createdAt', 'desc'),
-            limit(QUERY_LIMIT)
-          );
+          constraints.push(where('isPublic', '==', true));
+          constraints.push(where('status', 'in', ['resolved', 'answered']));
         } else {
-          // 'all' — fetch latest 50
-          q = query(
-            collection(db, 'questions'),
-            where('isPublic', '==', true),
-            orderBy('createdAt', 'desc'),
-            limit(QUERY_LIMIT)
-          );
+          constraints.push(where('isPublic', '==', true));
         }
 
+        constraints.push(orderBy('createdAt', 'desc'));
+
+        // Cursor: start after the last document from previous page
+        if (pageParam) {
+          constraints.push(startAfter(pageParam));
+        }
+
+        constraints.push(limit(PAGE_SIZE));
+
+        const q = query(collection(db, 'questions'), ...constraints);
         const snap = await getDocs(q);
-        const data = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-        return data;
+        const items = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+
+        return { items, lastDoc };
       } catch (error) {
         console.error('❌ usePublicQuestions error:', error);
         throw error;
       }
+    },
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => {
+      // If we got fewer items than PAGE_SIZE, there are no more pages
+      if (!lastPage?.lastDoc || lastPage.items.length < PAGE_SIZE) return undefined;
+      return lastPage.lastDoc;
     },
     staleTime: 1000 * 60, // 1 minute
   });
@@ -100,13 +96,18 @@ export function useQuestionDetail(questionId) {
       return { ...snap.data(), id: snap.id };
     },
     enabled: !!questionId,
-    // FUNDAMENTAL IMPROVEMENT: Use data already in the Agora board cache
+    // FUNDAMENTAL IMPROVEMENT: Use data already in the Agora board cache (paginated)
     initialData: () => {
-      // Check all filters in the cache for this question
-      const cached = queryClient.getQueryData(['publicQuestions', 'all'])?.find(q => q.id === questionId) ||
-                     queryClient.getQueryData(['publicQuestions', 'unanswered'])?.find(q => q.id === questionId) ||
-                     queryClient.getQueryData(['publicQuestions', 'solved'])?.find(q => q.id === questionId);
-      return cached;
+      const findInCache = (filterKey) => {
+        const cached = queryClient.getQueryData(['publicQuestions', filterKey]);
+        if (!cached?.pages) return undefined;
+        for (const page of cached.pages) {
+          const found = page.items.find(q => q.id === questionId);
+          if (found) return found;
+        }
+        return undefined;
+      };
+      return findInCache('all') || findInCache('unanswered') || findInCache('solved');
     },
     staleTime: 1000 * 30, // 30 seconds
   });
@@ -227,9 +228,18 @@ export function useQAMutations() {
           return { ...q, upvotedBy: newUpvotedBy, upvotes: newUpvotedBy.length };
         };
 
-        // Apply optimistic update to all cached question lists
+        // Apply optimistic update to all cached question lists (paginated shape)
         listKeys.forEach(key => {
-          queryClient.setQueryData(key, (old) => old?.map(toggleQuestion));
+          queryClient.setQueryData(key, (old) => {
+            if (!old?.pages) return old;
+            return {
+              ...old,
+              pages: old.pages.map(page => ({
+                ...page,
+                items: page.items.map(toggleQuestion)
+              }))
+            };
+          });
         });
 
         // Apply to detail cache
