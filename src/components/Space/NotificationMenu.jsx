@@ -2,8 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
-import { Bell } from 'lucide-react'; // Keep import if used elsewhere or remove if not. Actually I will replace usage.
+import { Mail, Megaphone, MessageCircle } from 'lucide-react';
 import './NotificationMenu.css';
+
+function NotificationIcon({ type }) {
+  if (type === 'reply') return <MessageCircle size={17} />;
+  if (type === 'memo') return <Mail size={17} />;
+  return <Megaphone size={17} />;
+}
 
 export default function NotificationMenu() {
   const [notifications, setNotifications] = useState([]);
@@ -37,7 +43,9 @@ export default function NotificationMenu() {
     );
 
     unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const notifs = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(n => n.type !== 'memo');
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.isRead).length);
     });
@@ -149,8 +157,8 @@ export default function NotificationMenu() {
                   className={`notification-item ${!notif.isRead ? 'unread' : ''}`}
                   onClick={() => handleNotificationClick(notif)}
                 >
-                  <div className="notif-icon">
-                    {notif.type === 'reply' ? '💬' : '📢'}
+                  <div className={`notif-icon ${notif.type === 'memo' ? 'memo' : ''}`}>
+                    <NotificationIcon type={notif.type} />
                   </div>
                   <div className="notif-content">
                     <p className="notif-message">{notif.message}</p>

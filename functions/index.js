@@ -6,6 +6,8 @@ const cors = require("cors")({ origin: true });
 const fetch = require("node-fetch");
 const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
+const DIRECT_MEMO_MAX_LENGTH = 2000;
+const DIRECT_MEMO_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 /**
  * fetchNotebook
@@ -466,6 +468,28 @@ async function loadMemberSummaries(memberIds = []) {
 
 function getDisplayNameFromUser(userData = {}) {
   return userData.publicDisplayName || userData.studentName || userData.name || userData.displayName || "탐사원";
+}
+
+function normalizeDirectMemoBody(value) {
+  return String(value || "").replace(/\r\n/g, "\n").trim().slice(0, DIRECT_MEMO_MAX_LENGTH);
+}
+
+function getDirectMemoPreview(body) {
+  const oneLine = String(body || "").replace(/\s+/g, " ").trim();
+  return oneLine.length > 64 ? `${oneLine.slice(0, 64)}...` : oneLine;
+}
+
+function toAdminTimestamp(value) {
+  if (!value) return null;
+  if (typeof value.toMillis === "function") return value;
+  if (value instanceof Date) return admin.firestore.Timestamp.fromDate(value);
+  if (typeof value === "number") return admin.firestore.Timestamp.fromMillis(value);
+  return null;
+}
+
+function createDirectMemoNotification(tx, memoRef, memoData) {
+  // Notification generation disabled. 
+  // Direct memo notifications are handled solely by the memo icon indicator on the client.
 }
 
 function buildClearedCrewUserFields() {
@@ -1132,6 +1156,303 @@ exports.listStudyCrews = regionalFunctions.https.onCall(async (_data, context) =
     crews,
   };
 });
+
+exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const recipientId = String(data?.recipientId || "").trim();
+  const body = normalizeDirectMemoBody(data?.body);
+
+  if (!recipientId) {
+    throw new functions.https.HttpsError("invalid-argument", "받는 사람을 선택해주세요.");
+  }
+  if (recipientId === uid) {
+    throw new functions.https.HttpsError("invalid-argument", "자기 자신에게는 편지를 보낼 수 없습니다.");
+  }
+  if (!body) {
+    throw new functions.https.HttpsError("invalid-argument", "편지 내용을 입력해주세요.");
+  }
+
+  const db = admin.firestore();
+  const senderRef = db.collection("users").doc(uid);
+  const recipientRef = db.collection("users").doc(recipientId);
+  const limitRef = senderRef.collection("directMemoLimits").doc(recipientId);
+  const memoRef = db.collection("directMemos").doc();
+
+  const result = await db.runTransaction(async (tx) => {
+    const [senderSnap, recipientSnap, limitSnap] = await Promise.all([
+      tx.get(senderRef),
+      tx.get(recipientRef),
+      tx.get(limitRef),
+    ]);
+
+    if (!senderSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "보내는 사람 프로필을 찾지 못했습니다.");
+    }
+    if (!recipientSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "받는 사람 프로필을 찾지 못했습니다.");
+    }
+
+    const senderData = senderSnap.data() || {};
+    const recipientData = recipientSnap.data() || {};
+    const nowMillis = Date.now();
+    const now = admin.firestore.Timestamp.fromMillis(nowMillis);
+    const lastImmediateAt = toAdminTimestamp(limitSnap.data()?.lastImmediateSentAt);
+    const lastScheduledDeliverAt = toAdminTimestamp(limitSnap.data()?.lastScheduledDeliverAt);
+    const lastImmediateMillis = lastImmediateAt?.toMillis?.() || 0;
+    const lastScheduledDeliverMillis = lastScheduledDeliverAt?.toMillis?.() || 0;
+    const hasActiveScheduleQueue = lastScheduledDeliverMillis > nowMillis;
+    const shouldSchedule = hasActiveScheduleQueue || (lastImmediateMillis > 0 && nowMillis - lastImmediateMillis < DIRECT_MEMO_COOLDOWN_MS);
+    const deliverAtMillis = shouldSchedule
+      ? (hasActiveScheduleQueue ? lastScheduledDeliverMillis + DIRECT_MEMO_COOLDOWN_MS : nowMillis + DIRECT_MEMO_COOLDOWN_MS)
+      : nowMillis;
+    const deliverAt = admin.firestore.Timestamp.fromMillis(deliverAtMillis);
+    const status = shouldSchedule ? "scheduled" : "delivered";
+
+    const memoData = {
+      senderId: uid,
+      senderName: getDisplayNameFromUser(senderData),
+      recipientId,
+      recipientName: getDisplayNameFromUser(recipientData),
+      participantIds: [uid, recipientId],
+      body,
+      bodyPreview: getDirectMemoPreview(body),
+      status,
+      isRead: false,
+      createdAt: now,
+      updatedAt: now,
+      deliverAt,
+      sentAt: status === "delivered" ? now : null,
+      readAt: null,
+      senderArchivedAt: null,
+      recipientArchivedAt: null,
+      senderDeletedAt: null,
+      recipientDeletedAt: null,
+    };
+
+    tx.set(memoRef, memoData);
+    if (status === "delivered") {
+      tx.set(limitRef, {
+        recipientId,
+        lastImmediateSentAt: now,
+        updatedAt: now,
+      }, { merge: true });
+      createDirectMemoNotification(tx, memoRef, memoData);
+    } else {
+      tx.set(limitRef, {
+        recipientId,
+        lastScheduledAt: now,
+        lastScheduledDeliverAt: deliverAt,
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    return {
+      memoId: memoRef.id,
+      status,
+      deliverAtMillis,
+      recipientName: memoData.recipientName,
+    };
+  });
+
+  return result;
+});
+
+exports.markDirectMemoRead = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const memoId = String(data?.memoId || "").trim();
+  if (!memoId) {
+    throw new functions.https.HttpsError("invalid-argument", "편지 정보를 찾을 수 없습니다.");
+  }
+
+  const memoRef = admin.firestore().collection("directMemos").doc(memoId);
+  await admin.firestore().runTransaction(async (tx) => {
+    const memoSnap = await tx.get(memoRef);
+    if (!memoSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "편지를 찾을 수 없습니다.");
+    }
+
+    const memo = memoSnap.data() || {};
+    if (memo.recipientId !== uid) {
+      throw new functions.https.HttpsError("permission-denied", "받은 편지만 읽음 처리할 수 있습니다.");
+    }
+    if (memo.status !== "delivered") return;
+    if (memo.isRead) return;
+
+    const now = admin.firestore.Timestamp.now();
+    tx.set(memoRef, {
+      isRead: true,
+      readAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  });
+
+  return { success: true };
+});
+
+exports.archiveDirectMemo = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const memoId = String(data?.memoId || "").trim();
+  if (!memoId) {
+    throw new functions.https.HttpsError("invalid-argument", "편지 정보를 찾을 수 없습니다.");
+  }
+
+  const memoRef = admin.firestore().collection("directMemos").doc(memoId);
+  await admin.firestore().runTransaction(async (tx) => {
+    const memoSnap = await tx.get(memoRef);
+    if (!memoSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "편지를 찾을 수 없습니다.");
+    }
+
+    const memo = memoSnap.data() || {};
+    const now = admin.firestore.Timestamp.now();
+    if (memo.recipientId === uid) {
+      tx.set(memoRef, { recipientArchivedAt: now, updatedAt: now }, { merge: true });
+      return;
+    }
+    if (memo.senderId === uid) {
+      tx.set(memoRef, { senderArchivedAt: now, updatedAt: now }, { merge: true });
+      return;
+    }
+    throw new functions.https.HttpsError("permission-denied", "내 편지만 보관할 수 있습니다.");
+  });
+
+  return { success: true };
+});
+
+exports.restoreDirectMemo = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const memoId = String(data?.memoId || "").trim();
+  if (!memoId) {
+    throw new functions.https.HttpsError("invalid-argument", "편지 정보를 찾을 수 없습니다.");
+  }
+
+  const memoRef = admin.firestore().collection("directMemos").doc(memoId);
+  await admin.firestore().runTransaction(async (tx) => {
+    const memoSnap = await tx.get(memoRef);
+    if (!memoSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "편지를 찾을 수 없습니다.");
+    }
+
+    const memo = memoSnap.data() || {};
+    const now = admin.firestore.Timestamp.now();
+    if (memo.recipientId === uid) {
+      if (memo.recipientDeletedAt) {
+        throw new functions.https.HttpsError("failed-precondition", "삭제한 편지는 복원할 수 없습니다.");
+      }
+      tx.set(memoRef, { recipientArchivedAt: null, updatedAt: now }, { merge: true });
+      return;
+    }
+    if (memo.senderId === uid) {
+      if (memo.senderDeletedAt) {
+        throw new functions.https.HttpsError("failed-precondition", "삭제한 편지는 복원할 수 없습니다.");
+      }
+      tx.set(memoRef, { senderArchivedAt: null, updatedAt: now }, { merge: true });
+      return;
+    }
+    throw new functions.https.HttpsError("permission-denied", "내 편지만 복원할 수 있습니다.");
+  });
+
+  return { success: true };
+});
+
+exports.deleteDirectMemo = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const memoId = String(data?.memoId || "").trim();
+  if (!memoId) {
+    throw new functions.https.HttpsError("invalid-argument", "편지 정보를 찾을 수 없습니다.");
+  }
+
+  const memoRef = admin.firestore().collection("directMemos").doc(memoId);
+  await admin.firestore().runTransaction(async (tx) => {
+    const memoSnap = await tx.get(memoRef);
+    if (!memoSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "편지를 찾을 수 없습니다.");
+    }
+
+    const memo = memoSnap.data() || {};
+    const now = admin.firestore.Timestamp.now();
+    if (memo.recipientId === uid) {
+      if (memo.senderDeletedAt) {
+        tx.delete(memoRef);
+        return;
+      }
+      tx.set(memoRef, {
+        recipientDeletedAt: now,
+        recipientArchivedAt: null,
+        updatedAt: now,
+      }, { merge: true });
+      return;
+    }
+    if (memo.senderId === uid) {
+      if (memo.recipientDeletedAt) {
+        tx.delete(memoRef);
+        return;
+      }
+      tx.set(memoRef, {
+        senderDeletedAt: now,
+        senderArchivedAt: null,
+        updatedAt: now,
+      }, { merge: true });
+      return;
+    }
+    throw new functions.https.HttpsError("permission-denied", "내 편지만 삭제할 수 있습니다.");
+  });
+
+  return { success: true };
+});
+
+exports.deliverScheduledDirectMemos = regionalFunctions.pubsub
+  .schedule("every 5 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = admin.firestore.Timestamp.now();
+    const snap = await db.collection("directMemos")
+      .where("status", "==", "scheduled")
+      .where("deliverAt", "<=", now)
+      .orderBy("deliverAt", "asc")
+      .limit(100)
+      .get();
+
+    if (snap.empty) return null;
+
+    const chunks = [];
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      chunks.push(snap.docs.slice(i, i + 400));
+    }
+
+    for (const docs of chunks) {
+      await db.runTransaction(async (tx) => {
+        const freshSnaps = await Promise.all(docs.map((docSnap) => tx.get(docSnap.ref)));
+        freshSnaps.forEach((docSnap) => {
+          if (!docSnap.exists) return;
+          const memoRef = docSnap.ref;
+          const memoData = docSnap.data() || {};
+          const deliverAtMillis = memoData.deliverAt?.toMillis?.() || 0;
+          if (memoData.status !== "scheduled" || deliverAtMillis > now.toMillis()) return;
+          const deliveredMemo = {
+            ...memoData,
+            status: "delivered",
+            sentAt: now,
+            updatedAt: now,
+          };
+          tx.set(memoRef, {
+            status: "delivered",
+            sentAt: now,
+            updatedAt: now,
+          }, { merge: true });
+          tx.set(db.collection("users").doc(memoData.senderId).collection("directMemoLimits").doc(memoData.recipientId), {
+            recipientId: memoData.recipientId,
+            lastImmediateSentAt: now,
+            updatedAt: now,
+          }, { merge: true });
+          createDirectMemoNotification(tx, memoRef, deliveredMemo);
+        });
+      });
+    }
+
+    return null;
+  });
 
 exports.createStudyRoom = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
