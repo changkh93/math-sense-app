@@ -222,7 +222,13 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
     if (!crewId) { setCrewRoom(null); return; }
     const roomQuery = query(collection(db, 'studyRooms'), where('crewId', '==', crewId));
     const unsub = onSnapshot(roomQuery, snap => {
-      const room = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.status !== 'ended').sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))[0] || null;
+      const room = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => {
+        if (r.status === 'ended') return false;
+        const baseMs = r.startedAt?.toMillis?.() || r.createdAt?.toMillis?.() || 0;
+        const durationMs = (r.durationMinutes || 50) * 60 * 1000;
+        if (baseMs && Date.now() >= baseMs + durationMs) return false;
+        return true;
+      }).sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))[0] || null;
       setCrewRoom(room);
     });
     return () => unsub();
@@ -535,7 +541,6 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
             ) : (
               <>
                 <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>아직 열린 집중방이 없습니다.</div>
-                {userData?.crewRole === 'leader' ? (
                   <>
                     <div style={{ display: 'grid', gap: '0.45rem' }}>
                       <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
@@ -558,9 +563,6 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
                     </div>
                     <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction} onClick={handleCreateStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'creating' ? '집중방 여는 중...' : `${roomDuration}분 집중방 열기`}</button>
                   </>
-                ) : (
-                  <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>리더가 방을 열면 여기서 입장할 수 있습니다.</div>
-                )}
               </>
             )}
           </div>

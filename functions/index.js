@@ -1484,21 +1484,27 @@ exports.createStudyRoom = regionalFunctions.https.onCall(async (data, context) =
     if (userData.crewId !== crewId) {
       throw new functions.https.HttpsError("permission-denied", "같은 크루 멤버만 집중방을 생성할 수 있습니다.");
     }
-    if (userData.crewRole !== "leader" && userData.role !== "admin") {
-      throw new functions.https.HttpsError("permission-denied", "크루 리더만 집중방을 열 수 있습니다.");
-    }
+
     if ((crewData.status || "pending") !== "approved") {
       throw new functions.https.HttpsError("failed-precondition", "승인된 크루만 Study Stream을 열 수 있습니다.");
     }
 
+    const now = new Date();
+
     if (crewData.activeStudyRoomId) {
       const activeRoomSnap = await tx.get(db.collection("studyRooms").doc(crewData.activeStudyRoomId));
       if (activeRoomSnap.exists && (activeRoomSnap.data()?.status || "waiting") !== "ended") {
-        throw new functions.https.HttpsError("failed-precondition", "이미 진행 중인 집중방이 있습니다.");
+        const activeRoomData = activeRoomSnap.data();
+        const baseMs = (activeRoomData.startedAt?.toMillis?.() || activeRoomData.createdAt?.toMillis?.() || 0);
+        const durationMs = (activeRoomData.durationMinutes || 50) * 60 * 1000;
+        
+        if (baseMs && now.getTime() < baseMs + durationMs) {
+          throw new functions.https.HttpsError("failed-precondition", "이미 진행 중인 집중방이 있습니다.");
+        } else {
+          tx.set(activeRoomSnap.ref, { status: "ended", endedAt: now }, { merge: true });
+        }
       }
     }
-
-    const now = new Date();
     const displayName = getDisplayNameFromUser(userData);
     const roomData = {
       crewId,
