@@ -117,7 +117,7 @@ function buildRefineryCauseStats(records = []) {
 }
 
 function SpaceHome() {
-  // const navigate = useNavigate()
+  const navigate = useNavigate()
   const location = useLocation()
   const { user, userData, loading: authLoading } = useAuth()
   const [history, setHistory] = useState([])
@@ -261,9 +261,9 @@ function SpaceHome() {
       if (isDarkMatterMode) stopDarkMatterMode() // Exit dark matter if active
       
       // Clear state to prevent re-triggering
-      window.history.replaceState({}, document.title)
+      navigate(location.pathname, { replace: true, state: {} })
     }
-  }, [location, isDarkMatterMode, stopDarkMatterMode])
+  }, [location, isDarkMatterMode, stopDarkMatterMode, navigate])
 
   // Data Hooks
   const { data: clusters, isLoading: loadingClusters } = useClusters()
