@@ -1797,55 +1797,11 @@ function SpaceHome() {
 
   // Mission Hub Mode (Data Log, Transmission, Field Test)
   if (selectedUnitDocId || quickQuizUnitId) {
-    // Pre-compute initial mode based on content availability
-    // We now use contentFlags if available to know exactly what exists,
-    // including if a quiz exists before the quiz data actually loads.
-    const unit = activeUnit || {}
+    let initialMode = 'briefing' // default: show Mission Control unconditionally
     
-    // Fallback detection if contentFlags is missing
-    const hasDataLog = !!(unit.learningContents?.text?.trim() || unit.learningContents?.pdfUrl?.trim())
-    const hasTransmission = !!(
-      (unit.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) ||
-      (unit.videoConfig?.videoId)
-    )
-    const hasWorkbook = !!(unit.workbookPages && unit.workbookPages.length > 0)
-    
-    // We can definitively know if text, video, or workbook exist from the unit doc itself.
-    // We ONLY need flags for hasQuiz, because quizzes are fetched async later.
-    const hasQuiz = (unit.contentFlags && unit.contentFlags.hasQuiz !== undefined) 
-      ? unit.contentFlags.hasQuiz 
-      : true; // Default to true if unknown to ensure Mission Control loads
-
-    let initialMode = 'briefing' // default: show Mission Control
-    
-    const availableContentsCount = [
-      hasQuiz, 
-      hasTransmission, 
-      hasDataLog, 
-      hasWorkbook
-    ].filter(Boolean).length;
-
     if (quickQuizMode) {
       initialMode = quickQuizMode;
-    } else if (availableContentsCount > 1) {
-      initialMode = 'briefing'; // Multiple items, show Mission Control
-    } else if (availableContentsCount === 0) {
-      // Empty unit or still loading? Fallback to briefing (Mission Control)
-      initialMode = 'briefing';
-    } else if (hasQuiz && !hasTransmission && !hasDataLog && !hasWorkbook) {
-      // ONLY Quiz
-      initialMode = 'quiz-modal';
-    } else if (!hasQuiz && hasDataLog && !hasTransmission && !hasWorkbook) {
-      // ONLY Data log
-      initialMode = 'text';
-    } else if (!hasQuiz && hasTransmission && !hasDataLog && !hasWorkbook) {
-      // ONLY Transmission
-      initialMode = 'video';
-    } else if (!hasQuiz && hasWorkbook && !hasTransmission && !hasDataLog) {
-      // ONLY Workbook
-      initialMode = 'workbook';
     }
-    // If it reaches here somehow, initialMode remains 'briefing'
 
     return (
       <MissionHub
