@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../firebase';
-import { collection, query, getDocs, where, orderBy, documentId } from 'firebase/firestore';
+import { collection, query, getDocs, where, orderBy, documentId, doc, setDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 
@@ -91,6 +91,26 @@ export default function AdminDarkMatterTab({ userId }) {
     });
     return Object.values(map).sort((a, b) => (a.unitTitle || '').localeCompare(b.unitTitle || ''));
   }, [questions]);
+
+  const handleUpdateRefineryImage = async (question) => {
+    const nextUrl = window.prompt(
+      '정제소에서 사용할 참고 이미지 URL을 입력하세요. 비워두면 원본 이미지를 사용합니다.',
+      question.refineryImageUrl || question.imageUrl || ''
+    );
+    if (nextUrl === null) return;
+
+    try {
+      await setDoc(doc(db, 'quizzes', question.id), {
+        refineryImageUrl: nextUrl.trim()
+      }, { merge: true });
+      setQuestions(prev => prev.map(q => (
+        q.id === question.id ? { ...q, refineryImageUrl: nextUrl.trim() } : q
+      )));
+    } catch (err) {
+      console.error('Failed to update refinery image:', err);
+      alert('정제소 이미지 저장에 실패했습니다.');
+    }
+  };
 
   if (loading) {
     return (
@@ -219,11 +239,29 @@ export default function AdminDarkMatterTab({ userId }) {
                     </div>
                   </div>
 
-                  {q.imageUrl && (
+                  {(q.refineryImageUrl || q.imageUrl) && (
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-                      <img src={q.imageUrl} alt="Question" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                      <img src={q.refineryImageUrl || q.imageUrl} alt="Question" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }} />
                     </div>
                   )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                    <button
+                      onClick={() => handleUpdateRefineryImage(q)}
+                      style={{
+                        padding: '0.5rem 0.9rem',
+                        background: 'rgba(251, 191, 36, 0.1)',
+                        border: '1px solid rgba(251, 191, 36, 0.35)',
+                        borderRadius: '8px',
+                        color: '#fbbf24',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: 800
+                      }}
+                    >
+                      ⚗️ 정제소 이미지 교체
+                    </button>
+                  </div>
 
                   <div style={{ 
                     color: 'var(--text-bright)', 

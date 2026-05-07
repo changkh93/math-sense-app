@@ -171,6 +171,57 @@ const QuizEditor = () => {
           </div>
 
           <div className="form-group">
+            <label style={{ color: '#fbbf24', fontWeight: 'bold' }}>정제소 변형문항 / Refinery Prompt</label>
+            <textarea
+              value={editingQuiz.refineryPrompt || ''}
+              onChange={e => setEditingQuiz({ ...editingQuiz, refineryPrompt: e.target.value })}
+              placeholder="정제소에서 사용할 변형 조건 문장을 입력하세요. 비워두면 코드/원문 기준으로 출제됩니다."
+              style={{
+                width: '100%',
+                minHeight: '120px',
+                fontFamily: 'monospace',
+                lineHeight: '1.6',
+                padding: '1rem',
+                background: 'rgba(5, 10, 25, 0.6)',
+                color: '#fff',
+                border: '1px solid rgba(251,191,36,0.25)',
+                borderRadius: '8px'
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>정제소 참고 이미지 URL</label>
+            <input
+              type="text"
+              value={editingQuiz.refineryImageUrl || ''}
+              onChange={e => setEditingQuiz({ ...editingQuiz, refineryImageUrl: e.target.value })}
+              placeholder="비워두면 원본 이미지를 사용합니다."
+            />
+          </div>
+
+          <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div>
+              <label>Concept ID</label>
+              <input
+                type="text"
+                value={editingQuiz.conceptId || ''}
+                onChange={e => setEditingQuiz({ ...editingQuiz, conceptId: e.target.value })}
+                placeholder="예: prism_edge_count"
+              />
+            </div>
+            <div>
+              <label>Variant Group ID</label>
+              <input
+                type="text"
+                value={editingQuiz.variantGroupId || ''}
+                onChange={e => setEditingQuiz({ ...editingQuiz, variantGroupId: e.target.value })}
+                placeholder="예: april_eval_solid_01"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Options (Check correct answers - 복수 선택 가능)</span>
               <span style={{ 

@@ -99,6 +99,7 @@ function SceneContent({
   equipment = {},
   isBoosting = false,
   onSelectDarkMatter,
+  onSelectDarkMatterRefinery,
   darkMatterCount = 0
 }) {
   const controlsRef = useRef()
@@ -343,6 +344,48 @@ function SceneContent({
             >
               다크 매터<br/>
               <span style={{ fontSize: '0.75rem', color: '#a78bfa', fontWeight: '500' }}>Dark Matter</span>
+            </Html>
+          </Float>
+        </group>
+      )}
+
+      {/* Dark Matter Refinery Planet */}
+      {( !selectedRegionId ) && (
+        <group position={[-6.8, -1.0, -0.5]}>
+          <Float speed={1.8} rotationIntensity={0.6} floatIntensity={0.9} floatingRange={[-0.25, 0.25]}>
+            <PlanetMesh
+              color="#f59e0b"
+              size={0.45}
+              planetType="crystal"
+              speed={0.01 + Math.min(0.02, (darkMatterCount || 0) * 0.001)}
+              showSpaceship={false}
+              showFormulas={true}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectDarkMatterRefinery) onSelectDarkMatterRefinery();
+                else if (onSelectDarkMatter) onSelectDarkMatter();
+              }}
+              onPointerOver={() => { document.body.style.cursor = 'pointer' }}
+              onPointerOut={() => { document.body.style.cursor = 'auto' }}
+            />
+            <Html
+              position={[0, 0.95, 0]}
+              center
+              zIndexRange={[100, 0]}
+              style={{
+                color: "#fbbf24",
+                fontSize: '0.95rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-title, sans-serif)',
+                whiteSpace: 'nowrap',
+                textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 12px #000',
+                pointerEvents: 'none',
+                textAlign: 'center',
+                lineHeight: '1.25'
+              }}
+            >
+              다크매터 정제소<br/>
+              <span style={{ fontSize: '0.68rem', color: '#fde68a', fontWeight: '500' }}>Refinery</span>
             </Html>
           </Float>
         </group>

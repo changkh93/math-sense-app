@@ -29,6 +29,7 @@ import StudyCrewView from './StudyCrewView'
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
+import DarkMatterRefineryView from './DarkMatterRefineryView'
 import CrystalLedger from './CrystalLedger'
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
@@ -79,6 +80,40 @@ function getPythonRegionImage(region) {
   if (title.includes('게임') || title.includes('프로젝트') || title.includes('turtle') || title.includes('창작')) return PYTHON_REGION_IMAGES.project
 
   return PYTHON_REGION_IMAGES.foundation
+}
+
+const REFINERY_CAUSE_IDS = ['concept_gap', 'equation_setup', 'missed_condition', 'calculation_error', 'no_checking']
+
+function normalizeRefineryCause(causeId) {
+  return ({
+    concept: 'concept_gap',
+    condition: 'missed_condition',
+    calculation: 'calculation_error',
+    guess: 'equation_setup'
+  }[causeId] || causeId)
+}
+
+function buildRefineryCauseStats(records = []) {
+  const latestByQuestion = new Map()
+  records.forEach(record => {
+    const key = record?.id || record?.questionId
+    if (!key) {
+      latestByQuestion.set(Symbol('cause-record'), record)
+      return
+    }
+    latestByQuestion.set(key, record)
+  })
+  const counts = REFINERY_CAUSE_IDS.reduce((acc, id) => ({ ...acc, [id]: 0 }), {})
+  latestByQuestion.forEach(record => {
+    const causeId = normalizeRefineryCause(record?.lastRefineryCause || record?.refineryCause)
+    if (counts[causeId] !== undefined) counts[causeId] += 1
+  })
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
+  const distribution = REFINERY_CAUSE_IDS.reduce((acc, id) => ({
+    ...acc,
+    [id]: total > 0 ? Math.round((counts[id] / total) * 100) : 0
+  }), {})
+  return { counts, distribution, total }
 }
 
 function SpaceHome() {
@@ -167,12 +202,21 @@ function SpaceHome() {
   const [darkMatterQuestions, setDarkMatterQuestions] = useState([])
   const [loadingDarkMatter, setLoadingDarkMatter] = useState(false)
   const [darkMatterCount, setDarkMatterCount] = useState(0)
+  const [darkMatterStats, setDarkMatterStats] = useState({ activeCount: 0, masteredCount: 0, repeatedCount: 0, maxFail: 0 })
   const [activeDarkMatterQuizQs, setActiveDarkMatterQuizQs] = useState(null)
+  const [darkMatterModeType, setDarkMatterModeType] = useState('learning')
 
   const stopDarkMatterMode = useCallback(() => {
     setIsDarkMatterMode(false)
     setActiveDarkMatterQuizQs(null)
     setDarkMatterQuestions([])
+    setDarkMatterModeType('learning')
+  }, [])
+
+  const isRecheckDue = useCallback((mark) => {
+    if (mark?.status !== 'recheck_pending') return false
+    const dueMs = mark.recheckAvailableAt?.toMillis?.() || 0
+    return !dueMs || dueMs <= Date.now()
   }, [])
 
   // Load initial dark matter count
@@ -181,15 +225,30 @@ function SpaceHome() {
     const loadCount = async () => {
       try {
         const iqSnap = await getDocs(collection(db, 'users', user.uid, 'incorrect_questions'))
-        const rmSnap = await getDocs(query(collection(db, 'users', user.uid, 'review_marks'), where('status', '==', 'active')))
+        const rmSnap = await getDocs(collection(db, 'users', user.uid, 'review_marks'))
         const allIds = new Set()
         iqSnap.docs.forEach(d => allIds.add(d.id))
-        rmSnap.docs.forEach(d => allIds.add(d.id))
+        rmSnap.docs.forEach(d => {
+          const mark = d.data()
+          if (mark?.status === 'active' || isRecheckDue(mark)) allIds.add(d.id)
+        })
+        const causeStats = buildRefineryCauseStats([
+          ...iqSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          ...rmSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        ])
         setDarkMatterCount(allIds.size)
+        setDarkMatterStats({
+          activeCount: allIds.size,
+          masteredCount: rmSnap.docs.filter(d => d.data()?.status === 'mastered').length,
+          pendingCount: rmSnap.docs.filter(d => d.data()?.status === 'recheck_pending').length,
+          repeatedCount: iqSnap.docs.filter(d => (d.data()?.failCount || 0) >= 2).length,
+          maxFail: iqSnap.docs.reduce((max, d) => Math.max(max, d.data()?.failCount || 0), 0),
+          causeStats
+        })
       } catch (e) { /* non-critical */ }
     }
     loadCount()
-  }, [user])
+  }, [user, isRecheckDue])
 
   // Sync view from location state (e.g. when coming from Agora)
   useEffect(() => {
@@ -351,12 +410,23 @@ function SpaceHome() {
     try {
       // 1. Fetch metadata IDs from incorrect_questions & review_marks
       const iqSnap = await getDocs(query(collection(db, 'users', user.uid, 'incorrect_questions'), orderBy('lastFailedAt', 'desc'), limit(100)))
-      const rmSnap = await getDocs(query(collection(db, 'users', user.uid, 'review_marks'), where('status', '==', 'active')))
+      const rmSnap = await getDocs(collection(db, 'users', user.uid, 'review_marks'))
       
       const iqMeta = iqSnap.docs.map(d => ({ id: d.id, ...d.data(), _source: 'incorrect' }))
-      const rmMeta = rmSnap.docs.map(d => ({ id: d.id, ...d.data(), _source: 'review' }))
+      const allReviewMeta = rmSnap.docs.map(d => ({ id: d.id, ...d.data(), _source: 'review' }))
+      const rmMeta = allReviewMeta.filter(m => m.status === 'active' || isRecheckDue(m))
+      const causeStats = buildRefineryCauseStats([...iqMeta, ...allReviewMeta])
       
       const allIds = Array.from(new Set([...iqMeta.map(m => m.id), ...rmMeta.map(m => m.id)]))
+      const nextStats = {
+        activeCount: allIds.length,
+        masteredCount: allReviewMeta.filter(m => m.status === 'mastered').length,
+        pendingCount: allReviewMeta.filter(m => m.status === 'recheck_pending').length,
+        repeatedCount: iqMeta.filter(m => (m.failCount || 0) >= 2).length,
+        maxFail: iqMeta.reduce((max, m) => Math.max(max, m.failCount || 0), 0),
+        causeStats
+      }
+      setDarkMatterStats(nextStats)
       if (allIds.length === 0) return []
 
       // 2. Fetch fresh quiz data from 'quizzes'
@@ -379,8 +449,12 @@ function SpaceHome() {
             id,
             _source: iqItem ? 'incorrect' : 'review',
             _reviewMark: !!rmItem,
+            _reviewStatus: rmItem?.status || null,
             _activeAt: activeAt, // Add physical timestamp for sorting
-            unitId: qData.unitId || iqItem?.unitId || rmItem?.unitId
+            failCount: iqItem?.failCount || 0,
+            lastFailedAt: iqItem?.lastFailedAt || null,
+            unitId: qData.unitId || iqItem?.unitId || rmItem?.unitId,
+            unitTitle: qData.unitTitle || iqItem?.unitTitle || rmItem?.unitTitle
           })
         })
       }
@@ -412,7 +486,7 @@ function SpaceHome() {
     }
   }
 
-  const startDarkMatterMode = async () => {
+  const startDarkMatterMode = async (modeType = 'learning') => {
     if (!user) return
     setLoadingDarkMatter(true)
     soundManager.playWarp()
@@ -428,6 +502,7 @@ function SpaceHome() {
       setDarkMatterQuestions(merged)
       setDarkMatterCount(merged.length)
       setActiveDarkMatterQuizQs(null) // Reset quiz selection
+      setDarkMatterModeType(modeType)
       setIsDarkMatterMode(true)
     } finally {
       setLoadingDarkMatter(false)
@@ -964,6 +1039,7 @@ function SpaceHome() {
 
         const userUpdates = {
           crystals: (freshUserData.crystals || 0) + atomicCrystalsEarned,
+          starCores: (freshUserData.starCores || 0) + (result.refineryMode ? (result.starCoresEarned || 0) : 0),
           totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
           totalScore: (freshUserData.totalScore || 0) + score,
           averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
@@ -1017,6 +1093,18 @@ function SpaceHome() {
             lastFailedAt: serverTimestamp(),
             failCount: increment(1)
           }, { merge: true })
+          if (result.refineryMode) {
+            finalBatch.set(doc(db, 'users', user.uid, 'review_marks', q.id), {
+              questionId: q.id,
+              unitId: q.unitId || '',
+              unitTitle: q.unitTitle || '',
+              conceptId: q.conceptId || '',
+              status: 'active',
+              markedAt: serverTimestamp(),
+              lastRefineryCause: q.refineryCause || '',
+              masteryStage: 'needs_refinery'
+            }, { merge: true })
+          }
         })
         hasBatchOps = true
       }
@@ -1026,6 +1114,29 @@ function SpaceHome() {
         result.correctQuestions.forEach(q => {
           // Delete from incorrect_questions
           finalBatch.delete(doc(db, 'users', user.uid, 'incorrect_questions', q.id))
+
+          if (result.refineryMode) {
+            const reviewRef = doc(db, 'users', user.uid, 'review_marks', q.id)
+            if (q.refineryRecheckPassed) {
+              finalBatch.set(reviewRef, {
+                ...q,
+                status: 'mastered',
+                masteredAt: serverTimestamp(),
+                lastRefineryCause: q.refineryCause || '',
+                masteryStage: 'mastered'
+              }, { merge: true })
+            } else {
+              finalBatch.set(reviewRef, {
+                ...q,
+                status: 'recheck_pending',
+                markedAt: serverTimestamp(),
+                recheckAvailableAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
+                lastRefineryCause: q.refineryCause || '',
+                masteryStage: 'pending_recheck'
+              }, { merge: true })
+            }
+            return
+          }
           
           // Mastery ONLY if NOT marked for review (confidence)
           if (!reviewMarkedIds.has(q.id)) {
@@ -1794,24 +1905,41 @@ function SpaceHome() {
   if (isDarkMatterMode && darkMatterQuestions.length > 0) {
     // Stage 1: Dashboard
     if (!activeDarkMatterQuizQs) {
+      if (darkMatterModeType === 'refinery') {
+        return (
+          <DarkMatterRefineryView
+            questions={darkMatterQuestions}
+            totalHistoryCount={history.length}
+            stats={darkMatterStats}
+            onComplete={handleComplete}
+            onExit={stopDarkMatterMode}
+            onOpenLearningDarkMatter={() => {
+              setActiveDarkMatterQuizQs(null)
+              setDarkMatterModeType('learning')
+            }}
+          />
+        )
+      }
+
       return (
         <DarkMatterView 
           questions={darkMatterQuestions}
           totalHistoryCount={history.length}
           onStartQuiz={(qs) => setActiveDarkMatterQuizQs(qs)}
-          onExit={() => setIsDarkMatterMode(false)}
+          onExit={stopDarkMatterMode}
         />
       )
     }
 
     // Stage 2: Quiz
+    const isRefineryQuiz = darkMatterModeType === 'refinery'
     return (
       <SpaceQuizView
-        key="dark-matter-quiz"
-        region={{ color: '#a855f7', title: '다크 매터 영역' }}
+        key={isRefineryQuiz ? 'dark-matter-refinery-quiz' : 'dark-matter-quiz'}
+        region={{ color: isRefineryQuiz ? '#f59e0b' : '#a855f7', title: isRefineryQuiz ? '다크매터 정제소' : '다크 매터 영역' }}
         quizData={{
-          unitId: 'dark_matter_zone',
-          title: '🌌 다크 매터 탐사',
+          unitId: isRefineryQuiz ? 'dark_matter_refinery' : 'dark_matter_zone',
+          title: isRefineryQuiz ? '⚗️ 다크매터 정화 작전' : '🌌 다크 매터 탐사',
           questions: activeDarkMatterQuizQs
         }}
         onExit={() => setActiveDarkMatterQuizQs(null)}
@@ -1868,7 +1996,10 @@ function SpaceHome() {
                 soundManager.playWarp();
               }}
               onSelectDarkMatter={() => {
-                startDarkMatterMode();
+                startDarkMatterMode('learning');
+              }}
+              onSelectDarkMatterRefinery={() => {
+                startDarkMatterMode('refinery');
               }}
               darkMatterCount={darkMatterCount}
               equipment={equipment}
@@ -2139,6 +2270,40 @@ function SpaceHome() {
                             <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>🌑</div>
                             <span className="font-tech" style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>다크 매터</span>
                             <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#a78bfa', fontWeight: 'bold' }}>Review Needed: {darkMatterCount}</div>
+                          </div>
+                        </Motion.div>
+
+                        {/* Special Card: Dark Matter Refinery */}
+                        <Motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1, transition: { delay: 0.2 } }}
+                          whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            startDarkMatterMode('refinery');
+                            if (soundManager?.playWarp) soundManager.playWarp();
+                          }}
+                          style={{
+                            padding: '1.5rem',
+                            width: '250px',
+                            background: 'rgba(245, 158, 11, 0.1)',
+                            border: '1px solid rgba(245, 158, 11, 0.45)',
+                            borderRadius: '20px',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            boxShadow: '0 8px 32px rgba(245, 158, 11, 0.22)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <div style={{ position: 'relative', zIndex: 1 }}>
+                            <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>⚗️</div>
+                            <span className="font-tech" style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>다크매터 정제소</span>
+                            <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#fbbf24', fontWeight: 'bold' }}>Purification: {darkMatterCount}</div>
                           </div>
                         </Motion.div>
                       </>
@@ -2582,10 +2747,11 @@ function SpaceHome() {
                 }
               }} 
               regions={regions}
-            startDarkMatterMode={startDarkMatterMode}
-            loadingDarkMatter={loadingDarkMatter}
-            darkMatterCount={darkMatterCount}
-          />
+              startDarkMatterMode={() => startDarkMatterMode('learning')}
+              startDarkMatterRefineryMode={() => startDarkMatterMode('refinery')}
+              loadingDarkMatter={loadingDarkMatter}
+              darkMatterCount={darkMatterCount}
+            />
           )}
           {currentView === 'collection' && <SpaceCollection userData={userData} history={history} />}
           {currentView === 'store' && (

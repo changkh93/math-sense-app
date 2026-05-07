@@ -522,7 +522,7 @@ function DiscoveryHUD({ activeItem, latestItem }) {
 /**
  * SpaceDashboard Main
  */
-export default function SpaceDashboard({ user, userData, onQuizSelect, regions, startDarkMatterMode, loadingDarkMatter, darkMatterCount }) {
+export default function SpaceDashboard({ user, userData, onQuizSelect, regions, startDarkMatterMode, startDarkMatterRefineryMode, loadingDarkMatter, darkMatterCount }) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [hoveredDiscovery, setHoveredDiscovery] = useState(null)
@@ -674,6 +674,36 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions, 
               <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 900, letterSpacing: '1px' }}>DARK MATTER</div>
               <div style={{ color: 'white', fontWeight: 800, fontSize: '0.9rem' }}>
                 {loadingDarkMatter ? '다크 매터 스캔 중...' : `미지의 영역 탐사 (${darkMatterCount || 0}개)`}
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="glass-card hud-border" 
+            style={{ 
+              padding: '1rem 1.5rem', 
+              minWidth: '220px', 
+              cursor: 'pointer',
+              background: darkMatterCount > 0 
+                ? 'rgba(180, 83, 9, 0.15)' 
+                : 'rgba(251, 191, 36, 0.05)',
+              border: darkMatterCount > 0 
+                ? '1px solid rgba(251, 191, 36, 0.55)'
+                : '1px solid rgba(251, 191, 36, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.8rem'
+            }}
+            onClick={startDarkMatterRefineryMode || startDarkMatterMode}
+          >
+            <div style={{ fontSize: '1.5rem' }}>⚗️</div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 900, letterSpacing: '1px' }}>REFINERY</div>
+              <div style={{ color: 'white', fontWeight: 800, fontSize: '0.9rem' }}>
+                {loadingDarkMatter ? '정제소 스캔 중...' : `정화 작전 (${darkMatterCount || 0}개)`}
               </div>
             </div>
           </motion.div>

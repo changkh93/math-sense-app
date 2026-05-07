@@ -71,7 +71,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // 초기 문제 설정 및 이어풀기 세션 로드
   useEffect(() => {
     // Guard key includes user uid so that when auth loads, we re-init with Firestore data
-    const guardKey = `${quizData?.unitId}__${user?.uid || 'anon'}`
+    const questionSignature = quizData?.questions?.map(q => q.id).join('|') || 'no_questions'
+    const guardKey = `${quizData?.unitId}__${user?.uid || 'anon'}__${questionSignature}`
     if (quizData?.questions?.length > 0 && initializedRef.current !== guardKey) {
       const initQuizSession = async () => {
         setIsLoadingSession(true)
@@ -120,6 +121,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             ...q,
             shuffledOptions: q.options ? shuffleArray(q.options) : []
           }));
+
+          const selectedIds = new Set(selected.map(q => q.id))
+          targetUserAnswers = Object.fromEntries(
+            Object.entries(targetUserAnswers).filter(([questionId]) => selectedIds.has(questionId))
+          )
+          targetEverWrong = targetEverWrong.filter(questionId => selectedIds.has(questionId))
+
+          if (targetCurrentIdx < 0 || targetCurrentIdx >= selected.length) {
+            const firstUnansweredIdx = selected.findIndex(q => !targetUserAnswers[q.id])
+            targetCurrentIdx = firstUnansweredIdx >= 0 ? firstUnansweredIdx : 0
+          }
           
           setCurrentQuestions(selected)
           setAllSessionQuestions(selected)

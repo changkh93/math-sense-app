@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { motion as Motion } from 'framer-motion'
+import soundManager from '../../utils/SoundManager'
 
 function getQuestionFallbackTitle(question, fallback) {
   if (typeof question === 'string') {
@@ -72,7 +73,7 @@ export default function DarkMatterView({
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <button 
-            onClick={onExit}
+            onClick={() => { soundManager.playClick(); onExit(); }}
             style={{
               position: 'absolute',
               top: '1rem',
@@ -194,7 +195,7 @@ export default function DarkMatterView({
             <Motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={handleStartAll}
+              onClick={() => { soundManager.playClick(); handleStartAll(); }}
               style={{
                 width: '100%',
                 padding: '1.2rem',
@@ -245,7 +246,7 @@ export default function DarkMatterView({
                     justifyContent: 'space-between',
                     gap: '1rem'
                   }}
-                  onClick={() => handleStartGroup(group)}
+                    onClick={() => { soundManager.playClick(); handleStartGroup(group); }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ 
