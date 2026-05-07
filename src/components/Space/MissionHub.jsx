@@ -74,6 +74,26 @@ const SilentCrystalToast = ({ amount, visible }) => (
   </AnimatePresence>
 )
 
+const LONG_VIDEO_SECONDS = 40 * 60
+const STANDARD_VIDEO_COMPLETION_THRESHOLD = 0.95
+const LONG_VIDEO_COMPLETION_THRESHOLD = 0.85
+
+const getVideoCompletionThreshold = (duration = 0) => (
+  duration > LONG_VIDEO_SECONDS
+    ? LONG_VIDEO_COMPLETION_THRESHOLD
+    : STANDARD_VIDEO_COMPLETION_THRESHOLD
+)
+
+const getVideoCompletionTargetPercent = (duration = 0) => (
+  Math.round(getVideoCompletionThreshold(duration) * 100)
+)
+
+const getNextTimeAttackDelay = (isFirst = false) => {
+  const minSeconds = 120
+  const maxSeconds = isFirst ? 180 : 300
+  return minSeconds + Math.floor(Math.random() * (maxSeconds - minSeconds + 1))
+}
+
 // ─── YouTube Player Component ───
 // Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
 const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, isOverlay = false, autoPlay = true }, ref) => {
@@ -495,7 +515,9 @@ export default function MissionHub({
   const showTimeAttackRef = useRef(false);
   const [timeAttackCombo, setTimeAttackCombo] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const isVideoPlayingRef = useRef(false);
   const nextAttackTimeRef = useRef(null);
+  const activeVideoSecondsRef = useRef(0);
   const sessionStartTimeRef = useRef(Date.now());
   const completionCrystalTriggeredRef = useRef(false);
   const timeAttackComboRef = useRef(0);
@@ -667,6 +689,7 @@ export default function MissionHub({
       timeAttackComboRef.current = 0;
       timeAttackCrystalsSessionRef.current = 0;
       nextAttackTimeRef.current = null;
+      activeVideoSecondsRef.current = 0;
       return
     }
 
@@ -724,6 +747,7 @@ export default function MissionHub({
       timeAttackComboRef.current = 0;
       timeAttackCrystalsSessionRef.current = 0;
       nextAttackTimeRef.current = null;
+      activeVideoSecondsRef.current = 0;
     }
   }, [selectedTx, learningProgress, loadingProgress])
 
@@ -773,6 +797,7 @@ export default function MissionHub({
     setIsAtEnd(false)
     setSaveStatus(null)
     setIsVideoPlaying(false)
+    isVideoPlayingRef.current = false
   }, [selectedTx?.id])
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
@@ -867,6 +892,7 @@ export default function MissionHub({
         timeAttackComboRef.current = 0;
         timeAttackCrystalsSessionRef.current = 0;
         nextAttackTimeRef.current = null;
+        activeVideoSecondsRef.current = 0;
         sessionStartTimeRef.current = Date.now();
         setCompletionBonusTimeLeft(null);
         completionTimerStartedRef.current = false;
@@ -1031,6 +1057,7 @@ export default function MissionHub({
     if (selectedTx) {
         setSelectedTx(null)
         setIsVideoPlaying(false)
+        isVideoPlayingRef.current = false
         if (txList.length <= 1) {
             updateCurrentMode('briefing')
         }
@@ -1162,24 +1189,6 @@ export default function MissionHub({
     if (!selectedTx || !userId) return
 
     const now = Date.now()
-    
-    // Time Attack Logic
-    if (duration > 0 && !videoCompletedRef.current) {
-      const sessionElapsedMs = now - sessionStartTimeRef.current;
-      
-      if (nextAttackTimeRef.current === null) {
-         // Initialize first attack time (at least 2 mins from session start/current pos)
-         nextAttackTimeRef.current = currentTime + Math.floor(Math.random() * 60) + 120;
-      } else if (currentTime >= nextAttackTimeRef.current && !showTimeAttackRef.current && sessionElapsedMs > 15000) {
-         // Avoid triggering in the first 15 seconds of a session
-         timeAttackOpportunityRef.current = {
-           id: `ta_${Date.now()}_${Math.floor(currentTime)}`,
-           videoTime: Math.floor(currentTime)
-         };
-         showTimeAttackRef.current = true;
-         setShowTimeAttack(true);
-      }
-    }
 
     const lastPollTime = lastPollTimeRef.current || now
     lastPollTimeRef.current = now
@@ -1191,9 +1200,30 @@ export default function MissionHub({
     lastVideoTimeRef.current = currentTime
     if (duration > 0) videoDurationRef.current = duration
 
-    // Track actual playback time (accumulate real elapsed time)
-    // Use actual real time gap to be accurate (protect against extreme throttling > 1s)
-    totalTimeSpentRef.current += Math.min(realGapMs / 1000, 1)
+    const activePlaybackDelta = isVideoPlayingRef.current
+      ? Math.min(Math.max(realGapMs, 0) / 1000, 1)
+      : 0
+
+    // Track actual playback time only while the YouTube player is actively playing.
+    totalTimeSpentRef.current += activePlaybackDelta
+    activeVideoSecondsRef.current += activePlaybackDelta
+
+    // Time Attack Logic: schedule by active playback time, not by YouTube timeline position.
+    // This keeps the random focus check fair when a student rewinds or repeats a section.
+    if (duration > 0 && !videoCompletedRef.current) {
+      const sessionElapsedMs = now - sessionStartTimeRef.current;
+      
+      if (nextAttackTimeRef.current === null) {
+         nextAttackTimeRef.current = activeVideoSecondsRef.current + getNextTimeAttackDelay(true);
+      } else if (activeVideoSecondsRef.current >= nextAttackTimeRef.current && !showTimeAttackRef.current && sessionElapsedMs > 15000) {
+         timeAttackOpportunityRef.current = {
+           id: `ta_${Date.now()}_${Math.floor(currentTime)}`,
+           videoTime: Math.floor(currentTime)
+         };
+         showTimeAttackRef.current = true;
+         setShowTimeAttack(true);
+      }
+    }
 
     // Calculate gap between polls
     const gap = currentSecond - lastSecond
@@ -1238,7 +1268,7 @@ export default function MissionHub({
       // Dynamic Threshold:
       // - Long Videos (>40m): 85% (Allows for ~6min break skip)
       // - Standard: 95% (Safe margin for minor skips/buffering)
-      const threshold = duration > 2400 ? 0.85 : 0.95;
+      const threshold = getVideoCompletionThreshold(duration);
 
       if (coverage >= threshold) {
         setVideoCompleted(true)
@@ -1295,7 +1325,7 @@ export default function MissionHub({
       awardReward()
     }
     */
-  }, [selectedTx, userId, unitId, activeUnit?.title, onNonQuizActivityComplete, showSilentToast, userDataRef])
+  }, [selectedTx, userId, unitId, activeUnit?.title, learningProgress?.videoProgress, onNonQuizActivityComplete, showSilentToast, userDataRef])
 
   // ─── Time Attack Handlers ───
   const handleTimeAttackHit = useCallback(async () => {
@@ -1307,7 +1337,7 @@ export default function MissionHub({
     // Update next time synchronously BEFORE any await to prevent race conditions with video timer
     const rawTime = videoPlayerRef.current?.getCurrentTime() || 0;
     const currentTime = Math.max(rawTime, lastVideoTimeRef.current || 0);
-    nextAttackTimeRef.current = currentTime + Math.floor(Math.random() * 180) + 120;
+    nextAttackTimeRef.current = activeVideoSecondsRef.current + getNextTimeAttackDelay(false);
     
     let reward = 10;
     if (timeAttackComboRef.current >= 2) reward = 20; // Fever mode
@@ -1357,7 +1387,7 @@ export default function MissionHub({
     // Update next time synchronously BEFORE any await to prevent race conditions with video timer
     const rawTime = videoPlayerRef.current?.getCurrentTime() || 0;
     const currentTime = Math.max(rawTime, lastVideoTimeRef.current || 0);
-    nextAttackTimeRef.current = currentTime + Math.floor(Math.random() * 180) + 120;
+    nextAttackTimeRef.current = activeVideoSecondsRef.current + getNextTimeAttackDelay(false);
     
     try {
       if (onNonQuizActivityComplete && selectedTx && opportunity?.id) {
@@ -1977,6 +2007,11 @@ export default function MissionHub({
     if (selectedTx) {
       // Get saved position for resume
       const txId = selectedTx.id || 'default'
+      const completionTargetPercent = getVideoCompletionTargetPercent(videoDurationRef.current)
+      const completionRate = Math.min(
+        100,
+        Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100)
+      )
 
       return (
           <div className="theater-wrapper">
@@ -1991,7 +2026,9 @@ export default function MissionHub({
                     onTimeUpdate={handleVideoTimeUpdate}
                     onComplete={() => setIsAtEnd(true)}
                     onPlaybackStateChange={(state) => {
-                      setIsVideoPlaying(state === window.YT?.PlayerState?.PLAYING)
+                      const playing = state === window.YT?.PlayerState?.PLAYING
+                      isVideoPlayingRef.current = playing
+                      setIsVideoPlaying(playing)
                     }}
                  />
                ) : (
@@ -2045,7 +2082,7 @@ export default function MissionHub({
                  </AnimatePresence>
                  {stampCount > 0 && (
                    <span className="font-tech" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                     학습: {Math.floor(stampCount / 60)}분 {stampCount % 60}초
+                     인정 학습: {Math.floor(stampCount / 60)}분 {stampCount % 60}초 · 완료율 {completionRate}% / 기준 {completionTargetPercent}%
                    </span>
                  )}
                  <button 
@@ -2084,7 +2121,7 @@ export default function MissionHub({
                         )
                      )
                    ) : isAtEnd ? (
-                       <>☑️ 수동 완료 처리 (완료 보너스 제외) - 수신율 {Math.min(100, Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100))}%</>
+                       <>☑️ 수동 완료 처리 (완료 보너스 제외) - 완료율 {completionRate}% / 기준 {completionTargetPercent}%</>
                    ) : (
                      <>📋 오늘은 여기까지</>
                    )}
@@ -2127,9 +2164,15 @@ export default function MissionHub({
                  )}
                </AnimatePresence>
                
+               {!videoCompleted && (
+                 <p className="font-tech" style={{ color: 'rgba(255,255,255,0.7)', margin: '0.75rem 0 0', fontSize: '0.82rem', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                   되감기 재시청은 복습으로 인정되지만 완료율은 새 구간만 증가합니다. 앞으로 넘긴 구간은 인정되지 않습니다.
+                 </p>
+               )}
+               
                {isAtEnd && !videoCompleted && (
                  <motion.p initial={{opacity:0}} animate={{opacity:1}} className="font-tech" style={{ color: '#ffb3b3', margin: 0, fontSize: '0.85rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                   통신 장애! 영상의 99% 이상을 탐사해야 보너스 수신이 가능합니다.
+                   통신 장애! 영상의 {completionTargetPercent}% 이상을 탐사해야 보너스 수신이 가능합니다.
                  </motion.p>
                )}
              </div>
