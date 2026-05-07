@@ -50,6 +50,8 @@ export default function CrystalLedger({ userData }) {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [txLimit, setTxLimit] = useState(30)
+  const [hasMore, setHasMore] = useState(true)
 
   const crystals = userData?.crystals || 0
 
@@ -65,7 +67,7 @@ export default function CrystalLedger({ userData }) {
     const q = query(
       collection(db, 'users', user.uid, 'crystal_transactions'),
       orderBy('timestamp', 'desc'),
-      limit(200)
+      limit(txLimit)
     )
 
     unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
@@ -78,6 +80,7 @@ export default function CrystalLedger({ userData }) {
         }
       })
       setTransactions(txs)
+      setHasMore(snapshot.docs.length === txLimit)
       setLoading(false)
     }, (error) => {
       console.error('Crystal ledger error:', error)
@@ -96,7 +99,7 @@ export default function CrystalLedger({ userData }) {
         }
       }
     };
-  }, [])
+  }, [txLimit])
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -349,6 +352,29 @@ export default function CrystalLedger({ userData }) {
                 ))}
               </div>
             )}
+            
+            {hasMore && !loading && filteredTransactions.length > 0 && (
+              <div style={{ textAlign: 'center', marginTop: '1.5rem', marginBottom: '1rem', paddingBottom: '1rem' }}>
+                <button 
+                  onClick={() => setTxLimit(prev => prev + 30)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: 'var(--text-bright)',
+                    padding: '0.6rem 1.5rem',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                >
+                  내역 더보기 ⬇️
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -376,6 +402,8 @@ export default function CrystalLedger({ userData }) {
 
         {/* Reward Guide Panel */}
         <div style={{
+          width: '100%',
+          maxWidth: '1200px',
           marginTop: '2rem',
           padding: '1.5rem',
           background: 'rgba(255, 255, 255, 0.05)',
@@ -395,51 +423,74 @@ export default function CrystalLedger({ userData }) {
           </h3>
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '1rem',
-            fontSize: '0.9rem',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
+            gap: '1.2rem',
+            fontSize: '0.85rem',
             color: 'var(--text-bright)'
           }}>
-            <div>
-              <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '0.3rem' }}>🚀 탐사 퀴즈</div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>🚀</span> 탐사 퀴즈
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 <li>정답 시 <span style={{color: 'var(--text-bright)'}}>+1</span> / 3콤보 <span style={{color: 'var(--text-bright)'}}>+5</span> / 최초 100점 <span style={{color: 'var(--text-bright)'}}>+10</span></li>
-                <li>오답 시 광석 유실 <span style={{color: '#f87171'}}>(1회차 -2, 2회차 -4, 3회차 -6 ...)</span></li>
-                <li>언제든 <span style={{color: 'var(--crystal-cyan)'}}>100점 달성 가능</span> (점수 제한 없음)</li>
-                <li>오답 시 <span style={{color: '#f87171'}}>시스템 복구 대기(3~9초)</span> 발생</li>
+                <li>오답 시 광석 유실 <span style={{color: '#f87171'}}>(1회차 -2, 2회차 -4...)</span></li>
+                <li>언제든 <span style={{color: 'var(--crystal-cyan)'}}>100점 달성 가능</span></li>
+                <li>오답 시 <span style={{color: '#f87171'}}>복구 대기(3~9초)</span> 발생</li>
               </ul>
             </div>
-            <div>
-              <div style={{ color: '#60a5fa', fontWeight: 'bold', marginBottom: '0.3rem' }}>💬 스텔라 아고라</div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
-                <li>질문 등록 완료 시 <span style={{color: 'var(--text-bright)'}}>+5</span> 광석</li>
-                <li>질문 스스로 해결 시 <span style={{color: 'var(--text-bright)'}}>+3</span> 광석</li>
-                <li>내 답변이 채택될 시 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
-                <li>선생님 인증 추가 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
+            
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#fbbf24', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>⚗️</span> 다크매터 정제소
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>정화 작전 완료 시 <span style={{color: 'var(--text-bright)'}}>+50</span> 광석 보너스</li>
+                <li>정제 성공 문항당 <span style={{color: 'var(--text-bright)'}}>+2</span> 광석 추가</li>
+                <li>오답 노트를 해결하고 보너스 획득!</li>
               </ul>
             </div>
-            <div>
-              <div style={{ color: '#00f3ff', fontWeight: 'bold', marginBottom: '0.3rem' }}>📄 데이터 로그</div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
+
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#60a5fa', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>💬</span> 스텔라 아고라
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>질문 등록 시 <span style={{color: 'var(--text-bright)'}}>+5</span> / 스스로 해결 <span style={{color: 'var(--text-bright)'}}>+3</span></li>
+                <li>내 답변 채택 시 <span style={{color: 'var(--text-bright)'}}>+20</span></li>
+                <li>선생님 인증 추가 <span style={{color: 'var(--text-bright)'}}>+10</span></li>
+              </ul>
+            </div>
+            
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#00ff88', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>📡</span> 트랜스미션 (영상)
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>3분 학습마다 <span style={{color: 'var(--text-bright)'}}>+10</span> / 90% 시청 <span style={{color: 'var(--text-bright)'}}>+20</span></li>
+                <li><span style={{color: '#f87171'}}>⚠️ 동시재생 보상 차단 (170초 쿨타임)</span></li>
+                <li><span style={{color: '#f87171'}}>⚠️ 1일 상한선: 500 광석</span></li>
+              </ul>
+            </div>
+            
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#00f3ff', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>📄</span> 데이터 로그
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 <li>학습 완료 시 <span style={{color: 'var(--text-bright)'}}>+30</span> 광석</li>
-                <li>1분 이상 학습 후 버튼 활성화</li>
+                <li>1분 이상 학습 후 완료 버튼 활성화</li>
                 <li>단원당 <span style={{color: 'var(--text-bright)'}}>최초 1회</span>만 지급</li>
               </ul>
             </div>
-            <div>
-              <div style={{ color: '#00ff88', fontWeight: 'bold', marginBottom: '0.3rem' }}>📡 트랜스미션 (영상)</div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
-                <li>3분 학습마다 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
-                <li>90% 시청 완료 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
-                <li><span style={{color: '#f87171', fontSize: '0.85em'}}>⚠️ 다중 창 및 기기 동시재생 보상 차단 (170초 쿨타임)</span></li>
-                <li><span style={{color: '#f87171', fontSize: '0.85em'}}>⚠️ 영상 시청 보상 1일 상한선: 500 광석</span></li>
-              </ul>
-            </div>
-            <div>
-              <div style={{ color: '#a855f7', fontWeight: 'bold', marginBottom: '0.3rem' }}>📁 항행 일지 (과제)</div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)' }}>
+
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#a855f7', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>📁</span> 항행 일지 (과제)
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 <li>과제 제출 및 승인 시 <span style={{color: 'var(--text-bright)'}}>+10 ~ 40</span> 광석</li>
-                <li>제출 내용의 성실도에 따라 본부에서 차등 지급</li>
+                <li>제출 내용의 성실도에 따라 차등 지급</li>
               </ul>
             </div>
           </div>

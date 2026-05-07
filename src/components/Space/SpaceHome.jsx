@@ -915,6 +915,9 @@ function SpaceHome() {
 
         if (crystalsEarned < 0) {
           atomicCrystalsEarned = crystalsEarned
+        } else if (result.refineryMode) {
+          // 정제소 모드는 서버 측 재계산 대신 전달받은 crystalsEarned를 신뢰 (이미 50 보너스가 포함됨)
+          atomicCrystalsEarned = crystalsEarned
         } else if (score > serverPreviousBest) {
           const improvementRatio = (score - serverPreviousBest) / score
           atomicCrystalsEarned = Math.round((crystalsEarned || 0) * improvementRatio)
@@ -1039,7 +1042,6 @@ function SpaceHome() {
 
         const userUpdates = {
           crystals: (freshUserData.crystals || 0) + atomicCrystalsEarned,
-          starCores: (freshUserData.starCores || 0) + (result.refineryMode ? (result.starCoresEarned || 0) : 0),
           totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
           totalScore: (freshUserData.totalScore || 0) + score,
           averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),

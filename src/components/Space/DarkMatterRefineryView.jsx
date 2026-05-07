@@ -392,8 +392,7 @@ function DarkMatterRefineryMission({ items, missionType = 'daily', onExit, onCom
       score: items.length > 0 ? Math.round((correctResults.length / items.length) * 100) : 0,
       totalCount: items.length,
       correctCount: correctResults.length,
-      crystalsEarned: Math.min(3, correctResults.length),
-      starCoresEarned: correctResults.length,
+      crystalsEarned: 50 + (correctResults.length * 2), // 50 bonus + 2 per correct item
       isPerfect: correctResults.length === items.length,
       initialRawScore: items.length > 0 ? Math.round((correctResults.length / items.length) * 100) : 0,
       attemptCount: 1,
