@@ -250,20 +250,26 @@ function SpaceHome() {
     loadCount()
   }, [user, isRecheckDue])
 
-  // Sync view from location state (e.g. when coming from Agora)
+  // Sync view from route state or query params (e.g. legacy extension/deep links)
   useEffect(() => {
-    if (location.state?.view) {
-      setCurrentView(location.state.view)
+    const params = new URLSearchParams(location.search)
+    const requestedView = location.state?.view || params.get('view')
+    const validViews = new Set(['planet', 'dashboard', 'collection', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub'])
+
+    if (requestedView && validViews.has(requestedView)) {
+      setCurrentView(requestedView)
       updateSelectedRegionId(null)
       updateSelectedChapterDocId(null)
       updateSelectedUnitDocId(null) // Clear stuck mission ID
       setQuickQuizUnitId(null)      // Clear quick quiz
+      setQuickQuizMode(null)
+      setShouldScrollStore(false)
       if (isDarkMatterMode) stopDarkMatterMode() // Exit dark matter if active
       
       // Clear state to prevent re-triggering
       navigate(location.pathname, { replace: true, state: {} })
     }
-  }, [location, isDarkMatterMode, stopDarkMatterMode, navigate])
+  }, [location.pathname, location.search, location.state, isDarkMatterMode, stopDarkMatterMode, navigate])
 
   // Data Hooks
   const { data: clusters, isLoading: loadingClusters } = useClusters()

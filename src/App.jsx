@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Navigate, Routes, Route } from 'react-router-dom'
 import './App.css'
 import './styles/space-theme.css' /* Global Space Theme */
 import SpaceHome from './components/Space/SpaceHome'
@@ -44,6 +44,9 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<SpaceHome />} />
+      <Route path="/journey" element={<Navigate to="/?view=journey" replace />} />
+      <Route path="/streak" element={<Navigate to="/?view=journey" replace />} />
+      <Route path="/agora-connect/:uid" element={<Navigate to="/?view=journey" replace />} />
       <Route path="/invite/:inviteCode" element={<InviteHandler />} />
       
       <Route path="/admin" element={
@@ -85,6 +88,7 @@ function App() {
       {/* Parent Portal */}
       <Route path="/parent" element={<ParentLogin />} />
       <Route path="/parent/dashboard" element={<ParentDashboard />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
