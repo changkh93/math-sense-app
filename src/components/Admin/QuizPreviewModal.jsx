@@ -113,7 +113,7 @@ export default function QuizPreviewModal({
                <div className="datalog-content-scroll glass" style={{ maxHeight: '600px', overflowY: 'auto', padding: '1.5rem', marginTop: '1rem', background: 'rgba(5, 10, 25, 0.6)' }}>
                   {unit?.learningContents ? (
                     <>
-                      {typeof unit.learningContents === 'object' && unit.learningContents.pdfUrl && (
+                      {unit.learningContents?.pdfUrl && (
                         <div style={{ marginBottom: '1.5rem', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
                           <iframe 
                             src={getEmbeddablePdfUrl(unit.learningContents.pdfUrl)}
@@ -122,7 +122,7 @@ export default function QuizPreviewModal({
                           />
                         </div>
                       )}
-                      <MissionMarkdownViewer text={typeof unit.learningContents === 'object' ? unit.learningContents.text : unit.learningContents} />
+                      <MissionMarkdownViewer text={unit.learningContents?.text ?? unit.learningContents} />
                     </>
                   ) : (
                     <p className="text-muted">학습 데이터를 불러올 수 없습니다.</p>
