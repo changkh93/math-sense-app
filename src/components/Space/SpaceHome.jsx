@@ -1261,7 +1261,7 @@ function SpaceHome() {
       !!transmissionId ||
       !!attentionSource
     const isLogActivity = activityCategory === 'text' || activityType.includes('로그')
-    const isAttentionEvent = !!attentionSource
+    const isAttentionEvent = !!attentionSource && (attentionResult === 'hit' || attentionResult === 'miss')
     const isAttentionMiss = isAttentionEvent && attentionResult === 'miss'
 
     try {
@@ -1374,6 +1374,27 @@ function SpaceHome() {
         const isCompletionActivity = activityType.includes('완료') || isLogActivity
         const shouldLogHistory = isCompletionActivity || streakResult.streakUpdate?.lastStreakDate || actualReward > 0 || isAttentionMiss || shouldLogFocusOnly
         const effectiveAttentionOpportunityId = attentionOpportunityId || (shouldLogFocusOnly ? `video_limit_${Math.floor(Date.now() / 1000)}` : "")
+        let stableHistoryId = null
+
+        if (shouldLogHistory) {
+          stableHistoryId = isLogActivity
+            ? `log_completion_${currentUnitId}`
+            : `video_completion_${currentUnitId}_${transmissionId || 'default'}`
+
+          if ((isAttentionEvent || shouldLogFocusOnly) && effectiveAttentionOpportunityId) {
+            stableHistoryId = `video_attention_${currentUnitId}_${transmissionId || 'default'}_${attentionSource || 'video_limit'}_${effectiveAttentionOpportunityId}`
+          } else if (!isCompletionActivity && isVideoActivity) {
+            const minMatch = activityType.match(/\((\d+)분/)
+            const minutes = minMatch ? minMatch[1] : 'int'
+            stableHistoryId = `video_interval_${currentUnitId}_${transmissionId || 'default'}_${minutes}min`
+          }
+        }
+
+        const historyRef = stableHistoryId ? doc(db, 'users', user.uid, 'history', stableHistoryId) : null
+        const existingAttentionHistorySnap = historyRef && isAttentionEvent
+          ? await transaction.get(historyRef)
+          : null
+        const shouldCountAttention = isAttentionEvent && !existingAttentionHistorySnap?.exists()
 
         if (actualReward > 0) {
           userUpdates.crystals = (freshUserData.crystals || 0) + actualReward
@@ -1388,6 +1409,19 @@ function SpaceHome() {
         } else {
           actualReward = 0 // Ensure non-negative
         }
+
+        if (shouldCountAttention) {
+          userUpdates.attentionOpportunities = increment(1)
+          userUpdates.videoAttentionOpportunities = increment(1)
+          if (attentionResult === 'hit') {
+            userUpdates.attentionHits = increment(1)
+            userUpdates.videoAttentionHits = increment(1)
+          } else {
+            userUpdates.attentionMisses = increment(1)
+            userUpdates.videoAttentionMisses = increment(1)
+          }
+        }
+
         if (Object.keys(streakUpdates).length > 0) {
           userUpdates.streakWriteAudit = buildStreakWriteAudit({
             source: 'space_home_nonquiz_complete',
@@ -1476,21 +1510,7 @@ function SpaceHome() {
         }
 
         // --- Atomic Logging: History ---
-        if (shouldLogHistory) {
-          // Use stable ID to prevent duplicates. For non-completion intervals, include the time marker.
-          let stableHistoryId = isLogActivity
-            ? `log_completion_${currentUnitId}`
-            : `video_completion_${currentUnitId}_${transmissionId || 'default'}`;
-
-          if ((isAttentionEvent || shouldLogFocusOnly) && effectiveAttentionOpportunityId) {
-            stableHistoryId = `video_attention_${currentUnitId}_${transmissionId || 'default'}_${attentionSource || 'video_limit'}_${effectiveAttentionOpportunityId}`;
-          } else if (!isCompletionActivity && isVideoActivity) {
-            const minMatch = activityType.match(/\((\d+)분/);
-            const minutes = minMatch ? minMatch[1] : 'int';
-            stableHistoryId = `video_interval_${currentUnitId}_${transmissionId || 'default'}_${minutes}min`;
-          }
-          
-          const historyRef = doc(db, 'users', user.uid, 'history', stableHistoryId)
+        if (shouldLogHistory && historyRef) {
           transaction.set(historyRef, {
             unitId: currentUnitId,
             unitTitle: transmissionTitle || activeUnit?.title || `탐사 기록 (${activityType})`,

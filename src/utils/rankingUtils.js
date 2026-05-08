@@ -1,5 +1,56 @@
 import { getTodayKST, getKSTComponents } from './streakUtils';
 
+export const FOCUS_MAX_SCORE = 600;
+export const FOCUS_WILSON_Z = 1.0;
+
+function readCounter(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null || value === '') continue;
+    const numberValue = Number(value);
+    if (Number.isFinite(numberValue)) {
+      return Math.max(0, Math.floor(numberValue));
+    }
+  }
+  return 0;
+}
+
+export function calculateWilsonLowerBound(successes, total, z = FOCUS_WILSON_Z) {
+  const n = Math.max(0, Math.floor(Number(total) || 0));
+  if (n <= 0) return 0;
+
+  const s = Math.min(n, Math.max(0, Math.floor(Number(successes) || 0)));
+  const phat = s / n;
+  const z2 = z * z;
+  const denominator = 1 + z2 / n;
+  const center = phat + z2 / (2 * n);
+  const margin = z * Math.sqrt((phat * (1 - phat) + z2 / (4 * n)) / n);
+
+  return Math.max(0, Math.min(1, (center - margin) / denominator));
+}
+
+export function calculateFocusData(user = {}) {
+  const hits = readCounter(user.videoAttentionHits, user.attentionHits, user.focusHits);
+  const misses = readCounter(user.videoAttentionMisses, user.attentionMisses, user.focusMisses);
+  const explicitOpportunities = readCounter(
+    user.videoAttentionOpportunities,
+    user.attentionOpportunities,
+    user.focusOpportunities
+  );
+  const opportunities = Math.max(explicitOpportunities, hits + misses);
+  const rawRate = opportunities > 0 ? hits / opportunities : 0;
+  const confidenceRate = calculateWilsonLowerBound(hits, opportunities);
+  const score = Math.floor(confidenceRate * FOCUS_MAX_SCORE);
+
+  return {
+    score,
+    hits,
+    misses: Math.max(0, opportunities - hits),
+    opportunities,
+    rawRate,
+    confidenceRate,
+  };
+}
+
 export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   const crystals = user.crystals || 0;
   const avgScore = user.averageScore || 0;
@@ -23,7 +74,11 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   const agoraScoreRaw = (questionCount * 5) + (helpCount * 20); // 질문 5점, 답변 채택 20점
   const agoraScore = agoraScoreRaw;
 
-  const totalSEI = wealthScore + skillScore + diligenceScore + growthScore + agoraScore;
+  // 6. 집중도 (Focus): 동영상 광석 획득 성공률을 Wilson lower bound로 보정하여 표본 수까지 반영
+  const focusData = calculateFocusData(user);
+  const focusScore = focusData.score;
+
+  const totalSEI = wealthScore + skillScore + diligenceScore + growthScore + agoraScore + focusScore;
   
   return {
     total: totalSEI,
@@ -32,6 +87,8 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
     diligence: diligenceScore,
     growth: growthScore,
     agora: agoraScore,
+    focus: focusScore,
+    focusData,
     tier: getTierFromSEI(totalSEI)
   };
 }

@@ -9,7 +9,7 @@ import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
 import { buildStreakWriteAudit, extractLearningActivityDates, getEffectiveStreak, getTodayKST, getKSTComponents, recalculateStreakState } from '../../utils/streakUtils'
-import { calculateSEI } from '../../utils/rankingUtils'
+import { calculateSEI, FOCUS_MAX_SCORE } from '../../utils/rankingUtils'
 import { useAdmin } from '../../hooks/useAdmin'
 import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getAnonymousLabel, getFrameSurfaceStyles, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
 
@@ -44,6 +44,10 @@ export default function SpaceRanking({ user, userData }) {
     agora: {
       title: '소통(아고라)',
       tip: '아고라 커뮤니티에서 질문하고 답변하며 **지식을 공유**하여 보너스 점수를 획득하세요.'
+    },
+    focus: {
+      title: '집중도(영상)',
+      tip: '영상 중 제시되는 **광석 획득 기회**를 빠짐없이 잡으세요. 성공률과 전체 기회 수를 함께 보는 Wilson 보정 점수입니다.'
     }
   };
 
@@ -361,7 +365,7 @@ export default function SpaceRanking({ user, userData }) {
           🏆 스텔라 관제계 (Meta Sense Universe)
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
-          단순한 광석 수량이 아닌, <strong>실력, 성실함, 성장세, 그리고 소통 능력</strong>을 종합하여 진정한 개척자를 가려냅니다. (대원 {topUsers.length}명 탐사 중)
+          단순한 광석 수량이 아닌, <strong>실력, 성실함, 집중도, 성장세, 그리고 소통 능력</strong>을 종합하여 진정한 개척자를 가려냅니다. (대원 {topUsers.length}명 탐사 중)
         </p>
       </div>
 
@@ -831,6 +835,7 @@ export default function SpaceRanking({ user, userData }) {
                                 <RadarChart width={300} height={260} cx="50%" cy="50%" outerRadius="65%" data={[
                                   { subject: '능력(부)', value: Math.min(100, (u.seiData?.wealth / 50) * 100) || 0, raw: u.seiData?.wealth || 0 },
                                   { subject: '끈기(성실)', value: Math.min(100, (u.seiData?.diligence / 300) * 100) || 0, raw: u.seiData?.diligence || 0 },
+                                  { subject: '집중도(영상)', value: Math.min(100, ((u.seiData?.focus || 0) / FOCUS_MAX_SCORE) * 100) || 0, raw: u.seiData?.focus || 0 },
                                   { subject: '잠재력(성장)', value: Math.min(100, (u.seiData?.growth / 200) * 100) || 0, raw: u.seiData?.growth || 0 },
                                   { subject: '소통(아고라)', value: Math.min(100, (u.seiData?.agora / 200) * 100) || 0, raw: u.seiData?.agora || 0 },
                                   { subject: '전문성(실력)', value: Math.min(100, (u.seiData?.skill / 1000) * 100) || 0, raw: u.seiData?.skill || 0 },
@@ -879,21 +884,28 @@ export default function SpaceRanking({ user, userData }) {
                                   )}
                                 </div>
                                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: panelTheme.text, fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                                  <li 
+                                  <li
                                     onMouseEnter={() => setHoveredMetric('skill')}
                                     onMouseLeave={() => setHoveredMetric(null)}
                                     style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '6px', transition: 'background 0.2s', background: hoveredMetric === 'skill' ? `${panelTheme.accent}16` : 'transparent' }}
                                   >
                                     <span>전문성(실력)</span><strong style={{ color: panelTheme.accent }}>{u.seiData?.skill || 0} pts</strong>
                                   </li>
-                                  <li 
+                                  <li
                                     onMouseEnter={() => setHoveredMetric('diligence')}
                                     onMouseLeave={() => setHoveredMetric(null)}
                                     style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '6px', transition: 'background 0.2s', background: hoveredMetric === 'diligence' ? `${panelTheme.accent}16` : 'transparent' }}
                                   >
                                     <span>끈기(성실)</span><strong style={{ color: panelTheme.accent }}>{u.seiData?.diligence || 0} pts</strong>
                                   </li>
-                                  <li 
+                                  <li
+                                    onMouseEnter={() => setHoveredMetric('focus')}
+                                    onMouseLeave={() => setHoveredMetric(null)}
+                                    style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '6px', transition: 'background 0.2s', background: hoveredMetric === 'focus' ? `${panelTheme.accent}16` : 'transparent' }}
+                                  >
+                                    <span>집중도(영상)</span><strong style={{ color: panelTheme.accent }}>{u.seiData?.focus || 0} pts</strong>
+                                  </li>
+                                  <li
                                     onMouseEnter={() => setHoveredMetric('wealth')}
                                     onMouseLeave={() => setHoveredMetric(null)}
                                     style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '6px', transition: 'background 0.2s', background: hoveredMetric === 'wealth' ? `${panelTheme.accent}16` : 'transparent' }}
