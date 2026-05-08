@@ -6,8 +6,9 @@ import { useClusters } from '../../hooks/useContent';
 import { storage, getFunctionUrl } from '../../firebase';
 import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import AssignmentChronicle from './AssignmentChronicle';
+import WarpGateDocking from './WarpGateDocking';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
-import { getTodayKST, getKSTComponents, scheduleIncludesDay } from '../../utils/streakUtils';
+import { getTodayKST } from '../../utils/streakUtils';
 
 /**
  * Assignment Hub (Stellar Archive)
@@ -351,140 +352,6 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * Warp Gate Docking Button (Attendance)
- */
-function WarpGateDocking({ clusterData, user, userData, attendanceMutation, todayAttendance, todayKST }) {
-  const [status, setStatus] = useState({ state: 'invalid', message: '', countdown: null });
-
-  useEffect(() => {
-    if (todayAttendance) {
-      setStatus({ 
-        state: 'completed', 
-        message: `도킹 완료 (${todayAttendance.status === 'late' ? '지각' : '정상'})` 
-      });
-      return;
-    }
-    
-    if (!clusterData?.classSchedule) return;
-
-    const timer = setInterval(() => {
-      const { dayOfWeek, hours, minutes, seconds } = getKSTComponents();
-      const currentTimeInMins = hours * 60 + minutes;
-
-      // Find matching schedule for today
-      const todaySchedule = clusterData.classSchedule.find(s => scheduleIncludesDay(s, dayOfWeek));
-
-      if (!todaySchedule) {
-        setStatus({ state: 'invalid', message: '오늘은 수업이 없습니다.' });
-        return;
-      }
-
-      const [startHour, startMin] = todaySchedule.startTime.split(':').map(Number);
-      const [endHour, endMin] = todaySchedule.endTime.split(':').map(Number);
-      
-      const startTimeInMins = startHour * 60 + startMin;
-      const endTimeInMins = endHour * 60 + endMin;
-      const dockingOpenTimeInMins = startTimeInMins - 10;
-      const onTimeGraceMins = startTimeInMins + 5; // User requested 5 minutes
-
-      if (currentTimeInMins < dockingOpenTimeInMins) {
-        setStatus({ state: 'invalid', message: `수업 시작 10분 전부터 도킹이 가능합니다. (${todaySchedule.startTime})` });
-      } else if (currentTimeInMins >= dockingOpenTimeInMins && currentTimeInMins < startTimeInMins) {
-        setStatus({ state: 'open', message: '탐사선 도킹 승인' });
-      } else if (currentTimeInMins >= startTimeInMins && currentTimeInMins <= onTimeGraceMins) {
-        // Calculate countdown for "on-time" docking
-        const totalClosingSecs = (onTimeGraceMins * 60) - (hours * 3600 + minutes * 60 + seconds);
-        const mins = Math.floor(totalClosingSecs / 60);
-        const secs = totalClosingSecs % 60;
-        setStatus({ 
-          state: 'closing', 
-          message: `도킹 마감 임박 - ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}` 
-        });
-      } else if (currentTimeInMins > onTimeGraceMins && currentTimeInMins <= endTimeInMins) {
-        setStatus({ state: 'late', message: '게이트 폐쇄 (지각 도킹)' });
-      } else {
-        setStatus({ state: 'invalid', message: '오늘 수업이 종료되었습니다.' });
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [clusterData, todayAttendance]);
-
-  const handleDocking = async () => {
-    if (status.state === 'invalid') return;
-    
-    try {
-      await attendanceMutation.mutateAsync({
-        userId: user.uid,
-        userName: userData?.studentName || user.displayName || user.email?.split('@')[0],
-        clusterId: clusterData.id,
-        clusterName: clusterData.name,
-        date: todayKST,
-        timestamp: new Date(),
-        status: status.state === 'late' ? 'late' : 'present'
-      });
-      alert(status.state === 'late' ? '지각 도킹되었습니다. 다음에는 서둘러주세요!' : '정상적으로 도킹(출석)되었습니다. 즐거운 탐험 되세요!');
-    } catch (err) {
-      console.error('Docking failed:', err);
-      alert('도킹 시스템 오류가 발생했습니다.');
-    }
-  };
-
-  if (status.state === 'invalid') {
-    return (
-      <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '20px' }}>
-        📡 {status.message}
-      </div>
-    );
-  }
-
-  if (status.state === 'completed') {
-    return (
-      <div className="font-tech" style={{ 
-        padding: '0.8rem 2rem', 
-        fontSize: '1.1rem', 
-        borderColor: 'var(--crystal-cyan)',
-        color: 'var(--crystal-cyan)',
-        boxShadow: `0 0 15px var(--crystal-cyan)`,
-        background: 'rgba(0, 212, 255, 0.1)',
-        fontWeight: 'bold',
-        borderRadius: '4px',
-        border: '1px solid var(--crystal-cyan)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem'
-      }}>
-        ✨ {status.message}
-      </div>
-    );
-  }
-
-  let btnColor = 'var(--neon-blue)';
-  if (status.state === 'closing') btnColor = 'var(--planet-orange)';
-  if (status.state === 'late') btnColor = '#ff4500';
-
-  return (
-    <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      onClick={handleDocking}
-      className="space-btn cosmic-btn font-tech"
-      style={{ 
-        padding: '0.8rem 2rem', 
-        fontSize: '1.1rem', 
-        borderColor: btnColor,
-        color: btnColor,
-        boxShadow: `0 0 15px ${btnColor}`,
-        background: 'rgba(0,0,0,0.4)',
-        fontWeight: 'bold'
-      }}
-    >
-      🚀 {status.message}
-    </motion.button>
   );
 }
 

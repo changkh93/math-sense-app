@@ -24,6 +24,7 @@ import SpaceRanking from './SpaceRanking'
 import SpaceJourney from './SpaceJourney'
 import RegionAccessModal from './RegionAccessModal' // New Integration
 import AssignmentHub from './AssignmentHub' // New Integration
+import WarpGateDocking from './WarpGateDocking'
 import ProfileEditView from './ProfileEditView' // Profile Management
 import StudyCrewView from './StudyCrewView'
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
@@ -31,6 +32,7 @@ import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 import DarkMatterRefineryView from './DarkMatterRefineryView'
 import CrystalLedger from './CrystalLedger'
+import { useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments'
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates, isRadarActive } from '../../utils/streakUtils'
@@ -38,6 +40,7 @@ import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { applyHolidayMultiplier, isRestDay } from '../../utils/holidayUtils'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
+import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
@@ -126,6 +129,9 @@ function SpaceHome() {
   const [transactions, setTransactions] = useState([])
   const [loadingTransactions, setLoadingTransactions] = useState(true)
   const [shouldScrollStore, setShouldScrollStore] = useState(false)
+  const [attendancePromptOpen, setAttendancePromptOpen] = useState(false)
+  const [attendancePromptStatus, setAttendancePromptStatus] = useState(null)
+  const [todayKSTForAttendance, setTodayKSTForAttendance] = useState(() => getTodayKST())
   
   // Selection State (Persist ID in session)
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
@@ -295,6 +301,78 @@ function SpaceHome() {
       return access[c.docId] === 'active' || access[c.id] === 'active';
     });
   }, [clusters, userData, loadingClusters]);
+
+  const activeClusterData = useMemo(() => {
+    if (!selectedClusterId) return null;
+    return clusters?.find(c => c.docId === selectedClusterId || c.id === selectedClusterId) || null;
+  }, [clusters, selectedClusterId]);
+
+  const { data: clusterAttendanceRecords, isLoading: loadingClusterAttendance } = useStudentAttendance(user?.uid, selectedClusterId);
+  const attendanceMutation = useRecordAttendance();
+
+  const todayAttendance = useMemo(() => {
+    return clusterAttendanceRecords?.find(a => a.date === todayKSTForAttendance) || null;
+  }, [clusterAttendanceRecords, todayKSTForAttendance]);
+
+  useEffect(() => {
+    const syncToday = () => setTodayKSTForAttendance(getTodayKST());
+    syncToday();
+    const timer = setInterval(syncToday, 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const attendancePromptKey = useMemo(() => {
+    if (!user?.uid || !selectedClusterId || !todayKSTForAttendance) return null;
+    return `metasense_attendance_prompt_closed:${user.uid}:${selectedClusterId}:${todayKSTForAttendance}`;
+  }, [user?.uid, selectedClusterId, todayKSTForAttendance]);
+
+  const dismissAttendancePrompt = useCallback(() => {
+    if (attendancePromptKey) sessionStorage.setItem(attendancePromptKey, 'true');
+    setAttendancePromptOpen(false);
+  }, [attendancePromptKey]);
+
+  useEffect(() => {
+    if (!selectedClusterId || !activeClusterData || loadingClusterAttendance || !attendancePromptKey) {
+      setAttendancePromptOpen(false);
+      setAttendancePromptStatus(null);
+      return;
+    }
+
+    const syncAttendancePrompt = () => {
+      const nextStatus = getAttendanceDockingStatus({
+        clusterData: activeClusterData,
+        todayAttendance
+      });
+      const dismissed = sessionStorage.getItem(attendancePromptKey) === 'true';
+      const shouldOpen = (
+        currentView === 'planet' &&
+        !selectedRegionId &&
+        !selectedChapterDocId &&
+        !selectedUnitDocId &&
+        !quickQuizUnitId &&
+        ['open', 'closing', 'late'].includes(nextStatus.state) &&
+        !dismissed
+      );
+
+      setAttendancePromptStatus(nextStatus);
+      setAttendancePromptOpen(shouldOpen);
+    };
+
+    syncAttendancePrompt();
+    const timer = setInterval(syncAttendancePrompt, 1000);
+    return () => clearInterval(timer);
+  }, [
+    activeClusterData,
+    attendancePromptKey,
+    currentView,
+    loadingClusterAttendance,
+    quickQuizUnitId,
+    selectedChapterDocId,
+    selectedClusterId,
+    selectedRegionId,
+    selectedUnitDocId,
+    todayAttendance
+  ]);
 
   useEffect(() => {
     if (loadingClusters) return;
@@ -2047,6 +2125,100 @@ function SpaceHome() {
           }
         }}
       />
+
+      <AnimatePresence>
+        {attendancePromptOpen && activeClusterData && (
+          <Motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 10005,
+              background: 'rgba(0, 0, 0, 0.55)',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
+              pointerEvents: 'auto'
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) dismissAttendancePrompt();
+            }}
+          >
+            <Motion.div
+              initial={{ scale: 0.92, y: 18 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 10 }}
+              className="glass-card hud-border"
+              style={{
+                width: 'min(92vw, 520px)',
+                padding: '1.7rem',
+                background: 'rgba(5, 10, 25, 0.94)',
+                borderColor: attendancePromptStatus?.state === 'late' ? '#ff4500' : 'var(--crystal-cyan)',
+                boxShadow: attendancePromptStatus?.state === 'late'
+                  ? '0 0 32px rgba(255, 69, 0, 0.26)'
+                  : '0 0 32px rgba(0, 212, 255, 0.24)',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="space-btn font-tech"
+                  onClick={dismissAttendancePrompt}
+                  aria-label="출석 안내 닫기"
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    padding: 0,
+                    borderRadius: '50%',
+                    borderColor: 'rgba(255,255,255,0.18)',
+                    background: 'rgba(255,255,255,0.06)'
+                  }}
+                >
+                  X
+                </button>
+              </div>
+
+              <div className="font-title" style={{ fontSize: '1.55rem', color: 'var(--text-bright)', marginBottom: '0.6rem' }}>
+                출석 체크 가능
+              </div>
+              <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55, margin: '0 0 1.3rem' }}>
+                {activeClusterData.name || '현재 군집'} 수업 시간이어서 여기서 바로 출석할 수 있습니다.
+              </p>
+
+              <WarpGateDocking
+                clusterData={activeClusterData}
+                user={user}
+                userData={userData}
+                attendanceMutation={attendanceMutation}
+                todayAttendance={todayAttendance}
+                todayKST={todayKSTForAttendance}
+                onDockingSuccess={dismissAttendancePrompt}
+              />
+
+              <button
+                type="button"
+                className="space-btn font-tech"
+                onClick={dismissAttendancePrompt}
+                style={{
+                  marginTop: '1.25rem',
+                  padding: '0.65rem 1.1rem',
+                  color: 'var(--text-muted)',
+                  borderColor: 'rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.04)'
+                }}
+              >
+                나중에 과제 기록소에서 하기
+              </button>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content Overlay */}
       <main className="space-container" style={{ 
