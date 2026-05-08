@@ -9,6 +9,16 @@ import 'katex/dist/katex.min.css';
 
 import ReactDOM from 'react-dom';
 
+// Helper to transform Google Drive view links to preview links
+const getEmbeddablePdfUrl = (url) => {
+  if (!url) return null;
+  const driveViewMatch = url.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
+  if (driveViewMatch && driveViewMatch[1]) {
+    return `https://drive.google.com/file/d/${driveViewMatch[1]}/preview`;
+  }
+  return url;
+};
+
 export default function QuizPreviewModal({ 
   isOpen, 
   onClose, 
@@ -100,9 +110,20 @@ export default function QuizPreviewModal({
                <div className="datalog-header glass">
                  📄 {title || unit?.title} - 데이터 로그 본문
                </div>
-               <div className="datalog-content-scroll glass" style={{ maxHeight: '400px', overflowY: 'auto', padding: '1.5rem', marginTop: '1rem', background: 'rgba(5, 10, 25, 0.6)' }}>
+               <div className="datalog-content-scroll glass" style={{ maxHeight: '600px', overflowY: 'auto', padding: '1.5rem', marginTop: '1rem', background: 'rgba(5, 10, 25, 0.6)' }}>
                   {unit?.learningContents ? (
-                    <MissionMarkdownViewer text={unit.learningContents} />
+                    <>
+                      {typeof unit.learningContents === 'object' && unit.learningContents.pdfUrl && (
+                        <div style={{ marginBottom: '1.5rem', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
+                          <iframe 
+                            src={getEmbeddablePdfUrl(unit.learningContents.pdfUrl)}
+                            title="Learning Data PDF Preview"
+                            style={{ width: '100%', height: '500px', border: 'none' }}
+                          />
+                        </div>
+                      )}
+                      <MissionMarkdownViewer text={typeof unit.learningContents === 'object' ? unit.learningContents.text : unit.learningContents} />
+                    </>
                   ) : (
                     <p className="text-muted">학습 데이터를 불러올 수 없습니다.</p>
                   )}

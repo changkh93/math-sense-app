@@ -6,8 +6,11 @@ import 'katex/dist/katex.min.css';
 
 const MissionMarkdownViewer = ({ text }) => {
   if (!text) return null;
+  
+  const content = typeof text === 'string' ? text : (text.text || '');
+  if (!content) return null;
 
-  const lines = text.split('\n');
+  const lines = content.split('\n');
   const blocks = [];
   let inTable = false;
   let inCodeBlock = false;
