@@ -1,11 +1,12 @@
 const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
-const { FieldPath } = require("firebase-admin/firestore");
+const { FieldPath, FieldValue } = require("firebase-admin/firestore");
 try { admin.initializeApp(); } catch (e) {}
 const cors = require("cors")({ origin: true });
 const fetch = require("node-fetch");
 const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
+const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const DIRECT_MEMO_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -420,6 +421,252 @@ async function requireAdminUid(context) {
   }
   return uid;
 }
+
+async function deleteQueryDocs(queryRef, stats, key) {
+  const db = admin.firestore();
+  let deleted = 0;
+
+  while (true) {
+    const snap = await queryRef.limit(300).get();
+    if (snap.empty) break;
+
+    const batch = db.batch();
+    snap.docs.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+      deleted += 1;
+    });
+    await batch.commit();
+  }
+
+  stats[key] = (stats[key] || 0) + deleted;
+  return deleted;
+}
+
+async function deleteStoragePrefix(bucket, prefix, stats) {
+  const [files] = await bucket.getFiles({ prefix });
+  if (!files.length) return;
+
+  await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true })));
+  stats.storageFiles = (stats.storageFiles || 0) + files.length;
+}
+
+async function recalculateQuestionAnswerCount(db, questionId, stats) {
+  if (!questionId) return;
+
+  const questionRef = db.collection("questions").doc(questionId);
+  const questionSnap = await questionRef.get();
+  if (!questionSnap.exists) return;
+
+  const answersSnap = await db.collection("answers").where("questionId", "==", questionId).get();
+  await questionRef.set({
+    answerCount: answersSnap.size,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  stats.questionsRecounted = (stats.questionsRecounted || 0) + 1;
+}
+
+async function removeDeletedUserFromArrays(db, uid, stats) {
+  const parentsSnap = await db.collection("parents").where("childrenUids", "array-contains", uid).get();
+  for (const parentDoc of parentsSnap.docs) {
+    await parentDoc.ref.set({
+      childrenUids: FieldValue.arrayRemove(uid),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    stats.parentLinksRemoved = (stats.parentLinksRemoved || 0) + 1;
+  }
+
+  const likedQuestionsSnap = await db.collection("questions").where("upvotedBy", "array-contains", uid).get();
+  for (const questionDoc of likedQuestionsSnap.docs) {
+    const upvotedBy = (questionDoc.data().upvotedBy || []).filter((id) => id !== uid);
+    await questionDoc.ref.set({ upvotedBy, upvotes: upvotedBy.length }, { merge: true });
+    stats.questionVotesRemoved = (stats.questionVotesRemoved || 0) + 1;
+  }
+
+  const likedMessagesSnap = await db.collection("starMessages").where("upvotedBy", "array-contains", uid).get();
+  for (const messageDoc of likedMessagesSnap.docs) {
+    const upvotedBy = (messageDoc.data().upvotedBy || []).filter((id) => id !== uid);
+    await messageDoc.ref.set({ upvotedBy, endorseCount: upvotedBy.length }, { merge: true });
+    stats.starMessageVotesRemoved = (stats.starMessageVotesRemoved || 0) + 1;
+  }
+}
+
+async function deleteRegionStudentLinks(db, uid, stats) {
+  const regionsSnap = await db.collection("regions").get();
+  const studentRefs = regionsSnap.docs.map((regionDoc) => regionDoc.ref.collection("students").doc(uid));
+  const studentSnaps = await Promise.all(studentRefs.map((studentRef) => studentRef.get()));
+  const existingRefs = studentSnaps.filter((studentSnap) => studentSnap.exists).map((studentSnap) => studentSnap.ref);
+
+  for (let i = 0; i < existingRefs.length; i += 300) {
+    const batch = db.batch();
+    existingRefs.slice(i, i + 300).forEach((studentRef) => batch.delete(studentRef));
+    await batch.commit();
+  }
+
+  stats.regionStudentLinksDeleted = (stats.regionStudentLinksDeleted || 0) + existingRefs.length;
+}
+
+async function cleanupStudyMemberships(db, uid, stats) {
+  const leaderCrewsSnap = await db.collection("crews").where("leaderId", "==", uid).get();
+  for (const crewDoc of leaderCrewsSnap.docs) {
+    await db.recursiveDelete(crewDoc.ref);
+    stats.crewsDeleted = (stats.crewsDeleted || 0) + 1;
+  }
+
+  const memberCrewsSnap = await db.collection("crews").where("memberIds", "array-contains", uid).get();
+  for (const crewDoc of memberCrewsSnap.docs) {
+    if (!crewDoc.exists) continue;
+    const crewData = crewDoc.data() || {};
+    if (crewData.leaderId === uid) continue;
+
+    const memberIds = (crewData.memberIds || []).filter((memberId) => memberId !== uid);
+    const members = Array.isArray(crewData.members)
+      ? crewData.members.filter((member) => member?.uid !== uid)
+      : [];
+    await crewDoc.ref.set({
+      memberIds,
+      members,
+      memberCount: memberIds.length,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    stats.crewMembershipsRemoved = (stats.crewMembershipsRemoved || 0) + 1;
+  }
+
+  await deleteQueryDocs(db.collectionGroup("greetings").where("userId", "==", uid), stats, "crewGreetingsDeleted");
+
+  const hostedRoomsSnap = await db.collection("studyRooms").where("hostUid", "==", uid).get();
+  const deletedRoomIds = new Set();
+  for (const roomDoc of hostedRoomsSnap.docs) {
+    await db.recursiveDelete(roomDoc.ref);
+    deletedRoomIds.add(roomDoc.id);
+    stats.studyRoomsDeleted = (stats.studyRoomsDeleted || 0) + 1;
+  }
+
+  const memberRoomsSnap = await db.collection("studyRooms").where("participantIds", "array-contains", uid).get();
+  for (const roomDoc of memberRoomsSnap.docs) {
+    if (deletedRoomIds.has(roomDoc.id)) continue;
+    await roomDoc.ref.set({
+      participantIds: FieldValue.arrayRemove(uid),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await roomDoc.ref.collection("participants").doc(uid).delete().catch((err) => {
+      if (err.code !== 5) throw err;
+    });
+    stats.studyRoomParticipationsRemoved = (stats.studyRoomParticipationsRemoved || 0) + 1;
+  }
+}
+
+async function deleteUserOwnedData(uid, options = {}) {
+  const db = admin.firestore();
+  const bucket = admin.storage().bucket();
+  const stats = {};
+  const affectedQuestionIds = new Set();
+
+  const userRef = db.collection("users").doc(uid);
+  const userSnap = await userRef.get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+
+  if (userData?.role === "admin" && !options.allowAdminDelete) {
+    throw new functions.https.HttpsError("failed-precondition", "관리자 계정은 이 기능으로 삭제할 수 없습니다.");
+  }
+
+  await removeDeletedUserFromArrays(db, uid, stats);
+  await cleanupStudyMemberships(db, uid, stats);
+
+  const ownQuestionsSnap = await db.collection("questions").where("userId", "==", uid).get();
+  for (const questionDoc of ownQuestionsSnap.docs) {
+    await deleteQueryDocs(db.collection("answers").where("questionId", "==", questionDoc.id), stats, "answersDeleted");
+    await questionDoc.ref.delete();
+    stats.questionsDeleted = (stats.questionsDeleted || 0) + 1;
+  }
+
+  const ownAnswersSnap = await db.collection("answers").where("userId", "==", uid).get();
+  for (const answerDoc of ownAnswersSnap.docs) {
+    const answerData = answerDoc.data() || {};
+    if (answerData.questionId) affectedQuestionIds.add(answerData.questionId);
+    await answerDoc.ref.delete();
+    stats.answersDeleted = (stats.answersDeleted || 0) + 1;
+  }
+
+  for (const questionId of affectedQuestionIds) {
+    await recalculateQuestionAnswerCount(db, questionId, stats);
+  }
+
+  await deleteQueryDocs(db.collection("assignments").where("userId", "==", uid), stats, "assignmentsDeleted");
+  await deleteQueryDocs(db.collection("attendance").where("userId", "==", uid), stats, "attendanceDeleted");
+  await deleteQueryDocs(db.collection("notifications").where("recipientId", "==", uid), stats, "notificationsDeleted");
+  await deleteQueryDocs(db.collection("directMemos").where("senderId", "==", uid), stats, "directMemosDeleted");
+  await deleteQueryDocs(db.collection("directMemos").where("recipientId", "==", uid), stats, "directMemosDeleted");
+  await deleteQueryDocs(db.collection("starMessages").where("userId", "==", uid), stats, "starMessagesDeleted");
+  await deleteQueryDocs(db.collectionGroup("directMemoLimits").where("recipientId", "==", uid), stats, "directMemoLimitsDeleted");
+  await deleteRegionStudentLinks(db, uid, stats);
+
+  await Promise.all([
+    deleteStoragePrefix(bucket, `drawings/${uid}/`, stats),
+    deleteStoragePrefix(bucket, `assignments/${uid}/`, stats),
+    deleteStoragePrefix(bucket, `agora-connect/${uid}/`, stats),
+  ]);
+
+  await db.recursiveDelete(userRef);
+  stats.userDocumentDeleted = userSnap.exists ? 1 : 0;
+
+  try {
+    await admin.auth().deleteUser(uid);
+    stats.authUserDeleted = 1;
+  } catch (error) {
+    if (error.code !== "auth/user-not-found") {
+      throw error;
+    }
+    stats.authUserDeleted = 0;
+  }
+
+  return {
+    uid,
+    email: userData?.email || "",
+    stats,
+  };
+}
+
+exports.adminDeleteUserAccount = accountDeletionFunctions.https.onCall(async (data, context) => {
+  const adminUid = await requireAdminUid(context);
+  const targetUid = String(data?.targetUid || "").trim();
+  const confirmText = String(data?.confirmText || "").trim();
+
+  if (!targetUid) {
+    throw new functions.https.HttpsError("invalid-argument", "삭제할 이용자 UID가 없습니다.");
+  }
+  if (targetUid === adminUid) {
+    throw new functions.https.HttpsError("failed-precondition", "현재 로그인한 관리자 본인은 삭제할 수 없습니다.");
+  }
+
+  const targetSnap = await admin.firestore().collection("users").doc(targetUid).get();
+  const targetData = targetSnap.exists ? targetSnap.data() : {};
+  const expectedEmail = String(targetData?.email || "").trim();
+  if (expectedEmail && confirmText !== expectedEmail && confirmText !== "DELETE") {
+    throw new functions.https.HttpsError("failed-precondition", "확인 문구가 일치하지 않습니다.");
+  }
+  if (!expectedEmail && confirmText !== targetUid && confirmText !== "DELETE") {
+    throw new functions.https.HttpsError("failed-precondition", "확인 문구가 일치하지 않습니다.");
+  }
+
+  return deleteUserOwnedData(targetUid);
+});
+
+exports.deleteCurrentUserAccount = accountDeletionFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const confirmText = String(data?.confirmText || "").trim();
+  const userSnap = await admin.firestore().collection("users").doc(uid).get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+  const expectedEmail = String(userData?.email || context.auth?.token?.email || "").trim();
+
+  if (expectedEmail && confirmText !== expectedEmail && confirmText !== "탈퇴") {
+    throw new functions.https.HttpsError("failed-precondition", "확인 문구가 일치하지 않습니다.");
+  }
+  if (!expectedEmail && confirmText !== "탈퇴") {
+    throw new functions.https.HttpsError("failed-precondition", "확인 문구가 일치하지 않습니다.");
+  }
+
+  return deleteUserOwnedData(uid);
+});
 
 async function loadMemberSummaries(memberIds = []) {
   const ids = uniqueIds(memberIds);

@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, query, where, getDocs, doc, setDoc, limit } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '../../firebase';
 import { useClusters } from '../../hooks/useContent';
-import { Search, User as UserIcon } from 'lucide-react';
+import { AlertTriangle, Search, Trash2, User as UserIcon } from 'lucide-react';
 import './Admin.css';
 
 function UserAccessManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [deletingUid, setDeletingUid] = useState('');
   const [allRegions, setAllRegions] = useState([]);
   const [regionsLoading, setRegionsLoading] = useState(false);
   const { data: clusters = [], isLoading: clustersLoading } = useClusters();
@@ -191,6 +193,54 @@ function UserAccessManager() {
     }
   };
 
+  const handlePermanentDeleteUser = async (targetUser) => {
+    if (!targetUser?.uid || deletingUid) return;
+
+    if (targetUser.uid === auth.currentUser?.uid) {
+      alert('현재 로그인한 관리자 본인은 이 화면에서 삭제할 수 없습니다.');
+      return;
+    }
+    if (targetUser.role === 'admin') {
+      alert('관리자 계정은 이 화면에서 삭제할 수 없습니다.');
+      return;
+    }
+
+    const displayName = targetUser.studentName || targetUser.name || targetUser.email || targetUser.uid;
+    const confirmTarget = targetUser.email || targetUser.uid;
+    const firstConfirm = window.confirm(
+      `${displayName} 이용자를 완전 삭제합니다.\n\n` +
+      '삭제 범위: 로그인 계정, 학습 기록, 광석/거래 내역, 과제, 출석, 질문/답변, 쪽지, 스터디 크루 연결, 업로드 파일.\n\n' +
+      '이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?'
+    );
+    if (!firstConfirm) return;
+
+    const confirmText = window.prompt(
+      `최종 확인을 위해 아래 문구를 정확히 입력하세요.\n\n${confirmTarget}`
+    );
+    if (confirmText !== confirmTarget) {
+      alert('확인 문구가 일치하지 않아 삭제를 취소했습니다.');
+      return;
+    }
+
+    setDeletingUid(targetUser.uid);
+    try {
+      const deleteUserAccount = httpsCallable(functions, 'adminDeleteUserAccount');
+      const result = await deleteUserAccount({
+        targetUid: targetUser.uid,
+        confirmText
+      });
+      setUsers(prev => prev.filter(user => user.uid !== targetUser.uid));
+      const stats = result?.data?.stats || {};
+      const deletedCount = Object.values(stats).reduce((sum, value) => sum + (Number(value) || 0), 0);
+      alert(`완전 삭제가 완료되었습니다. 정리된 항목: ${deletedCount}개`);
+    } catch (err) {
+      console.error('adminDeleteUserAccount failed:', err);
+      alert(err?.message || '이용자 완전 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setDeletingUid('');
+    }
+  };
+
   if (clustersLoading || regionsLoading) return <div>Loading DB...</div>;
 
   return (
@@ -221,10 +271,40 @@ function UserAccessManager() {
                   <div style={{ padding: '10px', background: 'rgba(0, 243, 255, 0.1)', borderRadius: '50%' }}>
                     <UserIcon size={30} color="#00f3ff" />
                   </div>
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <h3 style={{ margin: '0 0 5px 0', color: 'white', fontSize: '1.4rem' }}>{user.studentName || user.name || '이름 없음'}</h3>
                     <p style={{ margin: 0, color: '#88aabb', fontSize: '1rem' }}>{user.email} <span style={{fontSize: '0.8rem', opacity: 0.6}}>(UID: {user.uid})</span></p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePermanentDeleteUser(user)}
+                    disabled={deletingUid === user.uid || user.uid === auth.currentUser?.uid || user.role === 'admin'}
+                    title={user.role === 'admin' ? '관리자 계정은 삭제할 수 없습니다.' : '이용자 모든 데이터 완전 삭제'}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 94, 87, 0.65)',
+                      background: 'rgba(255, 94, 87, 0.12)',
+                      color: '#ff8a84',
+                      fontWeight: 800,
+                      cursor: deletingUid === user.uid || user.uid === auth.currentUser?.uid || user.role === 'admin' ? 'not-allowed' : 'pointer',
+                      opacity: deletingUid === user.uid || user.uid === auth.currentUser?.uid || user.role === 'admin' ? 0.55 : 1,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {deletingUid === user.uid ? (
+                      <>
+                        <AlertTriangle size={16} /> 삭제 중...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={16} /> 완전 삭제
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 <div style={{ overflowX: 'auto' }}>

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
@@ -15,11 +16,61 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
 
   const handleLogout = async () => {
     soundManager.playClick();
     await signOut(auth);
     navigate('/');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user?.uid || isDeletingAccount) return;
+    soundManager.playClick();
+
+    if (userData?.role === 'admin') {
+      alert('관리자 계정은 프로필 메뉴에서 탈퇴할 수 없습니다.');
+      return;
+    }
+
+    const confirmTarget = user?.email || '탈퇴';
+    const firstConfirm = window.confirm(
+      '계정을 완전히 탈퇴합니다.\n\n' +
+      '삭제 범위: 로그인 계정, 학습 기록, 광석/거래 내역, 과제, 출석, 질문/답변, 쪽지, 스터디 크루 연결, 업로드 파일.\n\n' +
+      '이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?'
+    );
+    if (!firstConfirm) return;
+
+    const confirmText = window.prompt(
+      `최종 확인을 위해 아래 문구를 정확히 입력하세요.\n\n${confirmTarget}`
+    );
+    if (confirmText !== confirmTarget) {
+      alert('확인 문구가 일치하지 않아 탈퇴를 취소했습니다.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setIsProfileMenuOpen(false);
+    window.sessionStorage.setItem('accountDeletionInProgress', user.uid);
+
+    try {
+      const deleteAccount = httpsCallable(functions, 'deleteCurrentUserAccount');
+      await deleteAccount({ confirmText });
+      try {
+        await signOut(auth);
+      } catch (signOutErr) {
+        console.warn('signOut after account deletion failed:', signOutErr);
+      }
+      window.sessionStorage.removeItem('accountDeletionInProgress');
+      navigate('/', { replace: true });
+      alert('탈퇴 처리가 완료되었습니다.');
+    } catch (err) {
+      console.error('deleteCurrentUserAccount failed:', err);
+      window.sessionStorage.removeItem('accountDeletionInProgress');
+      alert(err?.message || '탈퇴 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const handleNavClick = (view, path) => {
@@ -174,6 +225,23 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
                   }}
                 >
                   📊 LOGS
+                </button>
+
+                <button
+                  className="space-nav-link font-tech"
+                  disabled={isDeletingAccount || userData?.role === 'admin'}
+                  style={{
+                    textAlign: 'left',
+                    padding: '0.8rem',
+                    width: '100%',
+                    borderRadius: '8px',
+                    color: '#ff8a84',
+                    opacity: isDeletingAccount || userData?.role === 'admin' ? 0.55 : 1,
+                    cursor: isDeletingAccount || userData?.role === 'admin' ? 'not-allowed' : 'pointer'
+                  }}
+                  onClick={handleDeleteAccount}
+                >
+                  {isDeletingAccount ? '탈퇴 처리 중...' : '계정 탈퇴'}
                 </button>
                 
                 <button 

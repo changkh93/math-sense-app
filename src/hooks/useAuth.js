@@ -72,6 +72,12 @@ export function useAuth() {
               ...data
             });
           } else {
+            if (window.sessionStorage.getItem('accountDeletionInProgress') === firebaseUser.uid) {
+              setUserData(null);
+              setLoading(false);
+              return;
+            }
+
             // [안전 장치] 만약 유저 메인 문서만 삭제되었고 하위 데이터가 남아있는 경우를 대비해 스탯 복원을 시도합니다.
             const recoverUserData = async () => {
               try {
