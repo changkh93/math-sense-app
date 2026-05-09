@@ -14,7 +14,9 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
   const [history, setHistory] = useState(initialHistory || []);
   const [loading, setLoading] = useState(parentLoading || !initialHistory);
   
-  const [viewMode, setViewMode] = useState('constellation');
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('metasense_journey_view_mode') || 'calendar';
+  });
   const [popover, setPopover] = useState(null); // { dayData, x, y }
   const [transactions, setTransactions] = useState(initialTransactions || []);
 
@@ -394,7 +396,11 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
             ].map(mode => (
               <button
                 key={mode.id}
-                onClick={() => { setViewMode(mode.id); setPopover(null); }}
+                onClick={() => {
+                  setViewMode(mode.id);
+                  localStorage.setItem('metasense_journey_view_mode', mode.id);
+                  setPopover(null);
+                }}
                 className={`font-tech ${viewMode === mode.id ? 'active' : ''}`}
                 style={{
                   padding: '0.8rem 1.5rem',
@@ -609,10 +615,10 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
 
   return (
     <div className="constellation-wrapper" style={{ height: svgHeight }}>
-      <svg width="100%" height={svgHeight} viewBox={`0 0 1000 ${svgHeight}`}>
+      <svg width="100%" height={svgHeight} viewBox={`0 0 1000 ${svgHeight}`} shapeRendering="geometricPrecision" textRendering="optimizeLegibility">
         <defs>
           <filter id="glow-star" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
             <feMerge>
               <feMergeNode in="coloredBlur"/>
               <feMergeNode in="SourceGraphic"/>
@@ -682,7 +688,6 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
                 whileInView={{ pathLength: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8 }}
-                style={{ filter: "url(#glow-star)" }}
               />
             );
           }
@@ -714,7 +719,7 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
                     r={r} 
                     fill={node.isProtected ? 'rgba(0, 243, 255, 0.3)' : activeColor} 
                     className="core" 
-                    filter="url(#glow-star)" 
+                    filter={node.isToday ? 'url(#glow-star)' : undefined}
                     opacity={glowIntensity}
                     style={{ stroke: node.isProtected ? 'var(--crystal-cyan)' : 'none', strokeWidth: 2 }}
                   />

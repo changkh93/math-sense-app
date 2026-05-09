@@ -1,12 +1,14 @@
 .space-journey-container {
   min-height: calc(100vh - 80px);
+  min-height: calc(100dvh - 80px);
   box-sizing: border-box;
   color: #e2e8f0;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   background: radial-gradient(circle at 50% 100%, #0a0f2b 0%, #03050c 100%);
   display: flex;
   flex-direction: column;
+  isolation: isolate;
 }
 
 .journey-main-title {
@@ -30,7 +32,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: rgba(5, 10, 25, 0.6);
+  background: rgba(3, 7, 18, 0.88);
   border: 1px solid rgba(0, 243, 255, 0.15);
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -40,7 +42,7 @@
 
 .journey-card:hover {
   transform: none;
-  background: rgba(5, 10, 25, 0.6);
+  background: rgba(3, 7, 18, 0.88);
 }
 
 .space-journey-container.nebula-bg {
@@ -133,6 +135,7 @@
 /* Scroll Area */
 .journey-scroll-area {
   flex: 1;
+  min-height: clamp(520px, 68vh, 900px);
   overflow-y: auto;
   overflow-x: hidden;
   padding: 2rem;
@@ -213,10 +216,11 @@
 }
 
 .cal-month-block {
-  background: rgba(15, 20, 40, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(8, 13, 30, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 16px;
   padding: 1.5rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
 }
 
 .cal-month-title {
@@ -243,8 +247,8 @@
 
 .cal-cell {
   aspect-ratio: 1;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -261,7 +265,7 @@
 
 .cal-cell.clickable:hover {
   transform: scale(1.05);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(30, 41, 59, 0.9);
   z-index: 2;
 }
 
@@ -271,7 +275,7 @@
 
 .cal-date-num {
   font-size: 0.9rem;
-  color: #94a3b8;
+  color: #cbd5e1;
   z-index: 2;
 }
 
@@ -286,6 +290,7 @@
   inset: 2px;
   border-radius: 6px;
   z-index: 1;
+  mix-blend-mode: screen;
 }
 
 /* Popover */

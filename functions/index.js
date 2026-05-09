@@ -1,7 +1,14 @@
 const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const { FieldPath, FieldValue } = require("firebase-admin/firestore");
-try { admin.initializeApp(); } catch (e) {}
+const PROJECT_ID = "math-sense-1f6a8";
+const STORAGE_BUCKET = "math-sense-1f6a8.firebasestorage.app";
+try {
+  admin.initializeApp({
+    projectId: PROJECT_ID,
+    storageBucket: STORAGE_BUCKET,
+  });
+} catch (e) {}
 const cors = require("cors")({ origin: true });
 const fetch = require("node-fetch");
 const FUNCTIONS_REGION = "asia-northeast3";
@@ -443,10 +450,19 @@ async function deleteQueryDocs(queryRef, stats, key) {
 }
 
 async function deleteStoragePrefix(bucket, prefix, stats) {
-  const [files] = await bucket.getFiles({ prefix });
+  let files = [];
+  try {
+    [files] = await bucket.getFiles({ prefix });
+  } catch (error) {
+    console.warn("deleteStoragePrefix skipped:", { prefix, error: error.message });
+    stats.storageSkipped = (stats.storageSkipped || 0) + 1;
+    return;
+  }
   if (!files.length) return;
 
-  await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true })));
+  await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true }).catch((error) => {
+    if (error.code !== 404) throw error;
+  })));
   stats.storageFiles = (stats.storageFiles || 0) + files.length;
 }
 
@@ -505,6 +521,45 @@ async function deleteRegionStudentLinks(db, uid, stats) {
   stats.regionStudentLinksDeleted = (stats.regionStudentLinksDeleted || 0) + existingRefs.length;
 }
 
+async function deleteCrewGreetingsByUser(db, uid, stats) {
+  const crewsSnap = await db.collection("crews").get();
+  let deleted = 0;
+
+  for (const crewDoc of crewsSnap.docs) {
+    const greetingsSnap = await crewDoc.ref.collection("greetings").where("userId", "==", uid).get();
+    for (let i = 0; i < greetingsSnap.docs.length; i += 300) {
+      const batch = db.batch();
+      greetingsSnap.docs.slice(i, i + 300).forEach((greetingDoc) => {
+        batch.delete(greetingDoc.ref);
+        deleted += 1;
+      });
+      await batch.commit();
+    }
+  }
+
+  stats.crewGreetingsDeleted = (stats.crewGreetingsDeleted || 0) + deleted;
+}
+
+async function deleteDirectMemoLimitsForRecipient(db, uid, stats) {
+  const usersSnap = await db.collection("users").get();
+  let deleted = 0;
+
+  for (let i = 0; i < usersSnap.docs.length; i += 300) {
+    const refs = usersSnap.docs.slice(i, i + 300).map((userDoc) => userDoc.ref.collection("directMemoLimits").doc(uid));
+    const snaps = await Promise.all(refs.map((limitRef) => limitRef.get()));
+    const batch = db.batch();
+    snaps.forEach((limitSnap) => {
+      if (limitSnap.exists) {
+        batch.delete(limitSnap.ref);
+        deleted += 1;
+      }
+    });
+    await batch.commit();
+  }
+
+  stats.directMemoLimitsDeleted = (stats.directMemoLimitsDeleted || 0) + deleted;
+}
+
 async function cleanupStudyMemberships(db, uid, stats) {
   const leaderCrewsSnap = await db.collection("crews").where("leaderId", "==", uid).get();
   for (const crewDoc of leaderCrewsSnap.docs) {
@@ -531,7 +586,7 @@ async function cleanupStudyMemberships(db, uid, stats) {
     stats.crewMembershipsRemoved = (stats.crewMembershipsRemoved || 0) + 1;
   }
 
-  await deleteQueryDocs(db.collectionGroup("greetings").where("userId", "==", uid), stats, "crewGreetingsDeleted");
+  await deleteCrewGreetingsByUser(db, uid, stats);
 
   const hostedRoomsSnap = await db.collection("studyRooms").where("hostUid", "==", uid).get();
   const deletedRoomIds = new Set();
@@ -561,69 +616,99 @@ async function deleteUserOwnedData(uid, options = {}) {
   const stats = {};
   const affectedQuestionIds = new Set();
 
-  const userRef = db.collection("users").doc(uid);
-  const userSnap = await userRef.get();
-  const userData = userSnap.exists ? userSnap.data() : {};
-
-  if (userData?.role === "admin" && !options.allowAdminDelete) {
-    throw new functions.https.HttpsError("failed-precondition", "관리자 계정은 이 기능으로 삭제할 수 없습니다.");
-  }
-
-  await removeDeletedUserFromArrays(db, uid, stats);
-  await cleanupStudyMemberships(db, uid, stats);
-
-  const ownQuestionsSnap = await db.collection("questions").where("userId", "==", uid).get();
-  for (const questionDoc of ownQuestionsSnap.docs) {
-    await deleteQueryDocs(db.collection("answers").where("questionId", "==", questionDoc.id), stats, "answersDeleted");
-    await questionDoc.ref.delete();
-    stats.questionsDeleted = (stats.questionsDeleted || 0) + 1;
-  }
-
-  const ownAnswersSnap = await db.collection("answers").where("userId", "==", uid).get();
-  for (const answerDoc of ownAnswersSnap.docs) {
-    const answerData = answerDoc.data() || {};
-    if (answerData.questionId) affectedQuestionIds.add(answerData.questionId);
-    await answerDoc.ref.delete();
-    stats.answersDeleted = (stats.answersDeleted || 0) + 1;
-  }
-
-  for (const questionId of affectedQuestionIds) {
-    await recalculateQuestionAnswerCount(db, questionId, stats);
-  }
-
-  await deleteQueryDocs(db.collection("assignments").where("userId", "==", uid), stats, "assignmentsDeleted");
-  await deleteQueryDocs(db.collection("attendance").where("userId", "==", uid), stats, "attendanceDeleted");
-  await deleteQueryDocs(db.collection("notifications").where("recipientId", "==", uid), stats, "notificationsDeleted");
-  await deleteQueryDocs(db.collection("directMemos").where("senderId", "==", uid), stats, "directMemosDeleted");
-  await deleteQueryDocs(db.collection("directMemos").where("recipientId", "==", uid), stats, "directMemosDeleted");
-  await deleteQueryDocs(db.collection("starMessages").where("userId", "==", uid), stats, "starMessagesDeleted");
-  await deleteQueryDocs(db.collectionGroup("directMemoLimits").where("recipientId", "==", uid), stats, "directMemoLimitsDeleted");
-  await deleteRegionStudentLinks(db, uid, stats);
-
-  await Promise.all([
-    deleteStoragePrefix(bucket, `drawings/${uid}/`, stats),
-    deleteStoragePrefix(bucket, `assignments/${uid}/`, stats),
-    deleteStoragePrefix(bucket, `agora-connect/${uid}/`, stats),
-  ]);
-
-  await db.recursiveDelete(userRef);
-  stats.userDocumentDeleted = userSnap.exists ? 1 : 0;
-
+  let stage = "load-user";
   try {
-    await admin.auth().deleteUser(uid);
-    stats.authUserDeleted = 1;
-  } catch (error) {
-    if (error.code !== "auth/user-not-found") {
-      throw error;
-    }
-    stats.authUserDeleted = 0;
-  }
+    const userRef = db.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists ? userSnap.data() : {};
 
-  return {
-    uid,
-    email: userData?.email || "",
-    stats,
-  };
+    if (userData?.role === "admin" && !options.allowAdminDelete) {
+      throw new functions.https.HttpsError("failed-precondition", "관리자 계정은 이 기능으로 삭제할 수 없습니다.");
+    }
+
+    stage = "shared-array-cleanup";
+    await removeDeletedUserFromArrays(db, uid, stats);
+
+    stage = "study-membership-cleanup";
+    await cleanupStudyMemberships(db, uid, stats);
+
+    stage = "questions-cleanup";
+    const ownQuestionsSnap = await db.collection("questions").where("userId", "==", uid).get();
+    for (const questionDoc of ownQuestionsSnap.docs) {
+      await deleteQueryDocs(db.collection("answers").where("questionId", "==", questionDoc.id), stats, "answersDeleted");
+      await questionDoc.ref.delete();
+      stats.questionsDeleted = (stats.questionsDeleted || 0) + 1;
+    }
+
+    stage = "answers-cleanup";
+    const ownAnswersSnap = await db.collection("answers").where("userId", "==", uid).get();
+    for (const answerDoc of ownAnswersSnap.docs) {
+      const answerData = answerDoc.data() || {};
+      if (answerData.questionId) affectedQuestionIds.add(answerData.questionId);
+      await answerDoc.ref.delete();
+      stats.answersDeleted = (stats.answersDeleted || 0) + 1;
+    }
+
+    stage = "answer-count-sync";
+    for (const questionId of affectedQuestionIds) {
+      await recalculateQuestionAnswerCount(db, questionId, stats);
+    }
+
+    stage = "top-level-doc-cleanup";
+    await deleteQueryDocs(db.collection("assignments").where("userId", "==", uid), stats, "assignmentsDeleted");
+    await deleteQueryDocs(db.collection("attendance").where("userId", "==", uid), stats, "attendanceDeleted");
+    await deleteQueryDocs(db.collection("notifications").where("recipientId", "==", uid), stats, "notificationsDeleted");
+    await deleteQueryDocs(db.collection("directMemos").where("senderId", "==", uid), stats, "directMemosDeleted");
+    await deleteQueryDocs(db.collection("directMemos").where("recipientId", "==", uid), stats, "directMemosDeleted");
+    await deleteQueryDocs(db.collection("starMessages").where("userId", "==", uid), stats, "starMessagesDeleted");
+
+    stage = "nested-link-cleanup";
+    await deleteDirectMemoLimitsForRecipient(db, uid, stats);
+    await deleteRegionStudentLinks(db, uid, stats);
+
+    stage = "storage-cleanup";
+    await Promise.all([
+      deleteStoragePrefix(bucket, `drawings/${uid}/`, stats),
+      deleteStoragePrefix(bucket, `assignments/${uid}/`, stats),
+      deleteStoragePrefix(bucket, `agora-connect/${uid}/`, stats),
+    ]);
+
+    stage = "user-document-delete";
+    await db.recursiveDelete(userRef);
+    stats.userDocumentDeleted = userSnap.exists ? 1 : 0;
+
+    stage = "auth-user-delete";
+    try {
+      await admin.auth().deleteUser(uid);
+      stats.authUserDeleted = 1;
+    } catch (error) {
+      if (error.code !== "auth/user-not-found") {
+        throw error;
+      }
+      stats.authUserDeleted = 0;
+    }
+
+    return {
+      uid,
+      email: userData?.email || "",
+      stats,
+    };
+  } catch (error) {
+    console.error("deleteUserOwnedData failed:", {
+      uid,
+      stage,
+      stats,
+      code: error.code,
+      message: error.message,
+      stack: error.stack,
+    });
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError(
+      "internal",
+      `계정 삭제 중 오류가 발생했습니다. 실패 단계: ${stage}`,
+      { stage, stats }
+    );
+  }
 }
 
 exports.adminDeleteUserAccount = accountDeletionFunctions.https.onCall(async (data, context) => {

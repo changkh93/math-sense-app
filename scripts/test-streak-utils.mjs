@@ -15,28 +15,28 @@ import {
 
 function run() {
   const protectedReturn = calculateStreakUpdate({
-    lastStreakDate: '2026-04-03',
+    lastStreakDate: '2026-04-01',
     currentStreak: 5,
     longestStreak: 7,
     streakFreezeCount: 3,
     streakMilestones: [],
-  }, '2026-04-05');
+  }, '2026-04-03');
 
   assert.equal(protectedReturn.streakUpdate.currentStreak, 6);
   assert.equal(protectedReturn.streakUpdate.streakFreezeCount, 2);
   assert.equal(protectedReturn.meta.freezeUsed, true);
-  assert.deepEqual(protectedReturn.meta.defendedDates, ['2026-04-04']);
+  assert.deepEqual(protectedReturn.meta.defendedDates, ['2026-04-02']);
   assert.equal(protectedReturn.meta.consumedFreezeCount, 1);
 
   const activeOnlyStreak = calculateStreakFromHistory(
-    ['2026-04-03', '2026-04-05'],
-    ['2026-04-04'],
-    '2026-04-05'
+    ['2026-04-01', '2026-04-03'],
+    ['2026-04-02'],
+    '2026-04-03'
   );
   assert.equal(activeOnlyStreak, 2);
 
-  const currentGapDefense = getCurrentGapDefendedDates('2026-04-03', 1, '2026-04-05');
-  assert.deepEqual(currentGapDefense, ['2026-04-04']);
+  const currentGapDefense = getCurrentGapDefendedDates('2026-04-01', 1, '2026-04-03');
+  assert.deepEqual(currentGapDefense, ['2026-04-02']);
 
   const derivedActiveDates = Array.from(extractLearningActivityDates(
     [],
@@ -45,23 +45,23 @@ function run() {
   assert.deepEqual(derivedActiveDates, ['2026-04-05']);
 
   const repairedState = recalculateStreakState(
-    ['2026-04-03', '2026-04-05'],
-    ['2026-04-04'],
-    '2026-04-05'
+    ['2026-04-01', '2026-04-03'],
+    ['2026-04-02'],
+    '2026-04-03'
   );
   assert.equal(repairedState.correctStreak, 2);
-  assert.equal(repairedState.correctLastDate, '2026-04-05');
+  assert.equal(repairedState.correctLastDate, '2026-04-03');
   assert.equal(repairedState.coresRemaining, 0);
-  assert.deepEqual(repairedState.defendedDates, ['2026-04-04']);
+  assert.deepEqual(repairedState.defendedDates, ['2026-04-02']);
 
   const idleProtectedState = recalculateStreakState(
-    ['2026-04-03'],
-    ['2026-04-04'],
-    '2026-04-05'
+    ['2026-04-01'],
+    ['2026-04-02'],
+    '2026-04-03'
   );
   assert.equal(idleProtectedState.correctStreak, 1);
-  assert.equal(idleProtectedState.correctLastDate, '2026-04-03');
-  assert.deepEqual(idleProtectedState.defendedDates, ['2026-04-04']);
+  assert.equal(idleProtectedState.correctLastDate, '2026-04-01');
+  assert.deepEqual(idleProtectedState.defendedDates, ['2026-04-02']);
 
   const displayedProtectedStreak = getEffectiveStreak({
     currentStreak: 25,

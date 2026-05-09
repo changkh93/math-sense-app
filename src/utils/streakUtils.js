@@ -5,7 +5,7 @@
  * 순수 함수로 분리하여 테스트 용이성을 확보합니다.
  */
 
-import { isRestDay } from './holidayUtils';
+import { isRestDay } from './holidayUtils.js';
 
 export const STREAK_WRITE_AUDIT_VERSION = 2;
 

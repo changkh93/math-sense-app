@@ -172,31 +172,62 @@ function SpaceHome() {
   });
 
   // Specialized setters to persist
-  const updateSelectedClusterId = (id) => {
+  const updateSelectedClusterId = useCallback((id) => {
     setSelectedClusterId(id);
     if (id) sessionStorage.setItem('metasense_cluster_id', id);
     else sessionStorage.removeItem('metasense_cluster_id');
-  };
+  }, []);
 
-  const updateSelectedRegionId = (id) => {
+  const updateSelectedRegionId = useCallback((id) => {
     internalSetSelectedRegionId(id);
     if (id) sessionStorage.setItem('metasense_region_id', id);
     else sessionStorage.removeItem('metasense_region_id');
-  };
+  }, []);
 
-  const updateSelectedChapterDocId = (id) => {
+  const updateSelectedChapterDocId = useCallback((id) => {
     internalSetSelectedChapterDocId(id);
     if (id) sessionStorage.setItem('metasense_chapter_id', id);
     else sessionStorage.removeItem('metasense_chapter_id');
-  };
+  }, []);
 
-  const updateSelectedUnitDocId = (id) => {
+  const updateSelectedUnitDocId = useCallback((id) => {
     internalSetSelectedUnitDocId(id);
     if (id) sessionStorage.setItem('metasense_unit_id', id);
     else sessionStorage.removeItem('metasense_unit_id');
-  };
+  }, []);
   const [quickQuizUnitId, setQuickQuizUnitId] = useState(null) // New: Dashboard quick quiz
   const [quickQuizMode, setQuickQuizMode] = useState(null) // New: Mode for quick quiz
+
+  const clearMissionSelection = useCallback(() => {
+    updateSelectedUnitDocId(null);
+    setQuickQuizUnitId(null);
+    setQuickQuizMode(null);
+  }, [updateSelectedUnitDocId]);
+
+  const selectCluster = useCallback((id) => {
+    updateSelectedClusterId(id);
+    updateSelectedRegionId(null);
+    updateSelectedChapterDocId(null);
+    clearMissionSelection();
+    setCurrentView('planet');
+  }, [clearMissionSelection, updateSelectedChapterDocId, updateSelectedClusterId, updateSelectedRegionId]);
+
+  const selectRegion = useCallback((id) => {
+    updateSelectedRegionId(id);
+    updateSelectedChapterDocId(null);
+    clearMissionSelection();
+  }, [clearMissionSelection, updateSelectedChapterDocId, updateSelectedRegionId]);
+
+  const selectChapter = useCallback((id) => {
+    updateSelectedChapterDocId(id);
+    clearMissionSelection();
+  }, [clearMissionSelection, updateSelectedChapterDocId]);
+
+  const selectUnit = useCallback((id) => {
+    updateSelectedUnitDocId(id);
+    setQuickQuizUnitId(null);
+    setQuickQuizMode(null);
+  }, [updateSelectedUnitDocId]);
 
   // Region Access State
   const [pendingRegion, setPendingRegion] = useState(null)
@@ -218,6 +249,15 @@ function SpaceHome() {
     setDarkMatterQuestions([])
     setDarkMatterModeType('learning')
   }, [])
+
+  const switchRootView = useCallback((view) => {
+    setCurrentView(view);
+    updateSelectedRegionId(null);
+    updateSelectedChapterDocId(null);
+    clearMissionSelection();
+    setShouldScrollStore(false);
+    if (isDarkMatterMode) stopDarkMatterMode();
+  }, [clearMissionSelection, isDarkMatterMode, stopDarkMatterMode, updateSelectedChapterDocId, updateSelectedRegionId]);
 
   const isRecheckDue = useCallback((mark) => {
     if (mark?.status !== 'recheck_pending') return false
@@ -263,19 +303,12 @@ function SpaceHome() {
     const validViews = new Set(['planet', 'dashboard', 'collection', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub'])
 
     if (requestedView && validViews.has(requestedView)) {
-      setCurrentView(requestedView)
-      updateSelectedRegionId(null)
-      updateSelectedChapterDocId(null)
-      updateSelectedUnitDocId(null) // Clear stuck mission ID
-      setQuickQuizUnitId(null)      // Clear quick quiz
-      setQuickQuizMode(null)
-      setShouldScrollStore(false)
-      if (isDarkMatterMode) stopDarkMatterMode() // Exit dark matter if active
+      switchRootView(requestedView)
       
       // Clear state to prevent re-triggering
       navigate(location.pathname, { replace: true, state: {} })
     }
-  }, [location.pathname, location.search, location.state, isDarkMatterMode, stopDarkMatterMode, navigate])
+  }, [location.pathname, location.search, location.state, navigate, switchRootView])
 
   // Data Hooks
   const { data: clusters, isLoading: loadingClusters } = useClusters()
@@ -382,7 +415,7 @@ function SpaceHome() {
       const isValid = activeClusters.some(c => c.docId === selectedClusterId || c.id === selectedClusterId);
       if (!isValid) {
         // If not valid anymore (e.g. access revoked), clear it
-        updateSelectedClusterId(null);
+        selectCluster(null);
       }
     }
 
@@ -390,14 +423,15 @@ function SpaceHome() {
     if (activeClusters.length === 1 && !selectedClusterId) {
       updateSelectedClusterId(activeClusters[0].docId || activeClusters[0].id);
     }
-  }, [activeClusters, selectedClusterId, loadingClusters]);
+  }, [activeClusters, selectedClusterId, loadingClusters, selectCluster, updateSelectedClusterId]);
 
   const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions(selectedClusterId)
   const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
   const { data: units, isLoading: loadingUnits } = useUnits(selectedChapterDocId)
   
   // Singular hooks to resolve hierarchy for deep links
-  const { data: singleUnit } = useUnit(selectedUnitDocId || quickQuizUnitId)
+  const missionUnitId = selectedUnitDocId || quickQuizUnitId
+  const { data: singleUnit, isLoading: loadingSingleUnit, isFetched: singleUnitFetched } = useUnit(missionUnitId)
   const { data: singleChapter } = useChapter(selectedChapterDocId || singleUnit?.chapterId)
   const { data: singleRegion } = useRegion(selectedRegionId || singleChapter?.regionId)
 
@@ -406,7 +440,7 @@ function SpaceHome() {
     isLoading: loadingQuizzes, 
     isError: errorQuizzes, 
     refetch: refetchQuizzes 
-  } = useQuizzes(selectedUnitDocId || quickQuizUnitId)
+  } = useQuizzes(missionUnitId)
 
   // Fetch all units for all chapters in the selected region to calculate progress
   // Uses the same queryKey ['units', chapterId] as useUnits() to share cache
@@ -428,7 +462,42 @@ function SpaceHome() {
   // Active selections
   const activeRegion = regions?.find(r => r.id === selectedRegionId)
   const activeChapter = chapters?.find(c => c.docId === selectedChapterDocId) || singleChapter
-  const activeUnit = units?.find(u => u.docId === (selectedUnitDocId || quickQuizUnitId)) || singleUnit
+  const activeUnit = units?.find(u => u.docId === missionUnitId) || singleUnit
+
+  useEffect(() => {
+    if (!selectedRegionId || loadingRegions || errorRegions || !regions) return;
+    const isValidRegion = regions.some(r => r.id === selectedRegionId || r.docId === selectedRegionId);
+    if (!isValidRegion) {
+      console.warn('[NavigationGuard] Clearing stale region selection:', selectedRegionId);
+      selectRegion(null);
+    }
+  }, [errorRegions, loadingRegions, regions, selectRegion, selectedRegionId]);
+
+  useEffect(() => {
+    if (!selectedChapterDocId || loadingChapters || !chapters) return;
+    const isValidChapter = chapters.some(c => c.docId === selectedChapterDocId || c.id === selectedChapterDocId);
+    if (!isValidChapter) {
+      console.warn('[NavigationGuard] Clearing stale chapter selection:', selectedChapterDocId);
+      updateSelectedChapterDocId(null);
+      clearMissionSelection();
+    }
+  }, [chapters, clearMissionSelection, loadingChapters, selectedChapterDocId, updateSelectedChapterDocId]);
+
+  useEffect(() => {
+    if (!selectedUnitDocId || loadingUnits || !selectedChapterDocId || !units) return;
+    const isValidUnit = units.some(u => u.docId === selectedUnitDocId || u.id === selectedUnitDocId);
+    if (!isValidUnit) {
+      console.warn('[NavigationGuard] Clearing stale unit selection:', selectedUnitDocId);
+      clearMissionSelection();
+    }
+  }, [clearMissionSelection, loadingUnits, selectedChapterDocId, selectedUnitDocId, units]);
+
+  useEffect(() => {
+    if (!missionUnitId || activeUnit || loadingSingleUnit || !singleUnitFetched) return;
+    console.warn('[NavigationGuard] Mission unit not found. Returning to planet map:', missionUnitId);
+    clearMissionSelection();
+    setCurrentView('planet');
+  }, [activeUnit, clearMissionSelection, loadingSingleUnit, missionUnitId, singleUnitFetched]);
 
   const handleBackFromMission = useCallback(() => {
     // Logic: Mission Control -> Chapter Selection (Units List -> Chapters List)
@@ -442,14 +511,12 @@ function SpaceHome() {
     if (rid) updateSelectedRegionId(rid);
     if (clid) updateSelectedClusterId(clid);
 
-    updateSelectedUnitDocId(null);
-    setQuickQuizUnitId(null);
-    setQuickQuizMode(null);
+    clearMissionSelection();
     
     // Ensure we transition into the hierarchy view (Planet view)
     // regardless of where we came from (e.g. assignment hub)
     setCurrentView('planet');
-  }, [activeUnit, activeChapter, singleChapter, singleRegion, activeRegion, selectedChapterDocId, selectedRegionId, selectedClusterId]);
+  }, [activeUnit, activeChapter, singleChapter, singleRegion, activeRegion, selectedChapterDocId, selectedRegionId, selectedClusterId, clearMissionSelection, updateSelectedChapterDocId, updateSelectedClusterId, updateSelectedRegionId]);
 
   // Track Presence Activity
   const currentLocationString = useMemo(() => {
@@ -1302,7 +1369,7 @@ function SpaceHome() {
           justReachedMilestone: streakResultsFinal?.meta?.justReachedMilestone
         }
       })
-      updateSelectedUnitDocId(null)
+      clearMissionSelection()
     } catch (error) {
       console.error("Error saving quiz result:", error)
     } finally {
@@ -1900,7 +1967,23 @@ function SpaceHome() {
   }
 
   // Mission Hub Mode (Data Log, Transmission, Field Test)
-  if (selectedUnitDocId || quickQuizUnitId) {
+  if (missionUnitId) {
+    if (!activeUnit) {
+      return (
+        <div className="space-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div className="glass-card hud-border" style={{ padding: '2rem', textAlign: 'center', maxWidth: '420px' }}>
+            <div className="journey-loader" style={{ margin: '0 auto 1.5rem' }} />
+            <h2 className="font-title" style={{ color: 'var(--crystal-cyan)', margin: '0 0 0.8rem' }}>
+              미션 좌표 복구 중
+            </h2>
+            <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
+              이전 세션의 탐사 좌표를 확인하고 있습니다. 잘못된 좌표는 자동으로 행성 지도에서 다시 시작됩니다.
+            </p>
+          </div>
+        </div>
+      )
+    }
+
     let initialMode = 'briefing' // default: show Mission Control unconditionally
     
     if (quickQuizMode) {
@@ -1909,10 +1992,10 @@ function SpaceHome() {
 
     return (
       <MissionHub
-        key={selectedUnitDocId || quickQuizUnitId}
-        unitId={selectedUnitDocId || quickQuizUnitId}
+        key={missionUnitId}
+        unitId={missionUnitId}
         clusterId={selectedClusterId}
-        activeUnit={activeUnit || { title: "탐사 미션" }} 
+        activeUnit={activeUnit} 
         unitQuizzes={unitQuizzes}
         loadingQuizzes={loadingQuizzes}
         errorQuizzes={errorQuizzes}
@@ -1933,11 +2016,9 @@ function SpaceHome() {
       <div className="space-bg" style={{ overflowY: 'auto' }}>
         <SpaceNavbar 
           currentView={currentView} 
-          onViewChange={(view) => {
-            setCurrentView(view)
-          }} 
+          onViewChange={switchRootView} 
         />
-        <ProfileEditView onBack={() => { setCurrentView('planet'); soundManager.playWarp(); }} />
+        <ProfileEditView onBack={() => { switchRootView('planet'); soundManager.playWarp(); }} />
       </div>
     )
   }
@@ -1947,14 +2028,12 @@ function SpaceHome() {
       <div className="space-bg" style={{ overflowY: 'auto' }}>
         <SpaceNavbar
           currentView={currentView}
-          onViewChange={(view) => {
-            setCurrentView(view)
-          }}
+          onViewChange={switchRootView}
         />
         <StudyCrewView 
-          onBack={() => { setCurrentView('planet'); soundManager.playWarp(); }} 
+          onBack={() => { switchRootView('planet'); soundManager.playWarp(); }} 
           onNavigateStore={(scroll) => {
-            setCurrentView('store');
+            switchRootView('store');
             setShouldScrollStore(!!scroll);
             soundManager.playClick();
           }} 
@@ -2050,11 +2129,11 @@ function SpaceHome() {
                       return;
                    }
                 }
-                updateSelectedRegionId(id)
+                selectRegion(id)
                 soundManager.playWarp()
               }}
               onSelectArchive={() => {
-                setCurrentView('assignment_hub');
+                switchRootView('assignment_hub');
                 soundManager.playWarp();
               }}
               onSelectDarkMatter={() => {
@@ -2076,15 +2155,7 @@ function SpaceHome() {
       {/* Navigation */}
       <SpaceNavbar 
         currentView={currentView} 
-        onViewChange={(view) => {
-          setCurrentView(view)
-          updateSelectedRegionId(null)
-          updateSelectedChapterDocId(null)
-          updateSelectedUnitDocId(null) // Reset mission when navigating via navbar
-          setQuickQuizUnitId(null)
-          setShouldScrollStore(false)
-          if (isDarkMatterMode) stopDarkMatterMode()
-        }} 
+        onViewChange={switchRootView} 
       />
 
       <RegionAccessModal
@@ -2112,7 +2183,7 @@ function SpaceHome() {
               });
               await batch.commit();
               setPendingRegion(null);
-              updateSelectedRegionId(region.id);
+              selectRegion(region.id);
               soundManager.playWarp();
             } else {
               setAccessError('접근 코드가 올바르지 않습니다.');
@@ -2230,7 +2301,7 @@ function SpaceHome() {
             <ClusterSelector 
               clusters={activeClusters}
               onSelect={(id) => {
-                updateSelectedClusterId(id);
+                selectCluster(id);
                 soundManager.playWarp();
               }}
             />
@@ -2256,7 +2327,7 @@ function SpaceHome() {
                 {activeClusters.length > 1 && (
                   <button 
                     className="space-btn cosmic-btn" 
-                    onClick={() => { updateSelectedClusterId(null); soundManager.playClick(); }}
+                            onClick={() => { selectCluster(null); soundManager.playClick(); }}
                     style={{ 
                       position: 'fixed', 
                       left: '20px', 
@@ -2365,12 +2436,12 @@ function SpaceHome() {
                         <Motion.div
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1, transition: { delay: 0.1 } }}
-                          whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            setCurrentView('assignment_hub');
-                            if (soundManager?.playWarp) soundManager.playWarp();
-                          }}
+                                  whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => {
+                                    switchRootView('assignment_hub');
+                                    if (soundManager?.playWarp) soundManager.playWarp();
+                                  }}
                           style={{
                             padding: '1.5rem',
                             width: '250px',
@@ -2489,8 +2560,8 @@ function SpaceHome() {
                             return;
                           }
                         }
-                        updateSelectedRegionId(region.id);
-                        if (soundManager?.playWarp) soundManager.playWarp();
+                                selectRegion(region.id);
+                                if (soundManager?.playWarp) soundManager.playWarp();
                       }}
                       style={{
                         padding: is2DMode ? '1.5rem' : '0.5rem 1rem',
@@ -2578,7 +2649,7 @@ function SpaceHome() {
               <div className="fade-in" style={{ pointerEvents: 'auto', marginTop: '5vh' }}>
                 <button 
                   className="space-nav-link font-tech"
-                  onClick={() => { updateSelectedRegionId(null); soundManager.playClick() }}
+                          onClick={() => { selectRegion(null); soundManager.playClick() }}
                   style={{ marginBottom: '1rem' }}
                 >
                   ← RETURN TO GALAXY
@@ -2586,7 +2657,7 @@ function SpaceHome() {
                 <div className="glass-card" style={{ padding: '2rem', background: 'rgba(5, 5, 16, 0.8)', backdropFilter: 'blur(20px)', position: 'relative' }}>
                   {/* Close Button */}
                   <button 
-                    onClick={() => { updateSelectedRegionId(null); soundManager.playClick() }}
+                            onClick={() => { selectRegion(null); soundManager.playClick() }}
                     style={{
                       position: 'absolute',
                       top: '1.5rem',
@@ -2629,7 +2700,7 @@ function SpaceHome() {
                         key={chapter.docId}
                         whileHover={{ scale: 1.02, backgroundColor: 'rgba(0, 243, 255, 0.1)' }}
                         className="glass-card hud-border"
-                        onClick={() => { updateSelectedChapterDocId(chapter.docId); soundManager.playWarp() }}
+                                onClick={() => { selectChapter(chapter.docId); soundManager.playWarp() }}
                         style={{ padding: '2rem', cursor: 'pointer' }}
                       >
                         <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.5rem' }}>
@@ -2681,7 +2752,7 @@ function SpaceHome() {
                   {/* Unified Bottom Back Button */}
                   <button 
                     className="hud-btn secondary glass"
-                    onClick={() => { updateSelectedRegionId(null); soundManager.playClick() }}
+                            onClick={() => { selectRegion(null); soundManager.playClick() }}
                     style={{ 
                       display: 'block', 
                       margin: '3rem auto 0',
@@ -2697,10 +2768,10 @@ function SpaceHome() {
               <div className="fade-in" style={{ pointerEvents: 'auto', marginTop: '5vh' }}>
                 <button 
                   className="space-nav-link font-tech"
-                  onClick={() => {
-                    soundManager.playClick()
-                    updateSelectedChapterDocId(null)
-                  }}
+                          onClick={() => {
+                            soundManager.playClick()
+                            selectChapter(null)
+                          }}
                   style={{ marginBottom: '1rem' }}
                 >
                   ← RETURN TO SECTOR
@@ -2709,13 +2780,12 @@ function SpaceHome() {
                   {/* Close Button */}
                   <button 
                     onClick={() => {
-                      soundManager.playClick()
-                      if (chapters?.length === 1) {
-                        updateSelectedChapterDocId(null)
-                        updateSelectedRegionId(null)
-                      } else {
-                        updateSelectedChapterDocId(null)
-                      }
+                              soundManager.playClick()
+                              if (chapters?.length === 1) {
+                                selectRegion(null)
+                              } else {
+                                selectChapter(null)
+                              }
                     }}
                     style={{
                       position: 'absolute',
@@ -2775,10 +2845,10 @@ function SpaceHome() {
                         <Motion.button
                           key={unit.docId}
                           whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
-                          className={`glass-card hud-border ${isOverallCompleted ? 'completed' : ''}`}
-                          onClick={() => { 
-                            updateSelectedUnitDocId(unit.docId)
-                            soundManager.playClick() 
+                                  className={`glass-card hud-border ${isOverallCompleted ? 'completed' : ''}`}
+                                  onClick={() => { 
+                                    selectUnit(unit.docId)
+                                    soundManager.playClick() 
                           }}
                           style={{
                             padding: '1.2rem 1.5rem',
@@ -2865,13 +2935,12 @@ function SpaceHome() {
                   <button 
                     className="hud-btn secondary glass"
                     onClick={() => {
-                      soundManager.playClick()
-                      if (chapters?.length === 1) {
-                        updateSelectedChapterDocId(null)
-                        updateSelectedRegionId(null)
-                      } else {
-                        updateSelectedChapterDocId(null)
-                      }
+                              soundManager.playClick()
+                              if (chapters?.length === 1) {
+                                selectRegion(null)
+                              } else {
+                                selectChapter(null)
+                              }
                     }}
                     style={{ 
                       display: 'block', 
@@ -3004,14 +3073,11 @@ function SpaceHome() {
                     cursor: 'pointer',
                     fontWeight: 700
                   }}
-                  onClick={() => {
-                    setCompletionResult(null)
-                    updateSelectedUnitDocId(null)
-                    updateSelectedChapterDocId(null)
-                    updateSelectedRegionId(null)
-                    setCurrentView('dashboard')
-                    soundManager.playClick()
-                  }}
+                          onClick={() => {
+                            setCompletionResult(null)
+                            switchRootView('dashboard')
+                            soundManager.playClick()
+                          }}
                 >
                   📊 성장 기록 분석 (DASHBOARD)
                 </button>
@@ -3026,11 +3092,11 @@ function SpaceHome() {
                     cursor: 'pointer',
                     fontWeight: 700
                   }}
-                  onClick={() => {
-                    setCompletionResult(null)
-                    updateSelectedUnitDocId(null)
-                    soundManager.playClick()
-                  }}
+                          onClick={() => {
+                            setCompletionResult(null)
+                            clearMissionSelection()
+                            soundManager.playClick()
+                          }}
                 >
                   🛰️ 연속 탐사 진행 (CONTINUE)
                 </button>
@@ -3064,13 +3130,13 @@ function SpaceHome() {
       </AnimatePresence>
       <AnimatePresence>
         {currentView === 'assignment_hub' && (
-          <AssignmentHub 
-            clusterId={selectedClusterId} 
-            onClose={() => setCurrentView('planet')}
-            onNavigateToUnit={(unitId) => {
-              setCurrentView('planet');
-              if (unitId) updateSelectedUnitDocId(unitId);
-            }}
+                  <AssignmentHub 
+                    clusterId={selectedClusterId} 
+                    onClose={() => switchRootView('planet')}
+                    onNavigateToUnit={(unitId) => {
+                      switchRootView('planet');
+                      if (unitId) selectUnit(unitId);
+                    }}
           />
         )}
       </AnimatePresence>
