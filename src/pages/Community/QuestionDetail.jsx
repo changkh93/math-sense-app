@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Send, CheckCircle, Heart, User, Trash2, Edit3, X, Save, Sparkles } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, Heart, User, Trash2, Edit3, X, Save, Sparkles } from 'lucide-react';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import 'katex/dist/katex.min.css';
 import { auth, db } from '../../firebase';
@@ -14,6 +14,33 @@ import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
 import confetti from 'canvas-confetti';
 import './QuestionDetail.css';
+
+const getDateFromTimestamp = (timestamp) => {
+  if (!timestamp) return null;
+  if (timestamp instanceof Date) return timestamp;
+  if (typeof timestamp.toDate === 'function') return timestamp.toDate();
+  if (typeof timestamp.toMillis === 'function') return new Date(timestamp.toMillis());
+  if (typeof timestamp.seconds === 'number') return new Date(timestamp.seconds * 1000);
+  if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+    const parsed = new Date(timestamp);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+};
+
+const formatAgoraTimestamp = (timestamp) => {
+  const date = getDateFromTimestamp(timestamp);
+  if (!date) return '시간 확인 중';
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+};
 
 export default function QuestionDetail() {
   const { questionId } = useParams();
@@ -166,9 +193,15 @@ export default function QuestionDetail() {
               animate={{ opacity: 1, scale: 1 }}
             >
               <div className="question-meta">
-                <div className="author-info">
-                  <div className="author-avatar"><User size={16} /></div>
-                  <span>{questionAuthorLabel}</span>
+                <div className="question-author-block">
+                  <div className="author-info">
+                    <div className="author-avatar"><User size={16} /></div>
+                    <span>{questionAuthorLabel}</span>
+                  </div>
+                  <span className="agora-time-label" title={getDateFromTimestamp(question.createdAt)?.toLocaleString('ko-KR') || undefined}>
+                    <Clock size={14} />
+                    작성 {formatAgoraTimestamp(question.createdAt)}
+                  </span>
                 </div>
                 <div className="status-container">
                   <span className={`status-badge status-${question.status}`}>
@@ -357,6 +390,10 @@ export default function QuestionDetail() {
                                 {!crewName && !ans.isTeacher && <span>공개 답변자</span>}
                               </div>
                             )}
+                            <div className="answer-time-row" title={getDateFromTimestamp(ans.createdAt)?.toLocaleString('ko-KR') || undefined}>
+                              <Clock size={13} />
+                              <span>답변 {formatAgoraTimestamp(ans.createdAt)}</span>
+                            </div>
                           </div>
                         </div>
                         
