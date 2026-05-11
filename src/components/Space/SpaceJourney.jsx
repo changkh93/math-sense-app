@@ -198,6 +198,14 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     if (!todayKST) return { minDate: '', days: [] };
 
     let minDate = todayKST;
+    const dbStreak = getEffectiveStreak(userData);
+    if (dbStreak > 0 && userData?.lastStreakDate) {
+      const streakStart = new Date(`${userData.lastStreakDate}T12:00:00Z`);
+      streakStart.setUTCDate(streakStart.getUTCDate() - (dbStreak - 1));
+      const streakStartStr = streakStart.toISOString().split('T')[0];
+      if (streakStartStr < minDate) minDate = streakStartStr;
+    }
+
     history.forEach(h => {
       if (!h.timestamp) return;
       const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
@@ -252,7 +260,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     }
 
     return { minDate, days };
-  }, [history, todayKST, dailyStats, nodesWithProtection]);
+  }, [history, todayKST, dailyStats, nodesWithProtection, userData]);
 
   // 달력 뷰용 월별 데이터 (일부 최적화)
   const calendarMonths = useMemo(() => {
@@ -333,7 +341,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
   }
 
   const activeHistory = history.filter(h => h.timestamp);
-  if (activeHistory.length === 0 && transactions.length === 0) {
+  if (activeHistory.length === 0 && transactions.length === 0 && streak <= 0) {
     return (
       <div className="space-journey-container empty-journey">
         <div className="journey-empty-card glass-card hud-border">

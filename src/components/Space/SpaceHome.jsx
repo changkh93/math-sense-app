@@ -2041,6 +2041,25 @@ function SpaceHome() {
     )
   }
 
+  if (currentView === 'journey') {
+    return (
+      <div className="space-bg space-hud" style={{ minHeight: '100dvh', overflowY: 'auto', background: '#03050c' }}>
+        <SpaceNavbar
+          currentView={currentView}
+          onViewChange={switchRootView}
+        />
+        <main style={{ position: 'relative', zIndex: 1 }}>
+          <SpaceJourney
+            userData={userData}
+            initialHistory={history}
+            initialTransactions={transactions}
+            parentLoading={loadingHistory || loadingTransactions}
+          />
+        </main>
+      </div>
+    )
+  }
+
   // --- Profile View ---
   if (currentView === 'profile') {
     return (

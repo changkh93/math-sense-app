@@ -94,12 +94,44 @@ const getNextTimeAttackDelay = (isFirst = false) => {
   return minSeconds + Math.floor(Math.random() * (maxSeconds - minSeconds + 1))
 }
 
+const getYouTubeVideoId = (value = '') => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw
+  const patterns = [
+    /(?:youtube[.]com[/]watch[?]v=)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube[.]com[/]embed[/])([a-zA-Z0-9_-]{11})/,
+    /(?:youtube[.]com[/]shorts[/])([a-zA-Z0-9_-]{11})/,
+    /(?:youtu[.]be[/])([a-zA-Z0-9_-]{11})/,
+  ]
+  for (const pattern of patterns) {
+    const match = raw.match(pattern)
+    if (match?.[1]) return match[1]
+  }
+  return raw
+}
+
+const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
+  const params = new URLSearchParams({
+    start: String(Math.max(0, Math.floor(Number(start) || 0))),
+    autoplay: autoPlay ? '1' : '0',
+    controls: '1',
+    rel: '0',
+    modestbranding: '1',
+    playsinline: '1',
+  })
+  if (end) params.set('end', String(Math.floor(Number(end))))
+  return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`
+}
+
 // ─── YouTube Player Component ───
 // Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
 const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, isOverlay = false, autoPlay = true }, ref) => {
+  const normalizedVideoId = getYouTubeVideoId(videoId)
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
   const [hasError, setHasError] = useState(false)
+  const [apiTimedOut, setApiTimedOut] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const timeUpdateInterval = useRef(null)
@@ -173,6 +205,20 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   }, [onTimeUpdate])
 
   useEffect(() => {
+    setHasError(false)
+    setApiTimedOut(false)
+    if (!normalizedVideoId) {
+      setHasError(true)
+      return undefined
+    }
+
+    const apiTimeout = setTimeout(() => {
+      if (!playerRef.current) {
+        console.warn('YouTube iframe API did not initialize in time. Falling back to plain iframe.', { videoId: normalizedVideoId })
+        setApiTimedOut(true)
+      }
+    }, 7000)
+
     if (!window.YT) {
       const tag = document.createElement('script')
       tag.src = "https://www.youtube.com/iframe_api"
@@ -194,7 +240,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
       const player = new window.YT.Player(playerTargetId.current, {
         height: '100%',
         width: '100%',
-        videoId: videoId,
+        videoId: normalizedVideoId,
         playerVars: {
           start: start,
           end: end,
@@ -206,6 +252,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         },
         events: {
           'onReady': () => {
+            clearTimeout(apiTimeout)
             // Start continuous time tracking as soon as player is ready
             if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
             timeUpdateInterval.current = setInterval(() => {
@@ -245,9 +292,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
           },
           'onError': (event) => {
             console.error("YouTube Player Error:", event.data)
-            if (event.data === 100 || event.data === 101 || event.data === 150) {
-              setHasError(true)
-            }
+            setHasError(true)
           }
         }
       })
@@ -264,6 +309,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         }
       }, 100)
       return () => {
+        clearTimeout(apiTimeout)
         clearInterval(checkYT)
         if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
         if (playerRef.current && typeof playerRef.current.destroy === 'function') {
@@ -275,6 +321,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     }
 
     return () => {
+      clearTimeout(apiTimeout)
       if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
       if (playerRef.current && typeof playerRef.current.destroy === 'function') {
         try { playerRef.current.destroy() } catch (e) { /* ignore */ }
@@ -284,14 +331,28 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         wrapperRef.current.innerHTML = ''
       }
     }
-  }, [videoId, start, end])
+  }, [normalizedVideoId, start, end, autoPlay])
+
+  if (apiTimedOut && normalizedVideoId) {
+    return (
+      <iframe
+        src={buildYouTubeEmbedUrl({ videoId: normalizedVideoId, start, end, autoPlay })}
+        title="YouTube video player"
+        style={{ width: '100%', height: '100%', border: 0, borderRadius: '15px', background: '#000' }}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+    )
+  }
 
   if (hasError) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', color: 'var(--alert-red)', borderRadius: '15px' }}>
         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
         <h3 className="font-title" style={{ margin: 0, color: 'var(--alert-red)' }}>교신 장애</h3>
-        <p className="font-tech" style={{ marginTop: '0.5rem', opacity: 0.8, color: 'white' }}>본부의 복구 작업 중입니다.</p>
+        <p className="font-tech" style={{ marginTop: '0.5rem', opacity: 0.8, color: 'white' }}>
+          영상 ID 또는 브라우저 재생 권한을 확인해 주세요.
+        </p>
       </div>
     )
   }
@@ -323,7 +384,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
           left: 0, 
           width: '100%', 
           height: '100%', 
-          backgroundImage: `url(https://img.youtube.com/vi/${videoId}/${getThumbType()}.jpg)`, 
+          backgroundImage: `url(https://img.youtube.com/vi/${normalizedVideoId}/${getThumbType()}.jpg)`, 
           backgroundSize: 'cover', 
           backgroundPosition: 'center',
           zIndex: 10,
