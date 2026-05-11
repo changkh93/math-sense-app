@@ -100,6 +100,19 @@ function titleOf(item) {
   return item.title || item.unitTitle || item.chapterTitle || item.videoTitle || item.transmissionTitle || item.regionTitle || '';
 }
 
+function isReadingRelatedItem(item = {}) {
+  const text = [
+    titleOf(item),
+    item.unitId,
+    item.regionId,
+    item.clusterName,
+    item.category,
+    item.typeLabel,
+  ].filter(Boolean).join(' ');
+
+  return /독서|읽기|책|도서|문학|소설|고전|나니아|돈키호테|reading|book|novel/i.test(text);
+}
+
 function extractStudentQuestions(text = '') {
   const source = String(text || '').trim();
   if (!source) return [];
@@ -277,6 +290,9 @@ function compactAssignment(doc) {
       url: item.url || item.href || '',
       title: item.title || '',
     })) : [],
+    feedbackResponse: data.feedbackResponse || null,
+    feedbackReaction: data.feedbackReaction || data.feedbackResponse?.reaction || '',
+    feedbackComment: data.feedbackComment || data.feedbackResponse?.comment || '',
   };
 }
 
@@ -307,7 +323,7 @@ async function getUserAssignments(uid) {
   return snap.docs.map(compactAssignment);
 }
 
-function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgressQuizzes, attention }) {
+function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgressQuizzes, attention, readingActivityCount = 0 }) {
   const expectation = COURSE_EXPECTATIONS[normalizeCourseId(courseId)] || {
     label: courseId || '과정',
     totalMinutes: 0,
@@ -321,10 +337,13 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
   const ratio = target ? Math.round((videoMinutes / target) * 100) : null;
   const hasPractice = quizzes.length > 0 || inProgressQuizzes.length > 0;
   const hasConceptInput = videos.length > 0 || dataLogs.length > 0;
+  const hasMathPlatformActivity = hasConceptInput || hasPractice;
+  const isElementary = normalizeCourseId(courseId) === 'cluster_elementary';
   let level = '기록 부족';
 
   if (target) {
-    if (videoMinutes >= target * 0.8 || (videoMinutes >= target * 0.5 && hasPractice)) level = '충분';
+    if (isElementary && !hasMathPlatformActivity) level = '수학 기록 없음';
+    else if (videoMinutes >= target * 0.8 || (videoMinutes >= target * 0.5 && hasPractice)) level = '충분';
     else if (videoMinutes >= target * 0.4 || hasPractice) level = '조금 부족';
     else level = '부족';
   }
@@ -334,6 +353,8 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
   if (quizzes.length) balanceSignals.push(`완료 퀴즈 ${quizzes.length}개`);
   if (inProgressQuizzes.length) balanceSignals.push(`진행 중 퀴즈 ${inProgressQuizzes.map(item => `${item.title} ${item.answeredCount}/${item.totalCount}`).join(', ')}`);
   if (dataLogs.length) balanceSignals.push(`데이터 로그 ${dataLogs.length}개`);
+  if (isElementary && readingActivityCount) balanceSignals.push(`독서/읽기 활동 ${readingActivityCount}건`);
+  if (isElementary && readingActivityCount && !hasMathPlatformActivity) balanceSignals.push('독서 활동만 있고 수학 플랫폼 기록 없음');
   if (hasConceptInput && !hasPractice) balanceSignals.push('영상/개념 학습 대비 퀴즈 기록 없음');
   if (!hasConceptInput && hasPractice) balanceSignals.push('퀴즈 위주 학습');
   if (attention?.opportunities) balanceSignals.push(`집중도 광석 ${attention.hits}/${attention.opportunities}`);
@@ -346,6 +367,8 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
     platformCompletionRatio: ratio,
     level,
     hasBalancedPractice: hasConceptInput && hasPractice,
+    hasMathPlatformActivity,
+    readingActivityCount,
     balanceSignals,
   };
 }
@@ -367,10 +390,14 @@ async function getLearningSummary(uid, date, courseId = '') {
 
   const allItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   const items = allItems.filter(item => belongsToCourse(item, courseId));
-  const quizItems = items.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention'].includes(item.type || 'quiz'));
-  const videoItems = items.filter(item => ['video', 'video_complete', 'recovery_mastery', 'attention'].includes(item.type) || item.attentionResult === 'hit' || item.attentionResult === 'miss');
-  const dataLogItems = items.filter(item => ['text', 'data_log_read'].includes(item.type));
-  const attentionItems = items.filter(item => item.attentionResult === 'hit' || item.attentionResult === 'miss');
+  const isElementary = normalizeCourseId(courseId) === 'cluster_elementary';
+  const readingItems = isElementary ? items.filter(isReadingRelatedItem) : [];
+  const mathItems = isElementary ? items.filter(item => !isReadingRelatedItem(item)) : items;
+  const quizItems = mathItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention'].includes(item.type || 'quiz'));
+  const readingQuizItems = readingItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention'].includes(item.type || 'quiz'));
+  const videoItems = mathItems.filter(item => ['video', 'video_complete', 'recovery_mastery', 'attention'].includes(item.type) || item.attentionResult === 'hit' || item.attentionResult === 'miss');
+  const dataLogItems = mathItems.filter(item => ['text', 'data_log_read'].includes(item.type));
+  const attentionItems = mathItems.filter(item => item.attentionResult === 'hit' || item.attentionResult === 'miss');
   const scores = quizItems.map(item => Number(item.score)).filter(Number.isFinite);
   const progressSummary = summarizeLearningProgress(progressSnap?.docs || [], start, end, courseId);
   const videos = summarizeVideoRows(videoItems);
@@ -397,12 +424,17 @@ async function getLearningSummary(uid, date, courseId = '') {
     dataLogs: dataLogItems,
     inProgressQuizzes: progressSummary.inProgressQuizzes,
     attention,
+    readingActivityCount: readingItems.length,
   });
+  const hasElementaryReadingOnly = isElementary && readingItems.length > 0 && !load.hasMathPlatformActivity;
 
   return {
     allActivityCount: allItems.length,
     activityCount: items.length,
+    mathActivityCount: mathItems.length,
+    readingActivityCount: readingItems.length,
     quizCount: quizItems.length,
+    readingQuizCount: readingQuizItems.length,
     videoCount: videos.length,
     dataLogCount: dataLogItems.length,
     inProgressQuizCount: progressSummary.inProgressQuizzes.length,
@@ -413,12 +445,14 @@ async function getLearningSummary(uid, date, courseId = '') {
     videos,
     progressVideos: progressSummary.videos,
     quizzes,
+    readingQuizzes: summarizeQuizRows(readingQuizItems),
     dataLogs: dataLogItems.map(item => ({
       title: titleOf(item),
       timestamp: timestampToJson(item.timestamp),
     })),
     inProgressQuizzes: progressSummary.inProgressQuizzes,
     concernSignals: [
+      hasElementaryReadingOnly ? `초등수학 수학 학습 기록 없음: 독서/읽기 활동 ${readingItems.length}건만 확인` : '',
       load.platformCompletionRatio != null && load.level !== '충분' ? `기준 학습량 대비 ${load.level}: 영상 ${load.videoMinutes}분 / 기준 ${load.platformTargetMinutes}분` : '',
       load.balanceSignals.includes('영상/개념 학습 대비 퀴즈 기록 없음') ? '영상/개념 학습 후 퀴즈 기록 없음' : '',
       attentionOpportunities && attentionHits === 0 ? `집중도 광석 ${attentionHits}/${attentionOpportunities} 획득` : '',
@@ -502,6 +536,9 @@ function previousFor(current, allAssignments) {
       status: item.status,
       content: item.content.slice(0, 350),
       feedback: (item.feedback || item.aiFeedbackDraft || '').slice(0, 350),
+      feedbackResponse: item.feedbackResponse || null,
+      feedbackReaction: item.feedbackReaction || '',
+      feedbackComment: item.feedbackComment || '',
       attachmentNames: item.attachments.map(att => att.name).filter(Boolean),
     }));
 }

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../../hooks/useAuth';
-import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments';
+import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance, useSubmitFeedbackResponse } from '../../hooks/useAssignments';
 import { useClusters } from '../../hooks/useContent';
 import { storage, getFunctionUrl } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -379,9 +379,14 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
   const [attachmentMode, setAttachmentMode] = useState(null); // 'link' or 'file' or null
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedbackReaction, setFeedbackReaction] = useState(assignment?.feedbackReaction || assignment?.feedbackResponse?.reaction || '');
+  const [feedbackComment, setFeedbackComment] = useState(assignment?.feedbackComment || assignment?.feedbackResponse?.comment || '');
+  const [feedbackResponseSaved, setFeedbackResponseSaved] = useState(Boolean(assignment?.feedbackRespondedAt));
+  const [feedbackResponseError, setFeedbackResponseError] = useState('');
   const fileInputRef = useRef(null);
 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
+  const feedbackResponseMutation = useSubmitFeedbackResponse();
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -408,6 +413,23 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
 
   const handleRemoveLink = (index) => {
     setLinks(links.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitFeedbackResponse = async () => {
+    if (!assignment?.id || !feedbackReaction) return;
+    setFeedbackResponseError('');
+    try {
+      await feedbackResponseMutation.mutateAsync({
+        assignmentId: assignment.id,
+        userId: user?.uid,
+        reaction: feedbackReaction,
+        comment: feedbackComment,
+      });
+      setFeedbackResponseSaved(true);
+    } catch (error) {
+      console.error('Feedback response save failed:', error);
+      setFeedbackResponseError('저장에 실패했습니다. 잠시 뒤 다시 시도해 주세요.');
+    }
   };
 
   const handleFileSelect = (e) => {
@@ -637,6 +659,57 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
               </p>
               <div className="markdown-content feedback-markdown" style={{ color: 'var(--text-bright)', lineHeight: '1.75', fontSize: '0.98rem' }}>
                 <ReactMarkdown>{formatFeedbackForDisplay(assignment.feedback)}</ReactMarkdown>
+              </div>
+              <div className="feedback-response-panel">
+                <div className="feedback-response-header">
+                  <span>이 피드백이 어땠나요?</span>
+                  {(assignment.feedbackRespondedAt || feedbackResponseSaved) && <span className="feedback-response-saved">저장됨</span>}
+                </div>
+                <div className="feedback-reaction-row">
+                  <button
+                    type="button"
+                    aria-label="엄지척"
+                    title="도움이 됐어요"
+                    className={`feedback-reaction-button ${feedbackReaction === 'thumbs_up' ? 'selected' : ''}`}
+                    onClick={() => {
+                      setFeedbackReaction('thumbs_up');
+                      setFeedbackResponseSaved(false);
+                    }}
+                  >
+                    <span aria-hidden="true">👍</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="별로예요"
+                    title="별로예요"
+                    className={`feedback-reaction-button ${feedbackReaction === 'thumbs_down' ? 'selected' : ''}`}
+                    onClick={() => {
+                      setFeedbackReaction('thumbs_down');
+                      setFeedbackResponseSaved(false);
+                    }}
+                  >
+                    <span aria-hidden="true">👎</span>
+                  </button>
+                </div>
+                <textarea
+                  className="feedback-response-comment"
+                  value={feedbackComment}
+                  onChange={(event) => {
+                    setFeedbackComment(event.target.value);
+                    setFeedbackResponseSaved(false);
+                  }}
+                  placeholder="선생님에게 남기고 싶은 말을 적어 주세요."
+                  rows={3}
+                />
+                {feedbackResponseError && <div className="feedback-response-error">{feedbackResponseError}</div>}
+                <button
+                  type="button"
+                  className="cosmic-button secondary feedback-response-submit"
+                  onClick={handleSubmitFeedbackResponse}
+                  disabled={!feedbackReaction || feedbackResponseMutation.isPending}
+                >
+                  {feedbackResponseMutation.isPending ? '전송 중...' : '피드백 평가 남기기'}
+                </button>
               </div>
             </div>
           )}

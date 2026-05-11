@@ -10,8 +10,7 @@ import {
   setDoc, 
   updateDoc,
   increment,
-  serverTimestamp,
-  orderBy
+  serverTimestamp
 } from 'firebase/firestore'
 
 // ==========================================
@@ -98,6 +97,37 @@ export const useSubmitAssignment = () => {
       queryClient.invalidateQueries({ queryKey: ['assignments', 'student', variables.assignmentData.userId] });
       queryClient.invalidateQueries({ queryKey: ['assignments', 'student'] }); // Broader catch-all
     }
+  });
+};
+
+/**
+ * Student: respond to teacher feedback.
+ */
+export const useSubmitFeedbackResponse = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ assignmentId, userId, reaction, comment }) => {
+      const ref = doc(db, 'assignments', assignmentId);
+      const trimmedComment = String(comment || '').trim();
+      await updateDoc(ref, {
+        feedbackResponse: {
+          reaction,
+          comment: trimmedComment,
+          updatedAt: serverTimestamp(),
+        },
+        feedbackReaction: reaction,
+        feedbackComment: trimmedComment,
+        feedbackRespondedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return { assignmentId, userId };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['assignments', 'student', variables.userId] });
+      queryClient.invalidateQueries({ queryKey: ['assignments', 'student'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    },
   });
 };
 

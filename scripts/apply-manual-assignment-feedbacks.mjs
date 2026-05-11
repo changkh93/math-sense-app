@@ -54,6 +54,10 @@ function buildEvidence(context) {
     evidence.push(`첨부파일 확인: ${assignment.attachments.map(item => item.name).filter(Boolean).join(', ')}`);
   }
   if (learning.activityCount) evidence.push(`제출일 학습 기록 ${learning.activityCount}건 확인`);
+  if (learning.readingActivityCount) evidence.push(`초등 독서/읽기 활동 ${learning.readingActivityCount}건 확인`);
+  if (learning.mathActivityCount === 0 && learning.readingActivityCount > 0) {
+    evidence.push('초등수학 수학 플랫폼 학습 기록 없음 확인');
+  }
   if (learning.learningLoad) {
     evidence.push(`기준 학습량 비교: ${learning.learningLoad.videoMinutes}분 / ${learning.learningLoad.platformTargetMinutes || 0}분 (${learning.learningLoad.level || '판단 보류'})`);
   }
@@ -75,6 +79,10 @@ function buildEvidence(context) {
     evidence.push(`진행 중 퀴즈 확인: ${learning.inProgressQuizzes.map(item => `${item.title} ${item.answeredCount}/${item.totalCount}`).join(', ')}`);
   }
   if (context.previous?.length) evidence.push(`같은 과정 이전 제출 ${context.previous.length}건 참고`);
+  const previousResponses = (context.previous || []).filter(item => item.feedbackReaction || item.feedbackComment || item.feedbackResponse);
+  if (previousResponses.length) {
+    evidence.push(`이전 피드백 반응/코멘트 ${previousResponses.length}건 확인`);
+  }
   if (context.sameDay?.length) evidence.push(`같은 날짜 다른 과정 제출 ${context.sameDay.length}건 확인`);
   if (darkMatter.count) {
     const concepts = darkMatter.concepts?.length ? `: ${darkMatter.concepts.join(', ')}` : '';
@@ -92,7 +100,7 @@ function buildRubric(context) {
   return {
     submissionCompleteness: assignment.attachments?.length ? 3 : 2,
     requirementMatch: 2,
-    conceptApplication: learning.activityCount ? 2 : 1,
+    conceptApplication: learning.mathActivityCount === 0 && learning.readingActivityCount > 0 ? 1 : (learning.activityCount ? 2 : 1),
     resultVerification: assignment.attachments?.length ? 3 : 1,
     feedbackReflection: context.previous?.length ? 2 : 1,
     weaknessRecovery: darkMatter.count ? 1 : 2,
@@ -115,6 +123,7 @@ function calculateSuggestedBonusCrystals(context) {
 
   if (load.level === '충분') score += 8;
   else if (load.level === '조금 부족') score += 5;
+  else if (load.level === '수학 기록 없음') score -= 3;
   else if ((learning.videoCount || 0) > 0 || (learning.quizCount || 0) > 0 || (learning.inProgressQuizCount || 0) > 0) score += 3;
 
   if (load.hasBalancedPractice) score += 5;
@@ -128,6 +137,7 @@ function calculateSuggestedBonusCrystals(context) {
 
   if (assignment.studentQuestions?.length) score += 2;
   if (context.previous?.length) score += 1;
+  if ((context.previous || []).some(item => item.feedbackReaction || item.feedbackComment || item.feedbackResponse)) score += 1;
 
   return Math.max(10, Math.min(40, Math.round(score)));
 }
@@ -193,12 +203,23 @@ for (const context of contexts) {
       previousCount: context.previous?.length || 0,
       sameDayCount: context.sameDay?.length || 0,
       learningActivityCount: context.learningSummary?.activityCount || 0,
+      mathActivityCount: context.learningSummary?.mathActivityCount || 0,
+      readingActivityCount: context.learningSummary?.readingActivityCount || 0,
+      readingQuizCount: context.learningSummary?.readingQuizCount || 0,
       darkMatterCount: context.darkMatterSummary?.count || 0,
       focusScore: context.learningSummary?.focusScore ?? null,
       attention: context.learningSummary?.attention || null,
       learningLoad: context.learningSummary?.learningLoad || null,
       inProgressQuizCount: context.learningSummary?.inProgressQuizCount || 0,
       studentQuestionCount: context.assignment?.studentQuestions?.length || 0,
+      previousFeedbackResponses: (context.previous || [])
+        .filter(item => item.feedbackReaction || item.feedbackComment || item.feedbackResponse)
+        .map(item => ({
+          assignmentId: item.id,
+          date: item.date,
+          reaction: item.feedbackReaction || item.feedbackResponse?.reaction || '',
+          comment: item.feedbackComment || item.feedbackResponse?.comment || '',
+        })),
     },
   };
 

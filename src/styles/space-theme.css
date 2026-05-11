@@ -863,6 +863,75 @@
   margin-bottom: 0.5rem;
 }
 
+.feedback-response-panel {
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.feedback-response-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.7rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.feedback-response-saved {
+  color: var(--crystal-cyan);
+  font-size: 0.82rem;
+}
+
+.feedback-reaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+}
+
+.feedback-reaction-button {
+  width: 44px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-bright);
+  padding: 0;
+  font: inherit;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.feedback-reaction-button.selected {
+  border-color: var(--crystal-cyan);
+  background: rgba(0, 212, 255, 0.16);
+  color: var(--crystal-cyan);
+}
+
+.feedback-response-comment {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.72);
+  color: var(--text-bright);
+  padding: 0.75rem;
+  line-height: 1.55;
+}
+
+.feedback-response-error {
+  margin-top: 0.5rem;
+  color: #ff8a8a;
+  font-size: 0.88rem;
+}
+
+.feedback-response-submit {
+  margin-top: 0.7rem;
+}
+
 /* Code Blocks & Inline Code */
 .markdown-content pre, .markdown-body pre {
   background: rgba(0, 0, 0, 0.45) !important;

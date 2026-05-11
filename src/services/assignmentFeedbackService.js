@@ -159,6 +159,8 @@ function summarizeAssignment(assignment = {}) {
     attachmentNames: attachments.map((att) => att.name),
     links: (assignment.links || []).map((link) => link.url || link.title || '').filter(Boolean).slice(0, 5),
     feedback: String(assignment.feedback || '').slice(0, 600),
+    feedbackReaction: assignment.feedbackReaction || assignment.feedbackResponse?.reaction || '',
+    feedbackComment: String(assignment.feedbackComment || assignment.feedbackResponse?.comment || '').slice(0, 300),
     bonusCrystals: assignment.bonusCrystals || 0,
     revisionCount: assignment.revisionCount || 0,
     submittedAtMs: getTimestampMs(assignment.submittedAt),
@@ -322,6 +324,10 @@ function buildEvidence(context) {
   }
   if (previousSubmissions.length > 0) {
     evidence.push(`같은 과정의 최근 과제 ${previousSubmissions.length}건과 비교 가능`);
+  }
+  const previousResponses = previousSubmissions.filter((item) => item.feedbackReaction || item.feedbackComment);
+  if (previousResponses.length > 0) {
+    evidence.push(`이전 피드백에 대한 학생 반응 ${previousResponses.length}건 확인`);
   }
   if (sameDaySubmissions.length > 0) {
     evidence.push(`같은 날짜에 다른 과제 ${sameDaySubmissions.length}건도 제출되어 일괄 제출 맥락 확인 필요`);
