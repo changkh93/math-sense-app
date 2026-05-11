@@ -7,6 +7,25 @@ import { db, functions } from '../../firebase';
 import soundManager from '../../utils/SoundManager';
 
 const CHAT_MAX_LENGTH = 48;
+const VIDEO_CONSTRAINTS = {
+  width: { ideal: 640 },
+  height: { ideal: 360 },
+  frameRate: { ideal: 24, max: 30 },
+};
+const AUDIO_CONSTRAINTS = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+};
+
+const INITIAL_MEDIA_STATUS = {
+  phase: 'idle',
+  camera: 'unknown',
+  microphone: 'unknown',
+  cameraPermission: 'unknown',
+  microphonePermission: 'unknown',
+  messages: [],
+};
 
 const tileStyle = {
   position: 'relative',
@@ -25,6 +44,109 @@ function getFocusStatusLabel(status) {
   if (status === 'away') return '자리 비움';
   if (status === 'break') return '쉬는 중';
   return '집중 중';
+}
+
+function isLiveTrack(track) {
+  return !!track && track.readyState === 'live';
+}
+
+function hasLiveTrack(stream, kind) {
+  return !!stream?.getTracks().some((track) => track.kind === kind && isLiveTrack(track));
+}
+
+function getMediaErrorMessage(err, kind) {
+  const deviceLabel = kind === 'camera' ? '카메라' : '마이크';
+  const name = err?.name || '';
+
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+    return `${deviceLabel} 권한이 차단되어 있습니다. 주소창 왼쪽의 사이트 설정에서 ${deviceLabel}를 허용한 뒤 다시 연결해주세요.`;
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return `사용 가능한 ${deviceLabel} 장치를 찾지 못했습니다. 장치 연결과 브라우저 입력 장치 설정을 확인해주세요.`;
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return `${deviceLabel}를 다른 앱이나 브라우저 탭이 사용 중일 수 있습니다. 화상회의 앱을 닫고 다시 시도해주세요.`;
+  }
+  if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') {
+    return `${deviceLabel} 장치가 요청한 품질 설정을 지원하지 않습니다. 기본 설정으로 다시 연결해주세요.`;
+  }
+  if (name === 'SecurityError') {
+    return `보안 설정 때문에 ${deviceLabel} 접근이 막혔습니다. HTTPS 접속 상태와 브라우저 권한을 확인해주세요.`;
+  }
+  return `${deviceLabel}를 시작하지 못했습니다. 브라우저 권한과 장치 상태를 확인해주세요.`;
+}
+
+async function queryMediaPermission(name) {
+  if (!navigator.permissions?.query) return 'unknown';
+
+  try {
+    const result = await navigator.permissions.query({ name });
+    return result?.state || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+async function createLocalStudyMediaStream() {
+  const [cameraPermission, microphonePermission] = await Promise.all([
+    queryMediaPermission('camera'),
+    queryMediaPermission('microphone'),
+  ]);
+  const messages = [];
+  const tracks = [];
+  let camera = 'blocked';
+  let microphone = 'blocked';
+
+  try {
+    const cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: VIDEO_CONSTRAINTS,
+      audio: false,
+    });
+    const videoTracks = cameraStream.getVideoTracks().filter(isLiveTrack);
+    tracks.push(...videoTracks);
+    camera = videoTracks.length ? 'ready' : 'blocked';
+  } catch (err) {
+    console.warn('Failed to open Study Stream camera:', err);
+    messages.push(getMediaErrorMessage(err, 'camera'));
+  }
+
+  try {
+    const audioStream = await navigator.mediaDevices.getUserMedia({
+      video: false,
+      audio: AUDIO_CONSTRAINTS,
+    });
+    const audioTracks = audioStream.getAudioTracks().filter(isLiveTrack);
+    tracks.push(...audioTracks);
+    microphone = audioTracks.length ? 'ready' : 'blocked';
+  } catch (err) {
+    console.warn('Failed to open Study Stream microphone:', err);
+    messages.push(getMediaErrorMessage(err, 'microphone'));
+  }
+
+  if (!tracks.length) {
+    const error = new Error(messages[0] || '카메라와 마이크를 시작하지 못했습니다.');
+    error.mediaStatus = {
+      phase: 'blocked',
+      camera,
+      microphone,
+      cameraPermission,
+      microphonePermission,
+      messages,
+    };
+    throw error;
+  }
+
+  return {
+    stream: new MediaStream(tracks),
+    status: {
+      phase: messages.length ? 'partial' : 'ready',
+      camera,
+      microphone,
+      cameraPermission,
+      microphonePermission,
+      messages,
+    },
+  };
 }
 
 function getMiniWindowDocument(pipWindow) {
@@ -193,7 +315,7 @@ function syncMiniStudyWindow(pipWindow, { title, tiles, onReturn }) {
     const chat = tileNode.querySelector('.mini-chat');
     const name = tileNode.querySelector('.mini-name');
     const status = tileNode.querySelector('.mini-status');
-    const hasVideo = !!tile.stream && tile.cameraOn !== false;
+    const hasVideo = !!tile.stream && tile.cameraOn !== false && hasLiveTrack(tile.stream, 'video');
 
     if (video) {
       if (hasVideo) {
@@ -202,7 +324,12 @@ function syncMiniStudyWindow(pipWindow, { title, tiles, onReturn }) {
         }
         video.muted = true;
         video.style.display = 'block';
-        video.play().catch(() => {});
+        video.play().catch(() => {
+          if (placeholder) {
+            placeholder.style.display = 'grid';
+            placeholder.textContent = '영상 재생 대기 중';
+          }
+        });
       } else {
         video.srcObject = null;
         video.style.display = 'none';
@@ -313,16 +440,18 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const audioLevel = useAudioLevel(stream, !!stream);
+  const hasLiveVideo = cameraOn && hasLiveTrack(stream, 'video');
+  const [videoWaiting, setVideoWaiting] = useState(false);
 
   useEffect(() => {
     if (!videoRef.current) return;
     videoRef.current.srcObject = stream || null;
-    if (stream && cameraOn) {
+    if (stream && hasLiveVideo) {
       videoRef.current.play().catch(() => {
-        // Autoplay can briefly fail while the element is being remounted.
+        setVideoWaiting(true);
       });
     }
-  }, [stream, cameraOn]);
+  }, [stream, hasLiveVideo]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -336,19 +465,42 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
 
   return (
     <div style={tileStyle}>
-      {stream && cameraOn ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={muted}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#030814' }}
-        />
+      {hasLiveVideo ? (
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={muted}
+            onPlaying={() => setVideoWaiting(false)}
+            onWaiting={() => setVideoWaiting(true)}
+            onStalled={() => setVideoWaiting(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#030814' }}
+          />
+          {videoWaiting && (
+            <div className="font-tech" style={{
+              position: 'absolute',
+              left: 12,
+              right: 12,
+              bottom: 86,
+              padding: '0.45rem 0.65rem',
+              borderRadius: 8,
+              background: 'rgba(2, 6, 23, 0.78)',
+              border: '1px solid rgba(251, 191, 36, 0.24)',
+              color: '#fde68a',
+              fontSize: '0.72rem',
+              textAlign: 'center',
+              zIndex: 2,
+            }}>
+              영상 재생을 준비 중입니다
+            </div>
+          )}
+        </>
       ) : (
         <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.55)' }}>
           <div style={{ textAlign: 'center' }}>
             <UserRound size={40} />
-            <div style={{ marginTop: '0.6rem' }}>{cameraOn ? '영상 준비 중' : '카메라 꺼짐'}</div>
+            <div style={{ marginTop: '0.6rem' }}>{cameraOn ? '카메라 연결 확인 중' : '카메라 꺼짐'}</div>
           </div>
         </div>
       )}
@@ -571,6 +723,9 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const [chatDraft, setChatDraft] = useState('');
   const [chatAction, setChatAction] = useState('');
   const [controlAction, setControlAction] = useState('');
+  const [mediaAction, setMediaAction] = useState('');
+  const [mediaSessionRevision, setMediaSessionRevision] = useState(0);
+  const [mediaStatus, setMediaStatus] = useState({ ...INITIAL_MEDIA_STATUS, phase: 'starting' });
   const [participantProfiles, setParticipantProfiles] = useState({});
   const [miniWindowOpen, setMiniWindowOpen] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState(
@@ -596,8 +751,16 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const areMicsEnabled = room?.micsEnabled !== false;
   const localChatMessage = localParticipant?.chatMessage || '';
   const localAudioLevel = useAudioLevel(localStream, !!localStream);
-  const hasLocalAudioTrack = !!localStream?.getAudioTracks().length;
+  const hasLocalVideoTrack = hasLiveTrack(localStream, 'video');
+  const hasLocalAudioTrack = hasLiveTrack(localStream, 'audio');
   const localMicBlocked = !areMicsEnabled || !hasLocalAudioTrack;
+
+  const updateParticipantPresence = useCallback(async (partialData) => {
+    await setDoc(doc(db, 'studyRooms', roomId, 'participants', user.uid), {
+      lastSeenAt: serverTimestamp(),
+      ...partialData,
+    }, { merge: true });
+  }, [roomId, user.uid]);
 
   const closeRoomResources = useCallback(() => {
     callsRef.current.forEach((call) => call.close());
@@ -617,6 +780,49 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     miniWindowRef.current = null;
     setMiniWindowOpen(false);
     setLocalStream(null);
+  }, []);
+
+  const attachLocalTrackWatchers = useCallback((stream) => {
+    stream.getVideoTracks().forEach((track) => {
+      track.onended = () => {
+        setCameraOn(false);
+        setMediaStatus((prev) => ({
+          ...prev,
+          phase: 'partial',
+          camera: 'blocked',
+          messages: ['카메라 연결이 끊겼습니다. 카메라 다시 연결을 눌러 복구해주세요.'],
+        }));
+        updateParticipantPresence({ cameraOn: false }).catch((err) => {
+          console.error('Failed to sync ended camera track:', err);
+        });
+      };
+    });
+
+    stream.getAudioTracks().forEach((track) => {
+      track.onended = () => {
+        setMicOn(false);
+        setMediaStatus((prev) => ({
+          ...prev,
+          phase: 'partial',
+          microphone: 'blocked',
+          messages: ['마이크 연결이 끊겼습니다. 마이크 다시 연결을 눌러 복구해주세요.'],
+        }));
+        updateParticipantPresence({ micOn: false }).catch((err) => {
+          console.error('Failed to sync ended microphone track:', err);
+        });
+      };
+    });
+  }, [updateParticipantPresence]);
+
+  const replaceOutgoingTrack = useCallback((kind, nextTrack) => {
+    callsRef.current.forEach((call) => {
+      const sender = call.peerConnection?.getSenders?.().find((candidate) => candidate.track?.kind === kind);
+      if (sender) {
+        sender.replaceTrack(nextTrack).catch((err) => {
+          console.warn(`Failed to replace ${kind} track:`, err);
+        });
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -671,35 +877,14 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
 
     async function setupLocalMediaAndPeer() {
       try {
+        setMediaStatus({ ...INITIAL_MEDIA_STATUS, phase: 'starting' });
+        setError('');
+
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error('이 브라우저는 카메라 접근을 지원하지 않습니다.');
         }
 
-        const videoConstraints = {
-          width: { ideal: 640 },
-          height: { ideal: 360 },
-          frameRate: { ideal: 24, max: 30 },
-        };
-        let mediaWarning = '';
-        let stream;
-
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: videoConstraints,
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-            },
-          });
-        } catch (mediaErr) {
-          console.warn('Failed to open camera and microphone together:', mediaErr);
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: videoConstraints,
-            audio: false,
-          });
-          mediaWarning = '마이크를 시작하지 못했습니다. 브라우저 마이크 권한과 입력 장치를 확인해주세요.';
-        }
+        const { stream, status } = await createLocalStudyMediaStream();
 
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
@@ -709,11 +894,15 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         stream.getAudioTracks().forEach((track) => {
           track.enabled = false;
         });
+        const nextCameraOn = hasLiveTrack(stream, 'video');
+
+        attachLocalTrackWatchers(stream);
         localStreamRef.current = stream;
         setLocalStream(stream);
-        setCameraOn(true);
+        setCameraOn(nextCameraOn);
         setMicOn(false);
-        if (mediaWarning) setError(mediaWarning);
+        setMediaStatus(status);
+        if (status.messages.length) setError(status.messages.join(' '));
 
         const peer = new Peer();
         peerRef.current = peer;
@@ -724,7 +913,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
               uid: user.uid,
               displayName: userData?.studentName || userData?.publicDisplayName || user.displayName || '탐사원',
               peerId,
-              cameraOn: true,
+              cameraOn: nextCameraOn,
               micOn: false,
               focusStatus: 'focused',
               lastSeenAt: serverTimestamp(),
@@ -769,6 +958,9 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         });
       } catch (err) {
         console.error('Failed to initialize Study Stream room:', err);
+        if (err?.mediaStatus) {
+          setMediaStatus(err.mediaStatus);
+        }
         setError(err?.message || '카메라를 시작하지 못했습니다.');
       }
     }
@@ -790,7 +982,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         localStreamRef.current = null;
       }
     };
-  }, [roomId, room?.hostUid, user.uid, user.displayName, userData?.publicDisplayName, userData?.studentName]);
+  }, [attachLocalTrackWatchers, mediaSessionRevision, roomId, room?.hostUid, user.uid, user.displayName, userData?.publicDisplayName, userData?.studentName]);
 
   useEffect(() => {
     if (!localStreamRef.current || !peerRef.current) return;
@@ -832,13 +1024,6 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     });
   }, [participants, user.uid]);
 
-  const updateParticipantPresence = async (partialData) => {
-    await setDoc(doc(db, 'studyRooms', roomId, 'participants', user.uid), {
-      lastSeenAt: serverTimestamp(),
-      ...partialData,
-    }, { merge: true });
-  };
-
   useEffect(() => {
     const stream = localStreamRef.current;
     if (!stream || areMicsEnabled || !micOn) return;
@@ -876,16 +1061,17 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   }, [closeRoomResources, onLeave, room, user.uid]);
 
   useEffect(() => {
+    const originalTitle = originalTitleRef.current;
     const handleVisibilityChange = () => {
       if (document.hidden) return;
       setUnreadChatCount(0);
-      document.title = originalTitleRef.current;
+      document.title = originalTitle;
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      document.title = originalTitleRef.current;
+      document.title = originalTitle;
     };
   }, []);
 
@@ -941,7 +1127,14 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
 
   const toggleCamera = async () => {
     const stream = localStreamRef.current;
-    if (!stream) return;
+    if (!stream) {
+      await reconnectCamera();
+      return;
+    }
+    if (!hasLiveTrack(stream, 'video')) {
+      await reconnectCamera();
+      return;
+    }
     const nextValue = !cameraOn;
     stream.getVideoTracks().forEach((track) => {
       track.enabled = nextValue;
@@ -959,9 +1152,19 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       return;
     }
     const audioTracks = stream.getAudioTracks();
-    if (!audioTracks.length) {
-      alert('사용 가능한 마이크 입력이 없습니다. 브라우저 권한과 마이크 장치를 확인해주세요.');
-      await updateParticipantPresence({ micOn: false });
+    if (!audioTracks.length || !hasLiveTrack(stream, 'audio')) {
+      const reconnected = await reconnectMicrophone();
+      if (!reconnected) {
+        alert('사용 가능한 마이크 입력이 없습니다. 브라우저 권한과 마이크 장치를 확인해주세요.');
+        await updateParticipantPresence({ micOn: false });
+        return;
+      }
+      const nextStream = localStreamRef.current;
+      nextStream?.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+      });
+      setMicOn(true);
+      await updateParticipantPresence({ micOn: true });
       return;
     }
     const nextValue = !micOn;
@@ -1045,6 +1248,126 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       setError(err?.message || '멤버를 내보내지 못했습니다.');
     } finally {
       setRoomAction('');
+    }
+  };
+
+  const handleRetryMediaSetup = () => {
+    setError('');
+    setMediaAction('restarting');
+    setMediaSessionRevision((value) => value + 1);
+    window.setTimeout(() => setMediaAction(''), 400);
+  };
+
+  const reconnectCamera = async () => {
+    if (mediaAction) return false;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('이 브라우저는 카메라 접근을 지원하지 않습니다.');
+      return false;
+    }
+
+    setMediaAction('camera');
+    setError('');
+    try {
+      const cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: VIDEO_CONSTRAINTS,
+        audio: false,
+      });
+      const [nextTrack] = cameraStream.getVideoTracks().filter(isLiveTrack);
+      if (!nextTrack) {
+        throw new Error('카메라 영상 트랙을 찾지 못했습니다.');
+      }
+
+      const stream = localStreamRef.current || new MediaStream();
+      stream.getVideoTracks().forEach((track) => {
+        stream.removeTrack(track);
+        track.stop();
+      });
+      stream.addTrack(nextTrack);
+      attachLocalTrackWatchers(stream);
+      replaceOutgoingTrack('video', nextTrack);
+      localStreamRef.current = stream;
+      setLocalStream(new MediaStream(stream.getTracks()));
+      setCameraOn(true);
+      setMediaStatus((prev) => ({
+        ...prev,
+        phase: prev.microphone === 'blocked' ? 'partial' : 'ready',
+        camera: 'ready',
+        messages: prev.messages.filter((message) => !message.includes('카메라')),
+      }));
+      await updateParticipantPresence({ cameraOn: true });
+      soundManager.playClick();
+      return true;
+    } catch (err) {
+      console.error('Failed to reconnect camera:', err);
+      const message = err?.message && !err.name ? err.message : getMediaErrorMessage(err, 'camera');
+      setError(message);
+      setMediaStatus((prev) => ({
+        ...prev,
+        phase: 'partial',
+        camera: 'blocked',
+        messages: [message],
+      }));
+      await updateParticipantPresence({ cameraOn: false });
+      return false;
+    } finally {
+      setMediaAction('');
+    }
+  };
+
+  const reconnectMicrophone = async () => {
+    if (mediaAction) return false;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('이 브라우저는 마이크 접근을 지원하지 않습니다.');
+      return false;
+    }
+
+    setMediaAction('microphone');
+    setError('');
+    try {
+      const microphoneStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: AUDIO_CONSTRAINTS,
+      });
+      const [nextTrack] = microphoneStream.getAudioTracks().filter(isLiveTrack);
+      if (!nextTrack) {
+        throw new Error('마이크 입력 트랙을 찾지 못했습니다.');
+      }
+
+      const stream = localStreamRef.current || new MediaStream();
+      stream.getAudioTracks().forEach((track) => {
+        stream.removeTrack(track);
+        track.stop();
+      });
+      nextTrack.enabled = false;
+      stream.addTrack(nextTrack);
+      attachLocalTrackWatchers(stream);
+      replaceOutgoingTrack('audio', nextTrack);
+      localStreamRef.current = stream;
+      setLocalStream(new MediaStream(stream.getTracks()));
+      setMicOn(false);
+      setMediaStatus((prev) => ({
+        ...prev,
+        phase: prev.camera === 'blocked' ? 'partial' : 'ready',
+        microphone: 'ready',
+        messages: prev.messages.filter((message) => !message.includes('마이크')),
+      }));
+      await updateParticipantPresence({ micOn: false });
+      soundManager.playClick();
+      return true;
+    } catch (err) {
+      console.error('Failed to reconnect microphone:', err);
+      const message = err?.message && !err.name ? err.message : getMediaErrorMessage(err, 'microphone');
+      setError(message);
+      setMediaStatus((prev) => ({
+        ...prev,
+        phase: 'partial',
+        microphone: 'blocked',
+        messages: [message],
+      }));
+      await updateParticipantPresence({ micOn: false });
+      return false;
+    } finally {
+      setMediaAction('');
     }
   };
 
@@ -1239,6 +1562,56 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         </div>
       )}
 
+      {(mediaStatus.phase !== 'ready' || mediaStatus.camera !== 'ready' || mediaStatus.microphone !== 'ready') && (
+        <div className="hud-border" style={{ marginBottom: '1rem', padding: '0.9rem', borderRadius: '10px', background: 'rgba(6, 10, 28, 0.66)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.78rem' }}>
+                DEVICE CHECK
+              </div>
+              <div className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.82rem', marginTop: '0.25rem', lineHeight: 1.55 }}>
+                카메라 {mediaStatus.camera === 'ready' ? '연결됨' : mediaStatus.phase === 'starting' ? '확인 중' : '확인 필요'} ·
+                마이크 {mediaStatus.microphone === 'ready' ? '연결됨' : mediaStatus.phase === 'starting' ? '확인 중' : '확인 필요'}
+              </div>
+              {mediaStatus.messages.length > 0 && (
+                <div className="font-tech" style={{ color: '#fca5a5', fontSize: '0.78rem', marginTop: '0.35rem', lineHeight: 1.55 }}>
+                  {mediaStatus.messages[0]}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="space-nav-link font-tech"
+                onClick={handleRetryMediaSetup}
+                disabled={!!mediaAction}
+                style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Video size={15} /> {mediaAction === 'restarting' ? '확인 중...' : '전체 다시 확인'}
+              </button>
+              <button
+                type="button"
+                className="space-nav-link font-tech"
+                onClick={reconnectCamera}
+                disabled={!!mediaAction}
+                style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Camera size={15} /> {mediaAction === 'camera' ? '연결 중...' : '카메라 다시 연결'}
+              </button>
+              <button
+                type="button"
+                className="space-nav-link font-tech"
+                onClick={reconnectMicrophone}
+                disabled={!!mediaAction}
+                style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Mic size={15} /> {mediaAction === 'microphone' ? '연결 중...' : '마이크 다시 연결'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: '0.9rem' }}>
         <StreamTile
           stream={localStream}
@@ -1383,19 +1756,25 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       </div>
 
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-        <button type="button" className="space-nav-link font-tech" onClick={toggleCamera} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}>
+        <button
+          type="button"
+          className="space-nav-link font-tech"
+          onClick={toggleCamera}
+          disabled={!!mediaAction}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: mediaAction ? 0.55 : 1 }}
+        >
           {cameraOn ? <Camera size={16} /> : <CameraOff size={16} />}
-          {cameraOn ? '카메라 끄기' : '카메라 켜기'}
+          {mediaAction === 'camera' ? '카메라 연결 중...' : cameraOn ? '카메라 끄기' : hasLocalVideoTrack ? '카메라 켜기' : '카메라 연결'}
         </button>
         <button
           type="button"
           className="space-nav-link font-tech"
           onClick={toggleMic}
-          disabled={!areMicsEnabled || !hasLocalAudioTrack}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: areMicsEnabled && hasLocalAudioTrack ? 1 : 0.55 }}
+          disabled={!areMicsEnabled || !!mediaAction}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: areMicsEnabled && !mediaAction ? 1 : 0.55 }}
         >
           {micOn ? <Mic size={16} /> : <MicOff size={16} />}
-          {!areMicsEnabled ? '마이크 차단됨' : !hasLocalAudioTrack ? '마이크 없음' : micOn ? '마이크 끄기' : '마이크 켜기'}
+          {!areMicsEnabled ? '마이크 차단됨' : mediaAction === 'microphone' ? '마이크 연결 중...' : !hasLocalAudioTrack ? '마이크 연결' : micOn ? '마이크 끄기' : '마이크 켜기'}
         </button>
         <button type="button" className="space-nav-link font-tech" onClick={() => updateFocusStatus('focused')} style={{ borderRadius: '8px' }}>
           집중 중
