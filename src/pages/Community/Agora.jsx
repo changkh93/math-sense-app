@@ -17,13 +17,12 @@ export default function Agora() {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialFilter = searchParams.get('filter') || 'all';
+  const filter = searchParams.get('filter') || 'all';
+  const searchTermParam = searchParams.get('search') || '';
   const highlightId = searchParams.get('highlight');
   
-  const [filter, setFilter] = useState(initialFilter);
-  // const [category, setCategory] = useState('all');
-  const [viewMode, setViewMode] = useState('grid'); // Default to 'grid' (LIST)
-  const [searchTerm, setSearchTerm] = useState('');
+  // Local state for immediate UI feedback on search
+  const [searchTerm, setSearchTerm] = useState(searchTermParam);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Apply filters — now uses useInfiniteQuery
@@ -43,6 +42,32 @@ export default function Agora() {
     if (!paginatedData?.pages) return [];
     return paginatedData.pages.flatMap(page => page.items);
   }, [paginatedData]);
+  // --- State Sync to URL ---
+  const setFilter = (newFilter) => {
+    setSearchParams(prev => {
+      prev.set('filter', newFilter);
+      prev.delete('highlight'); // Reset highlight when filter changes
+      return prev;
+    }, { replace: true });
+  };
+
+  // Debounce search term update to URL to prevent excessive re-renders/fetches
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchParams(prev => {
+        if (searchTerm) prev.set('search', searchTerm);
+        else prev.delete('search');
+        // prev.delete('highlight'); // Keep highlight if it exists, or maybe delete it?
+        return prev;
+      }, { replace: true });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm, setSearchParams]);
+
+  // Sync local searchTerm if URL changes (e.g. browser back/forward)
+  React.useEffect(() => {
+    setSearchTerm(searchTermParam);
+  }, [searchTermParam]);
 
   // Scroll to highlighted item when data loads
   React.useEffect(() => {
@@ -190,7 +215,14 @@ export default function Agora() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ delay: idx < 20 ? idx * 0.03 : 0 }}
                   className={`question-card glass ${highlightId === q.id ? 'highlight-glow' : ''}`}
-                  onClick={() => navigate(`/agora/${q.id}`)}
+                  onClick={() => {
+                    // Update URL with highlight before navigating so it's in history
+                    setSearchParams(prev => {
+                      prev.set('highlight', q.id);
+                      return prev;
+                    }, { replace: true });
+                    navigate(`/agora/${q.id}`);
+                  }}
                 >
                   <div className="card-header">
                     <span className={`type-badge type-${q.type || 'other'}`}>

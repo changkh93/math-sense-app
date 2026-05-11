@@ -176,7 +176,7 @@ export default function QuestionDetail() {
 
       <div className="detail-content-wrapper">
         <header className="detail-header">
-          <button className="back-btn-minimal" onClick={() => navigate('/agora')}>
+          <button className="back-btn-minimal" onClick={() => navigate(-1)}>
             <ArrowLeft size={20} /> 아고라 성단으로
           </button>
         </header>
