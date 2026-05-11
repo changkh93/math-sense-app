@@ -285,7 +285,7 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           {aiFeedback && (
             <div style={{ display: 'grid', gap: '0.75rem', padding: '1rem', borderRadius: 10, background: 'rgba(15,23,42,0.68)', border: '1px solid rgba(0, 212, 255, 0.18)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <strong style={{ color: 'var(--crystal-cyan)' }}>AI 피드백 초안</strong>
+                <strong style={{ color: 'var(--crystal-cyan)' }}>AI 피드백 초안 <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>(PREVIEW)</span></strong>
                 <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
                   <button className="admin-btn secondary" style={{ fontSize: '0.78rem', padding: '0.32rem 0.55rem' }} onClick={applyAiDraftToFeedback}>
                     초안 적용
