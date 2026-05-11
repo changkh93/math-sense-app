@@ -42,7 +42,7 @@ async function fetchStudentReport(userId, days) {
 
   const student = {
     uid: userId,
-    name: userData.studentName || userData.name || userData.displayName || '알 수 없음',
+    name: userData.studentName || userData.publicDisplayName || userData.name || userData.displayName || '알 수 없음',
     email: userData.email || '',
     crystals: userData.crystals || 0,
     streak: userData.currentStreak || 0,

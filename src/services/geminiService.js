@@ -4,7 +4,8 @@ import { GoogleGenAI } from "@google/genai";
 let genAI = null;
 try {
   genAI = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-} catch (e) {
+} catch (error) {
+  void error;
   console.warn("Gemini API Key missing or invalid");
 }
 
@@ -20,9 +21,24 @@ const extractRetryDelay = (error) => {
     try {
         const match = error?.message?.match(/retry in ([0-9.]+)s/i);
         if (match) return Math.ceil(parseFloat(match[1]) * 1000) + 1000; // +1s buffer
-    } catch {}
+    } catch (parseError) {
+        void parseError;
+    }
     return 20000; // Default 20 second fallback
 };
+
+function parseJsonResponse(text) {
+  const raw = String(text || '').trim();
+  if (!raw) throw new Error('AI response is empty');
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\{[\s\S]*\})/);
+    if (match?.[1]) return JSON.parse(match[1]);
+    throw new Error('AI response is not valid JSON');
+  }
+}
 
 /**
  * Parses quizzes and transmission/transcript data to map a timestamp.
@@ -148,4 +164,90 @@ export const analyzeWorkbookImage = async (base64Image, mimeType) => {
     console.error("AI Auto Markup 중 오류 발생:", error);
     throw error;
   }
+};
+
+export const generateAssignmentFeedback = async (feedbackContext, styleKey = 'balanced') => {
+  if (!genAI) {
+    throw new Error("Gemini API client not initialized");
+  }
+
+  const prompt = `
+[시스템 역할]
+너는 Math Sense의 과제 제출물을 검토하는 교육 피드백 도우미다.
+교사를 대체하지 않고, 교사가 수정할 수 있는 고품질 초안을 만든다.
+
+[핵심 목표]
+- 학생이 "무엇을 잘했고, 무엇을 고치면 되며, 다음에 무엇을 해보면 되는지" 바로 알게 한다.
+- 실제 제출물, 첨부 목록, 제출일 학습 기록, 다크 매터, 이전 과제와의 변화를 근거로만 말한다.
+- 근거가 없는 칭찬이나 단정은 금지한다.
+- 개선점은 1개를 가장 명확하게 제시한다.
+- 정해진 커리큘럼을 벗어난 추가 미션이나 별도 과제는 제시하지 않는다.
+- 학생 제출문에 질문이 있으면 반드시 정확히 답한다. 확실하지 않으면 단정하지 말고 어떤 자료를 확인해야 하는지 교사용 보완 포인트로 남긴다.
+- 과제 피드백은 그날 해당 과정의 실제 학습 기록을 기준으로 한다. 누적 진도, 다른 과정 기록, 진행 중 기록을 완료 기록처럼 섞어 말하지 않는다.
+- 영상 학습은 실제 기록된 영상 개수와 시간을 정확히 말한다. 예: 영상 1개, 4분 47초.
+- 정규 기준은 초등수학 독서 20분+수학 20분, 중등수학 50분, Python 50분이다.
+- 영상만 있고 퀴즈/데이터 로그가 없거나, 퀴즈가 있는데 풀지 않은 흐름이면 학습 균형을 부드럽게 짚는다.
+- 보너스 광석은 10~40 범위에서 학습량, 균형, 집중도, 기록 품질을 근거로 제안한다. 너무 박하게 깎지 말고 다음 행동을 유도한다.
+- 학생을 낙인찍는 표현, "성의 없다", "부족하다" 같은 표현은 피하고 관찰 가능한 행동으로 바꾼다.
+
+[피드백 스타일]
+${JSON.stringify(feedbackContext.feedbackGoal || {}, null, 2)}
+
+[출력 형식]
+오직 JSON 객체로만 응답한다. 마크다운 코드블록은 쓰지 않는다.
+{
+  "studentFeedback": "학생에게 보여줄 마크다운 피드백. 반드시 '### 과제 피드백', '#### 잘한 점', '#### 이전보다 좋아진 점', '#### 더 발전시키면 좋은 점' 구조를 포함한다. 학생 질문이 있으면 '#### 질문에 대한 답변' 섹션을 추가해 정확히 답한다. 각 제목과 문단 사이에는 빈 줄을 넣고, 한 문단은 2문장 이하로 짧게 쓴다.",
+  "parentSummary": "학부모용 3~5문장 요약. 기술 세부보다 학습 태도와 변화 중심.",
+  "strengths": ["근거 있는 잘한 점 1~3개"],
+  "improvements": ["가장 중요한 개선 행동 1~2개"],
+  "studentQuestionAnswer": "학생 질문이 있으면 정확한 답변. 질문이 없으면 빈 문자열.",
+  "nextMission": "",
+  "comparisonWithPrevious": "이전 과제와 비교한 변화. 비교 데이터가 부족하면 기준점 형성으로 설명.",
+  "evidence": ["피드백 문장에 사용한 근거 3~6개"],
+  "rubricScores": {
+    "submissionCompleteness": 0,
+    "requirementMatch": 0,
+    "conceptApplication": 0,
+    "resultVerification": 0,
+    "feedbackReflection": 0,
+    "weaknessRecovery": 0,
+    "selfDirection": 0
+  },
+  "suggestedStatus": "reviewed 또는 needs_revision",
+  "suggestedBonusCrystals": 0,
+  "revisionRequest": "보완요청이 필요할 때 학생에게 보낼 구체적 문구. 승인 가능하면 빈 문자열."
+}
+
+[점수 규칙]
+rubricScores 각 항목은 0~3 정수다. 100점식 평가가 아니라 성장 관찰 지표다.
+
+[가독성 규칙]
+studentFeedback은 학생 화면에 그대로 표시된다.
+긴 문장을 한 덩어리로 붙여 쓰지 말고, 제목/문단/목록을 마크다운으로 구분한다.
+가능하면 "잘한 점", "더 발전시키면 좋은 점"은 각각 1~2문장으로 작성한다.
+새로운 미션, 추가 과제, 다음 과제에서 해야 할 별도 활동은 쓰지 않는다.
+학생 질문이 있으면 피드백 중간에 "#### 질문에 대한 답변" 섹션을 만들고, 질문을 먼저 짧게 다시 적은 뒤 답한다.
+답변은 현재 과제/커리큘럼/학습 기록/문제 데이터로 확인 가능한 범위에서만 한다.
+
+[데이터]
+${JSON.stringify(feedbackContext, null, 2)}
+`;
+
+  const response = await genAI.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+    }
+  });
+
+  const parsed = parseJsonResponse(response.text);
+  return {
+    ...parsed,
+    evidence: Array.isArray(parsed.evidence) && parsed.evidence.length
+      ? parsed.evidence
+      : feedbackContext.evidence || [],
+    generatedBy: 'gemini',
+    feedbackStyle: styleKey,
+  };
 };

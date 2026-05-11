@@ -832,6 +832,25 @@
   line-height: 1.7;
 }
 
+.markdown-content.feedback-markdown p,
+.markdown-body.feedback-markdown p {
+  margin: 0 0 0.9rem;
+  line-height: 1.75;
+}
+
+.markdown-content.feedback-markdown p:last-child,
+.markdown-body.feedback-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content.feedback-markdown ol,
+.markdown-content.feedback-markdown ul,
+.markdown-body.feedback-markdown ol,
+.markdown-body.feedback-markdown ul {
+  margin: 0.7rem 0 0.9rem;
+  padding-left: 1.35rem;
+}
+
 .markdown-content ul, .markdown-content ol,
 .markdown-body ul, .markdown-body ol {
   margin-bottom: 1.2rem;

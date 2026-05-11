@@ -24,6 +24,7 @@ export default function AdminAssignmentsDate({ selectedAssignmentId, onSelect })
     switch (status) {
       case 'submitted': return <span className="badge" style={{ background: '#f59e0b', color: 'white' }}>대기중</span>;
       case 'needs_revision': return <span className="badge" style={{ background: '#ef4444', color: 'white' }}>재검토 중</span>;
+      case 'missing': return <span className="badge" style={{ background: '#64748b', color: 'white' }}>누락</span>;
       case 'reviewed': return <span className="badge" style={{ background: '#10b981', color: 'white' }}>확인 완료</span>;
       default: return null;
     }

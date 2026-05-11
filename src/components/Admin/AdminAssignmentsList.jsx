@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAdminAssignments } from '../../hooks/useAssignments';
 
 export default function AdminAssignmentsList({ selectedAssignmentId, onSelect }) {
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'submitted', 'needs_revision', 'reviewed'
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'submitted', 'needs_revision', 'reviewed', 'missing'
   const [filterCluster, setFilterCluster] = useState('all');
   
   const { data: assignments, isLoading } = useAdminAssignments(
@@ -13,14 +13,14 @@ export default function AdminAssignmentsList({ selectedAssignmentId, onSelect })
   const filteredAssignments = useMemo(() => {
     if (!assignments) return [];
     return assignments.filter(a => {
-      // Must be submitted or needs revision or reviewed
-      if (!['submitted', 'needs_revision', 'reviewed'].includes(a.status)) return false;
+      // Must be a reviewable assignment state
+      if (!['submitted', 'needs_revision', 'reviewed', 'missing'].includes(a.status)) return false;
       if (filterStatus !== 'all' && a.status !== filterStatus) return false;
       return true;
     }).sort((a, b) => {
       // Sort priority: submitted -> needs_revision -> reviewed
       if (a.status !== b.status) {
-        const priority = { 'submitted': 1, 'needs_revision': 2, 'reviewed': 3 };
+        const priority = { 'submitted': 1, 'needs_revision': 2, 'missing': 3, 'reviewed': 4 };
         return (priority[a.status] || 99) - (priority[b.status] || 99);
       }
       return new Date(b.submittedAt?.toDate() || 0).getTime() - new Date(a.submittedAt?.toDate() || 0).getTime();
@@ -37,6 +37,7 @@ export default function AdminAssignmentsList({ selectedAssignmentId, onSelect })
     switch (status) {
       case 'submitted': return <span className="badge" style={{ background: '#f59e0b', color: 'white' }}>대기중</span>;
       case 'needs_revision': return <span className="badge" style={{ background: '#ef4444', color: 'white' }}>재검토 중</span>;
+      case 'missing': return <span className="badge" style={{ background: '#64748b', color: 'white' }}>누락</span>;
       case 'reviewed': return <span className="badge" style={{ background: '#10b981', color: 'white' }}>확인 완료</span>;
       default: return null;
     }
@@ -54,6 +55,7 @@ export default function AdminAssignmentsList({ selectedAssignmentId, onSelect })
           <option value="all">모든 상태</option>
           <option value="submitted">대기중 (미확인)</option>
           <option value="needs_revision">재검토 요망</option>
+          <option value="missing">누락</option>
           <option value="reviewed">확인 완료</option>
         </select>
 

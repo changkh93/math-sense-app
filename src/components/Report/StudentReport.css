@@ -294,10 +294,28 @@
 .report-assignment-feedback {
   font-size: 0.82rem;
   color: #a55eea;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: rgba(165, 94, 234, 0.08);
   border-radius: 8px;
   border-left: 3px solid #a55eea;
+  line-height: 1.65;
+}
+.report-assignment-feedback-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #c084fc;
+}
+.report-assignment-feedback p {
+  margin: 0 0 0.75rem;
+}
+.report-assignment-feedback p:last-child {
+  margin-bottom: 0;
+}
+.report-assignment-feedback ul,
+.report-assignment-feedback ol {
+  margin: 0.55rem 0 0.75rem;
+  padding-left: 1.25rem;
 }
 .report-assignment-status {
   display: inline-block;

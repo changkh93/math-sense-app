@@ -1,14 +1,18 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../../hooks/useAuth';
 import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments';
 import { useClusters } from '../../hooks/useContent';
 import { storage, getFunctionUrl } from '../../firebase';
-import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import AssignmentChronicle from './AssignmentChronicle';
 import WarpGateDocking from './WarpGateDocking';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
 import { getTodayKST } from '../../utils/streakUtils';
+import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
+
+const MotionDiv = motion.div;
 
 /**
  * Assignment Hub (Stellar Archive)
@@ -40,7 +44,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   
   // Data Fetching - Fetch cluster-wide assignments (ignore regionId)
   const { data: assignments, isLoading } = useStudentAssignments(user?.uid, clusterId);
-  const { data: attendanceRecords, isLoading: isAttendanceLoading } = useStudentAttendance(user?.uid, clusterId);
+  const { data: attendanceRecords } = useStudentAttendance(user?.uid, clusterId);
   const { data: clusters } = useClusters();
   const submitMutation = useSubmitAssignment();
   const attendanceMutation = useRecordAttendance();
@@ -103,6 +107,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
       case 'submitted': return '#fbbf24'; // Yellow pulse
       case 'reviewed': return '#00d4ff'; // Cyan complete
       case 'needs_revision': return '#ff4500'; // Red siren
+      case 'missing': return '#64748b';
       default: return 'rgba(255, 255, 255, 0.1)'; // Not submitted
     }
   };
@@ -112,6 +117,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
       case 'submitted': return '대기중';
       case 'reviewed': return '확인 완료';
       case 'needs_revision': return '재검토요망';
+      case 'missing': return '누락';
       default: return '미확인';
     }
   };
@@ -273,7 +279,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               const isToday = day.dateStr === todayKST;
 
               return (
-                <motion.div
+                <MotionDiv
                   key={day.dateStr}
                   whileHover={{ scale: 1.05 }}
                   onClick={() => setSelectedDateStr(day.dateStr)}
@@ -314,7 +320,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
                       </span>
                     </div>
                   )}
-                </motion.div>
+                </MotionDiv>
               )
             })}
           </div>
@@ -392,16 +398,6 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     return diffDays >= 0 && diffDays <= 6;
   }, [dateStr]);
-
-  const canSubmit = isWithinWindow || isNeedsRevision; 
-  // If it needs revision, we allow submission even if window passed? 
-  // User said "제출할 수 있도록", usually implies new work. 
-  // But let's follow the strict window for now as "Too past is not right".
-  // Actually, if it's already 'needs_revision', it's better to allow the student to fix it.
-  // But the user's request sounds like a rule for the "Target Date".
-  // "너무 과거 날짜에 과제를 제출하는 것도 맞지 않아요." -> The target date of the assignment.
-  // So even if it needs revision, if it's too old, they shouldn't be able to?
-  // Let's stick to the window rule for ALL submissions/edits to be safe and simple.
 
   const handleAddLink = (e) => {
     if (e) e.preventDefault();
@@ -639,8 +635,8 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
               <p className="font-tech" style={{ fontSize: '0.9rem', color: isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>📡사령부 회신 (COMMAND FEEDBACK)</span>
               </p>
-              <div style={{ color: 'var(--text-bright)', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-                {assignment.feedback}
+              <div className="markdown-content feedback-markdown" style={{ color: 'var(--text-bright)', lineHeight: '1.75', fontSize: '0.98rem' }}>
+                <ReactMarkdown>{formatFeedbackForDisplay(assignment.feedback)}</ReactMarkdown>
               </div>
             </div>
           )}
@@ -775,7 +771,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
           {/* Dynamic Input Area */}
           <AnimatePresence mode="wait">
             {attachmentMode === 'link' && (
-              <motion.div 
+              <MotionDiv 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -795,11 +791,11 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
                     추가
                   </button>
                 </div>
-              </motion.div>
+              </MotionDiv>
             )}
 
             {attachmentMode === 'file' && (
-              <motion.div 
+              <MotionDiv 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -853,7 +849,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
                   </p>
                   {!isDragging && <p style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '0.5rem' }}>(IMAGE, PDF, MD, PY...)</p>}
                 </div>
-              </motion.div>
+              </MotionDiv>
             )}
           </AnimatePresence>
           

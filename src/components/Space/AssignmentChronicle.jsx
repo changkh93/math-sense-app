@@ -5,6 +5,7 @@ import NotebookViewer from './NotebookViewer';
 import DailyLearningTimeline from './DailyLearningTimeline';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import '../../styles/space-theme.css';
+import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 
 /**
  * Assignment Chronicle (The Logbook / E-Book View)
@@ -275,8 +276,8 @@ export default function AssignmentChronicle({ assignments, onClose }) {
                             <span className="font-tech" style={{ marginLeft: 'auto', color: 'var(--star-gold)', fontSize: '0.85rem' }}>💎 +{currentLog.bonusCrystals}</span>
                           )}
                         </div>
-                        <div style={{ color: 'var(--text-bright)', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>
-                          {currentLog.feedback}
+                        <div className="markdown-content feedback-markdown" style={{ color: 'var(--text-bright)', lineHeight: '1.75', fontSize: '0.95rem' }}>
+                          <ReactMarkdown>{formatFeedbackForDisplay(currentLog.feedback)}</ReactMarkdown>
                         </div>
                       </div>
                     )}
@@ -602,4 +603,3 @@ function LinkPreview({ link, notebookData }) {
     </a>
   );
 }
-

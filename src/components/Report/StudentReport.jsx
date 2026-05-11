@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useStudentReport } from '../../hooks/useStudentReport';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
@@ -6,6 +7,7 @@ import {
 } from 'recharts';
 import { toPng } from 'html-to-image';
 import { Download, ArrowLeft } from 'lucide-react';
+import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 import './StudentReport.css';
 
 // ══════════════════════════════════════════════════
@@ -348,7 +350,8 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
                   </div>
                   {a.feedback && (
                     <div className="report-assignment-feedback">
-                      💬 {a.feedback}
+                      <div className="report-assignment-feedback-label">💬 피드백</div>
+                      <ReactMarkdown>{formatFeedbackForDisplay(a.feedback)}</ReactMarkdown>
                     </div>
                   )}
                 </div>
