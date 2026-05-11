@@ -9,6 +9,7 @@ import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
 import CrewDetailView from './CrewDetailView';
 import StudyStreamRoomView from './StudyStreamRoomView';
+import { useGlobalActiveRoomId } from '../../utils/roomState';
 import { formatCrewSchedule } from './crewSchedule';
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '활동 중' : s === 'rejected' ? '반려됨' : '승인 대기'; }
@@ -145,7 +146,7 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
   const [detailView, setDetailView] = useState(false);
-  const [activeRoomId, setActiveRoomId] = useState('');
+  const [activeRoomId, setActiveRoomId] = useGlobalActiveRoomId();
   const [openFaq, setOpenFaq] = useState(null);
   const [resubmitCrew, setResubmitCrew] = useState(null); // rejected crew data for resubmission
 
@@ -273,20 +274,10 @@ export default function StudyCrewView({ onNavigateStore }) {
     setJoinTarget(crew);
   };
 
+  // Note: activeRoomId rendering is now handled in SpaceHome.jsx 
+  // to maintain connection persistence across different menu tabs.
   if (activeRoomId) {
-    return (
-      <div className="space-bg fade-in" style={{ minHeight: '100vh', padding: '2rem 1rem 6rem' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto', width: '100%' }}>
-          <StudyStreamRoomView
-            roomId={activeRoomId}
-            user={user}
-            userData={userData}
-            crew={crew}
-            onLeave={() => setActiveRoomId('')}
-          />
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (detailView && hasCrew) {

@@ -31,6 +31,8 @@ import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 import DarkMatterRefineryView from './DarkMatterRefineryView'
+import StudyStreamRoomView from './StudyStreamRoomView'
+import { useGlobalActiveRoomId } from '../../utils/roomState'
 import CrystalLedger from './CrystalLedger'
 import { useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments'
 
@@ -132,6 +134,7 @@ function SpaceHome() {
   const [attendancePromptOpen, setAttendancePromptOpen] = useState(false)
   const [attendancePromptStatus, setAttendancePromptStatus] = useState(null)
   const [todayKSTForAttendance, setTodayKSTForAttendance] = useState(() => getTodayKST())
+  const [activeRoomId, setActiveRoomId] = useGlobalActiveRoomId()
   
   // Selection State (Persist ID in session)
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
@@ -1967,7 +1970,35 @@ function SpaceHome() {
   }
 
   // Mission Hub Mode (Data Log, Transmission, Field Test)
-  if (missionUnitId) {
+  // --- Persistent Study Room Helper ---
+  const persistentStudyRoom = activeRoomId ? (
+    <div 
+      className="space-bg fade-in" 
+      style={{ 
+        display: currentView === 'crew' ? 'block' : 'none',
+        position: 'fixed',
+        top: '64px', // Start below the navbar
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 50, // Below navbar (1000)
+        overflowY: 'auto'
+      }}
+    >
+      <div style={{ maxWidth: 1180, margin: '0 auto', width: '100%', padding: '2rem 1rem 6rem' }}>
+        <StudyStreamRoomView
+          roomId={activeRoomId}
+          user={user}
+          userData={userData}
+          crew={userData?.crewSnapshot}
+          onLeave={() => setActiveRoomId('')}
+        />
+      </div>
+    </div>
+  ) : null;
+
+  const renderMainContent = () => {
+    if (missionUnitId) {
     if (!activeUnit) {
       return (
         <div className="space-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
@@ -3141,7 +3172,15 @@ function SpaceHome() {
         )}
       </AnimatePresence>
     </div>
-  )
+    );
+  };
+
+  return (
+    <>
+      {renderMainContent()}
+      {persistentStudyRoom}
+    </>
+  );
 }
 
 
