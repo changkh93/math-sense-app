@@ -1,10 +1,43 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, query, where, getDocs, doc, setDoc, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from '../../firebase';
 import { useClusters } from '../../hooks/useContent';
 import { AlertTriangle, Search, Trash2, User as UserIcon } from 'lucide-react';
 import './Admin.css';
+
+const DAY_MAP = {
+  '1': '월',
+  '2': '화',
+  '3': '수',
+  '4': '목',
+  '5': '금',
+  '6': '토',
+  '7': '일'
+};
+
+const DAY_ORDER = { 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6, 일: 7 };
+
+function extractAvailableDays(classSchedule) {
+  if (!Array.isArray(classSchedule)) return [];
+
+  const daysSet = new Set();
+  classSchedule.forEach((schedule) => {
+    const addDay = (val) => {
+      if (!val) return;
+      const mapped = DAY_MAP[val] || val;
+      daysSet.add(mapped);
+    };
+
+    if (Array.isArray(schedule.days)) {
+      schedule.days.forEach(addDay);
+    } else if (schedule.day) {
+      addDay(schedule.day);
+    }
+  });
+
+  return Array.from(daysSet).sort((a, b) => (DAY_ORDER[a] || 99) - (DAY_ORDER[b] || 99));
+}
 
 function UserAccessManager() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,28 +166,29 @@ function UserAccessManager() {
       const userRef = doc(db, 'users', userId);
       const targetUser = users.find(u => u.uid === userId);
       const currentAccess = targetUser.clusterAccess || {};
+      const currentParticipation = targetUser.participation || {};
+      const targetCluster = clusters.find(cluster => (cluster.docId || cluster.id) === clusterId);
       
       const newAccess = { ...currentAccess };
+      const nextParticipation = { ...currentParticipation };
       if (newStatus === 'none') {
-        // We use delete carefully
         delete newAccess[clusterId];
+        if (targetCluster?.isPrivate) {
+          delete nextParticipation[clusterId];
+        }
       } else {
         newAccess[clusterId] = newStatus; // 'active' or 'suspended'
       }
 
-      // Firestore merge will not delete keys if we just pass a new object unless we overwrite it completely,
-      // but `{ merge: true }` will merge. If we want to delete a key using merge, we should use deleteField().
-      // For simplicity, we can just save it. Wait, actually if we want to delete a field inside a map with merge, 
-      // it's complicated. Better to set it to 'none' string if we want "no access" instead of deleting,
-      // or we just setDoc without merge for the whole clusterAccess map.
-      // Replacing the whole map is safer if we read the current one.
-      
-      await setDoc(userRef, { clusterAccess: newAccess }, { merge: true });
+      await updateDoc(userRef, {
+        clusterAccess: newAccess,
+        participation: nextParticipation
+      });
       
       // Update local state
       setUsers(prev => prev.map(u => {
         if (u.uid === userId) {
-          return { ...u, clusterAccess: newAccess };
+          return { ...u, clusterAccess: newAccess, participation: nextParticipation };
         }
         return u;
       }));
@@ -190,6 +224,37 @@ function UserAccessManager() {
     } catch (err) {
       console.error(err);
       alert('과정 상태 수정 실패');
+    }
+  };
+
+  const handleParticipationDayToggle = async (userId, clusterId, day) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const targetUser = users.find(u => u.uid === userId);
+      const currentParticipation = targetUser?.participation || {};
+      const currentDays = currentParticipation[clusterId] || [];
+      const nextDays = currentDays.includes(day)
+        ? currentDays.filter(d => d !== day)
+        : [...currentDays, day].sort((a, b) => (DAY_ORDER[a] || 99) - (DAY_ORDER[b] || 99));
+      const nextParticipation = { ...currentParticipation };
+
+      if (nextDays.length === 0) {
+        delete nextParticipation[clusterId];
+      } else {
+        nextParticipation[clusterId] = nextDays;
+      }
+
+      await updateDoc(userRef, { participation: nextParticipation });
+
+      setUsers(prev => prev.map(u => {
+        if (u.uid === userId) {
+          return { ...u, participation: nextParticipation };
+        }
+        return u;
+      }));
+    } catch (err) {
+      console.error(err);
+      alert('참여 요일 수정 실패');
     }
   };
 
@@ -311,15 +376,19 @@ function UserAccessManager() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left', background: 'rgba(0,0,0,0.2)' }}>
-                        <th style={{ padding: '15px', width: '30%' }}>행성 군집 (Cluster)</th>
-                        <th style={{ padding: '15px', width: '40%' }}>속성</th>
-                        <th style={{ padding: '15px', width: '30%' }}>접근 상태</th>
+                        <th style={{ padding: '15px', width: '24%' }}>행성 군집 (Cluster)</th>
+                        <th style={{ padding: '15px', width: '28%' }}>속성</th>
+                        <th style={{ padding: '15px', width: '20%' }}>접근 상태</th>
+                        <th style={{ padding: '15px', width: '28%' }}>참여 요일</th>
                       </tr>
                     </thead>
                     <tbody>
                       {clusters.map(cluster => {
                         const clusterId = cluster.docId || cluster.id;
                         const accessState = user.clusterAccess?.[clusterId] || 'none';
+                        const availableDays = extractAvailableDays(cluster.classSchedule);
+                        const selectedDays = user.participation?.[clusterId] || [];
+                        const isPrivateWithoutAccess = cluster.isPrivate && accessState !== 'active';
 
                         return (
                           <tr key={clusterId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -352,6 +421,43 @@ function UserAccessManager() {
                                 <option value="active" style={{background: '#1a1b26', color: '#00ffa0'}}>접근 허용 (Active)</option>
                                 <option value="suspended" style={{background: '#1a1b26', color: '#ff6060'}}>강제 정지 (Suspended)</option>
                               </select>
+                            </td>
+                            <td style={{ padding: '15px' }}>
+                              {availableDays.length > 0 ? (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                  {availableDays.map(day => {
+                                    const isSelected = selectedDays.includes(day);
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={day}
+                                        onClick={() => handleParticipationDayToggle(user.uid, clusterId, day)}
+                                        disabled={isPrivateWithoutAccess}
+                                        title={isPrivateWithoutAccess ? '비공개 군집은 접근 허용 후 참여 요일을 설정할 수 있습니다.' : `${day}요일 참여 여부 변경`}
+                                        style={{
+                                          padding: '7px 12px',
+                                          borderRadius: '999px',
+                                          border: `1px solid ${isSelected ? '#00f3ff' : 'rgba(255,255,255,0.2)'}`,
+                                          background: isSelected ? 'rgba(0, 243, 255, 0.22)' : 'rgba(255,255,255,0.07)',
+                                          color: isSelected ? '#00f3ff' : '#c8d4e3',
+                                          fontWeight: 800,
+                                          cursor: isPrivateWithoutAccess ? 'not-allowed' : 'pointer',
+                                          opacity: isPrivateWithoutAccess ? 0.45 : 1
+                                        }}
+                                      >
+                                        {day}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <span style={{ color: '#88aabb', fontSize: '0.9rem' }}>수업 요일 없음</span>
+                              )}
+                              {selectedDays.length > 0 && (
+                                <div style={{ marginTop: '8px', color: '#88aabb', fontSize: '0.82rem' }}>
+                                  선택됨: {selectedDays.join(', ')}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         );
