@@ -115,6 +115,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - `assignment.studentQuestions`가 비어 있지 않으면 반드시 `#### 질문에 대한 답변` 섹션을 추가한다.
 - 학생 질문에는 정확히 답한다. 확실하지 않거나 자료가 부족하면 모르는 내용을 지어내지 말고, “이 부분은 원문/문제/코드 실행 결과를 확인한 뒤 답해야 한다”고 운영자 확인 포인트로 남긴다.
 - 질문 답변은 칭찬이나 보완점에 묻히면 안 된다. 학생이 본인이 물어본 내용의 답을 바로 찾을 수 있어야 한다.
+- 질문 추출기가 학습 기록 문장을 질문으로 오탐할 수 있다. 이때도 저장 검증을 통과하도록 `#### 질문에 대한 답변` 섹션을 두고, “질문이라기보다 오늘 학습 기록으로 보인다”처럼 정정한 뒤 해당 개념의 핵심을 짧게 보완한다.
 
 권장 구조:
 
@@ -190,6 +191,18 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - `👍`이면 학생이 받아들인 지점을 다음 학습 행동과 연결해 준다.
 - `👎`이면 전날 설명이 어려웠을 수 있으므로 더 짧고 구체적으로 다시 설명한다.
 - 코멘트에 질문이나 감정 표현이 있으면 피드백 초반이나 `질문에 대한 답변`에서 짧게 응답한다.
+- “부족한 점도 적어 주세요”, “계속 이렇게 하면 되나요?”처럼 피드백 방식에 대한 요청이 있으면 다음 피드백의 `더 발전시키면 좋은 점`이나 `질문에 대한 답변`에서 직접 응답한다.
+- 학생 반응을 확인했다는 문장은 실제 반응이 있을 때만 쓴다. 예: “지난 피드백에 엄지척을 남긴 것도 확인했어요.”, “지난 피드백이 아쉬웠을 수 있어 오늘은 더 짧고 구체적으로 적어볼게요.”
+- `thumbs_down`에 코멘트가 없으면 원인을 추측해 단정하지 않는다. 대신 “이번에는 핵심을 더 짧고 구체적으로 적겠다”처럼 피드백 형식을 조정한다.
+- 코멘트가 긴 감정 표현이면 그대로 길게 반복하지 말고, “이해받는 느낌이 좋았다는 코멘트를 확인했다”처럼 요지를 짧게 반영한다.
+
+반응 반영 점검:
+
+```bash
+node --input-type=module -e 'import { readFileSync } from "fs"; const contexts=JSON.parse(readFileSync("/private/tmp/pending_assignment_contexts.json","utf8")).contexts||[]; const rows=contexts.map(c=>({ id:c.assignment?.id, name:c.displayName, responses:(c.previous||[]).filter(p=>p.feedbackReaction||p.feedbackComment||p.feedbackResponse).map(p=>({ date:p.date, reaction:p.feedbackReaction||p.feedbackResponse?.reaction||"", comment:p.feedbackComment||p.feedbackResponse?.comment||"" })) })).filter(r=>r.responses.length); console.log(JSON.stringify(rows,null,2));'
+```
+
+작성 전 이 목록의 모든 학생에 대해 다음 피드백 안에 반응 반영 문장이 들어갔는지 확인한다.
 
 ## 3. 운영툴 초안 필드에 저장
 

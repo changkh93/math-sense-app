@@ -10,7 +10,8 @@ import {
   setDoc, 
   updateDoc,
   increment,
-  serverTimestamp
+  serverTimestamp,
+  runTransaction
 } from 'firebase/firestore'
 
 // ==========================================
@@ -136,6 +137,24 @@ export const useSubmitFeedbackResponse = () => {
 // ==========================================
 
 import { recordCrystalTransaction } from '../utils/crystalLedger';
+
+const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
+
+const getTimestampMs = (value) => {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (value.seconds) return value.seconds * 1000;
+  if (value._seconds) return value._seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getAttendanceBaseMs = (attendance) => (
+  getTimestampMs(attendance?.timestamp) ||
+  getTimestampMs(attendance?.createdAt) ||
+  getTimestampMs(attendance?.updatedAt) ||
+  (attendance?.date ? new Date(`${attendance.date}T23:59:59+09:00`).getTime() : 0)
+);
 
 /**
  * Fetch assignments for Admin with filters
@@ -324,6 +343,97 @@ export const useRecordAttendance = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    }
+  });
+};
+
+/**
+ * Student: Apply penalties for attended class days where no assignment was
+ * submitted within 12 hours after attendance. This runs only when the archive
+ * is opened and uses deterministic ledger IDs, so each date is charged once.
+ */
+export const useApplyMissingAssignmentPenalties = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId, clusterId, attendanceRecords = [], assignments = [] }) => {
+      if (!userId || !clusterId) return { applied: 0 };
+
+      const assignmentDates = new Set(
+        assignments
+          .filter(a => ['submitted', 'reviewed', 'needs_revision'].includes(a.status))
+          .map(a => a.date)
+          .filter(Boolean)
+      );
+
+      const sortedAttendance = [...attendanceRecords]
+        .filter(a => (!a.userId || a.userId === userId) && a.date)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+      const nowMs = Date.now();
+      let missingStreak = 0;
+      const candidates = [];
+
+      sortedAttendance.forEach((attendance) => {
+        if (assignmentDates.has(attendance.date)) {
+          missingStreak = 0;
+          return;
+        }
+
+        missingStreak += 1;
+        const baseMs = getAttendanceBaseMs(attendance);
+        if (!baseMs || nowMs - baseMs < ASSIGNMENT_MISSING_GRACE_MS) return;
+
+        const penaltyAmount = -(15 + Math.max(0, missingStreak - 1) * 5);
+        candidates.push({
+          attendance,
+          missingStreak,
+          penaltyAmount,
+          txId: `assignment_missing_${clusterId}_${attendance.date}`
+        });
+      });
+
+      let applied = 0;
+      for (const item of candidates) {
+        const userRef = doc(db, 'users', userId);
+        const txRef = doc(db, 'users', userId, 'crystal_transactions', item.txId);
+
+        const didApply = await runTransaction(db, async (transaction) => {
+          const existingTx = await transaction.get(txRef);
+          if (existingTx.exists()) return false;
+
+          const penaltyAbs = Math.abs(item.penaltyAmount);
+          recordCrystalTransaction(userId, {
+            amount: item.penaltyAmount,
+            type: 'assignment_missing_penalty',
+            description: `출석 후 과제 미제출 페널티 (${item.attendance.date}, ${item.missingStreak}회 연속)`,
+            metadata: {
+              clusterId,
+              date: item.attendance.date,
+              attendanceId: item.attendance.id || '',
+              missingStreak: item.missingStreak,
+              basePenalty: 15,
+              consecutivePenalty: penaltyAbs - 15,
+              graceHours: 12
+            }
+          }, transaction, item.txId);
+
+          transaction.update(userRef, {
+            crystals: increment(item.penaltyAmount),
+            lastAssignmentPenaltyAt: serverTimestamp()
+          });
+
+          return true;
+        });
+
+        if (didApply) applied += 1;
+      }
+
+      return { applied };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'student', variables?.userId, variables?.clusterId] });
+      queryClient.invalidateQueries({ queryKey: ['assignments', 'student', variables?.userId, variables?.clusterId] });
     }
   });
 };

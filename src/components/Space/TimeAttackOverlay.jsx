@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 
 const MESSAGE_DATABASE = {
@@ -169,9 +169,13 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
   const [timeLeft, setTimeLeft] = useState(30);
   const [status, setStatus] = useState('active'); // 'active', 'hit', 'miss'
   const [message, setMessage] = useState('');
+  const deadlineRef = useRef(null);
+  const pausedRemainingRef = useRef(30000);
+  const resolvedRef = useRef(false);
 
   const handleMiss = useCallback(() => {
-    if (status !== 'active') return;
+    if (status !== 'active' || resolvedRef.current) return;
+    resolvedRef.current = true;
     setStatus('miss');
     setMessage(FAIL_MESSAGES[Math.floor(Math.random() * FAIL_MESSAGES.length)]);
     
@@ -181,21 +185,26 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
   }, [status, onMiss]);
 
   useEffect(() => {
-    if (status !== 'active' || isVideoPaused) return;
+    if (status !== 'active') return undefined;
 
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleMiss();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    if (!deadlineRef.current) {
+      deadlineRef.current = Date.now() + pausedRemainingRef.current;
+    }
 
+    const tick = () => {
+      const remainingMs = Math.max(0, deadlineRef.current - Date.now());
+      pausedRemainingRef.current = remainingMs;
+      const nextSeconds = Math.ceil(remainingMs / 1000);
+      setTimeLeft(nextSeconds);
+      if (remainingMs <= 0) {
+        handleMiss();
+      }
+    };
+
+    tick();
+    const timer = setInterval(tick, 250);
     return () => clearInterval(timer);
-  }, [status, isVideoPaused, handleMiss]);
+  }, [status, handleMiss]);
 
   const getRandomSuccessMessage = () => {
     const now = new Date();
@@ -231,7 +240,8 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
   };
 
   const handleHit = () => {
-    if (status !== 'active') return;
+    if (status !== 'active' || resolvedRef.current) return;
+    resolvedRef.current = true;
     setStatus('hit');
     setMessage(getRandomSuccessMessage());
     
@@ -283,7 +293,8 @@ export default function TimeAttackOverlay({ onHit, onMiss, currentCombo = 0, use
               backdropFilter: 'blur(5px)',
               boxSizing: 'border-box',
               textAlign: 'center',
-              userSelect: 'none'
+              userSelect: 'none',
+              opacity: isVideoPaused ? 0.9 : 1
             }}
           >
             <div style={{ fontSize: '2.2rem', marginBottom: '6px', lineHeight: 1 }}>

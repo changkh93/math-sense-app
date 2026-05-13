@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../../hooks/useAuth';
-import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance, useSubmitFeedbackResponse } from '../../hooks/useAssignments';
+import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance, useSubmitFeedbackResponse, useApplyMissingAssignmentPenalties } from '../../hooks/useAssignments';
 import { useClusters } from '../../hooks/useContent';
 import { storage, getFunctionUrl } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -13,6 +13,58 @@ import { getTodayKST } from '../../utils/streakUtils';
 import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 
 const MotionDiv = motion.div;
+const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
+
+const getTimestampMs = (value) => {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (value.seconds) return value.seconds * 1000;
+  if (value._seconds) return value._seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getAttendanceBaseMs = (attendance) => (
+  getTimestampMs(attendance?.timestamp) ||
+  getTimestampMs(attendance?.createdAt) ||
+  getTimestampMs(attendance?.updatedAt) ||
+  (attendance?.date ? new Date(`${attendance.date}T23:59:59+09:00`).getTime() : 0)
+);
+
+const getAssignmentMissingPenaltyMap = (assignments = [], attendanceRecords = [], nowMs = 0) => {
+  const assignmentDates = new Set(
+    assignments
+      .filter(a => ['submitted', 'reviewed', 'needs_revision'].includes(a.status))
+      .map(a => a.date)
+      .filter(Boolean)
+  );
+
+  const result = {};
+  let missingStreak = 0;
+
+  [...attendanceRecords]
+    .filter(a => a.date)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .forEach((attendance) => {
+      if (assignmentDates.has(attendance.date)) {
+        missingStreak = 0;
+        return;
+      }
+
+      missingStreak += 1;
+      const baseMs = getAttendanceBaseMs(attendance);
+      const matured = !!baseMs && nowMs > 0 && nowMs - baseMs >= ASSIGNMENT_MISSING_GRACE_MS;
+      const penalty = 15 + Math.max(0, missingStreak - 1) * 5;
+      result[attendance.date] = {
+        matured,
+        missingStreak,
+        penalty,
+        baseMs
+      };
+    });
+
+  return result;
+};
 
 /**
  * Assignment Hub (Stellar Archive)
@@ -24,13 +76,22 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   const [currentDate, setCurrentDate] = useState(() => new Date(`${getTodayKST()}T12:00:00Z`));
   const [selectedDateStr, setSelectedDateStr] = useState(null); // The date the user clicked on
   const [showChronicle, setShowChronicle] = useState(false);
+  const [penaltyCheckNow, setPenaltyCheckNow] = useState(0);
   const previousTodayRef = useRef(todayKST);
+  const penaltySweepKeyRef = useRef('');
 
   // Keep the archive aligned with the Korean teaching day, even across midnight.
   useEffect(() => {
     const syncToday = () => setTodayKST(getTodayKST());
     syncToday();
     const timer = setInterval(syncToday, 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const syncPenaltyClock = () => setPenaltyCheckNow(Date.now());
+    syncPenaltyClock();
+    const timer = setInterval(syncPenaltyClock, 60 * 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -48,10 +109,34 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   const { data: clusters } = useClusters();
   const submitMutation = useSubmitAssignment();
   const attendanceMutation = useRecordAttendance();
+  const penaltyMutation = useApplyMissingAssignmentPenalties();
+
+  useEffect(() => {
+    if (!user?.uid || !clusterId || isLoading || !assignments || !attendanceRecords) return;
+    const sweepKey = `${user.uid}:${clusterId}:${assignments.length}:${attendanceRecords.length}:${todayKST}`;
+    if (penaltySweepKeyRef.current === sweepKey || penaltyMutation.isPending) return;
+
+    const penaltyMap = getAssignmentMissingPenaltyMap(assignments, attendanceRecords, Date.now());
+    const hasMaturedMissing = Object.values(penaltyMap).some(item => item.matured);
+    if (!hasMaturedMissing) return;
+
+    penaltySweepKeyRef.current = sweepKey;
+    penaltyMutation.mutate({
+      userId: user.uid,
+      clusterId,
+      assignments,
+      attendanceRecords
+    });
+  }, [user?.uid, clusterId, assignments, attendanceRecords, isLoading, todayKST, penaltyMutation]);
 
   const clusterData = useMemo(() => {
     return clusters?.find(c => c.id === clusterId || c.docId === clusterId);
   }, [clusters, clusterId]);
+
+  const missingPenaltyByDate = useMemo(
+    () => getAssignmentMissingPenaltyMap(assignments || [], attendanceRecords || [], penaltyCheckNow),
+    [assignments, attendanceRecords, penaltyCheckNow]
+  );
 
   // Calendar Logic
   const daysInMonth = useMemo(() => {
@@ -269,6 +354,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               
               const isSelected = selectedDateStr === day.dateStr;
               const hasAssignment = !!day.assignment;
+              const penaltyInfo = missingPenaltyByDate[day.dateStr];
               const statusColor = getStatusColor(day.assignment?.status);
               
               // Determine animation based on status
@@ -320,6 +406,14 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
                       </span>
                     </div>
                   )}
+                  {!hasAssignment && penaltyInfo?.matured && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                      <div style={{ color: '#fb7185', fontSize: '1.1rem', filter: 'drop-shadow(0 0 6px rgba(251,113,133,0.6))' }}>−</div>
+                      <span className="font-tech" style={{ fontSize: '0.58rem', marginTop: '2px', color: '#fb7185', textAlign: 'center' }}>
+                        -{penaltyInfo.penalty} 광석
+                      </span>
+                    </div>
+                  )}
                 </MotionDiv>
               )
             })}
@@ -347,6 +441,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               regionId={regionId}
               dateStr={selectedDateStr}
               assignment={assignments?.find(a => a.date === selectedDateStr)} 
+              missingPenalty={missingPenaltyByDate[selectedDateStr]}
               user={user}
               userData={userData}
               submitMutation={submitMutation}
@@ -366,7 +461,58 @@ import { useLearningHistory } from '../../hooks/useLearningHistory';
 import DailyLearningTimeline from './DailyLearningTimeline';
 import StudentReport from '../Report/StudentReport';
 
-function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userData, submitMutation, onCancel, onNavigateToUnit }) {
+function AssignmentRewardSummary({ bonusCrystals = 0, missingPenalty = null }) {
+  const bonus = Number(bonusCrystals) || 0;
+  const showPenalty = missingPenalty?.matured;
+  if (bonus <= 0 && !showPenalty) return null;
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: bonus > 0 && showPenalty ? 'repeat(2, minmax(0, 1fr))' : '1fr',
+      gap: '0.75rem',
+      marginBottom: '1rem'
+    }}>
+      {bonus > 0 && (
+        <div className="glass-card" style={{
+          padding: '1rem 1.2rem',
+          background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.16), rgba(0, 212, 255, 0.08))',
+          border: '1px solid rgba(255, 215, 0, 0.55)',
+          boxShadow: '0 0 18px rgba(255, 215, 0, 0.14)'
+        }}>
+          <div className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
+            TEACHER BONUS
+          </div>
+          <div style={{ color: 'var(--text-bright)', fontSize: '1.45rem', fontWeight: 900 }}>
+            💎 +{bonus} 광석
+          </div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
+            과제 피드백과 함께 지급된 보너스입니다.
+          </div>
+        </div>
+      )}
+      {showPenalty && (
+        <div className="glass-card" style={{
+          padding: '1rem 1.2rem',
+          background: 'rgba(251, 113, 133, 0.1)',
+          border: '1px solid rgba(251, 113, 133, 0.55)'
+        }}>
+          <div className="font-tech" style={{ color: '#fb7185', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
+            MISSING ASSIGNMENT
+          </div>
+          <div style={{ color: '#fecdd3', fontSize: '1.35rem', fontWeight: 900 }}>
+            💎 -{missingPenalty.penalty} 광석
+          </div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
+            출석 후 12시간 내 미제출 · {missingPenalty.missingStreak}회 연속
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPenalty, user, userData, submitMutation, onCancel, onNavigateToUnit }) {
   const [activeTab, setActiveTab] = useState('report'); // 'report' | 'timeline' | 'growth'
   const [reportDays, setReportDays] = useState(30);
   
@@ -651,11 +797,18 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, user, userD
       {/* Report Form View */}
       {activeTab === 'report' && (
         <>
+          <AssignmentRewardSummary bonusCrystals={assignment?.bonusCrystals} missingPenalty={!assignment ? missingPenalty : null} />
+
           {/* Feedback Section (if reviewed or needs revision) */}
           {assignment?.feedback && (
             <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem', borderLeft: `4px solid ${isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)'}`, background: 'rgba(0,0,0,0.4)' }}>
               <p className="font-tech" style={{ fontSize: '0.9rem', color: isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>📡사령부 회신 (COMMAND FEEDBACK)</span>
+                {assignment?.bonusCrystals > 0 && (
+                  <span style={{ marginLeft: 'auto', color: 'var(--star-gold)', fontWeight: 900 }}>
+                    💎 +{assignment.bonusCrystals} 보너스
+                  </span>
+                )}
               </p>
               <div className="markdown-content feedback-markdown" style={{ color: 'var(--text-bright)', lineHeight: '1.75', fontSize: '0.98rem' }}>
                 <ReactMarkdown>{formatFeedbackForDisplay(assignment.feedback)}</ReactMarkdown>

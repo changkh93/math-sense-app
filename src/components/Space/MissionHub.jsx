@@ -88,6 +88,12 @@ const getVideoCompletionTargetPercent = (duration = 0) => (
   Math.round(getVideoCompletionThreshold(duration) * 100)
 )
 
+const getTodayKSTDate = () => {
+  const now = new Date()
+  const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+  return kst.toISOString().slice(0, 10)
+}
+
 const getNextTimeAttackDelay = (isFirst = false) => {
   const minSeconds = 120
   const maxSeconds = isFirst ? 180 : 300
@@ -564,6 +570,9 @@ export default function MissionHub({
   const stampedSetRef = useRef(new Set())
   const newStampCountRef = useRef(0)
   const totalTimeSpentRef = useRef(0)
+  const dailyTimeSpentRef = useRef(0)
+  const dailyTimeSpentDateRef = useRef(getTodayKSTDate())
+  const lastSyncedTimeSpentRef = useRef(0)
   const totalRewardedCrystalsRef = useRef(0)
   const idTokenRef = useRef(null)
   const isVideoProcessingRef = useRef(false)
@@ -660,6 +669,7 @@ export default function MissionHub({
 
   // ─── Transmission reward state (Bitset/Checklist) ───
   const [stampCount, setStampCount] = useState(0) // For UI display
+  const [creditedWatchSeconds, setCreditedWatchSeconds] = useState(0)
   const [videoCompleted, setVideoCompleted] = useState(false)
   useEffect(() => { videoCompletedRef.current = videoCompleted }, [videoCompleted])
 
@@ -738,6 +748,10 @@ export default function MissionHub({
       setStampCount(0) // Reset UI
       newStampCountRef.current = 0
       totalTimeSpentRef.current = 0
+      dailyTimeSpentRef.current = 0
+      dailyTimeSpentDateRef.current = getTodayKSTDate()
+      lastSyncedTimeSpentRef.current = 0
+      setCreditedWatchSeconds(0)
       totalRewardedCrystalsRef.current = 0
       videoCompletedRef.current = false
       videoCompletionBonusGivenRef.current = false
@@ -781,9 +795,12 @@ export default function MissionHub({
         totalRewardedCrystalsRef.current = txProgress.totalRewardedCrystals
       }
 
-      if (txProgress.totalTimeSpent) {
-        totalTimeSpentRef.current = txProgress.totalTimeSpent
-      }
+      totalTimeSpentRef.current = txProgress.totalTimeSpent || 0
+      lastSyncedTimeSpentRef.current = totalTimeSpentRef.current
+      setCreditedWatchSeconds(Math.floor(totalTimeSpentRef.current))
+      const todayKST = getTodayKSTDate()
+      dailyTimeSpentDateRef.current = todayKST
+      dailyTimeSpentRef.current = txProgress.todayTimeSpentDate === todayKST ? (txProgress.todayTimeSpent || 0) : 0
       
       // Mark as loaded ONLY if we have data or if it's explicitly done (prevents retrying empty data)
       loadedTxIdRef.current = txId
@@ -796,6 +813,10 @@ export default function MissionHub({
       setStampCount(0)
       newStampCountRef.current = 0
       totalTimeSpentRef.current = 0
+      dailyTimeSpentRef.current = 0
+      dailyTimeSpentDateRef.current = getTodayKSTDate()
+      lastSyncedTimeSpentRef.current = 0
+      setCreditedWatchSeconds(0)
       totalRewardedCrystalsRef.current = 0
       videoCompletedRef.current = false
       videoCompletionBonusGivenRef.current = false
@@ -912,6 +933,11 @@ export default function MissionHub({
       }
       
       totalTimeSpentRef.current = serverData?.totalTimeSpent || 0
+      lastSyncedTimeSpentRef.current = totalTimeSpentRef.current
+      setCreditedWatchSeconds(Math.floor(totalTimeSpentRef.current))
+      const todayKST = getTodayKSTDate()
+      dailyTimeSpentDateRef.current = todayKST
+      dailyTimeSpentRef.current = serverData?.todayTimeSpentDate === todayKST ? (serverData?.todayTimeSpent || 0) : 0
       totalRewardedCrystalsRef.current = serverData?.totalRewardedCrystals || 0
       setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
       
@@ -934,6 +960,10 @@ export default function MissionHub({
       setStampCount(0)
       newStampCountRef.current = 0
       totalTimeSpentRef.current = 0
+      dailyTimeSpentRef.current = 0
+      dailyTimeSpentDateRef.current = getTodayKSTDate()
+      lastSyncedTimeSpentRef.current = 0
+      setCreditedWatchSeconds(0)
       totalRewardedCrystalsRef.current = 0
       setTotalRewardedCrystals(0)
       setVideoCompleted(false)
@@ -984,6 +1014,8 @@ export default function MissionHub({
           const updateData = {
             [`videoProgress.${txId}.lastPosition`]: pos,
             [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+            [`videoProgress.${txId}.todayTimeSpent`]: dailyTimeSpentRef.current,
+            [`videoProgress.${txId}.todayTimeSpentDate`]: dailyTimeSpentDateRef.current,
             [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
             [`videoProgress.${txId}.stampedSeconds`]: stamps,
             [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || 'Main Video',
@@ -1004,6 +1036,8 @@ export default function MissionHub({
                 ...(prev?.videoProgress?.[txId] || {}),
                 lastPosition: pos,
                 totalTimeSpent: totalTimeSpentRef.current,
+                todayTimeSpent: dailyTimeSpentRef.current,
+                todayTimeSpentDate: dailyTimeSpentDateRef.current,
                 stampedSeconds: stamps
               }
             }
@@ -1034,6 +1068,8 @@ export default function MissionHub({
         progressData: {
           lastPosition: finalPos,
           totalTimeSpent: totalTimeSpentRef.current,
+          todayTimeSpent: dailyTimeSpentRef.current,
+          todayTimeSpentDate: dailyTimeSpentDateRef.current,
           stampedSeconds: Array.from(stampedSetRef.current),
           completed: videoCompletedRef.current,
           completionBonusGiven: videoCompletionBonusGivenRef.current
@@ -1075,6 +1111,27 @@ export default function MissionHub({
 
   const videoAlreadySavedRef = useRef(false) // Flag to prevent double-save via returnFromContent
 
+  const getVideoLearningMetadata = useCallback((txId, position, stamps) => {
+    const sessionWatchSeconds = Math.max(0, totalTimeSpentRef.current - lastSyncedTimeSpentRef.current)
+    return {
+      activityCategory: 'video',
+      transmissionId: txId,
+      transmissionTitle: selectedTx?.title || "Main Video",
+      stampedSeconds: stamps,
+      videoTime: Math.floor(sessionWatchSeconds),
+      sessionWatchSeconds,
+      totalTimeSpent: totalTimeSpentRef.current,
+      todayTimeSpent: dailyTimeSpentRef.current,
+      todayTimeSpentDate: dailyTimeSpentDateRef.current,
+      coverageSeconds: stamps.length,
+      currentPosition: position
+    }
+  }, [selectedTx])
+
+  const markVideoLearningSynced = useCallback(() => {
+    lastSyncedTimeSpentRef.current = totalTimeSpentRef.current
+  }, [])
+
   // Helper: when exiting content, go back to SpaceHome if single-content unit
   const returnFromContent = useCallback(async () => {
     // 1. Final Sync: Ensure the latest progress is sent before unmounting
@@ -1082,29 +1139,26 @@ export default function MissionHub({
     if (onNonQuizActivityComplete && selectedTx && !videoAlreadySavedRef.current) {
       const txId = selectedTx?.id || 'default';
       const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
+      const stamps = Array.from(stampedSetRef.current);
       
       // Check if we hit a milestone JUST before exiting
       if (newStampCountRef.current >= 180 && !rewardLockRef.current) {
         const minutes = Math.floor(stampedSetRef.current.size / 60);
         const rewardOutcome = await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
-          transmissionId: txId,
-          transmissionTitle: selectedTx?.title || "Main Video",
-          stampedSeconds: Array.from(stampedSetRef.current),
-          videoTime: currentTime
+          ...getVideoLearningMetadata(txId, currentTime, stamps)
         });
         if (rewardOutcome?.actualReward > 0) {
           showSilentToast(rewardOutcome.actualReward);
         } else if (rewardOutcome?.rewardBlockedReason === 'daily_cap') {
           showRewardLimitNotice('광석 지급은 리밋에 걸렸지만, 집중도 기록에는 반영됩니다.')
         }
+        markVideoLearningSynced()
       } else {
         // Just sync progress without reward
         await onNonQuizActivityComplete('영상 학습 기록 동기화', 0, {
-          transmissionId: txId,
-          transmissionTitle: selectedTx?.title || "Main Video",
-          stampedSeconds: Array.from(stampedSetRef.current),
-          videoTime: currentTime
+          ...getVideoLearningMetadata(txId, currentTime, stamps)
         });
+        markVideoLearningSynced()
       }
     }
 
@@ -1137,7 +1191,7 @@ export default function MissionHub({
       // Return to Mission Control (Briefing)
       updateCurrentMode('briefing')
     }
-  }, [initialMode, onBack, selectedTx, missionData, onNonQuizActivityComplete, showSilentToast, showRewardLimitNotice])
+  }, [initialMode, onBack, selectedTx, missionData, onNonQuizActivityComplete, showSilentToast, showRewardLimitNotice, getVideoLearningMetadata, markVideoLearningSynced])
 
   const logActivity = async (actionStr) => {
     if (!userId) return;
@@ -1208,6 +1262,8 @@ export default function MissionHub({
              setDoc(progressRef, {
                [`videoProgress.${txId}.lastPosition`]: pos,
                [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+               [`videoProgress.${txId}.todayTimeSpent`]: dailyTimeSpentRef.current,
+               [`videoProgress.${txId}.todayTimeSpentDate`]: dailyTimeSpentDateRef.current,
                [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
                [`videoProgress.${txId}.stampedSeconds`]: Array.from(stampedSetRef.current)
              }, { merge: true }).catch(err => console.warn("Background save failed:", err))
@@ -1256,18 +1312,38 @@ export default function MissionHub({
 
     const realGapMs = now - lastPollTime
 
+    const previousVideoTime = Number.isFinite(lastVideoTimeRef.current) ? lastVideoTimeRef.current : -1
+    const hasPreviousVideoTime = previousVideoTime >= 0
     const currentSecond = Math.floor(currentTime)
-    const lastSecond = Math.floor(lastVideoTimeRef.current)
+    const lastSecond = hasPreviousVideoTime ? Math.floor(previousVideoTime) : currentSecond
     lastVideoTimeRef.current = currentTime
     if (duration > 0) videoDurationRef.current = duration
 
-    const activePlaybackDelta = isVideoPlayingRef.current
-      ? Math.min(Math.max(realGapMs, 0) / 1000, 1)
+    const realGapSeconds = Math.max(realGapMs, 0) / 1000
+    const expectedVideoElapsed = realGapSeconds * playbackRate
+    const videoDelta = hasPreviousVideoTime ? currentTime - previousVideoTime : 0
+    const isForwardPlayback = videoDelta > 0
+    const isScrubbing = hasPreviousVideoTime && Math.abs(expectedVideoElapsed - videoDelta) > 2
+    const activePlaybackDelta = isVideoPlayingRef.current && isForwardPlayback
+      ? (isScrubbing ? Math.min(expectedVideoElapsed, 1) : videoDelta)
       : 0
 
-    // Track actual playback time only while the YouTube player is actively playing.
-    totalTimeSpentRef.current += activePlaybackDelta
-    activeVideoSecondsRef.current += activePlaybackDelta
+    // Count actually played video seconds, even when the student rewatches an
+    // already-covered section. Large seek jumps are excluded from this total.
+    if (activePlaybackDelta > 0) {
+      const todayKST = getTodayKSTDate()
+      if (dailyTimeSpentDateRef.current !== todayKST) {
+        dailyTimeSpentDateRef.current = todayKST
+        dailyTimeSpentRef.current = 0
+      }
+
+      totalTimeSpentRef.current += activePlaybackDelta
+      dailyTimeSpentRef.current += activePlaybackDelta
+      activeVideoSecondsRef.current += activePlaybackDelta
+
+      const flooredTotal = Math.floor(totalTimeSpentRef.current)
+      setCreditedWatchSeconds(prev => (prev !== flooredTotal ? flooredTotal : prev))
+    }
 
     // Time Attack Logic: schedule by active playback time, not by YouTube timeline position.
     // This keeps the random focus check fair when a student rewinds or repeats a section.
@@ -1288,12 +1364,6 @@ export default function MissionHub({
 
     // Calculate gap between polls
     const gap = currentSecond - lastSecond
-    
-    // Check if the gap is heavily discrepant from real time passed
-    // If user scrubs natively, the real clock time didn't change much, but `gap` is huge.
-    // If browser throttles, real clock time matches the `gap` (accounting for playback speed).
-    const expectedVideoElapsed = (realGapMs / 1000) * playbackRate
-    const isScrubbing = Math.abs(expectedVideoElapsed - gap) > 2 // 2 seconds tolerance
 
     let newStampsAdded = false
 
@@ -1543,6 +1613,8 @@ export default function MissionHub({
             rewardedStampCount: stamps.length - newStampCountRef.current,
             totalRewardedCrystals: totalRewardedCrystalsRef.current,
             totalTimeSpent: totalTimeSpentRef.current,
+            todayTimeSpent: dailyTimeSpentRef.current,
+            todayTimeSpentDate: dailyTimeSpentDateRef.current,
             transmissionTitle: selectedTx?.title || 'Main Video',
             updatedAt: serverTimestamp()
           }
@@ -1583,10 +1655,7 @@ export default function MissionHub({
             '영상 교신 완료',
             rewardAmount,
             {
-              activityCategory: 'video',
-              transmissionId: txId,
-              transmissionTitle: selectedTx?.title || "Main Video",
-              videoTime: savedPosition,
+              ...getVideoLearningMetadata(txId, savedPosition, stamps),
               ...completionAttentionMeta
             }
           )
@@ -1595,24 +1664,15 @@ export default function MissionHub({
         if (newStampCountRef.current >= 180 && !rewardLockRef.current) {
           const minutes = Math.floor(stampedSetRef.current.size / 60)
           exitRewardOutcome = await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
-            transmissionId: txId,
-            transmissionTitle: selectedTx?.title || "Main Video",
-            stampedSeconds: stamps,
-            videoTime: savedPosition,
-            attentionSource: 'video_exit',
-            attentionResult: 'hit',
-            attentionOpportunityId: `video_exit_${txId}_${savedPosition}`,
-            attentionWindowSeconds: 60
+            ...getVideoLearningMetadata(txId, savedPosition, stamps)
           })
         } else {
           exitRewardOutcome = await onNonQuizActivityComplete('영상 학습 기록 동기화', 0, {
-            transmissionId: txId,
-            transmissionTitle: selectedTx?.title || "Main Video",
-            stampedSeconds: stamps,
-            videoTime: savedPosition
+            ...getVideoLearningMetadata(txId, savedPosition, stamps)
           })
         }
       }
+      markVideoLearningSynced()
       
       if (exitRewardOutcome?.actualReward > 0) {
         showSilentToast(exitRewardOutcome.actualReward)
@@ -1634,6 +1694,8 @@ export default function MissionHub({
             ...(prev?.videoProgress?.[txId] || {}),
             lastPosition: savedPosition,
             totalTimeSpent: totalTimeSpentRef.current,
+            todayTimeSpent: dailyTimeSpentRef.current,
+            todayTimeSpentDate: dailyTimeSpentDateRef.current,
             stampedSeconds: stamps
         };
         if (videoCompleted || isManualComplete) {
@@ -2073,6 +2135,7 @@ export default function MissionHub({
         100,
         Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100)
       )
+      const creditedSeconds = Math.floor(creditedWatchSeconds)
 
       return (
           <div className="theater-wrapper">
@@ -2107,7 +2170,7 @@ export default function MissionHub({
                     className="space-nav-link font-tech"
                     onClick={() => {
                       soundManager.playClick()
-                      onBack()
+                      handleSaveVideoPosition()
                     }}
                     style={{ 
                       display: 'flex',
@@ -2141,9 +2204,9 @@ export default function MissionHub({
                      </motion.div>
                    )}
                  </AnimatePresence>
-                 {stampCount > 0 && (
+                 {(creditedSeconds > 0 || stampCount > 0) && (
                    <span className="font-tech" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                     인정 학습: {Math.floor(stampCount / 60)}분 {stampCount % 60}초 · 완료율 {completionRate}% / 기준 {completionTargetPercent}%
+                     인정 학습: {Math.floor(creditedSeconds / 60)}분 {creditedSeconds % 60}초 · 완료율 {completionRate}% / 기준 {completionTargetPercent}%
                    </span>
                  )}
                  <button 
@@ -2227,7 +2290,7 @@ export default function MissionHub({
                
                {!videoCompleted && (
                  <p className="font-tech" style={{ color: 'rgba(255,255,255,0.7)', margin: '0.75rem 0 0', fontSize: '0.82rem', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                   되감기 재시청은 복습으로 인정되지만 완료율은 새 구간만 증가합니다. 앞으로 넘긴 구간은 인정되지 않습니다.
+                   되감기 재시청도 인정 학습 시간에 포함됩니다. 완료율은 실제로 재생된 고유 구간만 증가하며, 앞으로 넘긴 구간은 인정되지 않습니다.
                  </p>
                )}
                

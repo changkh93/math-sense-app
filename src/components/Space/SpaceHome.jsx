@@ -1395,7 +1395,13 @@ function SpaceHome() {
       attentionSource,
       attentionResult,
       attentionOpportunityId,
-      attentionWindowSeconds
+      attentionWindowSeconds,
+      sessionWatchSeconds = 0,
+      totalTimeSpent = 0,
+      todayTimeSpent = 0,
+      todayTimeSpentDate = "",
+      coverageSeconds = stampedSeconds?.length || 0,
+      currentPosition = activityMetadata.videoTime || 0
     } = activityMetadata
     const currentUnitId = selectedUnitDocId || quickQuizUnitId || 'unknown'
     
@@ -1479,6 +1485,14 @@ function SpaceHome() {
         
         // Calculate KST Date
         const todayKST = getTodayKST()
+        const videoSessionSeconds = isVideoActivity && !isAttentionEvent
+          ? Math.max(0, Math.floor(Number(sessionWatchSeconds) || 0))
+          : 0
+        const completionVideoSessionSeconds = isVideoActivity && attentionSource === 'completion_bonus'
+          ? Math.max(0, Math.floor(Number(sessionWatchSeconds) || 0))
+          : 0
+        const shouldLogVideoView = isVideoActivity && !isAttentionEvent && videoSessionSeconds > 0
+        const shouldAccumulateVideoTime = shouldLogVideoView || completionVideoSessionSeconds > 0
 
         // --- Holiday Multiplier ---
         if (actualReward > 0) {
@@ -1520,26 +1534,25 @@ function SpaceHome() {
 
         const shouldLogFocusOnly = isVideoActivity && rewardBlockedReason === 'daily_cap'
         const isCompletionActivity = activityType.includes('완료') || isLogActivity
-        const shouldLogHistory = isCompletionActivity || streakResult.streakUpdate?.lastStreakDate || actualReward > 0 || isAttentionMiss || shouldLogFocusOnly
+        const shouldLogHistory = isCompletionActivity || shouldLogVideoView || streakResult.streakUpdate?.lastStreakDate || actualReward > 0 || isAttentionMiss || shouldLogFocusOnly
         const effectiveAttentionOpportunityId = attentionOpportunityId || (shouldLogFocusOnly ? `video_limit_${Math.floor(Date.now() / 1000)}` : "")
         let stableHistoryId = null
 
         if (shouldLogHistory) {
           stableHistoryId = isLogActivity
             ? `log_completion_${currentUnitId}`
-            : `video_completion_${currentUnitId}_${transmissionId || 'default'}`
+            : `video_daily_${todayKST}_${currentUnitId}_${transmissionId || 'default'}`
 
-          if ((isAttentionEvent || shouldLogFocusOnly) && effectiveAttentionOpportunityId) {
+          if (((isAttentionEvent && attentionSource !== 'completion_bonus') || shouldLogFocusOnly) && effectiveAttentionOpportunityId) {
             stableHistoryId = `video_attention_${currentUnitId}_${transmissionId || 'default'}_${attentionSource || 'video_limit'}_${effectiveAttentionOpportunityId}`
-          } else if (!isCompletionActivity && isVideoActivity) {
-            const minMatch = activityType.match(/\((\d+)분/)
-            const minutes = minMatch ? minMatch[1] : 'int'
-            stableHistoryId = `video_interval_${currentUnitId}_${transmissionId || 'default'}_${minutes}min`
           }
         }
 
         const historyRef = stableHistoryId ? doc(db, 'users', user.uid, 'history', stableHistoryId) : null
         const existingAttentionHistorySnap = historyRef && isAttentionEvent
+          ? await transaction.get(historyRef)
+          : null
+        const existingVideoHistorySnap = historyRef && shouldAccumulateVideoTime
           ? await transaction.get(historyRef)
           : null
         const shouldCountAttention = isAttentionEvent && !existingAttentionHistorySnap?.exists()
@@ -1608,6 +1621,9 @@ function SpaceHome() {
              transaction.set(progressDocRef, {
                [`${baseKey}.rewardedStampCount`]: stampedSeconds.length,
                [`${baseKey}.stampedSeconds`]: stampedSeconds,
+               [`${baseKey}.totalTimeSpent`]: totalTimeSpent,
+               [`${baseKey}.todayTimeSpent`]: todayTimeSpent,
+               [`${baseKey}.todayTimeSpentDate`]: todayTimeSpentDate || todayKST,
                [`${baseKey}.updatedAt`]: serverTimestamp(),
                updatedAt: serverTimestamp()
              }, { merge: true })
@@ -1659,6 +1675,17 @@ function SpaceHome() {
 
         // --- Atomic Logging: History ---
         if (shouldLogHistory && historyRef) {
+          const previousVideoTime = existingVideoHistorySnap?.exists()
+            ? Math.max(0, Math.floor(existingVideoHistorySnap.data()?.videoTime || 0))
+            : 0
+          const videoSecondsToAdd = shouldLogVideoView ? videoSessionSeconds : completionVideoSessionSeconds
+          const nextVideoTime = shouldAccumulateVideoTime
+            ? previousVideoTime + videoSecondsToAdd
+            : Math.floor(activityMetadata.videoTime || 0)
+          const previousStampedCount = existingVideoHistorySnap?.exists()
+            ? Math.max(0, Math.floor(existingVideoHistorySnap.data()?.stampedCount || 0))
+            : 0
+
           transaction.set(historyRef, {
             unitId: currentUnitId,
             unitTitle: transmissionTitle || activeUnit?.title || `탐사 기록 (${activityType})`,
@@ -1673,8 +1700,13 @@ function SpaceHome() {
             type: isLogActivity ? 'text' : ((isAttentionMiss || shouldLogFocusOnly) ? 'attention' : 'video'),
             activityType,
             // Include video duration and stamp count in metadata for summary calculation
-            videoTime: activityMetadata.videoTime || 0,
-            stampedCount: stampedSeconds?.length || 0,
+            videoTime: nextVideoTime,
+            sessionWatchSeconds: videoSecondsToAdd,
+            totalTimeSpent: Math.floor(Number(totalTimeSpent) || 0),
+            todayTimeSpent: Math.floor(Number(todayTimeSpent) || 0),
+            todayTimeSpentDate: todayTimeSpentDate || todayKST,
+            stampedCount: Math.max(previousStampedCount, coverageSeconds || stampedSeconds?.length || 0),
+            currentPosition,
             attentionSource: attentionSource || (shouldLogFocusOnly ? 'video_limit' : ""),
             attentionResult: attentionResult || (shouldLogFocusOnly ? 'hit' : ""),
             attentionOpportunityId: effectiveAttentionOpportunityId,

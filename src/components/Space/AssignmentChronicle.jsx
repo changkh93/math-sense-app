@@ -41,6 +41,7 @@ export default function AssignmentChronicle({ assignments, onClose }) {
   const currentLog = validAssignments[currentPage] || {};
   const isReviewed = currentLog.status === 'reviewed';
   const isNeedsRevision = currentLog.status === 'needs_revision';
+  const bonusCrystals = Number(currentLog.bonusCrystals) || 0;
 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading } = useLearningHistory(
     activeTab === 'timeline' ? currentLog.userId : null, 
@@ -260,6 +261,33 @@ export default function AssignmentChronicle({ assignments, onClose }) {
               <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
                 {activeTab === 'report' && (
                   <>
+                    {bonusCrystals > 0 && (
+                      <div style={{
+                        marginBottom: '1rem',
+                        padding: '1rem 1.25rem',
+                        background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.16), rgba(0, 212, 255, 0.08))',
+                        border: '1px solid rgba(255, 215, 0, 0.55)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '1rem',
+                        boxShadow: '0 0 18px rgba(255, 215, 0, 0.12)'
+                      }}>
+                        <div>
+                          <div className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
+                            TEACHER BONUS
+                          </div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.86rem' }}>
+                            과제 피드백과 함께 지급된 보너스 광석
+                          </div>
+                        </div>
+                        <div style={{ color: 'var(--text-bright)', fontSize: '1.45rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
+                          💎 +{bonusCrystals}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Feedback Banner (if exists) - shown at top */}
                     {currentLog.feedback && (
                       <div style={{ 
@@ -272,8 +300,8 @@ export default function AssignmentChronicle({ assignments, onClose }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                           <span style={{ fontSize: '1rem' }}>📡</span>
                           <span className="font-tech" style={{ fontSize: '0.8rem', color: isNeedsRevision ? '#ff4500' : 'var(--crystal-cyan)' }}>사령부 피드백</span>
-                          {currentLog.bonusCrystals > 0 && (
-                            <span className="font-tech" style={{ marginLeft: 'auto', color: 'var(--star-gold)', fontSize: '0.85rem' }}>💎 +{currentLog.bonusCrystals}</span>
+                          {bonusCrystals > 0 && (
+                            <span className="font-tech" style={{ marginLeft: 'auto', color: 'var(--star-gold)', fontSize: '0.9rem', fontWeight: 900 }}>💎 +{bonusCrystals} 보너스</span>
                           )}
                         </div>
                         <div className="markdown-content feedback-markdown" style={{ color: 'var(--text-bright)', lineHeight: '1.75', fontSize: '0.95rem' }}>

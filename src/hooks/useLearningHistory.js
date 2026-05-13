@@ -162,6 +162,7 @@ export function useLearningHistory(userId, dateStr) {
       const attentionSource = data.attentionSource || '';
       const attentionResult = data.attentionResult || '';
       const isAttentionEvent = !!attentionSource && (attentionResult === 'hit' || attentionResult === 'miss');
+      const isFocusOnlyEvent = isAttentionEvent && attentionSource !== 'completion_bonus';
       const unitId = data.unitId || 'unknown';
       const txId = data.transmissionId || 'default';
 
@@ -183,13 +184,13 @@ export function useLearningHistory(userId, dateStr) {
       let displayType = 'quiz_pass';
       const title = data.unitTitle || formatUnitId(data.unitId);
 
-      if (hType === 'attention' && isAttentionEvent) {
+      if (isFocusOnlyEvent) {
         displayType = 'video_attention';
       } else if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
         displayType = 'video_reward';
         // Track video time
         const vKey = getVideoKey(unitId, txId);
-        const vTime = data.videoTime || data.stampedCount || 0;
+        const vTime = data.videoTime || data.sessionWatchSeconds || data.stampedCount || 0;
         if (vTime > 0) {
           stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, Math.floor(vTime));
         }
@@ -227,7 +228,7 @@ export function useLearningHistory(userId, dateStr) {
         crystalsEarned: data.crystalsEarned || 0,
         metadata: {
           ...data,
-          videoTime: data.videoTime || data.stampedCount || 0,
+          videoTime: isFocusOnlyEvent ? 0 : (data.videoTime || data.sessionWatchSeconds || data.stampedCount || 0),
           attentionSource,
           attentionResult
         }
@@ -262,7 +263,7 @@ export function useLearningHistory(userId, dateStr) {
         const cleanDesc = desc.replace(/\s?영상 교신 수신/g, '').replace('보상 (영상 교신 완료)', '').replace('보너스', '').trim();
         displayTitle = `🎬 영상 학습: ${cleanDesc}`;
 
-        const vTime = metadata.stampedSeconds?.length || metadata.totalTimeSpent || 0;
+        const vTime = metadata.sessionWatchSeconds || metadata.videoTime || metadata.stampedSeconds?.length || 0;
         if (vTime > 0) {
           const unitId = metadata.unitId || 'unknown';
           const txId = metadata.transmissionId || 'default';
@@ -313,7 +314,10 @@ export function useLearningHistory(userId, dateStr) {
         if (data.videoProgress) {
           Object.entries(data.videoProgress).forEach(([txId, prog]) => {
             const stamps = prog.stampedSeconds?.length || 0;
-            if (stamps <= 0) return;
+            const todaySeconds = prog.todayTimeSpentDate === dateStr
+              ? Math.floor(prog.todayTimeSpent || 0)
+              : 0;
+            if (stamps <= 0 && todaySeconds <= 0) return;
 
             let progUpdatedAt;
             if (prog.updatedAt?.toDate) progUpdatedAt = prog.updatedAt.toDate();
@@ -325,7 +329,8 @@ export function useLearningHistory(userId, dateStr) {
             if (!isProgToday) return;
 
             const vKey = getVideoKey(unitId, txId);
-            stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, stamps);
+            const progressVideoSeconds = todaySeconds > 0 ? todaySeconds : stamps;
+            stats._videoTxMap[vKey] = Math.max(stats._videoTxMap[vKey] || 0, progressVideoSeconds);
 
             // Only add to feed if not already tracked via history
             const isAlreadyTracked = aggregated.some(a =>
@@ -341,7 +346,7 @@ export function useLearningHistory(userId, dateStr) {
                 type: 'video_view',
                 title: `🎬 영상 학습: ${prog.transmissionTitle || data.unitTitle || formatUnitId(unitId)}`,
                 score: null,
-                metadata: { ...prog, unitId, transmissionId: txId, videoTime: stamps }
+                metadata: { ...prog, unitId, transmissionId: txId, videoTime: progressVideoSeconds, stampedCount: stamps }
               });
             }
           });
@@ -410,7 +415,7 @@ export function useLearningHistory(userId, dateStr) {
     if (Object.values(rawData.loaded).every(v => v === true)) {
       setLoading(false);
     }
-  }, [rawData, startTime, endTime]);
+  }, [rawData, startTime, endTime, dateStr]);
 
   // ── GROUPED ACTIVITIES (derived via useMemo — no state loop) ──
   const groupedActivities = useMemo(() => {
@@ -552,7 +557,9 @@ function buildGroupedActivities(rawActivities) {
     }
 
     // Video: accumulate max video time
-    const vTime = meta.videoTime || meta.stampedCount || meta.metadata?.videoTime || 0;
+    const vTime = act.type === 'video_attention'
+      ? 0
+      : (meta.videoTime || meta.sessionWatchSeconds || meta.stampedCount || meta.metadata?.videoTime || 0);
     if (vTime > 0) {
       group.totalVideoSeconds = Math.max(group.totalVideoSeconds, Math.floor(vTime));
     }
