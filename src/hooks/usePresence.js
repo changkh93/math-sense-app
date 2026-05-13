@@ -8,10 +8,12 @@ import { db } from '../firebase';
  * @param {string} clusterId
  * @param {string} currentLocation description like `분수의 나눗셈 (개념 영상)`
  * @param {string} unitId 
+ * @param {string} activeRoomId
  */
-export function usePresence(userId, clusterId, currentLocation, unitId) {
+export function usePresence(userId, clusterId, currentLocation, unitId, activeRoomId = null) {
   const lastLocationRef = useRef(null);
   const lastUnitIdRef = useRef(null);
+  const lastRoomIdRef = useRef(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -29,7 +31,8 @@ export function usePresence(userId, clusterId, currentLocation, unitId) {
             lastUpdatedAt: serverTimestamp(),
             currentLocation: currentLocation || '메인 화면',
             clusterId: clusterId || 'cluster_elementary',
-            unitId: unitId || null
+            unitId: unitId || null,
+            activeRoomId: activeRoomId || null
           }
         };
 
@@ -59,11 +62,13 @@ export function usePresence(userId, clusterId, currentLocation, unitId) {
 
     const isNewLocation = 
       lastLocationRef.current !== currentLocation || 
-      lastUnitIdRef.current !== unitId;
+      lastUnitIdRef.current !== unitId ||
+      lastRoomIdRef.current !== activeRoomId;
 
     if (isNewLocation) {
       lastLocationRef.current = currentLocation;
       lastUnitIdRef.current = unitId;
+      lastRoomIdRef.current = activeRoomId;
       // Send immediately instead of debouncing
       updatePresence(document.hidden ? 'away' : 'online', true);
     }
@@ -80,5 +85,5 @@ export function usePresence(userId, clusterId, currentLocation, unitId) {
       clearTimeout(timeoutId);
       clearInterval(heartbeatId);
     };
-  }, [userId, clusterId, currentLocation, unitId]); 
+  }, [userId, clusterId, currentLocation, unitId, activeRoomId]); 
 }

@@ -109,9 +109,9 @@ const LiveUserRow = ({ user, onViewDetails }) => {
         </div>
         {user.crewId && (
            <div style={{ marginTop: 8, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-             <div style={{ width: 6, height: 6, borderRadius: '50%', background: currentLocation === '스터디 스트림 참여 중' ? '#00ffa0' : 'rgba(255,255,255,0.3)' }}></div>
-             <span style={{ color: currentLocation === '스터디 스트림 참여 중' ? '#00ffa0' : 'rgba(255,255,255,0.5)' }}>
-               {currentLocation === '스터디 스트림 참여 중' ? '크루 스트림 접속 중' : '크루 오프라인'}
+             <div style={{ width: 6, height: 6, borderRadius: '50%', background: (live.activeRoomId || currentLocation === '스터디 크루 방문 중') ? '#00ffa0' : 'rgba(255,255,255,0.3)' }}></div>
+             <span style={{ color: (live.activeRoomId || currentLocation === '스터디 크루 방문 중') ? '#00ffa0' : 'rgba(255,255,255,0.5)' }}>
+               {(live.activeRoomId || currentLocation === '스터디 크루 방문 중') ? '크루 접속 중' : '크루 오프라인'}
              </span>
            </div>
         )}
