@@ -77,6 +77,8 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   const [selectedDateStr, setSelectedDateStr] = useState(null); // The date the user clicked on
   const [showChronicle, setShowChronicle] = useState(false);
   const [penaltyCheckNow, setPenaltyCheckNow] = useState(0);
+  const [optimisticAssignmentsByDate, setOptimisticAssignmentsByDate] = useState({});
+  const [submissionNotice, setSubmissionNotice] = useState(null);
   const previousTodayRef = useRef(todayKST);
   const penaltySweepKeyRef = useRef('');
 
@@ -112,11 +114,45 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   const penaltyMutation = useApplyMissingAssignmentPenalties();
 
   useEffect(() => {
-    if (!user?.uid || !clusterId || isLoading || !assignments || !attendanceRecords) return;
-    const sweepKey = `${user.uid}:${clusterId}:${assignments.length}:${attendanceRecords.length}:${todayKST}`;
+    if (!assignments?.length) return;
+    setOptimisticAssignmentsByDate(prev => {
+      const next = { ...prev };
+      let changed = false;
+
+      Object.keys(next).forEach(dateStr => {
+        const optimisticAssignment = next[dateStr];
+        const serverAssignment = assignments.find(item => (
+          item.date === dateStr &&
+          (!optimisticAssignment.id || item.id === optimisticAssignment.id)
+        ));
+
+        if (serverAssignment) {
+          delete next[dateStr];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [assignments]);
+
+  const effectiveAssignments = useMemo(() => {
+    const byDate = new Map();
+    (assignments || []).forEach(item => {
+      if (item.date) byDate.set(item.date, item);
+    });
+    Object.entries(optimisticAssignmentsByDate).forEach(([dateStr, item]) => {
+      byDate.set(dateStr, item);
+    });
+    return Array.from(byDate.values());
+  }, [assignments, optimisticAssignmentsByDate]);
+
+  useEffect(() => {
+    if (!user?.uid || !clusterId || isLoading || !attendanceRecords) return;
+    const sweepKey = `${user.uid}:${clusterId}:${effectiveAssignments.length}:${attendanceRecords.length}:${todayKST}`;
     if (penaltySweepKeyRef.current === sweepKey || penaltyMutation.isPending) return;
 
-    const penaltyMap = getAssignmentMissingPenaltyMap(assignments, attendanceRecords, Date.now());
+    const penaltyMap = getAssignmentMissingPenaltyMap(effectiveAssignments, attendanceRecords, Date.now());
     const hasMaturedMissing = Object.values(penaltyMap).some(item => item.matured);
     if (!hasMaturedMissing) return;
 
@@ -124,18 +160,18 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
     penaltyMutation.mutate({
       userId: user.uid,
       clusterId,
-      assignments,
+      assignments: effectiveAssignments,
       attendanceRecords
     });
-  }, [user?.uid, clusterId, assignments, attendanceRecords, isLoading, todayKST, penaltyMutation]);
+  }, [user?.uid, clusterId, effectiveAssignments, attendanceRecords, isLoading, todayKST, penaltyMutation]);
 
   const clusterData = useMemo(() => {
     return clusters?.find(c => c.id === clusterId || c.docId === clusterId);
   }, [clusters, clusterId]);
 
   const missingPenaltyByDate = useMemo(
-    () => getAssignmentMissingPenaltyMap(assignments || [], attendanceRecords || [], penaltyCheckNow),
-    [assignments, attendanceRecords, penaltyCheckNow]
+    () => getAssignmentMissingPenaltyMap(effectiveAssignments || [], attendanceRecords || [], penaltyCheckNow),
+    [effectiveAssignments, attendanceRecords, penaltyCheckNow]
   );
 
   // Calendar Logic
@@ -174,7 +210,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
       const dateStr = `${year}-${month}-${dayStr}`;
       
       // Find assignment for this date
-      const assignment = assignments?.find(a => a.date === dateStr);
+      const assignment = effectiveAssignments?.find(a => a.date === dateStr);
       const attendance = attendanceRecords?.find(a => a.date === dateStr);
       
       days.push({
@@ -185,7 +221,20 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
       });
     }
     return days;
-  }, [currentDate, firstDayOfMonth, daysInMonth, assignments, attendanceRecords]);
+  }, [currentDate, firstDayOfMonth, daysInMonth, effectiveAssignments, attendanceRecords]);
+
+  const handleSubmitted = (submittedAssignment) => {
+    if (!submittedAssignment?.date) return;
+    setOptimisticAssignmentsByDate(prev => ({
+      ...prev,
+      [submittedAssignment.date]: submittedAssignment
+    }));
+    setSelectedDateStr(submittedAssignment.date);
+    setSubmissionNotice({
+      date: submittedAssignment.date,
+      status: submittedAssignment.status || 'submitted'
+    });
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -211,7 +260,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   if (showChronicle) {
     return (
       <AssignmentChronicle 
-        assignments={assignments} 
+        assignments={effectiveAssignments} 
         onClose={() => setShowChronicle(false)} 
       />
     );
@@ -440,18 +489,27 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               clusterId={clusterId}
               regionId={regionId}
               dateStr={selectedDateStr}
-              assignment={assignments?.find(a => a.date === selectedDateStr)} 
+              assignment={effectiveAssignments?.find(a => a.date === selectedDateStr)} 
               missingPenalty={missingPenaltyByDate[selectedDateStr]}
               user={user}
               userData={userData}
               submitMutation={submitMutation}
               onCancel={() => setSelectedDateStr(null)}
+              onSubmitted={handleSubmitted}
               onNavigateToUnit={onNavigateToUnit}
             />
           )}
         </div>
         </div>
       </div>
+      <AnimatePresence>
+        {submissionNotice && (
+          <SubmissionSuccessModal
+            dateStr={submissionNotice.date}
+            onClose={() => setSubmissionNotice(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -512,7 +570,61 @@ function AssignmentRewardSummary({ bonusCrystals = 0, missingPenalty = null }) {
   );
 }
 
-function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPenalty, user, userData, submitMutation, onCancel, onNavigateToUnit }) {
+function SubmissionSuccessModal({ dateStr, onClose }) {
+  return (
+    <MotionDiv
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10050,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0, 0, 0, 0.58)',
+        backdropFilter: 'blur(6px)',
+        padding: '1rem'
+      }}
+      onClick={onClose}
+    >
+      <MotionDiv
+        initial={{ scale: 0.94, y: 12 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.96, y: 8 }}
+        className="glass-card hud-border"
+        style={{
+          width: 'min(440px, 100%)',
+          padding: '2rem',
+          textAlign: 'center',
+          background: 'rgba(12, 18, 34, 0.96)'
+        }}
+        onClick={event => event.stopPropagation()}
+      >
+        <div style={{ fontSize: '3rem', marginBottom: '0.8rem' }}>✅</div>
+        <h3 className="font-title" style={{ color: 'var(--star-gold)', margin: '0 0 0.75rem' }}>
+          탐사 보고서 전송 완료
+        </h3>
+        <p style={{ color: 'var(--text-bright)', lineHeight: 1.65, margin: '0 0 1.5rem' }}>
+          {dateStr} 과제 제출이 완료되었습니다.
+          <br />
+          제출된 기록 화면으로 전환했습니다.
+        </p>
+        <button
+          type="button"
+          className="space-btn cosmic-btn font-tech"
+          onClick={onClose}
+          style={{ minWidth: '120px' }}
+        >
+          확인
+        </button>
+      </MotionDiv>
+    </MotionDiv>
+  );
+}
+
+function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPenalty, user, userData, submitMutation, onCancel, onSubmitted, onNavigateToUnit }) {
   const [activeTab, setActiveTab] = useState('report'); // 'report' | 'timeline' | 'growth'
   const [reportDays, setReportDays] = useState(30);
   
@@ -690,26 +802,36 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPena
         }
       }
 
-      await submitMutation.mutateAsync({
+      const assignmentData = {
+        userId: user.uid,
+        userName: userData?.studentName || user.displayName || user.email?.split('@')[0] || 'Unknown Explorer',
+        clusterId: normalizedClusterId,
+        regionId: regionId || null,
+        date: dateStr,
+        content,
+        links,
+        attachments: finalAttachments,
+        notebookData,
+        status: 'submitted',
+        revisionCount: (assignment?.revisionCount || 0) + (isNeedsRevision ? 1 : 0)
+      };
+
+      const submittedResult = await submitMutation.mutateAsync({
         docId: assignment?.id,
-        assignmentData: {
-          userId: user.uid,
-          userName: userData?.studentName || user.displayName || user.email?.split('@')[0] || 'Unknown Explorer',
-          clusterId: normalizedClusterId,
-          regionId: regionId || null,
-          date: dateStr,
-          content,
-          links,
-          attachments: finalAttachments,
-          notebookData,
-          status: 'submitted',
-          revisionCount: (assignment?.revisionCount || 0) + (isNeedsRevision ? 1 : 0)
-        }
+        assignmentData
       });
-      // Clear after submit 
+
       setFiles([]);
       setUploadProgress({});
-      onCancel(); // close panel
+      setAttachmentMode(null);
+      setIsSubmitting(false);
+      onSubmitted?.({
+        ...assignment,
+        ...assignmentData,
+        id: submittedResult?.id || assignment?.id,
+        submittedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
     } catch (error) {
       console.error("Submission failed:", error);
       alert("보고서 전송에 실패했습니다.");
@@ -894,6 +1016,49 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPena
                  ))}
                </div>
              )}
+            </div>
+          </div>
+        ) : isSubmitted ? (
+          <div style={{ flex: 1, color: 'var(--text-muted)', overflowY: 'auto' }}>
+            <div className="glass-card" style={{
+              padding: '1.5rem',
+              border: '1px solid rgba(251, 191, 36, 0.45)',
+              background: 'rgba(251, 191, 36, 0.08)',
+              marginBottom: '1.5rem'
+            }}>
+              <p className="font-tech" style={{ color: 'var(--star-gold)', margin: '0 0 0.5rem', fontWeight: 900 }}>
+                ✅ 제출 완료 · 피드백 대기중
+              </p>
+              <p style={{ margin: 0, lineHeight: 1.6, color: 'var(--text-bright)' }}>
+                탐사 보고서가 정상적으로 전송되었습니다. 선생님 확인 전까지 제출된 기록을 보관합니다.
+              </p>
+            </div>
+
+            <div className="glass-card" style={{ padding: '1.5rem', opacity: 0.9 }}>
+              <h4 style={{ color: 'var(--text-bright)', marginBottom: '1rem' }}>제출된 기록</h4>
+              <div style={{ whiteSpace: 'pre-wrap', fontSize: '1rem', lineHeight: '1.6', color: 'var(--text-muted)' }}>
+                {assignment.content}
+              </div>
+
+              {assignment.attachments?.length > 0 && (
+                <div style={{ marginTop: '1.5rem' }}>
+                  <p className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginBottom: '0.5rem' }}>첨부 파일</p>
+                  {assignment.attachments.map((att, i) => (
+                    <a key={i} href={att.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '0.5rem', borderRadius: '4px', color: 'white', marginRight: '0.5rem', marginBottom: '0.5rem', textDecoration: 'none' }}>
+                      📄 {att.name}
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {assignment.links?.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <p className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginBottom: '0.5rem' }}>첨부 링크</p>
+                  {assignment.links.map((lnk, i) => (
+                    <a key={i} href={lnk.url} target="_blank" rel="noreferrer" style={{ display: 'block', color: 'var(--neon-blue)', textDecoration: 'underline', marginBottom: '0.3rem' }}>{lnk.url}</a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : !isWithinWindow ? (
