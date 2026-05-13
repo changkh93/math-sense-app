@@ -361,8 +361,26 @@ export default function CrystalLedger({ userData }) {
                   <strong>{getProfileName(selectedRecipient)}</strong>
                   {getProfileHint(selectedRecipient) && <small>{getProfileHint(selectedRecipient)}</small>}
                 </span>
-                <button type="button" onClick={handleClearRecipient} aria-label="받는 친구 변경" disabled={transferBusy}>
-                  <X size={15} />
+                <button 
+                  type="button" 
+                  onClick={handleClearRecipient} 
+                  aria-label="받는 친구 변경" 
+                  disabled={transferBusy}
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ff6b6b', // Make it distinctly red
+                    background: 'rgba(255, 107, 107, 0.15)', // Light red background
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <X size={16} strokeWidth={3} />
                 </button>
               </div>
             ) : (
