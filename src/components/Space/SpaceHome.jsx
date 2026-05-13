@@ -523,6 +523,7 @@ function SpaceHome() {
 
   // Track Presence Activity
   const currentLocationString = useMemo(() => {
+    if (activeRoomId) return '스터디 스트림 참여 중';
     if (activeUnit) return `${activeUnit.title} ${quickQuizMode ? '(퀴즈 중)' : '(학습 중)'}`;
     if (activeChapter) return `${activeChapter.title} 진입`;
     if (activeRegion) return `${activeRegion.title} 탐색 중`;
@@ -532,7 +533,7 @@ function SpaceHome() {
     if (currentView === 'crew') return '스터디 크루 방문 중';
     if (currentView === 'assignment_hub') return '항행 일지(과제) 작성 중';
     return '우주 공간(메인) 대기 중';
-  }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode]);
+  }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode, activeRoomId]);
 
   usePresence(user?.uid, selectedClusterId, currentLocationString, activeUnit?.docId);
 

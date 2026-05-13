@@ -107,6 +107,14 @@ const LiveUserRow = ({ user, onViewDetails }) => {
              {currentLocation}
            </span>
         </div>
+        {user.crewId && (
+           <div style={{ marginTop: 8, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+             <div style={{ width: 6, height: 6, borderRadius: '50%', background: currentLocation === '스터디 스트림 참여 중' ? '#00ffa0' : 'rgba(255,255,255,0.3)' }}></div>
+             <span style={{ color: currentLocation === '스터디 스트림 참여 중' ? '#00ffa0' : 'rgba(255,255,255,0.5)' }}>
+               {currentLocation === '스터디 스트림 참여 중' ? '크루 스트림 접속 중' : '크루 오프라인'}
+             </span>
+           </div>
+        )}
         {(timeInCurrentLocation > 60000 && currentLocation !== '우주 공간(메인) 대기 중') && (
            <div style={{ fontSize: '0.8rem', color: isStuck ? '#ffb703' : 'rgba(255,255,255,0.5)', marginTop: 4 }}>
              <Clock size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
@@ -173,6 +181,7 @@ export default function LiveStatus() {
   const [selectedClusterId, setSelectedClusterId] = useState('all');
   const [users, setUsers] = useState([]);
   const [parentsMap, setParentsMap] = useState({});
+  const [crewsMap, setCrewsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [nowDate, setNowDate] = useState(new Date());
 
@@ -188,6 +197,17 @@ export default function LiveStatus() {
         }
       });
       setParentsMap(map);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'crews'), (snap) => {
+      const map = {};
+      snap.docs.forEach(d => {
+        map[d.id] = d.data();
+      });
+      setCrewsMap(map);
     });
     return () => unsub();
   }, []);
@@ -256,6 +276,37 @@ export default function LiveStatus() {
              (u.clusterAccess && u.clusterAccess[selectedClusterId] === 'active');
     });
   }, [users, selectedClusterId]);
+
+  // Group by Crew and Online Status
+  const { onlineWithoutCrew, offlineWithoutCrew, usersByCrew } = useMemo(() => {
+    const online = [];
+    const offline = [];
+    const byCrew = {}; // { [crewId]: [user1, user2] }
+    
+    filteredUsers.forEach(u => {
+       if (!u.crewId || !crewsMap[u.crewId]) {
+          const live = u.liveStatus || {};
+          const state = live.state || 'offline';
+          const lastUpdated = live.lastUpdatedAt?.toMillis() || 0;
+          const timeSince = Date.now() - lastUpdated;
+          
+          const isOffline = state === 'offline' || 
+                            (state === 'away' && timeSince >= 30 * 60000) || 
+                            (state === 'online' && timeSince >= 15 * 60000);
+
+          if (isOffline) {
+              offline.push(u);
+          } else {
+              online.push(u);
+          }
+       } else {
+          if (!byCrew[u.crewId]) byCrew[u.crewId] = [];
+          byCrew[u.crewId].push(u);
+       }
+    });
+    
+    return { onlineWithoutCrew: online, offlineWithoutCrew: offline, usersByCrew: byCrew };
+  }, [filteredUsers, crewsMap]);
 
   // --- Late Students Calculation ---
   const lateStudentsList = useMemo(() => {
@@ -487,16 +538,73 @@ export default function LiveStatus() {
                         </td>
                      </tr>
                    ) : (
-                     filteredUsers.map(user => (
-                       <LiveUserRow 
-                         key={user.uid} 
-                         user={user} 
-                         onViewDetails={(u, acts) => {
-                           setSelectedUser(u);
-                           setSelectedActivities(acts);
-                         }} 
-                       />
-                     ))
+                     <>
+                        {/* Online users without a Crew */}
+                        {onlineWithoutCrew.map(user => (
+                          <LiveUserRow 
+                            key={user.uid} 
+                            user={user} 
+                            onViewDetails={(u, acts) => {
+                              setSelectedUser(u);
+                              setSelectedActivities(acts);
+                            }} 
+                          />
+                        ))}
+                        
+                        {/* Grouped by Crew */}
+                        {Object.entries(usersByCrew).map(([crewId, groupUsers]) => (
+                           <React.Fragment key={crewId}>
+                              <tr>
+                                 <td colSpan="5" style={{ 
+                                   background: 'rgba(0, 243, 255, 0.05)', 
+                                   padding: '12px 15px', 
+                                   color: '#00f3ff', 
+                                   fontWeight: 'bold',
+                                   borderBottom: '1px solid rgba(0, 243, 255, 0.1)',
+                                   borderTop: '1px solid rgba(0, 243, 255, 0.1)'
+                                 }}>
+                                   🛡️ 스터디 크루: {crewsMap[crewId]?.name || '알 수 없는 크루'} ({groupUsers.length}명)
+                                 </td>
+                              </tr>
+                              {groupUsers.map(user => (
+                                <LiveUserRow 
+                                  key={user.uid} 
+                                  user={user} 
+                                  onViewDetails={(u, acts) => {
+                                    setSelectedUser(u);
+                                    setSelectedActivities(acts);
+                                  }} 
+                                />
+                              ))}
+                           </React.Fragment>
+                        ))}
+
+                        {/* Offline users without a Crew */}
+                        {offlineWithoutCrew.length > 0 && (
+                           <tr>
+                              <td colSpan="5" style={{ 
+                                background: 'rgba(255, 255, 255, 0.05)', 
+                                padding: '12px 15px', 
+                                color: 'rgba(255,255,255,0.5)', 
+                                fontSize: '0.9rem', 
+                                textAlign: 'center',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                              }}>
+                                오프라인 탐사원
+                              </td>
+                           </tr>
+                        )}
+                        {offlineWithoutCrew.map(user => (
+                          <LiveUserRow 
+                            key={user.uid} 
+                            user={user} 
+                            onViewDetails={(u, acts) => {
+                              setSelectedUser(u);
+                              setSelectedActivities(acts);
+                            }} 
+                          />
+                        ))}
+                     </>
                    )}
                 </tbody>
               </table>
