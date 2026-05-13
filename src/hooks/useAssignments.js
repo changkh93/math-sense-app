@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   runTransaction
 } from 'firebase/firestore'
+import { auth } from '../firebase'
 
 // ==========================================
 // STUDENT HOOKS
@@ -139,6 +140,242 @@ export const useSubmitFeedbackResponse = () => {
 import { recordCrystalTransaction } from '../utils/crystalLedger';
 
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
+const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
+const ACTIVE_WARNING_STATUSES = ['active', 'appealed'];
+
+const normalizeClusterId = (clusterId = '') => {
+  if (clusterId === '초등수학' || clusterId === 'cluster_elementary') return 'cluster_elementary';
+  if (clusterId === '파이썬' || clusterId === 'python') return 'python';
+  if (clusterId === '중등수학' || clusterId === 'middle-math') return 'middle-math';
+  if (clusterId === '서양고전' || clusterId === 'western-classic') return 'western-classic';
+  return clusterId;
+};
+
+const normalizeWarningType = (type) => (
+  type === 'consecutive_missing_assignment'
+    ? 'consecutive_missing_assignment'
+    : 'poor_assignment_submission'
+);
+
+const getWarningMessage = (type, customMessage = '') => {
+  const message = String(customMessage || '').trim();
+  if (message) return message;
+  if (type === 'consecutive_missing_assignment') {
+    return '연속 3회 과제 미제출이 확인되어 학습 경고가 기록되었습니다.';
+  }
+  return '이번 과제는 학습 기록과 제출 내용이 충분히 일치하지 않아 성실한 과제 수행으로 확인하기 어렵습니다.';
+};
+
+const getWarningId = ({ userId, assignmentId, clusterId, date, type }) => {
+  const normalizedType = normalizeWarningType(type);
+  if (normalizedType === 'consecutive_missing_assignment') {
+    return `warning_${userId}_${clusterId || 'all'}_${date}_consecutive_missing_3`;
+  }
+  return `warning_${assignmentId}_${normalizedType}`;
+};
+
+async function recomputeAssignmentWarningSummary(userId) {
+  if (!userId) return null;
+
+  const q = query(collection(db, 'assignmentWarnings'), where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  const warnings = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+  const active = warnings.filter(item => ACTIVE_WARNING_STATUSES.includes(item.status));
+  const byCluster = active.reduce((acc, item) => {
+    const key = item.clusterId || 'unknown';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const lastWarning = [...active].sort((a, b) => {
+    const aMs = getTimestampMs(a.createdAt) || getTimestampMs(a.updatedAt);
+    const bMs = getTimestampMs(b.createdAt) || getTimestampMs(b.updatedAt);
+    return bMs - aMs;
+  })[0] || null;
+
+  const summary = {
+    activeCount: active.length,
+    totalIssuedCount: warnings.length,
+    cancelledCount: warnings.filter(item => item.status === 'cancelled').length,
+    activeCountByCluster: byCluster,
+    lastWarningAt: lastWarning?.createdAt || lastWarning?.updatedAt || null,
+    lastWarningMessage: lastWarning?.message || '',
+    feeIncreaseRisk: active.length >= 3,
+    policyMessage: WARNING_POLICY_MESSAGE,
+    updatedAt: serverTimestamp(),
+  };
+
+  await setDoc(doc(db, 'users', userId), { assignmentWarningSummary: summary }, { merge: true });
+  return summary;
+}
+
+export const useStudentAssignmentWarnings = (userId, clusterId) => {
+  return useQuery({
+    queryKey: ['assignmentWarnings', 'student', userId, clusterId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const normalizedCluster = normalizeClusterId(clusterId);
+      const q = query(collection(db, 'assignmentWarnings'), where('userId', '==', userId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map(item => ({ id: item.id, ...item.data() }))
+        .filter(item => ACTIVE_WARNING_STATUSES.includes(item.status))
+        .filter(item => !normalizedCluster || item.clusterId === normalizedCluster)
+        .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60,
+  });
+};
+
+export const useAssignmentWarningsForAssignment = (assignmentId) => {
+  return useQuery({
+    queryKey: ['assignmentWarnings', 'assignment', assignmentId],
+    queryFn: async () => {
+      if (!assignmentId) return [];
+      const q = query(collection(db, 'assignmentWarnings'), where('assignmentId', '==', assignmentId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map(item => ({ id: item.id, ...item.data() }))
+        .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    },
+    enabled: !!assignmentId,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useIssueAssignmentWarning = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ assignment, type = 'poor_assignment_submission', message = '', evidence = {} }) => {
+      if (!assignment?.userId) throw new Error('경고 대상 학생 정보가 없습니다.');
+
+      const normalizedType = normalizeWarningType(type);
+      const warningId = getWarningId({
+        userId: assignment.userId,
+        assignmentId: assignment.id,
+        clusterId: assignment.clusterId,
+        date: assignment.date,
+        type: normalizedType,
+      });
+      const ref = doc(db, 'assignmentWarnings', warningId);
+      const warning = {
+        userId: assignment.userId,
+        userName: assignment.userName || '',
+        assignmentId: assignment.id || '',
+        clusterId: assignment.clusterId || '',
+        regionId: assignment.regionId || '',
+        date: assignment.date || '',
+        type: normalizedType,
+        status: 'active',
+        severity: 'warning',
+        message: getWarningMessage(normalizedType, message),
+        policyMessage: WARNING_POLICY_MESSAGE,
+        evidence: evidence || {},
+        appealLocked: false,
+        createdBy: auth.currentUser?.uid || '',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      await setDoc(ref, warning, { merge: true });
+      await recomputeAssignmentWarningSummary(assignment.userId);
+      return { id: warningId, ...warning };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['assignmentWarnings'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'userAllAssignments', variables?.assignment?.userId] });
+    },
+  });
+};
+
+export const useCancelAssignmentWarning = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ warning, reason = '' }) => {
+      if (!warning?.id || !warning?.userId) throw new Error('취소할 경고 정보가 없습니다.');
+      await setDoc(doc(db, 'assignmentWarnings', warning.id), {
+        status: 'cancelled',
+        cancelReason: String(reason || '').trim(),
+        cancelledBy: auth.currentUser?.uid || '',
+        cancelledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        ...(warning.appeal ? {
+          appeal: {
+            ...warning.appeal,
+            status: 'accepted',
+            reviewedAt: serverTimestamp(),
+            reviewedBy: auth.currentUser?.uid || '',
+          },
+        } : {}),
+      }, { merge: true });
+      await recomputeAssignmentWarningSummary(warning.userId);
+      return warning;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['assignmentWarnings'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'userAllAssignments', variables?.warning?.userId] });
+    },
+  });
+};
+
+export const useRejectWarningAppeal = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ warning, adminResponse = '' }) => {
+      if (!warning?.id || !warning?.userId) throw new Error('검토할 경고 정보가 없습니다.');
+      await setDoc(doc(db, 'assignmentWarnings', warning.id), {
+        status: 'active',
+        appeal: {
+          ...(warning.appeal || {}),
+          status: 'rejected',
+          adminResponse: String(adminResponse || '').trim(),
+          reviewedAt: serverTimestamp(),
+          reviewedBy: auth.currentUser?.uid || '',
+        },
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      await recomputeAssignmentWarningSummary(warning.userId);
+      return warning;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['assignmentWarnings'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'userAllAssignments', variables?.warning?.userId] });
+    },
+  });
+};
+
+export const useSubmitWarningAppeal = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ warningId, userId, text }) => {
+      const trimmed = String(text || '').trim();
+      if (!warningId || !userId) throw new Error('이의신청할 경고 정보가 없습니다.');
+      if (trimmed.length < 10) throw new Error('이의신청 내용은 최소 10자 이상 작성해 주세요.');
+
+      await updateDoc(doc(db, 'assignmentWarnings', warningId), {
+        status: 'appealed',
+        appealLocked: true,
+        appeal: {
+          text: trimmed,
+          status: 'submitted',
+          submittedAt: serverTimestamp(),
+        },
+        updatedAt: serverTimestamp(),
+      });
+      await recomputeAssignmentWarningSummary(userId);
+      return { warningId, userId };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['assignmentWarnings'] });
+      queryClient.invalidateQueries({ queryKey: ['assignmentWarnings', 'student', variables?.userId] });
+    },
+  });
+};
 
 const getTimestampMs = (value) => {
   if (!value) return 0;
@@ -358,6 +595,7 @@ export const useApplyMissingAssignmentPenalties = () => {
   return useMutation({
     mutationFn: async ({ userId, clusterId, attendanceRecords = [], assignments = [] }) => {
       if (!userId || !clusterId) return { applied: 0 };
+      const normalizedClusterId = normalizeClusterId(clusterId);
 
       const assignmentDates = new Set(
         assignments
@@ -389,27 +627,39 @@ export const useApplyMissingAssignmentPenalties = () => {
           attendance,
           missingStreak,
           penaltyAmount,
-          txId: `assignment_missing_${clusterId}_${attendance.date}`
+          txId: `assignment_missing_${normalizedClusterId}_${attendance.date}`
         });
       });
 
       let applied = 0;
+      let warningTouched = false;
       for (const item of candidates) {
         const userRef = doc(db, 'users', userId);
         const txRef = doc(db, 'users', userId, 'crystal_transactions', item.txId);
+        const warningId = item.missingStreak === 3
+          ? getWarningId({
+              userId,
+              clusterId: normalizedClusterId,
+              date: item.attendance.date,
+              type: 'consecutive_missing_assignment',
+            })
+          : '';
+        const warningRef = warningId ? doc(db, 'assignmentWarnings', warningId) : null;
 
-        const didApply = await runTransaction(db, async (transaction) => {
+        const result = await runTransaction(db, async (transaction) => {
           const existingTx = await transaction.get(txRef);
-          if (existingTx.exists()) return false;
+          const existingWarning = warningRef ? await transaction.get(warningRef) : null;
+          if (existingTx.exists()) return { didApply: false, didCreateWarning: false };
 
           const penaltyAbs = Math.abs(item.penaltyAmount);
           recordCrystalTransaction(userId, {
             amount: item.penaltyAmount,
             type: 'assignment_missing_penalty',
-            description: `출석 후 과제 미제출 페널티 (${item.attendance.date}, ${item.missingStreak}회 연속)`,
-            metadata: {
-              clusterId,
-              date: item.attendance.date,
+              description: `출석 후 과제 미제출 페널티 (${item.attendance.date}, ${item.missingStreak}회 연속)`,
+              metadata: {
+                clusterId,
+                normalizedClusterId,
+                date: item.attendance.date,
               attendanceId: item.attendance.id || '',
               missingStreak: item.missingStreak,
               basePenalty: 15,
@@ -423,10 +673,39 @@ export const useApplyMissingAssignmentPenalties = () => {
             lastAssignmentPenaltyAt: serverTimestamp()
           });
 
-          return true;
+          if (warningRef && !existingWarning?.exists()) {
+            transaction.set(warningRef, {
+              userId,
+              assignmentId: '',
+              clusterId: normalizedClusterId,
+              regionId: item.attendance.regionId || '',
+              date: item.attendance.date,
+              type: 'consecutive_missing_assignment',
+              status: 'active',
+              severity: 'warning',
+              message: getWarningMessage('consecutive_missing_assignment'),
+              policyMessage: WARNING_POLICY_MESSAGE,
+              evidence: {
+                missingStreak: item.missingStreak,
+                attendanceId: item.attendance.id || '',
+                graceHours: 12,
+              },
+              appealLocked: false,
+              createdBy: 'system_missing_assignment_sweep',
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
+          }
+
+          return { didApply: true, didCreateWarning: Boolean(warningRef && !existingWarning?.exists()) };
         });
 
-        if (didApply) applied += 1;
+        if (result.didApply) applied += 1;
+        if (result.didCreateWarning) warningTouched = true;
+      }
+
+      if (warningTouched) {
+        await recomputeAssignmentWarningSummary(userId);
       }
 
       return { applied };
@@ -434,6 +713,8 @@ export const useApplyMissingAssignmentPenalties = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['attendance', 'student', variables?.userId, variables?.clusterId] });
       queryClient.invalidateQueries({ queryKey: ['assignments', 'student', variables?.userId, variables?.clusterId] });
+      queryClient.invalidateQueries({ queryKey: ['assignmentWarnings', 'student', variables?.userId, variables?.clusterId] });
+      queryClient.invalidateQueries({ queryKey: ['assignmentWarnings'] });
     }
   });
 };

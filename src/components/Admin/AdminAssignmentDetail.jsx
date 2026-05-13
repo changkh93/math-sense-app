@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useReviewAssignment } from '../../hooks/useAssignments';
+import {
+  useAssignmentWarningsForAssignment,
+  useCancelAssignmentWarning,
+  useIssueAssignmentWarning,
+  useRejectWarningAppeal,
+  useReviewAssignment,
+} from '../../hooks/useAssignments';
 import {
   buildAssignmentFeedbackContext,
   createFallbackAssignmentFeedback,
@@ -9,10 +15,28 @@ import {
 import { generateAssignmentFeedback } from '../../services/geminiService';
 import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 import FileViewerModal from './FileViewerModal';
-import { Eye } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Eye, XCircle } from 'lucide-react';
+
+const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
+
+const WARNING_TYPE_LABELS = {
+  poor_assignment_submission: '불성실 과제 제출',
+  consecutive_missing_assignment: '연속 3회 미제출',
+};
+
+const getDefaultWarningMessage = (assignment) => {
+  if (assignment?.aiFeedbackPayload?.revisionRequest) {
+    return assignment.aiFeedbackPayload.revisionRequest;
+  }
+  return '이번 과제는 학습 기록과 제출 내용이 충분히 일치하지 않아 성실한 과제 수행으로 확인하기 어렵습니다.';
+};
 
 export default function AdminAssignmentDetail({ assignment, onReviewed }) {
   const reviewMutation = useReviewAssignment();
+  const issueWarningMutation = useIssueAssignmentWarning();
+  const cancelWarningMutation = useCancelAssignmentWarning();
+  const rejectAppealMutation = useRejectWarningAppeal();
+  const { data: assignmentWarnings = [] } = useAssignmentWarningsForAssignment(assignment?.id);
   
   const [feedback, setFeedback] = useState(assignment?.feedback || '');
   const [bonusCrystals, setBonusCrystals] = useState(assignment?.bonusCrystals ?? 40);
@@ -23,6 +47,10 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
   const [aiError, setAiError] = useState('');
   const [previewFile, setPreviewFile] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [shouldIssueWarning, setShouldIssueWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState(getDefaultWarningMessage(assignment));
+  const [warningCancelReason, setWarningCancelReason] = useState('');
+  const [appealResponse, setAppealResponse] = useState('');
 
   useEffect(() => {
     setFeedback(assignment?.feedback || '');
@@ -34,6 +62,10 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
     } : null));
     setAiContext(null);
     setAiError('');
+    setShouldIssueWarning(false);
+    setWarningMessage(getDefaultWarningMessage(assignment));
+    setWarningCancelReason('');
+    setAppealResponse('');
   }, [assignment]);
 
   if (!assignment) {
@@ -61,6 +93,19 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
         previousBonusCrystals: assignment.status === 'reviewed' ? (assignment.bonusCrystals || 0) : 0,
         previousStatus: assignment.status
       });
+      if (shouldIssueWarning) {
+        await issueWarningMutation.mutateAsync({
+          assignment,
+          type: 'poor_assignment_submission',
+          message: warningMessage,
+          evidence: {
+            reason: 'admin_review',
+            assignmentStatus: status,
+            suggestedBonusCrystals: Number(bonusCrystals) || 0,
+            aiEvidence: aiFeedback?.evidence || assignment.aiFeedbackEvidence || [],
+          },
+        });
+      }
       alert("검토 처리되었습니다.");
       if (onReviewed) onReviewed({ ...assignment, status, feedback, bonusCrystals: isApproved ? Number(bonusCrystals) : 0 });
     } catch (error) {
@@ -135,6 +180,38 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
   const applyRevisionRequest = () => {
     const text = aiFeedback?.revisionRequest || '이번 과제는 제출 내용의 일부가 확인되지 않습니다. 필요한 자료를 보완해서 다시 제출해 주세요.';
     setFeedback(text);
+  };
+
+  const activeWarnings = assignmentWarnings.filter(item => ['active', 'appealed'].includes(item.status));
+  const cancelledWarnings = assignmentWarnings.filter(item => item.status === 'cancelled');
+  const appealWarnings = assignmentWarnings.filter(item => item.appeal?.status === 'submitted');
+
+  const handleCancelWarning = async (warning) => {
+    if (!warning?.id) return;
+    const reason = warningCancelReason.trim() || '관리자 검토로 경고 취소';
+    try {
+      await cancelWarningMutation.mutateAsync({ warning, reason });
+      setWarningCancelReason('');
+      alert('경고를 취소했습니다.');
+    } catch (error) {
+      console.error('Cancel warning failed:', error);
+      alert('경고 취소에 실패했습니다.');
+    }
+  };
+
+  const handleRejectAppeal = async (warning) => {
+    if (!warning?.id) return;
+    try {
+      await rejectAppealMutation.mutateAsync({
+        warning,
+        adminResponse: appealResponse || '관리자 검토 결과 경고를 유지합니다.',
+      });
+      setAppealResponse('');
+      alert('이의신청을 기각 처리했습니다.');
+    } catch (error) {
+      console.error('Reject appeal failed:', error);
+      alert('이의신청 처리에 실패했습니다.');
+    }
   };
 
   return (
@@ -236,6 +313,48 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
             </div>
           </div>
         )}
+
+        {assignmentWarnings.length > 0 && (
+          <div style={{ marginTop: '1.5rem', display: 'grid', gap: '0.75rem' }}>
+            <h4 style={{ color: '#fbbf24', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertTriangle size={18} /> 경고 기록
+            </h4>
+            {assignmentWarnings.map((warning) => (
+              <div
+                key={warning.id}
+                style={{
+                  padding: '1rem',
+                  borderRadius: 8,
+                  background: warning.status === 'cancelled' ? 'rgba(16,185,129,0.08)' : 'rgba(251,191,36,0.08)',
+                  border: `1px solid ${warning.status === 'cancelled' ? 'rgba(16,185,129,0.35)' : 'rgba(251,191,36,0.35)'}`,
+                  color: 'var(--text-bright)',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.55,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.45rem' }}>
+                  <strong style={{ color: warning.status === 'cancelled' ? '#10b981' : '#fbbf24' }}>
+                    {WARNING_TYPE_LABELS[warning.type] || warning.type}
+                  </strong>
+                  <span className="font-tech" style={{ color: warning.status === 'cancelled' ? '#10b981' : '#fbbf24', fontSize: '0.75rem' }}>
+                    {warning.status === 'cancelled' ? '취소됨' : warning.status === 'appealed' ? '이의신청 접수' : '활성'}
+                  </span>
+                </div>
+                <div>{warning.message}</div>
+                <div style={{ color: '#fca5a5', marginTop: '0.45rem', fontSize: '0.82rem' }}>{warning.policyMessage || WARNING_POLICY_MESSAGE}</div>
+                {warning.appeal?.text && (
+                  <div style={{ marginTop: '0.8rem', padding: '0.75rem', borderRadius: 6, background: 'rgba(255,255,255,0.05)' }}>
+                    <strong style={{ color: 'var(--crystal-cyan)' }}>이의신청</strong>
+                    <div style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap' }}>{warning.appeal.text}</div>
+                    {warning.appeal.status === 'rejected' && warning.appeal.adminResponse && (
+                      <div style={{ marginTop: '0.5rem', color: '#fca5a5' }}>기각 사유: {warning.appeal.adminResponse}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Action Area (Write Feedback) */}
@@ -328,6 +447,98 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           <button className="admin-btn secondary" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }} onClick={() => applyMacro('첨부 파일이 열리지 않거나 내용이 누락되었습니다. 다시 확인 후 재전송 해주세요.')}>누락됨</button>
         </div>
 
+        <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1rem', padding: '1rem', borderRadius: 10, background: 'rgba(251, 191, 36, 0.06)', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
+          <label style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', color: '#fbbf24', fontWeight: 800 }}>
+            <input
+              type="checkbox"
+              checked={shouldIssueWarning}
+              onChange={(event) => setShouldIssueWarning(event.target.checked)}
+              disabled={activeWarnings.some(item => item.type === 'poor_assignment_submission')}
+            />
+            불성실 과제 제출 경고 1회 저장
+          </label>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.84rem', lineHeight: 1.5 }}>
+            불성실 제출 경고 1회, 연속 3회 미제출 경고 1회로 누적됩니다. 경고 3회 누적 시 “{WARNING_POLICY_MESSAGE}” 문구가 학생에게 표시됩니다.
+          </div>
+          {shouldIssueWarning && (
+            <textarea
+              className="admin-input"
+              value={warningMessage}
+              onChange={(event) => setWarningMessage(event.target.value)}
+              rows={3}
+              style={{ resize: 'vertical', lineHeight: 1.55 }}
+            />
+          )}
+          {activeWarnings.some(item => item.type === 'poor_assignment_submission') && (
+            <div style={{ color: '#fca5a5', fontSize: '0.84rem' }}>이 과제에는 이미 활성 불성실 제출 경고가 있습니다.</div>
+          )}
+          {activeWarnings.length > 0 && (
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
+              <input
+                className="admin-input"
+                value={warningCancelReason}
+                onChange={(event) => setWarningCancelReason(event.target.value)}
+                placeholder="경고 취소 사유"
+              />
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {activeWarnings.map(warning => (
+                  <button
+                    key={warning.id}
+                    type="button"
+                    className="admin-btn secondary"
+                    style={{ fontSize: '0.78rem', padding: '0.32rem 0.55rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    disabled={cancelWarningMutation.isPending}
+                    onClick={() => handleCancelWarning(warning)}
+                  >
+                    <XCircle size={14} /> {WARNING_TYPE_LABELS[warning.type] || '경고'} 취소
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {appealWarnings.length > 0 && (
+            <div style={{ display: 'grid', gap: '0.55rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <strong style={{ color: 'var(--crystal-cyan)' }}>이의신청 검토</strong>
+              <textarea
+                className="admin-input"
+                value={appealResponse}
+                onChange={(event) => setAppealResponse(event.target.value)}
+                placeholder="기각 시 학생에게 표시할 답변"
+                rows={2}
+              />
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {appealWarnings.map(warning => (
+                  <React.Fragment key={warning.id}>
+                    <button
+                      type="button"
+                      className="admin-btn primary"
+                      style={{ fontSize: '0.78rem', padding: '0.32rem 0.55rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      disabled={cancelWarningMutation.isPending}
+                      onClick={() => handleCancelWarning(warning)}
+                    >
+                      <CheckCircle size={14} /> 수락하고 경고 취소
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn danger"
+                      style={{ fontSize: '0.78rem', padding: '0.32rem 0.55rem' }}
+                      disabled={rejectAppealMutation.isPending}
+                      onClick={() => handleRejectAppeal(warning)}
+                    >
+                      이의신청 기각
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+          {cancelledWarnings.length > 0 && (
+            <div style={{ color: '#10b981', fontSize: '0.82rem' }}>
+              취소된 경고 {cancelledWarnings.length}건은 누적 경고 수에서 제외됩니다.
+            </div>
+          )}
+        </div>
+
         <textarea 
           className="admin-input" 
           placeholder="사령부 회신 (피드백) 내용 작성..." 
@@ -362,14 +573,14 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
             <button 
               className="admin-btn danger" 
               onClick={() => handleReview('missing')}
-              disabled={reviewMutation.isPending}
+              disabled={reviewMutation.isPending || issueWarningMutation.isPending}
             >
               ⛔ 누락 처리
             </button>
             <button 
               className="admin-btn danger" 
               onClick={() => handleReview('needs_revision')}
-              disabled={reviewMutation.isPending}
+              disabled={reviewMutation.isPending || issueWarningMutation.isPending}
             >
               ⚠️ 반려 (보완요청)
             </button>
@@ -377,7 +588,7 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
               className="admin-btn primary" 
               style={{ background: '#10b981', borderColor: '#10b981' }}
               onClick={() => handleReview('reviewed')}
-              disabled={reviewMutation.isPending}
+              disabled={reviewMutation.isPending || issueWarningMutation.isPending}
             >
               ✓ 승인 (APPROVE)
             </button>

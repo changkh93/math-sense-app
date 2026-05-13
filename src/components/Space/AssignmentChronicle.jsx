@@ -11,7 +11,14 @@ import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
  * Assignment Chronicle (The Logbook / E-Book View)
  * Single-column, book-like view with inline file previews and compact feedback.
  */
-export default function AssignmentChronicle({ assignments, onClose }) {
+const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
+
+const warningTypeLabel = (type) => {
+  if (type === 'consecutive_missing_assignment') return '연속 3회 미제출';
+  return '불성실 과제 제출';
+};
+
+export default function AssignmentChronicle({ assignments, warnings = [], onClose, onAppealRequest }) {
   const validAssignments = useMemo(() => {
     if (!assignments) return [];
     return [...assignments]
@@ -22,6 +29,7 @@ export default function AssignmentChronicle({ assignments, onClose }) {
   const [currentPage, setCurrentPage] = useState(validAssignments.length > 0 ? validAssignments.length - 1 : 0);
   const [showIndex, setShowIndex] = useState(false);
   const [activeTab, setActiveTab] = useState('report'); 
+  const [warningModalDismissed, setWarningModalDismissed] = useState(false);
 
   // Reset page when assignments change
   useEffect(() => {
@@ -42,6 +50,19 @@ export default function AssignmentChronicle({ assignments, onClose }) {
   const isReviewed = currentLog.status === 'reviewed';
   const isNeedsRevision = currentLog.status === 'needs_revision';
   const bonusCrystals = Number(currentLog.bonusCrystals) || 0;
+  const activeWarnings = useMemo(
+    () => (warnings || []).filter(item => ['active', 'appealed'].includes(item.status)),
+    [warnings]
+  );
+  const currentWarnings = useMemo(
+    () => activeWarnings.filter(item => (
+      item.date === currentLog.date ||
+      (item.assignmentId && item.assignmentId === currentLog.id)
+    )),
+    [activeWarnings, currentLog.date, currentLog.id]
+  );
+
+  const showWarningModal = activeWarnings.length > 0 && !warningModalDismissed;
 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading } = useLearningHistory(
     activeTab === 'timeline' ? currentLog.userId : null, 
@@ -73,6 +94,88 @@ export default function AssignmentChronicle({ assignments, onClose }) {
       overflow: 'hidden',
       boxSizing: 'border-box'
     }}>
+      <AnimatePresence>
+        {showWarningModal && activeWarnings.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 10050,
+              background: 'rgba(2,6,23,0.82)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1.2rem',
+            }}
+          >
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              className="glass-card"
+              style={{
+                width: 'min(560px, 100%)',
+                padding: '1.5rem',
+                border: '1px solid rgba(251,191,36,0.5)',
+                background: 'rgba(15,23,42,0.96)',
+                boxShadow: '0 20px 70px rgba(0,0,0,0.45)',
+              }}
+            >
+              <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                학습 경고
+              </div>
+              <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0 0 0.8rem', fontSize: '1.45rem' }}>
+                경고가 기록되었습니다
+              </h3>
+              <div style={{ color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '1rem' }}>
+                현재 누적 경고는 <strong style={{ color: '#fbbf24' }}>{activeWarnings.length}회</strong>입니다.
+                {activeWarnings.length >= 3 && (
+                  <>
+                    <br />
+                    {WARNING_POLICY_MESSAGE}
+                  </>
+                )}
+              </div>
+              <div style={{ display: 'grid', gap: '0.6rem', maxHeight: 220, overflowY: 'auto', marginBottom: '1rem' }}>
+                {activeWarnings.slice(0, 4).map((warning) => (
+                  <div key={warning.id} style={{ padding: '0.8rem', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', marginBottom: '0.35rem' }}>
+                      <strong style={{ color: '#fbbf24' }}>{warningTypeLabel(warning.type)}</strong>
+                      <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{warning.date}</span>
+                    </div>
+                    <div style={{ color: 'var(--text-bright)', lineHeight: 1.5, fontSize: '0.92rem' }}>{warning.message}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="space-btn cosmic-btn font-tech"
+                  onClick={() => setWarningModalDismissed(true)}
+                >
+                  확인했습니다
+                </button>
+                <button
+                  type="button"
+                  className="space-btn font-tech"
+                  style={{ borderColor: '#fbbf24', color: '#fbbf24' }}
+                  onClick={() => {
+                    const target = activeWarnings[0];
+                    setWarningModalDismissed(true);
+                    onAppealRequest?.(target);
+                  }}
+                >
+                  이의신청하기
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Persistent Top Bar Container */}
       <div style={{ 
         width: '100%', 
@@ -226,6 +329,7 @@ export default function AssignmentChronicle({ assignments, onClose }) {
                     {isReviewed && <span className="font-tech" style={{ background: 'rgba(0,212,255,0.2)', color: 'var(--crystal-cyan)', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid var(--crystal-cyan)' }}>✓ APPROVED</span>}
                     {isNeedsRevision && <span className="font-tech siren-pulse" style={{ background: 'rgba(255,69,0,0.2)', color: '#ff4500', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #ff4500' }}>⚠ REVISION</span>}
                     {currentLog.status === 'submitted' && <span className="font-tech" style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #fbbf24' }}>⏳ 검토 대기</span>}
+                    {currentWarnings.length > 0 && <span className="font-tech" style={{ background: 'rgba(251,191,36,0.16)', color: '#fbbf24', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #fbbf24' }}>경고 {currentWarnings.length}</span>}
                   </div>
                   <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '1.1rem' }}>{currentLog.date}</span>
                 </div>
@@ -285,6 +389,39 @@ export default function AssignmentChronicle({ assignments, onClose }) {
                         <div style={{ color: 'var(--text-bright)', fontSize: '1.45rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
                           💎 +{bonusCrystals}
                         </div>
+                      </div>
+                    )}
+
+                    {currentWarnings.length > 0 && (
+                      <div style={{
+                        marginBottom: '1rem',
+                        padding: '1rem 1.25rem',
+                        background: 'rgba(251,191,36,0.08)',
+                        border: '1px solid rgba(251,191,36,0.45)',
+                        borderRadius: 8,
+                      }}>
+                        <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.82rem', marginBottom: '0.55rem' }}>
+                          학습 경고
+                        </div>
+                        {currentWarnings.map(warning => (
+                          <div key={warning.id} style={{ color: 'var(--text-bright)', lineHeight: 1.6, marginBottom: '0.55rem' }}>
+                            <strong style={{ color: '#fbbf24' }}>{warningTypeLabel(warning.type)}</strong>
+                            <div>{warning.message}</div>
+                            {activeWarnings.length >= 3 && (
+                              <div style={{ color: '#fca5a5', fontSize: '0.84rem', marginTop: '0.25rem' }}>
+                                {warning.policyMessage || WARNING_POLICY_MESSAGE}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="space-btn font-tech"
+                          style={{ marginTop: '0.3rem', borderColor: '#fbbf24', color: '#fbbf24', fontSize: '0.8rem', padding: '0.45rem 0.8rem' }}
+                          onClick={() => onAppealRequest?.(currentWarnings[0])}
+                        >
+                          이의신청하기
+                        </button>
                       </div>
                     )}
 

@@ -2,7 +2,16 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../../hooks/useAuth';
-import { useStudentAssignments, useSubmitAssignment, useRecordAttendance, useStudentAttendance, useSubmitFeedbackResponse, useApplyMissingAssignmentPenalties } from '../../hooks/useAssignments';
+import {
+  useApplyMissingAssignmentPenalties,
+  useRecordAttendance,
+  useStudentAssignments,
+  useStudentAssignmentWarnings,
+  useStudentAttendance,
+  useSubmitAssignment,
+  useSubmitFeedbackResponse,
+  useSubmitWarningAppeal,
+} from '../../hooks/useAssignments';
 import { useClusters } from '../../hooks/useContent';
 import { storage, getFunctionUrl } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -14,6 +23,7 @@ import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 
 const MotionDiv = motion.div;
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
+const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
 
 const getTimestampMs = (value) => {
   if (!value) return 0;
@@ -108,6 +118,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   // Data Fetching - Fetch cluster-wide assignments (ignore regionId)
   const { data: assignments, isLoading } = useStudentAssignments(user?.uid, clusterId);
   const { data: attendanceRecords } = useStudentAttendance(user?.uid, clusterId);
+  const { data: assignmentWarnings = [] } = useStudentAssignmentWarnings(user?.uid, clusterId);
   const { data: clusters } = useClusters();
   const submitMutation = useSubmitAssignment();
   const attendanceMutation = useRecordAttendance();
@@ -266,7 +277,12 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
     return (
       <AssignmentChronicle 
         assignments={effectiveAssignments} 
+        warnings={assignmentWarnings}
         onClose={() => setShowChronicle(false)} 
+        onAppealRequest={(warning) => {
+          setShowChronicle(false);
+          if (warning?.date) setSelectedDateStr(warning.date);
+        }}
       />
     );
   }
@@ -495,6 +511,11 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               regionId={regionId}
               dateStr={selectedDateStr}
               assignment={effectiveAssignments?.find(a => a.date === selectedDateStr)} 
+              warnings={assignmentWarnings.filter(warning => (
+                warning.date === selectedDateStr ||
+                (warning.assignmentId && warning.assignmentId === effectiveAssignments?.find(a => a.date === selectedDateStr)?.id)
+              ))}
+              activeWarningCount={assignmentWarnings.length}
               missingPenalty={missingPenaltyByDate[selectedDateStr]}
               user={user}
               userData={userData}
@@ -629,7 +650,7 @@ function SubmissionSuccessModal({ dateStr, onClose }) {
   );
 }
 
-function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPenalty, user, userData, submitMutation, onCancel, onSubmitted, onNavigateToUnit }) {
+function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = [], activeWarningCount = 0, missingPenalty, user, userData, submitMutation, onCancel, onSubmitted, onNavigateToUnit }) {
   const [activeTab, setActiveTab] = useState('report'); // 'report' | 'timeline' | 'growth'
   const [reportDays, setReportDays] = useState(30);
   
@@ -646,10 +667,13 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPena
   const [feedbackComment, setFeedbackComment] = useState(assignment?.feedbackComment || assignment?.feedbackResponse?.comment || '');
   const [feedbackResponseSaved, setFeedbackResponseSaved] = useState(Boolean(assignment?.feedbackRespondedAt));
   const [feedbackResponseError, setFeedbackResponseError] = useState('');
+  const [appealTextByWarning, setAppealTextByWarning] = useState({});
+  const [appealError, setAppealError] = useState('');
   const fileInputRef = useRef(null);
 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
   const feedbackResponseMutation = useSubmitFeedbackResponse();
+  const warningAppealMutation = useSubmitWarningAppeal();
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -692,6 +716,23 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPena
     } catch (error) {
       console.error('Feedback response save failed:', error);
       setFeedbackResponseError('저장에 실패했습니다. 잠시 뒤 다시 시도해 주세요.');
+    }
+  };
+
+  const handleSubmitWarningAppeal = async (warning) => {
+    if (!warning?.id) return;
+    const text = appealTextByWarning[warning.id] || '';
+    setAppealError('');
+    try {
+      await warningAppealMutation.mutateAsync({
+        warningId: warning.id,
+        userId: user?.uid,
+        text,
+      });
+      setAppealTextByWarning(prev => ({ ...prev, [warning.id]: '' }));
+    } catch (error) {
+      console.error('Warning appeal failed:', error);
+      setAppealError(error?.message || '이의신청 제출에 실패했습니다.');
     }
   };
 
@@ -925,6 +966,58 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, missingPena
       {activeTab === 'report' && (
         <>
           <AssignmentRewardSummary bonusCrystals={assignment?.bonusCrystals} missingPenalty={!assignment ? missingPenalty : null} />
+
+          {warnings.length > 0 && (
+            <div className="glass-card" style={{ padding: '1.2rem', marginBottom: '1rem', border: '1px solid rgba(251, 191, 36, 0.45)', background: 'rgba(251, 191, 36, 0.08)' }}>
+              <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+                학습 경고
+              </div>
+              <div style={{ display: 'grid', gap: '0.9rem' }}>
+                {warnings.map((warning) => {
+                  const appealSubmitted = Boolean(warning.appealLocked || warning.appeal?.text);
+                  return (
+                    <div key={warning.id} style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div style={{ color: 'var(--text-bright)', lineHeight: 1.6 }}>{warning.message}</div>
+                      {activeWarningCount >= 3 && (
+                        <div style={{ color: '#fca5a5', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                          {warning.policyMessage || WARNING_POLICY_MESSAGE}
+                        </div>
+                      )}
+                      {appealSubmitted ? (
+                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: 6, background: 'rgba(0, 212, 255, 0.08)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                          <strong style={{ color: 'var(--crystal-cyan)' }}>이의신청 제출 완료</strong>
+                          <div style={{ marginTop: '0.4rem', whiteSpace: 'pre-wrap' }}>{warning.appeal?.text}</div>
+                          <div style={{ marginTop: '0.4rem', fontSize: '0.82rem' }}>제출 후 수정할 수 없습니다.</div>
+                          {warning.appeal?.status === 'rejected' && warning.appeal?.adminResponse && (
+                            <div style={{ marginTop: '0.5rem', color: '#fca5a5' }}>관리자 답변: {warning.appeal.adminResponse}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gap: '0.55rem', marginTop: '0.75rem' }}>
+                          <textarea
+                            className="feedback-response-comment"
+                            rows={3}
+                            value={appealTextByWarning[warning.id] || ''}
+                            onChange={(event) => setAppealTextByWarning(prev => ({ ...prev, [warning.id]: event.target.value }))}
+                            placeholder="경고가 잘못되었다고 생각하면 근거를 적어 주세요. 이의신청은 제출 후 수정할 수 없습니다."
+                          />
+                          <button
+                            type="button"
+                            className="cosmic-button secondary feedback-response-submit"
+                            disabled={warningAppealMutation.isPending || String(appealTextByWarning[warning.id] || '').trim().length < 10}
+                            onClick={() => handleSubmitWarningAppeal(warning)}
+                          >
+                            {warningAppealMutation.isPending ? '제출 중...' : '이의신청 제출'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {appealError && <div className="feedback-response-error" style={{ marginTop: '0.75rem' }}>{appealError}</div>}
+            </div>
+          )}
 
           {/* Feedback Section (if reviewed or needs revision) */}
           {assignment?.feedback && (

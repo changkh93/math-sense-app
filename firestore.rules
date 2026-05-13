@@ -256,6 +256,34 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Assignment warning ledger. Admins issue/cancel warnings, students can only
+    // submit one immutable appeal for their own active warning.
+    match /assignmentWarnings/{warningId} {
+      allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || (
+        isAuth() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.type == 'consecutive_missing_assignment' &&
+        request.resource.data.status == 'active'
+      );
+      allow update: if isAdmin() || (
+        isAuth() &&
+        resource.data.userId == request.auth.uid &&
+        resource.data.status == 'active' &&
+        (!('appealLocked' in resource.data) || resource.data.appealLocked != true) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'appeal', 'appealLocked', 'updatedAt']) &&
+        request.resource.data.status == 'appealed' &&
+        request.resource.data.appealLocked == true &&
+        request.resource.data.appeal is map &&
+        request.resource.data.appeal.status == 'submitted' &&
+        request.resource.data.appeal.text is string &&
+        request.resource.data.appeal.text.size() >= 10 &&
+        request.resource.data.appeal.text.size() <= 2000 &&
+        request.resource.data.appeal.submittedAt == request.time
+      );
+      allow delete: if isAdmin();
+    }
+
     // Star Messages (Community Ticker)
     match /starMessages/{messageId} {
       allow read: if isAuth();
