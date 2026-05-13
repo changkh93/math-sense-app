@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, limit } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from '../../firebase';
 import { useClusters } from '../../hooks/useContent';
@@ -213,7 +213,7 @@ function UserAccessManager() {
         nextRegionAccess[regionId] = newStatus; // active | completed | suspended
       }
 
-      await setDoc(userRef, { regionAccess: nextRegionAccess }, { merge: true });
+      await updateDoc(userRef, { regionAccess: nextRegionAccess });
 
       setUsers(prev => prev.map(u => {
         if (u.uid === userId) {
