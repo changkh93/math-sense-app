@@ -16,6 +16,7 @@ const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const DIRECT_MEMO_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const CRYSTAL_GIFT_DAILY_LIMIT = 50;
 
 /**
  * fetchNotebook
@@ -802,6 +803,15 @@ function getDisplayNameFromUser(userData = {}) {
   return userData.publicDisplayName || userData.studentName || userData.name || userData.displayName || "탐사원";
 }
 
+function getKstDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 function normalizeDirectMemoBody(value) {
   return String(value || "").replace(/\r\n/g, "\n").trim().slice(0, DIRECT_MEMO_MAX_LENGTH);
 }
@@ -1486,6 +1496,137 @@ exports.listStudyCrews = regionalFunctions.https.onCall(async (_data, context) =
 
   return {
     crews,
+  };
+});
+
+exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) => {
+  const senderId = await requireAuthUid(context);
+  const recipientId = String(data?.recipientId || "").trim();
+  const amount = Number(data?.amount);
+
+  if (!recipientId) {
+    throw new functions.https.HttpsError("invalid-argument", "받는 사람을 선택해주세요.");
+  }
+  if (recipientId === senderId) {
+    throw new functions.https.HttpsError("invalid-argument", "자기 자신에게는 광석을 보낼 수 없습니다.");
+  }
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new functions.https.HttpsError("invalid-argument", "보낼 광석 수를 1 이상 정수로 입력해주세요.");
+  }
+  if (amount > CRYSTAL_GIFT_DAILY_LIMIT) {
+    throw new functions.https.HttpsError("failed-precondition", `하루에 보낼 수 있는 광석은 최대 ${CRYSTAL_GIFT_DAILY_LIMIT}개입니다.`);
+  }
+
+  const db = admin.firestore();
+  const now = new Date();
+  const nowTimestamp = admin.firestore.Timestamp.fromDate(now);
+  const dayKey = getKstDateKey(now);
+  const senderRef = db.collection("users").doc(senderId);
+  const recipientRef = db.collection("users").doc(recipientId);
+  const limitRef = db.collection("crystalTransferDailyLimits").doc(`${senderId}_${dayKey}`);
+  const giftRef = db.collection("crystalTransfers").doc();
+  const senderTxRef = senderRef.collection("crystal_transactions").doc(`gift-sent-${giftRef.id}`);
+  const recipientTxRef = recipientRef.collection("crystal_transactions").doc(`gift-received-${giftRef.id}`);
+
+  const result = await db.runTransaction(async (tx) => {
+    const [senderSnap, recipientSnap, limitSnap] = await Promise.all([
+      tx.get(senderRef),
+      tx.get(recipientRef),
+      tx.get(limitRef),
+    ]);
+
+    if (!senderSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "보내는 사람 프로필을 찾지 못했습니다.");
+    }
+    if (!recipientSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "받는 사람 프로필을 찾지 못했습니다.");
+    }
+
+    const senderData = senderSnap.data() || {};
+    const recipientData = recipientSnap.data() || {};
+    if (senderData.role === "parent" || senderData.role === "admin") {
+      throw new functions.https.HttpsError("permission-denied", "학생 계정만 광석을 보낼 수 있습니다.");
+    }
+    if (recipientData.role === "parent" || recipientData.role === "admin") {
+      throw new functions.https.HttpsError("failed-precondition", "학생 계정에게만 광석을 보낼 수 있습니다.");
+    }
+
+    const senderCrystals = Math.max(0, Number(senderData.crystals || 0));
+    if (senderCrystals < amount) {
+      throw new functions.https.HttpsError("failed-precondition", "보유 광석이 부족합니다.");
+    }
+
+    const sentToday = Math.max(0, Number(limitSnap.data()?.sentAmount || 0));
+    if (sentToday + amount > CRYSTAL_GIFT_DAILY_LIMIT) {
+      const remaining = Math.max(0, CRYSTAL_GIFT_DAILY_LIMIT - sentToday);
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        `오늘은 ${remaining}광석까지만 더 보낼 수 있습니다.`
+      );
+    }
+
+    const senderName = getDisplayNameFromUser(senderData);
+    const recipientName = getDisplayNameFromUser(recipientData);
+    const transferData = {
+      senderId,
+      senderName,
+      recipientId,
+      recipientName,
+      amount,
+      dayKey,
+      createdAt: nowTimestamp,
+    };
+
+    tx.set(giftRef, transferData);
+    tx.set(senderRef, {
+      crystals: senderCrystals - amount,
+    }, { merge: true });
+    tx.set(recipientRef, {
+      crystals: Math.max(0, Number(recipientData.crystals || 0)) + amount,
+    }, { merge: true });
+    tx.set(limitRef, {
+      senderId,
+      dayKey,
+      sentAmount: sentToday + amount,
+      updatedAt: nowTimestamp,
+    }, { merge: true });
+    tx.set(senderTxRef, {
+      amount: -amount,
+      type: "crystal_gift_sent",
+      description: `${recipientName}님에게 광석 선물`,
+      metadata: {
+        transferId: giftRef.id,
+        recipientId,
+        recipientName,
+        dayKey,
+      },
+      timestamp: nowTimestamp,
+    });
+    tx.set(recipientTxRef, {
+      amount,
+      type: "crystal_gift_received",
+      description: `${senderName}님에게 받은 광석 선물`,
+      metadata: {
+        transferId: giftRef.id,
+        senderId,
+        senderName,
+        dayKey,
+      },
+      timestamp: nowTimestamp,
+    });
+
+    return {
+      transferId: giftRef.id,
+      recipientName,
+      sentToday: sentToday + amount,
+      remainingToday: CRYSTAL_GIFT_DAILY_LIMIT - sentToday - amount,
+    };
+  });
+
+  return {
+    success: true,
+    dailyLimit: CRYSTAL_GIFT_DAILY_LIMIT,
+    ...result,
   };
 });
 

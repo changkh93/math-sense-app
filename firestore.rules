@@ -187,6 +187,24 @@ service cloud.firestore {
       }
     }
 
+    // Server-managed crystal gifting audit and daily limit documents.
+    match /crystalTransfers/{transferId} {
+      allow read: if isAuth() && (
+        resource.data.senderId == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if false;
+    }
+
+    match /crystalTransferDailyLimits/{limitId} {
+      allow read: if isAuth() && (
+        resource.data.senderId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if false;
+    }
+
     // Parents: Parent accounts can read their own doc, admins can manage
     match /parents/{parentId} {
       allow read: if isAuth() && (request.auth.uid == parentId || isAdmin());

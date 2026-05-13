@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { motion as Motion, AnimatePresence } from 'framer-motion'
+import { motion as Motion } from 'framer-motion'
 import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
-import { db, auth } from '../../firebase'
+import { httpsCallable } from 'firebase/functions'
+import { Gift, Search, Send, UserRound, X } from 'lucide-react'
+import { db, auth, functions } from '../../firebase'
 import './CrystalLedger.css'
 import { getTodayKST, getYesterdayKST, getKSTComponents } from '../../utils/streakUtils'
+
+const CRYSTAL_GIFT_DAILY_LIMIT = 50
 
 // Transaction type configs
 const TX_CONFIG = {
@@ -17,6 +21,8 @@ const TX_CONFIG = {
   teacher_verify: { icon: '👨‍🏫', label: '교사 검증 보상', color: '#4ade80' },
   streak_bonus: { icon: '🔥', label: '연속 학습 보너스', color: '#fbbf24' },
   assignment_missing_penalty: { icon: '📝', label: '과제 미제출 차감', color: '#fb7185' },
+  crystal_gift_sent: { icon: '🎁', label: '친구 광석 선물', color: '#f87171' },
+  crystal_gift_received: { icon: '🎁', label: '친구 광석 수령', color: '#4ade80' },
   admin_adjust: { icon: '⚙️', label: '관리자 조정', color: '#a78bfa' },
   other: { icon: '💎', label: '기타', color: '#60a5fa' },
 }
@@ -47,12 +53,32 @@ function formatTime(date) {
   return `${period} ${hour12}:${m}`
 }
 
+function getProfileName(profile = {}, fallback = '탐사원') {
+  return profile.publicDisplayName || profile.studentName || profile.name || profile.displayName || fallback
+}
+
+function getProfileHint(profile = {}) {
+  return profile.publicTitle || profile.crewName || profile.email || ''
+}
+
+function getTransferErrorMessage(err) {
+  if (err?.code === 'functions/internal') return '광석 송금 서버가 아직 준비되지 않았습니다. Cloud Functions 배포가 필요합니다.'
+  if (err?.message) return err.message
+  return '광석 송금에 실패했습니다. 다시 시도해주세요.'
+}
+
 export default function CrystalLedger({ userData }) {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [txLimit, setTxLimit] = useState(30)
   const [hasMore, setHasMore] = useState(true)
+  const [recipients, setRecipients] = useState([])
+  const [recipientSearch, setRecipientSearch] = useState('')
+  const [selectedRecipientId, setSelectedRecipientId] = useState('')
+  const [transferAmount, setTransferAmount] = useState('')
+  const [transferBusy, setTransferBusy] = useState(false)
+  const [transferMessage, setTransferMessage] = useState(null)
 
   const crystals = userData?.crystals || 0
 
@@ -100,6 +126,29 @@ export default function CrystalLedger({ userData }) {
       }
     };
   }, [txLimit])
+
+  useEffect(() => {
+    const user = auth.currentUser
+    if (!user) {
+      setRecipients([])
+      return undefined
+    }
+
+    const unsubscribeRecipients = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const list = snapshot.docs
+        .map(docSnap => ({ uid: docSnap.id, ...docSnap.data() }))
+        .filter(profile => profile.uid !== user.uid && profile.role !== 'parent' && profile.role !== 'admin')
+        .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'))
+
+      setRecipients(list)
+      setSelectedRecipientId(prev => (prev && list.some(item => item.uid === prev) ? prev : ''))
+    }, (error) => {
+      console.error('Crystal transfer recipients error:', error)
+      setRecipients([])
+    })
+
+    return () => unsubscribeRecipients()
+  }, [])
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -155,6 +204,90 @@ export default function CrystalLedger({ userData }) {
     return (crystals || 0) - totalEarned + totalSpent
   }, [crystals, totalEarned, totalSpent])
 
+  const selectedRecipient = useMemo(
+    () => recipients.find(recipient => recipient.uid === selectedRecipientId) || null,
+    [recipients, selectedRecipientId]
+  )
+
+  const filteredRecipients = useMemo(() => {
+    const keyword = recipientSearch.trim().toLowerCase()
+    if (!keyword || selectedRecipient) return []
+
+    return recipients.filter(recipient => {
+      const haystack = [
+        recipient.publicDisplayName || '',
+        recipient.studentName || '',
+        recipient.name || '',
+        recipient.displayName || '',
+        recipient.crewName || '',
+        recipient.publicTitle || '',
+        recipient.email || '',
+      ].join(' ').toLowerCase()
+      return haystack.includes(keyword)
+    }).slice(0, 8)
+  }, [recipientSearch, recipients, selectedRecipient])
+
+  const handleSelectRecipient = (recipient) => {
+    setSelectedRecipientId(recipient.uid)
+    setRecipientSearch('')
+    setTransferMessage(null)
+  }
+
+  const handleClearRecipient = () => {
+    setSelectedRecipientId('')
+    setRecipientSearch('')
+  }
+
+  const handleTransferAmountChange = (event) => {
+    const value = event.target.value.replace(/[^\d]/g, '')
+    setTransferAmount(value)
+    setTransferMessage(null)
+  }
+
+  const handleCrystalTransfer = async (event) => {
+    event.preventDefault()
+    if (transferBusy) return
+
+    const amount = Number(transferAmount)
+    if (!selectedRecipient) {
+      setTransferMessage({ type: 'error', text: '광석을 받을 친구를 선택해주세요.' })
+      return
+    }
+    if (!Number.isInteger(amount) || amount <= 0) {
+      setTransferMessage({ type: 'error', text: '보낼 광석 수를 1 이상 정수로 입력해주세요.' })
+      return
+    }
+    if (amount > CRYSTAL_GIFT_DAILY_LIMIT) {
+      setTransferMessage({ type: 'error', text: `하루에 보낼 수 있는 광석은 최대 ${CRYSTAL_GIFT_DAILY_LIMIT}개입니다.` })
+      return
+    }
+    if (amount > crystals) {
+      setTransferMessage({ type: 'error', text: '보유 광석이 부족합니다.' })
+      return
+    }
+
+    setTransferBusy(true)
+    setTransferMessage(null)
+
+    try {
+      const transferCrystals = httpsCallable(functions, 'transferCrystals')
+      const result = await transferCrystals({ recipientId: selectedRecipient.uid, amount })
+      const data = result?.data || {}
+      setTransferAmount('')
+      setSelectedRecipientId('')
+      setRecipientSearch('')
+      setTransferMessage({
+        type: 'success',
+        text: `${data.recipientName || getProfileName(selectedRecipient)}님에게 ${amount}광석을 보냈습니다. 오늘 남은 송금 한도는 ${data.remainingToday ?? 0}광석입니다.`
+      })
+    } catch (err) {
+      console.error('Crystal transfer failed:', err)
+      setTransferMessage({ type: 'error', text: getTransferErrorMessage(err) })
+    } finally {
+      setTransferBusy(false)
+    }
+  }
+
   return (
     <div className="crystal-ledger-container fade-in">
       <div style={{ textAlign: 'center', marginBottom: '2.5rem', marginTop: '3rem' }}>
@@ -209,6 +342,107 @@ export default function CrystalLedger({ userData }) {
         </div>
 
       </div>
+
+      <form className="crystal-transfer-panel" onSubmit={handleCrystalTransfer}>
+        <div className="crystal-transfer-copy">
+          <span className="crystal-transfer-icon"><Gift size={19} /></span>
+          <div>
+            <h3>친구에게 광석 선물</h3>
+            <p>하루 최대 {CRYSTAL_GIFT_DAILY_LIMIT}광석까지 보낼 수 있습니다. 송금 기록은 양쪽 Ledger에 남습니다.</p>
+          </div>
+        </div>
+
+        <div className="crystal-transfer-controls">
+          <div className="crystal-recipient-field">
+            {selectedRecipient ? (
+              <div className="crystal-selected-recipient">
+                <span className="crystal-recipient-avatar"><UserRound size={16} /></span>
+                <span className="crystal-recipient-copy">
+                  <strong>{getProfileName(selectedRecipient)}</strong>
+                  {getProfileHint(selectedRecipient) && <small>{getProfileHint(selectedRecipient)}</small>}
+                </span>
+                <button type="button" onClick={handleClearRecipient} aria-label="받는 친구 변경" disabled={transferBusy}>
+                  <X size={15} />
+                </button>
+              </div>
+            ) : (
+              <div className="crystal-recipient-search">
+                <Search size={16} />
+                <input
+                  type="search"
+                  value={recipientSearch}
+                  onChange={(event) => {
+                    setRecipientSearch(event.target.value)
+                    setTransferMessage(null)
+                  }}
+                  placeholder="친구 이름 또는 이메일 검색"
+                  disabled={transferBusy}
+                />
+                {filteredRecipients.length > 0 && (
+                  <div className="crystal-recipient-results">
+                    {filteredRecipients.map(recipient => (
+                      <button
+                        key={recipient.uid}
+                        type="button"
+                        onClick={() => handleSelectRecipient(recipient)}
+                      >
+                        <span className="crystal-recipient-avatar"><UserRound size={15} /></span>
+                        <span className="crystal-recipient-copy">
+                          <strong>{getProfileName(recipient)}</strong>
+                          {getProfileHint(recipient) && <small>{getProfileHint(recipient)}</small>}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="crystal-amount-field">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={transferAmount}
+              onChange={handleTransferAmountChange}
+              placeholder="광석"
+              disabled={transferBusy}
+            />
+            <span>개</span>
+          </div>
+
+          <div className="crystal-quick-amounts">
+            {[10, 30, 50].map(amount => (
+              <button
+                key={amount}
+                type="button"
+                onClick={() => {
+                  setTransferAmount(String(amount))
+                  setTransferMessage(null)
+                }}
+                disabled={transferBusy || amount > crystals}
+              >
+                {amount}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="submit"
+            className="crystal-transfer-submit"
+            disabled={transferBusy || !selectedRecipient || !transferAmount}
+          >
+            <Send size={16} />
+            {transferBusy ? '전송 중' : '선물'}
+          </button>
+        </div>
+
+        {transferMessage && (
+          <div className={`crystal-transfer-message ${transferMessage.type}`}>
+            {transferMessage.text}
+          </div>
+        )}
+      </form>
 
       <div style={{ 
         display: 'flex', 
