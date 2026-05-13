@@ -16,6 +16,7 @@ const TX_CONFIG = {
   self_resolve: { icon: '🔍', label: '자가 해결 보상', color: '#4ade80' },
   teacher_verify: { icon: '👨‍🏫', label: '교사 검증 보상', color: '#4ade80' },
   streak_bonus: { icon: '🔥', label: '연속 학습 보너스', color: '#fbbf24' },
+  assignment_missing_penalty: { icon: '📝', label: '과제 미제출 차감', color: '#fb7185' },
   admin_adjust: { icon: '⚙️', label: '관리자 조정', color: '#a78bfa' },
   other: { icon: '💎', label: '기타', color: '#60a5fa' },
 }
@@ -60,7 +61,6 @@ export default function CrystalLedger({ userData }) {
     const user = auth.currentUser
     if (!user) return
 
-    setLoading(true)
     let unsubscribeSnapshot = null;
     let cleanupTimeout = null;
 

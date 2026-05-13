@@ -149,12 +149,17 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
 
   useEffect(() => {
     if (!user?.uid || !clusterId || isLoading || !attendanceRecords) return;
-    const sweepKey = `${user.uid}:${clusterId}:${effectiveAssignments.length}:${attendanceRecords.length}:${todayKST}`;
-    if (penaltySweepKeyRef.current === sweepKey || penaltyMutation.isPending) return;
 
-    const penaltyMap = getAssignmentMissingPenaltyMap(effectiveAssignments, attendanceRecords, Date.now());
-    const hasMaturedMissing = Object.values(penaltyMap).some(item => item.matured);
-    if (!hasMaturedMissing) return;
+    const penaltyMap = getAssignmentMissingPenaltyMap(effectiveAssignments, attendanceRecords, penaltyCheckNow || Date.now());
+    const maturedDates = Object.entries(penaltyMap)
+      .filter(([, item]) => item.matured)
+      .map(([dateStr]) => dateStr)
+      .sort();
+
+    if (maturedDates.length === 0) return;
+
+    const sweepKey = `${user.uid}:${clusterId}:${maturedDates.join(',')}`;
+    if (penaltySweepKeyRef.current === sweepKey || penaltyMutation.isPending) return;
 
     penaltySweepKeyRef.current = sweepKey;
     penaltyMutation.mutate({
@@ -163,7 +168,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
       assignments: effectiveAssignments,
       attendanceRecords
     });
-  }, [user?.uid, clusterId, effectiveAssignments, attendanceRecords, isLoading, todayKST, penaltyMutation]);
+  }, [user?.uid, clusterId, effectiveAssignments, attendanceRecords, isLoading, penaltyCheckNow, penaltyMutation]);
 
   const clusterData = useMemo(() => {
     return clusters?.find(c => c.id === clusterId || c.docId === clusterId);
