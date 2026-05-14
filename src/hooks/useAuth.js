@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, collection, getDocs } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { extractLearningActivityDates, getTodayKST, recalculateStreakState } from '../utils/streakUtils';
 
 export function useAuth() {
   const [user, setUser] = useState(null);
@@ -78,47 +79,91 @@ export function useAuth() {
               return;
             }
 
-            // [안전 장치] 만약 유저 메인 문서만 삭제되었고 하위 데이터가 남아있는 경우를 대비해 스탯 복원을 시도합니다.
+            // [안전 장치] 만약 유저 메인 문서만 삭제되었고 하위 데이터가 남아있는 경우를 대비해
+            // 하위 원장/학습/아고라 기록에서 가능한 집계값을 재구성합니다.
             const recoverUserData = async () => {
               try {
-                let sumCrystals = 0;
-                let totalQ = 0, totalS = 0, perfectC = 0;
+                const [
+                  txsSnap,
+                  histSnap,
+                  questionSnap,
+                  answerSnap
+                ] = await Promise.all([
+                  getDocs(collection(db, 'users', firebaseUser.uid, 'crystal_transactions')),
+                  getDocs(collection(db, 'users', firebaseUser.uid, 'history')),
+                  getDocs(query(collection(db, 'questions'), where('userId', '==', firebaseUser.uid))),
+                  getDocs(query(collection(db, 'answers'), where('userId', '==', firebaseUser.uid)))
+                ]);
 
-                // 1. 거래 내역(crystals) 복원
-                const txsSnap = await getDocs(collection(db, 'users', firebaseUser.uid, 'crystal_transactions'));
+                const transactions = txsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const history = histSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const answers = answerSnap.docs.map(d => d.data());
+
+                let ledgerCrystals = 0;
                 if (!txsSnap.empty) {
                   console.warn("⚠️ 유저 문서가 없으나 거래 내역 발견. 광석을 복원합니다.");
-                  txsSnap.forEach(d => { sumCrystals += (d.data().amount || 0) });
+                  transactions.forEach(d => { ledgerCrystals += (d.amount || 0) });
                 }
 
-                // 2. 퀴즈 기록(history) 복원
-                const histSnap = await getDocs(collection(db, 'users', firebaseUser.uid, 'history'));
+                let totalQ = 0, totalS = 0, perfectC = 0, historyCrystals = 0;
                 if (!histSnap.empty) {
                   console.warn("⚠️ 유저 문서가 없으나 학습 기록 발견. 통계를 복원합니다.");
-                  histSnap.forEach(d => {
-                    const data = d.data();
+                  history.forEach(data => {
                     totalQ++;
                     totalS += (data.score || 0);
+                    historyCrystals += (data.crystalsEarned || 0);
                     if (data.score === 100) perfectC++;
                   });
-                  
-                  // 만약 거래 내역 테이블이 생기기 전의 계정이라면 대략적으로 보상 추산
-                  if (txsSnap.empty) {
-                     sumCrystals = totalQ * 38; // 평균 보상치 (100점=40, 그외 등등)
-                  }
                 }
 
+                const activeDates = Array.from(extractLearningActivityDates(history, transactions)).sort();
+                const coreEvidenceDates = transactions
+                  .filter(t => t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core' && t.timestamp)
+                  .map(t => getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp)))
+                  .filter(Boolean);
+                const streakState = recalculateStreakState(activeDates, coreEvidenceDates, getTodayKST());
+                const hasRecoverableEvidence = !txsSnap.empty || !histSnap.empty || !questionSnap.empty || !answerSnap.empty;
+                const crystals = !txsSnap.empty ? ledgerCrystals : historyCrystals;
+
                 return {
-                  crystals: sumCrystals,
+                  crystals,
                   totalQuizzes: totalQ,
                   totalScore: totalS,
                   averageScore: totalQ > 0 ? Math.round((totalS / totalQ) * 10) / 10 : 0,
                   perfectCount: perfectC,
-                  _restored: true
+                  questionCount: questionSnap.size,
+                  helpCount: answers.filter(a => a.isAccepted).length,
+                  currentStreak: streakState.correctStreak,
+                  longestStreak: streakState.correctStreak,
+                  lastStreakDate: streakState.correctLastDate,
+                  streakFreezeCount: streakState.coresRemaining,
+                  _restored: hasRecoverableEvidence,
+                  recoveryNeedsReview: !txsSnap.empty && historyCrystals > ledgerCrystals + 100,
+                  recoverySourceCounts: {
+                    transactions: txsSnap.size,
+                    history: histSnap.size,
+                    questions: questionSnap.size,
+                    answers: answerSnap.size,
+                    activeDates: activeDates.length
+                  }
                 };
               } catch (err) {
                 console.error("데이터 자동 복원 실패:", err);
-                return { crystals: 0, totalQuizzes: 0, totalScore: 0, averageScore: 0, perfectCount: 0 };
+                return {
+                  crystals: 0,
+                  totalQuizzes: 0,
+                  totalScore: 0,
+                  averageScore: 0,
+                  perfectCount: 0,
+                  questionCount: 0,
+                  helpCount: 0,
+                  currentStreak: 0,
+                  longestStreak: 0,
+                  lastStreakDate: "",
+                  streakFreezeCount: 0,
+                  _restored: false,
+                  recoveryFailed: true
+                };
               }
             };
 
@@ -130,12 +175,12 @@ export function useAuth() {
                 averageScore: recovered.averageScore,
                 perfectCount: recovered.perfectCount,
                 spaceshipLevel: 1,
-                helpCount: 0,
-                questionCount: 0,
-                currentStreak: 0,
-                longestStreak: 0,
-                lastStreakDate: "",
-                streakFreezeCount: 0,
+                helpCount: recovered.helpCount,
+                questionCount: recovered.questionCount,
+                currentStreak: recovered.currentStreak,
+                longestStreak: recovered.longestStreak,
+                lastStreakDate: recovered.lastStreakDate,
+                streakFreezeCount: recovered.streakFreezeCount,
                 streakFreezeLastPurchasedAtMs: 0,
                 streakMilestones: [],
                 shieldCharges: 0,
@@ -167,8 +212,10 @@ export function useAuth() {
                 name: firebaseUser.displayName,
                 createdAt: new Date().toISOString()
               };
-              if (recovered._restored) {
-                initialData.adjustmentReason = "자동 복구 완료";
+              if (recovered._restored || recovered.recoveryFailed) {
+                initialData.adjustmentReason = recovered.recoveryFailed ? "자동 복구 실패" : "자동 복구 완료";
+                initialData.recoveryNeedsReview = !!recovered.recoveryNeedsReview;
+                initialData.recoverySourceCounts = recovered.recoverySourceCounts || null;
               }
               setDoc(userDocRef, initialData, { merge: true });
               setUserData(initialData);
