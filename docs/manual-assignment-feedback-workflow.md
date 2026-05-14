@@ -104,6 +104,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - `student.name`, `student.displayName`은 구글/부모 계정 이름일 수 있으므로 호칭 판단에 직접 쓰지 않는다.
 - 과제 내용, 첨부파일, 학습 기록, 이전 제출 기록에 근거가 있는 내용만 쓴다.
 - Python 또는 코드 제출 과제는 제출 본문뿐 아니라 첨부파일/링크의 원본 코드까지 확인한다. 첨부 원본 코드, 제출 본문에 붙여 넣은 코드, 제출하면서 기입한 설명 텍스트가 서로 맞지 않으면 반드시 운영자 확인 포인트로 남긴다.
+- 내보낸 컨텍스트에 원본 코드 내용이 없고 첨부 URL만 있으면, 해당 URL의 원본 파일을 내려받아 확인한다. 내려받은 파일이 비어 있거나 실패하면 피드백과 운영자 요약에 “첨부 원본 확인 필요”를 남긴다.
 - 정해진 커리큘럼을 벗어나는 별도 다음 미션은 쓰지 않는다.
 - `learningSummary.concernSignals`가 있으면 반드시 `더 발전시키면 좋은 점`에 반영한다.
 - `learningSummary.learningLoad`를 확인해 정규 학습량 대비 충분/조금 부족/부족을 판단한다.
@@ -175,6 +176,77 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - 첫 발생: `suggestedStatus: "reviewed"`를 유지할 수 있으나, 보너스는 낮게 제안하고 다음 행동을 명확히 적는다.
 - 2회 반복: `suggestedStatus: "needs_revision"` 또는 `revisionRequest` 작성을 검토한다. 보완요청 문구에는 다시 제출할 최소 조건을 넣는다.
 - 3회 이상 반복: 운영자가 보호자 안내, 개별 학습 점검, 제출 방식 재안내를 검토할 수 있도록 `aiFeedbackPayload.parentSummary` 또는 운영자 메모용 요약에 반복 신호를 남긴다.
+
+### 불성실 과제 제출 경고 저장
+
+불성실 과제 제출로 판단한 경우 피드백 문장에만 남기지 말고 `assignmentWarnings/{warningId}` 문서도 저장한다. 이 경고는 과제 1건당 1회로 계산한다.
+
+경고 유형:
+
+- `poor_assignment_submission`: 불성실 과제 제출 1회
+- `consecutive_missing_assignment`: 연속 3회 과제 미제출 1회
+
+경고 카운트 기준:
+
+- `status`가 `active` 또는 `appealed`인 경고만 활성 경고로 계산한다.
+- `cancelled` 경고는 누적 경고에서 제외한다.
+- 활성 경고가 3회 이상이면 학생 화면에 `경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.` 문구가 표시되어야 한다.
+- 학생 이의 신청은 1회만 가능하고, 제출 후 수정할 수 없다. 이의 신청 후에는 `status: "appealed"`, `appealLocked: true`, `appeal.status: "submitted"`로 저장한다.
+- 운영자는 어드민 과제 제출 검토 페이지에서 경고를 취소할 수 있고, 취소 시 `status: "cancelled"`로 변경한다.
+- 연속 3회 미제출 경고는 출석/과제 이력을 기준으로 생성한다. 학생이 과제 기록소에 들어오지 않아 클라이언트 스윕이 실행되지 않을 수 있으므로, 운영 검토 중 연속 미제출이 확인되면 운영자 또는 서버 작업으로도 같은 문서 ID 규칙에 맞춰 저장한다.
+
+`poor_assignment_submission` 저장 필드:
+
+```json
+{
+  "userId": "학생 uid",
+  "userName": "학생 이름",
+  "assignmentId": "과제 id",
+  "clusterId": "python",
+  "regionId": "",
+  "date": "2026-05-13",
+  "type": "poor_assignment_submission",
+  "status": "active",
+  "severity": "warning",
+  "message": "Python 기준 50분 대비 영상 16초만 확인되고 퀴즈/데이터 로그가 없습니다.",
+  "policyMessage": "경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.",
+  "evidence": {
+    "videoMinutes": 0.3,
+    "platformTargetMinutes": 50,
+    "quizCount": 0,
+    "activityCount": 1,
+    "concernSignals": ["기준 학습량 대비 부족"]
+  },
+  "appealLocked": false,
+  "createdBy": "codex-manual-review"
+}
+```
+
+권장 문서 ID:
+
+- 불성실 제출: `warning_{assignmentId}_poor_assignment_submission`
+- 연속 3회 미제출: `warning_{userId}_{clusterId}_{date}_consecutive_missing_3`
+
+경고 저장 후에는 반드시 `users/{userId}.assignmentWarningSummary`를 다시 계산한다.
+
+```json
+{
+  "activeCount": 3,
+  "totalIssuedCount": 3,
+  "cancelledCount": 0,
+  "activeCountByCluster": { "middle-math": 3 },
+  "feeIncreaseRisk": true,
+  "policyMessage": "경고 3회 누적 시 수강료가 10% 인상될 수 있습니다."
+}
+```
+
+검증 체크:
+
+- 경고 대상 과제마다 `assignmentWarnings` 문서가 1개씩 존재한다.
+- `policyMessage`가 정확히 들어 있다.
+- 이의 신청 전에는 `appealLocked: false`다.
+- 같은 학생 활성 경고가 3회 이상이면 `assignmentWarningSummary.feeIncreaseRisk === true`다.
+- 어드민이 경고를 취소하면 활성 경고 카운트와 `feeIncreaseRisk`가 즉시 다시 계산된다.
 
 보완요청 문구 예시:
 

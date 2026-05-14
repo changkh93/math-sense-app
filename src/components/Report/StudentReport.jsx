@@ -21,6 +21,19 @@ const CLUSTER_COLORS = {
   'math-history': '#a55eea'
 };
 
+const CLUSTER_LABELS = {
+  'cluster_elementary': '초등 과정',
+  'python': '파이썬',
+  'middle-math': '중등수학',
+  'western-classic': '서양고전',
+  'math-history': '수학사'
+};
+
+const WARNING_TYPE_LABELS = {
+  poor_assignment_submission: '불성실 과제 제출',
+  consecutive_missing_assignment: '연속 3회 미제출'
+};
+
 // ══════════════════════════════════════════════════
 // Helpers
 // ══════════════════════════════════════════════════
@@ -40,6 +53,13 @@ const formatTimeMinutes = (minutes) => {
   if (h > 0 && m > 0) return `${h}시간 ${m}분`;
   if (h > 0) return `${h}시간`;
   return `${m}분`;
+};
+
+const formatReportDate = (date) => {
+  if (!date) return '';
+  const value = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(value.getTime())) return '';
+  return value.toLocaleDateString('ko-KR');
 };
 
 // ══════════════════════════════════════════════════
@@ -90,7 +110,7 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
     );
   }
 
-  const { student, activeClusters, REGION_NAMES, REGION_TO_CLUSTER, attendance, learning, assignments, progress, peerComparison, predictions, focusIndex, insights, meta } = report;
+  const { student, activeClusters, REGION_NAMES, REGION_TO_CLUSTER, attendance, learning, assignments, warnings, progress, peerComparison, predictions, focusIndex, insights, meta } = report;
 
   const isAll = selectedCluster === 'all';
   const parentClusterId = !isAll ? REGION_TO_CLUSTER?.[selectedCluster] : null;
@@ -134,6 +154,7 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
             <span className="report-badge" style={{ color: '#fbbf24' }}>🔥 {student.streak}일 연속 출석</span>
             {student.joinedAt && <span className="report-badge" style={{ color: '#45aaf2' }}>📅 가입 {Math.floor((Date.now() - student.joinedAt.getTime()) / 86400000)}일째</span>}
             <span className="report-badge" style={{ color: '#f472b6' }}>🎯 집중도 {focusIndex.label}</span>
+            <span className="report-badge" style={{ color: warnings?.feeIncreaseRisk ? '#ff9f43' : '#fbbf24' }}>⚠️ 학습 경고 {warnings?.activeCount || 0}회</span>
           </div>
 
           {/* Toolbar */}
@@ -187,6 +208,13 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
                 <div className="report-stat-label">과제 제출</div>
                 <div className="report-stat-sub">확인완료 {displayReviewed}건</div>
               </div>
+              <div className="report-stat-card stat-warning">
+                <div className="report-stat-value">{warnings?.activeCount || 0}</div>
+                <div className="report-stat-label">학습 경고</div>
+                <div className="report-stat-sub">
+                  {warnings?.feeIncreaseRisk ? '수강료 인상 가능 안내' : `취소 ${warnings?.cancelledCount || 0}회 제외`}
+                </div>
+              </div>
               <div className="report-stat-card stat-pink">
                 <div className="report-stat-value">{focusIndex.score}</div>
                 <div className="report-stat-label">집중도 점수</div>
@@ -199,6 +227,8 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
             </div>
           </div>
         </div>
+
+        <WarningReportSection warnings={warnings} isParentView={isParentView} />
 
         {/* ─── Section 2: Weekly Trend ─── */}
         {learning.weeklyTrend.length > 1 && (
@@ -420,6 +450,142 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
 // ══════════════════════════════════════════════════
 // Sub-components
 // ══════════════════════════════════════════════════
+
+function WarningReportSection({ warnings, isParentView }) {
+  const activeCount = warnings?.activeCount || 0;
+  const cancelledCount = warnings?.cancelledCount || 0;
+  const feeIncreaseRisk = warnings?.feeIncreaseRisk || activeCount >= 3;
+  const remainingCount = Math.max(3 - activeCount, 0);
+  const recentWarnings = warnings?.recentWarnings || [];
+  const clusterCounts = Object.entries(warnings?.activeCountByCluster || {})
+    .filter(([, count]) => count > 0);
+
+  return (
+    <div className="report-section">
+      <div className="report-section-header">
+        <span className="report-section-icon">⚠️</span>
+        <h2 className="report-section-title">학습 경고 현황</h2>
+      </div>
+      <div className="report-section-body">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 12,
+          marginBottom: 16
+        }}>
+          <div style={{
+            padding: 16,
+            borderRadius: 14,
+            border: `1px solid ${feeIncreaseRisk ? 'rgba(255, 107, 107, 0.28)' : 'rgba(251, 191, 36, 0.22)'}`,
+            background: feeIncreaseRisk ? 'rgba(255, 107, 107, 0.08)' : 'rgba(251, 191, 36, 0.06)'
+          }}>
+            <div style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 800, marginBottom: 8 }}>
+              현재 누적 경고
+            </div>
+            <div style={{ fontSize: '1.8rem', lineHeight: 1, fontWeight: 900, color: feeIncreaseRisk ? '#ff6b6b' : '#fbbf24' }}>
+              {activeCount}회
+            </div>
+            <div style={{ marginTop: 8, fontSize: '0.78rem', color: 'rgba(255,255,255,0.62)', lineHeight: 1.5 }}>
+              {feeIncreaseRisk
+                ? warnings?.policyMessage || '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.'
+                : activeCount > 0
+                  ? `${remainingCount}회 추가 누적 시 수강료 인상 가능 안내 대상입니다.`
+                  : '현재 누적된 학습 경고가 없습니다.'}
+            </div>
+          </div>
+
+          <div style={{
+            padding: 16,
+            borderRadius: 14,
+            border: '1px solid rgba(69, 170, 242, 0.18)',
+            background: 'rgba(69, 170, 242, 0.05)'
+          }}>
+            <div style={{ fontSize: '0.72rem', color: '#45aaf2', fontWeight: 800, marginBottom: 8 }}>
+              경고 기준
+            </div>
+            <div style={{ display: 'grid', gap: 6, fontSize: '0.78rem', color: 'rgba(255,255,255,0.68)', lineHeight: 1.5 }}>
+              <div>불성실 과제 제출 1회는 학습 경고 1회로 기록됩니다.</div>
+              <div>연속 3회 미제출도 학습 경고 1회로 기록됩니다.</div>
+              <div>취소된 경고 {cancelledCount}회는 누적 횟수에서 제외됩니다.</div>
+            </div>
+          </div>
+
+          <div style={{
+            padding: 16,
+            borderRadius: 14,
+            border: '1px solid rgba(165, 94, 234, 0.18)',
+            background: 'rgba(165, 94, 234, 0.05)'
+          }}>
+            <div style={{ fontSize: '0.72rem', color: '#c4b5fd', fontWeight: 800, marginBottom: 8 }}>
+              이의 신청
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.68)', lineHeight: 1.5 }}>
+              학생은 경고별로 1회 이의신청할 수 있고, 제출 후 수정할 수 없습니다. 관리자 취소 시 누적 횟수에서 빠집니다.
+            </div>
+          </div>
+        </div>
+
+        {clusterCounts.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+            {clusterCounts.map(([clusterId, count]) => (
+              <span key={clusterId} className="report-badge" style={{ color: CLUSTER_COLORS[clusterId] || '#fbbf24' }}>
+                {CLUSTER_LABELS[clusterId] || clusterId} {count}회
+              </span>
+            ))}
+          </div>
+        )}
+
+        {recentWarnings.length > 0 ? (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {recentWarnings.map((warning) => (
+              <div key={warning.id} style={{
+                padding: 14,
+                borderRadius: 12,
+                border: '1px solid rgba(255, 159, 67, 0.2)',
+                background: 'rgba(255, 159, 67, 0.06)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <strong style={{ color: '#fbbf24' }}>
+                    {warning.ordinal}번째 학습 경고 · {WARNING_TYPE_LABELS[warning.type] || warning.typeLabel || '학습 경고'}
+                  </strong>
+                  <span style={{ color: 'rgba(255,255,255,0.42)', fontSize: '0.75rem' }}>
+                    {warning.dateLabel || formatReportDate(warning.createdAtDate)}
+                  </span>
+                </div>
+                {warning.message && (
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.82rem', lineHeight: 1.55 }}>
+                    {warning.message}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : warnings?.lastWarningMessage ? (
+          <div style={{
+            padding: 14,
+            borderRadius: 12,
+            border: '1px solid rgba(255, 159, 67, 0.18)',
+            background: 'rgba(255, 159, 67, 0.05)',
+            color: 'rgba(255,255,255,0.7)',
+            fontSize: '0.82rem',
+            lineHeight: 1.55
+          }}>
+            최근 경고: {warnings.lastWarningMessage}
+            {warnings.lastWarningAt && (
+              <span style={{ color: 'rgba(255,255,255,0.42)' }}> · {formatReportDate(warnings.lastWarningAt)}</span>
+            )}
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 14, fontSize: '0.75rem', color: 'rgba(255,255,255,0.42)', lineHeight: 1.5 }}>
+          {isParentView
+            ? '학부모님은 이 리포트에서 자녀의 현재 누적 경고와 정책 기준을 확인할 수 있습니다.'
+            : '이 리포트의 경고 횟수는 과제 기록소와 동일한 누적 기준을 사용합니다.'}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function HourlyHeatmap({ data }) {
   const max = Math.max(...data, 1);

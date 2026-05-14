@@ -216,10 +216,28 @@ export const useStudentAssignmentWarnings = (userId, clusterId) => {
       const normalizedCluster = normalizeClusterId(clusterId);
       const q = query(collection(db, 'assignmentWarnings'), where('userId', '==', userId));
       const snapshot = await getDocs(q);
-      return snapshot.docs
+      const warnings = snapshot.docs
         .map(item => ({ id: item.id, ...item.data() }))
+        .filter(item => !normalizedCluster || item.clusterId === normalizedCluster);
+
+      const activeSorted = warnings
         .filter(item => ACTIVE_WARNING_STATUSES.includes(item.status))
-        .filter(item => !normalizedCluster || item.clusterId === normalizedCluster)
+        .sort((a, b) => {
+          const dateCompare = String(a.date || '').localeCompare(String(b.date || ''));
+          if (dateCompare !== 0) return dateCompare;
+          return (getTimestampMs(a.createdAt) || getTimestampMs(a.updatedAt)) - (getTimestampMs(b.createdAt) || getTimestampMs(b.updatedAt));
+        });
+      const activeOrdinalById = activeSorted.reduce((acc, item, index) => {
+        acc[item.id] = index + 1;
+        return acc;
+      }, {});
+
+      return warnings
+        .map(item => ({
+          ...item,
+          activeWarningOrdinal: activeOrdinalById[item.id] || null,
+          activeWarningTotal: activeSorted.length,
+        }))
         .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     },
     enabled: !!userId,

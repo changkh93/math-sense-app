@@ -54,12 +54,23 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
     () => (warnings || []).filter(item => ['active', 'appealed'].includes(item.status)),
     [warnings]
   );
+  const cancelledWarnings = useMemo(
+    () => (warnings || []).filter(item => item.status === 'cancelled'),
+    [warnings]
+  );
   const currentWarnings = useMemo(
     () => activeWarnings.filter(item => (
       item.date === currentLog.date ||
       (item.assignmentId && item.assignmentId === currentLog.id)
     )),
     [activeWarnings, currentLog.date, currentLog.id]
+  );
+  const currentCancelledWarnings = useMemo(
+    () => cancelledWarnings.filter(item => (
+      item.date === currentLog.date ||
+      (item.assignmentId && item.assignmentId === currentLog.id)
+    )),
+    [cancelledWarnings, currentLog.date, currentLog.id]
   );
 
   const showWarningModal = activeWarnings.length > 0 && !warningModalDismissed;
@@ -147,6 +158,10 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                       <strong style={{ color: '#fbbf24' }}>{warningTypeLabel(warning.type)}</strong>
                       <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{warning.date}</span>
                     </div>
+                    <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.78rem', marginBottom: '0.25rem' }}>
+                      {warning.activeWarningOrdinal ? `${warning.activeWarningOrdinal}번째 학습 경고입니다.` : '학습 경고입니다.'}
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.2rem' }}>경고 사유</div>
                     <div style={{ color: 'var(--text-bright)', lineHeight: 1.5, fontSize: '0.92rem' }}>{warning.message}</div>
                   </div>
                 ))}
@@ -329,7 +344,7 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                     {isReviewed && <span className="font-tech" style={{ background: 'rgba(0,212,255,0.2)', color: 'var(--crystal-cyan)', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid var(--crystal-cyan)' }}>✓ APPROVED</span>}
                     {isNeedsRevision && <span className="font-tech siren-pulse" style={{ background: 'rgba(255,69,0,0.2)', color: '#ff4500', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #ff4500' }}>⚠ REVISION</span>}
                     {currentLog.status === 'submitted' && <span className="font-tech" style={{ background: 'rgba(251,191,36,0.2)', color: '#fbbf24', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #fbbf24' }}>⏳ 검토 대기</span>}
-                    {currentWarnings.length > 0 && <span className="font-tech" style={{ background: 'rgba(251,191,36,0.16)', color: '#fbbf24', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #fbbf24' }}>경고 {currentWarnings.length}</span>}
+                    {currentWarnings.length > 0 && <span className="font-tech" style={{ background: 'rgba(251,191,36,0.16)', color: '#fbbf24', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid #fbbf24' }}>누적 경고 {activeWarnings.length}</span>}
                   </div>
                   <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '1.1rem' }}>{currentLog.date}</span>
                 </div>
@@ -401,11 +416,15 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                         borderRadius: 8,
                       }}>
                         <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.82rem', marginBottom: '0.55rem' }}>
-                          학습 경고
+                          학습 경고 · 현재 누적 {activeWarnings.length}회
                         </div>
                         {currentWarnings.map(warning => (
                           <div key={warning.id} style={{ color: 'var(--text-bright)', lineHeight: 1.6, marginBottom: '0.55rem' }}>
                             <strong style={{ color: '#fbbf24' }}>{warningTypeLabel(warning.type)}</strong>
+                            <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.78rem', marginTop: '0.25rem' }}>
+                              {warning.activeWarningOrdinal ? `${warning.activeWarningOrdinal}번째 학습 경고입니다.` : '학습 경고입니다.'}
+                            </div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.3rem' }}>경고 사유</div>
                             <div>{warning.message}</div>
                             {activeWarnings.length >= 3 && (
                               <div style={{ color: '#fca5a5', fontSize: '0.84rem', marginTop: '0.25rem' }}>
@@ -422,6 +441,32 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                         >
                           이의신청하기
                         </button>
+                      </div>
+                    )}
+
+                    {currentCancelledWarnings.length > 0 && (
+                      <div style={{
+                        marginBottom: '1rem',
+                        padding: '1rem 1.25rem',
+                        background: 'rgba(16,185,129,0.08)',
+                        border: '1px solid rgba(16,185,129,0.35)',
+                        borderRadius: 8,
+                      }}>
+                        <div className="font-tech" style={{ color: '#34d399', fontSize: '0.82rem', marginBottom: '0.55rem' }}>
+                          취소된 학습 경고
+                        </div>
+                        {currentCancelledWarnings.map(warning => (
+                          <div key={warning.id} style={{ color: 'var(--text-bright)', lineHeight: 1.6, marginBottom: '0.55rem' }}>
+                            <strong style={{ color: '#34d399' }}>{warningTypeLabel(warning.type)} 취소</strong>
+                            <div>관리자 검토로 이 날짜의 경고가 취소되었습니다.</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.84rem', marginTop: '0.25rem' }}>
+                              취소 사유: {warning.cancelReason || '관리자 검토로 경고 취소'}
+                            </div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.25rem' }}>
+                              이 기록은 현재 누적 경고 {activeWarnings.length}회에 포함되지 않습니다.
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
 

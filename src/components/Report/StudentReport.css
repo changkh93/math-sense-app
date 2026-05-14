@@ -148,6 +148,8 @@
 .stat-blue { border-color: rgba(69, 170, 242, 0.12); background: rgba(69, 170, 242, 0.04); }
 .stat-gold .report-stat-value { color: #fbbf24; }
 .stat-gold { border-color: rgba(251, 191, 36, 0.12); background: rgba(251, 191, 36, 0.04); }
+.stat-warning .report-stat-value { color: #ff9f43; }
+.stat-warning { border-color: rgba(255, 159, 67, 0.16); background: rgba(255, 159, 67, 0.05); }
 .stat-pink .report-stat-value { color: #f472b6; }
 .stat-pink { border-color: rgba(244, 114, 182, 0.12); background: rgba(244, 114, 182, 0.04); }
 

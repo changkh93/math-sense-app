@@ -6,6 +6,7 @@ import {
   useIssueAssignmentWarning,
   useRejectWarningAppeal,
   useReviewAssignment,
+  useStudentAssignmentWarnings,
 } from '../../hooks/useAssignments';
 import {
   buildAssignmentFeedbackContext,
@@ -37,6 +38,7 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
   const cancelWarningMutation = useCancelAssignmentWarning();
   const rejectAppealMutation = useRejectWarningAppeal();
   const { data: assignmentWarnings = [] } = useAssignmentWarningsForAssignment(assignment?.id);
+  const { data: studentWarnings = [] } = useStudentAssignmentWarnings(assignment?.userId, assignment?.clusterId);
   
   const [feedback, setFeedback] = useState(assignment?.feedback || '');
   const [bonusCrystals, setBonusCrystals] = useState(assignment?.bonusCrystals ?? 40);
@@ -182,9 +184,16 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
     setFeedback(text);
   };
 
-  const activeWarnings = assignmentWarnings.filter(item => ['active', 'appealed'].includes(item.status));
-  const cancelledWarnings = assignmentWarnings.filter(item => item.status === 'cancelled');
-  const appealWarnings = assignmentWarnings.filter(item => item.appeal?.status === 'submitted');
+  const studentWarningById = new Map(studentWarnings.map(item => [item.id, item]));
+  const enrichedAssignmentWarnings = assignmentWarnings.map(item => ({
+    ...item,
+    ...(studentWarningById.get(item.id) || {}),
+  }));
+  const activeStudentWarnings = studentWarnings.filter(item => ['active', 'appealed'].includes(item.status));
+  const activeWarnings = enrichedAssignmentWarnings.filter(item => ['active', 'appealed'].includes(item.status));
+  const cancelledWarnings = enrichedAssignmentWarnings.filter(item => item.status === 'cancelled');
+  const appealWarnings = enrichedAssignmentWarnings.filter(item => item.appeal?.status === 'submitted');
+  const nextWarningOrdinal = activeStudentWarnings.length + 1;
 
   const handleCancelWarning = async (warning) => {
     if (!warning?.id) return;
@@ -314,12 +323,12 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           </div>
         )}
 
-        {assignmentWarnings.length > 0 && (
+        {enrichedAssignmentWarnings.length > 0 && (
           <div style={{ marginTop: '1.5rem', display: 'grid', gap: '0.75rem' }}>
             <h4 style={{ color: '#fbbf24', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertTriangle size={18} /> 경고 기록
+              <AlertTriangle size={18} /> 경고 기록 · 현재 누적 {activeStudentWarnings.length}회
             </h4>
-            {assignmentWarnings.map((warning) => (
+            {enrichedAssignmentWarnings.map((warning) => (
               <div
                 key={warning.id}
                 style={{
@@ -340,7 +349,22 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
                     {warning.status === 'cancelled' ? '취소됨' : warning.status === 'appealed' ? '이의신청 접수' : '활성'}
                   </span>
                 </div>
+                {warning.status !== 'cancelled' && (
+                  <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
+                    {warning.activeWarningOrdinal ? `${warning.activeWarningOrdinal}번째 학습 경고입니다.` : `현재 활성 경고 ${activeStudentWarnings.length}회 중 하나입니다.`}
+                  </div>
+                )}
+                {warning.status === 'cancelled' && (
+                  <div className="font-tech" style={{ color: '#10b981', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
+                    취소된 경고이며 현재 누적 {activeStudentWarnings.length}회에 포함되지 않습니다.
+                  </div>
+                )}
                 <div>{warning.message}</div>
+                {warning.status === 'cancelled' && (
+                  <div style={{ color: 'var(--text-muted)', marginTop: '0.45rem', fontSize: '0.82rem' }}>
+                    취소 사유: {warning.cancelReason || '관리자 검토로 경고 취소'}
+                  </div>
+                )}
                 <div style={{ color: '#fca5a5', marginTop: '0.45rem', fontSize: '0.82rem' }}>{warning.policyMessage || WARNING_POLICY_MESSAGE}</div>
                 {warning.appeal?.text && (
                   <div style={{ marginTop: '0.8rem', padding: '0.75rem', borderRadius: 6, background: 'rgba(255,255,255,0.05)' }}>
@@ -459,6 +483,11 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           </label>
           <div style={{ color: 'var(--text-muted)', fontSize: '0.84rem', lineHeight: 1.5 }}>
             불성실 제출 경고 1회, 연속 3회 미제출 경고 1회로 누적됩니다. 경고 3회 누적 시 “{WARNING_POLICY_MESSAGE}” 문구가 학생에게 표시됩니다.
+            <br />
+            현재 이 학생의 활성 학습 경고는 {activeStudentWarnings.length}회입니다.
+            {activeWarnings.some(item => item.type === 'poor_assignment_submission')
+              ? ` 이 과제의 경고는 ${activeWarnings.find(item => item.type === 'poor_assignment_submission')?.activeWarningOrdinal || activeStudentWarnings.length}번째 학습 경고입니다.`
+              : ` 새 경고를 저장하면 ${nextWarningOrdinal}번째 학습 경고가 됩니다.`}
           </div>
           {shouldIssueWarning && (
             <textarea

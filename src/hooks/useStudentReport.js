@@ -6,6 +6,13 @@ import {
   Timestamp, limit, orderBy
 } from 'firebase/firestore';
 
+const ACTIVE_WARNING_STATUSES = ['active', 'appealed'];
+const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
+const WARNING_TYPE_LABELS = {
+  poor_assignment_submission: '불성실 과제 제출',
+  consecutive_missing_assignment: '연속 3회 미제출'
+};
+
 // ══════════════════════════════════════════════════
 // useStudentReport – Master hook
 // ══════════════════════════════════════════════════
@@ -51,6 +58,7 @@ async function fetchStudentReport(userId, days) {
     clusterAccess: userData.clusterAccess || {},
     regionAccess: userData.regionAccess || {},
     participation: userData.participation || {},
+    warningSummary: userData.assignmentWarningSummary || null,
   };
 
   // Determine which clusters this student is enrolled in
@@ -59,11 +67,12 @@ async function fetchStudentReport(userId, days) {
     .map(([id]) => id);
 
   // ── Parallel fetch all data ──
-  const [attendance, history, allHistory, assignments, progress, regionsSnap, chaptersSnap, unitsSnap] = await Promise.all([
+  const [attendance, history, allHistory, assignments, assignmentWarnings, progress, regionsSnap, chaptersSnap, unitsSnap] = await Promise.all([
     fetchAttendance(userId),
     fetchHistory(userId, startTs, endTs),
     fetchAllHistory(userId),
     fetchAssignments(userId),
+    fetchAssignmentWarnings(userId),
     fetchProgress(userId),
     getDocs(collection(db, 'regions')),
     getDocs(collection(db, 'chapters')),
@@ -179,6 +188,7 @@ async function fetchStudentReport(userId, days) {
   const attendanceAnalysis = analyzeAttendance(attendance, days);
   const learningAnalysis = analyzeLearning(history, days);
   const assignmentAnalysis = analyzeAssignments(assignments, days, startDate);
+  const warningAnalysis = analyzeAssignmentWarnings(assignmentWarnings, student.warningSummary);
   const progressAnalysis = analyzeProgress(progress, unitToRegion, chapToRegion, allHistory);
   const regionEarliestTs = {};
   allHistory.forEach(h => {
@@ -237,6 +247,7 @@ async function fetchStudentReport(userId, days) {
     attendance: attendanceAnalysis,
     learning: learningAnalysis,
     assignments: assignmentAnalysis,
+    warnings: warningAnalysis,
     progress: progressAnalysis,
     peerComparison,
     predictions,
@@ -279,6 +290,17 @@ async function fetchAssignments(userId) {
   const q = query(collection(db, 'assignments'), where('userId', '==', userId));
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function fetchAssignmentWarnings(userId) {
+  try {
+    const q = query(collection(db, 'assignmentWarnings'), where('userId', '==', userId));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn('Assignment warning detail fetch failed; falling back to user summary:', err);
+    return [];
+  }
 }
 
 async function fetchProgress(userId) {
@@ -535,6 +557,70 @@ function analyzeAssignments(assignments, days, startDate) {
     recentList,
     attachmentRate: totalCount > 0 ? Math.round(withAttachments / totalCount * 100) : 0,
   };
+}
+
+function analyzeAssignmentWarnings(warnings = [], summary = null) {
+  const summaryActiveCount = Number(summary?.activeCount || 0);
+  const summaryCancelledCount = Number(summary?.cancelledCount || 0);
+  const summaryTotalIssuedCount = Number(summary?.totalIssuedCount || 0);
+
+  const normalized = warnings.map((warning) => ({
+    ...warning,
+    typeLabel: WARNING_TYPE_LABELS[warning.type] || '학습 경고',
+    dateLabel: warning.date || formatWarningDate(warning.createdAt),
+    createdAtDate: toDateSafe(warning.createdAt),
+  }));
+
+  const activeWarnings = normalized
+    .filter(warning => ACTIVE_WARNING_STATUSES.includes(warning.status))
+    .sort((a, b) => {
+      const aTime = a.createdAtDate?.getTime?.() || 0;
+      const bTime = b.createdAtDate?.getTime?.() || 0;
+      return aTime - bTime || (a.date || '').localeCompare(b.date || '');
+    })
+    .map((warning, index) => ({ ...warning, ordinal: index + 1 }));
+
+  const cancelledWarnings = normalized.filter(warning => warning.status === 'cancelled');
+  const appealedCount = activeWarnings.filter(warning => warning.status === 'appealed').length;
+
+  const activeCount = warnings.length > 0 ? activeWarnings.length : summaryActiveCount;
+  const cancelledCount = warnings.length > 0 ? cancelledWarnings.length : summaryCancelledCount;
+  const totalIssuedCount = warnings.length > 0 ? normalized.length : summaryTotalIssuedCount;
+
+  const byType = activeWarnings.reduce((acc, warning) => {
+    acc[warning.type] = (acc[warning.type] || 0) + 1;
+    return acc;
+  }, {});
+
+  return {
+    activeCount,
+    totalIssuedCount,
+    cancelledCount,
+    appealedCount,
+    feeIncreaseRisk: activeCount >= 3 || Boolean(summary?.feeIncreaseRisk),
+    policyMessage: summary?.policyMessage || WARNING_POLICY_MESSAGE,
+    activeCountByCluster: summary?.activeCountByCluster || {},
+    byType,
+    recentWarnings: [...activeWarnings].reverse().slice(0, 3),
+    lastWarningMessage: activeWarnings[activeWarnings.length - 1]?.message || summary?.lastWarningMessage || '',
+    lastWarningAt: activeWarnings[activeWarnings.length - 1]?.createdAtDate || toDateSafe(summary?.lastWarningAt),
+    hasWarningRecord: activeCount > 0 || totalIssuedCount > 0 || cancelledCount > 0,
+    detailAvailable: warnings.length > 0,
+  };
+}
+
+function toDateSafe(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (value.toDate) return value.toDate();
+  if (value._seconds) return new Date(value._seconds * 1000);
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatWarningDate(value) {
+  const date = toDateSafe(value);
+  return date ? date.toISOString().slice(0, 10) : '';
 }
 
 function analyzeProgress(progressDocs, unitToRegion, chapToRegion, allHistory = []) {

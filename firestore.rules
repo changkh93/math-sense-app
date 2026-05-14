@@ -14,6 +14,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isLinkedParentOf(userId) {
+      return isAuth() &&
+             exists(/databases/$(database)/documents/parents/$(request.auth.uid)) &&
+             userId in get(/databases/$(database)/documents/parents/$(request.auth.uid)).data.childrenUids;
+    }
+
     function streakManagedKeys() {
       return [
         'currentStreak',
@@ -179,10 +185,7 @@ service cloud.firestore {
         allow read, update, delete: if isAuth() && (
           request.auth.uid == userId || 
           isAdmin() ||
-          (
-            exists(/databases/$(database)/documents/parents/$(request.auth.uid)) &&
-            userId in get(/databases/$(database)/documents/parents/$(request.auth.uid)).data.childrenUids
-          )
+          isLinkedParentOf(userId)
         );
       }
     }
@@ -259,7 +262,11 @@ service cloud.firestore {
     // Assignment warning ledger. Admins issue/cancel warnings, students can only
     // submit one immutable appeal for their own active warning.
     match /assignmentWarnings/{warningId} {
-      allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isLinkedParentOf(resource.data.userId)
+      );
       allow create: if isAdmin() || (
         isAuth() &&
         request.resource.data.userId == request.auth.uid &&

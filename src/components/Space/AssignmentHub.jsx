@@ -386,13 +386,13 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
           alignItems: 'flex-start'
         }}>
         {/* Left: Interactive Calendar */}
-        <div className="glass-card hud-border" style={{ 
-          flex: '1 1 500px', // Min width 500px, but grow
-          padding: '2rem', 
-          display: 'flex', 
-          flexDirection: 'column',
-          minHeight: '600px'
-        }}>
+        <div style={{ flex: '1 1 500px', display: 'grid', gap: '1rem', minWidth: 0 }}>
+          <div className="glass-card hud-border" style={{ 
+            padding: '2rem', 
+            display: 'flex', 
+            flexDirection: 'column',
+            minHeight: '600px'
+          }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
             <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: 0 }}>
               과제 전송 달력
@@ -488,6 +488,10 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               )
             })}
           </div>
+          </div>
+          <AssignmentWarningPolicyCard
+            activeWarningCount={assignmentWarnings.filter(warning => ['active', 'appealed'].includes(warning.status)).length}
+          />
         </div>
 
         {/* Right: Submission/Detail Panel */}
@@ -515,7 +519,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
                 warning.date === selectedDateStr ||
                 (warning.assignmentId && warning.assignmentId === effectiveAssignments?.find(a => a.date === selectedDateStr)?.id)
               ))}
-              activeWarningCount={assignmentWarnings.length}
+              activeWarningCount={assignmentWarnings.filter(warning => ['active', 'appealed'].includes(warning.status)).length}
               missingPenalty={missingPenaltyByDate[selectedDateStr]}
               user={user}
               userData={userData}
@@ -592,6 +596,48 @@ function AssignmentRewardSummary({ bonusCrystals = 0, missingPenalty = null }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function AssignmentWarningPolicyCard({ activeWarningCount = 0 }) {
+  return (
+    <div className="glass-card" style={{
+      padding: '1rem 1.2rem',
+      marginBottom: '1rem',
+      background: 'rgba(59, 130, 246, 0.07)',
+      border: '1px solid rgba(0, 212, 255, 0.24)',
+    }}>
+      <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.82rem', marginBottom: '0.6rem' }}>
+        학습 경고 규칙 · 현재 누적 {activeWarningCount}회
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '0.7rem',
+      }}>
+        <div style={{ padding: '0.75rem', borderRadius: 8, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.76rem', marginBottom: '0.35rem' }}>불성실 과제 제출</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.86rem', lineHeight: 1.5 }}>
+            학습 기록이나 제출 내용이 과제 수행으로 확인되기 어려우면 경고 1회가 기록됩니다.
+          </div>
+        </div>
+        <div style={{ padding: '0.75rem', borderRadius: 8, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.76rem', marginBottom: '0.35rem' }}>연속 3회 미제출</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.86rem', lineHeight: 1.5 }}>
+            출석 후 과제 미제출이 3회 연속 확인되면 경고 1회가 기록됩니다.
+          </div>
+        </div>
+        <div style={{ padding: '0.75rem', borderRadius: 8, background: 'rgba(251, 113, 133, 0.08)', border: '1px solid rgba(251,113,133,0.25)' }}>
+          <div className="font-tech" style={{ color: '#fca5a5', fontSize: '0.76rem', marginBottom: '0.35rem' }}>3회 이상 누적</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.86rem', lineHeight: 1.5 }}>
+            {WARNING_POLICY_MESSAGE}
+          </div>
+        </div>
+      </div>
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5, marginTop: '0.75rem' }}>
+        취소된 경고는 누적에 포함되지 않습니다. 경고가 잘못되었다고 생각하면 경고별로 1회 이의신청할 수 있으며, 이의신청은 제출 후 수정할 수 없습니다.
+      </div>
     </div>
   );
 }
@@ -674,6 +720,8 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
   const feedbackResponseMutation = useSubmitFeedbackResponse();
   const warningAppealMutation = useSubmitWarningAppeal();
+  const activeWarnings = warnings.filter(warning => ['active', 'appealed'].includes(warning.status));
+  const cancelledWarnings = warnings.filter(warning => warning.status === 'cancelled');
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -967,16 +1015,20 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
         <>
           <AssignmentRewardSummary bonusCrystals={assignment?.bonusCrystals} missingPenalty={!assignment ? missingPenalty : null} />
 
-          {warnings.length > 0 && (
+          {(activeWarnings.length > 0 || cancelledWarnings.length > 0) && (
             <div className="glass-card" style={{ padding: '1.2rem', marginBottom: '1rem', border: '1px solid rgba(251, 191, 36, 0.45)', background: 'rgba(251, 191, 36, 0.08)' }}>
               <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-                학습 경고
+                학습 경고 · 현재 누적 {activeWarningCount}회
               </div>
               <div style={{ display: 'grid', gap: '0.9rem' }}>
-                {warnings.map((warning) => {
+                {activeWarnings.map((warning) => {
                   const appealSubmitted = Boolean(warning.appealLocked || warning.appeal?.text);
                   return (
                     <div key={warning.id} style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
+                        {warning.activeWarningOrdinal ? `${warning.activeWarningOrdinal}번째 학습 경고입니다.` : '학습 경고입니다.'}
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '0.25rem' }}>경고 사유</div>
                       <div style={{ color: 'var(--text-bright)', lineHeight: 1.6 }}>{warning.message}</div>
                       {activeWarningCount >= 3 && (
                         <div style={{ color: '#fca5a5', marginTop: '0.5rem', fontSize: '0.85rem' }}>
@@ -1014,6 +1066,22 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                     </div>
                   );
                 })}
+                {cancelledWarnings.map((warning) => (
+                  <div key={warning.id} style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.28)' }}>
+                    <div className="font-tech" style={{ color: '#34d399', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
+                      취소된 학습 경고입니다.
+                    </div>
+                    <div style={{ color: 'var(--text-bright)', lineHeight: 1.6 }}>
+                      관리자 검토로 이 날짜의 경고가 취소되었습니다.
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '0.45rem', lineHeight: 1.5 }}>
+                      취소 사유: {warning.cancelReason || '관리자 검토로 경고 취소'}
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                      이 기록은 현재 누적 경고 {activeWarningCount}회에 포함되지 않습니다.
+                    </div>
+                  </div>
+                ))}
               </div>
               {appealError && <div className="feedback-response-error" style={{ marginTop: '0.75rem' }}>{appealError}</div>}
             </div>
