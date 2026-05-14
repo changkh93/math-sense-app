@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useAdminAssignments } from '../../hooks/useAssignments';
+import { useAdminAssignments, useAdminTodayAttendance } from '../../hooks/useAssignments';
 
 export default function AdminAssignmentsDate({ selectedAssignmentId, onSelect }) {
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -8,17 +8,51 @@ export default function AdminAssignmentsDate({ selectedAssignmentId, onSelect })
     return today.toLocaleDateString('en-CA'); 
   });
 
-  const { data: assignments, isLoading } = useAdminAssignments('all', 'all', selectedDate, 'all');
+  const { data: assignments, isLoading: loadingAssignments } = useAdminAssignments('all', 'all', selectedDate, 'all');
+  const { data: attendances, isLoading: loadingAttendances } = useAdminTodayAttendance(selectedDate);
+
+  const isLoading = loadingAssignments || loadingAttendances;
 
   const groupedAssignments = useMemo(() => {
-    if (!assignments || assignments.length === 0) return {};
-    return assignments.reduce((acc, assignment) => {
+    if (!assignments && !attendances) return {};
+    
+    // Create a map of userIds who submitted an assignment
+    const submittedUserIds = new Set((assignments || []).map(a => a.userId));
+    
+    // Identify students who attended but did not submit
+    const missingAssignments = (attendances || [])
+      .filter(att => !submittedUserIds.has(att.userId))
+      .map(att => ({
+        id: `missing_${att.userId}_${selectedDate}`,
+        userId: att.userId,
+        userName: att.userName,
+        clusterId: att.clusterId,
+        date: selectedDate,
+        status: 'missing',
+        isMock: true,
+        submittedAt: null
+      }));
+
+    const allItems = [...(assignments || []), ...missingAssignments];
+
+    const grouped = allItems.reduce((acc, assignment) => {
       const cluster = assignment.clusterId || '미분류';
       if (!acc[cluster]) acc[cluster] = [];
       acc[cluster].push(assignment);
       return acc;
     }, {});
-  }, [assignments]);
+
+    // Sort items within each cluster so that 'missing' comes first
+    Object.keys(grouped).forEach(cluster => {
+      grouped[cluster].sort((a, b) => {
+        if (a.status === 'missing' && b.status !== 'missing') return -1;
+        if (a.status !== 'missing' && b.status === 'missing') return 1;
+        return new Date(b.submittedAt?.toDate?.() || 0).getTime() - new Date(a.submittedAt?.toDate?.() || 0).getTime();
+      });
+    });
+
+    return grouped;
+  }, [assignments, attendances, selectedDate]);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -78,7 +112,7 @@ export default function AdminAssignmentsDate({ selectedAssignmentId, onSelect })
                         {getStatusBadge(a.status)}
                       </div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        {new Date(a.submittedAt?.toDate()).toLocaleTimeString('ko-KR')} 제출
+                        {a.status === 'missing' ? '미제출' : `${new Date(a.submittedAt?.toDate?.() || 0).toLocaleTimeString('ko-KR')} 제출`}
                       </div>
                     </div>
                   ))}

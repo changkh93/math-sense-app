@@ -78,6 +78,22 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
     );
   }
 
+  if (assignment.isMock) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: '3', padding: '1.5rem', overflowY: 'auto', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', pb: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <h3 style={{ margin: 0 }}>{assignment.userName} 대원의 보고서 <span style={{fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '0.5rem'}}>({assignment.clusterId})</span></h3>
+            <span style={{ color: 'var(--crystal-cyan)' }}>{assignment.date}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '150px', color: '#ef4444', fontWeight: 'bold' }}>
+            이 날짜에 출석은 하였으나, 과제를 제출하지 않았습니다.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const handleReview = async (status) => {
     const isApproved = status === 'reviewed';
     if (!isApproved && !feedback.trim()) {

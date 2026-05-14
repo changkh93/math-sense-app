@@ -2,12 +2,16 @@ import React, { useState, useMemo } from 'react';
 import { useAdminAssignments } from '../../hooks/useAssignments';
 
 export default function AdminAssignmentsList({ selectedAssignmentId, onSelect }) {
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'submitted', 'needs_revision', 'reviewed', 'missing'
+  const [filterStatus, setFilterStatus] = useState('active'); // 'active', 'all', 'submitted', 'needs_revision', 'reviewed', 'missing'
   const [filterCluster, setFilterCluster] = useState('all');
   
+  const statusParam = filterStatus === 'active' ? ['submitted', 'needs_revision'] : filterStatus;
+
   const { data: assignments, isLoading } = useAdminAssignments(
     filterCluster !== 'all' ? filterCluster : null, 
-    null
+    null,
+    null,
+    statusParam
   );
 
   const filteredAssignments = useMemo(() => {
@@ -15,7 +19,11 @@ export default function AdminAssignmentsList({ selectedAssignmentId, onSelect })
     return assignments.filter(a => {
       // Must be a reviewable assignment state
       if (!['submitted', 'needs_revision', 'reviewed', 'missing'].includes(a.status)) return false;
-      if (filterStatus !== 'all' && a.status !== filterStatus) return false;
+      if (filterStatus === 'active') {
+        if (!['submitted', 'needs_revision'].includes(a.status)) return false;
+      } else if (filterStatus !== 'all' && a.status !== filterStatus) {
+        return false;
+      }
       return true;
     }).sort((a, b) => {
       // Sort priority: submitted -> needs_revision -> reviewed
@@ -52,11 +60,12 @@ export default function AdminAssignmentsList({ selectedAssignmentId, onSelect })
           onChange={e => setFilterStatus(e.target.value)}
           style={{ flex: 1 }}
         >
-          <option value="all">모든 상태</option>
-          <option value="submitted">대기중 (미확인)</option>
+          <option value="active">대기/재검토 (미확인)</option>
+          <option value="submitted">대기중</option>
           <option value="needs_revision">재검토 요망</option>
           <option value="missing">누락</option>
           <option value="reviewed">확인 완료</option>
+          <option value="all">모든 상태 전체</option>
         </select>
 
         <select 

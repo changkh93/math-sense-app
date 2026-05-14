@@ -426,7 +426,13 @@ export const useAdminAssignments = (clusterId, regionId, dateStr, status) => {
       if (clusterId && clusterId !== 'all') q = query(q, where('clusterId', '==', clusterId));
       if (regionId && regionId !== 'all') q = query(q, where('regionId', '==', regionId));
       if (dateStr) q = query(q, where('date', '==', dateStr));
-      if (status && status !== 'all') q = query(q, where('status', '==', status));
+      if (status && status !== 'all') {
+        if (Array.isArray(status)) {
+          q = query(q, where('status', 'in', status));
+        } else {
+          q = query(q, where('status', '==', status));
+        }
+      }
 
       const snapshot = await getDocs(q);
       let data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));

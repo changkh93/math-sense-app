@@ -45,12 +45,12 @@
   background: rgba(3, 7, 18, 0.88);
 }
 
-.space-journey-container.nebula-bg {
+.space-journey-container.journey-nebula-bg {
   background: radial-gradient(circle at 40% 60%, rgba(139, 92, 246, 0.15) 0%, #03050c 100%),
               radial-gradient(circle at 80% 20%, rgba(0, 243, 255, 0.1) 0%, transparent 60%);
 }
 
-.space-journey-container.supernova-bg {
+.space-journey-container.journey-supernova-bg {
   background: radial-gradient(circle at 50% 50%, rgba(255, 191, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 40%, #03050c 100%);
 }
 

@@ -359,7 +359,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
   const activeDaysCount = timelineData.days.filter(d => d.isActive).length;
 
   return (
-    <div className={`space-journey-container ${isSupernova ? 'supernova-bg' : isNebula ? 'nebula-bg' : ''}`}>
+    <div className={`space-journey-container ${isSupernova ? 'journey-supernova-bg' : isNebula ? 'journey-nebula-bg' : ''}`}>
       
       {/* 페이지 타이틀 (다른 시점과 통일) */}
       <div style={{ textAlign: 'center', marginBottom: '2.5rem', marginTop: '3rem' }}>
