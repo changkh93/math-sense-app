@@ -21,6 +21,12 @@ const CLUSTER_LABELS = {
   'western-classic': '서양고전',
 };
 
+const COURSE_TARGET_MINUTES = {
+  python: 50,
+  'middle-math': 50,
+  cluster_elementary: 20,
+};
+
 const STYLE_CONFIG = {
   gentle: {
     label: '부드럽게',
@@ -75,6 +81,15 @@ function getDateKey(value) {
   const date = value?.toDate ? value.toDate() : value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+}
+
+function getCourseTargetMinutes(clusterId) {
+  return COURSE_TARGET_MINUTES[normalizeClusterId(clusterId)] || 50;
+}
+
+function secondsFromLearningRow(row = {}) {
+  const seconds = Number(row.videoTime ?? row.seconds ?? row.durationSeconds ?? 0);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
 }
 
 function dateRangeForKst(dateStr) {
@@ -242,18 +257,35 @@ async function fetchLearningSummary(userId, dateStr) {
   const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention'].includes(row.type || 'quiz_pass'));
   const videoRows = rows.filter((row) => ['video', 'video_complete', 'recovery_mastery'].includes(row.type));
   const textRows = rows.filter((row) => ['text', 'data_log_read'].includes(row.type));
+  const dataLogRows = rows.filter((row) => row.type === 'data_log_read');
   const attentionRows = rows.filter((row) => row.attentionResult === 'hit' || row.attentionResult === 'miss');
   const scoreRows = quizRows.map((row) => Number(row.score)).filter(Number.isFinite);
   const titleSet = new Set(rows.map((row) => row.unitTitle || row.transmissionTitle || row.regionTitle).filter(Boolean));
+  const videoSeconds = videoRows.reduce((sum, row) => sum + secondsFromLearningRow(row), 0);
 
   return {
     date: dateStr,
     activityCount: rows.length,
     quizCount: quizRows.length,
     videoCount: videoRows.length,
+    videoSeconds,
+    videoMinutes: Math.round((videoSeconds / 60) * 10) / 10,
     textCount: textRows.length,
+    dataLogCount: dataLogRows.length,
     averageScore: scoreRows.length ? Math.round(scoreRows.reduce((sum, score) => sum + score, 0) / scoreRows.length) : null,
     titles: Array.from(titleSet).slice(0, 8),
+    videos: videoRows.slice(0, 6).map((row) => ({
+      title: row.unitTitle || row.transmissionTitle || row.regionTitle || '영상 학습',
+      seconds: secondsFromLearningRow(row),
+    })),
+    quizzes: quizRows.slice(0, 6).map((row) => ({
+      title: row.unitTitle || row.quizTitle || row.regionTitle || '퀴즈',
+      score: Number.isFinite(Number(row.score)) ? Number(row.score) : null,
+      type: row.type || 'quiz',
+    })),
+    dataLogs: dataLogRows.slice(0, 6).map((row) => ({
+      title: row.unitTitle || row.transmissionTitle || row.regionTitle || '데이터 로그',
+    })),
     focusScore: attentionRows.length
       ? Math.round((attentionRows.filter((row) => row.attentionResult === 'hit').length / attentionRows.length) * 100)
       : null,
@@ -345,6 +377,38 @@ function buildEvidence(context) {
   return evidence;
 }
 
+function buildFeedbackPolicyGuidance(context) {
+  const courseId = normalizeClusterId(context?.student?.courseId);
+  const targetMinutes = getCourseTargetMinutes(courseId);
+  const learning = context?.dailyLearningSummary || {};
+  const submission = context?.currentSubmission || {};
+  const videoMinutes = Number(learning.videoMinutes || 0);
+  const hasFollowUpActivity = Boolean(
+    (learning.quizCount || 0) > 0 ||
+    (learning.dataLogCount || 0) > 0 ||
+    (submission.attachmentCount || 0) > 0 ||
+    (submission.contentLength || 0) >= 80
+  );
+  const isVeryLowLearning = videoMinutes < Math.max(1, targetMinutes * 0.1) && !hasFollowUpActivity;
+  const isReasonableFlow = videoMinutes >= targetMinutes * 0.45 && hasFollowUpActivity;
+
+  return {
+    targetMinutes,
+    videoMinutes,
+    hasFollowUpActivity,
+    isVeryLowLearning,
+    isReasonableFlow,
+    rules: [
+      '영상 시간은 전체 학습 시간이 아니다. 학생은 영상을 멈추고 풀이, 코드 작성, 실행, 수정, 정리를 할 수 있다.',
+      '영상 시간이 기준의 절반 안팎이고 퀴즈, 데이터 로그, 코드 제출, 제출문 정리 중 하나 이상이 있으면 성실한 학습 흐름으로 인정한다.',
+      '영상 시간 숫자만으로 "기준 학습량 대비 부족"이라고 쓰지 않는다.',
+      '이미 퀴즈나 데이터 로그가 있으면 "퀴즈나 데이터 로그까지 이어가라"는 개선 문구를 쓰지 않는다.',
+      '개선점은 오답 이유 한 줄 정리, 코드 실행 결과, 직접 바꾼 코드 설명처럼 실제로 비어 있는 근거에서 고른다.',
+      'Python은 영상 시청보다 직접 코드 작성, 실행, 오류 수정, 실행 결과 근거를 더 중요하게 본다.',
+    ],
+  };
+}
+
 export async function buildAssignmentFeedbackContext(assignment, styleKey = 'balanced') {
   const date = assignment?.date || getDateKey(assignment?.submittedAt);
   const [student, assignmentHistory, dailyLearningSummary, darkMatterSummary] = await Promise.all([
@@ -390,6 +454,8 @@ export async function buildAssignmentFeedbackContext(assignment, styleKey = 'bal
     feedbackGoal: getAssignmentFeedbackStyle(styleKey),
   };
 
+  context.feedbackPolicyGuidance = buildFeedbackPolicyGuidance(context);
+
   return {
     ...context,
     evidence: buildEvidence(context),
@@ -404,6 +470,7 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
   const previous = context?.previousSubmissions || [];
   const darkMatter = context?.darkMatterSummary || {};
   const learning = context?.dailyLearningSummary || {};
+  const policy = context?.feedbackPolicyGuidance || {};
   const firstAttachment = submission.attachments?.[0]?.name;
   const weakness = darkMatter.recentWeaknesses?.[0];
   const studentQuestions = submission.studentQuestions || [];
@@ -414,13 +481,19 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
     ? '이전 과제 기록과 비교해 이번 제출에서 유지하거나 개선할 부분을 확인할 수 있습니다.'
     : '아직 비교할 과제 기록이 많지 않으므로, 이번 제출이 앞으로의 성장 기준점이 됩니다.';
 
+  const learningFlowNote = policy.isReasonableFlow
+    ? `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && learning.dataLogCount ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${!learning.quizCount && !learning.dataLogCount && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
+    : '';
+
   const improvement = weakness
     ? `${weakness}와 연결되는 부분은 다음 과제에서 한 번 더 의식해 보세요.`
+    : policy.isReasonableFlow
+      ? '다음 제출에서는 퀴즈에서 틀린 이유나 코드/풀이에서 막힌 부분을 한 줄 더 적어 주세요.'
     : '다음 제출에서는 결과를 확인한 과정이나 막혔던 부분을 한 줄 더 적어 보세요.';
 
   const feedback = styleKey === 'parent'
-    ? `### 과제 피드백\n\n${studentName} 학생은 ${courseLabel} 과제에서 ${submission.content ? '학습 내용을 글로 정리해 제출했습니다' : '과제를 제출했습니다'}. ${hasAttachments ? `첨부파일(${firstAttachment}${submission.attachmentCount > 1 ? ` 외 ${submission.attachmentCount - 1}개` : ''})도 함께 제출되어 결과 확인 근거가 있습니다.` : '다만 결과를 확인할 첨부 자료는 더 보강하면 좋겠습니다.'} ${learning.activityCount ? `제출일에는 학습 기록 ${learning.activityCount}건도 확인되어 과제와 학습 흐름을 함께 볼 수 있습니다.` : '제출일 학습 기록은 많지 않아 과제 수행 과정을 더 남기면 좋겠습니다.'} ${previousPoint} ${improvement}`
-    : `### 과제 피드백\n\n이번 ${courseLabel} 과제에서는 ${submission.content ? '배운 내용을 직접 정리해 제출했습니다' : '과제를 제출했습니다'}.\n\n#### 잘한 점\n${hasAttachments ? `제출 글과 함께 ${submission.attachmentCount}개의 첨부파일을 올린 점이 좋습니다. 결과물을 함께 남기면 무엇을 만들었는지 더 분명하게 확인할 수 있습니다.` : '과제를 제출한 흐름 자체는 좋습니다. 다음에는 실행 결과나 풀이 과정을 확인할 수 있는 자료까지 함께 남기면 더 좋아집니다.'}${questionSection}\n\n#### 이전보다 좋아진 점\n${previousPoint}\n\n#### 더 발전시키면 좋은 점\n${improvement}`;
+    ? `### 과제 피드백\n\n${studentName} 학생은 ${courseLabel} 과제에서 ${submission.content ? '학습 내용을 글로 정리해 제출했습니다' : '과제를 제출했습니다'}. ${hasAttachments ? `첨부파일(${firstAttachment}${submission.attachmentCount > 1 ? ` 외 ${submission.attachmentCount - 1}개` : ''})도 함께 제출되어 결과 확인 근거가 있습니다.` : '다만 결과를 확인할 첨부 자료는 더 보강하면 좋겠습니다.'} ${learningFlowNote || (learning.activityCount ? `제출일에는 학습 기록 ${learning.activityCount}건도 확인되어 과제와 학습 흐름을 함께 볼 수 있습니다.` : '제출일 학습 기록은 많지 않아 과제 수행 과정을 더 남기면 좋겠습니다.')} ${previousPoint} ${improvement}`
+    : `### 과제 피드백\n\n이번 ${courseLabel} 과제에서는 ${submission.content ? '배운 내용을 직접 정리해 제출했습니다' : '과제를 제출했습니다'}.\n\n#### 잘한 점\n${learningFlowNote || (hasAttachments ? `제출 글과 함께 ${submission.attachmentCount}개의 첨부파일을 올린 점이 좋습니다. 결과물을 함께 남기면 무엇을 만들었는지 더 분명하게 확인할 수 있습니다.` : '과제를 제출한 흐름 자체는 좋습니다. 다음에는 실행 결과나 풀이 과정을 확인할 수 있는 자료까지 함께 남기면 더 좋아집니다.')}${questionSection}\n\n#### 이전보다 좋아진 점\n${previousPoint}\n\n#### 더 발전시키면 좋은 점\n${improvement}`;
 
   return {
     studentFeedback: feedback,
@@ -441,7 +514,7 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
       selfDirection: submission.contentLength >= 120 ? 2 : 1,
     },
     suggestedStatus: hasAttachments || submission.contentLength >= 80 ? 'reviewed' : 'needs_revision',
-    suggestedBonusCrystals: hasAttachments ? 40 : 25,
+    suggestedBonusCrystals: policy.isReasonableFlow ? 35 : hasAttachments ? 40 : 25,
     revisionRequest: hasAttachments ? '' : '이번 과제는 제출 글은 확인되지만 결과를 확인할 첨부 자료가 부족합니다. 실행 결과 이미지나 풀이 과정을 함께 첨부해 다시 제출해 주세요.',
     generatedBy: 'local-fallback',
   };
