@@ -49,8 +49,21 @@ function inferCourseFromUnitId(unitId = '') {
   return '';
 }
 
+function inferCourseFromTitle(title = '') {
+  if (/python|파이썬|pygame|sprite|add_sound|sound|몬스터|플레이어|게임|코드/i.test(title)) return 'python';
+  if (/비와\s*비율|초등|자연수|분수|소수/i.test(title)) return 'cluster_elementary';
+  if (/중등|방정식|함수|다항식|곱셈공식|기하/i.test(title)) return 'middle-math';
+  return '';
+}
+
 function itemCourseId(item = {}) {
-  return normalizeCourseId(item.clusterId || item.courseId || item.regionId || inferCourseFromUnitId(item.unitId || ''));
+  return normalizeCourseId(
+    item.clusterId ||
+    item.courseId ||
+    item.regionId ||
+    inferCourseFromUnitId(item.unitId || '') ||
+    inferCourseFromTitle(`${titleOf(item)} ${item.quizTitle || ''}`)
+  );
 }
 
 function belongsToCourse(item = {}, courseId = '') {
@@ -208,12 +221,19 @@ function summarizeQuizRows(rows) {
 function summarizeLearningProgress(progressDocs, start, end, courseId) {
   const videos = [];
   const inProgressQuizzes = [];
+  const normalizedCourseId = normalizeCourseId(courseId);
 
   progressDocs.forEach(doc => {
     const data = doc.data();
     const unitId = doc.id;
-    const inferredCourse = inferCourseFromUnitId(unitId);
-    if (courseId && inferredCourse && normalizeCourseId(courseId) !== inferredCourse) return;
+    const progressCourse = normalizeCourseId(
+      data.clusterId ||
+      data.courseId ||
+      data.regionId ||
+      inferCourseFromUnitId(unitId) ||
+      inferCourseFromTitle(`${data.unitTitle || ''} ${data.quizSession?.quizTitle || ''}`)
+    );
+    if (normalizedCourseId && normalizedCourseId !== 'unknown' && progressCourse !== normalizedCourseId) return;
     const updatedAt = toDate(data.updatedAt);
 
     Object.entries(data.videoProgress || {}).forEach(([transmissionId, progress]) => {
@@ -293,6 +313,99 @@ function compactAssignment(doc) {
     feedbackResponse: data.feedbackResponse || null,
     feedbackReaction: data.feedbackReaction || data.feedbackResponse?.reaction || '',
     feedbackComment: data.feedbackComment || data.feedbackResponse?.comment || '',
+  };
+}
+
+function normalizeCodeLines(text = '') {
+  return String(text)
+    .split(/\r\n|\r|\n/)
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'));
+}
+
+async function fetchCodeAttachmentText(attachment = {}) {
+  if (!attachment?.url || !['py', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json', 'md', 'txt'].includes(attachment.type)) {
+    return attachment;
+  }
+
+  try {
+    const response = await fetch(attachment.url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    return {
+      ...attachment,
+      fetchStatus: 'ok',
+      textPreview: text.slice(0, 12000),
+      lineCount: text.split(/\r\n|\r|\n/).length,
+      charCount: text.length,
+    };
+  } catch (error) {
+    return {
+      ...attachment,
+      fetchStatus: 'failed',
+      fetchError: error?.message || '첨부 코드 원문을 읽지 못했습니다.',
+    };
+  }
+}
+
+async function enrichCodeAttachments(attachments = []) {
+  return Promise.all(attachments.map(fetchCodeAttachmentText));
+}
+
+function buildCodeComparison(currentAttachments = [], previousSubmissions = []) {
+  const currentCode = currentAttachments.find(attachment => attachment.textPreview);
+  const previousCodeCandidates = previousSubmissions
+    .flatMap(submission => (submission.attachments || []).map(attachment => ({ submission, attachment })))
+    .filter(({ attachment }) => attachment.textPreview);
+  const previousWithSameFileName = currentCode
+    ? previousCodeCandidates.find(({ attachment }) => attachment.name === currentCode.name)
+    : null;
+  const previousWithCode = previousWithSameFileName || previousCodeCandidates[0];
+
+  if (!currentCode) {
+    return {
+      currentCodeAvailable: false,
+      previousCodeAvailable: Boolean(previousWithCode),
+      summary: currentAttachments.some(attachment => ['py', 'js', 'jsx', 'ts', 'tsx', 'html', 'css'].includes(attachment.type))
+        ? '첨부 코드 파일은 있으나 원문을 읽지 못해 코드 변화 비교가 필요함'
+        : '',
+    };
+  }
+
+  if (!previousWithCode) {
+    return {
+      currentCodeAvailable: true,
+      previousCodeAvailable: false,
+      currentFileName: currentCode.name,
+      currentLineCount: currentCode.lineCount || 0,
+      summary: `첨부 코드 ${currentCode.name} 원문 ${currentCode.lineCount || 0}줄 확인, 비교 가능한 이전 코드 첨부는 없음`,
+    };
+  }
+
+  const currentLines = new Set(normalizeCodeLines(currentCode.textPreview));
+  const previousLines = new Set(normalizeCodeLines(previousWithCode.attachment.textPreview));
+  const addedLines = [...currentLines].filter(line => !previousLines.has(line));
+  const removedLines = [...previousLines].filter(line => !currentLines.has(line));
+  const isIdenticalToPrevious = addedLines.length === 0 && removedLines.length === 0;
+
+  return {
+    currentCodeAvailable: true,
+    previousCodeAvailable: true,
+    comparedSameFileName: Boolean(previousWithSameFileName),
+    isIdenticalToPrevious,
+    currentFileName: currentCode.name,
+    previousFileName: previousWithCode.attachment.name,
+    previousAssignmentId: previousWithCode.submission.id,
+    previousDate: previousWithCode.submission.date || '',
+    currentLineCount: currentCode.lineCount || 0,
+    previousLineCount: previousWithCode.attachment.lineCount || 0,
+    addedLineCount: addedLines.length,
+    removedLineCount: removedLines.length,
+    addedLineSamples: addedLines.slice(0, 8),
+    removedLineSamples: removedLines.slice(0, 6),
+    summary: isIdenticalToPrevious
+      ? `첨부 코드 ${currentCode.name}는 ${previousWithCode.submission.date || '이전 제출'}의 ${previousWithCode.attachment.name}와 코드 내용이 동일함`
+      : `첨부 코드 ${currentCode.name}를 이전 ${previousWithCode.attachment.name}와 비교: 새 줄 ${addedLines.length}개, 삭제/변경 줄 ${removedLines.length}개`,
   };
 }
 
@@ -540,6 +653,11 @@ function previousFor(current, allAssignments) {
       feedbackReaction: item.feedbackReaction || '',
       feedbackComment: item.feedbackComment || '',
       attachmentNames: item.attachments.map(att => att.name).filter(Boolean),
+      attachments: item.attachments.map(att => ({
+        name: att.name || '',
+        type: att.type || '',
+        url: att.url || '',
+      })),
     }));
 }
 
@@ -562,17 +680,37 @@ async function main() {
 
     const allAssignments = assignmentsCache.get(assignment.userId);
     const date = assignment.date || toDateText(assignment.submittedAt) || toDateText(assignment.createdAt);
+    const currentAttachments = await enrichCodeAttachments(assignment.attachments || []);
+    const previous = await Promise.all(previousFor(assignment, allAssignments).map(async item => ({
+      ...item,
+      attachments: await enrichCodeAttachments(item.attachments || []),
+    })));
+    const codeComparison = buildCodeComparison(currentAttachments, previous);
+    const assignmentWithCode = {
+      ...assignment,
+      attachments: currentAttachments,
+      codeAttachments: currentAttachments
+        .filter(item => item.textPreview || ['py', 'js', 'jsx', 'ts', 'tsx', 'html', 'css'].includes(item.type))
+        .map(item => ({
+          name: item.name,
+          lineCount: item.lineCount || 0,
+          fetchStatus: item.fetchStatus || '',
+          fetchError: item.fetchError || '',
+          textPreview: item.textPreview || '',
+        })),
+      codeComparison,
+    };
     const [learningSummary, darkMatterSummary] = await Promise.all([
       getLearningSummary(assignment.userId, date, assignment.clusterId || assignment.regionId || assignment.clusterName),
       getDarkMatterSummary(assignment.userId),
     ]);
 
     contexts.push({
-      assignment,
+      assignment: assignmentWithCode,
       student: userCache.get(assignment.userId),
       displayName: userCache.get(assignment.userId).studentName || assignment.userName || userCache.get(assignment.userId).publicDisplayName || userCache.get(assignment.userId).name || userCache.get(assignment.userId).displayName || '학생',
       courseLabel: assignment.clusterName || assignment.clusterId || assignment.regionId || '과정',
-      previous: previousFor(assignment, allAssignments),
+      previous,
       sameDay: allAssignments
         .filter(item => item.id !== assignment.id)
         .filter(item => (item.date || toDateText(item.submittedAt)) === date)

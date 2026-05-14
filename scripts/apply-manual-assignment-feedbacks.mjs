@@ -53,6 +53,9 @@ function buildEvidence(context) {
   if (assignment.attachments?.length) {
     evidence.push(`첨부파일 확인: ${assignment.attachments.map(item => item.name).filter(Boolean).join(', ')}`);
   }
+  if (assignment.codeComparison?.summary) {
+    evidence.push(`첨부 코드 비교: ${assignment.codeComparison.summary}`);
+  }
   if (learning.activityCount) evidence.push(`제출일 학습 기록 ${learning.activityCount}건 확인`);
   if (learning.readingActivityCount) evidence.push(`초등 독서/읽기 활동 ${learning.readingActivityCount}건 확인`);
   if (learning.mathActivityCount === 0 && learning.readingActivityCount > 0) {
@@ -211,6 +214,10 @@ for (const context of contexts) {
       attention: context.learningSummary?.attention || null,
       learningLoad: context.learningSummary?.learningLoad || null,
       inProgressQuizCount: context.learningSummary?.inProgressQuizCount || 0,
+      allLearningActivityCount: context.learningSummary?.allActivityCount || context.learningSummary?.activityCount || 0,
+      excludedOtherCourseTitles: context.learningSummary?.excludedOtherCourseTitles || [],
+      codeComparisonSummary: context.assignment?.codeComparison?.summary || '',
+      codeComparison: context.assignment?.codeComparison || null,
       studentQuestionCount: context.assignment?.studentQuestions?.length || 0,
       previousFeedbackResponses: (context.previous || [])
         .filter(item => item.feedbackReaction || item.feedbackComment || item.feedbackResponse)

@@ -61,10 +61,41 @@ export function getAssignmentFeedbackStyle(styleKey = 'balanced') {
 
 function normalizeClusterId(clusterId = '') {
   if (clusterId === '초등수학' || clusterId === 'cluster_elementary') return 'cluster_elementary';
+  if (clusterId === 'ratios') return 'cluster_elementary';
   if (clusterId === '파이썬' || clusterId === 'python') return 'python';
   if (clusterId === '중등수학' || clusterId === 'middle-math') return 'middle-math';
   if (clusterId === '서양고전' || clusterId === 'western-classic') return 'western-classic';
   return clusterId || 'unknown';
+}
+
+function inferCourseFromUnitId(unitId = '') {
+  if (/python|pygame|sprite|gameproj|sound|monster|player/i.test(unitId)) return 'python';
+  if (/ratio|ratios|elementary/i.test(unitId)) return 'cluster_elementary';
+  if (/middle|geo|algebra|equation|chap_177392/i.test(unitId)) return 'middle-math';
+  return '';
+}
+
+function inferCourseFromTitle(title = '') {
+  if (/python|파이썬|pygame|sprite|add_sound|sound|몬스터|플레이어|게임|코드/i.test(title)) return 'python';
+  if (/비와\s*비율|초등|자연수|분수|소수/i.test(title)) return 'cluster_elementary';
+  if (/중등|방정식|함수|다항식|곱셈공식|기하/i.test(title)) return 'middle-math';
+  return '';
+}
+
+function learningItemCourseId(item = {}) {
+  return normalizeClusterId(
+    item.clusterId ||
+    item.courseId ||
+    item.regionId ||
+    inferCourseFromUnitId(item.unitId || '') ||
+    inferCourseFromTitle(`${item.unitTitle || ''} ${item.transmissionTitle || ''} ${item.quizTitle || ''} ${item.regionTitle || ''}`)
+  );
+}
+
+function belongsToCourse(item = {}, courseId = '') {
+  const target = normalizeClusterId(courseId);
+  if (!target || target === 'unknown') return true;
+  return learningItemCourseId(item) === target;
 }
 
 function getTimestampMs(value) {
@@ -171,6 +202,7 @@ function summarizeAssignment(assignment = {}) {
     studentQuestions,
     hasStudentQuestion: studentQuestions.length > 0,
     attachmentCount: attachments.length,
+    attachments,
     attachmentNames: attachments.map((att) => att.name),
     links: (assignment.links || []).map((link) => link.url || link.title || '').filter(Boolean).slice(0, 5),
     feedback: String(assignment.feedback || '').slice(0, 600),
@@ -232,7 +264,7 @@ async function fetchAssignmentHistory(assignment) {
   return { previous, sameDay };
 }
 
-async function fetchLearningSummary(userId, dateStr) {
+async function fetchLearningSummary(userId, dateStr, courseId = '') {
   const range = dateRangeForKst(dateStr);
   if (!userId || !range) {
     return {
@@ -253,7 +285,8 @@ async function fetchLearningSummary(userId, dateStr) {
     where('timestamp', '<=', range.end)
   ));
 
-  const rows = historySnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  const allRows = historySnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  const rows = allRows.filter((row) => belongsToCourse(row, courseId));
   const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention'].includes(row.type || 'quiz_pass'));
   const videoRows = rows.filter((row) => ['video', 'video_complete', 'recovery_mastery'].includes(row.type));
   const textRows = rows.filter((row) => ['text', 'data_log_read'].includes(row.type));
@@ -265,6 +298,8 @@ async function fetchLearningSummary(userId, dateStr) {
 
   return {
     date: dateStr,
+    courseId: normalizeClusterId(courseId),
+    allActivityCount: allRows.length,
     activityCount: rows.length,
     quizCount: quizRows.length,
     videoCount: videoRows.length,
@@ -286,6 +321,10 @@ async function fetchLearningSummary(userId, dateStr) {
     dataLogs: dataLogRows.slice(0, 6).map((row) => ({
       title: row.unitTitle || row.transmissionTitle || row.regionTitle || '데이터 로그',
     })),
+    excludedOtherCourseTitles: Array.from(new Set(allRows
+      .filter((row) => !belongsToCourse(row, courseId))
+      .map((row) => row.unitTitle || row.transmissionTitle || row.quizTitle || row.regionTitle)
+      .filter(Boolean))).slice(0, 6),
     focusScore: attentionRows.length
       ? Math.round((attentionRows.filter((row) => row.attentionResult === 'hit').length / attentionRows.length) * 100)
       : null,
@@ -365,7 +404,12 @@ function buildEvidence(context) {
     evidence.push(`같은 날짜에 다른 과제 ${sameDaySubmissions.length}건도 제출되어 일괄 제출 맥락 확인 필요`);
   }
   if (dailyLearningSummary.activityCount > 0) {
-    evidence.push(`제출일 학습 기록 ${dailyLearningSummary.activityCount}건 확인`);
+    evidence.push(`제출일 ${context.student.courseLabel} 학습 기록 ${dailyLearningSummary.activityCount}건 확인`);
+  } else if (dailyLearningSummary.allActivityCount > 0) {
+    evidence.push(`같은 날짜 다른 과정 기록 ${dailyLearningSummary.allActivityCount}건은 확인되지만 ${context.student.courseLabel} 기록은 없음`);
+  }
+  if (currentSubmission.codeComparison?.summary) {
+    evidence.push(currentSubmission.codeComparison.summary);
   }
   if (darkMatterSummary.totalActive > 0) {
     evidence.push(`최근 다크 매터/재검토 문항 ${darkMatterSummary.totalActive}개 확인`);
@@ -383,19 +427,28 @@ function buildFeedbackPolicyGuidance(context) {
   const learning = context?.dailyLearningSummary || {};
   const submission = context?.currentSubmission || {};
   const videoMinutes = Number(learning.videoMinutes || 0);
-  const hasFollowUpActivity = Boolean(
+  const hasLearningFollowUpActivity = Boolean(
     (learning.quizCount || 0) > 0 ||
-    (learning.dataLogCount || 0) > 0 ||
-    (submission.attachmentCount || 0) > 0 ||
-    (submission.contentLength || 0) >= 80
+    (learning.dataLogCount || 0) > 0
   );
-  const isVeryLowLearning = videoMinutes < Math.max(1, targetMinutes * 0.1) && !hasFollowUpActivity;
-  const isReasonableFlow = videoMinutes >= targetMinutes * 0.45 && hasFollowUpActivity;
+  const hasSubmissionEvidence = Boolean(
+    (submission.attachmentCount || 0) > 0 ||
+    (submission.contentLength || 0) >= 80 ||
+    submission.codeComparison?.currentCodeAvailable
+  );
+  const hasCourseLearningRecord = Boolean(
+    videoMinutes > 0 ||
+    hasLearningFollowUpActivity
+  );
+  const isVeryLowLearning = !hasCourseLearningRecord || (videoMinutes < Math.max(1, targetMinutes * 0.1) && !hasLearningFollowUpActivity);
+  const isReasonableFlow = videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity;
 
   return {
     targetMinutes,
     videoMinutes,
-    hasFollowUpActivity,
+    hasLearningFollowUpActivity,
+    hasSubmissionEvidence,
+    hasCourseLearningRecord,
     isVeryLowLearning,
     isReasonableFlow,
     rules: [
@@ -409,24 +462,120 @@ function buildFeedbackPolicyGuidance(context) {
   };
 }
 
+async function fetchCodeAttachmentText(attachment) {
+  if (!attachment?.url || attachment.category !== 'code') return attachment;
+  try {
+    const response = await fetch(attachment.url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    return {
+      ...attachment,
+      fetchStatus: 'ok',
+      textPreview: text.slice(0, 12000),
+      lineCount: text.split(/\r\n|\r|\n/).length,
+      charCount: text.length,
+    };
+  } catch (error) {
+    return {
+      ...attachment,
+      fetchStatus: 'failed',
+      fetchError: error?.message || '첨부 코드 원문을 읽지 못했습니다.',
+    };
+  }
+}
+
+async function enrichCodeAttachments(attachments = []) {
+  return Promise.all(attachments.map(fetchCodeAttachmentText));
+}
+
+function normalizeCodeLines(text = '') {
+  return String(text)
+    .split(/\r\n|\r|\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+}
+
+function buildCodeComparison(currentAttachments = [], previousSubmissions = []) {
+  const currentCode = currentAttachments.find((attachment) => attachment.category === 'code' && attachment.textPreview);
+  const previousCodeCandidates = previousSubmissions
+    .flatMap((submission) => (submission.attachments || []).map((attachment) => ({ submission, attachment })))
+    .filter(({ attachment }) => attachment.category === 'code' && attachment.textPreview);
+  const previousWithSameFileName = currentCode
+    ? previousCodeCandidates.find(({ attachment }) => attachment.name === currentCode.name)
+    : null;
+  const previousWithCode = previousWithSameFileName || previousCodeCandidates[0];
+
+  if (!currentCode) {
+    return {
+      currentCodeAvailable: false,
+      previousCodeAvailable: Boolean(previousWithCode),
+      summary: currentAttachments.some((attachment) => attachment.category === 'code')
+        ? '첨부 코드 파일은 있으나 원문을 읽지 못해 코드 변화 비교가 필요함'
+        : '',
+    };
+  }
+
+  if (!previousWithCode) {
+    return {
+      currentCodeAvailable: true,
+      previousCodeAvailable: false,
+      currentFileName: currentCode.name,
+      currentLineCount: currentCode.lineCount || 0,
+      summary: `첨부 코드 ${currentCode.name} 원문 ${currentCode.lineCount || 0}줄 확인, 비교 가능한 이전 코드 첨부는 없음`,
+    };
+  }
+
+  const currentLines = new Set(normalizeCodeLines(currentCode.textPreview));
+  const previousLines = new Set(normalizeCodeLines(previousWithCode.attachment.textPreview));
+  const addedLines = [...currentLines].filter((line) => !previousLines.has(line));
+  const removedLines = [...previousLines].filter((line) => !currentLines.has(line));
+  const isIdenticalToPrevious = addedLines.length === 0 && removedLines.length === 0;
+
+  return {
+    currentCodeAvailable: true,
+    previousCodeAvailable: true,
+    comparedSameFileName: Boolean(previousWithSameFileName),
+    isIdenticalToPrevious,
+    currentFileName: currentCode.name,
+    previousFileName: previousWithCode.attachment.name,
+    previousAssignmentId: previousWithCode.submission.id,
+    previousDate: previousWithCode.submission.date || '',
+    currentLineCount: currentCode.lineCount || 0,
+    previousLineCount: previousWithCode.attachment.lineCount || 0,
+    addedLineCount: addedLines.length,
+    removedLineCount: removedLines.length,
+    addedLineSamples: addedLines.slice(0, 8),
+    removedLineSamples: removedLines.slice(0, 6),
+    summary: isIdenticalToPrevious
+      ? `첨부 코드 ${currentCode.name}는 ${previousWithCode.submission.date || '이전 제출'}의 ${previousWithCode.attachment.name}와 코드 내용이 동일함`
+      : `첨부 코드 ${currentCode.name}를 이전 ${previousWithCode.attachment.name}와 비교: 새 줄 ${addedLines.length}개, 삭제/변경 줄 ${removedLines.length}개`,
+  };
+}
+
 export async function buildAssignmentFeedbackContext(assignment, styleKey = 'balanced') {
   const date = assignment?.date || getDateKey(assignment?.submittedAt);
+  const courseId = normalizeClusterId(assignment?.clusterId || assignment?.regionId || assignment?.clusterName);
   const [student, assignmentHistory, dailyLearningSummary, darkMatterSummary] = await Promise.all([
     fetchStudentProfile(assignment?.userId),
     fetchAssignmentHistory(assignment),
-    fetchLearningSummary(assignment?.userId, date),
+    fetchLearningSummary(assignment?.userId, date, courseId),
     fetchDarkMatterSummary(assignment?.userId),
   ]);
 
-  const attachments = (assignment?.attachments || []).map(classifyAttachment);
+  const attachments = await enrichCodeAttachments((assignment?.attachments || []).map(classifyAttachment));
+  const previousSubmissions = await Promise.all((assignmentHistory.previous || []).map(async (item) => ({
+    ...item,
+    attachments: await enrichCodeAttachments(item.attachments || []),
+  })));
+  const codeComparison = buildCodeComparison(attachments, previousSubmissions);
   const submissionContent = String(assignment?.content || '');
   const studentQuestions = extractStudentQuestions(submissionContent);
   const context = {
     student: {
       id: assignment?.userId || '',
       name: student?.name || assignment?.userName || '학생',
-      courseId: normalizeClusterId(assignment?.clusterId),
-      courseLabel: CLUSTER_LABELS[normalizeClusterId(assignment?.clusterId)] || assignment?.clusterId || '과정',
+      courseId,
+      courseLabel: CLUSTER_LABELS[courseId] || assignment?.clusterId || '과정',
       streak: student?.streak || 0,
     },
     currentSubmission: {
@@ -439,6 +588,16 @@ export async function buildAssignmentFeedbackContext(assignment, styleKey = 'bal
       studentQuestions,
       hasStudentQuestion: studentQuestions.length > 0,
       attachments,
+      codeAttachments: attachments
+        .filter((attachment) => attachment.category === 'code')
+        .map((attachment) => ({
+          name: attachment.name,
+          lineCount: attachment.lineCount || 0,
+          fetchStatus: attachment.fetchStatus || '',
+          fetchError: attachment.fetchError || '',
+          textPreview: attachment.textPreview || '',
+        })),
+      codeComparison,
       attachmentCount: attachments.length,
       links: (assignment?.links || []).map((link) => link.url || link.title || '').filter(Boolean).slice(0, 8),
       revisionCount: assignment?.revisionCount || 0,
@@ -449,7 +608,7 @@ export async function buildAssignmentFeedbackContext(assignment, styleKey = 'bal
     },
     dailyLearningSummary,
     darkMatterSummary,
-    previousSubmissions: assignmentHistory.previous,
+    previousSubmissions,
     sameDaySubmissions: assignmentHistory.sameDay,
     feedbackGoal: getAssignmentFeedbackStyle(styleKey),
   };
@@ -490,10 +649,19 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
     : policy.isReasonableFlow
       ? '다음 제출에서는 퀴즈에서 틀린 이유나 코드/풀이에서 막힌 부분을 한 줄 더 적어 주세요.'
     : '다음 제출에서는 결과를 확인한 과정이나 막혔던 부분을 한 줄 더 적어 보세요.';
+  const noCourseLearningNote = policy.isVeryLowLearning
+    ? `제출일에 ${courseLabel} 학습 기록은 확인되지 않습니다.`
+    : '';
+  const codeComparisonNote = submission.codeComparison?.summary
+    ? `${submission.codeComparison.summary}.`
+    : '';
+  const codeReviewNote = submission.codeComparison?.isIdenticalToPrevious
+    ? `${codeComparisonNote} 이번 제출에서 새로 개선된 코드 변화는 확인되지 않습니다.`
+    : codeComparisonNote;
 
   const feedback = styleKey === 'parent'
     ? `### 과제 피드백\n\n${studentName} 학생은 ${courseLabel} 과제에서 ${submission.content ? '학습 내용을 글로 정리해 제출했습니다' : '과제를 제출했습니다'}. ${hasAttachments ? `첨부파일(${firstAttachment}${submission.attachmentCount > 1 ? ` 외 ${submission.attachmentCount - 1}개` : ''})도 함께 제출되어 결과 확인 근거가 있습니다.` : '다만 결과를 확인할 첨부 자료는 더 보강하면 좋겠습니다.'} ${learningFlowNote || (learning.activityCount ? `제출일에는 학습 기록 ${learning.activityCount}건도 확인되어 과제와 학습 흐름을 함께 볼 수 있습니다.` : '제출일 학습 기록은 많지 않아 과제 수행 과정을 더 남기면 좋겠습니다.')} ${previousPoint} ${improvement}`
-    : `### 과제 피드백\n\n이번 ${courseLabel} 과제에서는 ${submission.content ? '배운 내용을 직접 정리해 제출했습니다' : '과제를 제출했습니다'}.\n\n#### 잘한 점\n${learningFlowNote || (hasAttachments ? `제출 글과 함께 ${submission.attachmentCount}개의 첨부파일을 올린 점이 좋습니다. 결과물을 함께 남기면 무엇을 만들었는지 더 분명하게 확인할 수 있습니다.` : '과제를 제출한 흐름 자체는 좋습니다. 다음에는 실행 결과나 풀이 과정을 확인할 수 있는 자료까지 함께 남기면 더 좋아집니다.')}${questionSection}\n\n#### 이전보다 좋아진 점\n${previousPoint}\n\n#### 더 발전시키면 좋은 점\n${improvement}`;
+    : `### 과제 피드백\n\n이번 ${courseLabel} 과제에서는 ${submission.content ? '배운 내용을 직접 정리해 제출했습니다' : '과제를 제출했습니다'}. ${noCourseLearningNote}\n\n#### 잘한 점\n${codeReviewNote || learningFlowNote || (hasAttachments ? `제출 글과 함께 ${submission.attachmentCount}개의 첨부파일을 올린 점이 좋습니다. 결과물을 함께 남기면 무엇을 만들었는지 더 분명하게 확인할 수 있습니다.` : '과제를 제출한 흐름 자체는 좋습니다. 다음에는 실행 결과나 풀이 과정을 확인할 수 있는 자료까지 함께 남기면 더 좋아집니다.')}${questionSection}\n\n#### 이전보다 좋아진 점\n${submission.codeComparison?.isIdenticalToPrevious ? '같은 파일명 기준으로 이전 코드와 비교했지만, 이번 제출에서 새로 늘어난 코드나 구조 변화는 확인되지 않았습니다.' : previousPoint}\n\n#### 더 발전시키면 좋은 점\n${policy.isVeryLowLearning ? `${courseLabel} 학습 기록이 없어 코드가 어떤 과정을 거쳐 작성됐는지 확인하기 어렵습니다. 다음 제출에서는 실행 결과와 직접 바꾼 코드 2곳을 함께 적어 주세요.` : improvement}`;
 
   return {
     studentFeedback: feedback,
@@ -513,8 +681,8 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
       weaknessRecovery: weakness ? 1 : 2,
       selfDirection: submission.contentLength >= 120 ? 2 : 1,
     },
-    suggestedStatus: hasAttachments || submission.contentLength >= 80 ? 'reviewed' : 'needs_revision',
-    suggestedBonusCrystals: policy.isReasonableFlow ? 35 : hasAttachments ? 40 : 25,
+    suggestedStatus: policy.isVeryLowLearning ? 'needs_revision' : hasAttachments || submission.contentLength >= 80 ? 'reviewed' : 'needs_revision',
+    suggestedBonusCrystals: policy.isVeryLowLearning ? (submission.codeComparison?.currentCodeAvailable ? 20 : 10) : policy.isReasonableFlow ? 35 : hasAttachments ? 40 : 25,
     revisionRequest: hasAttachments ? '' : '이번 과제는 제출 글은 확인되지만 결과를 확인할 첨부 자료가 부족합니다. 실행 결과 이미지나 풀이 과정을 함께 첨부해 다시 제출해 주세요.',
     generatedBy: 'local-fallback',
   };

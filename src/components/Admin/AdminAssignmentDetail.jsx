@@ -153,6 +153,9 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           previousCount: context.previousSubmissions.length,
           sameDayCount: context.sameDaySubmissions.length,
           learningActivityCount: context.dailyLearningSummary.activityCount,
+          allLearningActivityCount: context.dailyLearningSummary.allActivityCount ?? context.dailyLearningSummary.activityCount,
+          excludedOtherCourseTitles: context.dailyLearningSummary.excludedOtherCourseTitles || [],
+          codeComparisonSummary: context.currentSubmission.codeComparison?.summary || '',
           darkMatterCount: context.darkMatterSummary.totalActive,
         },
       };
@@ -162,6 +165,27 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
       setFeedback(nextPayload.studentFeedback || '');
       if (Number.isFinite(Number(nextPayload.suggestedBonusCrystals))) {
         setBonusCrystals(Number(nextPayload.suggestedBonusCrystals));
+      }
+      if (context.feedbackPolicyGuidance?.isVeryLowLearning) {
+        setShouldIssueWarning(true);
+        const videoMinutes = Number(context.feedbackPolicyGuidance.videoMinutes || 0);
+        const codeComparisonSummary = context.currentSubmission.codeComparison?.summary || '';
+        const hasCodeImprovement = Boolean(
+          context.currentSubmission.codeComparison?.currentCodeAvailable &&
+          context.currentSubmission.codeComparison?.previousCodeAvailable &&
+          !context.currentSubmission.codeComparison?.isIdenticalToPrevious &&
+          ((context.currentSubmission.codeComparison?.addedLineCount || 0) > 0 ||
+            (context.currentSubmission.codeComparison?.removedLineCount || 0) > 0)
+        );
+        setWarningMessage(
+          `${context.student.courseLabel} 제출일 학습 기록이 매우 낮습니다` +
+          (videoMinutes > 0 ? `(${videoMinutes}분). ` : '. ') +
+          (hasCodeImprovement
+            ? `첨부 코드 개선은 확인됩니다(${codeComparisonSummary}). 다만 학습 기록과 제출 설명의 일치 여부는 별도 확인이 필요합니다.`
+            : context.currentSubmission.codeComparison?.currentCodeAvailable
+              ? `첨부 코드(${context.currentSubmission.codeComparison.currentFileName || '코드 파일'})는 별도 검토했으나, 제출일 학습 기록이 경고 기준에 해당합니다.`
+              : '영상/퀴즈/데이터 로그/코드 실행 근거가 충분히 확인되지 않습니다.')
+        );
       }
     } catch (error) {
       console.error('Failed to prepare assignment feedback:', error);
@@ -317,7 +341,19 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
             <div style={{ padding: '1rem', borderRadius: 8, background: 'rgba(0, 212, 255, 0.06)', border: '1px solid rgba(0, 212, 255, 0.16)', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>
               <div>최근 과제 비교: {aiFeedback?.contextSummary?.previousCount ?? aiContext?.previousSubmissions?.length ?? 0}건</div>
               <div>같은 날짜 다른 제출: {aiFeedback?.contextSummary?.sameDayCount ?? aiContext?.sameDaySubmissions?.length ?? 0}건</div>
-              <div>제출일 학습 기록: {aiFeedback?.contextSummary?.learningActivityCount ?? aiContext?.dailyLearningSummary?.activityCount ?? 0}건</div>
+              <div>
+                제출일 해당 과정 학습 기록: {aiFeedback?.contextSummary?.learningActivityCount ?? aiContext?.dailyLearningSummary?.activityCount ?? 0}건
+                {' / 전체 '}
+                {aiFeedback?.contextSummary?.allLearningActivityCount ?? aiContext?.dailyLearningSummary?.allActivityCount ?? aiFeedback?.contextSummary?.learningActivityCount ?? aiContext?.dailyLearningSummary?.activityCount ?? 0}건
+              </div>
+              {(aiFeedback?.contextSummary?.excludedOtherCourseTitles?.length > 0 || aiContext?.dailyLearningSummary?.excludedOtherCourseTitles?.length > 0) && (
+                <div style={{ color: '#fbbf24' }}>
+                  제외된 다른 과정 기록: {(aiFeedback?.contextSummary?.excludedOtherCourseTitles || aiContext?.dailyLearningSummary?.excludedOtherCourseTitles || []).join(', ')}
+                </div>
+              )}
+              {(aiFeedback?.contextSummary?.codeComparisonSummary || aiContext?.currentSubmission?.codeComparison?.summary) && (
+                <div>첨부 코드 비교: {aiFeedback?.contextSummary?.codeComparisonSummary || aiContext?.currentSubmission?.codeComparison?.summary}</div>
+              )}
               <div>다크 매터 연결: {aiFeedback?.contextSummary?.darkMatterCount ?? aiContext?.darkMatterSummary?.totalActive ?? 0}건</div>
             </div>
           </div>
