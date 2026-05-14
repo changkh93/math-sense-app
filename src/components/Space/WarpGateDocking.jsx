@@ -21,7 +21,7 @@ export default function WarpGateDocking({ clusterData, user, userData, attendanc
     const clusterId = clusterData.id || clusterData.docId;
 
     try {
-      await attendanceMutation.mutateAsync({
+      const result = await attendanceMutation.mutateAsync({
         userId: user.uid,
         userName: userData?.studentName || user.displayName || user.email?.split('@')[0],
         clusterId,
@@ -31,7 +31,10 @@ export default function WarpGateDocking({ clusterData, user, userData, attendanc
         status: status.state === 'late' ? 'late' : 'present'
       });
       if (onDockingSuccess) onDockingSuccess();
-      alert(status.state === 'late' ? '지각 도킹되었습니다. 다음에는 서둘러주세요!' : '정상적으로 도킹(출석)되었습니다. 즐거운 탐험 되세요!');
+      const rewardText = result?.rewardApplied ? ` +${result.rewardAmount}광석이 지급되었습니다.` : '';
+      alert(status.state === 'late'
+        ? `지각 도킹되었습니다. 다음에는 서둘러주세요!${rewardText}`
+        : `정상적으로 도킹(출석)되었습니다. 즐거운 탐험 되세요!${rewardText}`);
     } catch (err) {
       console.error('Docking failed:', err);
       alert('도킹 시스템 오류가 발생했습니다.');

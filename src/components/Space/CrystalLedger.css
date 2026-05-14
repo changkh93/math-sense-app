@@ -429,6 +429,20 @@
   text-overflow: ellipsis;
 }
 
+.ledger-tx-bonus {
+  font-size: 0.72rem;
+  color: #67e8f9;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ledger-tx-bonus span {
+  color: rgba(255, 255, 255, 0.48);
+  margin-left: 4px;
+}
+
 .ledger-tx-time {
   font-size: 0.68rem;
   color: rgba(255, 255, 255, 0.2);

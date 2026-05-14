@@ -39,7 +39,7 @@ import { useRecordAttendance, useStudentAttendance } from '../../hooks/useAssign
 // import { useParticles, createParticleBurst } from './ParticleEffects'
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates, isRadarActive } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
-import { applyHolidayMultiplier, isRestDay } from '../../utils/holidayUtils'
+import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
@@ -50,6 +50,24 @@ import Footer from '../common/Footer'
 
 // Styles
 import '../../styles/space-theme.css'
+
+function getRewardMultiplierSuffix(multiplierMeta) {
+  if (!multiplierMeta || multiplierMeta.multiplier <= 1 || multiplierMeta.bonusAmount <= 0) return ''
+  return ` ✨ (${multiplierMeta.label})`
+}
+
+function buildRewardMultiplierMetadata(multiplierMeta) {
+  if (!multiplierMeta || multiplierMeta.multiplier <= 1) return {}
+  return {
+    rewardBaseAmount: multiplierMeta.baseAmount,
+    rewardMultiplier: multiplierMeta.multiplier,
+    rewardMultiplierReason: multiplierMeta.reason,
+    rewardMultiplierLabel: multiplierMeta.label,
+    rewardBonusAmount: multiplierMeta.bonusAmount,
+    rewardMultiplierDate: multiplierMeta.dateStr,
+    ...(multiplierMeta.rewardAmountBeforeCap ? { rewardAmountBeforeCap: multiplierMeta.rewardAmountBeforeCap } : {})
+  }
+}
 
 const MIDDLE_MATH_REGION_IMAGES = {
   core: '/assets/planets/middle-math-core.png',
@@ -1054,6 +1072,7 @@ function SpaceHome() {
       // streakFreezeCount를 옛날 값으로 덮어쓰는 race condition을 유발합니다.
       // runTransaction은 충돌 시 자동 재시도하여 이를 방지합니다.
       const userDocRef = doc(db, 'users', user.uid)
+      const rewardEvaluationDate = new Date()
       const streakResult = await runTransaction(db, async (transaction) => {
         const freshSnap = await transaction.get(userDocRef)
         const progressDocRef = doc(db, 'users', user.uid, 'learning_progress', currentUnitId)
@@ -1066,6 +1085,7 @@ function SpaceHome() {
         // --- Server-side Reward Calculation (Prevent duplicate payout) ---
         const serverPreviousBest = freshProgressData.bestScore || 0
         let atomicCrystalsEarned = 0
+        let rewardMultiplierMeta = null
 
         if (crystalsEarned < 0) {
           atomicCrystalsEarned = crystalsEarned
@@ -1088,9 +1108,14 @@ function SpaceHome() {
             atomicCrystalsEarned += 5
           }
 
-          // --- Holiday Multiplier ---
+          // 신규 지급분에만 휴일/수업시간 외 배율을 적용합니다. 과거 기록은 재계산하지 않습니다.
           if (atomicCrystalsEarned > 0) {
-            atomicCrystalsEarned = applyHolidayMultiplier(atomicCrystalsEarned, getTodayKST());
+            rewardMultiplierMeta = applyCrystalRewardMultiplier(atomicCrystalsEarned, {
+              clusterId: selectedClusterId,
+              date: rewardEvaluationDate,
+              dateStr: getTodayKST(rewardEvaluationDate)
+            })
+            atomicCrystalsEarned = rewardMultiplierMeta.amount
           }
         }
 
@@ -1156,7 +1181,12 @@ function SpaceHome() {
             amount: atomicCrystalsEarned,
             type: atomicCrystalsEarned > 0 ? 'quiz_reward' : 'quiz_penalty',
             description: `${activeUnit?.title || '탐사 퀴즈'} ${atomicCrystalsEarned > 0 ? `(${score}점)` : '(시스템 손상)'}`,
-            metadata: { unitId: currentUnitId, score, penalty: atomicCrystalsEarned < 0 }
+            metadata: {
+              unitId: currentUnitId,
+              score,
+              penalty: atomicCrystalsEarned < 0,
+              ...buildRewardMultiplierMetadata(rewardMultiplierMeta)
+            }
           }, transaction, atomicCrystalsEarned > 0 ? `quiz_${currentUnitId}_s${score}` : `${stableQuizTxId}`)
         }
 
@@ -1182,6 +1212,10 @@ function SpaceHome() {
           totalCount: result.totalCount || 0,
           correctCount: result.correctCount || 0,
           crystalsEarned: atomicCrystalsEarned,
+          rewardMultiplier: rewardMultiplierMeta?.multiplier || 1,
+          rewardMultiplierReason: rewardMultiplierMeta?.reason || 'none',
+          rewardBaseAmount: rewardMultiplierMeta?.baseAmount ?? atomicCrystalsEarned,
+          rewardBonusAmount: rewardMultiplierMeta?.bonusAmount || 0,
           type: result.type === 'workbook' ? 'workbook' : 'quiz',
           timestamp: serverTimestamp()
         })
@@ -1228,11 +1262,11 @@ function SpaceHome() {
         // Transaction 내에서는 increment()를 쓸 수 없으므로, 직접 계산
         transaction.update(userDocRef, userUpdates)
 
-        return { streakCalc, freshUserData, atomicCrystalsEarned }
+        return { streakCalc, freshUserData, atomicCrystalsEarned, rewardMultiplierMeta }
       })
 
       // Transaction 밖에서 부수효과 처리 (트랜잭션 성공 후)
-      const { streakCalc: streakResultsFinal, atomicCrystalsEarned: finalCrystals } = streakResult
+      const { streakCalc: streakResultsFinal, atomicCrystalsEarned: finalCrystals, rewardMultiplierMeta } = streakResult
       const finalStreakUpdates = streakResultsFinal.streakUpdate || {}
 
       // --- Atomic Batch: Update incorrect_questions and review_marks ---
@@ -1362,7 +1396,7 @@ function SpaceHome() {
         rewardMessage: finalCrystals > 0 
           ? (isDarkMatterMode 
               ? `🌌 다크 매터 정화 성공! (+${finalCrystals} 광석)` 
-              : `${score}점으로 최고 기록을 경신했습니다! (+${finalCrystals} 광석)`) + (isRestDay(getTodayKST()) ? ' ✨ (휴일 보너스)' : '')
+              : `${score}점으로 최고 기록을 경신했습니다! (+${finalCrystals} 광석)`) + getRewardMultiplierSuffix(rewardMultiplierMeta)
           : (score === 100 ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)" : `최고 점수를 넘지 못해 추가 광석을 획득할 수 없습니다.`),
         streakInfo: {
           currentStreak: finalStreakUpdates.currentStreak || streakResultsFinal?.meta?.newStreak,
@@ -1417,6 +1451,7 @@ function SpaceHome() {
     const isLogActivity = activityCategory === 'text' || activityType.includes('로그')
     const isAttentionEvent = !!attentionSource && (attentionResult === 'hit' || attentionResult === 'miss')
     const isAttentionMiss = isAttentionEvent && attentionResult === 'miss'
+    const rewardEvaluationDate = new Date()
 
     try {
       const txResult = await runTransaction(db, async (transaction) => {
@@ -1485,6 +1520,7 @@ function SpaceHome() {
         
         // Calculate KST Date
         const todayKST = getTodayKST()
+        let rewardMultiplierMeta = null
         const videoSessionSeconds = isVideoActivity && !isAttentionEvent
           ? Math.max(0, Math.floor(Number(sessionWatchSeconds) || 0))
           : 0
@@ -1494,9 +1530,14 @@ function SpaceHome() {
         const shouldLogVideoView = isVideoActivity && !isAttentionEvent && videoSessionSeconds > 0
         const shouldAccumulateVideoTime = shouldLogVideoView || completionVideoSessionSeconds > 0
 
-        // --- Holiday Multiplier ---
+        // 신규 지급분에만 휴일/수업시간 외 배율을 적용합니다. 과거 기록은 재계산하지 않습니다.
         if (actualReward > 0) {
-          actualReward = applyHolidayMultiplier(actualReward, todayKST);
+          rewardMultiplierMeta = applyCrystalRewardMultiplier(actualReward, {
+            clusterId: selectedClusterId,
+            date: rewardEvaluationDate,
+            dateStr: todayKST
+          })
+          actualReward = rewardMultiplierMeta.amount
         }
 
         // --- Daily Video Reward Cap (Prevent infinite farming) ---
@@ -1515,6 +1556,15 @@ function SpaceHome() {
             actualReward = DAILY_VIDEO_CAP - dailyVideoCrystals
             if (actualReward <= 0) {
               rewardBlockedReason = 'daily_cap'
+            }
+          }
+
+          if (rewardMultiplierMeta) {
+            rewardMultiplierMeta = {
+              ...rewardMultiplierMeta,
+              amount: Math.max(0, actualReward),
+              bonusAmount: Math.max(0, Math.max(0, actualReward) - rewardMultiplierMeta.baseAmount),
+              rewardAmountBeforeCap: rewardMultiplierMeta.amount
             }
           }
 
@@ -1669,7 +1719,11 @@ function SpaceHome() {
             amount: actualReward,
             type: isVideoActivity ? 'transmission_reward' : 'data_log_reward',
             description: `${transmissionTitle || activeUnit?.title || '탐사'} 보상 (${activityType})`,
-            metadata: { unitId: currentUnitId, ...activityMetadata }
+            metadata: {
+              unitId: currentUnitId,
+              ...activityMetadata,
+              ...buildRewardMultiplierMetadata(rewardMultiplierMeta)
+            }
           }, transaction, stableTxId)
         }
 
@@ -1696,6 +1750,10 @@ function SpaceHome() {
             clusterId: selectedClusterId,
             score: 100,
             crystalsEarned: actualReward,
+            rewardMultiplier: rewardMultiplierMeta?.multiplier || 1,
+            rewardMultiplierReason: rewardMultiplierMeta?.reason || 'none',
+            rewardBaseAmount: rewardMultiplierMeta?.baseAmount ?? actualReward,
+            rewardBonusAmount: rewardMultiplierMeta?.bonusAmount || 0,
             timestamp: serverTimestamp(),
             type: isLogActivity ? 'text' : ((isAttentionMiss || shouldLogFocusOnly) ? 'attention' : 'video'),
             activityType,
@@ -1714,10 +1772,10 @@ function SpaceHome() {
           }, { merge: true })
         }
 
-        return { streakCalcResult: streakResult, streakUpdates, txUserData: freshUserData, actualReward, rewardBlockedReason }
+        return { streakCalcResult: streakResult, streakUpdates, txUserData: freshUserData, actualReward, rewardBlockedReason, rewardMultiplierMeta }
       })
 
-      const { streakCalcResult, streakUpdates, txUserData, actualReward, rewardBlockedReason } = txResult
+      const { streakCalcResult, streakUpdates, txUserData, actualReward, rewardBlockedReason, rewardMultiplierMeta } = txResult
 
       // Trigger milestone celebration
       if (streakCalcResult.meta?.justReachedMilestone) {
@@ -1740,7 +1798,9 @@ function SpaceHome() {
           setCompletionResult({
             crystalsEarned: actualReward,
             isPerfect: true,
-            rewardMessage: actualReward > 0 ? `${activityType} 달성! (+${actualReward} 광석)` : `이미 보상을 획득한 활동입니다.`,
+            rewardMessage: actualReward > 0
+              ? `${activityType} 달성! (+${actualReward} 광석)${getRewardMultiplierSuffix(rewardMultiplierMeta)}`
+              : `이미 보상을 획득한 활동입니다.`,
             streakInfo: {
               currentStreak: streakUpdates.currentStreak || streakCalcResult.meta?.newStreak || txUserData?.currentStreak || 0,
               freezeUsed: streakCalcResult.meta?.freezeUsed || false,

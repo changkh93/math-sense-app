@@ -4,7 +4,7 @@ export function getAttendanceDockingStatus({ clusterData, todayAttendance }) {
   if (todayAttendance) {
     return {
       state: 'completed',
-      message: `도킹 완료 (${todayAttendance.status === 'late' ? '지각' : '정상'})`
+      message: `도킹 완료 (${todayAttendance.status === 'late' ? '지각 +2광석' : '정상 +5광석'})`
     };
   }
 
@@ -32,7 +32,7 @@ export function getAttendanceDockingStatus({ clusterData, todayAttendance }) {
   }
 
   if (currentTimeInMins >= dockingOpenTimeInMins && currentTimeInMins < startTimeInMins) {
-    return { state: 'open', message: '탐사선 도킹 승인' };
+    return { state: 'open', message: '탐사선 도킹 승인 (+5광석)' };
   }
 
   if (currentTimeInMins >= startTimeInMins && currentTimeInMins <= onTimeGraceMins) {
@@ -41,12 +41,12 @@ export function getAttendanceDockingStatus({ clusterData, todayAttendance }) {
     const secs = totalClosingSecs % 60;
     return {
       state: 'closing',
-      message: `도킹 마감 임박 - ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+      message: `도킹 마감 임박 (+5광석) - ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
     };
   }
 
   if (currentTimeInMins > onTimeGraceMins && currentTimeInMins <= endTimeInMins) {
-    return { state: 'late', message: '게이트 폐쇄 (지각 도킹)' };
+    return { state: 'late', message: '게이트 폐쇄 (지각 도킹 +2광석)' };
   }
 
   return { state: 'invalid', message: '오늘 수업이 종료되었습니다.' };

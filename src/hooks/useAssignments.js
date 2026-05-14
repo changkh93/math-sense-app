@@ -140,6 +140,8 @@ export const useSubmitFeedbackResponse = () => {
 import { recordCrystalTransaction } from '../utils/crystalLedger';
 
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
+const ATTENDANCE_ON_TIME_REWARD = 5;
+const ATTENDANCE_LATE_REWARD = 2;
 const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
 const ACTIVE_WARNING_STATUSES = ['active', 'appealed'];
 
@@ -586,15 +588,57 @@ export const useRecordAttendance = () => {
   return useMutation({
     mutationFn: async (attendanceData) => {
       // Create a unique doc ID for the student+date+cluster to prevent double attendance
-      const docId = `${attendanceData.userId}_${attendanceData.date}_${attendanceData.clusterId}`;
+      const normalizedClusterId = normalizeClusterId(attendanceData.clusterId);
+      const docId = `${attendanceData.userId}_${attendanceData.date}_${normalizedClusterId}`;
       const ref = doc(db, 'attendance', docId);
-      
-      await setDoc(ref, {
-        ...attendanceData,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      
-      return { id: docId };
+      const userRef = doc(db, 'users', attendanceData.userId);
+      const txId = `attendance_reward_${normalizedClusterId}_${attendanceData.date}`;
+      const txRef = doc(db, 'users', attendanceData.userId, 'crystal_transactions', txId);
+      const isLate = attendanceData.status === 'late';
+      const rewardAmount = isLate ? ATTENDANCE_LATE_REWARD : ATTENDANCE_ON_TIME_REWARD;
+
+      const result = await runTransaction(db, async (transaction) => {
+        const existingAttendance = await transaction.get(ref);
+        const existingReward = await transaction.get(txRef);
+        const shouldApplyReward = !existingAttendance.exists() && !existingReward.exists();
+
+        transaction.set(ref, {
+          ...attendanceData,
+          clusterId: normalizedClusterId,
+          attendanceReward: rewardAmount,
+          rewardStatus: shouldApplyReward ? 'recorded' : 'already_recorded',
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        if (!shouldApplyReward) {
+          return { id: docId, rewardApplied: false, rewardAmount: 0 };
+        }
+
+        recordCrystalTransaction(attendanceData.userId, {
+          amount: rewardAmount,
+          type: 'attendance_reward',
+          description: isLate
+            ? `지각 출석 보상 (${attendanceData.date})`
+            : `정시 출석 보상 (${attendanceData.date})`,
+          metadata: {
+            clusterId: attendanceData.clusterId,
+            normalizedClusterId,
+            date: attendanceData.date,
+            attendanceId: docId,
+            status: attendanceData.status,
+            rewardRule: isLate ? 'late' : 'on_time'
+          }
+        }, transaction, txId);
+
+        transaction.update(userRef, {
+          crystals: increment(rewardAmount),
+          lastAttendanceRewardAt: serverTimestamp()
+        });
+
+        return { id: docId, rewardApplied: true, rewardAmount };
+      });
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });

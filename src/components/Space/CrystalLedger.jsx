@@ -19,6 +19,7 @@ const TX_CONFIG = {
   question_resolved: { icon: '✅', label: '질문 해결 보상', color: '#4ade80' },
   self_resolve: { icon: '🔍', label: '자가 해결 보상', color: '#4ade80' },
   teacher_verify: { icon: '👨‍🏫', label: '교사 검증 보상', color: '#4ade80' },
+  attendance_reward: { icon: '🚀', label: '출석 도킹 보상', color: '#38bdf8' },
   streak_bonus: { icon: '🔥', label: '연속 학습 보너스', color: '#fbbf24' },
   assignment_missing_penalty: { icon: '📝', label: '과제 미제출 차감', color: '#fb7185' },
   crystal_gift_sent: { icon: '🎁', label: '친구 광석 선물', color: '#f87171' },
@@ -581,6 +582,14 @@ export default function CrystalLedger({ userData }) {
                             {tx.description && (
                               <div className="ledger-tx-desc">{tx.description}</div>
                             )}
+                            {tx.metadata?.rewardMultiplier > 1 && (
+                              <div className="ledger-tx-bonus">
+                                {tx.metadata.rewardMultiplierLabel || `${tx.metadata.rewardMultiplier}배 보너스`}
+                                {tx.metadata.rewardBonusAmount > 0 && (
+                                  <span> 기본 {tx.metadata.rewardBaseAmount} + 보너스 {tx.metadata.rewardBonusAmount}</span>
+                                )}
+                              </div>
+                            )}
                             <div className="ledger-tx-time">{formatTime(tx.timestamp)}</div>
                           </div>
 
@@ -713,6 +722,28 @@ export default function CrystalLedger({ userData }) {
             </div>
             
             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#38bdf8', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>🚀</span> 워프 게이트 도킹 (출석)
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>정시 출석 체크 시 <span style={{color: 'var(--text-bright)'}}>+5</span> 광석</li>
+                <li>지각 출석 체크 시 <span style={{color: 'var(--text-bright)'}}>+2</span> 광석</li>
+                <li>수업 시작 10분 전부터 도킹 가능</li>
+              </ul>
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#67e8f9', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>✨</span> 학습 보상 배율
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>주말/휴일 학습 보상은 <span style={{color: 'var(--text-bright)'}}>1.5배</span> 지급</li>
+                <li>정규 수업시간 외 학습 보상은 <span style={{color: 'var(--text-bright)'}}>1.2배</span> 지급</li>
+                <li>소수점은 올림 처리, 휴일 배율이 우선 적용</li>
+              </ul>
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ color: '#00ff88', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '1.2em' }}>📡</span> 트랜스미션 (영상)
               </div>
@@ -741,6 +772,8 @@ export default function CrystalLedger({ userData }) {
               <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 <li>과제 제출 및 승인 시 <span style={{color: 'var(--text-bright)'}}>+10 ~ 40</span> 광석</li>
                 <li>제출 내용의 성실도에 따라 차등 지급</li>
+                <li>출석 후 과제 미제출 시 <span style={{color: '#f87171'}}>-15</span> 광석</li>
+                <li>연속 미제출 시 <span style={{color: '#f87171'}}>누적 차감</span> <span style={{color: 'var(--text-muted)'}}>(-20, -25...)</span></li>
               </ul>
             </div>
           </div>
