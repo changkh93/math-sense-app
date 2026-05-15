@@ -17,6 +17,11 @@ const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const DIRECT_MEMO_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
+const ASSIGNMENT_MISSING_LOOKBACK_DAYS = 7;
+const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
+const ASSIGNMENT_MISSING_BASE_PENALTY = 15;
+const ASSIGNMENT_MISSING_STEP_PENALTY = 5;
+const ASSIGNMENT_MISSING_MAX_PENALTY = 25;
 
 /**
  * fetchNotebook
@@ -810,6 +815,49 @@ function getKstDateKey(date = new Date()) {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
+}
+
+function normalizeClusterId(clusterId = "") {
+  if (clusterId === "초등수학" || clusterId === "cluster_elementary") return "cluster_elementary";
+  if (clusterId === "파이썬" || clusterId === "python") return "python";
+  if (clusterId === "중등수학" || clusterId === "middle-math") return "middle-math";
+  if (clusterId === "서양고전" || clusterId === "western-classic") return "western-classic";
+  return String(clusterId || "").trim();
+}
+
+function getRecentKstDateKeys(lookbackDays = ASSIGNMENT_MISSING_LOOKBACK_DAYS, now = new Date()) {
+  const keys = [];
+  for (let i = 0; i < lookbackDays; i += 1) {
+    keys.push(getKstDateKey(new Date(now.getTime() - i * 24 * 60 * 60 * 1000)));
+  }
+  return keys.sort();
+}
+
+function getMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  if (value.seconds) return value.seconds * 1000;
+  if (value._seconds) return value._seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getAttendanceBaseMs(attendance = {}) {
+  return (
+    getMillis(attendance.timestamp) ||
+    getMillis(attendance.createdAt) ||
+    getMillis(attendance.updatedAt) ||
+    (attendance.date ? new Date(`${attendance.date}T23:59:59+09:00`).getTime() : 0)
+  );
+}
+
+function getAssignmentMissingPenalty(missingStreak) {
+  return Math.min(
+    ASSIGNMENT_MISSING_MAX_PENALTY,
+    ASSIGNMENT_MISSING_BASE_PENALTY + Math.max(0, missingStreak - 1) * ASSIGNMENT_MISSING_STEP_PENALTY
+  );
 }
 
 function normalizeDirectMemoBody(value) {
@@ -1627,6 +1675,172 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
     success: true,
     dailyLimit: CRYSTAL_GIFT_DAILY_LIMIT,
     ...result,
+  };
+});
+
+exports.applyMissingAssignmentPenalties = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const normalizedClusterId = normalizeClusterId(data?.clusterId);
+  if (!normalizedClusterId) {
+    throw new functions.https.HttpsError("invalid-argument", "클러스터 정보가 필요합니다.");
+  }
+
+  const db = admin.firestore();
+  const now = new Date();
+  const nowMs = now.getTime();
+  const nowTimestamp = admin.firestore.Timestamp.fromDate(now);
+  const recentDates = getRecentKstDateKeys(ASSIGNMENT_MISSING_LOOKBACK_DAYS, now);
+  const submittedStatuses = new Set(["submitted", "reviewed", "needs_revision"]);
+
+  const [attendanceSnap, assignmentSnap] = await Promise.all([
+    db.collection("attendance")
+      .where("userId", "==", uid)
+      .where("clusterId", "==", normalizedClusterId)
+      .where("date", "in", recentDates)
+      .get(),
+    db.collection("assignments")
+      .where("userId", "==", uid)
+      .where("clusterId", "==", normalizedClusterId)
+      .where("date", "in", recentDates)
+      .get(),
+  ]);
+
+  const assignmentDates = new Set();
+  assignmentSnap.docs.forEach((snap) => {
+    const item = snap.data() || {};
+    if (item.date && submittedStatuses.has(item.status)) {
+      assignmentDates.add(item.date);
+    }
+  });
+
+  const attendanceRows = attendanceSnap.docs
+    .map((snap) => ({ id: snap.id, ...(snap.data() || {}) }))
+    .filter((item) => item.date)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  let missingStreak = 0;
+  const candidates = [];
+  attendanceRows.forEach((attendance) => {
+    if (assignmentDates.has(attendance.date)) {
+      missingStreak = 0;
+      return;
+    }
+
+    missingStreak += 1;
+    const baseMs = getAttendanceBaseMs(attendance);
+    if (!baseMs || nowMs - baseMs < ASSIGNMENT_MISSING_GRACE_MS) return;
+
+    const penalty = getAssignmentMissingPenalty(missingStreak);
+    candidates.push({
+      attendance,
+      missingStreak,
+      penaltyAmount: -penalty,
+      txId: `assignment_missing_${normalizedClusterId}_${attendance.date}`,
+      warningId: missingStreak === 3
+        ? `warning_${uid}_${normalizedClusterId}_${attendance.date}_consecutive_missing_3`
+        : "",
+    });
+  });
+
+  const userRef = db.collection("users").doc(uid);
+  let applied = 0;
+  let skippedExisting = 0;
+  let warningCreated = 0;
+  const appliedDates = [];
+
+  for (const item of candidates) {
+    const txRef = userRef.collection("crystal_transactions").doc(item.txId);
+    const warningRef = item.warningId ? db.collection("assignmentWarnings").doc(item.warningId) : null;
+
+    const result = await db.runTransaction(async (tx) => {
+      const [userSnap, existingTxSnap, existingWarningSnap] = await Promise.all([
+        tx.get(userRef),
+        tx.get(txRef),
+        warningRef ? tx.get(warningRef) : Promise.resolve(null),
+      ]);
+
+      if (!userSnap.exists) {
+        throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+      }
+      if (existingTxSnap.exists) {
+        return { didApply: false, didCreateWarning: false };
+      }
+
+      const userData = userSnap.data() || {};
+      const penaltyAbs = Math.abs(item.penaltyAmount);
+      tx.set(txRef, {
+        amount: item.penaltyAmount,
+        type: "assignment_missing_penalty",
+        description: `출석 후 과제 미제출 페널티 (${item.attendance.date}, 최근 7일 검토)`,
+        metadata: {
+          clusterId: normalizedClusterId,
+          normalizedClusterId,
+          date: item.attendance.date,
+          attendanceId: item.attendance.id || "",
+          missingStreak: item.missingStreak,
+          basePenalty: ASSIGNMENT_MISSING_BASE_PENALTY,
+          consecutivePenalty: Math.max(0, penaltyAbs - ASSIGNMENT_MISSING_BASE_PENALTY),
+          maxPenalty: ASSIGNMENT_MISSING_MAX_PENALTY,
+          graceHours: 12,
+          lookbackDays: ASSIGNMENT_MISSING_LOOKBACK_DAYS,
+          source: "applyMissingAssignmentPenalties",
+        },
+        timestamp: nowTimestamp,
+      });
+
+      tx.set(userRef, {
+        crystals: Number(userData.crystals || 0) + item.penaltyAmount,
+        lastAssignmentPenaltyAt: nowTimestamp,
+      }, { merge: true });
+
+      let didCreateWarning = false;
+      if (warningRef && !existingWarningSnap?.exists) {
+        tx.set(warningRef, {
+          userId: uid,
+          assignmentId: "",
+          clusterId: normalizedClusterId,
+          regionId: item.attendance.regionId || "",
+          date: item.attendance.date,
+          type: "consecutive_missing_assignment",
+          status: "active",
+          severity: "warning",
+          message: "연속 3회 과제 미제출이 확인되어 학습 경고가 기록되었습니다.",
+          policyMessage: "경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.",
+          evidence: {
+            missingStreak: item.missingStreak,
+            attendanceId: item.attendance.id || "",
+            graceHours: 12,
+            lookbackDays: ASSIGNMENT_MISSING_LOOKBACK_DAYS,
+          },
+          appealLocked: false,
+          createdBy: "server_missing_assignment_sweep",
+          createdAt: nowTimestamp,
+          updatedAt: nowTimestamp,
+        }, { merge: true });
+        didCreateWarning = true;
+      }
+
+      return { didApply: true, didCreateWarning };
+    });
+
+    if (result.didApply) {
+      applied += 1;
+      appliedDates.push(item.attendance.date);
+    } else {
+      skippedExisting += 1;
+    }
+    if (result.didCreateWarning) warningCreated += 1;
+  }
+
+  return {
+    success: true,
+    lookbackDays: ASSIGNMENT_MISSING_LOOKBACK_DAYS,
+    checkedDates: recentDates,
+    candidateCount: candidates.length,
+    applied,
+    skippedExisting,
+    warningCreated,
+    appliedDates,
   };
 });
 

@@ -171,21 +171,30 @@ service cloud.firestore {
     // Users: Any authenticated user can read user profiles (for ranking). Writing is restricted.
     match /users/{userId} {
       allow read: if isAuth();
-      // Allow cross-user updates for Q&A rewards (since crystals are granted client-side)
+      allow create: if isAuth() && (request.auth.uid == userId || isAdmin());
       allow update: if isAuth() && (
-        !touchesManagedStreakFields() ||
-        hasValidStreakWriteAudit()
+        isAdmin() ||
+        (
+          request.auth.uid == userId &&
+          (!touchesManagedStreakFields() || hasValidStreakWriteAudit())
+        )
       );
-      allow create, delete: if isAuth() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
       
       // Allow subcollections (like 'history', 'crystal_transactions', 'learning_progress', 'activityLogs')
       match /{document=**} {
-        // Allow creating transactions for other users (e.g. reward transactions)
-        allow create: if isAuth(); 
-        allow read, update, delete: if isAuth() && (
+        allow create: if isAuth() && (
+          request.auth.uid == userId ||
+          isAdmin()
+        );
+        allow read: if isAuth() && (
           request.auth.uid == userId || 
           isAdmin() ||
           isLinkedParentOf(userId)
+        );
+        allow update, delete: if isAuth() && (
+          request.auth.uid == userId ||
+          isAdmin()
         );
       }
     }

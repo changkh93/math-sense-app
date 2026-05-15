@@ -30,7 +30,8 @@ const StreakFixer = () => {
       .filter(t => t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core')
       .map(t => t.date);
     
-    // 2. 소모 기록과 현재 개수를 바탕으로 부족한 증거 보완 (수동 지급 등 대비)
+    // 2. 소모 기록으로만 부족한 증거를 보완합니다.
+    // 현재 보유 수량을 증거처럼 주입하면 잘못된 코어 수가 다시 정답으로 고정됩니다.
     const usageDates = transactions.filter(t => t.type === 'streak_freeze').map(t => t.date);
     const currentOwned = userData.streakFreezeCount || 0;
     
@@ -41,14 +42,6 @@ const StreakFixer = () => {
       if (idx !== -1) simulatedInventory.splice(idx, 1);
       else coreEvidence.push(uExDate); 
     });
-    
-    // 현재 보유 중인 개수가 계산보다 많으면 오늘 날짜로 보정
-    const currentlyExpected = coreEvidence.length - usageDates.length;
-    if (currentOwned > currentlyExpected) {
-      for (let i = 0; i < (currentOwned - currentlyExpected); i++) {
-        coreEvidence.push(todayKST);
-      }
-    }
 
     // 3. 학습 히스토리 수집
     const histSnap = await getDocs(query(collection(db, 'users', uid, 'history'), orderBy('timestamp', 'asc')));

@@ -3,14 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { Trophy, Medal, Star, Target, Info, ShieldAlert, Zap, CircleHelp } from 'lucide-react'
 import { db, auth } from '../../firebase'
-import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore'
+import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, runTransaction } from 'firebase/firestore'
 import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
-import { buildStreakWriteAudit, extractLearningActivityDates, getEffectiveStreak, getTodayKST, getKSTComponents, recalculateStreakState } from '../../utils/streakUtils'
+import { getEffectiveStreak, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
 import { calculateSEI, FOCUS_MAX_SCORE } from '../../utils/rankingUtils'
-import { useAdmin } from '../../hooks/useAdmin'
 import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getAnonymousLabel, getFrameSurfaceStyles, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
 
 export default function SpaceRanking({ user, userData }) {
@@ -22,7 +21,6 @@ export default function SpaceRanking({ user, userData }) {
   const [crewLeaderboard, setCrewLeaderboard] = useState([])
   const [hallOfFame, setHallOfFame] = useState({ bestAnswer: null, bestQuestion: null, growthStar: null })
   const [activatingShowcase, setActivatingShowcase] = useState(false)
-  const { isAdmin } = useAdmin();
 
   const SEI_TIPS = {
     skill: {
@@ -49,75 +47,6 @@ export default function SpaceRanking({ user, userData }) {
       title: '집중도(영상)',
       tip: '영상 중 제시되는 **광석 획득 기회**를 빠짐없이 잡으세요. 성공률과 전체 기회 수를 함께 보는 Wilson 보정 점수입니다.'
     }
-  };
-
-  const handleRepairStreaks = async () => {
-    if (!window.confirm("모든 랭킹 사용자의 스트릭 데이터를 분석하여 복구하시겠습니까?\n(Firestore 읽기가 다수 발생합니다)")) return;
-    try {
-      const repairPromises = topUsers.map(async (u) => {
-        const histQ = query(collection(db, 'users', u.id, 'history'), orderBy('timestamp', 'desc'), limit(100));
-        const txQ = query(collection(db, 'users', u.id, 'crystal_transactions'), orderBy('timestamp', 'asc'));
-        const [snap, txSnap] = await Promise.all([getDocs(histQ), getDocs(txQ)]);
-        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-        if (docs.length === 0) return null;
-
-        const transactions = txSnap.docs.map(d => ({ ...d.data(), id: d.id }));
-        const activeDates = Array.from(extractLearningActivityDates(docs, transactions)).sort();
-        const coreEvidenceDates = transactions
-          .filter(t => t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core' && t.timestamp)
-          .map(t => getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp)));
-
-        const usageDates = transactions
-          .filter(t => t.type === 'streak_freeze' && t.timestamp)
-          .map(t => getTodayKST(t.timestamp.toDate ? t.timestamp.toDate() : new Date(t.timestamp)))
-          .sort();
-
-        const currentOwned = u.streakFreezeCount || 0;
-        const simulatedInventory = [...coreEvidenceDates].sort();
-        usageDates.forEach(usageDate => {
-          const idx = simulatedInventory.findIndex(purchaseDate => purchaseDate <= usageDate);
-          if (idx !== -1) simulatedInventory.splice(idx, 1);
-          else coreEvidenceDates.push(usageDate);
-        });
-
-        const currentlyExpected = coreEvidenceDates.length - usageDates.length;
-        if (currentOwned > currentlyExpected) {
-          for (let i = 0; i < currentOwned - currentlyExpected; i++) {
-            coreEvidenceDates.push(getTodayKST());
-          }
-        }
-
-        const streakState = recalculateStreakState(activeDates, coreEvidenceDates, getTodayKST());
-        if (
-          streakState.correctStreak !== (u.currentStreak || 0) ||
-          streakState.correctLastDate !== (u.lastStreakDate || "") ||
-          streakState.coresRemaining !== currentOwned
-        ) {
-          await setDoc(doc(db, 'users', u.id), {
-            currentStreak: streakState.correctStreak,
-            lastStreakDate: streakState.correctLastDate,
-            longestStreak: Math.max(u.longestStreak || 0, streakState.correctStreak),
-            streakFreezeCount: streakState.coresRemaining,
-            streakWriteAudit: buildStreakWriteAudit({
-              source: 'space_ranking_admin_repair',
-              writerUid: user?.uid || auth.currentUser?.uid || '',
-              prevState: u,
-              nextState: {
-                currentStreak: streakState.correctStreak,
-                lastStreakDate: streakState.correctLastDate,
-                streakFreezeCount: streakState.coresRemaining,
-              },
-              writtenAt: serverTimestamp(),
-              note: u.id,
-            }),
-          }, { merge: true });
-          return u.id;
-        }
-        return null;
-      });
-      const results = await Promise.all(repairPromises);
-      alert(`${results.filter(Boolean).length}명의 스트릭 데이터가 복구되었습니다.`);
-    } catch (err) { alert("오류 발생: " + err.message); }
   };
 
   useEffect(() => {
@@ -415,27 +344,6 @@ export default function SpaceRanking({ user, userData }) {
           </button>
         ))}
 
-        {isAdmin && (
-          <button
-            onClick={handleRepairStreaks}
-            className="font-tech"
-            style={{
-              padding: '0.8rem 1.5rem',
-              background: 'rgba(255, 191, 0, 0.1)',
-              border: '1px dashed #ffbf00',
-              borderRadius: '12px',
-              color: '#ffbf00',
-              cursor: 'pointer',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            title="모든 사용자의 스트릭 데이터 동기화 (Admin)"
-          >
-            🔄 동기화
-          </button>
-        )}
       </div>
 
       <div style={{

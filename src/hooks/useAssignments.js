@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { db } from '../firebase'
+import { httpsCallable } from 'firebase/functions'
 import { 
   collection, 
   query, 
@@ -13,7 +14,7 @@ import {
   serverTimestamp,
   runTransaction
 } from 'firebase/firestore'
-import { auth } from '../firebase'
+import { auth, functions } from '../firebase'
 
 // ==========================================
 // STUDENT HOOKS
@@ -653,130 +654,18 @@ export const useRecordAttendance = () => {
 };
 
 /**
- * Student: Apply penalties for attended class days where no assignment was
- * submitted within 12 hours after attendance. This runs only when the archive
- * is opened and uses deterministic ledger IDs, so each date is charged once.
+ * Student: ask the server to review only the recent window for attended class
+ * days where no assignment was submitted within the grace period.
  */
 export const useApplyMissingAssignmentPenalties = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ userId, clusterId, attendanceRecords = [], assignments = [] }) => {
+    mutationFn: async ({ userId, clusterId }) => {
       if (!userId || !clusterId) return { applied: 0 };
-      const normalizedClusterId = normalizeClusterId(clusterId);
-
-      const assignmentDates = new Set(
-        assignments
-          .filter(a => ['submitted', 'reviewed', 'needs_revision'].includes(a.status))
-          .map(a => a.date)
-          .filter(Boolean)
-      );
-
-      const sortedAttendance = [...attendanceRecords]
-        .filter(a => (!a.userId || a.userId === userId) && a.date)
-        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-
-      const nowMs = Date.now();
-      let missingStreak = 0;
-      const candidates = [];
-
-      sortedAttendance.forEach((attendance) => {
-        if (assignmentDates.has(attendance.date)) {
-          missingStreak = 0;
-          return;
-        }
-
-        missingStreak += 1;
-        const baseMs = getAttendanceBaseMs(attendance);
-        if (!baseMs || nowMs - baseMs < ASSIGNMENT_MISSING_GRACE_MS) return;
-
-        const penaltyAmount = -(15 + Math.max(0, missingStreak - 1) * 5);
-        candidates.push({
-          attendance,
-          missingStreak,
-          penaltyAmount,
-          txId: `assignment_missing_${normalizedClusterId}_${attendance.date}`
-        });
-      });
-
-      let applied = 0;
-      let warningTouched = false;
-      for (const item of candidates) {
-        const userRef = doc(db, 'users', userId);
-        const txRef = doc(db, 'users', userId, 'crystal_transactions', item.txId);
-        const warningId = item.missingStreak === 3
-          ? getWarningId({
-              userId,
-              clusterId: normalizedClusterId,
-              date: item.attendance.date,
-              type: 'consecutive_missing_assignment',
-            })
-          : '';
-        const warningRef = warningId ? doc(db, 'assignmentWarnings', warningId) : null;
-
-        const result = await runTransaction(db, async (transaction) => {
-          const existingTx = await transaction.get(txRef);
-          const existingWarning = warningRef ? await transaction.get(warningRef) : null;
-          if (existingTx.exists()) return { didApply: false, didCreateWarning: false };
-
-          const penaltyAbs = Math.abs(item.penaltyAmount);
-          recordCrystalTransaction(userId, {
-            amount: item.penaltyAmount,
-            type: 'assignment_missing_penalty',
-              description: `출석 후 과제 미제출 페널티 (${item.attendance.date}, ${item.missingStreak}회 연속)`,
-              metadata: {
-                clusterId,
-                normalizedClusterId,
-                date: item.attendance.date,
-              attendanceId: item.attendance.id || '',
-              missingStreak: item.missingStreak,
-              basePenalty: 15,
-              consecutivePenalty: penaltyAbs - 15,
-              graceHours: 12
-            }
-          }, transaction, item.txId);
-
-          transaction.update(userRef, {
-            crystals: increment(item.penaltyAmount),
-            lastAssignmentPenaltyAt: serverTimestamp()
-          });
-
-          if (warningRef && !existingWarning?.exists()) {
-            transaction.set(warningRef, {
-              userId,
-              assignmentId: '',
-              clusterId: normalizedClusterId,
-              regionId: item.attendance.regionId || '',
-              date: item.attendance.date,
-              type: 'consecutive_missing_assignment',
-              status: 'active',
-              severity: 'warning',
-              message: getWarningMessage('consecutive_missing_assignment'),
-              policyMessage: WARNING_POLICY_MESSAGE,
-              evidence: {
-                missingStreak: item.missingStreak,
-                attendanceId: item.attendance.id || '',
-                graceHours: 12,
-              },
-              appealLocked: false,
-              createdBy: 'system_missing_assignment_sweep',
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-          }
-
-          return { didApply: true, didCreateWarning: Boolean(warningRef && !existingWarning?.exists()) };
-        });
-
-        if (result.didApply) applied += 1;
-        if (result.didCreateWarning) warningTouched = true;
-      }
-
-      if (warningTouched) {
-        await recomputeAssignmentWarningSummary(userId);
-      }
-
-      return { applied };
+      const applyMissingAssignmentPenalties = httpsCallable(functions, 'applyMissingAssignmentPenalties');
+      const result = await applyMissingAssignmentPenalties({ clusterId });
+      return result.data || { applied: 0 };
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['attendance', 'student', variables?.userId, variables?.clusterId] });

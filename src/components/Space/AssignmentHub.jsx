@@ -159,27 +159,27 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   }, [assignments, optimisticAssignmentsByDate]);
 
   useEffect(() => {
-    if (!user?.uid || !clusterId || isLoading || !attendanceRecords) return;
+    if (!user?.uid || !clusterId) return;
 
-    const penaltyMap = getAssignmentMissingPenaltyMap(effectiveAssignments, attendanceRecords, penaltyCheckNow || Date.now());
-    const maturedDates = Object.entries(penaltyMap)
-      .filter(([, item]) => item.matured)
-      .map(([dateStr]) => dateStr)
-      .sort();
-
-    if (maturedDates.length === 0) return;
-
-    const sweepKey = `${user.uid}:${clusterId}:${maturedDates.join(',')}`;
+    const sweepKey = `${user.uid}:${clusterId}:${todayKST}`;
     if (penaltySweepKeyRef.current === sweepKey || penaltyMutation.isPending) return;
 
     penaltySweepKeyRef.current = sweepKey;
-    penaltyMutation.mutate({
-      userId: user.uid,
-      clusterId,
-      assignments: effectiveAssignments,
-      attendanceRecords
-    });
-  }, [user?.uid, clusterId, effectiveAssignments, attendanceRecords, isLoading, penaltyCheckNow, penaltyMutation]);
+    penaltyMutation.mutate(
+      { userId: user.uid, clusterId },
+      {
+        onSuccess: (result) => {
+          if (result?.applied > 0) {
+            console.info('과제 미제출 서버 검토 차감 적용:', result);
+          }
+        },
+        onError: (error) => {
+          penaltySweepKeyRef.current = '';
+          console.error('과제 미제출 서버 검토 실패:', error);
+        }
+      }
+    );
+  }, [user?.uid, clusterId, todayKST, penaltyMutation]);
 
   const clusterData = useMemo(() => {
     return clusters?.find(c => c.id === clusterId || c.docId === clusterId);
@@ -480,7 +480,7 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
                       <div style={{ color: '#fb7185', fontSize: '1.1rem', filter: 'drop-shadow(0 0 6px rgba(251,113,133,0.6))' }}>−</div>
                       <span className="font-tech" style={{ fontSize: '0.58rem', marginTop: '2px', color: '#fb7185', textAlign: 'center' }}>
-                        -{penaltyInfo.penalty} 광석
+                        검토 필요
                       </span>
                     </div>
                   )}
@@ -589,10 +589,10 @@ function AssignmentRewardSummary({ bonusCrystals = 0, missingPenalty = null }) {
             MISSING ASSIGNMENT
           </div>
           <div style={{ color: '#fecdd3', fontSize: '1.35rem', fontWeight: 900 }}>
-            💎 -{missingPenalty.penalty} 광석
+            미제출 검토 필요
           </div>
           <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
-            출석 후 12시간 내 미제출 · {missingPenalty.missingStreak}회 연속
+            출석 후 12시간 내 미제출 · {missingPenalty.missingStreak}회 연속 · 서버가 최근 7일 기준으로 검토합니다.
           </div>
         </div>
       )}
