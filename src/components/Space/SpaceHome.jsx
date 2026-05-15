@@ -1641,10 +1641,6 @@ function SpaceHome() {
           const growthUpdates = calculateGrowthUpdates(freshUserData, actualReward)
           Object.assign(userUpdates, growthUpdates)
           
-          if (activityType.includes('완료') || isLogActivity) {
-             userUpdates.totalQuizzes = (freshUserData.totalQuizzes || 0) + 1
-             userUpdates.totalScore = (freshUserData.totalScore || 0) + 100
-          }
         } else {
           actualReward = 0 // Ensure non-negative
         }

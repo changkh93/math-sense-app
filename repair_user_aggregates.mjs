@@ -40,6 +40,11 @@ function sum(rows, field) {
   return rows.reduce((acc, row) => acc + Number(row[field] || 0), 0);
 }
 
+function isScoredQuizHistory(row) {
+  const type = row?.type || 'quiz';
+  return (type === 'quiz' || type === 'workbook') && typeof row.score === 'number';
+}
+
 async function rows(ref, orderField = '') {
   const snap = orderField
     ? await ref.orderBy(orderField, 'asc').get().catch(() => ref.get())
@@ -85,8 +90,9 @@ async function calculateAggregate(userDoc) {
     .filter(Boolean);
   const streak = recalculateStreakState(activeDates, coreEvidenceDates, getTodayKST());
 
-  const totalQuizzes = history.length;
-  const totalScore = sum(history, 'score');
+  const scoredQuizHistory = history.filter(isScoredQuizHistory);
+  const totalQuizzes = scoredQuizHistory.length;
+  const totalScore = sum(scoredQuizHistory, 'score');
   const txSum = sum(txs, 'amount');
   const historyCrystalSum = sum(history, 'crystalsEarned');
   const answers = answerSnap.docs.map(doc => doc.data());
@@ -96,7 +102,7 @@ async function calculateAggregate(userDoc) {
     totalQuizzes,
     totalScore,
     averageScore: totalQuizzes > 0 ? Math.round((totalScore / totalQuizzes) * 10) / 10 : 0,
-    perfectCount: history.filter(h => Number(h.score) === 100).length,
+    perfectCount: scoredQuizHistory.filter(h => Number(h.score) === 100).length,
     questionCount: questionSnap.size,
     helpCount: answers.filter(a => a.isAccepted).length,
     currentStreak: streak.correctStreak,
