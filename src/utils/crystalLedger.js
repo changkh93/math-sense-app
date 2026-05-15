@@ -24,17 +24,13 @@ export async function recordCrystalTransaction(userId, { amount, type, descripti
     timestamp: serverTimestamp()
   }
 
-  try {
-    const txRef = txId 
-      ? doc(db, 'users', userId, 'crystal_transactions', txId)
-      : doc(collection(db, 'users', userId, 'crystal_transactions'))
-    
-    if (transaction) {
-      transaction.set(txRef, txData)
-    } else {
-      await setDoc(txRef, txData)
-    }
-  } catch (error) {
-    console.error('Failed to record crystal transaction:', error)
+  const txRef = txId
+    ? doc(db, 'users', userId, 'crystal_transactions', txId)
+    : doc(collection(db, 'users', userId, 'crystal_transactions'))
+
+  if (transaction) {
+    transaction.set(txRef, txData)
+  } else {
+    await setDoc(txRef, txData)
   }
 }

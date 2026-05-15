@@ -299,7 +299,6 @@ export function getCurrentGapDefendedDates(lastActiveDate, freezeCount, todayKST
 export function getCurrentStreakWindow(activeDates, defendedDates, todayKST = getTodayKST()) {
   const activeSet = normalizeDateSet(activeDates);
   const defendedSet = normalizeDateSet(defendedDates);
-  const yesterdayKST = shiftKSTDate(todayKST, -1);
 
   const chainDates = [];
   const defendedDatesInWindow = [];

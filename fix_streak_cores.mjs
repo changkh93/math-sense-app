@@ -29,6 +29,11 @@ if (fs.existsSync(serviceAccountPath)) {
 
 const db = admin.firestore();
 const FIX_MODE = process.argv.includes('--fix');
+const DANGEROUS_FIX_MODE = process.argv.includes('--dangerously-fix-streak-cores');
+
+if (FIX_MODE && !DANGEROUS_FIX_MODE) {
+  throw new Error('Bulk streak/core repair is disabled. Use audited per-user repair scripts instead.');
+}
 
 async function auditAndFix() {
   console.log(`\n${'='.repeat(60)}`);

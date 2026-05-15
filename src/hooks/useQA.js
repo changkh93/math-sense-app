@@ -528,26 +528,40 @@ export function useQAMutations() {
     // Teacher Verification (Bonus Reward)
     verifyAnswer: useMutation({
       mutationFn: async ({ questionId, answerId }) => {
-        // Mark answer as verified
-        await updateDoc(doc(db, 'answers', answerId), { isVerified: true });
-        
-        // Get answerer to reward
-        const answerSnap = await getDoc(doc(db, 'answers', answerId));
-        const answerData = answerSnap.data();
-        if (answerData.userId && answerData.userId !== 'admin') {
-          const answererSnap = await getDoc(doc(db, 'users', answerData.userId));
-          let updateData = { crystals: increment(10) };
-          if (answererSnap.exists()) {
-            updateData = { ...updateData, ...calculateGrowthUpdates(answererSnap.data(), 10) };
-          }
-          await updateDoc(doc(db, 'users', answerData.userId), updateData);
-          recordCrystalTransaction(answerData.userId, {
+        await runTransaction(db, async (transaction) => {
+          const answerRef = doc(db, 'answers', answerId);
+          const answerSnap = await transaction.get(answerRef);
+          if (!answerSnap.exists()) throw new Error('답변을 찾을 수 없습니다.');
+
+          const answerData = answerSnap.data() || {};
+          if (answerData.isVerified) return;
+
+          const answererUid = answerData.userId;
+          const answererRef = answererUid && answererUid !== 'admin'
+            ? doc(db, 'users', answererUid)
+            : null;
+          const answererSnap = answererRef ? await transaction.get(answererRef) : null;
+
+          transaction.set(answerRef, {
+            isVerified: true,
+            verifiedAt: serverTimestamp(),
+          }, { merge: true });
+
+          if (!answererRef || !answererSnap?.exists()) return;
+
+          const answererData = answererSnap.data() || {};
+          transaction.set(answererRef, {
+            crystals: Number(answererData.crystals || 0) + 10,
+            ...calculateGrowthUpdates(answererData, 10),
+          }, { merge: true });
+
+          recordCrystalTransaction(answererUid, {
             amount: 10,
             type: 'teacher_verify',
             description: '교사 검증 보너스',
-            metadata: { questionId, answerId }
-          });
-        }
+            metadata: { questionId, answerId, source: 'teacher_verify_transaction' }
+          }, transaction, `teacher-verify-${answerId}`);
+        });
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['answers', variables.questionId] });

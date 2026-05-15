@@ -1,5 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
+if (!process.argv.includes("--dangerously-apply-global-correction")) {
+  throw new Error("Disabled global production correction script. Use audited repair scripts instead.");
+}
 
 const config = {
   apiKey: "AIzaSyAn1TdeM6XArdnf82bOk1BTQMIfkh7kXvQ",

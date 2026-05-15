@@ -15,6 +15,7 @@ try {
 }
 
 const db = admin.firestore();
+const APPLY = process.argv.includes('--apply');
 
 async function repairUserCrystals(userName) {
   console.log(`🔍 유저 '${userName}' 검색 중...`);
@@ -52,6 +53,10 @@ async function repairUserCrystals(userName) {
 
   if (userData.crystals !== calculatedBalance) {
     console.log(`⚠️ DB 잔고(${userData.crystals})와 불일치합니다. 수정을 시작합니다.`);
+    if (!APPLY) {
+      console.log("Dry run only. Re-run with --apply after manual audit to write this change.");
+      return;
+    }
     await db.collection('users').doc(uid).update({
       crystals: calculatedBalance,
       lastUpdated: admin.firestore.FieldValue.serverTimestamp()

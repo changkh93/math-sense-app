@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db, auth } from '../../firebase';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { getTodayKST, getCometTier, getEffectiveStreak, extractDefendedDates } from '../../utils/streakUtils';
+import { isRestDay } from '../../utils/holidayUtils';
 import './SpaceJourney.css';
 
 const JOURNEY_MAX_RENDER_DAYS = 540;
@@ -11,6 +12,21 @@ const JOURNEY_LOADING_FAILSAFE_MS = 8000;
 function hasLearningActivity(stats) {
   if (!stats) return false;
   return (stats.quizzes || 0) > 0 || (stats.videos || 0) > 0 || (stats.texts || 0) > 0 || (stats.workbooks || 0) > 0;
+}
+
+function getActiveDatesFromDailyStats(dailyStats) {
+  return new Set(
+    Array.from(dailyStats.entries())
+      .filter(([, stats]) => hasLearningActivity(stats))
+      .map(([date]) => date)
+  );
+}
+
+function getActiveDailyStats(dailyStats) {
+  return new Map(
+    Array.from(dailyStats.entries())
+      .filter(([, stats]) => hasLearningActivity(stats))
+  );
 }
 
 function addDaysKST(dateStr, delta) {
@@ -193,19 +209,19 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
 
   // Helper: Identify nodes that SHOULD be protected (historical + current gap)
   const baseNodesWithProtection = useMemo(() => {
-    return extractDefendedDates(transactions, userData, dailyStats);
+    return extractDefendedDates(transactions, userData, getActiveDailyStats(dailyStats));
   }, [dailyStats, transactions, userData]);
 
   // DB Source-of-truth correction:
   // If the DB says the streak is higher than what raw history proves (due to an admin or system override),
   // we conceptually "protect" the missing days backwards from lastStreakDate so the visual graph connects.
   const nodesWithProtection = useMemo(() => {
-    const activeDatesArray = Array.from(dailyStats.keys());
+    const activeDates = getActiveDatesFromDailyStats(dailyStats);
     
     // Use the base calculation to see what the raw history yields
     // Important: Don't import calculateStreakFromHistory since not imported directly, just use logic or getEffectiveStreak
-    const rawCalcStreak = getEffectiveStreak(userData, { activeDates: new Set(activeDatesArray), defendedDates: baseNodesWithProtection });
-    const dbStreak = getEffectiveStreak(userData); // Calculates pure DB value from header logic
+    const rawCalcStreak = getEffectiveStreak(userData, { activeDates, defendedDates: baseNodesWithProtection }, todayKST);
+    const dbStreak = getEffectiveStreak(userData, null, todayKST); // Calculates pure DB value from header logic
 
     if (dbStreak > rawCalcStreak && userData?.lastStreakDate) {
       const newDefended = new Set(baseNodesWithProtection);
@@ -220,13 +236,23 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
         }
         // Keep moving backwards. Even if it was active or newly defended, it counts towards the streak run
         count++;
-        cursor = getTodayKST(new Date(new Date(cursor + 'T12:00:00Z').getTime() - 86400000));
+        cursor = addDaysKST(cursor, -1);
         failsafe++;
       }
       return newDefended;
     }
     return baseNodesWithProtection;
-  }, [userData, dailyStats, baseNodesWithProtection]);
+  }, [userData, dailyStats, baseNodesWithProtection, todayKST]);
+
+  const journeyStreak = useMemo(() => {
+    const activeDates = getActiveDatesFromDailyStats(dailyStats);
+    const historyStreak = getEffectiveStreak(userData, { activeDates, defendedDates: nodesWithProtection }, todayKST);
+    const cachedStreak = getEffectiveStreak(userData, null, todayKST);
+
+    // The journey screen has the full local history. If the cached user doc is stale,
+    // prefer the deterministic reconstruction rather than showing a misleading 1-day streak.
+    return Math.max(cachedStreak, historyStreak);
+  }, [userData, dailyStats, nodesWithProtection, todayKST]);
 
   // 기간 노드 생성 (기록 시작일 ~ 오늘)
   const timelineData = useMemo(() => {
@@ -234,11 +260,11 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
 
     let minDate = todayKST;
     const oldestRenderableDate = addDaysKST(todayKST, -(JOURNEY_MAX_RENDER_DAYS - 1));
-    const dbStreak = getEffectiveStreak(userData);
-    if (dbStreak > 0 && userData?.lastStreakDate) {
-      const streakStart = new Date(`${userData.lastStreakDate}T12:00:00Z`);
-      streakStart.setUTCDate(streakStart.getUTCDate() - (dbStreak - 1));
-      const streakStartStr = streakStart.toISOString().split('T')[0];
+    const activeDates = Array.from(getActiveDatesFromDailyStats(dailyStats)).sort();
+    const lastJourneyDate = userData?.lastStreakDate || activeDates[activeDates.length - 1] || todayKST;
+
+    if (journeyStreak > 0 && lastJourneyDate) {
+      const streakStartStr = addDaysKST(lastJourneyDate, -(journeyStreak - 1));
       if (streakStartStr < minDate) minDate = streakStartStr;
     }
 
@@ -268,9 +294,11 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     while (curr <= endD) {
       const dStr = curr.toISOString().split('T')[0];
       const stats = dailyStats.get(dStr);
+      const isRest = isRestDay(dStr);
       days.push({
         date: dStr,
         isActive: hasLearningActivity(stats),
+        isRestDay: isRest,
         stats: stats || null,
         isToday: dStr === todayKST,
       });
@@ -282,9 +310,9 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     for (let i = 0; i < days.length; i++) {
       if (days[i].isActive) {
         currentStreakCount++;
-      } else if (nodesWithProtection.has(days[i].date)) {
+      } else if (nodesWithProtection.has(days[i].date) || days[i].isRestDay) {
         // Protected days maintain the streak, but do not increment it (just like Duo)
-        // If it's the very first node, it might be 0, but usually this happens mid-streak.
+        // Rest days also maintain the streak by policy: weekends and holidays do not break continuity.
       } else if (days[i].date < todayKST) {
         // 어제가 마지막이었고 오늘 아직 안 했더라도, 오늘이 지나기 전까지는 스트릭 유지 (Duo 스타일)
         currentStreakCount = 0;
@@ -300,7 +328,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     }
 
     return { minDate, days };
-  }, [history, todayKST, dailyStats, nodesWithProtection, userData]);
+  }, [history, todayKST, dailyStats, nodesWithProtection, userData, journeyStreak]);
 
   // 달력 뷰용 월별 데이터 (일부 최적화)
   const calendarMonths = useMemo(() => {
@@ -330,6 +358,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
           date: dStr,
           isActive: hasLearningActivity(stats),
           isProtected: nodesWithProtection.has(dStr),
+          isRestDay: isRestDay(dStr),
           stats: stats || null,
           isToday: dStr === todayKST
         });
@@ -349,10 +378,8 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     }
   }, [loading, viewMode]);
 
-  // 스트릭 소스 (헤더와 똑같이 DB 우선 로직 사용 후, UI 패치를 위해 계산된 패치 버전의 historyData 주입)
-  const streak = useMemo(() => {
-    return getEffectiveStreak(userData);
-  }, [userData]);
+  // Journey has full history locally, so display the reconstructed value when cached user data is stale.
+  const streak = journeyStreak;
 
   const tier = getCometTier(streak);
   const activeColor = streak > 0 ? tier.color : '#FF9F43';

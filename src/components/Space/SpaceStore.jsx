@@ -102,6 +102,20 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
 
         const freshUserData = freshSnap.data()
         const freshCrystals = freshUserData?.crystals || 0
+        const recordPurchaseTransaction = () => {
+          recordCrystalTransaction(user.uid, {
+            amount: -item.cost,
+            type: item.type === 'profile'
+              ? 'agora_profile_purchase'
+              : item.type === 'hall'
+                ? 'hall_purchase'
+                : item.type === 'crew'
+                  ? 'crew_purchase'
+                  : 'store_purchase',
+            description: `${item.name} 구매`,
+            metadata: { itemId: item.id }
+          }, transaction, `store_purchase_${item.id}_${nowMs}`)
+        }
 
         if (freshCrystals < item.cost) {
           throw new Error('INSUFFICIENT_CRYSTALS')
@@ -134,6 +148,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             }),
           }, { merge: true })
 
+          recordPurchaseTransaction()
           return { purchasedCount: freshFreezeCount + 1 }
         }
 
@@ -150,6 +165,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             shieldCharges: nextCharges,
           }, { merge: true })
 
+          recordPurchaseTransaction()
           return { purchasedCount: nextCharges }
         }
 
@@ -165,6 +181,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             radarExpiresAtMs: nowMs + RADAR_DURATION_MS,
           }, { merge: true })
 
+          recordPurchaseTransaction()
           return { purchasedCount: 1 }
         }
 
@@ -178,6 +195,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             profileSignatureUnlocked: true,
           }, { merge: true })
 
+          recordPurchaseTransaction()
           return { purchasedCount: 1 }
         }
 
@@ -195,6 +213,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             selectedProfileFrame: targetFrame,
           }, { merge: true })
 
+          recordPurchaseTransaction()
           return { purchasedCount: ownedFrames.length + 1 }
         }
 
@@ -205,6 +224,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             hallShowcaseCredits: currentCredits + 1,
           }, { merge: true })
 
+          recordPurchaseTransaction()
           return { purchasedCount: currentCredits + 1 }
         }
 
@@ -215,6 +235,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             crewCreationPasses: currentPasses + 1,
           }, { merge: true })
 
+          recordPurchaseTransaction()
           return { purchasedCount: currentPasses + 1 }
         }
 
@@ -225,6 +246,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             crewJoinPasses: currentPasses + 1,
           }, { merge: true })
 
+          recordPurchaseTransaction()
           return { purchasedCount: currentPasses + 1 }
         }
 
@@ -295,19 +317,6 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
           console.warn('프레임 구매 후 답변 스냅샷 동기화 실패:', syncErr)
         }
       }
-
-      recordCrystalTransaction(user.uid, {
-        amount: -item.cost,
-        type: item.type === 'profile'
-          ? 'agora_profile_purchase'
-          : item.type === 'hall'
-            ? 'hall_purchase'
-            : item.type === 'crew'
-              ? 'crew_purchase'
-              : 'store_purchase',
-        description: `${item.name} 구매`,
-        metadata: { itemId: item.id }
-      })
     } catch (err) {
       console.error('Purchase failed:', err)
       const message =

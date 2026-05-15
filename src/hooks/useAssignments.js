@@ -518,38 +518,58 @@ export const useReviewAssignment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ assignmentId, feedback, status, bonusCrystals, userId, previousBonusCrystals = 0 }) => {
+    mutationFn: async ({ assignmentId, feedback, status, bonusCrystals, userId }) => {
       const ref = doc(db, 'assignments', assignmentId);
       
       const newBonus = status === 'reviewed' ? (Number(bonusCrystals) || 0) : 0;
-      const crystalDiff = newBonus - previousBonusCrystals;
 
-      const updateData = {
-        feedback,
-        status,
-        bonusCrystals: newBonus,
-        reviewedAt: serverTimestamp(),
-        updatedAt: serverTimestamp() // To trigger revision alerts if admin edits comment
-      };
+      await runTransaction(db, async (transaction) => {
+        const assignmentSnap = await transaction.get(ref);
+        if (!assignmentSnap.exists()) throw new Error('ASSIGNMENT_NOT_FOUND');
 
-      await setDoc(ref, updateData, { merge: true });
+        const assignmentData = assignmentSnap.data() || {};
+        const targetUserId = userId || assignmentData.userId;
+        const previousBonus = assignmentData.status === 'reviewed'
+          ? Number(assignmentData.bonusCrystals || 0)
+          : 0;
+        const crystalDiff = newBonus - previousBonus;
+        const currentLedgerVersion = Number(assignmentData.bonusLedgerVersion || 0);
+        const nextLedgerVersion = crystalDiff !== 0 ? currentLedgerVersion + 1 : currentLedgerVersion;
+        const userRef = targetUserId ? doc(db, 'users', targetUserId) : null;
+        const userSnap = userRef && crystalDiff !== 0 ? await transaction.get(userRef) : null;
+        if (userRef && crystalDiff !== 0 && !userSnap.exists()) throw new Error('USER_NOT_FOUND');
 
-      // Award or revoke crystals based on the difference
-      if (crystalDiff !== 0 && userId) {
-        // 1. Record in Ledger
-        await recordCrystalTransaction(userId, {
+        transaction.set(ref, {
+          feedback,
+          status,
+          bonusCrystals: newBonus,
+          bonusLedgerVersion: nextLedgerVersion,
+          reviewedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        if (crystalDiff === 0 || !targetUserId) return;
+
+        const userData = userSnap.data() || {};
+        const txId = `assignment_review_${assignmentId}_${nextLedgerVersion}`;
+        recordCrystalTransaction(targetUserId, {
           amount: crystalDiff,
           type: crystalDiff > 0 ? 'teacher_verify' : 'teacher_revoke',
           description: crystalDiff > 0 ? `항행 일지 보상 (과제)` : `항행 일지 보상 취소 (보완 요청)`,
-          metadata: { assignmentId }
-        });
+          metadata: {
+            assignmentId,
+            previousBonus,
+            newBonus,
+            status,
+            bonusLedgerVersion: nextLedgerVersion,
+            source: 'assignment_review_transaction'
+          }
+        }, transaction, txId);
 
-        // 2. Actually update user balance
-        const userRef = doc(db, 'users', userId);
-        await updateDoc(userRef, {
-          crystals: increment(crystalDiff)
-        });
-      }
+        transaction.set(userRef, {
+          crystals: Number(userData.crystals || 0) + crystalDiff
+        }, { merge: true });
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });

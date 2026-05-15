@@ -44,6 +44,29 @@ service cloud.firestore {
              request.resource.data.streakWriteAudit.writtenAt == request.time;
     }
 
+    function assignmentStudentWritableKeys() {
+      return [
+        'userId',
+        'userName',
+        'clusterId',
+        'regionId',
+        'date',
+        'content',
+        'links',
+        'attachments',
+        'notebookData',
+        'status',
+        'revisionCount',
+        'isOfflineChecked',
+        'submittedAt',
+        'feedbackResponse',
+        'feedbackReaction',
+        'feedbackComment',
+        'feedbackRespondedAt',
+        'updatedAt'
+      ];
+    }
+
     match /clusters/{clusterId} {
       allow read: if true;
       allow create, delete: if isAdmin();
@@ -262,9 +285,20 @@ service cloud.firestore {
 
     // Assignments (Stellar Archive)
     match /assignments/{assignmentId} {
-      allow create: if isAuth();
+      allow create: if isAuth() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'submitted' &&
+        request.resource.data.keys().hasOnly(assignmentStudentWritableKeys());
       allow read: if isAuth();
-      allow update: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAuth() && (
+        isAdmin() ||
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.userId == resource.data.userId &&
+          request.resource.data.status == 'submitted' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(assignmentStudentWritableKeys())
+        )
+      );
       allow delete: if isAdmin();
     }
 

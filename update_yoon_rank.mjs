@@ -1,5 +1,8 @@
 import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
+if (!process.argv.includes('--dangerously-apply-manual-compensation')) {
+  throw new Error('Disabled one-off production compensation script. Use audited repair scripts instead.');
+}
 const serviceAccount = JSON.parse(readFileSync('./service-account.json', 'utf8'));
 if (admin.apps.length === 0) {
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
