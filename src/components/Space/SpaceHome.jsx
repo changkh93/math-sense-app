@@ -271,14 +271,34 @@ function SpaceHome() {
     setDarkMatterModeType('learning')
   }, [])
 
+  const resetViewportForRootView = useCallback(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.space-bg, .journey-scroll-area').forEach((node) => {
+        if ('scrollTop' in node) node.scrollTop = 0
+        if ('scrollLeft' in node) node.scrollLeft = 0
+      })
+    })
+  }, [])
+
   const switchRootView = useCallback((view) => {
+    setCompletionResult(null);
+    setStreakCelebration(null);
+    setAttendancePromptOpen(false);
+    setPendingRegion(null);
+    setAccessError(null);
+    setIsBoosting(false);
     setCurrentView(view);
     updateSelectedRegionId(null);
     updateSelectedChapterDocId(null);
     clearMissionSelection();
     setShouldScrollStore(false);
     if (isDarkMatterMode) stopDarkMatterMode();
-  }, [clearMissionSelection, isDarkMatterMode, stopDarkMatterMode, updateSelectedChapterDocId, updateSelectedRegionId]);
+    resetViewportForRootView();
+  }, [clearMissionSelection, isDarkMatterMode, resetViewportForRootView, stopDarkMatterMode, updateSelectedChapterDocId, updateSelectedRegionId]);
 
   const isRecheckDue = useCallback((mark) => {
     if (mark?.status !== 'recheck_pending') return false
@@ -782,6 +802,10 @@ function SpaceHome() {
       const historyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       setHistory(historyData)
       setLoadingHistory(false)
+    }, (err) => {
+      console.error('[SpaceHome] Failed to subscribe history:', err)
+      setHistory([])
+      setLoadingHistory(false)
     })
     return () => {
       if (cleanupTimeout) clearTimeout(cleanupTimeout);
@@ -805,6 +829,10 @@ function SpaceHome() {
     const q = query(txRef, orderBy('timestamp', 'desc'), limit(100));
     const unsubscribe = onSnapshot(q, (snap) => {
       setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoadingTransactions(false);
+    }, (err) => {
+      console.error('[SpaceHome] Failed to subscribe crystal transactions:', err)
+      setTransactions([])
       setLoadingTransactions(false);
     });
     return () => unsubscribe();

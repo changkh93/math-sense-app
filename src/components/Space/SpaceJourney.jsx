@@ -5,9 +5,18 @@ import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { getTodayKST, getCometTier, getEffectiveStreak, extractDefendedDates } from '../../utils/streakUtils';
 import './SpaceJourney.css';
 
+const JOURNEY_MAX_RENDER_DAYS = 540;
+const JOURNEY_LOADING_FAILSAFE_MS = 8000;
+
 function hasLearningActivity(stats) {
   if (!stats) return false;
   return (stats.quizzes || 0) > 0 || (stats.videos || 0) > 0 || (stats.texts || 0) > 0 || (stats.workbooks || 0) > 0;
+}
+
+function addDaysKST(dateStr, delta) {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().split('T')[0];
 }
 
 export default function SpaceJourney({ userData, initialHistory, initialTransactions, parentLoading }) {
@@ -22,6 +31,30 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
 
   const scrollContainerRef = useRef(null);
   const todayKST = getTodayKST();
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+        scrollContainerRef.current.scrollLeft = 0;
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!loading) return undefined;
+
+    const timer = setTimeout(() => {
+      console.warn('[SpaceJourney] Loading timed out. Rendering with available local data.');
+      setLoading(false);
+    }, JOURNEY_LOADING_FAILSAFE_MS);
+
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   useEffect(() => {
     if (parentLoading) {
@@ -60,6 +93,8 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
         setTransactions(tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
         console.error("Error fetching data:", err);
+        setHistory([]);
+        setTransactions([]);
       } finally {
         setLoading(false);
       }
@@ -198,6 +233,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     if (!todayKST) return { minDate: '', days: [] };
 
     let minDate = todayKST;
+    const oldestRenderableDate = addDaysKST(todayKST, -(JOURNEY_MAX_RENDER_DAYS - 1));
     const dbStreak = getEffectiveStreak(userData);
     if (dbStreak > 0 && userData?.lastStreakDate) {
       const streakStart = new Date(`${userData.lastStreakDate}T12:00:00Z`);
@@ -213,6 +249,10 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
       const dateStr = getTodayKST(d);
       if (dateStr < minDate) minDate = dateStr;
     });
+
+    if (minDate < oldestRenderableDate) {
+      minDate = oldestRenderableDate;
+    }
 
     // Constellation용 timeline (첫 기록이 있던 달의 1일이 포함된 주의 일요일부터)
     const startMonthStr = minDate.slice(0, 7) + '-01';
