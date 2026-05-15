@@ -70,6 +70,27 @@ function run() {
   }, null);
   assert.equal(displayedProtectedStreak, 25);
 
+  const weekendPreservedStreak = getEffectiveStreak({
+    currentStreak: 12,
+    lastStreakDate: '2026-05-15',
+    streakFreezeCount: 0,
+  }, null, '2026-05-18');
+  assert.equal(weekendPreservedStreak, 12);
+
+  const holidayPreservedStreak = getEffectiveStreak({
+    currentStreak: 12,
+    lastStreakDate: '2026-05-23',
+    streakFreezeCount: 0,
+  }, null, '2026-05-26');
+  assert.equal(holidayPreservedStreak, 12);
+
+  const weekdayMissBreaksDisplayedStreak = getEffectiveStreak({
+    currentStreak: 12,
+    lastStreakDate: '2026-05-15',
+    streakFreezeCount: 0,
+  }, null, '2026-05-19');
+  assert.equal(weekdayMissBreaksDisplayedStreak, 0);
+
   assert.equal(getTodayKST('2026-05-03T15:00:00.000Z'), '2026-05-04');
   assert.equal(getKSTComponents('2026-05-03T15:00:00.000Z').dayOfWeek, 1);
   assert.equal(normalizeScheduleDay('월'), 1);

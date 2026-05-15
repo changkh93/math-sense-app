@@ -5,6 +5,8 @@ import { Wrench, ShieldAlert, RefreshCw, CheckCircle, AlertTriangle } from 'luci
 
 import { buildStreakWriteAudit, extractLearningActivityDates, getTodayKST, recalculateStreakState } from '../../utils/streakUtils';
 
+const ENABLE_GLOBAL_STREAK_REPAIR = false;
+
 const StreakFixer = () => {
   const [targetUid, setTargetUid] = useState('');
   const [scanning, setScanning] = useState(false);
@@ -56,7 +58,6 @@ const StreakFixer = () => {
     const dbLastDate = userData.lastStreakDate || '';
     const shouldFix =
       result.correctStreak !== dbStreak ||
-      result.coresRemaining !== currentOwned ||
       result.correctLastDate !== dbLastDate;
 
     if (shouldFix) {
@@ -84,6 +85,10 @@ const StreakFixer = () => {
     setAffectedUsers([]);
     
     try {
+      if (!ENABLE_GLOBAL_STREAK_REPAIR) {
+        addLog('Global streak repair is disabled. Use individual audit after a manual evidence check.');
+        return;
+      }
       addLog('Starting comprehensive user audit...');
       const todayKST = getTodayKST();
       
@@ -141,6 +146,10 @@ const StreakFixer = () => {
 
   const applyFixes = async () => {
     if (affectedUsers.length === 0) return;
+    if (affectedUsers.length !== 1) {
+      alert('Bulk streak fixes are disabled. Apply one manually audited user at a time.');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to fix ${affectedUsers.length} users' streaks in Firestore?`)) return;
 
     setFixing(true);
@@ -151,7 +160,6 @@ const StreakFixer = () => {
         const updates = {
           currentStreak: user.correctStreak,
           longestStreak: user.correctLongest,
-          streakFreezeCount: user.correctFreezeCount, // Restore/fix core count
           lastStreakDate: user.correctLastDate,
           streakWriteAudit: buildStreakWriteAudit({
             source: 'admin_streak_fixer',
@@ -164,7 +172,7 @@ const StreakFixer = () => {
             nextState: {
               currentStreak: user.correctStreak,
               lastStreakDate: user.correctLastDate,
-              streakFreezeCount: user.correctFreezeCount,
+              streakFreezeCount: user.currentFreezeCount,
             },
             writtenAt: serverTimestamp(),
             note: user.uid,
@@ -229,10 +237,10 @@ const StreakFixer = () => {
           </h2>
           <button 
             onClick={runAudit}
-            disabled={scanning || fixing}
+            disabled={true}
             className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-all disabled:opacity-50"
           >
-            {scanning ? 'Scanning...' : 'Run Comprehensive Audit'}
+            Global Audit Disabled
           </button>
         </div>
       </div>

@@ -15,7 +15,14 @@ if (admin.apps.length === 0) {
 
 const db = admin.firestore();
 const APPLY = process.argv.includes('--apply');
+const DANGEROUS_APPLY = process.argv.includes('--dangerously-apply-aggregate-repair');
 const TARGET_ARG = process.argv.find(arg => arg.startsWith('--target='))?.slice('--target='.length) || '';
+
+if (APPLY && (!DANGEROUS_APPLY || !TARGET_ARG)) {
+  throw new Error(
+    'Global aggregate repair is disabled. Re-run with --target=<uid-or-name> --apply --dangerously-apply-aggregate-repair only after a manual audit.'
+  );
+}
 
 function valueToDate(value) {
   if (!value) return null;

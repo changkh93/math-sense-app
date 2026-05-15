@@ -564,26 +564,34 @@ export function calculateStreakFromHistory(activeDates, defendedDates, todayKST 
  * 
  * @param {Object} userData - 사용자 데이터
  * @param {Object} [historyData] - { activeDates: Set, defendedDates: Set } (제공 시 이력 기반 계산 수행)
+ * @param {string|null} [todayOverride] - 테스트용 오늘 날짜 오버라이드 (YYYY-MM-DD)
  * @returns {number}
  */
-export function getEffectiveStreak(userData, historyData = null) {
+export function getEffectiveStreak(userData, historyData = null, todayOverride = null) {
+  const todayKST = todayOverride || getTodayKST()
+
   // 1. historyData가 제공되면 이력 기반으로 계산 (가장 정확)
   if (historyData && (historyData.activeDates || historyData.activeSet)) {
     const active = historyData.activeSet || historyData.activeDates;
     const defended = historyData.defendedSet || historyData.defendedDates || new Set();
-    return calculateStreakFromHistory(active, defended, getTodayKST());
+    return calculateStreakFromHistory(active, defended, todayKST);
   }
 
   // 2. historyData가 없으면 DB에 저장된 캐시된 값 사용
   if (!userData?.lastStreakDate || !userData?.currentStreak) return 0
   
-  const todayKST = getTodayKST()
   const lastDate = userData.lastStreakDate
   const freezeCount = userData?.streakFreezeCount || 0
   
   // 오늘 이미 완료했거나 어제 완료한 경우 → 확실히 활성 상태로 간주
   // (어제의 경우 오늘이 아직 안 끝났으므로 스트릭이 유지되는 Duo 스타일)
-  if (lastDate === todayKST || lastDate === getYesterdayKST()) {
+  if (lastDate === todayKST || lastDate === shiftKSTDate(todayKST, -1)) {
+    return userData.currentStreak
+  }
+
+  const gapDates = listGapDatesExclusive(lastDate, todayKST)
+  const requiredMissedDates = gapDates.filter(d => !isRestDay(d))
+  if (requiredMissedDates.length === 0) {
     return userData.currentStreak
   }
 
