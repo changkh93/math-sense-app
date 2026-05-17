@@ -18,12 +18,11 @@ import {
   startAfter,
   runTransaction
 } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, auth, functions } from '../firebase';
 import { recordCrystalTransaction } from '../utils/crystalLedger';
 import { calculateGrowthUpdates } from '../utils/rankingUtils';
 import {
-  AGORA_ASKER_RESOLVE_REWARD,
-  AGORA_BASE_ACCEPT_REWARD,
   AGORA_PARTIAL_REFUND_RATIO,
   AGORA_SELF_RESOLVE_REWARD,
   buildAnswerProfileSnapshot
@@ -363,96 +362,8 @@ export function useQAMutations() {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
 
-        await runTransaction(db, async (transaction) => {
-          const questionRef = doc(db, 'questions', questionId);
-          const answerRef = doc(db, 'answers', answerId);
-          const askerRef = doc(db, 'users', user.uid);
-
-          // 1. All READS must come first
-          const [questionSnap, answerSnap, askerSnap] = await Promise.all([
-            transaction.get(questionRef),
-            transaction.get(answerRef),
-            transaction.get(askerRef)
-          ]);
-
-          if (!questionSnap.exists()) throw new Error('질문을 찾을 수 없습니다.');
-          if (!answerSnap.exists()) throw new Error('답변을 찾을 수 없습니다.');
-
-          const questionData = questionSnap.data();
-          const answerData = answerSnap.data();
-          const answererUid = answerData.userId;
-
-          if (questionData.userId !== user.uid) throw new Error('질문 작성자만 답변을 채택할 수 있습니다.');
-          if (questionData.status === 'resolved') throw new Error('이미 해결된 질문입니다.');
-
-          // Additional read for answerer if necessary
-          let answererSnap = null;
-          let answererRef = null;
-          if (answererUid !== user.uid && answererUid !== 'admin') {
-            answererRef = doc(db, 'users', answererUid);
-            answererSnap = await transaction.get(answererRef);
-          }
-
-          // 2. All WRITES must come after all reads
-          const lockedBounty = getLockedBountyAmount(questionData);
-          const totalAnswerReward = AGORA_BASE_ACCEPT_REWARD + lockedBounty;
-
-          // Answer update
-          transaction.set(answerRef, {
-            isAccepted: true,
-            acceptedAt: serverTimestamp(),
-          }, { merge: true });
-
-          // Question update
-          transaction.set(questionRef, {
-            status: 'resolved',
-            acceptedAnswerId: answerId,
-            updatedAt: serverTimestamp(),
-            bountyStatus: lockedBounty > 0 ? 'awarded' : (questionData.bountyStatus || 'none'),
-            bountyAwardedToAnswerId: lockedBounty > 0 ? answerId : null,
-          }, { merge: true });
-
-          // Answerer reward
-          if (answererRef && answererSnap) {
-            const answererData = answererSnap.exists() ? answererSnap.data() : {};
-
-            transaction.set(answererRef, {
-              crystals: (answererData?.crystals || 0) + totalAnswerReward,
-              helpCount: (answererData?.helpCount || 0) + 1,
-              ...calculateGrowthUpdates(answererData, totalAnswerReward),
-            }, { merge: true });
-
-            recordCrystalTransaction(answererUid, {
-              amount: AGORA_BASE_ACCEPT_REWARD,
-              type: 'answer_accepted',
-              description: '답변이 채택되었습니다',
-              metadata: { questionId, answerId }
-            }, transaction, `answer-accepted-${questionId}`);
-
-            if (lockedBounty > 0) {
-              recordCrystalTransaction(answererUid, {
-                amount: lockedBounty,
-                type: 'agora_bounty_award',
-                description: '현상금 질문 보상을 받았습니다',
-                metadata: { questionId, answerId }
-              }, transaction, `agora-bounty-award-${questionId}`);
-            }
-          }
-
-          // Asker bonus
-          const askerData = askerSnap.exists() ? askerSnap.data() : {};
-          transaction.set(askerRef, {
-            crystals: (askerData?.crystals || 0) + AGORA_ASKER_RESOLVE_REWARD,
-            ...calculateGrowthUpdates(askerData, AGORA_ASKER_RESOLVE_REWARD),
-          }, { merge: true });
-
-          recordCrystalTransaction(user.uid, {
-            amount: AGORA_ASKER_RESOLVE_REWARD,
-            type: 'question_resolved',
-            description: '질문 해결 보너스',
-            metadata: { questionId, answerId }
-          }, transaction, `question-resolved-${questionId}`);
-        });
+        const acceptAgoraAnswer = httpsCallable(functions, 'acceptAgoraAnswer');
+        await acceptAgoraAnswer({ questionId, answerId });
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['answers', variables.questionId] });

@@ -22,6 +22,94 @@ const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
 const ASSIGNMENT_MISSING_BASE_PENALTY = 15;
 const ASSIGNMENT_MISSING_STEP_PENALTY = 5;
 const ASSIGNMENT_MISSING_MAX_PENALTY = 25;
+const AGORA_BASE_ACCEPT_REWARD = 20;
+const AGORA_ASKER_RESOLVE_REWARD = 5;
+
+const KST_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const KST_WEEKDAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Seoul",
+  weekday: "short",
+});
+
+const KST_WEEKDAY_INDEX = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+function getKSTDateString(date = new Date()) {
+  return KST_FORMATTER.format(date);
+}
+
+function getKSTDateParts(date = new Date()) {
+  const parts = Object.fromEntries(
+    KST_FORMATTER.formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, Number(part.value)])
+  );
+  return {
+    ...parts,
+    dayOfWeek: KST_WEEKDAY_INDEX[KST_WEEKDAY_FORMATTER.format(date)],
+  };
+}
+
+function getKSTWeekMondayString(date = new Date()) {
+  const parts = getKSTDateParts(date);
+  const mondayOffset = (parts.dayOfWeek + 6) % 7;
+  const kstMidnightUtcMs = Date.UTC(parts.year, parts.month - 1, parts.day) - (9 * 60 * 60 * 1000);
+  return getKSTDateString(new Date(kstMidnightUtcMs - (mondayOffset * 24 * 60 * 60 * 1000)));
+}
+
+function calculateGrowthUpdates(userData, earnedAmount) {
+  if (!earnedAmount || earnedAmount <= 0 || !userData) return {};
+
+  const todayKST = getKSTDateString();
+  const mondayKST = getKSTWeekMondayString();
+  return {
+    dailyGrowth: userData.dailyGrowthDate === todayKST
+      ? Number(userData.dailyGrowth || 0) + earnedAmount
+      : earnedAmount,
+    dailyGrowthDate: todayKST,
+    weeklyGrowth: userData.weeklyGrowthMonday === mondayKST
+      ? Number(userData.weeklyGrowth || 0) + earnedAmount
+      : earnedAmount,
+    weeklyGrowthMonday: mondayKST,
+  };
+}
+
+function recordCrystalTransaction(transaction, userId, txId, { amount, type, description, metadata = {} }) {
+  if (!userId || (amount === 0 && type !== "streak_freeze")) return;
+
+  const txRef = admin.firestore()
+    .collection("users")
+    .doc(userId)
+    .collection("crystal_transactions")
+    .doc(txId);
+
+  transaction.set(txRef, {
+    amount,
+    type,
+    description,
+    metadata,
+    timestamp: FieldValue.serverTimestamp(),
+  });
+}
+
+function getLockedBountyAmount(questionData = {}) {
+  return questionData.bountyStatus === "locked"
+    ? Math.max(0, Number(questionData.bountyAmount || 0))
+    : 0;
+}
 
 /**
  * fetchNotebook
@@ -342,6 +430,130 @@ exports.adminResetUserPassword = regionalFunctions.https.onCall(async (data, con
   } catch (error) {
     console.error("adminResetUserPassword error:", error);
     throw new functions.https.HttpsError("internal", error.message);
+  }
+});
+
+/**
+ * acceptAgoraAnswer
+ *
+ * Atomically marks an Agora answer as accepted and pays server-managed rewards.
+ * This must run with Admin SDK privileges because the asker cannot directly
+ * update another student's user balance under Firestore security rules.
+ */
+exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context) => {
+  const askerUid = await requireAuthUid(context);
+  const questionId = typeof data?.questionId === "string" ? data.questionId.trim() : "";
+  const answerId = typeof data?.answerId === "string" ? data.answerId.trim() : "";
+
+  if (!questionId || !answerId) {
+    throw new functions.https.HttpsError("invalid-argument", "질문과 답변 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const questionRef = db.collection("questions").doc(questionId);
+  const answerRef = db.collection("answers").doc(answerId);
+  const askerRef = db.collection("users").doc(askerUid);
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const questionSnap = await transaction.get(questionRef);
+      const answerSnap = await transaction.get(answerRef);
+      const askerSnap = await transaction.get(askerRef);
+
+      if (!questionSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "질문을 찾을 수 없습니다.");
+      }
+      if (!answerSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "답변을 찾을 수 없습니다.");
+      }
+
+      const questionData = questionSnap.data() || {};
+      const answerData = answerSnap.data() || {};
+      const answererUid = answerData.userId;
+
+      if (questionData.userId !== askerUid) {
+        throw new functions.https.HttpsError("permission-denied", "질문 작성자만 답변을 채택할 수 있습니다.");
+      }
+      if (questionData.status === "resolved") {
+        throw new functions.https.HttpsError("failed-precondition", "이미 해결된 질문입니다.");
+      }
+      if (answerData.questionId !== questionId) {
+        throw new functions.https.HttpsError("failed-precondition", "이 질문의 답변만 채택할 수 있습니다.");
+      }
+      if (answerData.isAccepted === true) {
+        throw new functions.https.HttpsError("failed-precondition", "이미 채택된 답변입니다.");
+      }
+
+      let answererRef = null;
+      let answererSnap = null;
+      if (answererUid && answererUid !== askerUid && answererUid !== "admin") {
+        answererRef = db.collection("users").doc(answererUid);
+        answererSnap = await transaction.get(answererRef);
+      }
+
+      const lockedBounty = getLockedBountyAmount(questionData);
+      const totalAnswerReward = AGORA_BASE_ACCEPT_REWARD + lockedBounty;
+      const now = FieldValue.serverTimestamp();
+
+      transaction.set(answerRef, {
+        isAccepted: true,
+        acceptedAt: now,
+      }, { merge: true });
+
+      transaction.set(questionRef, {
+        status: "resolved",
+        acceptedAnswerId: answerId,
+        updatedAt: now,
+        bountyStatus: lockedBounty > 0 ? "awarded" : (questionData.bountyStatus || "none"),
+        bountyAwardedToAnswerId: lockedBounty > 0 ? answerId : null,
+      }, { merge: true });
+
+      if (answererRef) {
+        const answererData = answererSnap?.exists ? answererSnap.data() || {} : {};
+        transaction.set(answererRef, {
+          crystals: Number(answererData.crystals || 0) + totalAnswerReward,
+          helpCount: Number(answererData.helpCount || 0) + 1,
+          ...calculateGrowthUpdates(answererData, totalAnswerReward),
+        }, { merge: true });
+
+        recordCrystalTransaction(transaction, answererUid, `answer-accepted-${questionId}`, {
+          amount: AGORA_BASE_ACCEPT_REWARD,
+          type: "answer_accepted",
+          description: "답변이 채택되었습니다",
+          metadata: { questionId, answerId },
+        });
+
+        if (lockedBounty > 0) {
+          recordCrystalTransaction(transaction, answererUid, `agora-bounty-award-${questionId}`, {
+            amount: lockedBounty,
+            type: "agora_bounty_award",
+            description: "현상금 질문 보상을 받았습니다",
+            metadata: { questionId, answerId },
+          });
+        }
+      }
+
+      const askerData = askerSnap.exists ? askerSnap.data() || {} : {};
+      transaction.set(askerRef, {
+        crystals: Number(askerData.crystals || 0) + AGORA_ASKER_RESOLVE_REWARD,
+        ...calculateGrowthUpdates(askerData, AGORA_ASKER_RESOLVE_REWARD),
+      }, { merge: true });
+
+      recordCrystalTransaction(transaction, askerUid, `question-resolved-${questionId}`, {
+        amount: AGORA_ASKER_RESOLVE_REWARD,
+        type: "question_resolved",
+        description: "질문 해결 보너스",
+        metadata: { questionId, answerId },
+      });
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    console.error("acceptAgoraAnswer error:", error);
+    throw new functions.https.HttpsError("internal", "답변 채택 중 서버 오류가 발생했습니다.");
   }
 });
 
