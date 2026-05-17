@@ -503,6 +503,18 @@
   border: 1px dashed rgba(255,255,255,0.2);
 }
 
+.question-drawing-trigger {
+  position: relative;
+  width: 100%;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
 .question-drawing {
   width: 100%;
   max-height: 500px;
@@ -510,6 +522,97 @@
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: #1a1a2e;
+  display: block;
+  transition: transform 0.24s ease, filter 0.24s ease;
+}
+
+.question-drawing-trigger:hover .question-drawing,
+.question-drawing-trigger:focus-visible .question-drawing {
+  transform: scale(1.015);
+  filter: brightness(0.84);
+}
+
+.question-drawing-trigger:focus-visible {
+  outline: 2px solid var(--crystal-cyan);
+  outline-offset: 4px;
+}
+
+.question-drawing-zoom-hint {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(7, 13, 28, 0.82);
+  border: 1px solid rgba(0, 243, 255, 0.32);
+  color: var(--crystal-cyan);
+  font-size: 0.78rem;
+  font-weight: 800;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: none;
+}
+
+.question-drawing-trigger:hover .question-drawing-zoom-hint,
+.question-drawing-trigger:focus-visible .question-drawing-zoom-hint {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.drawing-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 2rem 2rem;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(7px);
+  cursor: zoom-out;
+}
+
+.drawing-modal-stage {
+  width: min(96vw, 1400px);
+  height: min(86vh, 980px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.drawing-modal-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  background: rgba(8, 10, 20, 0.9);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65);
+}
+
+.drawing-modal-close {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(10, 14, 28, 0.74);
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.drawing-modal-close:hover,
+.drawing-modal-close:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+  transform: scale(1.04);
 }
 
 .answers-section {
@@ -695,6 +798,21 @@
     gap: 1rem;
   }
   .question-content { font-size: 1.3rem; }
+  .drawing-modal-overlay {
+    padding: 4rem 0.75rem 1rem;
+  }
+  .drawing-modal-stage {
+    width: 100%;
+    height: 82vh;
+  }
+  .drawing-modal-close {
+    top: 0.85rem;
+    right: 0.85rem;
+  }
+  .question-drawing-zoom-hint {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Reward Overlay Systems */

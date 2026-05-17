@@ -67,6 +67,16 @@ service cloud.firestore {
       ];
     }
 
+    function assignmentFeedbackResponseKeys() {
+      return [
+        'feedbackResponse',
+        'feedbackReaction',
+        'feedbackComment',
+        'feedbackRespondedAt',
+        'updatedAt'
+      ];
+    }
+
     match /clusters/{clusterId} {
       allow read: if true;
       allow create, delete: if isAdmin();
@@ -297,6 +307,18 @@ service cloud.firestore {
           request.resource.data.userId == resource.data.userId &&
           request.resource.data.status == 'submitted' &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(assignmentStudentWritableKeys())
+        ) ||
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.userId == resource.data.userId &&
+          request.resource.data.status == resource.data.status &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(assignmentFeedbackResponseKeys()) &&
+          request.resource.data.feedbackReaction in ['thumbs_up', 'thumbs_down'] &&
+          request.resource.data.feedbackComment is string &&
+          request.resource.data.feedbackComment.size() <= 1000 &&
+          request.resource.data.feedbackResponse is map &&
+          request.resource.data.feedbackResponse.reaction == request.resource.data.feedbackReaction &&
+          request.resource.data.feedbackResponse.comment == request.resource.data.feedbackComment
         )
       );
       allow delete: if isAdmin();

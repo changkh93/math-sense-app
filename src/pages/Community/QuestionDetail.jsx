@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle, Clock, Heart, User, Trash2, Edit3, X, Save, Sparkles } from 'lucide-react';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import 'katex/dist/katex.min.css';
-import { auth, db } from '../../firebase';
+import { db } from '../../firebase';
 import { updateDoc, doc } from 'firebase/firestore';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
 import { buildAnswerProfileSnapshot, getAnonymousLabel, getProfileFrame } from '../../utils/socialUtils';
@@ -14,6 +14,9 @@ import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
 import confetti from 'canvas-confetti';
 import './QuestionDetail.css';
+
+const MotionDiv = motion.div;
+const MotionForm = motion.form;
 
 const getDateFromTimestamp = (timestamp) => {
   if (!timestamp) return null;
@@ -51,6 +54,7 @@ export default function QuestionDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [isCooldown, setIsCooldown] = useState(false);
+  const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
   
   const { data: question, isLoading: loadingQ } = useQuestionDetail(questionId);
   const { data: answers, isLoading: loadingA, error: errorA } = useQuestionAnswers(questionId);
@@ -105,6 +109,19 @@ export default function QuestionDetail() {
 
   const isOwner = question && sessionUser && question.userId === sessionUser.uid;
   const isResolved = question?.status === 'resolved';
+
+  useEffect(() => {
+    if (!isDrawingModalOpen) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsDrawingModalOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isDrawingModalOpen]);
 
   // Debug log for troubleshooting adoption issues
   React.useEffect(() => {
@@ -187,7 +204,7 @@ export default function QuestionDetail() {
           <div className="error-screen glass">질문을 찾을 수 없습니다.</div>
         ) : (
           <>
-            <motion.div 
+            <MotionDiv 
               className="main-question-card glass"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -250,7 +267,7 @@ export default function QuestionDetail() {
               )}
 
               {question.quizContext && (question.quizContext.quizTitle || question.quizContext.transmissionTitle) && (
-                <motion.div 
+                <MotionDiv 
                   className={`quiz-context-box glass clickable context-${question.type || 'quiz'}`}
                   onClick={() => setIsPreviewOpen(true)}
                   whileHover={{ scale: 1.02, backgroundColor: 'rgba(0, 243, 255, 0.1)' }}
@@ -259,7 +276,7 @@ export default function QuestionDetail() {
                    {question.type === 'video' ? '📡 관련 영상: ' : question.type === 'datalog' ? '📄 관련 데이터: ' : '📌 관련 퀴즈: '}
                    {question.quizContext.transmissionTitle || question.quizContext.quizTitle}
                    <span className="preview-hint-text">미리보기 클릭</span>
-                </motion.div>
+                </MotionDiv>
               )}
 
               <QuizPreviewModal 
@@ -278,7 +295,15 @@ export default function QuestionDetail() {
               {question.drawingUrl && (
                 <div className="question-drawing-container">
                   <h4 className="font-tech" style={{marginBottom: '1rem', color: '#fb923c'}}>📸 첨부된 이미지/드로잉</h4>
-                  <img src={question.drawingUrl} alt="Question Drawing" className="question-drawing" />
+                  <button
+                    type="button"
+                    className="question-drawing-trigger"
+                    onClick={() => setIsDrawingModalOpen(true)}
+                    aria-label="첨부 이미지 크게 보기"
+                  >
+                    <img src={question.drawingUrl} alt="Question Drawing" className="question-drawing" />
+                    <span className="question-drawing-zoom-hint">클릭해서 크게 보기</span>
+                  </button>
                 </div>
               )}
 
@@ -307,7 +332,7 @@ export default function QuestionDetail() {
                   </button>
                 )}
               </div>
-            </motion.div>
+            </MotionDiv>
 
             <section className="answers-section">
               <div className="answers-header-row">
@@ -342,7 +367,7 @@ export default function QuestionDetail() {
                       const frameBackground = profile.frameBackground || 'rgba(255, 255, 255, 0.04)';
 
                       return (
-                    <motion.div 
+                    <MotionDiv 
                       key={ans.id} 
                       className={`answer-card glass ${ans.isTeacher ? 'teacher-answer' : ''} ${ans.isAccepted ? 'accepted' : ''}`}
                       initial={{ opacity: 0, y: 10 }}
@@ -429,7 +454,7 @@ export default function QuestionDetail() {
                           boldColor: ans.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)'
                         })}
                       </div>
-                    </motion.div>
+                    </MotionDiv>
                       );
                     })()
                   ))
@@ -438,7 +463,7 @@ export default function QuestionDetail() {
             </section>
 
             {!isOwner && (
-              <motion.form 
+              <MotionForm 
                 className="new-answer-form glass"
                 onSubmit={handleAddAnswer}
                 initial={{ opacity: 0, y: 20 }}
@@ -458,21 +483,50 @@ export default function QuestionDetail() {
                 >
                   {addAnswer.isPending ? '보내는 중...' : isCooldown ? '완료! (대기중)' : '답변 등록하기'}
                 </button>
-              </motion.form>
+              </MotionForm>
             )}
           </>
         )}
       </div>
 
       <AnimatePresence>
+        {isDrawingModalOpen && question?.drawingUrl && (
+          <MotionDiv
+            className="drawing-modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsDrawingModalOpen(false)}
+          >
+            <button
+              type="button"
+              className="drawing-modal-close"
+              onClick={() => setIsDrawingModalOpen(false)}
+              aria-label="첨부 이미지 닫기"
+            >
+              <X size={24} />
+            </button>
+            <MotionDiv
+              className="drawing-modal-stage"
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 8 }}
+              transition={{ duration: 0.18 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <img src={question.drawingUrl} alt="확대된 첨부 이미지" className="drawing-modal-image" />
+            </MotionDiv>
+          </MotionDiv>
+        )}
+
         {showRewardMask && (
-          <motion.div 
+          <MotionDiv 
             className="reward-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div 
+            <MotionDiv 
               className="reward-content glass"
               initial={{ scale: 0.5, y: 50 }}
               animate={{ scale: 1, y: 0 }}
@@ -484,8 +538,8 @@ export default function QuestionDetail() {
               <div className="reward-badge font-tech">
                 💎 +{rewardAmount} CRYSTALS
               </div>
-            </motion.div>
-          </motion.div>
+            </MotionDiv>
+          </MotionDiv>
         )}
       </AnimatePresence>
     </div>
