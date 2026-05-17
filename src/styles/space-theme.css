@@ -904,6 +904,11 @@
   cursor: pointer;
 }
 
+.feedback-reaction-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .feedback-reaction-button.selected {
   border-color: var(--crystal-cyan);
   background: rgba(0, 212, 255, 0.16);
@@ -928,8 +933,32 @@
   font-size: 0.88rem;
 }
 
+.feedback-response-info {
+  margin-top: 0.5rem;
+  color: var(--crystal-cyan);
+  font-size: 0.88rem;
+}
+
+.feedback-response-hint {
+  margin-top: 0.1rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.feedback-response-hint.warning {
+  color: #fbbf24;
+}
+
 .feedback-response-submit {
   margin-top: 0.7rem;
+}
+
+.feedback-response-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: grayscale(0.35);
+  box-shadow: none;
 }
 
 /* Code Blocks & Inline Code */

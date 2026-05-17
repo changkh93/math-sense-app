@@ -111,8 +111,15 @@ export const useSubmitFeedbackResponse = () => {
 
   return useMutation({
     mutationFn: async ({ assignmentId, userId, reaction, comment }) => {
+      if (!assignmentId || !userId) throw new Error('저장할 과제 정보가 없습니다.');
+      if (!['thumbs_up', 'thumbs_down'].includes(reaction)) {
+        throw new Error('피드백 평가를 선택해 주세요.');
+      }
       const ref = doc(db, 'assignments', assignmentId);
       const trimmedComment = String(comment || '').trim();
+      if (trimmedComment.length > 1000) {
+        throw new Error('평가 코멘트는 1000자 이내로 작성해 주세요.');
+      }
       await updateDoc(ref, {
         feedbackResponse: {
           reaction,
@@ -377,18 +384,34 @@ export const useSubmitWarningAppeal = () => {
       const trimmed = String(text || '').trim();
       if (!warningId || !userId) throw new Error('이의신청할 경고 정보가 없습니다.');
       if (trimmed.length < 10) throw new Error('이의신청 내용은 최소 10자 이상 작성해 주세요.');
+      if (trimmed.length > 2000) throw new Error('이의신청 내용은 2000자 이내로 작성해 주세요.');
 
-      await updateDoc(doc(db, 'assignmentWarnings', warningId), {
-        status: 'appealed',
-        appealLocked: true,
-        appeal: {
-          text: trimmed,
-          status: 'submitted',
-          submittedAt: serverTimestamp(),
-        },
-        updatedAt: serverTimestamp(),
+      const warningRef = doc(db, 'assignmentWarnings', warningId);
+      await runTransaction(db, async (transaction) => {
+        const warningSnap = await transaction.get(warningRef);
+        if (!warningSnap.exists()) throw new Error('이의신청할 경고를 찾을 수 없습니다.');
+        const warning = warningSnap.data();
+        if (warning.userId !== userId) throw new Error('이의신청 권한이 없습니다.');
+        if (warning.status !== 'active' || warning.appealLocked === true || warning.appeal?.text) {
+          throw new Error('이미 이의신청이 제출되었습니다.');
+        }
+
+        transaction.update(warningRef, {
+          status: 'appealed',
+          appealLocked: true,
+          appeal: {
+            text: trimmed,
+            status: 'submitted',
+            submittedAt: serverTimestamp(),
+          },
+          updatedAt: serverTimestamp(),
+        });
       });
-      await recomputeAssignmentWarningSummary(userId);
+      try {
+        await recomputeAssignmentWarningSummary(userId);
+      } catch (summaryError) {
+        console.warn('Warning appeal saved, but warning summary recompute failed:', summaryError);
+      }
       return { warningId, userId };
     },
     onSuccess: (_, variables) => {
@@ -406,13 +429,6 @@ const getTimestampMs = (value) => {
   const parsed = new Date(value).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
 };
-
-const getAttendanceBaseMs = (attendance) => (
-  getTimestampMs(attendance?.timestamp) ||
-  getTimestampMs(attendance?.createdAt) ||
-  getTimestampMs(attendance?.updatedAt) ||
-  (attendance?.date ? new Date(`${attendance.date}T23:59:59+09:00`).getTime() : 0)
-);
 
 /**
  * Fetch assignments for Admin with filters

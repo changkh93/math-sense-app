@@ -713,8 +713,10 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const [feedbackComment, setFeedbackComment] = useState(assignment?.feedbackComment || assignment?.feedbackResponse?.comment || '');
   const [feedbackResponseSaved, setFeedbackResponseSaved] = useState(Boolean(assignment?.feedbackRespondedAt));
   const [feedbackResponseError, setFeedbackResponseError] = useState('');
+  const [feedbackResponseStatus, setFeedbackResponseStatus] = useState('');
   const [appealTextByWarning, setAppealTextByWarning] = useState({});
-  const [appealError, setAppealError] = useState('');
+  const [appealSubmittedByWarning, setAppealSubmittedByWarning] = useState({});
+  const [appealErrorByWarning, setAppealErrorByWarning] = useState({});
   const fileInputRef = useRef(null);
 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
@@ -729,6 +731,21 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const isReviewed = assignment?.status === 'reviewed';
   const isNeedsRevision = assignment?.status === 'needs_revision';
   const isSubmitted = assignment?.status === 'submitted';
+
+  useEffect(() => {
+    setFeedbackReaction(assignment?.feedbackReaction || assignment?.feedbackResponse?.reaction || '');
+    setFeedbackComment(assignment?.feedbackComment || assignment?.feedbackResponse?.comment || '');
+    setFeedbackResponseSaved(Boolean(assignment?.feedbackRespondedAt));
+    setFeedbackResponseError('');
+    setFeedbackResponseStatus('');
+  }, [
+    assignment?.id,
+    assignment?.feedbackReaction,
+    assignment?.feedbackResponse?.reaction,
+    assignment?.feedbackComment,
+    assignment?.feedbackResponse?.comment,
+    assignment?.feedbackRespondedAt
+  ]);
 
   // Window check: Today and previous 6 days (total 7 days)
   const isWithinWindow = useMemo(() => {
@@ -751,8 +768,17 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   };
 
   const handleSubmitFeedbackResponse = async () => {
-    if (!assignment?.id || !feedbackReaction) return;
+    if (feedbackResponseMutation.isPending || feedbackResponseSaved) return;
+    if (!assignment?.id || !user?.uid) {
+      setFeedbackResponseError('저장할 과제 정보가 없습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.');
+      return;
+    }
+    if (!feedbackReaction) {
+      setFeedbackResponseError('피드백 평가를 먼저 선택해 주세요.');
+      return;
+    }
     setFeedbackResponseError('');
+    setFeedbackResponseStatus('');
     try {
       await feedbackResponseMutation.mutateAsync({
         assignmentId: assignment.id,
@@ -761,26 +787,40 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
         comment: feedbackComment,
       });
       setFeedbackResponseSaved(true);
+      setFeedbackResponseStatus('피드백 평가가 저장되었습니다.');
     } catch (error) {
       console.error('Feedback response save failed:', error);
-      setFeedbackResponseError('저장에 실패했습니다. 잠시 뒤 다시 시도해 주세요.');
+      setFeedbackResponseSaved(false);
+      setFeedbackResponseStatus('');
+      setFeedbackResponseError(
+        error?.code === 'permission-denied'
+          ? '저장 권한이 거부되었습니다. 잠시 뒤 다시 시도해 주세요.'
+          : error?.message || '저장에 실패했습니다. 잠시 뒤 다시 시도해 주세요.'
+      );
     }
   };
 
   const handleSubmitWarningAppeal = async (warning) => {
-    if (!warning?.id) return;
+    if (!warning?.id || warningAppealMutation.isPending || appealSubmittedByWarning[warning.id]) return;
     const text = appealTextByWarning[warning.id] || '';
-    setAppealError('');
+    setAppealErrorByWarning(prev => ({ ...prev, [warning.id]: '' }));
     try {
       await warningAppealMutation.mutateAsync({
         warningId: warning.id,
         userId: user?.uid,
         text,
       });
+      setAppealSubmittedByWarning(prev => ({
+        ...prev,
+        [warning.id]: { text: String(text || '').trim() }
+      }));
       setAppealTextByWarning(prev => ({ ...prev, [warning.id]: '' }));
     } catch (error) {
       console.error('Warning appeal failed:', error);
-      setAppealError(error?.message || '이의신청 제출에 실패했습니다.');
+      setAppealErrorByWarning(prev => ({
+        ...prev,
+        [warning.id]: error?.message || '이의신청 제출에 실패했습니다.'
+      }));
     }
   };
 
@@ -1022,7 +1062,11 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
               </div>
               <div style={{ display: 'grid', gap: '0.9rem' }}>
                 {activeWarnings.map((warning) => {
-                  const appealSubmitted = Boolean(warning.appealLocked || warning.appeal?.text);
+                  const localAppeal = appealSubmittedByWarning[warning.id];
+                  const appealSubmitted = Boolean(localAppeal || warning.appealLocked || warning.appeal?.text);
+                  const appealText = String(appealTextByWarning[warning.id] || '');
+                  const trimmedAppealText = appealText.trim();
+                  const appealError = appealErrorByWarning[warning.id];
                   return (
                     <div key={warning.id} style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.08)' }}>
                       <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.82rem', marginBottom: '0.45rem' }}>
@@ -1038,7 +1082,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                       {appealSubmitted ? (
                         <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: 6, background: 'rgba(0, 212, 255, 0.08)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                           <strong style={{ color: 'var(--crystal-cyan)' }}>이의신청 제출 완료</strong>
-                          <div style={{ marginTop: '0.4rem', whiteSpace: 'pre-wrap' }}>{warning.appeal?.text}</div>
+                          <div style={{ marginTop: '0.4rem', whiteSpace: 'pre-wrap' }}>{warning.appeal?.text || localAppeal?.text}</div>
                           <div style={{ marginTop: '0.4rem', fontSize: '0.82rem' }}>제출 후 수정할 수 없습니다.</div>
                           {warning.appeal?.status === 'rejected' && warning.appeal?.adminResponse && (
                             <div style={{ marginTop: '0.5rem', color: '#fca5a5' }}>관리자 답변: {warning.appeal.adminResponse}</div>
@@ -1049,14 +1093,24 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                           <textarea
                             className="feedback-response-comment"
                             rows={3}
-                            value={appealTextByWarning[warning.id] || ''}
-                            onChange={(event) => setAppealTextByWarning(prev => ({ ...prev, [warning.id]: event.target.value }))}
+                            value={appealText}
+                            maxLength={2000}
+                            onChange={(event) => {
+                              setAppealTextByWarning(prev => ({ ...prev, [warning.id]: event.target.value }));
+                              setAppealErrorByWarning(prev => ({ ...prev, [warning.id]: '' }));
+                            }}
                             placeholder="경고가 잘못되었다고 생각하면 근거를 적어 주세요. 이의신청은 제출 후 수정할 수 없습니다."
                           />
+                          <div className={trimmedAppealText.length < 10 ? 'feedback-response-hint warning' : 'feedback-response-hint'}>
+                            {trimmedAppealText.length < 10
+                              ? `10자 이상 입력해야 제출할 수 있습니다. 현재 ${trimmedAppealText.length}자`
+                              : '제출 후 수정할 수 없으니 내용을 확인한 뒤 제출해 주세요.'}
+                          </div>
+                          {appealError && <div className="feedback-response-error">{appealError}</div>}
                           <button
                             type="button"
                             className="cosmic-button secondary feedback-response-submit"
-                            disabled={warningAppealMutation.isPending || String(appealTextByWarning[warning.id] || '').trim().length < 10}
+                            disabled={warningAppealMutation.isPending || trimmedAppealText.length < 10}
                             onClick={() => handleSubmitWarningAppeal(warning)}
                           >
                             {warningAppealMutation.isPending ? '제출 중...' : '이의신청 제출'}
@@ -1083,7 +1137,6 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                   </div>
                 ))}
               </div>
-              {appealError && <div className="feedback-response-error" style={{ marginTop: '0.75rem' }}>{appealError}</div>}
             </div>
           )}
 
@@ -1113,8 +1166,11 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                     title="도움이 됐어요"
                     className={`feedback-reaction-button ${feedbackReaction === 'thumbs_up' ? 'selected' : ''}`}
                     onClick={() => {
+                      if (feedbackResponseSaved && feedbackReaction === 'thumbs_up') return;
                       setFeedbackReaction('thumbs_up');
                       setFeedbackResponseSaved(false);
+                      setFeedbackResponseError('');
+                      setFeedbackResponseStatus('');
                     }}
                   >
                     <span aria-hidden="true">👍</span>
@@ -1125,8 +1181,11 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                     title="별로예요"
                     className={`feedback-reaction-button ${feedbackReaction === 'thumbs_down' ? 'selected' : ''}`}
                     onClick={() => {
+                      if (feedbackResponseSaved && feedbackReaction === 'thumbs_down') return;
                       setFeedbackReaction('thumbs_down');
                       setFeedbackResponseSaved(false);
+                      setFeedbackResponseError('');
+                      setFeedbackResponseStatus('');
                     }}
                   >
                     <span aria-hidden="true">👎</span>
@@ -1138,18 +1197,23 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                   onChange={(event) => {
                     setFeedbackComment(event.target.value);
                     setFeedbackResponseSaved(false);
+                    setFeedbackResponseError('');
+                    setFeedbackResponseStatus('');
                   }}
                   placeholder="선생님에게 남기고 싶은 말을 적어 주세요."
                   rows={3}
+                  maxLength={1000}
                 />
+                {!feedbackReaction && <div className="feedback-response-hint warning">👍 또는 👎를 선택하면 저장할 수 있습니다.</div>}
+                {feedbackResponseStatus && <div className="feedback-response-info">{feedbackResponseStatus}</div>}
                 {feedbackResponseError && <div className="feedback-response-error">{feedbackResponseError}</div>}
                 <button
                   type="button"
                   className="cosmic-button secondary feedback-response-submit"
                   onClick={handleSubmitFeedbackResponse}
-                  disabled={!feedbackReaction || feedbackResponseMutation.isPending}
+                  disabled={!feedbackReaction || feedbackResponseMutation.isPending || feedbackResponseSaved}
                 >
-                  {feedbackResponseMutation.isPending ? '전송 중...' : '피드백 평가 남기기'}
+                  {feedbackResponseSaved ? '저장 완료' : feedbackResponseMutation.isPending ? '전송 중...' : '피드백 평가 남기기'}
                 </button>
               </div>
             </div>
