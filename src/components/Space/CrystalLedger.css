@@ -443,6 +443,51 @@
   margin-left: 4px;
 }
 
+.ledger-agora-context {
+  margin-top: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(0, 243, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(0, 243, 255, 0.055);
+  display: grid;
+  gap: 0.25rem;
+  max-width: 560px;
+}
+
+.ledger-agora-question {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  color: rgba(226, 232, 240, 0.74);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.ledger-agora-question span {
+  color: var(--crystal-cyan, #00f3ff);
+  font-family: var(--font-tech);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.ledger-agora-question strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 700;
+}
+
+.ledger-agora-asker {
+  color: rgba(226, 232, 240, 0.58);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .ledger-tx-time {
   font-size: 0.68rem;
   color: rgba(255, 255, 255, 0.2);

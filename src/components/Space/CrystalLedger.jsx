@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { motion as Motion } from 'framer-motion'
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
+import { collection, doc, getDoc, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { Gift, Search, Send, UserRound, X } from 'lucide-react'
 import { db, auth, functions } from '../../firebase'
@@ -16,6 +16,8 @@ const TX_CONFIG = {
   transmission_reward: { icon: '📡', label: '트랜스미션 보상', color: '#00ff88' },
   store_purchase: { icon: '🛒', label: '스토어 구매', color: '#f87171' },
   answer_accepted: { icon: '💬', label: '답변 채택 보상', color: '#4ade80' },
+  agora_bounty_award: { icon: '💎', label: '현상금 질문 보상', color: '#4ade80' },
+  agora_bounty_lock: { icon: '🎯', label: '현상금 예치', color: '#f87171' },
   question_resolved: { icon: '✅', label: '질문 해결 보상', color: '#4ade80' },
   self_resolve: { icon: '🔍', label: '자가 해결 보상', color: '#4ade80' },
   teacher_verify: { icon: '👨‍🏫', label: '교사 검증 보상', color: '#4ade80' },
@@ -33,6 +35,28 @@ const FILTER_TABS = [
   { id: 'income', label: '획득', icon: '📈' },
   { id: 'expense', label: '소진', icon: '📉' },
 ]
+
+const AGORA_REWARD_TX_TYPES = new Set(['answer_accepted', 'agora_bounty_award'])
+
+function getQuestionPreview(content = '') {
+  const preview = String(content || '').replace(/\s+/g, ' ').trim()
+  return preview.length > 90 ? `${preview.slice(0, 90)}...` : preview
+}
+
+function getAgoraRewardContext(tx, questionMetaById = {}) {
+  if (!AGORA_REWARD_TX_TYPES.has(tx.type)) return null
+  const metadata = tx.metadata || {}
+  const hydratedMeta = metadata.questionId ? questionMetaById[metadata.questionId] : null
+  const questionPreview = metadata.questionPreview || metadata.questionTitle || hydratedMeta?.questionPreview || ''
+  const askerName = metadata.askerName || metadata.questionAskerName || hydratedMeta?.askerName || ''
+
+  if (!questionPreview && !askerName) return null
+
+  return {
+    questionPreview,
+    askerName,
+  }
+}
 
 function formatDateLabel(dateStr) {
   const todayStr = getTodayKST()
@@ -80,6 +104,7 @@ export default function CrystalLedger({ userData }) {
   const [transferAmount, setTransferAmount] = useState('')
   const [transferBusy, setTransferBusy] = useState(false)
   const [transferMessage, setTransferMessage] = useState(null)
+  const [questionMetaById, setQuestionMetaById] = useState({})
 
   const crystals = userData?.crystals || 0
 
@@ -127,6 +152,50 @@ export default function CrystalLedger({ userData }) {
       }
     };
   }, [txLimit])
+
+  useEffect(() => {
+    const missingQuestionIds = Array.from(new Set(
+      transactions
+        .filter(tx => AGORA_REWARD_TX_TYPES.has(tx.type))
+        .map(tx => tx.metadata?.questionId)
+        .filter(questionId => questionId && !questionMetaById[questionId])
+    ))
+
+    if (missingQuestionIds.length === 0) return undefined
+
+    let isCancelled = false
+
+    Promise.all(missingQuestionIds.map(async (questionId) => {
+      try {
+        const questionSnap = await getDoc(doc(db, 'questions', questionId))
+        if (!questionSnap.exists()) return null
+        const question = questionSnap.data() || {}
+        return {
+          questionId,
+          questionPreview: getQuestionPreview(question.content),
+          askerName: question.userName || question.askerName || '질문자',
+        }
+      } catch (error) {
+        console.error('Failed to hydrate Agora ledger question metadata:', error)
+        return null
+      }
+    })).then((items) => {
+      if (isCancelled) return
+      const nextMeta = items
+        .filter(Boolean)
+        .reduce((acc, item) => {
+          acc[item.questionId] = item
+          return acc
+        }, {})
+      if (Object.keys(nextMeta).length > 0) {
+        setQuestionMetaById(prev => ({ ...prev, ...nextMeta }))
+      }
+    })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [transactions, questionMetaById])
 
   useEffect(() => {
     const user = auth.currentUser
@@ -556,6 +625,7 @@ export default function CrystalLedger({ userData }) {
                       const config = TX_CONFIG[tx.type] || TX_CONFIG.other
                       const isPositive = (tx.amount || 0) >= 0
                       const balanceEntry = transactionsWithBalance.find(t => t.id === tx.id)
+                      const agoraContext = getAgoraRewardContext(tx, questionMetaById)
 
                       return (
                         <Motion.div 
@@ -581,6 +651,19 @@ export default function CrystalLedger({ userData }) {
                             <div className="ledger-tx-type">{config.label}</div>
                             {tx.description && (
                               <div className="ledger-tx-desc">{tx.description}</div>
+                            )}
+                            {agoraContext && (
+                              <div className="ledger-agora-context">
+                                {agoraContext.questionPreview && (
+                                  <div className="ledger-agora-question">
+                                    <span>질문</span>
+                                    <strong>{agoraContext.questionPreview}</strong>
+                                  </div>
+                                )}
+                                {agoraContext.askerName && (
+                                  <div className="ledger-agora-asker">질문자: {agoraContext.askerName}</div>
+                                )}
+                              </div>
                             )}
                             {tx.metadata?.rewardMultiplier > 1 && (
                               <div className="ledger-tx-bonus">

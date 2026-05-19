@@ -105,6 +105,18 @@ function recordCrystalTransaction(transaction, userId, txId, { amount, type, des
   });
 }
 
+function buildAgoraRewardMetadata(questionId, answerId, questionData = {}, askerUid = "") {
+  const content = String(questionData.content || "").replace(/\s+/g, " ").trim();
+  const questionPreview = content.length > 90 ? `${content.slice(0, 90)}...` : content;
+  return {
+    questionId,
+    answerId,
+    questionPreview,
+    askerUid,
+    askerName: questionData.userName || questionData.askerName || "질문자",
+  };
+}
+
 function getLockedBountyAmount(questionData = {}) {
   return questionData.bountyStatus === "locked"
     ? Math.max(0, Number(questionData.bountyAmount || 0))
@@ -494,6 +506,7 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
       const lockedBounty = getLockedBountyAmount(questionData);
       const totalAnswerReward = AGORA_BASE_ACCEPT_REWARD + lockedBounty;
       const now = FieldValue.serverTimestamp();
+      const agoraRewardMetadata = buildAgoraRewardMetadata(questionId, answerId, questionData, askerUid);
 
       transaction.set(answerRef, {
         isAccepted: true,
@@ -520,7 +533,7 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
           amount: AGORA_BASE_ACCEPT_REWARD,
           type: "answer_accepted",
           description: "답변이 채택되었습니다",
-          metadata: { questionId, answerId },
+          metadata: agoraRewardMetadata,
         });
 
         if (lockedBounty > 0) {
@@ -528,7 +541,7 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
             amount: lockedBounty,
             type: "agora_bounty_award",
             description: "현상금 질문 보상을 받았습니다",
-            metadata: { questionId, answerId },
+            metadata: agoraRewardMetadata,
           });
         }
       }
