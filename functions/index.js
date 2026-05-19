@@ -123,6 +123,117 @@ function getLockedBountyAmount(questionData = {}) {
     : 0;
 }
 
+function makeQuizQuestionStatId(unitId, questionId) {
+  return encodeURIComponent(`${unitId || "unknown"}__${questionId || "unknown"}`);
+}
+
+function normalizeStatKey(value) {
+  return String(value || "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .slice(0, 64);
+}
+
+function normalizeOptionSummaries(optionSummaries = []) {
+  return (Array.isArray(optionSummaries) ? optionSummaries : [])
+    .slice(0, 10)
+    .reduce((acc, option, index) => {
+      const key = normalizeStatKey(option?.key || `o${index}`);
+      if (!key) return acc;
+      acc[key] = {
+        text: String(option?.text || "").slice(0, 300),
+        isCorrect: option?.isCorrect === true,
+        diagnosticLabel: String(option?.diagnosticLabel || "").slice(0, 120),
+      };
+      return acc;
+    }, {});
+}
+
+/**
+ * submitQuizQuestionReaction
+ *
+ * Stores one anonymous aggregate response per student per quiz question.
+ * If the same student answers the same question again, the aggregate is adjusted
+ * instead of counted twice.
+ */
+exports.submitQuizQuestionReaction = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const unitId = typeof data?.unitId === "string" ? data.unitId.trim() : "";
+  const questionId = typeof data?.questionId === "string" ? data.questionId.trim() : "";
+  const selectedOptionKeys = Array.isArray(data?.selectedOptionKeys)
+    ? data.selectedOptionKeys.map(normalizeStatKey).filter(Boolean).slice(0, 10)
+    : [];
+  const reactionId = normalizeStatKey(data?.reactionId || "");
+  const isCorrect = data?.isCorrect === true;
+  const questionText = String(data?.questionText || "").replace(/\s+/g, " ").trim().slice(0, 500);
+  const unitTitle = String(data?.unitTitle || "").trim().slice(0, 200);
+  const optionSummaries = normalizeOptionSummaries(data?.optionSummaries || []);
+
+  if (!unitId || !questionId || selectedOptionKeys.length === 0 || !reactionId) {
+    throw new functions.https.HttpsError("invalid-argument", "퀴즈 반응 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const statId = makeQuizQuestionStatId(unitId, questionId);
+  const statRef = db.collection("quizQuestionStats").doc(statId);
+  const responseRef = db.collection("quizQuestionResponses").doc(`${uid}_${statId}`);
+  const now = FieldValue.serverTimestamp();
+
+  await db.runTransaction(async (transaction) => {
+    const responseSnap = await transaction.get(responseRef);
+    const statUpdates = {
+      unitId,
+      questionId,
+      unitTitle,
+      questionText,
+      optionSummaries,
+      updatedAt: now,
+    };
+
+    if (responseSnap.exists) {
+      const previous = responseSnap.data() || {};
+      const previousKeys = Array.isArray(previous.selectedOptionKeys)
+        ? previous.selectedOptionKeys.map(normalizeStatKey).filter(Boolean)
+        : [];
+      const previousReaction = normalizeStatKey(previous.reactionId || "");
+
+      previousKeys.forEach((key) => {
+        statUpdates[`optionCounts.${key}`] = FieldValue.increment(-1);
+      });
+      if (previousReaction) {
+        statUpdates[`reactionCounts.${previousReaction}`] = FieldValue.increment(-1);
+      }
+      if (previous.isCorrect === true && !isCorrect) {
+        statUpdates.correctResponses = FieldValue.increment(-1);
+      } else if (previous.isCorrect !== true && isCorrect) {
+        statUpdates.correctResponses = FieldValue.increment(1);
+      }
+    } else {
+      statUpdates.totalResponses = FieldValue.increment(1);
+      if (isCorrect) statUpdates.correctResponses = FieldValue.increment(1);
+      statUpdates.createdAt = now;
+    }
+
+    selectedOptionKeys.forEach((key) => {
+      statUpdates[`optionCounts.${key}`] = FieldValue.increment(1);
+    });
+    statUpdates[`reactionCounts.${reactionId}`] = FieldValue.increment(1);
+
+    transaction.set(statRef, statUpdates, { merge: true });
+    transaction.set(responseRef, {
+      uid,
+      unitId,
+      questionId,
+      selectedOptionKeys,
+      reactionId,
+      isCorrect,
+      updatedAt: now,
+      createdAt: responseSnap.exists ? (responseSnap.data()?.createdAt || now) : now,
+    }, { merge: true });
+  });
+
+  return { success: true, statId };
+});
+
 /**
  * fetchNotebook
  * 

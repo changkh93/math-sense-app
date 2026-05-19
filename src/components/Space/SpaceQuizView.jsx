@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils'
+import { parseInlineFormatting } from '../../utils/formatUtils'
 import 'katex/dist/katex.min.css'
 import { InlineMath } from 'react-katex'
 import StarField from './StarField'
@@ -11,8 +11,9 @@ import QuestionModal from '../QuestionModal'
 import { useSmartSync } from '../../hooks/useSync'
 import { useAuth } from '../../hooks/useAuth'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
-import { db } from '../../firebase'
-import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
+import { db, functions } from '../../firebase'
+import { doc, getDoc, onSnapshot, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
 
 // Fisher-Yates 셔플 알고리즘
 const shuffleArray = (array) => {
@@ -22,6 +23,81 @@ const shuffleArray = (array) => {
     [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
   }
   return newArr;
+}
+
+const QUIZ_REACTION_CHOICES = [
+  { id: 'understood', label: '확실히 이해했어요', tone: '#22c55e', review: false },
+  { id: 'uncertain_correct', label: '맞혔지만 확신은 없었어요', tone: '#fbbf24', review: true },
+  { id: 'missed_condition', label: '문제 조건을 놓쳐서 틀렸어요', tone: '#fb7185', review: true },
+  { id: 'solution_blocked', label: '풀이 방법에서 막혀서 틀렸어요', tone: '#a78bfa', review: true },
+  { id: 'guessed_concept_gap', label: '개념을 몰라서 찍었어요', tone: '#38bdf8', review: true },
+]
+
+const REACTION_CAUSE_LABELS = {
+  understood: '확실한 이해',
+  uncertain_correct: '확신 부족',
+  missed_condition: '조건 놓침',
+  solution_blocked: '풀이 방법 막힘',
+  guessed_concept_gap: '개념 공백/찍음',
+}
+
+const REVIEW_REACTION_IDS = new Set(['uncertain_correct', 'missed_condition', 'solution_blocked', 'guessed_concept_gap'])
+const MotionReactionPanel = motion.div
+
+const makeQuizQuestionStatId = (unitId, questionId) => encodeURIComponent(`${unitId || 'unknown'}__${questionId || 'unknown'}`)
+
+const getOptionKey = (question, option) => {
+  const options = question?.options || []
+  const index = options.findIndex(item => item === option || item?.text === option?.text)
+  return `o${Math.max(0, index)}`
+}
+
+const getOptionDiagnosticLabel = (option, isCorrect) => {
+  if (isCorrect) return '정답'
+  return option?.diagnosticLabel || option?.misconception || option?.errorType || option?.feedback || '오답 선택'
+}
+
+const getOptionSummaries = (question) => (question?.options || []).map((option, index) => ({
+  key: `o${index}`,
+  text: option?.text || '',
+  isCorrect: option?.isCorrect === true,
+  diagnosticLabel: getOptionDiagnosticLabel(option, option?.isCorrect === true),
+}))
+
+const getAnswerSelectedKeys = (question, answer) => {
+  if (!question || !answer) return []
+  if (answer.isMultiAnswer && Array.isArray(answer.selectedTexts)) {
+    return (question.options || [])
+      .map((option, index) => (answer.selectedTexts.includes(option.text) ? `o${index}` : null))
+      .filter(Boolean)
+  }
+  return [getOptionKey(question, answer)]
+}
+
+const getDisplayStats = (stats, question, pendingResult) => {
+  const options = getOptionSummaries(question)
+  const totalFromStats = Number(stats?.totalResponses || 0)
+  const counts = { ...(stats?.optionCounts || {}) }
+  let total = totalFromStats
+  let correctResponses = Number(stats?.correctResponses || 0)
+
+  if (pendingResult && !pendingResult.persisted) {
+    total += 1
+    if (pendingResult.isCorrect) correctResponses += 1
+    pendingResult.selectedOptionKeys.forEach(key => {
+      counts[key] = Number(counts[key] || 0) + 1
+    })
+  }
+
+  return {
+    total,
+    correctRate: total > 0 ? Math.round((correctResponses / total) * 100) : 0,
+    options: options.map(option => ({
+      ...option,
+      count: Number(counts[option.key] || 0),
+      percent: total > 0 ? Math.round((Number(counts[option.key] || 0) / total) * 100) : 0,
+    })),
+  }
 }
 
 export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield, hasRadar, isRadarBonus, onRequestSupport }) {
@@ -47,10 +123,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [isSavingExit, setIsSavingExit] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [modalContext, setModalContext] = useState(null)
-  const [isFirstPassPerfect, setIsFirstPassPerfect] = useState(false)
   const [firstPassScore, setFirstPassScore] = useState(null)
   const [showRadarScan, setShowRadarScan] = useState(false)
-  const [potentialOre, setPotentialOre] = useState(0)
+  const [potentialOre] = useState(0)
   const [reviewMarks, setReviewMarks] = useState(new Set()) // 재검토 마크 문항 ID
   
   // Interactive FAB (Support Tray) state
@@ -59,14 +134,18 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // Anti-Guessing State
   const [retryCount, setRetryCount] = useState(0)
   const [everWrongSet, setEverWrongSet] = useState(new Set())
-  const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const isMobile = window.innerWidth <= 768
   const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
   const [isAiExplanationOpen, setIsAiExplanationOpen] = useState(false)
   const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
   const [selectedMultiOptions, setSelectedMultiOptions] = useState(new Set()) // 멀티 정답 임시 선택
+  const [questionStats, setQuestionStats] = useState(null)
+  const [pendingResult, setPendingResult] = useState(null)
+  const [isSavingReaction, setIsSavingReaction] = useState(false)
+  const [reactionError, setReactionError] = useState('')
 
   const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
+  const currentQuestion = currentQuestions[currentIdx]
 
   // 초기 문제 설정 및 이어풀기 세션 로드
   useEffect(() => {
@@ -92,6 +171,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           let targetShieldsUsed = 0
           let targetRetryCount = savedRetryCount
           let targetFirstPassScore = null
+          let targetReviewMarks = []
 
           let targetEverWrong = []
 
@@ -110,6 +190,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 targetShieldsUsed = session.shieldsUsed || 0
                 targetFirstPassScore = session.firstPassScore !== undefined ? session.firstPassScore : null
                 targetEverWrong = session.everWrong || []
+                targetReviewMarks = Array.isArray(session.reviewMarks) ? session.reviewMarks : []
                 if (session.retryCount !== undefined) {
                   targetRetryCount = session.retryCount
                 }
@@ -127,6 +208,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             Object.entries(targetUserAnswers).filter(([questionId]) => selectedIds.has(questionId))
           )
           targetEverWrong = targetEverWrong.filter(questionId => selectedIds.has(questionId))
+          targetReviewMarks = targetReviewMarks.filter(questionId => selectedIds.has(questionId))
 
           if (targetCurrentIdx < 0 || targetCurrentIdx >= selected.length) {
             const firstUnansweredIdx = selected.findIndex(q => !targetUserAnswers[q.id])
@@ -144,6 +226,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           setShieldsUsed(targetShieldsUsed)
           setFirstPassScore(targetFirstPassScore)
           setEverWrongSet(new Set(targetEverWrong))
+          setReviewMarks(new Set(targetReviewMarks))
           
           initializedRef.current = guardKey;
 
@@ -163,25 +246,187 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
       initQuizSession()
     }
-  }, [quizData, hasRadar, user])
+  }, [quizData, hasRadar, isRadarBonus, user])
 
   // 문제 변경 시 AI 설명 패널 닫기 + 멀티 선택 초기화
   useEffect(() => {
     setIsAiExplanationOpen(false)
     setIsDetailedExplanationOpen(false)
     setSelectedMultiOptions(new Set())
+    setPendingResult(null)
+    setReactionError('')
   }, [currentIdx])
+
+  useEffect(() => {
+    if (!quizData?.unitId || !currentQuestion?.id) {
+      setQuestionStats(null)
+      return undefined
+    }
+
+    const statId = makeQuizQuestionStatId(quizData.unitId, currentQuestion.id)
+    const unsubscribe = onSnapshot(
+      doc(db, 'quizQuestionStats', statId),
+      (snapshot) => setQuestionStats(snapshot.exists() ? snapshot.data() : null),
+      (error) => {
+        console.error('Quiz question stats subscription failed:', error)
+        setQuestionStats(null)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [quizData?.unitId, currentQuestion?.id])
 
 
   const formatText = (text) => {
     return parseInlineFormatting(text, { keyPrefix: 'quiz' });
   }
 
-  const currentQuestion = currentQuestions[currentIdx]
-
   // 멀티 정답 여부 확인
   const getCorrectCount = (question) => question?.options?.filter(o => o.isCorrect).length || 0
   const isMultiAnswer = (question) => getCorrectCount(question) > 1
+  const displayedStats = getDisplayStats(questionStats, currentQuestion, pendingResult)
+
+  const saveProgressSession = async ({
+    nextIdxForSave,
+    nextUserAnswers,
+    nextCombo,
+    nextSessionCrystals,
+    nextShieldsUsed,
+    nextEverWrongSet,
+    nextReviewMarkIds,
+    computedFirstPass,
+    willBeResultMode
+  }) => {
+    if (user?.uid && quizData?.unitId && !reSolveMode && !willBeResultMode) {
+      try {
+        const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+        const sessionObj = {
+          currentIdx: nextIdxForSave,
+          userAnswers: nextUserAnswers,
+          comboCount: nextCombo,
+          sessionCrystals: nextSessionCrystals,
+          retryCount: retryCount,
+          shieldsUsed: nextShieldsUsed,
+          originalTotal: originalTotal,
+          firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore,
+          everWrong: Array.from(nextEverWrongSet),
+          reviewMarks: nextReviewMarkIds || Array.from(reviewMarks)
+        }
+        await setDoc(progressRef, {
+          quizSession: JSON.parse(JSON.stringify(sessionObj)),
+          unitTitle: quizData?.title || "탐사 퀴즈",
+          unitId: quizData.unitId || "",
+          updatedAt: serverTimestamp()
+        }, { merge: true })
+      } catch (e) {
+        console.error("Auto save failed", e)
+      }
+    }
+  }
+
+  const moveToNextQuestionOrResult = async (pending) => {
+    const nextIdxForSave = currentIdx < currentQuestions.length - 1 ? currentIdx + 1 : currentIdx
+    let computedFirstPass = firstPassScore
+    const willBeResultMode = currentIdx >= currentQuestions.length - 1
+
+    if (willBeResultMode) {
+      const totalCorrectSoFar = allSessionQuestions.filter(q => pending.userAnswers[q.id]?.isCorrect).length
+      if (pending.isCorrect && totalCorrectSoFar === originalTotal) {
+        setTimeout(() => {
+          const id = Date.now() + Math.random()
+          setFloatingMarkers(prev => [...prev, {
+            id,
+            text: '+10 PERFECT!',
+            type: 'gain',
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2
+          }])
+          setTimeout(() => setFloatingMarkers(prev => prev.filter(m => m.id !== id)), 2000)
+        }, 200)
+      }
+
+      if (retryCount === 0 && firstPassScore === null) {
+        computedFirstPass = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
+        setFirstPassScore(computedFirstPass)
+      }
+    }
+
+    await saveProgressSession({
+      nextIdxForSave,
+      nextUserAnswers: pending.userAnswers,
+      nextCombo: pending.combo,
+      nextSessionCrystals: pending.sessionCrystals,
+      nextShieldsUsed: pending.shieldsUsed,
+      nextEverWrongSet: new Set(pending.everWrongIds || []),
+      nextReviewMarkIds: pending.reviewMarkIds,
+      computedFirstPass,
+      willBeResultMode
+    })
+
+    setShowFeedback(null)
+    setIsRebooting(false)
+    setSelectedMultiOptions(new Set())
+    setPendingResult(null)
+    setReactionError('')
+
+    if (currentIdx < currentQuestions.length - 1) {
+      setCurrentIdx(prev => prev + 1)
+    } else {
+      setIsResultMode(true)
+    }
+  }
+
+  const handleQuizReaction = async (reactionId) => {
+    if (!pendingResult || isSavingReaction) return
+    const reaction = QUIZ_REACTION_CHOICES.find(item => item.id === reactionId)
+    if (!reaction) return
+
+    setIsSavingReaction(true)
+    setReactionError('')
+
+    try {
+      const submitQuizQuestionReaction = httpsCallable(functions, 'submitQuizQuestionReaction')
+      await submitQuizQuestionReaction({
+        unitId: quizData?.unitId || '',
+        questionId: currentQuestion?.id || '',
+        questionText: currentQuestion?.question || '',
+        unitTitle: currentQuestion?.unitTitle || quizData?.title || '',
+        selectedOptionKeys: pendingResult.selectedOptionKeys,
+        isCorrect: pendingResult.isCorrect,
+        reactionId,
+        optionSummaries: getOptionSummaries(currentQuestion),
+      })
+
+      const nextReviewMarks = new Set(reviewMarks)
+      if (REACTION_CAUSE_LABELS[reactionId]) {
+        pendingResult.userAnswers[currentQuestion.id] = {
+          ...pendingResult.userAnswers[currentQuestion.id],
+          reactionId,
+          reactionLabel: reaction.label,
+          darkMatterCause: REACTION_CAUSE_LABELS[reactionId],
+        }
+        setUserAnswers({ ...pendingResult.userAnswers })
+      }
+
+      if (REVIEW_REACTION_IDS.has(reactionId)) {
+        nextReviewMarks.add(currentQuestion.id)
+      } else {
+        nextReviewMarks.delete(currentQuestion.id)
+      }
+      setReviewMarks(nextReviewMarks)
+      await moveToNextQuestionOrResult({
+        ...pendingResult,
+        persisted: true,
+        reactionId,
+        reviewMarkIds: Array.from(nextReviewMarks),
+      })
+    } catch (error) {
+      console.error('Quiz reaction save failed:', error)
+      setReactionError(error?.message || '반응 저장에 실패했습니다. 다시 시도해 주세요.')
+    } finally {
+      setIsSavingReaction(false)
+    }
+  }
 
   // 멀티 정답: 옵션 토글 선택
   const handleMultiSelect = (option) => {
@@ -213,6 +458,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       selectedTexts: Array.from(selectedTexts),
       correctTexts: correctOpts.map(o => o.text)
     }
+    const selectedOptionKeys = getAnswerSelectedKeys(currentQuestion, answerRecord)
 
     // 피드백 표시
     setShowFeedback(isCorrect ? 'correct' : 'wrong')
@@ -279,82 +525,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setSessionCrystals(newSessionCrystals)
     setShieldsUsed(newShieldsUsed)
     setEverWrongSet(newEverWrongSet)
-
-    // 세션 자동 저장
-    const triggerAutoSave = async (willBeResultMode, computedFirstPass) => {
-      let nextIdxForSave = currentIdx
-      if (currentIdx < currentQuestions.length - 1) {
-        nextIdxForSave = currentIdx + 1
-      }
-      
-      if (user?.uid && quizData?.unitId && !reSolveMode && !willBeResultMode) {
-        try {
-          const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
-          const sessionObj = {
-            currentIdx: nextIdxForSave,
-            userAnswers: newUserAnswers,
-            comboCount: newCombo,
-            sessionCrystals: newSessionCrystals,
-            retryCount: retryCount,
-            shieldsUsed: newShieldsUsed,
-            originalTotal: originalTotal,
-            firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore,
-            everWrong: Array.from(newEverWrongSet)
-          }
-          await setDoc(progressRef, {
-            quizSession: JSON.parse(JSON.stringify(sessionObj)),
-            unitTitle: quizData?.title || "탐사 퀴즈",
-            unitId: quizData.unitId || "",
-            updatedAt: serverTimestamp()
-          }, { merge: true })
-        } catch (e) { console.error("Auto save failed", e) }
-      }
-    }
-
-    let willBeResultModeImmediate = false
-    let computedFirstPassImmediate = firstPassScore
-    
-    if (currentIdx >= currentQuestions.length - 1) {
-      willBeResultModeImmediate = true
-      const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect).length
-      if (retryCount === 0 && firstPassScore === null) {
-        computedFirstPassImmediate = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
-      }
-    }
-    
-    triggerAutoSave(willBeResultModeImmediate, computedFirstPassImmediate)
-
-    const performNextStep = () => {
-      if (isQuestionModalOpen) return;
-      setShowFeedback(null)
-      setIsRebooting(false)
-      setSelectedMultiOptions(new Set())
-      
-      let nextIdx = currentIdx
-      if (currentIdx < currentQuestions.length - 1) {
-        nextIdx = currentIdx + 1
-        setCurrentIdx(nextIdx)
-      } else {
-        const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect).length
-        if (isCorrect && totalCorrectSoFar === originalTotal) {
-          setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
-        }
-        
-        if (retryCount === 0 && firstPassScore === null) {
-          const fPassScore = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
-          setFirstPassScore(fPassScore)
-        }
-        setIsResultMode(true)
-      }
-    }
-
-    if (isCorrect) {
-      setTimeout(performNextStep, 800)
-    } else {
-      const rebootDelay = Math.min((retryCount + 1) * 3000, 9000)
-      setIsRebooting(true)
-      setTimeout(performNextStep, rebootDelay)
-    }
+    setPendingResult({
+      questionId: currentQuestion.id,
+      isCorrect,
+      selectedOptionKeys,
+      userAnswers: newUserAnswers,
+      combo: newCombo,
+      sessionCrystals: newSessionCrystals,
+      shieldsUsed: newShieldsUsed,
+      everWrongIds: Array.from(newEverWrongSet),
+      persisted: false,
+    })
   }
 
   const handleSelect = (option, event) => {
@@ -368,6 +549,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       ...userAnswers,
       [currentQuestion.id]: option
     }
+    const selectedOptionKeys = getAnswerSelectedKeys(currentQuestion, option)
     
     // 계산 로직 (Auto-save에 최신 값을 넘기기 위함)
     let newCombo = comboCount || 0
@@ -428,87 +610,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setSessionCrystals(newSessionCrystals)
     setShieldsUsed(newShieldsUsed)
     setEverWrongSet(newEverWrongSet)
-
-    // 세션 자동 저장 함수 (즉시 호출용)
-    const triggerAutoSave = async (willBeResultMode, computedFirstPass) => {
-      // 다음 문제 인덱스를 미리 계산하여 저장합니다.
-      let nextIdxForSave = currentIdx
-      if (currentIdx < currentQuestions.length - 1) {
-        nextIdxForSave = currentIdx + 1
-      }
-      
-      if (user?.uid && quizData?.unitId && !reSolveMode && !willBeResultMode) {
-        try {
-          const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
-          const sessionObj = {
-            currentIdx: nextIdxForSave,
-            userAnswers: newUserAnswers,
-            comboCount: newCombo,
-            sessionCrystals: newSessionCrystals,
-            retryCount: retryCount,
-            shieldsUsed: newShieldsUsed,
-            originalTotal: originalTotal,
-            firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore,
-            everWrong: Array.from(newEverWrongSet)
-          }
-          await setDoc(progressRef, {
-            quizSession: JSON.parse(JSON.stringify(sessionObj)),
-            unitTitle: quizData?.title || "탐사 퀴즈",
-            unitId: quizData.unitId || "",
-            updatedAt: serverTimestamp()
-          }, { merge: true })
-        } catch (e) { console.error("Auto save failed", e) }
-      }
-    }
-    
-    // 답안 확정 즉시 백그라운드 저장 실행 (사용자가 이펙트 도중 나가더라도 유실되지 않음)
-    let willBeResultModeImmediate = false
-    let computedFirstPassImmediate = firstPassScore
-    
-    if (currentIdx >= currentQuestions.length - 1) {
-      willBeResultModeImmediate = true
-      const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect).length
-      if (retryCount === 0 && firstPassScore === null) {
-        computedFirstPassImmediate = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
-      }
-    }
-    
-    // 비동기로 호출 (await ❌)
-    triggerAutoSave(willBeResultModeImmediate, computedFirstPassImmediate)
-
-    // 딜레이 후 다음 문제 이동 로직 (UI 전환만 담당)
-    const performNextStep = () => {
-      if (isQuestionModalOpen) return; // 선생님 질문 모달이 열려있으면 대기
-
-      setShowFeedback(null)
-      setIsRebooting(false)
-      
-      let nextIdx = currentIdx
-      if (currentIdx < currentQuestions.length - 1) {
-        nextIdx = currentIdx + 1
-        setCurrentIdx(nextIdx)
-      } else {
-        // 마지막 문제 로직
-        const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect).length
-        if (isCorrect && totalCorrectSoFar === originalTotal) {
-          setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
-        }
-        
-        if (retryCount === 0 && firstPassScore === null) {
-          const fPassScore = originalTotal > 0 ? Math.round((totalCorrectSoFar / originalTotal) * 100) : 0
-          setFirstPassScore(fPassScore)
-        }
-        setIsResultMode(true)
-      }
-    }
-
-    if (isCorrect) {
-      setTimeout(performNextStep, 800)
-    } else {
-      const rebootDelay = Math.min((retryCount + 1) * 3000, 9000)
-      setIsRebooting(true)
-      setTimeout(performNextStep, rebootDelay)
-    }
+    setPendingResult({
+      questionId: currentQuestion.id,
+      isCorrect,
+      selectedOptionKeys,
+      userAnswers: newUserAnswers,
+      combo: newCombo,
+      sessionCrystals: newSessionCrystals,
+      shieldsUsed: newShieldsUsed,
+      everWrongIds: Array.from(newEverWrongSet),
+      persisted: false,
+    })
   }
 
   // 명시적 닫기/저장 로직
@@ -530,7 +642,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             shieldsUsed: shieldsUsed,
             originalTotal: originalTotal,
             firstPassScore: firstPassScore !== null ? firstPassScore : null,
-            everWrong: Array.from(everWrongSet)
+            everWrong: Array.from(everWrongSet),
+            reviewMarks: Array.from(reviewMarks)
           }
           await setDoc(progressRef, {
             quizSession: JSON.parse(JSON.stringify(sessionObj)),
@@ -560,19 +673,6 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   const handleCloseQuestionModal = () => {
     setIsQuestionModalOpen(false)
-    // 피드백 도중 모달을 열었을 경우, 닫힐 때 다음 문제로 이동
-    if (showFeedback) {
-      const delay = showFeedback === 'correct' ? 500 : 1500
-      setTimeout(() => {
-        setIsRebooting(false)
-        setShowFeedback(null)
-        if (currentIdx < currentQuestions.length - 1) {
-          setCurrentIdx(prev => prev + 1)
-        } else {
-          setIsResultMode(true)
-        }
-      }, delay)
-    }
   }
 
   const handleReSolveWrong = () => {
@@ -609,7 +709,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   // 점수 계산 유틸리티 (상한 점수 폐지)
-  const calculateFinalScore = (rawScore, retryCount) => {
+  const calculateFinalScore = (rawScore) => {
     // 이제 더 이상 상한 점수를 적용하지 않고 원점수를 그대로 반환합니다.
     return rawScore;
   };
@@ -622,7 +722,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     // 점수 계산
     const correctCount = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
     const rawScore = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0
-    const finalScore = calculateFinalScore(rawScore, retryCount)
+    const finalScore = calculateFinalScore(rawScore)
     
     const canGetPerfectBonus = (correctCount === originalTotal)
     // isDarkMatter is now in component scope
@@ -658,25 +758,43 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         crystalsEarned,
         isPerfect: canGetPerfectBonus,
         shieldsUsed,
-        wrongQuestions: allSessionQuestions.filter(q => everWrongSet.has(q.id) || (userAnswers[q.id] && userAnswers[q.id].isCorrect === false)).map(q => ({
-          ...q,
-          unitId: q.unitId || quizData?.unitId || "",
-          unitTitle: q.unitTitle || quizData?.title || "",
-          chapterId: q.chapterId || quizData?.chapterId || "",
-          regionId: q.regionId || region?.id || ""
-        })),
-        correctQuestions: allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect && !everWrongSet.has(q.id)).map(q => ({
-          id: q.id,
-          unitId: q.unitId || quizData?.unitId || "",
-          unitTitle: q.unitTitle || quizData?.title || ""
-        })),
-        reviewMarkedQuestions: allSessionQuestions.filter(q => reviewMarks.has(q.id)).map(q => ({
-          id: q.id,
-          unitId: q.unitId || quizData?.unitId || "",
-          unitTitle: quizData?.title || "",
-          chapterId: q.chapterId || quizData?.chapterId || "",
-          regionId: q.regionId || region?.id || ""
-        }))
+        wrongQuestions: allSessionQuestions.filter(q => everWrongSet.has(q.id) || (userAnswers[q.id] && userAnswers[q.id].isCorrect === false)).map(q => {
+          const answerMeta = userAnswers[q.id] || {}
+          return {
+            ...q,
+            unitId: q.unitId || quizData?.unitId || "",
+            unitTitle: q.unitTitle || quizData?.title || "",
+            chapterId: q.chapterId || quizData?.chapterId || "",
+            regionId: q.regionId || region?.id || "",
+            reactionId: answerMeta.reactionId || "",
+            reactionLabel: answerMeta.reactionLabel || "",
+            darkMatterCause: answerMeta.darkMatterCause || ""
+          }
+        }),
+        correctQuestions: allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect && !everWrongSet.has(q.id)).map(q => {
+          const answerMeta = userAnswers[q.id] || {}
+          return {
+            id: q.id,
+            unitId: q.unitId || quizData?.unitId || "",
+            unitTitle: q.unitTitle || quizData?.title || "",
+            reactionId: answerMeta.reactionId || "",
+            reactionLabel: answerMeta.reactionLabel || "",
+            darkMatterCause: answerMeta.darkMatterCause || ""
+          }
+        }),
+        reviewMarkedQuestions: allSessionQuestions.filter(q => reviewMarks.has(q.id)).map(q => {
+          const answerMeta = userAnswers[q.id] || {}
+          return {
+            id: q.id,
+            unitId: q.unitId || quizData?.unitId || "",
+            unitTitle: quizData?.title || "",
+            chapterId: q.chapterId || quizData?.chapterId || "",
+            regionId: q.regionId || region?.id || "",
+            reactionId: answerMeta.reactionId || "",
+            reactionLabel: answerMeta.reactionLabel || "",
+            darkMatterCause: answerMeta.darkMatterCause || ""
+          }
+        })
       })
     } catch (err) {
       console.error("Finish failed:", err)
@@ -760,7 +878,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   if (isResultMode) {
     const correctCount = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect).length
     const rawScore = originalTotal > 0 ? Math.round((correctCount / originalTotal) * 100) : 0
-    const finalScore = calculateFinalScore(rawScore, retryCount)
+    const finalScore = calculateFinalScore(rawScore)
     const isPerfect = (correctCount === originalTotal)
     
     // 만점 보너스 가시성 (저장 로직과 동일하게 유지)
@@ -1317,42 +1435,14 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               {formatText(currentQuestion.question)}
             </h2>
 
-            {/* 재검토 마크 토글 */}
-            <button
-              onClick={() => {
-                setReviewMarks(prev => {
-                  const next = new Set(prev)
-                  if (next.has(currentQuestion.id)) next.delete(currentQuestion.id)
-                  else next.add(currentQuestion.id)
-                  return next
-                })
-                soundManager.playClick()
-              }}
-              style={{
-                marginTop: '1rem',
-                padding: '0.4rem 1rem',
-                borderRadius: '20px',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                border: reviewMarks.has(currentQuestion.id) 
-                  ? '2px solid #a855f7' 
-                  : '1px solid rgba(255,255,255,0.2)',
-                background: reviewMarks.has(currentQuestion.id) 
-                  ? 'rgba(168, 85, 247, 0.25)' 
-                  : 'rgba(255,255,255,0.05)',
-                color: reviewMarks.has(currentQuestion.id) 
-                  ? '#c084fc' 
-                  : 'var(--text-muted)',
-                transition: 'all 0.2s ease',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem'
-              }}
-            >
-              {reviewMarks.has(currentQuestion.id) ? '🔖' : '📌'}
-              {reviewMarks.has(currentQuestion.id) ? '재검토 마크됨' : '재검토 마크'}
-            </button>
+            <div style={{
+              marginTop: '1rem',
+              color: 'var(--text-muted)',
+              fontSize: '0.85rem',
+              lineHeight: 1.5
+            }}>
+              답을 고른 뒤 이해 상태를 선택하면 다음 문제로 이동합니다.
+            </div>
           </div>
 
           {/* 보기 */}
@@ -1364,22 +1454,18 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             {(currentQuestion?.shuffledOptions || []).map((option, idx) => {
               const multiMode = isMultiAnswer(currentQuestion)
               let btnClass = 'space-option-btn'
+              const optionKey = getOptionKey(currentQuestion, option)
+              const optionStats = showFeedback
+                ? displayedStats.options.find(stat => stat.key === optionKey)
+                : null
+              const isOptionSelected = multiMode
+                ? selectedMultiOptions.has(option.text)
+                : userAnswers[currentQuestion.id] === option
               
               if (multiMode) {
                 // 멀티 정답 모드: 선택 상태 표시
                 if (selectedMultiOptions.has(option.text) && !showFeedback) {
                   btnClass += ' multi-selected'
-                }
-                if (showFeedback) {
-                  const wasSelected = selectedMultiOptions.has(option.text)
-                  if (wasSelected && option.isCorrect) btnClass += ' correct'
-                  else if (wasSelected && !option.isCorrect) btnClass += ' wrong'
-                  else if (!wasSelected && option.isCorrect) btnClass += ' missed-correct'
-                }
-              } else {
-                // 단일 정답 모드: 기존 로직
-                if (showFeedback && userAnswers[currentQuestion.id] === option) {
-                  btnClass += option.isCorrect ? ' correct' : ' wrong'
                 }
               }
               
@@ -1397,29 +1483,181 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   }}
                   disabled={showFeedback !== null || isRebooting}
                   style={{ 
-                    opacity: (showFeedback || isRebooting) && !multiMode && userAnswers[currentQuestion.id] !== option ? 0.5 : 1,
+                    opacity: (showFeedback || isRebooting) && !isOptionSelected ? 0.72 : 1,
                     ...(multiMode && selectedMultiOptions.has(option.text) && !showFeedback ? {
                       border: '2px solid var(--crystal-cyan)',
                       background: 'rgba(0, 243, 255, 0.15)',
                       boxShadow: '0 0 12px rgba(0, 243, 255, 0.3)'
+                    } : {}),
+                    ...(showFeedback && isOptionSelected ? {
+                      border: '2px solid rgba(0, 243, 255, 0.55)',
+                      background: 'linear-gradient(135deg, rgba(0,243,255,0.16), rgba(96,165,250,0.1))',
+                      boxShadow: '0 0 18px rgba(0, 243, 255, 0.2)'
                     } : {})
                   }}
                 >
-                  {multiMode && (
-                    <span style={{ 
-                      marginRight: '0.5rem', 
-                      fontSize: '1.1rem',
-                      display: 'inline-flex',
-                      alignItems: 'center'
-                    }}>
-                      {selectedMultiOptions.has(option.text) ? '☑' : '☐'}
-                    </span>
-                  )}
-                  {formatText(option.text)}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {multiMode && (
+                      <span style={{ 
+                        fontSize: '1.1rem',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                      }}>
+                        {selectedMultiOptions.has(option.text) ? '☑' : '☐'}
+                      </span>
+                    )}
+                    <span>{formatText(option.text)}</span>
+                    {optionStats && (
+                      <span style={{
+                        color: isOptionSelected ? 'var(--crystal-cyan)' : 'var(--text-muted)',
+                        fontSize: '0.82em',
+                        fontWeight: 900,
+                        opacity: 0.95
+                      }}>
+                        ({optionStats.percent}%)
+                      </span>
+                    )}
+                  </span>
                 </button>
               )
             })}
           </div>
+
+          {showFeedback && pendingResult && (
+            <MotionReactionPanel
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                marginTop: '1.5rem',
+                padding: '1.2rem',
+                borderRadius: '18px',
+                border: `1px solid ${pendingResult.isCorrect ? 'rgba(34,197,94,0.45)' : 'rgba(248,113,113,0.45)'}`,
+                background: pendingResult.isCorrect
+                  ? 'linear-gradient(135deg, rgba(34,197,94,0.13), rgba(0,243,255,0.07))'
+                  : 'linear-gradient(135deg, rgba(248,113,113,0.13), rgba(168,85,247,0.08))',
+                boxShadow: pendingResult.isCorrect ? '0 0 22px rgba(34,197,94,0.12)' : '0 0 22px rgba(248,113,113,0.12)'
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '1rem',
+                flexWrap: 'wrap',
+                marginBottom: '1rem'
+              }}>
+                <div>
+                  <div style={{
+                    color: 'var(--crystal-cyan)',
+                    fontWeight: 900,
+                    fontSize: '1.15rem',
+                    marginBottom: '0.25rem'
+                  }}>
+                    채점 완료
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    보기 옆 괄호에 친구들이 고른 비율만 표시됩니다.
+                  </div>
+                </div>
+                <div style={{
+                  minWidth: 120,
+                  padding: '0.75rem 1rem',
+                  borderRadius: '14px',
+                  background: 'rgba(0,0,0,0.22)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '1.5rem' }}>{displayedStats.correctRate}%</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>이 문제 정답률</div>
+                </div>
+              </div>
+
+              <div style={{
+                margin: '1.2rem 0 0.75rem',
+                padding: '0.85rem 1rem',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(0,243,255,0.12), rgba(251,191,36,0.08))',
+                border: '1px solid rgba(0,243,255,0.22)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 12px 28px rgba(0,0,0,0.22)'
+              }}>
+                <div style={{ color: 'var(--text-bright)', fontWeight: 950, marginBottom: '0.2rem', fontSize: '1.05rem' }}>
+                  내 이해 상태를 선택하세요
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  아래 버튼 중 하나를 눌러야 집계가 저장되고 다음 문제로 이동합니다.
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                {QUIZ_REACTION_CHOICES.map(choice => {
+                  const reactionCounts = questionStats?.reactionCounts || {}
+                  const reactionTotal = Object.values(reactionCounts).reduce((sum, value) => sum + Number(value || 0), 0)
+                  const count = Number(reactionCounts[choice.id] || 0)
+                  const percent = reactionTotal > 0 ? Math.round((count / reactionTotal) * 100) : 0
+                  const disabledByAnswer =
+                    (pendingResult.isCorrect && ['missed_condition', 'solution_blocked'].includes(choice.id)) ||
+                    (!pendingResult.isCorrect && ['understood', 'uncertain_correct'].includes(choice.id))
+
+                  return (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      disabled={isSavingReaction || disabledByAnswer}
+                      onClick={() => {
+                        soundManager.playClick()
+                        handleQuizReaction(choice.id)
+                      }}
+                      style={{
+                        minHeight: 82,
+                        padding: '1rem',
+                        borderRadius: '18px',
+                        border: `1px solid ${disabledByAnswer ? 'rgba(255,255,255,0.08)' : `${choice.tone}88`}`,
+                        background: disabledByAnswer
+                          ? 'linear-gradient(145deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))'
+                          : `linear-gradient(145deg, ${choice.tone}2f, rgba(15,23,42,0.74) 58%, ${choice.tone}20)`,
+                        color: disabledByAnswer ? 'rgba(226,232,240,0.36)' : 'var(--text-bright)',
+                        cursor: disabledByAnswer || isSavingReaction ? 'not-allowed' : 'pointer',
+                        textAlign: 'left',
+                        opacity: disabledByAnswer ? 0.55 : 1,
+                        boxShadow: disabledByAnswer
+                          ? 'inset 0 1px 0 rgba(255,255,255,0.04)'
+                          : `0 14px 0 rgba(0,0,0,0.26), 0 18px 34px ${choice.tone}22, inset 0 1px 0 rgba(255,255,255,0.18)`,
+                        transform: disabledByAnswer ? 'translateY(3px)' : 'translateY(0)',
+                        transition: 'transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {!disabledByAnswer && (
+                        <span style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '42%',
+                          background: 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0))',
+                          pointerEvents: 'none'
+                        }} />
+                      )}
+                      <div style={{ position: 'relative', fontWeight: 950, lineHeight: 1.35, fontSize: '1rem' }}>{choice.label}</div>
+                      <div style={{ marginTop: '0.3rem', color: disabledByAnswer ? 'rgba(226,232,240,0.28)' : choice.tone, fontSize: '0.76rem', fontWeight: 800 }}>
+                        익명 반응 {count}명{reactionTotal > 0 ? ` · ${percent}%` : ''}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              {reactionError && (
+                <div style={{ marginTop: '0.7rem', color: '#fecaca', fontSize: '0.85rem' }}>
+                  {reactionError}
+                </div>
+              )}
+              {isSavingReaction && (
+                <div style={{ marginTop: '0.7rem', color: 'var(--crystal-cyan)', fontSize: '0.85rem', fontWeight: 800 }}>
+                  반응 저장 중...
+                </div>
+              )}
+            </MotionReactionPanel>
+          )}
 
           {/* 멀티 정답 안내 및 제출 버튼 */}
           {isMultiAnswer(currentQuestion) && !showFeedback && !isRebooting && (

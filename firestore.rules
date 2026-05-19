@@ -113,6 +113,17 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Anonymous aggregate quiz stats. Writes are server-managed by Cloud Functions
+    // so a student cannot inflate answer/reaction counts.
+    match /quizQuestionStats/{statId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    match /quizQuestionResponses/{responseId} {
+      allow read, write: if false;
+    }
+
     // Questions: Authenticated users can list/read public questions
     match /questions/{questionId} {
       allow create: if isAuth();
