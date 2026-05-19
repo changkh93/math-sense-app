@@ -148,6 +148,18 @@ function normalizeOptionSummaries(optionSummaries = []) {
     }, {});
 }
 
+function addStatDelta(deltas, fieldName, amount) {
+  deltas[fieldName] = (deltas[fieldName] || 0) + amount;
+}
+
+function applyStatDeltas(statUpdates, deltas) {
+  Object.entries(deltas).forEach(([fieldName, amount]) => {
+    if (amount !== 0) {
+      statUpdates[fieldName] = FieldValue.increment(amount);
+    }
+  });
+}
+
 /**
  * submitQuizQuestionReaction
  *
@@ -180,6 +192,7 @@ exports.submitQuizQuestionReaction = regionalFunctions.https.onCall(async (data,
 
   await db.runTransaction(async (transaction) => {
     const responseSnap = await transaction.get(responseRef);
+    const statDeltas = {};
     const statUpdates = {
       unitId,
       questionId,
@@ -197,10 +210,10 @@ exports.submitQuizQuestionReaction = regionalFunctions.https.onCall(async (data,
       const previousReaction = normalizeStatKey(previous.reactionId || "");
 
       previousKeys.forEach((key) => {
-        statUpdates[`optionCounts.${key}`] = FieldValue.increment(-1);
+        addStatDelta(statDeltas, `optionCounts.${key}`, -1);
       });
       if (previousReaction) {
-        statUpdates[`reactionCounts.${previousReaction}`] = FieldValue.increment(-1);
+        addStatDelta(statDeltas, `reactionCounts.${previousReaction}`, -1);
       }
       if (previous.isCorrect === true && !isCorrect) {
         statUpdates.correctResponses = FieldValue.increment(-1);
@@ -214,9 +227,10 @@ exports.submitQuizQuestionReaction = regionalFunctions.https.onCall(async (data,
     }
 
     selectedOptionKeys.forEach((key) => {
-      statUpdates[`optionCounts.${key}`] = FieldValue.increment(1);
+      addStatDelta(statDeltas, `optionCounts.${key}`, 1);
     });
-    statUpdates[`reactionCounts.${reactionId}`] = FieldValue.increment(1);
+    addStatDelta(statDeltas, `reactionCounts.${reactionId}`, 1);
+    applyStatDeltas(statUpdates, statDeltas);
 
     transaction.set(statRef, statUpdates, { merge: true });
     transaction.set(responseRef, {
@@ -232,6 +246,121 @@ exports.submitQuizQuestionReaction = regionalFunctions.https.onCall(async (data,
   });
 
   return { success: true, statId };
+});
+
+/**
+ * submitQuizSessionReactions
+ *
+ * Stores anonymous quiz answer/reaction aggregates once at the end of a quiz
+ * session. Each student still has one response document per question, so retrying
+ * the final submit adjusts prior counts instead of double-counting them.
+ */
+exports.submitQuizSessionReactions = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const unitId = typeof data?.unitId === "string" ? data.unitId.trim() : "";
+  const unitTitle = String(data?.unitTitle || "").trim().slice(0, 200);
+  const rawReactions = Array.isArray(data?.reactions) ? data.reactions : [];
+
+  if (!unitId) {
+    throw new functions.https.HttpsError("invalid-argument", "퀴즈 세션 정보가 올바르지 않습니다.");
+  }
+
+  const dedupedReactions = new Map();
+  rawReactions.slice(0, 100).forEach((reaction) => {
+    const questionId = typeof reaction?.questionId === "string" ? reaction.questionId.trim() : "";
+    const selectedOptionKeys = Array.isArray(reaction?.selectedOptionKeys)
+      ? reaction.selectedOptionKeys.map(normalizeStatKey).filter(Boolean).slice(0, 10)
+      : [];
+    const reactionId = normalizeStatKey(reaction?.reactionId || "");
+    if (!questionId || selectedOptionKeys.length === 0 || !reactionId) return;
+
+    const statId = makeQuizQuestionStatId(unitId, questionId);
+    dedupedReactions.set(statId, {
+      statId,
+      questionId,
+      selectedOptionKeys,
+      reactionId,
+      isCorrect: reaction?.isCorrect === true,
+      questionText: String(reaction?.questionText || "").replace(/\s+/g, " ").trim().slice(0, 500),
+      unitTitle: String(reaction?.unitTitle || unitTitle).trim().slice(0, 200),
+      optionSummaries: normalizeOptionSummaries(reaction?.optionSummaries || []),
+    });
+  });
+
+  const reactions = Array.from(dedupedReactions.values());
+  if (reactions.length === 0) {
+    return { success: true, savedCount: 0 };
+  }
+
+  const db = admin.firestore();
+  const now = FieldValue.serverTimestamp();
+
+  await db.runTransaction(async (transaction) => {
+    const items = [];
+
+    for (const reaction of reactions) {
+      const statRef = db.collection("quizQuestionStats").doc(reaction.statId);
+      const responseRef = db.collection("quizQuestionResponses").doc(`${uid}_${reaction.statId}`);
+      const responseSnap = await transaction.get(responseRef);
+      items.push({ reaction, statRef, responseRef, responseSnap });
+    }
+
+    items.forEach(({ reaction, statRef, responseRef, responseSnap }) => {
+      const statDeltas = {};
+      const statUpdates = {
+        unitId,
+        questionId: reaction.questionId,
+        unitTitle: reaction.unitTitle,
+        questionText: reaction.questionText,
+        optionSummaries: reaction.optionSummaries,
+        updatedAt: now,
+      };
+
+      if (responseSnap.exists) {
+        const previous = responseSnap.data() || {};
+        const previousKeys = Array.isArray(previous.selectedOptionKeys)
+          ? previous.selectedOptionKeys.map(normalizeStatKey).filter(Boolean)
+          : [];
+        const previousReaction = normalizeStatKey(previous.reactionId || "");
+
+        previousKeys.forEach((key) => {
+          addStatDelta(statDeltas, `optionCounts.${key}`, -1);
+        });
+        if (previousReaction) {
+          addStatDelta(statDeltas, `reactionCounts.${previousReaction}`, -1);
+        }
+        if (previous.isCorrect === true && !reaction.isCorrect) {
+          statUpdates.correctResponses = FieldValue.increment(-1);
+        } else if (previous.isCorrect !== true && reaction.isCorrect) {
+          statUpdates.correctResponses = FieldValue.increment(1);
+        }
+      } else {
+        statUpdates.totalResponses = FieldValue.increment(1);
+        if (reaction.isCorrect) statUpdates.correctResponses = FieldValue.increment(1);
+        statUpdates.createdAt = now;
+      }
+
+      reaction.selectedOptionKeys.forEach((key) => {
+        addStatDelta(statDeltas, `optionCounts.${key}`, 1);
+      });
+      addStatDelta(statDeltas, `reactionCounts.${reaction.reactionId}`, 1);
+      applyStatDeltas(statUpdates, statDeltas);
+
+      transaction.set(statRef, statUpdates, { merge: true });
+      transaction.set(responseRef, {
+        uid,
+        unitId,
+        questionId: reaction.questionId,
+        selectedOptionKeys: reaction.selectedOptionKeys,
+        reactionId: reaction.reactionId,
+        isCorrect: reaction.isCorrect,
+        updatedAt: now,
+        createdAt: responseSnap.exists ? (responseSnap.data()?.createdAt || now) : now,
+      }, { merge: true });
+    });
+  });
+
+  return { success: true, savedCount: reactions.length };
 });
 
 /**

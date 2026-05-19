@@ -12,7 +12,7 @@ import { useSmartSync } from '../../hooks/useSync'
 import { useAuth } from '../../hooks/useAuth'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import { db, functions } from '../../firebase'
-import { doc, getDoc, onSnapshot, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 
 // Fisher-Yates 셔플 알고리즘
@@ -263,17 +263,21 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       return undefined
     }
 
+    let isMounted = true
     const statId = makeQuizQuestionStatId(quizData.unitId, currentQuestion.id)
-    const unsubscribe = onSnapshot(
-      doc(db, 'quizQuestionStats', statId),
-      (snapshot) => setQuestionStats(snapshot.exists() ? snapshot.data() : null),
-      (error) => {
-        console.error('Quiz question stats subscription failed:', error)
-        setQuestionStats(null)
-      }
-    )
+    setQuestionStats(null)
+    getDoc(doc(db, 'quizQuestionStats', statId))
+      .then((snapshot) => {
+        if (isMounted) setQuestionStats(snapshot.exists() ? snapshot.data() : null)
+      })
+      .catch((error) => {
+        console.error('Quiz question stats load failed:', error)
+        if (isMounted) setQuestionStats(null)
+      })
 
-    return () => unsubscribe()
+    return () => {
+      isMounted = false
+    }
   }, [quizData?.unitId, currentQuestion?.id])
 
 
@@ -385,18 +389,6 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setReactionError('')
 
     try {
-      const submitQuizQuestionReaction = httpsCallable(functions, 'submitQuizQuestionReaction')
-      await submitQuizQuestionReaction({
-        unitId: quizData?.unitId || '',
-        questionId: currentQuestion?.id || '',
-        questionText: currentQuestion?.question || '',
-        unitTitle: currentQuestion?.unitTitle || quizData?.title || '',
-        selectedOptionKeys: pendingResult.selectedOptionKeys,
-        isCorrect: pendingResult.isCorrect,
-        reactionId,
-        optionSummaries: getOptionSummaries(currentQuestion),
-      })
-
       const nextReviewMarks = new Set(reviewMarks)
       if (REACTION_CAUSE_LABELS[reactionId]) {
         pendingResult.userAnswers[currentQuestion.id] = {
@@ -416,7 +408,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       setReviewMarks(nextReviewMarks)
       await moveToNextQuestionOrResult({
         ...pendingResult,
-        persisted: true,
+        persisted: false,
         reactionId,
         reviewMarkIds: Array.from(nextReviewMarks),
       })
@@ -714,6 +706,39 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     return rawScore;
   };
 
+  const buildQuizSessionReactions = () => (
+    allSessionQuestions
+      .map((question) => {
+        const answer = userAnswers[question.id]
+        if (!answer?.reactionId) return null
+        const selectedOptionKeys = getAnswerSelectedKeys(question, answer)
+        if (selectedOptionKeys.length === 0) return null
+
+        return {
+          questionId: question.id,
+          questionText: question.question || '',
+          unitTitle: question.unitTitle || quizData?.title || '',
+          selectedOptionKeys,
+          isCorrect: answer.isCorrect === true,
+          reactionId: answer.reactionId,
+          optionSummaries: getOptionSummaries(question),
+        }
+      })
+      .filter(Boolean)
+  )
+
+  const submitQuizSessionReactions = async () => {
+    const reactions = buildQuizSessionReactions()
+    if (!user?.uid || !quizData?.unitId || reactions.length === 0) return
+
+    const submitBatch = httpsCallable(functions, 'submitQuizSessionReactions')
+    await submitBatch({
+      unitId: quizData.unitId,
+      unitTitle: quizData?.title || '',
+      reactions,
+    })
+  }
+
   const handleFinish = async () => {
     if (isSubmitting) return
     setIsSubmitting(true)
@@ -738,6 +763,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       : sessionCrystals + (canGetPerfectBonus ? 10 : 0)
     
     try {
+      try {
+        await submitQuizSessionReactions()
+      } catch (reactionError) {
+        console.error("Failed to submit quiz session reactions", reactionError)
+      }
+
       // Clear localStorage on successful finish
       if (user?.uid && quizData?.unitId) {
         localStorage.removeItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
