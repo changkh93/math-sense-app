@@ -121,7 +121,8 @@ service cloud.firestore {
     }
 
     match /quizQuestionResponses/{responseId} {
-      allow read, write: if false;
+      allow read: if isAuth() && responseId.startsWith(request.auth.uid + "_");
+      allow write: if false;
     }
 
     // Questions: Authenticated users can list/read public questions
