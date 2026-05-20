@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
-import { AlertTriangle, CalendarDays, ChevronDown, Crown, Edit3, Lock, Plus, ShieldCheck, Sparkles, Users } from 'lucide-react';
-import { db } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { AlertTriangle, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Lock, Mail, Plus, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
+import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
 import CrewJoinModal from './CrewJoinModal';
@@ -14,6 +15,25 @@ import { formatCrewSchedule } from './crewSchedule';
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '활동 중' : s === 'rejected' ? '반려됨' : '승인 대기'; }
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
+function getProfileName(profile = {}, fallback = '탐사원') {
+  return profile.publicDisplayName || profile.studentName || profile.name || profile.displayName || fallback;
+}
+function getFullMemoTime(value) {
+  const date = value?.toDate?.();
+  if (!date) return '';
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+function getMemoErrorMessage(err) {
+  if (err?.code === 'permission-denied') return '편지함 권한이 아직 열리지 않았습니다. Firestore rules 배포가 필요합니다.';
+  if (err?.code === 'functions/internal' || err?.message?.includes('internal')) return '편지 발송 서버가 아직 준비되지 않았습니다. Cloud Functions 배포가 필요합니다.';
+  return err?.message || '편지를 보내지 못했습니다.';
+}
 
 const FAQ_ITEMS = [
   { q: '스터디 크루란 무엇인가요?', a: '스터디 크루는 최대 3명이 함께 공부하는 소규모 프리미엄 스터디 그룹입니다. 앱 안에서 바로 카메라 집중방을 열고, 서로의 학습을 응원할 수 있습니다.' },
@@ -23,8 +43,172 @@ const FAQ_ITEMS = [
   { q: '크루 승인은 얼마나 걸리나요?', a: '운영자가 크루 이름과 모토를 확인한 후 승인합니다. 보통 1~2일 이내에 처리됩니다.' },
 ];
 
-function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0 }) {
+function FounderLetterPanel({ crew, founderId, founderName, currentUid }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [status, setStatus] = useState('');
+  const [sending, setSending] = useState(false);
+  const isSelf = founderId && founderId === currentUid;
+  const canSend = !!founderId && !isSelf;
+
+  const stopCardClick = (event) => {
+    event.stopPropagation();
+  };
+
+  const handleSend = async (event) => {
+    event.stopPropagation();
+    const body = draft.trim();
+    if (!body || !canSend || sending) return;
+
+    setSending(true);
+    setStatus('');
+    soundManager.playClick();
+    try {
+      const fn = httpsCallable(functions, 'sendDirectMemo');
+      const res = await fn({
+        recipientId: founderId,
+        body: `[${crew.name || '스터디 크루'} 창설자에게]\n${body}`,
+      });
+      const data = res?.data || {};
+      setDraft('');
+      if (data.status === 'scheduled') {
+        setStatus(`${data.recipientName || founderName}님에게 오늘 이미 편지를 보냈습니다. 이 편지는 24시간 뒤(${getFullMemoTime({ toDate: () => new Date(data.deliverAtMillis) })}) 발송됩니다.`);
+      } else {
+        setStatus(`${data.recipientName || founderName}님에게 편지를 보냈습니다.`);
+      }
+    } catch (err) {
+      console.error('Failed to send crew founder memo:', err);
+      setStatus(getMemoErrorMessage(err));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div onClick={stopCardClick} onMouseDown={stopCardClick} style={{ marginTop: '0.7rem' }}>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!canSend) return;
+          soundManager.playClick();
+          setIsOpen((prev) => !prev);
+        }}
+        disabled={!canSend}
+        className="font-tech"
+        title={isSelf ? '내가 만든 크루입니다' : '창설자에게 편지 보내기'}
+        style={{
+          width: '100%',
+          minHeight: 36,
+          borderRadius: 8,
+          border: '1px solid rgba(147,197,253,0.2)',
+          background: canSend ? 'rgba(96,165,250,0.09)' : 'rgba(255,255,255,0.035)',
+          color: canSend ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.38)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.45rem',
+          cursor: canSend ? 'pointer' : 'not-allowed',
+          fontWeight: 800,
+          fontSize: '0.78rem',
+          padding: '0.55rem 0.65rem'
+        }}
+      >
+        <Mail size={14} />
+        {isSelf ? '내가 창설한 크루' : '창설자에게 편지'}
+      </button>
+
+      <AnimatePresence>
+        {isOpen && canSend && (
+          <Motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{
+              marginTop: '0.55rem',
+              padding: '0.75rem',
+              borderRadius: 8,
+              background: 'rgba(2,6,23,0.54)',
+              border: '1px solid rgba(147,197,253,0.16)',
+              display: 'grid',
+              gap: '0.55rem'
+            }}>
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value.slice(0, 2000))}
+                placeholder={`${founderName} 창설자에게 남길 편지`}
+                disabled={sending}
+                className="font-tech"
+                style={{
+                  width: '100%',
+                  minHeight: 86,
+                  resize: 'vertical',
+                  boxSizing: 'border-box',
+                  border: '1px solid rgba(147,197,253,0.22)',
+                  borderRadius: 8,
+                  background: 'rgba(7,13,30,0.78)',
+                  color: 'var(--text-bright)',
+                  padding: '0.72rem 0.8rem',
+                  lineHeight: 1.5,
+                  outline: 'none'
+                }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem' }}>
+                <span className="font-tech" style={{ color: 'rgba(255,255,255,0.42)', fontSize: '0.72rem' }}>
+                  {draft.length}/2000
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!draft.trim() || sending}
+                  className="font-tech"
+                  style={{
+                    minHeight: 34,
+                    borderRadius: 8,
+                    border: '1px solid rgba(0,243,255,0.26)',
+                    background: 'rgba(0,243,255,0.12)',
+                    color: 'var(--text-bright)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.5rem 0.7rem',
+                    cursor: !draft.trim() || sending ? 'not-allowed' : 'pointer',
+                    opacity: !draft.trim() || sending ? 0.55 : 1,
+                    fontWeight: 800
+                  }}
+                >
+                  {sending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={14} />}
+                  {sending ? '보내는 중' : '보내기'}
+                </button>
+              </div>
+              {status && (
+                <div className="font-tech" style={{
+                  color: status.includes('못했') || status.includes('오류') ? '#fecaca' : '#bbf7d0',
+                  background: status.includes('못했') || status.includes('오류') ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
+                  border: status.includes('못했') || status.includes('오류') ? '1px solid rgba(239,68,68,0.18)' : '1px solid rgba(34,197,94,0.16)',
+                  borderRadius: 8,
+                  padding: '0.55rem 0.65rem',
+                  fontSize: '0.75rem',
+                  lineHeight: 1.45
+                }}>
+                  {status}
+                </div>
+              )}
+            </div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founderProfile = null }) {
   const leaderId = crew.leaderId || crew.leaderUid || '';
+  const founderName = getProfileName(founderProfile || {}, crew.leaderName || '창설자 정보 없음');
+  const founderHint = founderProfile?.publicTitle || founderProfile?.crewName || founderProfile?.publicSignature || '';
   const isMyCreated = leaderId === userUid;
   const isMyJoined = !isMyCreated && crew.memberIds?.includes(userUid);
   const isMyCrew = crew.id === userCrewId;
@@ -105,6 +289,22 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0 }) {
               {scheduleText}
             </span>
           </div>
+          <div className="font-tech" style={{
+            marginTop: '0.55rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            minWidth: 0,
+            color: 'rgba(255,255,255,0.72)',
+            fontSize: '0.78rem'
+          }}>
+            <UserRound size={13} style={{ color: '#fbbf24', flexShrink: 0 }} />
+            <span style={{ color: '#fbbf24', fontWeight: 800, flexShrink: 0 }}>창설자</span>
+            <span title={founderHint || founderName} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {founderName}
+            </span>
+          </div>
+          <FounderLetterPanel crew={crew} founderId={leaderId} founderName={founderName} currentUid={userUid} />
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap', marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
@@ -143,6 +343,7 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [directoryCrews, setDirectoryCrews] = useState([]);
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
   const [crewOnlineCounts, setCrewOnlineCounts] = useState({});
+  const [userProfileById, setUserProfileById] = useState({});
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
   const [detailView, setDetailView] = useState(false);
@@ -202,10 +403,12 @@ export default function StudyCrewView({ onNavigateStore }) {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'users'), snap => {
       const nextCounts = {};
+      const nextProfiles = {};
       const now = Date.now();
 
       snap.docs.forEach((docSnap) => {
         const data = docSnap.data() || {};
+        nextProfiles[docSnap.id] = { uid: docSnap.id, ...data };
         if (data.role === 'admin' || data.role === 'parent') return;
         const crewId = data.crewId;
         if (!crewId) return;
@@ -219,6 +422,7 @@ export default function StudyCrewView({ onNavigateStore }) {
       });
 
       setCrewOnlineCounts(nextCounts);
+      setUserProfileById(nextProfiles);
     }, err => console.error('Crew online count error:', err));
 
     return () => unsub();
@@ -427,6 +631,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                     userCrewId={crewId}
                     onClick={handleCrewCardClick}
                     onlineCount={crewOnlineCounts[c.id] || 0}
+                    founderProfile={userProfileById[c.leaderId || c.leaderUid || ''] || null}
                   />
                 ))}
               </div>

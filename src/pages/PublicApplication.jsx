@@ -418,6 +418,29 @@ export default function PublicApplication({ fixedType }) {
           </button>
         </div>
 
+        <section className="video-section">
+          <div className="section-heading">
+            <span>Video Guide</span>
+            <h2 className="video-title">AI시대의 새로운 학습 시스템 메타센스</h2>
+            <p>
+              메타센스가 왜 단순한 온라인 문제 풀이가 아니라 학생의 학습 습관과 사고력을 함께 다루는 시스템인지 영상으로 확인해 보세요.
+            </p>
+          </div>
+          <div className="video-shell">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/GP_Fzqr-8mE"
+              title="AI시대의 새로운 학습 시스템 메타센스"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
+          <div className="video-cta">
+            <button type="button" onClick={scrollToForm}>
+              영상 확인 후 무료체험 신청하기
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        </section>
 
         <section className="section-block" id="courses">
           <div className="section-heading">
