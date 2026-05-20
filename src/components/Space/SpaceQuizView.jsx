@@ -74,6 +74,23 @@ const getAnswerSelectedKeys = (question, answer) => {
   return [getOptionKey(question, answer)]
 }
 
+const unflattenStats = (data) => {
+  if (!data) return null;
+  const result = { ...data };
+  result.optionCounts = result.optionCounts ? { ...result.optionCounts } : {};
+  result.reactionCounts = result.reactionCounts ? { ...result.reactionCounts } : {};
+  Object.keys(result).forEach(key => {
+    if (key.startsWith('optionCounts.')) {
+      const optionKey = key.substring('optionCounts.'.length);
+      result.optionCounts[optionKey] = result[key];
+    } else if (key.startsWith('reactionCounts.')) {
+      const reactionKey = key.substring('reactionCounts.'.length);
+      result.reactionCounts[reactionKey] = result[key];
+    }
+  });
+  return result;
+};
+
 const getDisplayStats = (stats, question, pendingResult, existingResponse, pendingReactionId) => {
   const options = getOptionSummaries(question)
   const totalFromStats = Number(stats?.totalResponses || 0)
@@ -305,7 +322,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     Promise.all([statsPromise, responsePromise])
       .then(([statsSnap, responseSnap]) => {
         if (isMounted) {
-          setQuestionStats(statsSnap.exists() ? statsSnap.data() : null)
+          setQuestionStats(statsSnap.exists() ? unflattenStats(statsSnap.data()) : null)
           setExistingResponse(responseSnap?.exists?.() ? responseSnap.data() : null)
         }
       })
