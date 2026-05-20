@@ -74,7 +74,7 @@ const getAnswerSelectedKeys = (question, answer) => {
   return [getOptionKey(question, answer)]
 }
 
-const getDisplayStats = (stats, question, pendingResult) => {
+const getDisplayStats = (stats, question, pendingResult, existingResponse, pendingReactionId) => {
   const options = getOptionSummaries(question)
   const totalFromStats = Number(stats?.totalResponses || 0)
   const counts = { ...(stats?.optionCounts || {}) }
@@ -82,16 +82,42 @@ const getDisplayStats = (stats, question, pendingResult) => {
   let correctResponses = Number(stats?.correctResponses || 0)
 
   if (pendingResult && !pendingResult.persisted) {
-    total += 1
-    if (pendingResult.isCorrect) correctResponses += 1
+    if (existingResponse) {
+      // Re-answer: subtract old option counts and adjust correctness, total stays the same
+      const previousKeys = Array.isArray(existingResponse.selectedOptionKeys)
+        ? existingResponse.selectedOptionKeys : []
+      previousKeys.forEach(key => {
+        counts[key] = Math.max(0, Number(counts[key] || 0) - 1)
+      })
+      if (existingResponse.isCorrect === true && !pendingResult.isCorrect) {
+        correctResponses = Math.max(0, correctResponses - 1)
+      } else if (existingResponse.isCorrect !== true && pendingResult.isCorrect) {
+        correctResponses += 1
+      }
+    } else {
+      // First-time answer: increment total
+      total += 1
+      if (pendingResult.isCorrect) correctResponses += 1
+    }
+    // Add new option counts
     pendingResult.selectedOptionKeys.forEach(key => {
       counts[key] = Number(counts[key] || 0) + 1
     })
   }
 
+  // Optimistic reaction counts
+  const reactionCounts = { ...(stats?.reactionCounts || {}) }
+  if (pendingResult && !pendingResult.persisted && pendingReactionId) {
+    if (existingResponse?.reactionId) {
+      reactionCounts[existingResponse.reactionId] = Math.max(0, Number(reactionCounts[existingResponse.reactionId] || 0) - 1)
+    }
+    reactionCounts[pendingReactionId] = Number(reactionCounts[pendingReactionId] || 0) + 1
+  }
+
   return {
     total,
     correctRate: total > 0 ? Math.round((correctResponses / total) * 100) : 0,
+    reactionCounts,
     options: options.map(option => ({
       ...option,
       count: Number(counts[option.key] || 0),
@@ -140,6 +166,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
   const [selectedMultiOptions, setSelectedMultiOptions] = useState(new Set()) // 멀티 정답 임시 선택
   const [questionStats, setQuestionStats] = useState(null)
+  const [existingResponse, setExistingResponse] = useState(null)
   const [pendingResult, setPendingResult] = useState(null)
   const [isSavingReaction, setIsSavingReaction] = useState(false)
   const [reactionError, setReactionError] = useState('')
@@ -260,25 +287,40 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   useEffect(() => {
     if (!quizData?.unitId || !currentQuestion?.id) {
       setQuestionStats(null)
+      setExistingResponse(null)
       return undefined
     }
 
     let isMounted = true
     const statId = makeQuizQuestionStatId(quizData.unitId, currentQuestion.id)
     setQuestionStats(null)
-    getDoc(doc(db, 'quizQuestionStats', statId))
-      .then((snapshot) => {
-        if (isMounted) setQuestionStats(snapshot.exists() ? snapshot.data() : null)
+    setExistingResponse(null)
+
+    // Load both stats and existing user response in parallel
+    const statsPromise = getDoc(doc(db, 'quizQuestionStats', statId))
+    const responsePromise = user?.uid
+      ? getDoc(doc(db, 'quizQuestionResponses', `${user.uid}_${statId}`))
+      : Promise.resolve(null)
+
+    Promise.all([statsPromise, responsePromise])
+      .then(([statsSnap, responseSnap]) => {
+        if (isMounted) {
+          setQuestionStats(statsSnap.exists() ? statsSnap.data() : null)
+          setExistingResponse(responseSnap?.exists?.() ? responseSnap.data() : null)
+        }
       })
       .catch((error) => {
         console.error('Quiz question stats load failed:', error)
-        if (isMounted) setQuestionStats(null)
+        if (isMounted) {
+          setQuestionStats(null)
+          setExistingResponse(null)
+        }
       })
 
     return () => {
       isMounted = false
     }
-  }, [quizData?.unitId, currentQuestion?.id])
+  }, [quizData?.unitId, currentQuestion?.id, user?.uid])
 
 
   const formatText = (text) => {
@@ -288,7 +330,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // 멀티 정답 여부 확인
   const getCorrectCount = (question) => question?.options?.filter(o => o.isCorrect).length || 0
   const isMultiAnswer = (question) => getCorrectCount(question) > 1
-  const displayedStats = getDisplayStats(questionStats, currentQuestion, pendingResult)
+  const currentReactionId = pendingResult ? userAnswers[currentQuestion?.id]?.reactionId : null
+  const displayedStats = getDisplayStats(questionStats, currentQuestion, pendingResult, existingResponse, currentReactionId)
 
   const saveProgressSession = async ({
     nextIdxForSave,
@@ -1620,7 +1663,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
                 {QUIZ_REACTION_CHOICES.map(choice => {
-                  const reactionCounts = questionStats?.reactionCounts || {}
+                  const reactionCounts = displayedStats.reactionCounts || {}
                   const reactionTotal = Object.values(reactionCounts).reduce((sum, value) => sum + Number(value || 0), 0)
                   const count = Number(reactionCounts[choice.id] || 0)
                   const percent = reactionTotal > 0 ? Math.round((count / reactionTotal) * 100) : 0
