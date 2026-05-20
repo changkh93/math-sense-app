@@ -191,8 +191,8 @@ const valueShowcases = [
       '많은 아이들이 공부를 "해야 하니까" 하는 것으로 받아들입니다. 그 상태에서는 늘 누군가의 점검이 필요하지요. 옆에서 시켜야 하고, 확인해야 하고, 끌어줘야 합니다.',
       '메타센스가 지향하는 것은 방임이 아니라, 아이가 스스로 움직일 수 있도록 돕는 구조입니다. 오늘 무엇을 해야 하는지 알고, 어디까지 했는지 확인하고, 조금 부족해도 다시 시도할 수 있는 경험이 쌓이면 — 아이는 "나는 해볼 수 있는 아이"라는 감각을 갖게 됩니다.',
     ],
-    image: '/images/metasense-home-preview.png',
-    imageAlt: '메타센스 학습 홈 화면',
+    image: '/images/features/planet-map.png',
+    imageAlt: '메타센스 행성 학습 화면',
     reverse: false,
   },
   {
@@ -347,7 +347,7 @@ export default function PublicApplication({ fixedType }) {
               <span />
               <strong>Meta Sense</strong>
             </div>
-            <img src="/images/metasense-home-preview.png" alt="메타센스 로그인 화면 미리보기" />
+            <img src="/images/features/planet-map.png" alt="메타센스 행성 학습 화면 미리보기" />
             <div className="preview-caption">
               <Orbit size={18} />
               <span>우주 탐험형 인터페이스 안에서 학생의 학습 경로와 기록이 이어집니다.</span>
