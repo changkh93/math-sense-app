@@ -347,7 +347,7 @@ export default function PublicApplication({ fixedType }) {
               <span />
               <strong>Meta Sense</strong>
             </div>
-            <img src="/images/features/planet-map.png" alt="메타센스 행성 학습 화면 미리보기" />
+            <img src="/images/features/planet-map-v2.png" alt="메타센스 행성 학습 화면 미리보기" />
             <div className="preview-caption">
               <Orbit size={18} />
               <span>우주 탐험형 인터페이스 안에서 학생의 학습 경로와 기록이 이어집니다.</span>
