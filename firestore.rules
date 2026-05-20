@@ -121,7 +121,7 @@ service cloud.firestore {
     }
 
     match /quizQuestionResponses/{responseId} {
-      allow read: if isAuth() && responseId.startsWith(request.auth.uid + "_");
+      allow read: if isAuth() && responseId.matches('^' + request.auth.uid + '_.*');
       allow write: if false;
     }
 
