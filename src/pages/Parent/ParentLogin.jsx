@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { signInWithEmailAndPassword, onAuthStateChanged, signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { Phone, Lock, LogIn, Rocket } from 'lucide-react';
 
@@ -58,22 +58,15 @@ export default function ParentLogin() {
       const email = phoneToEmail(digits);
       const cred = await signInWithEmailAndPassword(auth, email, password);
       
-      const { getDoc, doc, setDoc } = await import('firebase/firestore');
+      const { getDoc, doc } = await import('firebase/firestore');
       const { db } = await import('../../firebase');
       const snap = await getDoc(doc(db, 'parents', cred.user.uid));
       
       if (!snap.exists()) {
-        // Auth에는 있지만 Firestore 문서가 유실된 상태 (수동 삭제 등)
-        // 로그인에 성공했으므로 문서를 즉시 자동 복구합니다 (Self-heal)
-        await setDoc(doc(db, 'parents', cred.user.uid), {
-          phone: digits,
-          email: email,
-          childrenUids: [],
-          role: 'parent',
-          isDeleted: false,
-          createdAt: new Date(),
-          repairedAt: new Date()
-        });
+        await auth.signOut();
+        setError('회원가입이 필요한 계정입니다. 먼저 회원가입을 진행해 주세요.');
+        setLoading(false);
+        return;
       } else if (snap.data().isDeleted) {
         await auth.signOut();
         setError('삭제(비활성화)된 계정입니다. 선생님에게 문의해 주세요.');
@@ -89,6 +82,28 @@ export default function ParentLogin() {
       } else {
         setError('로그인에 실패했습니다. 다시 시도해 주세요.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      const { getDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../../firebase');
+      const snap = await getDoc(doc(db, 'parents', cred.user.uid));
+      if (!snap.exists() || snap.data().isDeleted) {
+        await auth.signOut();
+        setError('학부모 회원가입이 필요합니다.');
+        return;
+      }
+      navigate('/parent/dashboard');
+    } catch (err) {
+      console.error(err);
+      setError('Google 로그인에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -254,8 +269,28 @@ export default function ParentLogin() {
           </button>
         </form>
 
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          style={{
+            width: '100%',
+            marginTop: '12px',
+            padding: '14px',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.16)',
+            background: 'rgba(255,255,255,0.08)',
+            color: 'white',
+            fontSize: '1rem',
+            fontWeight: 700,
+            cursor: loading ? 'not-allowed' : 'pointer'
+          }}
+        >
+          Google 학부모 계정으로 로그인
+        </button>
+
         <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>
-          선생님으로부터 안내받은 전화번호와 비밀번호를 입력해 주세요.
+          신규 학부모는 메인 화면의 회원가입에서 Google 계정으로 가입해 주세요.
         </p>
       </div>
     </div>

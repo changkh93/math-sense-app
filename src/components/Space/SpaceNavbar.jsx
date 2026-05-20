@@ -2,7 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
-import { auth, functions } from '../../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
@@ -33,16 +34,32 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       return;
     }
 
-    const confirmTarget = user?.email || '탈퇴';
+    let parentData = null;
+    try {
+      const parentSnap = await getDoc(doc(db, 'parents', user.uid));
+      parentData = parentSnap.exists() && !parentSnap.data()?.isDeleted ? parentSnap.data() : null;
+    } catch (error) {
+      console.warn('parent account check failed before deletion:', error);
+    }
+
+    const rawEmail = String(user?.email || '').trim();
+    const syntheticParentMatch = rawEmail.match(/^(\d+)@parent\.mathsense\.app$/);
+    const syntheticStudentMatch = rawEmail.match(/^([^@]+)@student\.mathsense\.app$/);
+    const emailLocalPart = rawEmail.includes('@') ? rawEmail.split('@')[0] : rawEmail;
+    const confirmTarget = parentData?.phone || syntheticParentMatch?.[1] || syntheticStudentMatch?.[1] || emailLocalPart || '탈퇴';
+    const isLikelyParentAccount = Boolean(parentData) || Boolean(syntheticParentMatch) || userData?.role === 'parent';
     const firstConfirm = window.confirm(
       '계정을 완전히 탈퇴합니다.\n\n' +
+      (isLikelyParentAccount
+        ? '부모 계정과 연결된 자녀 계정도 함께 삭제됩니다.\n\n'
+        : '') +
       '삭제 범위: 로그인 계정, 학습 기록, 광석/거래 내역, 과제, 출석, 질문/답변, 쪽지, 스터디 크루 연결, 업로드 파일.\n\n' +
       '이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?'
     );
     if (!firstConfirm) return;
 
     const confirmText = window.prompt(
-      `최종 확인을 위해 아래 문구를 정확히 입력하세요.\n\n${confirmTarget}`
+      `최종 확인을 위해 아래 문구를 입력하세요.\n\n${confirmTarget}`
     );
     if (confirmText !== confirmTarget) {
       alert('확인 문구가 일치하지 않아 탈퇴를 취소했습니다.');

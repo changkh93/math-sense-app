@@ -9,8 +9,8 @@ import AdminRoute from './components/AdminRoute'
 import LiveStatus from './pages/Admin/LiveStatus'
 import ParentManager from './pages/Admin/ParentManager'
 import CrewApproval from './pages/Admin/CrewApproval'
+import Applications from './pages/Admin/Applications'
 
-import ParentLogin from './pages/Parent/ParentLogin'
 import ParentDashboard from './pages/Parent/ParentDashboard'
 
 import ClusterManager from './pages/Admin/ClusterManager'
@@ -30,6 +30,9 @@ import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import InviteHandler from './pages/InviteHandler'
+import PublicApplication from './pages/PublicApplication'
+import Signup from './pages/Signup'
+import Terms from './pages/Terms'
 
 import PrivateRoute from './components/PrivateRoute'
 
@@ -48,6 +51,10 @@ function App() {
       <Route path="/streak" element={<Navigate to="/?view=journey" replace />} />
       <Route path="/agora-connect/:uid" element={<Navigate to="/?view=journey" replace />} />
       <Route path="/invite/:inviteCode" element={<InviteHandler />} />
+      <Route path="/trial" element={<PublicApplication fixedType="trial" />} />
+      <Route path="/consultation" element={<PublicApplication fixedType="consultation" />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/terms" element={<Terms />} />
       
       <Route path="/admin" element={
         <AdminRoute>
@@ -59,6 +66,7 @@ function App() {
         <Route path="clusters" element={<ClusterManager />} />
         <Route path="users" element={<UserAccessManager />} />
         <Route path="parents" element={<ParentManager />} />
+        <Route path="applications" element={<Applications />} />
         <Route path="crews" element={<CrewApproval />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="assignments" element={<AdminAssignments />} />
@@ -86,7 +94,7 @@ function App() {
       <Route path="/privacy" element={<PrivacyPolicy />} />
 
       {/* Parent Portal */}
-      <Route path="/parent" element={<ParentLogin />} />
+      <Route path="/parent" element={<Navigate to="/" replace />} />
       <Route path="/parent/dashboard" element={<ParentDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

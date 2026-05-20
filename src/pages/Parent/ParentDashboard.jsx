@@ -10,6 +10,7 @@ import { Rocket, LogOut, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar 
 import { motion, AnimatePresence } from 'framer-motion';
 import StudentReport from '../../components/Report/StudentReport';
 import DailyLearningTimeline from '../../components/Space/DailyLearningTimeline';
+import ChildAccountCreator from '../../components/Parent/ChildAccountCreator';
 
 // -------------------------------------------------------------
 // Helper: format relative time
@@ -451,6 +452,7 @@ export default function ParentDashboard() {
   // 다중 자녀 탭 관리
   const [selectedChildUid, setSelectedChildUid] = useState(null);
   const [childrenProfiles, setChildrenProfiles] = useState({});
+  const [showChildCreator, setShowChildCreator] = useState(false);
 
   useEffect(() => {
     if (parentData?.childrenUids?.length > 0) {
@@ -476,7 +478,7 @@ export default function ParentDashboard() {
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        navigate('/parent');
+        navigate('/');
         return;
       }
 
@@ -508,7 +510,7 @@ export default function ParentDashboard() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    navigate('/parent');
+    navigate('/');
   };
 
   return (
@@ -545,7 +547,7 @@ export default function ParentDashboard() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Rocket size={22} color="#a55eea" />
-          <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>수학감각</span>
+          <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>메타 센스</span>
           <span style={{ fontSize: '0.75rem', color: '#a55eea', background: 'rgba(165,94,234,0.15)', padding: '2px 8px', borderRadius: '10px' }}>학부모</span>
         </div>
         <button onClick={handleLogout} style={{
@@ -583,6 +585,29 @@ export default function ParentDashboard() {
               </p>
             </div>
 
+            <div style={{ marginBottom: 18 }}>
+              <button
+                onClick={() => setShowChildCreator(prev => !prev)}
+                style={{
+                  width: '100%',
+                  border: '1px dashed rgba(0,212,255,0.35)',
+                  background: 'rgba(0,212,255,0.08)',
+                  color: '#67e8f9',
+                  borderRadius: 14,
+                  padding: '12px 14px',
+                  cursor: 'pointer',
+                  fontWeight: 800
+                }}
+              >
+                {showChildCreator ? '자녀 계정 생성 닫기' : '자녀 학습자 계정 추가'}
+              </button>
+              {showChildCreator && (
+                <div style={{ marginTop: 12 }}>
+                  <ChildAccountCreator compact onCreated={() => setShowChildCreator(false)} />
+                </div>
+              )}
+            </div>
+
             {(parentData?.childrenUids || []).length === 0 ? (
               <div style={{
                 textAlign: 'center', padding: '40px 20px',
@@ -592,7 +617,7 @@ export default function ParentDashboard() {
                 color: 'rgba(255,255,255,0.4)'
               }}>
                 아직 연결된 자녀가 없습니다.<br/>
-                선생님에게 자녀 연결을 요청해 주세요.
+                위의 버튼으로 자녀 학습자 계정을 만들 수 있습니다.
               </div>
             ) : (
               <>

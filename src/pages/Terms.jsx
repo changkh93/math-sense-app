@@ -1,0 +1,29 @@
+import { Link } from 'react-router-dom';
+
+export default function Terms() {
+  return (
+    <div style={{ minHeight: '100vh', background: '#050510', color: '#dbeafe', padding: '42px 20px', fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+      <main style={{ maxWidth: 860, margin: '0 auto' }}>
+        <Link to="/" style={{ color: '#93c5fd', textDecoration: 'none', fontWeight: 800 }}>메인으로 돌아가기</Link>
+        <h1 style={{ margin: '28px 0 10px', fontSize: '2.3rem', color: '#fff' }}>메타센스 이용약관</h1>
+        <p style={{ color: '#94a3b8', lineHeight: 1.7 }}>시행일: 2026년 5월 20일</p>
+
+        {[
+          ['1. 목적', '본 약관은 메타센스가 제공하는 온라인 학습 서비스, 학부모 계정, 자녀 학습자 계정, 학습 기록 관리 기능의 이용 조건과 절차를 정합니다.'],
+          ['2. 계정 생성과 보호자 동의', '초중등 학생의 서비스 이용은 보호자인 학부모가 회원가입 후 자녀 학습자 계정을 생성하는 방식으로 진행합니다. 학부모는 자녀의 서비스 이용, 학습 기록 저장, 과제 제출 및 피드백 확인에 동의한 것으로 봅니다.'],
+          ['3. 수집 및 이용 데이터', '서비스 운영을 위해 학부모 이름, 연락처, 이메일, 자녀 이름, 학년, 학습 기록, 과제, 퀴즈 결과, 출석, 상담 및 무료체험 신청 정보를 저장할 수 있습니다. 신청 정보는 메타센스 데이터베이스에 저장되며 외부 구글 시트로 저장하지 않습니다.'],
+          ['4. 무료체험', '무료체험은 1개월이며 기존 수강생 추천 정보가 확인되는 경우에 제공될 수 있습니다. 무료체험 이용 가능 여부와 시작일은 운영자가 최종 확인합니다.'],
+          ['5. 유료 수강 및 과정 접근', '메타센스는 주로 유료 수강생을 위한 학습 앱입니다. 과정 접근 권한은 결제, 무료체험 승인, 운영자 승인 상태에 따라 부여 또는 제한될 수 있습니다.'],
+          ['6. 금지 행위', '타인의 계정 사용, 학습 자료 무단 배포, 서비스 운영 방해, 허위 신청, 추천 정보 위조, 비정상적인 자동화 접근을 금지합니다.'],
+          ['7. 계정 탈퇴 및 데이터 삭제', '회원은 탈퇴를 요청할 수 있으며, 법령상 보관이 필요한 정보나 정산 및 분쟁 해결에 필요한 최소 정보를 제외하고 데이터를 삭제합니다.'],
+          ['8. 문의', '서비스 및 개인정보 관련 문의는 운영자 이메일 paul@dulcine.net 으로 접수합니다.']
+        ].map(([title, body]) => (
+          <section key={title} style={{ borderTop: '1px solid rgba(255,255,255,0.12)', padding: '24px 0' }}>
+            <h2 style={{ color: '#67e8f9', margin: '0 0 10px' }}>{title}</h2>
+            <p style={{ margin: 0, color: '#cbd5e1', lineHeight: 1.8 }}>{body}</p>
+          </section>
+        ))}
+      </main>
+    </div>
+  );
+}

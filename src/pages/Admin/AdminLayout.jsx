@@ -1,7 +1,7 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
-import { LayoutDashboard, Globe, Layers, LogOut, Database, MessageSquare, Ghost, Users, ShieldAlert, BookOpenText, Activity, Phone, FileBarChart, UserCheck } from 'lucide-react';
+import { LayoutDashboard, Globe, Layers, LogOut, Database, MessageSquare, Ghost, Users, ShieldAlert, BookOpenText, Activity, Phone, FileBarChart, UserCheck, ClipboardList } from 'lucide-react';
 import './Admin.css'; // We'll create this next
 
 const AdminLayout = () => {
@@ -40,6 +40,10 @@ const AdminLayout = () => {
           <Link to="/admin/parents" className="nav-link">
             <Phone size={20} />
             <span>학부모 통합 관리</span>
+          </Link>
+          <Link to="/admin/applications" className="nav-link">
+            <ClipboardList size={20} />
+            <span>신청자 관리</span>
           </Link>
           <Link to="/admin/crews" className="nav-link">
             <UserCheck size={20} />

@@ -24,6 +24,86 @@ const ASSIGNMENT_MISSING_STEP_PENALTY = 5;
 const ASSIGNMENT_MISSING_MAX_PENALTY = 25;
 const AGORA_BASE_ACCEPT_REWARD = 20;
 const AGORA_ASKER_RESOLVE_REWARD = 5;
+const STUDENT_AUTH_DOMAIN = "student.mathsense.app";
+
+function cleanText(value, maxLength = 200) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function digitsOnly(value, maxLength = 20) {
+  return String(value || "").replace(/[^0-9]/g, "").slice(0, maxLength);
+}
+
+function buildStudentEmail(loginId) {
+  return `${String(loginId || "").toLowerCase()}@${STUDENT_AUTH_DOMAIN}`;
+}
+
+async function requireParentDoc(uid) {
+  if (!uid) {
+    throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const parentRef = admin.firestore().collection("parents").doc(uid);
+  const parentSnap = await parentRef.get();
+  if (!parentSnap.exists || parentSnap.data()?.isDeleted) {
+    throw new functions.https.HttpsError("permission-denied", "학부모 계정이 필요합니다.");
+  }
+  return { parentRef, parentData: parentSnap.data() || {} };
+}
+
+function buildDefaultStudentUserData({ uid, email, studentName, loginId, grade, parentUid }) {
+  return {
+    crystals: 0,
+    totalQuizzes: 0,
+    totalScore: 0,
+    averageScore: 0,
+    perfectCount: 0,
+    spaceshipLevel: 1,
+    helpCount: 0,
+    questionCount: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    lastStreakDate: "",
+    streakFreezeCount: 0,
+    streakFreezeLastPurchasedAtMs: 0,
+    streakMilestones: [],
+    shieldCharges: 0,
+    hasRadar: false,
+    radarExpiresAtMs: 0,
+    publicProfileEnabled: false,
+    publicDisplayName: studentName,
+    publicTitle: "",
+    publicSignature: "",
+    profileSignatureUnlocked: false,
+    ownedProfileFrames: ["starter"],
+    selectedProfileFrame: "starter",
+    hallShowcaseCredits: 0,
+    hallSpotlightUntilMs: 0,
+    crewCreationPasses: 0,
+    crewJoinPasses: 0,
+    crewId: "",
+    crewName: "",
+    crewRole: "",
+    crewColor: "#00f3ff",
+    crewStatus: "",
+    crewGroupName: "",
+    crewInviteCode: "",
+    crewActiveStudyRoomId: "",
+    crewActiveStudyRoomStatus: "",
+    crewSnapshot: null,
+    clusterAccess: { cluster_elementary: "active" },
+    uid,
+    email,
+    name: studentName,
+    studentName,
+    loginId,
+    grade,
+    parentUid,
+    role: "student",
+    accountSource: "parent_created",
+    createdAt: new Date().toISOString(),
+    createdAtServer: FieldValue.serverTimestamp(),
+  };
+}
 
 const KST_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul",
@@ -361,6 +441,143 @@ exports.submitQuizSessionReactions = regionalFunctions.https.onCall(async (data,
   });
 
   return { success: true, savedCount: reactions.length };
+});
+
+exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) => {
+  const type = cleanText(data?.type, 30);
+  if (!["trial", "consultation"].includes(type)) {
+    throw new functions.https.HttpsError("invalid-argument", "신청 종류가 올바르지 않습니다.");
+  }
+
+  const applicantName = cleanText(data?.applicantName, 80);
+  const parentPhone = digitsOnly(data?.parentPhone, 16);
+  const studentName = cleanText(data?.studentName, 80);
+  const grade = cleanText(data?.grade, 30);
+  const message = cleanText(data?.message, 1000);
+  const referredStudentName = cleanText(data?.referredStudentName, 80);
+  const referrerParentPhone = digitsOnly(data?.referrerParentPhone, 16);
+  const preferredTime = cleanText(data?.preferredTime, 80);
+  const selectedCourse = cleanText(data?.selectedCourse, 80);
+
+  if (!applicantName || parentPhone.length < 10 || !studentName || !grade) {
+    throw new functions.https.HttpsError("invalid-argument", "필수 정보를 확인해 주세요.");
+  }
+
+  const payload = {
+    type,
+    status: "new",
+    applicantName,
+    parentPhone,
+    studentName,
+    grade,
+    message,
+    preferredTime,
+    selectedCourse,
+    referredStudentName,
+    referrerParentPhone,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+    source: "public_site",
+  };
+
+  const ref = await admin.firestore().collection("applications").add(payload);
+  return { success: true, id: ref.id };
+});
+
+exports.registerParentProfile = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const token = context.auth?.token || {};
+  const parentName = cleanText(data?.parentName || token.name, 80);
+  const phone = digitsOnly(data?.phone, 16);
+  const marketingConsent = data?.marketingConsent === true;
+  const termsAccepted = data?.termsAccepted === true;
+
+  if (!parentName || phone.length < 10 || !termsAccepted) {
+    throw new functions.https.HttpsError("invalid-argument", "이름, 전화번호, 필수 약관 동의가 필요합니다.");
+  }
+
+  const db = admin.firestore();
+  const parentRef = db.collection("parents").doc(uid);
+  const parentSnap = await parentRef.get();
+  const existingChildren = parentSnap.exists && Array.isArray(parentSnap.data()?.childrenUids)
+    ? parentSnap.data().childrenUids
+    : [];
+
+  await parentRef.set({
+    name: parentName,
+    phone,
+    loginId: phone,
+    loginEmail: `${phone}@parent.mathsense.app`,
+    email: token.email || "",
+    photoURL: token.picture || "",
+    childrenUids: existingChildren,
+    role: "parent",
+    authProvider: "google_password",
+    isDeleted: false,
+    termsAccepted: true,
+    termsAcceptedAt: FieldValue.serverTimestamp(),
+    marketingConsent,
+    updatedAt: FieldValue.serverTimestamp(),
+    createdAt: parentSnap.exists ? (parentSnap.data()?.createdAt || FieldValue.serverTimestamp()) : FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  return { success: true };
+});
+
+exports.createChildAccountForParent = regionalFunctions.https.onCall(async (data, context) => {
+  const parentUid = await requireAuthUid(context);
+  const { parentRef } = await requireParentDoc(parentUid);
+  const studentName = cleanText(data?.studentName, 80);
+  const loginId = cleanText(data?.loginId, 40).toLowerCase();
+  const password = String(data?.password || "");
+  const grade = cleanText(data?.grade, 30);
+  const birthDate = digitsOnly(data?.birthDate, 8);
+
+  if (!studentName || !grade) {
+    throw new functions.https.HttpsError("invalid-argument", "자녀 이름과 학년을 입력해 주세요.");
+  }
+  if (!/^[a-z0-9][a-z0-9._-]{5,19}$/.test(loginId)) {
+    throw new functions.https.HttpsError("invalid-argument", "아이디는 영문 소문자/숫자 조합 6~20자로 입력해 주세요.");
+  }
+  if (password.length < 6) {
+    throw new functions.https.HttpsError("invalid-argument", "비밀번호는 6자 이상이어야 합니다.");
+  }
+
+  const email = buildStudentEmail(loginId);
+  let createdUser;
+  try {
+    createdUser = await admin.auth().createUser({
+      email,
+      password,
+      displayName: studentName,
+      disabled: false,
+    });
+  } catch (err) {
+    if (err?.code === "auth/email-already-exists") {
+      throw new functions.https.HttpsError("already-exists", "이미 사용 중인 아이디입니다.");
+    }
+    console.error("createChildAccountForParent auth error:", err);
+    throw new functions.https.HttpsError("internal", "자녀 계정 생성 중 오류가 발생했습니다.");
+  }
+
+  const userRef = admin.firestore().collection("users").doc(createdUser.uid);
+  const userData = buildDefaultStudentUserData({
+    uid: createdUser.uid,
+    email,
+    studentName,
+    loginId,
+    grade,
+    parentUid,
+  });
+  if (birthDate) userData.birthDate = birthDate;
+
+  await userRef.set(userData, { merge: true });
+  await parentRef.set({
+    childrenUids: FieldValue.arrayUnion(createdUser.uid),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  return { success: true, childUid: createdUser.uid, loginId, studentName };
 });
 
 /**
@@ -1182,6 +1399,79 @@ async function deleteUserOwnedData(uid, options = {}) {
   }
 }
 
+function buildAccountDeletionConfirmCandidates({ userData = {}, parentData = {}, authUser = null, token = {} }) {
+  const values = [
+    userData?.email,
+    parentData?.email,
+    parentData?.loginEmail,
+    parentData?.phone,
+    parentData?.loginId,
+    authUser?.email,
+    token?.email,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  const candidates = new Set();
+  for (const value of values) {
+    candidates.add(value);
+    const atIndex = value.indexOf("@");
+    if (atIndex > 0) candidates.add(value.slice(0, atIndex));
+    const digits = value.replace(/[^0-9]/g, "");
+    if (digits.length >= 10) candidates.add(digits);
+  }
+  if (candidates.size === 0) candidates.add("탈퇴");
+  return candidates;
+}
+
+async function deleteParentOwnedData(parentUid) {
+  const db = admin.firestore();
+  const parentRef = db.collection("parents").doc(parentUid);
+  const parentSnap = await parentRef.get();
+  const parentData = parentSnap.exists ? parentSnap.data() : {};
+  const childrenUids = Array.isArray(parentData?.childrenUids)
+    ? [...new Set(parentData.childrenUids.filter(Boolean))]
+    : [];
+  const stats = {
+    parentChildrenRequestedForDeletion: childrenUids.length,
+    childDeletionResults: [],
+  };
+
+  for (const childUid of childrenUids) {
+    const result = await deleteUserOwnedData(childUid);
+    stats.childDeletionResults.push({
+      uid: childUid,
+      stats: result.stats,
+    });
+  }
+
+  const parentUserSnap = await db.collection("users").doc(parentUid).get();
+  if (parentUserSnap.exists) {
+    const result = await deleteUserOwnedData(parentUid);
+    stats.parentUserDocumentCleanup = result.stats;
+  }
+
+  await db.recursiveDelete(parentRef);
+  stats.parentDocumentDeleted = parentSnap.exists ? 1 : 0;
+
+  try {
+    await admin.auth().deleteUser(parentUid);
+    stats.parentAuthUserDeleted = 1;
+  } catch (error) {
+    if (error.code !== "auth/user-not-found") {
+      throw error;
+    }
+    stats.parentAuthUserDeleted = 0;
+  }
+
+  return {
+    uid: parentUid,
+    email: parentData?.email || parentData?.loginEmail || "",
+    role: "parent",
+    stats,
+  };
+}
+
 exports.adminDeleteUserAccount = accountDeletionFunctions.https.onCall(async (data, context) => {
   const adminUid = await requireAdminUid(context);
   const targetUid = String(data?.targetUid || "").trim();
@@ -1210,15 +1500,25 @@ exports.adminDeleteUserAccount = accountDeletionFunctions.https.onCall(async (da
 exports.deleteCurrentUserAccount = accountDeletionFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const confirmText = String(data?.confirmText || "").trim();
-  const userSnap = await admin.firestore().collection("users").doc(uid).get();
+  const db = admin.firestore();
+  const userSnap = await db.collection("users").doc(uid).get();
   const userData = userSnap.exists ? userSnap.data() : {};
-  const expectedEmail = String(userData?.email || context.auth?.token?.email || "").trim();
+  const parentSnap = await db.collection("parents").doc(uid).get();
+  const parentData = parentSnap.exists ? parentSnap.data() : {};
+  const authUser = await admin.auth().getUser(uid).catch(() => null);
+  const confirmCandidates = buildAccountDeletionConfirmCandidates({
+    userData,
+    parentData,
+    authUser,
+    token: context.auth?.token || {},
+  });
 
-  if (expectedEmail && confirmText !== expectedEmail && confirmText !== "탈퇴") {
+  if (!confirmCandidates.has(confirmText)) {
     throw new functions.https.HttpsError("failed-precondition", "확인 문구가 일치하지 않습니다.");
   }
-  if (!expectedEmail && confirmText !== "탈퇴") {
-    throw new functions.https.HttpsError("failed-precondition", "확인 문구가 일치하지 않습니다.");
+
+  if (parentSnap.exists && !parentData?.isDeleted) {
+    return deleteParentOwnedData(uid);
   }
 
   return deleteUserOwnedData(uid);

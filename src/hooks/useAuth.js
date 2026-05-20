@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 const buildDefaultUserData = (firebaseUser, extra = {}) => ({
@@ -49,6 +49,22 @@ const buildDefaultUserData = (firebaseUser, extra = {}) => ({
   ...extra
 });
 
+const isDeletedAccountData = (data = {}) => (
+  data?.isDeleted === true ||
+  data?.accountStatus === 'deleted' ||
+  Boolean(data?.deletedAt)
+);
+
+const setSignupRequiredNotice = (firebaseUser, reason = 'missing-membership') => {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem('metasenseLoginNotice', JSON.stringify({
+    type: 'signupRequired',
+    reason,
+    email: firebaseUser?.email || '',
+    ts: Date.now()
+  }));
+};
+
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -76,6 +92,18 @@ export function useAuth() {
         unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
+            if (isDeletedAccountData(data)) {
+              console.warn('삭제된 회원 계정의 앱 접근을 차단했습니다.', {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email
+              });
+              setSignupRequiredNotice(firebaseUser, 'deleted-membership');
+              setUserData(null);
+              setLoading(false);
+              signOut(auth);
+              return;
+            }
+
             setUserData({
               crystals: 0,
               totalQuizzes: 0,
@@ -117,6 +145,7 @@ export function useAuth() {
               clusterAccess: { cluster_elementary: 'active' },
               ...data
             });
+            setLoading(false);
           } else {
             if (window.sessionStorage.getItem('accountDeletionInProgress') === firebaseUser.uid) {
               setUserData(null);
@@ -160,28 +189,51 @@ export function useAuth() {
               }
             };
 
-            inspectRecoverableEvidence().then((inspection) => {
-              if (inspection.hasRecoverableEvidence) {
-                const blockedData = buildDefaultUserData(firebaseUser, {
-                  recoveryRequired: true,
-                  recoveryFailed: !!inspection.recoveryFailed,
-                  recoverySourceCounts: inspection.recoverySourceCounts || null,
-                  adjustmentReason: inspection.recoveryFailed ? '자동 복구 차단: 증거 확인 실패' : '자동 복구 차단: 관리자 검토 필요'
-                });
-                console.error('유저 문서가 없지만 하위 데이터가 남아 있어 클라이언트 자동 복구를 차단했습니다.', {
-                  uid: firebaseUser.uid,
-                  recoverySourceCounts: blockedData.recoverySourceCounts
-                });
-                setUserData(blockedData);
-                return;
-              }
+            inspectRecoverableEvidence().then(async (inspection) => {
+              try {
+                if (inspection.hasRecoverableEvidence) {
+                  const blockedData = buildDefaultUserData(firebaseUser, {
+                    recoveryRequired: true,
+                    recoveryFailed: !!inspection.recoveryFailed,
+                    recoverySourceCounts: inspection.recoverySourceCounts || null,
+                    adjustmentReason: inspection.recoveryFailed ? '자동 복구 차단: 증거 확인 실패' : '자동 복구 차단: 관리자 검토 필요'
+                  });
+                  console.error('유저 문서가 없지만 하위 데이터가 남아 있어 클라이언트 자동 복구를 차단했습니다.', {
+                    uid: firebaseUser.uid,
+                    recoverySourceCounts: blockedData.recoverySourceCounts
+                  });
+                  setUserData(blockedData);
+                  return;
+                }
 
-              const initialData = buildDefaultUserData(firebaseUser);
-              setDoc(userDocRef, initialData, { merge: true });
-              setUserData(initialData);
+                const parentSnap = await getDoc(doc(db, 'parents', firebaseUser.uid));
+                const parentData = parentSnap.exists() ? parentSnap.data() : null;
+                if (parentSnap.exists() && !isDeletedAccountData(parentData)) {
+                  setUserData({
+                    role: 'parent',
+                    ...parentData
+                  });
+                  return;
+                }
+
+                console.warn('가입되지 않은 Firebase Auth 계정의 앱 접근을 차단했습니다.', {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email
+                });
+                setSignupRequiredNotice(firebaseUser, 'missing-membership');
+                setUserData(null);
+                await signOut(auth);
+              } catch (err) {
+                console.error('회원 상태 확인 중 오류가 발생해 로그아웃합니다.', err);
+                setSignupRequiredNotice(firebaseUser, 'membership-check-failed');
+                setUserData(null);
+                await signOut(auth);
+              } finally {
+                setLoading(false);
+              }
             });
+            return;
           }
-          setLoading(false);
         }, (err) => {
           console.error("useAuth: User doc snapshot error:", err);
           setLoading(false);

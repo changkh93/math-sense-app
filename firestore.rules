@@ -267,6 +267,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Public applications are written by Cloud Functions and managed by admins.
+    match /applications/{applicationId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if false;
+    }
+
     // Notifications: Users can read/write their own notifications
     match /notifications/{notificationId} {
       allow read, write: if isAuth();
