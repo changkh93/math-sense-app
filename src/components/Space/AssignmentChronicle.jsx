@@ -9,6 +9,7 @@ import {
   useAssignmentShareCooldown,
   useAssignmentShareMutations
 } from '../../hooks/useAssignmentShares';
+import AssignmentShareModal from '../Community/AssignmentShareModal';
 import '../../styles/space-theme.css';
 import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 
@@ -90,7 +91,13 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
   );
   const shareCooldown = useAssignmentShareCooldown(isOwnerView ? user?.uid : null);
   const { publish } = useAssignmentShareMutations();
-  const [shareMessage, setShareMessage] = useState('');
+  const [shareFlow, setShareFlow] = useState({
+    open: false,
+    phase: 'idle',
+    kind: 'archive',
+    shareId: null,
+    error: ''
+  });
 
   const publishDailySummary = useMemo(() => ({
     quizCount: dailyStats?.quizCount || 0,
@@ -113,19 +120,47 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
 
   const handlePublish = async (kind) => {
     if (!currentLog.id || !hasPublishableFeedback || publish.isPending || !shareCooldown.data?.canShare) return;
-    setShareMessage('');
+    setShareFlow({
+      open: true,
+      phase: 'publishing',
+      kind,
+      shareId: null,
+      error: ''
+    });
     try {
-      await publish.mutateAsync({
+      const result = await publish.mutateAsync({
         assignmentId: currentLog.id,
         kind,
         dailySummary: publishDailySummary
       });
-      setShareMessage(kind === 'comfort'
-        ? '위로 요청이 스텔라 아고라에 공개되었습니다.'
-        : '항행 기록이 스텔라 아고라에 공개되었습니다.');
+      setShareFlow(prev => ({
+        ...prev,
+        phase: 'complete',
+        shareId: result?.shareId || null,
+        error: ''
+      }));
     } catch (error) {
-      setShareMessage(error?.message || '공개에 실패했습니다.');
+      setShareFlow(prev => ({
+        ...prev,
+        phase: 'error',
+        error: error?.message || '공개에 실패했습니다.'
+      }));
     }
+  };
+
+  const closeShareFlow = () => {
+    setShareFlow({
+      open: false,
+      phase: 'idle',
+      kind: 'archive',
+      shareId: null,
+      error: ''
+    });
+  };
+
+  const handleGoToSharedContent = (shareId) => {
+    closeShareFlow();
+    window.location.assign(`/agora?filter=archive&highlight=${shareId}`);
   };
 
   if (validAssignments.length === 0) {
@@ -450,17 +485,12 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                           과제 제출 내역과 피드백이 모두 있어야 공개할 수 있습니다.
                         </div>
                       )}
-                      {shareMessage && (
-                        <div style={{ color: shareMessage.includes('실패') ? '#fca5a5' : '#86efac', marginTop: '0.25rem' }}>
-                          {shareMessage}
-                        </div>
-                      )}
                     </div>
                     <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                       <button
                         type="button"
                         className="space-btn cosmic-btn font-tech"
-                        disabled={!hasPublishableFeedback || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending}
+                        disabled={!hasPublishableFeedback || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending || shareFlow.phase === 'publishing'}
                         onClick={() => handlePublish('archive')}
                         style={{ fontSize: '0.82rem', padding: '0.55rem 0.9rem' }}
                       >
@@ -469,13 +499,22 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                       <button
                         type="button"
                         className="space-btn font-tech"
-                        disabled={!hasPublishableFeedback || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending}
+                        disabled={!hasPublishableFeedback || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending || shareFlow.phase === 'publishing'}
                         onClick={() => handlePublish('comfort')}
                         style={{ borderColor: '#fda4af', color: '#fda4af', fontSize: '0.82rem', padding: '0.55rem 0.9rem' }}
                       >
                         위로 받기
                       </button>
                     </div>
+                    <AssignmentShareModal
+                      open={shareFlow.open}
+                      phase={shareFlow.phase}
+                      kind={shareFlow.kind}
+                      error={shareFlow.error}
+                      shareId={shareFlow.shareId}
+                      onClose={closeShareFlow}
+                      onGoToShare={handleGoToSharedContent}
+                    />
                   </div>
                 )}
               </div>

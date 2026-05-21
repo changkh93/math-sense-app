@@ -1146,6 +1146,8 @@ exports.publishAssignmentShare = regionalFunctions.https.onCall(async (data, con
         commentCount: 0,
         likedBy: [],
         comfortedBy: [],
+        likedByProfiles: [],
+        comfortedByProfiles: [],
         status: "public",
         publishedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
@@ -1190,20 +1192,32 @@ exports.reactAssignmentShare = regionalFunctions.https.onCall(async (data, conte
 
       const fieldName = reaction === "comfort" ? "comfortedBy" : "likedBy";
       const countName = reaction === "comfort" ? "comfortCount" : "likeCount";
+      const profileFieldName = reaction === "comfort" ? "comfortedByProfiles" : "likedByProfiles";
       const previousActors = Array.isArray(shareData[fieldName]) ? shareData[fieldName] : [];
       if (previousActors.includes(actorUid)) {
         throw new functions.https.HttpsError("failed-precondition", "이미 반응한 기록입니다.");
       }
 
       const ownerRef = db.collection("users").doc(ownerId);
-      const ownerSnap = await transaction.get(ownerRef);
+      const actorRef = db.collection("users").doc(actorUid);
+      const [ownerSnap, actorSnap] = await Promise.all([
+        transaction.get(ownerRef),
+        transaction.get(actorRef),
+      ]);
       if (!ownerSnap.exists) {
         throw new functions.https.HttpsError("not-found", "기록 소유자 정보를 찾을 수 없습니다.");
       }
 
       const ownerData = ownerSnap.data() || {};
+      const actorData = actorSnap.exists ? (actorSnap.data() || {}) : {};
+      const actorName = actorData.studentName || actorData.name || actorData.displayName || "탐험가";
       transaction.set(shareRef, {
         [fieldName]: FieldValue.arrayUnion(actorUid),
+        [profileFieldName]: FieldValue.arrayUnion({
+          userId: actorUid,
+          userName: String(actorName).slice(0, 80),
+          reactedAt: admin.firestore.Timestamp.now(),
+        }),
         [countName]: FieldValue.increment(1),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });

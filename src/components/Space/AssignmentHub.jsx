@@ -20,6 +20,7 @@ import { useClusters } from '../../hooks/useContent';
 import { storage, getFunctionUrl } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import AssignmentChronicle from './AssignmentChronicle';
+import AssignmentShareModal from '../Community/AssignmentShareModal';
 import WarpGateDocking from './WarpGateDocking';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
 import { getTodayKST } from '../../utils/streakUtils';
@@ -730,7 +731,13 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const { publish } = useAssignmentShareMutations();
   const activeWarnings = warnings.filter(warning => ['active', 'appealed'].includes(warning.status));
   const cancelledWarnings = warnings.filter(warning => warning.status === 'cancelled');
-  const [shareMessage, setShareMessage] = useState('');
+  const [shareFlow, setShareFlow] = useState({
+    open: false,
+    phase: 'idle',
+    kind: 'archive',
+    shareId: null,
+    error: ''
+  });
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -765,19 +772,47 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
 
   const handlePublishAssignmentShare = async (kind) => {
     if (!canPublishAssignment || publish.isPending || !shareCooldown.data?.canShare) return;
-    setShareMessage('');
+    setShareFlow({
+      open: true,
+      phase: 'publishing',
+      kind,
+      shareId: null,
+      error: ''
+    });
     try {
-      await publish.mutateAsync({
+      const result = await publish.mutateAsync({
         assignmentId: assignment.id,
         kind,
         dailySummary: publishDailySummary
       });
-      setShareMessage(kind === 'comfort'
-        ? '위로 요청이 스텔라 아고라에 공개되었습니다.'
-        : '항행 기록이 스텔라 아고라에 공개되었습니다.');
+      setShareFlow(prev => ({
+        ...prev,
+        phase: 'complete',
+        shareId: result?.shareId || null,
+        error: ''
+      }));
     } catch (error) {
-      setShareMessage(error?.message || '공개에 실패했습니다.');
+      setShareFlow(prev => ({
+        ...prev,
+        phase: 'error',
+        error: error?.message || '공개에 실패했습니다.'
+      }));
     }
+  };
+
+  const closeShareFlow = () => {
+    setShareFlow({
+      open: false,
+      phase: 'idle',
+      kind: 'archive',
+      shareId: null,
+      error: ''
+    });
+  };
+
+  const handleGoToSharedContent = (shareId) => {
+    closeShareFlow();
+    window.location.assign(`/agora?filter=archive&highlight=${shareId}`);
   };
 
   useEffect(() => {
@@ -1099,17 +1134,12 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                 다음 공개 가능 시간: {formatNextShareDate(shareCooldown.data?.nextAvailableAt)}
               </div>
             )}
-            {shareMessage && (
-              <div style={{ color: shareMessage.includes('실패') ? '#fca5a5' : '#86efac', marginTop: '0.22rem' }}>
-                {shareMessage}
-              </div>
-            )}
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="space-btn cosmic-btn font-tech"
-              disabled={!canPublishAssignment || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending}
+              disabled={!canPublishAssignment || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending || shareFlow.phase === 'publishing'}
               onClick={() => handlePublishAssignmentShare('archive')}
               style={{ fontSize: '0.78rem', padding: '0.5rem 0.85rem' }}
             >
@@ -1118,7 +1148,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
             <button
               type="button"
               className="space-btn font-tech"
-              disabled={!canPublishAssignment || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending}
+              disabled={!canPublishAssignment || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending || shareFlow.phase === 'publishing'}
               onClick={() => handlePublishAssignmentShare('comfort')}
               style={{ borderColor: '#fda4af', color: '#fda4af', fontSize: '0.78rem', padding: '0.5rem 0.85rem' }}
             >
@@ -1126,6 +1156,15 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
             </button>
           </div>
         </div>
+        <AssignmentShareModal
+          open={shareFlow.open}
+          phase={shareFlow.phase}
+          kind={shareFlow.kind}
+          error={shareFlow.error}
+          shareId={shareFlow.shareId}
+          onClose={closeShareFlow}
+          onGoToShare={handleGoToSharedContent}
+        />
       </div>
       
       {/* Daily Learning Timeline View */}

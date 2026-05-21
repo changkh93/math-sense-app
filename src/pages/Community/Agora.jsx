@@ -174,7 +174,7 @@ export default function Agora() {
         <div className="agora-layout-grid">
           <main className="agora-main">
             {filter === 'archive' ? (
-              <AssignmentShareFeed />
+              <AssignmentShareFeed highlightId={highlightId} />
             ) : isLoading ? (
               <div className="loading-state">질문을 불러오는 중...</div>
         ) : isError ? (

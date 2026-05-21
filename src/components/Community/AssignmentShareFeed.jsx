@@ -1,6 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Heart, HandHeart, Loader, MessageCircle, SendHorizontal } from 'lucide-react';
+import {
+  ChevronDown,
+  Gift,
+  HandHeart,
+  Heart,
+  Loader,
+  MessageCircle,
+  SendHorizontal,
+  Sparkles,
+  Users
+} from 'lucide-react';
 import {
   useAssignmentShareComments,
   useAssignmentShareMutations,
@@ -29,6 +39,40 @@ const clampText = (value, fallback = '공개된 내용이 없습니다.') => {
   const text = String(value || '').trim();
   return text || fallback;
 };
+
+function AssignmentShareGuide() {
+  return (
+    <section className="assignment-share-guide glass">
+      <div className="assignment-share-guide-main">
+        <div className="assignment-share-guide-icon">
+          <Sparkles size={22} />
+        </div>
+        <div>
+          <div className="assignment-share-guide-kicker">기록 공개 탭</div>
+          <h2>친구의 학습 기록을 읽고 응원하는 공간입니다</h2>
+          <p>
+            공개된 과제, 일일 학습 기록, 피드백을 보고 짧은 코멘트나 반응을 남겨 주세요.
+            반응 버튼을 누르면 내 광석은 차감되지 않고, 기록을 공개한 친구에게 +1 광석이 선물됩니다.
+          </p>
+        </div>
+      </div>
+      <div className="assignment-share-guide-actions">
+        <div>
+          <Gift size={16} />
+          <span>좋아요/위로 버튼: 친구에게 +1 광석</span>
+        </div>
+        <div>
+          <Users size={16} />
+          <span>N명 버튼: 반응한 친구 목록 보기</span>
+        </div>
+        <div>
+          <MessageCircle size={16} />
+          <span>댓글: 구체적인 응원과 피드백 남기기</span>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function AssignmentShareComments({ shareId }) {
   const [comment, setComment] = useState('');
@@ -80,18 +124,21 @@ function AssignmentShareComments({ shareId }) {
   );
 }
 
-function AssignmentShareCard({ share }) {
+function AssignmentShareCard({ share, highlight }) {
   const { user } = useAuth();
   const { react } = useAssignmentShareMutations();
   const [expanded, setExpanded] = useState(false);
+  const [showReactors, setShowReactors] = useState(false);
   const isComfort = share.kind === 'comfort';
   const reaction = isComfort ? 'comfort' : 'like';
   const reactedBy = isComfort ? share.comfortedBy : share.likedBy;
+  const reactorProfiles = isComfort ? share.comfortedByProfiles : share.likedByProfiles;
   const alreadyReacted = reactedBy?.includes(user?.uid);
   const reactionCount = isComfort ? (share.comfortCount || 0) : (share.likeCount || 0);
   const isOwner = share.ownerId === user?.uid;
   const assignmentContent = clampText(share.assignment?.content);
   const feedback = clampText(share.assignment?.feedback, '');
+  const reactionLabel = isComfort ? '위로' : '좋아요';
 
   const summaryItems = useMemo(() => ([
     { label: '퀴즈', value: share.dailySummary?.quizCount || 0 },
@@ -100,13 +147,33 @@ function AssignmentShareCard({ share }) {
     { label: '집중', value: `${share.dailySummary?.attentionHits || 0}/${share.dailySummary?.attentionOpportunities || 0}` }
   ]), [share.dailySummary]);
 
+  const reactors = useMemo(() => {
+    const byId = new Map();
+    (Array.isArray(reactorProfiles) ? reactorProfiles : []).forEach(item => {
+      const userId = item?.userId || item?.uid;
+      if (!userId) return;
+      byId.set(userId, {
+        userId,
+        userName: String(item?.userName || item?.name || '탐험가').trim() || '탐험가'
+      });
+    });
+    (Array.isArray(reactedBy) ? reactedBy : []).forEach(userId => {
+      if (!userId || byId.has(userId)) return;
+      byId.set(userId, {
+        userId,
+        userName: '이름 기록 전 반응'
+      });
+    });
+    return Array.from(byId.values());
+  }, [reactedBy, reactorProfiles]);
+
   const handleReact = async () => {
     if (alreadyReacted || react.isPending || isOwner) return;
     await react.mutateAsync({ shareId: share.id, reaction });
   };
 
   return (
-    <article className={`assignment-share-card glass ${isComfort ? 'comfort' : 'archive'}`}>
+    <article className={`assignment-share-card glass ${isComfort ? 'comfort' : 'archive'} ${highlight ? 'highlight-glow' : ''}`} id={`share-${share.id}`}>
       <div className="assignment-share-topline">
         <span className="assignment-share-kind">{isComfort ? '위로 요청' : '기록 공개'}</span>
         <span className="assignment-share-date">{toDateText(share.publishedAt)}</span>
@@ -159,60 +226,119 @@ function AssignmentShareCard({ share }) {
       )}
 
       <footer className="assignment-share-actions">
-        <button
-          type="button"
-          className={`assignment-share-reaction ${alreadyReacted ? 'active' : ''}`}
-          onClick={handleReact}
-          disabled={alreadyReacted || react.isPending || isOwner}
-          title={isOwner ? '내 기록에는 보상을 받을 수 없습니다' : alreadyReacted ? '이미 눌렀습니다' : '+1 광석 응원'}
-        >
-          {isComfort ? <HandHeart size={17} /> : <Heart size={17} fill={alreadyReacted ? 'currentColor' : 'none'} />}
-          <span>{isComfort ? '위로' : '좋아요'} {reactionCount}</span>
-        </button>
+        <div className="assignment-share-reaction-group">
+          <button
+            type="button"
+            className={`assignment-share-reaction ${alreadyReacted ? 'active' : ''}`}
+            onClick={handleReact}
+            disabled={alreadyReacted || react.isPending || isOwner}
+            title={isOwner ? '내 기록에는 보상을 받을 수 없습니다' : alreadyReacted ? '이미 눌렀습니다' : '내 광석 차감 없이 친구에게 +1 광석을 선물합니다'}
+          >
+            {isComfort ? <HandHeart size={17} /> : <Heart size={17} fill={alreadyReacted ? 'currentColor' : 'none'} />}
+            <span>{reactionLabel} +1 선물</span>
+          </button>
+          <button
+            type="button"
+            className={`assignment-share-reactors-toggle ${showReactors ? 'open' : ''}`}
+            onClick={() => setShowReactors(prev => !prev)}
+            disabled={reactionCount < 1}
+            aria-expanded={showReactors}
+            title={reactionCount < 1 ? '아직 반응한 친구가 없습니다' : `${reactionLabel}를 누른 친구 보기`}
+          >
+            <Users size={15} />
+            <span>{reactionCount}명</span>
+            <ChevronDown size={14} />
+          </button>
+        </div>
         <div className="assignment-share-comment-count">
           <MessageCircle size={16} />
           <span>{share.commentCount || 0}</span>
         </div>
       </footer>
 
+      {showReactors && (
+        <div className="assignment-share-reactors-panel">
+          <div className="assignment-share-reactors-title">
+            {reactionLabel}를 누른 친구
+          </div>
+          {reactors.length === 0 ? (
+            <div className="assignment-share-muted">아직 표시할 친구가 없습니다.</div>
+          ) : (
+            <div className="assignment-share-reactors-list">
+              {reactors.map(item => (
+                <div key={item.userId} className="assignment-share-reactor">
+                  <span className="assignment-share-reactor-avatar">{item.userName.slice(0, 1)}</span>
+                  <span>{item.userName}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <AssignmentShareComments shareId={share.id} />
     </article>
   );
 }
 
-export default function AssignmentShareFeed() {
+export default function AssignmentShareFeed({ highlightId }) {
   const { data: shares = [], isLoading, isError, error } = usePublicAssignmentShares();
+  const lastScrolledIdRef = useRef('');
+
+  useEffect(() => {
+    if (!highlightId || shares.length === 0 || lastScrolledIdRef.current === highlightId) return;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`share-${highlightId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        lastScrolledIdRef.current = highlightId;
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [highlightId, shares]);
 
   if (isLoading) {
     return (
-      <div className="assignment-share-state glass">
-        <Loader size={18} className="spin-icon" />
-        공개 기록을 불러오는 중...
+      <div className="assignment-share-area">
+        <AssignmentShareGuide />
+        <div className="assignment-share-state glass">
+          <Loader size={18} className="spin-icon" />
+          공개 기록을 불러오는 중...
+        </div>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="assignment-share-state glass">
-        기록 공개 탭을 불러오지 못했습니다. {error?.message || ''}
+      <div className="assignment-share-area">
+        <AssignmentShareGuide />
+        <div className="assignment-share-state glass">
+          기록 공개 탭을 불러오지 못했습니다. {error?.message || ''}
+        </div>
       </div>
     );
   }
 
   if (shares.length === 0) {
     return (
-      <div className="assignment-share-state glass">
-        아직 공개된 항행 기록이 없습니다. 과제 기록소에서 첫 기록을 열어보세요.
+      <div className="assignment-share-area">
+        <AssignmentShareGuide />
+        <div className="assignment-share-state glass">
+          아직 공개된 항행 기록이 없습니다. 과제 기록소에서 첫 기록을 열어보세요.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="assignment-share-feed">
-      {shares.map(share => (
-        <AssignmentShareCard key={share.id} share={share} />
-      ))}
+    <div className="assignment-share-area">
+      <AssignmentShareGuide />
+      <div className="assignment-share-feed">
+        {shares.map(share => (
+          <AssignmentShareCard key={share.id} share={share} highlight={highlightId === share.id} />
+        ))}
+      </div>
     </div>
   );
 }
