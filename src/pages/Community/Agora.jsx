@@ -10,8 +10,11 @@ import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import AgoraLiveTicker from '../../components/Community/AgoraLiveTicker';
 import StarMessageInput from '../../components/Community/StarMessageInput';
 import AgoraMotivationPanel from '../../components/Community/AgoraMotivationPanel';
+import AssignmentShareFeed from '../../components/Community/AssignmentShareFeed';
 import { useAuth } from '../../hooks/useAuth';
 import './Agora.css';
+
+const MotionDiv = motion.div;
 
 export default function Agora() {
   const navigate = useNavigate();
@@ -111,6 +114,7 @@ export default function Agora() {
     { id: 'all', label: '전체 질문', icon: '🌌' },
     { id: 'unanswered', label: '대기 중', icon: '🚨' },
     { id: 'solved', label: '해결됨', icon: '✅' },
+    { id: 'archive', label: '기록 공개', icon: '📖' },
     { id: 'my', label: '내 질문', icon: '🧑‍🚀' }
   ];
 
@@ -169,7 +173,9 @@ export default function Agora() {
         </div>
         <div className="agora-layout-grid">
           <main className="agora-main">
-            {isLoading ? (
+            {filter === 'archive' ? (
+              <AssignmentShareFeed />
+            ) : isLoading ? (
               <div className="loading-state">질문을 불러오는 중...</div>
         ) : isError ? (
           <div className="error-state glass">
@@ -206,7 +212,7 @@ export default function Agora() {
                     : (q.anonymousLabel || getAnonymousLabel(q.userId));
 
                   return (
-                <motion.div
+                <MotionDiv
                   key={q.id}
                   id={`question-${q.id}`}
                   layout
@@ -275,7 +281,7 @@ export default function Agora() {
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </MotionDiv>
                   );
                 })()
               ))}

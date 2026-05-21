@@ -4,6 +4,11 @@ import ReactMarkdown from 'react-markdown';
 import NotebookViewer from './NotebookViewer';
 import DailyLearningTimeline from './DailyLearningTimeline';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
+import { useAuth } from '../../hooks/useAuth';
+import {
+  useAssignmentShareCooldown,
+  useAssignmentShareMutations
+} from '../../hooks/useAssignmentShares';
 import '../../styles/space-theme.css';
 import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 
@@ -12,6 +17,7 @@ import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
  * Single-column, book-like view with inline file previews and compact feedback.
  */
 const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
+const MotionDiv = motion.div;
 
 const warningTypeLabel = (type) => {
   if (type === 'consecutive_missing_assignment') return '연속 3회 미제출';
@@ -19,6 +25,7 @@ const warningTypeLabel = (type) => {
 };
 
 export default function AssignmentChronicle({ assignments, warnings = [], onClose, onAppealRequest }) {
+  const { user } = useAuth();
   const validAssignments = useMemo(() => {
     if (!assignments) return [];
     return [...assignments]
@@ -47,8 +54,10 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
   };
 
   const currentLog = validAssignments[currentPage] || {};
+  const isOwnerView = !!user?.uid && currentLog.userId === user.uid;
   const isReviewed = currentLog.status === 'reviewed';
   const isNeedsRevision = currentLog.status === 'needs_revision';
+  const hasPublishableFeedback = Boolean(String(currentLog.feedback || '').trim());
   const bonusCrystals = Number(currentLog.bonusCrystals) || 0;
   const activeWarnings = useMemo(
     () => (warnings || []).filter(item => ['active', 'appealed'].includes(item.status)),
@@ -76,9 +85,48 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
   const showWarningModal = activeWarnings.length > 0 && !warningModalDismissed;
 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading } = useLearningHistory(
-    activeTab === 'timeline' ? currentLog.userId : null, 
-    activeTab === 'timeline' ? currentLog.date : null
+    currentLog.userId || null,
+    currentLog.date || null
   );
+  const shareCooldown = useAssignmentShareCooldown(isOwnerView ? user?.uid : null);
+  const { publish } = useAssignmentShareMutations();
+  const [shareMessage, setShareMessage] = useState('');
+
+  const publishDailySummary = useMemo(() => ({
+    quizCount: dailyStats?.quizCount || 0,
+    logCount: dailyStats?.logCount || 0,
+    totalVideoSeconds: dailyStats?.totalVideoSeconds || 0,
+    attentionHits: dailyStats?.attentionHits || 0,
+    attentionOpportunities: dailyStats?.attentionOpportunities || 0,
+    focusScore: dailyStats?.focusScore ?? null
+  }), [dailyStats]);
+
+  const formatNextShareDate = (date) => {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('ko-KR', {
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
+  const handlePublish = async (kind) => {
+    if (!currentLog.id || !hasPublishableFeedback || publish.isPending || !shareCooldown.data?.canShare) return;
+    setShareMessage('');
+    try {
+      await publish.mutateAsync({
+        assignmentId: currentLog.id,
+        kind,
+        dailySummary: publishDailySummary
+      });
+      setShareMessage(kind === 'comfort'
+        ? '위로 요청이 스텔라 아고라에 공개되었습니다.'
+        : '항행 기록이 스텔라 아고라에 공개되었습니다.');
+    } catch (error) {
+      setShareMessage(error?.message || '공개에 실패했습니다.');
+    }
+  };
 
   if (validAssignments.length === 0) {
     return (
@@ -107,7 +155,7 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
     }}>
       <AnimatePresence>
         {showWarningModal && activeWarnings.length > 0 && (
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -123,7 +171,7 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
               padding: '1.2rem',
             }}
           >
-            <motion.div
+            <MotionDiv
               initial={{ y: 24, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 24, opacity: 0 }}
@@ -187,8 +235,8 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                   이의신청하기
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </MotionDiv>
+          </MotionDiv>
         )}
       </AnimatePresence>
       {/* Persistent Top Bar Container */}
@@ -245,7 +293,7 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
         {/* Index Panel (Left Sidebar) */}
         <AnimatePresence>
           {showIndex && (
-            <motion.div 
+            <MotionDiv 
               initial={{ x: -300, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -300, opacity: 0 }}
@@ -279,7 +327,7 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                   </button>
                 ))}
               </div>
-            </motion.div>
+            </MotionDiv>
           )}
         </AnimatePresence>
 
@@ -313,7 +361,7 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
 
           {/* Single Page Content */}
           <AnimatePresence mode="wait">
-            <motion.div 
+            <MotionDiv 
               key={currentLog.id}
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -374,6 +422,62 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                     일일 학습 기록
                   </button>
                 </div>
+                {isOwnerView && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '0.9rem 1rem',
+                    borderRadius: 10,
+                    border: '1px solid rgba(0, 212, 255, 0.24)',
+                    background: 'rgba(0, 212, 255, 0.06)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                      <strong style={{ color: 'var(--crystal-cyan)' }}>스텔라 아고라 공개</strong>
+                      <span style={{ marginLeft: '0.5rem' }}>
+                        과제, 일일 기록, 피드백과 보너스 광석을 7일에 한 번 친구들에게 공개할 수 있습니다.
+                      </span>
+                      {!shareCooldown.isLoading && !shareCooldown.data?.canShare && (
+                        <div style={{ color: '#fbbf24', marginTop: '0.25rem' }}>
+                          다음 공개 가능 시간: {formatNextShareDate(shareCooldown.data?.nextAvailableAt)}
+                        </div>
+                      )}
+                      {!hasPublishableFeedback && (
+                        <div style={{ color: '#fbbf24', marginTop: '0.25rem' }}>
+                          과제 제출 내역과 피드백이 모두 있어야 공개할 수 있습니다.
+                        </div>
+                      )}
+                      {shareMessage && (
+                        <div style={{ color: shareMessage.includes('실패') ? '#fca5a5' : '#86efac', marginTop: '0.25rem' }}>
+                          {shareMessage}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="space-btn cosmic-btn font-tech"
+                        disabled={!hasPublishableFeedback || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending}
+                        onClick={() => handlePublish('archive')}
+                        style={{ fontSize: '0.82rem', padding: '0.55rem 0.9rem' }}
+                      >
+                        기록 공개하기
+                      </button>
+                      <button
+                        type="button"
+                        className="space-btn font-tech"
+                        disabled={!hasPublishableFeedback || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending}
+                        onClick={() => handlePublish('comfort')}
+                        style={{ borderColor: '#fda4af', color: '#fda4af', fontSize: '0.82rem', padding: '0.55rem 0.9rem' }}
+                      >
+                        위로 받기
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Scrollable Content */}
@@ -532,7 +636,7 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                   />
                 )}
               </div>
-            </motion.div>
+            </MotionDiv>
           </AnimatePresence>
 
           {/* Next */}

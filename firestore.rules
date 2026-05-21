@@ -374,6 +374,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Public assignment records shown in Stellar Agora. Creation, reactions,
+    // comments, cooldowns, and rewards are handled by Cloud Functions.
+    match /assignmentShares/{shareId} {
+      allow read: if isAuth();
+      allow create, update, delete: if false;
+
+      match /comments/{commentId} {
+        allow read: if isAuth();
+        allow create, update, delete: if false;
+      }
+    }
+
     // Star Messages (Community Ticker)
     match /starMessages/{messageId} {
       allow read: if isAuth();

@@ -24,6 +24,8 @@ const ASSIGNMENT_MISSING_STEP_PENALTY = 5;
 const ASSIGNMENT_MISSING_MAX_PENALTY = 25;
 const AGORA_BASE_ACCEPT_REWARD = 20;
 const AGORA_ASKER_RESOLVE_REWARD = 5;
+const ASSIGNMENT_SHARE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const ASSIGNMENT_SHARE_REACTION_REWARD = 1;
 const STUDENT_AUTH_DOMAIN = "student.mathsense.app";
 
 function cleanText(value, maxLength = 200) {
@@ -1024,6 +1026,251 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
     }
     console.error("acceptAgoraAnswer error:", error);
     throw new functions.https.HttpsError("internal", "답변 채택 중 서버 오류가 발생했습니다.");
+  }
+});
+
+function sanitizeAssignmentShareDailySummary(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  const readNumber = (key) => {
+    const numberValue = Number(source[key] || 0);
+    return Number.isFinite(numberValue) ? Math.max(0, Math.floor(numberValue)) : 0;
+  };
+  return {
+    quizCount: readNumber("quizCount"),
+    logCount: readNumber("logCount"),
+    totalVideoSeconds: readNumber("totalVideoSeconds"),
+    attentionHits: readNumber("attentionHits"),
+    attentionOpportunities: readNumber("attentionOpportunities"),
+    focusScore: source.focusScore === null || source.focusScore === undefined
+      ? null
+      : readNumber("focusScore"),
+  };
+}
+
+function buildAssignmentShareSnapshot(assignmentData = {}) {
+  const content = String(assignmentData.content || "").trim();
+  const feedback = String(assignmentData.feedback || "").trim();
+  const attachments = Array.isArray(assignmentData.attachments)
+    ? assignmentData.attachments.slice(0, 8).map((item) => ({
+        name: String(item?.name || "첨부 파일").slice(0, 120),
+        type: String(item?.type || "").slice(0, 40),
+      }))
+    : [];
+  const links = Array.isArray(assignmentData.links)
+    ? assignmentData.links.slice(0, 6).map((item) => ({
+        title: String(item?.title || item?.url || "참고 링크").slice(0, 120),
+      }))
+    : [];
+
+  return {
+    assignmentId: assignmentData.id || "",
+    date: String(assignmentData.date || "").slice(0, 20),
+    clusterId: String(assignmentData.clusterId || "").slice(0, 80),
+    regionId: String(assignmentData.regionId || "").slice(0, 80),
+    status: String(assignmentData.status || "").slice(0, 40),
+    content: content.slice(0, 2400),
+    feedback: feedback.slice(0, 1800),
+    bonusCrystals: Math.max(0, Math.floor(Number(assignmentData.bonusCrystals || 0))),
+    attachmentCount: attachments.length,
+    attachments,
+    links,
+  };
+}
+
+function getTimestampMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (value.seconds) return value.seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+exports.publishAssignmentShare = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const assignmentId = typeof data?.assignmentId === "string" ? data.assignmentId.trim() : "";
+  const kind = data?.kind === "comfort" ? "comfort" : "archive";
+
+  if (!assignmentId) {
+    throw new functions.https.HttpsError("invalid-argument", "공개할 과제 기록이 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const assignmentRef = db.collection("assignments").doc(assignmentId);
+  const userRef = db.collection("users").doc(uid);
+  const shareRef = db.collection("assignmentShares").doc();
+  const nowMs = Date.now();
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const [assignmentSnap, userSnap, previousSharesSnap] = await Promise.all([
+        transaction.get(assignmentRef),
+        transaction.get(userRef),
+        transaction.get(db.collection("assignmentShares").where("ownerId", "==", uid)),
+      ]);
+
+      if (!assignmentSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "과제 기록을 찾을 수 없습니다.");
+      }
+      if (!userSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "사용자 정보를 찾을 수 없습니다.");
+      }
+
+      const assignmentData = assignmentSnap.data() || {};
+      if (assignmentData.userId !== uid) {
+        throw new functions.https.HttpsError("permission-denied", "내 과제 기록만 공개할 수 있습니다.");
+      }
+      if (!["submitted", "reviewed", "needs_revision"].includes(assignmentData.status)) {
+        throw new functions.https.HttpsError("failed-precondition", "제출된 과제 기록만 공개할 수 있습니다.");
+      }
+      if (!String(assignmentData.feedback || "").trim()) {
+        throw new functions.https.HttpsError("failed-precondition", "피드백이 있는 과제 기록만 공개할 수 있습니다.");
+      }
+
+      const latestShare = previousSharesSnap.docs
+        .map((docSnap) => docSnap.data() || {})
+        .sort((a, b) => getTimestampMillis(b.publishedAt) - getTimestampMillis(a.publishedAt))[0];
+      const latestMs = getTimestampMillis(latestShare?.publishedAt);
+      if (latestMs && nowMs - latestMs < ASSIGNMENT_SHARE_COOLDOWN_MS) {
+        throw new functions.https.HttpsError("failed-precondition", "기록 공개와 위로 요청은 7일에 한 번만 사용할 수 있습니다.");
+      }
+
+      const userData = userSnap.data() || {};
+      transaction.set(shareRef, {
+        ownerId: uid,
+        ownerName: userData.studentName || userData.name || userData.displayName || "탐험가",
+        kind,
+        assignment: buildAssignmentShareSnapshot({ ...assignmentData, id: assignmentId }),
+        dailySummary: sanitizeAssignmentShareDailySummary(data?.dailySummary || {}),
+        likeCount: 0,
+        comfortCount: 0,
+        commentCount: 0,
+        likedBy: [],
+        comfortedBy: [],
+        status: "public",
+        publishedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    return { success: true, shareId: shareRef.id };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    console.error("publishAssignmentShare error:", error);
+    throw new functions.https.HttpsError("internal", "기록 공개 중 서버 오류가 발생했습니다.");
+  }
+});
+
+exports.reactAssignmentShare = regionalFunctions.https.onCall(async (data, context) => {
+  const actorUid = await requireAuthUid(context);
+  const shareId = typeof data?.shareId === "string" ? data.shareId.trim() : "";
+  const reaction = data?.reaction === "comfort" ? "comfort" : "like";
+
+  if (!shareId) {
+    throw new functions.https.HttpsError("invalid-argument", "공개 기록 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const shareRef = db.collection("assignmentShares").doc(shareId);
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const shareSnap = await transaction.get(shareRef);
+      if (!shareSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "공개 기록을 찾을 수 없습니다.");
+      }
+
+      const shareData = shareSnap.data() || {};
+      const ownerId = shareData.ownerId;
+      if (!ownerId) {
+        throw new functions.https.HttpsError("failed-precondition", "기록 소유자 정보가 없습니다.");
+      }
+      if (ownerId === actorUid) {
+        throw new functions.https.HttpsError("failed-precondition", "내 기록에는 보상을 받을 수 없습니다.");
+      }
+
+      const fieldName = reaction === "comfort" ? "comfortedBy" : "likedBy";
+      const countName = reaction === "comfort" ? "comfortCount" : "likeCount";
+      const previousActors = Array.isArray(shareData[fieldName]) ? shareData[fieldName] : [];
+      if (previousActors.includes(actorUid)) {
+        throw new functions.https.HttpsError("failed-precondition", "이미 반응한 기록입니다.");
+      }
+
+      const ownerRef = db.collection("users").doc(ownerId);
+      const ownerSnap = await transaction.get(ownerRef);
+      if (!ownerSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "기록 소유자 정보를 찾을 수 없습니다.");
+      }
+
+      const ownerData = ownerSnap.data() || {};
+      transaction.set(shareRef, {
+        [fieldName]: FieldValue.arrayUnion(actorUid),
+        [countName]: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(ownerRef, {
+        crystals: Number(ownerData.crystals || 0) + ASSIGNMENT_SHARE_REACTION_REWARD,
+        ...calculateGrowthUpdates(ownerData, ASSIGNMENT_SHARE_REACTION_REWARD),
+      }, { merge: true });
+
+      recordCrystalTransaction(transaction, ownerId, `assignment-share-${reaction}-${shareId}-${actorUid}`, {
+        amount: ASSIGNMENT_SHARE_REACTION_REWARD,
+        type: reaction === "comfort" ? "assignment_share_comfort" : "assignment_share_like",
+        description: reaction === "comfort" ? "공개 기록 위로 보상" : "공개 기록 좋아요 보상",
+        metadata: { shareId, actorUid, assignmentId: shareData.assignment?.assignmentId || "" },
+      });
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    console.error("reactAssignmentShare error:", error);
+    throw new functions.https.HttpsError("internal", "반응 저장 중 서버 오류가 발생했습니다.");
+  }
+});
+
+exports.commentAssignmentShare = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const shareId = typeof data?.shareId === "string" ? data.shareId.trim() : "";
+  const content = cleanText(data?.content || "", 240);
+
+  if (!shareId || content.length < 1) {
+    throw new functions.https.HttpsError("invalid-argument", "댓글 내용을 입력해주세요.");
+  }
+
+  const db = admin.firestore();
+  const shareRef = db.collection("assignmentShares").doc(shareId);
+  const userRef = db.collection("users").doc(uid);
+  const commentRef = shareRef.collection("comments").doc();
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const [shareSnap, userSnap] = await Promise.all([
+        transaction.get(shareRef),
+        transaction.get(userRef),
+      ]);
+      if (!shareSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "공개 기록을 찾을 수 없습니다.");
+      }
+      const userData = userSnap.exists ? userSnap.data() || {} : {};
+      transaction.set(commentRef, {
+        shareId,
+        userId: uid,
+        userName: userData.studentName || userData.name || userData.displayName || "탐험가",
+        content,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      transaction.set(shareRef, {
+        commentCount: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    return { success: true, commentId: commentRef.id };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    console.error("commentAssignmentShare error:", error);
+    throw new functions.https.HttpsError("internal", "댓글 저장 중 서버 오류가 발생했습니다.");
   }
 });
 

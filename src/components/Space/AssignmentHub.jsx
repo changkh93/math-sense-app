@@ -12,6 +12,10 @@ import {
   useSubmitFeedbackResponse,
   useSubmitWarningAppeal,
 } from '../../hooks/useAssignments';
+import {
+  useAssignmentShareCooldown,
+  useAssignmentShareMutations
+} from '../../hooks/useAssignmentShares';
 import { useClusters } from '../../hooks/useContent';
 import { storage, getFunctionUrl } from '../../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -722,8 +726,11 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
   const feedbackResponseMutation = useSubmitFeedbackResponse();
   const warningAppealMutation = useSubmitWarningAppeal();
+  const shareCooldown = useAssignmentShareCooldown(user?.uid);
+  const { publish } = useAssignmentShareMutations();
   const activeWarnings = warnings.filter(warning => ['active', 'appealed'].includes(warning.status));
   const cancelledWarnings = warnings.filter(warning => warning.status === 'cancelled');
+  const [shareMessage, setShareMessage] = useState('');
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -731,6 +738,47 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const isReviewed = assignment?.status === 'reviewed';
   const isNeedsRevision = assignment?.status === 'needs_revision';
   const isSubmitted = assignment?.status === 'submitted';
+  const hasPublishableFeedback = Boolean(String(assignment?.feedback || '').trim());
+  const canPublishAssignment = Boolean(
+    assignment?.id &&
+    ['submitted', 'reviewed', 'needs_revision'].includes(assignment?.status) &&
+    hasPublishableFeedback
+  );
+  const publishDailySummary = useMemo(() => ({
+    quizCount: dailyStats?.quizCount || 0,
+    logCount: dailyStats?.logCount || 0,
+    totalVideoSeconds: dailyStats?.totalVideoSeconds || 0,
+    attentionHits: dailyStats?.attentionHits || 0,
+    attentionOpportunities: dailyStats?.attentionOpportunities || 0,
+    focusScore: dailyStats?.focusScore ?? null
+  }), [dailyStats]);
+
+  const formatNextShareDate = (date) => {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('ko-KR', {
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
+  const handlePublishAssignmentShare = async (kind) => {
+    if (!canPublishAssignment || publish.isPending || !shareCooldown.data?.canShare) return;
+    setShareMessage('');
+    try {
+      await publish.mutateAsync({
+        assignmentId: assignment.id,
+        kind,
+        dailySummary: publishDailySummary
+      });
+      setShareMessage(kind === 'comfort'
+        ? '위로 요청이 스텔라 아고라에 공개되었습니다.'
+        : '항행 기록이 스텔라 아고라에 공개되었습니다.');
+    } catch (error) {
+      setShareMessage(error?.message || '공개에 실패했습니다.');
+    }
+  };
 
   useEffect(() => {
     setFeedbackReaction(assignment?.feedbackReaction || assignment?.feedbackResponse?.reaction || '');
@@ -1023,6 +1071,60 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
           >
             📊 학생 성장 리포트
           </button>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.8rem',
+          flexWrap: 'wrap',
+          padding: '0.8rem 0.9rem',
+          borderRadius: 10,
+          border: '1px solid rgba(0, 212, 255, 0.24)',
+          background: 'rgba(0, 212, 255, 0.06)'
+        }}>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>
+            <strong style={{ color: 'var(--crystal-cyan)' }}>스텔라 아고라 공개</strong>
+            <span style={{ marginLeft: '0.45rem' }}>
+              과제, 일일 학습 기록, 피드백과 보너스 광석을 친구들에게 공개합니다.
+            </span>
+            {!canPublishAssignment && (
+              <div style={{ color: '#fbbf24', marginTop: '0.22rem' }}>
+                과제 제출 내역과 피드백이 모두 있어야 공개할 수 있습니다.
+              </div>
+            )}
+            {canPublishAssignment && !shareCooldown.isLoading && !shareCooldown.data?.canShare && (
+              <div style={{ color: '#fbbf24', marginTop: '0.22rem' }}>
+                다음 공개 가능 시간: {formatNextShareDate(shareCooldown.data?.nextAvailableAt)}
+              </div>
+            )}
+            {shareMessage && (
+              <div style={{ color: shareMessage.includes('실패') ? '#fca5a5' : '#86efac', marginTop: '0.22rem' }}>
+                {shareMessage}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="space-btn cosmic-btn font-tech"
+              disabled={!canPublishAssignment || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending}
+              onClick={() => handlePublishAssignmentShare('archive')}
+              style={{ fontSize: '0.78rem', padding: '0.5rem 0.85rem' }}
+            >
+              기록 공개하기
+            </button>
+            <button
+              type="button"
+              className="space-btn font-tech"
+              disabled={!canPublishAssignment || shareCooldown.isLoading || !shareCooldown.data?.canShare || publish.isPending}
+              onClick={() => handlePublishAssignmentShare('comfort')}
+              style={{ borderColor: '#fda4af', color: '#fda4af', fontSize: '0.78rem', padding: '0.5rem 0.85rem' }}
+            >
+              위로 받기
+            </button>
+          </div>
         </div>
       </div>
       
