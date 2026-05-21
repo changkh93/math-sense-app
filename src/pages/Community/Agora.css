@@ -875,20 +875,24 @@
   border-color: rgba(0, 212, 255, 0.45);
 }
 
-.assignment-share-comment-input button {
-  width: 38px;
-  height: 38px;
+.assignment-share-comment-submit {
+  min-width: 78px;
+  height: 40px;
   border: none;
   border-radius: 10px;
   background: var(--crystal-cyan);
   color: #07111f;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
+  padding: 0 0.8rem;
   cursor: pointer;
+  font-weight: 900;
+  flex-shrink: 0;
 }
 
-.assignment-share-comment-input button:disabled {
+.assignment-share-comment-submit:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

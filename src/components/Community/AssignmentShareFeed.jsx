@@ -115,9 +115,11 @@ function AssignmentShareComments({ shareId }) {
           type="button"
           onClick={handleSubmit}
           disabled={!trimmed || commentMutation.isPending}
-          aria-label="댓글 보내기"
+          aria-label="댓글 등록"
+          className="assignment-share-comment-submit"
         >
           <SendHorizontal size={16} />
+          <span>등록</span>
         </button>
       </div>
     </div>
