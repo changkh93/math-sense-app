@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { db, auth } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, auth, functions } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import { useAdminUserAllAssignments, useAdminUserAllAttendance } from '../../hooks/useAssignments';
 import { getTodayKST } from '../../utils/streakUtils';
-import { Rocket, LogOut, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StudentReport from '../../components/Report/StudentReport';
 import DailyLearningTimeline from '../../components/Space/DailyLearningTimeline';
@@ -448,6 +449,7 @@ export default function ParentDashboard() {
   const [parentData, setParentData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // 다중 자녀 탭 관리
   const [selectedChildUid, setSelectedChildUid] = useState(null);
@@ -513,6 +515,50 @@ export default function ParentDashboard() {
     navigate('/');
   };
 
+  const handleDeleteAccount = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser?.uid || isDeletingAccount) return;
+
+    const confirmTarget = parentData?.phone || parentData?.loginId || parentData?.email || currentUser.email || '탈퇴';
+    const firstConfirm = window.confirm(
+      '학부모 계정을 완전히 탈퇴합니다.\n\n' +
+      '연결된 자녀 계정도 함께 삭제됩니다.\n\n' +
+      '삭제 범위: 로그인 계정, 자녀 학습 기록, 광석/거래 내역, 과제, 출석, 질문/답변, 쪽지, 스터디 크루 연결, 업로드 파일.\n\n' +
+      '이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?'
+    );
+    if (!firstConfirm) return;
+
+    const confirmText = window.prompt(
+      `최종 확인을 위해 아래 문구를 입력하세요.\n\n${confirmTarget}`
+    );
+    if (confirmText !== confirmTarget) {
+      alert('확인 문구가 일치하지 않아 탈퇴를 취소했습니다.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    window.sessionStorage.setItem('accountDeletionInProgress', currentUser.uid);
+
+    try {
+      const deleteAccount = httpsCallable(functions, 'deleteCurrentUserAccount');
+      await deleteAccount({ confirmText });
+      try {
+        await signOut(auth);
+      } catch (signOutErr) {
+        console.warn('signOut after account deletion failed:', signOutErr);
+      }
+      window.sessionStorage.removeItem('accountDeletionInProgress');
+      navigate('/', { replace: true });
+      alert('탈퇴 처리가 완료되었습니다.');
+    } catch (err) {
+      console.error('deleteCurrentUserAccount failed:', err);
+      window.sessionStorage.removeItem('accountDeletionInProgress');
+      alert(err?.message || '탈퇴 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -550,14 +596,26 @@ export default function ParentDashboard() {
           <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>메타 센스</span>
           <span style={{ fontSize: '0.75rem', color: '#a55eea', background: 'rgba(165,94,234,0.15)', padding: '2px 8px', borderRadius: '10px' }}>학부모</span>
         </div>
-        <button onClick={handleLogout} style={{
-          background: 'none', border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: '8px', padding: '8px 14px',
-          color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem'
-        }}>
-          <LogOut size={14} /> 로그아웃
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button onClick={handleDeleteAccount} disabled={isDeletingAccount} style={{
+            background: 'rgba(255, 88, 82, 0.08)', border: '1px solid rgba(255, 138, 132, 0.24)',
+            borderRadius: '8px', padding: '8px 14px',
+            color: '#ff8a84', cursor: isDeletingAccount ? 'not-allowed' : 'pointer',
+            opacity: isDeletingAccount ? 0.55 : 1,
+            display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem'
+          }}>
+            <Trash2 size={14} /> {isDeletingAccount ? '탈퇴 처리 중...' : '회원탈퇴'}
+          </button>
+          <button onClick={handleLogout} disabled={isDeletingAccount} style={{
+            background: 'none', border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '8px', padding: '8px 14px',
+            color: 'rgba(255,255,255,0.6)', cursor: isDeletingAccount ? 'not-allowed' : 'pointer',
+            opacity: isDeletingAccount ? 0.55 : 1,
+            display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem'
+          }}>
+            <LogOut size={14} /> 로그아웃
+          </button>
+        </div>
       </div>
 
       {/* Content */}

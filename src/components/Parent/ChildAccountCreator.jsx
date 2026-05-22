@@ -9,7 +9,7 @@ export default function ChildAccountCreator({ compact = false, onCreated }) {
     studentName: '',
     loginId: '',
     password: '',
-    grade: '초4',
+    grade: '',
     birthDate: ''
   });
   const [creating, setCreating] = useState(false);
@@ -27,7 +27,7 @@ export default function ChildAccountCreator({ compact = false, onCreated }) {
       const createChild = httpsCallable(functions, 'createChildAccountForParent');
       const result = await createChild(form);
       setMessage(`${result.data?.studentName || form.studentName} 계정이 생성되었습니다. 아이디: ${result.data?.loginId || form.loginId}`);
-      setForm({ studentName: '', loginId: '', password: '', grade: '초4', birthDate: '' });
+      setForm({ studentName: '', loginId: '', password: '', grade: '', birthDate: '' });
       if (onCreated) onCreated(result.data);
     } catch (err) {
       console.error(err);
@@ -80,7 +80,9 @@ export default function ChildAccountCreator({ compact = false, onCreated }) {
             style={inputStyle}
             value={form.grade}
             onChange={(e) => update('grade', e.target.value)}
+            required
           >
+            <option value="" style={{ color: '#111' }}>선택하세요.</option>
             {gradeOptions.map(grade => <option key={grade} value={grade} style={{ color: '#111' }}>{grade}</option>)}
           </select>
         </label>

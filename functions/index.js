@@ -36,6 +36,12 @@ function digitsOnly(value, maxLength = 20) {
   return String(value || "").replace(/[^0-9]/g, "").slice(0, maxLength);
 }
 
+function isDeletedMemberData(data = {}) {
+  return data?.isDeleted === true ||
+    data?.accountStatus === "deleted" ||
+    Boolean(data?.deletedAt);
+}
+
 function buildStudentEmail(loginId) {
   return `${String(loginId || "").toLowerCase()}@${STUDENT_AUTH_DOMAIN}`;
 }
@@ -489,16 +495,38 @@ exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) =>
 exports.registerParentProfile = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const token = context.auth?.token || {};
+  const signInProvider = token.firebase?.sign_in_provider || "";
   const parentName = cleanText(data?.parentName || token.name, 80);
   const phone = digitsOnly(data?.phone, 16);
   const marketingConsent = data?.marketingConsent === true;
   const termsAccepted = data?.termsAccepted === true;
 
+  if (signInProvider !== "google.com") {
+    throw new functions.https.HttpsError("failed-precondition", "Google 인증 후 학부모 회원가입을 진행해 주세요.");
+  }
   if (!parentName || phone.length < 10 || !termsAccepted) {
     throw new functions.https.HttpsError("invalid-argument", "이름, 전화번호, 필수 약관 동의가 필요합니다.");
   }
 
   const db = admin.firestore();
+  const studentUserSnap = await db.collection("users").doc(uid).get();
+  if (studentUserSnap.exists && !isDeletedMemberData(studentUserSnap.data())) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "이미 학생 계정으로 사용 중인 Google 계정입니다. 학부모 가입은 다른 Google 계정으로 진행해 주세요."
+    );
+  }
+
+  const samePhoneSnap = await db.collection("parents").where("phone", "==", phone).limit(5).get();
+  for (const parentDoc of samePhoneSnap.docs) {
+    if (parentDoc.id === uid) continue;
+    const parentData = parentDoc.data() || {};
+    if (isDeletedMemberData(parentData)) {
+      throw new functions.https.HttpsError("failed-precondition", "비활성화된 학부모 전화번호입니다. 선생님에게 문의해 주세요.");
+    }
+    throw new functions.https.HttpsError("already-exists", "이미 등록된 학부모 전화번호입니다.");
+  }
+
   const parentRef = db.collection("parents").doc(uid);
   const parentSnap = await parentRef.get();
   const existingChildren = parentSnap.exists && Array.isArray(parentSnap.data()?.childrenUids)
@@ -514,7 +542,8 @@ exports.registerParentProfile = regionalFunctions.https.onCall(async (data, cont
     photoURL: token.picture || "",
     childrenUids: existingChildren,
     role: "parent",
-    authProvider: "google_password",
+    authProvider: "google",
+    authProviders: FieldValue.arrayUnion("google.com"),
     isDeleted: false,
     termsAccepted: true,
     termsAcceptedAt: FieldValue.serverTimestamp(),

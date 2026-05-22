@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { EmailAuthProvider, linkWithCredential, signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { auth, googleProvider, functions } from '../firebase';
 import ChildAccountCreator from '../components/Parent/ChildAccountCreator';
@@ -9,8 +9,6 @@ export default function Signup() {
   const navigate = useNavigate();
   const [parentName, setParentName] = useState('');
   const [phone, setPhone] = useState('');
-  const [parentPassword, setParentPassword] = useState('');
-  const [parentPasswordConfirm, setParentPasswordConfirm] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [step, setStep] = useState('parent');
   const [loading, setLoading] = useState(false);
@@ -26,26 +24,26 @@ export default function Signup() {
       alert('학부모 전화번호를 확인해 주세요.');
       return;
     }
-    if (parentPassword.length < 6 || parentPassword !== parentPasswordConfirm) {
-      alert('비밀번호는 6자리 이상이어야 하며 확인값과 같아야 합니다.');
-      return;
-    }
 
     setLoading(true);
+    let authenticatedForSignup = false;
     try {
-      const cred = await signInWithPopup(auth, googleProvider);
-      const parentLoginEmail = `${phoneDigits}@parent.mathsense.app`;
-      const parentCredential = EmailAuthProvider.credential(parentLoginEmail, parentPassword);
-      await linkWithCredential(cred.user, parentCredential);
+      await signInWithPopup(auth, googleProvider);
+      authenticatedForSignup = true;
       const registerParent = httpsCallable(functions, 'registerParentProfile');
       await registerParent({ parentName, phone: phoneDigits, termsAccepted });
       setStep('child');
     } catch (err) {
       console.error(err);
-      const message = err?.code === 'auth/credential-already-in-use' || err?.code === 'auth/email-already-in-use'
-        ? '이미 등록된 학부모 전화번호입니다. 로그인 화면에서 전화번호와 비밀번호로 로그인해 주세요.'
+      const message = err?.code === 'functions/already-exists'
+        ? '이미 등록된 학부모 전화번호입니다. 기존 계정으로 로그인해 주세요.'
+        : err?.code === 'functions/failed-precondition'
+          ? err.message
         : err?.message || '회원가입에 실패했습니다.';
       alert(message);
+      if (authenticatedForSignup && auth.currentUser) {
+        await signOut(auth);
+      }
     } finally {
       setLoading(false);
     }
@@ -72,7 +70,7 @@ export default function Signup() {
         <section style={{ textAlign: 'center', marginBottom: 30 }}>
           <h1 style={{ margin: '0 0 12px', fontSize: 'clamp(2.2rem, 6vw, 3.6rem)', letterSpacing: 0 }}>회원가입</h1>
           <p style={{ margin: '0 auto', maxWidth: 560, color: 'rgba(255,255,255,0.62)', lineHeight: 1.65 }}>
-            학부모 전화번호 아이디를 만든 뒤 Google 인증을 연결하고, 이어서 자녀 학습자 계정을 만들어 줍니다.
+            학부모 이름과 전화번호를 입력한 뒤 Google 인증으로 가입하고, 이어서 자녀 학습자 계정을 만들어 줍니다.
           </p>
         </section>
 
@@ -80,18 +78,16 @@ export default function Signup() {
           <form onSubmit={handleParentSignup} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 18, padding: 26, display: 'grid', gap: 16, boxShadow: '0 24px 70px rgba(0,0,0,0.28)' }}>
             <div>
               <h2 style={{ margin: '0 0 8px' }}>학부모 계정 생성</h2>
-              <p style={{ margin: 0, color: 'rgba(255,255,255,0.58)', lineHeight: 1.55 }}>전화번호와 비밀번호로 로그인할 수 있고, 같은 계정에 Google 인증도 연결됩니다.</p>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.58)', lineHeight: 1.55 }}>앞으로 회원가입은 학부모 계정으로만 진행됩니다. 비밀번호 없이 Google 인증으로 로그인합니다.</p>
             </div>
             <input style={inputStyle} value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="학부모 이름" required />
             <input style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="학부모 전화번호" inputMode="tel" required />
-            <input style={inputStyle} type="password" value={parentPassword} onChange={(e) => setParentPassword(e.target.value)} placeholder="학부모 로그인 비밀번호" autoComplete="new-password" required />
-            <input style={inputStyle} type="password" value={parentPasswordConfirm} onChange={(e) => setParentPasswordConfirm(e.target.value)} placeholder="비밀번호 확인" autoComplete="new-password" required />
             <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: 'rgba(255,255,255,0.84)', lineHeight: 1.5 }}>
               <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} style={{ marginTop: 4 }} />
               <span><Link to="/terms" style={{ color: '#67e8f9' }}>이용약관 및 개인정보 처리</Link>에 동의합니다. (필수)</span>
             </label>
             <button type="submit" disabled={loading} style={{ border: 'none', borderRadius: 13, padding: '15px 18px', background: loading ? 'rgba(0,212,255,0.35)' : 'linear-gradient(135deg, #00d4ff, #7c3aed)', color: 'white', fontWeight: 900, fontSize: '1.05rem', cursor: loading ? 'not-allowed' : 'pointer' }}>
-              {loading ? '처리 중...' : '학부모 계정 만들고 Google 인증 연결'}
+              {loading ? '처리 중...' : 'Google 인증으로 학부모 회원가입'}
             </button>
           </form>
         ) : (
@@ -99,7 +95,7 @@ export default function Signup() {
             <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)', borderRadius: 16, padding: 18, color: '#bbf7d0' }}>
               학부모 회원가입이 완료되었습니다. 이어서 자녀 계정을 만들 수 있습니다.
             </div>
-            <ChildAccountCreator onCreated={() => navigate('/')} />
+            <ChildAccountCreator onCreated={() => navigate('/parent/dashboard')} />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={() => navigate('/parent/dashboard')} style={{ border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: 'white', borderRadius: 12, padding: '12px 18px', cursor: 'pointer', fontWeight: 800 }}>
                 학부모 대시보드로 이동

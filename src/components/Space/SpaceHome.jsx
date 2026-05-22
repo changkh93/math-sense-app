@@ -194,6 +194,12 @@ function SpaceHome() {
       }
     }
   }, [user?.uid])
+
+  useEffect(() => {
+    if (!authLoading && user && userData?.role === 'parent') {
+      navigate('/parent/dashboard', { replace: true })
+    }
+  }, [authLoading, navigate, user, userData?.role])
   
   // Selection State (Persist ID in session)
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
