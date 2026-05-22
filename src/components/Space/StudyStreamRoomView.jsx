@@ -26,6 +26,10 @@ const INITIAL_MEDIA_STATUS = {
   microphonePermission: 'unknown',
   messages: [],
 };
+const PEER_RESTARTABLE_ERROR_TYPES = new Set(['network', 'server-error', 'socket-error', 'socket-closed']);
+const PEER_REMOTE_WAIT_ERROR_TYPES = new Set(['peer-unavailable', 'disconnected']);
+const PEER_RESTART_DELAY_MS = 1800;
+const PEER_RESTART_ATTEMPT_LIMIT = 3;
 
 const tileStyle = {
   position: 'relative',
@@ -74,6 +78,27 @@ function getMediaErrorMessage(err, kind) {
     return `보안 설정 때문에 ${deviceLabel} 접근이 막혔습니다. HTTPS 접속 상태와 브라우저 권한을 확인해주세요.`;
   }
   return `${deviceLabel}를 시작하지 못했습니다. 브라우저 권한과 장치 상태를 확인해주세요.`;
+}
+
+function getPeerErrorMessage(err) {
+  const type = err?.type || err?.name || '';
+
+  if (type === 'peer-unavailable') {
+    return '상대방 연결 정보가 아직 준비되지 않았습니다. 잠시 후 자동으로 다시 연결을 시도합니다.';
+  }
+  if (type === 'network' || type === 'socket-error' || type === 'socket-closed') {
+    return 'PeerJS 신호 서버 연결이 불안정합니다. 자동 재연결을 시도합니다.';
+  }
+  if (type === 'server-error') {
+    return 'PeerJS 신호 서버가 응답하지 않습니다. 자동 재연결을 시도합니다.';
+  }
+  if (type === 'browser-incompatible') {
+    return '현재 브라우저가 WebRTC 연결을 지원하지 않습니다. Chrome 또는 Edge 최신 버전으로 접속해주세요.';
+  }
+  if (type === 'ssl-unavailable') {
+    return '보안 연결 설정 문제로 PeerJS에 연결하지 못했습니다. HTTPS 접속 상태를 확인해주세요.';
+  }
+  return 'PeerJS 연결에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 연결해주세요.';
 }
 
 async function queryMediaPermission(name) {
@@ -741,6 +766,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const miniWindowRef = useRef(null);
   const chatAlertStateRef = useRef({ initialized: false, messages: new Map() });
   const originalTitleRef = useRef(typeof document !== 'undefined' ? document.title : '');
+  const peerRetryTimerRef = useRef(0);
+  const peerRestartAttemptRef = useRef(0);
 
   const localParticipant = useMemo(
     () => participants.find((participant) => participant.uid === user.uid) || null,
@@ -908,6 +935,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         peerRef.current = peer;
 
         peer.on('open', async (peerId) => {
+          peerRestartAttemptRef.current = 0;
           try {
             await setDoc(doc(db, 'studyRooms', roomId, 'participants', user.uid), {
               uid: user.uid,
@@ -954,7 +982,21 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
 
         peer.on('error', (err) => {
           console.error('PeerJS error:', err);
-          setError('PeerJS 연결에 실패했습니다. 새로고침 후 다시 시도해주세요.');
+          const errorType = err?.type || err?.name || '';
+          if (PEER_REMOTE_WAIT_ERROR_TYPES.has(errorType)) {
+            return;
+          }
+
+          setError(getPeerErrorMessage(err));
+          if (!PEER_RESTARTABLE_ERROR_TYPES.has(errorType)) return;
+          if (peerRestartAttemptRef.current >= PEER_RESTART_ATTEMPT_LIMIT) return;
+
+          peerRestartAttemptRef.current += 1;
+          window.clearTimeout(peerRetryTimerRef.current);
+          peerRetryTimerRef.current = window.setTimeout(() => {
+            if (cancelled || peerRef.current !== peer) return;
+            setMediaSessionRevision((value) => value + 1);
+          }, PEER_RESTART_DELAY_MS);
         });
       } catch (err) {
         console.error('Failed to initialize Study Stream room:', err);
@@ -971,6 +1013,14 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
 
     return () => {
       cancelled = true;
+      window.clearTimeout(peerRetryTimerRef.current);
+      peerRetryTimerRef.current = 0;
+      setDoc(doc(db, 'studyRooms', roomId, 'participants', user.uid), {
+        peerId: '',
+        lastSeenAt: serverTimestamp(),
+      }, { merge: true }).catch((err) => {
+        console.warn('Failed to clear peer id:', err);
+      });
       activeCalls.forEach((call) => call.close());
       activeCalls.clear();
       if (peerRef.current) {
@@ -982,13 +1032,19 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         localStreamRef.current = null;
       }
     };
-  }, [attachLocalTrackWatchers, mediaSessionRevision, roomId, room?.hostUid, user.uid, user.displayName, userData?.publicDisplayName, userData?.studentName]);
+  }, [attachLocalTrackWatchers, mediaSessionRevision, roomId, user.uid, user.displayName, userData?.publicDisplayName, userData?.studentName]);
 
   useEffect(() => {
     if (!localStreamRef.current || !peerRef.current) return;
     participants.forEach((participant) => {
       if (participant.uid === user.uid || !participant.peerId) return;
-      if (callsRef.current.has(participant.uid)) return;
+      const existingCall = callsRef.current.get(participant.uid);
+      if (existingCall?.peer === participant.peerId) return;
+      if (existingCall) {
+        existingCall.close();
+        callsRef.current.delete(participant.uid);
+        setRemoteStreams((prev) => prev.filter((item) => item.uid !== participant.uid));
+      }
       if (user.uid > participant.uid) return;
 
       const outgoingCall = peerRef.current.call(participant.peerId, localStreamRef.current, {
