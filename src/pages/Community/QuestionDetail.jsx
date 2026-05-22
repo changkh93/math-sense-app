@@ -504,7 +504,7 @@ export default function QuestionDetail() {
               onClick={() => setIsDrawingModalOpen(false)}
               aria-label="첨부 이미지 닫기"
             >
-              <X size={24} />
+              <X size={24} strokeWidth={3} aria-hidden="true" />
             </button>
             <MotionDiv
               className="drawing-modal-stage"

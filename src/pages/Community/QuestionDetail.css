@@ -595,22 +595,38 @@
   position: fixed;
   top: 1.25rem;
   right: 1.25rem;
+  z-index: 3001;
   width: 46px;
   height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.44);
   border-radius: 50%;
-  background: rgba(10, 14, 28, 0.74);
-  color: rgba(255, 255, 255, 0.86);
+  background: rgba(5, 10, 24, 0.94);
+  color: #ffffff;
+  line-height: 1;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 0 0 1px rgba(0, 243, 255, 0.16), 0 12px 32px rgba(0, 0, 0, 0.55) !important;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.drawing-modal-close svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  color: #ffffff;
+  stroke: #ffffff !important;
+  filter: drop-shadow(0 0 6px rgba(0, 243, 255, 0.45));
+  opacity: 1;
 }
 
 .drawing-modal-close:hover,
 .drawing-modal-close:focus-visible {
-  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.78);
+  background: rgba(0, 243, 255, 0.18);
   color: white;
   transform: scale(1.04);
 }
