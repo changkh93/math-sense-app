@@ -839,6 +839,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       }
 
       await onComplete({ 
+        unitId: quizData?.unitId || quizData?.id || "",
+        unitTitle: quizData?.title || "탐사 퀴즈",
+        chapterId: quizData?.chapterId || "",
+        regionId: region?.id || "",
+        regionTitle: region?.title || "",
         score: finalScore, 
         initialRawScore: (firstPassScore !== null ? firstPassScore : rawScore), // Capture first pass specifically
         retryCount: retryCount, // Current session retry count

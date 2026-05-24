@@ -1130,6 +1130,11 @@ function SpaceHome() {
 
       // Anti-grinding logic
       const currentUnitId = result.unitId || selectedUnitDocId || quickQuizUnitId || 'unknown'
+      const currentUnitTitle = result.unitTitle || activeUnit?.title || '탐사 퀴즈'
+      const currentRegionId = result.regionId || selectedRegionId || ''
+      const currentRegionTitle = result.regionTitle || activeRegion?.title || 'Unknown Galaxy'
+      const currentChapterId = result.chapterId || selectedChapterDocId || ''
+      const isDarkMatterQuizResult = currentUnitId === 'dark_matter_zone'
       const scoreKey = result.type === 'workbook' ? `${currentUnitId}_workbook` : currentUnitId
       const previousBest = bestScores[scoreKey] || 0
       let actualCrystalsEarned = 0
@@ -1140,13 +1145,12 @@ function SpaceHome() {
         // Always apply penalty even if score didn't improve
         actualCrystalsEarned = crystalsEarned
         rewardMessage = `무지성 탐사로 인해 광석 ${Math.abs(crystalsEarned)}개가 소멸되었습니다.`
-      } else if (isDarkMatterMode) {
+      } else if (isDarkMatterMode || isDarkMatterQuizResult) {
         // --- Dark Matter Confidence-based Reward Policy ---
         // Reward is ONLY given for questions that are solved correctly AND the review mark is released.
         // If a user gets a question right but chooses to keep the review mark (guess or lack of confidence),
         // the question stays in Dark Matter and 0 crystals are awarded.
         const reviewMarkedIds = new Set((result.reviewMarkedQuestions || []).map(q => q.id))
-        const correctIds = new Set((result.correctQuestions || []).map(q => q.id))
         
         let solvedAndReleasedCount = 0
         result.correctQuestions?.forEach(q => {
@@ -1227,6 +1231,12 @@ function SpaceHome() {
         } else if (result.refineryMode) {
           // 정제소 모드는 서버 측 재계산 대신 전달받은 crystalsEarned를 신뢰 (이미 50 보너스가 포함됨)
           atomicCrystalsEarned = crystalsEarned
+        } else if (isDarkMatterQuizResult) {
+          const reviewMarkedIds = new Set((result.reviewMarkedQuestions || []).map(q => q.id))
+          const solvedAndReleasedCount = (result.correctQuestions || [])
+            .filter(q => !reviewMarkedIds.has(q.id))
+            .length
+          atomicCrystalsEarned = Math.min(5, solvedAndReleasedCount)
         } else if (score > serverPreviousBest) {
           const improvementRatio = (score - serverPreviousBest) / score
           atomicCrystalsEarned = Math.round((crystalsEarned || 0) * improvementRatio)
@@ -1315,7 +1325,7 @@ function SpaceHome() {
           recordCrystalTransaction(user.uid, {
             amount: atomicCrystalsEarned,
             type: atomicCrystalsEarned > 0 ? 'quiz_reward' : 'quiz_penalty',
-            description: `${activeUnit?.title || '탐사 퀴즈'} ${atomicCrystalsEarned > 0 ? `(${score}점)` : '(시스템 손상)'}`,
+            description: `${currentUnitTitle} ${atomicCrystalsEarned > 0 ? `(${score}점)` : '(시스템 손상)'}`,
             metadata: {
               unitId: currentUnitId,
               score,
@@ -1336,10 +1346,10 @@ function SpaceHome() {
         const historyRef = doc(collection(db, 'users', user.uid, 'history'))
         transaction.set(historyRef, {
           unitId: currentUnitId,
-          unitTitle: activeUnit?.title || "탐사 퀴즈",
-          regionId: selectedRegionId || freshUserData.lastRegionId || "",
-          regionTitle: activeRegion?.title || "Unknown Galaxy",
-          chapterId: selectedChapterDocId || "",
+          unitTitle: currentUnitTitle,
+          regionId: currentRegionId || freshUserData.lastRegionId || "",
+          regionTitle: currentRegionTitle,
+          chapterId: currentChapterId,
           clusterId: selectedClusterId,
           score: score,
           initialScore: result.initialRawScore ?? score, // 해당 세션만의 순수 최초 점수를 기록 (useLeaderboard가 과거 영수증을 역산하는데 사용됨)
@@ -1529,10 +1539,12 @@ function SpaceHome() {
         crystalsEarned: finalCrystals,
         isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
         rewardMessage: finalCrystals > 0 
-          ? (isDarkMatterMode 
+          ? ((isDarkMatterMode || isDarkMatterQuizResult) 
               ? `🌌 다크 매터 정화 성공! (+${finalCrystals} 광석)` 
               : `${score}점으로 최고 기록을 경신했습니다! (+${finalCrystals} 광석)`) + getRewardMultiplierSuffix(rewardMultiplierMeta)
-          : (score === 100 ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)" : `최고 점수를 넘지 못해 추가 광석을 획득할 수 없습니다.`),
+          : ((isDarkMatterMode || isDarkMatterQuizResult)
+              ? "문제를 맞혔으나 '재검토' 마크를 유지하여 보상이 지급되지 않았습니다. (학습 지속)"
+              : (score === 100 ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)" : `최고 점수를 넘지 못해 추가 광석을 획득할 수 없습니다.`)),
         streakInfo: {
           currentStreak: finalStreakUpdates.currentStreak || streakResultsFinal?.meta?.newStreak,
           freezeUsed: streakResultsFinal?.meta?.freezeUsed,
