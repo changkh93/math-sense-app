@@ -527,6 +527,12 @@ body.is-capturing .capture-hide {
   display: none !important;
 }
 
+body.is-capturing .modal-overlay,
+body.is-capturing #agora-floating-orb {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Hide YouTube iframes (which capture as black due to CORS) and show thumbnails instead */
 /* EXTENSION BRIDGE: If we use extension, we DON'T hide the video because extension can see it! */
 body.is-capturing:not(.is-extension-capturing) .yt-iframe-wrapper {

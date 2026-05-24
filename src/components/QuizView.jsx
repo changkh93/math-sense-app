@@ -269,7 +269,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       questionId: currentQuestion?.id,
       chapterId: quizData?.chapterId,
       unitId: quizData?.unitId,
-      wrongAnswer: userAnswers[currentQuestion?.id]
+      wrongAnswer: userAnswers[currentQuestion?.id],
+      captureRootSelector: '#regular-quiz-capture-area'
     })
     setIsQuestionModalOpen(true)
   }
@@ -402,7 +403,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
 
   // 퀴즈 화면
   return (
-    <div className="quiz-view-container glass" style={{ position: 'relative' }}>
+    <div id="regular-quiz-capture-area" className="quiz-view-container glass" style={{ position: 'relative' }}>
       <button className="exit-btn" onClick={() => { soundManager.playClick(); onExit(); }}>X 나가기</button>
       
       <div className="quiz-header">

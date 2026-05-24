@@ -718,7 +718,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       quizTitle: quizData?.title,
       questionId: currentQuestion?.id,
       chapterId: quizData?.chapterId,
-      wrongAnswer: userAnswers[currentQuestion?.id]
+      wrongAnswer: userAnswers[currentQuestion?.id],
+      captureRootSelector: '#space-quiz-capture-area'
     })
     setIsQuestionModalOpen(true)
   }
@@ -1330,7 +1331,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           </motion.div>
         )}
 
-        <div id="quiz-capture-area" className="glass-card space-quiz-card">
+        <div id="space-quiz-capture-area" className="glass-card space-quiz-card">
           {/* 닫기 버튼 (X 모양, 위치 저장 기능 유지) */}
           <button 
             onClick={handleExitClick}

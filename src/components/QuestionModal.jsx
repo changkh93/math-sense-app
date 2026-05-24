@@ -44,6 +44,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
   const [extensionStatus, setExtensionStatus] = useState('unknown'); // 'unknown', 'detected', 'not_found'
   const [showExtensionPrompt, setShowExtensionPrompt] = useState(false);
   const captureResolveRef = useRef(null);
+  const extensionProbeResolveRef = useRef(null);
+  const extensionProbeTimerRef = useRef(null);
 
   // Image Upload State
   const [attachedImage, setAttachedImage] = useState(null); // DataURL of uploaded/pasted image
@@ -54,7 +56,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       // Detect extension on open
-      checkExtension();
+      void checkExtension(1400);
     } else {
       document.body.style.overflow = 'auto';
       // Reset state when closing modal to prevent stale data
@@ -71,14 +73,34 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     return () => { document.body.style.overflow = 'auto'; };
   }, [isOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (extensionProbeTimerRef.current) {
+        clearTimeout(extensionProbeTimerRef.current);
+        extensionProbeTimerRef.current = null;
+      }
+      extensionProbeResolveRef.current = null;
+    };
+  }, []);
+
   // Handle messages from Extension Bridge
   useEffect(() => {
     const handleBridgeMessage = (event) => {
+      if (event.source !== window || !event.data || typeof event.data !== 'object') return;
       const { type, dataUrl, error, version } = event.data;
       
       if (type === 'AGORA_PONG') {
         console.log('🌌 Agora Extension Bridge Detected. Version:', version);
         setExtensionStatus('detected');
+        if (extensionProbeResolveRef.current) {
+          const resolve = extensionProbeResolveRef.current;
+          extensionProbeResolveRef.current = null;
+          if (extensionProbeTimerRef.current) {
+            clearTimeout(extensionProbeTimerRef.current);
+            extensionProbeTimerRef.current = null;
+          }
+          resolve(true);
+        }
       }
 
       if (type === 'AGORA_CAPTURE_RESPONSE') {
@@ -94,13 +116,135 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     return () => window.removeEventListener('message', handleBridgeMessage);
   }, []);
 
-  const checkExtension = () => {
+  const checkExtension = (timeoutMs = 1400) => {
+    if (extensionProbeTimerRef.current) {
+      clearTimeout(extensionProbeTimerRef.current);
+      extensionProbeTimerRef.current = null;
+    }
+
     setExtensionStatus('unknown');
     window.postMessage({ type: 'AGORA_PING' }, window.location.origin);
-    // Set a timeout to mark as not found if no pong received
-    setTimeout(() => {
-      setExtensionStatus(prev => prev === 'unknown' ? 'not_found' : prev);
-    }, 1000);
+
+    return new Promise((resolve) => {
+      extensionProbeResolveRef.current = resolve;
+      extensionProbeTimerRef.current = setTimeout(() => {
+        if (extensionProbeResolveRef.current === resolve) {
+          extensionProbeResolveRef.current = null;
+          extensionProbeTimerRef.current = null;
+          setExtensionStatus(prev => prev === 'unknown' ? 'not_found' : prev);
+          resolve(false);
+        }
+      }, timeoutMs);
+    });
+  };
+
+  const resolveCaptureElement = () => {
+    const selectorCandidates = [
+      activeContext?.captureRootSelector,
+      activeContext?.captureSelector,
+      activeContext?.captureRootId ? `#${activeContext.captureRootId}` : null,
+      (activeContext?.type === 'video' || activeContext?.type === 'datalog') ? '#quiz-capture-area' : null,
+      '#quiz-capture-area',
+      '#root',
+      'body'
+    ].filter(Boolean);
+
+    for (const selector of selectorCandidates) {
+      const element = document.querySelector(selector);
+      if (element) return element;
+    }
+
+    return null;
+  };
+
+  const isValidImageDataUrl = (dataUrl) => (
+    typeof dataUrl === 'string' && dataUrl.startsWith('data:image/') && dataUrl.length > 100
+  );
+
+  const getCaptureOptions = () => ({
+    quality: 0.9,
+    pixelRatio: 2,
+    backgroundColor: '#050a19',
+    cacheBust: true,
+    useCORS: true,
+    filter: (node) => {
+      if (node.classList?.contains('modal-overlay')) return false;
+      if (node.classList?.contains('capture-hide')) return false;
+      if (node.id === 'agora-floating-orb') return false;
+      if (node.tagName === 'IFRAME') return false;
+      if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
+        try {
+          if (node.sheet && !node.sheet.cssRules) return false;
+        } catch (e) {
+          console.warn('Skipping stylesheet due to potential SecurityError:', node.href);
+          return false;
+        }
+      }
+      return true;
+    }
+  });
+
+  const captureElementToDataUrl = async (element, captureOptions = getCaptureOptions()) => {
+    if (!element) return null;
+
+    const scrollEl = element.querySelector('.mission-content-view');
+    const cardEl = scrollEl?.querySelector('.glass-card');
+    if (scrollEl && cardEl && activeContext?.type === 'datalog') {
+      const scrollTop = scrollEl.scrollTop;
+      const viewportHeight = scrollEl.clientHeight;
+      const viewportWidth = scrollEl.clientWidth;
+      const ratio = 2;
+      const fullCanvas = await htmlToImage.toCanvas(cardEl, {
+        ...captureOptions,
+        quality: 1,
+        pixelRatio: ratio
+      });
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = viewportWidth * ratio;
+      cropCanvas.height = viewportHeight * ratio;
+      const ctx = cropCanvas.getContext('2d');
+      if (!ctx) return null;
+
+      ctx.drawImage(
+        fullCanvas,
+        0, scrollTop * ratio, cardEl.clientWidth * ratio, viewportHeight * ratio,
+        0, 0, viewportWidth * ratio, viewportHeight * ratio
+      );
+      return cropCanvas.toDataURL('image/png');
+    }
+
+    return htmlToImage.toPng(element, captureOptions);
+  };
+
+  const capturePdfFallbackToDataUrl = async (element) => {
+    if (!element) return null;
+
+    const iframes = element.querySelectorAll('iframe');
+    const placeholders = [];
+
+    try {
+      iframes.forEach(iframe => {
+        const placeholder = document.createElement('div');
+        placeholder.style.cssText = `
+          width: 100%; height: ${iframe.clientHeight || 360}px;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          background: linear-gradient(135deg, #1a1a2e, #16213e);
+          border: 2px dashed rgba(0, 243, 255, 0.4); border-radius: 12px;
+          color: rgba(0, 243, 255, 0.8); font-size: 1.5rem; font-family: monospace;
+        `;
+        placeholder.innerHTML = '<div style="font-size:3rem;margin-bottom:1rem">📄</div><div>PDF 문서 영역</div><div style="font-size:0.8rem;margin-top:0.5rem;color:rgba(255,255,255,0.4)">그림 위에 질문 내용을 그려주세요</div>';
+        iframe.parentNode?.insertBefore(placeholder, iframe);
+        iframe.style.display = 'none';
+        placeholders.push({ iframe, placeholder });
+      });
+
+      return await captureElementToDataUrl(element);
+    } finally {
+      placeholders.forEach(({ iframe, placeholder }) => {
+        iframe.style.display = '';
+        placeholder.remove();
+      });
+    }
   };
 
   const questionTypes = [
@@ -204,27 +348,35 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     return false; // Fell through
   };
 
-  const handleToggleDrawMode = async () => {
+  const handleToggleDrawMode = async ({ forceDomCapture = false } = {}) => {
     if (isDrawMode) {
       // Exit drawing mode without automatic saving (user must click Complete Attachment)
       setIsDrawMode(false);
     } else {
       // Turn ON: Capture Background
+      let shouldEnterDrawMode = false;
       try {
+        setError(null);
+        setShowExtensionPrompt(false);
         const isPdfDatalog = activeContext?.type === 'datalog' && activeContext?.pdfUrl;
         const isVideo = activeContext?.type === 'video';
 
         // ── 1. Extension Capture Path (works for BOTH video and PDF iframes) ──
-        if (isVideo || isPdfDatalog) {
-          if (extensionStatus === 'not_found' && isVideo) {
-             // Only show extension prompt for video (PDF has its own fallback)
-             setShowExtensionPrompt(true);
-             return;
-          }
-          
-          if (extensionStatus === 'detected') {
+        if ((isVideo || isPdfDatalog) && !forceDomCapture) {
+          const hasExtension = extensionStatus === 'detected' || await checkExtension(isVideo ? 2200 : 1400);
+          if (hasExtension) {
             const success = await attemptExtensionCapture();
-            if (success) return; // Extension captured the full screen including iframe
+            if (success) {
+              shouldEnterDrawMode = true;
+              return; // Extension captured the full screen including iframe
+            }
+          }
+
+          if (isVideo) {
+            // We cannot faithfully capture the live iframe frame without the bridge.
+            // Show the install prompt only after a second probe has failed.
+            setShowExtensionPrompt(true);
+            return;
           }
         }
 
@@ -238,72 +390,20 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
             console.log('📄 Attempting PDF capture via pdf.js for:', activeContext.pdfUrl);
             const result = await capturePdfPageToDataUrl(activeContext.pdfUrl, 1);
             console.log(`📄 PDF page ${result.pageNum}/${result.numPages} captured successfully`);
+            if (!isValidImageDataUrl(result.dataUrl)) throw new Error('PDF capture returned empty image');
             setBackgroundImage(result.dataUrl);
+            shouldEnterDrawMode = true;
           } catch (pdfErr) {
             console.warn('📄 PDF direct capture failed (CORS or network):', pdfErr.message);
             
             // ── 3. Fallback: Capture non-iframe content with a styled PDF placeholder ──
             try {
               await new Promise(resolve => setTimeout(resolve, 200));
-              const element = document.getElementById('quiz-capture-area');
-              if (element) {
-                // Temporarily replace the iframe area with a visible placeholder
-                const iframes = element.querySelectorAll('iframe');
-                const placeholders = [];
-                iframes.forEach(iframe => {
-                  const placeholder = document.createElement('div');
-                  placeholder.style.cssText = `
-                    width: 100%; height: ${iframe.clientHeight}px;
-                    display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    background: linear-gradient(135deg, #1a1a2e, #16213e);
-                    border: 2px dashed rgba(0, 243, 255, 0.4); border-radius: 12px;
-                    color: rgba(0, 243, 255, 0.8); font-size: 1.5rem; font-family: monospace;
-                  `;
-                  placeholder.innerHTML = '<div style="font-size:3rem;margin-bottom:1rem">📄</div><div>PDF 문서 영역</div><div style="font-size:0.8rem;margin-top:0.5rem;color:rgba(255,255,255,0.4)">그림 위에 질문 내용을 그려주세요</div>';
-                  iframe.parentNode.insertBefore(placeholder, iframe);
-                  iframe.style.display = 'none';
-                  placeholders.push({ iframe, placeholder });
-                });
-
-                const captureOptions = {
-                  quality: 0.9, pixelRatio: 2, backgroundColor: '#050a19',
-                  cacheBust: true, useCORS: true,
-                  filter: (node) => {
-                    if (node.classList?.contains('modal-overlay')) return false;
-                    if (node.classList?.contains('capture-hide')) return false;
-                    if (node.tagName === 'IFRAME') return false;
-                    if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
-                      try { if (node.sheet && !node.sheet.cssRules) return false; }
-                      catch (e) { return false; }
-                    }
-                    return true;
-                  }
-                };
-
-                const scrollEl = element.querySelector('.mission-content-view');
-                const cardEl = scrollEl?.querySelector('.glass-card');
-                if (scrollEl && cardEl) {
-                  const scrollTop = scrollEl.scrollTop;
-                  const viewportHeight = scrollEl.clientHeight;
-                  const viewportWidth = scrollEl.clientWidth;
-                  const ratio = 2;
-                  const fullCanvas = await htmlToImage.toCanvas(cardEl, { ...captureOptions, quality: 1, pixelRatio: ratio });
-                  const cropCanvas = document.createElement('canvas');
-                  cropCanvas.width = viewportWidth * ratio;
-                  cropCanvas.height = viewportHeight * ratio;
-                  const ctx = cropCanvas.getContext('2d');
-                  if (ctx) {
-                    ctx.drawImage(fullCanvas, 0, scrollTop * ratio, cardEl.clientWidth * ratio, viewportHeight * ratio, 0, 0, viewportWidth * ratio, viewportHeight * ratio);
-                    setBackgroundImage(cropCanvas.toDataURL('image/png'));
-                  }
-                }
-
-                // Restore iframes
-                placeholders.forEach(({ iframe, placeholder }) => {
-                  iframe.style.display = '';
-                  placeholder.remove();
-                });
-              }
+              const element = resolveCaptureElement();
+              const fallbackDataUrl = await capturePdfFallbackToDataUrl(element);
+              if (!isValidImageDataUrl(fallbackDataUrl)) throw new Error('PDF fallback returned empty image');
+              setBackgroundImage(fallbackDataUrl);
+              shouldEnterDrawMode = true;
             } catch (fallbackErr) {
               console.error('Fallback capture also failed:', fallbackErr);
               setError('PDF 화면을 캡처할 수 없습니다. 대신 📎 이미지 첨부 기능을 사용해주세요.');
@@ -319,87 +419,32 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
           // Wait for class change / UI state to settle
           await new Promise(resolve => setTimeout(resolve, 200));
 
-          const element = document.getElementById('quiz-capture-area');
+          const element = resolveCaptureElement();
           if (element) {
-            const captureOptions = {
-              quality: 0.9,
-              pixelRatio: 2,
-              backgroundColor: '#050a19',
-              cacheBust: true,
-              useCORS: true,
-              filter: (node) => {
-                // Skip problematic modal/UI elements
-                if (node.classList?.contains('modal-overlay')) return false;
-                if (node.classList?.contains('capture-hide')) return false;
-                // Skip IFRAMEs (like YouTube) to prevent SecurityError
-                if (node.tagName === 'IFRAME') return false;
-                // Skip style/link nodes that might trigger SecurityError if crossorigin fails
-                // We keep it broad but usually cross-origin links are the culprit
-                if (node.tagName === 'LINK' && node.rel === 'stylesheet') {
-                  try {
-                    // If we can't access rules, it's a security risk to keep it during capture
-                    if (node.sheet && !node.sheet.cssRules) return false;
-                  } catch (e) {
-                    console.warn('Skipping stylesheet due to potential SecurityError:', node.href);
-                    return false;
-                  }
-                }
-                return true;
-              }
-            };
-
             try {
-              // Precise Viewport Capture for Data Log
-              const scrollEl = element.querySelector('.mission-content-view');
-              const cardEl = scrollEl?.querySelector('.glass-card');
-              
-              if (scrollEl && cardEl && activeContext?.type === 'datalog') {
-                const scrollTop = scrollEl.scrollTop;
-                const viewportHeight = scrollEl.clientHeight;
-                const viewportWidth = scrollEl.clientWidth;
-                const ratio = 2; // Capture at 2x for clarity
-
-                // Capture the full content card first
-                const fullCanvas = await htmlToImage.toCanvas(cardEl, {
-                  ...captureOptions,
-                  quality: 1,
-                  pixelRatio: ratio
-                });
-
-                // Crop the visible part onto a new canvas
-                const cropCanvas = document.createElement('canvas');
-                cropCanvas.width = viewportWidth * ratio;
-                cropCanvas.height = viewportHeight * ratio;
-                const ctx = cropCanvas.getContext('2d');
-                
-                if (ctx) {
-                  ctx.drawImage(
-                    fullCanvas,
-                    0, scrollTop * ratio, cardEl.clientWidth * ratio, viewportHeight * ratio,
-                    0, 0, viewportWidth * ratio, viewportHeight * ratio
-                  );
-                  setBackgroundImage(cropCanvas.toDataURL('image/png'));
-                }
-              } else {
-                // Fallback for types without special scrolling needs (like video or quiz)
-                const dataUrl = await htmlToImage.toPng(element, captureOptions);
-                setBackgroundImage(dataUrl);
-              }
+              const dataUrl = await captureElementToDataUrl(element);
+              if (!isValidImageDataUrl(dataUrl)) throw new Error('DOM capture returned empty image');
+              setBackgroundImage(dataUrl);
+              shouldEnterDrawMode = true;
             } catch (captureErr) {
               console.error('Screen capture failed with Error:', captureErr);
               setError('화면을 캡처하는 중 보안 오류가 발생했습니다. 브라우저 설정이나 확장 프로그램을 확인해 주세요.');
             }
           } else {
-            console.warn('Capture target element #quiz-capture-area not found.');
+            console.warn('Capture target element not found.');
+            setError('캡처할 화면 영역을 찾지 못했습니다. 다시 시도하거나 이미지 첨부를 사용해주세요.');
           }
         }
       } catch (err) {
         console.error('General error entering draw mode:', err);
+        setError('화면 캡처를 시작하지 못했습니다. 다시 시도해주세요.');
       } finally {
         setIsCapturing(false);
         document.body.classList.remove('is-capturing');
         document.body.classList.remove('is-extension-capturing');
-        setIsDrawMode(true);
+        if (shouldEnterDrawMode) {
+          setIsDrawMode(true);
+        }
       }
     }
   };
@@ -823,11 +868,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
                 
                 <button 
                   onClick={() => {
-                    // Start legacy capture as fallback even if they don't install, but warn them
                     setShowExtensionPrompt(false);
-                    // Force legacy capture by tricking status
-                    setExtensionStatus('ignoring');
-                    setTimeout(() => handleToggleDrawMode(), 100);
+                    setTimeout(() => handleToggleDrawMode({ forceDomCapture: true }), 100);
                   }}
                   className="hud-btn secondary glass"
                   style={{ padding: '0.8rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}

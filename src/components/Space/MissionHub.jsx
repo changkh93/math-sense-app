@@ -652,7 +652,8 @@ export default function MissionHub({
       transmissionTitle: selectedTx?.title,
       videoId: contextType === 'video' ? selectedTx?.videoId : null,
       startTime: contextType === 'video' ? Math.floor(lastVideoTimeRef.current || 0) : null,
-      pdfUrl: contextType === 'datalog' ? missionData?.learningContents?.pdfUrl : null
+      pdfUrl: contextType === 'datalog' ? missionData?.learningContents?.pdfUrl : null,
+      captureRootSelector: '#mission-hub-capture-area'
     })
     setIsQuestionModalOpen(true)
   }
@@ -2637,7 +2638,7 @@ export default function MissionHub({
   }
 
   return (
-    <div className="mission-hub-container space-bg" id="quiz-capture-area" style={{ 
+    <div className="mission-hub-container space-bg" id="mission-hub-capture-area" style={{ 
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000,
       display: 'flex', flexDirection: 'column', overflow: 'hidden'
     }}>
