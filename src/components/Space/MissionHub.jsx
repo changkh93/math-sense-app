@@ -118,6 +118,7 @@ const getYouTubeVideoId = (value = '') => {
 }
 
 const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const params = new URLSearchParams({
     start: String(Math.max(0, Math.floor(Number(start) || 0))),
     autoplay: autoPlay ? '1' : '0',
@@ -125,7 +126,9 @@ const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
     rel: '0',
     modestbranding: '1',
     playsinline: '1',
+    enablejsapi: '1',
   })
+  if (origin) params.set('origin', origin)
   if (end) params.set('end', String(Math.floor(Number(end))))
   return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`
 }

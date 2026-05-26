@@ -37,6 +37,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
   const [isDrawMode, setIsDrawMode] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isPreparingCapture, setIsPreparingCapture] = useState(false);
   const [tempDrawing, setTempDrawing] = useState(null); // DataURL of final image
   const [canvasState, setCanvasState] = useState(null); // Fabric JSON for re-editing
 
@@ -66,6 +67,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       setBackgroundImage(null);
       setIsDrawMode(false);
       setIsCapturing(false);
+      setIsPreparingCapture(false);
       setError(null);
       setShowExtensionPrompt(false);
       setSelectedBounty(0);
@@ -356,6 +358,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       // Turn ON: Capture Background
       let shouldEnterDrawMode = false;
       try {
+        setIsPreparingCapture(true);
         setError(null);
         setShowExtensionPrompt(false);
         const isPdfDatalog = activeContext?.type === 'datalog' && activeContext?.pdfUrl;
@@ -439,6 +442,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         console.error('General error entering draw mode:', err);
         setError('화면 캡처를 시작하지 못했습니다. 다시 시도해주세요.');
       } finally {
+        setIsPreparingCapture(false);
         setIsCapturing(false);
         document.body.classList.remove('is-capturing');
         document.body.classList.remove('is-extension-capturing');
@@ -754,9 +758,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
                       type="button" 
                       className={`draw-toggle-btn ${isDrawMode ? 'active' : ''}`}
                       onClick={handleToggleDrawMode}
-                      disabled={isCapturing}
+                      disabled={isCapturing || isPreparingCapture}
                     >
-                      {isCapturing ? '화면 캡처 중...' : '🖌️ 그림으로 설명하기'}
+                      {isCapturing ? '화면 캡처 중...' : (isPreparingCapture ? '캡처 준비 중...' : '🖌️ 그림으로 설명하기')}
                     </button>
                   )}
                   <button 
