@@ -538,20 +538,24 @@ const ChildCard = ({ childUid }) => {
                     onClick={closePasswordReset}
                     disabled={resettingPassword}
                     style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      background: 'rgba(255,255,255,0.04)',
-                      color: 'rgba(255,255,255,0.66)',
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: 'rgba(255,255,255,0.82)',
                       cursor: resettingPassword ? 'not-allowed' : 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      gap: '6px',
+                      padding: '9px 12px',
+                      borderRadius: 999,
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap'
                     }}
-                    aria-label="닫기"
+                    aria-label="창 닫기"
+                    title="창 닫기"
                   >
-                    <X size={16} />
+                    <X size={14} />
+                    <span>닫기</span>
                   </button>
                 </div>
 
