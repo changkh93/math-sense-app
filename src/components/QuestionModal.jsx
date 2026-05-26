@@ -45,8 +45,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
   const [extensionStatus, setExtensionStatus] = useState('unknown'); // 'unknown', 'detected', 'not_found'
   const [showExtensionPrompt, setShowExtensionPrompt] = useState(false);
   const captureResolveRef = useRef(null);
+  const captureTimerRef = useRef(null);
   const extensionProbeResolveRef = useRef(null);
   const extensionProbeTimerRef = useRef(null);
+  const captureFlowLockRef = useRef(false);
 
   // Image Upload State
   const [attachedImage, setAttachedImage] = useState(null); // DataURL of uploaded/pasted image
@@ -60,6 +62,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       void checkExtension(1400);
     } else {
       document.body.style.overflow = 'auto';
+      resolvePendingExtensionProbe(false);
+      resolvePendingExtensionCapture({ error: 'Question modal closed' });
+      captureFlowLockRef.current = false;
       // Reset state when closing modal to prevent stale data
       setTempDrawing(null);
       setAttachedImage(null);
@@ -77,13 +82,30 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
 
   useEffect(() => {
     return () => {
-      if (extensionProbeTimerRef.current) {
-        clearTimeout(extensionProbeTimerRef.current);
-        extensionProbeTimerRef.current = null;
-      }
-      extensionProbeResolveRef.current = null;
+      resolvePendingExtensionProbe(false);
+      resolvePendingExtensionCapture({ error: 'Question modal unmounted' });
     };
   }, []);
+
+  const resolvePendingExtensionProbe = (detected) => {
+    if (extensionProbeTimerRef.current) {
+      clearTimeout(extensionProbeTimerRef.current);
+      extensionProbeTimerRef.current = null;
+    }
+    const resolve = extensionProbeResolveRef.current;
+    extensionProbeResolveRef.current = null;
+    if (resolve) resolve(detected);
+  };
+
+  const resolvePendingExtensionCapture = (result) => {
+    if (captureTimerRef.current) {
+      clearTimeout(captureTimerRef.current);
+      captureTimerRef.current = null;
+    }
+    const resolve = captureResolveRef.current;
+    captureResolveRef.current = null;
+    if (resolve) resolve(result);
+  };
 
   // Handle messages from Extension Bridge
   useEffect(() => {
@@ -94,23 +116,11 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       if (type === 'AGORA_PONG') {
         console.log('🌌 Agora Extension Bridge Detected. Version:', version);
         setExtensionStatus('detected');
-        if (extensionProbeResolveRef.current) {
-          const resolve = extensionProbeResolveRef.current;
-          extensionProbeResolveRef.current = null;
-          if (extensionProbeTimerRef.current) {
-            clearTimeout(extensionProbeTimerRef.current);
-            extensionProbeTimerRef.current = null;
-          }
-          resolve(true);
-        }
+        resolvePendingExtensionProbe(true);
       }
 
       if (type === 'AGORA_CAPTURE_RESPONSE') {
-        if (captureResolveRef.current) {
-          if (dataUrl) captureResolveRef.current({ dataUrl });
-          else captureResolveRef.current({ error });
-          captureResolveRef.current = null;
-        }
+        resolvePendingExtensionCapture(dataUrl ? { dataUrl } : { error });
       }
     };
 
@@ -119,24 +129,24 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
   }, []);
 
   const checkExtension = (timeoutMs = 1400) => {
-    if (extensionProbeTimerRef.current) {
-      clearTimeout(extensionProbeTimerRef.current);
-      extensionProbeTimerRef.current = null;
-    }
-
+    resolvePendingExtensionProbe(false);
     setExtensionStatus('unknown');
-    window.postMessage({ type: 'AGORA_PING' }, window.location.origin);
 
     return new Promise((resolve) => {
-      extensionProbeResolveRef.current = resolve;
+      extensionProbeResolveRef.current = (detected) => {
+        setExtensionStatus(detected ? 'detected' : 'not_found');
+        resolve(detected);
+      };
       extensionProbeTimerRef.current = setTimeout(() => {
-        if (extensionProbeResolveRef.current === resolve) {
-          extensionProbeResolveRef.current = null;
-          extensionProbeTimerRef.current = null;
-          setExtensionStatus(prev => prev === 'unknown' ? 'not_found' : prev);
-          resolve(false);
-        }
+        resolvePendingExtensionProbe(false);
       }, timeoutMs);
+
+      try {
+        window.postMessage({ type: 'AGORA_PING' }, window.location.origin);
+      } catch (err) {
+        console.warn('Extension probe failed:', err);
+        resolvePendingExtensionProbe(false);
+      }
     });
   };
 
@@ -320,6 +330,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
 
   // ─── Extension Capture Helper (shared between video & PDF) ───
   const attemptExtensionCapture = async () => {
+    resolvePendingExtensionCapture({ error: 'New capture request started' });
     setIsCapturing(true);
     document.body.classList.add('is-capturing');
     document.body.classList.add('is-extension-capturing');
@@ -333,11 +344,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       }, 300);
 
       // Timeout fallback
-      setTimeout(() => {
-        if (captureResolveRef.current === resolve) {
-          resolve({ error: 'Extension response timeout' });
-          captureResolveRef.current = null;
-        }
+      captureTimerRef.current = setTimeout(() => {
+        resolvePendingExtensionCapture({ error: 'Extension response timeout' });
       }, 6000);
     });
 
@@ -350,11 +358,35 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     return false; // Fell through
   };
 
+  const captureDomBackground = async () => {
+    setBackgroundImage(null);
+    setIsCapturing(true);
+    document.body.classList.add('is-capturing');
+    
+    // Wait for capture-hide / iframe-placeholder CSS to settle.
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    const element = resolveCaptureElement();
+    if (!element) {
+      throw new Error('Capture target element not found');
+    }
+
+    const dataUrl = await captureElementToDataUrl(element);
+    if (!isValidImageDataUrl(dataUrl)) {
+      throw new Error('DOM capture returned empty image');
+    }
+
+    setBackgroundImage(dataUrl);
+    return true;
+  };
+
   const handleToggleDrawMode = async ({ forceDomCapture = false } = {}) => {
     if (isDrawMode) {
       // Exit drawing mode without automatic saving (user must click Complete Attachment)
       setIsDrawMode(false);
     } else {
+      if (captureFlowLockRef.current) return;
+      captureFlowLockRef.current = true;
       // Turn ON: Capture Background
       let shouldEnterDrawMode = false;
       try {
@@ -376,9 +408,15 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
           }
 
           if (isVideo) {
-            // We cannot faithfully capture the live iframe frame without the bridge.
-            // Show the install prompt only after a second probe has failed.
-            setShowExtensionPrompt(true);
+            try {
+              // Browser DOM capture cannot read the live YouTube iframe, so CSS swaps
+              // it for the in-app timestamped thumbnail placeholder during capture.
+              shouldEnterDrawMode = await captureDomBackground();
+            } catch (videoFallbackErr) {
+              console.error('Video fallback capture failed:', videoFallbackErr);
+              setShowExtensionPrompt(true);
+              setError('영상 화면 캡처를 시작하지 못했습니다. 아고라 커넥트 설치 후 다시 시도하거나 이미지 첨부를 사용해주세요.');
+            }
             return;
           }
         }
@@ -415,33 +453,22 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
           // Continue to finally block → enter draw mode
         } else {
           // ── Original html-to-image capture for non-PDF content ──
-          setBackgroundImage(null); 
-          setIsCapturing(true); 
-          document.body.classList.add('is-capturing');
-          
-          // Wait for class change / UI state to settle
-          await new Promise(resolve => setTimeout(resolve, 200));
-
-          const element = resolveCaptureElement();
-          if (element) {
-            try {
-              const dataUrl = await captureElementToDataUrl(element);
-              if (!isValidImageDataUrl(dataUrl)) throw new Error('DOM capture returned empty image');
-              setBackgroundImage(dataUrl);
-              shouldEnterDrawMode = true;
-            } catch (captureErr) {
-              console.error('Screen capture failed with Error:', captureErr);
-              setError('화면을 캡처하는 중 보안 오류가 발생했습니다. 브라우저 설정이나 확장 프로그램을 확인해 주세요.');
-            }
-          } else {
-            console.warn('Capture target element not found.');
-            setError('캡처할 화면 영역을 찾지 못했습니다. 다시 시도하거나 이미지 첨부를 사용해주세요.');
+          try {
+            shouldEnterDrawMode = await captureDomBackground();
+          } catch (captureErr) {
+            console.error('Screen capture failed with Error:', captureErr);
+            setError(
+              captureErr.message === 'Capture target element not found'
+                ? '캡처할 화면 영역을 찾지 못했습니다. 다시 시도하거나 이미지 첨부를 사용해주세요.'
+                : '화면을 캡처하는 중 보안 오류가 발생했습니다. 브라우저 설정이나 확장 프로그램을 확인해 주세요.'
+            );
           }
         }
       } catch (err) {
         console.error('General error entering draw mode:', err);
         setError('화면 캡처를 시작하지 못했습니다. 다시 시도해주세요.');
       } finally {
+        captureFlowLockRef.current = false;
         setIsPreparingCapture(false);
         setIsCapturing(false);
         document.body.classList.remove('is-capturing');

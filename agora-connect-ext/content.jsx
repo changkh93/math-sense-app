@@ -36,13 +36,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // 획기적인 영상 캡처 해결책: 웹 앱에서 요청하면 확장 프로그램이 응답함
 // ============================================================
 window.addEventListener('message', (event) => {
-  // 보안을 위해 출처 확인이 필요할 수 있으나, 여기서는 액션 기반으로 처리
+  if (event.source !== window || !event.data || typeof event.data !== 'object') return;
   const { type } = event.data;
 
   // 1. 상태 확인 (Ping)
   if (type === 'AGORA_PING') {
     console.log('🌌 [Content] Received AGORA_PING');
-    window.postMessage({ type: 'AGORA_PONG', version: '1.0.2' }, window.location.origin);
+    window.postMessage({ type: 'AGORA_PONG', version: '1.0.3' }, window.location.origin);
   }
 
   // 2. 캡처 요청
@@ -57,6 +57,9 @@ window.addEventListener('message', (event) => {
       if (response && response.dataUrl) {
         console.log('🌌 [Content] Capture Success, sending response');
         window.postMessage({ type: 'AGORA_CAPTURE_RESPONSE', dataUrl: response.dataUrl }, window.location.origin);
+      } else if (response && response.error) {
+        console.warn('🌌 [Content] Capture returned error:', response.error);
+        window.postMessage({ type: 'AGORA_CAPTURE_RESPONSE', error: response.error }, window.location.origin);
       } else {
         console.warn('🌌 [Content] Capture returned empty response');
         window.postMessage({ type: 'AGORA_CAPTURE_RESPONSE', error: 'Capture failed or returned empty' }, window.location.origin);
