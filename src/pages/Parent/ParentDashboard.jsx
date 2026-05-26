@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import { useAdminUserAllAssignments, useAdminUserAllAttendance } from '../../hooks/useAssignments';
 import { getTodayKST } from '../../utils/streakUtils';
-import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight, KeyRound, Eye, EyeOff, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StudentReport from '../../components/Report/StudentReport';
 import DailyLearningTimeline from '../../components/Space/DailyLearningTimeline';
@@ -164,6 +164,11 @@ const ChildCard = ({ childUid }) => {
   const [showReport, setShowReport] = useState(false);
   const [reportDays, setReportDays] = useState(30);
   const [selectedDate, setSelectedDate] = useState(getTodayKST());
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
+  const [showPasswordText, setShowPasswordText] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
   
   const isToday = selectedDate === getTodayKST();
 
@@ -184,6 +189,41 @@ const ChildCard = ({ childUid }) => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(timer);
   }, []);
+
+  const closePasswordReset = () => {
+    if (resettingPassword) return;
+    setShowPasswordReset(false);
+    setPasswordForm({ password: '', confirm: '' });
+    setShowPasswordText(false);
+    setPasswordMessage('');
+  };
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    setPasswordMessage('');
+
+    if (passwordForm.password.length < 6) {
+      setPasswordMessage('비밀번호는 6자 이상이어야 합니다.');
+      return;
+    }
+    if (passwordForm.password !== passwordForm.confirm) {
+      setPasswordMessage('비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const resetChildPassword = httpsCallable(functions, 'resetChildPasswordForParent');
+      await resetChildPassword({ targetUid: childUid, newPassword: passwordForm.password });
+      setPasswordMessage('비밀번호가 변경되었습니다.');
+      setPasswordForm({ password: '', confirm: '' });
+    } catch (err) {
+      console.error('resetChildPasswordForParent failed:', err);
+      setPasswordMessage(err?.message || '비밀번호 변경에 실패했습니다.');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
 
   if (!childData) {
     return (
@@ -401,7 +441,31 @@ const ChildCard = ({ childUid }) => {
         </div>
 
         {/* Report Button */}
-        <div style={{ padding: '0 20px 18px' }}>
+        <div style={{ padding: '0 20px 18px', display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+          <button
+            onClick={() => {
+              setShowPasswordReset(true);
+              setPasswordMessage('');
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '12px',
+              color: 'rgba(255,255,255,0.78)',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              transition: 'all 0.2s'
+            }}
+          >
+            <KeyRound size={16} /> 학생 비밀번호 변경
+          </button>
           <button
             onClick={() => setShowReport(!showReport)}
             style={{
@@ -424,6 +488,189 @@ const ChildCard = ({ childUid }) => {
             📊 {showReport ? '리포트 닫기' : '성장 리포트 보기'}
           </button>
         </div>
+
+        <AnimatePresence>
+          {showPasswordReset && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 30,
+                background: 'rgba(3, 7, 18, 0.72)',
+                backdropFilter: 'blur(8px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 20
+              }}
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) closePasswordReset();
+              }}
+            >
+              <motion.form
+                onSubmit={handlePasswordReset}
+                initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                style={{
+                  width: 'min(100%, 420px)',
+                  background: 'rgba(26, 27, 46, 0.96)',
+                  border: '1px solid rgba(165, 94, 234, 0.28)',
+                  borderRadius: 18,
+                  boxShadow: '0 24px 80px rgba(0,0,0,0.48)',
+                  padding: 22,
+                  display: 'grid',
+                  gap: 14
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <h3 style={{ margin: 0, color: 'white', fontSize: '1.05rem' }}>학생 비밀번호 변경</h3>
+                    <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.52)', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                      {childData.studentName || childData.name || '자녀'} · {childData.loginId || childData.email}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closePasswordReset}
+                    disabled={resettingPassword}
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 10,
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(255,255,255,0.04)',
+                      color: 'rgba(255,255,255,0.66)',
+                      cursor: resettingPassword ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    aria-label="닫기"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <label>
+                  <span style={{ display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.68)', fontSize: '0.84rem' }}>새 비밀번호</span>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPasswordText ? 'text' : 'password'}
+                      value={passwordForm.password}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, password: e.target.value }))}
+                      minLength={6}
+                      autoComplete="new-password"
+                      required
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '12px 44px 12px 13px',
+                        borderRadius: 11,
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        background: 'rgba(255,255,255,0.06)',
+                        color: 'white',
+                        fontSize: '1rem'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordText(prev => !prev)}
+                      style={{
+                        position: 'absolute',
+                        right: 9,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'rgba(255,255,255,0.55)',
+                        cursor: 'pointer'
+                      }}
+                      aria-label={showPasswordText ? '비밀번호 숨기기' : '비밀번호 보기'}
+                    >
+                      {showPasswordText ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </label>
+
+                <label>
+                  <span style={{ display: 'block', marginBottom: 6, color: 'rgba(255,255,255,0.68)', fontSize: '0.84rem' }}>새 비밀번호 확인</span>
+                  <input
+                    type={showPasswordText ? 'text' : 'password'}
+                    value={passwordForm.confirm}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm: e.target.value }))}
+                    minLength={6}
+                    autoComplete="new-password"
+                    required
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '12px 13px',
+                      borderRadius: 11,
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      background: 'rgba(255,255,255,0.06)',
+                      color: 'white',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </label>
+
+                {passwordMessage && (
+                  <div style={{
+                    color: passwordMessage.includes('변경되었습니다') ? '#80f7c4' : '#ff8a84',
+                    background: passwordMessage.includes('변경되었습니다') ? 'rgba(0,255,160,0.08)' : 'rgba(255,88,82,0.08)',
+                    border: `1px solid ${passwordMessage.includes('변경되었습니다') ? 'rgba(0,255,160,0.18)' : 'rgba(255,88,82,0.18)'}`,
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    fontSize: '0.86rem'
+                  }}>
+                    {passwordMessage}
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={closePasswordReset}
+                    disabled={resettingPassword}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 11,
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.04)',
+                      color: 'rgba(255,255,255,0.72)',
+                      cursor: resettingPassword ? 'not-allowed' : 'pointer',
+                      fontWeight: 700
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resettingPassword}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 11,
+                      border: '1px solid rgba(165,94,234,0.34)',
+                      background: resettingPassword ? 'rgba(165,94,234,0.34)' : 'linear-gradient(135deg, #a55eea, #45aaf2)',
+                      color: 'white',
+                      cursor: resettingPassword ? 'not-allowed' : 'pointer',
+                      fontWeight: 800
+                    }}
+                  >
+                    {resettingPassword ? '변경 중...' : '변경'}
+                  </button>
+                </div>
+              </motion.form>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Full Report */}
         {showReport && (

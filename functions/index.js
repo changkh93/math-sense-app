@@ -933,6 +933,61 @@ exports.adminResetUserPassword = regionalFunctions.https.onCall(async (data, con
   }
 });
 
+exports.resetChildPasswordForParent = regionalFunctions.https.onCall(async (data, context) => {
+  const parentUid = await requireAuthUid(context);
+  const { parentData } = await requireParentDoc(parentUid);
+  const targetUid = typeof data?.targetUid === "string" ? data.targetUid.trim() : "";
+  const newPassword = String(data?.newPassword || "");
+
+  if (!targetUid) {
+    throw new functions.https.HttpsError("invalid-argument", "자녀 계정 정보가 올바르지 않습니다.");
+  }
+  if (newPassword.length < 6) {
+    throw new functions.https.HttpsError("invalid-argument", "비밀번호는 6자 이상이어야 합니다.");
+  }
+
+  const childrenUids = Array.isArray(parentData.childrenUids) ? parentData.childrenUids : [];
+  if (!childrenUids.includes(targetUid)) {
+    throw new functions.https.HttpsError("permission-denied", "연결된 자녀 계정만 변경할 수 있습니다.");
+  }
+
+  const db = admin.firestore();
+  const childRef = db.collection("users").doc(targetUid);
+  const childSnap = await childRef.get();
+  if (!childSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "자녀 계정을 찾을 수 없습니다.");
+  }
+
+  const childData = childSnap.data() || {};
+  if (childData.role === "admin" || childData.role === "parent") {
+    throw new functions.https.HttpsError("permission-denied", "학생 계정만 변경할 수 있습니다.");
+  }
+  if (childData.parentUid && childData.parentUid !== parentUid) {
+    throw new functions.https.HttpsError("permission-denied", "연결된 보호자 정보가 일치하지 않습니다.");
+  }
+
+  try {
+    await admin.auth().updateUser(targetUid, { password: newPassword });
+    await childRef.set({
+      lastPasswordResetByParentAt: FieldValue.serverTimestamp(),
+      lastPasswordResetByParentUid: parentUid,
+    }, { merge: true });
+
+    return {
+      success: true,
+      childUid: targetUid,
+      loginId: childData.loginId || "",
+      email: childData.email || "",
+    };
+  } catch (error) {
+    if (error?.code === "auth/user-not-found") {
+      throw new functions.https.HttpsError("not-found", "자녀 로그인 계정을 찾을 수 없습니다.");
+    }
+    console.error("resetChildPasswordForParent error:", error);
+    throw new functions.https.HttpsError("internal", "비밀번호 변경 중 오류가 발생했습니다.");
+  }
+});
+
 /**
  * acceptAgoraAnswer
  *
