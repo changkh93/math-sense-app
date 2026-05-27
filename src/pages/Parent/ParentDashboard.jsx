@@ -5,7 +5,7 @@ import { httpsCallable } from 'firebase/functions';
 import { db, auth, functions } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
-import { useAdminUserAllAssignments, useAdminUserAllAttendance } from '../../hooks/useAssignments';
+import { useAdminUserAllAssignments, useAdminUserAllAttendance, useStudentAssignmentWarnings } from '../../hooks/useAssignments';
 import { getTodayKST } from '../../utils/streakUtils';
 import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight, KeyRound, Eye, EyeOff, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +25,25 @@ const formatTimeElapsed = (ms) => {
   return `${hours}시간 전`;
 };
 
+const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
+const ACTIVE_WARNING_STATUSES = ['active', 'appealed'];
+
+const getTimestampMs = (value) => {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (value.seconds) return value.seconds * 1000;
+  if (value._seconds) return value._seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getAttendanceBaseMs = (attendance) => (
+  getTimestampMs(attendance?.timestamp) ||
+  getTimestampMs(attendance?.createdAt) ||
+  getTimestampMs(attendance?.updatedAt) ||
+  (attendance?.date ? new Date(`${attendance.date}T23:59:59+09:00`).getTime() : 0)
+);
+
 // -------------------------------------------------------------
 // ChildCalendar: Monthly calendar view for attendance/assignments
 // -------------------------------------------------------------
@@ -34,6 +53,7 @@ const ChildCalendar = ({ childUid, onDateSelect, selectedDate }) => {
   // Fetch all assignments and attendance for this child
   const { data: assignments } = useAdminUserAllAssignments(childUid);
   const { data: attendanceRecords } = useAdminUserAllAttendance(childUid);
+  const { data: assignmentWarnings = [] } = useStudentAssignmentWarnings(childUid);
 
   const daysInMonth = useMemo(() => {
     const year = currentMonth.getFullYear();
@@ -58,6 +78,28 @@ const ChildCalendar = ({ childUid, onDateSelect, selectedDate }) => {
     const days = [];
     const year = currentMonth.getFullYear();
     const month = String(currentMonth.getMonth() + 1).padStart(2, '0');
+    const nowMs = Date.now();
+    const submittedAssignmentKeys = new Set(
+      (assignments || [])
+        .filter(a => ['submitted', 'reviewed', 'needs_revision'].includes(a.status))
+        .map(a => `${a.date || ''}:${a.clusterId || ''}`)
+    );
+    const missingByDate = (attendanceRecords || []).reduce((acc, attendance) => {
+      if (!attendance?.date) return acc;
+      const assignmentKey = `${attendance.date}:${attendance.clusterId || ''}`;
+      if (submittedAssignmentKeys.has(assignmentKey)) return acc;
+      const baseMs = getAttendanceBaseMs(attendance);
+      if (!baseMs || nowMs - baseMs < ASSIGNMENT_MISSING_GRACE_MS) return acc;
+      if (!acc[attendance.date]) acc[attendance.date] = [];
+      acc[attendance.date].push(attendance);
+      return acc;
+    }, {});
+    const warningsByDate = (assignmentWarnings || []).reduce((acc, warning) => {
+      if (!warning?.date || !ACTIVE_WARNING_STATUSES.includes(warning.status)) return acc;
+      if (!acc[warning.date]) acc[warning.date] = [];
+      acc[warning.date].push(warning);
+      return acc;
+    }, {});
 
     for (let i = 0; i < firstDayOfMonth; i++) {
        days.push(null);
@@ -74,11 +116,13 @@ const ChildCalendar = ({ childUid, onDateSelect, selectedDate }) => {
         dateStr,
         dayNumber: i,
         assignments: dayAssignments,
-        attendance: attendance || null
+        attendance: attendance || null,
+        missingAttendances: missingByDate[dateStr] || [],
+        warnings: warningsByDate[dateStr] || []
       });
     }
     return days;
-  }, [currentMonth, firstDayOfMonth, daysInMonth, assignments, attendanceRecords]);
+  }, [currentMonth, firstDayOfMonth, daysInMonth, assignments, attendanceRecords, assignmentWarnings]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -111,6 +155,8 @@ const ChildCalendar = ({ childUid, onDateSelect, selectedDate }) => {
           
           const isSelected = selectedDate === day.dateStr;
           const isToday = day.dateStr === getTodayKST();
+          const hasMissing = day.missingAttendances.length > 0;
+          const hasWarning = day.warnings.length > 0;
           
           return (
             <div
@@ -131,6 +177,22 @@ const ChildCalendar = ({ childUid, onDateSelect, selectedDate }) => {
               }}
             >
               <span style={{ fontSize: '0.75rem', color: isToday ? '#a55eea' : 'white', fontWeight: isToday ? 700 : 400 }}>{day.dayNumber}</span>
+              {hasWarning && (
+                <div
+                  title="과제 경고"
+                  style={{
+                    position: 'absolute',
+                    top: 3,
+                    right: 3,
+                    color: '#fbbf24',
+                    fontSize: '0.74rem',
+                    lineHeight: 1,
+                    filter: 'drop-shadow(0 0 5px rgba(251,191,36,0.75))'
+                  }}
+                >
+                  ⚠
+                </div>
+              )}
               
               <div style={{ display: 'flex', gap: '2px', marginTop: '2px' }}>
                 {day.attendance && (
@@ -138,6 +200,9 @@ const ChildCalendar = ({ childUid, onDateSelect, selectedDate }) => {
                 )}
                 {day.assignments.length > 0 && (
                   <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: getStatusColor(day.assignments[0].status) }} title="과제" />
+                )}
+                {hasMissing && (
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#fb7185' }} title="출석 후 과제 미제출" />
                 )}
               </div>
             </div>
@@ -148,6 +213,8 @@ const ChildCalendar = ({ childUid, onDateSelect, selectedDate }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00ffa0' }} /> 출석</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fbbf24' }} /> 과제제출</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ffb703' }} /> 지각/보완</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fb7185' }} /> 미제출</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#fbbf24' }}>⚠ 경고</div>
       </div>
     </div>
   );

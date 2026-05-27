@@ -28,6 +28,20 @@ const ASSIGNMENT_SHARE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const ASSIGNMENT_SHARE_REACTION_REWARD = 1;
 const STUDENT_AUTH_DOMAIN = "student.mathsense.app";
 
+function buildAssignmentHubLink(clusterId, date) {
+  const params = new URLSearchParams({ view: "assignment_hub" });
+  if (clusterId) params.set("clusterId", String(clusterId));
+  if (date) params.set("date", String(date));
+  return `/?${params.toString()}`;
+}
+
+function getAssignmentNotificationClusterLabel(clusterId) {
+  if (!clusterId) return "해당 과정";
+  if (clusterId === "cluster_elementary") return "초등수학";
+  if (clusterId === "cluster_middle") return "중등수학";
+  return String(clusterId);
+}
+
 function cleanText(value, maxLength = 200) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
@@ -2861,6 +2875,7 @@ exports.applyMissingAssignmentPenalties = regionalFunctions.https.onCall(async (
   for (const item of candidates) {
     const txRef = userRef.collection("crystal_transactions").doc(item.txId);
     const warningRef = item.warningId ? db.collection("assignmentWarnings").doc(item.warningId) : null;
+    const missingNotificationRef = db.collection("notifications").doc(`assignment_missing_${uid}_${normalizedClusterId}_${item.attendance.date}`);
 
     const result = await db.runTransaction(async (tx) => {
       const [userSnap, existingTxSnap, existingWarningSnap] = await Promise.all([
@@ -2901,6 +2916,22 @@ exports.applyMissingAssignmentPenalties = regionalFunctions.https.onCall(async (
       tx.set(userRef, {
         crystals: Number(userData.crystals || 0) + item.penaltyAmount,
         lastAssignmentPenaltyAt: nowTimestamp,
+      }, { merge: true });
+
+      tx.set(missingNotificationRef, {
+        recipientId: uid,
+        type: "assignment_missing",
+        message: `출석 후 과제 미제출이 확인되었습니다. (${item.attendance.date})`,
+        link: buildAssignmentHubLink(normalizedClusterId, item.attendance.date),
+        isRead: false,
+        createdAt: nowTimestamp,
+        metadata: {
+          clusterId: normalizedClusterId,
+          date: item.attendance.date,
+          attendanceId: item.attendance.id || "",
+          missingStreak: item.missingStreak,
+          source: "applyMissingAssignmentPenalties",
+        },
       }, { merge: true });
 
       let didCreateWarning = false;
@@ -2953,6 +2984,69 @@ exports.applyMissingAssignmentPenalties = regionalFunctions.https.onCall(async (
     appliedDates,
   };
 });
+
+exports.notifyAssignmentWarningCreated = regionalFunctions.firestore
+  .document("assignmentWarnings/{warningId}")
+  .onCreate(async (snap, context) => {
+    const warning = snap.data() || {};
+    const userId = warning.userId;
+    if (!userId) return null;
+
+    const typeLabel = warning.type === "consecutive_missing_assignment"
+      ? "연속 3회 과제 미제출 경고"
+      : "불성실 과제 제출 경고";
+    const dateLabel = warning.date ? ` (${warning.date})` : "";
+
+    await admin.firestore().collection("notifications").doc(`assignment_warning_${context.params.warningId}`).set({
+      recipientId: userId,
+      type: "assignment_warning",
+      message: `${typeLabel}가 기록되었습니다.${dateLabel}`,
+      link: buildAssignmentHubLink(warning.clusterId, warning.date),
+      isRead: false,
+      createdAt: FieldValue.serverTimestamp(),
+      metadata: {
+        warningId: context.params.warningId,
+        warningType: warning.type || "",
+        clusterId: warning.clusterId || "",
+        date: warning.date || "",
+        assignmentId: warning.assignmentId || "",
+      },
+    }, { merge: true });
+
+    return null;
+  });
+
+exports.notifyAssignmentHighBonus = regionalFunctions.firestore
+  .document("assignments/{assignmentId}")
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return null;
+
+    const before = change.before.exists ? (change.before.data() || {}) : {};
+    const after = change.after.data() || {};
+    const beforeQualified = before.status === "reviewed" && Number(before.bonusCrystals || 0) >= 40;
+    const afterBonus = Number(after.bonusCrystals || 0);
+    const afterQualified = after.status === "reviewed" && afterBonus >= 40;
+
+    if (!after.userId || !afterQualified || beforeQualified) return null;
+
+    const clusterLabel = getAssignmentNotificationClusterLabel(after.clusterId);
+    await admin.firestore().collection("notifications").doc(`assignment_bonus_${context.params.assignmentId}`).set({
+      recipientId: after.userId,
+      type: "assignment_bonus",
+      message: `${clusterLabel} 과제에서 보너스 광석 ${Math.floor(afterBonus)}점을 받았습니다.`,
+      link: buildAssignmentHubLink(after.clusterId, after.date),
+      isRead: false,
+      createdAt: FieldValue.serverTimestamp(),
+      metadata: {
+        assignmentId: context.params.assignmentId,
+        clusterId: after.clusterId || "",
+        date: after.date || "",
+        bonusCrystals: afterBonus,
+      },
+    }, { merge: true });
+
+    return null;
+  });
 
 exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);

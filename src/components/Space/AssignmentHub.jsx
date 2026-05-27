@@ -29,6 +29,9 @@ import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 const MotionDiv = motion.div;
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
 const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
+const ACTIVE_WARNING_STATUSES = ['active', 'appealed'];
+
+const isDateKey = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
 
 const getTimestampMs = (value) => {
   if (!value) return 0;
@@ -85,11 +88,12 @@ const getAssignmentMissingPenaltyMap = (assignments = [], attendanceRecords = []
  * Assignment Hub (Stellar Archive)
  * The main interface for students to view their assignments map (calendar) and submit work.
  */
-export default function AssignmentHub({ clusterId, regionId, onClose, onNavigateToUnit }) {
+export default function AssignmentHub({ clusterId, regionId, initialDateStr, onClose, onNavigateToUnit }) {
   const { user, userData } = useAuth();
+  const normalizedInitialDateStr = isDateKey(initialDateStr) ? initialDateStr : null;
   const [todayKST, setTodayKST] = useState(() => getTodayKST());
-  const [currentDate, setCurrentDate] = useState(() => new Date(`${getTodayKST()}T12:00:00Z`));
-  const [selectedDateStr, setSelectedDateStr] = useState(null); // The date the user clicked on
+  const [currentDate, setCurrentDate] = useState(() => new Date(`${normalizedInitialDateStr || getTodayKST()}T12:00:00Z`));
+  const [selectedDateStr, setSelectedDateStr] = useState(normalizedInitialDateStr); // The date the user clicked on
   const [showChronicle, setShowChronicle] = useState(false);
   const [penaltyCheckNow, setPenaltyCheckNow] = useState(0);
   const [optimisticAssignmentsByDate, setOptimisticAssignmentsByDate] = useState({});
@@ -116,9 +120,21 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
   useEffect(() => {
     const previousToday = previousTodayRef.current;
     previousTodayRef.current = todayKST;
-    setSelectedDateStr(prev => (!prev || prev === previousToday ? todayKST : prev));
-    setCurrentDate(new Date(`${todayKST}T12:00:00Z`));
+    setSelectedDateStr(prev => {
+      const shouldFollowToday = !prev || prev === previousToday;
+      if (shouldFollowToday) {
+        setCurrentDate(new Date(`${todayKST}T12:00:00Z`));
+        return todayKST;
+      }
+      return prev;
+    });
   }, [todayKST]);
+
+  useEffect(() => {
+    if (!normalizedInitialDateStr) return;
+    setSelectedDateStr(normalizedInitialDateStr);
+    setCurrentDate(new Date(`${normalizedInitialDateStr}T12:00:00Z`));
+  }, [normalizedInitialDateStr]);
   
   // Data Fetching - Fetch cluster-wide assignments (ignore regionId)
   const { data: assignments, isLoading } = useStudentAssignments(user?.uid, clusterId);
@@ -195,6 +211,15 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
     [effectiveAssignments, attendanceRecords, penaltyCheckNow]
   );
 
+  const warningsByDate = useMemo(() => {
+    return (assignmentWarnings || []).reduce((acc, warning) => {
+      if (!warning.date) return acc;
+      if (!acc[warning.date]) acc[warning.date] = [];
+      acc[warning.date].push(warning);
+      return acc;
+    }, {});
+  }, [assignmentWarnings]);
+
   // Calendar Logic
   const daysInMonth = useMemo(() => {
     const year = currentDate.getUTCFullYear();
@@ -238,11 +263,12 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
         dateStr,
         dayNumber: i,
         assignment: assignment || null,
-        attendance: attendance || null
+        attendance: attendance || null,
+        warnings: warningsByDate[dateStr] || []
       });
     }
     return days;
-  }, [currentDate, firstDayOfMonth, daysInMonth, effectiveAssignments, attendanceRecords]);
+  }, [currentDate, firstDayOfMonth, daysInMonth, effectiveAssignments, attendanceRecords, warningsByDate]);
 
   const handleSubmitted = (submittedAssignment) => {
     if (!submittedAssignment?.date) return;
@@ -431,6 +457,8 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
               const hasAssignment = !!day.assignment;
               const penaltyInfo = missingPenaltyByDate[day.dateStr];
               const statusColor = getStatusColor(day.assignment?.status);
+              const activeDayWarnings = (day.warnings || []).filter(warning => ACTIVE_WARNING_STATUSES.includes(warning.status));
+              const hasWarning = activeDayWarnings.length > 0;
               
               // Determine animation based on status
               let animationClass = '';
@@ -458,11 +486,44 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
                   }}
                 >
                   <span className="font-tech" style={{ color: 'var(--text-muted)' }}>{day.dayNumber}</span>
+
+                  {hasWarning && (
+                    <div
+                      title={activeDayWarnings.some(warning => warning.type === 'consecutive_missing_assignment') ? '연속 미제출 경고' : '과제 제출 경고'}
+                      style={{
+                        position: 'absolute',
+                        top: '5px',
+                        right: '5px',
+                        color: '#fbbf24',
+                        fontSize: '0.9rem',
+                        zIndex: 2,
+                        filter: 'drop-shadow(0 0 6px rgba(251,191,36,0.7))'
+                      }}
+                    >
+                      ⚠
+                    </div>
+                  )}
                   
                   {/* Attendance Marker - Move to bottom right to avoid overlap with TODAY label */}
                   {day.attendance && (
-                    <div style={{ position: 'absolute', bottom: '5px', right: '5px', fontSize: '1rem', zIndex: 1, filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.5))' }}>
-                      {day.attendance.status === 'late' ? '⚠️' : '✅'}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '5px',
+                      right: '5px',
+                      zIndex: 1,
+                      width: '1.15rem',
+                      height: '1.15rem',
+                      borderRadius: '999px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: day.attendance.status === 'late' ? '0.82rem' : '0.95rem',
+                      color: day.attendance.status === 'late' ? '#111827' : 'inherit',
+                      background: day.attendance.status === 'late' ? '#ffb703' : 'transparent',
+                      boxShadow: day.attendance.status === 'late' ? '0 0 10px rgba(255,183,3,0.8)' : 'none',
+                      filter: day.attendance.status === 'late' ? 'none' : 'drop-shadow(0 0 5px rgba(255,255,255,0.5))'
+                    }}>
+                      {day.attendance.status === 'late' ? '◷' : '✅'}
                     </div>
                   )}
 
@@ -483,15 +544,26 @@ export default function AssignmentHub({ clusterId, regionId, onClose, onNavigate
                   )}
                   {!hasAssignment && penaltyInfo?.matured && (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                      <div style={{ color: '#fb7185', fontSize: '1.1rem', filter: 'drop-shadow(0 0 6px rgba(251,113,133,0.6))' }}>−</div>
-                      <span className="font-tech" style={{ fontSize: '0.58rem', marginTop: '2px', color: '#fb7185', textAlign: 'center' }}>
-                        검토 필요
-                      </span>
+                      <div style={{ color: hasWarning ? '#fbbf24' : '#fb7185', fontSize: '1.1rem', filter: `drop-shadow(0 0 6px ${hasWarning ? 'rgba(251,191,36,0.65)' : 'rgba(251,113,133,0.6)'})` }}>
+                        {hasWarning ? '⚠' : '−'}
+                      </div>
+                      {hasWarning && (
+                        <span className="font-tech" style={{ fontSize: '0.58rem', marginTop: '2px', color: '#fbbf24', textAlign: 'center' }}>
+                          경고
+                        </span>
+                      )}
                     </div>
                   )}
                 </MotionDiv>
               )
             })}
+          </div>
+          <div className="font-tech" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.8rem', marginTop: '1rem', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+            <span style={{ color: '#00d4ff' }}>● 확인 완료</span>
+            <span style={{ color: '#fbbf24' }}>● 대기중</span>
+            <span style={{ color: '#fbbf24' }}>⚠ 과제 경고</span>
+            <span style={{ color: '#ffb703' }}>◷ 지각 출석</span>
+            <span style={{ color: '#fb7185' }}>− 출석 후 과제 미제출</span>
           </div>
           </div>
           <AssignmentWarningPolicyCard

@@ -205,6 +205,7 @@ function SpaceHome() {
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
     return sessionStorage.getItem('metasense_cluster_id') || null;
   });
+  const [assignmentHubInitialDate, setAssignmentHubInitialDate] = useState(null);
   
   // --- 2D Mode Setup ---
   const [is2DMode, setIs2DMode] = useState(() => {
@@ -388,15 +389,23 @@ function SpaceHome() {
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const requestedView = location.state?.view || params.get('view')
+    const requestedClusterId = location.state?.clusterId || params.get('clusterId')
+    const requestedDate = location.state?.date || params.get('date') || params.get('assignmentDate')
     const validViews = new Set(['planet', 'dashboard', 'collection', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub'])
 
     if (requestedView && validViews.has(requestedView)) {
+      if (requestedView === 'assignment_hub') {
+        if (requestedClusterId) updateSelectedClusterId(requestedClusterId)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(String(requestedDate || ''))) {
+          setAssignmentHubInitialDate(requestedDate)
+        }
+      }
       switchRootView(requestedView)
       
       // Clear state to prevent re-triggering
       navigate(location.pathname, { replace: true, state: {} })
     }
-  }, [location.pathname, location.search, location.state, navigate, switchRootView])
+  }, [location.pathname, location.search, location.state, navigate, switchRootView, updateSelectedClusterId])
 
   // Data Hooks
   const { data: clusters, isLoading: loadingClusters } = useClusters()
@@ -2726,6 +2735,7 @@ function SpaceHome() {
                 soundManager.playWarp()
               }}
               onSelectArchive={() => {
+                setAssignmentHubInitialDate(null);
                 switchRootView('assignment_hub');
                 soundManager.playWarp();
               }}
@@ -3032,6 +3042,7 @@ function SpaceHome() {
                                   whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
                                   whileTap={{ scale: 0.95 }}
                                   onClick={() => {
+                                    setAssignmentHubInitialDate(null);
                                     switchRootView('assignment_hub');
                                     if (soundManager?.playWarp) soundManager.playWarp();
                                   }}
@@ -3725,8 +3736,13 @@ function SpaceHome() {
         {currentView === 'assignment_hub' && (
                   <AssignmentHub 
                     clusterId={selectedClusterId} 
-                    onClose={() => switchRootView('planet')}
+                    initialDateStr={assignmentHubInitialDate}
+                    onClose={() => {
+                      setAssignmentHubInitialDate(null);
+                      switchRootView('planet');
+                    }}
                     onNavigateToUnit={(unitId) => {
+                      setAssignmentHubInitialDate(null);
                       switchRootView('planet');
                       if (unitId) selectUnit(unitId);
                     }}
