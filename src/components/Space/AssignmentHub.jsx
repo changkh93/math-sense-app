@@ -90,6 +90,16 @@ const getAssignmentMissingPenaltyMap = (assignments = [], attendanceRecords = []
  */
 export default function AssignmentHub({ clusterId, regionId, initialDateStr, onClose, onNavigateToUnit }) {
   const { user, userData } = useAuth();
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const normalizedInitialDateStr = isDateKey(initialDateStr) ? initialDateStr : null;
   const [todayKST, setTodayKST] = useState(() => getTodayKST());
   const [currentDate, setCurrentDate] = useState(() => new Date(`${normalizedInitialDateStr || getTodayKST()}T12:00:00Z`));
@@ -240,6 +250,60 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
     setCurrentDate(new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 1, 12)));
   };
 
+  const handlePrevDay = () => {
+    const prevDate = new Date(currentDate.getTime());
+    prevDate.setUTCDate(currentDate.getUTCDate() - 1);
+    setCurrentDate(prevDate);
+    
+    const year = prevDate.getUTCFullYear();
+    const month = String(prevDate.getUTCMonth() + 1).padStart(2, '0');
+    const dayStr = String(prevDate.getUTCDate()).padStart(2, '0');
+    setSelectedDateStr(`${year}-${month}-${dayStr}`);
+  };
+
+  const handleNextDay = () => {
+    const nextDate = new Date(currentDate.getTime());
+    nextDate.setUTCDate(currentDate.getUTCDate() + 1);
+    setCurrentDate(nextDate);
+    
+    const year = nextDate.getUTCFullYear();
+    const month = String(nextDate.getUTCMonth() + 1).padStart(2, '0');
+    const dayStr = String(nextDate.getUTCDate()).padStart(2, '0');
+    setSelectedDateStr(`${year}-${month}-${dayStr}`);
+  };
+
+  // Build weekly calendar strip array (7 days around currentDate)
+  const weekDays = useMemo(() => {
+    const currentDayOfWeek = currentDate.getUTCDay();
+    const sunday = new Date(currentDate.getTime());
+    sunday.setUTCDate(currentDate.getUTCDate() - currentDayOfWeek);
+    
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(sunday.getTime());
+      day.setUTCDate(sunday.getUTCDate() + i);
+      
+      const year = day.getUTCFullYear();
+      const month = String(day.getUTCMonth() + 1).padStart(2, '0');
+      const dayStr = String(day.getUTCDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${dayStr}`;
+
+      const assignment = effectiveAssignments?.find(a => a.date === dateStr);
+      const attendance = attendanceRecords?.find(a => a.date === dateStr);
+      const warningsForDay = warningsByDate[dateStr] || [];
+
+      days.push({
+        dateStr,
+        dayNumber: day.getUTCDate(),
+        dayOfWeek: i,
+        assignment: assignment || null,
+        attendance: attendance || null,
+        warnings: warningsForDay
+      });
+    }
+    return days;
+  }, [currentDate, effectiveAssignments, attendanceRecords, warningsByDate]);
+
   // Build the calendar array
   const calendarDays = useMemo(() => {
     const days = [];
@@ -336,7 +400,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
       {/* Persistent Header */}
       <div style={{ 
         width: '100%', 
-        padding: '1rem 5%', 
+        padding: isMobile ? '0.75rem 1rem' : '1rem 5%', 
         borderBottom: '1px solid rgba(0, 243, 255, 0.1)',
         background: 'rgba(5, 5, 16, 0.6)',
         backdropFilter: 'blur(10px)',
@@ -350,40 +414,62 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
           width: '100%', 
           maxWidth: '1400px', 
           display: 'flex', 
-          justifyContent: 'space-between', 
+          flexDirection: isMobile ? 'column' : 'row',
           alignItems: 'center',
-          gap: '2rem'
+          gap: isMobile ? '0.5rem' : '2rem'
         }}>
-          <button 
-            className="space-nav-link font-tech"
-            onClick={onClose}
-            style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}
-          >
-            ← RETURN
-          </button>
+          {isMobile ? (
+            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button 
+                className="space-nav-link font-tech"
+                onClick={onClose}
+                style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+              >
+                ← RETURN
+              </button>
+              <button 
+                className="space-btn cosmic-btn font-tech" 
+                onClick={() => setShowChronicle(true)}
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+              >
+                 항해 일지 열기
+              </button>
+            </div>
+          ) : (
+            <button 
+              className="space-nav-link font-tech"
+              onClick={onClose}
+              style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+            >
+              ← RETURN
+            </button>
+          )}
           
           <h2 className="font-title" style={{ 
             color: 'var(--star-gold)', 
             textShadow: '0 0 10px rgba(255,215,0,0.5)', 
             margin: 0,
-            fontSize: 'clamp(1rem, 3vw, 1.8rem)',
+            fontSize: isMobile ? '1.15rem' : 'clamp(1rem, 3vw, 1.8rem)',
             textAlign: 'center',
             letterSpacing: '2px',
-            flex: 1
+            flex: 1,
+            width: '100%'
           }}>
              STELLAR ARCHIVE
-             <span className="font-tech" style={{ fontSize: '0.8rem', opacity: 0.6, marginLeft: '0.5rem', color: 'var(--crystal-cyan)' }}>
+             <span className="font-tech" style={{ fontSize: '0.75rem', opacity: 0.6, marginLeft: '0.5rem', color: 'var(--crystal-cyan)', whiteSpace: 'nowrap' }}>
                {clusterId ? `[${clusterId}]` : '[GALAXY_SCAN_PENDING]'}
              </span>
           </h2>
 
-          <button 
-            className="space-btn cosmic-btn font-tech" 
-            onClick={() => setShowChronicle(true)}
-            style={{ padding: '0.5rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
-          >
-             항해 일지 열기
-          </button>
+          {!isMobile && (
+            <button 
+              className="space-btn cosmic-btn font-tech" 
+              onClick={() => setShowChronicle(true)}
+              style={{ padding: '0.5rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+            >
+               항해 일지 열기
+            </button>
+          )}
         </div>
       </div>
 
@@ -405,159 +491,259 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
         overflowY: 'auto', 
         overflowX: 'hidden',
         width: '100%',
-        padding: '2rem 5% 6rem 5%',
+        padding: isMobile ? '1rem 3% 4rem 3%' : '2rem 5% 6rem 5%',
         boxSizing: 'border-box'
       }}>
         <div style={{ 
           maxWidth: '1400px',
           margin: '0 auto',
           display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: '2rem',
+          flexDirection: isMobile ? 'column' : 'row', 
+          gap: isMobile ? '1rem' : '2rem',
           alignItems: 'flex-start'
         }}>
         {/* Left: Interactive Calendar */}
-        <div style={{ flex: '1 1 500px', display: 'grid', gap: '1rem', minWidth: 0 }}>
+        <div style={{ flex: isMobile ? '1 1 100%' : '1 1 500px', display: 'grid', gap: '1rem', minWidth: 0, width: '100%' }}>
           <div className="glass-card hud-border" style={{ 
-            padding: '2rem', 
+            padding: isMobile ? '1rem' : '2rem', 
             display: 'flex', 
             flexDirection: 'column',
-            minHeight: '600px'
+            minHeight: isMobile ? 'auto' : '600px'
           }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-            <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: 0 }}>
-              과제 전송 달력
-            </h3>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button onClick={handlePrevMonth} className="cosmic-btn" style={{ padding: '0.5rem 1rem' }}>◀</button>
-              <span className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--crystal-cyan)' }}>
-                {currentDate.getUTCFullYear()} . {String(currentDate.getUTCMonth() + 1).padStart(2, '0')}
-              </span>
-              <button onClick={handleNextMonth} className="cosmic-btn" style={{ padding: '0.5rem 1rem' }}>▶</button>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: isMobile ? 'column' : 'row',
+            justifyContent: 'space-between', 
+            alignItems: isMobile ? 'stretch' : 'center', 
+            gap: '1rem',
+            marginBottom: isMobile ? '1rem' : '2rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: 0, fontSize: isMobile ? '1.1rem' : '1.3rem' }}>
+                과제 전송 달력
+              </h3>
+              {isMobile && (
+                <button 
+                  className="space-btn font-tech" 
+                  onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderColor: 'var(--crystal-cyan)', color: 'var(--crystal-cyan)', borderRadius: '6px' }}
+                >
+                  {isCalendarExpanded ? '달력 접기 ▲' : '달력 펼치기 ▼'}
+                </button>
+              )}
             </div>
+
+            {/* Date navigation controls */}
+            {(!isMobile || isCalendarExpanded) ? (
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'center' }}>
+                <button onClick={handlePrevMonth} className="cosmic-btn" style={{ padding: '0.5rem 1rem' }}>◀</button>
+                <span className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--crystal-cyan)' }}>
+                  {currentDate.getUTCFullYear()} . {String(currentDate.getUTCMonth() + 1).padStart(2, '0')}
+                </span>
+                <button onClick={handleNextMonth} className="cosmic-btn" style={{ padding: '0.5rem 1rem' }}>▶</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <button onClick={handlePrevDay} className="cosmic-btn font-tech" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>◀ 이전일</button>
+                <span className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--crystal-cyan)', fontWeight: 700 }}>
+                  {selectedDateStr}
+                </span>
+                <button onClick={handleNextDay} className="cosmic-btn font-tech" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>다음일 ▶</button>
+              </div>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '1rem', flex: 1 }}>
-            {/* Days of week */}
-            {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
-              <div key={day} className="font-tech" style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                {day}
-              </div>
-            ))}
-            
-            {/* Calendar Grid */}
-            {isLoading ? (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--crystal-cyan)', padding: '2rem' }}>
-                데이터 수신 중 (SCANNING DATA)...
-              </div>
-            ) : calendarDays.map((day, idx) => {
-              if (!day) return <div key={`empty-${idx}`} />;
+          {/* Grid or Single Line representation */}
+          {(!isMobile || isCalendarExpanded) ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '0.5rem' : '1rem', flex: 1 }}>
+              {/* Days of week */}
+              {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
+                <div key={day} className="font-tech" style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                  {day}
+                </div>
+              ))}
               
-              const isSelected = selectedDateStr === day.dateStr;
-              const hasAssignment = !!day.assignment;
-              const penaltyInfo = missingPenaltyByDate[day.dateStr];
-              const statusColor = getStatusColor(day.assignment?.status);
-              const activeDayWarnings = (day.warnings || []).filter(warning => ACTIVE_WARNING_STATUSES.includes(warning.status));
-              const hasWarning = activeDayWarnings.length > 0;
-              
-              // Determine animation based on status
-              let animationClass = '';
-              if (day.assignment?.status === 'needs_revision') animationClass = 'siren-pulse'; // Need to add to space-theme.css
-              else if (day.assignment?.status === 'submitted') animationClass = 'pulse-slow';
-              
-              const isToday = day.dateStr === todayKST;
+              {/* Calendar Grid */}
+              {isLoading ? (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--crystal-cyan)', padding: '2rem' }}>
+                  데이터 수신 중 (SCANNING DATA)...
+                </div>
+              ) : calendarDays.map((day, idx) => {
+                if (!day) return <div key={`empty-${idx}`} />;
+                
+                const isSelected = selectedDateStr === day.dateStr;
+                const hasAssignment = !!day.assignment;
+                const penaltyInfo = missingPenaltyByDate[day.dateStr];
+                const statusColor = getStatusColor(day.assignment?.status);
+                const activeDayWarnings = (day.warnings || []).filter(warning => ACTIVE_WARNING_STATUSES.includes(warning.status));
+                const hasWarning = activeDayWarnings.length > 0;
+                
+                // Determine animation based on status
+                let animationClass = '';
+                if (day.assignment?.status === 'needs_revision') animationClass = 'siren-pulse';
+                else if (day.assignment?.status === 'submitted') animationClass = 'pulse-slow';
+                
+                const isToday = day.dateStr === todayKST;
 
-              return (
-                <MotionDiv
-                  key={day.dateStr}
-                  whileHover={{ scale: 1.05 }}
-                  onClick={() => setSelectedDateStr(day.dateStr)}
-                  className={`glass-card ${animationClass} ${isToday ? 'today-highlight' : ''}`}
-                  style={{
-                    aspectRatio: '1/1',
-                    padding: '0.5rem',
-                    cursor: 'pointer',
-                    border: isSelected ? `2px solid var(--crystal-cyan)` : `1px solid rgba(255,255,255,0.1)`,
-                    background: isSelected ? 'rgba(0, 212, 255, 0.1)' : 'rgba(5, 10, 25, 0.4)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <span className="font-tech" style={{ color: 'var(--text-muted)' }}>{day.dayNumber}</span>
-
-                  {hasWarning && (
-                    <div
-                      title={activeDayWarnings.some(warning => warning.type === 'consecutive_missing_assignment') ? '연속 미제출 경고' : '과제 제출 경고'}
-                      style={{
-                        position: 'absolute',
-                        top: '5px',
-                        right: '5px',
-                        color: '#fbbf24',
-                        fontSize: '0.9rem',
-                        zIndex: 2,
-                        filter: 'drop-shadow(0 0 6px rgba(251,191,36,0.7))'
-                      }}
-                    >
-                      ⚠
-                    </div>
-                  )}
-                  
-                  {/* Attendance Marker - Move to bottom right to avoid overlap with TODAY label */}
-                  {day.attendance && (
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '5px',
-                      right: '5px',
-                      zIndex: 1,
-                      width: '1.15rem',
-                      height: '1.15rem',
-                      borderRadius: '999px',
+                return (
+                  <MotionDiv
+                    key={day.dateStr}
+                    whileHover={{ scale: 1.05 }}
+                    onClick={() => {
+                      setSelectedDateStr(day.dateStr);
+                      setCurrentDate(new Date(`${day.dateStr}T12:00:00Z`));
+                    }}
+                    className={`glass-card ${animationClass} ${isToday ? 'today-highlight' : ''}`}
+                    style={{
+                      aspectRatio: '1/1',
+                      padding: isMobile ? '0.3rem' : '0.5rem',
+                      cursor: 'pointer',
+                      border: isSelected ? `2px solid var(--crystal-cyan)` : `1px solid rgba(255,255,255,0.1)`,
+                      background: isSelected ? 'rgba(0, 212, 255, 0.1)' : 'rgba(5, 10, 25, 0.4)',
                       display: 'flex',
+                      flexDirection: 'column',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: isMobile ? '0.7rem' : '0.85rem' }}>{day.dayNumber}</span>
+
+                    {hasWarning && (
+                      <div
+                        title={activeDayWarnings.some(warning => warning.type === 'consecutive_missing_assignment') ? '연속 미제출 경고' : '과제 제출 경고'}
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          color: '#fbbf24',
+                          fontSize: isMobile ? '0.75rem' : '0.9rem',
+                          zIndex: 2,
+                          filter: 'drop-shadow(0 0 6px rgba(251,191,36,0.7))'
+                        }}
+                      >
+                        ⚠
+                      </div>
+                    )}
+                    
+                    {day.attendance && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '2px',
+                        right: '2px',
+                        zIndex: 1,
+                        width: isMobile ? '0.85rem' : '1.15rem',
+                        height: isMobile ? '0.85rem' : '1.15rem',
+                        borderRadius: '999px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: isMobile ? '0.65rem' : '0.95rem',
+                        color: day.attendance.status === 'late' ? '#111827' : 'inherit',
+                        background: day.attendance.status === 'late' ? '#ffb703' : 'transparent',
+                        boxShadow: day.attendance.status === 'late' ? '0 0 10px rgba(255,183,3,0.8)' : 'none',
+                        filter: day.attendance.status === 'late' ? 'none' : 'drop-shadow(0 0 5px rgba(255,255,255,0.5))'
+                      }}>
+                        {day.attendance.status === 'late' ? '◷' : '✓'}
+                      </div>
+                    )}
+
+                    {isToday && <div className="today-label" style={{ fontSize: '0.5rem', padding: '1px 2px' }}>TODAY</div>}
+                    
+                    {hasAssignment && (
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                        <div style={{ 
+                          width: isMobile ? '6px' : '12px', height: isMobile ? '6px' : '12px', 
+                          borderRadius: '50%', 
+                          background: statusColor,
+                          boxShadow: `0 0 10px ${statusColor}`
+                        }} />
+                        {!isMobile && (
+                          <span className="font-tech" style={{ fontSize: '0.6rem', marginTop: '4px', color: statusColor, textAlign: 'center' }}>
+                            {getStatusLabel(day.assignment.status)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {!hasAssignment && penaltyInfo?.matured && (
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                        <div style={{ color: hasWarning ? '#fbbf24' : '#fb7185', fontSize: isMobile ? '0.85rem' : '1.1rem', filter: `drop-shadow(0 0 6px ${hasWarning ? 'rgba(251,191,36,0.65)' : 'rgba(251,113,133,0.6)'})` }}>
+                          {hasWarning ? '⚠' : '−'}
+                        </div>
+                      </div>
+                    )}
+                  </MotionDiv>
+                )
+              })}
+            </div>
+          ) : (
+            /* Single-line (Weekly) Calendar Strip for Mobile */
+            <div style={{ display: 'flex', gap: '0.4rem', width: '100%', boxSizing: 'border-box' }}>
+              {weekDays.map((day) => {
+                const isSelected = selectedDateStr === day.dateStr;
+                const hasAssignment = !!day.assignment;
+                const penaltyInfo = missingPenaltyByDate[day.dateStr];
+                const statusColor = getStatusColor(day.assignment?.status);
+                const activeDayWarnings = (day.warnings || []).filter(warning => ACTIVE_WARNING_STATUSES.includes(warning.status));
+                const hasWarning = activeDayWarnings.length > 0;
+                const isToday = day.dateStr === todayKST;
+                const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+
+                return (
+                  <MotionDiv
+                    key={day.dateStr}
+                    whileHover={{ scale: 1.05 }}
+                    onClick={() => {
+                      setSelectedDateStr(day.dateStr);
+                      setCurrentDate(new Date(`${day.dateStr}T12:00:00Z`));
+                    }}
+                    className={`glass-card ${isToday ? 'today-highlight' : ''}`}
+                    style={{
+                      flex: 1,
+                      padding: '0.5rem 0.2rem',
+                      cursor: 'pointer',
+                      border: isSelected ? `2px solid var(--crystal-cyan)` : `1px solid rgba(255,255,255,0.1)`,
+                      background: isSelected ? 'rgba(0, 212, 255, 0.15)' : 'rgba(5, 10, 25, 0.4)',
+                      display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: day.attendance.status === 'late' ? '0.82rem' : '0.95rem',
-                      color: day.attendance.status === 'late' ? '#111827' : 'inherit',
-                      background: day.attendance.status === 'late' ? '#ffb703' : 'transparent',
-                      boxShadow: day.attendance.status === 'late' ? '0 0 10px rgba(255,183,3,0.8)' : 'none',
-                      filter: day.attendance.status === 'late' ? 'none' : 'drop-shadow(0 0 5px rgba(255,255,255,0.5))'
-                    }}>
-                      {day.attendance.status === 'late' ? '◷' : '✅'}
-                    </div>
-                  )}
-
-                  {isToday && <div className="today-label">TODAY</div>}
-                  
-                  {hasAssignment && (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                      <div style={{ 
-                        width: '12px', height: '12px', 
-                        borderRadius: '50%', 
-                        background: statusColor,
-                        boxShadow: `0 0 10px ${statusColor}`
-                      }} />
-                      <span className="font-tech" style={{ fontSize: '0.6rem', marginTop: '4px', color: statusColor, textAlign: 'center' }}>
-                        {getStatusLabel(day.assignment.status)}
-                      </span>
-                    </div>
-                  )}
-                  {!hasAssignment && penaltyInfo?.matured && (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                      <div style={{ color: hasWarning ? '#fbbf24' : '#fb7185', fontSize: '1.1rem', filter: `drop-shadow(0 0 6px ${hasWarning ? 'rgba(251,191,36,0.65)' : 'rgba(251,113,133,0.6)'})` }}>
-                        {hasWarning ? '⚠' : '−'}
-                      </div>
+                      position: 'relative',
+                      borderRadius: '6px',
+                      minWidth: 0
+                    }}
+                  >
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                      {dayNames[day.dayOfWeek]}
+                    </span>
+                    <span className="font-tech" style={{ fontSize: '1rem', fontWeight: 700, color: isSelected ? 'var(--crystal-cyan)' : 'white' }}>
+                      {day.dayNumber}
+                    </span>
+                    
+                    <div style={{ height: '8px', display: 'flex', alignItems: 'center', marginTop: '0.2rem' }}>
                       {hasWarning && (
-                        <span className="font-tech" style={{ fontSize: '0.58rem', marginTop: '2px', color: '#fbbf24', textAlign: 'center' }}>
-                          경고
-                        </span>
+                        <span style={{ color: '#fbbf24', fontSize: '0.7rem' }}>⚠</span>
                       )}
+                      {hasAssignment ? (
+                        <div style={{ 
+                          width: '6px', height: '6px', 
+                          borderRadius: '50%', 
+                          background: statusColor,
+                          boxShadow: `0 0 6px ${statusColor}`
+                        }} />
+                      ) : day.attendance ? (
+                        <span style={{ fontSize: '0.65rem', color: day.attendance.status === 'late' ? '#ffb703' : '#32ff78' }}>
+                          {day.attendance.status === 'late' ? '◷' : '✓'}
+                        </span>
+                      ) : penaltyInfo?.matured ? (
+                        <span style={{ color: '#fb7185', fontSize: '0.75rem' }}>−</span>
+                      ) : null}
                     </div>
-                  )}
-                </MotionDiv>
-              )
-            })}
-          </div>
+                  </MotionDiv>
+                );
+              })}
+            </div>
+          )}
+
           <div className="font-tech" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.8rem', marginTop: '1rem', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
             <span style={{ color: '#00d4ff' }}>● 확인 완료</span>
             <span style={{ color: '#fbbf24' }}>● 대기중</span>
@@ -566,19 +752,23 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
             <span style={{ color: '#fb7185' }}>− 출석 후 과제 미제출</span>
           </div>
           </div>
-          <AssignmentWarningPolicyCard
-            activeWarningCount={assignmentWarnings.filter(warning => ['active', 'appealed'].includes(warning.status)).length}
-          />
+          
+          {!isMobile && (
+            <AssignmentWarningPolicyCard
+              activeWarningCount={assignmentWarnings.filter(warning => ['active', 'appealed'].includes(warning.status)).length}
+            />
+          )}
         </div>
 
         {/* Right: Submission/Detail Panel */}
         <div className="glass-card hud-border" style={{ 
-          flex: '1 1 500px', 
-          padding: '2rem', 
+          flex: isMobile ? '1 1 100%' : '1 1 500px', 
+          padding: isMobile ? '1rem' : '2rem', 
           display: 'flex', 
           flexDirection: 'column',
-          minHeight: '600px',
-          minWidth: 0 // Prevent expansion by long content
+          minHeight: isMobile ? 'auto' : '600px',
+          minWidth: 0, // Prevent expansion by long content
+          width: '100%'
         }}>
           {!selectedDateStr ? (
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: 'var(--text-muted)', padding: '2rem' }}>
