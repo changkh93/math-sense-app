@@ -371,10 +371,12 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     return months;
   }, [timelineData.minDate, todayKST, dailyStats, nodesWithProtection]);
 
-  // 로딩 후 또는 뷰 모드 변경 시 맨 아랫부분으로 스크롤 (가장 최근)
+  // 뷰 전환 시 내부 패널의 시작 지점부터 보이게 유지한다.
+  // 모바일에서는 자동 하단 스크롤이 성좌 그래프를 화면 아래로 밀어 보이게 만든다.
   useLayoutEffect(() => {
     if (!loading && scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      scrollContainerRef.current.scrollTop = 0;
+      scrollContainerRef.current.scrollLeft = 0;
     }
   }, [loading, viewMode]);
 
