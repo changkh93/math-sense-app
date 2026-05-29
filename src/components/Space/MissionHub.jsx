@@ -527,6 +527,13 @@ export default function MissionHub({
 }) {
   const { user } = useAuth()
   const userId = user?.uid
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Keep a ref to userData to avoid stale closures in useCallback/useEffect
   const userDataRef = useRef(userData)
@@ -1771,15 +1778,16 @@ export default function MissionHub({
     const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasWorkbook].filter(Boolean).length
 
     return (
-    <div className="mission-dashboard fade-in" style={{ width: '100%', height: '100%', overflowY: 'auto', paddingBottom: '3rem' }}>
-      <div style={{ maxWidth: '1200px', width: '95%', margin: '0 auto', paddingTop: '1.5rem', position: 'relative' }}>
+    <div className="mission-dashboard fade-in" style={{ width: '100%', height: '100%', overflowY: 'auto', paddingBottom: isMobile ? '5.5rem' : '3rem' }}>
+      <div style={{ maxWidth: '1200px', width: isMobile ? '100%' : '95%', margin: '0 auto', padding: isMobile ? '0.75rem' : '1.5rem 0 0', boxSizing: 'border-box', position: 'relative' }}>
         {/* Redundant back link removed to fix overlap with global back button */}
 
 
         <h2 className="font-title" style={{ 
           textAlign: 'center', 
-          fontSize: '2rem', 
-          marginBottom: '2rem',
+          fontSize: isMobile ? '1.45rem' : '2rem', 
+          lineHeight: 1.25,
+          marginBottom: isMobile ? '1rem' : '2rem',
           textShadow: '0 0 10px var(--crystal-cyan)'
         }}>
           MISSION CONTROL: {activeUnit?.title || "비밀 작전 구역"}
@@ -1799,8 +1807,8 @@ export default function MissionHub({
       ) : (
       <div className="mission-grid" style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${Math.min(availableCount, 4)}, minmax(240px, 1fr))`,
-        gap: '2rem',
+        gridTemplateColumns: isMobile ? '1fr' : `repeat(${Math.min(availableCount, 4)}, minmax(240px, 1fr))`,
+        gap: isMobile ? '0.85rem' : '2rem',
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
@@ -1817,7 +1825,7 @@ export default function MissionHub({
                   className="glass-card hud-border"
                   onClick={() => handleModeChange('text')}
                   style={{ 
-                    cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                    cursor: 'pointer', padding: isMobile ? '1rem' : '2rem', display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', textAlign: isMobile ? 'left' : 'center', gap: isMobile ? '0.85rem' : 0,
                     background: logCompleted ? 'rgba(0, 243, 255, 0.08)' : undefined,
                     borderColor: logCompleted ? 'var(--crystal-cyan)' : undefined,
                     position: 'relative'
@@ -1847,7 +1855,7 @@ export default function MissionHub({
                   className="glass-card hud-border"
                   onClick={() => handleModeChange('video')}
                   style={{ 
-                    cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                    cursor: 'pointer', padding: isMobile ? '1rem' : '2rem', display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', textAlign: isMobile ? 'left' : 'center', gap: isMobile ? '0.85rem' : 0,
                     background: txAllCompleted ? 'rgba(0, 255, 136, 0.08)' : (txAnyCompleted ? 'rgba(255, 255, 255, 0.05)' : undefined),
                     borderColor: txAllCompleted ? 'var(--planet-green)' : (txAnyCompleted ? 'var(--crystal-cyan)' : undefined),
                     position: 'relative'
@@ -1879,7 +1887,7 @@ export default function MissionHub({
                   className="glass-card hud-border"
                   onClick={() => handleModeChange('workbook')}
                   style={{ 
-                    cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', 
+                    cursor: 'pointer', padding: isMobile ? '1rem' : '2rem', display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', textAlign: isMobile ? 'left' : 'center', gap: isMobile ? '0.85rem' : 0, 
                     border: workbookCompleted ? '1px solid var(--neon-blue)' : '1px solid var(--neon-blue)',
                     background: workbookCompleted ? 'rgba(0, 243, 255, 0.08)' : undefined,
                     position: 'relative'
@@ -1911,7 +1919,7 @@ export default function MissionHub({
                   className="glass-card hud-border"
                   onClick={() => handleModeChange('quiz')}
                   style={{ 
-                    cursor: 'pointer', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', 
+                    cursor: 'pointer', padding: isMobile ? '1rem' : '2rem', display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', textAlign: isMobile ? 'left' : 'center', gap: isMobile ? '0.85rem' : 0, 
                     border: quizCompleted ? '1px solid var(--star-gold)' : '1px solid var(--star-gold)',
                     background: quizCompleted ? 'rgba(255, 215, 0, 0.08)' : undefined,
                     position: 'relative'
@@ -1952,10 +1960,10 @@ export default function MissionHub({
         onClick={onBack}
         className="hud-btn secondary glass"
         style={{ 
-          marginTop: '4rem', 
+          marginTop: isMobile ? '1.5rem' : '4rem', 
           padding: '1rem 3rem',
           display: 'block',
-          margin: '4rem auto 0'
+          margin: isMobile ? '1.5rem auto 0' : '4rem auto 0'
         }}
       >
         ← RETURN TO MISSION SELECT
@@ -1965,10 +1973,10 @@ export default function MissionHub({
   )
   }
   const renderTextView = () => (
-    <div className="mission-content-view fade-in" style={{ maxWidth: '1200px', width: '95%', margin: '0 auto', padding: '1.5rem', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
-      <div className="glass-card" style={{ padding: '2.5rem 3rem', background: 'rgba(5, 10, 25, 0.9)', minHeight: 'fit-content' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
-          <h2 className="font-title" style={{ fontSize: '1.8rem', color: 'var(--crystal-cyan)' }}>DATA LOG: {activeUnit?.title}</h2>
+    <div className="mission-content-view fade-in" style={{ maxWidth: '1200px', width: isMobile ? '100%' : '95%', margin: '0 auto', padding: isMobile ? '0.75rem 0.75rem 5.5rem' : '1.5rem', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
+      <div className="glass-card" style={{ padding: isMobile ? '1rem' : '2.5rem 3rem', background: 'rgba(5, 10, 25, 0.9)', minHeight: 'fit-content' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: isMobile ? '1rem' : '2rem' }}>
+          <h2 className="font-title" style={{ fontSize: isMobile ? '1.25rem' : '1.8rem', lineHeight: 1.3, color: 'var(--crystal-cyan)', margin: 0 }}>DATA LOG: {activeUnit?.title}</h2>
           <button onClick={returnFromContent} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
         </div>
         
@@ -1986,7 +1994,7 @@ export default function MissionHub({
                 <span>↗️</span> 새 창에서 열기
               </a>
             </div>
-            <div style={{ width: '100%', height: '75vh', border: '1px solid var(--neon-blue)', borderRadius: '12px', overflow: 'hidden', background: '#fff', boxShadow: '0 0 20px rgba(0, 243, 255, 0.1)' }}>
+            <div style={{ width: '100%', height: isMobile ? '55vh' : '75vh', border: '1px solid var(--neon-blue)', borderRadius: '12px', overflow: 'hidden', background: '#fff', boxShadow: '0 0 20px rgba(0, 243, 255, 0.1)' }}>
               <iframe 
                 src={getEmbeddablePdfUrl(missionData.learningContents.pdfUrl)}
                 width="100%" 
@@ -2190,11 +2198,11 @@ export default function MissionHub({
                   >
                     ← RETURN TO MISSION SELECT
                   </button>
-                  <h3 className="font-title" style={{ margin: 0, color: '#fff', fontSize: '1.4rem', textShadow: '0 2px 5px rgba(0,0,0,0.8)' }}>
+                  <h3 className="font-title" style={{ margin: 0, color: '#fff', fontSize: isMobile ? '1rem' : '1.4rem', lineHeight: 1.3, textShadow: '0 2px 5px rgba(0,0,0,0.8)' }}>
                      <span style={{ color: 'var(--planet-green)' }}>📡 {selectedTx.title}</span>
                   </h3>
                </div>
-               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+               <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
                  <AnimatePresence>
                    {saveStatus && (
                      <motion.div 
@@ -2209,7 +2217,7 @@ export default function MissionHub({
                    )}
                  </AnimatePresence>
                  {(creditedSeconds > 0 || stampCount > 0) && (
-                   <span className="font-tech" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                   <span className="font-tech" style={{ color: 'rgba(255,255,255,0.8)', fontSize: isMobile ? '0.76rem' : '0.9rem', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
                      인정 학습: {Math.floor(creditedSeconds / 60)}분 {creditedSeconds % 60}초 · 완료율 {completionRate}% / 기준 {completionTargetPercent}%
                    </span>
                  )}
@@ -2225,13 +2233,13 @@ export default function MissionHub({
 
              {/* Bottom HUD Overlay */}
              <div className="theater-hud bottom-hud" style={{ opacity: (isUiVisible || videoCompleted || isAtEnd) ? 1 : 0, flexDirection: 'column' }}>
-               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+               <div style={{ display: 'flex', gap: isMobile ? '0.65rem' : '1rem', justifyContent: 'center', width: '100%', flexDirection: isMobile ? 'column' : 'row' }}>
                  <button 
                    onClick={handleSaveVideoPosition}
                    className="hud-btn secondary glass"
                    style={{ 
-                     padding: '0.8rem 2.5rem', 
-                     fontSize: '1rem',
+                     padding: isMobile ? '0.85rem 1rem' : '0.8rem 2.5rem', 
+                     fontSize: isMobile ? '0.9rem' : '1rem',
                      borderColor: videoCompleted ? 'var(--planet-green)' : (isAtEnd ? 'var(--alert-red)' : undefined),
                      background: videoCompleted ? 'rgba(0, 255, 136, 0.2)' : (isAtEnd ? 'rgba(255, 77, 77, 0.2)' : 'rgba(0,0,0,0.5)'),
                      color: isAtEnd && !videoCompleted ? '#ffb3b3' : 'white',
@@ -2259,8 +2267,8 @@ export default function MissionHub({
                    onClick={() => handleOpenQuestionModal('video')}
                    className="hud-btn primary glass capture-hide"
                    style={{
-                     padding: '0.8rem 2rem',
-                     fontSize: '1rem',
+                     padding: isMobile ? '0.85rem 1rem' : '0.8rem 2rem',
+                     fontSize: isMobile ? '0.9rem' : '1rem',
                      borderRadius: '10px',
                      background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.3), rgba(34, 211, 238, 0.3))',
                      borderColor: 'var(--crystal-cyan)',
@@ -2321,9 +2329,9 @@ export default function MissionHub({
 
     // Render list
     return (
-      <div className="mission-content-view fade-in" style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', paddingTop: '2rem' }}>
-         <h2 className="font-title" style={{ textAlign: 'center', color: 'var(--planet-green)', marginBottom: '2rem', fontSize: '2rem' }}>TRANSMISSION DATA CHIPS</h2>
-         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+      <div className="mission-content-view fade-in" style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '1rem 0.75rem 5.5rem' : '2rem 0 0', boxSizing: 'border-box' }}>
+         <h2 className="font-title" style={{ textAlign: 'center', color: 'var(--planet-green)', marginBottom: isMobile ? '1rem' : '2rem', fontSize: isMobile ? '1.6rem' : '2rem', lineHeight: 1.2 }}>TRANSMISSION DATA CHIPS</h2>
+         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))', gap: isMobile ? '0.85rem' : '1.5rem' }}>
              {txList.map((tx, idx) => {
                  const txId = tx.id || 'default'
                  const txProgress = learningProgress?.videoProgress?.[txId]
@@ -2343,11 +2351,11 @@ export default function MissionHub({
                  return (
                    <motion.div 
                       key={tx.id}
-                      whileHover={{ scale: 1.02, y: -5, borderColor: 'var(--planet-green)' }}
+                      whileHover={isMobile ? undefined : { scale: 1.02, y: -5, borderColor: 'var(--planet-green)' }}
                       onClick={() => setSelectedTx(tx)}
                       className="glass-card"
                       style={{ 
-                        cursor: 'pointer', padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', 
+                        cursor: 'pointer', padding: isMobile ? '1rem' : '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', 
                         border: isTxCompleted ? '1px solid var(--planet-green)' : '1px solid rgba(255,255,255,0.1)', 
                         background: isTxCompleted ? 'rgba(0, 255, 136, 0.06)' : 'rgba(10, 20, 40, 0.6)',
                         position: 'relative'
@@ -2359,7 +2367,7 @@ export default function MissionHub({
                        <div style={{ fontSize: '2.5rem' }}>📼</div>
                        <div>
                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontFamily: 'var(--font-tech)', marginBottom: '0.2rem' }}>DATA CHIP #{idx + 1}</div>
-                           <div style={{ color: 'var(--text-bright)', fontWeight: 'bold', fontSize: '1.1rem' }}>{tx.title || `영상 ${idx + 1}`}</div>
+                           <div style={{ color: 'var(--text-bright)', fontWeight: 'bold', fontSize: isMobile ? '1rem' : '1.1rem', lineHeight: 1.35 }}>{tx.title || `영상 ${idx + 1}`}</div>
                            {displayPos > 0 && !isTxCompleted && (
                              <div style={{ color: 'var(--crystal-cyan)', fontSize: '0.75rem', fontFamily: 'var(--font-tech)', marginTop: '0.3rem' }}>
                                ▶ {Math.floor(displayPos / 60)}:{String(Math.floor(displayPos % 60)).padStart(2, '0')}부터 이어보기
@@ -2370,7 +2378,7 @@ export default function MissionHub({
                  )
              })}
          </div>
-         <div style={{ textAlign: 'center', marginTop: '3rem' }}>
+         <div style={{ textAlign: 'center', marginTop: isMobile ? '1.5rem' : '3rem' }}>
              <button 
                onClick={() => updateCurrentMode('briefing')} 
                className="hud-btn secondary glass" 
@@ -2655,8 +2663,8 @@ export default function MissionHub({
             }}
             style={{ 
               position: 'absolute', 
-              top: '2rem', 
-              left: '2rem', 
+              top: isMobile ? '0.85rem' : '2rem', 
+              left: isMobile ? '0.75rem' : '2rem', 
               zIndex: 3000,
               display: 'flex',
               alignItems: 'center',
@@ -2669,17 +2677,17 @@ export default function MissionHub({
 
         <AnimatePresence mode='wait'>
            {currentMode === 'briefing' && (
-              <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px', overflowY: 'auto' }}>
+              <motion.div key="briefing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ flex: 1, minHeight: 0, paddingTop: isMobile ? '3.2rem' : '80px', overflowY: 'auto' }}>
                  {renderDashboard()}
               </motion.div>
            )}
            {currentMode === 'text' && (
-              <motion.div key="text" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px', overflowY: 'auto' }}>
+              <motion.div key="text" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} style={{ flex: 1, minHeight: 0, paddingTop: isMobile ? '3.2rem' : '80px', overflowY: 'auto' }}>
                  {renderTextView()}
               </motion.div>
            )}
            {currentMode === 'video' && (
-              <motion.div key="video" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} style={{ flex: 1, minHeight: 0, paddingTop: '80px', overflowY: 'auto' }}>
+              <motion.div key="video" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} style={{ flex: 1, minHeight: 0, paddingTop: isMobile ? '0' : '80px', overflowY: 'auto' }}>
                  {renderVideoView()}
               </motion.div>
            )}
@@ -2722,9 +2730,11 @@ export default function MissionHub({
             className="hud-btn primary glass capture-hide"
             style={{
               position: 'fixed',
-              bottom: '2rem',
-              right: '2rem',
-              padding: '1rem 1.5rem',
+              bottom: isMobile ? '1rem' : '2rem',
+              right: isMobile ? '1rem' : '2rem',
+              left: isMobile ? '1rem' : 'auto',
+              justifyContent: 'center',
+              padding: isMobile ? '0.9rem 1rem' : '1rem 1.5rem',
               borderRadius: '50px',
               background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.9), rgba(34, 211, 238, 0.9))',
               color: '#000',

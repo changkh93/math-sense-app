@@ -386,6 +386,31 @@ service cloud.firestore {
       }
     }
 
+    // Student-owned mistake notebook image queue. Students submit images; admins
+    // turn them into flash cards after reviewing the work.
+    match /mistakeUploads/{uploadId} {
+      allow create: if isAuth() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isLinkedParentOf(resource.data.userId)
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Generated flash cards. Students can read their own active cards; admins
+    // create and edit the back side with answer/explanation.
+    match /mistakeCards/{cardId} {
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isLinkedParentOf(resource.data.userId)
+      );
+      allow write: if isAdmin();
+    }
+
     // Star Messages (Community Ticker)
     match /starMessages/{messageId} {
       allow read: if isAuth();

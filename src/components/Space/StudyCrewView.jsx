@@ -350,10 +350,18 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [activeRoomId, setActiveRoomId] = useGlobalActiveRoomId();
   const [openFaq, setOpenFaq] = useState(null);
   const [resubmitCrew, setResubmitCrew] = useState(null); // rejected crew data for resubmission
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
   const crew = userData?.crewSnapshot || null;
   const crewId = crew?.id || userData?.crewId || '';
   const hasCrew = !!crewId;
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Check for rejected crew (leader's snapshot preserved with rejection info)
   const rejectedCrew = useMemo(() => {
@@ -498,23 +506,23 @@ export default function StudyCrewView({ onNavigateStore }) {
 
   return (
     <>
-      <div className="fade-in" style={{ minHeight: '100vh', padding: '2rem 1rem 6rem' }}>
+      <div className="fade-in" style={{ minHeight: '100vh', padding: isMobile ? '1rem 0.75rem 6.5rem' : '2rem 1rem 6rem' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', width: '100%' }}>
           
           {/* Hero */}
-          <div style={{ marginBottom: '3.5rem', textAlign: 'left' }}>
-            <h2 className="font-title" style={{ fontSize: '2.8rem', color: 'var(--text-bright)', marginBottom: '1rem', letterSpacing: '2px', textShadow: '0 0 20px rgba(0, 212, 255, 0.3)' }}>
+          <div style={{ marginBottom: isMobile ? '1.75rem' : '3.5rem', textAlign: 'left' }}>
+            <h2 className="font-title" style={{ fontSize: isMobile ? '2rem' : '2.8rem', color: 'var(--text-bright)', marginBottom: '0.75rem', letterSpacing: 0, textShadow: '0 0 20px rgba(0, 212, 255, 0.3)' }}>
               STUDY CREW
             </h2>
-            <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '1.1rem', maxWidth: '600px', lineHeight: 1.6 }}>
+            <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: isMobile ? '0.95rem' : '1.1rem', maxWidth: '600px', lineHeight: 1.6 }}>
               함께 공부하는 프리미엄 스터디 네트워크. 크루를 만들고, 초대 코드로 친구를 모아 3인 집중방에서 집중하세요.
             </p>
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: isMobile ? '1.25rem' : '2rem', flexWrap: 'wrap' }}>
               <button
                 className="space-btn cosmic-btn font-tech"
                 onClick={() => { soundManager.playClick(); setShowCreateModal(true); }}
                 disabled={hasCrew}
-                style={{ padding: '0.8rem 1.8rem', fontSize: '1rem', borderRadius: 12, display: 'flex', alignItems: 'center', gap: '0.6rem' }}
+                style={{ padding: isMobile ? '0.78rem 1rem' : '0.8rem 1.8rem', fontSize: isMobile ? '0.9rem' : '1rem', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', flex: isMobile ? '1 1 160px' : '0 0 auto' }}
               >
                 <Plus size={18} /> 새 크루 만들기
               </button>
@@ -522,7 +530,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                 <button
                   className="space-nav-link font-tech active"
                   onClick={() => { soundManager.playClick(); setDetailView(true); }}
-                  style={{ borderRadius: 12, display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.8rem 1.8rem' }}
+                  style={{ borderRadius: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', padding: isMobile ? '0.78rem 1rem' : '0.8rem 1.8rem', flex: isMobile ? '1 1 160px' : '0 0 auto' }}
                 >
                   <ShieldCheck size={18} /> 내 크루 보기
                 </button>
@@ -622,7 +630,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                 <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>아직 생성된 크루가 없습니다. 첫 번째 크루를 만들어보세요!</div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: isMobile ? '0.85rem' : '1.5rem' }}>
                 {sortedCrews.map(c => (
                   <CrewCard
                     key={c.id}

@@ -1,10 +1,11 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
 import { Trash2, CheckCircle, X } from 'lucide-react';
 import './MathKeypad.css';
 
 const MathKeypad = ({ value, onChange, onSubmit, indicatorText, visible, onClose, onNativeModeSwitch }) => {
   if (!visible) return null;
+  const isMobile = window.innerWidth <= 640;
 
   const handleKeyPress = (key) => {
     onChange?.((value || '') + key);
@@ -22,9 +23,9 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, visible, onClose
 
   return (
     <div className="math-keypad-overlay">
-      <motion.div 
+      <Motion.div 
         className="math-keypad-container"
-        drag
+        drag={!isMobile}
         dragMomentum={false}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -87,7 +88,7 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, visible, onClose
             <CheckCircle size={24} color="white" />
           </button>
         </div>
-      </motion.div>
+      </Motion.div>
     </div>
   );
 };

@@ -194,3 +194,42 @@ button:active {
   gap: 1.5rem;
 }
 
+@media (max-width: 768px) {
+  .theater-wrapper {
+    position: relative;
+    min-height: 100dvh;
+    height: 100dvh;
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-direction: column;
+    padding: 5.5rem 0 14rem;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+
+  .theater-aspect-box {
+    width: 100%;
+    max-height: none;
+    aspect-ratio: 16 / 9;
+    margin-top: 0;
+  }
+
+  .theater-hud {
+    padding: 1rem;
+  }
+
+  .theater-hud.top-hud {
+    position: fixed;
+    padding: calc(0.85rem + env(safe-area-inset-top, 0px)) 1rem 0.9rem;
+    background: rgba(0,0,0,0.92);
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .theater-hud.bottom-hud {
+    position: fixed;
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to top, rgba(0,0,0,0.96), rgba(0,0,0,0.82));
+    gap: 0.7rem;
+  }
+}

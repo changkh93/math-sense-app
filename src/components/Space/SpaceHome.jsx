@@ -24,6 +24,7 @@ import SpaceRanking from './SpaceRanking'
 import SpaceJourney from './SpaceJourney'
 import RegionAccessModal from './RegionAccessModal' // New Integration
 import AssignmentHub from './AssignmentHub' // New Integration
+import MistakeNotebookPlanet from './MistakeNotebookPlanet'
 import WarpGateDocking from './WarpGateDocking'
 import ProfileEditView from './ProfileEditView' // Profile Management
 import StudyCrewView from './StudyCrewView'
@@ -103,6 +104,55 @@ function getPythonRegionImage(region) {
   if (title.includes('게임') || title.includes('프로젝트') || title.includes('turtle') || title.includes('창작')) return PYTHON_REGION_IMAGES.project
 
   return PYTHON_REGION_IMAGES.foundation
+}
+
+function RegionPlanetVisual({ imageSrc, title, icon, isMobile, isLocked }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const visualSize = isMobile ? 72 : 112
+
+  if (imageSrc && !imageFailed) {
+    return (
+      <img
+        src={imageSrc}
+        alt=""
+        aria-hidden="true"
+        onError={() => setImageFailed(true)}
+        style={{
+          width: visualSize,
+          height: visualSize,
+          objectFit: 'cover',
+          marginBottom: isMobile ? '0.45rem' : '0.75rem',
+          borderRadius: '999px',
+          border: '1px solid rgba(255,255,255,0.16)',
+          boxShadow: isLocked ? 'none' : '0 0 24px rgba(92, 216, 255, 0.22)',
+          filter: isLocked ? 'grayscale(100%) opacity(45%)' : 'none',
+          display: 'block'
+        }}
+      />
+    )
+  }
+
+  return (
+    <div
+      aria-hidden="true"
+      title={title}
+      style={{
+        width: visualSize,
+        height: visualSize,
+        margin: `0 auto ${isMobile ? '0.45rem' : '0.75rem'}`,
+        borderRadius: '999px',
+        display: 'grid',
+        placeItems: 'center',
+        fontSize: isMobile ? '2.2rem' : '4rem',
+        background: 'radial-gradient(circle at 34% 28%, rgba(255,255,255,0.28), rgba(0,212,255,0.1) 38%, rgba(9,15,34,0.84) 72%)',
+        border: '1px solid rgba(0, 243, 255, 0.26)',
+        boxShadow: isLocked ? 'none' : '0 0 24px rgba(92, 216, 255, 0.18)',
+        filter: isLocked ? 'grayscale(100%) opacity(50%)' : 'none'
+      }}
+    >
+      {icon || '🌍'}
+    </div>
+  )
 }
 
 const REFINERY_CAUSE_IDS = ['concept_gap', 'equation_setup', 'missed_condition', 'calculation_error', 'no_checking']
@@ -209,7 +259,7 @@ function SpaceHome() {
   
   // --- 2D Mode Setup ---
   const [is2DMode, setIs2DMode] = useState(() => {
-    return localStorage.getItem('metasense_2d_mode') === 'true';
+    return window.innerWidth < 768 || localStorage.getItem('metasense_2d_mode') === 'true';
   });
 
   useEffect(() => {
@@ -391,7 +441,7 @@ function SpaceHome() {
     const requestedView = location.state?.view || params.get('view')
     const requestedClusterId = location.state?.clusterId || params.get('clusterId')
     const requestedDate = location.state?.date || params.get('date') || params.get('assignmentDate')
-    const validViews = new Set(['planet', 'dashboard', 'collection', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub'])
+    const validViews = new Set(['planet', 'dashboard', 'collection', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
 
     if (requestedView && validViews.has(requestedView)) {
       if (requestedView === 'assignment_hub') {
@@ -625,6 +675,7 @@ function SpaceHome() {
     if (currentView === 'collection') return '도감 방문 중';
     if (currentView === 'crew') return '스터디 크루 방문 중';
     if (currentView === 'assignment_hub') return '항행 일지(과제) 작성 중';
+    if (currentView === 'mistake_notebook') return '오답노트 행성 복습 중';
     return '우주 공간(메인) 대기 중';
   }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode]);
 
@@ -780,7 +831,14 @@ function SpaceHome() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    const handleResize = () => {
+      const nextIsMobile = window.innerWidth < 768
+      setIsMobile(nextIsMobile)
+      if (nextIsMobile) {
+        setIs2DMode(true)
+        localStorage.setItem('metasense_2d_mode', 'true')
+      }
+    }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
@@ -2644,6 +2702,23 @@ function SpaceHome() {
     )
   }
 
+  if (currentView === 'mistake_notebook') {
+    return (
+      <>
+        <SpaceNavbar
+          currentView={currentView}
+          onViewChange={switchRootView}
+        />
+        <MistakeNotebookPlanet
+          onBack={() => {
+            switchRootView('planet');
+            soundManager.playWarp();
+          }}
+        />
+      </>
+    )
+  }
+
   // --- Dark Matter View ---
   if (isDarkMatterMode && darkMatterQuestions.length > 0) {
     // Stage 1: Dashboard
@@ -2700,12 +2775,12 @@ function SpaceHome() {
 
   // Main App
   return (
-    <div className="space-bg" style={{ 
+    <div className={`space-bg ${isMobile ? 'mobile-space-home' : ''}`} style={{ 
       overflowX: 'hidden'
     }}>
       {/* 3D Background Scene - Always Visible but controlled by state */}
       <AnimatePresence>
-        {currentView === 'planet' && selectedClusterId && !is2DMode && (
+        {currentView === 'planet' && selectedClusterId && !is2DMode && !isMobile && (
             <Motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2744,6 +2819,10 @@ function SpaceHome() {
               }}
               onSelectDarkMatterRefinery={() => {
                 startDarkMatterMode('refinery');
+              }}
+              onSelectMistakeNotebook={() => {
+                switchRootView('mistake_notebook');
+                soundManager.playWarp();
               }}
               darkMatterCount={darkMatterCount}
               equipment={equipment}
@@ -2932,11 +3011,12 @@ function SpaceHome() {
                     className="space-btn cosmic-btn" 
                             onClick={() => { selectCluster(null); soundManager.playClick(); }}
                     style={{ 
-                      position: 'fixed', 
-                      left: '20px', 
-                      top: '120px', 
-                      padding: '12px 24px', 
-                      fontSize: '1rem', 
+                      position: isMobile ? 'relative' : 'fixed', 
+                      left: isMobile ? 'auto' : '20px', 
+                      top: isMobile ? 'auto' : '120px', 
+                      margin: isMobile ? '0.75rem 0 0' : 0,
+                      padding: isMobile ? '0.75rem 1rem' : '12px 24px', 
+                      fontSize: isMobile ? '0.9rem' : '1rem', 
                       pointerEvents: 'auto',
                       background: 'rgba(0, 243, 255, 0.15)',
                       border: '1px solid var(--neon-blue)',
@@ -2956,6 +3036,7 @@ function SpaceHome() {
                     position: 'fixed', 
                     right: '25px', 
                     top: '120px', 
+                    display: isMobile ? 'none' : 'block',
                     padding: '12px 24px', 
                     fontSize: '1.05rem', 
                     fontWeight: 'bold',
@@ -3007,20 +3088,20 @@ function SpaceHome() {
                     bottom: is2DMode ? 'auto' : '100px',
                     left: is2DMode ? 'auto' : '50%',
                     transform: is2DMode ? 'none' : 'translateX(-50%)',
-                    marginTop: is2DMode ? '150px' : '0',
+                    marginTop: is2DMode ? (isMobile ? '0.75rem' : '150px') : '0',
                     pointerEvents: 'auto',
                     zIndex: 50,
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: is2DMode ? '2rem' : '0.6rem',
+                    gap: is2DMode ? (isMobile ? '0.75rem' : '2rem') : '0.6rem',
                     justifyContent: 'center',
-                    maxWidth: is2DMode ? '1200px' : '90vw',
-                    padding: is2DMode ? '2rem' : '1rem 1.5rem',
+                    maxWidth: is2DMode ? (isMobile ? '100%' : '1200px') : '90vw',
+                    padding: is2DMode ? (isMobile ? '0.75rem 0.15rem 5.5rem' : '2rem') : '1rem 1.5rem',
                     background: is2DMode ? 'transparent' : 'rgba(5, 5, 20, 0.7)',
                     backdropFilter: is2DMode ? 'none' : 'blur(12px)',
                     borderRadius: '16px',
                     border: is2DMode ? 'none' : '1px solid rgba(0, 243, 255, 0.15)',
-                    margin: is2DMode ? '180px auto 100px' : undefined // Added more bottom margin for scrolling
+                    margin: is2DMode ? (isMobile ? '0.75rem auto 5.5rem' : '180px auto 100px') : undefined // Added more bottom margin for scrolling
                   }}
                 >
                   {loadingRegions ? (
@@ -3047,11 +3128,11 @@ function SpaceHome() {
                                     if (soundManager?.playWarp) soundManager.playWarp();
                                   }}
                           style={{
-                            padding: '1.5rem',
-                            width: '250px',
+                            padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                            width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
                             background: 'rgba(255, 215, 0, 0.1)',
                             border: '1px solid rgba(255, 215, 0, 0.4)',
-                            borderRadius: '20px',
+                            borderRadius: isMobile ? '14px' : '20px',
                             color: 'white',
                             cursor: 'pointer',
                             display: 'flex',
@@ -3064,9 +3145,43 @@ function SpaceHome() {
                           }}
                         >
                           <div style={{ position: 'relative', zIndex: 1 }}>
-                            <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>🛰️</div>
-                            <span className="font-tech" style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>과제 기록소</span>
+                            <div style={{ fontSize: isMobile ? '2.2rem' : '4rem', marginBottom: '0.5rem' }}>🛰️</div>
+                            <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>과제 기록소</span>
                             <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#ffd700', fontWeight: 'bold' }}>Stellar Archive</div>
+                          </div>
+                        </Motion.div>
+
+                        {/* Special Card: Mistake Notebook */}
+                        <Motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1, transition: { delay: 0.13 } }}
+                          whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            switchRootView('mistake_notebook');
+                            if (soundManager?.playWarp) soundManager.playWarp();
+                          }}
+                          style={{
+                            padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                            width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
+                            background: 'rgba(20, 184, 166, 0.1)',
+                            border: '1px solid rgba(45, 212, 191, 0.42)',
+                            borderRadius: isMobile ? '14px' : '20px',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            boxShadow: '0 8px 32px rgba(20, 184, 166, 0.18)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <div style={{ position: 'relative', zIndex: 1 }}>
+                            <div style={{ fontSize: isMobile ? '2.2rem' : '4rem', marginBottom: '0.5rem' }}>🧠</div>
+                            <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>오답노트 행성</span>
+                            <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#5eead4', fontWeight: 'bold' }}>Memory Planet</div>
                           </div>
                         </Motion.div>
 
@@ -3081,11 +3196,11 @@ function SpaceHome() {
                             if (soundManager?.playWarp) soundManager.playWarp();
                           }}
                           style={{
-                            padding: '1.5rem',
-                            width: '250px',
+                            padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                            width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
                             background: 'rgba(168, 85, 247, 0.1)',
                             border: '1px solid rgba(168, 85, 247, 0.4)',
-                            borderRadius: '20px',
+                            borderRadius: isMobile ? '14px' : '20px',
                             color: 'white',
                             cursor: 'pointer',
                             display: 'flex',
@@ -3098,8 +3213,8 @@ function SpaceHome() {
                           }}
                         >
                           <div style={{ position: 'relative', zIndex: 1 }}>
-                            <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>🌑</div>
-                            <span className="font-tech" style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>다크 매터</span>
+                            <div style={{ fontSize: isMobile ? '2.2rem' : '4rem', marginBottom: '0.5rem' }}>🌑</div>
+                            <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>다크 매터</span>
                             <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#a78bfa', fontWeight: 'bold' }}>Review Needed: {darkMatterCount}</div>
                           </div>
                         </Motion.div>
@@ -3115,11 +3230,11 @@ function SpaceHome() {
                             if (soundManager?.playWarp) soundManager.playWarp();
                           }}
                           style={{
-                            padding: '1.5rem',
-                            width: '250px',
+                            padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                            width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
                             background: 'rgba(245, 158, 11, 0.1)',
                             border: '1px solid rgba(245, 158, 11, 0.45)',
-                            borderRadius: '20px',
+                            borderRadius: isMobile ? '14px' : '20px',
                             color: 'white',
                             cursor: 'pointer',
                             display: 'flex',
@@ -3132,8 +3247,8 @@ function SpaceHome() {
                           }}
                         >
                           <div style={{ position: 'relative', zIndex: 1 }}>
-                            <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>⚗️</div>
-                            <span className="font-tech" style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>다크매터 정제소</span>
+                            <div style={{ fontSize: isMobile ? '2.2rem' : '4rem', marginBottom: '0.5rem' }}>⚗️</div>
+                            <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>다크매터 정제소</span>
                             <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#fbbf24', fontWeight: 'bold' }}>Purification: {darkMatterCount}</div>
                           </div>
                         </Motion.div>
@@ -3168,21 +3283,21 @@ function SpaceHome() {
                                 if (soundManager?.playWarp) soundManager.playWarp();
                       }}
                       style={{
-                        padding: is2DMode ? '1.5rem' : '0.5rem 1rem',
-                        width: is2DMode ? '250px' : 'auto',
+                        padding: is2DMode ? (isMobile ? '0.85rem 0.65rem' : '1.5rem') : '0.5rem 1rem',
+                        width: is2DMode ? (isMobile ? 'calc(50% - 0.45rem)' : '250px') : 'auto',
                         background: is2DMode 
                           ? (isCompleted ? 'rgba(80, 200, 120, 0.15)' : 'rgba(5, 20, 40, 0.8)') 
                           : (isCompleted ? 'rgba(80, 200, 120, 0.2)' : 'rgba(0, 212, 255, 0.1)'),
                         border: is2DMode 
                           ? `1px solid ${isCompleted ? 'rgba(80, 200, 120, 0.6)' : 'rgba(0, 243, 255, 0.4)'}`
                           : `1px solid ${isCompleted ? 'rgba(80, 200, 120, 0.5)' : 'rgba(0, 212, 255, 0.3)'}`,
-                        borderRadius: is2DMode ? '20px' : '10px',
+                        borderRadius: is2DMode ? (isMobile ? '14px' : '20px') : '10px',
                         color: 'white',
                         cursor: 'pointer',
                         display: 'flex',
                         flexDirection: is2DMode ? 'column' : 'row',
                         alignItems: 'center',
-                        gap: is2DMode ? '1rem' : '0.5rem',
+                        gap: is2DMode ? (isMobile ? '0.55rem' : '1rem') : '0.5rem',
                         boxShadow: is2DMode ? (isCompleted ? '0 8px 32px rgba(80,200,120,0.3)' : '0 8px 32px rgba(0,0,0,0.6)') : 'none',
                         position: 'relative',
                         overflow: 'hidden'
@@ -3199,44 +3314,31 @@ function SpaceHome() {
                       
                       <div style={{ position: 'relative', zIndex: 1 }}>
                         {is2DMode && (
-                          middleMathRegionImage || pythonRegionImage ? (
-                            <img
-                              src={middleMathRegionImage || pythonRegionImage}
-                              alt={region.title}
-                              style={{
-                                width: '112px',
-                                height: '112px',
-                                objectFit: 'cover',
-                                marginBottom: '0.75rem',
-                                borderRadius: '999px',
-                                border: '1px solid rgba(255,255,255,0.16)',
-                                boxShadow: isRegionLocked
-                                  ? 'none'
-                                  : '0 0 24px rgba(92, 216, 255, 0.22)',
-                                filter: isRegionLocked ? 'grayscale(100%) opacity(45%)' : 'none'
-                              }}
-                            />
-                          ) : (
-                            <div style={{ 
-                              fontSize: '4rem', 
-                              marginBottom: '0.5rem', 
-                              filter: isRegionLocked ? 'grayscale(100%) opacity(50%)' : 'drop-shadow(0 0 15px rgba(255,255,255,0.4))' 
-                            }}>
-                              {region.icon || '🌍'}
-                            </div>
-                          )
+                          <RegionPlanetVisual
+                            imageSrc={middleMathRegionImage || pythonRegionImage}
+                            title={region.title}
+                            icon={region.icon}
+                            isMobile={isMobile}
+                            isLocked={isRegionLocked}
+                          />
                         )}
                         <span className="font-tech" style={{ 
-                          fontSize: is2DMode ? '1.3rem' : '0.85rem',
+                          fontSize: is2DMode ? (isMobile ? '0.94rem' : '1.3rem') : '0.85rem',
                           fontWeight: is2DMode ? 'bold' : 'normal',
-                          color: isRegionLocked ? '#88aabb' : 'white'
+                          color: isRegionLocked ? '#88aabb' : 'white',
+                          display: 'block',
+                          maxWidth: '100%',
+                          lineHeight: 1.35,
+                          wordBreak: 'keep-all',
+                          overflowWrap: 'anywhere',
+                          textAlign: 'center'
                         }}>
                           {isRegionLocked && !is2DMode ? '🔒 ' : ''}
                           {region.title}
                         </span>
                         
                         {is2DMode && (
-                          <div style={{ marginTop: '0.8rem', fontSize: '0.9rem', color: isRegionLocked ? '#ff6b6b' : 'var(--crystal-cyan)', fontWeight: 'bold' }}>
+                          <div style={{ marginTop: isMobile ? '0.45rem' : '0.8rem', fontSize: isMobile ? '0.74rem' : '0.9rem', color: isRegionLocked ? '#ff6b6b' : 'var(--crystal-cyan)', fontWeight: 'bold' }}>
                             {isRegionLocked ? '🔒 접근 제한' : (isCompleted ? '⭐ 탐사 완료' : '진입 가능')}
                           </div>
                         )}
@@ -3250,7 +3352,7 @@ function SpaceHome() {
               </div>
             ) : !selectedChapterDocId ? (
               // Chapter Selection (Overlay)
-              <div className="fade-in" style={{ pointerEvents: 'auto', marginTop: '5vh' }}>
+              <div className="fade-in" style={{ pointerEvents: 'auto', marginTop: isMobile ? '1rem' : '5vh' }}>
                 <button 
                   className="space-nav-link font-tech"
                           onClick={() => { selectRegion(null); soundManager.playClick() }}
@@ -3258,7 +3360,7 @@ function SpaceHome() {
                 >
                   ← RETURN TO GALAXY
                 </button>
-                <div className="glass-card" style={{ padding: '2rem', background: 'rgba(5, 5, 16, 0.8)', backdropFilter: 'blur(20px)', position: 'relative' }}>
+                <div className="glass-card" style={{ padding: isMobile ? '1rem' : '2rem', background: 'rgba(5, 5, 16, 0.8)', backdropFilter: 'blur(20px)', position: 'relative' }}>
                   {/* Close Button */}
                   <button 
                             onClick={() => { selectRegion(null); soundManager.playClick() }}
@@ -3284,8 +3386,8 @@ function SpaceHome() {
                   </button>
                   <h2 className="font-title" style={{ 
                     color: 'var(--text-bright)', 
-                    fontSize: '2rem', 
-                    marginBottom: '2rem',
+                    fontSize: isMobile ? '1.35rem' : '2rem', 
+                    marginBottom: isMobile ? '1rem' : '2rem',
                     borderBottom: '1px solid var(--neon-blue)',
                     paddingBottom: '1rem' 
                   }}>
@@ -3294,18 +3396,18 @@ function SpaceHome() {
                   <SectorLeaderboard user={user} regionId={selectedRegionId} />
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                    gap: '1.5rem'
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
+                    gap: isMobile ? '0.8rem' : '1.5rem'
                   }}>
                     {loadingChapters ? (
                       <div className="font-tech" style={{ color: 'var(--text-muted)' }}>SCANNING...</div>
                     ) : chapters?.map(chapter => (
                       <Motion.div
                         key={chapter.docId}
-                        whileHover={{ scale: 1.02, backgroundColor: 'rgba(0, 243, 255, 0.1)' }}
+                        whileHover={isMobile ? undefined : { scale: 1.02, backgroundColor: 'rgba(0, 243, 255, 0.1)' }}
                         className="glass-card hud-border"
                                 onClick={() => { selectChapter(chapter.docId); soundManager.playWarp() }}
-                        style={{ padding: '2rem', cursor: 'pointer' }}
+                        style={{ padding: isMobile ? '1.1rem' : '2rem', cursor: 'pointer' }}
                       >
                         <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.5rem' }}>
                           {chapter.title}
@@ -3359,7 +3461,7 @@ function SpaceHome() {
                             onClick={() => { selectRegion(null); soundManager.playClick() }}
                     style={{ 
                       display: 'block', 
-                      margin: '3rem auto 0',
+                      margin: isMobile ? '1.5rem auto 0' : '3rem auto 0',
                       padding: '0.8rem 2.5rem'
                     }}
                   >
@@ -3369,7 +3471,7 @@ function SpaceHome() {
               </div>
             ) : (
               // Unit Selection (Overlay)
-              <div className="fade-in" style={{ pointerEvents: 'auto', marginTop: '5vh' }}>
+              <div className="fade-in" style={{ pointerEvents: 'auto', marginTop: isMobile ? '1rem' : '5vh' }}>
                 <button 
                   className="space-nav-link font-tech"
                           onClick={() => {
@@ -3380,7 +3482,7 @@ function SpaceHome() {
                 >
                   ← RETURN TO SECTOR
                 </button>
-                <div className="glass-card" style={{ padding: '2rem', background: 'rgba(5, 5, 16, 0.8)', backdropFilter: 'blur(20px)', maxWidth: '800px', margin: '0 auto', position: 'relative' }}>
+                <div className="glass-card" style={{ padding: isMobile ? '1rem' : '2rem', background: 'rgba(5, 5, 16, 0.8)', backdropFilter: 'blur(20px)', maxWidth: '800px', width: '100%', boxSizing: 'border-box', margin: '0 auto', position: 'relative' }}>
                   {/* Close Button */}
                   <button 
                     onClick={() => {
@@ -3413,8 +3515,8 @@ function SpaceHome() {
                   </button>
                   <h2 className="font-title" style={{ 
                     color: 'var(--text-bright)', 
-                    fontSize: '1.8rem', 
-                    marginBottom: '2rem', 
+                    fontSize: isMobile ? '1.25rem' : '1.8rem', 
+                    marginBottom: isMobile ? '1rem' : '2rem', 
                     textAlign: 'center',
                     borderBottom: '1px solid var(--neon-blue)',
                     paddingBottom: '1rem'
@@ -3448,25 +3550,26 @@ function SpaceHome() {
                       return (
                         <Motion.button
                           key={unit.docId}
-                          whileHover={{ scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
+                          whileHover={isMobile ? undefined : { scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
                                   className={`glass-card hud-border ${isOverallCompleted ? 'completed' : ''}`}
                                   onClick={() => { 
                                     selectUnit(unit.docId)
                                     soundManager.playClick() 
                           }}
                           style={{
-                            padding: '1.2rem 1.5rem',
+                            padding: isMobile ? '1rem' : '1.2rem 1.5rem',
                             textAlign: 'left',
                             cursor: 'pointer',
                             color: 'var(--text-bright)',
-                            fontSize: '1.1rem',
+                            fontSize: isMobile ? '0.96rem' : '1.1rem',
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center',
+                            alignItems: isMobile ? 'stretch' : 'center',
                             borderLeft: isOverallCompleted ? '4px solid var(--secondary)' : '1px solid var(--neon-blue)',
                             position: 'relative',
                             flexWrap: 'wrap',
-                            gap: '1rem'
+                            flexDirection: isMobile ? 'column' : 'row',
+                            gap: isMobile ? '0.8rem' : '1rem'
                           }}
                         >
                           {checkIsBonusUnit(unit.docId || unit.id) && (
@@ -3478,15 +3581,15 @@ function SpaceHome() {
                               zIndex: 1
                             }}>💎</div>
                           )}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <span className="font-title">
-                              <span style={{ color: 'var(--neon-blue)', marginRight: '1rem' }}>{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.55rem' : '1rem', minWidth: 0 }}>
+                            <span className="font-title" style={{ lineHeight: 1.35, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
+                              <span style={{ color: 'var(--neon-blue)', marginRight: isMobile ? '0.45rem' : '1rem' }}>{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}</span>
                               {isOverallCompleted && <span style={{ marginRight: '0.5rem' }}>✅</span>}
                               {unit.title}
                             </span>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: isMobile ? '0.75rem' : '1.5rem', flexWrap: 'wrap' }}>
                             {/* Modality Badges */}
                             <div style={{ display: 'flex', gap: '0.8rem' }}>
                               {hasText && (
@@ -3526,7 +3629,7 @@ function SpaceHome() {
                               </span>
                             )}
                             
-                            <span style={{ color: 'var(--crystal-cyan)', minWidth: '80px', textAlign: 'right' }}>
+                            <span style={{ color: 'var(--crystal-cyan)', minWidth: isMobile ? 'auto' : '80px', textAlign: 'right' }}>
                               {isOverallCompleted ? 'REPLAY' : '🚀 START'}
                             </span>
                           </div>
@@ -3548,7 +3651,7 @@ function SpaceHome() {
                     }}
                     style={{ 
                       display: 'block', 
-                      margin: '3rem auto 0',
+                      margin: isMobile ? '1.5rem auto 0' : '3rem auto 0',
                       padding: '0.8rem 2.5rem'
                     }}
                   >

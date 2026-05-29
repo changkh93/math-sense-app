@@ -177,7 +177,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // Anti-Guessing State
   const [retryCount, setRetryCount] = useState(0)
   const [everWrongSet, setEverWrongSet] = useState(new Set())
-  const isMobile = window.innerWidth <= 768
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
   const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
   const [isAiExplanationOpen, setIsAiExplanationOpen] = useState(false)
   const [isDetailedExplanationOpen, setIsDetailedExplanationOpen] = useState(false)
@@ -190,6 +190,13 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
   const currentQuestion = currentQuestions[currentIdx]
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // 초기 문제 설정 및 이어풀기 세션 로드
   useEffect(() => {
@@ -1181,7 +1188,16 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   return (
-    <div className="space-bg" style={{ display: 'flex', width: '100%', position: 'relative' }}>
+    <div
+      className="space-bg"
+      style={{
+        display: 'flex',
+        width: '100%',
+        position: 'relative',
+        minHeight: '100dvh',
+        overflowX: 'hidden'
+      }}
+    >
       <StarField count={100} />
       
       <div 
@@ -1191,7 +1207,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           width: '100%',
           flex: 1,
           margin: 0,
-          paddingRight: (isAiExplanationOpen && !isMobile) ? '400px' : '0'
+          paddingRight: (isAiExplanationOpen && !isMobile) ? '400px' : '0',
+          padding: isMobile ? '0.75rem 0.75rem 6.25rem' : undefined
         }}
       >
         {/* Interactive Support Tray (FAB) */}
@@ -1206,14 +1223,14 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             transition={{ type: 'spring', damping: 20, stiffness: 100 }}
             style={{ 
               position: 'fixed', 
-              bottom: '6rem', 
-              right: '0', 
+              bottom: isMobile ? '1rem' : '6rem', 
+              right: isMobile ? '1rem' : '0', 
               zIndex: 9999,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'flex-end',
               gap: '0.8rem',
-              paddingRight: '1rem'
+              paddingRight: isMobile ? 0 : '1rem'
             }}
           >
             <AnimatePresence>
@@ -1222,7 +1239,13 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'flex-end' }}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.8rem',
+                    alignItems: 'flex-end',
+                    width: isMobile ? 'calc(100vw - 2rem)' : 'auto'
+                  }}
                 >
                   {/* Data Link Button */}
                   {onRequestSupport && (
@@ -1243,7 +1266,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                         border: '2px solid rgba(0, 255, 136, 0.6)',
                         boxShadow: '0 0 15px rgba(0, 255, 136, 0.3)',
                         background: 'rgba(5, 20, 10, 0.95)',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        width: isMobile ? '100%' : 'auto',
+                        justifyContent: isMobile ? 'center' : 'flex-start'
                       }}
                     >
                       <span style={{ fontSize: '1.2rem' }}>📡</span>
@@ -1270,7 +1295,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                         border: '2px solid rgba(168, 85, 247, 0.6)',
                         boxShadow: '0 0 15px rgba(168, 85, 247, 0.3)',
                         background: 'rgba(20, 5, 25, 0.95)',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        width: isMobile ? '100%' : 'auto',
+                        justifyContent: isMobile ? 'center' : 'flex-start'
                       }}
                     >
                       <span style={{ fontSize: '1.2rem' }}>🤖</span>
@@ -1296,7 +1323,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                       border: '2px solid rgba(0, 243, 255, 0.6)',
                       boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)',
                       background: 'rgba(5, 5, 20, 0.95)',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      width: isMobile ? '100%' : 'auto',
+                      justifyContent: isMobile ? 'center' : 'flex-start'
                     }}
                   >
                     <span style={{ fontSize: '1.2rem' }}>🙋</span>
@@ -1312,8 +1341,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               whileTap={{ scale: 0.9 }}
               onClick={() => setIsTrayExpanded(!isTrayExpanded)}
               style={{
-                width: '56px',
-                height: '56px',
+                width: isMobile ? '52px' : '56px',
+                height: isMobile ? '52px' : '56px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, var(--crystal-cyan), var(--planet-purple))',
                 border: '2px solid white',
@@ -1361,7 +1390,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           </button>
 
           {/* 헤더 */}
-          <div style={{ marginBottom: '2rem' }}>
+          <div style={{ marginBottom: isMobile ? '1.35rem' : '2rem', paddingRight: isMobile ? '2.75rem' : 0 }}>
             <span style={{
               background: region?.color || 'var(--crystal-cyan)',
               color: 'white',
@@ -1545,8 +1574,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           {/* 보기 */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '1rem'
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+            gap: isMobile ? '0.75rem' : '1rem'
           }}>
             {(currentQuestion?.shuffledOptions || []).map((option, idx) => {
               const multiMode = isMultiAnswer(currentQuestion)
@@ -1684,7 +1713,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   아래 버튼 중 하나를 눌러야 집계가 저장되고 다음 문제로 이동합니다.
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
                 {QUIZ_REACTION_CHOICES.map(choice => {
                   const reactionCounts = displayedStats.reactionCounts || {}
                   const reactionTotal = Object.values(reactionCounts).reduce((sum, value) => sum + Number(value || 0), 0)
@@ -1704,9 +1733,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                         handleQuizReaction(choice.id)
                       }}
                       style={{
-                        minHeight: 82,
-                        padding: '1rem',
-                        borderRadius: '18px',
+                        minHeight: isMobile ? 70 : 82,
+                        padding: isMobile ? '0.85rem' : '1rem',
+                        borderRadius: isMobile ? '14px' : '18px',
                         border: `1px solid ${disabledByAnswer ? 'rgba(255,255,255,0.08)' : `${choice.tone}88`}`,
                         background: disabledByAnswer
                           ? 'linear-gradient(145deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))'
@@ -1735,7 +1764,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                           pointerEvents: 'none'
                         }} />
                       )}
-                      <div style={{ position: 'relative', fontWeight: 950, lineHeight: 1.35, fontSize: '1rem' }}>{choice.label}</div>
+                      <div style={{ position: 'relative', fontWeight: 950, lineHeight: 1.35, fontSize: isMobile ? '0.92rem' : '1rem' }}>{choice.label}</div>
                       <div style={{ marginTop: '0.3rem', color: disabledByAnswer ? 'rgba(226,232,240,0.28)' : choice.tone, fontSize: '0.76rem', fontWeight: 800 }}>
                         익명 반응 {count}명{reactionTotal > 0 ? ` · ${percent}%` : ''}
                       </div>

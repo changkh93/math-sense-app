@@ -25,6 +25,7 @@ import TeacherQA from './pages/Admin/TeacherQA'
 import PythonCourseBuilder from './pages/Admin/PythonCourseBuilder'
 import MiddleSchoolMathBuilder from './pages/Admin/MiddleSchoolMathBuilder'
 import AdminAssignments from './pages/Admin/AdminAssignments'
+import MistakeNotebookAdmin from './pages/Admin/MistakeNotebookAdmin'
 import AdminStudentReport from './pages/Admin/AdminStudentReport'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
@@ -70,6 +71,7 @@ function App() {
         <Route path="crews" element={<CrewApproval />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="assignments" element={<AdminAssignments />} />
+        <Route path="mistake-notebook" element={<MistakeNotebookAdmin />} />
         <Route path="student-report" element={<AdminStudentReport />} />
         <Route path="mission/:unitId" element={<MissionContentEditor />} />
         <Route path="mission/:unitId/ai-tagging" element={<AITaggingEditor />} />

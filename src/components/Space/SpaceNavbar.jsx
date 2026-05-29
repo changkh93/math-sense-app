@@ -17,6 +17,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
+  const [isMobileMoreOpen, setIsMobileMoreOpen] = React.useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
 
   const handleLogout = async () => {
@@ -92,6 +93,8 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
 
   const handleNavClick = (view, path) => {
     soundManager.playClick();
+    setIsMobileMoreOpen(false);
+    setIsProfileMenuOpen(false);
     const isHome = window.location.pathname === '/';
     
     if (path === '/agora') {
@@ -105,9 +108,73 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     }
   };
 
+  const viewTitle = ({
+    planet: '학습 지도',
+    dashboard: '성장 기록',
+    mistake_notebook: '오답노트',
+    assignment_hub: '과제',
+    journey: '항해 기록',
+    ledger: '광석 내역',
+    collection: '도감',
+    ranking: '랭킹',
+    store: '스토어',
+    crew: '스터디 크루',
+    agora: '스텔라 아고라',
+    profile: '프로필'
+  })[currentView] || (window.location.pathname.startsWith('/agora') ? '스텔라 아고라' : 'Meta Sense');
+
+  const mobilePrimaryNav = [
+    { view: 'planet', label: '학습', icon: '🪐' },
+    { view: 'mistake_notebook', label: '오답', icon: '🧠' },
+    { view: 'assignment_hub', label: '과제', icon: '🛰️' },
+    { view: 'journey', label: '기록', icon: '☄️' }
+  ];
+
+  const mobileMoreNav = [
+    { view: 'dashboard', label: '성장 기록', icon: '📊' },
+    { view: 'collection', label: '도감', icon: '🏆' },
+    { view: 'ranking', label: '랭킹', icon: '🏅' },
+    { view: 'store', label: '스토어', icon: '🎨' },
+    { view: 'crew', label: '스터디 크루', icon: '🛰️' },
+    { view: 'ledger', label: '광석 내역', icon: '💎' }
+  ];
+
+  const mobileIsAgoraActive = window.location.pathname.startsWith('/agora');
+
   return (
     <nav className="space-nav hud-border">
-      <div className="space-nav-links font-title">
+      <div className="mobile-nav-top">
+        <button
+          type="button"
+          className="mobile-brand-btn"
+          onClick={() => handleNavClick('planet', '/')}
+          aria-label="학습 지도로 이동"
+        >
+          <img src="/m-logo.svg" alt="" />
+        </button>
+        <div className="mobile-current-view">
+          <span className="mobile-current-kicker">META SENSE</span>
+          <strong>{viewTitle}</strong>
+        </div>
+        <div className="mobile-nav-actions">
+          <DirectMemoMenu />
+          <NotificationMenu />
+          <button
+            type="button"
+            className={`mobile-profile-btn ${isProfileMenuOpen ? 'active' : ''}`}
+            onClick={() => { soundManager.playClick(); setIsProfileMenuOpen(!isProfileMenuOpen); setIsMobileMoreOpen(false); }}
+            aria-label="프로필 메뉴 열기"
+          >
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt="" />
+            ) : (
+              <span>{(userData?.studentName || user?.displayName)?.[0] || '?'}</span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-nav-links desktop-nav-links font-title">
         <div style={{ display: 'flex', alignItems: 'center', marginRight: '1rem', cursor: 'pointer' }} onClick={() => handleNavClick('planet', '/')}>
           <img src="/m-logo.svg" alt="Meta Sense Logo" style={{ width: '30px', filter: 'drop-shadow(0 0 8px rgba(0, 243, 255, 0.6))' }} />
         </div>
@@ -122,6 +189,12 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           onClick={() => handleNavClick('collection', '/')}
         >
           🏆 DATABASE
+        </button>
+        <button
+          className={`space-nav-link ${currentView === 'mistake_notebook' ? 'active' : ''}`}
+          onClick={() => handleNavClick('mistake_notebook', '/')}
+        >
+          🧠 NOTE
         </button>
         <button 
           className={`space-nav-link ${currentView === 'ranking' ? 'active' : ''}`}
@@ -149,7 +222,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         </button>
       </div>
       
-      <div className="nav-right">
+      <div className="nav-right desktop-nav-right">
         <DirectMemoMenu />
         <NotificationMenu />
         <div 
@@ -170,7 +243,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         </div>
 
         {/* Profile Menu relative container */}
-        <div style={{ position: 'relative' }}>
+        <div className="profile-menu-anchor" style={{ position: 'relative' }}>
           <div 
             onClick={() => { soundManager.playClick(); setIsProfileMenuOpen(!isProfileMenuOpen); }}
             style={{ 
@@ -196,6 +269,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           <AnimatePresence>
             {isProfileMenuOpen && (
               <Motion.div
+                className="profile-menu-panel"
                 initial={{ opacity: 0, y: -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -276,6 +350,105 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           </AnimatePresence>
         </div>
       </div>
+
+      <div className="mobile-bottom-nav">
+        {mobilePrimaryNav.map(item => (
+          <button
+            key={item.view}
+            type="button"
+            className={`mobile-bottom-tab ${currentView === item.view ? 'active' : ''}`}
+            onClick={() => handleNavClick(item.view, '/')}
+          >
+            <span>{item.icon}</span>
+            <strong>{item.label}</strong>
+          </button>
+        ))}
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${isMobileMoreOpen || mobileIsAgoraActive || ['dashboard', 'collection', 'ranking', 'store', 'crew', 'ledger'].includes(currentView) ? 'active' : ''}`}
+          onClick={() => { soundManager.playClick(); setIsMobileMoreOpen(prev => !prev); setIsProfileMenuOpen(false); }}
+        >
+          <span>☰</span>
+          <strong>더보기</strong>
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {isMobileMoreOpen && (
+          <Motion.div
+            className="mobile-more-sheet"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 18 }}
+            transition={{ duration: 0.18 }}
+          >
+            <div className="mobile-sheet-handle" />
+            <div className="mobile-more-grid">
+              {mobileMoreNav.map(item => (
+                <button
+                  key={item.view}
+                  type="button"
+                  className={currentView === item.view ? 'active' : ''}
+                  onClick={() => handleNavClick(item.view, '/')}
+                >
+                  <span>{item.icon}</span>
+                  <strong>{item.label}</strong>
+                </button>
+              ))}
+              <button
+                type="button"
+                className={mobileIsAgoraActive ? 'active' : ''}
+                onClick={() => handleNavClick('agora', '/agora')}
+              >
+                <span>🏛️</span>
+                <strong>스텔라 아고라</strong>
+              </button>
+              <button type="button" onClick={() => handleNavClick('profile', '/')}>
+                <span>👤</span>
+                <strong>프로필</strong>
+              </button>
+            </div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isProfileMenuOpen && (
+          <Motion.div
+            className="mobile-profile-sheet"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 18 }}
+            transition={{ duration: 0.18 }}
+          >
+            <div className="mobile-sheet-handle" />
+            <div className="mobile-profile-summary">
+              <span>안녕하세요,</span>
+              <strong>{userData?.studentName || user?.displayName || '탐사원'}님</strong>
+            </div>
+            <button type="button" onClick={() => handleNavClick('profile', '/')}>프로필 수정</button>
+            <button type="button" onClick={() => handleNavClick('dashboard', '/')}>성장 기록</button>
+            <button
+              type="button"
+              className="danger"
+              disabled={isDeletingAccount || userData?.role === 'admin'}
+              onClick={handleDeleteAccount}
+            >
+              {isDeletingAccount ? '탈퇴 처리 중...' : '계정 탈퇴'}
+            </button>
+            <button
+              type="button"
+              className="logout"
+              onClick={() => {
+                setIsProfileMenuOpen(false);
+                handleLogout();
+              }}
+            >
+              로그아웃
+            </button>
+          </Motion.div>
+        )}
+      </AnimatePresence>
     </nav>
   );
 }

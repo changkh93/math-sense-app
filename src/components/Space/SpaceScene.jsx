@@ -100,6 +100,7 @@ function SceneContent({
   isBoosting = false,
   onSelectDarkMatter,
   onSelectDarkMatterRefinery,
+  onSelectMistakeNotebook,
   darkMatterCount = 0
 }) {
   const controlsRef = useRef()
@@ -302,6 +303,46 @@ function SceneContent({
             >
               과제 기록소<br/>
               <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: '500' }}>Stellar Archive</span>
+            </Html>
+          </Float>
+        </group>
+      )}
+
+      {/* Mistake Notebook Planet */}
+      {( !selectedRegionId ) && (
+        <group position={[4.8, 0.3, -1.2]}>
+          <Float speed={1.7} rotationIntensity={0.55} floatIntensity={1} floatingRange={[-0.25, 0.25]}>
+            <PlanetMesh
+              color="#14b8a6"
+              size={0.65}
+              planetType="cloud"
+              showSpaceship={false}
+              showFormulas={true}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectMistakeNotebook) onSelectMistakeNotebook();
+              }}
+              onPointerOver={() => { document.body.style.cursor = 'pointer' }}
+              onPointerOut={() => { document.body.style.cursor = 'auto' }}
+            />
+            <Html
+              position={[0, 1.25, 0]}
+              center
+              zIndexRange={[100, 0]}
+              style={{
+                color: "#5eead4",
+                fontSize: '1.05rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-title, sans-serif)',
+                whiteSpace: 'nowrap',
+                textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 12px #000',
+                pointerEvents: 'none',
+                textAlign: 'center',
+                lineHeight: '1.3'
+              }}
+            >
+              오답노트 행성<br/>
+              <span style={{ fontSize: '0.72rem', color: '#ccfbf1', fontWeight: '500' }}>Memory Planet</span>
             </Html>
           </Float>
         </group>

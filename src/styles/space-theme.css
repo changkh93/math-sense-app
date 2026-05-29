@@ -440,7 +440,34 @@
   }
   
   .space-quiz-container {
+    padding: 0.75rem 0.75rem 6.25rem;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .space-quiz-card {
     padding: 1rem;
+    border-radius: 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .space-option-btn {
+    padding: 0.95rem 1rem;
+    border-radius: 12px;
+    font-size: 1rem;
+    line-height: 1.35;
+    text-align: left;
+  }
+
+  .space-image-card {
+    padding: 10px;
+    border-radius: 14px;
+    max-width: 100%;
+  }
+
+  .space-question-image {
+    max-height: 36vh;
   }
 
   /* Title font size scaling if not handled by JS */

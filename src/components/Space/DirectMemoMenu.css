@@ -549,6 +549,64 @@
 
 @media (max-width: 640px) {
   .direct-memo-dropdown {
-    right: max(-92px, calc(24px - 100vw));
+    position: fixed;
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-height: calc(100dvh - 9.8rem);
+    border-radius: 16px;
+    z-index: 1400;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .direct-memo-header {
+    padding: 0.9rem;
+  }
+
+  .direct-memo-tabs {
+    display: flex;
+    overflow-x: auto;
+    grid-template-columns: none;
+    gap: 0.45rem;
+  }
+
+  .direct-memo-tabs button {
+    min-width: 106px;
+    flex: 0 0 auto;
+  }
+
+  .direct-memo-compose-panel {
+    overflow-y: auto;
+  }
+
+  .direct-memo-list {
+    max-height: none;
+    flex: 1;
+  }
+
+  .direct-memo-card {
+    padding: 0.85rem;
+  }
+
+  .direct-memo-card-bottom {
+    align-items: stretch;
+    gap: 0.8rem;
+  }
+
+  .direct-memo-card-actions {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .direct-memo-compose-footer {
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .direct-memo-send {
+    justify-content: center;
   }
 }
