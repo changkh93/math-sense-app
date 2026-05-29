@@ -646,11 +646,31 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
 // 서브 컴포넌트: Constellation View (성좌 뷰)
 // ------------------------------------------
 function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
-  const ROW_HEIGHT = 100;
-  const paddingX = 200;
-  const contentWidth = 700;
+  const [isMobileConstellation, setIsMobileConstellation] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  ));
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileConstellation(window.innerWidth <= 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const ROW_HEIGHT = isMobileConstellation ? 58 : 100;
+  const viewBoxWidth = isMobileConstellation ? 420 : 1000;
+  const paddingX = isMobileConstellation ? 64 : 200;
+  const contentWidth = isMobileConstellation ? 318 : 700;
+  const monthLabelX = isMobileConstellation ? 8 : 30;
+  const monthLineStartX = isMobileConstellation ? 58 : 120;
+  const monthLineEndX = isMobileConstellation ? 410 : 950;
+  const startY = isMobileConstellation ? 62 : 100;
+  const headerY = isMobileConstellation ? 24 : 45;
+  const headerLineY = isMobileConstellation ? 38 : 65;
   const totalWeeks = Math.ceil(nodes.length / 7);
-  const svgHeight = totalWeeks * ROW_HEIGHT + 150;
+  const svgHeight = totalWeeks * ROW_HEIGHT + (isMobileConstellation ? 80 : 150);
 
   const nodePositions = useMemo(() => {
     return nodes.map((n, i) => {
@@ -662,11 +682,11 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
       
       // y 좌표에 약간의 물결 치는 궤도 효과를 주어 너무 정형된 그리드처럼 보이지 않게
       const yOffset = Math.sin((wIdx + dIdx) * 0.5) * 15;
-      const y = 100 + wIdx * ROW_HEIGHT + yOffset;
+      const y = startY + wIdx * ROW_HEIGHT + yOffset;
 
       return { ...n, x, y, wIdx, dIdx };
     });
-  }, [nodes]);
+  }, [nodes, ROW_HEIGHT, paddingX, contentWidth, startY]);
 
   const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -691,8 +711,15 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
   });
 
   return (
-    <div className="constellation-wrapper" style={{ height: svgHeight }}>
-      <svg width="100%" height={svgHeight} viewBox={`0 0 1000 ${svgHeight}`} shapeRendering="geometricPrecision" textRendering="optimizeLegibility">
+    <div className="constellation-wrapper">
+      <svg
+        width="100%"
+        viewBox={`0 0 ${viewBoxWidth} ${svgHeight}`}
+        preserveAspectRatio="xMidYMin meet"
+        shapeRendering="geometricPrecision"
+        textRendering="optimizeLegibility"
+        style={{ display: 'block', height: 'auto' }}
+      >
         <defs>
           <filter id="glow-star" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
@@ -714,17 +741,17 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
             <text 
               key={wd} 
               x={paddingX + dIdx * (contentWidth / 6)} 
-              y={45} 
+              y={headerY} 
               fill="#64748b" 
-              fontSize="12" 
+              fontSize={isMobileConstellation ? 7 : 12}
               fontWeight="bold" 
               textAnchor="middle"
-              style={{ letterSpacing: '2px' }}
+              style={{ letterSpacing: isMobileConstellation ? '1px' : '2px' }}
             >
               {wd}
             </text>
           ))}
-          <line x1="120" y1="65" x2="950" y2="65" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+          <line x1={monthLineStartX} y1={headerLineY} x2={monthLineEndX} y2={headerLineY} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
         </g>
 
         {/* 월 표시(좌측) 및 가로 구분선 */}
@@ -733,17 +760,17 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
           return (
             <g key={`month-${mData.month}`}>
               {/* 왼쪽의 월 타이틀 */}
-              <text x="30" y={mData.y - 10} fill="#fff" fontSize="24" fontWeight="900" style={{ letterSpacing: '2px', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>
+              <text x={monthLabelX} y={mData.y - 10} fill="#fff" fontSize={isMobileConstellation ? 11 : 24} fontWeight="900" style={{ letterSpacing: isMobileConstellation ? '1px' : '2px', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>
                 {mData.month.slice(5, 7)}월
               </text>
-              <text x="30" y={mData.y + 15} fill="#64748b" fontSize="14" style={{ letterSpacing: '1px' }}>
+              <text x={monthLabelX} y={mData.y + (isMobileConstellation ? 5 : 15)} fill="#64748b" fontSize={isMobileConstellation ? 8 : 14} style={{ letterSpacing: '1px' }}>
                 {mData.month.slice(0, 4)}
-                {isFirstMonth && <tspan fill="rgba(0,243,255,0.8)" fontSize="12" dx="5"> (시작점)</tspan>}
+                {isFirstMonth && !isMobileConstellation && <tspan fill="rgba(0,243,255,0.8)" fontSize="12" dx="5"> (시작점)</tspan>}
               </text>
 
               {/* 가로 구분선 (첫 달이 아닐 때만) */}
               {!isFirstMonth && (
-                <line x1="120" y1={mData.y - 30} x2="950" y2={mData.y - 30} stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="5,5" />
+                <line x1={monthLineStartX} y1={mData.y - 30} x2={monthLineEndX} y2={mData.y - 30} stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="5,5" />
               )}
             </g>
           );
@@ -758,7 +785,7 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
                 key={`line-${i}`}
                 x1={node.x} y1={node.y} x2={next.x} y2={next.y}
                 stroke="url(#comet-trail)"
-                strokeWidth="4"
+                strokeWidth={isMobileConstellation ? 2.4 : 4}
                 strokeLinecap="round"
                 opacity="0.8"
                 initial={{ pathLength: 0 }}
@@ -775,12 +802,12 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
         {nodePositions.map((node, i) => {
           // 크기와 광채(히트맵) 계산
           const crystals = node.stats?.crystals || 0;
-          let r = 8;
+          let r = isMobileConstellation ? 5 : 8;
           let glowIntensity = 1;
 
-          if (crystals > 50) { r = 14; glowIntensity = 1.5; }
-          else if (crystals > 20) { r = 11; glowIntensity = 1.2; }
-          else if (crystals > 0) { r = 9; glowIntensity = 1; }
+          if (crystals > 50) { r = isMobileConstellation ? 8 : 14; glowIntensity = 1.5; }
+          else if (crystals > 20) { r = isMobileConstellation ? 7 : 11; glowIntensity = 1.2; }
+          else if (crystals > 0) { r = isMobileConstellation ? 6 : 9; glowIntensity = 1; }
 
           return (
             <g
@@ -811,23 +838,23 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
                     />
                   )}
                   {node.isToday && (
-                    <circle r={r + 8} fill="none" strokeWidth="2" stroke={activeColor} opacity="0.6">
-                      <animate attributeName="r" values={`${r+4};${r+12};${r+4}`} dur="2s" repeatCount="indefinite" />
+                    <circle r={r + (isMobileConstellation ? 5 : 8)} fill="none" strokeWidth="2" stroke={activeColor} opacity="0.6">
+                      <animate attributeName="r" values={`${r+4};${r+(isMobileConstellation ? 8 : 12)};${r+4}`} dur="2s" repeatCount="indefinite" />
                       <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite" />
                     </circle>
                   )}
                 </>
               ) : (
                 // 미학습일: 희미한 점
-                <circle r="3" fill="rgba(255,255,255,0.1)" />
+                <circle r={isMobileConstellation ? 1.8 : 3} fill="rgba(255,255,255,0.1)" />
               )}
 
               {/* 밝게 보이는 날짜 텍스트 */}
               <text 
-                y={(node.isActive || node.isProtected) ? r + 16 : 12} 
+                y={(node.isActive || node.isProtected) ? r + (isMobileConstellation ? 8 : 16) : (isMobileConstellation ? 7 : 12)}
                 textAnchor="middle" 
                 fill={(node.isActive || node.isProtected) ? '#e2e8f0' : '#475569'} 
-                fontSize={(node.isActive || node.isProtected) ? "12" : "11"} 
+                fontSize={(node.isActive || node.isProtected) ? (isMobileConstellation ? "6" : "12") : (isMobileConstellation ? "5" : "11")}
                 fontWeight={(node.isActive || node.isProtected) ? '800' : 'normal'} 
                 style={{ pointerEvents: 'none' }}
               >
