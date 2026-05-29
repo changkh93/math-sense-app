@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ArrowLeft, CalendarDays, Camera, CameraOff, Clock3, Crown, Loader2, LogOut, Radio, Send, StickyNote, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Camera, CameraOff, ChevronDown, Clock3, Crown, Loader2, LogOut, Radio, Send, StickyNote, Trash2, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
@@ -161,6 +161,8 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
   const [previewError, setPreviewError] = useState('');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [leaveAction, setLeaveAction] = useState('');
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
+  const [showCrewInfo, setShowCrewInfo] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true));
   const previewStreamRef = useRef(null);
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
@@ -183,6 +185,17 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
   const roomIsFull = (crewRoom?.participantCount || 0) >= (crewRoom?.maxParticipants || 3);
   const isLeader = userData?.crewRole === 'leader';
   const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
+
+  useEffect(() => {
+    const handleResize = () => {
+      const nextIsMobile = window.innerWidth <= 768;
+      setIsMobile(nextIsMobile);
+      setShowCrewInfo((prev) => nextIsMobile ? prev : true);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const memberNameById = useMemo(() => {
     const next = new Map();
@@ -435,23 +448,34 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
   if (!crew) return null;
 
   return (
-    <div style={{ maxWidth: 1120, margin: '0 auto', width: '100%', padding: '2rem 1rem 6rem' }}>
+    <div style={{ maxWidth: 1120, margin: '0 auto', width: '100%', padding: isMobile ? '1rem 0.75rem 7rem' : '2rem 1rem 6rem' }}>
       {/* Back */}
-      <button onClick={() => { if (previewStreamRef.current) { previewStreamRef.current.getTracks().forEach(t => t.stop()); previewStreamRef.current = null; } onBack(); }} className="space-nav-link font-tech" style={{ marginBottom: '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: 8 }}>
+      <button onClick={() => { if (previewStreamRef.current) { previewStreamRef.current.getTracks().forEach(t => t.stop()); previewStreamRef.current = null; } onBack(); }} className="space-nav-link font-tech" style={{ marginBottom: isMobile ? '0.75rem' : '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: 8, minHeight: isMobile ? 40 : undefined }}>
         <ArrowLeft size={16} /> 크루 목록으로
       </button>
 
       {/* Crew Header */}
-      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card hud-border" style={{ padding: '1.4rem', borderRadius: 12, marginBottom: '1.2rem' }}>
+      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card hud-border" style={{ padding: isMobile ? '1rem' : '1.4rem', borderRadius: 12, marginBottom: isMobile ? '0.85rem' : '1.2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ width: 56, height: 56, borderRadius: 12, background: crew.color || '#00d4ff', boxShadow: `0 0 20px ${(crew.color || '#00d4ff')}55`, flexShrink: 0 }} />
+          <div style={{ width: isMobile ? 42 : 56, height: isMobile ? 42 : 56, borderRadius: 12, background: crew.color || '#00d4ff', boxShadow: `0 0 20px ${(crew.color || '#00d4ff')}55`, flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="font-tech" style={{ color: getCrewStatusColor(status), fontWeight: 800, fontSize: '0.82rem' }}>{getCrewStatusLabel(status)}</div>
-            <h2 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.2rem 0 0', fontSize: '1.6rem' }}>{crew.name || userData?.crewName || '스터디 크루'}</h2>
-            <p className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', margin: '0.3rem 0 0', lineHeight: 1.5 }}>{crew.motto || '아직 크루 모토가 없습니다.'}</p>
+            <h2 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.2rem 0 0', fontSize: isMobile ? '1.28rem' : '1.6rem', lineHeight: 1.25, wordBreak: 'keep-all' }}>{crew.name || userData?.crewName || '스터디 크루'}</h2>
+            <p className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', margin: '0.3rem 0 0', lineHeight: 1.5, fontSize: isMobile ? '0.86rem' : undefined }}>{crew.motto || '아직 크루 모토가 없습니다.'}</p>
           </div>
+          {isMobile && (
+            <button
+              type="button"
+              className="space-nav-link font-tech"
+              onClick={() => { soundManager.playClick(); setShowCrewInfo((prev) => !prev); }}
+              style={{ width: '100%', borderRadius: 10, minHeight: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}
+            >
+              {showCrewInfo ? '크루 정보 접기' : '크루 정보 펼치기'}
+              <ChevronDown size={16} style={{ transform: showCrewInfo ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }} />
+            </button>
+          )}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.6rem', marginTop: '1rem' }}>
+        {(!isMobile || showCrewInfo) && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.6rem', marginTop: '1rem' }}>
           {[
             { label: '초대 코드', value: crew.inviteCode || '-', color: 'var(--text-bright)' },
             { label: '군집', value: crew.groupName || '자유 스터디', color: 'var(--crystal-cyan)' },
@@ -464,8 +488,8 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
               <strong style={{ color: item.color, fontSize: '1rem' }}>{item.value}</strong>
             </div>
           ))}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '0.7rem', marginTop: '0.8rem' }}>
+        </div>}
+        {(!isMobile || showCrewInfo) && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '0.7rem', marginTop: '0.8rem' }}>
           <div style={{ ...panelStyle, padding: '0.85rem' }}>
             <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginBottom: '0.35rem' }}>크루 설명</div>
             <div className="font-tech" style={{ color: 'rgba(255,255,255,0.78)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
@@ -480,21 +504,21 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
               {formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes)}
             </div>
           </div>
-        </div>
+        </div>}
       </Motion.div>
 
       {/* Study Stream Control */}
-      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card hud-border" style={{ padding: '1.3rem', borderRadius: 12, marginBottom: '1.2rem' }}>
-        <div style={{ marginBottom: '1rem' }}>
+      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card hud-border" style={{ padding: isMobile ? '1rem' : '1.3rem', borderRadius: 12, marginBottom: '1.2rem', scrollMarginTop: 76 }}>
+        <div style={{ marginBottom: isMobile ? '0.75rem' : '1rem' }}>
           <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>STUDY STREAM</div>
-          <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.2rem', marginTop: '0.15rem' }}>집중방 컨트롤</div>
-          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem' }}>
+          <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: isMobile ? '1.1rem' : '1.2rem', marginTop: '0.15rem' }}>집중방 컨트롤</div>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem', lineHeight: 1.45 }}>
             이 제어는 각 참여자 자신의 화면에만 표시되고, 본인 카메라와 상태만 바꿉니다.
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(min(420px, 100%), 1.35fr) minmax(min(300px, 100%), 0.85fr)', gap: '1rem', alignItems: 'stretch' }}>
-          <div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(min(420px, 100%), 1.35fr) minmax(min(300px, 100%), 0.85fr)', gap: isMobile ? '0.85rem' : '1rem', alignItems: 'stretch' }}>
+          <div style={{ order: isMobile ? 2 : 0 }}>
             <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,243,255,0.2)', background: '#020617', position: 'relative' }}>
               {previewStream && previewCameraOn ? (
                 <video ref={el => { if (el) el.srcObject = previewStream; }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -510,7 +534,7 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
             {previewError && previewCameraOn && <div className="font-tech" style={{ color: '#fda4af', lineHeight: 1.45, marginTop: '0.65rem' }}>{previewError}</div>}
           </div>
 
-          <div style={{ ...panelStyle, display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: '100%' }}>
+          <div style={{ ...panelStyle, display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: '100%', order: isMobile ? 1 : 0, padding: isMobile ? '0.85rem' : panelStyle.padding }}>
             <button type="button" className="space-nav-link font-tech" onClick={() => { setPreviewCameraOn(p => !p); soundManager.playClick(); }} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}>
               {previewCameraOn ? <Camera size={15} /> : <CameraOff size={15} />}
               {previewCameraOn ? '카메라 ON' : '카메라 OFF'}
@@ -533,9 +557,9 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
                   </div>
                 </div>
                 {isRoomParticipant ? (
-                  <button type="button" className="space-btn cosmic-btn font-tech" onClick={() => onEnterRoom && onEnterRoom(crewRoom.id)} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>집중방 다시 열기</button>
+                  <button type="button" className="space-btn cosmic-btn font-tech" onClick={() => onEnterRoom && onEnterRoom(crewRoom.id)} style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.9rem 1.1rem', minHeight: isMobile ? 52 : undefined, marginTop: 'auto' }}>집중방 다시 열기</button>
                 ) : (
-                  <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction || roomIsFull} onClick={handleJoinStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'joining' ? '입장 처리 중...' : roomIsFull ? '정원 가득 참' : '집중방 입장'}</button>
+                  <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction || roomIsFull} onClick={handleJoinStudyRoom} style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.9rem 1.1rem', minHeight: isMobile ? 52 : undefined, marginTop: 'auto' }}>{roomAction === 'joining' ? '입장 처리 중...' : roomIsFull ? '정원 가득 참' : '집중방 입장'}</button>
                 )}
               </>
             ) : (
@@ -561,7 +585,7 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
                         <span>120분</span>
                       </div>
                     </div>
-                    <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction} onClick={handleCreateStudyRoom} style={{ borderRadius: 8, padding: '0.9rem 1.1rem', marginTop: 'auto' }}>{roomAction === 'creating' ? '집중방 여는 중...' : `${roomDuration}분 집중방 열기`}</button>
+                    <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction} onClick={handleCreateStudyRoom} style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.9rem 1.1rem', minHeight: isMobile ? 52 : undefined, marginTop: 'auto' }}>{roomAction === 'creating' ? '집중방 여는 중...' : `${roomDuration}분 집중방 열기`}</button>
                   </>
               </>
             )}

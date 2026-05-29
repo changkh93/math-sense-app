@@ -461,7 +461,7 @@ function useAudioLevel(stream, enabled = true) {
   return hasAudioInput ? level : 0;
 }
 
-function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBlocked = false, isLocal, message, badgeLabel, badgeColor = 'rgba(96, 165, 250, 0.18)', locationLine, liveStatusOverlay, action }) {
+function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBlocked = false, isLocal, message, badgeLabel, badgeColor = 'rgba(96, 165, 250, 0.18)', locationLine, liveStatusOverlay, action, compact = false, style }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const audioLevel = useAudioLevel(stream, !!stream);
@@ -489,7 +489,7 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
   }, [cameraOn, muted, stream]);
 
   return (
-    <div style={tileStyle}>
+    <div style={{ ...tileStyle, ...style }}>
       {hasLiveVideo ? (
         <>
           <video
@@ -507,13 +507,13 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
               position: 'absolute',
               left: 12,
               right: 12,
-              bottom: 86,
+              bottom: compact ? 70 : 86,
               padding: '0.45rem 0.65rem',
               borderRadius: 8,
               background: 'rgba(2, 6, 23, 0.78)',
               border: '1px solid rgba(251, 191, 36, 0.24)',
               color: '#fde68a',
-              fontSize: '0.72rem',
+              fontSize: compact ? '0.66rem' : '0.72rem',
               textAlign: 'center',
               zIndex: 2,
             }}>
@@ -524,8 +524,8 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
       ) : (
         <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.55)' }}>
           <div style={{ textAlign: 'center' }}>
-            <UserRound size={40} />
-            <div style={{ marginTop: '0.6rem' }}>{cameraOn ? '카메라 연결 확인 중' : '카메라 꺼짐'}</div>
+            <UserRound size={compact ? 30 : 40} />
+            <div style={{ marginTop: compact ? '0.4rem' : '0.6rem', fontSize: compact ? '0.78rem' : undefined }}>{cameraOn ? '카메라 연결 확인 중' : '카메라 꺼짐'}</div>
           </div>
         </div>
       )}
@@ -534,13 +534,14 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
           className="font-tech"
           style={{
             position: 'absolute',
-            top: 12,
-            left: 12,
-            padding: '0.35rem 0.6rem',
+            top: compact ? 8 : 12,
+            left: compact ? 8 : 12,
+            padding: compact ? '0.25rem 0.48rem' : '0.35rem 0.6rem',
             borderRadius: 999,
             background: badgeColor,
             border: '1px solid rgba(255,255,255,0.08)',
             color: '#fff',
+            fontSize: compact ? '0.68rem' : undefined,
             fontWeight: 700,
             backdropFilter: 'blur(10px)'
           }}
@@ -557,11 +558,11 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
           title={action.title}
           style={{
             position: 'absolute',
-            top: 10,
-            right: 10,
+            top: compact ? 8 : 10,
+            right: compact ? 8 : 10,
             minWidth: 0,
-            width: 36,
-            height: 36,
+            width: compact ? 32 : 36,
+            height: compact ? 32 : 36,
             padding: 0,
             display: 'inline-flex',
             alignItems: 'center',
@@ -584,18 +585,18 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
           title={liveStatusOverlay}
           style={{
             position: 'absolute',
-            top: 12,
-            left: badgeLabel ? 92 : 12,
-            right: action ? 54 : 12,
+            top: compact ? 8 : 12,
+            left: badgeLabel ? (compact ? 70 : 92) : (compact ? 8 : 12),
+            right: action ? (compact ? 46 : 54) : (compact ? 8 : 12),
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.4rem',
-            padding: '0.42rem 0.62rem',
+            padding: compact ? '0.32rem 0.5rem' : '0.42rem 0.62rem',
             borderRadius: 999,
             background: 'linear-gradient(135deg, rgba(3, 8, 20, 0.76), rgba(15, 23, 42, 0.66))',
             border: '1px solid rgba(34, 211, 238, 0.34)',
             color: 'var(--crystal-cyan)',
-            fontSize: '0.72rem',
+            fontSize: compact ? '0.62rem' : '0.72rem',
             fontWeight: 800,
             lineHeight: 1.25,
             whiteSpace: 'nowrap',
@@ -617,10 +618,10 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
       <div style={{
         position: 'absolute',
         inset: 'auto 0 0 0',
-        padding: '0.9rem',
+        padding: compact ? '0.62rem' : '0.9rem',
         background: 'linear-gradient(180deg, rgba(2,6,23,0), rgba(2,6,23,0.82) 28%, rgba(2,6,23,0.94))',
         display: 'grid',
-        gap: '0.6rem',
+        gap: compact ? '0.42rem' : '0.6rem',
       }}>
         {message && (
           <div
@@ -628,12 +629,12 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
             style={{
               justifySelf: 'start',
               maxWidth: '88%',
-              padding: '0.5rem 0.8rem',
-              borderRadius: '14px',
+              padding: compact ? '0.35rem 0.55rem' : '0.5rem 0.8rem',
+              borderRadius: compact ? '10px' : '14px',
               background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.9))',
               border: '1px solid rgba(125, 211, 252, 0.32)',
               color: '#f8fafc',
-              fontSize: '0.84rem',
+              fontSize: compact ? '0.7rem' : '0.84rem',
               fontWeight: 700,
               lineHeight: 1.35,
               boxShadow: '0 10px 24px rgba(2, 6, 23, 0.42)',
@@ -649,12 +650,12 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
             {message}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: compact ? '0.4rem' : '0.75rem' }}>
           <div>
-            <div className="font-tech" style={{ color: '#fff', fontWeight: 800 }}>
+            <div className="font-tech" style={{ color: '#fff', fontWeight: 800, fontSize: compact ? '0.84rem' : undefined, lineHeight: 1.25 }}>
               {label}{isLocal ? ' (나)' : ''}
             </div>
-            <div className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.82rem' }}>
+            <div className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', fontSize: compact ? '0.7rem' : '0.82rem' }}>
               {subtitle}
             </div>
             {locationLine && !liveStatusOverlay && (
@@ -665,7 +666,7 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
                   marginTop: '0.28rem',
                   maxWidth: 'min(280px, 72vw)',
                   color: 'var(--crystal-cyan)',
-                  fontSize: '0.76rem',
+                  fontSize: compact ? '0.64rem' : '0.76rem',
                   lineHeight: 1.35,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -675,8 +676,8 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
                 {locationLine}
               </div>
             )}
-            <div style={{ marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-              <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', color: micOn ? 'var(--planet-green)' : 'rgba(255,255,255,0.5)', fontSize: '0.74rem' }}>
+            <div style={{ marginTop: compact ? '0.28rem' : '0.45rem', display: 'flex', alignItems: 'center', gap: compact ? '0.28rem' : '0.45rem', flexWrap: 'wrap' }}>
+              <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', color: micOn ? 'var(--planet-green)' : 'rgba(255,255,255,0.5)', fontSize: compact ? '0.62rem' : '0.74rem' }}>
                 {micOn ? <Mic size={13} /> : <MicOff size={13} />}
                 {audioBlocked ? '차단됨' : micOn ? '마이크 켜짐' : '음소거'}
               </span>
@@ -757,6 +758,10 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
 
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -880,6 +885,18 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       setNowMs(Date.now());
     }, 1000);
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -1516,17 +1533,28 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       };
     });
   const localLiveStatusLine = buildLiveLocationLine(participantProfiles[user.uid]?.liveStatus || userData?.liveStatus, nowMs);
+  const visibleRemoteTiles = remoteTiles.slice(0, 2);
+  const isCompactRoom = viewport.width <= 860;
+  const isCompactLandscapeRoom = isCompactRoom && viewport.width > viewport.height;
+  const streamGridColumns = isCompactRoom
+    ? 'repeat(2, minmax(0, 1fr))'
+    : 'repeat(3, minmax(0, 1fr))';
+  const streamTileAspectRatio = isCompactRoom
+    ? (isCompactLandscapeRoom ? '16 / 10' : '1 / 1')
+    : '4 / 5';
+  const streamTileGap = isCompactRoom ? '0.55rem' : '0.9rem';
+  const emptySlotCount = Math.max(0, 3 - (visibleRemoteTiles.length + 1));
+  const localMiniTile = {
+    uid: user.uid,
+    label: getParticipantLabel(userData, user.displayName || '나'),
+    subtitle: getFocusStatusLabel(focusStatus),
+    cameraOn,
+    stream: localStream,
+    message: isChatEnabled ? localChatMessage : '',
+    locationLine: localLiveStatusLine,
+  };
   const miniTiles = [
-    {
-      uid: user.uid,
-      label: getParticipantLabel(userData, user.displayName || '나'),
-      subtitle: getFocusStatusLabel(focusStatus),
-      cameraOn,
-      stream: localStream,
-      message: isChatEnabled ? localChatMessage : '',
-      locationLine: localLiveStatusLine,
-    },
-    ...remoteTiles.map((participant) => ({
+    ...visibleRemoteTiles.map((participant) => ({
       uid: participant.uid,
       label: participant.label,
       subtitle: participant.subtitle,
@@ -1535,6 +1563,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       message: isChatEnabled ? participant.chatMessage : '',
       locationLine: buildLiveLocationLine(participant.liveStatus, nowMs),
     })),
+    localMiniTile,
   ].slice(0, 3);
 
   useEffect(() => {
@@ -1554,14 +1583,14 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       : '채팅 알림 켜기';
 
   return (
-    <div className="glass-card hud-border" style={{ padding: '1.1rem', borderRadius: '10px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
+    <div className="glass-card hud-border" style={{ padding: isCompactRoom ? '0.75rem' : '1.1rem', borderRadius: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: isCompactRoom ? '0.75rem' : '1rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: isCompactRoom ? '0.75rem' : '1rem' }}>
         <div>
           <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800 }}>STUDY STREAM ROOM</div>
-          <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.2rem 0 0' }}>
+          <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.2rem 0 0', fontSize: isCompactRoom ? '1.08rem' : undefined, lineHeight: 1.25 }}>
             {room?.title || '집중방'}
           </h3>
-          <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.35rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.35rem', display: 'flex', gap: isCompactRoom ? '0.5rem' : '0.75rem', flexWrap: 'wrap', fontSize: isCompactRoom ? '0.8rem' : undefined }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
               <Radio size={14} /> {room?.status === 'live' ? 'LIVE' : 'WAITING'}
             </span>
@@ -1579,14 +1608,14 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', justifyContent: isCompactRoom ? 'stretch' : 'flex-end', width: isCompactRoom ? '100%' : undefined }}>
           <button
             type="button"
             className="space-nav-link font-tech"
             onClick={handleOpenMiniWindow}
             disabled={!miniWindowSupported}
             title={miniWindowSupported ? '다른 탭에서도 보이는 미니 집중방 창을 엽니다.' : '이 브라우저는 미니 집중방 창을 지원하지 않습니다.'}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: miniWindowSupported ? 1 : 0.55 }}
+            style={{ flex: isCompactRoom ? '1 1 0' : undefined, minWidth: isCompactRoom ? 0 : undefined, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', borderRadius: '8px', opacity: miniWindowSupported ? 1 : 0.55 }}
           >
             <Video size={16} /> {miniWindowOpen ? '미니창 열림' : '미니창 열기'}
           </button>
@@ -1596,7 +1625,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
             onClick={handleEnableNotifications}
             disabled={!notificationSupported || notificationPermission === 'granted' || notificationPermission === 'denied'}
             title="다른 탭에서 공부할 때 Study Stream 채팅을 브라우저 알림으로 받습니다."
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px', opacity: notificationSupported && notificationPermission === 'default' ? 1 : 0.64 }}
+            style={{ flex: isCompactRoom ? '1 1 0' : undefined, minWidth: isCompactRoom ? 0 : undefined, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', borderRadius: '8px', opacity: notificationSupported && notificationPermission === 'default' ? 1 : 0.64 }}
           >
             <MessageSquare size={16} /> {notificationLabel}
           </button>
@@ -1605,7 +1634,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
             className="space-nav-link font-tech"
             onClick={handleLeave}
             disabled={!!roomAction}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', borderRadius: '8px' }}
+            style={{ flex: isCompactRoom ? '1 1 0' : undefined, minWidth: isCompactRoom ? 0 : undefined, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', borderRadius: '8px' }}
           >
             <PhoneOff size={16} /> {roomAction === 'leaving' ? '나가는 중...' : '방 나가기'}
           </button>
@@ -1668,22 +1697,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: '0.9rem' }}>
-        <StreamTile
-          stream={localStream}
-          muted
-          label={userData?.studentName || user.displayName || '나'}
-          subtitle={focusStatus === 'away' ? '자리 비움' : focusStatus === 'break' ? '쉬는 중' : '집중 중'}
-          cameraOn={cameraOn}
-          micOn={micOn && hasLocalAudioTrack && areMicsEnabled}
-          audioBlocked={localMicBlocked}
-          isLocal
-          message={isChatEnabled ? localChatMessage : ''}
-          badgeLabel={isHost ? 'HOST' : 'ME'}
-          badgeColor={isHost ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
-          liveStatusOverlay={localLiveStatusLine}
-        />
-        {remoteTiles.map((participant) => {
+      <div style={{ display: 'grid', gridTemplateColumns: streamGridColumns, gap: streamTileGap, alignItems: 'stretch' }}>
+        {visibleRemoteTiles.map((participant) => {
           const isRemoteHost = room?.hostUid === participant.uid || crew?.leaderId === participant.uid;
           return (
             <StreamTile
@@ -1705,14 +1720,32 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
                 disabled: roomAction === `kicking:${participant.uid}`,
                 onClick: () => handleKickParticipant(participant),
               } : null}
+              compact={isCompactRoom}
+              style={{ aspectRatio: streamTileAspectRatio }}
             />
           );
         })}
-        {Array.from({ length: Math.max(0, 2 - remoteTiles.length) }).map((_, index) => (
-          <div key={`empty-${index}`} style={{ ...tileStyle, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.45)' }}>
+        <StreamTile
+          stream={localStream}
+          muted
+          label={userData?.studentName || user.displayName || '나'}
+          subtitle={focusStatus === 'away' ? '자리 비움' : focusStatus === 'break' ? '쉬는 중' : '집중 중'}
+          cameraOn={cameraOn}
+          micOn={micOn && hasLocalAudioTrack && areMicsEnabled}
+          audioBlocked={localMicBlocked}
+          isLocal
+          message={isChatEnabled ? localChatMessage : ''}
+          badgeLabel={isHost ? 'HOST' : 'ME'}
+          badgeColor={isHost ? 'rgba(250, 204, 21, 0.22)' : 'rgba(96, 165, 250, 0.18)'}
+          liveStatusOverlay={localLiveStatusLine}
+          compact={isCompactRoom}
+          style={{ aspectRatio: streamTileAspectRatio }}
+        />
+        {Array.from({ length: emptySlotCount }).map((_, index) => (
+          <div key={`empty-${index}`} style={{ ...tileStyle, aspectRatio: streamTileAspectRatio, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.45)' }}>
             <div style={{ textAlign: 'center' }}>
-              <Video size={34} />
-              <div style={{ marginTop: '0.55rem' }}>초대 대기 슬롯</div>
+              <Video size={isCompactRoom ? 28 : 34} />
+              <div style={{ marginTop: '0.55rem', fontSize: isCompactRoom ? '0.82rem' : undefined }}>초대 대기 슬롯</div>
             </div>
           </div>
         ))}

@@ -18,7 +18,9 @@
 .mobile-nav-top,
 .mobile-bottom-nav,
 .mobile-more-sheet,
-.mobile-profile-sheet {
+.mobile-profile-sheet,
+.mobile-streak-btn,
+.mobile-crystal-btn {
   display: none;
 }
 
@@ -98,13 +100,15 @@
   .mobile-nav-top {
     width: 100%;
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr);
     align-items: center;
-    gap: 0.7rem;
+    gap: 0.55rem;
   }
 
   .mobile-brand-btn,
   .mobile-profile-btn,
+  .mobile-streak-btn,
+  .mobile-crystal-btn,
   .mobile-bottom-tab,
   .mobile-more-grid button,
   .mobile-profile-sheet button {
@@ -115,51 +119,55 @@
   }
 
   .mobile-brand-btn {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 12px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 243, 255, 0.08);
-    border: 1px solid rgba(0, 243, 255, 0.18);
+    background: rgba(0, 243, 255, 0.11);
+    border: 1px solid rgba(0, 243, 255, 0.34);
+    overflow: hidden;
   }
 
   .mobile-brand-btn img {
-    width: 27px;
-    filter: drop-shadow(0 0 8px rgba(0, 243, 255, 0.52));
+    display: block;
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(0, 243, 255, 0.72));
   }
 
-  .mobile-current-view {
-    min-width: 0;
-    display: grid;
-    gap: 0.12rem;
-  }
-
-  .mobile-current-kicker {
+  .mobile-brand-fallback {
     color: var(--crystal-cyan);
     font-family: var(--font-tech);
-    font-size: 0.65rem;
+    font-size: 1.3rem;
     font-weight: 900;
-  }
-
-  .mobile-current-view strong {
-    color: white;
-    font-family: var(--font-title);
-    font-size: 1rem;
-    line-height: 1.15;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .mobile-nav-actions {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    justify-self: end;
+    gap: 0.32rem;
+    min-width: 0;
   }
 
-  .mobile-profile-btn {
+  .mobile-nav-top .notification-menu-container {
+    margin-right: 0;
+  }
+
+  .mobile-nav-top .direct-memo-button,
+  .mobile-nav-top .notification-bell-btn {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    min-height: 38px;
+  }
+
+  .mobile-profile-btn,
+  .mobile-streak-btn,
+  .mobile-crystal-btn {
     width: 40px;
     height: 40px;
     border-radius: 999px;
@@ -171,8 +179,51 @@
     border: 1px solid rgba(0, 243, 255, 0.42);
   }
 
-  .mobile-profile-btn.active {
+  .mobile-streak-btn {
+    width: auto;
+    min-width: 44px;
+    padding: 0 0.5rem;
+  }
+
+  .mobile-crystal-btn {
+    width: auto;
+    min-width: 52px;
+    gap: 0.32rem;
+    padding: 0 0.5rem;
+    color: var(--star-gold);
+    font-family: var(--font-tech);
+    font-weight: 900;
+  }
+
+  .mobile-streak-btn .comet-badge {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    animation: none;
+    gap: 0.18rem;
+  }
+
+  .mobile-streak-btn .comet-tail,
+  .mobile-streak-btn .comet-tooltip {
+    display: none;
+  }
+
+  .mobile-crystal-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+    background: linear-gradient(135deg, #fef08a 0%, #f59e0b 55%, #7c2d12 100%);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.55);
+    transform: rotate(45deg);
+  }
+
+  .mobile-profile-btn.active,
+  .mobile-streak-btn.active,
+  .mobile-crystal-btn.active {
     box-shadow: 0 0 18px rgba(0, 243, 255, 0.42);
+    background: rgba(0, 243, 255, 0.18);
   }
 
   .mobile-profile-btn img {
@@ -181,14 +232,17 @@
     object-fit: cover;
   }
 
-  .mobile-profile-btn span {
+  .mobile-profile-initial {
     color: #031018;
     font-weight: 900;
-    background: var(--crystal-cyan);
+    font-family: var(--font-title);
+    font-size: 1.05rem;
+    background: linear-gradient(135deg, var(--crystal-cyan), #7dd3fc);
     width: 100%;
     height: 100%;
     display: grid;
     place-items: center;
+    text-transform: uppercase;
   }
 
   .mobile-bottom-nav {
@@ -236,10 +290,7 @@
   .mobile-more-sheet,
   .mobile-profile-sheet {
     position: fixed;
-    left: 0.75rem;
-    right: 0.75rem;
-    bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px));
-    z-index: 1300;
+    z-index: 2400;
     display: block;
     border: 1px solid rgba(0, 243, 255, 0.24);
     border-radius: 16px;
@@ -249,12 +300,70 @@
     backdrop-filter: blur(18px);
   }
 
+  .mobile-more-sheet {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(4.85rem + env(safe-area-inset-bottom, 0px));
+    top: calc(4.75rem + env(safe-area-inset-top, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .mobile-profile-sheet {
+    top: calc(4.35rem + env(safe-area-inset-top, 0px));
+    right: 0.75rem;
+    left: auto;
+    bottom: auto;
+    width: min(320px, calc(100vw - 1.5rem));
+  }
+
+  .mobile-profile-sheet::before {
+    content: '';
+    position: absolute;
+    top: -7px;
+    right: 22px;
+    width: 14px;
+    height: 14px;
+    background: rgba(8, 13, 30, 0.98);
+    border-left: 1px solid rgba(0, 243, 255, 0.24);
+    border-top: 1px solid rgba(0, 243, 255, 0.24);
+    transform: rotate(45deg);
+  }
+
   .mobile-sheet-handle {
     width: 42px;
     height: 4px;
     margin: 0 auto 0.75rem;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.22);
+  }
+
+  .mobile-sheet-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0 0 0.75rem;
+    padding: 0 0.2rem 0.7rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .mobile-sheet-title span {
+    color: var(--crystal-cyan);
+    font-family: var(--font-tech);
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+  }
+
+  .mobile-sheet-title button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.76);
+    cursor: pointer;
   }
 
   .mobile-more-grid {
@@ -282,9 +391,23 @@
     color: var(--crystal-cyan);
   }
 
+  .mobile-more-grid button.danger {
+    color: #ffaaa5;
+    border-color: rgba(255, 138, 132, 0.22);
+  }
+
+  .mobile-more-grid button.logout {
+    color: var(--planet-orange);
+    border-color: rgba(251, 146, 60, 0.22);
+  }
+
   .mobile-profile-sheet {
     display: grid;
     gap: 0.55rem;
+  }
+
+  .mobile-profile-sheet .mobile-sheet-handle {
+    display: none;
   }
 
   .mobile-profile-summary {
