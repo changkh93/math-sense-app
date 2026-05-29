@@ -1,3 +1,6 @@
+import { MAY_EVAL_UNIT_IDS, MAY_EVAL_VARIANT_CATALOG } from './refineryMayEvaluationCatalog.js'
+import { MIDDLE_MAY_EVAL_UNIT_IDS, MIDDLE_MAY_EVAL_VARIANT_CATALOG } from './refineryMiddleMayEvaluationCatalog.js'
+
 const APRIL_EVAL_UNIT_ID = 'reg_1774390167801_chap_1774390206639_unit_1777506272514'
 const MARCH_EVAL_UNIT_ID = 'reg_1774390167801_chap_1774390206639_unit_1774390276970'
 const MARCH_EVAL_G5_UNIT_ID = 'reg_1774390167801_chap_1774390199371_unit_1774390267517'
@@ -516,6 +519,8 @@ const item = (n, conceptId, conceptName, bridge, variant, hints = {}) => ({
 })
 
 export const REFINERY_VARIANT_CATALOG = {
+  ...MAY_EVAL_VARIANT_CATALOG,
+  ...MIDDLE_MAY_EVAL_VARIANT_CATALOG,
   [qid(1)]: item(1, 'apr_eval_pattern_boxes', '빈칸 규칙 해석', {
     question: '다음 규칙에 맞게 ㉠, ㉡, ㉢에 들어갈 수를 차례대로 구하시오.\n$24 \\div 4 = ㉠$, $㉠ + 7 = ㉡$, $㉡ - 5 = ㉢$',
     options: mc('$6, 13, 8$', ['$4, 11, 6$', '$6, 11, 8$', '$8, 13, 6$', '$6, 13, 6$'])
@@ -2459,7 +2464,9 @@ export const REFINERY_SUPPORTED_UNIT_IDS = [
   APRIL_EVAL_G3_UNIT_ID,
   APRIL_EVAL_M1_UNIT_ID,
   APRIL_EVAL_M2_UNIT_ID,
-  APRIL_EVAL_M3_UNIT_ID
+  APRIL_EVAL_M3_UNIT_ID,
+  ...MAY_EVAL_UNIT_IDS,
+  ...MIDDLE_MAY_EVAL_UNIT_IDS
 ]
 
 export function isRefinerySupportedQuestion(question) {
