@@ -140,7 +140,10 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     || user?.email?.split('@')?.[0]
     || '탐사원';
   const profileInitial = Array.from(String(profileDisplayName).trim())[0] || '?';
-  const rawProfilePhoto = userData?.photoURL || userData?.profileImageUrl || userData?.avatarUrl || user?.photoURL || '';
+  const isGoogleAuthAccount = user?.providerData?.some(provider => provider.providerId === 'google.com');
+  const rawProfilePhoto = user?.photoURL || (!isGoogleAuthAccount
+    ? (userData?.photoURL || userData?.profileImageUrl || userData?.avatarUrl || '')
+    : '');
   const profilePhotoUrl = /^https?:\/\//.test(String(rawProfilePhoto)) || /^data:image\//.test(String(rawProfilePhoto))
     ? rawProfilePhoto
     : '';
@@ -194,6 +197,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
             onClick={() => { soundManager.playClick(); setIsProfileMenuOpen(!isProfileMenuOpen); setIsMobileMoreOpen(false); }}
             aria-label="프로필 메뉴 열기"
           >
+            <span className="mobile-profile-initial" aria-hidden="true">{profileInitial}</span>
             {shouldShowProfilePhoto ? (
               <img
                 src={profilePhotoUrl}
@@ -203,9 +207,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
                   if (!event.currentTarget.naturalWidth) setIsProfileImageFailed(true);
                 }}
               />
-            ) : (
-              <span className="mobile-profile-initial" aria-hidden="true">{profileInitial}</span>
-            )}
+            ) : null}
           </button>
         </div>
       </div>
