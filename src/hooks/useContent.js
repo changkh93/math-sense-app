@@ -44,8 +44,9 @@ export function useRegion(regionId) {
   });
 }
 
-export function useRegions(clusterId = 'cluster_elementary') {
+export function useRegions(clusterId = 'cluster_elementary', options = {}) {
   const cid = clusterId || 'cluster_elementary';
+  const enabled = options.enabled ?? !!cid;
   return useQuery({
     queryKey: ['regions', cid],
     queryFn: async () => {
@@ -72,7 +73,7 @@ export function useRegions(clusterId = 'cluster_elementary') {
 
       return data.sort((a, b) => (a.order || 0) - (b.order || 0));
     },
-    enabled: !!cid, // Only fetch if we have a clusterId (prevents default 'cluster_elementary' leaks)
+    enabled,
     staleTime: 1000 * 60 * 5,
     retry: 2
   });

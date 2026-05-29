@@ -130,8 +130,9 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   ];
 
   const mobileIsAgoraActive = window.location.pathname.startsWith('/agora');
-  const effectiveStreak = getEffectiveStreak(userData);
-  const crystalCount = userData?.crystals || 0;
+  const isUserDataReady = Boolean(userData && !userData.dataLoadError && !userData.recoveryRequired);
+  const effectiveStreak = isUserDataReady ? getEffectiveStreak(userData) : 0;
+  const crystalCount = isUserDataReady ? (userData?.crystals || 0) : null;
   const profileDisplayName = userData?.publicDisplayName
     || userData?.studentName
     || userData?.name
@@ -178,18 +179,18 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
             type="button"
             className={`mobile-streak-btn ${currentView === 'journey' ? 'active' : ''}`}
             onClick={() => handleNavClick('journey', '/')}
-            aria-label={`연속 학습 ${effectiveStreak}일`}
+            aria-label={isUserDataReady ? `연속 학습 ${effectiveStreak}일` : '연속 학습 동기화 중'}
           >
-            <CometBadge streak={effectiveStreak} compact showTooltip={false} />
+            {isUserDataReady ? <CometBadge streak={effectiveStreak} compact showTooltip={false} /> : <span className="mobile-sync-dots">…</span>}
           </button>
           <button
             type="button"
             className={`mobile-crystal-btn ${currentView === 'ledger' ? 'active' : ''}`}
             onClick={() => handleNavClick('ledger', '/')}
-            aria-label={`광석 ${crystalCount}개`}
+            aria-label={isUserDataReady ? `광석 ${crystalCount}개` : '광석 동기화 중'}
           >
             <span className="mobile-crystal-icon" />
-            <strong>{crystalCount}</strong>
+            <strong>{isUserDataReady ? crystalCount : '…'}</strong>
           </button>
           <button
             type="button"
@@ -268,7 +269,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           style={{ cursor: 'pointer', display: 'flex' }}
           title="별자리 항해 기록 보기"
         >
-          <CometBadge streak={getEffectiveStreak(userData)} />
+          {isUserDataReady ? <CometBadge streak={effectiveStreak} /> : <span className="desktop-sync-dots">…</span>}
         </div>
         <div 
           className={`crystal-counter font-tech ${currentView === 'ledger' ? 'ledger-open' : ''}`}
@@ -277,7 +278,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           title="광석 입출금 내역 보기"
         >
           <div className="crystal-icon"></div>
-          <span>{userData?.crystals || 0} (광석)</span>
+          <span>{isUserDataReady ? `${crystalCount} (광석)` : '동기화 중'}</span>
         </div>
 
         {/* Profile Menu relative container */}
@@ -299,7 +300,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
               <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <div style={{ width: '100%', height: '100%', background: 'var(--crystal-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 'bold' }}>
-                {(userData?.studentName || user?.displayName)?.[0] || '?'}
+                {profileInitial}
               </div>
             )}
           </div>

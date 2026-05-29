@@ -462,6 +462,7 @@ function SpaceHome() {
   
   const activeClusters = useMemo(() => {
     if (loadingClusters) return [];
+    if (user && (!userData || userData.dataLoadError || userData.recoveryRequired)) return [];
     
     let list = clusters || [];
     if (list.length === 0) {
@@ -480,7 +481,7 @@ function SpaceHome() {
       if (!c.isPrivate) return true;
       return access[c.docId] === 'active' || access[c.id] === 'active';
     });
-  }, [clusters, userData, loadingClusters]);
+  }, [clusters, loadingClusters, user, userData]);
 
   const activeClusterData = useMemo(() => {
     if (!selectedClusterId) return null;
@@ -572,7 +573,10 @@ function SpaceHome() {
     }
   }, [activeClusters, selectedClusterId, loadingClusters, selectCluster, updateSelectedClusterId]);
 
-  const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions(selectedClusterId)
+  const canLoadLearningMap = Boolean(userData && !userData.dataLoadError && !userData.recoveryRequired && selectedClusterId)
+  const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions(selectedClusterId, {
+    enabled: canLoadLearningMap
+  })
   const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
   const { data: units, isLoading: loadingUnits } = useUnits(selectedChapterDocId)
   
@@ -2065,7 +2069,7 @@ function SpaceHome() {
   }
 
   // Loading State with Timeout & Error handling
-  const isLoading = (authLoading || loadingClusters || loadingRegions) && !errorRegions
+  const isLoading = (authLoading || loadingClusters || (canLoadLearningMap && loadingRegions)) && !errorRegions
 
   if (isLoading) {
     return (
@@ -2575,6 +2579,75 @@ function SpaceHome() {
         <div style={{ width: '100%', zIndex: 100, marginTop: 'auto' }}>
           <Footer />
         </div>
+      </div>
+    )
+  }
+
+  const hasAccountDataIssue = userData?.dataLoadError || userData?.recoveryRequired
+
+  if (!userData || hasAccountDataIssue) {
+    const issueTitle = userData?.recoveryRequired
+      ? '계정 데이터 복구가 필요합니다'
+      : '계정 데이터를 불러오지 못했습니다'
+    const issueDescription = userData?.recoveryRequired
+      ? '학습 기록이나 광석 기록은 남아 있지만 회원 문서가 없어 관리자 복구가 필요합니다.'
+      : '인증은 완료되었지만 광석, 연속일, 군집 권한을 아직 확인하지 못했습니다. 새로고침 후에도 반복되면 계정 연결을 점검해야 합니다.'
+
+    return (
+      <div className="space-bg" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+        <StarField count={150} />
+        <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
+        <main
+          className="space-container"
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'calc(var(--space-nav-height) + 2rem) 1rem 7rem',
+            pointerEvents: 'auto'
+          }}
+        >
+          <section
+            className="hud-border"
+            style={{
+              width: 'min(560px, 100%)',
+              padding: '1.5rem',
+              borderRadius: 18,
+              background: 'rgba(5, 10, 25, 0.88)',
+              textAlign: 'center',
+              boxShadow: '0 18px 45px rgba(0,0,0,0.35)'
+            }}
+          >
+            <div className="font-title" style={{ color: '#ff7676', fontSize: '1.45rem', marginBottom: '0.9rem' }}>
+              ⚠ {issueTitle}
+            </div>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, margin: '0 0 1.25rem' }}>
+              {issueDescription}
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="space-btn font-tech"
+                onClick={() => window.location.reload()}
+                style={{ padding: '0.8rem 1.1rem', color: 'var(--crystal-cyan)' }}
+              >
+                다시 동기화
+              </button>
+              <button
+                type="button"
+                className="space-btn font-tech"
+                onClick={async () => {
+                  await signOut(auth)
+                  navigate('/', { replace: true })
+                }}
+                style={{ padding: '0.8rem 1.1rem', color: '#ffb86b' }}
+              >
+                로그아웃
+              </button>
+            </div>
+          </section>
+        </main>
       </div>
     )
   }

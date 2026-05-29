@@ -89,63 +89,66 @@ export function useAuth() {
 
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const applyUserDocumentData = (data) => {
+          if (isDeletedAccountData(data)) {
+            console.warn('삭제된 회원 계정의 앱 접근을 차단했습니다.', {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email
+            });
+            setSignupRequiredNotice(firebaseUser, 'deleted-membership');
+            setUserData(null);
+            setLoading(false);
+            signOut(auth);
+            return;
+          }
+
+          setUserData({
+            crystals: 0,
+            totalQuizzes: 0,
+            totalScore: 0,
+            spaceshipLevel: 1,
+            helpCount: 0,
+            questionCount: 0,
+            // Streak defaults
+            currentStreak: 0,
+            longestStreak: 0,
+            lastStreakDate: "",
+            streakFreezeCount: 0,
+            streakFreezeLastPurchasedAtMs: 0,
+            streakMilestones: [],
+            shieldCharges: 0,
+            hasRadar: false,
+            radarExpiresAtMs: 0,
+            publicProfileEnabled: true,
+            publicDisplayName: '',
+            publicTitle: '',
+            publicSignature: '',
+            profileSignatureUnlocked: false,
+            ownedProfileFrames: ['starter'],
+            selectedProfileFrame: 'starter',
+            hallShowcaseCredits: 0,
+            hallSpotlightUntilMs: 0,
+            crewCreationPasses: 0,
+            crewJoinPasses: 0,
+            crewId: '',
+            crewName: '',
+            crewRole: '',
+            crewColor: '#00f3ff',
+            crewStatus: '',
+            crewGroupName: '',
+            crewInviteCode: '',
+            crewActiveStudyRoomId: '',
+            crewActiveStudyRoomStatus: '',
+            crewSnapshot: null,
+            clusterAccess: { cluster_elementary: 'active' },
+            ...data
+          });
+          setLoading(false);
+        };
+
         unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (isDeletedAccountData(data)) {
-              console.warn('삭제된 회원 계정의 앱 접근을 차단했습니다.', {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email
-              });
-              setSignupRequiredNotice(firebaseUser, 'deleted-membership');
-              setUserData(null);
-              setLoading(false);
-              signOut(auth);
-              return;
-            }
-
-            setUserData({
-              crystals: 0,
-              totalQuizzes: 0,
-              totalScore: 0,
-              spaceshipLevel: 1,
-              helpCount: 0,
-              questionCount: 0,
-              // Streak defaults
-              currentStreak: 0,
-              longestStreak: 0,
-              lastStreakDate: "",
-              streakFreezeCount: 0,
-              streakFreezeLastPurchasedAtMs: 0,
-              streakMilestones: [],
-              shieldCharges: 0,
-              hasRadar: false,
-              radarExpiresAtMs: 0,
-              publicProfileEnabled: true,
-              publicDisplayName: '',
-              publicTitle: '',
-              publicSignature: '',
-              profileSignatureUnlocked: false,
-              ownedProfileFrames: ['starter'],
-              selectedProfileFrame: 'starter',
-              hallShowcaseCredits: 0,
-              hallSpotlightUntilMs: 0,
-              crewCreationPasses: 0,
-              crewJoinPasses: 0,
-              crewId: '',
-              crewName: '',
-              crewRole: '',
-              crewColor: '#00f3ff',
-              crewStatus: '',
-              crewGroupName: '',
-              crewInviteCode: '',
-              crewActiveStudyRoomId: '',
-              crewActiveStudyRoomStatus: '',
-              crewSnapshot: null,
-              clusterAccess: { cluster_elementary: 'active' },
-              ...data
-            });
-            setLoading(false);
+            applyUserDocumentData(docSnap.data());
           } else {
             if (window.sessionStorage.getItem('accountDeletionInProgress') === firebaseUser.uid) {
               setUserData(null);
@@ -236,7 +239,26 @@ export function useAuth() {
           }
         }, (err) => {
           console.error("useAuth: User doc snapshot error:", err);
-          setLoading(false);
+          getDoc(userDocRef)
+            .then((fallbackSnap) => {
+              if (fallbackSnap.exists()) {
+                applyUserDocumentData(fallbackSnap.data());
+                return;
+              }
+
+              setUserData(buildDefaultUserData(firebaseUser, {
+                dataLoadError: true,
+                adjustmentReason: '사용자 데이터 동기화 실패: 회원 문서를 확인할 수 없음'
+              }));
+            })
+            .catch((fallbackErr) => {
+              console.error("useAuth: User doc fallback read failed:", fallbackErr);
+              setUserData(buildDefaultUserData(firebaseUser, {
+                dataLoadError: true,
+                adjustmentReason: fallbackErr?.message || '사용자 데이터 동기화 실패'
+              }));
+            })
+            .finally(() => setLoading(false));
         });
       } else {
         setUserData(null);
