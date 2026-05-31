@@ -298,6 +298,119 @@
   flex-direction: column;
 }
 
+.login-public-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.login-public-action {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 0.62rem 0.95rem;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 0.95rem;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.login-public-action:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.login-public-action--trial {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.52rem;
+  min-height: 3rem;
+  padding: 0.58rem 1.1rem 0.58rem 1.18rem;
+  color: #03121f;
+  border-color: rgba(255, 255, 255, 0.72);
+  background: linear-gradient(135deg, #fff176 0%, #42e8ff 48%, #34f5a5 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18) inset, 0 0 22px rgba(66, 232, 255, 0.46), 0 0 44px rgba(52, 245, 165, 0.24);
+  overflow: hidden;
+  transform: translateY(-1px);
+  animation: trialCtaPulse 2.6s ease-in-out infinite;
+}
+
+.login-public-action--trial::before {
+  content: "";
+  position: absolute;
+  inset: -45% -30%;
+  background: linear-gradient(115deg, transparent 24%, rgba(255, 255, 255, 0.72) 42%, transparent 60%);
+  transform: translateX(-70%) rotate(8deg);
+  animation: trialCtaSweep 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.login-public-action--trial:hover {
+  border-color: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(135deg, #fff59d 0%, #67e8f9 48%, #5cffb2 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22) inset, 0 0 30px rgba(103, 232, 249, 0.58), 0 0 58px rgba(52, 245, 165, 0.34);
+  transform: translateY(-3px) scale(1.02);
+}
+
+.login-public-action__label,
+.login-public-action__badge {
+  position: relative;
+  z-index: 1;
+}
+
+.login-public-action__label {
+  font-weight: 950;
+}
+
+.login-public-action__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.45rem;
+  border-radius: 999px;
+  padding: 0.23rem 0.48rem;
+  background: rgba(4, 17, 31, 0.82);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  box-shadow: 0 0 14px rgba(4, 17, 31, 0.28);
+  white-space: nowrap;
+}
+
+@keyframes trialCtaPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18) inset, 0 0 22px rgba(66, 232, 255, 0.46), 0 0 44px rgba(52, 245, 165, 0.24);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28) inset, 0 0 34px rgba(66, 232, 255, 0.62), 0 0 68px rgba(52, 245, 165, 0.36);
+  }
+}
+
+@keyframes trialCtaSweep {
+  0%,
+  42% {
+    transform: translateX(-76%) rotate(8deg);
+  }
+  74%,
+  100% {
+    transform: translateX(76%) rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-public-action--trial,
+  .login-public-action--trial::before {
+    animation: none;
+  }
+}
+
 /* ========================================
    Quiz View (Space Theme)
    ======================================== */
@@ -432,6 +545,29 @@
   
   .space-container.login-layout {
     padding: 1rem 1rem 3rem 1rem; /* More bottom padding for safe area */
+  }
+
+  .login-public-actions {
+    gap: 0.42rem;
+  }
+
+  .login-public-action {
+    padding: 0.55rem 0.7rem;
+    font-size: 0.82rem;
+  }
+
+  .login-public-action--trial {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.8rem;
+  }
+
+  .login-public-action__badge {
+    min-height: 1.28rem;
+    font-size: 0.66rem;
+    padding: 0.18rem 0.42rem;
   }
 
   .planet-orb {

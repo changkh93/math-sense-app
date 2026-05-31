@@ -2134,30 +2134,21 @@ function SpaceHome() {
           >
             META SENSE
           </button>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div className="login-public-actions">
             {[
-              ['무료체험', '/trial'],
+              ['무료체험', '/trial', '1주일 무료'],
               ['전화상담', '/consultation'],
               ['회원가입', '/signup']
-            ].map(([label, path]) => (
+            ].map(([label, path, badge]) => (
               <button
                 key={path}
                 type="button"
                 onClick={() => navigate(path)}
-                className="font-tech"
-                style={{
-                  border: '1px solid rgba(255,255,255,0.16)',
-                  background: path === '/trial' ? 'rgba(34,197,94,0.20)' : 'rgba(255,255,255,0.08)',
-                  color: 'white',
-                  borderRadius: 999,
-                  padding: isMobile ? '0.55rem 0.7rem' : '0.62rem 0.95rem',
-                  cursor: 'pointer',
-                  fontWeight: 800,
-                  fontSize: isMobile ? '0.82rem' : '0.95rem',
-                  backdropFilter: 'blur(10px)'
-                }}
+                className={`font-tech login-public-action${path === '/trial' ? ' login-public-action--trial' : ''}`}
+                aria-label={path === '/trial' ? '1주일 무료체험 신청' : label}
               >
-                {label}
+                <span className="login-public-action__label">{label}</span>
+                {badge && <span className="login-public-action__badge">{badge}</span>}
               </button>
             ))}
           </div>
