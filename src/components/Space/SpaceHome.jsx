@@ -2768,18 +2768,15 @@ function SpaceHome() {
 
   if (currentView === 'mistake_notebook') {
     return (
-      <>
-        <SpaceNavbar
-          currentView={currentView}
-          onViewChange={switchRootView}
-        />
+      <div className="space-focus-route">
         <MistakeNotebookPlanet
+          onNavigateView={switchRootView}
           onBack={() => {
             switchRootView('planet');
             soundManager.playWarp();
           }}
         />
-      </>
+      </div>
     )
   }
 

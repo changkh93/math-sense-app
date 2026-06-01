@@ -1,26 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
 import {
-  Archive,
   Brain,
   CalendarClock,
   Check,
-  ChevronRight,
   Clock,
+  Edit3,
   Flame,
-  Gauge,
   ImagePlus,
   Layers,
   RotateCcw,
+  Save,
   Sparkles,
+  Trash2,
   Upload
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import {
+  useArchiveStudentMistakeCard,
   useReviewMistakeCard,
   useStudentMistakeNotebook,
-  useSubmitMistakeUpload
+  useSubmitMistakeUpload,
+  useUpdateStudentMistakeCard
 } from '../../hooks/useMistakeNotebook'
 import StarField from './StarField'
 import soundManager from '../../utils/SoundManager'
@@ -86,16 +89,14 @@ function getDueState(card) {
 }
 
 function getMasteryLabel(card) {
-  if (card?.review?.masteryLevel === 'stable') return '안정화'
+  if (card?.review?.masteryLevel === 'stable') return '장기 기억'
   if (card?.review?.masteryLevel === 'needs_recheck') return '재확인'
   return '학습 중'
 }
 
 function UploadPanel({ user, userData }) {
   const [file, setFile] = useState(null)
-  const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
-  const [tags, setTags] = useState('')
   const [message, setMessage] = useState('')
   const submitUpload = useSubmitMistakeUpload()
 
@@ -114,11 +115,9 @@ function UploadPanel({ user, userData }) {
     event.preventDefault()
     setMessage('')
     try {
-      await submitUpload.mutateAsync({ file, user, userData, title, note, tags })
+      await submitUpload.mutateAsync({ file, user, userData, title: '', note, tags: '' })
       setFile(null)
-      setTitle('')
       setNote('')
-      setTags('')
       setMessage('업로드가 접수되었습니다. 카드가 발행되면 복습 덱에 들어옵니다.')
       soundManager.playCrystal()
     } catch (error) {
@@ -148,23 +147,13 @@ function UploadPanel({ user, userData }) {
       <div className="mn-upload-form">
         <div>
           <h2>카드 제작 요청</h2>
-          <p>선생님이 정답과 해설을 붙여 플래시카드로 발행합니다.</p>
+          <p>이미지와 메모는 운영툴에서 카드 제작 참고 자료로 사용됩니다.</p>
         </div>
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="제목 힌트"
-        />
         <textarea
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          placeholder="헷갈린 부분이나 내가 쓴 답"
-          rows={5}
-        />
-        <input
-          value={tags}
-          onChange={(event) => setTags(event.target.value)}
-          placeholder="태그: 내심, 함수, 계산실수"
+          placeholder="카드 제작 메모(선택): 내가 쓴 답, 헷갈린 조건, 궁금한 부분"
+          rows={7}
         />
         <button type="submit" disabled={!file || submitUpload.isPending}>
           <Upload size={17} />
@@ -181,17 +170,33 @@ function UploadPanel({ user, userData }) {
 }
 
 function StudyCard({ card, revealed, onReveal }) {
+  const handleKeyDown = (event) => {
+    if (revealed) return
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault()
+      onReveal()
+    }
+  }
+
   return (
-    <button type="button" className={`mn-study-card ${revealed ? 'is-revealed' : ''}`} onClick={onReveal}>
+    <div
+      role="button"
+      tabIndex={revealed ? -1 : 0}
+      className={`mn-study-card ${revealed ? 'is-revealed' : ''}`}
+      onClick={() => {
+        if (!revealed) onReveal()
+      }}
+      onKeyDown={handleKeyDown}
+      aria-label={revealed ? '정답과 해설' : '클릭하여 정답 보기'}
+    >
       <div className="mn-card-inner">
         <div className="mn-card-face mn-card-front">
           <div className="mn-card-image-shell">
             <img src={card.imageUrl} alt={card.questionTitle || '오답 이미지'} />
           </div>
-          <div className="mn-card-front-meta">
-            <span>FRONT</span>
-            <h2>{card.questionTitle || '나의 오답 카드'}</h2>
-            {card.concept && <p>{card.concept}</p>}
+          <div className="mn-flip-cue" aria-hidden="true">
+            <RotateCcw size={18} />
+            <span>클릭하여 정답 보기</span>
           </div>
         </div>
 
@@ -205,7 +210,7 @@ function StudyCard({ card, revealed, onReveal }) {
           </div>
         </div>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -315,10 +320,7 @@ function StudyCardSession({ card, done, total, progress, onReview, reviewing }) 
 
       <div className="mn-review-controls">
         {!revealed ? (
-          <button type="button" className="mn-show-answer" onClick={() => setRevealed(true)}>
-            <ChevronRight size={18} />
-            답 확인
-          </button>
+          <div className="mn-flip-note">카드 어디든 클릭하면 정답과 해설이 열립니다.</div>
         ) : (
           <div className="mn-rating-grid">
             {REVIEW_RATINGS.map((rating) => {
@@ -344,28 +346,112 @@ function StudyCardSession({ card, done, total, progress, onReview, reviewing }) 
   )
 }
 
-function LibraryGrid({ cards, emptyText }) {
+function LibraryGrid({ cards, emptyText, editable = false, onUpdateCard, onArchiveCard, busy = false }) {
+  const [editingId, setEditingId] = useState('')
+  const [draft, setDraft] = useState('')
+  const [message, setMessage] = useState('')
+  const editingCard = cards.find(card => card.id === editingId) || null
+
+  const startEdit = (card) => {
+    setEditingId(card.id)
+    setDraft(card.explanation || '')
+    setMessage('')
+  }
+
+  const cancelEdit = () => {
+    setEditingId('')
+    setDraft('')
+    setMessage('')
+  }
+
+  const saveEdit = async (card) => {
+    setMessage('')
+    try {
+      await onUpdateCard?.(card, draft)
+      setEditingId('')
+      setDraft('')
+      setMessage('해설을 저장했습니다.')
+    } catch (error) {
+      setMessage(error?.message || '해설 저장에 실패했습니다.')
+    }
+  }
+
+  const archiveCard = async (card) => {
+    const ok = window.confirm('이 카드를 전체 카드에서 삭제할까요? 복습 목록에서도 사라집니다.')
+    if (!ok) return
+    setMessage('')
+    try {
+      await onArchiveCard?.(card)
+      setMessage('카드를 삭제했습니다.')
+    } catch (error) {
+      setMessage(error?.message || '카드 삭제에 실패했습니다.')
+    }
+  }
+
   if (!cards.length) {
     return <div className="mn-empty-panel">{emptyText}</div>
   }
 
   return (
-    <div className="mn-library-grid">
-      {cards.map(card => (
-        <article key={card.id} className="mn-mini-card">
-          <div className="mn-mini-image">
-            <img src={card.imageUrl} alt={card.questionTitle || '오답 카드'} />
+    <div className={`mn-library-workspace ${editingCard ? 'with-editor' : ''}`}>
+      {message && <div className={`mn-library-message ${message.includes('실패') ? 'error' : 'ok'}`}>{message}</div>}
+      <div className="mn-library-grid">
+        {cards.map(card => {
+          const isEditing = editingId === card.id
+          return (
+            <article key={card.id} className={`mn-mini-card ${isEditing ? 'editing' : ''}`}>
+              <div className="mn-mini-image">
+                <img src={card.imageUrl} alt={card.questionTitle || '오답 카드'} />
+              </div>
+              <div className="mn-mini-body">
+                <h3>{card.questionTitle || '오답 카드'}</h3>
+                <p>{card.concept || (card.tags || []).slice(0, 2).join(', ') || '개념 카드'}</p>
+                <div>
+                  <span><Clock size={13} /> {formatDateTime(card.review?.nextReviewAt)}</span>
+                  <span>{getMasteryLabel(card)}</span>
+                </div>
+                {editable && (
+                  <div className="mn-card-actions">
+                    <button type="button" onClick={() => startEdit(card)} disabled={busy || isEditing}>
+                      <Edit3 size={14} />
+                      {isEditing ? '수정 중' : '수정'}
+                    </button>
+                    <button type="button" className="danger" onClick={() => archiveCard(card)} disabled={busy}>
+                      <Trash2 size={14} />
+                      삭제
+                    </button>
+                  </div>
+                )}
+              </div>
+            </article>
+          )
+        })}
+      </div>
+      {editingCard && (
+        <aside className="mn-edit-panel">
+          <div className="mn-edit-preview">
+            <img src={editingCard.imageUrl} alt={editingCard.questionTitle || '오답 카드'} />
           </div>
-          <div className="mn-mini-body">
-            <h3>{card.questionTitle || '오답 카드'}</h3>
-            <p>{card.concept || (card.tags || []).slice(0, 2).join(', ') || '개념 카드'}</p>
-            <div>
-              <span><Clock size={13} /> {formatDateTime(card.review?.nextReviewAt)}</span>
-              <span>{getMasteryLabel(card)}</span>
-            </div>
+          <div className="mn-edit-header">
+            <span>뒷면 해설 수정</span>
+            <h2>{editingCard.questionTitle || '오답 카드'}</h2>
+            <p>학생 화면의 카드 뒷면에 표시될 해설입니다.</p>
           </div>
-        </article>
-      ))}
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            aria-label="뒷면 해설"
+            rows={18}
+          />
+          <div className="mn-edit-actions">
+            <button type="button" onClick={() => saveEdit(editingCard)} disabled={busy || !draft.trim()}>
+              <Save size={16} />
+              저장
+            </button>
+            <button type="button" onClick={cancelEdit} disabled={busy}>취소</button>
+          </div>
+        </aside>
+      )}
     </div>
   )
 }
@@ -384,7 +470,7 @@ function PendingGrid({ uploads }) {
           </div>
           <div className="mn-mini-body">
             <h3>{item.title || '발행 대기 이미지'}</h3>
-            <p>{(item.tags || []).join(', ') || '검토 대기'}</p>
+            <p>{item.note || '운영툴 검토 대기'}</p>
             <div><span><CalendarClock size={13} /> {formatDateTime(item.createdAt)}</span></div>
           </div>
         </article>
@@ -393,11 +479,15 @@ function PendingGrid({ uploads }) {
   )
 }
 
-export default function MistakeNotebookPlanet({ onBack }) {
+export default function MistakeNotebookPlanet({ onBack, onNavigateView }) {
+  const navigate = useNavigate()
   const { user, userData } = useAuth()
   const [deck, setDeck] = useState('due')
+  const [isDeckMenuOpen, setIsDeckMenuOpen] = useState(false)
   const notebook = useStudentMistakeNotebook(user?.uid)
   const reviewMutation = useReviewMistakeCard(user?.uid)
+  const updateCardMutation = useUpdateStudentMistakeCard(user?.uid)
+  const archiveCardMutation = useArchiveStudentMistakeCard(user?.uid)
   const data = notebook.data || { dueCards: [], cards: [], pendingUploads: [], uploads: [] }
 
   const scheduledCards = useMemo(
@@ -425,38 +515,93 @@ export default function MistakeNotebookPlanet({ onBack }) {
     await reviewMutation.mutateAsync({ card, result })
   }
 
+  const handleUpdateCard = async (card, explanation) => {
+    await updateCardMutation.mutateAsync({ cardId: card.id, explanation })
+  }
+
+  const handleArchiveCard = async (card) => {
+    await archiveCardMutation.mutateAsync({ cardId: card.id })
+  }
+
+  const selectDeck = (nextDeck) => {
+    setDeck(nextDeck)
+    setIsDeckMenuOpen(false)
+  }
+
+  const moveToView = (view) => {
+    setIsDeckMenuOpen(false)
+    if (view === 'agora') {
+      navigate('/agora')
+      return
+    }
+    onNavigateView?.(view)
+  }
+
   return (
     <div className="space-bg mn-planet-page">
       <StarField count={120} />
+      <button
+        type="button"
+        className={`mn-focus-menu-toggle ${isDeckMenuOpen ? 'active' : ''}`}
+        onClick={() => setIsDeckMenuOpen(prev => !prev)}
+        aria-expanded={isDeckMenuOpen}
+        aria-label="오답노트 메뉴 열기"
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+      <button type="button" className="mn-focus-back-btn" onClick={onBack}>
+        ← 행성 지도로
+      </button>
+      {isDeckMenuOpen && (
+        <button
+          type="button"
+          className="mn-menu-scrim"
+          onClick={() => setIsDeckMenuOpen(false)}
+          aria-label="메뉴 닫기"
+        />
+      )}
+      <aside className={`mn-deck-rail ${isDeckMenuOpen ? 'open' : ''}`}>
+        <div className="mn-rail-header">
+          <strong>오답노트 메뉴</strong>
+          <button type="button" onClick={() => setIsDeckMenuOpen(false)} aria-label="메뉴 닫기">×</button>
+        </div>
+        <button
+          type="button"
+          className={`mn-create-card-btn ${deck === 'upload' ? 'active' : ''}`}
+          onClick={() => selectDeck('upload')}
+        >
+          <ImagePlus size={18} />
+          <span>이미지로 카드 만들기</span>
+        </button>
+        <div className="mn-rail-divider" />
+        <DeckButton active={deck === 'due'} icon={<Brain size={18} />} label="오늘 덱" count={data.dueCards.length} onClick={() => selectDeck('due')} />
+        <DeckButton active={deck === 'learning'} icon={<Flame size={18} />} label="학습 중" count={learningCards.length} onClick={() => selectDeck('learning')} />
+        <DeckButton active={deck === 'stable'} icon={<Sparkles size={18} />} label="장기 기억" count={stableCards.length} onClick={() => selectDeck('stable')} />
+        <DeckButton active={deck === 'all'} icon={<Layers size={18} />} label="전체 카드" count={data.cards.length} onClick={() => selectDeck('all')} />
+        <DeckButton active={deck === 'pending'} icon={<CalendarClock size={18} />} label="발행 대기" count={data.pendingUploads.length} onClick={() => selectDeck('pending')} />
+        <div className="mn-rail-note">
+          <strong>{scheduledCards.length}</strong>
+          <span>예약된 카드</span>
+        </div>
+        <div className="mn-rail-divider" />
+        <button type="button" className="mn-exit-btn" onClick={onBack}>행성 지도로</button>
+        <div className="mn-view-links">
+          <button type="button" onClick={() => moveToView('assignment_hub')}>과제</button>
+          <button type="button" onClick={() => moveToView('agora')}>아고라</button>
+          <button type="button" onClick={() => moveToView('store')}>스토어</button>
+        </div>
+      </aside>
       <div className="mn-shell">
         <header className="mn-hero">
-          <button type="button" className="mn-back-btn" onClick={onBack}>← 행성 지도로</button>
           <div>
             <span className="mn-kicker">MEMORY PLANET</span>
             <h1>오답노트 행성</h1>
-            <p>이미지를 떠올리고, 답을 확인하고, 난이도로 다음 복습 궤도를 정합니다.</p>
-          </div>
-          <div className="mn-metrics">
-            <Metric icon={<Layers size={18} />} label="전체" value={data.cards.length} />
-            <Metric icon={<Gauge size={18} />} label="오늘" value={data.dueCards.length} />
-            <Metric icon={<Archive size={18} />} label="대기" value={data.pendingUploads.length} />
           </div>
         </header>
 
         <main className="mn-workspace">
-          <aside className="mn-deck-rail">
-            <DeckButton active={deck === 'due'} icon={<Brain size={18} />} label="오늘 덱" count={data.dueCards.length} onClick={() => setDeck('due')} />
-            <DeckButton active={deck === 'learning'} icon={<Flame size={18} />} label="학습 중" count={learningCards.length} onClick={() => setDeck('learning')} />
-            <DeckButton active={deck === 'stable'} icon={<Sparkles size={18} />} label="안정화" count={stableCards.length} onClick={() => setDeck('stable')} />
-            <DeckButton active={deck === 'all'} icon={<Layers size={18} />} label="전체 카드" count={data.cards.length} onClick={() => setDeck('all')} />
-            <DeckButton active={deck === 'pending'} icon={<CalendarClock size={18} />} label="발행 대기" count={data.pendingUploads.length} onClick={() => setDeck('pending')} />
-            <DeckButton active={deck === 'upload'} icon={<ImagePlus size={18} />} label="이미지 보내기" count={0} onClick={() => setDeck('upload')} />
-            <div className="mn-rail-note">
-              <strong>{scheduledCards.length}</strong>
-              <span>예약된 카드</span>
-            </div>
-          </aside>
-
           <section className="mn-content-panel">
             {notebook.isLoading ? (
               <div className="mn-empty-panel">오답노트 궤도 계산 중...</div>
@@ -482,7 +627,14 @@ export default function MistakeNotebookPlanet({ onBack }) {
                       </div>
                     )
                   ) : (
-                    <LibraryGrid cards={activeDeckCards} emptyText="아직 표시할 카드가 없습니다." />
+                    <LibraryGrid
+                      cards={activeDeckCards}
+                      emptyText="아직 표시할 카드가 없습니다."
+                      editable={deck === 'all'}
+                      onUpdateCard={handleUpdateCard}
+                      onArchiveCard={handleArchiveCard}
+                      busy={updateCardMutation.isPending || archiveCardMutation.isPending}
+                    />
                   )
                 )}
               </>
@@ -501,15 +653,5 @@ function DeckButton({ active, icon, label, count, onClick }) {
       <strong>{label}</strong>
       {count > 0 && <em>{count}</em>}
     </button>
-  )
-}
-
-function Metric({ icon, label, value }) {
-  return (
-    <div className="mn-metric">
-      <span>{icon}</span>
-      <small>{label}</small>
-      <strong>{value}</strong>
-    </div>
   )
 }

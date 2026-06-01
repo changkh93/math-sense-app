@@ -408,7 +408,36 @@ service cloud.firestore {
         isAdmin() ||
         isLinkedParentOf(resource.data.userId)
       );
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuth() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'explanation',
+          'studentEditedAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.explanation is string &&
+        request.resource.data.explanation.size() > 0 &&
+        request.resource.data.explanation.size() <= 8000 &&
+        request.resource.data.studentEditedAt == request.time &&
+        request.resource.data.updatedAt == request.time
+      ) || (
+        isAuth() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'archivedBy',
+          'archivedAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.status == 'archived' &&
+        request.resource.data.archivedBy == request.auth.uid &&
+        request.resource.data.archivedAt == request.time &&
+        request.resource.data.updatedAt == request.time
+      );
     }
 
     // Star Messages (Community Ticker)

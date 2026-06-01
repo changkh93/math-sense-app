@@ -224,6 +224,52 @@ export function useReviewMistakeCard(userId) {
   })
 }
 
+export function useUpdateStudentMistakeCard(userId) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ cardId, explanation }) => {
+      if (!userId || !cardId) throw new Error('수정할 카드 정보가 없습니다.')
+      const cleanExplanation = String(explanation || '').trim()
+      if (!cleanExplanation) throw new Error('해설을 입력해 주세요.')
+      if (cleanExplanation.length > 8000) throw new Error('해설은 8000자 이하로 입력해 주세요.')
+
+      await updateDoc(doc(db, 'mistakeCards', cardId), {
+        explanation: cleanExplanation,
+        studentEditedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+
+      return { cardId, explanation: cleanExplanation }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mistakeNotebook', 'student', userId] })
+    }
+  })
+}
+
+export function useArchiveStudentMistakeCard(userId) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ cardId }) => {
+      if (!userId || !cardId) throw new Error('삭제할 카드 정보가 없습니다.')
+
+      await updateDoc(doc(db, 'mistakeCards', cardId), {
+        status: 'archived',
+        archivedBy: userId,
+        archivedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+
+      return { cardId }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mistakeNotebook', 'student', userId] })
+    }
+  })
+}
+
 export function useAdminMistakeUploads(status = 'pending') {
   return useQuery({
     queryKey: ['mistakeNotebook', 'admin', 'uploads', status],
