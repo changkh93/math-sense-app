@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { Children, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { Archive, CheckCircle2, Image, Send, Sparkles } from 'lucide-react'
-import { parseInlineFormatting } from '../../utils/formatUtils'
+import { Archive, CheckCircle2, Clipboard, FileJson, Image, Send, Sparkles } from 'lucide-react'
+import { normalizeEscapedNewlines, parseInlineFormatting } from '../../utils/formatUtils'
 import {
   useAdminMistakeUploads,
   useArchiveMistakeUpload,
@@ -38,6 +38,145 @@ function buildStarterExplanation(upload) {
     '다음에 확인할 포인트:'
   ].filter(Boolean)
   return hints.join('\n\n')
+}
+
+function buildAiPrompt(upload) {
+  const options = Array.isArray(upload?.sourceOptions) && upload.sourceOptions.length > 0
+    ? upload.sourceOptions.map((option, index) => `${index + 1}. ${option}`).join('\n')
+    : '없음'
+  const existingTags = Array.isArray(upload?.tags) && upload.tags.length > 0 ? upload.tags.join(', ') : '없음'
+
+  return `첨부된 이미지를 보고 학생용 오답노트 플래시카드 뒷면을 완성해 주세요.
+
+이미지를 함께 첨부했습니다. 만약 이미지 첨부가 보이지 않는다면 아래 imageUrl을 참고하되, 이미지 내용을 직접 확인할 수 없으면 canPublish를 false로 반환하세요.
+
+imageUrl: ${upload?.imageUrl || '없음'}
+학생 이름: ${upload?.userName || '알 수 없음'}
+학생이 입력한 제목: ${upload?.title || '없음'}
+학생 메모: ${upload?.note || '없음'}
+문제 텍스트: ${upload?.questionText || '이미지에 있음'}
+선택지:
+${options}
+기존 태그: ${existingTags}
+
+작성 원칙:
+- 이미지/문제에서 확인되는 내용만 사용하세요.
+- 정답을 확정할 수 없거나 이미지가 잘려 있으면 canPublish를 false로 반환하세요.
+- 카드 제목은 문제의 핵심 개념이 드러나게 짧게 쓰세요.
+- answer는 학생이 외워야 할 최종 정답만 간결하게 쓰세요. 선택형이면 번호와 값을 함께 쓰세요.
+- explanation은 반드시 Markdown 형식으로 쓰고, 아래 3개 제목을 포함하세요.
+  - ### 핵심 개념
+  - ### 풀이
+  - ### 다음에 떠올릴 점
+- 수식은 인라인 LaTeX $...$ 형식을 사용하세요. 예: $y=a(x-r_1)(x-r_2)$
+- 태그는 3~8개로 작성하세요.
+- difficulty는 반드시 "light", "normal", "hard" 중 하나만 사용하세요.
+- 학생을 평가하거나 비난하지 말고, 복습에 바로 쓸 수 있게 명확하게 작성하세요.
+
+반드시 아래 JSON 형식만 반환하세요. 설명 문장이나 주석을 JSON 밖에 쓰지 마세요.
+
+\`\`\`json
+{
+  "canPublish": true,
+  "questionTitle": "카드 제목",
+  "concept": "핵심 개념명",
+  "answer": "최종 정답",
+  "explanation": "### 핵심 개념\\n\\n...\\n\\n### 풀이\\n\\n...\\n\\n### 다음에 떠올릴 점\\n\\n...",
+  "tags": ["태그1", "태그2", "태그3"],
+  "difficulty": "normal",
+  "needsReviewReason": ""
+}
+\`\`\`
+
+발행할 수 없는 경우:
+
+\`\`\`json
+{
+  "canPublish": false,
+  "questionTitle": "",
+  "concept": "",
+  "answer": "",
+  "explanation": "",
+  "tags": [],
+  "difficulty": "normal",
+  "needsReviewReason": "정답을 확정할 수 없는 이유"
+}
+\`\`\``
+}
+
+function parseAiCardJson(rawText) {
+  const jsonMatch = String(rawText || '').match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+  const cleanJson = jsonMatch ? jsonMatch[1] : String(rawText || '').trim()
+  const parsed = JSON.parse(cleanJson)
+  if (parsed.canPublish === false) {
+    throw new Error(parsed.needsReviewReason || 'AI가 발행 불가로 판단했습니다.')
+  }
+
+  const requiredFields = ['questionTitle', 'concept', 'answer', 'explanation']
+  const missing = requiredFields.filter(field => !String(parsed[field] || '').trim())
+  if (missing.length > 0) {
+    throw new Error(`필수 필드가 비어 있습니다: ${missing.join(', ')}`)
+  }
+
+  const difficulty = ['light', 'normal', 'hard'].includes(parsed.difficulty) ? parsed.difficulty : 'normal'
+  const tags = Array.isArray(parsed.tags)
+    ? parsed.tags.map(tag => String(tag || '').trim()).filter(Boolean)
+    : String(parsed.tags || '').split(',').map(tag => tag.trim()).filter(Boolean)
+
+  return {
+    questionTitle: String(parsed.questionTitle || '').trim().slice(0, 140),
+    concept: String(parsed.concept || '').trim().slice(0, 120),
+    answer: String(parsed.answer || '').trim(),
+    explanation: String(parsed.explanation || '').trim(),
+    tags: tags.slice(0, 12).join(', '),
+    difficulty
+  }
+}
+
+function formatMarkdownChildren(children, keyPrefix) {
+  return Children.map(children, (child, index) => {
+    if (typeof child === 'string') {
+      return parseInlineFormatting(child, {
+        keyPrefix: `${keyPrefix}-${index}`
+      })
+    }
+    return child
+  })
+}
+
+function FormattedMarkdown({ children, keyPrefix = 'admin-md' }) {
+  return (
+    <ReactMarkdown
+      components={{
+        p: ({ children: nodeChildren }) => (
+          <p>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-p`)}</p>
+        ),
+        li: ({ children: nodeChildren }) => (
+          <li>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-li`)}</li>
+        ),
+        strong: ({ children: nodeChildren }) => (
+          <strong>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-strong`)}</strong>
+        ),
+        em: ({ children: nodeChildren }) => (
+          <em>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-em`)}</em>
+        ),
+        h1: ({ children: nodeChildren }) => (
+          <h1>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-h1`)}</h1>
+        ),
+        h2: ({ children: nodeChildren }) => (
+          <h2>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-h2`)}</h2>
+        ),
+        h3: ({ children: nodeChildren }) => (
+          <h3>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-h3`)}</h3>
+        ),
+        h4: ({ children: nodeChildren }) => (
+          <h4>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-h4`)}</h4>
+        )
+      }}
+    >
+      {normalizeEscapedNewlines(children)}
+    </ReactMarkdown>
+  )
 }
 
 function UploadPreview({ upload, compact = false }) {
@@ -276,21 +415,45 @@ function getInitialForm(upload) {
 function MistakeCardEditor({ selected }) {
   const [form, setForm] = useState(() => getInitialForm(selected))
   const [notice, setNotice] = useState('')
+  const [aiJson, setAiJson] = useState('')
+  const [aiNotice, setAiNotice] = useState('')
   const createCard = useCreateMistakeCard()
 
   const handleChange = (key, value) => {
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
-  const handleCreate = async () => {
+  const handleCreate = async (formOverride = form) => {
     setNotice('')
     try {
-      await createCard.mutateAsync({ upload: selected, form })
+      await createCard.mutateAsync({ upload: selected, form: formOverride })
       setNotice(selected.cardId
         ? '플래시카드를 수정 저장했습니다. 학생 오답노트 행성에 반영됩니다.'
         : '플래시카드를 발행했습니다. 학생 오답노트 행성의 복습 목록에 반영됩니다.')
     } catch (error) {
       setNotice(error?.message || '카드 발행에 실패했습니다.')
+    }
+  }
+
+  const handleCopyAiPrompt = async () => {
+    setAiNotice('')
+    try {
+      await navigator.clipboard.writeText(buildAiPrompt(selected))
+      setAiNotice('AI 프롬프트를 복사했습니다. 이미지도 함께 첨부해서 AI에게 질문하세요.')
+    } catch {
+      setAiNotice('클립보드 복사에 실패했습니다. 브라우저 권한을 확인하거나 프롬프트를 직접 선택해 복사하세요.')
+    }
+  }
+
+  const handleApplyAiJson = async ({ publish = false } = {}) => {
+    setAiNotice('')
+    try {
+      const nextForm = parseAiCardJson(aiJson)
+      setForm(nextForm)
+      setAiNotice(publish ? 'AI JSON을 입력칸에 반영하고 바로 발행합니다.' : 'AI JSON을 입력칸에만 반영했습니다. 내용을 확인한 뒤 아래 저장 버튼으로 발행하세요.')
+      if (publish) await handleCreate(nextForm)
+    } catch (error) {
+      setAiNotice(error?.message || 'AI JSON을 해석하지 못했습니다.')
     }
   }
 
@@ -309,6 +472,48 @@ function MistakeCardEditor({ selected }) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div style={{ border: '1px solid rgba(0, 212, 255, 0.18)', borderRadius: 8, padding: '0.9rem', background: 'rgba(0, 212, 255, 0.05)', display: 'grid', gap: '0.7rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ margin: 0, color: 'var(--crystal-cyan)', fontSize: '1rem' }}>
+                <Sparkles size={16} /> AI JSON으로 카드 완성
+              </h3>
+              <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.45 }}>
+                먼저 프롬프트를 복사해 이미지와 함께 AI에게 묻습니다. 받은 JSON은 검토만 하려면 입력칸에 반영하고, 확실하면 바로 발행하세요.
+              </p>
+            </div>
+            <button className="admin-btn secondary" type="button" onClick={handleCopyAiPrompt}>
+              <Clipboard size={15} /> 프롬프트 복사
+            </button>
+          </div>
+
+          <textarea
+            style={{ ...inputStyle, minHeight: 112, resize: 'vertical', lineHeight: 1.5, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.82rem' }}
+            value={aiJson}
+            onChange={e => setAiJson(e.target.value)}
+            placeholder={'AI가 반환한 ```json ... ``` 또는 순수 JSON을 여기에 붙여넣기'}
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+            <button className="admin-btn secondary" type="button" onClick={() => handleApplyAiJson()} disabled={!aiJson.trim()}>
+              <FileJson size={15} /> 입력칸에만 반영
+            </button>
+            <button className="admin-btn primary" type="button" onClick={() => handleApplyAiJson({ publish: true })} disabled={!aiJson.trim() || createCard.isPending}>
+              <Send size={15} /> 바로 발행
+            </button>
+          </div>
+
+          {aiNotice && (
+            <div style={{
+              color: aiNotice.includes('실패') || aiNotice.includes('못했습니다') || aiNotice.includes('비어') || aiNotice.includes('발행 불가') ? '#ffb4ac' : '#86efac',
+              fontSize: '0.84rem',
+              lineHeight: 1.45
+            }}>
+              {aiNotice}
+            </div>
+          )}
+        </div>
+
         <label style={labelStyle}>카드 제목</label>
         <input style={inputStyle} value={form.questionTitle} onChange={e => handleChange('questionTitle', e.target.value)} />
 
@@ -345,8 +550,8 @@ function MistakeCardEditor({ selected }) {
           <button className="admin-btn secondary" type="button" onClick={() => handleChange('explanation', buildStarterExplanation(selected))}>
             <Sparkles size={15} /> 해설 틀 채우기
           </button>
-          <button className="admin-btn primary" type="button" onClick={handleCreate} disabled={createCard.isPending}>
-            <Send size={15} /> {createCard.isPending ? '저장 중...' : (selected.cardId ? '수정 저장' : '플래시카드 발행')}
+          <button className="admin-btn primary" type="button" onClick={() => handleCreate()} disabled={createCard.isPending}>
+            <Send size={15} /> {createCard.isPending ? '저장 중...' : (selected.cardId ? '변경사항 저장' : '현재 입력값으로 발행')}
           </button>
         </div>
 
@@ -366,9 +571,13 @@ function MistakeCardEditor({ selected }) {
           <h3 style={{ margin: '0 0 0.7rem', color: 'var(--crystal-cyan)', fontSize: '1rem' }}>
             <CheckCircle2 size={16} /> 카드 뒷면 미리보기
           </h3>
-          <div style={{ color: '#bbf7d0', fontWeight: 900, marginBottom: 8 }}>정답: {form.answer || '-'}</div>
+          <div style={{ color: '#bbf7d0', fontWeight: 900, marginBottom: 8 }}>
+            정답: {parseInlineFormatting(form.answer || '-', { keyPrefix: `admin-preview-answer-${selected.id}` })}
+          </div>
           <div style={{ color: 'rgba(255,255,255,0.84)', lineHeight: 1.6 }}>
-            <ReactMarkdown>{form.explanation || '해설을 입력하면 미리보기가 표시됩니다.'}</ReactMarkdown>
+            <FormattedMarkdown keyPrefix={`admin-preview-${selected.id}`}>
+              {form.explanation || '해설을 입력하면 미리보기가 표시됩니다.'}
+            </FormattedMarkdown>
           </div>
         </div>
       </div>

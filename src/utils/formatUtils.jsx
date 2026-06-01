@@ -2,6 +2,45 @@ import React from 'react';
 import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
 
+const LOST_LATEX_COMMAND_PATTERN = /(?<!\\)(xrightarrow|xleftarrow|rightarrow|leftarrow|Rightarrow|Leftarrow|overline|underline|implies|triangle|parallel|cdot|times|frac|sqrt|div|neq|leq|geq|left|right|circ|perp|pm|pi|theta|alpha|beta|gamma|Delta|Omega)/g;
+const CONTROL_CHARS = {
+  formFeed: String.fromCharCode(0x0c),
+  verticalTab: String.fromCharCode(0x0b),
+  backspace: String.fromCharCode(0x08),
+  tab: String.fromCharCode(0x09),
+  lineFeed: String.fromCharCode(0x0a),
+  carriageReturn: String.fromCharCode(0x0d)
+};
+
+const protectExistingLatexCommands = (text) => {
+  const protectedCommands = [];
+  const protectedText = text.replace(/\\[a-zA-Z]+/g, (match) => {
+    const token = `@@LATEX_CMD_${protectedCommands.length}@@`;
+    protectedCommands.push(match);
+    return token;
+  });
+
+  return { protectedText, protectedCommands };
+};
+
+const restoreProtectedLatexCommands = (text, protectedCommands) => (
+  text.replace(/@@LATEX_CMD_(\d+)@@/g, (_, index) => protectedCommands[Number(index)] || '')
+);
+
+const restoreLostLatexCommandSlashes = (text) => {
+  const { protectedText, protectedCommands } = protectExistingLatexCommands(text);
+  const repaired = protectedText.replace(LOST_LATEX_COMMAND_PATTERN, '\\$1');
+  return restoreProtectedLatexCommands(repaired, protectedCommands);
+};
+
+export const normalizeEscapedNewlines = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  return text
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n(?![a-zA-Z])/g, '\n')
+    .replace(/\\r(?![a-zA-Z])/g, '\n');
+};
+
 /**
  * Sanitizes LaTeX strings to handle common JS escaping issues.
  * Specifically handles the case where \frac becomes [Form Feed]rac (\f + rac)
@@ -9,15 +48,17 @@ import 'katex/dist/katex.min.css';
 export const sanitizeLaTeX = (text) => {
   if (!text || typeof text !== 'string') return text;
   
-  return text
-    .replace(/\u000c\s?rac/g, '\\frac') // Form Feed + (space) + rac -> \frac
-    .replace(/\u000a\s?neq/g, '\\neq')  // Newline + (space) + neq -> \neq
-    .replace(/\u000c/g, '\\f') // Fallback Form Feed
-    .replace(/\u000b/g, '\\v') // Vertical Tab
-    .replace(/\u0008/g, '\\b') // Backspace
-    .replace(/\u0009/g, '\\t') // Tab
-    .replace(/\u000a/g, '\\n') // Newline
-    .replace(/\u000d/g, '\\r'); // Carriage Return
+  const controlCharFixed = normalizeEscapedNewlines(text)
+    .replace(new RegExp(`${CONTROL_CHARS.formFeed}\\s?rac`, 'g'), '\\frac')
+    .replace(new RegExp(`${CONTROL_CHARS.lineFeed}\\s?neq`, 'g'), '\\neq')
+    .replaceAll(CONTROL_CHARS.formFeed, '\\f')
+    .replaceAll(CONTROL_CHARS.verticalTab, '\\v')
+    .replaceAll(CONTROL_CHARS.backspace, '\\b')
+    .replaceAll(CONTROL_CHARS.tab, '\\t')
+    .replaceAll(CONTROL_CHARS.lineFeed, '\\n')
+    .replaceAll(CONTROL_CHARS.carriageReturn, '\\r');
+
+  return restoreLostLatexCommandSlashes(controlCharFixed);
 };
 
 /**
@@ -29,6 +70,7 @@ export const sanitizeLaTeX = (text) => {
 export const parseInlineFormatting = (text, options = {}) => {
   if (!text) return text;
   if (typeof text !== 'string') return String(text);
+  const normalizedText = normalizeEscapedNewlines(text);
 
   const {
     boldColor = 'var(--crystal-cyan)',
@@ -38,7 +80,7 @@ export const parseInlineFormatting = (text, options = {}) => {
   } = options;
   
   // 1. Split by Block Math: $$math$$
-  const blockMathParts = text.split(/(\$\$.*?\$\$)/gs);
+  const blockMathParts = normalizedText.split(/(\$\$.*?\$\$)/gs);
   
   return blockMathParts.flatMap((bmPart, bmIndex) => {
     // Check if it's a block math match

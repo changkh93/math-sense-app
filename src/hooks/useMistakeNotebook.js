@@ -15,6 +15,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '../firebase'
 import { auth } from '../firebase'
+import { normalizeEscapedNewlines } from '../utils/formatUtils'
 
 const REVIEW_INTERVALS_DAYS = [1, 3, 7, 14, 30, 60, 120]
 
@@ -46,15 +47,16 @@ function getQuizMistakeSource(quizData = {}) {
 function getCorrectAnswerText(question = {}) {
   const correctOptions = (question.options || [])
     .filter(option => option?.isCorrect)
-    .map(option => String(option?.text || '').trim())
+    .map(option => cleanAnswerText(option?.text || ''))
     .filter(Boolean)
 
   if (correctOptions.length > 0) return correctOptions.join(', ')
-  return String(question.answer || question.correctAnswer || '정답 확인 필요').trim()
+  const answer = cleanAnswerText(question.answer || question.correctAnswer || '')
+  return answer || '정답 확인 필요'
 }
 
 function getQuizMistakeExplanation(question = {}) {
-  return String(question.explanation || question.hint || '').trim()
+  return normalizeEscapedNewlines(String(question.explanation || question.hint || '')).trim()
 }
 
 function getQuizOptionTexts(question = {}) {
@@ -65,11 +67,20 @@ function getQuizOptionTexts(question = {}) {
 }
 
 function cleanQuizFrontText(value) {
-  return String(value || '')
+  return normalizeEscapedNewlines(String(value || ''))
     .replace(/\$([0-9]+(?:\.[0-9]+)?)\$/g, '$1')
     .replace(/\$([가-힣a-zA-Z0-9\s.,:;!?%°℃㎝㎡]+)\$/g, '$1')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function cleanAnswerText(value) {
+  const normalized = normalizeEscapedNewlines(String(value || ''))
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!normalized) return ''
+  if (/#{2,}|문제 풀이|풀이 전략|상세 풀이|주의점|문제 내용/.test(normalized)) return ''
+  return normalized.length > 180 ? `${normalized.slice(0, 177).trim()}...` : normalized
 }
 
 function getQuizMistakeMeta(question = {}, quizData = {}) {

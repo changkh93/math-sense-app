@@ -680,13 +680,24 @@
 
 .mn-answer-chip {
   display: inline-flex;
+  max-width: 100%;
+  box-sizing: border-box;
+  align-items: flex-start;
   border-radius: 999px;
   background: rgba(34, 197, 94, 0.16);
   border: 1px solid rgba(74, 222, 128, 0.34);
   color: #bbf7d0;
   font-weight: 900;
+  font-size: clamp(0.82rem, 1.4vw, 0.98rem);
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
   padding: 0.5rem 0.75rem;
   margin-bottom: 1rem;
+}
+
+.mn-answer-chip .katex {
+  font-size: 1em;
 }
 
 .mn-card-back h2 {

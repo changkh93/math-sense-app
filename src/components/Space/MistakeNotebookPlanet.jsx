@@ -27,7 +27,7 @@ import {
 } from '../../hooks/useMistakeNotebook'
 import StarField from './StarField'
 import soundManager from '../../utils/SoundManager'
-import { parseInlineFormatting } from '../../utils/formatUtils'
+import { normalizeEscapedNewlines, parseInlineFormatting } from '../../utils/formatUtils'
 import '../../styles/space-theme.css'
 import './MistakeNotebookPlanet.css'
 
@@ -136,7 +136,7 @@ function FormattedMarkdown({ children, keyPrefix = 'mn-md' }) {
         )
       }}
     >
-      {children}
+      {normalizeEscapedNewlines(children)}
     </ReactMarkdown>
   )
 }
