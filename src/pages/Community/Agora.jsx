@@ -72,19 +72,6 @@ export default function Agora() {
     setSearchTerm(searchTermParam);
   }, [searchTermParam]);
 
-  // Scroll to highlighted item when data loads
-  React.useEffect(() => {
-    if (highlightId && allQuestions.length > 0 && !isLoading) {
-      setTimeout(() => {
-        const el = document.getElementById(`question-${highlightId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 500);
-    }
-  }, [highlightId, allQuestions, isLoading]);
-
-
   const questions = React.useMemo(() => {
     let filtered = allQuestions;
     
@@ -96,19 +83,8 @@ export default function Agora() {
       );
     }
 
-    // If highlighting, move that item to top
-    if (highlightId) {
-      const targetIdx = filtered.findIndex(q => q.id === highlightId);
-      if (targetIdx > -1) {
-        const target = filtered[targetIdx];
-        const others = [...filtered];
-        others.splice(targetIdx, 1);
-        filtered = [target, ...others];
-      }
-    }
-    
     return filtered;
-  }, [allQuestions, searchTerm, highlightId]);
+  }, [allQuestions, searchTerm]);
 
   const filters = [
     { id: 'all', label: '전체 질문', icon: '🌌' },
@@ -220,13 +196,8 @@ export default function Agora() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ delay: idx < 20 ? idx * 0.03 : 0 }}
-                  className={`question-card glass ${highlightId === q.id ? 'highlight-glow' : ''}`}
+                  className="question-card glass"
                   onClick={() => {
-                    // Update URL with highlight before navigating so it's in history
-                    setSearchParams(prev => {
-                      prev.set('highlight', q.id);
-                      return prev;
-                    }, { replace: true });
                     navigate(`/agora/${q.id}`);
                   }}
                 >
