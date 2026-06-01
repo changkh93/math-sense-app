@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Children, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
@@ -27,6 +27,7 @@ import {
 } from '../../hooks/useMistakeNotebook'
 import StarField from './StarField'
 import soundManager from '../../utils/SoundManager'
+import { parseInlineFormatting } from '../../utils/formatUtils'
 import '../../styles/space-theme.css'
 import './MistakeNotebookPlanet.css'
 
@@ -92,6 +93,99 @@ function getMasteryLabel(card) {
   if (card?.review?.masteryLevel === 'stable') return '장기 기억'
   if (card?.review?.masteryLevel === 'needs_recheck') return '재확인'
   return '학습 중'
+}
+
+function formatMarkdownChildren(children, keyPrefix) {
+  return Children.map(children, (child, index) => {
+    if (typeof child === 'string') {
+      return parseInlineFormatting(child, {
+        keyPrefix: `${keyPrefix}-${index}`
+      })
+    }
+    return child
+  })
+}
+
+function FormattedMarkdown({ children, keyPrefix = 'mn-md' }) {
+  return (
+    <ReactMarkdown
+      components={{
+        p: ({ children: nodeChildren }) => (
+          <p>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-p`)}</p>
+        ),
+        li: ({ children: nodeChildren }) => (
+          <li>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-li`)}</li>
+        ),
+        strong: ({ children: nodeChildren }) => (
+          <strong>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-strong`)}</strong>
+        ),
+        em: ({ children: nodeChildren }) => (
+          <em>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-em`)}</em>
+        ),
+        h1: ({ children: nodeChildren }) => (
+          <h1>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-h1`)}</h1>
+        ),
+        h2: ({ children: nodeChildren }) => (
+          <h2>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-h2`)}</h2>
+        ),
+        h3: ({ children: nodeChildren }) => (
+          <h3>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-h3`)}</h3>
+        ),
+        h4: ({ children: nodeChildren }) => (
+          <h4>{formatMarkdownChildren(nodeChildren, `${keyPrefix}-h4`)}</h4>
+        )
+      }}
+    >
+      {children}
+    </ReactMarkdown>
+  )
+}
+
+function CardFrontVisual({ card, compact = false }) {
+  const options = Array.isArray(card?.sourceOptions) ? card.sourceOptions.filter(Boolean) : []
+  const isQuizCard = card?.source === 'dark_matter_quiz' || card?.questionText || options.length > 0
+
+  if (isQuizCard) {
+    return (
+      <div className={`mn-quiz-front ${compact ? 'compact' : ''}`}>
+        <div className="mn-quiz-front-label">{card?.sourceQuizTitle || 'QUIZ FRONT'}</div>
+        {card?.imageUrl && (
+          <div className="mn-quiz-front-image">
+            <img src={card.imageUrl} alt={card.questionTitle || '퀴즈 이미지'} />
+          </div>
+        )}
+        <div className="mn-quiz-front-question">
+          {parseInlineFormatting(card?.questionText || card?.questionTitle || '문제 내용이 없습니다.', {
+            keyPrefix: `mn-front-q-${card?.id || 'card'}`
+          })}
+        </div>
+        {options.length > 0 && (
+          <ol className="mn-quiz-front-options">
+            {options.map((option, index) => (
+              <li key={`${option}-${index}`}>
+                {parseInlineFormatting(option, {
+                  keyPrefix: `mn-front-opt-${card?.id || 'card'}-${index}`
+                })}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    )
+  }
+
+  if (card?.imageUrl) {
+    return <img src={card.imageUrl} alt={card.questionTitle || '오답 이미지'} />
+  }
+
+  return (
+    <div className={`mn-text-front ${compact ? 'compact' : ''}`}>
+      <span>{card?.source === 'dark_matter_quiz' ? 'DARK MATTER QUIZ' : 'QUESTION'}</span>
+      <p>{parseInlineFormatting(card?.questionText || card?.questionTitle || '문제 내용이 없습니다.', {
+        keyPrefix: `mn-text-front-${card?.id || 'card'}`
+      })}</p>
+    </div>
+  )
 }
 
 function UploadPanel({ user, userData }) {
@@ -192,7 +286,7 @@ function StudyCard({ card, revealed, onReveal }) {
       <div className="mn-card-inner">
         <div className="mn-card-face mn-card-front">
           <div className="mn-card-image-shell">
-            <img src={card.imageUrl} alt={card.questionTitle || '오답 이미지'} />
+            <CardFrontVisual card={card} />
           </div>
           <div className="mn-flip-cue" aria-hidden="true">
             <RotateCcw size={18} />
@@ -202,10 +296,16 @@ function StudyCard({ card, revealed, onReveal }) {
 
         <div className="mn-card-face mn-card-back">
           <div className="mn-card-back-scroll">
-            <div className="mn-answer-chip">정답 · {card.answer || '-'}</div>
+            <div className="mn-answer-chip">
+              정답 · {parseInlineFormatting(card.answer || '-', {
+                keyPrefix: `mn-answer-${card?.id || 'card'}`
+              })}
+            </div>
             <h2>{card.questionTitle || '나의 오답 카드'}</h2>
             <div className="mn-markdown">
-              <ReactMarkdown>{card.explanation || '해설이 아직 없습니다.'}</ReactMarkdown>
+              <FormattedMarkdown keyPrefix={`mn-back-${card?.id || 'card'}`}>
+                {card.explanation || '해설이 아직 없습니다.'}
+              </FormattedMarkdown>
             </div>
           </div>
         </div>
@@ -401,7 +501,7 @@ function LibraryGrid({ cards, emptyText, editable = false, onUpdateCard, onArchi
           return (
             <article key={card.id} className={`mn-mini-card ${isEditing ? 'editing' : ''}`}>
               <div className="mn-mini-image">
-                <img src={card.imageUrl} alt={card.questionTitle || '오답 카드'} />
+                <CardFrontVisual card={card} compact />
               </div>
               <div className="mn-mini-body">
                 <h3>{card.questionTitle || '오답 카드'}</h3>
@@ -430,7 +530,7 @@ function LibraryGrid({ cards, emptyText, editable = false, onUpdateCard, onArchi
       {editingCard && (
         <aside className="mn-edit-panel">
           <div className="mn-edit-preview">
-            <img src={editingCard.imageUrl} alt={editingCard.questionTitle || '오답 카드'} />
+            <CardFrontVisual card={editingCard} />
           </div>
           <div className="mn-edit-header">
             <span>뒷면 해설 수정</span>

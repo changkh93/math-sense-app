@@ -35,6 +35,66 @@ function splitTags(value) {
     .slice(0, 12)
 }
 
+function buildQuizMistakeCardId(userId, unitId, questionId) {
+  return `quiz_${userId}_${encodeURIComponent(unitId || 'unknown')}_${encodeURIComponent(questionId || 'unknown')}`
+}
+
+function getQuizMistakeSource(quizData = {}) {
+  return quizData?.unitId === 'dark_matter_zone' ? 'dark_matter_quiz' : 'quiz'
+}
+
+function getCorrectAnswerText(question = {}) {
+  const correctOptions = (question.options || [])
+    .filter(option => option?.isCorrect)
+    .map(option => String(option?.text || '').trim())
+    .filter(Boolean)
+
+  if (correctOptions.length > 0) return correctOptions.join(', ')
+  return String(question.answer || question.correctAnswer || '정답 확인 필요').trim()
+}
+
+function getQuizMistakeExplanation(question = {}) {
+  return String(question.explanation || question.hint || '').trim()
+}
+
+function getQuizOptionTexts(question = {}) {
+  return (question.options || [])
+    .map(option => cleanQuizFrontText(option?.text || option || ''))
+    .filter(Boolean)
+    .slice(0, 12)
+}
+
+function cleanQuizFrontText(value) {
+  return String(value || '')
+    .replace(/\$([0-9]+(?:\.[0-9]+)?)\$/g, '$1')
+    .replace(/\$([가-힣a-zA-Z0-9\s.,:;!?%°℃㎝㎡]+)\$/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getQuizMistakeMeta(question = {}, quizData = {}) {
+  const sourceUnitId = question.unitId || quizData?.sourceUnitId || quizData?.unitId || ''
+  const sourceQuestionId = question.id
+  const questionText = cleanQuizFrontText(question.question || '')
+  const unitTitle = String(question.unitTitle || quizData?.title || '다크매터 퀴즈').trim()
+  const concept = String(question.conceptTag || question.category || unitTitle).trim().slice(0, 120)
+  const questionTitle = String(question.title || concept || questionText || '다크매터 오답 카드').trim().slice(0, 140)
+
+  return {
+    sourceUnitId,
+    sourceQuestionId,
+    questionText,
+    unitTitle,
+    concept,
+    questionTitle,
+    answer: getCorrectAnswerText(question).slice(0, 1000),
+    imageUrl: String(question.imageUrl || '').trim(),
+    sourceOptions: getQuizOptionTexts(question),
+    difficulty: question.difficulty || 'normal',
+    tags: splitTags([unitTitle, concept, '다크매터'].filter(Boolean).join(','))
+  }
+}
+
 function getNextReviewState(result, previous = {}) {
   const now = Date.now()
   const normalizedResult = ({
@@ -270,6 +330,135 @@ export function useArchiveStudentMistakeCard(userId) {
   })
 }
 
+export function useCreateMistakeCardFromQuiz(userId) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ question, quizData, user, userData }) => {
+      if (!userId || !user?.uid || user.uid !== userId) throw new Error('로그인이 필요합니다.')
+      if (!question?.id) throw new Error('담을 문제 정보가 없습니다.')
+
+      const meta = getQuizMistakeMeta(question, quizData)
+      const source = getQuizMistakeSource(quizData)
+      const explanation = getQuizMistakeExplanation(question)
+
+      const baseCardId = buildQuizMistakeCardId(userId, meta.sourceUnitId, meta.sourceQuestionId)
+      const userCardsSnap = await getDocs(query(collection(db, 'mistakeCards'), where('userId', '==', userId)))
+      const existingCard = userCardsSnap.docs
+        .map(item => ({ id: item.id, ...item.data() }))
+        .find(item =>
+          ['dark_matter_quiz', 'quiz'].includes(item.source) &&
+          item.sourceUnitId === meta.sourceUnitId &&
+          item.sourceQuestionId === meta.sourceQuestionId
+        )
+
+      if (existingCard && existingCard.status !== 'archived') {
+        const needsFrontPatch =
+          !existingCard.questionText ||
+          !Array.isArray(existingCard.sourceOptions) ||
+          existingCard.sourceOptions.length === 0
+
+        if (needsFrontPatch) {
+          await updateDoc(doc(db, 'mistakeCards', existingCard.id), {
+            sourceQuizTitle: meta.unitTitle,
+            imageUrl: meta.imageUrl,
+            questionTitle: meta.questionTitle,
+            questionText: meta.questionText,
+            sourceOptions: meta.sourceOptions,
+            answer: meta.answer,
+            concept: meta.concept,
+            tags: meta.tags,
+            difficulty: meta.difficulty,
+            updatedAt: serverTimestamp()
+          })
+          return { id: existingCard.id, alreadyExists: true, updatedExisting: true }
+        }
+        return { id: existingCard.id, alreadyExists: true }
+      }
+
+      if (!explanation) {
+        const userUploadsSnap = await getDocs(query(collection(db, 'mistakeUploads'), where('userId', '==', userId)))
+        const existingPending = userUploadsSnap.docs
+          .map(item => ({ id: item.id, ...item.data() }))
+          .find(item =>
+            ['dark_matter_quiz', 'quiz'].includes(item.source) &&
+            item.sourceUnitId === meta.sourceUnitId &&
+            item.sourceQuestionId === meta.sourceQuestionId &&
+            item.status === 'pending'
+          )
+
+        if (existingPending) {
+          return { id: existingPending.id, alreadyExists: true, pendingReview: true }
+        }
+
+        const uploadPayload = {
+          userId,
+          userName: userData?.studentName || userData?.name || user.displayName || user.email || '학생',
+          imageUrl: meta.imageUrl,
+          imagePath: '',
+          title: meta.questionTitle,
+          note: [
+            'AI 설명이 없어 운영툴에서 해설을 완성해야 합니다.',
+            meta.questionText ? `문제: ${meta.questionText}` : '',
+            meta.sourceOptions.length ? `선택지:\n${meta.sourceOptions.map((option, index) => `${index + 1}. ${option}`).join('\n')}` : '',
+            meta.answer ? `정답 후보: ${meta.answer}` : ''
+          ].filter(Boolean).join('\n\n').slice(0, 2000),
+          tags: meta.tags,
+          status: 'pending',
+          source,
+          sourceUnitId: meta.sourceUnitId,
+          sourceQuestionId: meta.sourceQuestionId,
+          sourceQuizTitle: meta.unitTitle,
+          questionText: meta.questionText,
+          sourceOptions: meta.sourceOptions,
+          answer: meta.answer,
+          concept: meta.concept,
+          difficulty: meta.difficulty,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }
+
+        const uploadRef = await addDoc(collection(db, 'mistakeUploads'), uploadPayload)
+        return { id: uploadRef.id, ...uploadPayload, alreadyExists: false, pendingReview: true }
+      }
+
+      const cardRef = existingCard
+        ? doc(collection(db, 'mistakeCards'))
+        : doc(db, 'mistakeCards', baseCardId)
+
+      const payload = {
+        userId,
+        userName: userData?.studentName || userData?.name || user.displayName || user.email || '학생',
+        source,
+        sourceUnitId: meta.sourceUnitId,
+        sourceQuestionId: meta.sourceQuestionId,
+        sourceQuizTitle: meta.unitTitle,
+        imageUrl: meta.imageUrl,
+        imagePath: '',
+        questionTitle: meta.questionTitle,
+        questionText: meta.questionText,
+        sourceOptions: meta.sourceOptions,
+        answer: meta.answer,
+        explanation: explanation.slice(0, 8000),
+        concept: meta.concept,
+        tags: meta.tags,
+        difficulty: meta.difficulty,
+        status: 'active',
+        createdBy: userId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }
+
+      await setDoc(cardRef, payload)
+      return { id: cardRef.id, ...payload, alreadyExists: false }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mistakeNotebook', 'student', userId] })
+      queryClient.invalidateQueries({ queryKey: ['mistakeNotebook', 'admin'] })
+    }
+  })
+}
+
 export function useAdminMistakeUploads(status = 'pending') {
   return useQuery({
     queryKey: ['mistakeNotebook', 'admin', 'uploads', status],
@@ -302,8 +491,14 @@ export function useCreateMistakeCard() {
       const payload = {
         userId: upload.userId,
         userName: upload.userName || '',
+        source: upload.source || 'admin_review',
         sourceUploadId: upload.id,
-        imageUrl: upload.imageUrl,
+        sourceUnitId: upload.sourceUnitId || '',
+        sourceQuestionId: upload.sourceQuestionId || '',
+        sourceQuizTitle: upload.sourceQuizTitle || '',
+        questionText: upload.questionText || '',
+        sourceOptions: upload.sourceOptions || [],
+        imageUrl: upload.imageUrl || '',
         imagePath: upload.imagePath || '',
         questionTitle: String(form.questionTitle || upload.title || '나의 오답 카드').trim().slice(0, 140),
         answer: String(form.answer || '').trim(),

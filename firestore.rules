@@ -408,7 +408,58 @@ service cloud.firestore {
         isAdmin() ||
         isLinkedParentOf(resource.data.userId)
       );
-      allow create, delete: if isAdmin();
+      allow create: if isAdmin() || (
+        isAuth() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.source in ['dark_matter_quiz', 'quiz'] &&
+        request.resource.data.status == 'active' &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.keys().hasOnly([
+          'userId',
+          'userName',
+          'source',
+          'sourceUploadId',
+          'sourceUnitId',
+          'sourceQuestionId',
+          'sourceQuizTitle',
+          'imageUrl',
+          'imagePath',
+          'questionTitle',
+          'questionText',
+          'sourceOptions',
+          'answer',
+          'explanation',
+          'concept',
+          'tags',
+          'difficulty',
+          'status',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.questionTitle is string &&
+        request.resource.data.questionTitle.size() > 0 &&
+        request.resource.data.questionTitle.size() <= 140 &&
+        request.resource.data.questionText is string &&
+        request.resource.data.questionText.size() <= 4000 &&
+        request.resource.data.sourceOptions is list &&
+        request.resource.data.sourceOptions.size() <= 12 &&
+        request.resource.data.answer is string &&
+        request.resource.data.answer.size() > 0 &&
+        request.resource.data.answer.size() <= 1000 &&
+        request.resource.data.explanation is string &&
+        request.resource.data.explanation.size() > 0 &&
+        request.resource.data.explanation.size() <= 8000 &&
+        request.resource.data.sourceUnitId is string &&
+        request.resource.data.sourceQuestionId is string &&
+        request.resource.data.imageUrl is string &&
+        request.resource.data.imagePath is string &&
+        request.resource.data.tags is list &&
+        request.resource.data.tags.size() <= 12
+      );
+      allow delete: if isAdmin();
       allow update: if isAdmin() || (
         isAuth() &&
         resource.data.userId == request.auth.uid &&
@@ -423,6 +474,47 @@ service cloud.firestore {
         request.resource.data.explanation.size() <= 8000 &&
         request.resource.data.studentEditedAt == request.time &&
         request.resource.data.updatedAt == request.time
+      ) || (
+        isAuth() &&
+        resource.data.userId == request.auth.uid &&
+        resource.data.source in ['dark_matter_quiz', 'quiz'] &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'sourceQuizTitle',
+          'imageUrl',
+          'questionTitle',
+          'questionText',
+          'sourceOptions',
+          'answer',
+          'concept',
+          'tags',
+          'difficulty',
+          'updatedAt'
+        ]) &&
+        request.resource.data.questionTitle is string &&
+        request.resource.data.questionTitle.size() > 0 &&
+        request.resource.data.questionTitle.size() <= 140 &&
+        request.resource.data.questionText is string &&
+        request.resource.data.questionText.size() <= 4000 &&
+        request.resource.data.sourceOptions is list &&
+        request.resource.data.sourceOptions.size() <= 12 &&
+        request.resource.data.answer is string &&
+        request.resource.data.answer.size() > 0 &&
+        request.resource.data.answer.size() <= 1000 &&
+        request.resource.data.imageUrl is string &&
+        request.resource.data.tags is list &&
+        request.resource.data.tags.size() <= 12 &&
+        request.resource.data.updatedAt == request.time
+      ) || (
+        isAuth() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'lastReviewedAt',
+          'lastReviewResult'
+        ]) &&
+        request.resource.data.lastReviewedAt == request.time &&
+        request.resource.data.lastReviewResult in ['again', 'hard', 'good', 'easy']
       ) || (
         isAuth() &&
         resource.data.userId == request.auth.uid &&

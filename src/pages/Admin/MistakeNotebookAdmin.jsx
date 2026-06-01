@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Archive, CheckCircle2, Image, Send, Sparkles } from 'lucide-react'
+import { parseInlineFormatting } from '../../utils/formatUtils'
 import {
   useAdminMistakeUploads,
   useArchiveMistakeUpload,
@@ -30,12 +31,106 @@ function formatUploadDate(value) {
 
 function buildStarterExplanation(upload) {
   const hints = [
+    upload?.questionText ? `문제: ${upload.questionText}` : '',
     upload?.note ? `학생 메모: ${upload.note}` : '',
     '핵심 개념:',
     '풀이:',
     '다음에 확인할 포인트:'
   ].filter(Boolean)
   return hints.join('\n\n')
+}
+
+function UploadPreview({ upload, compact = false }) {
+  const options = Array.isArray(upload?.sourceOptions) ? upload.sourceOptions.filter(Boolean) : []
+
+  if (upload?.imageUrl) {
+    if (compact) {
+      return (
+        <img
+          src={upload.imageUrl}
+          alt={upload.title || '오답 이미지'}
+          style={{ width: 82, height: 82, objectFit: 'cover', borderRadius: 6, background: '#0f172a' }}
+        />
+      )
+    }
+
+    return (
+      <div style={{ padding: '1rem', display: 'grid', gap: '1rem' }}>
+        <img
+          src={upload.imageUrl}
+          alt={upload.title || '오답 이미지'}
+          style={{ width: '100%', maxHeight: 360, objectFit: 'contain', display: 'block', borderRadius: 8, background: 'rgba(255,255,255,0.92)' }}
+        />
+        {upload.questionText && (
+          <div style={{ color: 'white', fontWeight: 850, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+            {parseInlineFormatting(upload.questionText, { keyPrefix: `admin-mn-q-${upload.id || 'upload'}` })}
+          </div>
+        )}
+        {options.length > 0 && (
+          <ol style={{ margin: 0, paddingLeft: '1.2rem', color: 'rgba(255,255,255,0.84)', lineHeight: 1.55 }}>
+            {options.map((option, index) => (
+              <li key={`${option}-${index}`}>
+                {parseInlineFormatting(option, { keyPrefix: `admin-mn-opt-${upload.id || 'upload'}-${index}` })}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      width: compact ? 82 : '100%',
+      height: compact ? 82 : 'auto',
+      minHeight: compact ? 82 : 260,
+      boxSizing: 'border-box',
+      borderRadius: compact ? 6 : 0,
+      background: 'linear-gradient(145deg, rgba(15,23,42,0.95), rgba(2,6,23,0.92))',
+      border: compact ? '1px solid rgba(0,212,255,0.22)' : 'none',
+      padding: compact ? '0.5rem' : '1.25rem',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: compact ? 'center' : 'flex-start',
+      gap: compact ? '0.25rem' : '0.75rem'
+    }}>
+      <span style={{
+        color: 'var(--crystal-cyan)',
+        fontSize: compact ? '0.58rem' : '0.78rem',
+        fontWeight: 900,
+        letterSpacing: '0.08em'
+      }}>
+        QUIZ
+      </span>
+      <div style={{
+        color: 'white',
+        fontWeight: 850,
+        lineHeight: 1.45,
+        fontSize: compact ? '0.68rem' : '1.05rem',
+        display: compact ? '-webkit-box' : 'block',
+        WebkitLineClamp: compact ? 4 : 'unset',
+        WebkitBoxOrient: compact ? 'vertical' : 'unset',
+        overflow: compact ? 'hidden' : 'visible',
+        whiteSpace: 'pre-wrap'
+      }}>
+        {compact
+          ? (upload?.questionText || upload?.title || '문제 텍스트가 없습니다.')
+          : parseInlineFormatting(upload?.questionText || upload?.title || '문제 텍스트가 없습니다.', {
+            keyPrefix: `admin-mn-text-${upload?.id || 'upload'}`
+          })}
+      </div>
+      {!compact && options.length > 0 && (
+        <ol style={{ margin: 0, paddingLeft: '1.2rem', color: 'rgba(255,255,255,0.82)', lineHeight: 1.55 }}>
+          {options.map((option, index) => (
+            <li key={`${option}-${index}`}>
+              {parseInlineFormatting(option, { keyPrefix: `admin-mn-text-opt-${upload?.id || 'upload'}-${index}` })}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  )
 }
 
 export default function MistakeNotebookAdmin() {
@@ -103,7 +198,7 @@ export default function MistakeNotebookAdmin() {
             {uploadsQuery.isLoading ? (
               <p style={{ color: 'var(--text-muted)' }}>업로드 대기열을 불러오는 중...</p>
             ) : uploads.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '2rem' }}>해당 상태의 이미지가 없습니다.</p>
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '2rem' }}>해당 상태의 항목이 없습니다.</p>
             ) : uploads.map(upload => (
               <button
                 key={upload.id}
@@ -123,7 +218,7 @@ export default function MistakeNotebookAdmin() {
                   textAlign: 'left'
                 }}
               >
-                <img src={upload.imageUrl} alt={upload.title || '오답 이미지'} style={{ width: 82, height: 82, objectFit: 'cover', borderRadius: 6, background: '#0f172a' }} />
+                <UploadPreview upload={upload} compact />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 900, color: 'var(--text-bright)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {upload.title || '제목 없음'}
@@ -140,15 +235,15 @@ export default function MistakeNotebookAdmin() {
         <section className="admin-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {!selected ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-              왼쪽에서 오답 이미지를 선택하세요.
+              왼쪽에서 오답 항목을 선택하세요.
             </div>
           ) : (
             <>
               <div style={{ padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                 <div>
-                  <h2 style={{ margin: 0, color: 'var(--text-bright)', fontSize: '1.15rem' }}>{selected.userName} 학생 오답 이미지</h2>
+                  <h2 style={{ margin: 0, color: 'var(--text-bright)', fontSize: '1.15rem' }}>{selected.userName} 학생 오답 항목</h2>
                   <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                    이미지 앞면, 입력한 정답/해설 뒷면으로 플래시카드가 발행됩니다.
+                    이미지 또는 문제 텍스트 앞면, 입력한 정답/해설 뒷면으로 플래시카드가 발행됩니다.
                   </p>
                 </div>
                 <button className="admin-btn secondary" onClick={handleArchive} disabled={archiveUpload.isPending}>
@@ -170,9 +265,9 @@ function getInitialForm(upload) {
   const card = upload.card || {}
   return {
     questionTitle: card.questionTitle || upload.title || '나의 오답 카드',
-    answer: card.answer || '',
+    answer: card.answer || upload.answer || '',
     explanation: card.explanation || buildStarterExplanation(upload),
-    concept: card.concept || '',
+    concept: card.concept || upload.concept || '',
     tags: (card.tags || upload.tags || []).join(', '),
     difficulty: card.difficulty || 'normal'
   }
@@ -203,7 +298,7 @@ function MistakeCardEditor({ selected }) {
     <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'grid', gridTemplateColumns: 'minmax(280px, 42%) minmax(0, 1fr)', gap: '1rem' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, overflow: 'hidden', background: 'rgba(0,0,0,0.2)' }}>
-          <img src={selected.imageUrl} alt={selected.title || '학생 오답 이미지'} style={{ width: '100%', maxHeight: 520, objectFit: 'contain', display: 'block' }} />
+          <UploadPreview upload={selected} />
         </div>
         <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '1rem', background: 'rgba(255,255,255,0.03)' }}>
           <h3 style={{ margin: '0 0 0.6rem', color: 'var(--crystal-cyan)', fontSize: '1rem' }}><Image size={16} /> 학생 메모</h3>

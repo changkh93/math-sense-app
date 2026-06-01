@@ -14,6 +14,7 @@ import MissionMarkdownViewer from './MissionMarkdownViewer'
 import { db, functions } from '../../firebase'
 import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
+import { useCreateMistakeCardFromQuiz } from '../../hooks/useMistakeNotebook'
 
 // Fisher-Yates 셔플 알고리즘
 const shuffleArray = (array) => {
@@ -146,7 +147,7 @@ const getDisplayStats = (stats, question, pendingResult, existingResponse, pendi
 export default function SpaceQuizView({ region, quizData, onExit, onComplete, hasShield, hasRadar, isRadarBonus, onRequestSupport }) {
   // Real-time synchronization watchdog
   useSmartSync(quizData?.unitId)
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
 
   const [currentQuestions, setCurrentQuestions] = useState([])
   const [currentIdx, setCurrentIdx] = useState(0)
@@ -187,6 +188,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [pendingResult, setPendingResult] = useState(null)
   const [isSavingReaction, setIsSavingReaction] = useState(false)
   const [reactionError, setReactionError] = useState('')
+  const createMistakeCard = useCreateMistakeCardFromQuiz(user?.uid)
+  const [mistakeCardMessage, setMistakeCardMessage] = useState('')
+  const [savedMistakeQuestionIds, setSavedMistakeQuestionIds] = useState(new Set())
 
   const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
   const currentQuestion = currentQuestions[currentIdx]
@@ -306,6 +310,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setSelectedMultiOptions(new Set())
     setPendingResult(null)
     setReactionError('')
+    setMistakeCardMessage('')
   }, [currentIdx])
 
   useEffect(() => {
@@ -356,6 +361,34 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const isMultiAnswer = (question) => getCorrectCount(question) > 1
   const currentReactionId = pendingResult ? userAnswers[currentQuestion?.id]?.reactionId : null
   const displayedStats = getDisplayStats(questionStats, currentQuestion, pendingResult, existingResponse, currentReactionId)
+  const currentQuestionSaved = currentQuestion?.id ? savedMistakeQuestionIds.has(currentQuestion.id) : false
+  const hasMistakeExplanation = Boolean(currentQuestion?.explanation || currentQuestion?.hint)
+
+  const handleAddToMistakeNotebook = async () => {
+    if (!currentQuestion || createMistakeCard.isPending) return
+
+    setMistakeCardMessage('')
+    try {
+      const result = await createMistakeCard.mutateAsync({
+        question: currentQuestion,
+        quizData,
+        user,
+        userData
+      })
+      setSavedMistakeQuestionIds(prev => {
+        const next = new Set(prev)
+        next.add(currentQuestion.id)
+        return next
+      })
+      setMistakeCardMessage(result?.pendingReview
+        ? (result?.alreadyExists ? '이미 운영툴 발행 대기 중입니다.' : 'AI 설명이 없어 운영툴 발행 대기로 보냈습니다.')
+        : result?.updatedExisting ? '기존 오답노트 카드의 앞면 정보를 보강했습니다.'
+        : (result?.alreadyExists ? '이미 오답노트에 담긴 문제입니다.' : '오답노트에 담았습니다.'))
+      soundManager.playClick()
+    } catch (error) {
+      setMistakeCardMessage(error?.message || '오답노트에 담지 못했습니다.')
+    }
+  }
 
   const saveProgressSession = async ({
     nextIdxForSave,
@@ -1305,6 +1338,36 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                     </button>
                   )}
 
+                  {currentQuestion && (
+                    <button
+                      className="support-action-btn mistake-note"
+                      onClick={handleAddToMistakeNotebook}
+                      disabled={createMistakeCard.isPending || currentQuestionSaved}
+                      style={{
+                        padding: '0 1.2rem',
+                        borderRadius: '25px',
+                        height: '46px',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        color: currentQuestionSaved ? 'rgba(187,247,208,0.88)' : '#fef3c7',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        cursor: createMistakeCard.isPending || currentQuestionSaved ? 'not-allowed' : 'pointer',
+                        border: currentQuestionSaved ? '2px solid rgba(74, 222, 128, 0.42)' : '2px solid rgba(250, 204, 21, 0.62)',
+                        boxShadow: currentQuestionSaved ? '0 0 15px rgba(34, 197, 94, 0.22)' : '0 0 15px rgba(250, 204, 21, 0.26)',
+                        background: currentQuestionSaved ? 'rgba(5, 35, 22, 0.95)' : 'rgba(34, 24, 5, 0.95)',
+                        whiteSpace: 'nowrap',
+                        width: isMobile ? '100%' : 'auto',
+                        justifyContent: isMobile ? 'center' : 'flex-start',
+                        opacity: createMistakeCard.isPending ? 0.72 : 1
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>{currentQuestionSaved ? '✓' : hasMistakeExplanation ? '🧠' : '🛠'}</span>
+                      <span>{createMistakeCard.isPending ? '담는 중...' : currentQuestionSaved ? '처리됨' : hasMistakeExplanation ? '오답노트에 담기' : '운영툴로 보내기'}</span>
+                    </button>
+                  )}
+
                   {/* Ask Teacher Button */}
                   <button 
                     className="support-action-btn teacher-ask" 
@@ -1713,6 +1776,58 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   아래 버튼 중 하나를 눌러야 집계가 저장되고 다음 문제로 이동합니다.
                 </div>
               </div>
+              {currentQuestion && (
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '0.7rem',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  margin: '0 0 1rem',
+                  padding: '0.9rem 1rem',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, rgba(250,204,21,0.12), rgba(168,85,247,0.08))',
+                  border: '1px solid rgba(250,204,21,0.24)'
+                }}>
+                  <div>
+                    <div style={{ color: '#fef3c7', fontWeight: 950 }}>
+                      {hasMistakeExplanation ? '이 문제를 오답노트에 저장' : 'AI 설명 없이 운영툴로 보내기'}
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.18rem' }}>
+                      {hasMistakeExplanation
+                        ? '자세한 AI 설명을 카드 뒷면으로 바로 발행합니다.'
+                        : '운영툴의 발행 대기 목록에서 정답과 해설을 완성하면 카드로 발행됩니다.'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddToMistakeNotebook}
+                    disabled={createMistakeCard.isPending || currentQuestionSaved}
+                    style={{
+                      minHeight: 42,
+                      padding: '0.65rem 1rem',
+                      borderRadius: '12px',
+                      border: currentQuestionSaved ? '1px solid rgba(74,222,128,0.45)' : '1px solid rgba(250,204,21,0.5)',
+                      background: currentQuestionSaved ? 'rgba(34,197,94,0.14)' : 'rgba(250,204,21,0.14)',
+                      color: currentQuestionSaved ? '#bbf7d0' : '#fde68a',
+                      fontWeight: 900,
+                      cursor: createMistakeCard.isPending || currentQuestionSaved ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {createMistakeCard.isPending ? '보내는 중...' : currentQuestionSaved ? '처리됨' : hasMistakeExplanation ? '오답노트에 담기' : '운영툴로 보내기'}
+                  </button>
+                  {mistakeCardMessage && (
+                    <div style={{
+                      flexBasis: '100%',
+                      color: mistakeCardMessage.includes('못') || mistakeCardMessage.includes('없습니다') ? '#fecaca' : '#bbf7d0',
+                      fontSize: '0.85rem',
+                      fontWeight: 800
+                    }}>
+                      {mistakeCardMessage}
+                    </div>
+                  )}
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
                 {QUIZ_REACTION_CHOICES.map(choice => {
                   const reactionCounts = displayedStats.reactionCounts || {}
