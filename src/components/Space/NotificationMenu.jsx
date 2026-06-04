@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
-import { AlertTriangle, CalendarX, Gem, Mail, Megaphone, MessageCircle } from 'lucide-react';
+import { AlertTriangle, Award, CalendarX, Gem, Mail, Megaphone, MessageCircle } from 'lucide-react';
 import './NotificationMenu.css';
 
 function NotificationIcon({ type }) {
@@ -11,6 +11,7 @@ function NotificationIcon({ type }) {
   if (type === 'assignment_missing') return <CalendarX size={17} />;
   if (type === 'assignment_warning') return <AlertTriangle size={17} />;
   if (type === 'assignment_bonus') return <Gem size={17} />;
+  if (type === 'certificate_award') return <Award size={17} />;
   return <Megaphone size={17} />;
 }
 
@@ -19,6 +20,7 @@ function getNotificationIconClass(type) {
   if (type === 'assignment_missing') return 'assignment-missing';
   if (type === 'assignment_warning') return 'assignment-warning';
   if (type === 'assignment_bonus') return 'assignment-bonus';
+  if (type === 'certificate_award') return 'certificate-award';
   return '';
 }
 

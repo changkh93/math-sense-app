@@ -4,6 +4,7 @@ import { collection, query, orderBy, limit, onSnapshot, where, getDocs } from 'f
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Rocket, Zap, Navigation } from 'lucide-react'
 import '../../styles/space-theme.css'
+import CertificateAwardsBoard from './CertificateAwardsBoard'
 
 /**
  * StarNavigator - 계층적 탐사 지도를 표시 (Region -> Chapter)
@@ -709,6 +710,8 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions, 
           </motion.div>
         </div>
       </header>
+
+      <CertificateAwardsBoard user={user} />
 
       {/* Breadcrumb & Navigation */}
       <section style={{ marginBottom: '2.5rem' }}>

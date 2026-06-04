@@ -4,6 +4,7 @@ import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from '../../firebase';
 import { useClusters } from '../../hooks/useContent';
 import { AlertTriangle, Search, Trash2, User as UserIcon } from 'lucide-react';
+import { STUDENT_GRADE_OPTIONS, getGradeLabel, normalizeGradeValue } from '../../utils/monthlyEvaluationAwards';
 import './Admin.css';
 
 const DAY_MAP = {
@@ -258,6 +259,26 @@ function UserAccessManager() {
     }
   };
 
+  const handleGradeChange = async (userId, nextGrade) => {
+    try {
+      const normalizedGrade = normalizeGradeValue(nextGrade);
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        grade: normalizedGrade,
+        gradeLabel: getGradeLabel(normalizedGrade, '')
+      });
+
+      setUsers(prev => prev.map(u => (
+        u.uid === userId
+          ? { ...u, grade: normalizedGrade, gradeLabel: getGradeLabel(normalizedGrade, '') }
+          : u
+      )));
+    } catch (err) {
+      console.error(err);
+      alert('학년 저장 실패');
+    }
+  };
+
   const handlePermanentDeleteUser = async (targetUser) => {
     if (!targetUser?.uid || deletingUid) return;
 
@@ -340,6 +361,31 @@ function UserAccessManager() {
                     <h3 style={{ margin: '0 0 5px 0', color: 'white', fontSize: '1.4rem' }}>{user.studentName || user.name || '이름 없음'}</h3>
                     <p style={{ margin: 0, color: '#88aabb', fontSize: '1rem' }}>{user.email} <span style={{fontSize: '0.8rem', opacity: 0.6}}>(UID: {user.uid})</span></p>
                   </div>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '180px', color: '#88aabb', fontSize: '0.78rem', fontWeight: 800 }}>
+                    학년
+                    <select
+                      value={normalizeGradeValue(user.grade)}
+                      onChange={(e) => handleGradeChange(user.uid, e.target.value)}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        outline: 'none',
+                        width: '100%',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      <option value="" style={{ background: '#1a1b26', color: 'white' }}>학년 미지정</option>
+                      {STUDENT_GRADE_OPTIONS.map(grade => (
+                        <option key={grade.value} value={grade.value} style={{ background: '#1a1b26', color: 'white' }}>
+                          {grade.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <button
                     type="button"
                     onClick={() => handlePermanentDeleteUser(user)}

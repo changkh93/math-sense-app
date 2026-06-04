@@ -27,6 +27,7 @@ import MiddleSchoolMathBuilder from './pages/Admin/MiddleSchoolMathBuilder'
 import AdminAssignments from './pages/Admin/AdminAssignments'
 import MistakeNotebookAdmin from './pages/Admin/MistakeNotebookAdmin'
 import AdminStudentReport from './pages/Admin/AdminStudentReport'
+import MonthlyEvaluationAwards from './pages/Admin/MonthlyEvaluationAwards'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
@@ -71,6 +72,7 @@ function App() {
         <Route path="crews" element={<CrewApproval />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="assignments" element={<AdminAssignments />} />
+        <Route path="monthly-evaluations" element={<MonthlyEvaluationAwards />} />
         <Route path="mistake-notebook" element={<MistakeNotebookAdmin />} />
         <Route path="student-report" element={<AdminStudentReport />} />
         <Route path="mission/:unitId" element={<MissionContentEditor />} />

@@ -274,6 +274,17 @@ service cloud.firestore {
       allow create: if false;
     }
 
+    // Monthly evaluation certificate awards. Admins grant awards; students can
+    // read their own award ledger for the dashboard certificate board.
+    match /monthlyEvaluationAwards/{awardId} {
+      allow read: if isAuth() && (
+        isAdmin() ||
+        resource.data.studentId == request.auth.uid ||
+        isLinkedParentOf(resource.data.studentId)
+      );
+      allow create, update, delete: if isAdmin();
+    }
+
     // Notifications: Users can read/write their own notifications
     match /notifications/{notificationId} {
       allow read, write: if isAuth();

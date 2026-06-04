@@ -172,6 +172,11 @@
   background: rgba(52, 211, 153, 0.16);
 }
 
+.notif-icon.certificate-award {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.16);
+}
+
 .notif-content {
   flex: 1;
 }

@@ -1,0 +1,184 @@
+.certificate-awards-board {
+  padding: 1.35rem;
+  margin-bottom: 2rem;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(250, 204, 21, 0.22);
+}
+
+.certificate-awards-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.certificate-awards-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.3rem;
+  color: var(--text-bright);
+  font-size: 1.08rem;
+}
+
+.certificate-awards-header h3 svg {
+  color: #facc15;
+}
+
+.certificate-awards-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.certificate-awards-header strong {
+  color: #facc15;
+  font-size: 1.2rem;
+  white-space: nowrap;
+}
+
+.certificate-awards-empty {
+  padding: 1.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 800;
+}
+
+.certificate-awards-list,
+.certificate-awards-group,
+.certificate-awards-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.certificate-awards-group {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: start;
+}
+
+.certificate-awards-month {
+  color: #facc15;
+  font-family: var(--font-tech);
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding-top: 0.7rem;
+}
+
+.certificate-award-item {
+  width: 100%;
+  min-height: 66px;
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--text-bright);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.75rem 0.9rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.certificate-award-item:hover {
+  border-color: rgba(250, 204, 21, 0.58);
+  background: rgba(30, 41, 59, 0.86);
+}
+
+.certificate-award-ribbon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.14);
+  color: #facc15;
+  font-size: 0.78rem;
+  font-weight: 950;
+  border: 1px solid rgba(250, 204, 21, 0.3);
+}
+
+.certificate-award-item strong,
+.certificate-award-item small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.certificate-award-item strong {
+  font-size: 0.95rem;
+}
+
+.certificate-award-item small {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.certificate-award-item b {
+  color: #86efac;
+  font-size: 1rem;
+}
+
+.certificate-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.certificate-modal {
+  position: relative;
+  width: min(96vw, 820px);
+}
+
+.certificate-modal .certificate-preview {
+  margin: 0 auto;
+}
+
+.certificate-modal-close {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.96);
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .certificate-awards-group {
+    grid-template-columns: 1fr;
+  }
+
+  .certificate-awards-month {
+    padding-top: 0;
+  }
+
+  .certificate-award-item {
+    grid-template-columns: 1fr auto;
+  }
+
+  .certificate-award-ribbon {
+    grid-column: 1 / -1;
+    width: max-content;
+  }
+}

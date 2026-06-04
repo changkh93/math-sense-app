@@ -775,3 +775,232 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.monthly-awards-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.monthly-awards-summary > div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.58);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.monthly-awards-summary span {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.monthly-awards-summary strong {
+  color: #f8fafc;
+  font-size: 1.45rem;
+}
+
+.monthly-awards-toolbar {
+  display: grid;
+  grid-template-columns: 90px 100px 140px 170px 140px minmax(220px, 1fr);
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.monthly-awards-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.monthly-awards-toolbar input,
+.monthly-awards-toolbar select {
+  min-height: 40px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.8);
+  color: #f8fafc;
+  padding: 0 10px;
+  font-weight: 800;
+}
+
+.monthly-awards-search span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.8);
+  padding: 0 10px;
+}
+
+.monthly-awards-search input {
+  min-height: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.admin-error-banner {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.28);
+  color: #fecaca;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.monthly-awards-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  gap: 18px;
+  align-items: start;
+}
+
+.monthly-awards-table-card,
+.monthly-awards-preview {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.monthly-awards-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.monthly-awards-table-head h3,
+.monthly-awards-preview h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.monthly-awards-table-head span {
+  color: #94a3b8;
+  font-weight: 800;
+}
+
+.monthly-awards-table-wrap {
+  overflow-x: auto;
+}
+
+.monthly-awards-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #f8fafc;
+  min-width: 860px;
+}
+
+.monthly-awards-table th,
+.monthly-awards-table td {
+  padding: 13px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+}
+
+.monthly-awards-table th {
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  background: rgba(2, 6, 23, 0.36);
+}
+
+.monthly-awards-table td > span {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+
+.muted-text {
+  color: #94a3b8;
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.perfect-score {
+  color: #facc15;
+}
+
+.award-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 900;
+  font-size: 0.78rem;
+}
+
+.award-status.awarded {
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  background: rgba(5, 150, 105, 0.18);
+  color: #86efac;
+  cursor: pointer;
+}
+
+.award-status.pending {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(148, 163, 184, 0.1);
+  color: #cbd5e1;
+}
+
+.award-action-btn {
+  padding: 8px 11px;
+  white-space: nowrap;
+}
+
+.monthly-awards-empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 36px 16px;
+}
+
+.monthly-awards-preview {
+  padding: 16px;
+  position: sticky;
+  top: 16px;
+}
+
+.monthly-awards-preview .certificate-preview {
+  margin: 14px auto;
+}
+
+.monthly-awards-preview-note {
+  color: #cbd5e1;
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 1180px) {
+  .monthly-awards-toolbar,
+  .monthly-awards-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .monthly-awards-summary {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .monthly-awards-preview {
+    position: static;
+  }
+}
