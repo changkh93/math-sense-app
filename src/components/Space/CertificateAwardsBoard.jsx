@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { Award, X } from 'lucide-react'
 import { db } from '../../firebase'
@@ -66,56 +67,62 @@ export default function CertificateAwardsBoard({ user }) {
     return Object.entries(groups)
   }, [awards])
 
-  return (
-    <section className="certificate-awards-board glass-card">
-      <div className="certificate-awards-header">
-        <div>
-          <h3><Award size={20} /> 상장 수여 현황판</h3>
-          <p>월간평가에서 받은 상장이 월별로 기록됩니다.</p>
-        </div>
-        <strong>{loading ? '...' : `${awards.length}장`}</strong>
-      </div>
-
-      {loading ? (
-        <div className="certificate-awards-empty">상장 기록을 수신 중입니다.</div>
-      ) : awards.length === 0 ? (
-        <div className="certificate-awards-empty">아직 수여된 상장이 없습니다.</div>
-      ) : (
-        <div className="certificate-awards-list">
-          {groupedAwards.map(([monthKey, monthAwards]) => (
-            <div className="certificate-awards-group" key={monthKey}>
-              <div className="certificate-awards-month">{monthKey}</div>
-              <div className="certificate-awards-items">
-                {monthAwards.map(award => (
-                  <button type="button" key={award.id} onClick={() => setSelectedAward(award)} className="certificate-award-item">
-                    <span className="certificate-award-ribbon">최우수상</span>
-                    <span>
-                      <strong>{award.evaluationLabel || `${award.year}년 ${award.month}월 월간평가`}</strong>
-                      <small>{getCourseLabel(award.courseClusterId)} · {getAwardDateLabel(award)}</small>
-                    </span>
-                    <b>{award.score || 100}점</b>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {selectedAward && (
-        <div className="certificate-modal-backdrop" onClick={() => setSelectedAward(null)}>
-          <div className="certificate-modal" role="dialog" aria-modal="true" aria-label="상장 보기" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="certificate-modal-close" onClick={() => setSelectedAward(null)} aria-label="상장 닫기">
-              <X size={20} />
-            </button>
-            <div className="certificate-modal-head">
-              <span>{selectedAward.evaluationLabel || `${selectedAward.year}년 ${selectedAward.month}월 월간평가`}</span>
-              <strong>{selectedAward.awardTitle || '최우수상'} 수여</strong>
-            </div>
-            <CertificatePreview award={selectedAward} />
+  const modal = selectedAward && typeof document !== 'undefined'
+    ? createPortal(
+      <div className="certificate-modal-backdrop" onClick={() => setSelectedAward(null)}>
+        <div className="certificate-modal" role="dialog" aria-modal="true" aria-label="상장 보기" onClick={(event) => event.stopPropagation()}>
+          <button type="button" className="certificate-modal-close" onClick={() => setSelectedAward(null)} aria-label="상장 닫기">
+            <X size={20} />
+          </button>
+          <div className="certificate-modal-head">
+            <span>{selectedAward.evaluationLabel || `${selectedAward.year}년 ${selectedAward.month}월 월간평가`}</span>
+            <strong>{selectedAward.awardTitle || '최우수상'} 수여</strong>
           </div>
+          <CertificatePreview award={selectedAward} />
         </div>
-      )}
-    </section>
+      </div>,
+      document.body
+    )
+    : null
+
+  return (
+    <>
+      <section className="certificate-awards-board glass-card">
+        <div className="certificate-awards-header">
+          <div>
+            <h3><Award size={20} /> 상장 수여 현황판</h3>
+            <p>월간평가에서 받은 상장이 월별로 기록됩니다.</p>
+          </div>
+          <strong>{loading ? '...' : `${awards.length}장`}</strong>
+        </div>
+
+        {loading ? (
+          <div className="certificate-awards-empty">상장 기록을 수신 중입니다.</div>
+        ) : awards.length === 0 ? (
+          <div className="certificate-awards-empty">아직 수여된 상장이 없습니다.</div>
+        ) : (
+          <div className="certificate-awards-list">
+            {groupedAwards.map(([monthKey, monthAwards]) => (
+              <div className="certificate-awards-group" key={monthKey}>
+                <div className="certificate-awards-month">{monthKey}</div>
+                <div className="certificate-awards-items">
+                  {monthAwards.map(award => (
+                    <button type="button" key={award.id} onClick={() => setSelectedAward(award)} className="certificate-award-item">
+                      <span className="certificate-award-ribbon">최우수상</span>
+                      <span>
+                        <strong>{award.evaluationLabel || `${award.year}년 ${award.month}월 월간평가`}</strong>
+                        <small>{getCourseLabel(award.courseClusterId)} · {getAwardDateLabel(award)}</small>
+                      </span>
+                      <b>{award.score || 100}점</b>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      {modal}
+    </>
   )
 }
