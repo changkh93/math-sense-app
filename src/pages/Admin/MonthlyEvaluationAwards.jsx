@@ -234,7 +234,7 @@ export default function MonthlyEvaluationAwards() {
         studentName: row.studentName,
         email: row.email,
         grade: row.grade,
-        gradeLabel: row.gradeLabel,
+        gradeLabel: getGradeLabel(row.grade, '') || row.gradeLabel.replace(/\s*\(기록\s*기준\)/, ''),
         courseClusterId: row.courseClusterId,
         courseName: row.courseName,
         year: Number(year),

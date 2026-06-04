@@ -14,7 +14,8 @@ function getAwardedDateLabel(award = {}) {
 
 export default function CertificatePreview({ award = {}, compact = false }) {
   const studentName = award.studentName || award.name || '학생'
-  const gradeLabel = award.gradeLabel || getGradeLabel(award.grade, '')
+  const rawGradeLabel = award.gradeLabel || getGradeLabel(award.grade, '')
+  const gradeLabel = rawGradeLabel ? rawGradeLabel.replace(/\s*\(기록\s*기준\)/, '') : ''
   const year = Number(award.year) || new Date().getFullYear()
   const month = Number(award.month) || 5
   const awardedDateLabel = getAwardedDateLabel(award)
