@@ -179,6 +179,13 @@
   color: #f8fafc;
 }
 
+.certificate-modal-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 .certificate-modal-head span {
   color: #facc15;
   font-size: 0.82rem;
@@ -191,6 +198,27 @@
   font-size: 1.05rem;
   font-weight: 950;
   white-space: nowrap;
+}
+
+.certificate-modal-print {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(250, 204, 21, 0.34);
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.14);
+  color: #facc15;
+  font-weight: 950;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.certificate-modal-print:hover {
+  border-color: rgba(250, 204, 21, 0.65);
+  background: rgba(250, 204, 21, 0.22);
 }
 
 .certificate-modal-close {
@@ -249,5 +277,66 @@
     align-items: flex-start;
     padding-right: 44px;
     gap: 3px;
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@media print {
+  html,
+  body.certificate-print-active {
+    width: 210mm;
+    min-height: 297mm;
+    background: #fff !important;
+  }
+
+  body.certificate-print-active * {
+    visibility: hidden !important;
+  }
+
+  body.certificate-print-active .certificate-modal-backdrop,
+  body.certificate-print-active .certificate-modal-backdrop * {
+    visibility: visible !important;
+  }
+
+  body.certificate-print-active .certificate-modal-backdrop {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: auto !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+  }
+
+  body.certificate-print-active .certificate-modal {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  body.certificate-print-active .certificate-modal-head,
+  body.certificate-print-active .certificate-modal-close,
+  body.certificate-print-active .certificate-modal-print {
+    display: none !important;
+  }
+
+  body.certificate-print-active .certificate-modal .certificate-preview {
+    width: 190mm !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
-import { Award, X } from 'lucide-react'
+import { Award, Printer, X } from 'lucide-react'
 import { db } from '../../firebase'
 import CertificatePreview from '../CertificatePreview'
 import { formatKoreanDate, formatKoreanDateFromString, getCourseLabel } from '../../utils/monthlyEvaluationAwards'
@@ -32,10 +32,12 @@ export default function CertificateAwardsBoard({ user }) {
     }
 
     document.body.style.overflow = 'hidden'
+    document.body.classList.add('certificate-print-active')
     window.addEventListener('keydown', handleKeyDown)
 
     return () => {
       document.body.style.overflow = originalOverflow
+      document.body.classList.remove('certificate-print-active')
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [selectedAward])
@@ -67,6 +69,10 @@ export default function CertificateAwardsBoard({ user }) {
     return Object.entries(groups)
   }, [awards])
 
+  const handlePrint = () => {
+    window.requestAnimationFrame(() => window.print())
+  }
+
   const modal = selectedAward && typeof document !== 'undefined'
     ? createPortal(
       <div className="certificate-modal-backdrop" onClick={() => setSelectedAward(null)}>
@@ -75,8 +81,14 @@ export default function CertificateAwardsBoard({ user }) {
             <X size={20} />
           </button>
           <div className="certificate-modal-head">
-            <span>{selectedAward.evaluationLabel || `${selectedAward.year}년 ${selectedAward.month}월 월간평가`}</span>
-            <strong>{selectedAward.awardTitle || '최우수상'} 수여</strong>
+            <div>
+              <span>{selectedAward.evaluationLabel || `${selectedAward.year}년 ${selectedAward.month}월 월간평가`}</span>
+              <strong>{selectedAward.awardTitle || '최우수상'} 수여</strong>
+            </div>
+            <button type="button" className="certificate-modal-print" onClick={handlePrint}>
+              <Printer size={17} />
+              인쇄
+            </button>
           </div>
           <CertificatePreview award={selectedAward} />
         </div>
