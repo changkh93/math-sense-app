@@ -23,6 +23,23 @@ export default function CertificateAwardsBoard({ user }) {
   const [selectedAward, setSelectedAward] = useState(null)
 
   useEffect(() => {
+    if (!selectedAward) return undefined
+
+    const originalOverflow = document.body.style.overflow
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setSelectedAward(null)
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = originalOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [selectedAward])
+
+  useEffect(() => {
     if (!user?.uid) return undefined
     const q = query(collection(db, 'monthlyEvaluationAwards'), where('studentId', '==', user.uid))
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -87,10 +104,14 @@ export default function CertificateAwardsBoard({ user }) {
 
       {selectedAward && (
         <div className="certificate-modal-backdrop" onClick={() => setSelectedAward(null)}>
-          <div className="certificate-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="certificate-modal" role="dialog" aria-modal="true" aria-label="상장 보기" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="certificate-modal-close" onClick={() => setSelectedAward(null)} aria-label="상장 닫기">
               <X size={20} />
             </button>
+            <div className="certificate-modal-head">
+              <span>{selectedAward.evaluationLabel || `${selectedAward.year}년 ${selectedAward.month}월 월간평가`}</span>
+              <strong>{selectedAward.awardTitle || '최우수상'} 수여</strong>
+            </div>
             <CertificatePreview award={selectedAward} />
           </div>
         </div>

@@ -131,28 +131,73 @@
   position: fixed;
   inset: 0;
   z-index: 3200;
-  background: rgba(0, 0, 0, 0.72);
+  background:
+    radial-gradient(circle at 50% 18%, rgba(250, 204, 21, 0.18), transparent 34%),
+    rgba(2, 6, 23, 0.82);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  overflow-y: auto;
+  padding: 18px;
+  overflow: hidden;
 }
 
 .certificate-modal {
   position: relative;
-  width: min(96vw, 820px);
+  width: min(92vw, 720px);
+  max-height: calc(100vh - 36px);
+  border: 1px solid rgba(250, 204, 21, 0.32);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.92)),
+    rgba(15, 23, 42, 0.96);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.62),
+    0 0 44px rgba(250, 204, 21, 0.16);
+  padding: 18px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  overflow: visible;
 }
 
 .certificate-modal .certificate-preview {
   margin: 0 auto;
+  width: min(84vw, 56vh, 620px);
+  box-shadow:
+    0 22px 58px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(250, 204, 21, 0.18);
+}
+
+.certificate-modal-head {
+  width: min(84vw, 56vh, 620px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: #f8fafc;
+}
+
+.certificate-modal-head span {
+  color: #facc15;
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.certificate-modal-head strong {
+  color: #f8fafc;
+  font-size: 1.05rem;
+  font-weight: 950;
+  white-space: nowrap;
 }
 
 .certificate-modal-close {
   position: absolute;
-  top: -16px;
-  right: -16px;
-  z-index: 2;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
   width: 40px;
   height: 40px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -162,6 +207,11 @@
   background: rgba(15, 23, 42, 0.96);
   color: #fff;
   cursor: pointer;
+}
+
+.certificate-modal-close:hover {
+  border-color: rgba(250, 204, 21, 0.55);
+  color: #facc15;
 }
 
 @media (max-width: 720px) {
@@ -180,5 +230,24 @@
   .certificate-award-ribbon {
     grid-column: 1 / -1;
     width: max-content;
+  }
+
+  .certificate-modal {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    padding: 14px 10px 16px;
+    gap: 10px;
+  }
+
+  .certificate-modal .certificate-preview,
+  .certificate-modal-head {
+    width: min(92vw, 54vh);
+  }
+
+  .certificate-modal-head {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-right: 44px;
+    gap: 3px;
   }
 }
