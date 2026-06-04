@@ -286,20 +286,20 @@
 }
 
 @media print {
+  /* Hide all siblings of the modal container to prevent them from taking up layout space,
+     which avoids blank pages (pages 1 and 2) before the certificate. */
+  body.certificate-print-active > :not(.certificate-modal-backdrop) {
+    display: none !important;
+  }
+
   html,
   body.certificate-print-active {
-    width: 210mm;
-    min-height: 297mm;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #fff !important;
-  }
-
-  body.certificate-print-active * {
-    visibility: hidden !important;
-  }
-
-  body.certificate-print-active .certificate-modal-backdrop,
-  body.certificate-print-active .certificate-modal-backdrop * {
-    visibility: visible !important;
   }
 
   body.certificate-print-active .certificate-modal-backdrop {

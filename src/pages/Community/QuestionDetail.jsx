@@ -323,7 +323,6 @@ export default function QuestionDetail() {
                     onClick={async () => {
                       if(window.confirm('문제가 해결되었나요? 알려주셔서 감사해요!')) {
                         await selfResolve.mutateAsync({ questionId, reason: 'self_solved' });
-                        triggerVictory(3);
                       }
                     }}
                   >

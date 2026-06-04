@@ -269,7 +269,6 @@ export default function SpaceRanking({ user, userData }) {
       items: [
         { label: '답변 채택', value: '+20 💎', desc: '내가 쓴 답변이 채택됨' },
         { label: '질문 해결', value: '+5 💎', desc: '내 질문이 해결됨' },
-        { label: '스스로 해결', value: '+3 💎', desc: '자기 주도 해결 보충' },
         { label: '선생님 인증', value: '+10 💎', desc: '최우수 답변 추가 보너스' },
       ]
     }

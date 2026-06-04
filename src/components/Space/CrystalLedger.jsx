@@ -15,11 +15,14 @@ const TX_CONFIG = {
   data_log_reward: { icon: '📄', label: '데이터 로그 보상', color: '#00f3ff' },
   transmission_reward: { icon: '📡', label: '트랜스미션 보상', color: '#00ff88' },
   store_purchase: { icon: '🛒', label: '스토어 구매', color: '#f87171' },
+  store_gift_purchase: { icon: '🎁', label: '상점 선물 구매', color: '#f87171' },
+  store_item_gift_sent: { icon: '🎁', label: '상점 아이템 선물', color: '#60a5fa' },
+  store_item_gift_received: { icon: '🎁', label: '상점 아이템 수령', color: '#4ade80' },
   answer_accepted: { icon: '💬', label: '답변 채택 보상', color: '#4ade80' },
   agora_bounty_award: { icon: '💎', label: '현상금 질문 보상', color: '#4ade80' },
   agora_bounty_lock: { icon: '🎯', label: '현상금 예치', color: '#f87171' },
   question_resolved: { icon: '✅', label: '질문 해결 보상', color: '#4ade80' },
-  self_resolve: { icon: '🔍', label: '자가 해결 보상', color: '#4ade80' },
+  self_resolve: { icon: '🔍', label: '자가 해결 처리', color: '#60a5fa' },
   teacher_verify: { icon: '👨‍🏫', label: '교사 검증 보상', color: '#4ade80' },
   attendance_reward: { icon: '🚀', label: '출석 도킹 보상', color: '#38bdf8' },
   streak_bonus: { icon: '🔥', label: '연속 학습 보너스', color: '#fbbf24' },
@@ -798,7 +801,7 @@ export default function CrystalLedger({ userData }) {
                 <span style={{ fontSize: '1.2em' }}>💬</span> 스텔라 아고라
               </div>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                <li>질문 등록 시 <span style={{color: 'var(--text-bright)'}}>+5</span> / 스스로 해결 <span style={{color: 'var(--text-bright)'}}>+3</span></li>
+                <li>질문 등록 시 <span style={{color: 'var(--text-bright)'}}>+5</span></li>
                 <li>내 답변 채택 시 <span style={{color: 'var(--text-bright)'}}>+20</span></li>
                 <li>선생님 인증 추가 <span style={{color: 'var(--text-bright)'}}>+10</span></li>
               </ul>

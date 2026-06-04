@@ -2718,7 +2718,7 @@ export default function MissionHub({
                bestScore: bestScores[unitId]
              }}
              onCancel={() => {
-               const hasDataLog = !!(missionData?.learningContents?.text?.trim())
+               const hasDataLog = !!(missionData?.learningContents?.text?.trim() || missionData?.learningContents?.pdfUrl?.trim())
                const hasTransmission = !!(missionData?.transmissions?.length > 0 && missionData.transmissions.some(tx => tx.videoId))
                if (!hasDataLog && !hasTransmission) {
                  // Quiz-only unit — cancel goes back to SpaceHome

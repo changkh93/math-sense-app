@@ -17,6 +17,75 @@ const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const DIRECT_MEMO_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
+const STORE_RADAR_DURATION_DAYS = 7;
+const STORE_PHOTON_SHIELD_CHARGES_PER_GIFT = 10;
+const STORE_PHOTON_SHIELD_MAX_CHARGES = 20;
+const STORE_ITEM_GIFT_CATALOG = {
+  cryo_core: {
+    name: "크라이오 코어",
+    cost: 100,
+    ownedMode: "count",
+    senderField: "streakFreezeCount",
+    recipientField: "streakFreezeCount",
+    transferAmount: 1,
+  },
+  photon_shield: {
+    name: "광자 실드",
+    cost: 20,
+    ownedMode: "count",
+    senderField: "shieldCharges",
+    recipientField: "shieldCharges",
+    transferAmount: STORE_PHOTON_SHIELD_CHARGES_PER_GIFT,
+    maxRecipientValue: STORE_PHOTON_SHIELD_MAX_CHARGES,
+  },
+  radar: {
+    name: "첨단 마이닝 스캐너",
+    cost: 100,
+    ownedMode: "purchase_only",
+  },
+  signature_unlock: {
+    name: "시그니처 해금",
+    cost: 30,
+    ownedMode: "purchase_only",
+    uniqueField: "profileSignatureUnlocked",
+  },
+  frame_nebula: {
+    name: "네뷸라 프레임",
+    cost: 50,
+    ownedMode: "purchase_only",
+    frameId: "nebula",
+  },
+  frame_solar: {
+    name: "솔라 프레임",
+    cost: 150,
+    ownedMode: "purchase_only",
+    frameId: "solar",
+  },
+  hall_showcase_credit: {
+    name: "명예의 전당 쇼케이스",
+    cost: 50,
+    ownedMode: "count",
+    senderField: "hallShowcaseCredits",
+    recipientField: "hallShowcaseCredits",
+    transferAmount: 1,
+  },
+  crew_creation_pass: {
+    name: "스터디 크루 창설권",
+    cost: 1000,
+    ownedMode: "count",
+    senderField: "crewCreationPasses",
+    recipientField: "crewCreationPasses",
+    transferAmount: 1,
+  },
+  crew_join_pass: {
+    name: "스터디 크루 참여권",
+    cost: 300,
+    ownedMode: "count",
+    senderField: "crewJoinPasses",
+    recipientField: "crewJoinPasses",
+    transferAmount: 1,
+  },
+};
 const ASSIGNMENT_MISSING_LOOKBACK_DAYS = 7;
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
 const ASSIGNMENT_MISSING_BASE_PENALTY = 15;
@@ -1932,6 +2001,101 @@ function getDisplayNameFromUser(userData = {}) {
   return userData.publicDisplayName || userData.studentName || userData.name || userData.displayName || "탐사원";
 }
 
+function getOwnedProfileFrames(userData = {}) {
+  const owned = Array.isArray(userData.ownedProfileFrames) ? userData.ownedProfileFrames : [];
+  return Array.from(new Set(["starter", ...owned]));
+}
+
+function getProfileFrameMeta(frameId = "starter") {
+  if (frameId === "nebula") {
+    return {
+      id: "nebula",
+      name: "네뷸라 프레임",
+      accent: "#8b5cf6",
+      bg: "linear-gradient(135deg, rgba(139, 92, 246, 0.28), rgba(17, 24, 39, 0.96))",
+    };
+  }
+  if (frameId === "solar") {
+    return {
+      id: "solar",
+      name: "솔라 프레임",
+      accent: "#f59e0b",
+      bg: "linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(17, 24, 39, 0.96))",
+    };
+  }
+  return {
+    id: "starter",
+    name: "스타터 프레임",
+    accent: "#00f3ff",
+    bg: "linear-gradient(135deg, rgba(0, 243, 255, 0.16), rgba(11, 18, 42, 0.95))",
+  };
+}
+
+function buildAnswerProfileSnapshotForUser(userData = {}) {
+  const displayName = getDisplayNameFromUser(userData);
+  const frame = getProfileFrameMeta(userData.selectedProfileFrame || "starter");
+  return {
+    displayName,
+    publicTitle: String(userData.publicTitle || "").trim(),
+    publicSignature: String(userData.publicSignature || "").trim(),
+    profileFrameId: frame.id,
+    frameName: frame.name,
+    frameAccent: frame.accent,
+    frameBackground: frame.bg,
+    crewId: userData.crewId || "",
+    crewName: userData.crewName || "",
+    crewRole: userData.crewRole || "",
+    crewColor: userData.crewColor || "#00f3ff",
+    helpCount: userData.helpCount || 0,
+    questionCount: userData.questionCount || 0,
+    hallSpotlightUntilMs: userData.hallSpotlightUntilMs || 0,
+  };
+}
+
+function buildServerStreakGiftAudit({ source, writerUid, prevState = {}, nextFreezeCount, writtenAt, note }) {
+  return {
+    version: 2,
+    source,
+    writerUid,
+    writtenAt,
+    prevCurrentStreak: prevState.currentStreak ?? 0,
+    prevLastStreakDate: prevState.lastStreakDate ?? "",
+    prevFreezeCount: prevState.streakFreezeCount ?? 0,
+    nextCurrentStreak: prevState.currentStreak ?? 0,
+    nextLastStreakDate: prevState.lastStreakDate ?? "",
+    nextFreezeCount,
+    note,
+  };
+}
+
+function isRadarActiveServer(userData = {}, nowMs = Date.now()) {
+  if (!userData.hasRadar) return false;
+  const expiresAtMs = Number(userData.radarExpiresAtMs || 0);
+  return !expiresAtMs || expiresAtMs > nowMs;
+}
+
+async function syncAnswerProfileSnapshotsForUser(userId, userData = {}) {
+  const db = admin.firestore();
+  const snapshot = buildAnswerProfileSnapshotForUser(userData);
+  const answersSnap = await db.collection("answers").where("userId", "==", userId).get();
+  if (answersSnap.empty) return;
+
+  let batch = db.batch();
+  let opCount = 0;
+  for (const docSnap of answersSnap.docs) {
+    batch.update(docSnap.ref, { publicProfileSnapshot: snapshot });
+    opCount += 1;
+    if (opCount >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      opCount = 0;
+    }
+  }
+  if (opCount > 0) {
+    await batch.commit();
+  }
+}
+
 function getKstDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -2668,6 +2832,203 @@ exports.listStudyCrews = regionalFunctions.https.onCall(async (_data, context) =
 
   return {
     crews,
+  };
+});
+
+exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => {
+  const senderId = await requireAuthUid(context);
+  const recipientId = String(data?.recipientId || "").trim();
+  const itemId = String(data?.itemId || "").trim();
+  const mode = String(data?.mode || "purchase").trim();
+  const item = STORE_ITEM_GIFT_CATALOG[itemId];
+
+  if (!recipientId) {
+    throw new functions.https.HttpsError("invalid-argument", "받는 사람을 선택해주세요.");
+  }
+  if (recipientId === senderId) {
+    throw new functions.https.HttpsError("invalid-argument", "자기 자신에게는 상점 아이템을 선물할 수 없습니다.");
+  }
+  if (!item) {
+    throw new functions.https.HttpsError("invalid-argument", "선물할 수 없는 아이템입니다.");
+  }
+  if (mode !== "purchase" && mode !== "owned") {
+    throw new functions.https.HttpsError("invalid-argument", "선물 방식이 올바르지 않습니다.");
+  }
+  if (mode === "owned" && item.ownedMode !== "count") {
+    throw new functions.https.HttpsError("failed-precondition", "이 아이템은 보유분 선물이 불가능합니다. 구매해서 선물해주세요.");
+  }
+
+  const db = admin.firestore();
+  const now = new Date();
+  const nowMs = now.getTime();
+  const nowTimestamp = admin.firestore.Timestamp.fromDate(now);
+  const senderRef = db.collection("users").doc(senderId);
+  const recipientRef = db.collection("users").doc(recipientId);
+  const giftRef = db.collection("storeItemGifts").doc();
+  const senderTxRef = senderRef.collection("crystal_transactions").doc(`store-item-gift-sent-${giftRef.id}`);
+  const recipientTxRef = recipientRef.collection("crystal_transactions").doc(`store-item-gift-received-${giftRef.id}`);
+
+  const result = await db.runTransaction(async (tx) => {
+    const [senderSnap, recipientSnap] = await Promise.all([
+      tx.get(senderRef),
+      tx.get(recipientRef),
+    ]);
+
+    if (!senderSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "보내는 사람 프로필을 찾지 못했습니다.");
+    }
+    if (!recipientSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "받는 사람 프로필을 찾지 못했습니다.");
+    }
+
+    const senderData = senderSnap.data() || {};
+    const recipientData = recipientSnap.data() || {};
+    if (senderData.role === "parent" || senderData.role === "admin") {
+      throw new functions.https.HttpsError("permission-denied", "학생 계정만 상점 아이템을 선물할 수 있습니다.");
+    }
+    if (recipientData.role === "parent" || recipientData.role === "admin") {
+      throw new functions.https.HttpsError("failed-precondition", "학생 계정에게만 상점 아이템을 선물할 수 있습니다.");
+    }
+
+    const senderUpdates = {};
+    const recipientUpdates = {};
+    const senderCrystals = Math.max(0, Number(senderData.crystals || 0));
+    const senderName = getDisplayNameFromUser(senderData);
+    const recipientName = getDisplayNameFromUser(recipientData);
+    let shouldSyncRecipientAnswers = false;
+
+    if (mode === "purchase") {
+      if (senderCrystals < item.cost) {
+        throw new functions.https.HttpsError("failed-precondition", "보유 광석이 부족합니다.");
+      }
+      senderUpdates.crystals = senderCrystals - item.cost;
+    } else {
+      const senderOwned = Math.max(0, Number(senderData[item.senderField] || 0));
+      if (senderOwned < item.transferAmount) {
+        const unitLabel = itemId === "photon_shield" ? `${item.transferAmount}회분` : `${item.transferAmount}개`;
+        throw new functions.https.HttpsError("failed-precondition", `${item.name} 보유분이 부족합니다. (${unitLabel} 필요)`);
+      }
+      senderUpdates[item.senderField] = senderOwned - item.transferAmount;
+      if (itemId === "cryo_core") {
+        senderUpdates.streakWriteAudit = buildServerStreakGiftAudit({
+          source: "space_store_gift_send_cryo_core",
+          writerUid: senderId,
+          prevState: senderData,
+          nextFreezeCount: senderOwned - item.transferAmount,
+          writtenAt: nowTimestamp,
+          note: giftRef.id,
+        });
+      }
+    }
+
+    if (itemId === "radar") {
+      if (isRadarActiveServer(recipientData, nowMs)) {
+        throw new functions.https.HttpsError("failed-precondition", `${recipientName}님은 이미 ${item.name}를 활성화 중입니다.`);
+      }
+      recipientUpdates.hasRadar = true;
+      recipientUpdates.radarActivatedAtMs = nowMs;
+      recipientUpdates.radarExpiresAtMs = nowMs + STORE_RADAR_DURATION_DAYS * 24 * 60 * 60 * 1000;
+    } else if (item.uniqueField) {
+      if (recipientData[item.uniqueField]) {
+        throw new functions.https.HttpsError("failed-precondition", `${recipientName}님은 이미 ${item.name}를 보유 중입니다.`);
+      }
+      recipientUpdates[item.uniqueField] = true;
+      shouldSyncRecipientAnswers = true;
+    } else if (item.frameId) {
+      const recipientFrames = getOwnedProfileFrames(recipientData);
+      if (recipientFrames.includes(item.frameId)) {
+        throw new functions.https.HttpsError("failed-precondition", `${recipientName}님은 이미 ${item.name}를 보유 중입니다.`);
+      }
+      recipientUpdates.ownedProfileFrames = [...recipientFrames, item.frameId];
+      recipientUpdates.selectedProfileFrame = item.frameId;
+      shouldSyncRecipientAnswers = true;
+    } else {
+      const currentRecipientOwned = Math.max(0, Number(recipientData[item.recipientField] || 0));
+      const nextRecipientOwned = currentRecipientOwned + item.transferAmount;
+      if (item.maxRecipientValue && nextRecipientOwned > item.maxRecipientValue) {
+        throw new functions.https.HttpsError("failed-precondition", `${recipientName}님은 ${item.name}를 더 받을 수 없습니다.`);
+      }
+      recipientUpdates[item.recipientField] = nextRecipientOwned;
+      if (itemId === "cryo_core") {
+        recipientUpdates.streakWriteAudit = buildServerStreakGiftAudit({
+          source: "space_store_gift_receive_cryo_core",
+          writerUid: senderId,
+          prevState: recipientData,
+          nextFreezeCount: nextRecipientOwned,
+          writtenAt: nowTimestamp,
+          note: giftRef.id,
+        });
+      }
+    }
+
+    const giftData = {
+      senderId,
+      senderName,
+      recipientId,
+      recipientName,
+      itemId,
+      itemName: item.name,
+      mode,
+      cost: mode === "purchase" ? item.cost : 0,
+      transferAmount: item.transferAmount || 1,
+      createdAt: nowTimestamp,
+    };
+
+    tx.set(giftRef, giftData);
+    tx.set(senderRef, senderUpdates, { merge: true });
+    tx.set(recipientRef, recipientUpdates, { merge: true });
+    tx.set(senderTxRef, {
+      amount: mode === "purchase" ? -item.cost : 0,
+      type: mode === "purchase" ? "store_gift_purchase" : "store_item_gift_sent",
+      description: `${recipientName}님에게 ${item.name} 선물`,
+      metadata: {
+        giftId: giftRef.id,
+        recipientId,
+        recipientName,
+        itemId,
+        itemName: item.name,
+        giftMode: mode,
+      },
+      timestamp: nowTimestamp,
+    });
+    tx.set(recipientTxRef, {
+      amount: 0,
+      type: "store_item_gift_received",
+      description: `${senderName}님에게 ${item.name} 선물 받음`,
+      metadata: {
+        giftId: giftRef.id,
+        senderId,
+        senderName,
+        itemId,
+        itemName: item.name,
+        giftMode: mode,
+      },
+      timestamp: nowTimestamp,
+    });
+
+    return {
+      giftId: giftRef.id,
+      recipientName,
+      itemName: item.name,
+      mode,
+      shouldSyncRecipientAnswers,
+    };
+  });
+
+  if (result.shouldSyncRecipientAnswers) {
+    try {
+      const recipientSnap = await recipientRef.get();
+      if (recipientSnap.exists) {
+        await syncAnswerProfileSnapshotsForUser(recipientId, recipientSnap.data() || {});
+      }
+    } catch (error) {
+      console.error("giftStoreItem answer profile sync failed:", error);
+    }
+  }
+
+  return {
+    success: true,
+    ...result,
   };
 });
 

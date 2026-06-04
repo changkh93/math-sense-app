@@ -9,12 +9,21 @@
     "build:ext": "bash scripts/build-ext.sh",
     "lint": "eslint .",
     "test:streak": "node scripts/test-streak-utils.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "video:studio": "remotion studio video/index.jsx",
+    "video:render:metasense": "remotion render video/index.jsx MetasenseShort out/metasense-promo-raw.mp4 --codec=h264 --pixel-format=yuv420p",
+    "video:still:metasense": "remotion still video/index.jsx MetasenseShort out/metasense-thumbnail.png --frame=240",
+    "video:render:remote": "remotion render video/index.jsx MetasenseRemoteShort out/metasense-remote-promo-raw.mp4 --codec=h264 --pixel-format=yuv420p",
+    "video:still:remote": "remotion still video/index.jsx MetasenseRemoteShort out/metasense-remote-thumbnail.png --frame=315",
+    "video:render:docu": "remotion render video/index.jsx MetasenseDocuBrandFilm out/metasense-docu-brand-film-raw.mp4 --codec=h264 --pixel-format=yuv420p",
+    "video:still:docu": "remotion still video/index.jsx MetasenseDocuBrandFilm out/metasense-docu-brand-film-still.png --frame=2250"
   },
   "dependencies": {
     "@google/genai": "^1.42.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
+    "@remotion/cli": "^4.0.471",
+    "@remotion/renderer": "^4.0.471",
     "@tanstack/react-query": "^5.90.20",
     "canvas-confetti": "^1.9.4",
     "dnd-kit": "^0.0.2",
@@ -35,6 +44,7 @@
     "react-router-dom": "^7.13.0",
     "react-sketch-canvas": "^6.2.0",
     "recharts": "^3.7.0",
+    "remotion": "^4.0.471",
     "three": "^0.182.0"
   },
   "devDependencies": {

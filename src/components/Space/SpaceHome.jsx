@@ -77,6 +77,33 @@ const MIDDLE_MATH_REGION_IMAGES = {
   exam: '/assets/planets/middle-math-exam.png'
 }
 
+const chunkArray = (items, size) => {
+  const chunks = []
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size))
+  }
+  return chunks
+}
+
+function getUnitContentAvailability(unit, quizAvailabilityMap = {}) {
+  const unitId = unit?.docId || unit?.id
+  const flags = unit?.contentFlags || {}
+  const hasFlag = (key) => typeof flags[key] === 'boolean'
+
+  return {
+    hasQuiz: hasFlag('hasQuiz') ? flags.hasQuiz : !!quizAvailabilityMap[unitId],
+    hasVideo: hasFlag('hasTransmission')
+      ? flags.hasTransmission
+      : !!((unit?.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) || unit?.videoConfig?.videoId),
+    hasText: hasFlag('hasDataLog')
+      ? flags.hasDataLog
+      : !!(unit?.learningContents?.text?.trim() || unit?.learningContents?.pdfUrl?.trim()),
+    hasWorkbook: hasFlag('hasWorkbook')
+      ? flags.hasWorkbook
+      : !!(unit?.workbookPages && unit.workbookPages.length > 0)
+  }
+}
+
 function getMiddleMathRegionImage(region) {
   const title = region?.title || ''
 
@@ -610,6 +637,52 @@ function SpaceHome() {
     }))
   })
 
+  const quizAvailabilityUnitIds = useMemo(() => {
+    const ids = new Set()
+    ;(units || []).forEach(unit => {
+      const unitId = unit.docId || unit.id
+      if (unitId) ids.add(unitId)
+    })
+    chapterUnitResults.forEach(result => {
+      ;(result.data || []).forEach(unit => {
+        const unitId = unit.docId || unit.id
+        if (unitId) ids.add(unitId)
+      })
+    })
+    return Array.from(ids).sort()
+  }, [units, chapterUnitResults])
+
+  const quizAvailabilityChunks = useMemo(
+    () => chunkArray(quizAvailabilityUnitIds, 10),
+    [quizAvailabilityUnitIds]
+  )
+
+  const quizAvailabilityResults = useQueries({
+    queries: quizAvailabilityChunks.map(unitIds => ({
+      queryKey: ['quizAvailability', unitIds],
+      queryFn: async () => {
+        if (!unitIds.length) return []
+        const q = query(collection(db, 'quizzes'), where('unitId', 'in', unitIds))
+        const snap = await getDocs(q)
+        return Array.from(new Set(snap.docs.map(docSnap => docSnap.data()?.unitId).filter(Boolean)))
+      },
+      enabled: unitIds.length > 0,
+      staleTime: 1000 * 60 * 30,
+      gcTime: 1000 * 60 * 60
+    }))
+  })
+
+  const loadingQuizAvailability = quizAvailabilityResults.some(result => result.isPending || result.isLoading)
+  const quizAvailabilityMap = useMemo(() => {
+    const map = {}
+    quizAvailabilityResults.forEach(result => {
+      ;(result.data || []).forEach(unitId => {
+        map[unitId] = true
+      })
+    })
+    return map
+  }, [quizAvailabilityResults])
+
   // Active selections
   const activeRegion = regions?.find(r => r.id === selectedRegionId)
   const activeChapter = chapters?.find(c => c.docId === selectedChapterDocId) || singleChapter
@@ -1124,7 +1197,7 @@ function SpaceHome() {
     
     // Guard: need both chapters array AND history to have finished loading
     if (!chapters || !chapters.length) return progress
-    if (loadingHistory) return progress
+    if (loadingHistory || loadingQuizAvailability) return progress
 
     // Check if ALL chapterUnitResults have loaded
     const allLoaded = chapterUnitResults.length > 0 && 
@@ -1148,11 +1221,7 @@ function SpaceHome() {
         // Find progress using docId or fallback id
         const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
 
-        // Check availability of each modality
-        const hasQuiz = (unit.contentFlags && unit.contentFlags.hasQuiz !== undefined) ? unit.contentFlags.hasQuiz : true
-        const hasVideo = !!((unit.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) || unit.videoConfig?.videoId)
-        const hasText = !!(unit.learningContents?.text?.trim())
-        const hasWorkbook = !!(unit.workbookPages && unit.workbookPages.length > 0)
+        const { hasQuiz, hasVideo, hasText, hasWorkbook } = getUnitContentAvailability(unit, quizAvailabilityMap)
 
         if (hasQuiz) {
           counts.quiz.total++
@@ -1186,7 +1255,7 @@ function SpaceHome() {
       }
     })
     return progress
-  }, [chapters, unitProgressMap, chapterUnitResults, loadingHistory])
+  }, [chapters, unitProgressMap, chapterUnitResults, loadingHistory, loadingQuizAvailability, quizAvailabilityMap])
 
 
   const isProcessingSave = useRef(false)
@@ -3595,10 +3664,7 @@ function SpaceHome() {
                     ) : units?.map((unit, idx) => {
                       const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
                       
-                      const hasQuiz = (unit.contentFlags && unit.contentFlags.hasQuiz !== undefined) ? unit.contentFlags.hasQuiz : true
-                      const hasVideo = !!((unit.transmissions?.length > 0 && unit.transmissions.some(tx => tx.videoId)) || unit.videoConfig?.videoId)
-                      const hasText = !!(unit.learningContents?.text?.trim())
-                      const hasWorkbook = !!(unit.workbookPages && unit.workbookPages.length > 0)
+                      const { hasQuiz, hasVideo, hasText, hasWorkbook } = getUnitContentAvailability(unit, quizAvailabilityMap)
 
                       const isOverallCompleted = 
                         (!hasQuiz || uProg.quiz) &&

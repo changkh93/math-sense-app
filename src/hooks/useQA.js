@@ -23,8 +23,6 @@ import { db, auth, functions } from '../firebase';
 import { recordCrystalTransaction } from '../utils/crystalLedger';
 import { calculateGrowthUpdates } from '../utils/rankingUtils';
 import {
-  AGORA_PARTIAL_REFUND_RATIO,
-  AGORA_SELF_RESOLVE_REWARD,
   buildAnswerProfileSnapshot
 } from '../utils/socialUtils';
 
@@ -381,53 +379,27 @@ export function useQAMutations() {
 
         await runTransaction(db, async (transaction) => {
           const questionRef = doc(db, 'questions', questionId);
-          const userRef = doc(db, 'users', user.uid);
           const questionSnap = await transaction.get(questionRef);
-          const userSnap = await transaction.get(userRef);
 
           if (!questionSnap.exists()) throw new Error('질문을 찾을 수 없습니다.');
 
           const questionData = questionSnap.data();
           if (questionData.userId !== user.uid) throw new Error('질문 작성자만 해결 처리를 할 수 있습니다.');
+          if (questionData.status === 'resolved') throw new Error('이미 해결된 질문입니다.');
 
           const lockedBounty = getLockedBountyAmount(questionData);
-          const hasAnswers = (questionData.answerCount || 0) > 0;
-          const refundedBounty = lockedBounty > 0
-            ? (hasAnswers ? Math.floor(lockedBounty * AGORA_PARTIAL_REFUND_RATIO) : lockedBounty)
-            : 0;
-          const userData = userSnap.exists() ? userSnap.data() : {};
 
           transaction.set(questionRef, {
             status: 'resolved',
             resolutionType: 'self',
             resolutionReason: reason,
             updatedAt: serverTimestamp(),
-            bountyStatus: refundedBounty > 0
-              ? (refundedBounty === lockedBounty ? 'refunded' : 'split')
+            bountyStatus: lockedBounty > 0
+              ? 'forfeited'
               : (questionData.bountyStatus || 'none'),
-            refundedBountyAmount: refundedBounty,
+            forfeitedBountyAmount: lockedBounty,
+            refundedBountyAmount: 0,
           }, { merge: true });
-
-          transaction.set(userRef, {
-            crystals: (userData?.crystals || 0) + AGORA_SELF_RESOLVE_REWARD + refundedBounty,
-            ...calculateGrowthUpdates(userData, AGORA_SELF_RESOLVE_REWARD),
-          }, { merge: true });
-
-          recordCrystalTransaction(user.uid, {
-            amount: AGORA_SELF_RESOLVE_REWARD,
-            type: 'self_resolve',
-            description: '스스로 해결 보너스',
-            metadata: { questionId }
-          }, transaction, `self-resolve-${questionId}`);
-
-          if (refundedBounty > 0) {
-            recordCrystalTransaction(user.uid, {
-              amount: refundedBounty,
-              type: 'agora_bounty_refund',
-              description: hasAnswers ? '현상금 일부가 환불되었습니다' : '현상금이 전액 환불되었습니다',
-              metadata: { questionId, refundedBounty, hasAnswers }
-            }, transaction, `agora-bounty-refund-${questionId}`);
-          }
         });
       },
       onSuccess: (_, variables) => {

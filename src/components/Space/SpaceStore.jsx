@@ -1,7 +1,10 @@
-import React, { useState } from 'react'
+import React from 'react'
+import { createPortal } from 'react-dom'
 import { motion as Motion } from 'framer-motion'
-import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
-import { db } from '../../firebase'
+import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
+import { Gift, Search, Send, UserRound, X } from 'lucide-react'
+import { db, functions } from '../../firebase'
 import soundManager from '../../utils/SoundManager'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import {
@@ -19,9 +22,24 @@ import { buildAnswerProfileSnapshot, normalizeOwnedFrames, SOCIAL_STORE_ITEMS } 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RADAR_DURATION_MS = RADAR_DURATION_DAYS * DAY_MS
 
+function getProfileName(profile = {}, fallback = '탐사원') {
+  return profile.publicDisplayName || profile.studentName || profile.name || profile.displayName || fallback
+}
+
+function getProfileHint(profile = {}) {
+  return profile.publicTitle || profile.crewName || profile.email || ''
+}
+
 export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
   const [purchasing, setPurchasing] = React.useState(false)
   const [purchaseMessage, setPurchaseMessage] = React.useState(null)
+  const [recipients, setRecipients] = React.useState([])
+  const [giftItem, setGiftItem] = React.useState(null)
+  const [giftMode, setGiftMode] = React.useState('purchase')
+  const [giftRecipientSearch, setGiftRecipientSearch] = React.useState('')
+  const [giftRecipientId, setGiftRecipientId] = React.useState('')
+  const [giftBusy, setGiftBusy] = React.useState(false)
+  const [giftMessage, setGiftMessage] = React.useState(null)
 
   React.useEffect(() => {
     if (shouldScrollToBottom) {
@@ -33,6 +51,27 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
       }, 100);
     }
   }, [shouldScrollToBottom]);
+
+  React.useEffect(() => {
+    if (!user?.uid) {
+      setRecipients([])
+      return undefined
+    }
+
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const list = snapshot.docs
+        .map(docSnap => ({ uid: docSnap.id, ...docSnap.data() }))
+        .filter(profile => profile.uid !== user.uid && profile.role !== 'parent' && profile.role !== 'admin')
+        .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'))
+      setRecipients(list)
+      setGiftRecipientId(prev => (prev && list.some(item => item.uid === prev) ? prev : ''))
+    }, (error) => {
+      console.error('Store gift recipients error:', error)
+      setRecipients([])
+    })
+
+    return () => unsubscribe()
+  }, [user?.uid])
 
   const cryoCooldownRemainingMs = getStreakFreezePurchaseCooldownRemainingMs(userData)
   const cryoCooldownRemainingDays = cryoCooldownRemainingMs > 0 ? Math.ceil(cryoCooldownRemainingMs / DAY_MS) : 0
@@ -86,6 +125,138 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
     if (item.id === 'frame_nebula') return ownedFrames.includes('nebula')
     if (item.id === 'frame_solar') return ownedFrames.includes('solar')
     return false
+  }
+
+  const selectedGiftRecipient = React.useMemo(
+    () => recipients.find(recipient => recipient.uid === giftRecipientId) || null,
+    [recipients, giftRecipientId]
+  )
+
+  const filteredGiftRecipients = React.useMemo(() => {
+    const term = giftRecipientSearch.trim().toLowerCase()
+    if (!term || selectedGiftRecipient) return []
+    return recipients
+      .filter(recipient => {
+        const haystack = [
+          getProfileName(recipient),
+          getProfileHint(recipient),
+          recipient.email,
+          recipient.loginId,
+        ].filter(Boolean).join(' ').toLowerCase()
+        return haystack.includes(term)
+      })
+      .slice(0, 8)
+  }, [giftRecipientSearch, recipients, selectedGiftRecipient])
+
+  const getOwnedGiftUnitCount = (item) => {
+    if (item.id === 'cryo_core') return userData?.streakFreezeCount || 0
+    if (item.id === 'photon_shield') return Math.floor((userData?.shieldCharges || 0) / PHOTON_SHIELD_CHARGES_PER_PURCHASE)
+    if (item.id === 'hall_showcase_credit') return userData?.hallShowcaseCredits || 0
+    if (item.id === 'crew_creation_pass') return userData?.crewCreationPasses || 0
+    if (item.id === 'crew_join_pass') return userData?.crewJoinPasses || 0
+    return 0
+  }
+
+  const canGiftOwned = (item) => getOwnedGiftUnitCount(item) > 0
+
+  const getGiftUnitLabel = (item) => {
+    if (item.id === 'photon_shield') return `${PHOTON_SHIELD_CHARGES_PER_PURCHASE}회분`
+    if (item.id === 'radar') return `${RADAR_DURATION_DAYS}일 활성권`
+    return '1개'
+  }
+
+  const getRecipientGiftBlockReason = (item, recipient) => {
+    if (!item || !recipient) return ''
+    const recipientFrames = normalizeOwnedFrames(recipient)
+
+    if (item.id === 'radar' && isRadarActive(recipient)) {
+      return `${getProfileName(recipient)}님은 이미 ${item.name}를 활성화 중입니다.`
+    }
+    if (item.id === 'signature_unlock' && recipient.profileSignatureUnlocked) {
+      return `${getProfileName(recipient)}님은 이미 ${item.name}을 보유 중입니다.`
+    }
+    if (item.id === 'frame_nebula' && recipientFrames.includes('nebula')) {
+      return `${getProfileName(recipient)}님은 이미 ${item.name}을 보유 중입니다.`
+    }
+    if (item.id === 'frame_solar' && recipientFrames.includes('solar')) {
+      return `${getProfileName(recipient)}님은 이미 ${item.name}을 보유 중입니다.`
+    }
+    if (
+      item.id === 'photon_shield' &&
+      (recipient.shieldCharges || 0) + PHOTON_SHIELD_CHARGES_PER_PURCHASE > PHOTON_SHIELD_MAX_CHARGES
+    ) {
+      return `${getProfileName(recipient)}님은 광자 실드 최대 ${PHOTON_SHIELD_MAX_CHARGES}회를 초과합니다.`
+    }
+
+    return ''
+  }
+
+  const getGiftSubmitBlockReason = () => {
+    if (!giftItem) return '선물할 아이템을 선택해주세요.'
+    if (!selectedGiftRecipient) return '받는 친구를 선택해주세요.'
+    if (giftMode === 'owned' && !canGiftOwned(giftItem)) {
+      return `${giftItem.name} 보유분이 부족합니다.`
+    }
+    if (giftMode === 'purchase' && (userData?.crystals || 0) < giftItem.cost) {
+      return `광석이 부족합니다. (${giftItem.cost - (userData?.crystals || 0)}개 더 필요)`
+    }
+    return getRecipientGiftBlockReason(giftItem, selectedGiftRecipient)
+  }
+
+  const openGiftModal = (item) => {
+    const ownedAvailable = canGiftOwned(item)
+    setGiftItem(item)
+    setGiftMode(ownedAvailable ? 'owned' : 'purchase')
+    setGiftRecipientSearch('')
+    setGiftRecipientId('')
+    setGiftMessage(null)
+  }
+
+  const closeGiftModal = () => {
+    if (giftBusy) return
+    setGiftItem(null)
+    setGiftRecipientSearch('')
+    setGiftRecipientId('')
+    setGiftMessage(null)
+  }
+
+  const handleGiftStoreItem = async (event) => {
+    event.preventDefault()
+    const blockReason = getGiftSubmitBlockReason()
+    if (giftBusy || blockReason) {
+      if (blockReason) setGiftMessage({ type: 'error', text: blockReason })
+      return
+    }
+
+    setGiftBusy(true)
+    setGiftMessage(null)
+
+    try {
+      const giftStoreItem = httpsCallable(functions, 'giftStoreItem')
+      const result = await giftStoreItem({
+        itemId: giftItem.id,
+        recipientId: selectedGiftRecipient.uid,
+        mode: giftMode,
+      })
+      const recipientName = result.data?.recipientName || getProfileName(selectedGiftRecipient)
+      soundManager.playCrystal()
+      setPurchaseMessage({
+        type: 'success',
+        text: `${recipientName}님에게 ${giftItem.name} 선물 완료!`,
+      })
+      setGiftItem(null)
+      setGiftRecipientSearch('')
+      setGiftRecipientId('')
+      setTimeout(() => setPurchaseMessage(null), 3000)
+    } catch (err) {
+      console.error('Store gift failed:', err)
+      setGiftMessage({
+        type: 'error',
+        text: err.message || '선물 처리에 실패했습니다. 다시 시도해주세요.',
+      })
+    } finally {
+      setGiftBusy(false)
+    }
   }
 
   const handlePurchase = async (item) => {
@@ -338,6 +509,336 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
     }
   }
 
+  const renderGiftButton = (item) => (
+    <button
+      type="button"
+      className="space-nav-link"
+      disabled={giftBusy}
+      style={{
+        width: '100%',
+        marginTop: '0.65rem',
+        fontSize: '0.85rem',
+        padding: '0.7rem',
+        fontWeight: 700,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.4rem',
+        background: 'rgba(245, 158, 11, 0.12)',
+        border: '1px solid rgba(245, 158, 11, 0.38)',
+        color: '#fbbf24',
+        cursor: giftBusy ? 'not-allowed' : 'pointer',
+        opacity: giftBusy ? 0.7 : 1,
+      }}
+      onClick={() => openGiftModal(item)}
+    >
+      <Gift size={15} />
+      선물하기
+    </button>
+  )
+
+  const giftSubmitBlockReason = getGiftSubmitBlockReason()
+  const ownedGiftAvailable = giftItem ? canGiftOwned(giftItem) : false
+  const giftModal = giftItem ? createPortal(
+    <div
+      role="presentation"
+      onClick={closeGiftModal}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        background: 'rgba(2, 6, 23, 0.72)',
+        backdropFilter: 'blur(10px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+      }}
+    >
+      <Motion.form
+        onSubmit={handleGiftStoreItem}
+        className="glass-card"
+        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          width: 'min(620px, 100%)',
+          maxHeight: 'calc(100vh - 32px)',
+          overflowY: 'auto',
+          padding: '1.5rem',
+          border: '1px solid rgba(245, 158, 11, 0.42)',
+          background: 'rgba(15, 23, 42, 0.96)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.42)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#fbbf24', fontWeight: 800, marginBottom: '0.4rem' }}>
+              <Gift size={20} />
+              상점 아이템 선물
+            </div>
+            <h3 style={{ margin: 0, color: 'var(--text-bright)', fontSize: '1.35rem' }}>
+              {giftItem.icon} {giftItem.name}
+            </h3>
+            <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.5 }}>
+              보유분이 있으면 내 재고에서 보내고, 없으면 광석으로 구매해서 바로 친구에게 전달합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="선물 창 닫기"
+            onClick={closeGiftModal}
+            disabled={giftBusy}
+            style={{
+              width: 36,
+              height: 36,
+              minWidth: 36,
+              borderRadius: 10,
+              border: '1px solid rgba(148, 163, 184, 0.28)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'var(--text-muted)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: giftBusy ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', color: 'var(--text-bright)', fontWeight: 700, marginBottom: '0.5rem' }}>
+              받는 친구
+            </label>
+            {selectedGiftRecipient ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.75rem',
+                borderRadius: 12,
+                border: '1px solid rgba(0, 243, 255, 0.28)',
+                background: 'rgba(0, 243, 255, 0.08)',
+              }}>
+                <span style={{ color: 'var(--crystal-cyan)', display: 'inline-flex' }}><UserRound size={18} /></span>
+                <div style={{ flex: 1 }}>
+                  <strong style={{ color: 'var(--text-bright)' }}>{getProfileName(selectedGiftRecipient)}</strong>
+                  {getProfileHint(selectedGiftRecipient) && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2 }}>
+                      {getProfileHint(selectedGiftRecipient)}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGiftRecipientId('')
+                    setGiftRecipientSearch('')
+                    setGiftMessage(null)
+                  }}
+                  disabled={giftBusy}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-muted)',
+                    cursor: giftBusy ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            ) : (
+              <div style={{ position: 'relative' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.55rem',
+                  padding: '0.75rem',
+                  borderRadius: 12,
+                  border: '1px solid rgba(148, 163, 184, 0.24)',
+                  background: 'rgba(255,255,255,0.04)',
+                }}>
+                  <Search size={17} style={{ color: 'var(--text-muted)' }} />
+                  <input
+                    type="search"
+                    value={giftRecipientSearch}
+                    onChange={(event) => {
+                      setGiftRecipientSearch(event.target.value)
+                      setGiftMessage(null)
+                    }}
+                    placeholder="친구 이름, 칭호, 이메일 검색"
+                    disabled={giftBusy}
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      outline: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-bright)',
+                      fontSize: '0.95rem',
+                    }}
+                  />
+                </div>
+                {filteredGiftRecipients.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 0.4rem)',
+                    left: 0,
+                    right: 0,
+                    zIndex: 5,
+                    borderRadius: 12,
+                    border: '1px solid rgba(0, 243, 255, 0.22)',
+                    background: 'rgba(15, 23, 42, 0.98)',
+                    boxShadow: '0 16px 42px rgba(0,0,0,0.36)',
+                    overflow: 'hidden',
+                  }}>
+                    {filteredGiftRecipients.map(recipient => (
+                      <button
+                        key={recipient.uid}
+                        type="button"
+                        onClick={() => {
+                          setGiftRecipientId(recipient.uid)
+                          setGiftRecipientSearch('')
+                          setGiftMessage(null)
+                        }}
+                        style={{
+                          width: '100%',
+                          border: 'none',
+                          borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
+                          background: 'transparent',
+                          color: 'var(--text-bright)',
+                          padding: '0.75rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <UserRound size={16} style={{ color: 'var(--crystal-cyan)' }} />
+                        <span>
+                          <strong>{getProfileName(recipient)}</strong>
+                          {getProfileHint(recipient) && (
+                            <small style={{ display: 'block', color: 'var(--text-muted)', marginTop: 2 }}>
+                              {getProfileHint(recipient)}
+                            </small>
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label style={{ display: 'block', color: 'var(--text-bright)', fontWeight: 700, marginBottom: '0.5rem' }}>
+              선물 방식
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
+              <button
+                type="button"
+                disabled={!ownedGiftAvailable || giftBusy}
+                onClick={() => {
+                  setGiftMode('owned')
+                  setGiftMessage(null)
+                }}
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: 12,
+                  border: giftMode === 'owned' ? '1px solid #fbbf24' : '1px solid rgba(148, 163, 184, 0.22)',
+                  background: giftMode === 'owned' ? 'rgba(245, 158, 11, 0.16)' : 'rgba(255,255,255,0.04)',
+                  color: ownedGiftAvailable ? 'var(--text-bright)' : 'rgba(148, 163, 184, 0.62)',
+                  cursor: ownedGiftAvailable && !giftBusy ? 'pointer' : 'not-allowed',
+                  textAlign: 'left',
+                }}
+              >
+                <strong>보유분 선물</strong>
+                <span style={{ display: 'block', marginTop: 4, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  보유 가능 수량: {getOwnedGiftUnitCount(giftItem)} · {getGiftUnitLabel(giftItem)}
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={giftBusy}
+                onClick={() => {
+                  setGiftMode('purchase')
+                  setGiftMessage(null)
+                }}
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: 12,
+                  border: giftMode === 'purchase' ? '1px solid var(--crystal-cyan)' : '1px solid rgba(148, 163, 184, 0.22)',
+                  background: giftMode === 'purchase' ? 'rgba(0, 243, 255, 0.12)' : 'rgba(255,255,255,0.04)',
+                  color: 'var(--text-bright)',
+                  cursor: giftBusy ? 'not-allowed' : 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <strong>구매해서 선물</strong>
+                <span style={{ display: 'block', marginTop: 4, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  비용: {giftItem.cost}광석 · 내 보유 {userData?.crystals || 0}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {giftSubmitBlockReason && selectedGiftRecipient && (
+            <div style={{
+              padding: '0.75rem 0.9rem',
+              borderRadius: 12,
+              border: '1px solid rgba(248, 113, 113, 0.32)',
+              background: 'rgba(248, 113, 113, 0.1)',
+              color: '#fca5a5',
+              fontSize: '0.85rem',
+            }}>
+              {giftSubmitBlockReason}
+            </div>
+          )}
+
+          {giftMessage && (
+            <div style={{
+              padding: '0.75rem 0.9rem',
+              borderRadius: 12,
+              border: `1px solid ${giftMessage.type === 'success' ? 'rgba(74, 222, 128, 0.32)' : 'rgba(248, 113, 113, 0.32)'}`,
+              background: giftMessage.type === 'success' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)',
+              color: giftMessage.type === 'success' ? 'var(--planet-green)' : '#fca5a5',
+              fontSize: '0.85rem',
+            }}>
+              {giftMessage.text}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="space-nav-link"
+            disabled={giftBusy || !!giftSubmitBlockReason}
+            style={{
+              width: '100%',
+              padding: '0.85rem',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem',
+              background: giftBusy || giftSubmitBlockReason ? 'rgba(107, 114, 128, 0.18)' : 'rgba(245, 158, 11, 0.18)',
+              border: giftBusy || giftSubmitBlockReason ? '1px solid rgba(107, 114, 128, 0.32)' : '1px solid rgba(245, 158, 11, 0.48)',
+              color: giftBusy || giftSubmitBlockReason ? 'rgba(148, 163, 184, 0.86)' : '#fbbf24',
+              cursor: giftBusy || giftSubmitBlockReason ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Send size={16} />
+            {giftBusy ? '선물 보내는 중...' : giftMode === 'owned' ? '보유분 선물 보내기' : `구매해서 선물하기 (${giftItem.cost}광석)`}
+          </button>
+        </div>
+      </Motion.form>
+    </div>,
+    document.body
+  ) : null
+
   return (
     <div className="fade-in">
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
@@ -381,6 +882,8 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
           {purchaseMessage.text}
         </Motion.div>
       )}
+
+      {giftModal}
 
       {/* ⏳ 기간제 탐사 장비 */}
       <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem', marginTop: '3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -442,6 +945,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                     ? '구매 중...' 
                     : `구매하기 (${item.cost} 광석)`}
             </button>
+            {renderGiftButton(item)}
           </div>
         ))}
       </div>
@@ -548,6 +1052,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                 {radarRemainingDays > 0 ? `활성 중, 약 ${radarRemainingDays}일 남음` : '활성 중'}
               </div>
             )}
+            {renderGiftButton(item)}
           </div>
         ))}
       </div>
@@ -593,6 +1098,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             >
               {isOwned ? '이미 보유 중' : '구매하기'}
             </button>
+            {renderGiftButton(item)}
           </div>
             )
           })()
@@ -627,6 +1133,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             >
               구매하기
             </button>
+            {renderGiftButton(item)}
           </div>
         ))}
       </div>
@@ -660,6 +1167,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             >
               구매하기
             </button>
+            {renderGiftButton(item)}
           </div>
         ))}
       </div>

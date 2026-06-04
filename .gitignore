@@ -27,3 +27,4 @@ dist-ssr
 service-account.json
 scratch/
 .firebase/
+out/
