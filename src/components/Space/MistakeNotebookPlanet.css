@@ -25,7 +25,8 @@
 .mn-deck-btn,
 .mn-create-card-btn,
 .mn-rating-btn,
-.mn-upload-form button,
+.mn-upload-tab-panel > button,
+.mn-ai-actions button,
 .mn-focus-back-btn,
 .mn-exit-btn,
 .mn-view-links button,
@@ -40,7 +41,8 @@
 .mn-deck-btn:hover,
 .mn-create-card-btn:hover,
 .mn-rating-btn:hover,
-.mn-upload-form button:hover,
+.mn-upload-tab-panel > button:hover,
+.mn-ai-actions button:hover,
 .mn-focus-back-btn:hover,
 .mn-exit-btn:hover,
 .mn-view-links button:hover,
@@ -1044,6 +1046,10 @@
   gap: 1rem;
 }
 
+.mn-upload-preview-stack {
+  min-width: 0;
+}
+
 .mn-dropzone {
   min-height: 470px;
   border: 1px dashed rgba(94, 234, 212, 0.44);
@@ -1090,6 +1096,46 @@
   padding: 1rem;
   display: grid;
   gap: 0.8rem;
+  align-content: start;
+}
+
+.mn-upload-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.5);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 0.35rem;
+}
+
+.mn-upload-tabs button {
+  min-width: 0;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255,255,255,0.68);
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  line-height: 1.25;
+  white-space: normal;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.mn-upload-tabs button.active {
+  background: rgba(94, 234, 212, 0.14);
+  border-color: rgba(94, 234, 212, 0.32);
+  color: #ccfbf1;
+}
+
+.mn-upload-tab-panel {
+  display: grid;
+  gap: 0.8rem;
 }
 
 .mn-upload-form h2 {
@@ -1120,9 +1166,11 @@
   resize: vertical;
 }
 
-.mn-upload-form button {
+.mn-upload-tab-panel > button,
+.mn-ai-actions button {
   min-height: 54px;
   border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
   background: linear-gradient(135deg, #14b8a6, #60a5fa);
   color: #06121f;
   font-weight: 900;
@@ -1130,9 +1178,32 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  cursor: pointer;
 }
 
-.mn-upload-form button:disabled {
+.mn-upload-tab-panel > button.secondary,
+.mn-ai-actions button.secondary {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.86);
+  border-color: rgba(94, 234, 212, 0.24);
+}
+
+.mn-ai-json-input {
+  min-height: 164px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.mn-ai-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 0.65rem;
+}
+
+.mn-upload-tabs button:disabled,
+.mn-upload-tab-panel > button:disabled,
+.mn-ai-actions button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -1177,6 +1248,10 @@
   }
 
   .mn-upload-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .mn-ai-actions {
     grid-template-columns: 1fr;
   }
 
@@ -1252,6 +1327,12 @@
 
   .mn-create-card-btn {
     min-height: 52px;
+  }
+
+  .mn-upload-tabs button {
+    font-size: 0.82rem;
+    gap: 0.3rem;
+    padding: 0.45rem 0.35rem;
   }
 
   .mn-rail-divider {

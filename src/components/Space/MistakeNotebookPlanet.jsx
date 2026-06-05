@@ -7,12 +7,15 @@ import {
   CalendarClock,
   Check,
   Clock,
+  Clipboard,
   Edit3,
+  FileJson,
   Flame,
   ImagePlus,
   Layers,
   RotateCcw,
   Save,
+  Send,
   Sparkles,
   Trash2,
   Upload
@@ -20,6 +23,7 @@ import {
 import { useAuth } from '../../hooks/useAuth'
 import {
   useArchiveStudentMistakeCard,
+  useCreateMistakeCard,
   useReviewMistakeCard,
   useStudentMistakeNotebook,
   useSubmitMistakeUpload,
@@ -28,6 +32,10 @@ import {
 import StarField from './StarField'
 import soundManager from '../../utils/SoundManager'
 import { normalizeEscapedNewlines, parseInlineFormatting } from '../../utils/formatUtils'
+import {
+  buildMistakeNotebookAiPrompt,
+  parseMistakeNotebookAiCardJson
+} from '../../utils/mistakeNotebookAi'
 import '../../styles/space-theme.css'
 import './MistakeNotebookPlanet.css'
 
@@ -191,13 +199,26 @@ function CardFrontVisual({ card, compact = false }) {
 function UploadPanel({ user, userData }) {
   const [file, setFile] = useState(null)
   const [note, setNote] = useState('')
+  const [activeTab, setActiveTab] = useState('admin')
+  const [aiJson, setAiJson] = useState('')
   const [message, setMessage] = useState('')
   const submitUpload = useSubmitMistakeUpload()
+  const createCard = useCreateMistakeCard()
 
   const previewUrl = useMemo(() => {
     if (!file) return ''
     return URL.createObjectURL(file)
   }, [file])
+
+  const promptUpload = useMemo(() => ({
+    userName: userData?.studentName || userData?.name || user?.displayName || user?.email || '학생',
+    title: file?.name || '',
+    note,
+    imageUrl: file ? `업로드 전 로컬 이미지: ${file.name}` : '',
+    questionText: '',
+    sourceOptions: [],
+    tags: []
+  }), [file, note, user, userData])
 
   useEffect(() => {
     return () => {
@@ -219,47 +240,154 @@ function UploadPanel({ user, userData }) {
     }
   }
 
+  const handleCopyAiPrompt = async () => {
+    setMessage('')
+    if (!file) {
+      setMessage('먼저 문제 이미지를 선택해 주세요.')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(buildMistakeNotebookAiPrompt(promptUpload))
+      setMessage('AI 프롬프트를 복사했습니다. 같은 이미지를 AI에 첨부하고 붙여넣어 주세요.')
+    } catch {
+      setMessage('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.')
+    }
+  }
+
+  const handlePublishWithAi = async () => {
+    setMessage('')
+    try {
+      if (!file) throw new Error('먼저 문제 이미지를 선택해 주세요.')
+      const form = parseMistakeNotebookAiCardJson(aiJson)
+      const upload = await submitUpload.mutateAsync({ file, user, userData, title: form.questionTitle, note, tags: form.tags })
+      await createCard.mutateAsync({ upload, form })
+      setFile(null)
+      setNote('')
+      setAiJson('')
+      setMessage('AI 프롬프트 결과로 카드를 바로 발행했습니다. 전체 카드에서 확인할 수 있습니다.')
+      soundManager.playCrystal()
+    } catch (error) {
+      setMessage(error?.message || '카드 발행에 실패했습니다.')
+    }
+  }
+
+  const isBusy = submitUpload.isPending || createCard.isPending
+
   return (
-    <form onSubmit={handleSubmit} className="mn-upload-panel">
-      <label className="mn-dropzone">
-        {previewUrl ? (
-          <img src={previewUrl} alt="업로드 미리보기" />
+    <div className="mn-upload-panel">
+      <div className="mn-upload-preview-stack">
+        <label className="mn-dropzone">
+          {previewUrl ? (
+            <img src={previewUrl} alt="업로드 미리보기" />
+          ) : (
+            <div className="mn-dropzone-empty">
+              <ImagePlus size={44} />
+              <strong>풀이 이미지 업로드</strong>
+              <span>문제와 풀이 흔적이 보이게 올려 주세요.</span>
+            </div>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] || null)
+              setMessage('')
+            }}
+          />
+        </label>
+      </div>
+
+      <section className="mn-upload-form">
+        <div className="mn-upload-tabs" role="tablist" aria-label="카드 제작 방식">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'admin'}
+            className={activeTab === 'admin' ? 'active' : ''}
+            onClick={() => setActiveTab('admin')}
+          >
+            <Upload size={16} />
+            운영툴로 보내기
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'ai'}
+            className={activeTab === 'ai' ? 'active' : ''}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Sparkles size={16} />
+            AI 프롬프트로 제작
+          </button>
+        </div>
+
+        {activeTab === 'admin' ? (
+          <form onSubmit={handleSubmit} className="mn-upload-tab-panel">
+            <div>
+              <h2>카드 제작 요청</h2>
+              <p>이미지와 메모는 운영툴에서 카드 제작 참고 자료로 사용됩니다.</p>
+            </div>
+            <textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="카드 제작 메모(선택): 내가 쓴 답, 헷갈린 조건, 궁금한 부분"
+              rows={7}
+            />
+            <button type="submit" disabled={!file || isBusy}>
+              <Upload size={17} />
+              {submitUpload.isPending ? '전송 중...' : '운영툴로 보내기'}
+            </button>
+          </form>
         ) : (
-          <div className="mn-dropzone-empty">
-            <ImagePlus size={44} />
-            <strong>풀이 이미지 업로드</strong>
-            <span>문제와 풀이 흔적이 보이게 올려 주세요.</span>
+          <div className="mn-upload-tab-panel">
+            <div>
+              <h2>AI 프롬프트로 제작</h2>
+              <p>프롬프트를 복사해 이미지와 함께 AI에 묻고, 받은 JSON을 붙여넣으면 바로 발행됩니다.</p>
+            </div>
+            <textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="AI에게 같이 전달할 메모(선택): 내가 쓴 답, 헷갈린 조건, 궁금한 부분"
+              rows={4}
+            />
+            <button type="button" className="secondary" onClick={handleCopyAiPrompt} disabled={!file || isBusy}>
+              <Clipboard size={17} />
+              프롬프트 복사
+            </button>
+            <textarea
+              className="mn-ai-json-input"
+              value={aiJson}
+              onChange={(event) => setAiJson(event.target.value)}
+              placeholder={'AI가 반환한 ```json ... ``` 또는 순수 JSON을 여기에 붙여넣기'}
+              rows={8}
+            />
+            <div className="mn-ai-actions">
+              <button type="button" className="secondary" onClick={() => {
+                try {
+                  parseMistakeNotebookAiCardJson(aiJson)
+                  setMessage('AI JSON을 확인했습니다. 발행하기를 누르면 카드로 저장됩니다.')
+                } catch (error) {
+                  setMessage(error?.message || 'AI JSON을 해석하지 못했습니다.')
+                }
+              }} disabled={!aiJson.trim() || isBusy}>
+                <FileJson size={17} />
+                JSON 확인
+              </button>
+              <button type="button" onClick={handlePublishWithAi} disabled={!file || !aiJson.trim() || isBusy}>
+                <Send size={17} />
+                {isBusy ? '발행 중...' : '발행하기'}
+              </button>
+            </div>
           </div>
         )}
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(event) => setFile(event.target.files?.[0] || null)}
-        />
-      </label>
 
-      <div className="mn-upload-form">
-        <div>
-          <h2>카드 제작 요청</h2>
-          <p>이미지와 메모는 운영툴에서 카드 제작 참고 자료로 사용됩니다.</p>
-        </div>
-        <textarea
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          placeholder="카드 제작 메모(선택): 내가 쓴 답, 헷갈린 조건, 궁금한 부분"
-          rows={7}
-        />
-        <button type="submit" disabled={!file || submitUpload.isPending}>
-          <Upload size={17} />
-          {submitUpload.isPending ? '전송 중...' : '운영툴로 보내기'}
-        </button>
         {message && (
-          <div className={`mn-upload-message ${message.includes('실패') ? 'error' : 'ok'}`}>
+          <div className={`mn-upload-message ${message.includes('실패') || message.includes('먼저') || message.includes('못했습니다') || message.includes('비어') || message.includes('발행 불가') ? 'error' : 'ok'}`}>
             {message}
           </div>
         )}
-      </div>
-    </form>
+      </section>
+    </div>
   )
 }
 

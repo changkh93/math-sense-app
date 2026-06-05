@@ -408,7 +408,26 @@ service cloud.firestore {
         isAdmin() ||
         isLinkedParentOf(resource.data.userId)
       );
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuth() &&
+        resource.data.userId == request.auth.uid &&
+        resource.data.status == 'pending' &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.status == 'card_created' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'cardId',
+          'reviewedBy',
+          'reviewedAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.cardId is string &&
+        request.resource.data.cardId.size() > 0 &&
+        request.resource.data.reviewedBy == request.auth.uid &&
+        request.resource.data.reviewedAt == request.time &&
+        request.resource.data.updatedAt == request.time
+      );
+      allow delete: if isAdmin();
     }
 
     // Generated flash cards. Students can read their own active cards; admins
@@ -423,7 +442,7 @@ service cloud.firestore {
         isAuth() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.createdBy == request.auth.uid &&
-        request.resource.data.source in ['dark_matter_quiz', 'quiz'] &&
+        request.resource.data.source in ['dark_matter_quiz', 'quiz', 'student_upload'] &&
         request.resource.data.status == 'active' &&
         request.resource.data.createdAt == request.time &&
         request.resource.data.updatedAt == request.time &&
