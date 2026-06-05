@@ -391,32 +391,31 @@ function UploadPanel({ user, userData }) {
   )
 }
 
-function StudyCard({ card, revealed, onReveal }) {
+function StudyCard({ card, revealed, onToggle }) {
   const handleKeyDown = (event) => {
-    if (revealed) return
     if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault()
-      onReveal()
+      event.stopPropagation()
+      event.nativeEvent?.stopImmediatePropagation?.()
+      onToggle()
     }
   }
 
   return (
     <div
       role="button"
-      tabIndex={revealed ? -1 : 0}
+      tabIndex={0}
       className={`mn-study-card ${revealed ? 'is-revealed' : ''}`}
-      onClick={() => {
-        if (!revealed) onReveal()
-      }}
+      onClick={onToggle}
       onKeyDown={handleKeyDown}
-      aria-label={revealed ? '정답과 해설' : '클릭하여 정답 보기'}
+      aria-label={revealed ? '클릭하여 문제 보기' : '클릭하여 정답 보기'}
     >
       <div className="mn-card-inner">
         <div className="mn-card-face mn-card-front">
           <div className="mn-card-image-shell">
             <CardFrontVisual card={card} />
           </div>
-          <div className="mn-flip-cue" aria-hidden="true">
+          <div className="mn-flip-cue mn-front-flip-cue" aria-hidden="true">
             <RotateCcw size={18} />
             <span>클릭하여 정답 보기</span>
           </div>
@@ -435,6 +434,10 @@ function StudyCard({ card, revealed, onReveal }) {
                 {card.explanation || '해설이 아직 없습니다.'}
               </FormattedMarkdown>
             </div>
+          </div>
+          <div className="mn-flip-cue mn-back-flip-cue" aria-hidden="true">
+            <RotateCcw size={18} />
+            <span>클릭하여 문제 보기</span>
           </div>
         </div>
       </div>
@@ -503,7 +506,7 @@ function StudyCardSession({ card, done, total, progress, onReview, reviewing }) 
 
       if (event.key === ' ' || event.key === 'Enter') {
         event.preventDefault()
-        if (!revealed) setRevealed(true)
+        setRevealed(prev => !prev)
         return
       }
       if (!revealed) return
@@ -542,7 +545,7 @@ function StudyCardSession({ card, done, total, progress, onReview, reviewing }) 
           exit={{ opacity: 0, x: -34, scale: 0.98 }}
           transition={{ duration: 0.28 }}
         >
-          <StudyCard card={card} revealed={revealed} onReveal={() => setRevealed(true)} />
+          <StudyCard card={card} revealed={revealed} onToggle={() => setRevealed(prev => !prev)} />
         </Motion.div>
       </AnimatePresence>
 

@@ -655,6 +655,10 @@
   color: #fde68a;
 }
 
+.mn-back-flip-cue {
+  opacity: 0;
+}
+
 .mn-study-card:hover .mn-flip-cue,
 .mn-study-card:focus-visible .mn-flip-cue {
   opacity: 1;
@@ -662,8 +666,17 @@
   border-color: rgba(250, 204, 21, 0.42);
 }
 
-.mn-study-card.is-revealed .mn-flip-cue {
+.mn-study-card.is-revealed .mn-front-flip-cue {
   opacity: 0;
+}
+
+.mn-study-card.is-revealed .mn-back-flip-cue {
+  opacity: 0.68;
+}
+
+.mn-study-card.is-revealed:hover .mn-back-flip-cue,
+.mn-study-card.is-revealed:focus-visible .mn-back-flip-cue {
+  opacity: 1;
 }
 
 .mn-card-back {
