@@ -73,10 +73,23 @@ ${options}
 \`\`\``
 }
 
+function parseJsonWithLatexFallback(cleanJson) {
+  try {
+    return JSON.parse(cleanJson)
+  } catch (error) {
+    const latexSafeJson = cleanJson.replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
+    try {
+      return JSON.parse(latexSafeJson)
+    } catch {
+      throw error
+    }
+  }
+}
+
 export function parseMistakeNotebookAiCardJson(rawText) {
   const jsonMatch = String(rawText || '').match(/```(?:json)?\s*([\s\S]*?)\s*```/)
   const cleanJson = jsonMatch ? jsonMatch[1] : String(rawText || '').trim()
-  const parsed = JSON.parse(cleanJson)
+  const parsed = parseJsonWithLatexFallback(cleanJson)
   if (parsed.canPublish === false) {
     throw new Error(parsed.needsReviewReason || 'AI가 발행 불가로 판단했습니다.')
   }
