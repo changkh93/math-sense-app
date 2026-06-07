@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion as Motion, AnimatePresence } from 'framer-motion'
 import './QuizView.css'
 import 'katex/dist/katex.min.css'
-import { InlineMath } from 'react-katex'
 import { createParticleBurst, shakeScreen } from './Space/ParticleEffects'
 import soundManager from '../utils/SoundManager'
-import { parseInlineFormatting, sanitizeLaTeX } from '../utils/formatUtils'
+import { parseInlineFormatting } from '../utils/formatUtils'
 import QuestionModal from './QuestionModal'
 
 export default function QuizView({ region, quizData, onExit, onComplete }) {
@@ -21,6 +20,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   const [floatingMarkers, setFloatingMarkers] = useState([]) // { id, text, type, x, y }
   const [originalTotal, setOriginalTotal] = useState(0)
   const [allSessionQuestions, setAllSessionQuestions] = useState([]) // 최초 20문항 저장
+  const [deferredQuestionIds, setDeferredQuestionIds] = useState(new Set())
+  const [isDeferredRound, setIsDeferredRound] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false)
   const [modalContext, setModalContext] = useState(null)
@@ -46,6 +47,11 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       setOriginalTotal(selected.length);
       initializedUnitId.current = quizData.unitId;
       setCurrentIdx(0); // Reset index on unit change
+      setDeferredQuestionIds(new Set());
+      setIsDeferredRound(false);
+      setUserAnswers({});
+      setIsResultMode(false);
+      setReSolveMode(false);
     }
   }, [quizData])
 
@@ -55,6 +61,67 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
   };
 
   const currentQuestion = currentQuestions[currentIdx]
+
+  const getPendingDeferredQuestions = (deferredIds = deferredQuestionIds, answers = userAnswers) => (
+    allSessionQuestions.filter(q => deferredIds.has(q.id) && !answers[q.id])
+  )
+
+  const moveToNextDeferredOrResult = (nextDeferredIds, nextUserAnswers, answeredQuestionId, isCorrect, addMarker) => {
+    const remainingDeferredIds = new Set(nextDeferredIds)
+    if (answeredQuestionId) {
+      remainingDeferredIds.delete(answeredQuestionId)
+    }
+    setDeferredQuestionIds(remainingDeferredIds)
+
+    if (currentIdx < currentQuestions.length - 1) {
+      setCurrentIdx(prev => prev + 1)
+      return
+    }
+
+    const pendingDeferredQuestions = !reSolveMode && !isDeferredRound
+      ? getPendingDeferredQuestions(remainingDeferredIds, nextUserAnswers)
+      : []
+
+    if (pendingDeferredQuestions.length > 0) {
+      setCurrentQuestions(pendingDeferredQuestions)
+      setCurrentIdx(0)
+      setIsDeferredRound(true)
+      return
+    }
+
+    if (isCorrect) {
+      const totalCorrectSoFar = allSessionQuestions.filter(q => nextUserAnswers[q.id]?.isCorrect).length
+      if (totalCorrectSoFar === originalTotal) {
+        setTimeout(() => addMarker?.('+10 PERFECT!', 'gain', 60, -60), 200)
+      }
+    }
+    setIsDeferredRound(false)
+    setIsResultMode(true)
+  }
+
+  const handleMarkAndSkip = () => {
+    if (!currentQuestion || isRebooting || showFeedback || reSolveMode || isDeferredRound) return
+
+    soundManager.playClick()
+    const nextDeferredIds = new Set(deferredQuestionIds)
+    nextDeferredIds.add(currentQuestion.id)
+    setDeferredQuestionIds(nextDeferredIds)
+    setSelectedMultiOptions(new Set())
+
+    if (currentIdx < currentQuestions.length - 1) {
+      setCurrentIdx(prev => prev + 1)
+      return
+    }
+
+    const pendingDeferredQuestions = getPendingDeferredQuestions(nextDeferredIds, userAnswers)
+    if (pendingDeferredQuestions.length > 0) {
+      setCurrentQuestions(pendingDeferredQuestions)
+      setCurrentIdx(0)
+      setIsDeferredRound(true)
+    } else {
+      setIsResultMode(true)
+    }
+  }
 
   // 멀티 정답 여부 확인
   const getCorrectCount = (question) => question?.options?.filter(o => o.isCorrect).length || 0
@@ -130,16 +197,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         if (isQuestionModalOpen) return;
         setShowFeedback(null)
         setSelectedMultiOptions(new Set())
-        if (currentIdx < currentQuestions.length - 1) {
-          setCurrentIdx(prev => prev + 1)
-        } else {
-          const newUserAnswers = { ...userAnswers, [currentQuestion.id]: answerRecord }
-          const totalCorrectSoFar = allSessionQuestions.filter(q => newUserAnswers[q.id]?.isCorrect || q.id === currentQuestion.id).length
-          if (totalCorrectSoFar === originalTotal) {
-            setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
-          }
-          setIsResultMode(true)
-        }
+        const newUserAnswers = { ...userAnswers, [currentQuestion.id]: answerRecord }
+        moveToNextDeferredOrResult(deferredQuestionIds, newUserAnswers, currentQuestion.id, isCorrect, addMarker)
       }, 800)
     } else {
       soundManager.playWrong()
@@ -158,11 +217,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         setIsRebooting(false)
         setShowFeedback(null)
         setSelectedMultiOptions(new Set())
-        if (currentIdx < currentQuestions.length - 1) {
-          setCurrentIdx(prev => prev + 1)
-        } else {
-          setIsResultMode(true)
-        }
+        const newUserAnswers = { ...userAnswers, [currentQuestion.id]: answerRecord }
+        moveToNextDeferredOrResult(deferredQuestionIds, newUserAnswers, currentQuestion.id, isCorrect, addMarker)
       }, 3000)
     }
 
@@ -217,16 +273,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         if (isQuestionModalOpen) return;
         
         setShowFeedback(null)
-        if (currentIdx < currentQuestions.length - 1) {
-          setCurrentIdx(prev => prev + 1)
-        } else {
-          // 마지막 문제이고 전체 정답률 100% 인 경우 보너스 알림
-          const totalCorrectSoFar = allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect || q.id === currentQuestion.id).length
-          if (totalCorrectSoFar === originalTotal) {
-            setTimeout(() => addMarker('+10 PERFECT!', 'gain', 60, -60), 200)
-          }
-          setIsResultMode(true)
-        }
+        const newUserAnswers = { ...userAnswers, [currentQuestion.id]: option }
+        moveToNextDeferredOrResult(deferredQuestionIds, newUserAnswers, currentQuestion.id, isCorrect, addMarker)
       }, 800)
 
     } else {
@@ -248,11 +296,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
 
         setIsRebooting(false)
         setShowFeedback(null)
-        if (currentIdx < currentQuestions.length - 1) {
-          setCurrentIdx(prev => prev + 1)
-        } else {
-          setIsResultMode(true)
-        }
+        const newUserAnswers = { ...userAnswers, [currentQuestion.id]: option }
+        moveToNextDeferredOrResult(deferredQuestionIds, newUserAnswers, currentQuestion.id, isCorrect, addMarker)
       }, 3000)
     }
 
@@ -283,17 +328,18 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       setTimeout(() => {
         setIsRebooting(false);
         setShowFeedback(null);
-        if (currentIdx < currentQuestions.length - 1) {
-          setCurrentIdx(prev => prev + 1);
-        } else {
-          setIsResultMode(true);
-        }
+        moveToNextDeferredOrResult(
+          deferredQuestionIds,
+          userAnswers,
+          currentQuestion?.id,
+          userAnswers[currentQuestion?.id]?.isCorrect === true
+        );
       }, delay);
     }
   };
 
   const handleReSolveWrong = () => {
-    const wrongQuestions = currentQuestions.filter(q => !userAnswers[q.id]?.isCorrect).map(q => ({
+    const wrongQuestions = allSessionQuestions.filter(q => !userAnswers[q.id]?.isCorrect).map(q => ({
       ...q,
       shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
     }))
@@ -307,6 +353,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
     setCurrentIdx(0)
     setIsResultMode(false)
     setReSolveMode(true)
+    setIsDeferredRound(false)
+    setDeferredQuestionIds(new Set())
   }
 
   const handleFinish = () => {
@@ -327,7 +375,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       total: 100, 
       correctCount, 
       totalCount: originalTotal, 
-      questions: currentQuestions,
+      questions: allSessionQuestions,
       crystalsEarned,
       isPerfect: canGetPerfectBonus
     })
@@ -375,7 +423,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         </div>
 
         <div className="result-list">
-          {currentQuestions.map((q, idx) => {
+          {(reSolveMode ? currentQuestions : allSessionQuestions).map((q, idx) => {
             const isCorrect = userAnswers[q.id]?.isCorrect
             return (
               <div key={q.id} className={`result-item ${isCorrect ? 'correct' : 'wrong'}`}>
@@ -408,7 +456,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       
       <div className="quiz-header">
         <span className="region-badge" style={{ backgroundColor: region?.color || '#eee' }}>
-          {quizData?.title} {reSolveMode && ' (오답 재도전)'}
+          {quizData?.title} {reSolveMode && ' (오답 재도전)'} {isDeferredRound && ' (표시 문제)'}
         </span>
         <div className="progress-bar">
           <div 
@@ -416,7 +464,10 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
             style={{ width: `${((currentIdx + 1) / currentQuestions.length) * 100}%` }}
           ></div>
         </div>
-        <span className="progress-text">{currentIdx + 1} / {currentQuestions.length}</span>
+        <span className="progress-text">
+          {currentIdx + 1} / {currentQuestions.length}
+          {!reSolveMode && !isDeferredRound && deferredQuestionIds.size > 0 && ` · 표시 ${deferredQuestionIds.size}`}
+        </span>
       </div>
 
       <div className="question-card">
@@ -523,12 +574,30 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
             </button>
           </div>
         )}
+
+        {!showFeedback && !isRebooting && !reSolveMode && !isDeferredRound && (
+          <div className="quiz-secondary-actions">
+            <button
+              type="button"
+              className="mark-skip-btn"
+              onClick={handleMarkAndSkip}
+            >
+              표시하고 넘기기
+            </button>
+          </div>
+        )}
+
+        {isDeferredRound && !showFeedback && !isRebooting && (
+          <div className="deferred-round-note">
+            표시하고 넘긴 문제입니다. 답을 골라야 결과를 확인할 수 있어요.
+          </div>
+        )}
       </div>
 
       {/* 시스템 리부트 오버레이 */}
       <AnimatePresence>
         {isRebooting && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -560,14 +629,14 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
             <div style={{ color: 'white', opacity: 0.8 }}>
               에너지 손실로 인한 시스템 복구 중... (3s)
             </div>
-          </motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
 
       {/* 부유 마커 애니메이션 */}
       <AnimatePresence>
         {floatingMarkers.map(marker => (
-          <motion.div
+          <Motion.div
             key={marker.id}
             initial={{ 
               opacity: 0, 
@@ -606,13 +675,13 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
             <span style={{ color: marker.type === 'gain' ? '#50C878' : '#ff4d4d' }}>
               {marker.text}
             </span>
-          </motion.div>
+          </Motion.div>
         ))}
       </AnimatePresence>
 
       {/* Interactive Support Tray (FAB) */}
       {!isResultMode && (
-        <motion.div 
+        <Motion.div
           className="support-tray-wrapper"
           initial={{ x: 100, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
@@ -631,7 +700,7 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         >
           <AnimatePresence>
             {isTrayExpanded && (
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
@@ -660,11 +729,11 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
                   <span style={{ fontSize: '1.2rem' }}>🙋</span>
                   <span>선생님 질문</span>
                 </button>
-              </motion.div>
+              </Motion.div>
             )}
           </AnimatePresence>
 
-          <motion.button
+          <Motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsTrayExpanded(!isTrayExpanded)}
@@ -685,8 +754,8 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
             }}
           >
             {isTrayExpanded ? '✕' : '✨'}
-          </motion.button>
-        </motion.div>
+          </Motion.button>
+        </Motion.div>
       )}
 
       <QuestionModal 

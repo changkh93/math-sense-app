@@ -171,6 +171,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [showRadarScan, setShowRadarScan] = useState(false)
   const [potentialOre] = useState(0)
   const [reviewMarks, setReviewMarks] = useState(new Set()) // 재검토 마크 문항 ID
+  const [deferredQuestionIds, setDeferredQuestionIds] = useState(new Set())
+  const [isDeferredRound, setIsDeferredRound] = useState(false)
   
   // Interactive FAB (Support Tray) state
   const [isTrayExpanded, setIsTrayExpanded] = useState(false)
@@ -227,6 +229,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           let targetRetryCount = savedRetryCount
           let targetFirstPassScore = null
           let targetReviewMarks = []
+          let targetDeferredQuestionIds = []
+          let targetIsDeferredRound = false
 
           let targetEverWrong = []
 
@@ -246,6 +250,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 targetFirstPassScore = session.firstPassScore !== undefined ? session.firstPassScore : null
                 targetEverWrong = session.everWrong || []
                 targetReviewMarks = Array.isArray(session.reviewMarks) ? session.reviewMarks : []
+                targetDeferredQuestionIds = Array.isArray(session.deferredQuestionIds) ? session.deferredQuestionIds : []
+                targetIsDeferredRound = session.isDeferredRound === true
                 if (session.retryCount !== undefined) {
                   targetRetryCount = session.retryCount
                 }
@@ -264,13 +270,21 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           )
           targetEverWrong = targetEverWrong.filter(questionId => selectedIds.has(questionId))
           targetReviewMarks = targetReviewMarks.filter(questionId => selectedIds.has(questionId))
+          targetDeferredQuestionIds = targetDeferredQuestionIds.filter(questionId => selectedIds.has(questionId) && !targetUserAnswers[questionId])
 
-          if (targetCurrentIdx < 0 || targetCurrentIdx >= selected.length) {
-            const firstUnansweredIdx = selected.findIndex(q => !targetUserAnswers[q.id])
+          const deferredIdSet = new Set(targetDeferredQuestionIds)
+          const deferredQuestions = selected.filter(q => deferredIdSet.has(q.id))
+          const activeQuestions = targetIsDeferredRound && deferredQuestions.length > 0
+            ? deferredQuestions
+            : selected
+          targetIsDeferredRound = targetIsDeferredRound && deferredQuestions.length > 0
+
+          if (targetCurrentIdx < 0 || targetCurrentIdx >= activeQuestions.length) {
+            const firstUnansweredIdx = activeQuestions.findIndex(q => !targetUserAnswers[q.id])
             targetCurrentIdx = firstUnansweredIdx >= 0 ? firstUnansweredIdx : 0
           }
           
-          setCurrentQuestions(selected)
+          setCurrentQuestions(activeQuestions)
           setAllSessionQuestions(selected)
           setOriginalTotal(selected.length)
           setRetryCount(targetRetryCount)
@@ -282,6 +296,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           setFirstPassScore(targetFirstPassScore)
           setEverWrongSet(new Set(targetEverWrong))
           setReviewMarks(new Set(targetReviewMarks))
+          setDeferredQuestionIds(new Set(targetDeferredQuestionIds))
+          setIsDeferredRound(targetIsDeferredRound)
           
           initializedRef.current = guardKey;
 
@@ -398,6 +414,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     nextShieldsUsed,
     nextEverWrongSet,
     nextReviewMarkIds,
+    nextDeferredQuestionIds,
+    nextIsDeferredRound,
     computedFirstPass,
     willBeResultMode
   }) => {
@@ -414,7 +432,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           originalTotal: originalTotal,
           firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore,
           everWrong: Array.from(nextEverWrongSet),
-          reviewMarks: nextReviewMarkIds || Array.from(reviewMarks)
+          reviewMarks: nextReviewMarkIds || Array.from(reviewMarks),
+          deferredQuestionIds: nextDeferredQuestionIds || Array.from(deferredQuestionIds),
+          isDeferredRound: nextIsDeferredRound ?? isDeferredRound
         }
         await setDoc(progressRef, {
           quizSession: JSON.parse(JSON.stringify(sessionObj)),
@@ -428,10 +448,23 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }
   }
 
+  const getPendingDeferredQuestions = (deferredIds = deferredQuestionIds, answers = userAnswers) => (
+    allSessionQuestions.filter(q => deferredIds.has(q.id) && !answers[q.id])
+  )
+
   const moveToNextQuestionOrResult = async (pending) => {
-    const nextIdxForSave = currentIdx < currentQuestions.length - 1 ? currentIdx + 1 : currentIdx
+    const nextDeferredIds = new Set(pending.deferredQuestionIds || Array.from(deferredQuestionIds))
+    if (currentQuestion?.id) {
+      nextDeferredIds.delete(currentQuestion.id)
+    }
+    const hasNextInCurrentRound = currentIdx < currentQuestions.length - 1
+    const pendingDeferredQuestions = !reSolveMode && !isDeferredRound && !hasNextInCurrentRound
+      ? getPendingDeferredQuestions(nextDeferredIds, pending.userAnswers)
+      : []
+    const shouldEnterDeferredRound = pendingDeferredQuestions.length > 0
+    const nextIdxForSave = hasNextInCurrentRound ? currentIdx + 1 : (shouldEnterDeferredRound ? 0 : currentIdx)
     let computedFirstPass = firstPassScore
-    const willBeResultMode = currentIdx >= currentQuestions.length - 1
+    const willBeResultMode = !hasNextInCurrentRound && !shouldEnterDeferredRound
 
     if (willBeResultMode) {
       const totalCorrectSoFar = allSessionQuestions.filter(q => pending.userAnswers[q.id]?.isCorrect).length
@@ -463,6 +496,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       nextShieldsUsed: pending.shieldsUsed,
       nextEverWrongSet: new Set(pending.everWrongIds || []),
       nextReviewMarkIds: pending.reviewMarkIds,
+      nextDeferredQuestionIds: Array.from(nextDeferredIds),
+      nextIsDeferredRound: shouldEnterDeferredRound ? true : (hasNextInCurrentRound ? isDeferredRound : false),
       computedFirstPass,
       willBeResultMode
     })
@@ -472,10 +507,16 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setSelectedMultiOptions(new Set())
     setPendingResult(null)
     setReactionError('')
+    setDeferredQuestionIds(nextDeferredIds)
 
-    if (currentIdx < currentQuestions.length - 1) {
+    if (hasNextInCurrentRound) {
       setCurrentIdx(prev => prev + 1)
+    } else if (shouldEnterDeferredRound) {
+      setCurrentQuestions(pendingDeferredQuestions)
+      setCurrentIdx(0)
+      setIsDeferredRound(true)
     } else {
+      setIsDeferredRound(false)
       setIsResultMode(true)
     }
   }
@@ -715,6 +756,45 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     })
   }
 
+  const handleMarkAndSkip = async () => {
+    if (!currentQuestion || isRebooting || showFeedback || reSolveMode || isDeferredRound) return
+
+    soundManager.playClick()
+    const nextDeferredIds = new Set(deferredQuestionIds)
+    nextDeferredIds.add(currentQuestion.id)
+    const hasNextInCurrentRound = currentIdx < currentQuestions.length - 1
+    const pendingDeferredQuestions = hasNextInCurrentRound
+      ? []
+      : getPendingDeferredQuestions(nextDeferredIds, userAnswers)
+    const nextIdxForSave = hasNextInCurrentRound ? currentIdx + 1 : 0
+
+    setDeferredQuestionIds(nextDeferredIds)
+    setSelectedMultiOptions(new Set())
+    setReactionError('')
+
+    await saveProgressSession({
+      nextIdxForSave,
+      nextUserAnswers: userAnswers,
+      nextCombo: comboCount,
+      nextSessionCrystals: sessionCrystals,
+      nextShieldsUsed: shieldsUsed,
+      nextEverWrongSet: everWrongSet,
+      nextReviewMarkIds: Array.from(reviewMarks),
+      nextDeferredQuestionIds: Array.from(nextDeferredIds),
+      nextIsDeferredRound: !hasNextInCurrentRound && pendingDeferredQuestions.length > 0,
+      computedFirstPass: firstPassScore,
+      willBeResultMode: false
+    })
+
+    if (hasNextInCurrentRound) {
+      setCurrentIdx(prev => prev + 1)
+    } else if (pendingDeferredQuestions.length > 0) {
+      setCurrentQuestions(pendingDeferredQuestions)
+      setCurrentIdx(0)
+      setIsDeferredRound(true)
+    }
+  }
+
   // 명시적 닫기/저장 로직
   const handleExitClick = async () => {
     soundManager.playClick()
@@ -735,7 +815,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             originalTotal: originalTotal,
             firstPassScore: firstPassScore !== null ? firstPassScore : null,
             everWrong: Array.from(everWrongSet),
-            reviewMarks: Array.from(reviewMarks)
+            reviewMarks: Array.from(reviewMarks),
+            deferredQuestionIds: Array.from(deferredQuestionIds),
+            isDeferredRound
           }
           await setDoc(progressRef, {
             quizSession: JSON.parse(JSON.stringify(sessionObj)),
@@ -783,7 +865,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   const startReSolveProcess = () => {
     // 현재 세션의 전체 문제 중 틀린 문제만 필터링
-    const wrongQuestions = currentQuestions.filter(q => !userAnswers[q.id]?.isCorrect).map(q => ({
+    const wrongQuestions = allSessionQuestions.filter(q => !userAnswers[q.id]?.isCorrect).map(q => ({
       ...q,
       shuffledOptions: q.options ? [...q.options].sort(() => Math.random() - 0.5) : []
     }))
@@ -799,6 +881,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setCurrentIdx(0)
     setIsResultMode(false)
     setReSolveMode(true)
+    setIsDeferredRound(false)
+    setDeferredQuestionIds(new Set())
   }
 
   // 점수 계산 유틸리티 (상한 점수 폐지)
@@ -1123,7 +1207,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               marginBottom: '2rem',
               textAlign: 'left'
             }}>
-              {currentQuestions.map((q, idx) => {
+              {(reSolveMode ? currentQuestions : allSessionQuestions).map((q, idx) => {
                 const isCorrect = userAnswers[q.id]?.isCorrect
                 return (
                   <div 
@@ -1462,7 +1546,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               fontSize: '0.9rem',
               fontWeight: 700
             }}>
-              {currentQuestion?.unitTitle || quizData?.title} {reSolveMode && '(재도전)'}
+              {currentQuestion?.unitTitle || quizData?.title} {reSolveMode && '(재도전)'} {isDeferredRound && '(표시 문제)'}
             </span>
             
             {/* 진행바 */}
@@ -1503,6 +1587,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 fontSize: '0.8rem',
               }}>
                 {currentIdx + 1} / {currentQuestions.length}
+                {!reSolveMode && !isDeferredRound && deferredQuestionIds.size > 0 ? ` · 표시 ${deferredQuestionIds.size}` : ''}
               </span>
             </div>
           </div>
@@ -1631,6 +1716,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               lineHeight: 1.5
             }}>
               답을 고른 뒤 이해 상태를 선택하면 다음 문제로 이동합니다.
+              {!reSolveMode && !isDeferredRound && deferredQuestionIds.size > 0 && (
+                <span> 표시한 문제 {deferredQuestionIds.size}개는 마지막 문제 뒤에 다시 나옵니다.</span>
+              )}
+              {isDeferredRound && (
+                <span> 표시하고 넘긴 문제입니다. 답을 골라야 결과를 확인할 수 있어요.</span>
+              )}
             </div>
           </div>
 
@@ -1898,6 +1989,33 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 </div>
               )}
             </MotionReactionPanel>
+          )}
+
+          {!showFeedback && !isRebooting && !reSolveMode && !isDeferredRound && (
+            <div style={{
+              marginTop: '1.25rem',
+              display: 'flex',
+              justifyContent: 'center'
+            }}>
+              <button
+                type="button"
+                onClick={handleMarkAndSkip}
+                style={{
+                  minHeight: 44,
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(251, 191, 36, 0.55)',
+                  background: 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(15,23,42,0.72))',
+                  color: '#fde68a',
+                  fontSize: '0.95rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: '0 10px 26px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.12)'
+                }}
+              >
+                표시하고 넘기기
+              </button>
+            </div>
           )}
 
           {/* 멀티 정답 안내 및 제출 버튼 */}
