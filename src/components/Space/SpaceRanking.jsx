@@ -523,8 +523,9 @@ export default function SpaceRanking({ user, userData }) {
                     const growth = rankMode === 'growth' ? (u.weeklyGain || 0) : (u.dailyGain || 0);
                     const tier = u.seiData?.tier || { name: '브론즈 파일럿', color: '#cd7f32', icon: '🚀' };
                     const isPodium = (u.displayRank || 0) <= 3;
+                    const hasCustomFrame = u.selectedProfileFrame === 'nebula' || u.selectedProfileFrame === 'solar';
                     const frameTheme = getFrameSurfaceStyles(u.selectedProfileFrame, isExpanded ? 'panel' : 'row')
-                    const panelTheme = isPodium
+                    const panelTheme = (isPodium || hasCustomFrame)
                       ? frameTheme
                       : {
                           background: 'rgba(0, 0, 0, 0.22)',
@@ -552,23 +553,33 @@ export default function SpaceRanking({ user, userData }) {
                           borderBottom: '1px solid rgba(255,255,255,0.05)',
                           alignItems: 'center',
                           background: isExpanded
-                            ? (isPodium ? panelTheme.background : 'rgba(0, 0, 0, 0.18)')
+                            ? panelTheme.background
+                            : hasCustomFrame
+                              ? frameTheme.background
                             : isMe
                               ? 'rgba(0, 243, 255, 0.12)'
                               : 'transparent',
                           boxShadow: isExpanded
-                            ? (isPodium ? `${panelTheme.glow}, inset 0 0 0 1px rgba(255,255,255,0.03)` : 'none')
+                            ? `${panelTheme.glow}, inset 0 0 0 1px rgba(255,255,255,0.03)`
+                            : hasCustomFrame
+                              ? `${frameTheme.glow}, inset 0 0 0 1px ${frameTheme.borderColor}`
                             : isMe
                               ? 'inset 0 0 20px rgba(0, 243, 255, 0.2)'
                               : 'none',
-                          borderRadius: isExpanded || isMe ? '10px' : '0',
-                          margin: isExpanded || isMe ? '5px 0' : '0',
+                          borderRadius: isExpanded || isMe || hasCustomFrame ? '10px' : '0',
+                          margin: isExpanded || isMe || hasCustomFrame ? '5px 0' : '0',
                           borderLeft: isExpanded
-                            ? `4px solid ${isPodium ? panelTheme.accent : 'rgba(255,255,255,0.2)'}`
+                            ? `4px solid ${panelTheme.accent}`
+                            : hasCustomFrame
+                              ? `4px solid ${frameTheme.accent}`
                             : isMe
                               ? '4px solid var(--crystal-cyan)'
                               : 'none',
-                          border: isExpanded ? `1px solid ${isPodium ? panelTheme.borderColor : 'rgba(255,255,255,0.08)'}` : 'none',
+                          border: isExpanded
+                            ? `1px solid ${panelTheme.borderColor}`
+                            : hasCustomFrame
+                              ? `1px solid ${frameTheme.borderColor}`
+                              : 'none',
                           color: '#fff !important',
                           cursor: 'pointer',
                           transition: 'background 0.2s',
@@ -599,9 +610,9 @@ export default function SpaceRanking({ user, userData }) {
                                 maxWidth: '200px',
                                 padding: '2px 8px',
                                 borderRadius: '999px',
-                                background: isExpanded ? `${frameTheme.accent}18` : 'rgba(255,255,255,0.06)',
-                                border: `1px solid ${isExpanded ? frameTheme.borderColor : 'rgba(255,255,255,0.08)'}`,
-                                color: isExpanded ? frameTheme.text : 'rgba(255,255,255,0.78)',
+                                background: (isExpanded || hasCustomFrame) ? `${frameTheme.accent}18` : 'rgba(255,255,255,0.06)',
+                                border: `1px solid ${(isExpanded || hasCustomFrame) ? frameTheme.borderColor : 'rgba(255,255,255,0.08)'}`,
+                                color: (isExpanded || hasCustomFrame) ? frameTheme.text : 'rgba(255,255,255,0.78)',
                                 fontSize: '0.72rem',
                                 lineHeight: 1.3,
                                 whiteSpace: 'nowrap',
@@ -619,9 +630,9 @@ export default function SpaceRanking({ user, userData }) {
                                 width: '22px',
                                 height: '22px',
                                 borderRadius: '999px',
-                                background: isExpanded ? `${frameTheme.accent}20` : 'rgba(255,255,255,0.06)',
-                                border: `1px solid ${isExpanded ? frameTheme.borderColor : 'rgba(255,255,255,0.08)'}`,
-                                color: isExpanded ? frameTheme.accent : 'rgba(255,255,255,0.72)',
+                                background: (isExpanded || hasCustomFrame) ? `${frameTheme.accent}20` : 'rgba(255,255,255,0.06)',
+                                border: `1px solid ${(isExpanded || hasCustomFrame) ? frameTheme.borderColor : 'rgba(255,255,255,0.08)'}`,
+                                color: (isExpanded || hasCustomFrame) ? frameTheme.accent : 'rgba(255,255,255,0.72)',
                                 fontSize: '0.78rem',
                                 flex: '0 0 auto'
                               }} title="프로필 프레임">
@@ -762,6 +773,10 @@ export default function SpaceRanking({ user, userData }) {
                                         : u.selectedProfileFrame === 'solar'
                                           ? '따뜻한 금빛 존재감이 강한 사용자입니다.'
                                           : '기본 프레임으로 표시됩니다.')
+                                      : hasCustomFrame
+                                        ? (u.selectedProfileFrame === 'nebula'
+                                          ? '차분한 보랏빛 프레임을 장착했습니다.'
+                                          : '따뜻한 금빛 프레임을 장착했습니다.')
                                       : '기본 검정 배경으로 표시됩니다.'}
                                   </div>
                                   {u.selectedProfileFrame && (
