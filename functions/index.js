@@ -2045,6 +2045,37 @@ function getDisplayNameFromUser(userData = {}) {
   return userData.publicDisplayName || userData.studentName || userData.name || userData.displayName || "탐사원";
 }
 
+const STUDY_CREW_MISSION_MAX_LENGTH = 60;
+const STUDY_CREW_DAILY_MISSIONS = [
+  { id: "mood_color", category: "아이스브레이킹", title: "오늘의 기분 색깔", prompt: "오늘 기분을 색깔 하나와 이유 한마디로 표현해보세요." },
+  { id: "study_goal", category: "학습 목표", title: "오늘의 목표", prompt: "오늘 집중방에서 끝내고 싶은 공부 목표를 한 줄로 남겨보세요." },
+  { id: "favorite_snack", category: "취향 공유", title: "집중 간식", prompt: "공부할 때 먹고 싶은 간식 하나를 공유해보세요." },
+  { id: "mistake_share", category: "수학 습관", title: "자주 하는 실수", prompt: "수학 문제를 풀 때 내가 자주 하는 실수 하나를 적어보세요." },
+  { id: "encourage_friend", category: "서로 응원", title: "응원 한마디", prompt: "오늘 같이 공부하는 멤버에게 짧은 응원 한마디를 남겨보세요." },
+  { id: "focus_tip", category: "학습 습관", title: "나만의 집중법", prompt: "내가 집중할 때 도움이 되는 방법 하나를 알려주세요." },
+  { id: "hard_problem", category: "수학 대화", title: "막히는 순간", prompt: "어려운 문제를 만났을 때 나는 어떻게 버티는지 적어보세요." },
+  { id: "one_sentence_math", category: "수학 대화", title: "오늘의 수학 한 문장", prompt: "오늘 배운 수학 내용을 한 문장으로 설명해보세요." },
+  { id: "good_place", category: "취향 공유", title: "좋아하는 공부 장소", prompt: "내가 공부가 잘 되는 장소 유형을 하나 말해보세요." },
+  { id: "thank_you", category: "서로 응원", title: "고마운 점 찾기", prompt: "오늘 함께 공부하는 멤버에게 고마운 점을 하나 찾아 적어보세요." },
+  { id: "problem_for_friend", category: "수학 대화", title: "친구에게 낼 문제", prompt: "친구에게 내고 싶은 아주 짧은 수학 문제 아이디어를 적어보세요." },
+  { id: "break_style", category: "취향 공유", title: "쉬는 방식", prompt: "공부하다 쉴 때 내가 좋아하는 쉬는 방법을 공유해보세요." },
+  { id: "proud_today", category: "학습 회고", title: "오늘의 뿌듯함", prompt: "오늘 공부하면서 가장 뿌듯했던 순간을 한 줄로 남겨보세요." },
+  { id: "tomorrow_promise", category: "서로 응원", title: "내일의 약속", prompt: "내일 다시 공부한다면 꼭 지키고 싶은 약속 하나를 적어보세요." },
+];
+
+function getKstDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(date);
+}
+
+function getStudyCrewMissionForDate(dateKey) {
+  const numericSeed = Number(String(dateKey || "").replace(/-/g, "")) || 0;
+  return STUDY_CREW_DAILY_MISSIONS[numericSeed % STUDY_CREW_DAILY_MISSIONS.length];
+}
+
+function getStudyCrewMissionScopeKey(scopeType, scopeId) {
+  return `${scopeType}_${String(scopeId || "").replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
 const OPEN_STUDY_POOLS = {
   elem_2_4: {
     id: "elem_2_4",
@@ -2500,13 +2531,14 @@ async function syncCrewToMembers(crewId, crewData, greetings = []) {
   const crewSnapshot = buildCrewSnapshot(crewId, crewData, memberSummaries, greetings);
   const isRejected = crewData.status === "rejected";
   const leaderId = crewData.leaderId || "";
+  const db = admin.firestore();
 
-  const batch = admin.firestore().batch();
+  const batch = db.batch();
   memberIds.forEach((uid) => {
     const isLeader = uid === leaderId;
     // On rejection: leader keeps snapshot (to see reason & resubmit), others get cleared
     const keepSnapshot = isRejected && isLeader;
-    batch.set(admin.firestore().collection("users").doc(uid), {
+    batch.set(db.collection("users").doc(uid), {
       crewId: isRejected ? "" : crewId,
       crewName: isRejected ? "" : (crewData.name || ""),
       crewRole: isRejected ? "" : (isLeader ? "leader" : "member"),
@@ -2523,6 +2555,12 @@ async function syncCrewToMembers(crewId, crewData, greetings = []) {
     }, { merge: true });
   });
   await batch.commit();
+
+  await Promise.all(memberIds.map(async (uid) => {
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists) return;
+    await syncAnswerProfileSnapshotsForUser(uid, userSnap.data() || {});
+  }));
 }
 
 async function refreshCrewGreetings(crewId, crewData) {
@@ -3058,6 +3096,103 @@ exports.deleteStudyCrewGreeting = regionalFunctions.https.onCall(async (data, co
   const refreshedCrewSnap = await crewRef.get();
   await refreshCrewGreetings(crewId, refreshedCrewSnap.data() || {});
   return { success: true };
+});
+
+exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const scopeType = String(data?.scopeType || "").trim();
+  const scopeId = String(data?.scopeId || "").trim();
+  const answer = String(data?.answer || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, STUDY_CREW_MISSION_MAX_LENGTH);
+
+  if (!["crew", "room"].includes(scopeType) || !scopeId) {
+    throw new functions.https.HttpsError("invalid-argument", "미션 위치 정보가 올바르지 않습니다.");
+  }
+  if (!answer) {
+    throw new functions.https.HttpsError("invalid-argument", "미션 답변을 입력해주세요.");
+  }
+
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(uid);
+  const scopeRef = scopeType === "crew"
+    ? db.collection("crews").doc(scopeId)
+    : db.collection("studyRooms").doc(scopeId);
+  const now = new Date();
+  const dateKey = getKstDateKey(now);
+  const mission = getStudyCrewMissionForDate(dateKey);
+  const scopeKey = getStudyCrewMissionScopeKey(scopeType, scopeId);
+  const missionRef = db.collection("studyCrewDailyMissions").doc(scopeKey).collection("days").doc(dateKey);
+  const responseRef = missionRef.collection("responses").doc(uid);
+
+  await db.runTransaction(async (tx) => {
+    const [userSnap, scopeSnap, responseSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(scopeRef),
+      tx.get(responseRef),
+    ]);
+
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+    }
+    if (!scopeSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "미션을 남길 크루 또는 방을 찾을 수 없습니다.");
+    }
+
+    const userData = userSnap.data() || {};
+    const scopeData = scopeSnap.data() || {};
+    let targetIds = [];
+    if (scopeType === "crew") {
+      targetIds = getCrewMemberIds(scopeData);
+      if (!targetIds.includes(uid)) {
+        throw new functions.https.HttpsError("permission-denied", "크루 멤버만 오늘의 미션을 남길 수 있습니다.");
+      }
+      if ((scopeData.status || "pending") !== "approved") {
+        throw new functions.https.HttpsError("failed-precondition", "승인된 크루에서만 미션을 사용할 수 있습니다.");
+      }
+    } else {
+      targetIds = uniqueIds(Array.isArray(scopeData.participantIds) ? scopeData.participantIds : []);
+      if (!targetIds.includes(uid)) {
+        throw new functions.https.HttpsError("permission-denied", "방 참여자만 오늘의 미션을 남길 수 있습니다.");
+      }
+      if ((scopeData.status || "waiting") === "ended") {
+        throw new functions.https.HttpsError("failed-precondition", "종료된 방에는 미션을 남길 수 없습니다.");
+      }
+    }
+
+    tx.set(missionRef, {
+      scopeType,
+      scopeId,
+      dateKey,
+      missionId: mission.id,
+      category: mission.category,
+      title: mission.title,
+      prompt: mission.prompt,
+      maxLength: STUDY_CREW_MISSION_MAX_LENGTH,
+      targetCount: Math.max(targetIds.length, 1),
+      updatedAt: now,
+      createdAt: now,
+    }, { merge: true });
+
+    tx.set(responseRef, {
+      scopeType,
+      scopeId,
+      dateKey,
+      missionId: mission.id,
+      userId: uid,
+      userName: getDisplayNameFromUser(userData),
+      answer,
+      createdAt: responseSnap.exists ? (responseSnap.data()?.createdAt || now) : now,
+      updatedAt: now,
+    }, { merge: true });
+  });
+
+  return {
+    success: true,
+    dateKey,
+    mission,
+  };
 });
 
 exports.listStudyCrews = regionalFunctions.https.onCall(async (_data, context) => {

@@ -5,6 +5,7 @@ import { Camera, CameraOff, Hash, MessageSquare, MessageSquareOff, Mic, MicOff, 
 import Peer from 'peerjs';
 import { db, functions } from '../../firebase';
 import soundManager from '../../utils/SoundManager';
+import StudyCrewDailyMission from './StudyCrewDailyMission';
 
 const CHAT_MAX_LENGTH = 48;
 const VIDEO_CONSTRAINTS = {
@@ -1691,6 +1692,17 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       {error && (
         <div className="font-tech" style={{ marginBottom: '1rem', color: '#fda4af' }}>
           {error}
+        </div>
+      )}
+
+      {roomId && (
+        <div style={{ marginBottom: isCompactRoom ? '0.75rem' : '1rem' }}>
+          <StudyCrewDailyMission
+            scopeType="room"
+            scopeId={roomId}
+            targetCount={participants.length || room?.participantCount || 1}
+            compact={isCompactRoom}
+          />
         </div>
       )}
 

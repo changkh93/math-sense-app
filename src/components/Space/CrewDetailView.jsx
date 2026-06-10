@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import soundManager from '../../utils/SoundManager';
 import CrewSettingsModal from './CrewSettingsModal';
+import StudyCrewDailyMission from './StudyCrewDailyMission';
 import { formatCrewSchedule } from './crewSchedule';
 
 const inputStyle = {
@@ -592,6 +593,16 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
           </div>
         </div>
       </Motion.div>
+
+      {status === 'approved' && crewId && (
+        <div style={{ marginBottom: '1.2rem' }}>
+          <StudyCrewDailyMission
+            scopeType="crew"
+            scopeId={crewId}
+            targetCount={crewMemberIds.length || enrichedMembers.length || 1}
+          />
+        </div>
+      )}
 
       {/* Members */}
       <div style={{ marginBottom: '1.2rem' }}>

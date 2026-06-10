@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { Crown, Edit3, X } from 'lucide-react';
-import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
@@ -139,23 +139,11 @@ export default function CrewSettingsModal({ isOpen, onClose, crew }) {
         ...nextGroup,
       };
 
-      const batch = writeBatch(db);
-      const crewRef = doc(db, 'crews', crew.id);
-      const userRef = doc(db, 'users', user.uid);
-      const nextCrewSnapshot = {
-        ...(crew || {}),
+      const updateStudyCrew = httpsCallable(functions, 'updateStudyCrew');
+      await updateStudyCrew({
+        crewId: crew.id,
         ...nextCrewData,
-        id: crew.id,
-      };
-
-      batch.set(crewRef, { ...nextCrewData, updatedAt: serverTimestamp() }, { merge: true });
-      batch.set(userRef, {
-        crewName: nextCrewData.name,
-        crewColor: nextCrewData.color,
-        crewGroupName: nextCrewData.groupName,
-        crewSnapshot: nextCrewSnapshot,
-      }, { merge: true });
-      await batch.commit();
+      });
 
       setIsDirty(false);
       setMessage('크루 설정을 저장했습니다.');

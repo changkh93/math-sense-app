@@ -218,6 +218,21 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /studyCrewDailyMissions/{scopeKey} {
+      allow read: if isAuth();
+      allow write: if false;
+
+      match /days/{dayId} {
+        allow read: if isAuth();
+        allow write: if false;
+
+        match /responses/{responseId} {
+          allow read: if isAuth();
+          allow write: if false;
+        }
+      }
+    }
+
     // Users: Any authenticated user can read user profiles (for ranking). Writing is restricted.
     match /users/{userId} {
       allow read: if isAuth();
