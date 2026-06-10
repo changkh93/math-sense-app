@@ -56,6 +56,18 @@ function inferCourseFromTitle(title = '') {
   return '';
 }
 
+function hasMiddleMathLevelUpSignal(text = '') {
+  return /중등|방정식|부등식|등식|함수|다항식|곱셈공식|제곱근|소인수분해|완전제곱|이차|유리수|정수|절댓값|기하/i.test(text);
+}
+
+function shouldIncludeCourse(itemCourse = '', normalizedCourseId = '', options = {}) {
+  if (!normalizedCourseId || normalizedCourseId === 'unknown') return true;
+  if (itemCourse === normalizedCourseId) return true;
+  return normalizedCourseId === 'cluster_elementary'
+    && options.includeMiddleMathLevelUp === true
+    && itemCourse === 'middle-math';
+}
+
 function itemCourseId(item = {}) {
   return normalizeCourseId(
     item.clusterId ||
@@ -66,10 +78,10 @@ function itemCourseId(item = {}) {
   );
 }
 
-function belongsToCourse(item = {}, courseId = '') {
+function belongsToCourse(item = {}, courseId = '', options = {}) {
   const normalized = normalizeCourseId(courseId);
   const itemCourse = itemCourseId(item);
-  return !normalized || normalized === 'unknown' || itemCourse === normalized;
+  return shouldIncludeCourse(itemCourse, normalized, options);
 }
 
 function toMillis(value) {
@@ -218,7 +230,7 @@ function summarizeQuizRows(rows) {
   }));
 }
 
-function summarizeLearningProgress(progressDocs, start, end, courseId) {
+function summarizeLearningProgress(progressDocs, start, end, courseId, options = {}) {
   const videos = [];
   const inProgressQuizzes = [];
   const normalizedCourseId = normalizeCourseId(courseId);
@@ -233,7 +245,7 @@ function summarizeLearningProgress(progressDocs, start, end, courseId) {
       inferCourseFromUnitId(unitId) ||
       inferCourseFromTitle(`${data.unitTitle || ''} ${data.quizSession?.quizTitle || ''}`)
     );
-    if (normalizedCourseId && normalizedCourseId !== 'unknown' && progressCourse !== normalizedCourseId) return;
+    if (!shouldIncludeCourse(progressCourse, normalizedCourseId, options)) return;
     const updatedAt = toDate(data.updatedAt);
 
     Object.entries(data.videoProgress || {}).forEach(([transmissionId, progress]) => {
@@ -486,7 +498,7 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
   };
 }
 
-async function getLearningSummary(uid, date, courseId = '') {
+async function getLearningSummary(uid, date, courseId = '', options = {}) {
   if (!uid || !date) return { activityCount: 0, quizCount: 0, averageScore: null, titles: [], videos: [], inProgressQuizzes: [] };
   const start = new Date(`${date}T00:00:00+09:00`);
   const end = new Date(`${date}T23:59:59+09:00`);
@@ -502,7 +514,7 @@ async function getLearningSummary(uid, date, courseId = '') {
   if (!snap) return { activityCount: 0, quizCount: 0, averageScore: null, titles: [], videos: [], inProgressQuizzes: [] };
 
   const allItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  const items = allItems.filter(item => belongsToCourse(item, courseId));
+  const items = allItems.filter(item => belongsToCourse(item, courseId, options));
   const isElementary = normalizeCourseId(courseId) === 'cluster_elementary';
   const readingItems = isElementary ? items.filter(isReadingRelatedItem) : [];
   const mathItems = isElementary ? items.filter(item => !isReadingRelatedItem(item)) : items;
@@ -512,7 +524,7 @@ async function getLearningSummary(uid, date, courseId = '') {
   const dataLogItems = mathItems.filter(item => ['text', 'data_log_read'].includes(item.type));
   const attentionItems = mathItems.filter(item => item.attentionResult === 'hit' || item.attentionResult === 'miss');
   const scores = quizItems.map(item => Number(item.score)).filter(Number.isFinite);
-  const progressSummary = summarizeLearningProgress(progressSnap?.docs || [], start, end, courseId);
+  const progressSummary = summarizeLearningProgress(progressSnap?.docs || [], start, end, courseId, options);
   const videos = summarizeVideoRows(videoItems);
   const quizzes = summarizeQuizRows(quizItems);
   const attentionHits = attentionItems.filter(item => item.attentionResult === 'hit').length;
@@ -700,8 +712,11 @@ async function main() {
         })),
       codeComparison,
     };
+    const courseId = assignment.clusterId || assignment.regionId || assignment.clusterName;
+    const includeMiddleMathLevelUp = normalizeCourseId(courseId) === 'cluster_elementary'
+      && hasMiddleMathLevelUpSignal(`${assignment.title || ''} ${assignment.content || ''}`);
     const [learningSummary, darkMatterSummary] = await Promise.all([
-      getLearningSummary(assignment.userId, date, assignment.clusterId || assignment.regionId || assignment.clusterName),
+      getLearningSummary(assignment.userId, date, courseId, { includeMiddleMathLevelUp }),
       getDarkMatterSummary(assignment.userId),
     ]);
 
