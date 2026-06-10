@@ -778,7 +778,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     () => participants.find((participant) => participant.uid === user.uid) || null,
     [participants, user.uid]
   );
-  const isHost = room?.hostUid === user.uid || crew?.leaderId === user.uid || userData?.crewRole === 'leader';
+  const isOpenStudyRoom = room?.roomType === 'openStudy';
+  const isHost = room?.hostUid === user.uid || (!isOpenStudyRoom && (crew?.leaderId === user.uid || userData?.crewRole === 'leader'));
   const isChatEnabled = room?.chatEnabled !== false;
   const areMicsEnabled = room?.micsEnabled !== false;
   const localChatMessage = localParticipant?.chatMessage || '';
@@ -1451,7 +1452,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
 
     try {
       closeRoomResources();
-      const leaveStudyRoomSession = httpsCallable(functions, 'leaveStudyRoomSession');
+      const leaveStudyRoomSession = httpsCallable(functions, isOpenStudyRoom ? 'leaveOpenStudyRoom' : 'leaveStudyRoomSession');
       await leaveStudyRoomSession({ roomId });
       if (onLeave) onLeave();
     } catch (err) {
@@ -1595,10 +1596,10 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
               <Radio size={14} /> {room?.status === 'live' ? 'LIVE' : 'WAITING'}
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Users size={14} /> 현재 {participants.length}/3명
+              <Users size={14} /> 현재 {participants.length}/{room?.maxParticipants || 3}명
             </span>
             <span>{formatRemainingLabel(room, nowMs)}</span>
-            {crew?.inviteCode && (
+            {!isOpenStudyRoom && crew?.inviteCode && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Hash size={14} /> {crew.inviteCode}
               </span>

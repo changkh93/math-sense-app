@@ -2001,6 +2001,100 @@ function getDisplayNameFromUser(userData = {}) {
   return userData.publicDisplayName || userData.studentName || userData.name || userData.displayName || "탐사원";
 }
 
+const OPEN_STUDY_POOLS = {
+  elem_2_4: {
+    id: "elem_2_4",
+    label: "초2~초4",
+    title: "기초 탐험반",
+    description: "기초 개념을 함께 다지는 저학년 오픈 스터디",
+    color: "#38bdf8",
+    maxParticipants: 3,
+    allowAutoExpand: true,
+  },
+  elem_5: {
+    id: "elem_5",
+    label: "초5",
+    title: "초5 도약반",
+    description: "분수, 도형, 문장제를 같이 밀어 올리는 방",
+    color: "#34d399",
+    maxParticipants: 3,
+    allowAutoExpand: true,
+  },
+  elem_6: {
+    id: "elem_6",
+    label: "초6",
+    title: "초6 전환반",
+    description: "중등 수학으로 넘어가기 전 마지막 점검",
+    color: "#fbbf24",
+    maxParticipants: 3,
+    allowAutoExpand: true,
+  },
+  mid_1: {
+    id: "mid_1",
+    label: "중1",
+    title: "중1 개척반",
+    description: "문자와 식, 함수 감각을 함께 잡는 방",
+    color: "#f97316",
+    maxParticipants: 3,
+    allowAutoExpand: true,
+  },
+  mid_2_3: {
+    id: "mid_2_3",
+    label: "중2~중3",
+    title: "중등 심화반",
+    description: "고난도 문제와 개념 연결을 같이 푸는 방",
+    color: "#a78bfa",
+    maxParticipants: 3,
+    allowAutoExpand: true,
+  },
+  free: {
+    id: "free",
+    label: "자유학년",
+    title: "자유 합류반",
+    description: "학년이 애매하거나 자유롭게 함께 공부하는 방",
+    color: "#fb7185",
+    maxParticipants: 3,
+    allowAutoExpand: true,
+  },
+};
+
+function getOpenStudyPoolIdFromGrade(userData = {}) {
+  const gradeValue = userData.grade || userData.schoolGrade || userData.studentGrade || "";
+  const text = String(gradeValue || "").replace(/\s+/g, "");
+  const number = Number((text.match(/\d+/) || [0])[0]);
+  const isMiddle = /중|middle|mid/i.test(text);
+  const isElementary = /초|elementary|elem/i.test(text);
+
+  if (isMiddle) {
+    if (number === 1) return "mid_1";
+    if (number === 2 || number === 3) return "mid_2_3";
+  }
+  if (isElementary || number > 0) {
+    if (number >= 2 && number <= 4) return "elem_2_4";
+    if (number === 5) return "elem_5";
+    if (number === 6) return "elem_6";
+  }
+  return "free";
+}
+
+function getTimestampMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  return 0;
+}
+
+function isActiveOpenStudyRoom(roomData = {}, nowMs = Date.now()) {
+  const status = roomData.status || "waiting";
+  if (status === "ended") return false;
+  const baseMs = getTimestampMillis(roomData.startedAt) || getTimestampMillis(roomData.createdAt) || getTimestampMillis(roomData.lastActivityAt);
+  if (!baseMs) return true;
+  const durationMs = (Number(roomData.durationMinutes) || 50) * 60 * 1000;
+  const graceMs = status === "waiting" ? 30 * 60 * 1000 : 10 * 60 * 1000;
+  return nowMs < baseMs + durationMs + graceMs;
+}
+
 function getOwnedProfileFrames(userData = {}) {
   const owned = Array.isArray(userData.ownedProfileFrames) ? userData.ownedProfileFrames : [];
   return Array.from(new Set(["starter", ...owned]));
@@ -3898,6 +3992,258 @@ exports.leaveStudyRoomSession = regionalFunctions.https.onCall(async (data, cont
 
     const roomData = roomSnap.data() || {};
     await removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomData, uid);
+  });
+
+  return { success: true };
+});
+
+exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const requestedPoolId = String(data?.poolId || "").trim();
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(uid);
+  const userSnap = await userRef.get();
+
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+  }
+
+  const userData = userSnap.data() || {};
+  const recommendedPoolId = getOpenStudyPoolIdFromGrade(userData);
+  const poolId = OPEN_STUDY_POOLS[requestedPoolId] ? requestedPoolId : recommendedPoolId;
+  const isAdminUser = userData.role === "admin";
+  if (!OPEN_STUDY_POOLS[poolId]) {
+    throw new functions.https.HttpsError("invalid-argument", "참여할 수 없는 오픈 스터디입니다.");
+  }
+  if (!isAdminUser && poolId !== "free" && poolId !== recommendedPoolId) {
+    throw new functions.https.HttpsError("failed-precondition", "내 학년에 맞는 오픈 스터디만 참여할 수 있습니다.");
+  }
+
+  const nowMs = Date.now();
+  const activeMembershipSnap = await db.collection("studyRooms")
+    .where("participantIds", "array-contains", uid)
+    .limit(10)
+    .get();
+  const activeMemberships = activeMembershipSnap.docs
+    .map((docSnap) => ({ ref: docSnap.ref, id: docSnap.id, data: docSnap.data() || {} }))
+    .filter((room) => isActiveOpenStudyRoom(room.data, nowMs));
+  const existingOpenStudyRoom = activeMemberships.find((room) => room.data.roomType === "openStudy");
+  if (existingOpenStudyRoom) {
+    return {
+      success: true,
+      roomId: existingOpenStudyRoom.id,
+      pool: OPEN_STUDY_POOLS[existingOpenStudyRoom.data.poolId] || OPEN_STUDY_POOLS.free,
+      reused: true,
+    };
+  }
+  if (activeMemberships.length > 0) {
+    throw new functions.https.HttpsError("failed-precondition", "이미 다른 집중방에 참여 중입니다.");
+  }
+
+  const poolConfig = OPEN_STUDY_POOLS[poolId];
+  const maxParticipants = Number(poolConfig.maxParticipants || 3);
+  const roomQuerySnap = await db.collection("studyRooms")
+    .where("roomType", "==", "openStudy")
+    .limit(100)
+    .get();
+  const candidateRefs = roomQuerySnap.docs
+    .map((docSnap) => {
+      const roomData = docSnap.data() || {};
+      const participantIds = Array.isArray(roomData.participantIds) ? roomData.participantIds : [];
+      const roomMax = Number(roomData.maxParticipants || maxParticipants);
+      return { ref: docSnap.ref, id: docSnap.id, roomData, participantIds, roomMax };
+    })
+    .filter((candidate) => (
+      candidate.roomData.poolId === poolId &&
+      isActiveOpenStudyRoom(candidate.roomData, nowMs) &&
+      candidate.participantIds.length < candidate.roomMax
+    ))
+    .sort((a, b) => {
+      const aCount = a.participantIds.length;
+      const bCount = b.participantIds.length;
+      const aScore = aCount > 0 ? 100 + aCount : 0;
+      const bScore = bCount > 0 ? 100 + bCount : 0;
+      return bScore - aScore;
+    })
+    .slice(0, 10);
+
+  const result = await db.runTransaction(async (tx) => {
+    const poolRef = db.collection("openStudyPools").doc(poolId);
+    const [freshUserSnap, poolSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(poolRef),
+    ]);
+    if (!freshUserSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+    }
+
+    const freshUserData = freshUserSnap.data() || {};
+    const displayName = getDisplayNameFromUser(freshUserData);
+    const now = new Date();
+    let selectedRoomRef = null;
+    let selectedRoomData = null;
+    let selectedParticipantIds = [];
+    const prioritizedRefs = [];
+    const poolData = poolSnap.exists ? (poolSnap.data() || {}) : {};
+    const currentRoomId = String(poolData.currentRoomId || "").trim();
+    const seenRoomIds = new Set();
+
+    if (currentRoomId) {
+      prioritizedRefs.push({ ref: db.collection("studyRooms").doc(currentRoomId), id: currentRoomId });
+      seenRoomIds.add(currentRoomId);
+    }
+    candidateRefs.forEach((candidate) => {
+      if (seenRoomIds.has(candidate.id)) return;
+      prioritizedRefs.push(candidate);
+      seenRoomIds.add(candidate.id);
+    });
+
+    for (const candidate of prioritizedRefs) {
+      const roomSnap = await tx.get(candidate.ref);
+      if (!roomSnap.exists) continue;
+      const roomData = roomSnap.data() || {};
+      const participantIds = Array.isArray(roomData.participantIds) ? roomData.participantIds.filter(Boolean) : [];
+      const roomMax = Number(roomData.maxParticipants || maxParticipants);
+      if (!isActiveOpenStudyRoom(roomData, now.getTime())) continue;
+      if (participantIds.includes(uid)) {
+        selectedRoomRef = roomSnap.ref;
+        selectedRoomData = roomData;
+        selectedParticipantIds = participantIds;
+        break;
+      }
+      if (participantIds.length >= roomMax) continue;
+
+      selectedRoomRef = roomSnap.ref;
+      selectedRoomData = roomData;
+      selectedParticipantIds = participantIds;
+      break;
+    }
+
+    if (!selectedRoomRef) {
+      selectedRoomRef = db.collection("studyRooms").doc();
+      selectedRoomData = {
+        roomType: "openStudy",
+        poolId,
+        poolLabel: poolConfig.label,
+        crewId: "",
+        crewName: poolConfig.title,
+        crewColor: poolConfig.color,
+        title: `${poolConfig.label} 오픈 스터디`,
+        hostUid: uid,
+        hostName: displayName,
+        status: "waiting",
+        mode: "open-study",
+        maxParticipants,
+        durationMinutes: 50,
+        participantIds: [],
+        participantCount: 0,
+        peerServerMode: "peerjs-public",
+        chatEnabled: true,
+        micsEnabled: true,
+        createdAt: now,
+        startedAt: null,
+        endedAt: null,
+        lastActivityAt: now,
+      };
+      selectedParticipantIds = [];
+    }
+
+    const nextParticipantIds = selectedParticipantIds.includes(uid)
+      ? selectedParticipantIds
+      : [...selectedParticipantIds, uid];
+    const nextCount = nextParticipantIds.length;
+    const nextStatus = nextCount >= 2 ? "live" : "waiting";
+    const nextHostUid = selectedRoomData.hostUid || uid;
+    const participantRole = nextHostUid === uid ? "host" : "member";
+    const nextCurrentRoomId = nextCount >= maxParticipants ? "" : selectedRoomRef.id;
+
+    tx.set(poolRef, {
+      ...poolConfig,
+      currentRoomId: nextCurrentRoomId,
+      activeRoomCountHint: Math.max(1, Number(poolData.activeRoomCountHint || 0)),
+      updatedAt: now,
+    }, { merge: true });
+
+    tx.set(selectedRoomRef, {
+      ...selectedRoomData,
+      roomType: "openStudy",
+      poolId,
+      poolLabel: poolConfig.label,
+      crewId: "",
+      crewName: poolConfig.title,
+      crewColor: poolConfig.color,
+      title: selectedRoomData.title || `${poolConfig.label} 오픈 스터디`,
+      hostUid: nextHostUid,
+      hostName: selectedRoomData.hostName || displayName,
+      maxParticipants,
+      participantIds: nextParticipantIds,
+      participantCount: nextCount,
+      status: nextStatus,
+      startedAt: selectedRoomData.startedAt || (nextStatus === "live" ? now : null),
+      endedAt: null,
+      lastActivityAt: now,
+    }, { merge: true });
+
+    tx.set(selectedRoomRef.collection("participants").doc(uid), {
+      uid,
+      displayName,
+      role: participantRole,
+      peerId: "",
+      cameraOn: false,
+      micOn: false,
+      focusStatus: "focused",
+      chatMessage: "",
+      chatUpdatedAt: null,
+      joinedAt: now,
+      lastSeenAt: now,
+      deviceLabel: "browser",
+    }, { merge: true });
+
+    tx.set(userRef, {
+      activeOpenStudyRoomId: selectedRoomRef.id,
+      activeOpenStudyPoolId: poolId,
+      activeOpenStudyRoomStatus: nextStatus,
+      updatedAt: now,
+    }, { merge: true });
+
+    return { roomId: selectedRoomRef.id, status: nextStatus };
+  });
+
+  return {
+    success: true,
+    roomId: result.roomId,
+    status: result.status,
+    pool: poolConfig,
+  };
+});
+
+exports.leaveOpenStudyRoom = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const roomId = String(data?.roomId || "").trim();
+  if (!roomId) {
+    throw new functions.https.HttpsError("invalid-argument", "방 ID가 없습니다.");
+  }
+
+  const db = admin.firestore();
+  const roomRef = db.collection("studyRooms").doc(roomId);
+  const userRef = db.collection("users").doc(uid);
+
+  await db.runTransaction(async (tx) => {
+    const roomSnap = await tx.get(roomRef);
+    if (roomSnap.exists) {
+      const roomData = roomSnap.data() || {};
+      if (roomData.roomType !== "openStudy") {
+        throw new functions.https.HttpsError("failed-precondition", "오픈 스터디 방이 아닙니다.");
+      }
+      await removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomData, uid);
+    }
+
+    tx.set(userRef, {
+      activeOpenStudyRoomId: "",
+      activeOpenStudyPoolId: "",
+      activeOpenStudyRoomStatus: "",
+      updatedAt: new Date(),
+    }, { merge: true });
   });
 
   return { success: true };

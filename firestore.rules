@@ -213,6 +213,11 @@ service cloud.firestore {
       }
     }
 
+    match /openStudyPools/{poolId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
     // Users: Any authenticated user can read user profiles (for ranking). Writing is restricted.
     match /users/{userId} {
       allow read: if isAuth();

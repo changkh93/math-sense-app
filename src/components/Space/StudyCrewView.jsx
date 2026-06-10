@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AlertTriangle, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Lock, Mail, Plus, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Lock, Mail, Plus, Send, ShieldCheck, Sparkles, UserRound, Users, Video } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
@@ -42,6 +42,44 @@ const FAQ_ITEMS = [
   { q: '최대 몇 명까지 참여할 수 있나요?', a: '현재 크루 당 최대 3명까지 참여할 수 있습니다. 소규모 집중 학습에 최적화된 구조입니다.' },
   { q: '크루 승인은 얼마나 걸리나요?', a: '운영자가 크루 이름과 모토를 확인한 후 승인합니다. 보통 1~2일 이내에 처리됩니다.' },
 ];
+
+const OPEN_STUDY_POOLS = [
+  { id: 'elem_2_4', label: '초2~초4', title: '기초 탐험반', desc: '기초 개념을 함께 다지는 저학년 오픈 스터디', color: '#38bdf8' },
+  { id: 'elem_5', label: '초5', title: '초5 도약반', desc: '분수, 도형, 문장제를 같이 밀어 올리는 방', color: '#34d399' },
+  { id: 'elem_6', label: '초6', title: '초6 전환반', desc: '중등 수학으로 넘어가기 전 마지막 점검', color: '#fbbf24' },
+  { id: 'mid_1', label: '중1', title: '중1 개척반', desc: '문자와 식, 함수 감각을 함께 잡는 방', color: '#f97316' },
+  { id: 'mid_2_3', label: '중2~중3', title: '중등 심화반', desc: '고난도 문제와 개념 연결을 같이 푸는 방', color: '#a78bfa' },
+  { id: 'free', label: '자유학년', title: '자유 합류반', desc: '학년이 애매하거나 자유롭게 함께 공부하는 방', color: '#fb7185' },
+];
+
+function normalizeOpenStudyPoolIdFromGrade(grade) {
+  const text = String(grade || '').replace(/\s+/g, '');
+  const number = Number(text.match(/\d+/)?.[0] || 0);
+  const isMiddle = /중|middle|mid/i.test(text);
+  const isElementary = /초|elementary|elem/i.test(text);
+
+  if (isMiddle) {
+    if (number === 1) return 'mid_1';
+    if (number === 2 || number === 3) return 'mid_2_3';
+  }
+  if (isElementary || number > 0) {
+    if (number >= 2 && number <= 4) return 'elem_2_4';
+    if (number === 5) return 'elem_5';
+    if (number === 6) return 'elem_6';
+  }
+  return 'free';
+}
+
+function isActiveStudyRoom(room) {
+  const status = room?.status || 'waiting';
+  if (status === 'ended') return false;
+  const timestamp = room?.startedAt || room?.createdAt || room?.lastActivityAt;
+  const baseMs = timestamp?.toMillis?.() || 0;
+  if (!baseMs) return true;
+  const durationMs = (room?.durationMinutes || 50) * 60 * 1000;
+  const graceMs = status === 'waiting' ? 30 * 60 * 1000 : 10 * 60 * 1000;
+  return Date.now() < baseMs + durationMs + graceMs;
+}
 
 function FounderLetterPanel({ crew, founderId, founderName, currentUid }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -338,9 +376,101 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
   );
 }
 
+function OpenStudyCard({ pool, stats, recommended, disabled, joining, onJoin }) {
+  const activeRooms = stats?.rooms || 0;
+  const participants = stats?.participants || 0;
+  const availableSlots = stats?.slots || 0;
+
+  return (
+    <Motion.div
+      whileHover={{ y: disabled ? 0 : -3 }}
+      style={{
+        minHeight: 172,
+        borderRadius: 18,
+        padding: '1rem',
+        background: recommended
+          ? `linear-gradient(135deg, ${pool.color}26, rgba(7,13,30,0.9) 58%)`
+          : 'rgba(7,13,30,0.76)',
+        border: `1px solid ${recommended ? `${pool.color}88` : 'rgba(255,255,255,0.09)'}`,
+        boxShadow: recommended ? `0 0 28px ${pool.color}1f` : '0 10px 26px rgba(0,0,0,0.18)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        opacity: disabled ? 0.62 : 1,
+      }}
+    >
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.7rem', alignItems: 'flex-start' }}>
+          <div>
+            <div className="font-tech" style={{ color: pool.color, fontSize: '0.78rem', fontWeight: 900, letterSpacing: '0.08em' }}>
+              {pool.label}
+            </div>
+            <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.08rem', marginTop: '0.32rem', lineHeight: 1.25 }}>
+              {pool.title}
+            </div>
+          </div>
+          {recommended && (
+            <span className="font-tech" style={{
+              color: '#06111f',
+              background: pool.color,
+              borderRadius: 999,
+              padding: '0.2rem 0.48rem',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+              whiteSpace: 'nowrap',
+            }}>
+              추천
+            </span>
+          )}
+        </div>
+        <div className="font-tech" style={{ color: 'rgba(255,255,255,0.64)', fontSize: '0.82rem', lineHeight: 1.55, marginTop: '0.65rem' }}>
+          {pool.desc}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+          <span className="font-tech" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '0.32rem' }}>
+            <Video size={13} /> 열린 방 {activeRooms}
+          </span>
+          <span className="font-tech" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '0.32rem' }}>
+            <Users size={13} /> 참여 {participants}명
+          </span>
+          <span className="font-tech" style={{ color: availableSlots > 0 ? 'var(--planet-green)' : 'rgba(255,255,255,0.52)', fontSize: '0.76rem' }}>
+            빈자리 {availableSlots}
+          </span>
+        </div>
+        <button
+          type="button"
+          className={`space-btn font-tech ${recommended ? 'cosmic-btn' : ''}`}
+          onClick={() => onJoin(pool.id)}
+          disabled={disabled || joining}
+          style={{
+            width: '100%',
+            minHeight: 42,
+            borderRadius: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.45rem',
+            background: recommended ? undefined : 'rgba(255,255,255,0.08)',
+            border: recommended ? undefined : '1px solid rgba(255,255,255,0.1)',
+            opacity: disabled ? 0.65 : 1,
+          }}
+        >
+          {joining ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+          {joining ? '배정 중...' : recommended ? '내 학년으로 참여' : '참여하기'}
+        </button>
+      </div>
+    </Motion.div>
+  );
+}
+
 export default function StudyCrewView({ onNavigateStore }) {
   const { user, userData } = useAuth();
   const [directoryCrews, setDirectoryCrews] = useState([]);
+  const [openStudyRooms, setOpenStudyRooms] = useState([]);
+  const [openStudyAction, setOpenStudyAction] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
   const [crewOnlineCounts, setCrewOnlineCounts] = useState({});
   const [userProfileById, setUserProfileById] = useState({});
@@ -409,6 +539,14 @@ export default function StudyCrewView({ onNavigateStore }) {
   }, []);
 
   useEffect(() => {
+    const openRoomsQuery = query(collection(db, 'studyRooms'), where('roomType', '==', 'openStudy'));
+    const unsub = onSnapshot(openRoomsQuery, snap => {
+      setOpenStudyRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(isActiveStudyRoom));
+    }, err => console.error('Open study room directory error:', err));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     const unsub = onSnapshot(collection(db, 'users'), snap => {
       const nextCounts = {};
       const nextProfiles = {};
@@ -461,6 +599,51 @@ export default function StudyCrewView({ onNavigateStore }) {
       return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
     });
   }, [directoryCrews, user?.uid]);
+
+  const recommendedOpenStudyPoolId = useMemo(
+    () => normalizeOpenStudyPoolIdFromGrade(userData?.grade || userData?.schoolGrade || userData?.studentGrade),
+    [userData?.grade, userData?.schoolGrade, userData?.studentGrade]
+  );
+
+  const openStudyStatsByPool = useMemo(() => {
+    const stats = {};
+    OPEN_STUDY_POOLS.forEach((pool) => {
+      stats[pool.id] = { rooms: 0, participants: 0, slots: 0 };
+    });
+
+    openStudyRooms.forEach((room) => {
+      const poolId = room.poolId || 'free';
+      const participantCount = Array.isArray(room.participantIds)
+        ? room.participantIds.length
+        : Number(room.participantCount || 0);
+      const maxParticipants = Number(room.maxParticipants || 3);
+      if (!stats[poolId]) stats[poolId] = { rooms: 0, participants: 0, slots: 0 };
+      stats[poolId].rooms += 1;
+      stats[poolId].participants += participantCount;
+      stats[poolId].slots += Math.max(0, maxParticipants - participantCount);
+    });
+
+    return stats;
+  }, [openStudyRooms]);
+
+  const handleJoinOpenStudy = async (poolId) => {
+    if (!user?.uid || openStudyAction) return;
+    soundManager.playClick();
+    setOpenStudyAction(poolId);
+
+    try {
+      const joinOpenStudyRoom = httpsCallable(functions, 'joinOpenStudyRoom');
+      const res = await joinOpenStudyRoom({ poolId });
+      const roomId = res?.data?.roomId || '';
+      if (!roomId) throw new Error('오픈 스터디 방을 배정받지 못했습니다.');
+      setActiveRoomId(roomId);
+    } catch (err) {
+      console.error('Failed to join open study room:', err);
+      alert(err?.message || '오픈 스터디에 참여하지 못했습니다.');
+    } finally {
+      setOpenStudyAction('');
+    }
+  };
 
   const handleCrewCardClick = (crew) => {
     soundManager.playClick();
@@ -616,6 +799,54 @@ export default function StudyCrewView({ onNavigateStore }) {
               </button>
             </Motion.div>
           )}
+
+          {/* Open Study Section */}
+          <div style={{ marginBottom: '3.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <div>
+                <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.9rem', letterSpacing: '1px' }}>
+                  OPEN GRADE STUDY
+                </div>
+                <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.35rem 0 0', fontSize: isMobile ? '1.35rem' : '1.6rem' }}>
+                  학년별 오픈 스터디
+                </h3>
+                <p className="font-tech" style={{ color: 'var(--text-muted)', margin: '0.45rem 0 0', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                  고정 멤버 없이 바로 참여합니다. 비어 있는 방이 있으면 합류하고, 모두 가득 차면 새 방이 열립니다.
+                </p>
+              </div>
+              <div className="font-tech" style={{
+                color: 'rgba(255,255,255,0.68)',
+                background: 'rgba(0,243,255,0.08)',
+                border: '1px solid rgba(0,243,255,0.14)',
+                borderRadius: 999,
+                padding: '0.42rem 0.72rem',
+                fontSize: '0.78rem',
+                whiteSpace: 'nowrap',
+              }}>
+                내 추천: {OPEN_STUDY_POOLS.find((pool) => pool.id === recommendedOpenStudyPoolId)?.label || '자유학년'}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: isMobile ? '0.85rem' : '1rem' }}>
+              {OPEN_STUDY_POOLS.map((pool) => {
+                const isRecommended = pool.id === recommendedOpenStudyPoolId;
+                const isFlexiblePool = pool.id === 'free';
+                const isAdminUser = userData?.role === 'admin';
+                const disabled = !isRecommended && !isFlexiblePool && !isAdminUser;
+                return (
+                  <OpenStudyCard
+                    key={pool.id}
+                    pool={pool}
+                    stats={openStudyStatsByPool[pool.id]}
+                    recommended={isRecommended}
+                    disabled={disabled || !!openStudyAction}
+                    joining={openStudyAction === pool.id}
+                    onJoin={handleJoinOpenStudy}
+                  />
+                );
+              })}
+            </div>
+          </div>
 
           {/* Directory Section */}
           <div style={{ marginBottom: '4rem' }}>
