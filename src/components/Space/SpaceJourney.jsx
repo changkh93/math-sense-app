@@ -35,6 +35,32 @@ function addDaysKST(dateStr, delta) {
   return d.toISOString().split('T')[0];
 }
 
+function shiftMonth(monthStr, delta) {
+  const d = new Date(`${monthStr}-01T12:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + delta);
+  return d.toISOString().slice(0, 7);
+}
+
+function formatMonthLabel(monthStr) {
+  if (!monthStr) return '';
+  const [year, month] = monthStr.split('-');
+  return `${year}년 ${month}월`;
+}
+
+function getMonthWindow(monthStr) {
+  const monthStart = new Date(`${monthStr}-01T12:00:00Z`);
+  const start = new Date(monthStart);
+  start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+
+  const end = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0, 12));
+  end.setUTCDate(end.getUTCDate() + (6 - end.getUTCDay()));
+
+  return {
+    startDate: start.toISOString().split('T')[0],
+    endDate: end.toISOString().split('T')[0],
+  };
+}
+
 export default function SpaceJourney({ userData, initialHistory, initialTransactions, parentLoading }) {
   const [history, setHistory] = useState(initialHistory || []);
   const [loading, setLoading] = useState(parentLoading || !initialHistory);
@@ -44,6 +70,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
   });
   const [popover, setPopover] = useState(null); // { dayData, x, y }
   const [transactions, setTransactions] = useState(initialTransactions || []);
+  const [selectedMonth, setSelectedMonth] = useState(() => getTodayKST().slice(0, 7));
 
   const scrollContainerRef = useRef(null);
   const todayKST = getTodayKST();
@@ -197,7 +224,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
       t.type === 'store_purchase' && t.metadata?.itemId === 'cryo_core'
     ).length;
     
-    const usedFromLogs = transactions.filter(t => t.type === 'streak_freeze').length;
+    const usedFromLogs = extractDefendedDates(transactions, {}, getActiveDailyStats(dailyStats)).size;
     const remaining = userData?.streakFreezeCount || 0;
     
     // Inferred total purchased (at least what we have now + what we know we used)
@@ -205,7 +232,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     const totalUsed = totalPurchased - remaining;
 
     return { purchased: totalPurchased, used: totalUsed, remaining };
-  }, [transactions, userData?.streakFreezeCount]);
+  }, [transactions, userData?.streakFreezeCount, dailyStats]);
 
   // Helper: Identify nodes that SHOULD be protected (historical + current gap)
   const baseNodesWithProtection = useMemo(() => {
@@ -231,7 +258,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
 
       // Bridging backwards from the last logged streak date
       while (count < dbStreak && failsafe < 365) {
-        if (!dailyStats.has(cursor)) {
+        if (!dailyStats.has(cursor) && !isRestDay(cursor)) {
           newDefended.add(cursor); // Missing day -> Virtual Protection (🧊)
         }
         // Keep moving backwards. Even if it was active or newly defended, it counts towards the streak run
@@ -318,58 +345,97 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
         currentStreakCount = 0;
       }
       days[i].streakRun = currentStreakCount;
-      days[i].isProtected = nodesWithProtection.has(days[i].date);
+      days[i].isProtected = nodesWithProtection.has(days[i].date) && !days[i].isRestDay;
+      days[i].isRestBridge = days[i].isRestDay && days[i].date <= todayKST && currentStreakCount > 0;
 
-      // Connect if (active or protected) AND next is (active or protected)
-      const isCurrentActiveOrProtected = days[i].isActive || days[i].isProtected;
-      const isNextActiveOrProtected = i < days.length - 1 && (days[i+1].isActive || nodesWithProtection.has(days[i+1].date));
+      // Connect learned/protected days through rest days without treating rest days as core defense.
+      const isCurrentStreakNode = days[i].isActive || days[i].isProtected || days[i].isRestBridge;
+      const isNextStreakNode = i < days.length - 1 && (
+        days[i+1].isActive ||
+        (nodesWithProtection.has(days[i+1].date) && !days[i+1].isRestDay) ||
+        (days[i+1].isRestDay && days[i+1].date <= todayKST && currentStreakCount > 0)
+      );
       
-      days[i].connectsNext = isCurrentActiveOrProtected && isNextActiveOrProtected;
+      days[i].connectsNext = isCurrentStreakNode && isNextStreakNode;
     }
 
     return { minDate, days };
   }, [history, todayKST, dailyStats, nodesWithProtection, userData, journeyStreak]);
 
+  const availableMonths = useMemo(() => {
+    if (!timelineData.minDate) return [todayKST.slice(0, 7)];
+
+    const months = [];
+    let cursor = timelineData.minDate.slice(0, 7);
+    const endMonth = todayKST.slice(0, 7);
+    let failsafe = 0;
+
+    while (cursor <= endMonth && failsafe < 240) {
+      months.push(cursor);
+      cursor = shiftMonth(cursor, 1);
+      failsafe++;
+    }
+
+    return months;
+  }, [timelineData.minDate, todayKST]);
+
+  useEffect(() => {
+    if (!availableMonths.length) return;
+    if (!availableMonths.includes(selectedMonth)) {
+      setSelectedMonth(availableMonths[availableMonths.length - 1]);
+    }
+  }, [availableMonths, selectedMonth]);
+
+  const visibleTimelineDays = useMemo(() => {
+    const { startDate, endDate } = getMonthWindow(selectedMonth);
+    const days = timelineData.days
+      .filter(day => day.date >= startDate && day.date <= endDate)
+      .map(day => ({ ...day }));
+
+    if (days.length > 0) {
+      days[days.length - 1].connectsNext = false;
+    }
+
+    return days;
+  }, [timelineData.days, selectedMonth]);
+
   // 달력 뷰용 월별 데이터 (일부 최적화)
   const calendarMonths = useMemo(() => {
     if (!timelineData.minDate) return [];
+    const timelineDayByDate = new Map(timelineData.days.map(day => [day.date, day]));
     
-    const startY = parseInt(timelineData.minDate.slice(0, 4), 10);
-    const startM = parseInt(timelineData.minDate.slice(5, 7), 10);
-    const endY = parseInt(todayKST.slice(0, 4), 10);
-    const endM = parseInt(todayKST.slice(5, 7), 10);
+    const y = parseInt(selectedMonth.slice(0, 4), 10);
+    const m = parseInt(selectedMonth.slice(5, 7), 10);
     
     const months = [];
-    let y = startY, m = startM;
-    while (y < endY || (y === endY && m <= endM)) {
-      const monthStr = `${y}-${m.toString().padStart(2, '0')}`;
-      const firstDay = new Date(`${monthStr}-01T12:00:00Z`);
-      const padding = firstDay.getUTCDay(); 
-      const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-      
-      const cDays = [];
-      for (let i = 0; i < padding; i++) cDays.push(null);
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dStr = `${monthStr}-${day.toString().padStart(2, '0')}`;
-        // 미래 날짜 방지
-        if (dStr > todayKST) break;
-        const stats = dailyStats.get(dStr);
-        cDays.push({
-          date: dStr,
-          isActive: hasLearningActivity(stats),
-          isProtected: nodesWithProtection.has(dStr),
-          isRestDay: isRestDay(dStr),
-          stats: stats || null,
-          isToday: dStr === todayKST
-        });
-      }
-      months.push({ label: monthStr, days: cDays });
-      
-      m++;
-      if (m > 12) { m = 1; y++; }
+    const monthStr = selectedMonth;
+    const firstDay = new Date(`${monthStr}-01T12:00:00Z`);
+    const padding = firstDay.getUTCDay(); 
+    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    
+    const cDays = [];
+    for (let i = 0; i < padding; i++) cDays.push(null);
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dStr = `${monthStr}-${day.toString().padStart(2, '0')}`;
+      // 미래 날짜 방지
+      if (dStr > todayKST) break;
+      const stats = dailyStats.get(dStr);
+      const timelineDay = timelineDayByDate.get(dStr);
+      cDays.push({
+        date: dStr,
+        isActive: hasLearningActivity(stats),
+        isRestDay: isRestDay(dStr),
+        isProtected: timelineDay?.isProtected || false,
+        isRestBridge: timelineDay?.isRestBridge || false,
+        streakRun: timelineDay?.streakRun || 0,
+        stats: stats || null,
+        isToday: dStr === todayKST
+      });
     }
+    months.push({ label: monthStr, days: cDays });
+
     return months;
-  }, [timelineData.minDate, todayKST, dailyStats, nodesWithProtection]);
+  }, [timelineData, todayKST, dailyStats, selectedMonth]);
 
   // 뷰 전환 시 내부 패널의 시작 지점부터 보이게 유지한다.
   // 모바일에서는 자동 하단 스크롤이 성좌 그래프를 화면 아래로 밀어 보이게 만든다.
@@ -426,6 +492,10 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
   }
 
   const activeDaysCount = timelineData.days.filter(d => d.isActive).length;
+  const selectedMonthActiveDaysCount = visibleTimelineDays.filter(d => d.date.startsWith(selectedMonth) && d.isActive).length;
+  const selectedMonthIndex = availableMonths.indexOf(selectedMonth);
+  const canGoPrevMonth = selectedMonthIndex > 0;
+  const canGoNextMonth = selectedMonthIndex >= 0 && selectedMonthIndex < availableMonths.length - 1;
 
   return (
     <div className={`space-journey-container ${isSupernova ? 'journey-supernova-bg' : isNebula ? 'journey-nebula-bg' : ''}`}>
@@ -465,8 +535,39 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
           </div>
         </div>
         
+        <div className="journey-month-nav" aria-label="월 이동">
+          <button
+            type="button"
+            className="month-nav-btn"
+            disabled={!canGoPrevMonth}
+            onClick={() => {
+              if (!canGoPrevMonth) return;
+              setPopover(null);
+              setSelectedMonth(availableMonths[selectedMonthIndex - 1]);
+            }}
+          >
+            이전 달
+          </button>
+          <div className="month-nav-current">
+            <strong>{formatMonthLabel(selectedMonth)}</strong>
+            <span>{selectedMonthActiveDaysCount}일 탐사 표시 중</span>
+          </div>
+          <button
+            type="button"
+            className="month-nav-btn"
+            disabled={!canGoNextMonth}
+            onClick={() => {
+              if (!canGoNextMonth) return;
+              setPopover(null);
+              setSelectedMonth(availableMonths[selectedMonthIndex + 1]);
+            }}
+          >
+            다음 달
+          </button>
+        </div>
+
         {/* 모드 전환 탭 */}
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             {[
               { id: 'constellation', label: '성좌 뷰', icon: '🌌' },
               { id: 'calendar', label: '달력 뷰', icon: '📅' }
@@ -525,14 +626,16 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
               style={{ left: popover.x, top: popover.y, transform: 'translate(-50%, -100%)', marginTop: '-15px' }}
             >
               <h4>{popover.day.date}</h4>
-              {(popover.day.isActive || popover.day.isProtected) ? (
+              {(popover.day.isActive || popover.day.isProtected || popover.day.isRestBridge) ? (
                 <>
                   <div style={{ color: '#4ade80', fontWeight: 'bold', marginBottom: '10px' }}>
                     {popover.day.isActive && popover.day.isProtected
                       ? '✨ 탐사항해 완료 + 🧊 코어 사용 기록'
                       : popover.day.isActive
                         ? '✨ 탐사항해 완료'
-                        : '🧊 코어 보호 활성화'}
+                        : popover.day.isProtected
+                          ? '🧊 코어 보호 활성화'
+                          : '🌙 휴식일 - 연속일 유지'}
                   </div>
                   <ul className="hologram-details">
                     {popover.day.isActive ? (
@@ -553,6 +656,8 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
                       </>
                     ) : popover.day.isProtected ? (
                       <li>크라이오 코어로 궤도 유지됨</li>
+                    ) : popover.day.isRestBridge ? (
+                      <li>주말/공휴일은 코어를 쓰지 않고 연속일을 유지합니다.</li>
                     ) : null}
                   </ul>
                   {popover.day.streakRun > 0 && (
@@ -577,7 +682,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
         <div className="journey-card">
           <div className="journey-scroll-area" ref={scrollContainerRef}>
             {viewMode === 'constellation' ? (
-              <ConstellationView nodes={timelineData.days} tier={tier} activeColor={activeColor} onStarClick={handleDayClick} />
+              <ConstellationView nodes={visibleTimelineDays} displayMonth={selectedMonth} tier={tier} activeColor={activeColor} onStarClick={handleDayClick} />
             ) : (
               <TraditionalCalendarView months={calendarMonths} tier={tier} activeColor={activeColor} onDayClick={handleDayClick} />
             )}
@@ -596,6 +701,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
 function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
   const thisWeek = timelineDays.slice(-7);
   const dayLabels = ['일', '월', '화', '수', '목', '금', '토'];
+  const today = thisWeek.find(d => d.isToday);
 
   return (
     <div className="streak-bottom-banner">
@@ -605,7 +711,11 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
           </div>
           <h2 style={{ color: streak > 0 ? tier.color : '#94a3b8' }}>
             {streak > 0 
-              ? (thisWeek.find(d => d.isToday)?.isProtected ? `🧊 코어 보호 중 (${streak}일)` : `${streak}일 연속 탐사!`) 
+              ? (today?.isProtected
+                ? `🧊 코어 보호 중 (${streak}일)`
+                : today?.isRestBridge
+                  ? `🌙 휴식일 (${streak}일 유지)`
+                  : `${streak}일 연속 탐사!`)
               : "오늘의 탐사를 시작해보세요!"}
           </h2>
        </div>
@@ -616,16 +726,24 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
                 const d = thisWeek[i];
                 const isActive = d?.isActive;
                 const isProtected = d?.isProtected;
+                const isRestBridge = d?.isRestBridge;
                 const isToday = d?.isToday;
-                const color = isActive ? activeColor : (isProtected ? 'rgba(0, 243, 255, 0.4)' : 'rgba(255,255,255,0.08)');
+                const color = isActive
+                  ? activeColor
+                  : isProtected
+                    ? 'rgba(0, 243, 255, 0.4)'
+                    : isRestBridge
+                      ? 'rgba(148, 163, 184, 0.22)'
+                      : 'rgba(255,255,255,0.08)';
                 
                 return (
                   <div key={wd} className="day-column">
                     <span className={`day-label ${isToday ? 'banner-today-label' : ''}`}>{wd}</span>
-                    <div className={`bar-segment ${isActive ? 'active' : ''} ${isProtected ? 'protected' : ''}`} style={{ backgroundColor: color }}>
+                    <div className={`bar-segment ${isActive ? 'active' : ''} ${isProtected ? 'protected' : ''} ${isRestBridge ? 'rest-bridge' : ''}`} style={{ backgroundColor: color }}>
                        {isToday && <div className="today-indicator" style={{ borderColor: isProtected ? 'var(--crystal-cyan)' : activeColor }} />}
                        {isActive && <div className="bar-glow" style={{ boxShadow: `0 0 10px ${activeColor}` }}></div>}
                        {isProtected && <div className="freeze-icon" style={{ fontSize: '0.8rem', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>🧊</div>}
+                       {!isProtected && isRestBridge && <div className="rest-icon" style={{ fontSize: '0.7rem', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#cbd5e1' }}>휴</div>}
                     </div>
                   </div>
                 );
@@ -633,7 +751,8 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
           </div>
        </div>
         <p className="banner-cheer">
-         {thisWeek.find(d => d.isToday)?.isProtected ? "활동을 쉬어가는 날입니다. 크라이오 코어가 궤도를 보호하고 있어요!" :
+         {today?.isProtected ? "크라이오 코어가 평일 공백을 방어하고 있어요!" :
+          today?.isRestBridge ? "주말/공휴일은 쉬어도 연속일이 유지됩니다. 코어는 사용하지 않아요." :
           streak >= 7 ? "와우! 일주일 내내 완벽한 연속 학습을 달성했어요!" : 
           streak > 0 ? "매일매일 새로운 지식의 항로를 개척하고 있어요!" :
           "단원을 완료하고 지식의 궤적에 처음으로 불을 밝혀보세요!"}
@@ -645,7 +764,7 @@ function BottomStreakBanner({ streak, tier, activeColor, timelineDays }) {
 // ------------------------------------------
 // 서브 컴포넌트: Constellation View (성좌 뷰)
 // ------------------------------------------
-function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
+function ConstellationView({ nodes, displayMonth, tier, activeColor, onStarClick }) {
   const [isMobileConstellation, setIsMobileConstellation] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   ));
@@ -690,25 +809,9 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
 
   const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-  // 월 구분 마커 추적
-  let currentMonth = '';
-  const monthsData = [];
-  
-  nodePositions.forEach((node, i) => {
-    const m = node.date.slice(0, 7);
-    if (m !== currentMonth) {
-      currentMonth = m;
-      
-      const last = monthsData[monthsData.length - 1];
-      // 같은 주(wIdx)에 달이 바뀌면 안 겹치도록 기존 월을 덮어씀 (예: 1월 31일 패딩)
-      if (last && last.wIdx === node.wIdx) {
-        last.month = m;
-      } else {
-        // 각 월의 첫 주 라디우스 근처에 Y 앵커 지정
-        monthsData.push({ month: m, y: node.y, wIdx: node.wIdx });
-      }
-    }
-  });
+  const monthsData = nodePositions.length > 0
+    ? [{ month: displayMonth || nodePositions[0].date.slice(0, 7), y: nodePositions[0].y, wIdx: nodePositions[0].wIdx }]
+    : [];
 
   return (
     <div className="constellation-wrapper">
@@ -778,8 +881,8 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
 
         {/* 빛의 궤적 선분 (Lines) */}
         {nodePositions.map((node, i) => {
-          if (node.connectsNext) {
-            const next = nodePositions[i + 1];
+          const next = nodePositions[i + 1];
+          if (node.connectsNext && next) {
             return (
               <motion.line
                 key={`line-${i}`}
@@ -802,6 +905,7 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
         {nodePositions.map((node, i) => {
           // 크기와 광채(히트맵) 계산
           const crystals = node.stats?.crystals || 0;
+          const isStreakNode = node.isActive || node.isProtected || node.isRestBridge;
           let r = isMobileConstellation ? 5 : 8;
           let glowIntensity = 1;
 
@@ -813,23 +917,25 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
             <g
               key={`star-${i}`} 
               transform={`translate(${node.x}, ${node.y})`} 
-              className={`star-node ${(node.isActive || node.isProtected) ? 'active' : ''}`}
+              className={`star-node ${isStreakNode ? 'active' : ''} ${node.isRestBridge ? 'rest-bridge' : ''}`}
               style={{ cursor: 'pointer' }}
               onClick={(e) => onStarClick(e, node)}
             >
-              {(node.isActive || node.isProtected) ? (
+              {isStreakNode ? (
                 <>
                   <circle 
                     r={r} 
-                    fill={node.isProtected ? 'rgba(0, 243, 255, 0.3)' : activeColor} 
+                    fill={node.isProtected ? 'rgba(0, 243, 255, 0.3)' : node.isRestBridge ? 'rgba(148, 163, 184, 0.22)' : activeColor} 
                     className="core" 
                     filter={node.isToday ? 'url(#glow-star)' : undefined}
-                    opacity={glowIntensity}
-                    style={{ stroke: node.isProtected ? 'var(--crystal-cyan)' : 'none', strokeWidth: 2 }}
+                    opacity={node.isRestBridge ? 0.8 : glowIntensity}
+                    style={{ stroke: node.isProtected ? 'var(--crystal-cyan)' : node.isRestBridge ? 'rgba(203, 213, 225, 0.55)' : 'none', strokeWidth: 2 }}
                   />
                   {/* 별빛 중심점 - Only for active stars, Use ice for protected */}
                   {node.isProtected ? (
                     <text textAnchor="middle" dy=".3em" fontSize={r} style={{ pointerEvents: 'none' }}>🧊</text>
+                  ) : node.isRestBridge ? (
+                    <text textAnchor="middle" dy=".3em" fontSize={Math.max(6, r * 0.9)} fill="#cbd5e1" fontWeight="800" style={{ pointerEvents: 'none' }}>휴</text>
                   ) : (
                     <path 
                       d={`M0,-${r/1.5} L${r/3},-${r/3} L${r/1.5},0 L${r/3},${r/3} L0,${r/1.5} L-${r/3},${r/3} L-${r/1.5},0 L-${r/3},-${r/3} Z`}
@@ -851,11 +957,11 @@ function ConstellationView({ nodes, tier, activeColor, onStarClick }) {
 
               {/* 밝게 보이는 날짜 텍스트 */}
               <text 
-                y={(node.isActive || node.isProtected) ? r + (isMobileConstellation ? 8 : 16) : (isMobileConstellation ? 7 : 12)}
+                y={isStreakNode ? r + (isMobileConstellation ? 8 : 16) : (isMobileConstellation ? 7 : 12)}
                 textAnchor="middle" 
-                fill={(node.isActive || node.isProtected) ? '#e2e8f0' : '#475569'} 
-                fontSize={(node.isActive || node.isProtected) ? (isMobileConstellation ? "6" : "12") : (isMobileConstellation ? "5" : "11")}
-                fontWeight={(node.isActive || node.isProtected) ? '800' : 'normal'} 
+                fill={isStreakNode ? '#e2e8f0' : '#475569'} 
+                fontSize={isStreakNode ? (isMobileConstellation ? "6" : "12") : (isMobileConstellation ? "5" : "11")}
+                fontWeight={isStreakNode ? '800' : 'normal'} 
                 style={{ pointerEvents: 'none' }}
               >
                 {node.date.slice(8, 10)}
@@ -893,7 +999,7 @@ function TraditionalCalendarView({ months, tier, activeColor, onDayClick }) {
                return (
                 <div 
                   key={day.date} 
-                  className={`cal-cell clickable ${day.isActive ? 'active' : ''} ${day.isProtected ? 'protected' : ''} ${day.isToday ? 'today' : ''}`}
+                  className={`cal-cell clickable ${day.isActive ? 'active' : ''} ${day.isProtected ? 'protected' : ''} ${day.isRestBridge ? 'rest-bridge' : ''} ${day.isToday ? 'today' : ''}`}
                   onClick={(e) => onDayClick(e, day)}
                 >
                   <span className="cal-date-num">{parseInt(day.date.slice(8, 10), 10)}</span>
@@ -904,6 +1010,7 @@ function TraditionalCalendarView({ months, tier, activeColor, onDayClick }) {
                     />
                   )}
                   {day.isProtected && <div className="freeze-icon-mini">🧊</div>}
+                  {!day.isProtected && day.isRestBridge && <div className="rest-icon-mini">휴</div>}
                 </div>
               );
             })}

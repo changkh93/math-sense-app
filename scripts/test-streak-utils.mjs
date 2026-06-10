@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   calculateStreakFromHistory,
   calculateStreakUpdate,
+  extractDefendedDates,
   extractLearningActivityDates,
   getEffectiveStreak,
   getCurrentGapDefendedDates,
@@ -43,6 +44,19 @@ function run() {
     [{ type: 'transmission_reward', timestamp: '2026-04-05T01:00:00+09:00' }]
   )).sort();
   assert.deepEqual(derivedActiveDates, ['2026-04-05']);
+
+  const explicitRestDefenseDates = Array.from(extractDefendedDates([
+    {
+      type: 'streak_freeze',
+      metadata: { defendedDates: ['2026-05-22', '2026-05-23', '2026-05-24'] },
+    },
+  ], {}, new Map())).sort();
+  assert.deepEqual(explicitRestDefenseDates, ['2026-05-22']);
+
+  const legacyRestOnlyFreezeDates = Array.from(extractDefendedDates([
+    { type: 'streak_freeze', timestamp: '2026-05-25T10:00:00+09:00' },
+  ], {}, new Map([['2026-05-22', { quizzes: 1 }]]))).sort();
+  assert.deepEqual(legacyRestOnlyFreezeDates, []);
 
   const repairedState = recalculateStreakState(
     ['2026-04-01', '2026-04-03'],

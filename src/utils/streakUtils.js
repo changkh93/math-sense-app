@@ -619,7 +619,9 @@ export function extractDefendedDates(transactions, userData, dailyStats) {
   // 1. future-format streak_freeze transactions with explicit defendedDates
   (transactions || []).forEach(t => {
     if (t.type === 'streak_freeze' && t.metadata?.defendedDates) {
-      t.metadata.defendedDates.forEach(d => protectionSet.add(d));
+      t.metadata.defendedDates
+        .filter(d => !isRestDay(d))
+        .forEach(d => protectionSet.add(d));
     }
   });
 
@@ -644,7 +646,9 @@ export function extractDefendedDates(transactions, userData, dailyStats) {
           for (let j = 0; j < gap; j++) {
             scanObj.setUTCDate(scanObj.getUTCDate() + 1);
             const dStr = scanObj.toISOString().split('T')[0];
-            protectionSet.add(dStr);
+            if (!isRestDay(dStr)) {
+              protectionSet.add(dStr);
+            }
           }
         }
       }
