@@ -218,6 +218,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /studyCrewMissionPlans/{dateKey} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
     match /studyCrewDailyMissions/{scopeKey} {
       allow read: if isAuth();
       allow write: if false;

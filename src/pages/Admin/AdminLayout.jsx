@@ -47,7 +47,7 @@ const AdminLayout = () => {
           </Link>
           <Link to="/admin/crews" className="nav-link">
             <UserCheck size={20} />
-            <span>스터디 크루 승인</span>
+            <span>스터디 크루 관리</span>
           </Link>
           <Link to="/admin/content" className="nav-link">
             <Layers size={20} />

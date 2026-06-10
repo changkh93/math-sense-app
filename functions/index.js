@@ -2072,8 +2072,37 @@ function getStudyCrewMissionForDate(dateKey) {
   return STUDY_CREW_DAILY_MISSIONS[numericSeed % STUDY_CREW_DAILY_MISSIONS.length];
 }
 
+function resolveStudyCrewMissionForDate(dateKey, planData = null) {
+  if (planData?.disabled === true) {
+    return { disabled: true };
+  }
+  const title = String(planData?.title || "").trim();
+  const prompt = String(planData?.prompt || "").trim();
+  if (title && prompt) {
+    return {
+      id: String(planData.missionId || `admin_${dateKey}`).slice(0, 80),
+      category: String(planData.category || "운영 미션").slice(0, 40),
+      title: title.slice(0, 50),
+      prompt: prompt.slice(0, 180),
+      source: "admin",
+    };
+  }
+  return {
+    ...getStudyCrewMissionForDate(dateKey),
+    source: "default",
+  };
+}
+
 function getStudyCrewMissionScopeKey(scopeType, scopeId) {
   return `${scopeType}_${String(scopeId || "").replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
+function validateStudyCrewMissionDateKey(dateKey) {
+  const value = String(dateKey || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new functions.https.HttpsError("invalid-argument", "날짜 형식이 올바르지 않습니다.");
+  }
+  return value;
 }
 
 const OPEN_STUDY_POOLS = {
@@ -3121,15 +3150,17 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
     : db.collection("studyRooms").doc(scopeId);
   const now = new Date();
   const dateKey = getKstDateKey(now);
-  const mission = getStudyCrewMissionForDate(dateKey);
+  const planRef = db.collection("studyCrewMissionPlans").doc(dateKey);
   const scopeKey = getStudyCrewMissionScopeKey(scopeType, scopeId);
   const missionRef = db.collection("studyCrewDailyMissions").doc(scopeKey).collection("days").doc(dateKey);
   const responseRef = missionRef.collection("responses").doc(uid);
 
+  let savedMission = null;
   await db.runTransaction(async (tx) => {
-    const [userSnap, scopeSnap, responseSnap] = await Promise.all([
+    const [userSnap, scopeSnap, planSnap, responseSnap] = await Promise.all([
       tx.get(userRef),
       tx.get(scopeRef),
+      tx.get(planRef),
       tx.get(responseRef),
     ]);
 
@@ -3142,6 +3173,11 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
 
     const userData = userSnap.data() || {};
     const scopeData = scopeSnap.data() || {};
+    const mission = resolveStudyCrewMissionForDate(dateKey, planSnap.exists ? (planSnap.data() || {}) : null);
+    if (mission.disabled) {
+      throw new functions.https.HttpsError("failed-precondition", "오늘의 크루 미션이 운영자에 의해 비활성화되었습니다.");
+    }
+    savedMission = mission;
     let targetIds = [];
     if (scopeType === "crew") {
       targetIds = getCrewMemberIds(scopeData);
@@ -3191,7 +3227,89 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
   return {
     success: true,
     dateKey,
+    mission: savedMission,
+  };
+});
+
+exports.getStudyCrewMissionAdmin = regionalFunctions.https.onCall(async (data, context) => {
+  await requireAdminUid(context);
+  const db = admin.firestore();
+  const dateKey = validateStudyCrewMissionDateKey(data?.dateKey || getKstDateKey());
+  const planSnap = await db.collection("studyCrewMissionPlans").doc(dateKey).get();
+  const plan = planSnap.exists ? ({ id: planSnap.id, ...planSnap.data() }) : null;
+  const mission = resolveStudyCrewMissionForDate(dateKey, plan);
+
+  return {
+    dateKey,
+    plan,
     mission,
+    defaultMission: getStudyCrewMissionForDate(dateKey),
+    templates: STUDY_CREW_DAILY_MISSIONS,
+  };
+});
+
+exports.saveStudyCrewMissionAdmin = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAdminUid(context);
+  const dateKey = validateStudyCrewMissionDateKey(data?.dateKey || getKstDateKey());
+  const title = String(data?.title || "").trim().slice(0, 50);
+  const prompt = String(data?.prompt || "").trim().slice(0, 180);
+  const category = String(data?.category || "운영 미션").trim().slice(0, 40);
+  const missionId = String(data?.missionId || `admin_${dateKey}`).trim().replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80);
+
+  if (!title || !prompt) {
+    throw new functions.https.HttpsError("invalid-argument", "미션 제목과 설명을 입력해주세요.");
+  }
+
+  const now = new Date();
+  const planRef = admin.firestore().collection("studyCrewMissionPlans").doc(dateKey);
+  await planRef.set({
+    dateKey,
+    missionId: missionId || `admin_${dateKey}`,
+    category,
+    title,
+    prompt,
+    maxLength: STUDY_CREW_MISSION_MAX_LENGTH,
+    disabled: false,
+    source: "admin",
+    updatedAt: now,
+    updatedBy: uid,
+    createdAt: now,
+  }, { merge: true });
+
+  return {
+    success: true,
+    dateKey,
+    mission: resolveStudyCrewMissionForDate(dateKey, { missionId, category, title, prompt }),
+  };
+});
+
+exports.deleteStudyCrewMissionAdmin = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAdminUid(context);
+  const dateKey = validateStudyCrewMissionDateKey(data?.dateKey || getKstDateKey());
+  const mode = String(data?.mode || "disable").trim();
+  const planRef = admin.firestore().collection("studyCrewMissionPlans").doc(dateKey);
+
+  if (mode === "default") {
+    await planRef.delete();
+    return {
+      success: true,
+      dateKey,
+      mission: resolveStudyCrewMissionForDate(dateKey, null),
+    };
+  }
+
+  await planRef.set({
+    dateKey,
+    disabled: true,
+    source: "admin",
+    updatedAt: new Date(),
+    updatedBy: uid,
+  }, { merge: true });
+
+  return {
+    success: true,
+    dateKey,
+    mission: { disabled: true },
   };
 });
 
