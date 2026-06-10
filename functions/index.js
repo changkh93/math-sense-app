@@ -2134,9 +2134,9 @@ function isActiveOpenStudyRoom(roomData = {}, nowMs = Date.now()) {
   if (status === "ended") return false;
   const baseMs = getTimestampMillis(roomData.startedAt) || getTimestampMillis(roomData.createdAt) || getTimestampMillis(roomData.lastActivityAt);
   if (!baseMs) return true;
+  if (status === "waiting") return nowMs < baseMs + 5 * 60 * 1000;
   const durationMs = (Number(roomData.durationMinutes) || 50) * 60 * 1000;
-  const graceMs = status === "waiting" ? 30 * 60 * 1000 : 10 * 60 * 1000;
-  return nowMs < baseMs + durationMs + graceMs;
+  return nowMs < baseMs + durationMs + 10 * 60 * 1000;
 }
 
 const OPEN_STUDY_PARTICIPANT_STALE_MS = 2 * 60 * 1000;
@@ -2174,6 +2174,77 @@ async function getFreshOpenStudyParticipantState(tx, roomRef, roomData = {}, now
   });
 
   return { activeIds, staleIds };
+}
+
+async function syncOpenStudyRoomParticipantsTransaction(tx, db, roomRef, roomData = {}, now = new Date()) {
+  const nowMs = now.getTime();
+  const participantState = await getFreshOpenStudyParticipantState(tx, roomRef, roomData, nowMs);
+  const activeIds = participantState.activeIds;
+  const staleIds = participantState.staleIds;
+  const poolId = roomData.poolId || "free";
+  const poolRef = db.collection("openStudyPools").doc(poolId);
+  const poolSnap = await tx.get(poolRef);
+  const poolData = poolSnap.exists ? (poolSnap.data() || {}) : {};
+
+  staleIds.forEach((participantId) => {
+    tx.delete(roomRef.collection("participants").doc(participantId));
+  });
+
+  if (!activeIds.length) {
+    tx.set(roomRef, {
+      participantIds: [],
+      participantCount: 0,
+      status: "ended",
+      endedAt: roomData.endedAt || now,
+      lastActivityAt: now,
+    }, { merge: true });
+
+    if (poolData.currentRoomId === roomRef.id) {
+      tx.set(poolRef, {
+        currentRoomId: "",
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    return { activeIds, staleIds, status: "ended" };
+  }
+
+  const existingHostUid = roomData.hostUid || "";
+  const nextHostUid = activeIds.includes(existingHostUid) ? existingHostUid : activeIds[0];
+  let nextHostName = roomData.hostName || "탐사원";
+  if (nextHostUid !== existingHostUid) {
+    const nextHostSnap = await tx.get(db.collection("users").doc(nextHostUid));
+    nextHostName = nextHostSnap.exists ? getDisplayNameFromUser(nextHostSnap.data() || {}) : "탐사원";
+    tx.set(roomRef.collection("participants").doc(nextHostUid), {
+      role: "host",
+    }, { merge: true });
+  }
+
+  const nextStatus = activeIds.length >= 2 ? "live" : "waiting";
+  const maxParticipants = Number(roomData.maxParticipants || OPEN_STUDY_POOLS[poolId]?.maxParticipants || 3);
+  const roomUpdate = {
+    participantIds: activeIds,
+    participantCount: activeIds.length,
+    hostUid: nextHostUid,
+    hostName: nextHostName,
+    status: nextStatus,
+    lastActivityAt: now,
+  };
+
+  if (nextStatus === "live" && !roomData.startedAt) {
+    roomUpdate.startedAt = now;
+  }
+
+  tx.set(roomRef, roomUpdate, { merge: true });
+
+  if (poolData.currentRoomId === roomRef.id || activeIds.length < maxParticipants) {
+    tx.set(poolRef, {
+      currentRoomId: activeIds.length < maxParticipants ? roomRef.id : "",
+      updatedAt: now,
+    }, { merge: true });
+  }
+
+  return { activeIds, staleIds, status: nextStatus };
 }
 
 function getOwnedProfileFrames(userData = {}) {
@@ -3875,6 +3946,34 @@ exports.deliverScheduledDirectMemos = regionalFunctions.pubsub
           }, { merge: true });
           createDirectMemoNotification(tx, memoRef, deliveredMemo);
         });
+      });
+    }
+
+    return null;
+  });
+
+exports.sweepOpenStudyRooms = regionalFunctions.pubsub
+  .schedule("every 1 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = new Date();
+    const roomSnap = await db.collection("studyRooms")
+      .where("roomType", "==", "openStudy")
+      .limit(100)
+      .get();
+
+    const rooms = roomSnap.docs
+      .map((docSnap) => ({ ref: docSnap.ref, data: docSnap.data() || {} }))
+      .filter((room) => (room.data.status || "waiting") !== "ended");
+
+    for (const room of rooms) {
+      await db.runTransaction(async (tx) => {
+        const freshRoomSnap = await tx.get(room.ref);
+        if (!freshRoomSnap.exists) return;
+        const roomData = freshRoomSnap.data() || {};
+        if (roomData.roomType !== "openStudy" || (roomData.status || "waiting") === "ended") return;
+        await syncOpenStudyRoomParticipantsTransaction(tx, db, freshRoomSnap.ref, roomData, now);
       });
     }
 

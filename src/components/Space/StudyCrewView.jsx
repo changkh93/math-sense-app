@@ -76,9 +76,9 @@ function isActiveStudyRoom(room) {
   const timestamp = room?.startedAt || room?.createdAt || room?.lastActivityAt;
   const baseMs = timestamp?.toMillis?.() || 0;
   if (!baseMs) return true;
+  if (status === 'waiting') return Date.now() < baseMs + 5 * 60 * 1000;
   const durationMs = (room?.durationMinutes || 50) * 60 * 1000;
-  const graceMs = status === 'waiting' ? 30 * 60 * 1000 : 10 * 60 * 1000;
-  return Date.now() < baseMs + durationMs + graceMs;
+  return Date.now() < baseMs + durationMs + 10 * 60 * 1000;
 }
 
 function FounderLetterPanel({ crew, founderId, founderName, currentUid }) {
