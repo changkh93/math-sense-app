@@ -7,6 +7,7 @@ import './NotificationMenu.css';
 
 function NotificationIcon({ type }) {
   if (type === 'reply') return <MessageCircle size={17} />;
+  if (type === 'assignment_share_comment') return <MessageCircle size={17} />;
   if (type === 'memo') return <Mail size={17} />;
   if (type === 'assignment_missing') return <CalendarX size={17} />;
   if (type === 'assignment_warning') return <AlertTriangle size={17} />;
@@ -17,6 +18,7 @@ function NotificationIcon({ type }) {
 
 function getNotificationIconClass(type) {
   if (type === 'memo') return 'memo';
+  if (type === 'assignment_share_comment') return 'reply';
   if (type === 'assignment_missing') return 'assignment-missing';
   if (type === 'assignment_warning') return 'assignment-warning';
   if (type === 'assignment_bonus') return 'assignment-bonus';

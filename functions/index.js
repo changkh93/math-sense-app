@@ -1455,6 +1455,50 @@ exports.commentAssignmentShare = regionalFunctions.https.onCall(async (data, con
   }
 });
 
+exports.notifyAssignmentShareCommentCreated = regionalFunctions.firestore
+  .document("assignmentShares/{shareId}/comments/{commentId}")
+  .onCreate(async (snap, context) => {
+    const comment = snap.data() || {};
+    const shareId = context.params.shareId;
+    const commentId = context.params.commentId;
+    const commenterId = comment.userId || "";
+    const commenterName = String(comment.userName || "탐험가").trim() || "탐험가";
+    const content = String(comment.content || "").trim();
+
+    if (!shareId || !commentId || !commenterId) return null;
+
+    const db = admin.firestore();
+    const shareRef = db.collection("assignmentShares").doc(shareId);
+    const shareSnap = await shareRef.get();
+    if (!shareSnap.exists) return null;
+
+    const share = shareSnap.data() || {};
+    const ownerId = share.ownerId;
+    if (!ownerId || ownerId === commenterId) return null;
+
+    const shareKindLabel = share.kind === "comfort" ? "위로 요청" : "기록 공개";
+    const commentPreview = content ? ` “${content.slice(0, 40)}${content.length > 40 ? "…" : ""}”` : "";
+
+    await db.collection("notifications").doc(`assignment_share_comment_${shareId}_${commentId}`).set({
+      recipientId: ownerId,
+      type: "assignment_share_comment",
+      message: `${commenterName}님이 ${shareKindLabel}에 댓글을 남겼습니다.${commentPreview}`,
+      link: `/agora?filter=archive&highlight=${shareId}`,
+      isRead: false,
+      createdAt: FieldValue.serverTimestamp(),
+      metadata: {
+        shareId,
+        commentId,
+        commenterId,
+        commenterName,
+        assignmentId: share.assignment?.assignmentId || "",
+        kind: share.kind || "archive",
+      },
+    }, { merge: true });
+
+    return null;
+  });
+
 function buildCrewSnapshot(crewId, crewData, memberSummaries = [], greetings = []) {
   return {
     id: crewId,

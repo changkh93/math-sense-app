@@ -79,7 +79,14 @@ function AssignmentShareComments({ shareId }) {
   const { user } = useAuth();
   const { data: comments = [], isLoading } = useAssignmentShareComments(shareId);
   const { comment: commentMutation } = useAssignmentShareMutations();
+  const inputRef = useRef(null);
   const trimmed = comment.trim();
+  const quickReplies = [
+    '고생했어요!',
+    '대단해요, 배울 점이 많아요.',
+    '어려웠던 부분이 어디였나요?',
+    '다음 기록도 기대돼요.'
+  ];
 
   const handleSubmit = async () => {
     if (!trimmed || commentMutation.isPending) return;
@@ -87,8 +94,29 @@ function AssignmentShareComments({ shareId }) {
     setComment('');
   };
 
+  const handleQuickReply = (text) => {
+    setComment(prev => {
+      const current = String(prev || '').trim();
+      return current ? `${current} ${text}` : text;
+    });
+    inputRef.current?.focus();
+  };
+
   return (
     <div className="assignment-share-comments">
+      <div className="assignment-share-quick-replies">
+        {quickReplies.map((reply) => (
+          <button
+            key={reply}
+            type="button"
+            className="assignment-share-quick-reply"
+            onClick={() => handleQuickReply(reply)}
+          >
+            {reply}
+          </button>
+        ))}
+      </div>
+      <div className="assignment-share-muted">빠른 문구를 누르면 댓글 칸에 들어갑니다. 바로 등록하거나 조금 더 덧붙여도 됩니다.</div>
       <div className="assignment-share-comment-list">
         {isLoading ? (
           <div className="assignment-share-muted">댓글을 불러오는 중...</div>
@@ -103,6 +131,7 @@ function AssignmentShareComments({ shareId }) {
       </div>
       <div className="assignment-share-comment-input">
         <input
+          ref={inputRef}
           value={comment}
           onChange={(event) => setComment(event.target.value)}
           onKeyDown={(event) => {
