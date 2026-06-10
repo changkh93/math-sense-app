@@ -11,6 +11,7 @@ import {
   getPublicProfile,
   normalizeOwnedFrames
 } from '../../utils/socialUtils';
+import './ProfileEditView.css';
 
 const sectionTitleStyle = {
   color: 'var(--text-bright)',
@@ -21,10 +22,10 @@ const sectionTitleStyle = {
 
 function Field({ label, children, hint }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <label className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.9rem' }}>{label}</label>
+    <div className="profile-edit-field">
+      <label className="profile-edit-label font-tech">{label}</label>
       {children}
-      {hint && <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: '1.45', margin: 0 }}>{hint}</p>}
+      {hint && <p className="profile-edit-hint font-tech">{hint}</p>}
     </div>
   );
 }
@@ -231,7 +232,7 @@ export default function ProfileEditView({ onBack }) {
         <Motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card hud-border"
+          className="glass-card hud-border profile-edit-panel"
           style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}
         >
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
@@ -265,16 +266,10 @@ export default function ProfileEditView({ onBack }) {
             <section>
               <h3 className="font-tech" style={sectionTitleStyle}>🪪 공개 프로필 명함</h3>
 
-              <div style={{
-                padding: '1.4rem',
-                borderRadius: '20px',
-                border: `1px solid ${publicProfile.frameAccent}55`,
+              <div className="profile-preview-card" style={{
+                borderColor: `${publicProfile.frameAccent}55`,
                 background: publicProfile.frameBackground,
-                boxShadow: `0 0 24px ${publicProfile.frameAccent}20`,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.65rem',
-                marginBottom: '1.5rem'
+                boxShadow: `0 0 24px ${publicProfile.frameAccent}20`
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                   <div>
@@ -308,17 +303,25 @@ export default function ProfileEditView({ onBack }) {
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-                <Field label="공개 프로필 사용">
-                  <label className="font-tech" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-bright)' }}>
+              <div className="public-profile-settings">
+                <div className="public-profile-toggle-card">
+                  <div>
+                    <div className="public-profile-toggle-title font-tech">공개 프로필 사용</div>
+                    <p className="public-profile-toggle-copy font-tech">
+                      답변과 랭킹 카드에 위 명함 정보가 표시됩니다.
+                    </p>
+                  </div>
+                  <label className="profile-switch" aria-label="공개 프로필 사용">
                     <input
                       type="checkbox"
                       checked={formData.publicProfileEnabled}
                       onChange={(e) => setFormData({ ...formData, publicProfileEnabled: e.target.checked })}
                     />
-                    답변과 랭킹 카드에서 공개 프로필 사용
+                    <span className="profile-switch-track">
+                      <span className="profile-switch-thumb" />
+                    </span>
                   </label>
-                </Field>
+                </div>
 
                 <Field label="공개 표시 이름" hint="질문자는 익명 처리되고, 답변/랭킹 카드에만 노출됩니다.">
                   <input
@@ -395,40 +398,29 @@ export default function ProfileEditView({ onBack }) {
                   return (
                     <div
                       key={cluster.docId}
+                      className="schedule-cluster-card"
                       style={{
-                        background: 'rgba(0,0,0,0.3)',
-                        border: `1px solid ${isParticipatingAny ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.1)'}`,
-                        borderRadius: '12px',
-                        padding: '1.5rem',
-                        transition: 'all 0.3s ease'
+                        borderColor: isParticipatingAny ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.12)'
                       }}
                     >
-                      <h4 className="font-title" style={{ color: isParticipatingAny ? 'var(--crystal-cyan)' : 'var(--text-muted)', marginBottom: '1rem', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                        {cluster.name}
-                        {isParticipatingAny && <span style={{ fontSize: '1rem' }}>✅ 참여중</span>}
+                      <h4 className="schedule-cluster-title font-title" style={{ color: isParticipatingAny ? 'var(--crystal-cyan)' : 'var(--text-muted)' }}>
+                        <span>{cluster.name}</span>
+                        <span className={`schedule-status-pill font-tech ${isParticipatingAny ? 'active' : ''}`}>
+                          {isParticipatingAny ? '참여중' : '요일 선택'}
+                        </span>
                       </h4>
 
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem' }}>
-                        {availableDays.map(day => {
+                      <div className="schedule-days-grid">
+                        {['월', '화', '수', '목', '금', '토', '일'].map(day => {
+                          const isAvailable = availableDays.includes(day);
                           const isSelected = selectedDaysForCluster.includes(day);
                           return (
                             <button
                               type="button"
                               key={day}
+                              disabled={!isAvailable}
                               onClick={() => handleDaySelect(cluster.docId, day)}
-                              className={`font-tech ${isSelected ? 'glitch-warp' : ''}`}
-                              style={{
-                                padding: '0.5rem 1.2rem',
-                                borderRadius: '30px',
-                                fontSize: '1rem',
-                                fontWeight: 'bold',
-                                color: isSelected ? '#000' : 'var(--text-bright)',
-                                background: isSelected ? 'var(--crystal-cyan)' : 'var(--glass-bg)',
-                                border: `1px solid ${isSelected ? 'var(--crystal-cyan)' : 'var(--glass-border)'}`,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                boxShadow: isSelected ? '0 0 15px rgba(0, 212, 255, 0.4)' : 'none'
-                              }}
+                              className={`schedule-day-btn font-tech ${isSelected ? 'selected' : ''}`}
                             >
                               {day}요일
                             </button>

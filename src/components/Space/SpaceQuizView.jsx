@@ -32,6 +32,7 @@ const QUIZ_REACTION_CHOICES = [
   { id: 'missed_condition', label: '문제 조건을 놓쳐서 틀렸어요', tone: '#fb7185', review: true },
   { id: 'solution_blocked', label: '풀이 방법에서 막혀서 틀렸어요', tone: '#a78bfa', review: true },
   { id: 'guessed_concept_gap', label: '개념을 몰라서 찍었어요', tone: '#38bdf8', review: true },
+  { id: 'careless_mistake', label: '아는데 실수해서 틀렸어요', tone: '#fb923c', review: true },
 ]
 
 const REACTION_CAUSE_LABELS = {
@@ -40,9 +41,10 @@ const REACTION_CAUSE_LABELS = {
   missed_condition: '조건 놓침',
   solution_blocked: '풀이 방법 막힘',
   guessed_concept_gap: '개념 공백/찍음',
+  careless_mistake: '아는 내용 실수',
 }
 
-const REVIEW_REACTION_IDS = new Set(['uncertain_correct', 'missed_condition', 'solution_blocked', 'guessed_concept_gap'])
+const REVIEW_REACTION_IDS = new Set(['uncertain_correct', 'missed_condition', 'solution_blocked', 'guessed_concept_gap', 'careless_mistake'])
 const MotionReactionPanel = motion.div
 
 const makeQuizQuestionStatId = (unitId, questionId) => encodeURIComponent(`${unitId || 'unknown'}__${questionId || 'unknown'}`)
@@ -1850,75 +1852,73 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   <div style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '1.5rem' }}>{displayedStats.correctRate}%</div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>이 문제 정답률</div>
                 </div>
+                {currentQuestion && (
+                  <div style={{
+                    flex: '1 1 320px',
+                    minHeight: 76,
+                    padding: '0.75rem 0.9rem',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, rgba(250,204,21,0.11), rgba(15,23,42,0.28))',
+                    border: '1px solid rgba(250,204,21,0.26)',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.8rem'
+                  }}>
+                    <div>
+                      <div style={{ color: '#fef3c7', fontWeight: 950, fontSize: '0.95rem' }}>
+                        {hasMistakeExplanation ? '오답노트에 저장' : '운영툴 발행 대기'}
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.16rem', lineHeight: 1.35 }}>
+                        {hasMistakeExplanation
+                          ? 'AI 설명 카드로 바로 발행합니다.'
+                          : '해설 완성 후 카드로 발행됩니다.'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddToMistakeNotebook}
+                      disabled={createMistakeCard.isPending || currentQuestionSaved}
+                      style={{
+                        minHeight: 40,
+                        padding: '0.58rem 0.9rem',
+                        borderRadius: '12px',
+                        border: currentQuestionSaved ? '1px solid rgba(74,222,128,0.45)' : '1px solid rgba(250,204,21,0.54)',
+                        background: currentQuestionSaved ? 'rgba(34,197,94,0.14)' : 'rgba(250,204,21,0.14)',
+                        color: currentQuestionSaved ? '#bbf7d0' : '#fde68a',
+                        fontWeight: 900,
+                        whiteSpace: 'nowrap',
+                        cursor: createMistakeCard.isPending || currentQuestionSaved ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {createMistakeCard.isPending ? '저장 중...' : currentQuestionSaved ? '처리됨' : '오답노트에 담기'}
+                    </button>
+                    {mistakeCardMessage && (
+                      <div style={{
+                        flexBasis: '100%',
+                        color: mistakeCardMessage.includes('못') || mistakeCardMessage.includes('없습니다') ? '#fecaca' : '#bbf7d0',
+                        fontSize: '0.8rem',
+                        fontWeight: 800
+                      }}>
+                        {mistakeCardMessage}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div style={{
-                margin: '1.2rem 0 0.75rem',
-                padding: '0.85rem 1rem',
-                borderRadius: '16px',
-                background: 'linear-gradient(135deg, rgba(0,243,255,0.12), rgba(251,191,36,0.08))',
-                border: '1px solid rgba(0,243,255,0.22)',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 12px 28px rgba(0,0,0,0.22)'
+                margin: '1.15rem 0 0.7rem',
+                padding: '0 0.2rem'
               }}>
-                <div style={{ color: 'var(--text-bright)', fontWeight: 950, marginBottom: '0.2rem', fontSize: '1.05rem' }}>
+                <div style={{ color: 'var(--text-bright)', fontWeight: 950, marginBottom: '0.18rem', fontSize: '1.05rem' }}>
                   내 이해 상태를 선택하세요
                 </div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                   아래 버튼 중 하나를 눌러야 집계가 저장되고 다음 문제로 이동합니다.
                 </div>
               </div>
-              {currentQuestion && (
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '0.7rem',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  margin: '0 0 1rem',
-                  padding: '0.9rem 1rem',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, rgba(250,204,21,0.12), rgba(168,85,247,0.08))',
-                  border: '1px solid rgba(250,204,21,0.24)'
-                }}>
-                  <div>
-                    <div style={{ color: '#fef3c7', fontWeight: 950 }}>
-                      {hasMistakeExplanation ? '이 문제를 오답노트에 저장' : 'AI 설명 없이 운영툴로 보내기'}
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.18rem' }}>
-                      {hasMistakeExplanation
-                        ? '자세한 AI 설명을 카드 뒷면으로 바로 발행합니다.'
-                        : '운영툴의 발행 대기 목록에서 정답과 해설을 완성하면 카드로 발행됩니다.'}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddToMistakeNotebook}
-                    disabled={createMistakeCard.isPending || currentQuestionSaved}
-                    style={{
-                      minHeight: 42,
-                      padding: '0.65rem 1rem',
-                      borderRadius: '12px',
-                      border: currentQuestionSaved ? '1px solid rgba(74,222,128,0.45)' : '1px solid rgba(250,204,21,0.5)',
-                      background: currentQuestionSaved ? 'rgba(34,197,94,0.14)' : 'rgba(250,204,21,0.14)',
-                      color: currentQuestionSaved ? '#bbf7d0' : '#fde68a',
-                      fontWeight: 900,
-                      cursor: createMistakeCard.isPending || currentQuestionSaved ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {createMistakeCard.isPending ? '보내는 중...' : currentQuestionSaved ? '처리됨' : hasMistakeExplanation ? '오답노트에 담기' : '운영툴로 보내기'}
-                  </button>
-                  {mistakeCardMessage && (
-                    <div style={{
-                      flexBasis: '100%',
-                      color: mistakeCardMessage.includes('못') || mistakeCardMessage.includes('없습니다') ? '#fecaca' : '#bbf7d0',
-                      fontSize: '0.85rem',
-                      fontWeight: 800
-                    }}>
-                      {mistakeCardMessage}
-                    </div>
-                  )}
-                </div>
-              )}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
                 {QUIZ_REACTION_CHOICES.map(choice => {
                   const reactionCounts = displayedStats.reactionCounts || {}
@@ -1926,7 +1926,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   const count = Number(reactionCounts[choice.id] || 0)
                   const percent = reactionTotal > 0 ? Math.round((count / reactionTotal) * 100) : 0
                   const disabledByAnswer =
-                    (pendingResult.isCorrect && ['missed_condition', 'solution_blocked'].includes(choice.id)) ||
+                    (pendingResult.isCorrect && ['missed_condition', 'solution_blocked', 'careless_mistake'].includes(choice.id)) ||
                     (!pendingResult.isCorrect && ['understood', 'uncertain_correct'].includes(choice.id))
 
                   return (

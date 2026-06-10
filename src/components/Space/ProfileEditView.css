@@ -1,0 +1,269 @@
+.profile-edit-panel,
+.profile-edit-panel:hover {
+  transform: none;
+}
+
+.profile-edit-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.profile-edit-label {
+  color: var(--crystal-cyan);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.profile-edit-hint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.profile-edit-panel .space-input {
+  width: 100%;
+  min-height: 2.85rem;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 243, 255, 0.24);
+  border-radius: 10px;
+  background: rgba(5, 9, 24, 0.74);
+  color: var(--text-bright);
+  padding: 0.78rem 0.9rem;
+  font-family: var(--font-tech);
+  font-size: 1rem;
+  font-weight: 700;
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.profile-edit-panel .space-input::placeholder {
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.profile-edit-panel .space-input:focus {
+  border-color: rgba(0, 243, 255, 0.76);
+  background: rgba(8, 16, 36, 0.92);
+  box-shadow: 0 0 0 3px rgba(0, 243, 255, 0.12), 0 0 18px rgba(0, 243, 255, 0.12);
+}
+
+.profile-edit-panel select.space-input {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--crystal-cyan) 50%),
+    linear-gradient(135deg, var(--crystal-cyan) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 2.4rem;
+}
+
+.profile-edit-panel textarea.space-input {
+  min-height: 5.4rem;
+  line-height: 1.45;
+}
+
+.profile-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1.35rem;
+  padding: 1.4rem;
+  border: 1px solid;
+  border-radius: 14px;
+}
+
+.public-profile-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem 1.5rem;
+}
+
+.public-profile-toggle-card {
+  display: flex;
+  min-height: 5.6rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  grid-column: 1 / -1;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(0, 243, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(0, 243, 255, 0.06);
+}
+
+.public-profile-toggle-title {
+  color: var(--text-bright);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.public-profile-toggle-copy {
+  margin: 0.24rem 0 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.profile-switch {
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.profile-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.profile-switch-track {
+  display: inline-flex;
+  width: 3.35rem;
+  height: 1.86rem;
+  align-items: center;
+  padding: 0.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.profile-switch-thumb {
+  width: 1.36rem;
+  height: 1.36rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.profile-switch input:checked + .profile-switch-track {
+  border-color: rgba(0, 243, 255, 0.76);
+  background: rgba(0, 243, 255, 0.28);
+  box-shadow: 0 0 18px rgba(0, 243, 255, 0.18);
+}
+
+.profile-switch input:checked + .profile-switch-track .profile-switch-thumb {
+  transform: translateX(1.46rem);
+  background: var(--crystal-cyan);
+}
+
+.schedule-cluster-card {
+  padding: 1.25rem;
+  border: 1px solid;
+  border-radius: 14px;
+  background: rgba(3, 8, 24, 0.58);
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.schedule-cluster-card:has(.schedule-day-btn.selected) {
+  background: rgba(0, 243, 255, 0.055);
+  box-shadow: 0 0 22px rgba(0, 243, 255, 0.08);
+}
+
+.schedule-cluster-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1rem;
+  font-size: 1.12rem;
+  line-height: 1.25;
+}
+
+.schedule-status-pill {
+  flex: 0 0 auto;
+  min-width: 5.4rem;
+  padding: 0.24rem 0.62rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.54);
+  background: rgba(255, 255, 255, 0.06);
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.schedule-status-pill.active {
+  border-color: rgba(74, 222, 128, 0.56);
+  color: #86efac;
+  background: rgba(74, 222, 128, 0.12);
+}
+
+.schedule-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.schedule-day-btn {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 2.65rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 900;
+  line-height: 1;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+  transform: none;
+}
+
+.schedule-day-btn:hover:not(:disabled) {
+  border-color: rgba(0, 243, 255, 0.48);
+  background: rgba(0, 243, 255, 0.12);
+  transform: none;
+}
+
+.schedule-day-btn:hover,
+.schedule-day-btn:active,
+.schedule-day-btn:focus {
+  transform: none;
+}
+
+.schedule-day-btn.selected {
+  border-color: rgba(0, 243, 255, 0.9);
+  background: var(--crystal-cyan);
+  color: #03121f;
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.34);
+}
+
+.schedule-day-btn:disabled {
+  cursor: default;
+  opacity: 0.28;
+}
+
+@media (max-width: 760px) {
+  .public-profile-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .public-profile-toggle-card {
+    align-items: flex-start;
+  }
+
+  .schedule-days-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .schedule-days-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-cluster-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
