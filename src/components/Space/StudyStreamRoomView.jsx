@@ -889,6 +889,22 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   }, []);
 
   useEffect(() => {
+    if (!user?.uid) return undefined;
+    const participantRef = doc(db, 'studyRooms', roomId, 'participants', user.uid);
+    const syncHeartbeat = () => {
+      setDoc(participantRef, {
+        lastSeenAt: serverTimestamp(),
+      }, { merge: true }).catch((err) => {
+        console.warn('Failed to sync Study Stream heartbeat:', err);
+      });
+    };
+
+    syncHeartbeat();
+    const intervalId = window.setInterval(syncHeartbeat, 20000);
+    return () => window.clearInterval(intervalId);
+  }, [roomId, user?.uid]);
+
+  useEffect(() => {
     const handleResize = () => {
       setViewport({
         width: window.innerWidth,

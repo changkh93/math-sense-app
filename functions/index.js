@@ -2139,6 +2139,43 @@ function isActiveOpenStudyRoom(roomData = {}, nowMs = Date.now()) {
   return nowMs < baseMs + durationMs + graceMs;
 }
 
+const OPEN_STUDY_PARTICIPANT_STALE_MS = 2 * 60 * 1000;
+
+async function getFreshOpenStudyParticipantState(tx, roomRef, roomData = {}, nowMs = Date.now()) {
+  const participantIds = Array.isArray(roomData.participantIds)
+    ? Array.from(new Set(roomData.participantIds.filter(Boolean)))
+    : [];
+  if (!participantIds.length) {
+    return { activeIds: [], staleIds: [] };
+  }
+
+  const participantSnaps = await Promise.all(
+    participantIds.map((participantId) => tx.get(roomRef.collection("participants").doc(participantId)))
+  );
+  const activeIds = [];
+  const staleIds = [];
+  const roomBaseMs = getTimestampMillis(roomData.lastActivityAt) || getTimestampMillis(roomData.createdAt) || nowMs;
+
+  participantIds.forEach((participantId, index) => {
+    const participantSnap = participantSnaps[index];
+    if (!participantSnap.exists) {
+      staleIds.push(participantId);
+      return;
+    }
+
+    const participantData = participantSnap.data() || {};
+    const lastSeenMs = getTimestampMillis(participantData.lastSeenAt) || roomBaseMs;
+    if (nowMs - lastSeenMs > OPEN_STUDY_PARTICIPANT_STALE_MS) {
+      staleIds.push(participantId);
+      return;
+    }
+
+    activeIds.push(participantId);
+  });
+
+  return { activeIds, staleIds };
+}
+
 function getOwnedProfileFrames(userData = {}) {
   const owned = Array.isArray(userData.ownedProfileFrames) ? userData.ownedProfileFrames : [];
   return Array.from(new Set(["starter", ...owned]));
@@ -4099,8 +4136,7 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
     })
     .filter((candidate) => (
       candidate.roomData.poolId === poolId &&
-      isActiveOpenStudyRoom(candidate.roomData, nowMs) &&
-      candidate.participantIds.length < candidate.roomMax
+      isActiveOpenStudyRoom(candidate.roomData, nowMs)
     ))
     .sort((a, b) => {
       const aCount = a.participantIds.length;
@@ -4127,6 +4163,7 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
     let selectedRoomRef = null;
     let selectedRoomData = null;
     let selectedParticipantIds = [];
+    let selectedStaleParticipantIds = [];
     const prioritizedRefs = [];
     const poolData = poolSnap.exists ? (poolSnap.data() || {}) : {};
     const currentRoomId = String(poolData.currentRoomId || "").trim();
@@ -4146,13 +4183,16 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
       const roomSnap = await tx.get(candidate.ref);
       if (!roomSnap.exists) continue;
       const roomData = roomSnap.data() || {};
-      const participantIds = Array.isArray(roomData.participantIds) ? roomData.participantIds.filter(Boolean) : [];
       const roomMax = Number(roomData.maxParticipants || maxParticipants);
       if (!isActiveOpenStudyRoom(roomData, now.getTime())) continue;
+      const participantState = await getFreshOpenStudyParticipantState(tx, roomSnap.ref, roomData, now.getTime());
+      const participantIds = participantState.activeIds;
+
       if (participantIds.includes(uid)) {
         selectedRoomRef = roomSnap.ref;
         selectedRoomData = roomData;
         selectedParticipantIds = participantIds;
+        selectedStaleParticipantIds = participantState.staleIds;
         break;
       }
       if (participantIds.length >= roomMax) continue;
@@ -4160,6 +4200,7 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
       selectedRoomRef = roomSnap.ref;
       selectedRoomData = roomData;
       selectedParticipantIds = participantIds;
+      selectedStaleParticipantIds = participantState.staleIds;
       break;
     }
 
@@ -4190,6 +4231,7 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
         lastActivityAt: now,
       };
       selectedParticipantIds = [];
+      selectedStaleParticipantIds = [];
     }
 
     const nextParticipantIds = selectedParticipantIds.includes(uid)
@@ -4197,9 +4239,21 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
       : [...selectedParticipantIds, uid];
     const nextCount = nextParticipantIds.length;
     const nextStatus = nextCount >= 2 ? "live" : "waiting";
-    const nextHostUid = selectedRoomData.hostUid || uid;
+    const existingHostUid = selectedRoomData.hostUid || "";
+    const nextHostUid = nextParticipantIds.includes(existingHostUid) ? existingHostUid : (selectedParticipantIds[0] || uid);
+    let nextHostName = selectedRoomData.hostName || displayName;
+    if (nextHostUid === uid) {
+      nextHostName = displayName;
+    } else if (nextHostUid !== existingHostUid) {
+      const nextHostSnap = await tx.get(db.collection("users").doc(nextHostUid));
+      nextHostName = nextHostSnap.exists ? getDisplayNameFromUser(nextHostSnap.data() || {}) : "탐사원";
+    }
     const participantRole = nextHostUid === uid ? "host" : "member";
     const nextCurrentRoomId = nextCount >= maxParticipants ? "" : selectedRoomRef.id;
+
+    selectedStaleParticipantIds.forEach((participantId) => {
+      tx.delete(selectedRoomRef.collection("participants").doc(participantId));
+    });
 
     tx.set(poolRef, {
       ...poolConfig,
@@ -4218,7 +4272,7 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
       crewColor: poolConfig.color,
       title: selectedRoomData.title || `${poolConfig.label} 오픈 스터디`,
       hostUid: nextHostUid,
-      hostName: selectedRoomData.hostName || displayName,
+      hostName: nextHostName,
       maxParticipants,
       participantIds: nextParticipantIds,
       participantCount: nextCount,
