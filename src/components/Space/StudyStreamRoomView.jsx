@@ -30,6 +30,7 @@ const PEER_RESTARTABLE_ERROR_TYPES = new Set(['network', 'server-error', 'socket
 const PEER_REMOTE_WAIT_ERROR_TYPES = new Set(['peer-unavailable', 'disconnected']);
 const PEER_RESTART_DELAY_MS = 1800;
 const PEER_RESTART_ATTEMPT_LIMIT = 3;
+const REMOTE_STREAM_RETRY_GRACE_MS = 10000;
 
 const tileStyle = {
   position: 'relative',
@@ -525,7 +526,7 @@ function StreamTile({ stream, muted, label, subtitle, cameraOn, micOn, audioBloc
         <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.55)' }}>
           <div style={{ textAlign: 'center' }}>
             <UserRound size={compact ? 30 : 40} />
-            <div style={{ marginTop: compact ? '0.4rem' : '0.6rem', fontSize: compact ? '0.78rem' : undefined }}>{cameraOn ? '카메라 연결 확인 중' : '카메라 꺼짐'}</div>
+            <div style={{ marginTop: compact ? '0.4rem' : '0.6rem', fontSize: compact ? '0.78rem' : undefined }}>{cameraOn ? '카메라 재연결 중' : '카메라 꺼짐'}</div>
           </div>
         </div>
       )}
@@ -766,6 +767,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callsRef = useRef(new Map());
+  const callStartedAtRef = useRef(new Map());
+  const peerIdSeenAtRef = useRef(new Map());
   const leavingRef = useRef(false);
   const wasAcceptedParticipantRef = useRef(false);
   const miniWindowRef = useRef(null);
@@ -996,6 +999,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
 
           const remoteUid = call.metadata?.uid || call.peer;
           callsRef.current.set(remoteUid, call);
+          callStartedAtRef.current.set(remoteUid, Date.now());
           call.answer(answerStream);
           call.on('stream', (remoteStream) => {
             setRemoteStreams((prev) => {
@@ -1006,10 +1010,12 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
           });
           call.on('close', () => {
             callsRef.current.delete(remoteUid);
+            callStartedAtRef.current.delete(remoteUid);
             setRemoteStreams((prev) => prev.filter((item) => item.uid !== remoteUid));
           });
           call.on('error', () => {
             callsRef.current.delete(remoteUid);
+            callStartedAtRef.current.delete(remoteUid);
             setRemoteStreams((prev) => prev.filter((item) => item.uid !== remoteUid));
           });
         });
@@ -1057,6 +1063,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       });
       activeCalls.forEach((call) => call.close());
       activeCalls.clear();
+      callStartedAtRef.current.clear();
+      peerIdSeenAtRef.current.clear();
       if (peerRef.current) {
         peerRef.current.destroy();
         peerRef.current = null;
@@ -1070,16 +1078,33 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
 
   useEffect(() => {
     if (!localStreamRef.current || !peerRef.current) return;
+    const now = nowMs || Date.now();
     participants.forEach((participant) => {
       if (participant.uid === user.uid || !participant.peerId) return;
       const existingCall = callsRef.current.get(participant.uid);
-      if (existingCall?.peer === participant.peerId) return;
+      const remoteEntry = remoteStreams.find((streamItem) => streamItem.uid === participant.uid);
+      const hasRemoteVideo = !!remoteEntry?.stream && hasLiveTrack(remoteEntry.stream, 'video');
+      const hasRemoteMedia = !!remoteEntry?.stream && remoteEntry.stream.getTracks().some(isLiveTrack);
+      const hasExpectedRemoteStream = participant.cameraOn === false ? hasRemoteMedia : hasRemoteVideo;
+      const seenPeer = peerIdSeenAtRef.current.get(participant.uid);
+      if (!seenPeer || seenPeer.peerId !== participant.peerId) {
+        peerIdSeenAtRef.current.set(participant.uid, { peerId: participant.peerId, seenAt: now });
+      }
+
+      const peerSeenAt = peerIdSeenAtRef.current.get(participant.uid)?.seenAt || now;
+      const existingStartedAt = callStartedAtRef.current.get(participant.uid) || 0;
+      const existingIsFresh = existingStartedAt && now - existingStartedAt < REMOTE_STREAM_RETRY_GRACE_MS;
+      const shouldFallbackCall = now - peerSeenAt >= REMOTE_STREAM_RETRY_GRACE_MS;
+
+      if (existingCall?.peer === participant.peerId && (hasExpectedRemoteStream || existingIsFresh)) return;
+      if (user.uid > participant.uid && !shouldFallbackCall && !existingCall) return;
+
       if (existingCall) {
         existingCall.close();
         callsRef.current.delete(participant.uid);
+        callStartedAtRef.current.delete(participant.uid);
         setRemoteStreams((prev) => prev.filter((item) => item.uid !== participant.uid));
       }
-      if (user.uid > participant.uid) return;
 
       const outgoingCall = peerRef.current.call(participant.peerId, localStreamRef.current, {
         metadata: { uid: user.uid },
@@ -1087,6 +1112,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       if (!outgoingCall) return;
 
       callsRef.current.set(participant.uid, outgoingCall);
+      callStartedAtRef.current.set(participant.uid, now);
       outgoingCall.on('stream', (remoteStream) => {
         setRemoteStreams((prev) => {
           const next = prev.filter((item) => item.uid !== participant.uid);
@@ -1096,10 +1122,12 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       });
       outgoingCall.on('close', () => {
         callsRef.current.delete(participant.uid);
+        callStartedAtRef.current.delete(participant.uid);
         setRemoteStreams((prev) => prev.filter((item) => item.uid !== participant.uid));
       });
       outgoingCall.on('error', () => {
         callsRef.current.delete(participant.uid);
+        callStartedAtRef.current.delete(participant.uid);
         setRemoteStreams((prev) => prev.filter((item) => item.uid !== participant.uid));
       });
     });
@@ -1109,10 +1137,12 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       if (!activeParticipantIds.has(participantUid)) {
         call.close();
         callsRef.current.delete(participantUid);
+        callStartedAtRef.current.delete(participantUid);
+        peerIdSeenAtRef.current.delete(participantUid);
         setRemoteStreams((prev) => prev.filter((item) => item.uid !== participantUid));
       }
     });
-  }, [participants, user.uid]);
+  }, [nowMs, participants, remoteStreams, user.uid]);
 
   useEffect(() => {
     const stream = localStreamRef.current;
