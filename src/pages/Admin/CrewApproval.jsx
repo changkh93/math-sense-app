@@ -320,7 +320,7 @@ function DailyMissionManager() {
       await loadMission(dateKey);
     } catch (err) {
       console.error('Failed to restore default daily mission:', err);
-      setMessage(err?.message || '기본 미션 복구에 실패했습니다.');
+      setMessage(err?.message || '자동 추천 미션 복구에 실패했습니다.');
     } finally {
       setBusy('');
     }
@@ -359,12 +359,12 @@ function DailyMissionManager() {
               {isDisabled ? '학생 화면에서 오늘의 미션이 숨겨집니다.' : effectiveMission?.prompt || '미션 설명 없음'}
             </div>
             <div style={{ color: hasAdminPlan ? '#fde68a' : '#86efac', fontSize: '0.78rem', marginTop: '0.55rem', fontWeight: 700 }}>
-              {isDisabled ? '운영자 삭제 상태' : hasAdminPlan ? '운영자 지정 미션' : '기본 순환 미션'}
+              {isDisabled ? '운영자 삭제 상태' : hasAdminPlan ? '운영자 지정 미션' : '자동 추천 미션'}
             </div>
           </div>
 
           <div style={{ padding: '0.9rem', borderRadius: 10, background: 'rgba(2,6,23,0.5)', border: '1px solid rgba(148,163,184,0.16)' }}>
-            <div style={{ color: '#38bdf8', fontWeight: 800, fontSize: '0.82rem', marginBottom: '0.35rem' }}>기본 후보</div>
+            <div style={{ color: '#38bdf8', fontWeight: 800, fontSize: '0.82rem', marginBottom: '0.35rem' }}>자동 추천 후보</div>
             <div style={{ color: '#f8fafc', fontWeight: 800 }}>{defaultMission.title}</div>
             <div style={{ color: '#94a3b8', fontSize: '0.86rem', lineHeight: 1.55, marginTop: '0.4rem' }}>{defaultMission.prompt}</div>
             <button
@@ -373,7 +373,7 @@ function DailyMissionManager() {
               onClick={() => applyTemplate(defaultMission)}
               style={{ marginTop: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
             >
-              <Edit3 size={15} /> 기본 후보 불러오기
+              <Edit3 size={15} /> 입력칸에 불러오기
             </button>
           </div>
         </div>
@@ -422,7 +422,7 @@ function DailyMissionManager() {
             <RefreshCw size={15} /> 다시 불러오기
           </button>
           <button type="button" className="admin-btn secondary" onClick={handleRestoreDefault} disabled={!!busy} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <RotateCcw size={15} /> 기본 미션 복구
+            <RotateCcw size={15} /> 자동 추천 미션 복구
           </button>
           <button type="button" className="admin-btn danger" onClick={handleDisable} disabled={!!busy} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
             <Trash2 size={15} /> 오늘 미션 삭제
