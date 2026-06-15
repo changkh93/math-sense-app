@@ -2034,7 +2034,7 @@ export default function MissionHub({
               </div>
             )}
             <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
-              <MissionMarkdownViewer text={missionData?.learningContents?.text} />
+              <MissionMarkdownViewer text={missionData?.learningContents?.text} imageMode="reading" />
             </div>
           </div>
         )}
@@ -2588,7 +2588,7 @@ export default function MissionHub({
                                 </div>
                               )}
                               <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
-                                <MissionMarkdownViewer text={missionData?.learningContents?.text} />
+                                <MissionMarkdownViewer text={missionData?.learningContents?.text} imageMode="reading" />
                               </div>
                             </div>
                           )}

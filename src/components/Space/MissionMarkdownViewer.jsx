@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { InlineMath, BlockMath } from 'react-katex';
-import { Check } from 'lucide-react';
+import { Check, ExternalLink, X, ZoomIn } from 'lucide-react';
 import 'katex/dist/katex.min.css';
 
-const MissionMarkdownViewer = ({ text }) => {
+const MissionMarkdownViewer = ({ text, imageMode = 'default' }) => {
+  const [expandedImage, setExpandedImage] = useState(null);
+
   if (!text) return null;
   
   const content = typeof text === 'string' ? text : (text.text || '');
@@ -98,6 +100,95 @@ const MissionMarkdownViewer = ({ text }) => {
   const parseRow = (rowStr) => {
     const clean = rowStr.trim().replace(/^\||\|$/g, '');
     return clean.split('|').map(c => c.trim());
+  };
+
+  const renderImageBlock = (key, altText, imgUrl) => {
+    const isReadingImage = imageMode === 'reading';
+    return (
+      <div
+        key={key}
+        style={{
+          margin: isReadingImage ? '2rem 0' : '1.5rem 0',
+          textAlign: 'center',
+          position: 'relative'
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setExpandedImage({ src: imgUrl, alt: altText })}
+          style={{
+            display: 'inline-block',
+            padding: 0,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'zoom-in',
+            maxWidth: '100%'
+          }}
+          aria-label={`${altText || '학습 이미지'} 확대`}
+          title="이미지 확대"
+        >
+          <img 
+            src={imgUrl} 
+            alt={altText} 
+            style={{ 
+                width: isReadingImage ? 'min(100%, 900px)' : 'auto',
+                maxWidth: '100%', 
+                maxHeight: isReadingImage ? 'none' : '400px',
+                height: 'auto',
+                borderRadius: '8px', 
+                boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                display: 'block',
+                background: '#fff'
+            }} 
+          />
+        </button>
+        {isReadingImage && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              marginTop: '0.7rem'
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setExpandedImage({ src: imgUrl, alt: altText })}
+              className="hud-btn secondary glass"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.4rem 0.7rem',
+                fontSize: '0.75rem'
+              }}
+            >
+              <ZoomIn size={14} /> 확대
+            </button>
+            <a
+              href={imgUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hud-btn secondary glass"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.4rem 0.7rem',
+                fontSize: '0.75rem',
+                textDecoration: 'none'
+              }}
+            >
+              <ExternalLink size={14} /> 새 창
+            </a>
+          </div>
+        )}
+        {altText && altText !== '이미지 설명' && (
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>{altText}</p>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -207,9 +298,14 @@ const MissionMarkdownViewer = ({ text }) => {
 
         // 2. Blockquotes
         if (line.startsWith('> ')) {
+            const quoteContent = line.replace(/^>\s*/, '');
+            const quoteImgMatch = quoteContent.match(/^!\[([^\]]*)\]\((.*?)\)$/);
+            if (quoteImgMatch) {
+                return renderImageBlock(`quote-img-${i}`, quoteImgMatch[1], quoteImgMatch[2]);
+            }
             return (
                 <blockquote key={i} style={{ borderLeft: '4px solid var(--star-gold)', paddingLeft: '1rem', margin: '0.8rem 0', color: 'var(--text-muted)' }}>
-                    {parseInlineFormatting(line.replace(/^>\s*/, ''))}
+                    {parseInlineFormatting(quoteContent)}
                 </blockquote>
             );
         }
@@ -265,24 +361,7 @@ const MissionMarkdownViewer = ({ text }) => {
         if (imgMatch) {
           const altText = imgMatch[1];
           const imgUrl = imgMatch[2];
-          return (
-            <div key={i} style={{ margin: '1.5rem 0', textAlign: 'center' }}>
-              <img 
-                src={imgUrl} 
-                alt={altText} 
-                style={{ 
-                    maxWidth: '100%', 
-                    maxHeight: '400px', 
-                    borderRadius: '8px', 
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
-                    border: '1px solid rgba(255,255,255,0.1)'
-                }} 
-              />
-              {altText && altText !== '이미지 설명' && (
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>{altText}</p>
-              )}
-            </div>
-          );
+          return renderImageBlock(`img-${i}`, altText, imgUrl);
         }
 
         // 5. Single line Math Block (If line only contains math, make it a block)
@@ -298,6 +377,61 @@ const MissionMarkdownViewer = ({ text }) => {
         // 6. Regular text
         return <p key={i} style={{ marginBottom: '0.6rem', wordBreak: 'keep-all' }}>{parseInlineFormatting(line)}</p>;
       })}
+      {expandedImage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={expandedImage.alt || '확대 이미지'}
+          onClick={() => setExpandedImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 5000,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2rem'
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setExpandedImage(null)}
+            aria-label="닫기"
+            title="닫기"
+            style={{
+              position: 'fixed',
+              top: '1rem',
+              right: '1rem',
+              width: '2.5rem',
+              height: '2.5rem',
+              borderRadius: '999px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: 'rgba(5, 10, 25, 0.85)',
+              color: '#fff',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            <X size={20} />
+          </button>
+          <img
+            src={expandedImage.src}
+            alt={expandedImage.alt}
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              maxWidth: 'min(96vw, 1400px)',
+              maxHeight: '92vh',
+              objectFit: 'contain',
+              borderRadius: '8px',
+              background: '#fff',
+              boxShadow: '0 0 30px rgba(0, 243, 255, 0.2)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
