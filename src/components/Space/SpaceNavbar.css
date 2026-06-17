@@ -30,6 +30,38 @@
   gap: 0.5rem;
 }
 
+.desktop-brand-btn {
+  width: 40px;
+  height: 40px;
+  margin-right: 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.desktop-brand-btn img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(0, 243, 255, 0.6));
+}
+
+.desktop-brand-btn:hover,
+.desktop-brand-btn:focus-visible {
+  background: rgba(0, 243, 255, 0.1);
+  box-shadow: 0 0 18px rgba(0, 243, 255, 0.22);
+  outline: none;
+}
+
+.desktop-brand-btn:active {
+  transform: scale(0.96);
+}
+
 .nav-toggle-wrapper {
   margin-left: 1rem;
 }
@@ -76,6 +108,139 @@
 
 .logout-btn:hover {
   opacity: 1;
+}
+
+.live-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: grid;
+  place-items: start center;
+  padding: calc(5.4rem + env(safe-area-inset-top, 0px)) 1rem 1rem;
+  background: rgba(2, 4, 12, 0.56);
+  backdrop-filter: blur(7px);
+}
+
+.live-menu-modal {
+  width: min(460px, 100%);
+  border: 1px solid rgba(0, 243, 255, 0.34);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(0, 243, 255, 0.16), transparent 34%),
+    rgba(8, 13, 30, 0.98);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.68), 0 0 30px rgba(0, 243, 255, 0.12);
+  padding: 1rem;
+  color: var(--text-bright);
+}
+
+.live-menu-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.live-menu-head > div {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.live-menu-head span {
+  color: var(--crystal-cyan);
+  font-family: var(--font-tech);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.live-menu-head strong {
+  font-size: 1.2rem;
+  line-height: 1.25;
+}
+
+.live-menu-close {
+  flex: 0 0 36px;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 1.35rem/1 Arial, sans-serif;
+  cursor: pointer;
+}
+
+.live-menu-close:hover,
+.live-menu-close:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-color: rgba(0, 243, 255, 0.34);
+  outline: none;
+}
+
+.live-menu-links {
+  display: grid;
+  gap: 0.65rem;
+  padding-top: 0.9rem;
+}
+
+.live-menu-link {
+  min-height: 78px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-bright);
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.live-menu-link:hover,
+.live-menu-link:focus-visible {
+  background: rgba(0, 243, 255, 0.11);
+  border-color: rgba(0, 243, 255, 0.36);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.live-menu-link-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(0, 243, 255, 0.12);
+  color: var(--crystal-cyan);
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 18px rgba(0, 243, 255, 0.1);
+}
+
+.live-menu-link-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.22rem;
+}
+
+.live-menu-link-copy strong {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.live-menu-link-copy small {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 @media (max-width: 1024px) {
@@ -453,5 +618,26 @@
 
   .mobile-profile-sheet button.logout {
     color: var(--planet-orange);
+  }
+
+  .live-menu-backdrop {
+    place-items: end center;
+    padding: 1rem 0.75rem calc(5.2rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .live-menu-modal {
+    width: 100%;
+    border-radius: 14px;
+  }
+
+  .live-menu-link {
+    min-height: 72px;
+    grid-template-columns: 40px minmax(0, 1fr) 18px;
+    padding: 0.75rem;
+  }
+
+  .live-menu-link-icon {
+    width: 40px;
+    height: 40px;
   }
 }

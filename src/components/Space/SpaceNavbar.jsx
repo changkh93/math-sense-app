@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc } from 'firebase/firestore';
+import { ExternalLink, MessageCircle, Video } from 'lucide-react';
 import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
@@ -13,11 +14,27 @@ import CometBadge from './CometBadge';
 import { getEffectiveStreak } from '../../utils/streakUtils';
 import './SpaceNavbar.css';
 
+const LIVE_SUPPORT_LINKS = [
+  {
+    label: '화상강의실',
+    subtitle: '매일 들어오는 메타센스 화상 수업 공간',
+    href: 'https://meet.google.com/bii-rnyp-jbe',
+    Icon: Video
+  },
+  {
+    label: 'Q&A방',
+    subtitle: '선생님과 일대일로 소통하고 질문하는 공간',
+    href: 'https://meet.google.com/qzg-psru-qnc',
+    Icon: MessageCircle
+  }
+];
+
 export default function SpaceNavbar({ currentView, onViewChange }) {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
   const [isMobileMoreOpen, setIsMobileMoreOpen] = React.useState(false);
+  const [isLiveMenuOpen, setIsLiveMenuOpen] = React.useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
   const [isBrandImageFailed, setIsBrandImageFailed] = React.useState(false);
   const [isProfileImageFailed, setIsProfileImageFailed] = React.useState(false);
@@ -25,6 +42,17 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   React.useEffect(() => {
     setIsProfileImageFailed(false);
   }, [user?.photoURL, userData?.photoURL, userData?.profileImageUrl, userData?.avatarUrl]);
+
+  React.useEffect(() => {
+    if (!isLiveMenuOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsLiveMenuOpen(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLiveMenuOpen]);
 
   const handleLogout = async () => {
     soundManager.playClick();
@@ -101,6 +129,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     soundManager.playClick();
     setIsMobileMoreOpen(false);
     setIsProfileMenuOpen(false);
+    setIsLiveMenuOpen(false);
     const isHome = window.location.pathname === '/';
     
     if (path === '/agora') {
@@ -112,6 +141,18 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       // Already on home page, just change view
       if (onViewChange) onViewChange(view);
     }
+  };
+
+  const handleBrandClick = () => {
+    soundManager.playClick();
+    setIsMobileMoreOpen(false);
+    setIsProfileMenuOpen(false);
+    setIsLiveMenuOpen(true);
+  };
+
+  const handleLiveLinkClick = () => {
+    soundManager.playClick();
+    setIsLiveMenuOpen(false);
   };
 
   const mobilePrimaryNav = [
@@ -163,8 +204,8 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         <button
           type="button"
           className="mobile-brand-btn"
-          onClick={() => handleNavClick('planet', '/')}
-          aria-label="학습 지도로 이동"
+          onClick={handleBrandClick}
+          aria-label="메타센스 실시간 수업 메뉴 열기"
         >
           {!isBrandImageFailed ? (
             <img src="/m-logo.svg" alt="" onError={() => setIsBrandImageFailed(true)} />
@@ -214,9 +255,14 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       </div>
 
       <div className="space-nav-links desktop-nav-links font-title">
-        <div style={{ display: 'flex', alignItems: 'center', marginRight: '1rem', cursor: 'pointer' }} onClick={() => handleNavClick('planet', '/')}>
-          <img src="/m-logo.svg" alt="Meta Sense Logo" style={{ width: '30px', filter: 'drop-shadow(0 0 8px rgba(0, 243, 255, 0.6))' }} />
-        </div>
+        <button
+          type="button"
+          className="desktop-brand-btn"
+          onClick={handleBrandClick}
+          aria-label="메타센스 실시간 수업 메뉴 열기"
+        >
+          <img src="/m-logo.svg" alt="" />
+        </button>
         <button 
           className={`space-nav-link ${currentView === 'planet' ? 'active' : ''}`}
           onClick={() => handleNavClick('planet', '/')}
@@ -390,6 +436,67 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         </div>
       </div>
     </nav>
+
+      <AnimatePresence>
+        {isLiveMenuOpen && (
+          <Motion.div
+            className="live-menu-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setIsLiveMenuOpen(false)}
+          >
+            <Motion.div
+              className="live-menu-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="live-menu-title"
+              initial={{ opacity: 0, y: -10, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.96 }}
+              transition={{ duration: 0.2 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="live-menu-head">
+                <div>
+                  <span>METASENSE LIVE</span>
+                  <strong id="live-menu-title">실시간 수업 링크</strong>
+                </div>
+                <button
+                  type="button"
+                  className="live-menu-close"
+                  onClick={() => setIsLiveMenuOpen(false)}
+                  aria-label="실시간 수업 메뉴 닫기"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="live-menu-links">
+                {LIVE_SUPPORT_LINKS.map(({ label, subtitle, href, Icon }) => (
+                  <a
+                    key={href}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleLiveLinkClick}
+                    className="live-menu-link"
+                  >
+                    <span className="live-menu-link-icon" aria-hidden="true">
+                      {React.createElement(Icon, { size: 20 })}
+                    </span>
+                    <span className="live-menu-link-copy">
+                      <strong>{label}</strong>
+                      <small>{subtitle}</small>
+                    </span>
+                    <ExternalLink size={16} aria-hidden="true" />
+                  </a>
+                ))}
+              </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="mobile-bottom-nav">
         {mobilePrimaryNav.map(item => (
