@@ -117,10 +117,21 @@ const getYouTubeVideoId = (value = '') => {
   return raw
 }
 
+const getNormalizedVideoRange = (start = 0, end = 0) => {
+  const normalizedStart = Math.max(0, Math.floor(Number(start) || 0))
+  const normalizedEnd = Math.max(0, Math.floor(Number(end) || 0))
+
+  return {
+    start: normalizedStart,
+    end: normalizedEnd > normalizedStart ? normalizedEnd : undefined,
+  }
+}
+
 const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const range = getNormalizedVideoRange(start, end)
   const params = new URLSearchParams({
-    start: String(Math.max(0, Math.floor(Number(start) || 0))),
+    start: String(range.start),
     autoplay: autoPlay ? '1' : '0',
     controls: '1',
     rel: '0',
@@ -129,7 +140,7 @@ const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
     enablejsapi: '1',
   })
   if (origin) params.set('origin', origin)
-  if (end) params.set('end', String(Math.floor(Number(end))))
+  if (range.end) params.set('end', String(range.end))
   return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`
 }
 
@@ -145,6 +156,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   const [duration, setDuration] = useState(0)
   const timeUpdateInterval = useRef(null)
   const playerTargetId = useRef(`yt-player-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
+  const { start: normalizedStart, end: normalizedEnd } = getNormalizedVideoRange(start, end)
 
   useImperativeHandle(ref, () => ({
     pauseVideo: () => {
@@ -251,8 +263,8 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         width: '100%',
         videoId: normalizedVideoId,
         playerVars: {
-          start: start,
-          end: end,
+          start: normalizedStart,
+          ...(normalizedEnd ? { end: normalizedEnd } : {}),
           autoplay: autoPlay ? 1 : 0,
           controls: 1,
           modestbranding: 1,
@@ -340,7 +352,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         wrapperRef.current.innerHTML = ''
       }
     }
-  }, [normalizedVideoId, start, end, autoPlay])
+  }, [normalizedVideoId, normalizedStart, normalizedEnd, autoPlay])
 
   if (apiTimedOut && normalizedVideoId) {
     return (
@@ -2155,11 +2167,11 @@ export default function MissionHub({
     if (selectedTx) {
       // Get saved position for resume
       const txId = selectedTx.id || 'default'
-      const completionTargetPercent = getVideoCompletionTargetPercent(videoDurationRef.current)
-      const completionRate = Math.min(
-        100,
-        Math.floor((stampCount / (videoDurationRef.current || Math.max(stampCount, 1))) * 100)
-      )
+      const knownVideoDuration = videoDurationRef.current > 0 ? videoDurationRef.current : 0
+      const completionTargetPercent = getVideoCompletionTargetPercent(knownVideoDuration)
+      const completionRate = knownVideoDuration > 0
+        ? Math.min(100, Math.floor((stampCount / knownVideoDuration) * 100))
+        : 0
       const creditedSeconds = Math.floor(creditedWatchSeconds)
 
       return (
