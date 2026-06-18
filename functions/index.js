@@ -19,7 +19,6 @@ const DIRECT_MEMO_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
 const STORE_RADAR_DURATION_DAYS = 7;
 const STORE_PHOTON_SHIELD_CHARGES_PER_GIFT = 10;
-const STORE_PHOTON_SHIELD_MAX_CHARGES = 20;
 const STORE_ITEM_GIFT_CATALOG = {
   cryo_core: {
     name: "크라이오 코어",
@@ -36,7 +35,6 @@ const STORE_ITEM_GIFT_CATALOG = {
     senderField: "shieldCharges",
     recipientField: "shieldCharges",
     transferAmount: STORE_PHOTON_SHIELD_CHARGES_PER_GIFT,
-    maxRecipientValue: STORE_PHOTON_SHIELD_MAX_CHARGES,
   },
   radar: {
     name: "첨단 마이닝 스캐너",
@@ -1248,6 +1246,8 @@ function getTimestampMillis(value) {
   if (!value) return 0;
   if (typeof value.toMillis === "function") return value.toMillis();
   if (value.seconds) return value.seconds * 1000;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
   const parsed = new Date(value).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -2046,6 +2046,10 @@ function getDisplayNameFromUser(userData = {}) {
 }
 
 const STUDY_CREW_MISSION_MAX_LENGTH = 60;
+const STUDY_CREW_MISSION_INDIVIDUAL_REWARD = 5;
+const STUDY_CREW_MISSION_TEAM_REWARD = 20;
+const STUDY_CREW_MISSION_INDIVIDUAL_DAILY_LIMIT = 1;
+const STUDY_CREW_MISSION_TEAM_DAILY_LIMIT = 2;
 const STUDY_CREW_DAILY_MISSIONS = [
   { id: "life_movie_quote", category: "아이스브레이킹", title: "인생 영화 명대사", prompt: "나의 인생 영화 속 명대사 하나를 적어보세요." },
   { id: "million_won_first_buy", category: "아이스브레이킹", title: "100만 원이 생긴다면", prompt: "지금 당장 100만 원이 생긴다면 가장 먼저 사고 싶은 것을 적어보세요." },
@@ -2267,14 +2271,6 @@ function getOpenStudyPoolIdFromGrade(userData = {}) {
   return "free";
 }
 
-function getTimestampMillis(value) {
-  if (!value) return 0;
-  if (typeof value.toMillis === "function") return value.toMillis();
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === "number") return value;
-  return 0;
-}
-
 function isActiveOpenStudyRoom(roomData = {}, nowMs = Date.now()) {
   const status = roomData.status || "waiting";
   if (status === "ended") return false;
@@ -2285,18 +2281,35 @@ function isActiveOpenStudyRoom(roomData = {}, nowMs = Date.now()) {
   return nowMs < baseMs + durationMs + 10 * 60 * 1000;
 }
 
-const OPEN_STUDY_PARTICIPANT_STALE_MS = 2 * 60 * 1000;
+const OPEN_STUDY_PARTICIPANT_STALE_MS = 12 * 60 * 1000;
+const OPEN_STUDY_LIVE_PARTICIPANT_STALE_BUFFER_MS = 20 * 60 * 1000;
+const OPEN_STUDY_LIVE_PARTICIPANT_MAX_STALE_MS = 90 * 60 * 1000;
+
+function getOpenStudyParticipantStaleMs(roomData = {}) {
+  const durationMs = (Number(roomData.durationMinutes) || 50) * 60 * 1000;
+  return Math.min(
+    Math.max(OPEN_STUDY_PARTICIPANT_STALE_MS, durationMs + OPEN_STUDY_LIVE_PARTICIPANT_STALE_BUFFER_MS),
+    OPEN_STUDY_LIVE_PARTICIPANT_MAX_STALE_MS
+  );
+}
 
 async function getFreshOpenStudyParticipantState(tx, roomRef, roomData = {}, nowMs = Date.now()) {
-  const participantIds = Array.isArray(roomData.participantIds)
+  const roomMax = Number(roomData.maxParticipants || OPEN_STUDY_POOLS[roomData.poolId]?.maxParticipants || 3);
+  const participantIdsFromRoom = Array.isArray(roomData.participantIds)
     ? Array.from(new Set(roomData.participantIds.filter(Boolean)))
     : [];
+  const participantDocsSnap = await tx.get(roomRef.collection("participants").limit(Math.max(roomMax, participantIdsFromRoom.length, 3)));
+  const participantIdsFromDocs = participantDocsSnap.docs.map((docSnap) => docSnap.id).filter(Boolean);
+  const participantIds = Array.from(new Set([...participantIdsFromRoom, ...participantIdsFromDocs]));
   if (!participantIds.length) {
     return { activeIds: [], staleIds: [] };
   }
 
+  const participantSnapById = new Map(participantDocsSnap.docs.map((docSnap) => [docSnap.id, docSnap]));
   const participantSnaps = await Promise.all(
-    participantIds.map((participantId) => tx.get(roomRef.collection("participants").doc(participantId)))
+    participantIds.map((participantId) => (
+      participantSnapById.get(participantId) || tx.get(roomRef.collection("participants").doc(participantId))
+    ))
   );
   const activeIds = [];
   const staleIds = [];
@@ -2311,7 +2324,8 @@ async function getFreshOpenStudyParticipantState(tx, roomRef, roomData = {}, now
 
     const participantData = participantSnap.data() || {};
     const lastSeenMs = getTimestampMillis(participantData.lastSeenAt) || roomBaseMs;
-    if (nowMs - lastSeenMs > OPEN_STUDY_PARTICIPANT_STALE_MS) {
+    const participantStaleMs = getOpenStudyParticipantStaleMs(roomData);
+    if (nowMs - lastSeenMs > participantStaleMs) {
       staleIds.push(participantId);
       return;
     }
@@ -2486,15 +2500,6 @@ async function syncAnswerProfileSnapshotsForUser(userId, userData = {}) {
   if (opCount > 0) {
     await batch.commit();
   }
-}
-
-function getKstDateKey(date = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
 }
 
 function normalizeClusterId(clusterId = "") {
@@ -3242,12 +3247,27 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
   const responseRef = missionRef.collection("responses").doc(uid);
 
   let savedMission = null;
+  let rewardResult = {
+    individualAwarded: false,
+    individualAmount: 0,
+    teamAwarded: false,
+    teamAmount: 0,
+    teamEligible: false,
+    teamTargetCount: 0,
+    completedCount: 0,
+  };
   await db.runTransaction(async (tx) => {
-    const [userSnap, scopeSnap, planSnap, responseSnap] = await Promise.all([
+    const responsesQuery = missionRef.collection("responses");
+    const individualRewardHistoryQuery = userRef.collection("crystal_transactions")
+      .where("type", "==", "study_crew_mission");
+    const [userSnap, scopeSnap, planSnap, missionSnap, responseSnap, responsesSnap, individualRewardHistorySnap] = await Promise.all([
       tx.get(userRef),
       tx.get(scopeRef),
       tx.get(planRef),
+      tx.get(missionRef),
       tx.get(responseRef),
+      tx.get(responsesQuery),
+      tx.get(individualRewardHistoryQuery),
     ]);
 
     if (!userSnap.exists) {
@@ -3283,6 +3303,70 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       }
     }
 
+    targetIds = uniqueIds(targetIds);
+    const responseUserIds = new Set();
+    responsesSnap.forEach((docSnap) => {
+      const responseData = docSnap.data() || {};
+      responseUserIds.add(responseData.userId || docSnap.id);
+    });
+    responseUserIds.add(uid);
+
+    const targetIdSet = new Set(targetIds);
+    const completedTargetIds = [...responseUserIds].filter((id) => targetIdSet.has(id));
+    const teamEligible = targetIds.length >= 2;
+    const teamCompleted = teamEligible && targetIds.every((id) => responseUserIds.has(id));
+    const missionData = missionSnap.exists ? (missionSnap.data() || {}) : {};
+    const teamAlreadyAwarded = Boolean(missionData.teamRewardAwardedAt);
+    const countTodayRewardHistory = (historySnap) => {
+      let count = 0;
+      historySnap?.forEach((docSnap) => {
+        const rewardData = docSnap.data() || {};
+        if (rewardData?.metadata?.dateKey === dateKey) count += 1;
+      });
+      return count;
+    };
+    const individualRewardCount = userData.studyCrewMissionRewardDate === dateKey
+      ? Number(userData.studyCrewMissionRewardCount || 0)
+      : 0;
+    const effectiveIndividualRewardCount = Math.max(
+      individualRewardCount,
+      countTodayRewardHistory(individualRewardHistorySnap)
+    );
+    const shouldAwardIndividual = !responseSnap.exists
+      && effectiveIndividualRewardCount < STUDY_CREW_MISSION_INDIVIDUAL_DAILY_LIMIT;
+    const shouldCompleteTeamReward = teamCompleted && !teamAlreadyAwarded;
+    const rewardUserIds = uniqueIds([
+      ...(shouldAwardIndividual ? [uid] : []),
+      ...(shouldCompleteTeamReward ? targetIds : []),
+    ]);
+    const rewardUserSnaps = new Map([[uid, userSnap]]);
+    if (rewardUserIds.length > 0) {
+      await Promise.all(rewardUserIds
+        .filter((rewardUid) => rewardUid !== uid)
+        .map(async (rewardUid) => {
+          const rewardUserRef = db.collection("users").doc(rewardUid);
+          rewardUserSnaps.set(rewardUid, await tx.get(rewardUserRef));
+        }));
+    }
+    const teamRewardHistorySnaps = new Map();
+    if (shouldCompleteTeamReward) {
+      await Promise.all(targetIds.map(async (rewardUid) => {
+        const teamRewardHistoryQuery = db.collection("users")
+          .doc(rewardUid)
+          .collection("crystal_transactions")
+          .where("type", "==", "study_crew_team_mission");
+        teamRewardHistorySnaps.set(rewardUid, await tx.get(teamRewardHistoryQuery));
+      }));
+    }
+    const getEffectiveTeamRewardCount = (rewardUid) => {
+      const rewardUserSnap = rewardUserSnaps.get(rewardUid);
+      const rewardUserData = rewardUserSnap?.exists ? (rewardUserSnap.data() || {}) : {};
+      const teamRewardCount = rewardUserData.studyCrewTeamMissionRewardDate === dateKey
+        ? Number(rewardUserData.studyCrewTeamMissionRewardCount || 0)
+        : 0;
+      return Math.max(teamRewardCount, countTodayRewardHistory(teamRewardHistorySnaps.get(rewardUid)));
+    };
+
     tx.set(missionRef, {
       scopeType,
       scopeId,
@@ -3293,8 +3377,18 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       prompt: mission.prompt,
       maxLength: STUDY_CREW_MISSION_MAX_LENGTH,
       targetCount: Math.max(targetIds.length, 1),
+      completedCount: completedTargetIds.length,
+      teamEligible,
+      teamCompleted,
+      individualRewardDailyLimit: STUDY_CREW_MISSION_INDIVIDUAL_DAILY_LIMIT,
+      teamRewardDailyLimit: STUDY_CREW_MISSION_TEAM_DAILY_LIMIT,
       updatedAt: now,
       createdAt: now,
+      ...(shouldCompleteTeamReward ? {
+        teamCompletedAt: now,
+        teamRewardAwardedAt: now,
+        teamRewardUserIds: targetIds.filter((rewardUid) => getEffectiveTeamRewardCount(rewardUid) < STUDY_CREW_MISSION_TEAM_DAILY_LIMIT),
+      } : {}),
     }, { merge: true });
 
     tx.set(responseRef, {
@@ -3308,12 +3402,94 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       createdAt: responseSnap.exists ? (responseSnap.data()?.createdAt || now) : now,
       updatedAt: now,
     }, { merge: true });
+
+    const rewardsByUser = new Map();
+    const rewardUserUpdates = new Map();
+    const addReward = (rewardUid, amount, update = {}) => {
+      rewardsByUser.set(rewardUid, (rewardsByUser.get(rewardUid) || 0) + amount);
+      rewardUserUpdates.set(rewardUid, {
+        ...(rewardUserUpdates.get(rewardUid) || {}),
+        ...update,
+      });
+    };
+
+    if (shouldAwardIndividual) {
+      addReward(uid, STUDY_CREW_MISSION_INDIVIDUAL_REWARD, {
+        studyCrewMissionRewardDate: dateKey,
+        studyCrewMissionRewardCount: effectiveIndividualRewardCount + 1,
+      });
+      recordCrystalTransaction(tx, uid, `study-crew-daily-mission-${dateKey}`, {
+        amount: STUDY_CREW_MISSION_INDIVIDUAL_REWARD,
+        type: "study_crew_mission",
+        description: "오늘의 크루 미션 완료 보상",
+        metadata: {
+          scopeType,
+          scopeId,
+          scopeKey,
+          dateKey,
+          missionId: mission.id,
+        },
+      });
+    }
+
+    const teamRewardedUserIds = [];
+    if (shouldCompleteTeamReward) {
+      targetIds.forEach((rewardUid) => {
+        const rewardUserSnap = rewardUserSnaps.get(rewardUid);
+        if (!rewardUserSnap?.exists) return;
+        const teamRewardCount = getEffectiveTeamRewardCount(rewardUid);
+        if (teamRewardCount >= STUDY_CREW_MISSION_TEAM_DAILY_LIMIT) return;
+
+        teamRewardedUserIds.push(rewardUid);
+        addReward(rewardUid, STUDY_CREW_MISSION_TEAM_REWARD, {
+          studyCrewTeamMissionRewardDate: dateKey,
+          studyCrewTeamMissionRewardCount: teamRewardCount + 1,
+        });
+        recordCrystalTransaction(tx, rewardUid, `study-crew-daily-mission-team-${scopeKey}-${dateKey}`, {
+          amount: STUDY_CREW_MISSION_TEAM_REWARD,
+          type: "study_crew_team_mission",
+          description: "팀 크루 미션 완료 보상",
+          metadata: {
+            scopeType,
+            scopeId,
+            scopeKey,
+            dateKey,
+            missionId: mission.id,
+            completedUserIds: targetIds,
+          },
+        });
+      });
+    }
+
+    rewardsByUser.forEach((amount, rewardUid) => {
+      const rewardUserSnap = rewardUserSnaps.get(rewardUid);
+      if (!rewardUserSnap?.exists) return;
+      const rewardUserData = rewardUserSnap.data() || {};
+      tx.set(db.collection("users").doc(rewardUid), {
+        crystals: Number(rewardUserData.crystals || 0) + amount,
+        ...(rewardUserUpdates.get(rewardUid) || {}),
+      }, { merge: true });
+    });
+
+    rewardResult = {
+      individualAwarded: shouldAwardIndividual,
+      individualAmount: shouldAwardIndividual ? STUDY_CREW_MISSION_INDIVIDUAL_REWARD : 0,
+      individualDailyLimit: STUDY_CREW_MISSION_INDIVIDUAL_DAILY_LIMIT,
+      teamAwarded: teamRewardedUserIds.includes(uid),
+      teamAmount: teamRewardedUserIds.includes(uid) ? STUDY_CREW_MISSION_TEAM_REWARD : 0,
+      teamDailyLimit: STUDY_CREW_MISSION_TEAM_DAILY_LIMIT,
+      teamRewardedUserIds,
+      teamEligible,
+      teamTargetCount: targetIds.length,
+      completedCount: completedTargetIds.length,
+    };
   });
 
   return {
     success: true,
     dateKey,
     mission: savedMission,
+    rewards: rewardResult,
   };
 });
 
@@ -3490,7 +3666,7 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
     } else {
       const senderOwned = Math.max(0, Number(senderData[item.senderField] || 0));
       if (senderOwned < item.transferAmount) {
-        const unitLabel = itemId === "photon_shield" ? `${item.transferAmount}회분` : `${item.transferAmount}개`;
+        const unitLabel = itemId === "photon_shield" ? `${item.transferAmount}회 방어` : `${item.transferAmount}개`;
         throw new functions.https.HttpsError("failed-precondition", `${item.name} 보유분이 부족합니다. (${unitLabel} 필요)`);
       }
       senderUpdates[item.senderField] = senderOwned - item.transferAmount;
@@ -4431,9 +4607,14 @@ exports.joinStudyRoomSession = regionalFunctions.https.onCall(async (data, conte
   const db = admin.firestore();
   const userRef = db.collection("users").doc(uid);
   const roomRef = db.collection("studyRooms").doc(roomId);
+  const participantRef = roomRef.collection("participants").doc(uid);
 
   await db.runTransaction(async (tx) => {
-    const [userSnap, roomSnap] = await Promise.all([tx.get(userRef), tx.get(roomRef)]);
+    const [userSnap, roomSnap, participantSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(roomRef),
+      tx.get(participantRef),
+    ]);
     if (!userSnap.exists) {
       throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
     }
@@ -4443,15 +4624,24 @@ exports.joinStudyRoomSession = regionalFunctions.https.onCall(async (data, conte
 
     const userData = userSnap.data() || {};
     const roomData = roomSnap.data() || {};
+    const isOpenStudyRoom = roomData.roomType === "openStudy";
     if ((roomData.status || "waiting") === "ended") {
-      throw new functions.https.HttpsError("failed-precondition", "이미 종료된 집중방입니다.");
+      const participantData = participantSnap.exists ? (participantSnap.data() || {}) : {};
+      const lastSeenMs = getTimestampMillis(participantData.lastSeenAt) || 0;
+      const canRepairEndedOpenStudyRoom = isOpenStudyRoom &&
+        participantSnap.exists &&
+        Date.now() - lastSeenMs <= getOpenStudyParticipantStaleMs(roomData);
+      if (!canRepairEndedOpenStudyRoom) {
+        throw new functions.https.HttpsError("failed-precondition", "이미 종료된 집중방입니다.");
+      }
     }
-    if (userData.crewId !== roomData.crewId) {
+    if (!isOpenStudyRoom && userData.crewId !== roomData.crewId) {
       throw new functions.https.HttpsError("permission-denied", "같은 크루 멤버만 입장할 수 있습니다.");
     }
 
     const participantIds = Array.isArray(roomData.participantIds) ? roomData.participantIds : [];
-    if (!participantIds.includes(uid) && participantIds.length >= 3) {
+    const maxParticipants = Number(roomData.maxParticipants || 3);
+    if (!participantIds.includes(uid) && participantIds.length >= maxParticipants) {
       throw new functions.https.HttpsError("failed-precondition", "이 집중방은 이미 가득 찼습니다.");
     }
 
@@ -4460,6 +4650,7 @@ exports.joinStudyRoomSession = regionalFunctions.https.onCall(async (data, conte
     const nextStatus = nextCount >= 2 ? "live" : "waiting";
     const now = new Date();
     const participantRole = roomData.hostUid === uid ? "host" : "member";
+    const participantData = participantSnap.exists ? (participantSnap.data() || {}) : {};
 
     tx.set(roomRef, {
       participantIds: nextParticipantIds,
@@ -4467,26 +4658,37 @@ exports.joinStudyRoomSession = regionalFunctions.https.onCall(async (data, conte
       status: nextStatus,
       startedAt: roomData.startedAt || (nextStatus === "live" ? now : null),
       lastActivityAt: now,
+      kickedParticipantIds: FieldValue.arrayRemove(uid),
     }, { merge: true });
-    tx.set(roomRef.collection("participants").doc(uid), {
+    tx.set(participantRef, {
       uid,
       displayName: getDisplayNameFromUser(userData),
       role: participantRole,
-      peerId: "",
-      cameraOn: false,
-      micOn: false,
-      focusStatus: "focused",
-      chatMessage: "",
-      chatUpdatedAt: null,
-      joinedAt: now,
+      peerId: typeof participantData.peerId === "string" ? participantData.peerId : "",
+      cameraOn: typeof participantData.cameraOn === "boolean" ? participantData.cameraOn : false,
+      micOn: typeof participantData.micOn === "boolean" ? participantData.micOn : false,
+      focusStatus: participantData.focusStatus || "focused",
+      chatMessage: typeof participantData.chatMessage === "string" ? participantData.chatMessage : "",
+      chatUpdatedAt: participantData.chatUpdatedAt || null,
+      joinedAt: participantData.joinedAt || now,
       lastSeenAt: now,
       deviceLabel: "browser",
+      presenceState: "active",
     }, { merge: true });
-    tx.set(db.collection("crews").doc(roomData.crewId), {
-      activeStudyRoomId: roomId,
-      activeStudyRoomStatus: nextStatus,
-      updatedAt: now,
-    }, { merge: true });
+    if (isOpenStudyRoom) {
+      tx.set(userRef, {
+        activeOpenStudyRoomId: roomId,
+        activeOpenStudyPoolId: roomData.poolId || "",
+        activeOpenStudyRoomStatus: nextStatus,
+        updatedAt: now,
+      }, { merge: true });
+    } else {
+      tx.set(db.collection("crews").doc(roomData.crewId), {
+        activeStudyRoomId: roomId,
+        activeStudyRoomStatus: nextStatus,
+        updatedAt: now,
+      }, { merge: true });
+    }
 
   });
 
@@ -4539,6 +4741,60 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
   }
 
   const nowMs = Date.now();
+  const activeOpenStudyRoomId = String(userData.activeOpenStudyRoomId || "").trim();
+  if (activeOpenStudyRoomId) {
+    const activeOpenRoomRef = db.collection("studyRooms").doc(activeOpenStudyRoomId);
+    const [activeOpenRoomSnap, activeOpenParticipantSnap] = await Promise.all([
+      activeOpenRoomRef.get(),
+      activeOpenRoomRef.collection("participants").doc(uid).get(),
+    ]);
+    if (activeOpenRoomSnap.exists && activeOpenParticipantSnap.exists) {
+      const activeOpenRoomData = activeOpenRoomSnap.data() || {};
+      const activeParticipantData = activeOpenParticipantSnap.data() || {};
+      const activeLastSeenMs = getTimestampMillis(activeParticipantData.lastSeenAt) || nowMs;
+      const activeStaleMs = getOpenStudyParticipantStaleMs(activeOpenRoomData);
+      if (
+        activeOpenRoomData.roomType === "openStudy" &&
+        activeOpenRoomData.poolId === poolId &&
+        nowMs - activeLastSeenMs <= activeStaleMs
+      ) {
+        const now = new Date();
+        const activeParticipantIds = Array.isArray(activeOpenRoomData.participantIds)
+          ? activeOpenRoomData.participantIds.filter(Boolean)
+          : [];
+        const repairedParticipantIds = activeParticipantIds.includes(uid)
+          ? activeParticipantIds
+          : [...activeParticipantIds, uid];
+        const repairedStatus = repairedParticipantIds.length >= 2 ? "live" : "waiting";
+        await activeOpenRoomRef.set({
+          participantIds: repairedParticipantIds,
+          participantCount: repairedParticipantIds.length,
+          status: repairedStatus,
+          startedAt: activeOpenRoomData.startedAt || (repairedStatus === "live" ? now : null),
+          endedAt: null,
+          lastActivityAt: now,
+          kickedParticipantIds: FieldValue.arrayRemove(uid),
+        }, { merge: true });
+        await activeOpenRoomRef.collection("participants").doc(uid).set({
+          lastSeenAt: now,
+          presenceState: "active",
+        }, { merge: true });
+        await userRef.set({
+          activeOpenStudyRoomId,
+          activeOpenStudyPoolId: poolId,
+          activeOpenStudyRoomStatus: repairedStatus,
+          updatedAt: now,
+        }, { merge: true });
+        return {
+          success: true,
+          roomId: activeOpenStudyRoomId,
+          pool: OPEN_STUDY_POOLS[activeOpenRoomData.poolId] || OPEN_STUDY_POOLS.free,
+          reused: true,
+          repaired: true,
+        };
+      }
+    }
+  }
   const activeMembershipSnap = await db.collection("studyRooms")
     .where("participantIds", "array-contains", uid)
     .limit(10)
@@ -4688,6 +4944,9 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
     }
     const participantRole = nextHostUid === uid ? "host" : "member";
     const nextCurrentRoomId = nextCount >= maxParticipants ? "" : selectedRoomRef.id;
+    const selectedParticipantRef = selectedRoomRef.collection("participants").doc(uid);
+    const selectedParticipantSnap = await tx.get(selectedParticipantRef);
+    const selectedParticipantData = selectedParticipantSnap.exists ? (selectedParticipantSnap.data() || {}) : {};
 
     selectedStaleParticipantIds.forEach((participantId) => {
       tx.delete(selectedRoomRef.collection("participants").doc(participantId));
@@ -4718,21 +4977,23 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
       startedAt: selectedRoomData.startedAt || (nextStatus === "live" ? now : null),
       endedAt: null,
       lastActivityAt: now,
+      kickedParticipantIds: FieldValue.arrayRemove(uid),
     }, { merge: true });
 
-    tx.set(selectedRoomRef.collection("participants").doc(uid), {
+    tx.set(selectedParticipantRef, {
       uid,
       displayName,
       role: participantRole,
-      peerId: "",
-      cameraOn: false,
-      micOn: false,
-      focusStatus: "focused",
-      chatMessage: "",
-      chatUpdatedAt: null,
-      joinedAt: now,
+      peerId: typeof selectedParticipantData.peerId === "string" ? selectedParticipantData.peerId : "",
+      cameraOn: typeof selectedParticipantData.cameraOn === "boolean" ? selectedParticipantData.cameraOn : false,
+      micOn: typeof selectedParticipantData.micOn === "boolean" ? selectedParticipantData.micOn : false,
+      focusStatus: selectedParticipantData.focusStatus || "focused",
+      chatMessage: typeof selectedParticipantData.chatMessage === "string" ? selectedParticipantData.chatMessage : "",
+      chatUpdatedAt: selectedParticipantData.chatUpdatedAt || null,
+      joinedAt: selectedParticipantData.joinedAt || now,
       lastSeenAt: now,
       deviceLabel: "browser",
+      presenceState: "active",
     }, { merge: true });
 
     tx.set(userRef, {
@@ -4824,6 +5085,12 @@ exports.kickStudyRoomParticipant = regionalFunctions.https.onCall(async (data, c
       throw new functions.https.HttpsError("not-found", "이미 방에 없는 멤버입니다.");
     }
 
+    tx.set(roomRef, {
+      kickedParticipantIds: FieldValue.arrayUnion(targetUid),
+      lastKickedParticipantId: targetUid,
+      lastKickedByUid: uid,
+      lastKickedAt: new Date(),
+    }, { merge: true });
     await removeParticipantFromStudyRoomTransaction(tx, db, roomRef, roomData, targetUid);
   });
 

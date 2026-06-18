@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { CheckCircle2, Loader2, Send, Sparkles, Users } from 'lucide-react';
@@ -11,13 +11,25 @@ function getScopeKey(scopeType, scopeId) {
   return `${scopeType}_${String(scopeId || '').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 }
 
+function getTimestampKey(value) {
+  if (!value) return '';
+  if (typeof value.toMillis === 'function') return String(value.toMillis());
+  if (typeof value.seconds === 'number') return `${value.seconds}_${value.nanoseconds || 0}`;
+  return String(value);
+}
+
 export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount = 0, compact = false }) {
   const { user } = useAuth();
   const [responses, setResponses] = useState([]);
   const [missionPlan, setMissionPlan] = useState(null);
+  const [missionDay, setMissionDay] = useState(null);
   const [draft, setDraft] = useState('');
   const [action, setAction] = useState('');
   const [message, setMessage] = useState('');
+  const [rewardToasts, setRewardToasts] = useState([]);
+  const missionDaySeenRef = useRef(false);
+  const shownTeamRewardKeyRef = useRef('');
+  const suppressNextTeamRewardToastRef = useRef(false);
 
   const todayKey = useMemo(() => getTodayStudyCrewMissionKey(), []);
   const mission = useMemo(() => {
@@ -36,7 +48,17 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
   const myResponse = responses.find((response) => response.userId === user?.uid) || null;
   const completedCount = responses.length;
   const target = Math.max(Number(targetCount || 0), completedCount, 1);
-  const teamCompleted = completedCount >= target;
+  const teamTarget = target >= 2 ? target : 0;
+  const teamCompleted = teamTarget > 0 && completedCount >= teamTarget;
+  const teamRewardKey = getTimestampKey(missionDay?.teamRewardAwardedAt);
+
+  const pushRewardToast = (amount, label = '광석 획득') => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setRewardToasts((items) => [...items, { id, amount, label }]);
+    window.setTimeout(() => {
+      setRewardToasts((items) => items.filter((item) => item.id !== id));
+    }, 5200);
+  };
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'studyCrewMissionPlans', todayKey), (snap) => {
@@ -51,26 +73,62 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
   useEffect(() => {
     if (!scopeType || !scopeId) {
       setResponses([]);
+      setMissionDay(null);
       return undefined;
     }
+
+    missionDaySeenRef.current = false;
+    shownTeamRewardKeyRef.current = '';
+    suppressNextTeamRewardToastRef.current = false;
+    const missionDayRef = doc(db, 'studyCrewDailyMissions', scopeKey, 'days', todayKey);
+    const unsubMission = onSnapshot(missionDayRef, (snap) => {
+      setMissionDay(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+    }, (err) => {
+      console.error('Failed to listen daily crew mission status:', err);
+      setMissionDay(null);
+    });
 
     const responsesQuery = query(
       collection(db, 'studyCrewDailyMissions', scopeKey, 'days', todayKey, 'responses'),
       orderBy('createdAt', 'asc')
     );
-    const unsub = onSnapshot(responsesQuery, (snap) => {
+    const unsubResponses = onSnapshot(responsesQuery, (snap) => {
       setResponses(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
     }, (err) => {
       console.error('Failed to listen daily crew mission responses:', err);
       setResponses([]);
     });
-    return () => unsub();
+    return () => {
+      unsubMission();
+      unsubResponses();
+    };
   }, [scopeId, scopeKey, scopeType, todayKey]);
 
   useEffect(() => {
-    if (!myResponse) return;
+    if (!myResponse?.answer) return;
     setDraft('');
   }, [myResponse?.answer]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!missionDaySeenRef.current) {
+      missionDaySeenRef.current = true;
+      shownTeamRewardKeyRef.current = teamRewardKey;
+      return;
+    }
+    if (!teamRewardKey || shownTeamRewardKeyRef.current === teamRewardKey) return;
+
+    shownTeamRewardKeyRef.current = teamRewardKey;
+    const rewardUserIds = Array.isArray(missionDay?.teamRewardUserIds) ? missionDay.teamRewardUserIds : [];
+    if (!rewardUserIds.includes(user.uid)) return;
+    if (suppressNextTeamRewardToastRef.current) {
+      suppressNextTeamRewardToastRef.current = false;
+      return;
+    }
+
+    pushRewardToast(20, '팀 미션 완료');
+    setMessage('팀 미션이 완료되어 +20 광석을 획득했습니다.');
+  }, [missionDay?.teamRewardUserIds, teamRewardKey, user?.uid]);
 
   const submitAnswer = async () => {
     const answer = draft.trim().replace(/\s+/g, ' ').slice(0, STUDY_CREW_MISSION_MAX_LENGTH);
@@ -81,9 +139,20 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
     soundManager.playClick();
     try {
       const fn = httpsCallable(functions, 'submitStudyCrewDailyMission');
-      await fn({ scopeType, scopeId, answer });
+      const result = await fn({ scopeType, scopeId, answer });
+      const rewards = result?.data?.rewards || {};
       setDraft('');
-      setMessage(myResponse ? '오늘의 미션 답변을 수정했습니다.' : '오늘의 미션을 완료했습니다.');
+      if (rewards.individualAwarded) {
+        pushRewardToast(rewards.individualAmount || 5);
+        setMessage('오늘의 미션을 완료해 +5 광석을 획득했습니다.');
+      } else {
+        setMessage(myResponse ? '오늘의 미션 답변을 수정했습니다.' : '오늘의 미션을 저장했습니다.');
+      }
+      if (rewards.teamAwarded) {
+        suppressNextTeamRewardToastRef.current = true;
+        pushRewardToast(rewards.teamAmount || 20, '팀 미션 완료');
+        setMessage('팀 미션이 완료되어 +20 광석을 획득했습니다.');
+      }
     } catch (err) {
       console.error('Failed to submit daily crew mission:', err);
       setMessage(err?.message || '미션 답변을 저장하지 못했습니다.');
@@ -102,6 +171,8 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
 
   return (
     <section className="glass-card hud-border" style={{
+      position: 'relative',
+      overflow: 'hidden',
       padding: compact ? '0.9rem' : '1.1rem',
       borderRadius: 12,
       borderColor: teamCompleted ? 'rgba(34,197,94,0.34)' : 'rgba(0,243,255,0.18)',
@@ -109,6 +180,48 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
         ? 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(7,13,30,0.82) 58%)'
         : 'rgba(7,13,30,0.78)',
     }}>
+      <style>{`
+        @keyframes missionRewardFloat {
+          0% { transform: translate3d(0, 38px, 0) scale(0.82); opacity: 0; }
+          10% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
+          72% { transform: translate3d(-18px, -92px, 0) scale(1.05); opacity: 1; }
+          100% { transform: translate3d(-34px, -168px, 0) scale(1.12); opacity: 0; }
+        }
+      `}</style>
+      {rewardToasts.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          right: compact ? 14 : 22,
+          top: compact ? 14 : 18,
+          zIndex: 4,
+          display: 'grid',
+          gap: '0.4rem',
+          pointerEvents: 'none',
+        }}>
+          {rewardToasts.map((toast) => (
+            <div
+              key={toast.id}
+              className="font-tech"
+              style={{
+                animation: 'missionRewardFloat 5.1s cubic-bezier(0.16, 0.8, 0.24, 1) forwards',
+                borderRadius: 999,
+                border: '1px solid rgba(125,211,252,0.78)',
+                background: 'linear-gradient(135deg, rgba(8,47,73,0.96), rgba(14,165,233,0.95) 48%, rgba(37,99,235,0.96))',
+                boxShadow: '0 18px 44px rgba(14,165,233,0.48), 0 0 0 3px rgba(255,255,255,0.08)',
+                color: '#ffffff',
+                fontWeight: 900,
+                padding: compact ? '0.5rem 0.72rem' : '0.62rem 0.9rem',
+                fontSize: compact ? '0.82rem' : '0.94rem',
+                letterSpacing: '0.01em',
+                textShadow: '0 2px 6px rgba(0,0,0,0.62)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              💎 +{toast.amount} {toast.label}
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0, flex: '1 1 260px' }}>
           <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -137,7 +250,7 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
           fontSize: '0.76rem',
         }}>
           {teamCompleted ? <CheckCircle2 size={14} /> : <Users size={14} />}
-          {completedCount}/{target} 완료
+          {teamTarget > 0 ? `${completedCount}/${teamTarget} 완료` : '팀 미션은 2명 이상'}
         </div>
       </div>
 

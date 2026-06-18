@@ -146,7 +146,7 @@ const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
 
 // ─── YouTube Player Component ───
 // Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
-const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, isOverlay = false, autoPlay = true }, ref) => {
+const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, onError, isOverlay = false, autoPlay = true }, ref) => {
   const normalizedVideoId = getYouTubeVideoId(videoId)
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
@@ -314,6 +314,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
           'onError': (event) => {
             console.error("YouTube Player Error:", event.data)
             setHasError(true)
+            if (onError) onError(event.data)
           }
         }
       })
@@ -367,12 +368,46 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   }
 
   if (hasError) {
+    const directWatchUrl = `https://www.youtube.com/watch?v=${normalizedVideoId}${start ? `&t=${start}` : ''}`
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', color: 'var(--alert-red)', borderRadius: '15px' }}>
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-        <h3 className="font-title" style={{ margin: 0, color: 'var(--alert-red)' }}>교신 장애</h3>
-        <p className="font-tech" style={{ marginTop: '0.5rem', opacity: 0.8, color: 'white' }}>
-          영상 ID 또는 브라우저 재생 권한을 확인해 주세요.
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(5, 10, 25, 0.95)', color: '#fff', borderRadius: '15px', padding: '2rem', textAlign: 'center', border: '1px solid var(--alert-red)', boxSizing: 'border-box' }}>
+        <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⚠️</div>
+        <h3 className="font-title" style={{ margin: 0, color: 'var(--alert-red)', fontSize: '1.4rem' }}>영상 전송 오류 (교신 장애)</h3>
+        
+        <div style={{ maxWidth: '480px', margin: '1rem 0', padding: '1rem', background: 'rgba(255, 77, 77, 0.08)', border: '1px solid rgba(255, 77, 77, 0.2)', borderRadius: '8px', fontSize: '0.9rem', lineHeight: '1.6', color: '#e2e8f0', textAlign: 'left' }}>
+          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold', color: '#ffb3b3' }}>
+            💡 구글 자녀 계정(Family Link) 및 제한 모드 안내
+          </p>
+          <p style={{ margin: 0 }}>
+            구글 자녀 계정, 학교 계정, 또는 브라우저의 YouTube 제한 모드가 켜져 있는 경우, 보안 정책으로 인해 타사 사이트의 임베드 재생이 제한될 수 있습니다.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%', maxWidth: '320px', marginTop: '0.5rem' }}>
+          <a
+            href={directWatchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hud-btn primary glass"
+            style={{
+              padding: '0.8rem 1.5rem',
+              background: 'rgba(0, 243, 255, 0.2)',
+              border: '2px solid var(--crystal-cyan)',
+              color: 'var(--text-bright)',
+              borderRadius: '10px',
+              textDecoration: 'none',
+              fontWeight: 700,
+              fontSize: '1rem',
+              display: 'inline-block',
+              cursor: 'pointer'
+            }}
+          >
+            📺 YouTube에서 직접 보기
+          </a>
+        </div>
+        
+        <p className="font-tech" style={{ marginTop: '1.2rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          ※ YouTube에서 영상을 보신 후, 플레이어 하단의 <b>[수동 완료 처리]</b>를 누르시면 다음 단계로 진행하실 수 있습니다.
         </p>
       </div>
     )
@@ -553,6 +588,7 @@ export default function MissionHub({
   const { user } = useAuth()
   const userId = user?.uid
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [videoError, setVideoError] = useState(false)
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -916,6 +952,7 @@ export default function MissionHub({
     setSaveStatus(null)
     setIsVideoPlaying(false)
     isVideoPlayingRef.current = false
+    setVideoError(false)
   }, [selectedTx?.id])
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
@@ -1635,8 +1672,8 @@ export default function MissionHub({
       const stamps = Array.from(stampedSetRef.current)
       
       let isManualComplete = false
-      // Remove 20% hurdle. If they reached the end but didn't complete, allow manual completion without bonus
-      if (isAtEnd && !videoCompleted) {
+      // Remove 20% hurdle. If they reached the end or encountered an error but didn't complete, allow manual completion without bonus
+      if ((isAtEnd || videoError) && !videoCompleted) {
          isManualComplete = true
       }
       
@@ -2191,6 +2228,9 @@ export default function MissionHub({
                       isVideoPlayingRef.current = playing
                       setIsVideoPlaying(playing)
                     }}
+                    onError={(err) => {
+                      setVideoError(true)
+                    }}
                  />
                ) : (
                  <div className="font-tech" style={{ color: 'var(--text-muted)' }}>
@@ -2265,9 +2305,9 @@ export default function MissionHub({
                    style={{ 
                      padding: isMobile ? '0.85rem 1rem' : '0.8rem 2.5rem', 
                      fontSize: isMobile ? '0.9rem' : '1rem',
-                     borderColor: videoCompleted ? 'var(--planet-green)' : (isAtEnd ? 'var(--alert-red)' : undefined),
-                     background: videoCompleted ? 'rgba(0, 255, 136, 0.2)' : (isAtEnd ? 'rgba(255, 77, 77, 0.2)' : 'rgba(0,0,0,0.5)'),
-                     color: isAtEnd && !videoCompleted ? '#ffb3b3' : 'white',
+                     borderColor: videoCompleted ? 'var(--planet-green)' : ((isAtEnd || videoError) ? 'var(--alert-red)' : undefined),
+                     background: videoCompleted ? 'rgba(0, 255, 136, 0.2)' : ((isAtEnd || videoError) ? 'rgba(255, 77, 77, 0.2)' : 'rgba(0,0,0,0.5)'),
+                     color: (isAtEnd || videoError) && !videoCompleted ? '#ffb3b3' : 'white',
                      boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
                    }}
                  >
@@ -2281,8 +2321,8 @@ export default function MissionHub({
                           <>☑️ 수신 지연! (완료 보너스 소멸) · 돌아가기</>
                         )
                      )
-                   ) : isAtEnd ? (
-                       <>☑️ 수동 완료 처리 (완료 보너스 제외) - 완료율 {completionRate}% / 기준 {completionTargetPercent}%</>
+                   ) : (isAtEnd || videoError) ? (
+                       <>☑️ 수동 완료 처리 (외부 시청 완료)</>
                    ) : (
                      <>📋 오늘은 여기까지</>
                    )}

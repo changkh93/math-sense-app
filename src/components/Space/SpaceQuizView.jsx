@@ -644,7 +644,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       const remainingShields = hasShield - shieldsUsed
       if (remainingShields > 0) {
         newShieldsUsed += 1
-        addMarker(`🛡️ DEFENDED! (-1)`, 'gain')
+        addMarker('🛡️ 방어! 실드 1회 소모', 'gain')
       } else {
         const currentPenalty = (retryCount + 1) * 2
         newSessionCrystals -= currentPenalty
@@ -728,7 +728,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       const remainingShields = hasShield - shieldsUsed
       if (remainingShields > 0) {
         newShieldsUsed += 1
-        addMarker(`🛡️ DEFENDED! (-1)`, 'gain')
+        addMarker('🛡️ 방어! 실드 1회 소모', 'gain')
       } else {
         const currentPenalty = (retryCount + 1) * 2
         newSessionCrystals -= currentPenalty
@@ -2145,7 +2145,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 </div>
                 {hasShield - shieldsUsed >= 0 && shieldsUsed > 0 && (
                   <div style={{ color: 'var(--star-gold)', marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                    🛡️ 광자 쉴드가 에너지를 보호했습니다! (남은 방어: {hasShield - shieldsUsed}회)
+                    🛡️ 광자 실드가 에너지를 보호했습니다! (남은 방어 횟수: {hasShield - shieldsUsed}회)
                   </div>
                 )}
               </motion.div>

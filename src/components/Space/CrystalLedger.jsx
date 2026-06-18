@@ -24,6 +24,8 @@ const TX_CONFIG = {
   question_resolved: { icon: '✅', label: '질문 해결 보상', color: '#4ade80' },
   self_resolve: { icon: '🔍', label: '자가 해결 처리', color: '#60a5fa' },
   teacher_verify: { icon: '👨‍🏫', label: '교사 검증 보상', color: '#4ade80' },
+  study_crew_mission: { icon: '🛰️', label: '스터디 크루 미션', color: '#38bdf8' },
+  study_crew_team_mission: { icon: '🤝', label: '스터디 크루 팀 미션', color: '#4ade80' },
   attendance_reward: { icon: '🚀', label: '출석 도킹 보상', color: '#38bdf8' },
   streak_bonus: { icon: '🔥', label: '연속 학습 보너스', color: '#fbbf24' },
   assignment_missing_penalty: { icon: '📝', label: '과제 미제출 차감', color: '#fb7185' },
@@ -804,6 +806,18 @@ export default function CrystalLedger({ userData }) {
                 <li>질문 등록 시 <span style={{color: 'var(--text-bright)'}}>+5</span></li>
                 <li>내 답변 채택 시 <span style={{color: 'var(--text-bright)'}}>+20</span></li>
                 <li>선생님 인증 추가 <span style={{color: 'var(--text-bright)'}}>+10</span></li>
+              </ul>
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#38bdf8', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>🛰️</span> 스터디 크루
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>오늘의 개인 미션 완료 시 <span style={{color: 'var(--text-bright)'}}>+5</span> 광석</li>
+                <li>개인 미션 보상은 <span style={{color: 'var(--text-bright)'}}>하루 1회</span>만 지급</li>
+                <li>팀 미션 완료 시 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
+                <li>팀 미션 보상은 <span style={{color: 'var(--text-bright)'}}>하루 최대 2회</span>, 2명 이상 참여 시 가능</li>
               </ul>
             </div>
             

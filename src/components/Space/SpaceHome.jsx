@@ -3665,8 +3665,9 @@ function SpaceHome() {
                       const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
                       
                       const { hasQuiz, hasVideo, hasText, hasWorkbook } = getUnitContentAvailability(unit, quizAvailabilityMap)
+                      const hasAnyContent = hasQuiz || hasVideo || hasText || hasWorkbook
 
-                      const isOverallCompleted = 
+                      const isOverallCompleted = hasAnyContent &&
                         (!hasQuiz || uProg.quiz) &&
                         (!hasVideo || uProg.video) &&
                         (!hasText || uProg.text) &&
@@ -3677,17 +3678,19 @@ function SpaceHome() {
                       return (
                         <Motion.button
                           key={unit.docId}
-                          whileHover={isMobile ? undefined : { scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
+                          whileHover={isMobile || !hasAnyContent ? undefined : { scale: 1.02, x: 10, backgroundColor: 'rgba(0, 243, 255, 0.15)' }}
                                   className={`glass-card hud-border ${isOverallCompleted ? 'completed' : ''}`}
+                                  disabled={!hasAnyContent}
                                   onClick={() => { 
+                                    if (!hasAnyContent) return
                                     selectUnit(unit.docId)
                                     soundManager.playClick() 
                           }}
                           style={{
                             padding: isMobile ? '1rem' : '1.2rem 1.5rem',
                             textAlign: 'left',
-                            cursor: 'pointer',
-                            color: 'var(--text-bright)',
+                            cursor: hasAnyContent ? 'pointer' : 'not-allowed',
+                            color: hasAnyContent ? 'var(--text-bright)' : 'rgba(255,255,255,0.45)',
                             fontSize: isMobile ? '0.96rem' : '1.1rem',
                             display: 'flex',
                             justifyContent: 'space-between',
@@ -3696,7 +3699,8 @@ function SpaceHome() {
                             position: 'relative',
                             flexWrap: 'wrap',
                             flexDirection: isMobile ? 'column' : 'row',
-                            gap: isMobile ? '0.8rem' : '1rem'
+                            gap: isMobile ? '0.8rem' : '1rem',
+                            opacity: hasAnyContent ? 1 : 0.62
                           }}
                         >
                           {checkIsBonusUnit(unit.docId || unit.id) && (
@@ -3756,8 +3760,8 @@ function SpaceHome() {
                               </span>
                             )}
                             
-                            <span style={{ color: 'var(--crystal-cyan)', minWidth: isMobile ? 'auto' : '80px', textAlign: 'right' }}>
-                              {isOverallCompleted ? 'REPLAY' : '🚀 START'}
+                            <span style={{ color: hasAnyContent ? 'var(--crystal-cyan)' : 'var(--text-muted)', minWidth: isMobile ? 'auto' : '80px', textAlign: 'right' }}>
+                              {!hasAnyContent ? '준비중' : (isOverallCompleted ? 'REPLAY' : '🚀 START')}
                             </span>
                           </div>
                         </Motion.button>

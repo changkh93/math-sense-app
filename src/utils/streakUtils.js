@@ -184,7 +184,6 @@ export function getNowKST() {
 export const RADAR_DURATION_DAYS = 7;
 export const CRYO_CORE_PURCHASE_COOLDOWN_DAYS = 30;
 export const PHOTON_SHIELD_CHARGES_PER_PURCHASE = 10;
-export const PHOTON_SHIELD_MAX_CHARGES = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function isRadarActive(userData, nowMs = Date.now()) {

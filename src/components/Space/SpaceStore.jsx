@@ -11,7 +11,6 @@ import {
   buildStreakWriteAudit,
   CRYO_CORE_PURCHASE_COOLDOWN_DAYS,
   PHOTON_SHIELD_CHARGES_PER_PURCHASE,
-  PHOTON_SHIELD_MAX_CHARGES,
   RADAR_DURATION_DAYS,
   getRadarTimeRemainingMs,
   getStreakFreezePurchaseCooldownRemainingMs,
@@ -96,9 +95,8 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
       name: '광자 실드', 
       icon: '🛡️', 
       cost: 20, 
-      maxOwn: PHOTON_SHIELD_MAX_CHARGES, // Max charges
       chargesPerPurchase: PHOTON_SHIELD_CHARGES_PER_PURCHASE,
-      desc: '퀴즈를 풀다 틀려도 피같은 광석(-2)이 깎이지 않게 지켜줍니다! 한 번 구매하면 든든하게 10번이나 막아줘요.',
+      desc: '퀴즈를 풀다 틀려도 피같은 광석(-2)이 깎이지 않게 지켜줍니다! 한 번 구매하면 10회 방어할 수 있어요.',
       currentOwned: userData?.shieldCharges || 0
     },
   ]
@@ -160,7 +158,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
   const canGiftOwned = (item) => getOwnedGiftUnitCount(item) > 0
 
   const getGiftUnitLabel = (item) => {
-    if (item.id === 'photon_shield') return `${PHOTON_SHIELD_CHARGES_PER_PURCHASE}회분`
+    if (item.id === 'photon_shield') return `${PHOTON_SHIELD_CHARGES_PER_PURCHASE}회 방어`
     if (item.id === 'radar') return `${RADAR_DURATION_DAYS}일 활성권`
     return '1개'
   }
@@ -181,13 +179,6 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
     if (item.id === 'frame_solar' && recipientFrames.includes('solar')) {
       return `${getProfileName(recipient)}님은 이미 ${item.name}을 보유 중입니다.`
     }
-    if (
-      item.id === 'photon_shield' &&
-      (recipient.shieldCharges || 0) + PHOTON_SHIELD_CHARGES_PER_PURCHASE > PHOTON_SHIELD_MAX_CHARGES
-    ) {
-      return `${getProfileName(recipient)}님은 광자 실드 최대 ${PHOTON_SHIELD_MAX_CHARGES}회를 초과합니다.`
-    }
-
     return ''
   }
 
@@ -327,10 +318,6 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
           const currentCharges = freshUserData?.shieldCharges || 0
           const nextCharges = currentCharges + PHOTON_SHIELD_CHARGES_PER_PURCHASE
 
-          if (nextCharges > PHOTON_SHIELD_MAX_CHARGES) {
-            throw new Error('PHOTON_SHIELD_MAX_REACHED')
-          }
-
           transaction.set(userRef, {
             crystals: freshCrystals - item.cost,
             shieldCharges: nextCharges,
@@ -434,7 +421,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
       } else if (item.id === 'photon_shield') {
         setPurchaseMessage({
           type: 'success',
-          text: `${item.name} 구매 완료! (현재 잔여: ${txResult.purchasedCount}/${item.maxOwn}회)`
+          text: `${item.name} 구매 완료! (남은 방어 횟수: ${txResult.purchasedCount}회)`
         })
       } else if (item.id === 'radar') {
         setPurchaseMessage({
@@ -495,9 +482,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
           ? `광석이 부족합니다. (필요: ${item.cost}개)`
           : err.message === 'CRYO_CORE_COOLDOWN'
               ? `크라이오 코어는 ${CRYO_CORE_PURCHASE_COOLDOWN_DAYS}일에 1개만 구매할 수 있습니다.`
-              : err.message === 'PHOTON_SHIELD_MAX_REACHED'
-                ? `${item.name}는 최대 ${item.maxOwn}회까지 충전할 수 있습니다.`
-                : err.message === 'ALREADY_OWNED'
+              : err.message === 'ALREADY_OWNED'
                   ? `${item.name}는 이미 해금했습니다.`
                 : err.message === 'RADAR_ALREADY_ACTIVE'
                   ? `${item.name}는 이미 활성화 중입니다. 만료 후 다시 구매할 수 있습니다.`
@@ -973,7 +958,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                 <div style={{ fontWeight: 700, color: 'var(--text-bright)', fontSize: '1.2rem' }}>{item.name}</div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--crystal-cyan)', marginTop: '0.2rem' }}>
                   <span style={{ fontWeight: 800 }}>💰 {item.cost} 광석</span>
-                  {item.id === 'photon_shield' && <span style={{ opacity: 0.7, marginLeft: '0.5rem' }}>(10회분 충전)</span>}
+                  {item.id === 'photon_shield' && <span style={{ opacity: 0.7, marginLeft: '0.5rem' }}>(10회 방어)</span>}
                 </div>
                 <div style={{ 
                   marginTop: '0.5rem', 
@@ -986,7 +971,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: item.currentOwned > 0 ? 'var(--planet-green)' : 'var(--text-muted)' }} />
                   {item.id === 'cryo_core' 
                     ? `현재 보유: ${item.currentOwned}개 / 월 1회 구매`
-                    : `남은 횟수: ${item.currentOwned}회 / 최대 ${item.maxOwn}회`
+                    : `남은 방어 횟수: ${item.currentOwned}회`
                   }
                 </div>
               </div>
@@ -1000,7 +985,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                 </span>
               ) : item.id === 'photon_shield' ? (
                 <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-                  ※ 퀴즈 중 오답 시 자동으로 소모됩니다. (1회 구매 시 {item.chargesPerPurchase}회 충전, 최대 {item.maxOwn}회까지 누적 충전 가능)
+                  ※ 퀴즈 중 오답 시 자동으로 소모됩니다. (1회 구매 시 {item.chargesPerPurchase}회 방어 추가)
                 </span>
               ) : (
                 <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
@@ -1010,32 +995,30 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             </p>
             <button 
               className="space-nav-link" 
-              disabled={purchasing || (item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'photon_shield' && (item.currentOwned + PHOTON_SHIELD_CHARGES_PER_PURCHASE) > item.maxOwn) || (item.id === 'radar' && radarActive) || (userData?.crystals || 0) < item.cost}
+              disabled={purchasing || (item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'radar' && radarActive) || (userData?.crystals || 0) < item.cost}
               style={{ 
                 width: '100%', 
                 fontSize: '0.9rem', 
                 padding: '0.8rem',
                 fontWeight: 700,
-                background: ((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'photon_shield' && (item.currentOwned + PHOTON_SHIELD_CHARGES_PER_PURCHASE) > item.maxOwn) || (item.id === 'radar' && radarActive)) 
+                background: ((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'radar' && radarActive)) 
                   ? 'rgba(107, 114, 128, 0.2)' 
                   : (userData?.crystals || 0) < item.cost 
                     ? 'rgba(239, 68, 68, 0.1)'
                     : 'rgba(0, 243, 255, 0.15)',
-                border: ((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'photon_shield' && (item.currentOwned + PHOTON_SHIELD_CHARGES_PER_PURCHASE) > item.maxOwn) || (item.id === 'radar' && radarActive))
+                border: ((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'radar' && radarActive))
                   ? '1px solid rgba(107, 114, 128, 0.3)'
                   : '1px solid rgba(0, 243, 255, 0.4)',
-                color: ((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'photon_shield' && (item.currentOwned + PHOTON_SHIELD_CHARGES_PER_PURCHASE) > item.maxOwn) || (item.id === 'radar' && radarActive)) ? '#6B7280' : 'var(--crystal-cyan)',
-                cursor: (((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'photon_shield' && (item.currentOwned + PHOTON_SHIELD_CHARGES_PER_PURCHASE) > item.maxOwn) || (item.id === 'radar' && radarActive)) || purchasing) ? 'not-allowed' : 'pointer',
+                color: ((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'radar' && radarActive)) ? '#6B7280' : 'var(--crystal-cyan)',
+                cursor: (((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'radar' && radarActive)) || purchasing) ? 'not-allowed' : 'pointer',
                 opacity: purchasing ? 0.7 : 1
               }}
               onClick={() => handlePurchase(item)}
             >
-              {((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'photon_shield' && (item.currentOwned + PHOTON_SHIELD_CHARGES_PER_PURCHASE) > item.maxOwn) || (item.id === 'radar' && radarActive)) 
+              {((item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'radar' && radarActive)) 
                 ? (item.id === 'cryo_core' && cryoCooldownRemainingMs > 0
                   ? '구매 대기 중'
-                  : item.id === 'radar' && radarActive
-                    ? '활성 중'
-                    : '최대 한도 초과')
+                  : '활성 중')
                 : (userData?.crystals || 0) < item.cost 
                   ? `광석 부족 (${item.cost - (userData?.crystals || 0)}개 더 필요)` 
                   : purchasing 

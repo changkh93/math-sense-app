@@ -32,6 +32,7 @@ const PEER_REMOTE_WAIT_ERROR_TYPES = new Set(['peer-unavailable', 'disconnected'
 const PEER_RESTART_DELAY_MS = 1800;
 const PEER_RESTART_ATTEMPT_LIMIT = 3;
 const REMOTE_STREAM_RETRY_GRACE_MS = 10000;
+const STUDY_ROOM_HEARTBEAT_MS = 15000;
 
 const tileStyle = {
   position: 'relative',
@@ -772,6 +773,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const peerIdSeenAtRef = useRef(new Map());
   const leavingRef = useRef(false);
   const wasAcceptedParticipantRef = useRef(false);
+  const reconnectingParticipantRef = useRef(false);
   const miniWindowRef = useRef(null);
   const chatAlertStateRef = useRef({ initialized: false, messages: new Map() });
   const originalTitleRef = useRef(typeof document !== 'undefined' ? document.title : '');
@@ -896,16 +898,33 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     if (!user?.uid) return undefined;
     const participantRef = doc(db, 'studyRooms', roomId, 'participants', user.uid);
     const syncHeartbeat = () => {
-      setDoc(participantRef, {
+      const payload = {
         lastSeenAt: serverTimestamp(),
-      }, { merge: true }).catch((err) => {
+        presenceState: document.hidden ? 'background' : 'active',
+      };
+      if (document.hidden) {
+        payload.lastHiddenAt = serverTimestamp();
+      } else {
+        payload.lastVisibleAt = serverTimestamp();
+      }
+      setDoc(participantRef, payload, { merge: true }).catch((err) => {
         console.warn('Failed to sync Study Stream heartbeat:', err);
       });
     };
 
     syncHeartbeat();
-    const intervalId = window.setInterval(syncHeartbeat, 20000);
-    return () => window.clearInterval(intervalId);
+    const intervalId = window.setInterval(syncHeartbeat, STUDY_ROOM_HEARTBEAT_MS);
+    document.addEventListener('visibilitychange', syncHeartbeat);
+    window.addEventListener('focus', syncHeartbeat);
+    window.addEventListener('pageshow', syncHeartbeat);
+    window.addEventListener('online', syncHeartbeat);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', syncHeartbeat);
+      window.removeEventListener('focus', syncHeartbeat);
+      window.removeEventListener('pageshow', syncHeartbeat);
+      window.removeEventListener('online', syncHeartbeat);
+    };
   }, [roomId, user?.uid]);
 
   useEffect(() => {
@@ -1051,6 +1070,8 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     setupLocalMediaAndPeer();
 
     const activeCalls = callsRef.current;
+    const activeCallStartedAt = callStartedAtRef.current;
+    const activePeerIdSeenAt = peerIdSeenAtRef.current;
 
     return () => {
       cancelled = true;
@@ -1058,14 +1079,17 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
       peerRetryTimerRef.current = 0;
       setDoc(doc(db, 'studyRooms', roomId, 'participants', user.uid), {
         peerId: '',
+        cameraOn: false,
+        micOn: false,
+        presenceState: 'closed',
         lastSeenAt: serverTimestamp(),
       }, { merge: true }).catch((err) => {
         console.warn('Failed to clear peer id:', err);
       });
       activeCalls.forEach((call) => call.close());
       activeCalls.clear();
-      callStartedAtRef.current.clear();
-      peerIdSeenAtRef.current.clear();
+      activeCallStartedAt.clear();
+      activePeerIdSeenAt.clear();
       if (peerRef.current) {
         peerRef.current.destroy();
         peerRef.current = null;
@@ -1169,17 +1193,38 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   useEffect(() => {
     if (!room || leavingRef.current) return;
     const participantIds = Array.isArray(room.participantIds) ? room.participantIds : [];
-    if (participantIds.includes(user.uid)) {
-      wasAcceptedParticipantRef.current = true;
+    const kickedParticipantIds = Array.isArray(room.kickedParticipantIds) ? room.kickedParticipantIds : [];
+    const wasKickedByHost = kickedParticipantIds.includes(user.uid);
+    if (wasKickedByHost) {
+      leavingRef.current = true;
+      closeRoomResources();
+      alert('운영자가 집중방에서 내보냈습니다.');
+      if (onLeave) onLeave();
       return;
     }
-    if (!wasAcceptedParticipantRef.current) return;
 
-    leavingRef.current = true;
-    closeRoomResources();
-    alert('운영자가 집중방에서 내보냈습니다.');
-    if (onLeave) onLeave();
-  }, [closeRoomResources, onLeave, room, user.uid]);
+    if (participantIds.includes(user.uid)) {
+      wasAcceptedParticipantRef.current = true;
+      reconnectingParticipantRef.current = false;
+      return;
+    }
+
+    const hasLocalParticipantDoc = participants.some((participant) => participant.uid === user.uid);
+    if (!wasAcceptedParticipantRef.current && !hasLocalParticipantDoc) return;
+
+    wasAcceptedParticipantRef.current = true;
+    if (reconnectingParticipantRef.current) return;
+    reconnectingParticipantRef.current = true;
+    const repairStudyRoomMembership = httpsCallable(functions, 'joinStudyRoomSession');
+    repairStudyRoomMembership({ roomId })
+      .then(() => {
+        reconnectingParticipantRef.current = false;
+      })
+      .catch((err) => {
+        console.warn('Failed to repair study room membership:', err);
+        reconnectingParticipantRef.current = false;
+      });
+  }, [closeRoomResources, onLeave, participants, room, roomId, user.uid]);
 
   useEffect(() => {
     const originalTitle = originalTitleRef.current;
