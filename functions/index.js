@@ -84,6 +84,7 @@ const STORE_ITEM_GIFT_CATALOG = {
     transferAmount: 1,
   },
 };
+const OPERATOR_GIFT_EMAIL = "paul@dulcine.net";
 const ASSIGNMENT_MISSING_LOOKBACK_DAYS = 7;
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
 const ASSIGNMENT_MISSING_BASE_PENALTY = 15;
@@ -125,6 +126,12 @@ function isDeletedMemberData(data = {}) {
 
 function buildStudentEmail(loginId) {
   return `${String(loginId || "").toLowerCase()}@${STUDENT_AUTH_DOMAIN}`;
+}
+
+function canOperatorGift(senderData = {}, context = null) {
+  const authEmail = String(context?.auth?.token?.email || "").toLowerCase();
+  const profileEmail = String(senderData.email || "").toLowerCase();
+  return authEmail === OPERATOR_GIFT_EMAIL || profileEmail === OPERATOR_GIFT_EMAIL;
 }
 
 async function requireParentDoc(uid) {
@@ -3644,7 +3651,7 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
 
     const senderData = senderSnap.data() || {};
     const recipientData = recipientSnap.data() || {};
-    if (senderData.role === "parent" || senderData.role === "admin") {
+    if (!canOperatorGift(senderData, context) && (senderData.role === "parent" || senderData.role === "admin")) {
       throw new functions.https.HttpsError("permission-denied", "학생 계정만 상점 아이템을 선물할 수 있습니다.");
     }
     if (recipientData.role === "parent" || recipientData.role === "admin") {
@@ -3838,7 +3845,7 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
 
     const senderData = senderSnap.data() || {};
     const recipientData = recipientSnap.data() || {};
-    if (senderData.role === "parent" || senderData.role === "admin") {
+    if (!canOperatorGift(senderData, context) && (senderData.role === "parent" || senderData.role === "admin")) {
       throw new functions.https.HttpsError("permission-denied", "학생 계정만 광석을 보낼 수 있습니다.");
     }
     if (recipientData.role === "parent" || recipientData.role === "admin") {
