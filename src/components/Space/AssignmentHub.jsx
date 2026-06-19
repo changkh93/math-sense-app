@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../../hooks/useAuth';
@@ -30,8 +30,154 @@ const MotionDiv = motion.div;
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
 const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
 const ACTIVE_WARNING_STATUSES = ['active', 'appealed'];
+const ASSIGNMENT_DRAFT_STORAGE_PREFIX = 'metasense.assignmentDraft.v1';
+const UNSENT_ASSIGNMENT_DRAFT_MESSAGE = '전송하지 않은 과제 글이 있습니다. 이동하면 일부 변경사항이 저장되지 않을 수 있습니다.';
+const ASSIGNMENT_DRAFT_FILE_DB_NAME = 'metasense-assignment-drafts';
+const ASSIGNMENT_DRAFT_FILE_DB_VERSION = 1;
+const ASSIGNMENT_DRAFT_FILE_STORE = 'files';
 
 const isDateKey = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+
+const getAssignmentDraftStorageKey = ({ userId, clusterId, dateStr }) => {
+  if (!userId || !dateStr) return '';
+  return `${ASSIGNMENT_DRAFT_STORAGE_PREFIX}:${userId}:${clusterId || 'unknown'}:${dateStr}`;
+};
+
+const safeReadAssignmentDraft = (storageKey) => {
+  if (!storageKey || typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.warn('Failed to read assignment draft:', error);
+    return null;
+  }
+};
+
+const safeWriteAssignmentDraft = (storageKey, payload) => {
+  if (!storageKey || typeof window === 'undefined') return false;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(payload));
+    return true;
+  } catch (error) {
+    console.warn('Failed to save assignment draft:', error);
+    return false;
+  }
+};
+
+const safeRemoveAssignmentDraft = (storageKey) => {
+  if (!storageKey || typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch (error) {
+    console.warn('Failed to remove assignment draft:', error);
+  }
+};
+
+const openAssignmentDraftFileDb = () => {
+  if (typeof window === 'undefined' || !window.indexedDB) {
+    return Promise.reject(new Error('IndexedDB is not available.'));
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(ASSIGNMENT_DRAFT_FILE_DB_NAME, ASSIGNMENT_DRAFT_FILE_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(ASSIGNMENT_DRAFT_FILE_STORE)) {
+        db.createObjectStore(ASSIGNMENT_DRAFT_FILE_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const safeReadAssignmentDraftFiles = async (storageKey) => {
+  if (!storageKey) return [];
+  let db;
+  try {
+    db = await openAssignmentDraftFileDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(ASSIGNMENT_DRAFT_FILE_STORE, 'readonly');
+      const request = tx.objectStore(ASSIGNMENT_DRAFT_FILE_STORE).get(storageKey);
+      request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.warn('Failed to read assignment draft files:', error);
+    return [];
+  } finally {
+    db?.close();
+  }
+};
+
+const safeWriteAssignmentDraftFiles = async (storageKey, files = []) => {
+  if (!storageKey) return false;
+  let db;
+  try {
+    db = await openAssignmentDraftFileDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(ASSIGNMENT_DRAFT_FILE_STORE, 'readwrite');
+      const request = tx.objectStore(ASSIGNMENT_DRAFT_FILE_STORE).put(files, storageKey);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    return true;
+  } catch (error) {
+    console.warn('Failed to save assignment draft files:', error);
+    return false;
+  } finally {
+    db?.close();
+  }
+};
+
+const safeRemoveAssignmentDraftFiles = async (storageKey) => {
+  if (!storageKey) return;
+  let db;
+  try {
+    db = await openAssignmentDraftFileDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(ASSIGNMENT_DRAFT_FILE_STORE, 'readwrite');
+      const request = tx.objectStore(ASSIGNMENT_DRAFT_FILE_STORE).delete(storageKey);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.warn('Failed to remove assignment draft files:', error);
+  } finally {
+    db?.close();
+  }
+};
+
+const hasDraftPayload = (draft = {}) => (
+  Boolean(String(draft.content || '').trim()) ||
+  Boolean(String(draft.newLink || '').trim()) ||
+  Boolean((draft.links || []).length) ||
+  Boolean((draft.existingAttachments || []).length)
+);
+
+const areDraftListsEqual = (left = [], right = []) => (
+  JSON.stringify(left || []) === JSON.stringify(right || [])
+);
+
+const hasDraftChangedFromAssignment = (draft = {}, assignment = null) => {
+  if (!hasDraftPayload(draft)) return false;
+  if (!assignment) return true;
+  return (
+    String(draft.content || '') !== String(assignment.content || '') ||
+    Boolean(String(draft.newLink || '').trim()) ||
+    !areDraftListsEqual(draft.links || [], assignment.links || []) ||
+    !areDraftListsEqual(draft.existingAttachments || [], assignment.attachments || [])
+  );
+};
+
+const formatDraftSavedAt = (timestamp) => {
+  if (!timestamp) return '';
+  return new Intl.DateTimeFormat('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(timestamp));
+};
 
 const getTimestampMs = (value) => {
   if (!value) return 0;
@@ -108,6 +254,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   const [penaltyCheckNow, setPenaltyCheckNow] = useState(0);
   const [optimisticAssignmentsByDate, setOptimisticAssignmentsByDate] = useState({});
   const [submissionNotice, setSubmissionNotice] = useState(null);
+  const unsentDraftRef = useRef({ dirty: false });
   const previousTodayRef = useRef(todayKST);
   const penaltySweepKeyRef = useRef('');
 
@@ -125,6 +272,34 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
     const timer = setInterval(syncPenaltyClock, 60 * 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (!unsentDraftRef.current?.dirty) return;
+      event.preventDefault();
+      event.returnValue = UNSENT_ASSIGNMENT_DRAFT_MESSAGE;
+      return UNSENT_ASSIGNMENT_DRAFT_MESSAGE;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  const handleDraftStateChange = useCallback((draftState) => {
+    unsentDraftRef.current = draftState || { dirty: false };
+  }, []);
+
+  const confirmDraftNavigation = useCallback(() => {
+    if (!unsentDraftRef.current?.dirty) return true;
+    const hasFiles = unsentDraftRef.current?.hasFiles;
+    const message = hasFiles
+      ? '전송하지 않은 과제 글이 있습니다. 글과 링크는 임시저장되지만, 새로 선택한 파일은 다시 선택해야 합니다. 계속 이동할까요?'
+      : '전송하지 않은 과제 글이 임시저장되어 있습니다. 계속 이동할까요?';
+    return window.confirm(message);
+  }, []);
+
+  const handleCloseArchive = useCallback(() => {
+    if (confirmDraftNavigation()) onClose?.();
+  }, [confirmDraftNavigation, onClose]);
 
   // Auto-select today's KST date when entering the archive.
   useEffect(() => {
@@ -251,6 +426,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   };
 
   const handlePrevDay = () => {
+    if (!confirmDraftNavigation()) return;
     const prevDate = new Date(currentDate.getTime());
     prevDate.setUTCDate(currentDate.getUTCDate() - 1);
     setCurrentDate(prevDate);
@@ -262,6 +438,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   };
 
   const handleNextDay = () => {
+    if (!confirmDraftNavigation()) return;
     const nextDate = new Date(currentDate.getTime());
     nextDate.setUTCDate(currentDate.getUTCDate() + 1);
     setCurrentDate(nextDate);
@@ -335,6 +512,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   }, [currentDate, firstDayOfMonth, daysInMonth, effectiveAssignments, attendanceRecords, warningsByDate]);
 
   const handleSubmitted = (submittedAssignment) => {
+    handleDraftStateChange({ dirty: false });
     if (!submittedAssignment?.date) return;
     setOptimisticAssignmentsByDate(prev => ({
       ...prev,
@@ -422,14 +600,16 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
             <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
               <button 
                 className="space-nav-link font-tech"
-                onClick={onClose}
+                onClick={handleCloseArchive}
                 style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}
               >
                 ← RETURN
               </button>
               <button 
                 className="space-btn cosmic-btn font-tech" 
-                onClick={() => setShowChronicle(true)}
+                onClick={() => {
+                  if (confirmDraftNavigation()) setShowChronicle(true);
+                }}
                 style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
               >
                  항해 일지 열기
@@ -438,7 +618,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
           ) : (
             <button 
               className="space-nav-link font-tech"
-              onClick={onClose}
+              onClick={handleCloseArchive}
               style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}
             >
               ← RETURN
@@ -464,7 +644,9 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
           {!isMobile && (
             <button 
               className="space-btn cosmic-btn font-tech" 
-              onClick={() => setShowChronicle(true)}
+              onClick={() => {
+                if (confirmDraftNavigation()) setShowChronicle(true);
+              }}
               style={{ padding: '0.5rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
             >
                항해 일지 열기
@@ -590,6 +772,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
                     key={day.dateStr}
                     whileHover={{ scale: 1.05 }}
                     onClick={() => {
+                      if (selectedDateStr !== day.dateStr && !confirmDraftNavigation()) return;
                       setSelectedDateStr(day.dateStr);
                       setCurrentDate(new Date(`${day.dateStr}T12:00:00Z`));
                     }}
@@ -693,6 +876,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
                     key={day.dateStr}
                     whileHover={{ scale: 1.05 }}
                     onClick={() => {
+                      if (selectedDateStr !== day.dateStr && !confirmDraftNavigation()) return;
                       setSelectedDateStr(day.dateStr);
                       setCurrentDate(new Date(`${day.dateStr}T12:00:00Z`));
                     }}
@@ -791,9 +975,12 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
               user={user}
               userData={userData}
               submitMutation={submitMutation}
-              onCancel={() => setSelectedDateStr(null)}
+              onCancel={() => {
+                if (confirmDraftNavigation()) setSelectedDateStr(null);
+              }}
               onSubmitted={handleSubmitted}
               onNavigateToUnit={onNavigateToUnit}
+              onDraftStateChange={handleDraftStateChange}
             />
           )}
         </div>
@@ -963,7 +1150,7 @@ function SubmissionSuccessModal({ dateStr, onClose }) {
   );
 }
 
-function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = [], activeWarningCount = 0, missingPenalty, user, userData, submitMutation, onCancel, onSubmitted, onNavigateToUnit }) {
+function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = [], activeWarningCount = 0, missingPenalty, user, userData, submitMutation, onCancel, onSubmitted, onNavigateToUnit, onDraftStateChange }) {
   const [activeTab, setActiveTab] = useState('report'); // 'report' | 'timeline' | 'growth'
   const [reportDays, setReportDays] = useState(30);
   
@@ -976,6 +1163,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const [attachmentMode, setAttachmentMode] = useState(null); // 'link' or 'file' or null
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draftStatus, setDraftStatus] = useState('');
   const [feedbackReaction, setFeedbackReaction] = useState(assignment?.feedbackReaction || assignment?.feedbackResponse?.reaction || '');
   const [feedbackComment, setFeedbackComment] = useState(assignment?.feedbackComment || assignment?.feedbackResponse?.comment || '');
   const [feedbackResponseSaved, setFeedbackResponseSaved] = useState(Boolean(assignment?.feedbackRespondedAt));
@@ -985,6 +1173,10 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const [appealSubmittedByWarning, setAppealSubmittedByWarning] = useState({});
   const [appealErrorByWarning, setAppealErrorByWarning] = useState({});
   const fileInputRef = useRef(null);
+  const skipNextDraftAutosaveRef = useRef(true);
+  const draftStorageKey = useMemo(() => (
+    getAssignmentDraftStorageKey({ userId: user?.uid, clusterId, dateStr })
+  ), [user?.uid, clusterId, dateStr]);
 
   const { activities, groupedActivities, dailyStats, loading: timelineLoading, error: timelineError } = useLearningHistory(user?.uid, dateStr);
   const feedbackResponseMutation = useSubmitFeedbackResponse();
@@ -1101,15 +1293,209 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
     return diffDays >= 0 && diffDays <= 6;
   }, [dateStr]);
 
+  const canEditSubmission = isWithinWindow && !isReviewed && !isSubmitted;
+
+  useEffect(() => {
+    let cancelled = false;
+    skipNextDraftAutosaveRef.current = true;
+
+    if (!canEditSubmission) {
+      onDraftStateChange?.({ dirty: false });
+      return undefined;
+    }
+
+    const draft = safeReadAssignmentDraft(draftStorageKey);
+    const shouldRestoreDraft = draft && hasDraftChangedFromAssignment(draft, assignment);
+
+    setContent(shouldRestoreDraft ? String(draft.content || '') : (assignment?.content || ''));
+    setLinks(shouldRestoreDraft ? (draft.links || []) : (assignment?.links || []));
+    setNewLink(shouldRestoreDraft ? String(draft.newLink || '') : '');
+    setExistingAttachments(shouldRestoreDraft ? (draft.existingAttachments || []) : (assignment?.attachments || []));
+
+    if (shouldRestoreDraft) {
+      const savedAtText = formatDraftSavedAt(draft.updatedAt);
+      setDraftStatus(savedAtText ? `임시저장된 글을 불러왔습니다. (${savedAtText})` : '임시저장된 글을 불러왔습니다.');
+    } else {
+      setDraftStatus('');
+    }
+
+    safeReadAssignmentDraftFiles(draftStorageKey).then((draftFiles) => {
+      if (cancelled) return;
+      setFiles(draftFiles);
+      if (draftFiles.length > 0) {
+        onDraftStateChange?.({ dirty: true, hasFiles: true });
+        setDraftStatus(prev => prev || `임시저장된 파일 ${draftFiles.length}개를 불러왔습니다.`);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    assignment,
+    canEditSubmission,
+    draftStorageKey,
+    onDraftStateChange
+  ]);
+
+  useEffect(() => {
+    if (!canEditSubmission || !draftStorageKey || isSubmitting) return;
+
+    if (skipNextDraftAutosaveRef.current) {
+      skipNextDraftAutosaveRef.current = false;
+      return;
+    }
+
+    const draftPayload = {
+      assignmentId: assignment?.id || null,
+      dateStr,
+      clusterId,
+      content,
+      links,
+      newLink,
+      existingAttachments,
+      updatedAt: Date.now()
+    };
+
+    const dirty = hasDraftChangedFromAssignment(draftPayload, assignment) || files.length > 0;
+    onDraftStateChange?.({ dirty, hasFiles: files.length > 0 });
+
+    if (!hasDraftChangedFromAssignment(draftPayload, assignment)) {
+      safeRemoveAssignmentDraft(draftStorageKey);
+      if (files.length === 0) setDraftStatus('');
+      return;
+    }
+
+    const updatedPayload = { ...draftPayload, updatedAt: Date.now() };
+    if (safeWriteAssignmentDraft(draftStorageKey, updatedPayload)) {
+      const savedAtText = formatDraftSavedAt(updatedPayload.updatedAt);
+      setDraftStatus(savedAtText ? `임시저장됨 ${savedAtText}` : '임시저장됨');
+    }
+  }, [
+    assignment,
+    canEditSubmission,
+    clusterId,
+    content,
+    dateStr,
+    draftStorageKey,
+    existingAttachments,
+    files.length,
+    isSubmitting,
+    links,
+    newLink,
+    onDraftStateChange
+  ]);
+
+  useEffect(() => () => {
+    onDraftStateChange?.({ dirty: false });
+  }, [onDraftStateChange]);
+
+  const persistDraftImmediately = useCallback((nextDraftFields = {}) => {
+    if (!canEditSubmission || !draftStorageKey || isSubmitting) return;
+
+    const draftPayload = {
+      assignmentId: assignment?.id || null,
+      dateStr,
+      clusterId,
+      content,
+      links,
+      newLink,
+      existingAttachments,
+      updatedAt: Date.now(),
+      ...nextDraftFields
+    };
+    const draftChanged = hasDraftChangedFromAssignment(draftPayload, assignment);
+    const dirty = draftChanged || files.length > 0;
+    onDraftStateChange?.({ dirty, hasFiles: files.length > 0 });
+
+    if (!draftChanged) {
+      safeRemoveAssignmentDraft(draftStorageKey);
+      if (files.length === 0) setDraftStatus('');
+      return;
+    }
+
+    if (safeWriteAssignmentDraft(draftStorageKey, draftPayload)) {
+      const savedAtText = formatDraftSavedAt(draftPayload.updatedAt);
+      setDraftStatus(savedAtText ? `임시저장됨 ${savedAtText}` : '임시저장됨');
+    }
+  }, [
+    assignment,
+    canEditSubmission,
+    clusterId,
+    content,
+    dateStr,
+    draftStorageKey,
+    existingAttachments,
+    files.length,
+    isSubmitting,
+    links,
+    newLink,
+    onDraftStateChange
+  ]);
+
+  const handleContentChange = (event) => {
+    const nextContent = event.target.value;
+    setContent(nextContent);
+    persistDraftImmediately({ content: nextContent });
+  };
+
+  const handleNewLinkChange = (event) => {
+    const nextNewLink = event.target.value;
+    setNewLink(nextNewLink);
+    persistDraftImmediately({ newLink: nextNewLink });
+  };
+
+  const persistDraftFiles = useCallback(async (nextFiles) => {
+    if (!canEditSubmission || !draftStorageKey || isSubmitting) return;
+
+    if (nextFiles.length > 0) {
+      const saved = await safeWriteAssignmentDraftFiles(draftStorageKey, nextFiles);
+      if (saved) {
+        setDraftStatus(`임시저장됨 · 파일 ${nextFiles.length}개 포함`);
+      }
+    } else {
+      await safeRemoveAssignmentDraftFiles(draftStorageKey);
+    }
+
+    const currentDraft = {
+      assignmentId: assignment?.id || null,
+      dateStr,
+      clusterId,
+      content,
+      links,
+      newLink,
+      existingAttachments,
+      updatedAt: Date.now()
+    };
+    const dirty = hasDraftChangedFromAssignment(currentDraft, assignment) || nextFiles.length > 0;
+    onDraftStateChange?.({ dirty, hasFiles: nextFiles.length > 0 });
+  }, [
+    assignment,
+    canEditSubmission,
+    clusterId,
+    content,
+    dateStr,
+    draftStorageKey,
+    existingAttachments,
+    isSubmitting,
+    links,
+    newLink,
+    onDraftStateChange
+  ]);
+
   const handleAddLink = (e) => {
     if (e) e.preventDefault();
     if (!newLink.trim()) return;
-    setLinks([...links, { url: newLink.trim(), title: newLink.trim(), image: '' }]);
+    const nextLinks = [...links, { url: newLink.trim(), title: newLink.trim(), image: '' }];
+    setLinks(nextLinks);
+    persistDraftImmediately({ links: nextLinks, newLink: '' });
     setNewLink('');
   };
 
   const handleRemoveLink = (index) => {
-    setLinks(links.filter((_, i) => i !== index));
+    const nextLinks = links.filter((_, i) => i !== index);
+    setLinks(nextLinks);
+    persistDraftImmediately({ links: nextLinks });
   };
 
   const handleSubmitFeedbackResponse = async () => {
@@ -1179,16 +1565,22 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
         }
         return true;
       });
-      setFiles([...files, ...validFiles]);
+      const nextFiles = [...files, ...validFiles];
+      setFiles(nextFiles);
+      persistDraftFiles(nextFiles);
     }
   };
 
   const handleRemoveNewFile = (index) => {
-    setFiles(files.filter((_, i) => i !== index));
+    const nextFiles = files.filter((_, i) => i !== index);
+    setFiles(nextFiles);
+    persistDraftFiles(nextFiles);
   };
 
   const handleRemoveExistingAttachment = (index) => {
-    setExistingAttachments(existingAttachments.filter((_, i) => i !== index));
+    const nextAttachments = existingAttachments.filter((_, i) => i !== index);
+    setExistingAttachments(nextAttachments);
+    persistDraftImmediately({ existingAttachments: nextAttachments });
   };
 
   const handleSubmit = async () => {
@@ -1210,6 +1602,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
 
     if (!normalizedClusterId) {
       alert("군집(Cluster) 정보가 유실되었습니다. 화면을 새로고침한 후 다시 시도해주세요.");
+      setIsSubmitting(false);
       return;
     }
 
@@ -1300,6 +1693,10 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
         assignmentData
       });
 
+      safeRemoveAssignmentDraft(draftStorageKey);
+      await safeRemoveAssignmentDraftFiles(draftStorageKey);
+      onDraftStateChange?.({ dirty: false });
+      setDraftStatus('');
       setFiles([]);
       setUploadProgress({});
       setAttachmentMode(null);
@@ -1717,7 +2114,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
             className="space-input" 
             placeholder="오늘 제출할 과제의 요점을 정리해 보세요. 나의 언어로 정리하는 순간, 지식은 온전히 내 것이 됩니다! (최소 10자)" 
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
             style={{ 
               minHeight: '120px', // Reduced from 200px
               maxHeight: '250px',
@@ -1727,6 +2124,21 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
               fontSize: '0.95rem'
             }}
           />
+          <div className="font-tech" style={{
+            minHeight: '1.1rem',
+            marginTop: '-0.55rem',
+            marginBottom: '0.8rem',
+            color: draftStatus ? 'var(--crystal-cyan)' : 'var(--text-muted)',
+            fontSize: '0.76rem',
+            lineHeight: 1.4
+          }}>
+            {draftStatus || '작성 중인 글은 이 기기에 자동 임시저장됩니다.'}
+            {files.length > 0 && (
+              <span style={{ color: '#fbbf24', marginLeft: '0.5rem' }}>
+                새로 선택한 파일은 전송 전까지 다시 선택이 필요할 수 있습니다.
+              </span>
+            )}
+          </div>
 
           {/* Attachment Summary (Always visible if data exists) */}
           {(links.length > 0 || existingAttachments.length > 0 || files.length > 0) && (
@@ -1807,7 +2219,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                     className="space-input" 
                     placeholder="https://colab.research.google.com/..." 
                     value={newLink}
-                    onChange={(e) => setNewLink(e.target.value)}
+                    onChange={handleNewLinkChange}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddLink(); }}
                     style={{ flex: 1, fontSize: '0.85rem' }}
                   />
@@ -1864,7 +2276,9 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
                       return true;
                     });
                     if (droppedFiles.length > 0) {
-                      setFiles(prev => [...prev, ...droppedFiles]);
+                      const nextFiles = [...files, ...droppedFiles];
+                      setFiles(nextFiles);
+                      persistDraftFiles(nextFiles);
                     }
                   }}
                 >
