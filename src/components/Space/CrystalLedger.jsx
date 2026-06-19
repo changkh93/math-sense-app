@@ -8,6 +8,7 @@ import './CrystalLedger.css'
 import { getTodayKST, getYesterdayKST, getKSTComponents } from '../../utils/streakUtils'
 
 const CRYSTAL_GIFT_DAILY_LIMIT = 50
+const OPERATOR_GIFT_EMAIL = 'paul@dulcine.net'
 
 // Transaction type configs
 const TX_CONFIG = {
@@ -112,6 +113,7 @@ export default function CrystalLedger({ userData }) {
   const [questionMetaById, setQuestionMetaById] = useState({})
 
   const crystals = userData?.crystals || 0
+  const isOperatorGiftExempt = String(userData?.email || auth.currentUser?.email || '').toLowerCase() === OPERATOR_GIFT_EMAIL
 
   // Listen to crystal_transactions
   useEffect(() => {
@@ -332,7 +334,7 @@ export default function CrystalLedger({ userData }) {
       setTransferMessage({ type: 'error', text: '보낼 광석 수를 1 이상 정수로 입력해주세요.' })
       return
     }
-    if (amount > CRYSTAL_GIFT_DAILY_LIMIT) {
+    if (!isOperatorGiftExempt && amount > CRYSTAL_GIFT_DAILY_LIMIT) {
       setTransferMessage({ type: 'error', text: `하루에 보낼 수 있는 광석은 최대 ${CRYSTAL_GIFT_DAILY_LIMIT}개입니다.` })
       return
     }
@@ -353,7 +355,9 @@ export default function CrystalLedger({ userData }) {
       setRecipientSearch('')
       setTransferMessage({
         type: 'success',
-        text: `${data.recipientName || getProfileName(selectedRecipient)}님에게 ${amount}광석을 보냈습니다. 오늘 남은 송금 한도는 ${data.remainingToday ?? 0}광석입니다.`
+        text: data.operatorGiftExempt
+          ? `${data.recipientName || getProfileName(selectedRecipient)}님에게 ${amount}광석을 보냈습니다. 운영자 계정은 제한 없이 전송됩니다.`
+          : `${data.recipientName || getProfileName(selectedRecipient)}님에게 ${amount}광석을 보냈습니다. 오늘 남은 송금 한도는 ${data.remainingToday ?? 0}광석입니다.`
       })
     } catch (err) {
       console.error('Crystal transfer failed:', err)
@@ -423,7 +427,7 @@ export default function CrystalLedger({ userData }) {
           <span className="crystal-transfer-icon"><Gift size={19} /></span>
           <div>
             <h3>친구에게 광석 선물</h3>
-            <p>하루 최대 {CRYSTAL_GIFT_DAILY_LIMIT}광석까지 보낼 수 있습니다. 송금 기록은 양쪽 Ledger에 남습니다.</p>
+            <p>{isOperatorGiftExempt ? '운영자 계정은 제한 없이 광석을 보낼 수 있습니다. 송금 기록은 양쪽 Ledger에 남습니다.' : `하루 최대 ${CRYSTAL_GIFT_DAILY_LIMIT}광석까지 보낼 수 있습니다. 송금 기록은 양쪽 Ledger에 남습니다.`}</p>
           </div>
         </div>
 

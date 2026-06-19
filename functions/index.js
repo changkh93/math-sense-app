@@ -3814,9 +3814,6 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new functions.https.HttpsError("invalid-argument", "보낼 광석 수를 1 이상 정수로 입력해주세요.");
   }
-  if (amount > CRYSTAL_GIFT_DAILY_LIMIT) {
-    throw new functions.https.HttpsError("failed-precondition", `하루에 보낼 수 있는 광석은 최대 ${CRYSTAL_GIFT_DAILY_LIMIT}개입니다.`);
-  }
 
   const db = admin.firestore();
   const now = new Date();
@@ -3845,6 +3842,7 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
 
     const senderData = senderSnap.data() || {};
     const recipientData = recipientSnap.data() || {};
+    const operatorGiftExempt = canOperatorGift(senderData, context);
     if (!canOperatorGift(senderData, context) && (senderData.role === "parent" || senderData.role === "admin")) {
       throw new functions.https.HttpsError("permission-denied", "학생 계정만 광석을 보낼 수 있습니다.");
     }
@@ -3858,7 +3856,7 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
     }
 
     const sentToday = Math.max(0, Number(limitSnap.data()?.sentAmount || 0));
-    if (sentToday + amount > CRYSTAL_GIFT_DAILY_LIMIT) {
+    if (!operatorGiftExempt && sentToday + amount > CRYSTAL_GIFT_DAILY_LIMIT) {
       const remaining = Math.max(0, CRYSTAL_GIFT_DAILY_LIMIT - sentToday);
       throw new functions.https.HttpsError(
         "failed-precondition",
@@ -3885,12 +3883,14 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
     tx.set(recipientRef, {
       crystals: Math.max(0, Number(recipientData.crystals || 0)) + amount,
     }, { merge: true });
-    tx.set(limitRef, {
-      senderId,
-      dayKey,
-      sentAmount: sentToday + amount,
-      updatedAt: nowTimestamp,
-    }, { merge: true });
+    if (!operatorGiftExempt) {
+      tx.set(limitRef, {
+        senderId,
+        dayKey,
+        sentAmount: sentToday + amount,
+        updatedAt: nowTimestamp,
+      }, { merge: true });
+    }
     tx.set(senderTxRef, {
       amount: -amount,
       type: "crystal_gift_sent",
@@ -3920,13 +3920,14 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
       transferId: giftRef.id,
       recipientName,
       sentToday: sentToday + amount,
-      remainingToday: CRYSTAL_GIFT_DAILY_LIMIT - sentToday - amount,
+      remainingToday: operatorGiftExempt ? null : CRYSTAL_GIFT_DAILY_LIMIT - sentToday - amount,
+      dailyLimit: operatorGiftExempt ? null : CRYSTAL_GIFT_DAILY_LIMIT,
+      operatorGiftExempt,
     };
   });
 
   return {
     success: true,
-    dailyLimit: CRYSTAL_GIFT_DAILY_LIMIT,
     ...result,
   };
 });
