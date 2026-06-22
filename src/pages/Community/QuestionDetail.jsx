@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle, Clock, Heart, User, Trash2, Edit3, X, Save, Sparkles } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, Heart, User, Trash2, Edit3, X, Save, Sparkles, Reply, Send } from 'lucide-react';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import 'katex/dist/katex.min.css';
 import { db } from '../../firebase';
@@ -55,6 +55,8 @@ export default function QuestionDetail() {
   const [editContent, setEditContent] = useState('');
   const [isCooldown, setIsCooldown] = useState(false);
   const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
+  const [activeReplyAnswerId, setActiveReplyAnswerId] = useState(null);
+  const [replyContent, setReplyContent] = useState('');
   
   const { data: question, isLoading: loadingQ } = useQuestionDetail(questionId);
   const { data: answers, isLoading: loadingA, error: errorA } = useQuestionAnswers(questionId);
@@ -62,6 +64,21 @@ export default function QuestionDetail() {
 
   const [showRewardMask, setShowRewardMask] = useState(false);
   const [rewardAmount, setRewardAmount] = useState(0);
+
+  const topLevelAnswers = React.useMemo(
+    () => (answers || []).filter((answer) => !answer.parentAnswerId),
+    [answers]
+  );
+
+  const repliesByParent = React.useMemo(() => {
+    const grouped = {};
+    (answers || []).forEach((answer) => {
+      if (!answer.parentAnswerId) return;
+      if (!grouped[answer.parentAnswerId]) grouped[answer.parentAnswerId] = [];
+      grouped[answer.parentAnswerId].push(answer);
+    });
+    return grouped;
+  }, [answers]);
 
   const triggerVictory = (amount) => {
     setRewardAmount(amount);
@@ -97,7 +114,7 @@ export default function QuestionDetail() {
   // --- SELF-HEALING: Sync answerCount if out of sync ---
   React.useEffect(() => {
     if (question && answers && !loadingQ && !loadingA) {
-      const actualCount = answers.length;
+      const actualCount = topLevelAnswers.length;
       if (question.answerCount !== actualCount) {
         console.log(`🧹 Self-healing: Syncing answerCount for question ${questionId}. Expected: ${actualCount}, Found: ${question.answerCount}`);
         updateDoc(doc(db, 'questions', questionId), {
@@ -105,7 +122,7 @@ export default function QuestionDetail() {
         }).catch(err => console.warn('Failed self-healing sync:', err));
       }
     }
-  }, [question, answers, loadingQ, loadingA, questionId]);
+  }, [question, answers, topLevelAnswers.length, loadingQ, loadingA, questionId]);
 
   const isOwner = question && sessionUser && question.userId === sessionUser.uid;
   const isResolved = question?.status === 'resolved';
@@ -163,6 +180,25 @@ export default function QuestionDetail() {
     }
   };
 
+  const handleAddReply = async (parentAnswerId) => {
+    if (!replyContent.trim() || addAnswer.isPending) return;
+
+    const content = replyContent.trim();
+    try {
+      await addAnswer.mutateAsync({
+        questionId,
+        content,
+        isTeacher: false,
+        parentAnswerId
+      });
+      setReplyContent('');
+      setActiveReplyAnswerId(null);
+    } catch (error) {
+      console.error("Failed to post answer reply:", error);
+      alert('답글 전송 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
+  };
+
   const handleDeleteQuestion = async () => {
     if (window.confirm('정말 이 질문을 삭제하시겠습니까?')) {
       await deleteQuestion.mutateAsync(questionId);
@@ -184,6 +220,87 @@ export default function QuestionDetail() {
   const questionAuthorLabel = question?.isPublic === false
     ? (question?.userName || '비공개 질문')
     : (question?.anonymousLabel || getAnonymousLabel(question?.userId));
+
+  const getAnswerPresentation = (answer) => {
+    const liveProfile = answer.userId === sessionUser?.uid
+      ? buildAnswerProfileSnapshot(sessionUserData, sessionUserData?.studentName || sessionUser?.displayName || '탐험가')
+      : null;
+    const profile = answer.publicProfileSnapshot || liveProfile || {};
+    const displayName = answer.isTeacher
+      ? '관리자'
+      : (profile.displayName || answer.userName || '답변자');
+    const title = profile.publicTitle || '';
+    const frameName = profile.frameName || getProfileFrame(profile.profileFrameId).name || '';
+    const crewName = profile.crewName || '';
+    const signature = profile.publicSignature || '';
+    const frameAccent = profile.frameAccent || (answer.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)');
+    const frameBackground = profile.frameBackground || 'rgba(255, 255, 255, 0.04)';
+
+    return { profile, displayName, title, frameName, crewName, signature, frameAccent, frameBackground };
+  };
+
+  const renderAnswerIdentity = (answer, timeLabel = '답변') => {
+    const {
+      profile,
+      displayName,
+      title,
+      frameName,
+      crewName,
+      signature,
+      frameAccent,
+      frameBackground
+    } = getAnswerPresentation(answer);
+
+    return (
+      <div className="author-info">
+        {answer.isTeacher && <span className="teacher-badge">선생님</span>}
+        <div
+          className="answer-identity-card"
+          style={{
+            border: `1px solid ${frameAccent}55`,
+            background: frameBackground,
+          }}
+        >
+          <div className="answer-identity-top">
+            <span className="answer-identity-name">{displayName}</span>
+            {signature && !answer.isTeacher && (
+              <span style={{
+                maxWidth: '240px',
+                padding: '2px 8px',
+                borderRadius: '999px',
+                background: `${frameAccent}18`,
+                border: `1px solid ${frameAccent}55`,
+                color: frameAccent,
+                fontSize: '0.72rem',
+                lineHeight: 1.3,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {signature}
+              </span>
+            )}
+            {title && <span className="answer-identity-title">{title}</span>}
+            {frameName && (
+              <span className="answer-identity-frame">
+                {frameName}
+              </span>
+            )}
+          </div>
+          {(crewName || !answer.isTeacher) && (
+            <div className="answer-identity-meta">
+              {crewName && <span style={{ color: profile.crewColor || frameAccent }}>🛰️ {crewName}</span>}
+              {!crewName && !answer.isTeacher && <span>공개 답변자</span>}
+            </div>
+          )}
+          <div className="answer-time-row" title={getDateFromTimestamp(answer.createdAt)?.toLocaleString('ko-KR') || undefined}>
+            <Clock size={13} />
+            <span>{timeLabel} {formatAgoraTimestamp(answer.createdAt)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={`question-detail-container space-bg fadeIn`}>
@@ -336,7 +453,7 @@ export default function QuestionDetail() {
             <section className="answers-section">
               <div className="answers-header-row">
                  <strong className="answers-count font-tech">
-                   답변 {loadingA ? '...' : (answers?.length || 0)}개
+                   답변 {loadingA ? '...' : topLevelAnswers.length}개
                  </strong>
                  {loadingA && <div className="loading-spinner-small" />}
               </div>
@@ -346,24 +463,13 @@ export default function QuestionDetail() {
                   <div className="error-msg glass">답변을 불러오는데 실패했습니다. (인덱스 생성 중일 수 있습니다)</div>
                 ) : !answers && loadingA ? (
                   Array.from({length: 2}).map((_, i) => <div key={i} className="answer-skeleton glass" />)
-                  ) : answers?.length === 0 ? (
+                  ) : topLevelAnswers.length === 0 ? (
                   <div className="empty-answers font-tech">아직 답변이 없어요. 첫 번째 힌트를 남겨보세요!</div>
                 ) : (
-                  answers?.map((ans) => (
+                  topLevelAnswers.map((ans) => (
                     (() => {
-                      const liveProfile = ans.userId === sessionUser?.uid
-                        ? buildAnswerProfileSnapshot(sessionUserData, sessionUserData?.studentName || sessionUser?.displayName || '탐험가')
-                        : null;
-                      const profile = ans.publicProfileSnapshot || liveProfile || {};
-                      const displayName = ans.isTeacher
-                        ? '관리자'
-                        : (profile.displayName || ans.userName || '답변자');
-                      const title = profile.publicTitle || '';
-                      const frameName = profile.frameName || getProfileFrame(profile.profileFrameId).name || '';
-                      const crewName = profile.crewName || '';
-                      const signature = profile.publicSignature || '';
-                      const frameAccent = profile.frameAccent || (ans.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)');
-                      const frameBackground = profile.frameBackground || 'rgba(255, 255, 255, 0.04)';
+                      const replies = repliesByParent[ans.id] || [];
+                      const isReplying = activeReplyAnswerId === ans.id;
 
                       return (
                     <MotionDiv 
@@ -373,53 +479,7 @@ export default function QuestionDetail() {
                       animate={{ opacity: 1, y: 0 }}
                     >
                       <div className="card-header">
-                        <div className="author-info">
-                          {ans.isTeacher && <span className="teacher-badge">선생님</span>}
-                          <div
-                            className="answer-identity-card"
-                            style={{
-                              border: `1px solid ${frameAccent}55`,
-                              background: frameBackground,
-                            }}
-                          >
-                            <div className="answer-identity-top">
-                              <span className="answer-identity-name">{displayName}</span>
-                              {signature && !ans.isTeacher && (
-                                <span style={{
-                                  maxWidth: '240px',
-                                  padding: '2px 8px',
-                                  borderRadius: '999px',
-                                  background: `${frameAccent}18`,
-                                  border: `1px solid ${frameAccent}55`,
-                                  color: frameAccent,
-                                  fontSize: '0.72rem',
-                                  lineHeight: 1.3,
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
-                                }}>
-                                  {signature}
-                                </span>
-                              )}
-                              {title && <span className="answer-identity-title">{title}</span>}
-                              {frameName && (
-                                <span className="answer-identity-frame">
-                                  {frameName}
-                                </span>
-                              )}
-                            </div>
-                            {(crewName || !ans.isTeacher) && (
-                              <div className="answer-identity-meta">
-                                {crewName && <span style={{ color: profile.crewColor || frameAccent }}>🛰️ {crewName}</span>}
-                                {!crewName && !ans.isTeacher && <span>공개 답변자</span>}
-                              </div>
-                            )}
-                            <div className="answer-time-row" title={getDateFromTimestamp(ans.createdAt)?.toLocaleString('ko-KR') || undefined}>
-                              <Clock size={13} />
-                              <span>답변 {formatAgoraTimestamp(ans.createdAt)}</span>
-                            </div>
-                          </div>
-                        </div>
+                        {renderAnswerIdentity(ans, '답변')}
                         
                         <div className="header-right-actions">
                           {ans.isAccepted && (
@@ -453,6 +513,72 @@ export default function QuestionDetail() {
                           boldColor: ans.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)'
                         })}
                       </div>
+                      <div className="answer-actions-row">
+                        <button
+                          type="button"
+                          className={`answer-reply-toggle ${isReplying ? 'active' : ''}`}
+                          onClick={() => {
+                            setActiveReplyAnswerId(isReplying ? null : ans.id);
+                            setReplyContent('');
+                          }}
+                        >
+                          <Reply size={15} />
+                          <span>{isReplying ? '답글 닫기' : '답글 달기'}</span>
+                        </button>
+                        {replies.length > 0 && (
+                          <span className="answer-reply-count">답글 {replies.length}개</span>
+                        )}
+                      </div>
+
+                      {isReplying && (
+                        <div className="answer-reply-form">
+                          <textarea
+                            className="answer-reply-textarea"
+                            placeholder="이 답변에 이어서 질문하거나 답해주세요."
+                            value={replyContent}
+                            onChange={(event) => setReplyContent(event.target.value)}
+                          />
+                          <div className="answer-reply-form-actions">
+                            <button
+                              type="button"
+                              className="answer-reply-cancel"
+                              onClick={() => {
+                                setActiveReplyAnswerId(null);
+                                setReplyContent('');
+                              }}
+                            >
+                              취소
+                            </button>
+                            <button
+                              type="button"
+                              className="answer-reply-submit"
+                              disabled={addAnswer.isPending || !replyContent.trim()}
+                              onClick={() => handleAddReply(ans.id)}
+                            >
+                              <Send size={14} />
+                              {addAnswer.isPending ? '보내는 중...' : '답글 등록'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {replies.length > 0 && (
+                        <div className="answer-replies-list">
+                          {replies.map((reply) => (
+                            <div key={reply.id} className={`answer-reply-card ${reply.isTeacher ? 'teacher-reply' : ''}`}>
+                              <div className="answer-reply-header">
+                                {renderAnswerIdentity(reply, '답글')}
+                              </div>
+                              <div className="answer-reply-content">
+                                {parseInlineFormatting(reply.content, {
+                                  keyPrefix: `ans-reply-${reply.id}`,
+                                  boldColor: reply.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)'
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </MotionDiv>
                       );
                     })()

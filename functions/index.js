@@ -1641,8 +1641,9 @@ async function recalculateQuestionAnswerCount(db, questionId, stats) {
   if (!questionSnap.exists) return;
 
   const answersSnap = await db.collection("answers").where("questionId", "==", questionId).get();
+  const answerCount = answersSnap.docs.filter((answerDoc) => !answerDoc.data().parentAnswerId).length;
   await questionRef.set({
-    answerCount: answersSnap.size,
+    answerCount,
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
   stats.questionsRecounted = (stats.questionsRecounted || 0) + 1;

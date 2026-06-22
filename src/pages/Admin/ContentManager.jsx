@@ -74,6 +74,7 @@ const ContentManager = () => {
       
       const answerCounts = {};
       aSnap.docs.forEach(doc => {
+        if (doc.data().parentAnswerId) return;
         const qId = doc.data().questionId;
         if (qId) {
            answerCounts[qId] = (answerCounts[qId] || 0) + 1;

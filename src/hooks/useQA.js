@@ -275,9 +275,24 @@ export function useQAMutations() {
     }),
 
     addAnswer: useMutation({
-      mutationFn: async ({ questionId, content, isTeacher = false }) => {
+      mutationFn: async ({ questionId, content, isTeacher = false, parentAnswerId = null }) => {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
+        const isReply = Boolean(parentAnswerId);
+
+        let parentAnswerData = null;
+        if (isReply) {
+          const parentAnswerSnap = await getDoc(doc(db, 'answers', parentAnswerId));
+          if (!parentAnswerSnap.exists()) throw new Error('원본 답변을 찾을 수 없습니다.');
+
+          parentAnswerData = parentAnswerSnap.data();
+          if (parentAnswerData.questionId !== questionId) {
+            throw new Error('질문과 답변 정보가 일치하지 않습니다.');
+          }
+          if (parentAnswerData.parentAnswerId) {
+            throw new Error('답글에는 다시 답글을 달 수 없습니다.');
+          }
+        }
 
         // Fetch studentName from profile for correct display
         let resolvedName = user.displayName || '익명 학생';
@@ -302,15 +317,24 @@ export function useQAMutations() {
           createdAt: serverTimestamp()
         };
 
+        if (isReply) {
+          answerData.parentAnswerId = parentAnswerId;
+          answerData.replyToUserId = parentAnswerData.userId || null;
+          answerData.replyToUserName = parentAnswerData.userName || '';
+        }
+
         const answerRef = await addDoc(collection(db, 'answers'), answerData);
 
-        // Update question (answerCount + status if teacher)
-        const updateData = {
-          answerCount: increment(1),
-          updatedAt: serverTimestamp()
-        };
-        
-        if (isTeacher) {
+        const updateData = isReply
+          ? {
+              updatedAt: serverTimestamp()
+            }
+          : {
+              answerCount: increment(1),
+              updatedAt: serverTimestamp()
+            };
+
+        if (!isReply && isTeacher) {
           updateData.status = 'answered';
         }
 
@@ -333,6 +357,7 @@ export function useQAMutations() {
               content: newAnswer.content,
               isTeacher: newAnswer.isTeacher,
               isAccepted: false,
+              parentAnswerId: newAnswer.parentAnswerId || null,
               publicProfileSnapshot: buildAnswerProfileSnapshot({}, auth.currentUser?.displayName || '익명 학생'),
               createdAt: new Date(),
               isOptimistic: true // UI indicator if needed
