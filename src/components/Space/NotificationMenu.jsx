@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { AlertTriangle, Award, CalendarX, Gem, Mail, Megaphone, MessageCircle } from 'lucide-react';
+import { getEvaluationPeriodLabel, getScholarshipCourseLabel } from '../../utils/scholarshipAwards';
 import './NotificationMenu.css';
 
 function NotificationIcon({ type }) {
@@ -26,6 +27,32 @@ function getNotificationIconClass(type) {
   if (type === 'scholarship_award') return 'scholarship-award';
   if (type === 'certificate_award') return 'certificate-award';
   return '';
+}
+
+function getScholarshipNotificationParts(notification = {}) {
+  const metadata = notification.metadata || {};
+  const awardIdMatch = String(metadata.awardId || notification.link || '').match(/_(\d{4})_(\d{1,2})_/);
+  const year = Number(metadata.year || awardIdMatch?.[1]);
+  const month = Number(metadata.month || awardIdMatch?.[2]);
+  const courseClusterId = metadata.courseClusterId || '';
+
+  return {
+    year: Number.isFinite(year) && year > 0 ? year : null,
+    month: Number.isFinite(month) && month > 0 ? month : null,
+    courseLabel: getScholarshipCourseLabel(courseClusterId),
+  };
+}
+
+function getNotificationMessage(notification = {}) {
+  const message = String(notification.message || '');
+  if (notification.type !== 'scholarship_award' || !/NaN/i.test(message)) return message;
+
+  const { year, month, courseLabel } = getScholarshipNotificationParts(notification);
+  if (year && month) {
+    return `축하합니다! ${getEvaluationPeriodLabel(year, month)} ${courseLabel} 장학생으로 선정되어 다음 수강료 20% 감면 혜택이 적용됩니다.`;
+  }
+
+  return message.replace(/NaN년\s*NaN월\s*/gi, '');
 }
 
 export default function NotificationMenu() {
@@ -178,7 +205,7 @@ export default function NotificationMenu() {
                     <NotificationIcon type={notif.type} />
                   </div>
                   <div className="notif-content">
-                    <p className="notif-message">{notif.message}</p>
+                    <p className="notif-message">{getNotificationMessage(notif)}</p>
                     <span className="notif-time">
                       {notif.createdAt?.toDate().toLocaleString()}
                     </span>

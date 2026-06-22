@@ -298,6 +298,9 @@ export default function ScholarshipAwards() {
       return
     }
     const awardLabel = getScholarshipAwardLabel(row)
+    const notificationAwardLabel = /NaN/i.test(String(awardLabel))
+      ? `${getEvaluationPeriodLabel(year, month)} ${row.courseName || getScholarshipCourseLabel(row.courseClusterId)} 장학생`
+      : awardLabel
     const ok = window.confirm(`${row.studentName} 학생을 ${awardLabel}으로 수여합니다.\n혜택: 다음 수강료 20% 감면`)
     if (!ok) return
 
@@ -353,7 +356,7 @@ export default function ScholarshipAwards() {
       batch.set(notificationRef, {
         recipientId: row.studentId,
         type: 'scholarship_award',
-        message: `축하합니다! ${awardLabel}으로 선정되어 다음 수강료 20% 감면 혜택이 적용됩니다.`,
+        message: `축하합니다! ${notificationAwardLabel}으로 선정되어 다음 수강료 20% 감면 혜택이 적용됩니다.`,
         link: `/?view=dashboard&scholarship=${row.awardId}`,
         isRead: false,
         createdAt: serverTimestamp(),
