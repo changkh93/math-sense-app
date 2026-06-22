@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "math-sense-1f6a8",
     "public": "dist",
     "ignore": [
       "firebase.json",
