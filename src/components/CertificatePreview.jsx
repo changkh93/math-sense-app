@@ -4,6 +4,7 @@ import {
   formatKoreanDateFromString,
   getGradeLabel,
 } from '../utils/monthlyEvaluationAwards'
+import { getEvaluationPeriodLabel, getScholarshipCourseLabel } from '../utils/scholarshipAwards'
 import prizeBadgeImage from '../assets/prize_badge.png'
 import sealImage from '../assets/seal.png'
 import './CertificatePreview.css'
@@ -13,12 +14,54 @@ function getAwardedDateLabel(award = {}) {
 }
 
 export default function CertificatePreview({ award = {}, compact = false }) {
+  const isScholarship = award.awardKind === 'scholarship' || Boolean(award.scholarshipTitle)
   const studentName = award.studentName || award.name || '학생'
   const rawGradeLabel = award.gradeLabel || getGradeLabel(award.grade, '')
   const gradeLabel = rawGradeLabel ? rawGradeLabel.replace(/\s*\(기록\s*기준\)/, '') : ''
   const year = Number(award.year) || new Date().getFullYear()
   const month = Number(award.month) || 5
   const awardedDateLabel = getAwardedDateLabel(award)
+
+  if (isScholarship) {
+    const periodLabel = award.evaluationPeriodLabel || getEvaluationPeriodLabel(year, month)
+    const courseName = award.courseName || getScholarshipCourseLabel(award.courseClusterId)
+
+    return (
+      <article className={`certificate-preview scholarship-certificate ${compact ? 'compact' : ''}`}>
+        <div className="scholarship-stars" />
+        <div className="scholarship-certificate-inner">
+          <div className="scholarship-kicker">META SENSE SCHOLARSHIP</div>
+          <h2 className="scholarship-title">장학 증서</h2>
+
+          <section className="scholarship-recipient">
+            <span>{gradeLabel}</span>
+            <strong>{studentName}</strong>
+          </section>
+
+          <p className="scholarship-body">
+            위 학생은 {periodLabel} {courseName} 과정에서 성실한 과제 제출과
+            꾸준한 학습 기록을 통해 뛰어난 자기주도 학습 태도를 보여주었기에
+            {month}월 메타센스 장학생으로 선정합니다.
+          </p>
+
+          <div className="scholarship-benefit">
+            <span>혜택</span>
+            <strong>다음 수강료 20% 감면</strong>
+          </div>
+
+          <div className="scholarship-date">{awardedDateLabel}</div>
+
+          <footer className="scholarship-footer">
+            <div className="scholarship-gem">◆</div>
+            <div className="certificate-publisher scholarship-publisher">
+              <strong>도서출판 둘시네</strong>
+            </div>
+            <img className="certificate-seal scholarship-seal" src={sealImage} alt="도서출판 둘시네 직인" />
+          </footer>
+        </div>
+      </article>
+    )
+  }
 
   return (
     <article className={`certificate-preview ${compact ? 'compact' : ''}`}>

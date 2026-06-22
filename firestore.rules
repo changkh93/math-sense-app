@@ -310,6 +310,17 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Monthly scholarship awards. Admins grant awards; students and linked
+    // parents can read awarded scholarship certificates.
+    match /scholarshipAwards/{awardId} {
+      allow read: if isAuth() && (
+        isAdmin() ||
+        resource.data.studentId == request.auth.uid ||
+        isLinkedParentOf(resource.data.studentId)
+      );
+      allow create, update, delete: if isAdmin();
+    }
+
     // Notifications: Users can read/write their own notifications
     match /notifications/{notificationId} {
       allow read, write: if isAuth();

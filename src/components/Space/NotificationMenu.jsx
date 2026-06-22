@@ -12,6 +12,7 @@ function NotificationIcon({ type }) {
   if (type === 'assignment_missing') return <CalendarX size={17} />;
   if (type === 'assignment_warning') return <AlertTriangle size={17} />;
   if (type === 'assignment_bonus') return <Gem size={17} />;
+  if (type === 'scholarship_award') return <Award size={17} />;
   if (type === 'certificate_award') return <Award size={17} />;
   return <Megaphone size={17} />;
 }
@@ -22,6 +23,7 @@ function getNotificationIconClass(type) {
   if (type === 'assignment_missing') return 'assignment-missing';
   if (type === 'assignment_warning') return 'assignment-warning';
   if (type === 'assignment_bonus') return 'assignment-bonus';
+  if (type === 'scholarship_award') return 'scholarship-award';
   if (type === 'certificate_award') return 'certificate-award';
   return '';
 }

@@ -59,7 +59,7 @@ const AdminLayout = () => {
           </Link>
           <Link to="/admin/monthly-evaluations" className="nav-link">
             <Trophy size={20} />
-            <span>월간평가 상장</span>
+            <span>장학금, 상장</span>
           </Link>
           <Link to="/admin/mistake-notebook" className="nav-link">
             <BookOpenCheck size={20} />

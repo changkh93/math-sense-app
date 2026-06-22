@@ -12,6 +12,7 @@ import {
 import { Award, CheckCircle2, Filter, RefreshCcw, Search } from 'lucide-react'
 import { db } from '../../firebase'
 import CertificatePreview from '../../components/CertificatePreview'
+import ScholarshipAwards from './ScholarshipAwards'
 import {
   MONTHLY_EVALUATION_COURSES,
   STUDENT_GRADE_OPTIONS,
@@ -78,6 +79,7 @@ export default function MonthlyEvaluationAwards() {
   const [awardingId, setAwardingId] = useState('')
   const [previewAward, setPreviewAward] = useState(null)
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('scholarships')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -286,162 +288,179 @@ export default function MonthlyEvaluationAwards() {
   return (
     <div className="admin-page">
       <div className="admin-header-row">
-        <h2>월간평가 상장 수여</h2>
-        <button type="button" className="secondary-btn" onClick={loadData} disabled={loading}>
-          <RefreshCcw size={16} /> 새로고침
+        <h2>장학금, 상장</h2>
+        {activeTab === 'certificates' && (
+          <button type="button" className="secondary-btn" onClick={loadData} disabled={loading}>
+            <RefreshCcw size={16} /> 새로고침
+          </button>
+        )}
+      </div>
+
+      <div className="admin-tabbar awards-tabbar">
+        <button type="button" className={activeTab === 'scholarships' ? 'active' : ''} onClick={() => setActiveTab('scholarships')}>
+          장학금
+        </button>
+        <button type="button" className={activeTab === 'certificates' ? 'active' : ''} onClick={() => setActiveTab('certificates')}>
+          월간평가 상장
         </button>
       </div>
 
-      <div className="monthly-awards-summary">
-        <div><span>대상</span><strong>{stats.total}</strong></div>
-        <div><span>100점</span><strong>{stats.perfect}</strong></div>
-        <div><span>수여 완료</span><strong>{stats.awarded}</strong></div>
-        <div><span>수여 가능</span><strong>{stats.pending}</strong></div>
-      </div>
-
-      <div className="monthly-awards-toolbar">
-        <label>
-          연도
-          <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value) || DEFAULT_YEAR)} />
-        </label>
-        <label>
-          월
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-            {Array.from({ length: 12 }, (_, idx) => idx + 1).map(value => (
-              <option key={value} value={value}>{value}월</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          과정
-          <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
-            <option value="all">전체</option>
-            {MONTHLY_EVALUATION_COURSES.map(course => (
-              <option key={course.id} value={course.id}>{course.label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          학년
-          <select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}>
-            <option value="all">전체</option>
-            {STUDENT_GRADE_OPTIONS.map(grade => (
-              <option key={grade.value} value={grade.value}>{grade.label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          수여 상태
-          <select value={awardFilter} onChange={(e) => setAwardFilter(e.target.value)}>
-            <option value="all">전체</option>
-            <option value="perfect_only">100점만</option>
-            <option value="not_awarded">미수여</option>
-            <option value="awarded">수여 완료</option>
-          </select>
-        </label>
-        <label className="monthly-awards-search">
-          검색
-          <span>
-            <Search size={16} />
-            <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="이름, 이메일, 학년" />
-          </span>
-        </label>
-      </div>
-
-      {error && <div className="admin-error-banner">{error}</div>}
-
-      <div className="monthly-awards-layout">
-        <section className="monthly-awards-table-card">
-          <div className="monthly-awards-table-head">
-            <h3><Filter size={18} /> {year}년 {month}월 월간평가 결과</h3>
-            <span>{loading ? '동기화 중...' : `${rows.length}명`}</span>
+      {activeTab === 'scholarships' ? (
+        <ScholarshipAwards />
+      ) : (
+        <>
+          <div className="monthly-awards-summary">
+            <div><span>대상</span><strong>{stats.total}</strong></div>
+            <div><span>100점</span><strong>{stats.perfect}</strong></div>
+            <div><span>수여 완료</span><strong>{stats.awarded}</strong></div>
+            <div><span>수여 가능</span><strong>{stats.pending}</strong></div>
           </div>
-          <div className="monthly-awards-table-wrap">
-            <table className="monthly-awards-table">
-              <thead>
-                <tr>
-                  <th>과정</th>
-                  <th>학생</th>
-                  <th>학년</th>
-                  <th>최고점</th>
-                  <th>응시</th>
-                  <th>상장</th>
-                  <th>관리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(row => (
-                  <tr key={row.id}>
-                    <td>{getCourseLabel(row.courseClusterId)}</td>
-                    <td>
-                      <strong>{row.studentName}</strong>
-                      <span>{row.email}</span>
-                    </td>
-                    <td>{row.gradeLabel}</td>
-                    <td>
-                      {row.missingGrade ? (
-                        <span className="muted-text">학년 미지정</span>
-                      ) : row.missingConfig ? (
-                        <span className="muted-text">평가 미설정</span>
-                      ) : row.score == null ? (
-                        <span className="muted-text">기록 없음</span>
-                      ) : (
-                        <strong className={row.score === 100 ? 'perfect-score' : ''}>{row.score}점</strong>
-                      )}
-                    </td>
-                    <td>{row.attemptCount}회</td>
-                    <td>
-                      {row.award ? (
-                        <button type="button" className="award-status awarded" onClick={() => setPreviewAward(row.award)}>
-                          <CheckCircle2 size={15} /> 수여 완료
-                        </button>
-                      ) : (
-                        <span className="award-status pending">미수여</span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="primary-btn award-action-btn"
-                        disabled={!row.canAward || awardingId === row.awardId}
-                        onClick={() => handleAward(row)}
-                        title={row.missingGrade ? '먼저 학생의 학년을 입력해 주세요.' : row.missingConfig ? '이 학년의 월간평가 단원이 아직 설정되지 않았습니다.' : row.score !== 100 ? '100점 학생에게만 수여할 수 있습니다.' : row.award ? '이미 수여되었습니다.' : '상장 수여'}
-                      >
-                        <Award size={16} />
-                        {awardingId === row.awardId ? '수여 중...' : '상장수여'}
-                      </button>
-                    </td>
-                  </tr>
+
+          <div className="monthly-awards-toolbar">
+            <label>
+              연도
+              <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value) || DEFAULT_YEAR)} />
+            </label>
+            <label>
+              월
+              <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+                {Array.from({ length: 12 }, (_, idx) => idx + 1).map(value => (
+                  <option key={value} value={value}>{value}월</option>
                 ))}
-                {!loading && rows.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="monthly-awards-empty">조건에 맞는 학생이 없습니다.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+              </select>
+            </label>
+            <label>
+              과정
+              <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
+                <option value="all">전체</option>
+                {MONTHLY_EVALUATION_COURSES.map(course => (
+                  <option key={course.id} value={course.id}>{course.label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              학년
+              <select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}>
+                <option value="all">전체</option>
+                {STUDENT_GRADE_OPTIONS.map(grade => (
+                  <option key={grade.value} value={grade.value}>{grade.label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              수여 상태
+              <select value={awardFilter} onChange={(e) => setAwardFilter(e.target.value)}>
+                <option value="all">전체</option>
+                <option value="perfect_only">100점만</option>
+                <option value="not_awarded">미수여</option>
+                <option value="awarded">수여 완료</option>
+              </select>
+            </label>
+            <label className="monthly-awards-search">
+              검색
+              <span>
+                <Search size={16} />
+                <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="이름, 이메일, 학년" />
+              </span>
+            </label>
           </div>
-        </section>
 
-        <aside className="monthly-awards-preview">
-          <h3>상장 미리보기</h3>
-          <CertificatePreview
-            compact
-            award={previewAward || {
-              studentName: '이현서',
-              gradeLabel: '초등학교 5학년',
-              courseName: '초등수학',
-              year,
-              month,
-              awardedDate: getKstDateString(new Date()),
-            }}
-          />
-          <p className="monthly-awards-preview-note">
-            수여일은 운영자가 <strong>상장수여</strong> 버튼을 누른 날짜로 저장됩니다.
-            예: {formatKoreanDateFromString(getKstDateString(new Date()))}
-          </p>
-        </aside>
-      </div>
+          {error && <div className="admin-error-banner">{error}</div>}
+
+          <div className="monthly-awards-layout">
+            <section className="monthly-awards-table-card">
+              <div className="monthly-awards-table-head">
+                <h3><Filter size={18} /> {year}년 {month}월 월간평가 결과</h3>
+                <span>{loading ? '동기화 중...' : `${rows.length}명`}</span>
+              </div>
+              <div className="monthly-awards-table-wrap">
+                <table className="monthly-awards-table">
+                  <thead>
+                    <tr>
+                      <th>과정</th>
+                      <th>학생</th>
+                      <th>학년</th>
+                      <th>최고점</th>
+                      <th>응시</th>
+                      <th>상장</th>
+                      <th>관리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(row => (
+                      <tr key={row.id}>
+                        <td>{getCourseLabel(row.courseClusterId)}</td>
+                        <td>
+                          <strong>{row.studentName}</strong>
+                          <span>{row.email}</span>
+                        </td>
+                        <td>{row.gradeLabel}</td>
+                        <td>
+                          {row.missingGrade ? (
+                            <span className="muted-text">학년 미지정</span>
+                          ) : row.missingConfig ? (
+                            <span className="muted-text">평가 미설정</span>
+                          ) : row.score == null ? (
+                            <span className="muted-text">기록 없음</span>
+                          ) : (
+                            <strong className={row.score === 100 ? 'perfect-score' : ''}>{row.score}점</strong>
+                          )}
+                        </td>
+                        <td>{row.attemptCount}회</td>
+                        <td>
+                          {row.award ? (
+                            <button type="button" className="award-status awarded" onClick={() => setPreviewAward(row.award)}>
+                              <CheckCircle2 size={15} /> 수여 완료
+                            </button>
+                          ) : (
+                            <span className="award-status pending">미수여</span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="primary-btn award-action-btn"
+                            disabled={!row.canAward || awardingId === row.awardId}
+                            onClick={() => handleAward(row)}
+                            title={row.missingGrade ? '먼저 학생의 학년을 입력해 주세요.' : row.missingConfig ? '이 학년의 월간평가 단원이 아직 설정되지 않았습니다.' : row.score !== 100 ? '100점 학생에게만 수여할 수 있습니다.' : row.award ? '이미 수여되었습니다.' : '상장 수여'}
+                          >
+                            <Award size={16} />
+                            {awardingId === row.awardId ? '수여 중...' : '상장수여'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!loading && rows.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="monthly-awards-empty">조건에 맞는 학생이 없습니다.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <aside className="monthly-awards-preview">
+              <h3>상장 미리보기</h3>
+              <CertificatePreview
+                compact
+                award={previewAward || {
+                  studentName: '이현서',
+                  gradeLabel: '초등학교 5학년',
+                  courseName: '초등수학',
+                  year,
+                  month,
+                  awardedDate: getKstDateString(new Date()),
+                }}
+              />
+              <p className="monthly-awards-preview-note">
+                수여일은 운영자가 <strong>상장수여</strong> 버튼을 누른 날짜로 저장됩니다.
+                예: {formatKoreanDateFromString(getKstDateString(new Date()))}
+              </p>
+            </aside>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { Award, Printer, X } from 'lucide-react'
 import { db } from '../../firebase'
 import CertificatePreview from '../CertificatePreview'
 import { formatKoreanDate, formatKoreanDateFromString, getCourseLabel } from '../../utils/monthlyEvaluationAwards'
+import { getScholarshipCourseLabel } from '../../utils/scholarshipAwards'
 import './CertificateAwardsBoard.css'
 
 function getAwardSortMs(award = {}) {
@@ -19,7 +20,8 @@ function getAwardDateLabel(award = {}) {
 }
 
 export default function CertificateAwardsBoard({ user }) {
-  const [awards, setAwards] = useState([])
+  const [certificateAwards, setCertificateAwards] = useState([])
+  const [scholarshipAwards, setScholarshipAwards] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedAward, setSelectedAward] = useState(null)
 
@@ -44,20 +46,55 @@ export default function CertificateAwardsBoard({ user }) {
 
   useEffect(() => {
     if (!user?.uid) return undefined
-    const q = query(collection(db, 'monthlyEvaluationAwards'), where('studentId', '==', user.uid))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    setLoading(true)
+    let certificateLoaded = false
+    let scholarshipLoaded = false
+    const maybeStopLoading = () => {
+      if (certificateLoaded && scholarshipLoaded) setLoading(false)
+    }
+
+    const certificateQuery = query(collection(db, 'monthlyEvaluationAwards'), where('studentId', '==', user.uid))
+    const scholarshipQuery = query(collection(db, 'scholarshipAwards'), where('studentId', '==', user.uid))
+
+    const unsubscribeCertificates = onSnapshot(certificateQuery, (snapshot) => {
       const nextAwards = snapshot.docs
         .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
         .sort((a, b) => getAwardSortMs(b) - getAwardSortMs(a))
-      setAwards(nextAwards)
-      setLoading(false)
+      setCertificateAwards(nextAwards)
+      certificateLoaded = true
+      maybeStopLoading()
     }, (error) => {
       console.error('certificate awards load failed:', error)
-      setAwards([])
-      setLoading(false)
+      setCertificateAwards([])
+      certificateLoaded = true
+      maybeStopLoading()
     })
-    return () => unsubscribe()
+
+    const unsubscribeScholarships = onSnapshot(scholarshipQuery, (snapshot) => {
+      const nextAwards = snapshot.docs
+        .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+        .filter(award => award.status !== 'revoked')
+        .sort((a, b) => getAwardSortMs(b) - getAwardSortMs(a))
+      setScholarshipAwards(nextAwards)
+      scholarshipLoaded = true
+      maybeStopLoading()
+    }, (error) => {
+      console.error('scholarship awards load failed:', error)
+      setScholarshipAwards([])
+      scholarshipLoaded = true
+      maybeStopLoading()
+    })
+
+    return () => {
+      unsubscribeCertificates()
+      unsubscribeScholarships()
+    }
   }, [user?.uid])
+
+  const awards = useMemo(() => (
+    [...certificateAwards, ...scholarshipAwards]
+      .sort((a, b) => getAwardSortMs(b) - getAwardSortMs(a))
+  ), [certificateAwards, scholarshipAwards])
 
   const groupedAwards = useMemo(() => {
     const groups = {}
@@ -82,8 +119,8 @@ export default function CertificateAwardsBoard({ user }) {
           </button>
           <div className="certificate-modal-head">
             <div>
-              <span>{selectedAward.evaluationLabel || `${selectedAward.year}년 ${selectedAward.month}월 월간평가`}</span>
-              <strong>{selectedAward.awardTitle || '최우수상'} 수여</strong>
+              <span>{selectedAward.awardLabel || selectedAward.evaluationLabel || `${selectedAward.year}년 ${selectedAward.month}월 월간평가`}</span>
+              <strong>{selectedAward.awardKind === 'scholarship' ? '장학증서 수여' : `${selectedAward.awardTitle || '최우수상'} 수여`}</strong>
             </div>
             <button type="button" className="certificate-modal-print" onClick={handlePrint}>
               <Printer size={17} />
@@ -103,7 +140,7 @@ export default function CertificateAwardsBoard({ user }) {
         <div className="certificate-awards-header">
           <div>
             <h3><Award size={20} /> 상장 수여 현황판</h3>
-            <p>월간평가에서 받은 상장이 월별로 기록됩니다.</p>
+            <p>월간평가 상장과 장학증서가 월별로 기록됩니다.</p>
           </div>
           <strong>{loading ? '...' : `${awards.length}장`}</strong>
         </div>
@@ -120,12 +157,18 @@ export default function CertificateAwardsBoard({ user }) {
                 <div className="certificate-awards-items">
                   {monthAwards.map(award => (
                     <button type="button" key={award.id} onClick={() => setSelectedAward(award)} className="certificate-award-item">
-                      <span className="certificate-award-ribbon">최우수상</span>
-                      <span>
-                        <strong>{award.evaluationLabel || `${award.year}년 ${award.month}월 월간평가`}</strong>
-                        <small>{getCourseLabel(award.courseClusterId)} · {getAwardDateLabel(award)}</small>
+                      <span className={`certificate-award-ribbon ${award.awardKind === 'scholarship' ? 'scholarship' : ''}`}>
+                        {award.awardKind === 'scholarship' ? '장학증서' : '최우수상'}
                       </span>
-                      <b>{award.score || 100}점</b>
+                      <span>
+                        <strong>{award.awardLabel || award.evaluationLabel || `${award.year}년 ${award.month}월 월간평가`}</strong>
+                        <small>
+                          {award.awardKind === 'scholarship' ? getScholarshipCourseLabel(award.courseClusterId) : getCourseLabel(award.courseClusterId)}
+                          {' · '}
+                          {getAwardDateLabel(award)}
+                        </small>
+                      </span>
+                      <b>{award.awardKind === 'scholarship' ? '20%' : `${award.score || 100}점`}</b>
                     </button>
                   ))}
                 </div>

@@ -177,6 +177,11 @@
   background: rgba(250, 204, 21, 0.16);
 }
 
+.notif-icon.scholarship-award {
+  color: #67e8f9;
+  background: rgba(34, 211, 238, 0.16);
+}
+
 .notif-content {
   flex: 1;
 }
