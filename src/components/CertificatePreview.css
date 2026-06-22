@@ -243,8 +243,16 @@
 
 .scholarship-border-outer {
   inset: 5.1%;
-  border: clamp(2px, 0.5cqw, 4px) solid rgba(241, 194, 125, 0.96);
-  box-shadow: 0 0 24px rgba(241, 194, 125, 0.08);
+  padding: clamp(2px, 0.48cqw, 4px);
+  border: 0;
+  background: linear-gradient(135deg, #f7d996 0%, #c89248 48%, #f4c77b 100%);
+  clip-path: polygon(6.2% 0, 93.8% 0, 100% 6.2%, 100% 93.8%, 93.8% 100%, 6.2% 100%, 0 93.8%, 0 6.2%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  filter: drop-shadow(0 0 14px rgba(241, 194, 125, 0.12));
 }
 
 .scholarship-border-inner {
@@ -253,35 +261,58 @@
 
 .scholarship-corner {
   position: absolute;
-  width: clamp(26px, 6.8cqw, 64px);
-  height: clamp(26px, 6.8cqw, 64px);
-  border: clamp(2px, 0.45cqw, 4px) solid rgba(241, 194, 125, 0.94);
-  border-right: 0;
-  border-bottom: 0;
-  border-top-left-radius: 70%;
+  width: clamp(42px, 10cqw, 94px);
+  height: clamp(42px, 10cqw, 94px);
   pointer-events: none;
 }
 
+.scholarship-corner::before,
+.scholarship-corner::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-color: rgba(241, 194, 125, 0.94);
+  pointer-events: none;
+}
+
+.scholarship-corner::before {
+  width: 64%;
+  height: 64%;
+  border-top: clamp(2px, 0.38cqw, 3px) solid rgba(241, 194, 125, 0.94);
+  border-left: clamp(2px, 0.38cqw, 3px) solid rgba(241, 194, 125, 0.94);
+  border-top-left-radius: 100%;
+}
+
+.scholarship-corner::after {
+  width: 42%;
+  height: 42%;
+  transform: translate(34%, 34%);
+  border-top: 1px solid rgba(241, 194, 125, 0.72);
+  border-left: 1px solid rgba(241, 194, 125, 0.72);
+  border-top-left-radius: 100%;
+}
+
 .scholarship-corner-tl {
-  top: 5.1%;
-  left: 5.1%;
+  top: 5.3%;
+  left: 5.3%;
 }
 
 .scholarship-corner-tr {
-  top: 5.1%;
-  right: 5.1%;
+  top: 5.3%;
+  right: 5.3%;
   transform: rotate(90deg);
 }
 
 .scholarship-corner-br {
-  right: 5.1%;
-  bottom: 5.1%;
+  right: 5.3%;
+  bottom: 5.3%;
   transform: rotate(180deg);
 }
 
 .scholarship-corner-bl {
-  left: 5.1%;
-  bottom: 5.1%;
+  left: 5.3%;
+  bottom: 5.3%;
   transform: rotate(270deg);
 }
 

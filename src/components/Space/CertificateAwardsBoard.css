@@ -176,6 +176,10 @@
     0 0 0 1px rgba(250, 204, 21, 0.18);
 }
 
+.certificate-modal .scholarship-certificate {
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.45);
+}
+
 .certificate-modal-head {
   width: min(84vw, 56vh, 620px);
   display: flex;
