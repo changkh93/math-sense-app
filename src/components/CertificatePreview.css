@@ -243,16 +243,9 @@
 
 .scholarship-border-outer {
   inset: 5.1%;
-  padding: clamp(2px, 0.48cqw, 4px);
-  border: 0;
-  background: linear-gradient(135deg, #f7d996 0%, #c89248 48%, #f4c77b 100%);
-  clip-path: polygon(6.2% 0, 93.8% 0, 100% 6.2%, 100% 93.8%, 93.8% 100%, 6.2% 100%, 0 93.8%, 0 6.2%);
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  filter: drop-shadow(0 0 14px rgba(241, 194, 125, 0.12));
+  border: clamp(2px, 0.5cqw, 4px) solid rgba(241, 194, 125, 0.96);
+  border-radius: 0;
+  box-shadow: 0 0 14px rgba(241, 194, 125, 0.12);
 }
 
 .scholarship-border-inner {
@@ -589,5 +582,22 @@
 
   .scholarship-seal {
     width: 40px;
+  }
+}
+
+@media print {
+  .scholarship-border-outer {
+    border: 2.2pt solid #c79643;
+    box-shadow: none;
+  }
+
+  .scholarship-corner::before {
+    border-top: 1.7pt solid #c79643;
+    border-left: 1.7pt solid #c79643;
+  }
+
+  .scholarship-corner::after {
+    border-top: 0.8pt solid #d9ad64;
+    border-left: 0.8pt solid #d9ad64;
   }
 }
