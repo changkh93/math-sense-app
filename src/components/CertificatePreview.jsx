@@ -13,17 +13,28 @@ function getAwardedDateLabel(award = {}) {
   return formatKoreanDateFromString(award.awardedDate) || formatKoreanDate(award.awardedAt) || ''
 }
 
+function getAwardYearMonth(award = {}) {
+  const labelMatch = String(award.awardLabel || award.evaluationLabel || award.evaluationPeriodLabel || '').match(/(\d{4})\D+(\d{1,2})\D*월/)
+  const dateMatch = String(award.awardedDate || '').match(/^(\d{4})-(\d{1,2})-/)
+  const year = Number(award.year || award.evaluationYear || labelMatch?.[1] || dateMatch?.[1])
+  const month = Number(award.month || award.evaluationMonth || labelMatch?.[2] || dateMatch?.[2])
+  return {
+    year: Number.isFinite(year) && year > 0 ? year : new Date().getFullYear(),
+    month: Number.isFinite(month) && month > 0 ? month : new Date().getMonth() + 1,
+  }
+}
+
 export default function CertificatePreview({ award = {}, compact = false }) {
   const isScholarship = award.awardKind === 'scholarship' || Boolean(award.scholarshipTitle)
   const studentName = award.studentName || award.name || '학생'
   const rawGradeLabel = award.gradeLabel || getGradeLabel(award.grade, '')
   const gradeLabel = rawGradeLabel ? rawGradeLabel.replace(/\s*\(기록\s*기준\)/, '') : ''
-  const year = Number(award.year) || new Date().getFullYear()
-  const month = Number(award.month) || 5
+  const { year, month } = getAwardYearMonth(award)
   const awardedDateLabel = getAwardedDateLabel(award)
 
   if (isScholarship) {
-    const periodLabel = award.evaluationPeriodLabel || getEvaluationPeriodLabel(year, month)
+    const storedPeriodLabel = /NaN/i.test(String(award.evaluationPeriodLabel || '')) ? '' : award.evaluationPeriodLabel
+    const periodLabel = storedPeriodLabel || getEvaluationPeriodLabel(year, month)
     const courseName = award.courseName || getScholarshipCourseLabel(award.courseClusterId)
 
     return (

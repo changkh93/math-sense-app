@@ -5,7 +5,7 @@ import { Award, Printer, X } from 'lucide-react'
 import { db } from '../../firebase'
 import CertificatePreview from '../CertificatePreview'
 import { formatKoreanDate, formatKoreanDateFromString, getCourseLabel } from '../../utils/monthlyEvaluationAwards'
-import { getScholarshipCourseLabel } from '../../utils/scholarshipAwards'
+import { getEvaluationPeriodLabel, getScholarshipCourseLabel } from '../../utils/scholarshipAwards'
 import './CertificateAwardsBoard.css'
 
 function getAwardSortMs(award = {}) {
@@ -17,6 +17,37 @@ function getAwardSortMs(award = {}) {
 
 function getAwardDateLabel(award = {}) {
   return formatKoreanDateFromString(award.awardedDate) || formatKoreanDate(award.awardedAt) || '수여일 확인 중'
+}
+
+function getAwardYearMonth(award = {}) {
+  const labelMatch = String(award.awardLabel || award.evaluationLabel || award.evaluationPeriodLabel || '').match(/(\d{4})\D+(\d{1,2})\D*월/)
+  const dateMatch = String(award.awardedDate || '').match(/^(\d{4})-(\d{1,2})-/)
+  const year = Number(award.year || award.evaluationYear || labelMatch?.[1] || dateMatch?.[1])
+  const month = Number(award.month || award.evaluationMonth || labelMatch?.[2] || dateMatch?.[2])
+  return {
+    year: Number.isFinite(year) && year > 0 ? year : null,
+    month: Number.isFinite(month) && month > 0 ? month : null,
+  }
+}
+
+function getAwardMonthKey(award = {}) {
+  const { year, month } = getAwardYearMonth(award)
+  if (year && month) return `${year}.${String(month).padStart(2, '0')}`
+  return '수여월 미확인'
+}
+
+function getAwardDisplayLabel(award = {}) {
+  const storedLabel = award.awardLabel || award.evaluationLabel
+  if (storedLabel && !/NaN/i.test(String(storedLabel))) return storedLabel
+  const { year, month } = getAwardYearMonth(award)
+  if (year && month) {
+    return award.awardKind === 'scholarship'
+      ? `${getEvaluationPeriodLabel(year, month)} ${getScholarshipCourseLabel(award.courseClusterId)} 장학생`
+      : `${year}년 ${month}월 월간평가`
+  }
+  return award.awardKind === 'scholarship'
+    ? `${getScholarshipCourseLabel(award.courseClusterId)} 장학생`
+    : '월간평가 상장'
 }
 
 export default function CertificateAwardsBoard({ user }) {
@@ -99,7 +130,7 @@ export default function CertificateAwardsBoard({ user }) {
   const groupedAwards = useMemo(() => {
     const groups = {}
     awards.forEach(award => {
-      const key = `${award.year}.${String(award.month).padStart(2, '0')}`
+      const key = getAwardMonthKey(award)
       if (!groups[key]) groups[key] = []
       groups[key].push(award)
     })
@@ -119,7 +150,7 @@ export default function CertificateAwardsBoard({ user }) {
           </button>
           <div className="certificate-modal-head">
             <div>
-              <span>{selectedAward.awardLabel || selectedAward.evaluationLabel || `${selectedAward.year}년 ${selectedAward.month}월 월간평가`}</span>
+              <span>{getAwardDisplayLabel(selectedAward)}</span>
               <strong>{selectedAward.awardKind === 'scholarship' ? '장학증서 수여' : `${selectedAward.awardTitle || '최우수상'} 수여`}</strong>
             </div>
             <button type="button" className="certificate-modal-print" onClick={handlePrint}>
@@ -161,7 +192,7 @@ export default function CertificateAwardsBoard({ user }) {
                         {award.awardKind === 'scholarship' ? '장학증서' : '최우수상'}
                       </span>
                       <span>
-                        <strong>{award.awardLabel || award.evaluationLabel || `${award.year}년 ${award.month}월 월간평가`}</strong>
+                        <strong>{getAwardDisplayLabel(award)}</strong>
                         <small>
                           {award.awardKind === 'scholarship' ? getScholarshipCourseLabel(award.courseClusterId) : getCourseLabel(award.courseClusterId)}
                           {' · '}
