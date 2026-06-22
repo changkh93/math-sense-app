@@ -30,10 +30,10 @@ export default function CertificatePreview({ award = {}, compact = false }) {
       <article className={`certificate-preview scholarship-certificate ${compact ? 'compact' : ''}`}>
         <div className="scholarship-border scholarship-border-outer" />
         <div className="scholarship-border scholarship-border-inner" />
-        <div className="scholarship-corner corner-tl" />
-        <div className="scholarship-corner corner-tr" />
-        <div className="scholarship-corner corner-br" />
-        <div className="scholarship-corner corner-bl" />
+        <div className="scholarship-corner scholarship-corner-tl" />
+        <div className="scholarship-corner scholarship-corner-tr" />
+        <div className="scholarship-corner scholarship-corner-br" />
+        <div className="scholarship-corner scholarship-corner-bl" />
         <div className="scholarship-content">
           <header className="scholarship-header">
             <div className="scholarship-kicker">META SENSE SCHOLARSHIP</div>
@@ -61,13 +61,8 @@ export default function CertificatePreview({ award = {}, compact = false }) {
             위 학생은 {periodLabel} {courseName} 과정에서
             성실한 과제 제출과 꾸준한 학습 기록을 통해
             뛰어난 자기주도 학습 태도를 보여주었기에
-            {month}월 메타센스 장학생으로 선정합니다.
+            {' '}{month}월 메타센스 장학생으로 선정합니다.
           </p>
-
-          <div className="scholarship-benefit">
-            <span>혜택</span>
-            <strong>다음 수강료 20% 감면</strong>
-          </div>
 
           <div className="scholarship-footer">
             <div className="scholarship-footer-line">
