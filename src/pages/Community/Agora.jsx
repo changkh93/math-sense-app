@@ -12,6 +12,7 @@ import StarMessageInput from '../../components/Community/StarMessageInput';
 import AgoraMotivationPanel from '../../components/Community/AgoraMotivationPanel';
 import AssignmentShareFeed from '../../components/Community/AssignmentShareFeed';
 import { useAuth } from '../../hooks/useAuth';
+import { LinkPreviewList, parseInlineFormatting } from '../../utils/formatUtils';
 import './Agora.css';
 
 const MotionDiv = motion.div;
@@ -218,7 +219,10 @@ export default function Agora() {
                   </div>
 
                   <div className="card-content">
-                    <h3 className="line-clamp-2">{q.content}</h3>
+                    <h3 className="line-clamp-2">
+                      {parseInlineFormatting(q.content, { keyPrefix: `agora-card-${q.id}` })}
+                    </h3>
+                    <LinkPreviewList text={q.content} compact keyPrefix={`agora-card-link-${q.id}`} />
                     {q.drawingUrl && (
                       <div className="drawing-thumbnail">
                         <img src={q.drawingUrl} alt="Question Drawing" loading="lazy" />

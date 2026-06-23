@@ -61,6 +61,193 @@ export const sanitizeLaTeX = (text) => {
   return restoreLostLatexCommandSlashes(controlCharFixed);
 };
 
+const URL_MATCH_PATTERN = /(https?:\/\/[^\s<>"']+)/gi;
+
+const trimUrlToken = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  return rawUrl.replace(/[.,!?;:)\]}]+$/g, '');
+};
+
+export const extractPlainUrls = (text) => {
+  if (!text || typeof text !== 'string') return [];
+
+  const urls = [];
+  const seen = new Set();
+  const normalizedText = normalizeEscapedNewlines(text);
+  const matches = normalizedText.matchAll(new RegExp(URL_MATCH_PATTERN));
+
+  for (const match of matches) {
+    const url = trimUrlToken(match[0]);
+    if (!url || seen.has(url)) continue;
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) continue;
+      seen.add(url);
+      urls.push(url);
+    } catch {
+      // Ignore malformed URL-like text.
+    }
+  }
+
+  return urls;
+};
+
+const getYouTubeVideoId = (url) => {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+
+    if (host === 'youtu.be') {
+      return parsed.pathname.split('/').filter(Boolean)[0] || '';
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+      if (parsed.searchParams.get('v')) return parsed.searchParams.get('v');
+
+      const pathParts = parsed.pathname.split('/').filter(Boolean);
+      if (['shorts', 'embed', 'live'].includes(pathParts[0]) && pathParts[1]) {
+        return pathParts[1];
+      }
+    }
+  } catch {
+    return '';
+  }
+
+  return '';
+};
+
+export const getUrlPreviewData = (url) => {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const youtubeId = getYouTubeVideoId(url);
+
+    if (youtubeId) {
+      return {
+        url,
+        host,
+        type: 'youtube',
+        title: 'YouTube 영상',
+        subtitle: host,
+        imageUrl: `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`
+      };
+    }
+
+    return {
+      url,
+      host,
+      type: 'link',
+      title: host,
+      subtitle: parsed.pathname === '/' ? '링크 열기' : parsed.pathname.replace(/^\//, '').slice(0, 52),
+      imageUrl: ''
+    };
+  } catch {
+    return null;
+  }
+};
+
+const renderTextWithAutoLinks = (text, options, keyBase) => {
+  if (!text) return null;
+
+  const {
+    linkColor = 'var(--neon-blue)'
+  } = options;
+
+  const parts = [];
+  let lastIndex = 0;
+  const matches = text.matchAll(new RegExp(URL_MATCH_PATTERN));
+
+  for (const match of matches) {
+    const rawUrl = match[0];
+    const href = trimUrlToken(rawUrl);
+    const trailingText = rawUrl.slice(href.length);
+
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+    }
+
+    if (href) {
+      parts.push({ type: 'url', value: href });
+    }
+
+    if (trailingText) {
+      parts.push({ type: 'text', value: trailingText });
+    }
+
+    lastIndex = match.index + rawUrl.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+
+  if (!parts.length) parts.push({ type: 'text', value: text });
+
+  return parts.flatMap((part, partIndex) => {
+    if (part.type === 'url') {
+      return (
+        <a
+          key={`${keyBase}-url-${partIndex}`}
+          href={part.value}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: linkColor,
+            textDecoration: 'underline',
+            textUnderlineOffset: '0.18em',
+            overflowWrap: 'anywhere',
+            cursor: 'pointer'
+          }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {part.value}
+        </a>
+      );
+    }
+
+    return part.value.split(/(\n)/g).map((linePart, lineIndex) => {
+      if (linePart === '\n') return <br key={`${keyBase}-br-${partIndex}-${lineIndex}`} />;
+      return linePart ? <span key={`${keyBase}-text-${partIndex}-${lineIndex}`}>{linePart}</span> : null;
+    });
+  });
+};
+
+export const LinkPreviewList = ({ text, className = '', compact = false, keyPrefix = 'link-preview' }) => {
+  const previews = extractPlainUrls(text)
+    .map(getUrlPreviewData)
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (!previews.length) return null;
+
+  return (
+    <div className={`auto-link-preview-list ${compact ? 'compact' : ''} ${className}`.trim()}>
+      {previews.map((preview, index) => (
+        <a
+          key={`${keyPrefix}-${preview.url}-${index}`}
+          className={`auto-link-preview-card ${preview.type}`}
+          href={preview.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {preview.imageUrl ? (
+            <img src={preview.imageUrl} alt="" loading="lazy" className="auto-link-preview-thumb" />
+          ) : (
+            <span className="auto-link-preview-fallback" aria-hidden="true">
+              {preview.host[0]?.toUpperCase() || 'L'}
+            </span>
+          )}
+          <span className="auto-link-preview-copy">
+            <span className="auto-link-preview-title">{preview.title}</span>
+            <span className="auto-link-preview-subtitle">{preview.subtitle}</span>
+          </span>
+        </a>
+      ))}
+    </div>
+  );
+};
+
 /**
  * Parses inline formatting for bold (**text**), math ($math$), and italic (*text*).
  * @param {string} text The text to parse.
@@ -169,15 +356,11 @@ export const parseInlineFormatting = (text, options = {}) => {
                     </em>
                   );
               }
-              // 5. Final check for newlines in the remaining text: \n
-              if (typeof iPart === 'string' && iPart.includes('\n')) {
-                const lineParts = iPart.split(/(\n)/g);
-                return lineParts.map((lPart, lIndex) => {
-                  if (lPart === '\n') return <br key={`${keyPrefix}-br-${lIndex}-${bIndex}-${mIndex}-${iIndex}`} />;
-                  return lPart ? <span key={`${keyPrefix}-text-${lIndex}-${bIndex}-${mIndex}-${iIndex}`}>{lPart}</span> : null;
-                });
-              }
-              return <span key={`${keyPrefix}-text-${lIndex}-${bIndex}-${mIndex}-${iIndex}`}>{iPart}</span>;
+              return renderTextWithAutoLinks(
+                iPart,
+                options,
+                `${keyPrefix}-${lIndex}-${bIndex}-${mIndex}-${iIndex}`
+              );
           });
       });
     });

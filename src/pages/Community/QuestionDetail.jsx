@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle, Clock, Heart, User, Trash2, Edit3, X, Save, Sparkles, Reply, Send } from 'lucide-react';
-import { parseInlineFormatting } from '../../utils/formatUtils';
+import { LinkPreviewList, normalizeEscapedNewlines, parseInlineFormatting } from '../../utils/formatUtils';
 import 'katex/dist/katex.min.css';
 import { db } from '../../firebase';
 import { updateDoc, doc } from 'firebase/firestore';
@@ -17,6 +17,30 @@ import './QuestionDetail.css';
 
 const MotionDiv = motion.div;
 const MotionForm = motion.form;
+const QUESTION_SINGLE_LINE_LEAD_LENGTH = 18;
+
+const splitQuestionContent = (content) => {
+  const normalized = normalizeEscapedNewlines(content || '').trim();
+  if (!normalized) return { lead: '', body: '' };
+
+  const lines = normalized.split('\n');
+  const firstContentIndex = lines.findIndex((line) => line.trim());
+  if (firstContentIndex < 0) return { lead: '', body: '' };
+
+  const leadLine = lines[firstContentIndex].trim();
+  const remaining = lines.slice(firstContentIndex + 1).join('\n').trim();
+  if (remaining) return { lead: leadLine, body: remaining };
+
+  const chars = Array.from(leadLine);
+  if (chars.length <= QUESTION_SINGLE_LINE_LEAD_LENGTH + 10) {
+    return { lead: leadLine, body: '' };
+  }
+
+  return {
+    lead: chars.slice(0, QUESTION_SINGLE_LINE_LEAD_LENGTH).join(''),
+    body: chars.slice(QUESTION_SINGLE_LINE_LEAD_LENGTH).join('').trimStart()
+  };
+};
 
 const getDateFromTimestamp = (timestamp) => {
   if (!timestamp) return null;
@@ -378,10 +402,26 @@ export default function QuestionDetail() {
                   </div>
                 </div>
               ) : (
-                <h2 className="question-content">
-                  {parseInlineFormatting(question.content, { keyPrefix: 'q-detail' })}
-                </h2>
+                (() => {
+                  const { lead, body } = splitQuestionContent(question.content);
+
+                  return (
+                    <div className={`question-content ${body ? '' : 'single-line'}`}>
+                      {lead && (
+                        <div className="question-content-lead">
+                          {parseInlineFormatting(lead, { keyPrefix: 'q-detail-lead' })}
+                        </div>
+                      )}
+                      {body && (
+                        <div className="question-content-body">
+                          {parseInlineFormatting(body, { keyPrefix: 'q-detail-body' })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               )}
+              <LinkPreviewList text={question.content} keyPrefix={`question-link-${question.id}`} />
 
               {question.quizContext && (question.quizContext.quizTitle || question.quizContext.transmissionTitle) && (
                 <MotionDiv 
