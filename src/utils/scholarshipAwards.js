@@ -90,12 +90,27 @@ export function getStudentDisplayName(user = {}) {
   return user.studentName || user.publicDisplayName || user.name || user.displayName || user.email || '이름 없음'
 }
 
-export function isActiveScholarshipStudent(user = {}, courseClusterId) {
-  if (!user || user.role === 'admin' || user.role === 'parent' || user.isDeleted || user.accountStatus === 'deleted') return false
+export function hasActiveCourseAccess(user = {}, courseClusterId) {
   const normalized = normalizeScholarshipCourseId(courseClusterId)
   const access = user.clusterAccess || {}
   if (access[normalized] === 'active') return true
-  return normalized === 'cluster_elementary' && !user.clusterAccess
+
+  const participation = user.participation || {}
+  const participationValue = participation[normalized] || participation[courseClusterId]
+  if (Array.isArray(participationValue) && participationValue.length > 0) return true
+  if (
+    participationValue &&
+    typeof participationValue === 'object' &&
+    Object.keys(participationValue).length > 0
+  ) return true
+
+  const hasAccessRecords = Boolean(user.clusterAccess && Object.keys(access).length > 0)
+  return normalized === 'cluster_elementary' && !hasAccessRecords
+}
+
+export function isActiveScholarshipStudent(user = {}, courseClusterId) {
+  if (!user || user.role === 'admin' || user.role === 'parent' || user.isDeleted || user.accountStatus === 'deleted') return false
+  return hasActiveCourseAccess(user, courseClusterId)
 }
 
 export function average(values = []) {

@@ -27,6 +27,7 @@ import {
   getKstDateString,
   normalizeGradeValue,
 } from '../../utils/monthlyEvaluationAwards'
+import { hasActiveCourseAccess } from '../../utils/scholarshipAwards'
 import './Admin.css'
 
 const DEFAULT_YEAR = 2026
@@ -49,9 +50,7 @@ function isStudentUser(user = {}) {
 }
 
 function hasActiveCourse(user = {}, courseClusterId) {
-  const access = user.clusterAccess || {}
-  if (access[courseClusterId] === 'active') return true
-  return courseClusterId === 'cluster_elementary' && !user.clusterAccess
+  return hasActiveCourseAccess(user, courseClusterId)
 }
 
 function getBestHistory(records = []) {
