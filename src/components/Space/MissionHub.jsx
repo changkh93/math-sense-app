@@ -146,7 +146,7 @@ const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
 
 // ─── YouTube Player Component ───
 // Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
-const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, onError, isOverlay = false, autoPlay = true }, ref) => {
+const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, onTrackingStatus, onError, isOverlay = false, autoPlay = true }, ref) => {
   const normalizedVideoId = getYouTubeVideoId(videoId)
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
@@ -225,6 +225,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     onTimeUpdateRef.current = onTimeUpdate
   }, [onTimeUpdate])
 
+  const onTrackingStatusRef = useRef(onTrackingStatus)
+  useEffect(() => {
+    onTrackingStatusRef.current = onTrackingStatus
+  }, [onTrackingStatus])
+
   useEffect(() => {
     setHasError(false)
     setApiTimedOut(false)
@@ -236,6 +241,13 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     const apiTimeout = setTimeout(() => {
       if (!playerRef.current) {
         console.warn('YouTube iframe API did not initialize in time. Falling back to plain iframe.', { videoId: normalizedVideoId })
+        onTrackingStatusRef.current?.({
+          event: 'api_timeout',
+          apiReady: false,
+          apiTimedOut: true,
+          fallbackIframe: true,
+          videoId: normalizedVideoId
+        })
         setApiTimedOut(true)
       }
     }, 7000)
@@ -269,11 +281,19 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
           controls: 1,
           modestbranding: 1,
           rel: 0,
+          playsinline: 1,
           origin: window.location.origin
         },
         events: {
           'onReady': () => {
             clearTimeout(apiTimeout)
+            onTrackingStatusRef.current?.({
+              event: 'api_ready',
+              apiReady: true,
+              apiTimedOut: false,
+              fallbackIframe: false,
+              videoId: normalizedVideoId
+            })
             // Start continuous time tracking as soon as player is ready
             if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
             timeUpdateInterval.current = setInterval(() => {
@@ -293,6 +313,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
             }, 200) 
           },
           'onStateChange': (event) => {
+            onTrackingStatusRef.current?.({
+              event: 'player_state',
+              playerState: event.data,
+              videoId: normalizedVideoId
+            })
             if (onPlaybackStateChange) {
               onPlaybackStateChange(event.data)
             }
@@ -313,6 +338,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
           },
           'onError': (event) => {
             console.error("YouTube Player Error:", event.data)
+            onTrackingStatusRef.current?.({
+              event: 'player_error',
+              playerError: event.data,
+              videoId: normalizedVideoId
+            })
             setHasError(true)
             if (onError) onError(event.data)
           }
@@ -650,6 +680,18 @@ export default function MissionHub({
   const lastActivityTimeRef = useRef(Date.now())
   const loadedTxIdRef = useRef(null) // Track which video was last loaded to prevent overwrite loops
   const lastInitializedTxIdRef = useRef(null)
+  const videoTrackingStatusRef = useRef({
+    apiReady: false,
+    apiTimedOut: false,
+    fallbackIframe: false,
+    playerState: null,
+    playerError: null,
+    lastTimeUpdateAt: null,
+    lastForwardPlaybackAt: null,
+    inferredPlayback: false
+  })
+  const inferredPlaybackLoggedRef = useRef(false)
+  const trackingStallLoggedRef = useRef(false)
   
   // ─── Time Attack State ───
   const [showTimeAttack, setShowTimeAttack] = useState(false);
@@ -666,6 +708,8 @@ export default function MissionHub({
   const timeAttackOpportunityRef = useRef(null);
   const [completionBonusTimeLeft, setCompletionBonusTimeLeft] = useState(null);
   const completionTimerStartedRef = useRef(false);
+  const [videoTrackingWarning, setVideoTrackingWarning] = useState("");
+  const [videoTrackingUnavailable, setVideoTrackingUnavailable] = useState(false);
   
   useEffect(() => {
     if (completionBonusTimeLeft === null || completionBonusTimeLeft <= 0) return;
@@ -953,6 +997,20 @@ export default function MissionHub({
     setIsVideoPlaying(false)
     isVideoPlayingRef.current = false
     setVideoError(false)
+    setVideoTrackingWarning("")
+    setVideoTrackingUnavailable(false)
+    videoTrackingStatusRef.current = {
+      apiReady: false,
+      apiTimedOut: false,
+      fallbackIframe: false,
+      playerState: null,
+      playerError: null,
+      lastTimeUpdateAt: null,
+      lastForwardPlaybackAt: null,
+      inferredPlayback: false
+    }
+    inferredPlaybackLoggedRef.current = false
+    trackingStallLoggedRef.current = false
   }, [selectedTx?.id])
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
@@ -1064,6 +1122,22 @@ export default function MissionHub({
     }
   }, [userId, selectedTx, loadingProgress, learningProgress, unitId])
 
+  const getTrackingDiagnostics = useCallback(() => {
+    const status = videoTrackingStatusRef.current || {}
+    return {
+      apiReady: !!status.apiReady,
+      apiTimedOut: !!status.apiTimedOut,
+      fallbackIframe: !!status.fallbackIframe,
+      playerState: status.playerState ?? null,
+      playerError: status.playerError ?? null,
+      lastTimeUpdateAt: status.lastTimeUpdateAt || null,
+      lastForwardPlaybackAt: status.lastForwardPlaybackAt || null,
+      inferredPlayback: !!status.inferredPlayback,
+      trackingUnavailable: !!videoTrackingUnavailable,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+    }
+  }, [videoTrackingUnavailable])
+
   // ─── Video Progress: Part 2 - Auto-save Interval & Unload-save (Stable loop) ───
   useEffect(() => {
     if (loadingProgress || !userId || !selectedTx) return
@@ -1092,6 +1166,7 @@ export default function MissionHub({
             [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
             [`videoProgress.${txId}.stampedSeconds`]: stamps,
             [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || 'Main Video',
+            [`videoProgress.${txId}.trackingDiagnostics`]: getTrackingDiagnostics(),
             updatedAt: serverTimestamp()
           }
           
@@ -1111,7 +1186,8 @@ export default function MissionHub({
                 totalTimeSpent: totalTimeSpentRef.current,
                 todayTimeSpent: dailyTimeSpentRef.current,
                 todayTimeSpentDate: dailyTimeSpentDateRef.current,
-                stampedSeconds: stamps
+                stampedSeconds: stamps,
+                trackingDiagnostics: getTrackingDiagnostics()
               }
             }
           }))
@@ -1145,7 +1221,8 @@ export default function MissionHub({
           todayTimeSpentDate: dailyTimeSpentDateRef.current,
           stampedSeconds: Array.from(stampedSetRef.current),
           completed: videoCompletedRef.current,
-          completionBonusGiven: videoCompletionBonusGivenRef.current
+          completionBonusGiven: videoCompletionBonusGivenRef.current,
+          trackingDiagnostics: getTrackingDiagnostics()
         }
       })
       
@@ -1162,7 +1239,7 @@ export default function MissionHub({
       window.removeEventListener('beforeunload', handleUnloadSave)
       window.removeEventListener('popstate', handleUnloadSave)
     }
-  }, [userId, selectedTx, loadingProgress, unitId])
+  }, [userId, selectedTx, loadingProgress, unitId, getTrackingDiagnostics])
 
   // ─── Silent Toast helper ───
   const showSilentToast = useCallback((amount) => {
@@ -1184,6 +1261,63 @@ export default function MissionHub({
 
   const videoAlreadySavedRef = useRef(false) // Flag to prevent double-save via returnFromContent
 
+  const logActivity = useCallback(async (actionStr, metadata = null) => {
+    if (!userId) return;
+    try {
+        const logId = `${Date.now()}_${Math.random().toString(36).substring(2,7)}`
+        const logRef = doc(db, 'users', userId, 'activityLogs', logId)
+        await setDoc(logRef, {
+           action: actionStr,
+           unitId: unitId || 'unknown_unit',
+           unitTitle: activeUnit?.title || '',
+           clusterId: clusterId || '',
+           ...(metadata ? { metadata } : {}),
+           timestamp: serverTimestamp()
+        })
+    } catch (err) {
+        console.warn("Failed to log activity", err)
+    }
+  }, [activeUnit?.title, clusterId, unitId, userId])
+
+  const handleVideoTrackingStatus = useCallback((event = {}) => {
+    const next = {
+      ...videoTrackingStatusRef.current,
+      ...event,
+      lastStatusAt: Date.now()
+    }
+    videoTrackingStatusRef.current = next
+
+    if (event.event === 'api_timeout') {
+      setVideoTrackingUnavailable(true)
+      setVideoTrackingWarning('영상은 재생될 수 있지만 학습 추적이 불안정합니다. 시청 후 수동 완료 처리로 저장해 주세요.')
+      logActivity('video_tracking_api_timeout', {
+        transmissionId: selectedTx?.id || 'default',
+        transmissionTitle: selectedTx?.title || '',
+        videoId: event.videoId || selectedTx?.videoId || '',
+        ...getTrackingDiagnostics()
+      })
+    } else if (event.event === 'api_ready') {
+      setVideoTrackingUnavailable(false)
+      setVideoTrackingWarning("")
+      logActivity('video_tracking_api_ready', {
+        transmissionId: selectedTx?.id || 'default',
+        transmissionTitle: selectedTx?.title || '',
+        videoId: event.videoId || selectedTx?.videoId || '',
+        ...getTrackingDiagnostics()
+      })
+    } else if (event.event === 'player_error') {
+      setVideoTrackingUnavailable(true)
+      setVideoTrackingWarning('영상 추적 오류가 감지되었습니다. 외부 시청을 완료했다면 수동 완료 처리로 저장해 주세요.')
+      logActivity('video_tracking_player_error', {
+        transmissionId: selectedTx?.id || 'default',
+        transmissionTitle: selectedTx?.title || '',
+        videoId: event.videoId || selectedTx?.videoId || '',
+        errorCode: event.playerError ?? null,
+        ...getTrackingDiagnostics()
+      })
+    }
+  }, [getTrackingDiagnostics, logActivity, selectedTx])
+
   const getVideoLearningMetadata = useCallback((txId, position, stamps) => {
     const sessionWatchSeconds = Math.max(0, totalTimeSpentRef.current - lastSyncedTimeSpentRef.current)
     return {
@@ -1197,9 +1331,10 @@ export default function MissionHub({
       todayTimeSpent: dailyTimeSpentRef.current,
       todayTimeSpentDate: dailyTimeSpentDateRef.current,
       coverageSeconds: stamps.length,
-      currentPosition: position
+      currentPosition: position,
+      trackingDiagnostics: getTrackingDiagnostics()
     }
-  }, [selectedTx])
+  }, [getTrackingDiagnostics, selectedTx])
 
   const markVideoLearningSynced = useCallback(() => {
     lastSyncedTimeSpentRef.current = totalTimeSpentRef.current
@@ -1266,23 +1401,6 @@ export default function MissionHub({
     }
   }, [initialMode, onBack, selectedTx, missionData, onNonQuizActivityComplete, showSilentToast, showRewardLimitNotice, getVideoLearningMetadata, markVideoLearningSynced])
 
-  const logActivity = async (actionStr) => {
-    if (!userId) return;
-    try {
-        const logId = `${Date.now()}_${Math.random().toString(36).substring(2,7)}`
-        const logRef = doc(db, 'users', userId, 'activityLogs', logId)
-        await setDoc(logRef, {
-           action: actionStr,
-           unitId: unitId || 'unknown_unit',
-           unitTitle: activeUnit?.title || '',
-           clusterId: clusterId || '',
-           timestamp: serverTimestamp()
-        })
-    } catch (err) {
-        console.warn("Failed to log activity", err)
-    }
-  }
-
   // ─── Data Log Timer Logic ───
   useEffect(() => {
     if (currentMode !== 'text') return
@@ -1338,7 +1456,8 @@ export default function MissionHub({
                [`videoProgress.${txId}.todayTimeSpent`]: dailyTimeSpentRef.current,
                [`videoProgress.${txId}.todayTimeSpentDate`]: dailyTimeSpentDateRef.current,
                [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
-               [`videoProgress.${txId}.stampedSeconds`]: Array.from(stampedSetRef.current)
+               [`videoProgress.${txId}.stampedSeconds`]: Array.from(stampedSetRef.current),
+               [`videoProgress.${txId}.trackingDiagnostics`]: getTrackingDiagnostics()
              }, { merge: true }).catch(err => console.warn("Background save failed:", err))
            }
         }
@@ -1355,7 +1474,7 @@ export default function MissionHub({
       if (timerRef.current) clearInterval(timerRef.current)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [logTimerActive, timeRemaining, storageKey, currentMode, selectedTx, userId, unitId])
+  }, [logTimerActive, timeRemaining, storageKey, currentMode, selectedTx, userId, unitId, getTrackingDiagnostics])
 
   // ─── Data Log: Claim reward ───
   const handleClaimLogReward = async () => {
@@ -1379,6 +1498,10 @@ export default function MissionHub({
     if (!selectedTx || !userId) return
 
     const now = Date.now()
+    videoTrackingStatusRef.current = {
+      ...videoTrackingStatusRef.current,
+      lastTimeUpdateAt: now
+    }
 
     const lastPollTime = lastPollTimeRef.current || now
     lastPollTimeRef.current = now
@@ -1397,9 +1520,36 @@ export default function MissionHub({
     const videoDelta = hasPreviousVideoTime ? currentTime - previousVideoTime : 0
     const isForwardPlayback = videoDelta > 0
     const isScrubbing = hasPreviousVideoTime && Math.abs(expectedVideoElapsed - videoDelta) > 2
-    const activePlaybackDelta = isVideoPlayingRef.current && isForwardPlayback
+    const pageVisible = typeof document === 'undefined' || document.visibilityState === 'visible'
+    const inferredPlayback = pageVisible && isForwardPlayback && !isScrubbing && videoDelta <= Math.max(3, expectedVideoElapsed + 1)
+    const effectivePlaying = isVideoPlayingRef.current || inferredPlayback
+    const activePlaybackDelta = pageVisible && effectivePlaying && isForwardPlayback
       ? (isScrubbing ? Math.min(expectedVideoElapsed, 1) : videoDelta)
       : 0
+
+    if (inferredPlayback && !isVideoPlayingRef.current) {
+      videoTrackingStatusRef.current = {
+        ...videoTrackingStatusRef.current,
+        inferredPlayback: true,
+        lastForwardPlaybackAt: now
+      }
+      if (!inferredPlaybackLoggedRef.current) {
+        inferredPlaybackLoggedRef.current = true
+        logActivity('video_tracking_inferred_playback', {
+          transmissionId: selectedTx?.id || 'default',
+          transmissionTitle: selectedTx?.title || '',
+          videoId: selectedTx?.videoId || '',
+          currentTime: Math.floor(currentTime),
+          previousVideoTime: Math.floor(previousVideoTime),
+          ...getTrackingDiagnostics()
+        })
+      }
+    } else if (activePlaybackDelta > 0) {
+      videoTrackingStatusRef.current = {
+        ...videoTrackingStatusRef.current,
+        lastForwardPlaybackAt: now
+      }
+    }
 
     // Count actually played video seconds, even when the student rewatches an
     // already-covered section. Large seek jumps are excluded from this total.
@@ -1529,7 +1679,36 @@ export default function MissionHub({
       awardReward()
     }
     */
-  }, [selectedTx, userId, unitId, activeUnit?.title, learningProgress?.videoProgress, onNonQuizActivityComplete, showSilentToast, userDataRef])
+  }, [selectedTx, userId, unitId, activeUnit?.title, learningProgress?.videoProgress, onNonQuizActivityComplete, showSilentToast, userDataRef, logActivity, getTrackingDiagnostics])
+
+  useEffect(() => {
+    if (currentMode !== 'video' || !selectedTx) return undefined
+
+    const interval = setInterval(() => {
+      if (videoTrackingUnavailable || trackingStallLoggedRef.current) return
+
+      const status = videoTrackingStatusRef.current || {}
+      const hasStartedPosition = Math.floor(lastVideoTimeRef.current || 0) > 0
+      const hasMeaningfulProgress = stampCount > 3 || creditedWatchSeconds > 3
+      const sessionAgeMs = Date.now() - sessionStartTimeRef.current
+
+      if (status.apiReady && hasStartedPosition && !hasMeaningfulProgress && sessionAgeMs > 15000) {
+        trackingStallLoggedRef.current = true
+        setVideoTrackingWarning('영상 재생 추적이 멈춘 것 같습니다. 저장 전 진행률이 오르는지 확인해 주세요.')
+        logActivity('video_tracking_stalled', {
+          transmissionId: selectedTx?.id || 'default',
+          transmissionTitle: selectedTx?.title || '',
+          videoId: selectedTx?.videoId || '',
+          lastPosition: Math.floor(lastVideoTimeRef.current || 0),
+          stampCount,
+          creditedWatchSeconds,
+          ...getTrackingDiagnostics()
+        })
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [currentMode, selectedTx, videoTrackingUnavailable, stampCount, creditedWatchSeconds, logActivity, getTrackingDiagnostics])
 
   // ─── Time Attack Handlers ───
   const handleTimeAttackHit = useCallback(async () => {
@@ -1673,7 +1852,7 @@ export default function MissionHub({
       
       let isManualComplete = false
       // Remove 20% hurdle. If they reached the end or encountered an error but didn't complete, allow manual completion without bonus
-      if ((isAtEnd || videoError) && !videoCompleted) {
+      if ((isAtEnd || videoError || videoTrackingUnavailable) && !videoCompleted) {
          isManualComplete = true
       }
       
@@ -1689,6 +1868,7 @@ export default function MissionHub({
             todayTimeSpent: dailyTimeSpentRef.current,
             todayTimeSpentDate: dailyTimeSpentDateRef.current,
             transmissionTitle: selectedTx?.title || 'Main Video',
+            trackingDiagnostics: getTrackingDiagnostics(),
             updatedAt: serverTimestamp()
           }
         },
@@ -1769,7 +1949,8 @@ export default function MissionHub({
             totalTimeSpent: totalTimeSpentRef.current,
             todayTimeSpent: dailyTimeSpentRef.current,
             todayTimeSpentDate: dailyTimeSpentDateRef.current,
-            stampedSeconds: stamps
+            stampedSeconds: stamps,
+            trackingDiagnostics: getTrackingDiagnostics()
         };
         if (videoCompleted || isManualComplete) {
             updatedVideoProgress.completed = true;
@@ -2223,6 +2404,7 @@ export default function MissionHub({
                     end={selectedTx.end}
                     onTimeUpdate={handleVideoTimeUpdate}
                     onComplete={() => setIsAtEnd(true)}
+                    onTrackingStatus={handleVideoTrackingStatus}
                     onPlaybackStateChange={(state) => {
                       const playing = state === window.YT?.PlayerState?.PLAYING
                       isVideoPlayingRef.current = playing
@@ -2297,7 +2479,28 @@ export default function MissionHub({
              </div>
 
              {/* Bottom HUD Overlay */}
-             <div className="theater-hud bottom-hud" style={{ opacity: (isUiVisible || videoCompleted || isAtEnd) ? 1 : 0, flexDirection: 'column' }}>
+             <div className="theater-hud bottom-hud" style={{ opacity: (isUiVisible || videoCompleted || isAtEnd || videoTrackingWarning) ? 1 : 0, flexDirection: 'column' }}>
+               {videoTrackingWarning && (
+                 <div
+                   className="font-tech"
+                   style={{
+                     width: '100%',
+                     maxWidth: '720px',
+                     margin: '0 auto 0.65rem',
+                     padding: '0.65rem 0.85rem',
+                     border: '1px solid rgba(255, 184, 0, 0.45)',
+                     borderRadius: '8px',
+                     background: 'rgba(255, 184, 0, 0.14)',
+                     color: '#ffe6a3',
+                     fontSize: isMobile ? '0.78rem' : '0.86rem',
+                     lineHeight: 1.45,
+                     textAlign: 'center',
+                     boxShadow: '0 4px 15px rgba(0,0,0,0.35)'
+                   }}
+                 >
+                   {videoTrackingWarning}
+                 </div>
+               )}
                <div style={{ display: 'flex', gap: isMobile ? '0.65rem' : '1rem', justifyContent: 'center', width: '100%', flexDirection: isMobile ? 'column' : 'row' }}>
                  <button 
                    onClick={handleSaveVideoPosition}
@@ -2305,9 +2508,9 @@ export default function MissionHub({
                    style={{ 
                      padding: isMobile ? '0.85rem 1rem' : '0.8rem 2.5rem', 
                      fontSize: isMobile ? '0.9rem' : '1rem',
-                     borderColor: videoCompleted ? 'var(--planet-green)' : ((isAtEnd || videoError) ? 'var(--alert-red)' : undefined),
-                     background: videoCompleted ? 'rgba(0, 255, 136, 0.2)' : ((isAtEnd || videoError) ? 'rgba(255, 77, 77, 0.2)' : 'rgba(0,0,0,0.5)'),
-                     color: (isAtEnd || videoError) && !videoCompleted ? '#ffb3b3' : 'white',
+                     borderColor: videoCompleted ? 'var(--planet-green)' : ((isAtEnd || videoError || videoTrackingUnavailable) ? 'var(--alert-red)' : undefined),
+                     background: videoCompleted ? 'rgba(0, 255, 136, 0.2)' : ((isAtEnd || videoError || videoTrackingUnavailable) ? 'rgba(255, 77, 77, 0.2)' : 'rgba(0,0,0,0.5)'),
+                     color: (isAtEnd || videoError || videoTrackingUnavailable) && !videoCompleted ? '#ffb3b3' : 'white',
                      boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
                    }}
                  >
@@ -2321,7 +2524,7 @@ export default function MissionHub({
                           <>☑️ 수신 지연! (완료 보너스 소멸) · 돌아가기</>
                         )
                      )
-                   ) : (isAtEnd || videoError) ? (
+                   ) : (isAtEnd || videoError || videoTrackingUnavailable) ? (
                        <>☑️ 수동 완료 처리 (외부 시청 완료)</>
                    ) : (
                      <>📋 오늘은 여기까지</>
