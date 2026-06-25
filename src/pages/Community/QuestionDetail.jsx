@@ -7,7 +7,7 @@ import 'katex/dist/katex.min.css';
 import { db } from '../../firebase';
 import { updateDoc, doc } from 'firebase/firestore';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
-import { buildAnswerProfileSnapshot, getAnonymousLabel, getProfileFrame } from '../../utils/socialUtils';
+import { AGORA_BOUNTY_OPTIONS, buildAnswerProfileSnapshot, getAnonymousLabel, getProfileFrame } from '../../utils/socialUtils';
 import { useAuth } from '../../hooks/useAuth';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
@@ -77,6 +77,7 @@ export default function QuestionDetail() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
+  const [editBounty, setEditBounty] = useState(0);
   const [isCooldown, setIsCooldown] = useState(false);
   const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
   const [activeReplyAnswerId, setActiveReplyAnswerId] = useState(null);
@@ -230,15 +231,35 @@ export default function QuestionDetail() {
     }
   };
 
+  const isBountyFinalized =
+    question?.bountyStatus === 'awarded' ||
+    question?.bountyStatus === 'forfeited' ||
+    Boolean(question?.acceptedAnswerId);
+
   const handleStartEdit = () => {
     setEditContent(question.content);
+    setEditBounty(question.bountyAmount || 0);
     setIsEditing(true);
   };
 
   const handleSaveEdit = async () => {
     if (!editContent.trim()) return;
-    await updateQuestion.mutateAsync({ questionId, content: editContent });
-    setIsEditing(false);
+    try {
+      await updateQuestion.mutateAsync({
+        questionId,
+        content: editContent,
+        bountyAmount: isBountyFinalized ? undefined : editBounty
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to update question:', err);
+      const message = err?.message === 'BOUNTY_FINALIZED'
+        ? '이미 답변이 채택되어 현상금을 변경할 수 없어요.'
+        : err?.message === 'INSUFFICIENT_BOUNTY'
+          ? '광석이 부족하여 현상금을 변경할 수 없어요.'
+          : '질문 수정 중 오류가 발생했습니다. 다시 시도해주세요.';
+      alert(message);
+    }
   };
 
   const questionAuthorLabel = question?.isPublic === false
@@ -387,17 +408,38 @@ export default function QuestionDetail() {
 
               {isEditing ? (
                 <div className="edit-question-box">
-                  <textarea 
+                  <textarea
                     className="edit-textarea glass"
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                   />
+                  <div className={`bounty-section ${isBountyFinalized ? 'bounty-section-disabled' : ''}`}>
+                    <div className="section-label font-tech">현상금 질문 설정</div>
+                    <p className="bounty-copy">
+                      {isBountyFinalized
+                        ? '이미 답변이 채택되어 현상금을 변경할 수 없어요.'
+                        : '현상금을 변경하면 보유 광석에서 차액이 자동으로 정산됩니다.'}
+                    </p>
+                    <div className="bounty-options">
+                      {AGORA_BOUNTY_OPTIONS.map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          className={`bounty-chip ${editBounty === amount ? 'active' : ''}`}
+                          onClick={() => setEditBounty(amount)}
+                          disabled={isBountyFinalized || updateQuestion.isPending}
+                        >
+                          {amount === 0 ? '현상금 없음' : `${amount} 광석`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="edit-actions">
                     <button className="cancel-btn glass" onClick={() => setIsEditing(false)}>
                       <X size={16} /> 취소
                     </button>
-                    <button className="save-btn glass" onClick={handleSaveEdit}>
-                      <Save size={16} /> 저장
+                    <button className="save-btn glass" onClick={handleSaveEdit} disabled={updateQuestion.isPending}>
+                      <Save size={16} /> {updateQuestion.isPending ? '저장 중...' : '저장'}
                     </button>
                   </div>
                 </div>

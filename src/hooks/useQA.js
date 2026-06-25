@@ -517,12 +517,72 @@ export function useQAMutations() {
       }
     }),
 
-    // Update Question
+    // Update Question (content + optional bounty adjustment)
     updateQuestion: useMutation({
-      mutationFn: async ({ questionId, content }) => {
-        await updateDoc(doc(db, 'questions', questionId), {
-          content,
-          updatedAt: serverTimestamp()
+      mutationFn: async ({ questionId, content, bountyAmount }) => {
+        const user = auth.currentUser;
+        if (!user) throw new Error('로그인이 필요합니다.');
+
+        // Bounty field omitted → legacy content-only update (no balance impact)
+        if (bountyAmount === undefined) {
+          await updateDoc(doc(db, 'questions', questionId), {
+            content,
+            updatedAt: serverTimestamp()
+          });
+          return;
+        }
+
+        const nextBounty = Math.max(0, Number(bountyAmount) || 0);
+
+        await runTransaction(db, async (transaction) => {
+          const questionRef = doc(db, 'questions', questionId);
+          const userRef = doc(db, 'users', user.uid);
+          const questionSnap = await transaction.get(questionRef);
+          const userSnap = await transaction.get(userRef);
+
+          if (!questionSnap.exists()) throw new Error('질문을 찾을 수 없습니다.');
+
+          const questionData = questionSnap.data();
+          if (questionData.userId !== user.uid) throw new Error('질문 작성자만 수정할 수 있습니다.');
+
+          // Already awarded/forfeited bounties are finalized and cannot be changed
+          const isBountyFinalized =
+            questionData.bountyStatus === 'awarded' ||
+            questionData.bountyStatus === 'forfeited' ||
+            Boolean(questionData.acceptedAnswerId);
+          if (isBountyFinalized) throw new Error('BOUNTY_FINALIZED');
+
+          const lockedBounty = getLockedBountyAmount(questionData);
+          const delta = nextBounty - lockedBounty;
+
+          const questionUpdate = {
+            content,
+            bountyAmount: nextBounty,
+            bountyStatus: nextBounty > 0 ? 'locked' : 'none',
+            bountyLockedAt: nextBounty > 0 ? serverTimestamp() : null,
+            updatedAt: serverTimestamp()
+          };
+          transaction.set(questionRef, questionUpdate, { merge: true });
+
+          if (delta === 0) return;
+
+          const userData = userSnap.exists() ? userSnap.data() : {};
+          const currentCrystals = userData?.crystals || 0;
+
+          if (delta > 0 && delta > currentCrystals) {
+            throw new Error('INSUFFICIENT_BOUNTY');
+          }
+
+          transaction.set(userRef, {
+            crystals: currentCrystals - delta
+          }, { merge: true });
+
+          recordCrystalTransaction(user.uid, {
+            amount: -delta,
+            type: delta > 0 ? 'agora_bounty_lock' : 'agora_bounty_refund',
+            description: delta > 0 ? '현상금 질문 수정 (추가 잠금)' : '현상금 질문 수정 (잔액 환불)',
+            metadata: { questionId, bountyAmount: nextBounty, delta }
+          }, transaction, `agora-bounty-update-${questionId}`);
         });
       },
       onSuccess: (_, variables) => {

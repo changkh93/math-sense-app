@@ -231,6 +231,65 @@
   gap: 1rem;
 }
 
+.bounty-section {
+  padding: 1rem;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(0, 243, 255, 0.15);
+}
+
+.bounty-section .section-label {
+  color: var(--text-bright);
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.bounty-copy {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.bounty-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.bounty-chip {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-bright);
+  border-radius: 999px;
+  padding: 0.55rem 0.95rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bounty-chip:hover:not(:disabled) {
+  border-color: rgba(0, 243, 255, 0.48);
+}
+
+.bounty-chip.active {
+  border-color: rgba(0, 243, 255, 0.48);
+  background: rgba(0, 243, 255, 0.15);
+  color: var(--crystal-cyan);
+  box-shadow: 0 0 16px rgba(0, 243, 255, 0.16);
+}
+
+.bounty-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bounty-section-disabled {
+  opacity: 0.7;
+}
+
 .edit-textarea {
   width: 100%;
   min-height: 120px;
