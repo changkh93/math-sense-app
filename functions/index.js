@@ -1526,7 +1526,10 @@ function buildCrewSnapshot(crewId, crewData, memberSummaries = [], greetings = [
     leaderName: crewData.leaderName || '',
     activeStudyRoomId: crewData.activeStudyRoomId || '',
     activeStudyRoomStatus: crewData.activeStudyRoomStatus || '',
-    studyRoomCapacity: crewData.studyRoomCapacity || 3,
+    studyRoomCapacity: crewData.studyRoomCapacity || 0,
+    googleMeetUrl: crewData.googleMeetUrl || '',
+    googleMeetUpdatedAt: crewData.googleMeetUpdatedAt || null,
+    googleMeetUpdatedBy: crewData.googleMeetUpdatedBy || '',
     memberCount: crewData.memberCount || memberSummaries.length || 0,
     memberIds: crewData.memberIds || memberSummaries.map((m) => m.uid),
     members: memberSummaries,
@@ -2210,7 +2213,7 @@ const OPEN_STUDY_POOLS = {
     title: "기초 탐험반",
     description: "기초 개념을 함께 다지는 저학년 오픈 스터디",
     color: "#38bdf8",
-    maxParticipants: 3,
+    maxParticipants: 100,
     allowAutoExpand: true,
   },
   elem_5: {
@@ -2219,7 +2222,7 @@ const OPEN_STUDY_POOLS = {
     title: "초5 도약반",
     description: "분수, 도형, 문장제를 같이 밀어 올리는 방",
     color: "#34d399",
-    maxParticipants: 3,
+    maxParticipants: 100,
     allowAutoExpand: true,
   },
   elem_6: {
@@ -2228,7 +2231,7 @@ const OPEN_STUDY_POOLS = {
     title: "초6 전환반",
     description: "중등 수학으로 넘어가기 전 마지막 점검",
     color: "#fbbf24",
-    maxParticipants: 3,
+    maxParticipants: 100,
     allowAutoExpand: true,
   },
   mid_1: {
@@ -2237,7 +2240,7 @@ const OPEN_STUDY_POOLS = {
     title: "중1 개척반",
     description: "문자와 식, 함수 감각을 함께 잡는 방",
     color: "#f97316",
-    maxParticipants: 3,
+    maxParticipants: 100,
     allowAutoExpand: true,
   },
   mid_2_3: {
@@ -2246,7 +2249,7 @@ const OPEN_STUDY_POOLS = {
     title: "중등 심화반",
     description: "고난도 문제와 개념 연결을 같이 푸는 방",
     color: "#a78bfa",
-    maxParticipants: 3,
+    maxParticipants: 100,
     allowAutoExpand: true,
   },
   free: {
@@ -2255,7 +2258,7 @@ const OPEN_STUDY_POOLS = {
     title: "자유 합류반",
     description: "학년이 애매하거나 자유롭게 함께 공부하는 방",
     color: "#fb7185",
-    maxParticipants: 3,
+    maxParticipants: 100,
     allowAutoExpand: true,
   },
 };
@@ -2277,6 +2280,43 @@ function getOpenStudyPoolIdFromGrade(userData = {}) {
     if (number === 6) return "elem_6";
   }
   return "free";
+}
+
+function normalizeGoogleMeetUrl(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  let url;
+  try {
+    url = new URL(raw);
+  } catch (err) {
+    throw new functions.https.HttpsError("invalid-argument", "Google Meet 주소 형식이 올바르지 않습니다.");
+  }
+
+  if (url.protocol !== "https:") {
+    throw new functions.https.HttpsError("invalid-argument", "Google Meet 주소는 https 주소여야 합니다.");
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  const isGoogleMeet = hostname === "meet.google.com" || hostname.endsWith(".meet.google.com");
+  const isGoogleCalendarMeet = hostname === "calendar.google.com" && url.href.includes("meet.google.com");
+  if (!isGoogleMeet && !isGoogleCalendarMeet) {
+    throw new functions.https.HttpsError("invalid-argument", "meet.google.com 주소만 등록할 수 있습니다.");
+  }
+
+  return url.toString().slice(0, 500);
+}
+
+function buildOpenStudyPoolPayload(poolId, poolData = {}) {
+  const base = OPEN_STUDY_POOLS[poolId] || OPEN_STUDY_POOLS.free;
+  return {
+    ...base,
+    ...poolData,
+    id: poolId,
+    googleMeetUrl: poolData.googleMeetUrl || "",
+    googleMeetUpdatedAt: poolData.googleMeetUpdatedAt || null,
+    googleMeetUpdatedBy: poolData.googleMeetUpdatedBy || "",
+  };
 }
 
 function isActiveOpenStudyRoom(roomData = {}, nowMs = Date.now()) {
@@ -2302,11 +2342,11 @@ function getOpenStudyParticipantStaleMs(roomData = {}) {
 }
 
 async function getFreshOpenStudyParticipantState(tx, roomRef, roomData = {}, nowMs = Date.now()) {
-  const roomMax = Number(roomData.maxParticipants || OPEN_STUDY_POOLS[roomData.poolId]?.maxParticipants || 3);
+  const roomMax = Number(roomData.maxParticipants || OPEN_STUDY_POOLS[roomData.poolId]?.maxParticipants || 100);
   const participantIdsFromRoom = Array.isArray(roomData.participantIds)
     ? Array.from(new Set(roomData.participantIds.filter(Boolean)))
     : [];
-  const participantDocsSnap = await tx.get(roomRef.collection("participants").limit(Math.max(roomMax, participantIdsFromRoom.length, 3)));
+  const participantDocsSnap = await tx.get(roomRef.collection("participants").limit(Math.max(roomMax, participantIdsFromRoom.length, 100)));
   const participantIdsFromDocs = participantDocsSnap.docs.map((docSnap) => docSnap.id).filter(Boolean);
   const participantIds = Array.from(new Set([...participantIdsFromRoom, ...participantIdsFromDocs]));
   if (!participantIds.length) {
@@ -2389,7 +2429,7 @@ async function syncOpenStudyRoomParticipantsTransaction(tx, db, roomRef, roomDat
   }
 
   const nextStatus = activeIds.length >= 2 ? "live" : "waiting";
-  const maxParticipants = Number(roomData.maxParticipants || OPEN_STUDY_POOLS[poolId]?.maxParticipants || 3);
+  const maxParticipants = Number(roomData.maxParticipants || OPEN_STUDY_POOLS[poolId]?.maxParticipants || 100);
   const roomUpdate = {
     participantIds: activeIds,
     participantCount: activeIds.length,
@@ -2682,7 +2722,9 @@ async function syncCrewToMembers(crewId, crewData, greetings = []) {
       ...(!isRejected && isLeader ? { rejectedCrewId: "" } : {}),
     }, { merge: true });
   });
-  await batch.commit();
+  if (memberIds.length) {
+    await batch.commit();
+  }
 
   await Promise.all(memberIds.map(async (uid) => {
     const userSnap = await db.collection("users").doc(uid).get();
@@ -2786,7 +2828,10 @@ exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) =
     inviteCode,
     activeStudyRoomId: "",
     activeStudyRoomStatus: "",
-    studyRoomCapacity: 3,
+    studyRoomCapacity: 0,
+    googleMeetUrl: "",
+    googleMeetUpdatedAt: null,
+    googleMeetUpdatedBy: "",
     memberIds: [uid],
     memberCount: 1,
     createdAt,
@@ -2986,7 +3031,7 @@ exports.reviewStudyCrew = regionalFunctions.https.onCall(async (data, context) =
       rejectionReason: "",
       activeStudyRoomId: crewData.activeStudyRoomId || "",
       activeStudyRoomStatus: crewData.activeStudyRoomStatus || "",
-      studyRoomCapacity: crewData.studyRoomCapacity || 3,
+      studyRoomCapacity: crewData.studyRoomCapacity || 0,
       approvedAt: new Date(),
       updatedAt: new Date(),
     };
@@ -2997,7 +3042,7 @@ exports.reviewStudyCrew = regionalFunctions.https.onCall(async (data, context) =
       rejectionReason: "",
       activeStudyRoomId: crewData.activeStudyRoomId || "",
       activeStudyRoomStatus: crewData.activeStudyRoomStatus || "",
-      studyRoomCapacity: crewData.studyRoomCapacity || 3,
+      studyRoomCapacity: crewData.studyRoomCapacity || 0,
       approvedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -3601,6 +3646,245 @@ exports.listStudyCrews = regionalFunctions.https.onCall(async (_data, context) =
 
   return {
     crews,
+  };
+});
+
+exports.listOpenStudyPoolsAdmin = regionalFunctions.https.onCall(async (_data, context) => {
+  await requireAdminUid(context);
+  const db = admin.firestore();
+  const poolIds = Object.keys(OPEN_STUDY_POOLS);
+  const poolSnaps = await Promise.all(poolIds.map((poolId) => db.collection("openStudyPools").doc(poolId).get()));
+  const pools = poolIds.map((poolId, index) => {
+    const data = poolSnaps[index].exists ? (poolSnaps[index].data() || {}) : {};
+    return buildOpenStudyPoolPayload(poolId, data);
+  });
+  return { pools };
+});
+
+exports.adminUpdateStudyCrewDetails = regionalFunctions.https.onCall(async (data, context) => {
+  await requireAdminUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const crewSnap = await crewRef.get();
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+
+  const crewData = crewSnap.data() || {};
+  const normalizedSchedule = normalizeCrewSchedule(
+    data?.scheduleDays ?? crewData.scheduleDays,
+    data?.scheduleTimes ?? crewData.scheduleTimes,
+  );
+  const now = new Date();
+  const updatedCrew = {
+    ...crewData,
+    name: String(data?.name ?? crewData.name ?? "").trim().slice(0, 28),
+    motto: String(data?.motto ?? crewData.motto ?? "").trim().slice(0, 52),
+    description: String(data?.description ?? crewData.description ?? "").trim().slice(0, 500),
+    color: String(data?.color ?? crewData.color ?? "#00d4ff").trim().slice(0, 30) || "#00d4ff",
+    groupId: String(data?.groupId ?? crewData.groupId ?? "none").trim().slice(0, 80) || "none",
+    groupName: String(data?.groupName ?? crewData.groupName ?? "자유 스터디").trim().slice(0, 80) || "자유 스터디",
+    clusterId: String(data?.clusterId ?? crewData.clusterId ?? "").trim().slice(0, 120),
+    clusterName: String(data?.clusterName ?? crewData.clusterName ?? "").trim().slice(0, 120),
+    ...normalizedSchedule,
+    updatedAt: now,
+  };
+
+  if (!updatedCrew.name) {
+    throw new functions.https.HttpsError("invalid-argument", "크루 이름을 입력해주세요.");
+  }
+
+  await crewRef.set(updatedCrew, { merge: true });
+  await syncCrewToMembers(crewId, {
+    ...updatedCrew,
+    updatedAt: now.toISOString(),
+  });
+  return { success: true };
+});
+
+exports.adminUpdateStudyCrewMeetUrl = regionalFunctions.https.onCall(async (data, context) => {
+  const adminUid = await requireAdminUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+  const googleMeetUrl = normalizeGoogleMeetUrl(data?.googleMeetUrl || "");
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const crewSnap = await crewRef.get();
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+
+  const now = new Date();
+  const updatedCrew = {
+    ...(crewSnap.data() || {}),
+    googleMeetUrl,
+    googleMeetUpdatedAt: now,
+    googleMeetUpdatedBy: adminUid,
+    updatedAt: now,
+  };
+
+  await crewRef.set(updatedCrew, { merge: true });
+  await syncCrewToMembers(crewId, {
+    ...updatedCrew,
+    googleMeetUpdatedAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+  });
+  return { success: true, googleMeetUrl };
+});
+
+exports.adminUpdateOpenStudyMeetUrl = regionalFunctions.https.onCall(async (data, context) => {
+  const adminUid = await requireAdminUid(context);
+  const poolId = String(data?.poolId || "").trim();
+  if (!OPEN_STUDY_POOLS[poolId]) {
+    throw new functions.https.HttpsError("invalid-argument", "오픈 스터디 구분이 올바르지 않습니다.");
+  }
+  const googleMeetUrl = normalizeGoogleMeetUrl(data?.googleMeetUrl || "");
+  const now = new Date();
+  await admin.firestore().collection("openStudyPools").doc(poolId).set({
+    ...OPEN_STUDY_POOLS[poolId],
+    googleMeetUrl,
+    googleMeetUpdatedAt: now,
+    googleMeetUpdatedBy: adminUid,
+    updatedAt: now,
+  }, { merge: true });
+  return { success: true, pool: buildOpenStudyPoolPayload(poolId, { googleMeetUrl, googleMeetUpdatedAt: now, googleMeetUpdatedBy: adminUid }) };
+});
+
+exports.adminRemoveStudyCrewMember = regionalFunctions.https.onCall(async (data, context) => {
+  await requireAdminUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  const targetUid = String(data?.targetUid || "").trim();
+  if (!crewId || !targetUid) {
+    throw new functions.https.HttpsError("invalid-argument", "크루와 탈퇴시킬 멤버를 선택해주세요.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const targetUserRef = db.collection("users").doc(targetUid);
+  let nextCrewData = null;
+
+  await db.runTransaction(async (tx) => {
+    const [crewSnap, targetUserSnap] = await Promise.all([
+      tx.get(crewRef),
+      tx.get(targetUserRef),
+    ]);
+    if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+
+    const crewData = crewSnap.data() || {};
+    const memberIds = getCrewMemberIds(crewData);
+    if (!memberIds.includes(targetUid)) {
+      throw new functions.https.HttpsError("failed-precondition", "해당 이용자는 이 크루 멤버가 아닙니다.");
+    }
+
+    const remainingMemberIds = memberIds.filter((uid) => uid !== targetUid);
+    const targetWasLeader = crewData.leaderId === targetUid;
+    const now = new Date();
+    let nextLeaderId = crewData.leaderId || "";
+    let nextLeaderName = crewData.leaderName || "";
+    let nextStatus = crewData.status || "pending";
+
+    if (targetWasLeader) {
+      nextLeaderId = remainingMemberIds[0] || "";
+      if (nextLeaderId) {
+        const nextLeaderSnap = await tx.get(db.collection("users").doc(nextLeaderId));
+        nextLeaderName = nextLeaderSnap.exists ? getDisplayNameFromUser(nextLeaderSnap.data() || {}) : "";
+      } else {
+        nextLeaderName = "";
+        nextStatus = "archived";
+      }
+    }
+
+    nextCrewData = {
+      ...crewData,
+      leaderId: nextLeaderId,
+      leaderName: nextLeaderName,
+      memberIds: remainingMemberIds,
+      memberCount: remainingMemberIds.length,
+      status: nextStatus,
+      updatedAt: now,
+    };
+
+    tx.set(crewRef, nextCrewData, { merge: true });
+    if (!targetUserSnap.exists || (targetUserSnap.data() || {}).crewId === crewId) {
+      tx.set(targetUserRef, {
+        ...buildClearedCrewUserFields(),
+        updatedAt: now,
+      }, { merge: true });
+    }
+  });
+
+  await syncCrewToMembers(crewId, {
+    ...nextCrewData,
+    updatedAt: new Date().toISOString(),
+  });
+  return { success: true };
+});
+
+exports.enterStudyCrewMeet = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+
+  const db = admin.firestore();
+  const [userSnap, crewSnap] = await Promise.all([
+    db.collection("users").doc(uid).get(),
+    db.collection("crews").doc(crewId).get(),
+  ]);
+  if (!userSnap.exists) throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+
+  const userData = userSnap.data() || {};
+  const crewData = crewSnap.data() || {};
+  const isAdminUser = userData.role === "admin";
+  const isMember = userData.crewId === crewId || getCrewMemberIds(crewData).includes(uid);
+  if (!isAdminUser && !isMember) {
+    throw new functions.https.HttpsError("permission-denied", "같은 크루 멤버만 입장할 수 있습니다.");
+  }
+  if ((crewData.status || "pending") !== "approved") {
+    throw new functions.https.HttpsError("failed-precondition", "승인된 크루만 입장할 수 있습니다.");
+  }
+  const googleMeetUrl = String(crewData.googleMeetUrl || "").trim();
+  if (!googleMeetUrl) {
+    throw new functions.https.HttpsError("failed-precondition", "운영자가 Google Meet 주소를 준비 중입니다.");
+  }
+  return {
+    success: true,
+    googleMeetUrl,
+    crew: {
+      id: crewSnap.id,
+      name: crewData.name || "스터디 크루",
+    },
+  };
+});
+
+exports.enterOpenStudyMeet = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const requestedPoolId = String(data?.poolId || "").trim();
+  if (!OPEN_STUDY_POOLS[requestedPoolId]) {
+    throw new functions.https.HttpsError("invalid-argument", "오픈 스터디 구분이 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const userSnap = await db.collection("users").doc(uid).get();
+  if (!userSnap.exists) throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+
+  const userData = userSnap.data() || {};
+  const recommendedPoolId = getOpenStudyPoolIdFromGrade(userData);
+  const isAdminUser = userData.role === "admin";
+  if (!isAdminUser && requestedPoolId !== "free" && requestedPoolId !== recommendedPoolId) {
+    throw new functions.https.HttpsError("failed-precondition", "내 학년에 맞는 오픈 스터디만 참여할 수 있습니다.");
+  }
+
+  const poolSnap = await db.collection("openStudyPools").doc(requestedPoolId).get();
+  const pool = buildOpenStudyPoolPayload(requestedPoolId, poolSnap.exists ? (poolSnap.data() || {}) : {});
+  const googleMeetUrl = String(pool.googleMeetUrl || "").trim();
+  if (!googleMeetUrl) {
+    throw new functions.https.HttpsError("failed-precondition", "운영자가 Google Meet 주소를 준비 중입니다.");
+  }
+  return {
+    success: true,
+    googleMeetUrl,
+    pool,
   };
 });
 
@@ -4565,7 +4849,7 @@ exports.createStudyRoom = regionalFunctions.https.onCall(async (data, context) =
       hostName: displayName,
       status: "waiting",
       mode: "focus",
-      maxParticipants: 3,
+      maxParticipants: 100,
       durationMinutes,
       participantIds: [uid],
       participantCount: 1,
@@ -4596,7 +4880,7 @@ exports.createStudyRoom = regionalFunctions.https.onCall(async (data, context) =
     tx.set(crewRef, {
       activeStudyRoomId: roomRef.id,
       activeStudyRoomStatus: "waiting",
-      studyRoomCapacity: 3,
+      studyRoomCapacity: 0,
       updatedAt: now,
     }, { merge: true });
 
@@ -4649,7 +4933,7 @@ exports.joinStudyRoomSession = regionalFunctions.https.onCall(async (data, conte
     }
 
     const participantIds = Array.isArray(roomData.participantIds) ? roomData.participantIds : [];
-    const maxParticipants = Number(roomData.maxParticipants || 3);
+    const maxParticipants = Number(roomData.maxParticipants || 100);
     if (!participantIds.includes(uid) && participantIds.length >= maxParticipants) {
       throw new functions.https.HttpsError("failed-precondition", "이 집중방은 이미 가득 찼습니다.");
     }
@@ -4825,7 +5109,7 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
   }
 
   const poolConfig = OPEN_STUDY_POOLS[poolId];
-  const maxParticipants = Number(poolConfig.maxParticipants || 3);
+  const maxParticipants = Number(poolConfig.maxParticipants || 100);
   const roomQuerySnap = await db.collection("studyRooms")
     .where("roomType", "==", "openStudy")
     .limit(100)

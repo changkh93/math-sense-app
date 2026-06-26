@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { collection, documentId, getDocs, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AlertTriangle, CalendarDays, CheckCircle2, Crown, Edit3, RefreshCw, RotateCcw, Save, Sparkles, Trash2, Users, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, Crown, Edit3, ExternalLink, Link2, RefreshCw, RotateCcw, Save, Sparkles, Trash2, UserMinus, Users, X, XCircle } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { STUDY_CREW_DAILY_MISSIONS, STUDY_CREW_MISSION_MAX_LENGTH, getStudyCrewMissionForDate, getTodayStudyCrewMissionKey } from '../../components/Space/studyCrewMissionDefaults';
 
 function statusLabel(status) {
   if (status === 'approved') return '승인 완료';
   if (status === 'rejected') return '반려';
+  if (status === 'archived') return '보관됨';
   return '승인 대기';
 }
 
@@ -464,37 +465,66 @@ function DailyMissionManager() {
   );
 }
 
+function buildCrewEditDraft(crew = {}) {
+  return {
+    name: crew.name || '',
+    motto: crew.motto || '',
+    description: crew.description || '',
+    color: crew.color || '#00d4ff',
+    groupName: crew.groupName || crew.clusterName || '자유 스터디',
+  };
+}
+
+const fieldStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  borderRadius: 8,
+  border: '1px solid #334155',
+  background: '#0f172a',
+  color: '#fff',
+  padding: '0.68rem 0.75rem',
+  outline: 'none',
+};
+
 export default function CrewApproval() {
   const [crews, setCrews] = useState([]);
+  const [openPools, setOpenPools] = useState([]);
   const [busyId, setBusyId] = useState('');
-  const [filter, setFilter] = useState('pending');
+  const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [rejectTarget, setRejectTarget] = useState(null);
-  const [activeTab, setActiveTab] = useState('approval');
+  const [activeTab, setActiveTab] = useState('open');
+  const [meetDrafts, setMeetDrafts] = useState({});
+  const [editDrafts, setEditDrafts] = useState({});
+  const [message, setMessage] = useState('');
+
+  const refreshData = async () => {
+    setLoading(true);
+    setMessage('');
+    try {
+      const [crewResult, poolResult] = await Promise.all([
+        httpsCallable(functions, 'listStudyCrews')(),
+        httpsCallable(functions, 'listOpenStudyPoolsAdmin')(),
+      ]);
+      const hydratedCrews = await hydrateCrewProfiles(crewResult?.data?.crews || []);
+      setCrews(hydratedCrews);
+      setOpenPools(poolResult?.data?.pools || []);
+      setMeetDrafts({
+        ...Object.fromEntries(hydratedCrews.map(crew => [`crew:${crew.id}`, crew.googleMeetUrl || ''])),
+        ...Object.fromEntries((poolResult?.data?.pools || []).map(pool => [`pool:${pool.id}`, pool.googleMeetUrl || ''])),
+      });
+      setEditDrafts(Object.fromEntries(hydratedCrews.map(crew => [crew.id, buildCrewEditDraft(crew)])));
+    } catch (err) {
+      console.error('Failed to load study crew admin data:', err);
+      setMessage('스터디 크루 정보를 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadCrews() {
-      setLoading(true);
-      try {
-        const listStudyCrews = httpsCallable(functions, 'listStudyCrews');
-        const result = await listStudyCrews();
-        const hydratedCrews = await hydrateCrewProfiles(result?.data?.crews || []);
-        if (cancelled) return;
-        setCrews(hydratedCrews);
-      } catch (err) {
-        console.error('Failed to load crews:', err);
-        if (!cancelled) setCrews([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    loadCrews();
-    return () => {
-      cancelled = true;
-    };
+    refreshData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const visibleCrews = useMemo(() => {
@@ -502,19 +532,19 @@ export default function CrewApproval() {
     return crews.filter(crew => (crew.status || 'pending') === filter);
   }, [crews, filter]);
 
-  const refreshCrews = async () => {
-    const listStudyCrews = httpsCallable(functions, 'listStudyCrews');
-    const result = await listStudyCrews();
-    const hydratedCrews = await hydrateCrewProfiles(result?.data?.crews || []);
-    setCrews(hydratedCrews);
+  const setMeetDraft = (key, value) => {
+    setMeetDrafts(prev => ({ ...prev, [key]: value }));
+  };
+
+  const setCrewDraft = (crewId, patch) => {
+    setEditDrafts(prev => ({ ...prev, [crewId]: { ...(prev[crewId] || {}), ...patch } }));
   };
 
   const approveCrew = async (crew) => {
-    setBusyId(crew.id);
+    setBusyId(`approve:${crew.id}`);
     try {
-      const reviewStudyCrew = httpsCallable(functions, 'reviewStudyCrew');
-      await reviewStudyCrew({ crewId: crew.id, action: 'approve' });
-      await refreshCrews();
+      await httpsCallable(functions, 'reviewStudyCrew')({ crewId: crew.id, action: 'approve' });
+      await refreshData();
     } catch (err) {
       console.error('Failed to approve crew:', err);
       alert('크루 승인 처리에 실패했습니다.');
@@ -525,15 +555,83 @@ export default function CrewApproval() {
 
   const handleReject = async (reason) => {
     if (!rejectTarget || !reason) return;
-    setBusyId(rejectTarget.id);
+    setBusyId(`reject:${rejectTarget.id}`);
     try {
-      const reviewStudyCrew = httpsCallable(functions, 'reviewStudyCrew');
-      await reviewStudyCrew({ crewId: rejectTarget.id, action: 'reject', rejectionReason: reason });
+      await httpsCallable(functions, 'reviewStudyCrew')({ crewId: rejectTarget.id, action: 'reject', rejectionReason: reason });
       setRejectTarget(null);
-      await refreshCrews();
+      await refreshData();
     } catch (err) {
       console.error('Failed to reject crew:', err);
       alert('크루 반려 처리에 실패했습니다: ' + (err?.message || ''));
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const saveCrewDetails = async (crew) => {
+    const draft = editDrafts[crew.id] || buildCrewEditDraft(crew);
+    setBusyId(`details:${crew.id}`);
+    try {
+      await httpsCallable(functions, 'adminUpdateStudyCrewDetails')({
+        crewId: crew.id,
+        ...draft,
+      });
+      setMessage('크루 정보를 저장했습니다.');
+      await refreshData();
+    } catch (err) {
+      console.error('Failed to save crew details:', err);
+      alert(err?.message || '크루 정보 저장에 실패했습니다.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const saveCrewMeet = async (crew) => {
+    setBusyId(`meet:${crew.id}`);
+    try {
+      await httpsCallable(functions, 'adminUpdateStudyCrewMeetUrl')({
+        crewId: crew.id,
+        googleMeetUrl: meetDrafts[`crew:${crew.id}`] || '',
+      });
+      setMessage('Google Meet 주소를 저장했습니다.');
+      await refreshData();
+    } catch (err) {
+      console.error('Failed to save crew meet url:', err);
+      alert(err?.message || 'Google Meet 주소 저장에 실패했습니다.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const saveOpenMeet = async (pool) => {
+    setBusyId(`pool:${pool.id}`);
+    try {
+      await httpsCallable(functions, 'adminUpdateOpenStudyMeetUrl')({
+        poolId: pool.id,
+        googleMeetUrl: meetDrafts[`pool:${pool.id}`] || '',
+      });
+      setMessage('학년별 오픈 스터디 Meet 주소를 저장했습니다.');
+      await refreshData();
+    } catch (err) {
+      console.error('Failed to save open study meet url:', err);
+      alert(err?.message || 'Google Meet 주소 저장에 실패했습니다.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const removeCrewMember = async (crew, member) => {
+    const isLeader = member.uid === crew.leaderId || member.crewRole === 'leader';
+    const confirmed = window.confirm(`${getMemberName(member)}님을 "${crew.name}" 크루에서 탈퇴 처리할까요?${isLeader ? '\n리더를 탈퇴시키면 남은 멤버 중 한 명이 자동으로 리더가 됩니다.' : ''}`);
+    if (!confirmed) return;
+    setBusyId(`remove:${crew.id}:${member.uid}`);
+    try {
+      await httpsCallable(functions, 'adminRemoveStudyCrewMember')({ crewId: crew.id, targetUid: member.uid });
+      setMessage('멤버를 탈퇴 처리했습니다.');
+      await refreshData();
+    } catch (err) {
+      console.error('Failed to remove crew member:', err);
+      alert(err?.message || '멤버 탈퇴 처리에 실패했습니다.');
     } finally {
       setBusyId('');
     }
@@ -545,176 +643,208 @@ export default function CrewApproval() {
         <div>
           <h1 style={{ margin: 0 }}>스터디 크루 관리</h1>
           <p style={{ margin: '0.45rem 0 0', color: '#94a3b8' }}>
-            크루 승인과 전체 스터디 크루에 적용되는 오늘의 미션을 관리합니다.
+            학년별 오픈 스터디와 이용자 생성 크루의 Google Meet 주소, 멤버, 운영 정보를 관리합니다.
           </p>
         </div>
-        {activeTab === 'approval' && (
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: 8, padding: '0.7rem 0.85rem' }}
-          >
-            <option value="pending">승인 대기</option>
-            <option value="approved">승인 완료</option>
-            <option value="rejected">반려</option>
-            <option value="all">전체</option>
-          </select>
-        )}
+        <button type="button" className="admin-btn secondary" onClick={refreshData} disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+          <RefreshCw size={15} /> 새로고침
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
-        <button
-          type="button"
-          className={`admin-btn ${activeTab === 'approval' ? 'primary' : 'secondary'}`}
-          onClick={() => setActiveTab('approval')}
-        >
-          크루 승인
-        </button>
-        <button
-          type="button"
-          className={`admin-btn ${activeTab === 'missions' ? 'primary' : 'secondary'}`}
-          onClick={() => setActiveTab('missions')}
-        >
-          오늘의 미션
-        </button>
+        {[
+          ['open', '학년별 오픈 스터디 크루'],
+          ['user', '이용자 생성 스터디 크루'],
+          ['missions', '오늘의 미션'],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`admin-btn ${activeTab === key ? 'primary' : 'secondary'}`}
+            onClick={() => setActiveTab(key)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+
+      {message && (
+        <div style={{ marginBottom: '1rem', padding: '0.8rem 1rem', borderRadius: 10, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', color: '#bbf7d0' }}>
+          {message}
+        </div>
+      )}
 
       {activeTab === 'missions' ? (
         <DailyMissionManager />
+      ) : activeTab === 'open' ? (
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          <div className="admin-card" style={{ padding: '1rem', color: '#94a3b8', lineHeight: 1.55 }}>
+            이용자 프로필의 학년 정보로 진입 가능 여부를 확인합니다. 자유학년은 예외적으로 누구나 입장할 수 있습니다.
+          </div>
+          {loading && <div className="admin-card" style={{ padding: '1.2rem', color: '#94a3b8' }}>오픈 스터디 정보를 불러오는 중...</div>}
+          {!loading && openPools.map(pool => (
+            <section key={pool.id} className="admin-card" style={{ padding: '1.2rem', borderRadius: 12, background: 'rgba(15,23,42,0.78)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ color: pool.color || '#38bdf8', fontSize: '0.82rem', fontWeight: 800 }}>{pool.label}</div>
+                  <h2 style={{ margin: '0.25rem 0 0', fontSize: '1.25rem' }}>{pool.title}</h2>
+                  <p style={{ margin: '0.45rem 0 0', color: '#94a3b8', lineHeight: 1.5 }}>{pool.description}</p>
+                </div>
+                {pool.googleMeetUrl && (
+                  <a href={pool.googleMeetUrl} target="_blank" rel="noreferrer" className="admin-btn secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', textDecoration: 'none' }}>
+                    <ExternalLink size={15} /> 열기
+                  </a>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.7rem', marginTop: '1rem', alignItems: 'center' }}>
+                <label style={{ display: 'grid', gap: '0.35rem' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>Google Meet 주소</span>
+                  <input
+                    value={meetDrafts[`pool:${pool.id}`] || ''}
+                    onChange={(e) => setMeetDraft(`pool:${pool.id}`, e.target.value)}
+                    placeholder="https://meet.google.com/..."
+                    style={fieldStyle}
+                  />
+                </label>
+                <button type="button" className="admin-btn primary" onClick={() => saveOpenMeet(pool)} disabled={!!busyId} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', alignSelf: 'end' }}>
+                  <Save size={15} /> 저장
+                </button>
+              </div>
+            </section>
+          ))}
+        </div>
       ) : (
         <>
-          <div style={{ display: 'grid', gap: '1rem' }}>
-        {loading && (
-          <div className="admin-card" style={{ padding: '1.2rem', color: '#94a3b8' }}>
-            크루 정보를 불러오는 중...
-          </div>
-        )}
-
-        {!loading && visibleCrews.length === 0 && (
-          <div className="admin-card" style={{ padding: '1.2rem', color: '#94a3b8' }}>
-            표시할 크루가 없습니다.
-          </div>
-        )}
-
-        {visibleCrews.map(crew => {
-          const status = crew.status || 'pending';
-          const members = getCrewMembers(crew);
-          const memberCount = crew.memberCount || members.length || crew.memberIds?.length || 1;
-          return (
-            <div
-              key={crew.id}
-              className="admin-card"
-              style={{
-                padding: '1.2rem',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 12,
-                background: 'rgba(15, 23, 42, 0.78)'
-              }}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              style={{ background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: 8, padding: '0.7rem 0.85rem' }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                    <span style={{ width: 14, height: 14, borderRadius: 4, background: crew.color || '#00d4ff', display: 'inline-block' }} />
-                    <h2 style={{ margin: 0, fontSize: '1.25rem' }}>{crew.name}</h2>
-                    <span style={{ color: statusColor(status), fontWeight: 700 }}>{statusLabel(status)}</span>
-                  </div>
-                  <p style={{ margin: '0.55rem 0 0', color: '#cbd5e1' }}>{crew.motto || '모토 없음'}</p>
-                  <div style={{ marginTop: '0.7rem', color: '#94a3b8', fontSize: '0.9rem' }}>
-                    리더: {crew.leaderName || crew.leaderId || '-'} · 군집: {crew.groupName || crew.clusterName || '자유 스터디'} · 멤버 {memberCount}명 · 초대코드 {crew.inviteCode || '-'}
+              <option value="all">전체</option>
+              <option value="pending">승인 대기</option>
+              <option value="approved">승인 완료</option>
+              <option value="rejected">반려</option>
+              <option value="archived">보관됨</option>
+            </select>
+            <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>총 {visibleCrews.length}개</div>
+          </div>
+
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {loading && <div className="admin-card" style={{ padding: '1.2rem', color: '#94a3b8' }}>크루 정보를 불러오는 중...</div>}
+            {!loading && visibleCrews.length === 0 && <div className="admin-card" style={{ padding: '1.2rem', color: '#94a3b8' }}>표시할 크루가 없습니다.</div>}
+            {visibleCrews.map(crew => {
+              const status = crew.status || 'pending';
+              const members = getCrewMembers(crew);
+              const draft = editDrafts[crew.id] || buildCrewEditDraft(crew);
+              return (
+                <section key={crew.id} className="admin-card" style={{ padding: '1.2rem', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, background: 'rgba(15,23,42,0.78)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <span style={{ width: 14, height: 14, borderRadius: 4, background: crew.color || '#00d4ff', display: 'inline-block' }} />
+                        <h2 style={{ margin: 0, fontSize: '1.25rem' }}>{crew.name || '이름 없는 크루'}</h2>
+                        <span style={{ color: statusColor(status), fontWeight: 700 }}>{statusLabel(status)}</span>
+                      </div>
+                      <div style={{ marginTop: '0.6rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+                        리더: {crew.leaderName || crew.leaderId || '-'} · 멤버 {members.length}명 · 초대코드 {crew.inviteCode || '-'}
+                      </div>
+                    </div>
+                    {crew.googleMeetUrl && (
+                      <a href={crew.googleMeetUrl} target="_blank" rel="noreferrer" className="admin-btn secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', textDecoration: 'none', alignSelf: 'flex-start' }}>
+                        <ExternalLink size={15} /> Meet 열기
+                      </a>
+                    )}
                   </div>
 
-                  <div style={{ marginTop: '0.9rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))', gap: '0.8rem', marginTop: '1rem' }}>
+                    <label style={{ display: 'grid', gap: '0.35rem' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>크루 이름</span>
+                      <input value={draft.name} onChange={(e) => setCrewDraft(crew.id, { name: e.target.value })} style={fieldStyle} />
+                    </label>
+                    <label style={{ display: 'grid', gap: '0.35rem' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>모토</span>
+                      <input value={draft.motto} onChange={(e) => setCrewDraft(crew.id, { motto: e.target.value })} style={fieldStyle} />
+                    </label>
+                    <label style={{ display: 'grid', gap: '0.35rem' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>군집/분류</span>
+                      <input value={draft.groupName} onChange={(e) => setCrewDraft(crew.id, { groupName: e.target.value })} style={fieldStyle} />
+                    </label>
+                    <label style={{ display: 'grid', gap: '0.35rem' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>색상</span>
+                      <input value={draft.color} onChange={(e) => setCrewDraft(crew.id, { color: e.target.value })} style={fieldStyle} />
+                    </label>
+                  </div>
+                  <label style={{ display: 'grid', gap: '0.35rem', marginTop: '0.8rem' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>설명</span>
+                    <textarea value={draft.description} onChange={(e) => setCrewDraft(crew.id, { description: e.target.value })} rows={3} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} />
+                  </label>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.7rem', marginTop: '0.9rem', alignItems: 'center' }}>
+                    <label style={{ display: 'grid', gap: '0.35rem' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Link2 size={14} /> Google Meet 주소</span>
+                      <input value={meetDrafts[`crew:${crew.id}`] || ''} onChange={(e) => setMeetDraft(`crew:${crew.id}`, e.target.value)} placeholder="https://meet.google.com/..." style={fieldStyle} />
+                    </label>
+                    <button type="button" className="admin-btn primary" onClick={() => saveCrewMeet(crew)} disabled={!!busyId} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', alignSelf: 'end' }}>
+                      <Save size={15} /> 주소 저장
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                    <button type="button" className="admin-btn primary" onClick={() => saveCrewDetails(crew)} disabled={!!busyId || !draft.name.trim()} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Save size={15} /> 정보 저장
+                    </button>
+                    <button type="button" className="admin-btn secondary" onClick={() => approveCrew(crew)} disabled={!!busyId || status === 'approved'} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <CheckCircle2 size={15} /> 승인
+                    </button>
+                    <button type="button" className="admin-btn danger" onClick={() => setRejectTarget(crew)} disabled={!!busyId} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <XCircle size={15} /> 반려
+                    </button>
+                  </div>
+
+                  {status === 'rejected' && crew.rejectionReason && (
+                    <div style={{ marginTop: '0.8rem', padding: '0.7rem 0.9rem', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <div style={{ color: '#fca5a5', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.2rem' }}>반려 사유</div>
+                      <div style={{ color: '#fecaca', fontSize: '0.9rem', lineHeight: 1.5 }}>{crew.rejectionReason}</div>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: '1.1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#e2e8f0', fontSize: '0.88rem', fontWeight: 700, marginBottom: '0.55rem' }}>
                       <Users size={16} /> 크루 멤버 전체
                     </div>
                     {members.length === 0 ? (
                       <div style={{ color: '#64748b', fontSize: '0.88rem' }}>멤버 정보가 없습니다.</div>
                     ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '0.5rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(250px, 100%), 1fr))', gap: '0.5rem' }}>
                         {members.map(member => {
                           const isLeader = member.uid === crew.leaderId || member.crewRole === 'leader';
                           return (
-                            <div
-                              key={member.uid}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.55rem',
-                                minWidth: 0,
-                                padding: '0.58rem 0.7rem',
-                                borderRadius: 8,
-                                background: 'rgba(15,23,42,0.72)',
-                                border: '1px solid rgba(148,163,184,0.18)',
-                              }}
-                            >
+                            <div key={member.uid} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0, padding: '0.58rem 0.7rem', borderRadius: 8, background: 'rgba(15,23,42,0.72)', border: '1px solid rgba(148,163,184,0.18)' }}>
                               {isLeader ? <Crown size={15} style={{ color: '#facc15', flex: '0 0 auto' }} /> : <Users size={15} style={{ color: '#38bdf8', flex: '0 0 auto' }} />}
-                              <div style={{ minWidth: 0 }}>
+                              <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   <span style={{ color: '#f8fafc', fontWeight: 700, overflowWrap: 'anywhere' }}>{getMemberName(member)}</span>
-                                  <span style={{ color: isLeader ? '#fde68a' : '#bae6fd', fontSize: '0.76rem', fontWeight: 700 }}>
-                                    {isLeader ? '리더' : '멤버'}
-                                  </span>
+                                  <span style={{ color: isLeader ? '#fde68a' : '#bae6fd', fontSize: '0.76rem', fontWeight: 700 }}>{isLeader ? '리더' : '멤버'}</span>
                                 </div>
-                                <div style={{ color: '#94a3b8', fontSize: '0.78rem', overflowWrap: 'anywhere' }}>
-                                  UID {member.uid}{member.email ? ` · ${member.email}` : ''}
-                                </div>
+                                <div style={{ color: '#94a3b8', fontSize: '0.78rem', overflowWrap: 'anywhere' }}>UID {member.uid}</div>
                               </div>
+                              <button type="button" title="멤버 탈퇴 처리" onClick={() => removeCrewMember(crew, member)} disabled={!!busyId} style={{ border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(69,10,10,0.5)', color: '#fecaca', borderRadius: 8, width: 34, height: 34, display: 'inline-grid', placeItems: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                                <UserMinus size={15} />
+                              </button>
                             </div>
                           );
                         })}
                       </div>
                     )}
                   </div>
-
-                  {/* Show rejection reason if rejected */}
-                  {status === 'rejected' && crew.rejectionReason && (
-                    <div style={{
-                      marginTop: '0.8rem', padding: '0.7rem 0.9rem', borderRadius: 8,
-                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)'
-                    }}>
-                      <div style={{ color: '#fca5a5', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.2rem' }}>반려 사유</div>
-                      <div style={{ color: '#fecaca', fontSize: '0.9rem', lineHeight: 1.5 }}>{crew.rejectionReason}</div>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ color: '#38bdf8', fontSize: '0.9rem' }}>
-                  Study Stream 정원 {crew.studyRoomCapacity || 3}명
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '0.7rem', alignItems: 'center', marginTop: '1rem' }}>
-                <button
-                  type="button"
-                  onClick={() => approveCrew(crew)}
-                  disabled={busyId === crew.id}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#14532d', color: '#dcfce7', border: '1px solid #22c55e55', borderRadius: 8, padding: '0.75rem 0.9rem', cursor: 'pointer' }}
-                >
-                  <CheckCircle2 size={17} /> 승인
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRejectTarget(crew)}
-                  disabled={busyId === crew.id}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#450a0a', color: '#fee2e2', border: '1px solid #ef444455', borderRadius: 8, padding: '0.75rem 0.9rem', cursor: 'pointer' }}
-                >
-                  <XCircle size={17} /> 반려
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Rejection reason modal */}
-      {rejectTarget && (
-        <RejectModal
-          crew={rejectTarget}
-          onConfirm={handleReject}
-          onCancel={() => setRejectTarget(null)}
-          busy={!!busyId}
-        />
-      )}
+                </section>
+              );
+            })}
+          </div>
+          {rejectTarget && (
+            <RejectModal crew={rejectTarget} onConfirm={handleReject} onCancel={() => setRejectTarget(null)} busy={!!busyId} />
+          )}
         </>
       )}
     </div>

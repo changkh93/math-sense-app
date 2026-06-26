@@ -2,15 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AlertTriangle, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Lock, Mail, Plus, Send, ShieldCheck, Sparkles, UserRound, Users, Video } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ChevronDown, Crown, Edit3, ExternalLink, Loader2, Mail, Plus, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
 import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
 import CrewDetailView from './CrewDetailView';
-import StudyStreamRoomView from './StudyStreamRoomView';
-import { useGlobalActiveRoomId } from '../../utils/roomState';
 import { formatCrewSchedule } from './crewSchedule';
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '활동 중' : s === 'rejected' ? '반려됨' : '승인 대기'; }
@@ -36,10 +34,10 @@ function getMemoErrorMessage(err) {
 }
 
 const FAQ_ITEMS = [
-  { q: '스터디 크루란 무엇인가요?', a: '스터디 크루는 최대 3명이 함께 공부하는 소규모 프리미엄 스터디 그룹입니다. 앱 안에서 바로 카메라 집중방을 열고, 서로의 학습을 응원할 수 있습니다.' },
+  { q: '스터디 크루란 무엇인가요?', a: '스터디 크루는 함께 공부할 멤버를 정하고 Google Meet에서 만나 학습 리듬을 유지하는 프리미엄 스터디 그룹입니다.' },
   { q: '창설권과 참여권의 차이는 무엇인가요?', a: '창설권(1,000광석)은 새 크루를 만들 때 필요하고, 참여권(300광석)은 다른 크루에 합류할 때 필요합니다. 두 가지 모두 스토어에서 구매할 수 있습니다.' },
-  { q: '집중방은 어떻게 사용하나요?', a: '크루가 운영자 승인을 받으면, 멤버 누구나 10분부터 120분까지 집중 시간을 정해 방을 열 수 있습니다. 다른 멤버들은 열린 방에 바로 입장하여 카메라를 켜고 함께 공부합니다.' },
-  { q: '최대 몇 명까지 참여할 수 있나요?', a: '현재 크루 당 최대 3명까지 참여할 수 있습니다. 소규모 집중 학습에 최적화된 구조입니다.' },
+  { q: '집중방은 어떻게 사용하나요?', a: '크루가 운영자 승인을 받고 Google Meet 주소가 준비되면 참여하기 버튼으로 바로 입장합니다.' },
+  { q: '몇 명까지 참여할 수 있나요?', a: '앱에서는 인원 제한을 두지 않습니다. 실제 입장 가능 인원은 등록된 Google Meet 정책을 따릅니다.' },
   { q: '크루 승인은 얼마나 걸리나요?', a: '운영자가 크루 이름과 모토를 확인한 후 승인합니다. 보통 1~2일 이내에 처리됩니다.' },
 ];
 
@@ -68,17 +66,6 @@ function normalizeOpenStudyPoolIdFromGrade(grade) {
     if (number === 6) return 'elem_6';
   }
   return 'free';
-}
-
-function isActiveStudyRoom(room) {
-  const status = room?.status || 'waiting';
-  if (status === 'ended') return false;
-  const timestamp = room?.startedAt || room?.createdAt || room?.lastActivityAt;
-  const baseMs = timestamp?.toMillis?.() || 0;
-  if (!baseMs) return true;
-  if (status === 'waiting') return Date.now() < baseMs + 5 * 60 * 1000;
-  const durationMs = (room?.durationMinutes || 50) * 60 * 1000;
-  return Date.now() < baseMs + durationMs + 10 * 60 * 1000;
 }
 
 function FounderLetterPanel({ crew, founderId, founderName, currentUid }) {
@@ -250,9 +237,8 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
   const isMyCreated = leaderId === userUid;
   const isMyJoined = !isMyCreated && crew.memberIds?.includes(userUid);
   const isMyCrew = crew.id === userCrewId;
-  const isFull = (crew.memberCount || crew.memberIds?.length || 0) >= (crew.maxMembers || 3);
   const isApproved = crew.status === 'approved';
-  const canJoin = isApproved && !isFull && !isMyCrew;
+  const canJoin = isApproved && !isMyCrew;
   const description = crew.description || crew.motto || '상세 설명 없음';
   const scheduleText = formatCrewSchedule(crew.scheduleDays || [], crew.scheduleTimes || {});
 
@@ -261,7 +247,6 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
   let badgeBg = '';
   if (isMyCreated) { badgeText = '내가 만든 크루'; badgeColor = '#fbbf24'; badgeBg = 'rgba(251,191,36,0.12)'; }
   else if (isMyJoined || isMyCrew) { badgeText = '참여 중'; badgeColor = 'var(--planet-green)'; badgeBg = 'rgba(16,185,129,0.12)'; }
-  else if (isFull) { badgeText = '정원 마감'; badgeColor = '#f87171'; badgeBg = 'rgba(248,113,113,0.1)'; }
   else if (!isApproved) { badgeText = getCrewStatusLabel(crew.status); badgeColor = getCrewStatusColor(crew.status); badgeBg = 'rgba(255,165,0,0.08)'; }
   else { badgeText = '참여 가능'; badgeColor = 'var(--crystal-cyan)'; badgeBg = 'rgba(0,243,255,0.08)'; }
 
@@ -348,7 +333,7 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap', marginTop: '0.7rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
           <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Users size={13} /> {crew.memberCount || crew.memberIds?.length || 1}/{crew.maxMembers || 3}명
+            <Users size={13} /> {crew.memberCount || crew.memberIds?.length || 1}명
           </div>
           <div className="font-tech" style={{
             color: 'var(--planet-green)',
@@ -369,18 +354,13 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
           {crew.groupName || '자유 스터디'}
         </div>
         {isMyCreated && <Crown size={14} style={{ color: '#fbbf24' }} />}
-        {isFull && !isMyCrew && <Lock size={13} style={{ color: '#f87171', opacity: 0.7 }} />}
         {canJoin && <Sparkles size={13} style={{ color: 'var(--crystal-cyan)' }} />}
       </div>
     </Motion.div>
   );
 }
 
-function OpenStudyCard({ pool, stats, recommended, disabled, joining, onJoin }) {
-  const activeRooms = stats?.rooms || 0;
-  const participants = stats?.participants || 0;
-  const availableSlots = stats?.slots || 0;
-
+function OpenStudyCard({ pool, recommended, disabled, joining, onJoin }) {
   return (
     <Motion.div
       whileHover={{ y: disabled ? 0 : -3 }}
@@ -431,13 +411,7 @@ function OpenStudyCard({ pool, stats, recommended, disabled, joining, onJoin }) 
       <div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
           <span className="font-tech" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '0.32rem' }}>
-            <Video size={13} /> 열린 방 {activeRooms}
-          </span>
-          <span className="font-tech" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '0.32rem' }}>
-            <Users size={13} /> 참여 {participants}명
-          </span>
-          <span className="font-tech" style={{ color: availableSlots > 0 ? 'var(--planet-green)' : 'rgba(255,255,255,0.52)', fontSize: '0.76rem' }}>
-            빈자리 {availableSlots}
+            <ExternalLink size={13} /> Google Meet 새 탭 입장
           </span>
         </div>
         <button
@@ -459,7 +433,7 @@ function OpenStudyCard({ pool, stats, recommended, disabled, joining, onJoin }) 
           }}
         >
           {joining ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
-          {joining ? '배정 중...' : recommended ? '내 학년으로 참여' : '참여하기'}
+          {joining ? '확인 중...' : recommended ? '내 학년으로 참여' : '참여하기'}
         </button>
       </div>
     </Motion.div>
@@ -469,7 +443,6 @@ function OpenStudyCard({ pool, stats, recommended, disabled, joining, onJoin }) 
 export default function StudyCrewView({ onNavigateStore }) {
   const { user, userData } = useAuth();
   const [directoryCrews, setDirectoryCrews] = useState([]);
-  const [openStudyRooms, setOpenStudyRooms] = useState([]);
   const [openStudyAction, setOpenStudyAction] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
   const [crewOnlineCounts, setCrewOnlineCounts] = useState({});
@@ -477,7 +450,6 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
   const [detailView, setDetailView] = useState(false);
-  const [activeRoomId, setActiveRoomId] = useGlobalActiveRoomId();
   const [openFaq, setOpenFaq] = useState(null);
   const [resubmitCrew, setResubmitCrew] = useState(null); // rejected crew data for resubmission
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
@@ -539,14 +511,6 @@ export default function StudyCrewView({ onNavigateStore }) {
   }, []);
 
   useEffect(() => {
-    const openRoomsQuery = query(collection(db, 'studyRooms'), where('roomType', '==', 'openStudy'));
-    const unsub = onSnapshot(openRoomsQuery, snap => {
-      setOpenStudyRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(isActiveStudyRoom));
-    }, err => console.error('Open study room directory error:', err));
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
     const unsub = onSnapshot(collection(db, 'users'), snap => {
       const nextCounts = {};
       const nextProfiles = {};
@@ -588,8 +552,8 @@ export default function StudyCrewView({ onNavigateStore }) {
       const bIsMember = b.memberIds?.includes(uid) ? 0 : 1;
       if (aIsMember !== bIsMember) return aIsMember - bIsMember;
 
-      const aCanJoin = a.status === 'approved' && (a.memberCount || a.memberIds?.length || 0) < (a.maxMembers || 3) ? 0 : 1;
-      const bCanJoin = b.status === 'approved' && (b.memberCount || b.memberIds?.length || 0) < (b.maxMembers || 3) ? 0 : 1;
+      const aCanJoin = a.status === 'approved' ? 0 : 1;
+      const bCanJoin = b.status === 'approved' ? 0 : 1;
       if (aCanJoin !== bCanJoin) return aCanJoin - bCanJoin;
 
       const aApproved = a.status === 'approved' ? 0 : 1;
@@ -605,38 +569,17 @@ export default function StudyCrewView({ onNavigateStore }) {
     [userData?.grade, userData?.schoolGrade, userData?.studentGrade]
   );
 
-  const openStudyStatsByPool = useMemo(() => {
-    const stats = {};
-    OPEN_STUDY_POOLS.forEach((pool) => {
-      stats[pool.id] = { rooms: 0, participants: 0, slots: 0 };
-    });
-
-    openStudyRooms.forEach((room) => {
-      const poolId = room.poolId || 'free';
-      const participantCount = Array.isArray(room.participantIds)
-        ? room.participantIds.length
-        : Number(room.participantCount || 0);
-      const maxParticipants = Number(room.maxParticipants || 3);
-      if (!stats[poolId]) stats[poolId] = { rooms: 0, participants: 0, slots: 0 };
-      stats[poolId].rooms += 1;
-      stats[poolId].participants += participantCount;
-      stats[poolId].slots += Math.max(0, maxParticipants - participantCount);
-    });
-
-    return stats;
-  }, [openStudyRooms]);
-
   const handleJoinOpenStudy = async (poolId) => {
     if (!user?.uid || openStudyAction) return;
     soundManager.playClick();
     setOpenStudyAction(poolId);
 
     try {
-      const joinOpenStudyRoom = httpsCallable(functions, 'joinOpenStudyRoom');
-      const res = await joinOpenStudyRoom({ poolId });
-      const roomId = res?.data?.roomId || '';
-      if (!roomId) throw new Error('오픈 스터디 방을 배정받지 못했습니다.');
-      setActiveRoomId(roomId);
+      const enterOpenStudyMeet = httpsCallable(functions, 'enterOpenStudyMeet');
+      const res = await enterOpenStudyMeet({ poolId });
+      const googleMeetUrl = res?.data?.googleMeetUrl || '';
+      if (!googleMeetUrl) throw new Error('Google Meet 주소가 아직 준비되지 않았습니다.');
+      window.open(googleMeetUrl, '_blank', 'noopener,noreferrer');
     } catch (err) {
       console.error('Failed to join open study room:', err);
       alert(err?.message || '오픈 스터디에 참여하지 못했습니다.');
@@ -653,11 +596,6 @@ export default function StudyCrewView({ onNavigateStore }) {
       setDetailView(true);
       return;
     }
-    const isFull = (crew.memberCount || crew.memberIds?.length || 0) >= (crew.maxMembers || 3);
-    if (isFull) {
-      alert('이 크루는 정원이 가득 찼습니다.');
-      return;
-    }
     if (crew.status !== 'approved') {
       alert('이 크루는 아직 운영자 승인 대기 중입니다.');
       return;
@@ -669,18 +607,11 @@ export default function StudyCrewView({ onNavigateStore }) {
     setJoinTarget(crew);
   };
 
-  // Note: activeRoomId rendering is now handled in SpaceHome.jsx 
-  // to maintain connection persistence across different menu tabs.
-  if (activeRoomId) {
-    return null;
-  }
-
   if (detailView && hasCrew) {
     return (
       <div className="fade-in">
         <CrewDetailView
           onBack={() => setDetailView(false)}
-          onEnterRoom={(roomId) => setActiveRoomId(roomId)}
           onNavigateStore={onNavigateStore}
         />
       </div>
@@ -698,7 +629,7 @@ export default function StudyCrewView({ onNavigateStore }) {
               STUDY CREW
             </h2>
             <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: isMobile ? '0.95rem' : '1.1rem', maxWidth: '600px', lineHeight: 1.6 }}>
-              함께 공부하는 프리미엄 스터디 네트워크. 크루를 만들고, 초대 코드로 친구를 모아 3인 집중방에서 집중하세요.
+              함께 공부하는 프리미엄 스터디 네트워크. 크루를 만들고, 초대 코드로 친구를 모아 Google Meet에서 집중하세요.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: isMobile ? '1.25rem' : '2rem', flexWrap: 'wrap' }}>
               <button
@@ -811,7 +742,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                   학년별 오픈 스터디
                 </h3>
                 <p className="font-tech" style={{ color: 'var(--text-muted)', margin: '0.45rem 0 0', fontSize: '0.9rem', lineHeight: 1.55 }}>
-                  고정 멤버 없이 바로 참여합니다. 비어 있는 방이 있으면 합류하고, 모두 가득 차면 새 방이 열립니다.
+                  프로필 학년에 맞는 오픈 스터디로 바로 참여합니다. 운영자가 등록한 Google Meet이 새 탭으로 열립니다.
                 </p>
               </div>
               <div className="font-tech" style={{
@@ -837,7 +768,6 @@ export default function StudyCrewView({ onNavigateStore }) {
                   <OpenStudyCard
                     key={pool.id}
                     pool={pool}
-                    stats={openStudyStatsByPool[pool.id]}
                     recommended={isRecommended}
                     disabled={disabled || !!openStudyAction}
                     joining={openStudyAction === pool.id}
@@ -896,8 +826,8 @@ export default function StudyCrewView({ onNavigateStore }) {
               <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0 0 1.5rem', fontSize: '1.5rem' }}>함께 공부하면 집중력이 달라집니다</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
                 {[
-                  { icon: '🎯', title: '소규모 집중', desc: '최대 3명의 작은 그룹으로 산만함 없이 깊은 집중을 유지합니다.' },
-                  { icon: '📹', title: '카메라 집중방', desc: '서로의 모습을 보며 공부하면 자연스럽게 집중 시간이 늘어납니다.' },
+                  { icon: '🎯', title: '함께 집중', desc: '크루 멤버와 같은 시간에 접속해 공부 리듬을 유지합니다.' },
+                  { icon: '📹', title: 'Google Meet 입장', desc: '운영자가 준비한 안정적인 화상 공간에서 바로 만납니다.' },
                   { icon: '🔥', title: '학습 동기부여', desc: '크루 멤버의 연속 학습일과 오늘의 학습 상태를 한눈에 확인합니다.' },
                 ].map(item => (
                   <div key={item.title} style={{ padding: '1.2rem', borderRadius: 14, background: 'rgba(0,243,255,0.04)', border: '1px solid rgba(0,243,255,0.08)' }}>

@@ -1688,7 +1688,7 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
               <Radio size={14} /> {room?.status === 'live' ? 'LIVE' : 'WAITING'}
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Users size={14} /> 현재 {participants.length}/{room?.maxParticipants || 3}명
+              <Users size={14} /> 현재 {participants.length}/{room?.maxParticipants || 100}명
             </span>
             <span>{formatRemainingLabel(room, nowMs)}</span>
             {!isOpenStudyRoom && crew?.inviteCode && (

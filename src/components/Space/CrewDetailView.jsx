@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
-import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ArrowLeft, CalendarDays, Camera, CameraOff, ChevronDown, Clock3, Crown, Loader2, LogOut, Radio, Send, StickyNote, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChevronDown, Crown, Loader2, LogOut, Send, StickyNote, Trash2, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
@@ -145,26 +145,20 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
   );
 }
 
-export default function CrewDetailView({ onBack, onEnterRoom }) {
+export default function CrewDetailView({ onBack }) {
   const { user, userData } = useAuth();
   const [roomAction, setRoomAction] = useState('');
   const [message, setMessage] = useState('');
   const [noteText, setNoteText] = useState('');
   const [pendingNotes, setPendingNotes] = useState([]);
   const [activeNoteAction, setActiveNoteAction] = useState('');
-  const [roomDuration, setRoomDuration] = useState(50);
-  const [crewRoom, setCrewRoom] = useState(null);
   const [crewDocData, setCrewDocData] = useState(null);
   const [liveNotes, setLiveNotes] = useState([]);
   const [memberProfiles, setMemberProfiles] = useState({});
-  const [previewStream, setPreviewStream] = useState(null);
-  const [previewCameraOn, setPreviewCameraOn] = useState(true);
-  const [previewError, setPreviewError] = useState('');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [leaveAction, setLeaveAction] = useState('');
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
   const [showCrewInfo, setShowCrewInfo] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true));
-  const previewStreamRef = useRef(null);
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
   const crewId = crew?.id || userData?.crewId || '';
@@ -182,8 +176,6 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
   const status = crew?.status || userData?.crewStatus || 'pending';
   const todayKey = getTodayKey();
   const studiedToday = members.filter(m => m.lastStreakDate === todayKey);
-  const isRoomParticipant = !!crewRoom?.participantIds?.includes(user?.uid);
-  const roomIsFull = (crewRoom?.participantCount || 0) >= (crewRoom?.maxParticipants || 3);
   const isLeader = userData?.crewRole === 'leader';
   const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
 
@@ -231,23 +223,6 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [enrichedMembers]);
 
-  // Listen to study rooms
-  useEffect(() => {
-    if (!crewId) { setCrewRoom(null); return; }
-    const roomQuery = query(collection(db, 'studyRooms'), where('crewId', '==', crewId));
-    const unsub = onSnapshot(roomQuery, snap => {
-      const room = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => {
-        if (r.status === 'ended') return false;
-        const baseMs = r.startedAt?.toMillis?.() || r.createdAt?.toMillis?.() || 0;
-        const durationMs = (r.durationMinutes || 50) * 60 * 1000;
-        if (baseMs && Date.now() >= baseMs + durationMs) return false;
-        return true;
-      }).sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))[0] || null;
-      setCrewRoom(room);
-    });
-    return () => unsub();
-  }, [crewId]);
-
   useEffect(() => {
     if (!crewId) {
       setCrewDocData(null);
@@ -282,35 +257,6 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
     if (!notes.length) return;
     setPendingNotes((prev) => prev.filter((pending) => !notes.some((note) => note.userId === pending.userId && note.text === pending.text)));
   }, [notes]);
-
-  // Camera preview
-  useEffect(() => {
-    let cancelled = false;
-    async function setup() {
-      if (!navigator.mediaDevices?.getUserMedia) { setPreviewError('카메라 미리보기를 지원하지 않습니다.'); return; }
-      if (previewStreamRef.current) { setPreviewStream(previewStreamRef.current); return; }
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 } }, audio: false });
-        if (cancelled) { s.getTracks().forEach(t => t.stop()); return; }
-        s.getVideoTracks().forEach(t => { t.enabled = previewCameraOn; });
-        previewStreamRef.current = s;
-        setPreviewStream(s);
-        setPreviewError('');
-      } catch {
-        if (!cancelled) { setPreviewStream(null); setPreviewError('카메라 미리보기 실패. 브라우저 권한을 확인해주세요.'); }
-      }
-    }
-    setup();
-    return () => { cancelled = true; };
-  }, [previewCameraOn]);
-
-  useEffect(() => {
-    if (!previewStreamRef.current) return;
-    previewStreamRef.current.getVideoTracks().forEach(t => { t.enabled = previewCameraOn; });
-    setPreviewStream(previewStreamRef.current);
-  }, [previewCameraOn]);
-
-  useEffect(() => () => { if (previewStreamRef.current) { previewStreamRef.current.getTracks().forEach(t => t.stop()); previewStreamRef.current = null; } }, []);
 
   const handlePostNote = async (text = noteText) => {
     const clean = text.trim().slice(0, NOTE_MAX_LENGTH);
@@ -386,30 +332,19 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
     handlePostNote();
   };
 
-  const handleCreateStudyRoom = async () => {
+  const handleEnterMeet = async () => {
     if (!crewId || roomAction) return;
-    setRoomAction('creating');
-    setMessage('집중방 여는 중...');
+    setRoomAction('entering');
+    setMessage('Google Meet 주소 확인 중...');
     soundManager.playClick();
     try {
-      const fn = httpsCallable(functions, 'createStudyRoom');
-      const res = await fn({ crewId, durationMinutes: roomDuration });
-      if (onEnterRoom) onEnterRoom(res?.data?.roomId || '');
-      setMessage('집중방을 열었습니다.');
-    } catch (e) { setMessage(getFunctionsErrorMessage(e, '집중방 생성 실패.')); }
-    finally { setRoomAction(''); }
-  };
-
-  const handleJoinStudyRoom = async () => {
-    if (!crewRoom?.id || roomAction) return;
-    setRoomAction('joining');
-    setMessage('집중방 입장 중...');
-    soundManager.playClick();
-    try {
-      const fn = httpsCallable(functions, 'joinStudyRoomSession');
-      await fn({ roomId: crewRoom.id });
-      if (onEnterRoom) onEnterRoom(crewRoom.id);
-    } catch (e) { setMessage(getFunctionsErrorMessage(e, '입장 실패.')); }
+      const fn = httpsCallable(functions, 'enterStudyCrewMeet');
+      const res = await fn({ crewId });
+      const googleMeetUrl = res?.data?.googleMeetUrl || '';
+      if (!googleMeetUrl) throw new Error('Google Meet 주소가 아직 준비되지 않았습니다.');
+      window.open(googleMeetUrl, '_blank', 'noopener,noreferrer');
+      setMessage('Google Meet을 새 탭으로 열었습니다.');
+    } catch (e) { setMessage(getFunctionsErrorMessage(e, e?.message || '입장 실패.')); }
     finally { setRoomAction(''); }
   };
 
@@ -433,10 +368,6 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
       const fn = httpsCallable(functions, 'leaveStudyCrew');
       await fn({ crewId });
       setMessage(isLeader ? '크루를 삭제했습니다.' : '크루에서 탈퇴했습니다.');
-      if (previewStreamRef.current) {
-        previewStreamRef.current.getTracks().forEach((track) => track.stop());
-        previewStreamRef.current = null;
-      }
       onBack();
     } catch (err) {
       console.error('Failed to leave crew:', err);
@@ -451,7 +382,7 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
   return (
     <div style={{ maxWidth: 1120, margin: '0 auto', width: '100%', padding: isMobile ? '1rem 0.75rem 7rem' : '2rem 1rem 6rem' }}>
       {/* Back */}
-      <button onClick={() => { if (previewStreamRef.current) { previewStreamRef.current.getTracks().forEach(t => t.stop()); previewStreamRef.current = null; } onBack(); }} className="space-nav-link font-tech" style={{ marginBottom: isMobile ? '0.75rem' : '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: 8, minHeight: isMobile ? 40 : undefined }}>
+      <button onClick={onBack} className="space-nav-link font-tech" style={{ marginBottom: isMobile ? '0.75rem' : '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: 8, minHeight: isMobile ? 40 : undefined }}>
         <ArrowLeft size={16} /> 크루 목록으로
       </button>
 
@@ -508,90 +439,32 @@ export default function CrewDetailView({ onBack, onEnterRoom }) {
         </div>}
       </Motion.div>
 
-      {/* Study Stream Control */}
+      {/* Google Meet Entry */}
       <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card hud-border" style={{ padding: isMobile ? '1rem' : '1.3rem', borderRadius: 12, marginBottom: '1.2rem', scrollMarginTop: 76 }}>
-        <div style={{ marginBottom: isMobile ? '0.75rem' : '1rem' }}>
-          <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>STUDY STREAM</div>
-          <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: isMobile ? '1.1rem' : '1.2rem', marginTop: '0.15rem' }}>집중방 컨트롤</div>
-          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem', lineHeight: 1.45 }}>
-            이 제어는 각 참여자 자신의 화면에만 표시되고, 본인 카메라와 상태만 바꿉니다.
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(min(420px, 100%), 1.35fr) minmax(min(300px, 100%), 0.85fr)', gap: isMobile ? '0.85rem' : '1rem', alignItems: 'stretch' }}>
-          <div style={{ order: isMobile ? 2 : 0 }}>
-            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,243,255,0.2)', background: '#020617', position: 'relative' }}>
-              {previewStream && previewCameraOn ? (
-                <video ref={el => { if (el) el.srcObject = previewStream; }} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div className="font-tech" style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.54)' }}>
-                  {previewError || '카메라가 꺼져 있습니다.'}
-                </div>
-              )}
-              <div className="font-tech" style={{ position: 'absolute', left: 12, bottom: 12, padding: '0.32rem 0.6rem', borderRadius: 999, background: 'rgba(2,6,23,0.72)', color: 'var(--text-bright)', fontSize: '0.82rem' }}>
-                {userData?.studentName || userData?.publicDisplayName || user?.displayName || '나'}
-              </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>GOOGLE MEET</div>
+            <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: isMobile ? '1.1rem' : '1.2rem', marginTop: '0.15rem' }}>크루 집중방 입장</div>
+            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem', lineHeight: 1.55 }}>
+              운영자가 등록한 Google Meet이 새 탭으로 열립니다.
             </div>
-            {previewError && previewCameraOn && <div className="font-tech" style={{ color: '#fda4af', lineHeight: 1.45, marginTop: '0.65rem' }}>{previewError}</div>}
           </div>
-
-          <div style={{ ...panelStyle, display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: '100%', order: isMobile ? 1 : 0, padding: isMobile ? '0.85rem' : panelStyle.padding }}>
-            <button type="button" className="space-nav-link font-tech" onClick={() => { setPreviewCameraOn(p => !p); soundManager.playClick(); }} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%' }}>
-              {previewCameraOn ? <Camera size={15} /> : <CameraOff size={15} />}
-              {previewCameraOn ? '카메라 ON' : '카메라 OFF'}
-            </button>
-
-            {status !== 'approved' ? (
-              <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>운영자 승인 후 방을 열 수 있습니다.</div>
-            ) : crewRoom ? (
-              <>
-                <div style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(2,6,23,0.62)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div className="font-tech" style={{ color: crewRoom.status === 'live' ? 'var(--planet-green)' : 'var(--planet-orange)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Radio size={14} /> {crewRoom.status === 'live' ? '집중 진행 중' : '입장 대기 중'}
-                  </div>
-                  <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.45rem', display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Users size={14} /> {crewRoom.participantCount || 0}/{crewRoom.maxParticipants || 3}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Clock3 size={14} /> {crewRoom.durationMinutes || 50}분</span>
-                  </div>
-                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.8rem', marginTop: '0.55rem', lineHeight: 1.45 }}>
-                    이미 열린 방이 있어 새 시간 선택은 방이 종료된 뒤 가능합니다.
-                  </div>
-                </div>
-                {isRoomParticipant ? (
-                  <button type="button" className="space-btn cosmic-btn font-tech" onClick={() => onEnterRoom && onEnterRoom(crewRoom.id)} style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.9rem 1.1rem', minHeight: isMobile ? 52 : undefined, marginTop: 'auto' }}>집중방 다시 열기</button>
-                ) : (
-                  <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction || roomIsFull} onClick={handleJoinStudyRoom} style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.9rem 1.1rem', minHeight: isMobile ? 52 : undefined, marginTop: 'auto' }}>{roomAction === 'joining' ? '입장 처리 중...' : roomIsFull ? '정원 가득 참' : '집중방 입장'}</button>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55 }}>아직 열린 집중방이 없습니다.</div>
-                  <>
-                    <div style={{ display: 'grid', gap: '0.45rem' }}>
-                      <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                        집중 시간: <strong style={{ color: 'var(--crystal-cyan)' }}>{roomDuration}분</strong>
-                      </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="120"
-                        step="10"
-                        value={roomDuration}
-                        onChange={(e) => setRoomDuration(Number(e.target.value))}
-                        style={{ width: '100%' }}
-                      />
-                      <div className="font-tech" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                        <span>10분</span>
-                        <span>60분</span>
-                        <span>120분</span>
-                      </div>
-                    </div>
-                    <button type="button" className="space-btn cosmic-btn font-tech" disabled={!!roomAction} onClick={handleCreateStudyRoom} style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.9rem 1.1rem', minHeight: isMobile ? 52 : undefined, marginTop: 'auto' }}>{roomAction === 'creating' ? '집중방 여는 중...' : `${roomDuration}분 집중방 열기`}</button>
-                  </>
-              </>
-            )}
-          </div>
+          <button
+            type="button"
+            className="space-btn cosmic-btn font-tech"
+            disabled={status !== 'approved' || !!roomAction || !crew.googleMeetUrl}
+            onClick={handleEnterMeet}
+            style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.9rem 1.25rem', minHeight: isMobile ? 52 : undefined, minWidth: isMobile ? '100%' : 180 }}
+          >
+            {roomAction === 'entering' ? '확인 중...' : '참여하기'}
+          </button>
         </div>
+        {status !== 'approved' && (
+          <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55, marginTop: '0.9rem' }}>운영자 승인 후 입장할 수 있습니다.</div>
+        )}
+        {status === 'approved' && !crew.googleMeetUrl && (
+          <div className="font-tech" style={{ color: '#fbbf24', lineHeight: 1.55, marginTop: '0.9rem' }}>운영자가 Google Meet 주소를 준비 중입니다.</div>
+        )}
       </Motion.div>
 
       {status === 'approved' && crewId && (
