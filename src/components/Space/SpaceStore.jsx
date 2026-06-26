@@ -500,24 +500,24 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
       className="space-nav-link"
       disabled={giftBusy}
       style={{
-        width: '100%',
-        marginTop: '0.65rem',
+        flex: '0 0 auto',
+        whiteSpace: 'nowrap',
         fontSize: '0.85rem',
-        padding: '0.7rem',
+        padding: '0.7rem 0.9rem',
         fontWeight: 700,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '0.4rem',
-        background: 'rgba(245, 158, 11, 0.12)',
-        border: '1px solid rgba(245, 158, 11, 0.38)',
-        color: '#fbbf24',
+        gap: '0.35rem',
+        background: 'rgba(0, 243, 255, 0.05)',
+        border: '1px solid rgba(0, 243, 255, 0.3)',
+        color: 'var(--text-bright)',
         cursor: giftBusy ? 'not-allowed' : 'pointer',
         opacity: giftBusy ? 0.7 : 1,
       }}
       onClick={() => openGiftModal(item)}
     >
-      <Gift size={15} />
+      <Gift size={15} style={{ color: 'var(--crystal-cyan)' }} />
       선물하기
     </button>
   )
@@ -540,22 +540,24 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
         padding: '16px',
       }}
     >
-      <Motion.form
-        onSubmit={handleGiftStoreItem}
-        className="glass-card"
-        initial={{ opacity: 0, y: 16, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          width: 'min(620px, 100%)',
-          maxHeight: 'calc(100vh - 32px)',
-          overflowY: 'auto',
-          padding: '1.5rem',
-          border: '1px solid rgba(245, 158, 11, 0.42)',
-          background: 'rgba(15, 23, 42, 0.96)',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.42)',
-        }}
-      >
+        <Motion.form
+          onSubmit={handleGiftStoreItem}
+          className="glass-card"
+          initial={{ opacity: 0, y: 16, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          onClick={(event) => event.stopPropagation()}
+          style={{
+            width: 'min(620px, 100%)',
+            maxHeight: 'calc(100vh - 32px)',
+            overflowY: 'auto',
+            padding: '1.5rem',
+            border: '1px solid rgba(245, 158, 11, 0.42)',
+            background: 'rgba(15, 23, 42, 0.96)',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.42)',
+            transform: 'none',
+            transition: 'none',
+          }}
+        >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#fbbf24', fontWeight: 800, marginBottom: '0.4rem' }}>
@@ -575,20 +577,24 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             onClick={closeGiftModal}
             disabled={giftBusy}
             style={{
-              width: 36,
-              height: 36,
-              minWidth: 36,
+              flex: '0 0 auto',
+              width: 38,
+              height: 38,
+              minWidth: 38,
               borderRadius: 10,
-              border: '1px solid rgba(148, 163, 184, 0.28)',
-              background: 'rgba(255,255,255,0.04)',
-              color: 'var(--text-muted)',
+              border: '1px solid rgba(0, 243, 255, 0.6)',
+              background: 'rgba(0, 243, 255, 0.22)',
+              color: '#ffffff',
+              fontSize: '1.25rem',
+              fontWeight: 800,
+              lineHeight: 1,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: giftBusy ? 'not-allowed' : 'pointer',
             }}
           >
-            <X size={18} />
+            ✕
           </button>
         </div>
 
@@ -900,11 +906,12 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.5 }}>
               {item.desc}
             </p>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem' }}>
             <button 
               className="space-nav-link" 
               disabled={purchasing || item.isOwned || (userData?.crystals || 0) < item.cost}
               style={{ 
-                width: '100%', 
+                flex: 1, 
                 fontSize: '0.9rem', 
                 padding: '0.8rem',
                 fontWeight: 700,
@@ -931,6 +938,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                     : `구매하기 (${item.cost} 광석)`}
             </button>
             {renderGiftButton(item)}
+            </div>
           </div>
         ))}
       </div>
@@ -993,11 +1001,12 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                 </span>
               )}
             </p>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem' }}>
             <button 
               className="space-nav-link" 
               disabled={purchasing || (item.id === 'cryo_core' && cryoCooldownRemainingMs > 0) || (item.id === 'radar' && radarActive) || (userData?.crystals || 0) < item.cost}
               style={{ 
-                width: '100%', 
+                flex: 1, 
                 fontSize: '0.9rem', 
                 padding: '0.8rem',
                 fontWeight: 700,
@@ -1025,6 +1034,8 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                     ? '구매 중...' 
                     : `구매하기 (${item.cost} 광석)`}
             </button>
+            {renderGiftButton(item)}
+            </div>
             {item.id === 'cryo_core' && cryoCooldownRemainingMs > 0 && (
               <div style={{ marginTop: '0.6rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 다음 구매 가능: 약 {cryoCooldownRemainingDays}일 후
@@ -1035,7 +1046,6 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                 {radarRemainingDays > 0 ? `활성 중, 약 ${radarRemainingDays}일 남음` : '활성 중'}
               </div>
             )}
-            {renderGiftButton(item)}
           </div>
         ))}
       </div>
@@ -1073,15 +1083,33 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                     ? '이미 해금됨'
                     : '랭킹과 답변 카드에서 강한 존재감'}
             </div>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem' }}>
             <button
               className="space-nav-link"
               disabled={purchasing || isOwned || (userData?.crystals || 0) < item.cost}
-              style={{ width: '100%', fontSize: '0.85rem', padding: '0.7rem' }}
+              style={{ 
+                flex: 1, 
+                fontSize: '0.85rem', 
+                padding: '0.7rem',
+                fontWeight: 700,
+                background: isOwned 
+                  ? 'rgba(107, 114, 128, 0.2)' 
+                  : (userData?.crystals || 0) < item.cost 
+                    ? 'rgba(239, 68, 68, 0.1)'
+                    : 'rgba(0, 243, 255, 0.15)',
+                border: isOwned
+                  ? '1px solid rgba(107, 114, 128, 0.3)'
+                  : '1px solid rgba(0, 243, 255, 0.4)',
+                color: isOwned ? '#6B7280' : 'var(--crystal-cyan)',
+                cursor: (isOwned || purchasing) ? 'not-allowed' : 'pointer',
+                opacity: purchasing ? 0.7 : 1
+              }}
               onClick={() => handlePurchase(item)}
             >
               {isOwned ? '이미 보유 중' : '구매하기'}
             </button>
             {renderGiftButton(item)}
+            </div>
           </div>
             )
           })()
@@ -1108,15 +1136,35 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', marginBottom: '1rem' }}>
               현재 쇼케이스 보유: {userData?.hallShowcaseCredits || 0}회
             </div>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem' }}>
             <button
               className="space-nav-link"
               disabled={purchasing || (userData?.crystals || 0) < item.cost}
-              style={{ width: '100%', fontSize: '0.85rem', padding: '0.7rem' }}
+              style={{ 
+                flex: 1, 
+                fontSize: '0.85rem', 
+                padding: '0.7rem',
+                fontWeight: 700,
+                background: (userData?.crystals || 0) < item.cost 
+                  ? 'rgba(239, 68, 68, 0.1)'
+                  : 'rgba(0, 243, 255, 0.15)',
+                border: (userData?.crystals || 0) < item.cost
+                  ? '1px solid rgba(239, 68, 68, 0.4)'
+                  : '1px solid rgba(0, 243, 255, 0.4)',
+                color: (userData?.crystals || 0) < item.cost ? '#ff6b6b' : 'var(--crystal-cyan)',
+                cursor: purchasing ? 'not-allowed' : 'pointer',
+                opacity: purchasing ? 0.7 : 1
+              }}
               onClick={() => handlePurchase(item)}
             >
-              구매하기
+              {(userData?.crystals || 0) < item.cost
+                ? `광석 부족 (${item.cost - (userData?.crystals || 0)}개 더 필요)`
+                : purchasing
+                  ? '구매 중...'
+                  : '구매하기'}
             </button>
             {renderGiftButton(item)}
+            </div>
           </div>
         ))}
       </div>
@@ -1142,15 +1190,35 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                 ? `보유 창설권: ${userData?.crewCreationPasses || 0}개`
                 : `보유 참여권: ${userData?.crewJoinPasses || 0}개`}
             </div>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem' }}>
             <button
               className="space-nav-link"
               disabled={purchasing || (userData?.crystals || 0) < item.cost}
-              style={{ width: '100%', fontSize: '0.85rem', padding: '0.7rem' }}
+              style={{ 
+                flex: 1, 
+                fontSize: '0.85rem', 
+                padding: '0.7rem',
+                fontWeight: 700,
+                background: (userData?.crystals || 0) < item.cost 
+                  ? 'rgba(239, 68, 68, 0.1)'
+                  : 'rgba(0, 243, 255, 0.15)',
+                border: (userData?.crystals || 0) < item.cost
+                  ? '1px solid rgba(239, 68, 68, 0.4)'
+                  : '1px solid rgba(0, 243, 255, 0.4)',
+                color: (userData?.crystals || 0) < item.cost ? '#ff6b6b' : 'var(--crystal-cyan)',
+                cursor: purchasing ? 'not-allowed' : 'pointer',
+                opacity: purchasing ? 0.7 : 1
+              }}
               onClick={() => handlePurchase(item)}
             >
-              구매하기
+              {(userData?.crystals || 0) < item.cost
+                ? `광석 부족 (${item.cost - (userData?.crystals || 0)}개 더 필요)`
+                : purchasing
+                  ? '구매 중...'
+                  : '구매하기'}
             </button>
             {renderGiftButton(item)}
+            </div>
           </div>
         ))}
       </div>
