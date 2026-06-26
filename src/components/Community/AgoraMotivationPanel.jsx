@@ -3,37 +3,39 @@ import { Trophy, Star, Zap, Target } from 'lucide-react';
 import { useQARanking } from '../../hooks/useQA';
 import './AgoraMotivationPanel.css';
 
-const getAchievementTitle = (helpCount = 0) => {
-  if (helpCount >= 100) return '아고라의 지배자';
-  if (helpCount >= 50) return '수학의 아인슈타인';
-  if (helpCount >= 10) return '은하계의 뉴턴';
-  if (helpCount >= 1) return '수학 탐험가';
-  return '수습 항해사';
-};
-
-// Level thresholds: cumulative crystals needed to reach each level
-// Lv.1: 0, Lv.2: 100, Lv.3: 250, Lv.4: 500, Lv.5: 1000, Lv.6: 2000, Lv.7: 5000
-const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 5000];
+const EXPLORER_LEVELS = [
+  { level: 1, threshold: 0, title: '수습 항해사' },
+  { level: 2, threshold: 100, title: '별빛 수집가' },
+  { level: 3, threshold: 250, title: '궤도 계산가' },
+  { level: 4, threshold: 500, title: '성운 탐험가' },
+  { level: 5, threshold: 1000, title: '문제 해결 파일럿' },
+  { level: 6, threshold: 2000, title: '블랙홀 전략가' },
+  { level: 7, threshold: 5000, title: '은하계의 뉴턴' },
+  { level: 8, threshold: 9000, title: '별자리의 가우스' },
+  { level: 9, threshold: 15000, title: '차원의 오일러' },
+  { level: 10, threshold: 24000, title: '우주의 아인슈타인' },
+  { level: 11, threshold: 38000, title: '아고라의 아르키메데스' },
+  { level: 12, threshold: 60000, title: '스텔라의 전설' },
+];
 
 /**
  * Calculate level and progress from total crystals.
- * Returns { level, progress (0-100), remaining, currentThreshold, nextThreshold }
+ * Returns { level, title, progress (0-100), remaining, currentThreshold, nextThreshold }
  */
 function calculateLevel(crystals) {
-  let level = 1;
-  for (let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
-    if (crystals >= LEVEL_THRESHOLDS[i]) {
-      level = i + 1;
+  let currentLevel = EXPLORER_LEVELS[0];
+  for (let i = 1; i < EXPLORER_LEVELS.length; i++) {
+    if (crystals >= EXPLORER_LEVELS[i].threshold) {
+      currentLevel = EXPLORER_LEVELS[i];
     } else {
       break;
     }
   }
 
-  const isMaxLevel = level >= LEVEL_THRESHOLDS.length;
-  const currentThreshold = LEVEL_THRESHOLDS[level - 1] || 0;
-  const nextThreshold = isMaxLevel
-    ? currentThreshold // Max level reached
-    : LEVEL_THRESHOLDS[level];
+  const nextLevel = EXPLORER_LEVELS.find((item) => item.level === currentLevel.level + 1);
+  const isMaxLevel = !nextLevel;
+  const currentThreshold = currentLevel.threshold;
+  const nextThreshold = nextLevel?.threshold || currentThreshold;
 
   const rangeSize = nextThreshold - currentThreshold;
   const crystalsInRange = crystals - currentThreshold;
@@ -44,20 +46,31 @@ function calculateLevel(crystals) {
 
   const remaining = isMaxLevel ? 0 : nextThreshold - crystals;
 
-  return { level, progress, remaining, currentThreshold, nextThreshold, isMaxLevel };
+  return {
+    level: currentLevel.level,
+    title: currentLevel.title,
+    nextTitle: nextLevel?.title || null,
+    progress,
+    remaining,
+    currentThreshold,
+    nextThreshold,
+    isMaxLevel
+  };
 }
 
 export default function AgoraMotivationPanel({ userData, activeCategory, onCategoryChange }) {
   const { data: ranking, isLoading } = useQARanking();
 
-  const helpCount = userData?.helpCount || 0;
   const crystals = userData?.crystals || 0;
 
-  // Calculate level dynamically from crystals (no longer relying on spaceshipLevel)
-  const { level: explorerLevel, progress, remaining, isMaxLevel } = calculateLevel(crystals);
-
-  // Achievement Title
-  const title = getAchievementTitle(helpCount);
+  const {
+    level: explorerLevel,
+    title,
+    nextTitle,
+    progress,
+    remaining,
+    isMaxLevel
+  } = calculateLevel(crystals);
 
   return (
     <aside className="agora-side-panel">
@@ -102,7 +115,7 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
           {isMaxLevel ? (
             <p className="hint">🎉 최고 등급 달성! 총 광석: {crystals}개</p>
           ) : (
-            <p className="hint">다음 레벨까지 광석 {remaining}개 더 필요해요! (보유: {crystals}개)</p>
+            <p className="hint">다음 등급: {nextTitle}까지 광석 {remaining}개 더 필요해요! (보유: {crystals}개)</p>
           )}
         </div>
       </section>
@@ -133,4 +146,3 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
     </aside>
   );
 }
-
