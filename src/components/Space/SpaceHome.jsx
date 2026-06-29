@@ -519,6 +519,44 @@ function SpaceHome() {
     return activeClusterData?.name || activeClusterData?.title || activeClusterData?.label || '';
   }, [activeClusterData]);
 
+  const presencePublicProfile = useMemo(() => ({
+    publicDisplayName: userData?.publicDisplayName || '',
+    studentName: userData?.studentName || '',
+    name: userData?.name || user?.displayName || '',
+    displayName: user?.displayName || '',
+    gradeLabel: userData?.gradeLabel || '',
+    grade: userData?.grade || '',
+    schoolGrade: userData?.schoolGrade || '',
+    studentGrade: userData?.studentGrade || '',
+    selectedCourse: userData?.selectedCourse || '',
+    courseName: userData?.courseName || '',
+    currentCourse: userData?.currentCourse || '',
+    crewId: userData?.crewId || '',
+    crewName: userData?.crewName || '',
+    crewColor: userData?.crewColor || '',
+    crewSnapshot: userData?.crewSnapshot || null,
+    role: userData?.role || '',
+    studyInvitePreference: userData?.studyInvitePreference || 'open',
+  }), [
+    user?.displayName,
+    userData?.courseName,
+    userData?.crewColor,
+    userData?.crewId,
+    userData?.crewName,
+    userData?.crewSnapshot,
+    userData?.currentCourse,
+    userData?.grade,
+    userData?.gradeLabel,
+    userData?.name,
+    userData?.publicDisplayName,
+    userData?.role,
+    userData?.schoolGrade,
+    userData?.selectedCourse,
+    userData?.studentGrade,
+    userData?.studentName,
+    userData?.studyInvitePreference
+  ]);
+
   const { data: clusterAttendanceRecords, isLoading: loadingClusterAttendance } = useStudentAttendance(user?.uid, selectedClusterId);
   const attendanceMutation = useRecordAttendance();
 
@@ -760,7 +798,7 @@ function SpaceHome() {
     return '우주 공간(메인) 대기 중';
   }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode]);
 
-  usePresence(user?.uid, selectedClusterId, currentLocationString, activeUnit?.docId, activeRoomId, activeClusterName);
+  usePresence(user?.uid, selectedClusterId, currentLocationString, activeUnit?.docId, activeRoomId, activeClusterName, presencePublicProfile);
 
   // Auto-skip single chapter OR Auto-resolve Parent Chapter if jumping directly to a unit
   useEffect(() => {

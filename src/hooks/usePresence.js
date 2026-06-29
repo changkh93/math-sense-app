@@ -10,8 +10,9 @@ import { db } from '../firebase';
  * @param {string} unitId 
  * @param {string} activeRoomId
  * @param {string} clusterName
+ * @param {object} publicProfile
  */
-export function usePresence(userId, clusterId, currentLocation, unitId, activeRoomId = null, clusterName = '') {
+export function usePresence(userId, clusterId, currentLocation, unitId, activeRoomId = null, clusterName = '', publicProfile = {}) {
   const lastLocationRef = useRef(null);
   const lastUnitIdRef = useRef(null);
   const lastRoomIdRef = useRef(null);
@@ -25,27 +26,59 @@ export function usePresence(userId, clusterId, currentLocation, unitId, activeRo
     const updatePresence = async (state, isNewLocation = false) => {
       try {
         const userRef = doc(db, 'users', userId);
-        
-        const mergeData = {
-          liveStatus: {
-            state: state,
-            lastUpdatedAt: serverTimestamp(),
-            currentLocation: currentLocation || '메인 화면',
-            clusterId: clusterId || 'cluster_elementary',
-            unitId: unitId || null,
-            activeRoomId: activeRoomId || null
-          }
+        const liveStatusRef = doc(db, 'liveStatuses', userId);
+        const timestamp = serverTimestamp();
+        const liveStatus = {
+          state: state,
+          lastUpdatedAt: timestamp,
+          currentLocation: currentLocation || '메인 화면',
+          clusterId: clusterId || 'cluster_elementary',
+          unitId: unitId || null,
+          activeRoomId: activeRoomId || null
         };
 
         if (clusterName) {
-          mergeData.liveStatus.clusterName = clusterName;
+          liveStatus.clusterName = clusterName;
         }
+        
+        const mergeData = {
+          liveStatus
+        };
 
         if (isNewLocation) {
-          mergeData.liveStatus.enteredAt = serverTimestamp();
+          mergeData.liveStatus.enteredAt = timestamp;
         }
 
-        await setDoc(userRef, mergeData, { merge: true });
+        const liveStatusData = {
+          uid: userId,
+          ...liveStatus,
+          publicDisplayName: publicProfile.publicDisplayName || '',
+          studentName: publicProfile.studentName || '',
+          name: publicProfile.name || '',
+          displayName: publicProfile.displayName || '',
+          gradeLabel: publicProfile.gradeLabel || '',
+          grade: publicProfile.grade || '',
+          schoolGrade: publicProfile.schoolGrade || '',
+          studentGrade: publicProfile.studentGrade || '',
+          selectedCourse: publicProfile.selectedCourse || '',
+          courseName: publicProfile.courseName || '',
+          currentCourse: publicProfile.currentCourse || '',
+          crewId: publicProfile.crewId || '',
+          crewName: publicProfile.crewName || '',
+          crewColor: publicProfile.crewColor || '',
+          crewSnapshot: publicProfile.crewSnapshot || null,
+          role: publicProfile.role || '',
+          studyInvitePreference: publicProfile.studyInvitePreference || 'open'
+        };
+
+        if (isNewLocation) {
+          liveStatusData.enteredAt = timestamp;
+        }
+
+        await Promise.all([
+          setDoc(userRef, mergeData, { merge: true }),
+          setDoc(liveStatusRef, liveStatusData, { merge: true })
+        ]);
         
       } catch (err) {
         console.error("Presence update failed:", err);
@@ -90,5 +123,5 @@ export function usePresence(userId, clusterId, currentLocation, unitId, activeRo
       clearTimeout(timeoutId);
       clearInterval(heartbeatId);
     };
-  }, [userId, clusterId, currentLocation, unitId, activeRoomId, clusterName]);
+  }, [userId, clusterId, currentLocation, unitId, activeRoomId, clusterName, publicProfile]);
 }

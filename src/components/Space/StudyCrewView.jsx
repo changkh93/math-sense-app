@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Mail, Plus, Radio, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
@@ -1037,7 +1037,8 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [selectedInviteOptionId, setSelectedInviteOptionId] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
   const [crewOnlineCounts, setCrewOnlineCounts] = useState({});
-  const [userProfileById, setUserProfileById] = useState({});
+  const [liveStatusById, setLiveStatusById] = useState({});
+  const [liveStatusRefreshAt, setLiveStatusRefreshAt] = useState(() => Date.now());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
   const [detailView, setDetailView] = useState(false);
@@ -1109,31 +1110,41 @@ export default function StudyCrewView({ onNavigateStore }) {
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'users'), snap => {
+    const recentCutoff = Timestamp.fromMillis(liveStatusRefreshAt - 5 * 60 * 1000);
+    const liveQuery = query(
+      collection(db, 'liveStatuses'),
+      where('lastUpdatedAt', '>=', recentCutoff),
+      orderBy('lastUpdatedAt', 'desc'),
+      limit(40)
+    );
+
+    const unsub = onSnapshot(liveQuery, snap => {
       const nextCounts = {};
-      const nextProfiles = {};
-      const now = Date.now();
+      const nextStatuses = {};
 
       snap.docs.forEach((docSnap) => {
         const data = docSnap.data() || {};
-        nextProfiles[docSnap.id] = { uid: docSnap.id, ...data };
+        const status = { uid: data.uid || docSnap.id, liveStatus: data, ...data };
+        nextStatuses[docSnap.id] = status;
         if (data.role === 'admin' || data.role === 'parent') return;
         const crewId = data.crewId;
         if (!crewId) return;
-
-        const live = data.liveStatus || {};
-        const updatedMs = live.lastUpdatedAt?.toMillis?.() || 0;
-        const isOnline = live.state === 'online' && updatedMs && (now - updatedMs < 5 * 60 * 1000);
+        const isOnline = data.state === 'online';
         if (!isOnline) return;
 
         nextCounts[crewId] = (nextCounts[crewId] || 0) + 1;
       });
 
       setCrewOnlineCounts(nextCounts);
-      setUserProfileById(nextProfiles);
+      setLiveStatusById(nextStatuses);
     }, err => console.error('Crew online count error:', err));
 
     return () => unsub();
+  }, [liveStatusRefreshAt]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setLiveStatusRefreshAt(Date.now()), 60 * 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const sortedCrews = useMemo(() => {
@@ -1180,7 +1191,7 @@ export default function StudyCrewView({ onNavigateStore }) {
 
   const liveStudents = useMemo(() => {
     const now = Date.now();
-    return Object.values(userProfileById)
+    return Object.values(liveStatusById)
       .filter(profile => profile?.uid && profile.role !== 'admin' && profile.role !== 'parent' && isLiveStudent(profile, now))
       .map(profile => {
         return {
@@ -1202,7 +1213,7 @@ export default function StudyCrewView({ onNavigateStore }) {
         if (aCrew !== bCrew) return aCrew - bCrew;
         return (b.profile.liveStatus?.lastUpdatedAt?.toMillis?.() || 0) - (a.profile.liveStatus?.lastUpdatedAt?.toMillis?.() || 0);
       });
-  }, [clusterLabelById, crewId, user?.uid, userProfileById]);
+  }, [clusterLabelById, crewId, liveStatusById, user?.uid]);
 
   const livePeerCount = useMemo(
     () => liveStudents.filter(student => student.uid !== user?.uid).length,
@@ -1726,7 +1737,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                     userCrewId={crewId}
                     onClick={handleCrewCardClick}
                     onlineCount={crewOnlineCounts[c.id] || 0}
-                    founderProfile={userProfileById[c.leaderId || c.leaderUid || ''] || null}
+                    founderProfile={liveStatusById[c.leaderId || c.leaderUid || ''] || null}
                   />
                 ))}
               </div>

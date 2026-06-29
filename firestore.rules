@@ -250,6 +250,12 @@ service cloud.firestore {
     }
 
     // Users: Any authenticated user can read user profiles (for ranking). Writing is restricted.
+    match /liveStatuses/{userId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth() && request.auth.uid == userId;
+      allow delete: if isAdmin();
+    }
+
     match /users/{userId} {
       allow read: if isAuth();
       allow create: if isAuth() && (request.auth.uid == userId || isAdmin());
