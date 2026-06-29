@@ -614,6 +614,150 @@ function OpenStudyWaitingRoom({ pool, activity, activeStudents, recommended, joi
   );
 }
 
+function StudyInviteModal({
+  isOpen,
+  student,
+  options,
+  selectedOptionId,
+  onSelectOption,
+  message,
+  sending,
+  onClose,
+  onSend,
+}) {
+  if (!isOpen || !student) return null;
+  const selectedOption = options.find((option) => option.id === selectedOptionId) || options[0];
+
+  return (
+    <AnimatePresence>
+      <Motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1300,
+          background: 'rgba(0,0,0,0.52)',
+          display: 'grid',
+          placeItems: 'center',
+          padding: '1rem',
+        }}
+      >
+        <Motion.div
+          initial={{ y: 18, scale: 0.97, opacity: 0 }}
+          animate={{ y: 0, scale: 1, opacity: 1 }}
+          exit={{ y: 18, scale: 0.97, opacity: 0 }}
+          className="glass-card hud-border"
+          style={{
+            width: 'min(560px, 96vw)',
+            maxHeight: '88vh',
+            overflowY: 'auto',
+            borderRadius: 16,
+            padding: '1.25rem',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'flex-start', marginBottom: '1rem' }}>
+            <div>
+              <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.78rem', letterSpacing: '0.08em' }}>
+                STUDY INVITE
+              </div>
+              <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.3rem 0 0', fontSize: '1.35rem' }}>
+                공부 제안 보내기
+              </h3>
+              <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                {student.name}님에게 보낼 장소와 문구를 확인하세요.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="space-nav-link font-tech"
+              onClick={onClose}
+              disabled={sending}
+              style={{ borderRadius: 8, minWidth: 38, minHeight: 34, padding: '0.35rem 0.6rem' }}
+            >
+              닫기
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gap: '0.65rem', marginBottom: '1rem' }}>
+            {options.map((option) => {
+              const selected = option.id === selectedOption?.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="font-tech"
+                  onClick={() => onSelectOption(option.id)}
+                  disabled={sending}
+                  style={{
+                    textAlign: 'left',
+                    borderRadius: 12,
+                    border: selected ? `1px solid ${option.color}` : '1px solid rgba(255,255,255,0.1)',
+                    background: selected ? `${option.color}18` : 'rgba(7,13,30,0.7)',
+                    color: 'var(--text-bright)',
+                    padding: '0.85rem',
+                    cursor: sending ? 'wait' : 'pointer',
+                    display: 'grid',
+                    gap: '0.28rem',
+                  }}
+                >
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center' }}>
+                    <strong style={{ color: option.color }}>{option.title}</strong>
+                    <span style={{ color: selected ? option.color : 'rgba(255,255,255,0.5)', fontSize: '0.72rem' }}>
+                      {option.badge}
+                    </span>
+                  </span>
+                  <span style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.8rem', lineHeight: 1.45 }}>
+                    {option.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{
+            borderRadius: 12,
+            border: '1px solid rgba(0,243,255,0.16)',
+            background: 'rgba(2,6,23,0.62)',
+            padding: '0.9rem',
+            marginBottom: '1rem',
+          }}>
+            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.75rem', marginBottom: '0.55rem' }}>
+              발송될 편지
+            </div>
+            <div className="font-tech" style={{ color: 'rgba(255,255,255,0.84)', fontSize: '0.86rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              {message}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="space-nav-link font-tech"
+              onClick={onClose}
+              disabled={sending}
+              style={{ borderRadius: 10, minHeight: 42, padding: '0 1rem' }}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className="space-btn cosmic-btn font-tech"
+              onClick={onSend}
+              disabled={sending || !selectedOption}
+              style={{ borderRadius: 10, minHeight: 42, padding: '0 1.15rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+            >
+              {sending ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+              {sending ? '보내는 중...' : '이 내용으로 보내기'}
+            </button>
+          </div>
+        </Motion.div>
+      </Motion.div>
+    </AnimatePresence>
+  );
+}
+
 function LiveStudentDrawer({
   isOpen,
   onClose,
@@ -623,7 +767,6 @@ function LiveStudentDrawer({
   hasCrew,
   inviteAction,
   onInviteStudent,
-  onOpenCreateCrew,
   onOpenMyCrew,
 }) {
   const visibleStudents = students.slice(0, 24);
@@ -700,7 +843,7 @@ function LiveStudentDrawer({
                   const state = formatLiveState(student.profile);
                   const isSelf = student.uid === currentUid;
                   const isSameCrew = hasCrew && student.profile.crewId === currentCrewId;
-                  const actionLabel = isSelf ? '나' : !hasCrew ? '크루 만들기' : isSameCrew ? '내 크루 보기' : '공부 제안';
+                  const actionLabel = isSelf ? '나' : isSameCrew ? '내 크루 보기' : '공부 제안';
                   const isSending = inviteAction === student.uid;
                   return (
                     <div key={student.uid} style={{
@@ -737,10 +880,6 @@ function LiveStudentDrawer({
                           className={isSelf ? 'space-nav-link font-tech' : 'space-btn font-tech'}
                           onClick={() => {
                             if (isSelf) return;
-                            if (!hasCrew) {
-                              onOpenCreateCrew();
-                              return;
-                            }
                             if (isSameCrew) {
                               onOpenMyCrew();
                               return;
@@ -785,6 +924,8 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [openStudyWaitingPoolId, setOpenStudyWaitingPoolId] = useState('');
   const [livePanelOpen, setLivePanelOpen] = useState(false);
   const [liveInviteAction, setLiveInviteAction] = useState('');
+  const [inviteTargetStudent, setInviteTargetStudent] = useState(null);
+  const [selectedInviteOptionId, setSelectedInviteOptionId] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
   const [crewOnlineCounts, setCrewOnlineCounts] = useState({});
   const [userProfileById, setUserProfileById] = useState({});
@@ -961,6 +1102,95 @@ export default function StudyCrewView({ onNavigateStore }) {
     });
   }, [liveStudents, selectedOpenStudyPool]);
 
+  const inviteOptions = useMemo(() => {
+    const options = [];
+    const senderGradePoolId = normalizeOpenStudyPoolIdFromGrade(userData?.grade || userData?.schoolGrade || userData?.studentGrade);
+    const targetGradePoolId = inviteTargetStudent
+      ? normalizeOpenStudyPoolIdFromGrade(inviteTargetStudent.profile.grade || inviteTargetStudent.profile.schoolGrade || inviteTargetStudent.profile.studentGrade)
+      : senderGradePoolId;
+    const preferredPoolId = selectedOpenStudyPool?.id || targetGradePoolId || senderGradePoolId || 'free';
+    const preferredPool = OPEN_STUDY_POOLS.find(pool => pool.id === preferredPoolId) || OPEN_STUDY_POOLS.find(pool => pool.id === 'free');
+
+    if (selectedOpenStudyPool) {
+      options.push({
+        id: `open:${selectedOpenStudyPool.id}`,
+        type: 'openStudy',
+        poolId: selectedOpenStudyPool.id,
+        title: selectedOpenStudyPool.title,
+        badge: '현재 오픈 스터디',
+        color: selectedOpenStudyPool.color,
+        description: `${selectedOpenStudyPool.label} 오픈 스터디 대기방에서 만나 Google Meet으로 같이 입장합니다.`,
+      });
+    }
+
+    if (preferredPool && !options.some(option => option.id === `open:${preferredPool.id}`)) {
+      options.push({
+        id: `open:${preferredPool.id}`,
+        type: 'openStudy',
+        poolId: preferredPool.id,
+        title: preferredPool.title,
+        badge: preferredPool.id === targetGradePoolId ? '상대 학년 추천' : '오픈 스터디',
+        color: preferredPool.color,
+        description: `${preferredPool.label} 오픈 스터디 대기방에서 만나 Google Meet으로 같이 입장합니다.`,
+      });
+    }
+
+    const senderPool = OPEN_STUDY_POOLS.find(pool => pool.id === senderGradePoolId);
+    if (senderPool && !options.some(option => option.id === `open:${senderPool.id}`)) {
+      options.push({
+        id: `open:${senderPool.id}`,
+        type: 'openStudy',
+        poolId: senderPool.id,
+        title: senderPool.title,
+        badge: '내 학년 추천',
+        color: senderPool.color,
+        description: `${senderPool.label} 오픈 스터디 대기방에서 만나 Google Meet으로 같이 입장합니다.`,
+      });
+    }
+
+    if (hasCrew && crewId) {
+      options.push({
+        id: `crew:${crewId}`,
+        type: 'crew',
+        crewId,
+        title: crew?.name || userData?.crewName || userData?.crewSnapshot?.name || '내 스터디 크루',
+        badge: '내 크루',
+        color: crew?.color || '#00d4ff',
+        description: '내가 속한 스터디 크루 대기방으로 초대합니다. 초대 코드가 있으면 편지에 함께 포함됩니다.',
+      });
+    }
+
+    return options;
+  }, [
+    crew?.color,
+    crew?.name,
+    crewId,
+    hasCrew,
+    inviteTargetStudent,
+    selectedOpenStudyPool,
+    userData?.crewName,
+    userData?.crewSnapshot?.name,
+    userData?.grade,
+    userData?.schoolGrade,
+    userData?.studentGrade,
+  ]);
+
+  const selectedInviteOption = useMemo(
+    () => inviteOptions.find(option => option.id === selectedInviteOptionId) || inviteOptions[0] || null,
+    [inviteOptions, selectedInviteOptionId]
+  );
+
+  const inviteMessagePreview = useMemo(() => {
+    if (!inviteTargetStudent || !selectedInviteOption) return '';
+    const senderName = getProfileName(userData, user?.displayName || '탐사원');
+    if (selectedInviteOption.type === 'crew') {
+      const inviteCode = crew?.inviteCode || crew?.code || '';
+      const inviteCodeLine = inviteCode ? `\n초대 코드: ${inviteCode}` : '';
+      return `[스터디 크루 공부 제안]\n${senderName}님이 ${selectedInviteOption.title}에서 함께 공부하자고 제안했어요.\n스터디 크루 화면에서 ${selectedInviteOption.title}을 확인하고 Google Meet 대기방에 들어와 주세요.${inviteCodeLine}`;
+    }
+    return `[학년별 오픈 스터디 제안]\n${senderName}님이 ${selectedInviteOption.title}에서 함께 공부하자고 제안했어요.\n스터디 크루 화면의 학년별 오픈 스터디에서 ${selectedInviteOption.title} 대기방에 들어와 주세요.\n대기방에서 오늘의 미션을 남기고 Google Meet으로 함께 입장할 수 있어요.`;
+  }, [crew?.code, crew?.inviteCode, inviteTargetStudent, selectedInviteOption, user?.displayName, userData]);
+
   const handleJoinOpenStudy = (poolId) => {
     if (!user?.uid) return;
     soundManager.playClick();
@@ -986,28 +1216,29 @@ export default function StudyCrewView({ onNavigateStore }) {
     }
   };
 
-  const handleInviteLiveStudent = async (student) => {
-    if (!user?.uid || !student?.uid || student.uid === user.uid || liveInviteAction) return;
-    if (!hasCrew) {
-      setLivePanelOpen(false);
-      setShowCreateModal(true);
-      return;
-    }
+  const handleOpenInviteModal = (student) => {
+    if (!user?.uid || !student?.uid || student.uid === user.uid) return;
+    soundManager.playClick();
+    const targetPoolId = selectedOpenStudyPool?.id || normalizeOpenStudyPoolIdFromGrade(student.profile.grade || student.profile.schoolGrade || student.profile.studentGrade);
+    const initialOptionId = targetPoolId ? `open:${targetPoolId}` : '';
+    setInviteTargetStudent(student);
+    setSelectedInviteOptionId(initialOptionId);
+  };
 
+  const handleSendStudyInvite = async () => {
+    const student = inviteTargetStudent;
+    if (!user?.uid || !student?.uid || !selectedInviteOption || liveInviteAction) return;
     soundManager.playClick();
     setLiveInviteAction(student.uid);
     try {
       const sendMemo = httpsCallable(functions, 'sendDirectMemo');
-      const senderName = getProfileName(userData, user.displayName || '탐사원');
-      const currentCrewName = crew?.name || userData?.crewName || userData?.crewSnapshot?.name || '내 스터디 크루';
-      const inviteCode = crew?.inviteCode || crew?.code || '';
-      const inviteCodeLine = inviteCode ? `\n초대 코드: ${inviteCode}` : '';
       const res = await sendMemo({
         recipientId: student.uid,
-        body: `[스터디 크루 공부 제안]\n${senderName}님이 ${currentCrewName}에서 함께 공부하자고 제안했어요.\n스터디 크루 화면에서 ${currentCrewName}을 확인하고 Google Meet 대기방에 들어와 주세요.${inviteCodeLine}`,
+        body: inviteMessagePreview,
       });
       const data = res?.data || {};
       alert(`${data.recipientName || student.name}님에게 공부 제안을 보냈습니다.`);
+      setInviteTargetStudent(null);
     } catch (err) {
       console.error('Failed to send live study invite:', err);
       alert(getMemoErrorMessage(err));
@@ -1068,15 +1299,25 @@ export default function StudyCrewView({ onNavigateStore }) {
           currentCrewId={crewId}
           hasCrew={hasCrew}
           inviteAction={liveInviteAction}
-          onInviteStudent={handleInviteLiveStudent}
-          onOpenCreateCrew={() => {
-            setLivePanelOpen(false);
-            setShowCreateModal(true);
-          }}
+          onInviteStudent={handleOpenInviteModal}
           onOpenMyCrew={() => {
             setLivePanelOpen(false);
             setDetailView(true);
           }}
+        />
+        <StudyInviteModal
+          isOpen={!!inviteTargetStudent}
+          student={inviteTargetStudent}
+          options={inviteOptions}
+          selectedOptionId={selectedInviteOption?.id || ''}
+          onSelectOption={setSelectedInviteOptionId}
+          message={inviteMessagePreview}
+          sending={!!liveInviteAction}
+          onClose={() => {
+            if (liveInviteAction) return;
+            setInviteTargetStudent(null);
+          }}
+          onSend={handleSendStudyInvite}
         />
         <CrewCreateModal
           isOpen={showCreateModal}
@@ -1282,15 +1523,25 @@ export default function StudyCrewView({ onNavigateStore }) {
             currentCrewId={crewId}
             hasCrew={hasCrew}
             inviteAction={liveInviteAction}
-            onInviteStudent={handleInviteLiveStudent}
-            onOpenCreateCrew={() => {
-              setLivePanelOpen(false);
-              setShowCreateModal(true);
-            }}
+            onInviteStudent={handleOpenInviteModal}
             onOpenMyCrew={() => {
               setLivePanelOpen(false);
               setDetailView(true);
             }}
+          />
+          <StudyInviteModal
+            isOpen={!!inviteTargetStudent}
+            student={inviteTargetStudent}
+            options={inviteOptions}
+            selectedOptionId={selectedInviteOption?.id || ''}
+            onSelectOption={setSelectedInviteOptionId}
+            message={inviteMessagePreview}
+            sending={!!liveInviteAction}
+            onClose={() => {
+              if (liveInviteAction) return;
+              setInviteTargetStudent(null);
+            }}
+            onSend={handleSendStudyInvite}
           />
 
           {/* Directory Section */}
