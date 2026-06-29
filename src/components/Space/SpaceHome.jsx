@@ -1,14 +1,15 @@
 import { useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { auth, googleProvider, db } from '../../firebase'
+import { auth, googleProvider, db, functions } from '../../firebase'
 import { signInWithPopup, signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, where, getDocs, getDoc, writeBatch, increment, limit, runTransaction, Timestamp, documentId } from 'firebase/firestore'
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, where, getDocs, getDoc, writeBatch, increment, limit, runTransaction, Timestamp, documentId, updateDoc } from 'firebase/firestore'
 import { useClusters, useRegions, useRegion, useChapters, useChapter, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { usePresence } from '../../hooks/usePresence'
 // import { regions as localRegions } from '../../data/regions'
 import { motion as Motion, AnimatePresence } from 'framer-motion' // Added Framer Motion
+import { httpsCallable } from 'firebase/functions'
 
 // Space Components
 import StarField from './StarField'
@@ -48,7 +49,7 @@ import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
 import Footer from '../common/Footer'
-import { BellRing, Mail, Sparkles } from 'lucide-react'
+import { BellRing, Mail, Sparkles, X } from 'lucide-react'
 
 // Styles
 import '../../styles/space-theme.css'
@@ -111,6 +112,9 @@ function getNotificationPreview(notification = {}) {
 function RealtimeTopAlerts({ userId }) {
   const [latestMemo, setLatestMemo] = useState(null)
   const [latestNotification, setLatestNotification] = useState(null)
+  const [dismissedIds, setDismissedIds] = useState({})
+  const [activeAlert, setActiveAlert] = useState(null)
+  const [alertAction, setAlertAction] = useState('')
 
   useEffect(() => {
     if (!userId) {
@@ -165,42 +169,62 @@ function RealtimeTopAlerts({ userId }) {
     return () => unsub()
   }, [userId])
 
+  const handleDismiss = (event, id) => {
+    event.stopPropagation()
+    setDismissedIds((prev) => ({ ...prev, [id]: true }))
+    if (activeAlert?.id === id) setActiveAlert(null)
+  }
+
+  const handleOpenAlert = async (alert) => {
+    setActiveAlert(alert)
+    setAlertAction(alert.id)
+    try {
+      if (alert.kind === 'memo') {
+        const markRead = httpsCallable(functions, 'markDirectMemoRead')
+        await markRead({ memoId: alert.source.id })
+      } else if (alert.kind === 'notification' && !alert.source.isRead) {
+        await updateDoc(doc(db, 'notifications', alert.source.id), {
+          isRead: true
+        })
+      }
+    } catch (err) {
+      console.warn('[RealtimeTopAlerts] mark read failed:', err)
+    } finally {
+      setAlertAction('')
+    }
+  }
+
   const alerts = [
     latestMemo ? {
       id: `memo:${latestMemo.id}`,
+      kind: 'memo',
       label: '새 편지',
       text: getMemoPreview(latestMemo),
+      detailTitle: `${latestMemo.senderName || '탐사원'}님의 편지`,
+      detailBody: latestMemo.body || latestMemo.bodyPreview || '',
       time: getRealtimeAlertTime(latestMemo.sentAt || latestMemo.createdAt),
       Icon: Mail,
-      color: '#00f3ff'
+      color: '#00f3ff',
+      source: latestMemo
     } : null,
     latestNotification ? {
       id: `notification:${latestNotification.id}`,
+      kind: 'notification',
       label: '새 알림',
       text: getNotificationPreview(latestNotification),
+      detailTitle: latestNotification.title || '알림 내용',
+      detailBody: getNotificationPreview(latestNotification),
       time: getRealtimeAlertTime(latestNotification.createdAt),
       Icon: BellRing,
-      color: '#fbbf24'
+      color: '#fbbf24',
+      source: latestNotification
     } : null
-  ].filter(Boolean)
+  ].filter((alert) => alert && !dismissedIds[alert.id])
 
-  if (alerts.length === 0) return null
+  if (alerts.length === 0 && !activeAlert) return null
 
   return (
-    <div
-      aria-live="polite"
-      style={{
-        position: 'fixed',
-        top: 'max(0.8rem, env(safe-area-inset-top, 0px))',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 4200,
-        display: 'grid',
-        gap: '0.45rem',
-        width: 'min(560px, calc(100vw - 1.5rem))',
-        pointerEvents: 'none'
-      }}
-    >
+    <>
       <style>{`
         @keyframes realtimeAlertGlow {
           0%, 100% { box-shadow: 0 0 12px rgba(0, 243, 255, 0.22), 0 12px 35px rgba(0,0,0,0.34); transform: translateY(0); }
@@ -211,53 +235,197 @@ function RealtimeTopAlerts({ userId }) {
           50% { opacity: 1; transform: scale(1.08) rotate(12deg); }
         }
       `}</style>
-      {alerts.map(({ id, label, text, time, Icon, color }) => (
+      {alerts.length > 0 && (
         <div
-          key={id}
-          className="font-tech"
+          aria-live="polite"
           style={{
-            pointerEvents: 'none',
+            position: 'fixed',
+            top: 'max(0.8rem, env(safe-area-inset-top, 0px))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 4200,
             display: 'grid',
-            gridTemplateColumns: '34px minmax(0, 1fr) auto',
-            alignItems: 'center',
-            gap: '0.65rem',
-            padding: '0.62rem 0.78rem',
-            borderRadius: 12,
-            border: `1px solid ${color}66`,
-            background: 'linear-gradient(135deg, rgba(7,13,30,0.94), rgba(10,18,38,0.9))',
-            color: 'var(--text-bright)',
-            backdropFilter: 'blur(12px)',
-            animation: 'realtimeAlertGlow 1.45s ease-in-out infinite'
+            gap: '0.45rem',
+            width: 'min(560px, calc(100vw - 1.5rem))',
+            pointerEvents: 'auto'
           }}
         >
-          <span style={{
-            width: 34,
-            height: 34,
-            borderRadius: 9,
-            display: 'grid',
-            placeItems: 'center',
-            background: `${color}1f`,
-            color
-          }}>
-            <Icon size={18} />
-          </span>
-          <span style={{ minWidth: 0 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color, fontWeight: 900, fontSize: '0.72rem', marginBottom: '0.12rem' }}>
-              <Sparkles size={13} style={{ animation: 'realtimeSpark 1.1s ease-in-out infinite' }} />
-              {label}
-            </span>
-            <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.84rem', fontWeight: 800 }}>
-              {text}
-            </span>
-          </span>
-          {time && (
-            <span style={{ color: 'rgba(255,255,255,0.52)', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
-              {time}
-            </span>
-          )}
+          {alerts.map((alert) => {
+            const { id, label, text, time, Icon, color } = alert
+            const isBusy = alertAction === id
+            return (
+              <div
+                key={id}
+                role="button"
+                tabIndex={0}
+                className="font-tech"
+                onClick={() => handleOpenAlert(alert)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    handleOpenAlert(alert)
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  display: 'grid',
+                  gridTemplateColumns: '34px minmax(0, 1fr) auto 30px',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.62rem 0.52rem 0.62rem 0.78rem',
+                  borderRadius: 12,
+                  border: `1px solid ${color}66`,
+                  background: 'linear-gradient(135deg, rgba(7,13,30,0.94), rgba(10,18,38,0.9))',
+                  color: 'var(--text-bright)',
+                  backdropFilter: 'blur(12px)',
+                  animation: 'realtimeAlertGlow 1.45s ease-in-out infinite',
+                  cursor: 'pointer'
+                }}
+              >
+                <span style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 9,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: `${color}1f`,
+                  color
+                }}>
+                  <Icon size={18} />
+                </span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color, fontWeight: 900, fontSize: '0.72rem', marginBottom: '0.12rem' }}>
+                    <Sparkles size={13} style={{ animation: 'realtimeSpark 1.1s ease-in-out infinite' }} />
+                    {label}
+                  </span>
+                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.84rem', fontWeight: 800 }}>
+                    {isBusy ? '확인 중...' : text}
+                  </span>
+                </span>
+                {time && (
+                  <span style={{ color: 'rgba(255,255,255,0.52)', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+                    {time}
+                  </span>
+                )}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="알림 닫기"
+                  onClick={(event) => handleDismiss(event, id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') handleDismiss(event, id)
+                  }}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 8,
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: 'rgba(255,255,255,0.68)',
+                    background: 'rgba(255,255,255,0.06)'
+                  }}
+                >
+                  <X size={15} />
+                </span>
+              </div>
+            )
+          })}
         </div>
-      ))}
-    </div>
+      )}
+
+      <AnimatePresence>
+        {activeAlert && (
+          <Motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 4300,
+              display: 'grid',
+              placeItems: 'start center',
+              padding: 'max(5.2rem, env(safe-area-inset-top, 0px)) 1rem 1rem',
+              background: 'rgba(2,4,12,0.45)',
+              backdropFilter: 'blur(5px)'
+            }}
+            onMouseDown={() => setActiveAlert(null)}
+          >
+            <Motion.div
+              initial={{ y: -12, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -12, opacity: 0, scale: 0.98 }}
+              onMouseDown={(event) => event.stopPropagation()}
+              className="font-tech"
+              style={{
+                width: 'min(560px, 100%)',
+                borderRadius: 14,
+                border: `1px solid ${activeAlert.color}66`,
+                background: 'rgba(7,13,30,0.98)',
+                color: 'var(--text-bright)',
+                boxShadow: '0 24px 70px rgba(0,0,0,0.5)',
+                overflow: 'hidden'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem', padding: '0.9rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: activeAlert.color, fontWeight: 900, fontSize: '0.76rem', marginBottom: '0.18rem' }}>
+                    {activeAlert.label}
+                  </div>
+                  <div style={{ fontWeight: 900, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeAlert.detailTitle}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="닫기"
+                  onClick={() => setActiveAlert(null)}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(255,255,255,0.06)',
+                    color: 'rgba(255,255,255,0.78)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div style={{ padding: '1rem', whiteSpace: 'pre-wrap', lineHeight: 1.65, color: 'rgba(255,255,255,0.86)', maxHeight: '48vh', overflowY: 'auto' }}>
+                {activeAlert.detailBody || activeAlert.text}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem', padding: '0 1rem 1rem' }}>
+                {activeAlert.kind === 'notification' && activeAlert.source.link && (
+                  <button
+                    type="button"
+                    className="space-btn font-tech"
+                    onClick={() => {
+                      window.open(activeAlert.source.link, '_blank', 'noopener,noreferrer')
+                    }}
+                    style={{ borderRadius: 9, minHeight: 36, padding: '0 0.8rem', color: activeAlert.color }}
+                  >
+                    새 탭에서 열기
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="space-nav-link font-tech"
+                  onClick={() => setActiveAlert(null)}
+                  style={{ borderRadius: 9, minHeight: 36, padding: '0 0.8rem' }}
+                >
+                  닫기
+                </button>
+              </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 
