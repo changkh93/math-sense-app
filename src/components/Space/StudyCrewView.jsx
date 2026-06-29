@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -625,6 +625,13 @@ function StudyInviteModal({
   onClose,
   onSend,
 }) {
+  const sheetRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    window.setTimeout(() => sheetRef.current?.focus?.(), 0);
+  }, [isOpen]);
+
   if (!isOpen || !student) return null;
   const selectedOption = options.find((option) => option.id === selectedOptionId) || options[0];
 
@@ -638,35 +645,45 @@ function StudyInviteModal({
           position: 'fixed',
           inset: 0,
           zIndex: 1300,
-          background: 'rgba(0,0,0,0.52)',
-          display: 'grid',
-          placeItems: 'center',
-          padding: '1rem',
+          background: 'rgba(0,0,0,0.22)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'flex-start',
+          padding: '0.75rem',
+          paddingTop: '0.75rem',
         }}
       >
         <Motion.div
-          initial={{ y: 18, scale: 0.97, opacity: 0 }}
-          animate={{ y: 0, scale: 1, opacity: 1 }}
-          exit={{ y: 18, scale: 0.97, opacity: 0 }}
+          initial={{ x: 24, y: -8, scale: 0.98, opacity: 0 }}
+          animate={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+          exit={{ x: 24, y: -8, scale: 0.98, opacity: 0 }}
           className="glass-card hud-border"
+          ref={sheetRef}
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-label="공부 제안 보내기"
           style={{
-            width: 'min(560px, 96vw)',
-            maxHeight: '88vh',
+            width: 'min(420px, 94vw)',
+            maxHeight: 'calc(100vh - 1.5rem)',
             overflowY: 'auto',
-            borderRadius: 16,
-            padding: '1.25rem',
+            borderRadius: 14,
+            padding: '1rem',
+            marginTop: 0,
+            marginRight: 0,
+            boxShadow: '0 24px 60px rgba(0,0,0,0.48)',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'flex-start', marginBottom: '0.85rem' }}>
             <div>
               <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.78rem', letterSpacing: '0.08em' }}>
                 STUDY INVITE
               </div>
-              <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.3rem 0 0', fontSize: '1.35rem' }}>
+              <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.24rem 0 0', fontSize: '1.12rem' }}>
                 공부 제안 보내기
               </h3>
-              <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                {student.name}님에게 보낼 장소와 문구를 확인하세요.
+              <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.76rem', marginTop: '0.25rem', lineHeight: 1.45 }}>
+                {student.name}님에게 보낼 장소를 선택하세요.
               </div>
             </div>
             <button
@@ -680,53 +697,55 @@ function StudyInviteModal({
             </button>
           </div>
 
-          <div style={{ display: 'grid', gap: '0.65rem', marginBottom: '1rem' }}>
+          <div
+            role="radiogroup"
+            aria-label="공부 제안 장소 선택"
+            style={{ display: 'grid', gridTemplateColumns: options.length > 1 ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: '0.45rem', marginBottom: '0.8rem' }}
+          >
             {options.map((option) => {
               const selected = option.id === selectedOption?.id;
               return (
                 <button
                   key={option.id}
                   type="button"
+                  role="radio"
+                  aria-checked={selected}
                   className="font-tech"
                   onClick={() => onSelectOption(option.id)}
                   disabled={sending}
                   style={{
-                    textAlign: 'left',
-                    borderRadius: 12,
+                    textAlign: 'center',
+                    borderRadius: 10,
                     border: selected ? `1px solid ${option.color}` : '1px solid rgba(255,255,255,0.1)',
-                    background: selected ? `${option.color}18` : 'rgba(7,13,30,0.7)',
-                    color: 'var(--text-bright)',
-                    padding: '0.85rem',
+                    background: selected ? `${option.color}20` : 'rgba(7,13,30,0.72)',
+                    color: selected ? option.color : 'rgba(255,255,255,0.78)',
+                    padding: '0.7rem 0.55rem',
+                    minHeight: 48,
                     cursor: sending ? 'wait' : 'pointer',
-                    display: 'grid',
-                    gap: '0.28rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 900,
+                    lineHeight: 1.25,
                   }}
                 >
-                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', alignItems: 'center' }}>
-                    <strong style={{ color: option.color }}>{option.title}</strong>
-                    <span style={{ color: selected ? option.color : 'rgba(255,255,255,0.5)', fontSize: '0.72rem' }}>
-                      {option.badge}
-                    </span>
-                  </span>
-                  <span style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.8rem', lineHeight: 1.45 }}>
-                    {option.description}
-                  </span>
+                  {option.title}
                 </button>
               );
             })}
           </div>
 
           <div style={{
-            borderRadius: 12,
+            borderRadius: 10,
             border: '1px solid rgba(0,243,255,0.16)',
             background: 'rgba(2,6,23,0.62)',
-            padding: '0.9rem',
-            marginBottom: '1rem',
+            padding: '0.75rem',
+            marginBottom: '0.8rem',
           }}>
-            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.75rem', marginBottom: '0.55rem' }}>
+            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.72rem', marginBottom: '0.45rem' }}>
               발송될 편지
             </div>
-            <div className="font-tech" style={{ color: 'rgba(255,255,255,0.84)', fontSize: '0.86rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+            <div className="font-tech" style={{ color: 'rgba(255,255,255,0.84)', fontSize: '0.78rem', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
               {message}
             </div>
           </div>
@@ -737,7 +756,7 @@ function StudyInviteModal({
               className="space-nav-link font-tech"
               onClick={onClose}
               disabled={sending}
-              style={{ borderRadius: 10, minHeight: 42, padding: '0 1rem' }}
+              style={{ borderRadius: 10, minHeight: 38, padding: '0 0.85rem' }}
             >
               취소
             </button>
@@ -746,7 +765,7 @@ function StudyInviteModal({
               className="space-btn cosmic-btn font-tech"
               onClick={onSend}
               disabled={sending || !selectedOption}
-              style={{ borderRadius: 10, minHeight: 42, padding: '0 1.15rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+              style={{ borderRadius: 10, minHeight: 38, padding: '0 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
             >
               {sending ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
               {sending ? '보내는 중...' : '이 내용으로 보내기'}
