@@ -48,6 +48,7 @@ import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
 import Footer from '../common/Footer'
+import { BellRing, Mail, Sparkles } from 'lucide-react'
 
 // Styles
 import '../../styles/space-theme.css'
@@ -83,6 +84,181 @@ const chunkArray = (items, size) => {
     chunks.push(items.slice(i, i + size))
   }
   return chunks
+}
+
+function getRealtimeAlertTime(value) {
+  const date = value?.toDate?.()
+  if (!date) return ''
+  return new Intl.DateTimeFormat('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date)
+}
+
+function getMemoPreview(memo = {}) {
+  const sender = memo.senderName || '탐사원'
+  const body = String(memo.bodyPreview || memo.body || '').replace(/\s+/g, ' ').trim()
+  if (/스터디|크루|오픈 스터디|공부 제안/.test(body)) {
+    return `${sender}님이 공부 제안을 보냈어요.`
+  }
+  return `${sender}님에게 새 편지가 왔어요.`
+}
+
+function getNotificationPreview(notification = {}) {
+  return String(notification.message || notification.title || '새 알림이 도착했어요.').replace(/\s+/g, ' ').trim()
+}
+
+function RealtimeTopAlerts({ userId }) {
+  const [latestMemo, setLatestMemo] = useState(null)
+  const [latestNotification, setLatestNotification] = useState(null)
+
+  useEffect(() => {
+    if (!userId) {
+      setLatestMemo(null)
+      return undefined
+    }
+
+    const memoQuery = query(
+      collection(db, 'directMemos'),
+      where('recipientId', '==', userId),
+      where('status', '==', 'delivered'),
+      orderBy('sentAt', 'desc'),
+      limit(6)
+    )
+
+    const unsub = onSnapshot(memoQuery, (snap) => {
+      const memo = snap.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .find((item) => !item.isRead && !item.recipientDeletedAt)
+      setLatestMemo(memo || null)
+    }, (err) => {
+      console.warn('[RealtimeTopAlerts] memo subscribe failed:', err)
+      setLatestMemo(null)
+    })
+
+    return () => unsub()
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      setLatestNotification(null)
+      return undefined
+    }
+
+    const notificationQuery = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(6)
+    )
+
+    const unsub = onSnapshot(notificationQuery, (snap) => {
+      const notification = snap.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .find((item) => !item.isRead && item.type !== 'memo')
+      setLatestNotification(notification || null)
+    }, (err) => {
+      console.warn('[RealtimeTopAlerts] notification subscribe failed:', err)
+      setLatestNotification(null)
+    })
+
+    return () => unsub()
+  }, [userId])
+
+  const alerts = [
+    latestMemo ? {
+      id: `memo:${latestMemo.id}`,
+      label: '새 편지',
+      text: getMemoPreview(latestMemo),
+      time: getRealtimeAlertTime(latestMemo.sentAt || latestMemo.createdAt),
+      Icon: Mail,
+      color: '#00f3ff'
+    } : null,
+    latestNotification ? {
+      id: `notification:${latestNotification.id}`,
+      label: '새 알림',
+      text: getNotificationPreview(latestNotification),
+      time: getRealtimeAlertTime(latestNotification.createdAt),
+      Icon: BellRing,
+      color: '#fbbf24'
+    } : null
+  ].filter(Boolean)
+
+  if (alerts.length === 0) return null
+
+  return (
+    <div
+      aria-live="polite"
+      style={{
+        position: 'fixed',
+        top: 'max(0.8rem, env(safe-area-inset-top, 0px))',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 4200,
+        display: 'grid',
+        gap: '0.45rem',
+        width: 'min(560px, calc(100vw - 1.5rem))',
+        pointerEvents: 'none'
+      }}
+    >
+      <style>{`
+        @keyframes realtimeAlertGlow {
+          0%, 100% { box-shadow: 0 0 12px rgba(0, 243, 255, 0.22), 0 12px 35px rgba(0,0,0,0.34); transform: translateY(0); }
+          50% { box-shadow: 0 0 28px rgba(0, 243, 255, 0.46), 0 18px 48px rgba(0,0,0,0.42); transform: translateY(-1px); }
+        }
+        @keyframes realtimeSpark {
+          0%, 100% { opacity: 0.55; transform: scale(0.92) rotate(0deg); }
+          50% { opacity: 1; transform: scale(1.08) rotate(12deg); }
+        }
+      `}</style>
+      {alerts.map(({ id, label, text, time, Icon, color }) => (
+        <div
+          key={id}
+          className="font-tech"
+          style={{
+            pointerEvents: 'none',
+            display: 'grid',
+            gridTemplateColumns: '34px minmax(0, 1fr) auto',
+            alignItems: 'center',
+            gap: '0.65rem',
+            padding: '0.62rem 0.78rem',
+            borderRadius: 12,
+            border: `1px solid ${color}66`,
+            background: 'linear-gradient(135deg, rgba(7,13,30,0.94), rgba(10,18,38,0.9))',
+            color: 'var(--text-bright)',
+            backdropFilter: 'blur(12px)',
+            animation: 'realtimeAlertGlow 1.45s ease-in-out infinite'
+          }}
+        >
+          <span style={{
+            width: 34,
+            height: 34,
+            borderRadius: 9,
+            display: 'grid',
+            placeItems: 'center',
+            background: `${color}1f`,
+            color
+          }}>
+            <Icon size={18} />
+          </span>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color, fontWeight: 900, fontSize: '0.72rem', marginBottom: '0.12rem' }}>
+              <Sparkles size={13} style={{ animation: 'realtimeSpark 1.1s ease-in-out infinite' }} />
+              {label}
+            </span>
+            <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.84rem', fontWeight: 800 }}>
+              {text}
+            </span>
+          </span>
+          {time && (
+            <span style={{ color: 'rgba(255,255,255,0.52)', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+              {time}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function getUnitContentAvailability(unit, quizAvailabilityMap = {}) {
@@ -4031,6 +4207,7 @@ function SpaceHome() {
 
   return (
     <>
+      <RealtimeTopAlerts userId={user?.uid} />
       {renderMainContent()}
       {persistentStudyRoom}
     </>
