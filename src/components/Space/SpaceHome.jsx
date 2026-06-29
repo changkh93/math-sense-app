@@ -515,6 +515,10 @@ function SpaceHome() {
     return clusters?.find(c => c.docId === selectedClusterId || c.id === selectedClusterId) || null;
   }, [clusters, selectedClusterId]);
 
+  const activeClusterName = useMemo(() => {
+    return activeClusterData?.name || activeClusterData?.title || activeClusterData?.label || '';
+  }, [activeClusterData]);
+
   const { data: clusterAttendanceRecords, isLoading: loadingClusterAttendance } = useStudentAttendance(user?.uid, selectedClusterId);
   const attendanceMutation = useRecordAttendance();
 
@@ -756,7 +760,7 @@ function SpaceHome() {
     return '우주 공간(메인) 대기 중';
   }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode]);
 
-  usePresence(user?.uid, selectedClusterId, currentLocationString, activeUnit?.docId, activeRoomId);
+  usePresence(user?.uid, selectedClusterId, currentLocationString, activeUnit?.docId, activeRoomId, activeClusterName);
 
   // Auto-skip single chapter OR Auto-resolve Parent Chapter if jumping directly to a unit
   useEffect(() => {

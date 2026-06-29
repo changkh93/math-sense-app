@@ -5,6 +5,7 @@ import { httpsCallable } from 'firebase/functions';
 import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Mail, Plus, Radio, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
+import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
 import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
@@ -20,8 +21,34 @@ function getProfileName(profile = {}, fallback = '탐사원') {
 function getProfileGrade(profile = {}) {
   return profile.gradeLabel || profile.grade || profile.schoolGrade || profile.studentGrade || '학년 미지정';
 }
-function getProfileCourse(profile = {}) {
-  return profile.selectedCourse || profile.courseName || profile.currentCourse || profile.clusterName || '과정 미지정';
+const FALLBACK_CLUSTER_LABELS = {
+  cluster_elementary: '초등수학',
+  'middle-math': '중등수학',
+  python: '파이썬',
+  'western-classic': '서양고전',
+};
+function getClusterLabel(cluster = {}) {
+  return cluster.name || cluster.title || cluster.label || cluster.displayName || '';
+}
+function getValidCourseLabel(...values) {
+  return values.find((value) => {
+    const text = String(value || '').trim();
+    return text && text !== '과정 미지정' && text !== '미지정' && text !== '-';
+  }) || '';
+}
+function getProfileCourse(profile = {}, clusterLabelById = {}) {
+  const live = profile.liveStatus || {};
+  const clusterId = live.clusterId || profile.currentClusterId || profile.clusterId || profile.selectedClusterId || '';
+  return getValidCourseLabel(
+    profile.selectedCourse,
+    profile.courseName,
+    profile.currentCourse,
+    live.courseName,
+    live.clusterName,
+    profile.clusterName,
+    clusterLabelById[clusterId],
+    FALLBACK_CLUSTER_LABELS[clusterId]
+  ) || '과정 미지정';
 }
 function getProfileCrewName(profile = {}) {
   return profile.crewName || profile.crewSnapshot?.name || '소속 크루 없음';
@@ -938,6 +965,7 @@ function LiveStudentDrawer({
 
 export default function StudyCrewView({ onNavigateStore }) {
   const { user, userData } = useAuth();
+  const { data: clusters = [] } = useClusters();
   const [directoryCrews, setDirectoryCrews] = useState([]);
   const [openStudyAction, setOpenStudyAction] = useState('');
   const [openStudyWaitingPoolId, setOpenStudyWaitingPoolId] = useState('');
@@ -1070,6 +1098,17 @@ export default function StudyCrewView({ onNavigateStore }) {
     [userData?.grade, userData?.schoolGrade, userData?.studentGrade]
   );
 
+  const clusterLabelById = useMemo(() => {
+    const next = { ...FALLBACK_CLUSTER_LABELS };
+    clusters.forEach((cluster) => {
+      const label = getClusterLabel(cluster);
+      if (!label) return;
+      const ids = [cluster.docId, cluster.id].filter(Boolean);
+      ids.forEach((id) => { next[id] = label; });
+    });
+    return next;
+  }, [clusters]);
+
   const liveStudents = useMemo(() => {
     const now = Date.now();
     return Object.values(userProfileById)
@@ -1080,7 +1119,7 @@ export default function StudyCrewView({ onNavigateStore }) {
           profile,
           name: getProfileName(profile),
           grade: getProfileGrade(profile),
-          course: getProfileCourse(profile),
+          course: getProfileCourse(profile, clusterLabelById),
           crewName: getProfileCrewName(profile),
           location: profile.liveStatus?.currentLocation || '메인 화면',
         };
@@ -1094,7 +1133,7 @@ export default function StudyCrewView({ onNavigateStore }) {
         if (aCrew !== bCrew) return aCrew - bCrew;
         return (b.profile.liveStatus?.lastUpdatedAt?.toMillis?.() || 0) - (a.profile.liveStatus?.lastUpdatedAt?.toMillis?.() || 0);
       });
-  }, [crewId, user?.uid, userProfileById]);
+  }, [clusterLabelById, crewId, user?.uid, userProfileById]);
 
   const openStudyActivityByPool = useMemo(() => {
     const next = {};

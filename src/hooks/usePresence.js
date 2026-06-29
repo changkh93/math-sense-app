@@ -9,8 +9,9 @@ import { db } from '../firebase';
  * @param {string} currentLocation description like `분수의 나눗셈 (개념 영상)`
  * @param {string} unitId 
  * @param {string} activeRoomId
+ * @param {string} clusterName
  */
-export function usePresence(userId, clusterId, currentLocation, unitId, activeRoomId = null) {
+export function usePresence(userId, clusterId, currentLocation, unitId, activeRoomId = null, clusterName = '') {
   const lastLocationRef = useRef(null);
   const lastUnitIdRef = useRef(null);
   const lastRoomIdRef = useRef(null);
@@ -35,6 +36,10 @@ export function usePresence(userId, clusterId, currentLocation, unitId, activeRo
             activeRoomId: activeRoomId || null
           }
         };
+
+        if (clusterName) {
+          mergeData.liveStatus.clusterName = clusterName;
+        }
 
         if (isNewLocation) {
           mergeData.liveStatus.enteredAt = serverTimestamp();
@@ -85,5 +90,5 @@ export function usePresence(userId, clusterId, currentLocation, unitId, activeRo
       clearTimeout(timeoutId);
       clearInterval(heartbeatId);
     };
-  }, [userId, clusterId, currentLocation, unitId, activeRoomId]); 
+  }, [userId, clusterId, currentLocation, unitId, activeRoomId, clusterName]);
 }
