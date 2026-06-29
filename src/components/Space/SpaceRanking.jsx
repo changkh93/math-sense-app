@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { Trophy, Medal, Star, Target, Info, ShieldAlert, Zap, CircleHelp } from 'lucide-react'
 import { db, auth } from '../../firebase'
@@ -13,6 +14,7 @@ import { calculateSEI, FOCUS_MAX_SCORE } from '../../utils/rankingUtils'
 import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getAnonymousLabel, getFrameSurfaceStyles, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
 
 export default function SpaceRanking({ user, userData }) {
+  const navigate = useNavigate()
   const [topUsers, setTopUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [rankMode, setRankMode] = useState('sei') 
@@ -252,6 +254,13 @@ export default function SpaceRanking({ user, userData }) {
     }
   }
 
+  const openPublicProfile = (event, uid) => {
+    event.stopPropagation()
+    if (!uid) return
+    soundManager.playClick()
+    navigate(`/profile/${uid}`)
+  }
+
   const rewardRules = [
     { 
       category: '🎯 탐사(퀴즈) 보상', 
@@ -359,11 +368,19 @@ export default function SpaceRanking({ user, userData }) {
             </span>
           </div>
           <div style={{ display: 'grid', gap: '0.8rem' }}>
-            <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
-              <div style={{ color: '#fbbf24', fontWeight: 800, marginBottom: '0.35rem' }}>친절한 설명상</div>
-              <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>
-                {hallOfFame.bestAnswer?.publicProfileSnapshot?.displayName || hallOfFame.bestAnswer?.userName || '아직 선정 중'}
-              </div>
+              <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
+                <div style={{ color: '#fbbf24', fontWeight: 800, marginBottom: '0.35rem' }}>친절한 설명상</div>
+              {hallOfFame.bestAnswer?.userId ? (
+                <button
+                  type="button"
+                  className="ranking-profile-link ranking-profile-link-inline"
+                  onClick={(event) => openPublicProfile(event, hallOfFame.bestAnswer.userId)}
+                >
+                  {hallOfFame.bestAnswer?.publicProfileSnapshot?.displayName || hallOfFame.bestAnswer?.userName || '아직 선정 중'}
+                </button>
+              ) : (
+                <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>아직 선정 중</div>
+              )}
               <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem', lineHeight: 1.45 }}>
                 {hallOfFame.bestAnswer ? (hallOfFame.bestAnswer.content || '').slice(0, 72) : '채택/인증/설명 밀도를 기준으로 계산합니다.'}
               </div>
@@ -379,11 +396,19 @@ export default function SpaceRanking({ user, userData }) {
                 {hallOfFame.bestQuestion ? (hallOfFame.bestQuestion.content || '').slice(0, 72) : '질문자는 계속 익명으로 보호됩니다.'}
               </div>
             </div>
-            <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
-              <div style={{ color: '#34d399', fontWeight: 800, marginBottom: '0.35rem' }}>급상승 파일럿</div>
-              <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>
-                {hallOfFame.growthStar?.studentName || hallOfFame.growthStar?.name || '아직 선정 중'}
-              </div>
+              <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
+                <div style={{ color: '#34d399', fontWeight: 800, marginBottom: '0.35rem' }}>급상승 파일럿</div>
+              {hallOfFame.growthStar?.id ? (
+                <button
+                  type="button"
+                  className="ranking-profile-link ranking-profile-link-inline"
+                  onClick={(event) => openPublicProfile(event, hallOfFame.growthStar.id)}
+                >
+                  {hallOfFame.growthStar?.publicDisplayName || hallOfFame.growthStar?.studentName || hallOfFame.growthStar?.name || '아직 선정 중'}
+                </button>
+              ) : (
+                <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>아직 선정 중</div>
+              )}
               <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
                 이번 주 성장 +{hallOfFame.growthStar?.weeklyGain || 0}
               </div>
@@ -598,13 +623,19 @@ export default function SpaceRanking({ user, userData }) {
                         </span>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ 
-                              fontSize: '1.1rem', 
-                              fontWeight: isMe ? 800 : 500,
-                              color: isMe ? '#ffffff' : 'rgba(255,255,255,0.9)'
-                            }}>
+                            <button
+                              type="button"
+                              className="ranking-profile-link"
+                              onClick={(event) => openPublicProfile(event, u.id)}
+                              aria-label={`${u.publicDisplayName || u.studentName || u.name || '무명 탐험가'}님의 탐험기지 보기`}
+                              style={{
+                                fontSize: '1.1rem',
+                                fontWeight: isMe ? 800 : 500,
+                                color: isMe ? '#ffffff' : 'rgba(255,255,255,0.9)'
+                              }}
+                            >
                               {u.publicDisplayName || u.studentName || u.name || '무명 탐험가'}
-                            </span>
+                            </button>
                             {u.publicSignature && (
                               <span style={{
                                 maxWidth: '200px',

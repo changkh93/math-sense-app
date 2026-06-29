@@ -16,7 +16,7 @@ import {
   getStreakFreezePurchaseCooldownRemainingMs,
   isRadarActive,
 } from '../../utils/streakUtils'
-import { buildAnswerProfileSnapshot, normalizeOwnedFrames, SOCIAL_STORE_ITEMS } from '../../utils/socialUtils'
+import { BASE_THEMES, buildAnswerProfileSnapshot, getBaseTheme, normalizeOwnedBaseThemes, normalizeOwnedFrames, SOCIAL_STORE_ITEMS } from '../../utils/socialUtils'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RADAR_DURATION_MS = RADAR_DURATION_DAYS * DAY_MS
@@ -114,14 +114,21 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
   ]
 
   const profileItems = SOCIAL_STORE_ITEMS.filter(item => item.type === 'profile')
+  const baseItems = SOCIAL_STORE_ITEMS.filter(item => item.type === 'base')
+  const baseThemeStoreCards = BASE_THEMES.map(theme => ({
+    theme,
+    item: baseItems.find(item => item.themeId === theme.id) || null,
+  }))
   const hallItems = SOCIAL_STORE_ITEMS.filter(item => item.type === 'hall')
   const crewItems = SOCIAL_STORE_ITEMS.filter(item => item.type === 'crew')
   const ownedFrames = normalizeOwnedFrames(userData)
+  const ownedBaseThemes = normalizeOwnedBaseThemes(userData)
 
   const isSocialItemOwned = (item) => {
     if (item.id === 'signature_unlock') return !!userData?.profileSignatureUnlocked
     if (item.id === 'frame_nebula') return ownedFrames.includes('nebula')
     if (item.id === 'frame_solar') return ownedFrames.includes('solar')
+    if (item.type === 'base') return ownedBaseThemes.includes(item.themeId)
     return false
   }
 
@@ -269,6 +276,8 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             amount: -item.cost,
             type: item.type === 'profile'
               ? 'agora_profile_purchase'
+              : item.type === 'base'
+                ? 'base_theme_purchase'
               : item.type === 'hall'
                 ? 'hall_purchase'
                 : item.type === 'crew'
@@ -375,6 +384,23 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
           return { purchasedCount: ownedFrames.length + 1 }
         }
 
+        if (item.type === 'base' && item.themeId) {
+          const ownedBaseThemes = normalizeOwnedBaseThemes(freshUserData)
+
+          if (ownedBaseThemes.includes(item.themeId)) {
+            throw new Error('ALREADY_OWNED')
+          }
+
+          transaction.set(userRef, {
+            crystals: freshCrystals - item.cost,
+            ownedBaseThemes: [...ownedBaseThemes, item.themeId],
+            selectedBaseTheme: item.themeId,
+          }, { merge: true })
+
+          recordPurchaseTransaction()
+          return { purchasedCount: ownedBaseThemes.length + 1 }
+        }
+
         if (item.id === 'hall_showcase_credit') {
           const currentCredits = freshUserData?.hallShowcaseCredits || 0
           transaction.set(userRef, {
@@ -438,6 +464,11 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
           type: 'success',
           text: `${item.name} 해금 완료! 프로필 명함에서 선택할 수 있습니다.`
         })
+      } else if (item.type === 'base') {
+        setPurchaseMessage({
+          type: 'success',
+          text: `${item.name} 해금 완료! 공개 탐험기지 배경으로 장착되었습니다.`
+        })
       } else if (item.id === 'hall_showcase_credit') {
         setPurchaseMessage({
           type: 'success',
@@ -488,6 +519,51 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
                   ? `${item.name}는 이미 활성화 중입니다. 만료 후 다시 구매할 수 있습니다.`
                   : '구매에 실패했습니다. 다시 시도해주세요.'
       setPurchaseMessage({ type: 'error', text: message })
+      setTimeout(() => setPurchaseMessage(null), 3000)
+    } finally {
+      setPurchasing(false)
+    }
+  }
+
+  const handleEquipBaseTheme = async (themeId) => {
+    if (purchasing || !user?.uid || !themeId) return
+    const currentThemeId = userData?.selectedBaseTheme || 'orbital'
+    if (currentThemeId === themeId) return
+
+    setPurchasing(true)
+    const userRef = doc(db, 'users', user.uid)
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const freshSnap = await transaction.get(userRef)
+        if (!freshSnap.exists()) throw new Error('User document not found')
+
+        const freshUserData = freshSnap.data()
+        const freshOwnedThemes = normalizeOwnedBaseThemes(freshUserData)
+
+        if (!freshOwnedThemes.includes(themeId)) {
+          throw new Error('BASE_THEME_NOT_OWNED')
+        }
+
+        transaction.set(userRef, {
+          selectedBaseTheme: themeId,
+        }, { merge: true })
+      })
+
+      soundManager.playClick()
+      setPurchaseMessage({
+        type: 'success',
+        text: `${getBaseTheme(themeId).name} 배경을 공개 탐험기지에 장착했습니다.`,
+      })
+      setTimeout(() => setPurchaseMessage(null), 3000)
+    } catch (err) {
+      console.error('Equip base theme failed:', err)
+      setPurchaseMessage({
+        type: 'error',
+        text: err.message === 'BASE_THEME_NOT_OWNED'
+          ? '아직 해금하지 않은 탐험기지 배경입니다.'
+          : '배경 장착에 실패했습니다. 다시 시도해주세요.',
+      })
       setTimeout(() => setPurchaseMessage(null), 3000)
     } finally {
       setPurchasing(false)
@@ -1114,6 +1190,91 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
             )
           })()
         ))}
+      </div>
+
+      <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem' }}>🛖 나의 탐험기지 배경</h3>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: '1.5rem',
+        marginBottom: '4rem'
+      }}>
+        {baseThemeStoreCards.map(({ theme, item }) => {
+          const isOwned = ownedBaseThemes.includes(theme.id)
+          const isSelected = (userData?.selectedBaseTheme || 'orbital') === theme.id
+          const cost = item?.cost || 0
+          const canAfford = (userData?.crystals || 0) >= cost
+
+          return (
+            <div key={theme.id} className="glass-card" style={{
+              padding: '1.5rem',
+              border: isSelected ? `1px solid ${theme.accent}` : '1px solid rgba(255,255,255,0.12)',
+              background: theme.pageBackground,
+              overflow: 'hidden',
+              position: 'relative'
+            }}>
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(2, 6, 23, 0.42)',
+                pointerEvents: 'none'
+              }} />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '2.5rem' }}>{theme.icon}</div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: 'var(--text-bright)' }}>{theme.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: theme.accent }}>
+                      {cost > 0 ? `💰 ${cost} 광석` : '기본 제공'}
+                    </div>
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.72)', marginBottom: '1rem', lineHeight: 1.6 }}>
+                  {item?.description || theme.description}
+                </p>
+                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.62)', marginBottom: '1rem' }}>
+                  {isSelected ? '현재 공개 탐험기지에 장착 중' : isOwned ? '해금됨 · 여기서 바로 장착 가능' : theme.description}
+                </div>
+                <button
+                  className="space-nav-link"
+                  disabled={purchasing || isSelected || (!isOwned && !canAfford)}
+                  style={{
+                    width: '100%',
+                    fontSize: '0.85rem',
+                    padding: '0.7rem',
+                    fontWeight: 800,
+                    background: isSelected
+                      ? 'rgba(107, 114, 128, 0.2)'
+                      : (!isOwned && !canAfford)
+                        ? 'rgba(239, 68, 68, 0.1)'
+                        : `${theme.accent}24`,
+                    border: isSelected
+                      ? '1px solid rgba(107, 114, 128, 0.3)'
+                      : `1px solid ${theme.accent}66`,
+                    color: isSelected ? '#9ca3af' : theme.accent,
+                    cursor: (isSelected || purchasing || (!isOwned && !canAfford)) ? 'not-allowed' : 'pointer',
+                    opacity: purchasing ? 0.7 : 1
+                  }}
+                  onClick={() => {
+                    if (isOwned) {
+                      handleEquipBaseTheme(theme.id)
+                    } else if (item) {
+                      handlePurchase(item)
+                    }
+                  }}
+                >
+                  {isSelected
+                    ? '장착 중'
+                    : isOwned
+                      ? '장착하기'
+                      : !canAfford
+                        ? `광석 부족 (${cost - (userData?.crystals || 0)}개 더 필요)`
+                        : '구매하고 장착하기'}
+                </button>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem' }}>🏆 주간 명예의 전당</h3>

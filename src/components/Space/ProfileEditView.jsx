@@ -7,8 +7,10 @@ import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
 import {
   PROFILE_TITLES,
+  getBaseTheme,
   getProfileFrame,
   getPublicProfile,
+  normalizeOwnedBaseThemes,
   normalizeOwnedFrames
 } from '../../utils/socialUtils';
 import './ProfileEditView.css';
@@ -43,10 +45,12 @@ export default function ProfileEditView({ onBack }) {
     publicDisplayName: '',
     publicTitle: PROFILE_TITLES[0],
     publicSignature: '',
-    selectedProfileFrame: 'starter'
+    selectedProfileFrame: 'starter',
+    selectedBaseTheme: 'orbital'
   });
 
   const ownedFrames = useMemo(() => normalizeOwnedFrames(userData), [userData]);
+  const ownedBaseThemes = useMemo(() => normalizeOwnedBaseThemes(userData), [userData]);
   const publicProfile = useMemo(
     () => getPublicProfile(
       {
@@ -56,6 +60,7 @@ export default function ProfileEditView({ onBack }) {
         publicTitle: formData.publicTitle,
         publicSignature: formData.publicSignature,
         selectedProfileFrame: formData.selectedProfileFrame,
+        selectedBaseTheme: formData.selectedBaseTheme,
         crewName: userData?.crewName,
         crewRole: userData?.crewRole,
         crewColor: userData?.crewColor
@@ -77,7 +82,10 @@ export default function ProfileEditView({ onBack }) {
         publicSignature: userData.publicSignature || '',
         selectedProfileFrame: normalizeOwnedFrames(userData).includes(userData.selectedProfileFrame)
           ? userData.selectedProfileFrame
-          : normalizeOwnedFrames(userData)[0]
+          : normalizeOwnedFrames(userData)[0],
+        selectedBaseTheme: normalizeOwnedBaseThemes(userData).includes(userData.selectedBaseTheme)
+          ? userData.selectedBaseTheme
+          : normalizeOwnedBaseThemes(userData)[0]
       });
     }
   }, [userData, user]);
@@ -148,6 +156,7 @@ export default function ProfileEditView({ onBack }) {
         ? formData.publicSignature.trim().slice(0, 28)
         : (userData?.publicSignature || '');
       const selectedFrame = ownedFrames.includes(formData.selectedProfileFrame) ? formData.selectedProfileFrame : ownedFrames[0];
+      const selectedBaseTheme = ownedBaseThemes.includes(formData.selectedBaseTheme) ? formData.selectedBaseTheme : ownedBaseThemes[0];
       const mergedProfileData = {
         ...userData,
         studentName: formData.studentName.trim(),
@@ -157,6 +166,7 @@ export default function ProfileEditView({ onBack }) {
         publicTitle: formData.publicTitle.trim(),
         publicSignature,
         selectedProfileFrame: selectedFrame,
+        selectedBaseTheme,
         crewId: userData?.crewId || '',
         crewName: userData?.crewName || '',
         crewRole: userData?.crewRole || '',
@@ -174,6 +184,7 @@ export default function ProfileEditView({ onBack }) {
         publicTitle: formData.publicTitle.trim(),
         publicSignature,
         selectedProfileFrame: selectedFrame,
+        selectedBaseTheme,
         profileUpdatedAt: serverTimestamp()
       });
 
@@ -294,7 +305,7 @@ export default function ProfileEditView({ onBack }) {
                   </div>
                 </div>
                 <div style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.72)' }}>
-                  도움 {userData?.helpCount || 0}회 · 질문 {userData?.questionCount || 0}회
+                  도움 {userData?.helpCount || 0}회 · 질문 {userData?.questionCount || 0}회 · 기지 {getBaseTheme(formData.selectedBaseTheme).name}
                 </div>
                 {publicProfile.publicSignature && (
                   <div style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', borderTop: '1px dashed rgba(255,255,255,0.12)', paddingTop: '0.8rem', fontStyle: 'italic' }}>
@@ -355,6 +366,19 @@ export default function ProfileEditView({ onBack }) {
                     {ownedFrames.map(frameId => {
                       const frame = getProfileFrame(frameId);
                       return <option key={frame.id} value={frame.id}>{frame.name}</option>;
+                    })}
+                  </select>
+                </Field>
+
+                <Field label="탐험기지 배경" hint="공개 탐험기지 페이지의 전체 배경에 적용됩니다.">
+                  <select
+                    className="space-input"
+                    value={formData.selectedBaseTheme}
+                    onChange={(e) => setFormData({ ...formData, selectedBaseTheme: e.target.value })}
+                  >
+                    {ownedBaseThemes.map(themeId => {
+                      const theme = getBaseTheme(themeId);
+                      return <option key={theme.id} value={theme.id}>{theme.icon} {theme.name}</option>;
                     })}
                   </select>
                 </Field>

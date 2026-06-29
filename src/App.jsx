@@ -30,6 +30,7 @@ import AdminStudentReport from './pages/Admin/AdminStudentReport'
 import MonthlyEvaluationAwards from './pages/Admin/MonthlyEvaluationAwards'
 import Agora from './pages/Community/Agora'
 import QuestionDetail from './pages/Community/QuestionDetail'
+import PublicProfile from './pages/Community/PublicProfile'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import InviteHandler from './pages/InviteHandler'
 import PublicApplication from './pages/PublicApplication'
@@ -93,6 +94,11 @@ function App() {
       <Route path="/agora/:questionId" element={
         <PrivateRoute>
           <QuestionDetail />
+        </PrivateRoute>
+      } />
+      <Route path="/profile/:uid" element={
+        <PrivateRoute>
+          <PublicProfile />
         </PrivateRoute>
       } />
       <Route path="/privacy" element={<PrivacyPolicy />} />

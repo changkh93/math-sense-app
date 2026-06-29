@@ -125,6 +125,21 @@
   min-width: 180px;
 }
 
+button.answer-identity-card {
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.answer-identity-card-link {
+  cursor: pointer;
+}
+
+.answer-identity-card-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.14);
+}
+
 .answer-identity-top {
   display: flex;
   align-items: center;

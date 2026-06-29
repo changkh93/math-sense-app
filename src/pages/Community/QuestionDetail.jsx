@@ -295,54 +295,70 @@ export default function QuestionDetail() {
       frameAccent,
       frameBackground
     } = getAnswerPresentation(answer);
+    const canOpenPublicProfile = Boolean(answer.userId) && !answer.isTeacher && answer.userId !== 'admin';
+    const identityCardStyle = {
+      border: `1px solid ${frameAccent}55`,
+      background: frameBackground,
+    };
+    const identityCardContent = (
+      <>
+        <div className="answer-identity-top">
+          <span className="answer-identity-name">{displayName}</span>
+          {signature && !answer.isTeacher && (
+            <span style={{
+              maxWidth: '240px',
+              padding: '2px 8px',
+              borderRadius: '999px',
+              background: `${frameAccent}18`,
+              border: `1px solid ${frameAccent}55`,
+              color: frameAccent,
+              fontSize: '0.72rem',
+              lineHeight: 1.3,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              {signature}
+            </span>
+          )}
+          {title && <span className="answer-identity-title">{title}</span>}
+          {frameName && (
+            <span className="answer-identity-frame">
+              {frameName}
+            </span>
+          )}
+        </div>
+        {(crewName || !answer.isTeacher) && (
+          <div className="answer-identity-meta">
+            {crewName && <span style={{ color: profile.crewColor || frameAccent }}>🛰️ {crewName}</span>}
+            {!crewName && !answer.isTeacher && <span>공개 답변자</span>}
+          </div>
+        )}
+        <div className="answer-time-row" title={getDateFromTimestamp(answer.createdAt)?.toLocaleString('ko-KR') || undefined}>
+          <Clock size={13} />
+          <span>{timeLabel} {formatAgoraTimestamp(answer.createdAt)}</span>
+        </div>
+      </>
+    );
 
     return (
       <div className="author-info">
         {answer.isTeacher && <span className="teacher-badge">선생님</span>}
-        <div
-          className="answer-identity-card"
-          style={{
-            border: `1px solid ${frameAccent}55`,
-            background: frameBackground,
-          }}
-        >
-          <div className="answer-identity-top">
-            <span className="answer-identity-name">{displayName}</span>
-            {signature && !answer.isTeacher && (
-              <span style={{
-                maxWidth: '240px',
-                padding: '2px 8px',
-                borderRadius: '999px',
-                background: `${frameAccent}18`,
-                border: `1px solid ${frameAccent}55`,
-                color: frameAccent,
-                fontSize: '0.72rem',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {signature}
-              </span>
-            )}
-            {title && <span className="answer-identity-title">{title}</span>}
-            {frameName && (
-              <span className="answer-identity-frame">
-                {frameName}
-              </span>
-            )}
+        {canOpenPublicProfile ? (
+          <button
+            type="button"
+            className="answer-identity-card answer-identity-card-link"
+            style={identityCardStyle}
+            onClick={() => navigate(`/profile/${answer.userId}`)}
+            aria-label={`${displayName}님의 탐험기지 보기`}
+          >
+            {identityCardContent}
+          </button>
+        ) : (
+          <div className="answer-identity-card" style={identityCardStyle}>
+            {identityCardContent}
           </div>
-          {(crewName || !answer.isTeacher) && (
-            <div className="answer-identity-meta">
-              {crewName && <span style={{ color: profile.crewColor || frameAccent }}>🛰️ {crewName}</span>}
-              {!crewName && !answer.isTeacher && <span>공개 답변자</span>}
-            </div>
-          )}
-          <div className="answer-time-row" title={getDateFromTimestamp(answer.createdAt)?.toLocaleString('ko-KR') || undefined}>
-            <Clock size={13} />
-            <span>{timeLabel} {formatAgoraTimestamp(answer.createdAt)}</span>
-          </div>
-        </div>
+        )}
       </div>
     );
   };

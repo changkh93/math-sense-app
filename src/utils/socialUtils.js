@@ -48,6 +48,45 @@ export const PROFILE_TITLES = [
   '성장 중인 파일럿'
 ];
 
+export const BASE_THEMES = [
+  {
+    id: 'orbital',
+    name: '기본 궤도 기지',
+    icon: '🛰️',
+    accent: '#00f3ff',
+    pageBackground: 'var(--space-gradient)',
+    surface: 'rgba(15, 23, 42, 0.72)',
+    description: '메타센스 기본 우주 기지 배경입니다.',
+  },
+  {
+    id: 'aurora_observatory',
+    name: '오로라 관측소',
+    icon: '🌌',
+    accent: '#34d399',
+    pageBackground: 'radial-gradient(circle at 18% 18%, rgba(52, 211, 153, 0.24), transparent 32%), radial-gradient(circle at 78% 12%, rgba(96, 165, 250, 0.2), transparent 34%), linear-gradient(135deg, #071a1a 0%, #0f172a 52%, #10233d 100%)',
+    surface: 'rgba(8, 30, 32, 0.74)',
+    description: '차분한 녹청빛 관측소 분위기의 탐험기지 배경입니다.',
+  },
+  {
+    id: 'solar_archive',
+    name: '황금 기록보관소',
+    icon: '☀️',
+    accent: '#f59e0b',
+    pageBackground: 'radial-gradient(circle at 78% 16%, rgba(245, 158, 11, 0.24), transparent 34%), radial-gradient(circle at 16% 72%, rgba(239, 68, 68, 0.12), transparent 34%), linear-gradient(135deg, #1f1306 0%, #111827 52%, #2a1808 100%)',
+    surface: 'rgba(30, 20, 10, 0.8)',
+    description: '화려한 황금 천정과 기록관 벽면이 보이는 탐험기지 배경입니다.',
+  },
+  {
+    id: 'deep_lab',
+    name: '심해 연구기지',
+    icon: '🔬',
+    accent: '#38bdf8',
+    pageBackground: 'radial-gradient(circle at 22% 18%, rgba(56, 189, 248, 0.22), transparent 32%), radial-gradient(circle at 72% 78%, rgba(20, 184, 166, 0.14), transparent 36%), linear-gradient(135deg, #061826 0%, #0f172a 54%, #082f49 100%)',
+    surface: 'rgba(5, 20, 32, 0.82)',
+    description: '생물발광 산호와 유리 돔 연구기지가 보이는 심해 탐험 배경입니다.',
+  },
+];
+
 export const SOCIAL_STORE_ITEMS = [
   {
     id: 'signature_unlock',
@@ -72,6 +111,33 @@ export const SOCIAL_STORE_ITEMS = [
     cost: 150,
     type: 'profile',
     description: '랭킹과 답변 카드에서 눈에 띄는 금빛 프레임을 해금합니다.',
+  },
+  {
+    id: 'base_aurora_observatory',
+    name: '오로라 관측소',
+    icon: '🌌',
+    cost: 120,
+    type: 'base',
+    themeId: 'aurora_observatory',
+    description: '나의 탐험기지 공개 페이지에 녹청빛 관측소 배경을 적용할 수 있습니다.',
+  },
+  {
+    id: 'base_solar_archive',
+    name: '황금 기록보관소',
+    icon: '☀️',
+    cost: 160,
+    type: 'base',
+    themeId: 'solar_archive',
+    description: '공개 탐험기지에 화려한 황금 기록관 배경을 적용할 수 있습니다.',
+  },
+  {
+    id: 'base_deep_lab',
+    name: '심해 연구기지',
+    icon: '🔬',
+    cost: 140,
+    type: 'base',
+    themeId: 'deep_lab',
+    description: '공개 탐험기지에 생물발광 산호와 심해 연구 돔 배경을 적용할 수 있습니다.',
   },
   {
     id: 'hall_showcase_credit',
@@ -110,6 +176,10 @@ export function getAnonymousLabel(seed) {
 
 export function getProfileFrame(frameId) {
   return PROFILE_FRAMES.find(frame => frame.id === frameId) || PROFILE_FRAMES[0];
+}
+
+export function getBaseTheme(themeId) {
+  return BASE_THEMES.find(theme => theme.id === themeId) || BASE_THEMES[0];
 }
 
 export function getFrameSurfaceStyles(frameId, mode = 'panel') {
@@ -175,6 +245,7 @@ export function getPublicProfile(userData = {}, fallbackName = '탐험가') {
     helpCount: safeUserData.helpCount || 0,
     questionCount: safeUserData.questionCount || 0,
     hallSpotlightUntilMs: safeUserData.hallSpotlightUntilMs || 0,
+    selectedBaseTheme: getBaseTheme(safeUserData.selectedBaseTheme).id,
   };
 }
 
@@ -182,6 +253,12 @@ export function normalizeOwnedFrames(userData = {}) {
   const safeUserData = userData && typeof userData === 'object' ? userData : {};
   const owned = Array.isArray(safeUserData.ownedProfileFrames) ? safeUserData.ownedProfileFrames : [];
   return Array.from(new Set(['starter', ...owned]));
+}
+
+export function normalizeOwnedBaseThemes(userData = {}) {
+  const safeUserData = userData && typeof userData === 'object' ? userData : {};
+  const owned = Array.isArray(safeUserData.ownedBaseThemes) ? safeUserData.ownedBaseThemes : [];
+  return Array.from(new Set(['orbital', ...owned]));
 }
 
 export function buildAnswerProfileSnapshot(userData = {}, fallbackName = '탐험가') {

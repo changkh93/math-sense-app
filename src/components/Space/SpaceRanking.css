@@ -65,6 +65,31 @@
 .rule-icon-blue { color: var(--crystal-cyan); }
 .rule-icon-purple { color: #a55eea; }
 
+.ranking-profile-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ranking-profile-link:hover {
+  color: var(--crystal-cyan) !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ranking-profile-link-inline {
+  color: var(--text-bright);
+  font-weight: 700;
+}
+
 @media (max-width: 768px) {
   .guide-grid {
     grid-template-columns: 1fr;
