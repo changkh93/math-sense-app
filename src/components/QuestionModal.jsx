@@ -66,6 +66,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       resolvePendingExtensionCapture({ error: 'Question modal closed' });
       captureFlowLockRef.current = false;
       // Reset state when closing modal to prevent stale data
+      setContent('');
+      setType('quiz');
+      setIsPublic(true);
       setTempDrawing(null);
       setAttachedImage(null);
       setCanvasState(null);
@@ -641,7 +644,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       });
       
       queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });
-      
+
+      setContent('');
+      setType('quiz');
+      setIsPublic(true);
       setTempDrawing(null);
       setAttachedImage(null);
       setCanvasState(null);
