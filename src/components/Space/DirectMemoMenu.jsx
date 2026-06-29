@@ -28,19 +28,6 @@ function getMemoTime(value) {
   }).format(date);
 }
 
-function getFullMemoTime(value) {
-  const date = value?.toDate?.();
-  if (!date) return '';
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
-
 function getErrorMessage(err) {
   if (err?.code === 'permission-denied') {
     return '편지함 권한이 아직 열리지 않았습니다. Firestore rules 배포가 필요합니다.';
@@ -308,11 +295,7 @@ export default function DirectMemoMenu() {
       setRecipientSearch('');
       setActiveTab('sent');
       const data = res?.data || {};
-      if (data.status === 'scheduled') {
-        setMessage(`${data.recipientName || '상대방'}님에게 오늘 이미 편지를 보냈습니다. 이 편지는 24시간 뒤(${getFullMemoTime({ toDate: () => new Date(data.deliverAtMillis) })}) 발송됩니다.`);
-      } else {
-        setMessage(`${data.recipientName || '상대방'}님에게 편지를 보냈습니다.`);
-      }
+      setMessage(`${data.recipientName || '상대방'}님에게 편지를 보냈습니다.`);
     } catch (err) {
       console.error('Failed to send direct memo:', err);
       setMessage(getErrorMessage(err));
@@ -575,7 +558,7 @@ export default function DirectMemoMenu() {
                   <Send size={15} /> {action === 'sending' ? '보내는 중...' : '보내기'}
                 </button>
               </div>
-              <p className="direct-memo-rule">같은 상대에게 즉시 배달되는 편지는 24시간에 1개입니다. 추가 편지는 보내기 후 24시간 뒤 자동 발송됩니다.</p>
+              <p className="direct-memo-rule">스터디 약속과 질문을 자유롭게 주고받을 수 있습니다. 서로에게 필요한 말만 짧고 안전하게 남겨주세요.</p>
             </div>
           ) : (
             <div className="direct-memo-list">

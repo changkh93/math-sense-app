@@ -335,7 +335,7 @@ export default function CrewDetailView({ onBack }) {
   const handleEnterMeet = async () => {
     if (!crewId || roomAction) return;
     setRoomAction('entering');
-    setMessage('Google Meet 주소 확인 중...');
+    setMessage('Google Meet 대기방 확인 중...');
     soundManager.playClick();
     try {
       const fn = httpsCallable(functions, 'enterStudyCrewMeet');
@@ -343,7 +343,7 @@ export default function CrewDetailView({ onBack }) {
       const googleMeetUrl = res?.data?.googleMeetUrl || '';
       if (!googleMeetUrl) throw new Error('Google Meet 주소가 아직 준비되지 않았습니다.');
       window.open(googleMeetUrl, '_blank', 'noopener,noreferrer');
-      setMessage('Google Meet을 새 탭으로 열었습니다.');
+      setMessage('Google Meet 대기방을 새 탭으로 열었습니다.');
     } catch (e) { setMessage(getFunctionsErrorMessage(e, e?.message || '입장 실패.')); }
     finally { setRoomAction(''); }
   };
@@ -446,7 +446,7 @@ export default function CrewDetailView({ onBack }) {
             <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>GOOGLE MEET</div>
             <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: isMobile ? '1.1rem' : '1.2rem', marginTop: '0.15rem' }}>크루 집중방 입장</div>
             <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem', lineHeight: 1.55 }}>
-              운영자가 등록한 Google Meet이 새 탭으로 열립니다.
+              운영자가 준비한 Google Meet 대기방이 새 탭으로 열립니다.
             </div>
           </div>
           <button

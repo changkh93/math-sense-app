@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AlertTriangle, CalendarDays, ChevronDown, Crown, Edit3, ExternalLink, Loader2, Mail, Plus, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Mail, Plus, Radio, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
 import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
 import CrewDetailView from './CrewDetailView';
+import StudyCrewDailyMission from './StudyCrewDailyMission';
 import { formatCrewSchedule } from './crewSchedule';
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '활동 중' : s === 'rejected' ? '반려됨' : '승인 대기'; }
@@ -16,16 +17,31 @@ function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)'
 function getProfileName(profile = {}, fallback = '탐사원') {
   return profile.publicDisplayName || profile.studentName || profile.name || profile.displayName || fallback;
 }
-function getFullMemoTime(value) {
-  const date = value?.toDate?.();
-  if (!date) return '';
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+function getProfileGrade(profile = {}) {
+  return profile.gradeLabel || profile.grade || profile.schoolGrade || profile.studentGrade || '학년 미지정';
+}
+function getProfileCourse(profile = {}) {
+  return profile.selectedCourse || profile.courseName || profile.currentCourse || profile.clusterName || '과정 미지정';
+}
+function getProfileCrewName(profile = {}) {
+  return profile.crewName || profile.crewSnapshot?.name || '소속 크루 없음';
+}
+function getTimestampMs(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+function isLiveStudent(profile = {}, now = Date.now()) {
+  const live = profile.liveStatus || {};
+  const updatedMs = getTimestampMs(live.lastUpdatedAt);
+  if (!updatedMs || now - updatedMs > 5 * 60 * 1000) return false;
+  return live.state === 'online' || live.state === 'away';
+}
+function formatLiveState(profile = {}) {
+  const live = profile.liveStatus || {};
+  if (live.state === 'away') return { label: '자리비움', color: '#fbbf24', dot: '#fbbf24' };
+  return { label: '온라인', color: 'var(--planet-green)', dot: '#22c55e' };
 }
 function getMemoErrorMessage(err) {
   if (err?.code === 'permission-denied') return '편지함 권한이 아직 열리지 않았습니다. Firestore rules 배포가 필요합니다.';
@@ -36,8 +52,8 @@ function getMemoErrorMessage(err) {
 const FAQ_ITEMS = [
   { q: '스터디 크루란 무엇인가요?', a: '스터디 크루는 함께 공부할 멤버를 정하고 Google Meet에서 만나 학습 리듬을 유지하는 프리미엄 스터디 그룹입니다.' },
   { q: '창설권과 참여권의 차이는 무엇인가요?', a: '창설권(1,000광석)은 새 크루를 만들 때 필요하고, 참여권(300광석)은 다른 크루에 합류할 때 필요합니다. 두 가지 모두 스토어에서 구매할 수 있습니다.' },
-  { q: '집중방은 어떻게 사용하나요?', a: '크루가 운영자 승인을 받고 Google Meet 주소가 준비되면 참여하기 버튼으로 바로 입장합니다.' },
-  { q: '몇 명까지 참여할 수 있나요?', a: '앱에서는 인원 제한을 두지 않습니다. 실제 입장 가능 인원은 등록된 Google Meet 정책을 따릅니다.' },
+  { q: '집중방은 어떻게 사용하나요?', a: '오픈 스터디나 내 크루에서 참여하기를 누르면 운영자가 준비한 Google Meet 대기방으로 입장합니다.' },
+  { q: '몇 명까지 참여할 수 있나요?', a: '입장 가능 인원과 운영 방식은 등록된 Google Meet 정책을 따릅니다.' },
   { q: '크루 승인은 얼마나 걸리나요?', a: '운영자가 크루 이름과 모토를 확인한 후 승인합니다. 보통 1~2일 이내에 처리됩니다.' },
 ];
 
@@ -96,11 +112,7 @@ function FounderLetterPanel({ crew, founderId, founderName, currentUid }) {
       });
       const data = res?.data || {};
       setDraft('');
-      if (data.status === 'scheduled') {
-        setStatus(`${data.recipientName || founderName}님에게 오늘 이미 편지를 보냈습니다. 이 편지는 24시간 뒤(${getFullMemoTime({ toDate: () => new Date(data.deliverAtMillis) })}) 발송됩니다.`);
-      } else {
-        setStatus(`${data.recipientName || founderName}님에게 편지를 보냈습니다.`);
-      }
+      setStatus(`${data.recipientName || founderName}님에게 편지를 보냈습니다.`);
     } catch (err) {
       console.error('Failed to send crew founder memo:', err);
       setStatus(getMemoErrorMessage(err));
@@ -360,7 +372,8 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
   );
 }
 
-function OpenStudyCard({ pool, recommended, disabled, joining, onJoin }) {
+function OpenStudyCard({ pool, recommended, disabled, joining, onJoin, activity }) {
+  const activeNames = activity?.names || [];
   return (
     <Motion.div
       whileHover={{ y: disabled ? 0 : -3 }}
@@ -411,9 +424,17 @@ function OpenStudyCard({ pool, recommended, disabled, joining, onJoin }) {
       <div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
           <span className="font-tech" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '0.32rem' }}>
-            <ExternalLink size={13} /> Google Meet 새 탭 입장
+            <Radio size={13} /> 현재 {activity?.count || 0}명 접속 중
+          </span>
+          <span className="font-tech" style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.76rem' }}>
+            Google Meet 대기방
           </span>
         </div>
+        {activeNames.length > 0 && (
+          <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.76rem', lineHeight: 1.45, marginBottom: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {activeNames.slice(0, 3).join(', ')}{activity.count > 3 ? ` 외 ${activity.count - 3}명` : ''}
+          </div>
+        )}
         <button
           type="button"
           className={`space-btn font-tech ${recommended ? 'cosmic-btn' : ''}`}
@@ -440,10 +461,330 @@ function OpenStudyCard({ pool, recommended, disabled, joining, onJoin }) {
   );
 }
 
+function OpenStudyWaitingRoom({ pool, activity, activeStudents, recommended, joining, onBack, onEnterMeet, onOpenLivePanel, isMobile }) {
+  return (
+    <div className="fade-in" style={{ minHeight: '100vh', padding: isMobile ? '1rem 0.75rem 6.5rem' : '2rem 1rem 6rem' }}>
+      <div style={{ maxWidth: 980, margin: '0 auto', width: '100%' }}>
+        <button
+          type="button"
+          className="space-nav-link font-tech"
+          onClick={onBack}
+          style={{ borderRadius: 10, marginBottom: '1.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+        >
+          <ArrowLeft size={16} /> 오픈 스터디 목록으로
+        </button>
+
+        <section className="glass-card hud-border" style={{ borderRadius: 16, padding: isMobile ? '1.2rem' : '1.5rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{
+              width: 52,
+              height: 52,
+              borderRadius: 12,
+              background: pool.color,
+              boxShadow: `0 0 22px ${pool.color}55`,
+              flexShrink: 0,
+            }} />
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <div className="font-tech" style={{ color: pool.color, fontWeight: 900, fontSize: '0.78rem', letterSpacing: '0.08em' }}>
+                OPEN GRADE STUDY
+              </div>
+              <h2 className="font-title" style={{ color: 'var(--text-bright)', fontSize: isMobile ? '1.55rem' : '2rem', margin: '0.28rem 0 0' }}>
+                {pool.title}
+              </h2>
+              <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.92rem', lineHeight: 1.6, margin: '0.45rem 0 0' }}>
+                {pool.desc}
+              </p>
+            </div>
+            {recommended && (
+              <span className="font-tech" style={{
+                color: '#06111f',
+                background: pool.color,
+                borderRadius: 999,
+                padding: '0.32rem 0.65rem',
+                fontSize: '0.74rem',
+                fontWeight: 900,
+                whiteSpace: 'nowrap',
+              }}>
+                내 추천
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: '0.7rem', marginTop: '1.15rem' }}>
+            {[
+              { label: '학년', value: pool.label },
+              { label: '접속', value: `${activity?.count || 0}명` },
+              { label: '방식', value: 'Google Meet' },
+            ].map((item) => (
+              <div key={item.label} style={{ background: 'rgba(7,13,30,0.72)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '0.85rem' }}>
+                <div className="font-tech" style={{ color: 'rgba(255,255,255,0.48)', fontSize: '0.72rem', marginBottom: '0.25rem' }}>
+                  {item.label}
+                </div>
+                <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 900 }}>
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="glass-card hud-border" style={{ borderRadius: 16, padding: isMobile ? '1.1rem' : '1.35rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: isMobile ? 'stretch' : 'center', flexDirection: isMobile ? 'column' : 'row' }}>
+            <div>
+              <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.78rem', letterSpacing: '0.08em' }}>
+                GOOGLE MEET
+              </div>
+              <h3 className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.2rem', margin: '0.32rem 0 0' }}>
+                오픈 스터디 집중방 입장
+              </h3>
+              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.45rem', lineHeight: 1.55 }}>
+                준비된 Meet 대기방이 새 탭으로 열립니다.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="space-btn cosmic-btn font-tech"
+              onClick={() => onEnterMeet(pool.id)}
+              disabled={joining}
+              style={{ minHeight: 46, borderRadius: 12, minWidth: isMobile ? '100%' : 190, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+            >
+              {joining ? <Loader2 size={17} className="spin" /> : <Sparkles size={17} />}
+              {joining ? '입장 확인 중...' : 'Google Meet 입장'}
+            </button>
+          </div>
+        </section>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <StudyCrewDailyMission
+            scopeType="openStudy"
+            scopeId={pool.id}
+            targetCount={1}
+            teamRewardsEnabled={false}
+          />
+        </div>
+
+        <section className="glass-card hud-border" style={{ borderRadius: 16, padding: isMobile ? '1.1rem' : '1.35rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.85rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
+            <div>
+              <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.78rem', letterSpacing: '0.08em' }}>
+                LIVE STUDENTS
+              </div>
+              <h3 className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.08rem', margin: '0.28rem 0 0' }}>
+                같은 학년대 접속 학생
+              </h3>
+            </div>
+            <button
+              type="button"
+              className="space-nav-link font-tech"
+              onClick={onOpenLivePanel}
+              style={{ borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Users size={15} /> 전체 보기
+            </button>
+          </div>
+
+          {activeStudents.length === 0 ? (
+            <div className="font-tech" style={{ color: 'var(--text-muted)', padding: '0.85rem', borderRadius: 10, background: 'rgba(7,13,30,0.55)' }}>
+              지금 이 학년대에 표시할 온라인 학생이 없습니다.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.65rem' }}>
+              {activeStudents.slice(0, 6).map((student) => {
+                const state = formatLiveState(student.profile);
+                return (
+                  <div key={student.uid} style={{ padding: '0.75rem', borderRadius: 10, background: 'rgba(7,13,30,0.62)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 900, marginBottom: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {student.name}
+                    </div>
+                    <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.76rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {student.grade} · {student.course}
+                    </div>
+                    <div className="font-tech" style={{ color: state.color, fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.28rem', marginTop: '0.45rem' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 999, background: state.dot }} />
+                      {state.label}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function LiveStudentDrawer({
+  isOpen,
+  onClose,
+  students,
+  currentUid,
+  currentCrewId,
+  hasCrew,
+  inviteAction,
+  onInviteStudent,
+  onOpenCreateCrew,
+  onOpenMyCrew,
+}) {
+  const visibleStudents = students.slice(0, 24);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <Motion.button
+            type="button"
+            aria-label="온라인 학생 패널 닫기"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1180,
+              background: 'rgba(0,0,0,0.34)',
+              border: 0,
+              padding: 0,
+              cursor: 'default',
+            }}
+          />
+          <Motion.aside
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+            className="hud-border"
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1190,
+              width: 'min(390px, 92vw)',
+              background: 'rgba(7,13,30,0.97)',
+              boxShadow: '-24px 0 50px rgba(0,0,0,0.35)',
+              padding: '1rem',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 900, fontSize: '0.78rem', letterSpacing: '0.08em' }}>
+                  LIVE STATUS
+                </div>
+                <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.28rem 0 0', fontSize: '1.25rem' }}>
+                  지금 접속 중
+                </h3>
+                <div className="font-tech" style={{ color: 'rgba(255,255,255,0.52)', fontSize: '0.78rem', marginTop: '0.25rem' }}>
+                  최근 5분 내 온라인 {students.length}명
+                </div>
+              </div>
+              <button
+                type="button"
+                className="space-nav-link font-tech"
+                onClick={onClose}
+                style={{ borderRadius: 8, minWidth: 38, minHeight: 34, padding: '0.35rem 0.6rem' }}
+              >
+                닫기
+              </button>
+            </div>
+
+            {visibleStudents.length === 0 ? (
+              <div className="glass-card hud-border" style={{ padding: '1rem', borderRadius: 10, color: 'var(--text-muted)' }}>
+                지금은 표시할 온라인 학생이 없습니다.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '0.55rem' }}>
+                {visibleStudents.map((student) => {
+                  const state = formatLiveState(student.profile);
+                  const isSelf = student.uid === currentUid;
+                  const isSameCrew = hasCrew && student.profile.crewId === currentCrewId;
+                  const actionLabel = isSelf ? '나' : !hasCrew ? '크루 만들기' : isSameCrew ? '내 크루 보기' : '공부 제안';
+                  const isSending = inviteAction === student.uid;
+                  return (
+                    <div key={student.uid} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '38px minmax(0, 1fr)',
+                      gap: '0.7rem',
+                      alignItems: 'center',
+                      padding: '0.75rem',
+                      borderRadius: 10,
+                      background: isSelf ? 'rgba(0,243,255,0.08)' : 'rgba(255,255,255,0.045)',
+                      border: isSelf ? '1px solid rgba(0,243,255,0.2)' : '1px solid rgba(255,255,255,0.08)',
+                    }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: student.profile.crewColor || '#00d4ff', display: 'grid', placeItems: 'center', color: '#06111f', fontWeight: 900 }}>
+                        {(student.name || '?').slice(0, 1)}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {student.name}{isSelf ? ' (나)' : ''}
+                          </div>
+                          <span className="font-tech" style={{ color: state.color, fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.28rem', flexShrink: 0 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: 999, background: state.dot }} />
+                            {state.label}
+                          </span>
+                        </div>
+                        <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.73rem', marginTop: '0.22rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {student.grade} · {student.course}
+                        </div>
+                        <div className="font-tech" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.73rem', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {student.crewName} · {student.location}
+                        </div>
+                        <button
+                          type="button"
+                          className={isSelf ? 'space-nav-link font-tech' : 'space-btn font-tech'}
+                          onClick={() => {
+                            if (isSelf) return;
+                            if (!hasCrew) {
+                              onOpenCreateCrew();
+                              return;
+                            }
+                            if (isSameCrew) {
+                              onOpenMyCrew();
+                              return;
+                            }
+                            onInviteStudent(student);
+                          }}
+                          disabled={isSelf || isSending}
+                          style={{
+                            marginTop: '0.65rem',
+                            width: '100%',
+                            minHeight: 34,
+                            borderRadius: 9,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.38rem',
+                            background: isSelf ? 'rgba(255,255,255,0.04)' : 'rgba(0,243,255,0.1)',
+                            border: isSelf ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,243,255,0.22)',
+                            color: isSelf ? 'rgba(255,255,255,0.45)' : 'var(--crystal-cyan)',
+                          }}
+                        >
+                          {isSending ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+                          {isSending ? '보내는 중...' : actionLabel}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export default function StudyCrewView({ onNavigateStore }) {
   const { user, userData } = useAuth();
   const [directoryCrews, setDirectoryCrews] = useState([]);
   const [openStudyAction, setOpenStudyAction] = useState('');
+  const [openStudyWaitingPoolId, setOpenStudyWaitingPoolId] = useState('');
+  const [livePanelOpen, setLivePanelOpen] = useState(false);
+  const [liveInviteAction, setLiveInviteAction] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
   const [crewOnlineCounts, setCrewOnlineCounts] = useState({});
   const [userProfileById, setUserProfileById] = useState({});
@@ -569,7 +910,64 @@ export default function StudyCrewView({ onNavigateStore }) {
     [userData?.grade, userData?.schoolGrade, userData?.studentGrade]
   );
 
-  const handleJoinOpenStudy = async (poolId) => {
+  const liveStudents = useMemo(() => {
+    const now = Date.now();
+    return Object.values(userProfileById)
+      .filter(profile => profile?.uid && profile.role !== 'admin' && profile.role !== 'parent' && isLiveStudent(profile, now))
+      .map(profile => {
+        return {
+          uid: profile.uid,
+          profile,
+          name: getProfileName(profile),
+          grade: getProfileGrade(profile),
+          course: getProfileCourse(profile),
+          crewName: getProfileCrewName(profile),
+          location: profile.liveStatus?.currentLocation || '메인 화면',
+        };
+      })
+      .sort((a, b) => {
+        const aSelf = a.uid === user?.uid ? 0 : 1;
+        const bSelf = b.uid === user?.uid ? 0 : 1;
+        if (aSelf !== bSelf) return aSelf - bSelf;
+        const aCrew = a.profile.crewId === crewId ? 0 : 1;
+        const bCrew = b.profile.crewId === crewId ? 0 : 1;
+        if (aCrew !== bCrew) return aCrew - bCrew;
+        return (b.profile.liveStatus?.lastUpdatedAt?.toMillis?.() || 0) - (a.profile.liveStatus?.lastUpdatedAt?.toMillis?.() || 0);
+      });
+  }, [crewId, user?.uid, userProfileById]);
+
+  const openStudyActivityByPool = useMemo(() => {
+    const next = {};
+    OPEN_STUDY_POOLS.forEach(pool => { next[pool.id] = { count: 0, names: [] }; });
+    liveStudents.forEach(student => {
+      const poolId = normalizeOpenStudyPoolIdFromGrade(student.profile.grade || student.profile.schoolGrade || student.profile.studentGrade);
+      if (!poolId || !next[poolId]) return;
+      next[poolId].count += 1;
+      next[poolId].names.push(student.name);
+    });
+    return next;
+  }, [liveStudents]);
+
+  const selectedOpenStudyPool = useMemo(
+    () => OPEN_STUDY_POOLS.find(pool => pool.id === openStudyWaitingPoolId) || null,
+    [openStudyWaitingPoolId]
+  );
+
+  const selectedOpenStudyStudents = useMemo(() => {
+    if (!selectedOpenStudyPool) return [];
+    return liveStudents.filter(student => {
+      const poolId = normalizeOpenStudyPoolIdFromGrade(student.profile.grade || student.profile.schoolGrade || student.profile.studentGrade);
+      return poolId === selectedOpenStudyPool.id;
+    });
+  }, [liveStudents, selectedOpenStudyPool]);
+
+  const handleJoinOpenStudy = (poolId) => {
+    if (!user?.uid) return;
+    soundManager.playClick();
+    setOpenStudyWaitingPoolId(poolId);
+  };
+
+  const handleEnterOpenStudyMeet = async (poolId) => {
     if (!user?.uid || openStudyAction) return;
     soundManager.playClick();
     setOpenStudyAction(poolId);
@@ -585,6 +983,36 @@ export default function StudyCrewView({ onNavigateStore }) {
       alert(err?.message || '오픈 스터디에 참여하지 못했습니다.');
     } finally {
       setOpenStudyAction('');
+    }
+  };
+
+  const handleInviteLiveStudent = async (student) => {
+    if (!user?.uid || !student?.uid || student.uid === user.uid || liveInviteAction) return;
+    if (!hasCrew) {
+      setLivePanelOpen(false);
+      setShowCreateModal(true);
+      return;
+    }
+
+    soundManager.playClick();
+    setLiveInviteAction(student.uid);
+    try {
+      const sendMemo = httpsCallable(functions, 'sendDirectMemo');
+      const senderName = getProfileName(userData, user.displayName || '탐사원');
+      const currentCrewName = crew?.name || userData?.crewName || userData?.crewSnapshot?.name || '내 스터디 크루';
+      const inviteCode = crew?.inviteCode || crew?.code || '';
+      const inviteCodeLine = inviteCode ? `\n초대 코드: ${inviteCode}` : '';
+      const res = await sendMemo({
+        recipientId: student.uid,
+        body: `[스터디 크루 공부 제안]\n${senderName}님이 ${currentCrewName}에서 함께 공부하자고 제안했어요.\n스터디 크루 화면에서 ${currentCrewName}을 확인하고 Google Meet 대기방에 들어와 주세요.${inviteCodeLine}`,
+      });
+      const data = res?.data || {};
+      alert(`${data.recipientName || student.name}님에게 공부 제안을 보냈습니다.`);
+    } catch (err) {
+      console.error('Failed to send live study invite:', err);
+      alert(getMemoErrorMessage(err));
+    } finally {
+      setLiveInviteAction('');
     }
   };
 
@@ -615,6 +1043,47 @@ export default function StudyCrewView({ onNavigateStore }) {
           onNavigateStore={onNavigateStore}
         />
       </div>
+    );
+  }
+
+  if (selectedOpenStudyPool) {
+    return (
+      <>
+        <OpenStudyWaitingRoom
+          pool={selectedOpenStudyPool}
+          activity={openStudyActivityByPool[selectedOpenStudyPool.id]}
+          activeStudents={selectedOpenStudyStudents}
+          recommended={selectedOpenStudyPool.id === recommendedOpenStudyPoolId}
+          joining={openStudyAction === selectedOpenStudyPool.id}
+          onBack={() => setOpenStudyWaitingPoolId('')}
+          onEnterMeet={handleEnterOpenStudyMeet}
+          onOpenLivePanel={() => setLivePanelOpen(true)}
+          isMobile={isMobile}
+        />
+        <LiveStudentDrawer
+          isOpen={livePanelOpen}
+          onClose={() => setLivePanelOpen(false)}
+          students={liveStudents}
+          currentUid={user?.uid}
+          currentCrewId={crewId}
+          hasCrew={hasCrew}
+          inviteAction={liveInviteAction}
+          onInviteStudent={handleInviteLiveStudent}
+          onOpenCreateCrew={() => {
+            setLivePanelOpen(false);
+            setShowCreateModal(true);
+          }}
+          onOpenMyCrew={() => {
+            setLivePanelOpen(false);
+            setDetailView(true);
+          }}
+        />
+        <CrewCreateModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onNavigateStore={onNavigateStore}
+        />
+      </>
     );
   }
 
@@ -649,6 +1118,30 @@ export default function StudyCrewView({ onNavigateStore }) {
                   <ShieldCheck size={18} /> 내 크루 보기
                 </button>
               )}
+              <button
+                type="button"
+                className="font-tech"
+                onClick={() => { soundManager.playClick(); setLivePanelOpen(true); }}
+                style={{
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,243,255,0.38)',
+                  background: 'linear-gradient(135deg, rgba(0,243,255,0.18), rgba(52,211,153,0.1))',
+                  color: 'var(--text-bright)',
+                  boxShadow: '0 0 22px rgba(0,243,255,0.12)',
+                  minHeight: isMobile ? 44 : 48,
+                  padding: isMobile ? '0.78rem 1rem' : '0.8rem 1.25rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.55rem',
+                  cursor: 'pointer',
+                  flex: isMobile ? '1 1 100%' : '0 0 auto',
+                  fontWeight: 900,
+                }}
+              >
+                <Radio size={18} style={{ color: 'var(--crystal-cyan)' }} />
+                지금 접속 중 {liveStudents.length}명
+              </button>
             </div>
           </div>
 
@@ -742,19 +1235,21 @@ export default function StudyCrewView({ onNavigateStore }) {
                   학년별 오픈 스터디
                 </h3>
                 <p className="font-tech" style={{ color: 'var(--text-muted)', margin: '0.45rem 0 0', fontSize: '0.9rem', lineHeight: 1.55 }}>
-                  프로필 학년에 맞는 오픈 스터디로 바로 참여합니다. 운영자가 등록한 Google Meet이 새 탭으로 열립니다.
+                  프로필 학년에 맞는 오픈 스터디 대기방으로 참여한 뒤 Google Meet 집중방에 입장합니다.
                 </p>
               </div>
-              <div className="font-tech" style={{
-                color: 'rgba(255,255,255,0.68)',
-                background: 'rgba(0,243,255,0.08)',
-                border: '1px solid rgba(0,243,255,0.14)',
-                borderRadius: 999,
-                padding: '0.42rem 0.72rem',
-                fontSize: '0.78rem',
-                whiteSpace: 'nowrap',
-              }}>
-                내 추천: {OPEN_STUDY_POOLS.find((pool) => pool.id === recommendedOpenStudyPoolId)?.label || '자유학년'}
+              <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="font-tech" style={{
+                  color: 'rgba(255,255,255,0.68)',
+                  background: 'rgba(0,243,255,0.08)',
+                  border: '1px solid rgba(0,243,255,0.14)',
+                  borderRadius: 999,
+                  padding: '0.42rem 0.72rem',
+                  fontSize: '0.78rem',
+                  whiteSpace: 'nowrap',
+                }}>
+                  내 추천: {OPEN_STUDY_POOLS.find((pool) => pool.id === recommendedOpenStudyPoolId)?.label || '자유학년'}
+                </div>
               </div>
             </div>
 
@@ -772,11 +1267,31 @@ export default function StudyCrewView({ onNavigateStore }) {
                     disabled={disabled || !!openStudyAction}
                     joining={openStudyAction === pool.id}
                     onJoin={handleJoinOpenStudy}
+                    activity={openStudyActivityByPool[pool.id]}
                   />
                 );
               })}
             </div>
           </div>
+
+          <LiveStudentDrawer
+            isOpen={livePanelOpen}
+            onClose={() => setLivePanelOpen(false)}
+            students={liveStudents}
+            currentUid={user?.uid}
+            currentCrewId={crewId}
+            hasCrew={hasCrew}
+            inviteAction={liveInviteAction}
+            onInviteStudent={handleInviteLiveStudent}
+            onOpenCreateCrew={() => {
+              setLivePanelOpen(false);
+              setShowCreateModal(true);
+            }}
+            onOpenMyCrew={() => {
+              setLivePanelOpen(false);
+              setDetailView(true);
+            }}
+          />
 
           {/* Directory Section */}
           <div style={{ marginBottom: '4rem' }}>

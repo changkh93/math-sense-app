@@ -18,7 +18,7 @@ function getTimestampKey(value) {
   return String(value);
 }
 
-export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount = 0, compact = false }) {
+export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount = 0, compact = false, teamRewardsEnabled = true }) {
   const { user } = useAuth();
   const [responses, setResponses] = useState([]);
   const [missionPlan, setMissionPlan] = useState(null);
@@ -48,7 +48,7 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
   const myResponse = responses.find((response) => response.userId === user?.uid) || null;
   const completedCount = responses.length;
   const target = Math.max(Number(targetCount || 0), completedCount, 1);
-  const teamTarget = target >= 2 ? target : 0;
+  const teamTarget = teamRewardsEnabled && target >= 2 ? target : 0;
   const teamCompleted = teamTarget > 0 && completedCount >= teamTarget;
   const teamRewardKey = getTimestampKey(missionDay?.teamRewardAwardedAt);
 
@@ -117,6 +117,7 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
       return;
     }
     if (!teamRewardKey || shownTeamRewardKeyRef.current === teamRewardKey) return;
+    if (!teamRewardsEnabled) return;
 
     shownTeamRewardKeyRef.current = teamRewardKey;
     const rewardUserIds = Array.isArray(missionDay?.teamRewardUserIds) ? missionDay.teamRewardUserIds : [];
@@ -128,7 +129,7 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
 
     pushRewardToast(20, '팀 미션 완료');
     setMessage('팀 미션이 완료되어 +20 광석을 획득했습니다.');
-  }, [missionDay?.teamRewardUserIds, teamRewardKey, user?.uid]);
+  }, [missionDay?.teamRewardUserIds, teamRewardKey, teamRewardsEnabled, user?.uid]);
 
   const submitAnswer = async () => {
     const answer = draft.trim().replace(/\s+/g, ' ').slice(0, STUDY_CREW_MISSION_MAX_LENGTH);
@@ -148,7 +149,7 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
       } else {
         setMessage(myResponse ? '오늘의 미션 답변을 수정했습니다.' : '오늘의 미션을 저장했습니다.');
       }
-      if (rewards.teamAwarded) {
+      if (teamRewardsEnabled && rewards.teamAwarded) {
         suppressNextTeamRewardToastRef.current = true;
         pushRewardToast(rewards.teamAmount || 20, '팀 미션 완료');
         setMessage('팀 미션이 완료되어 +20 광석을 획득했습니다.');
@@ -237,21 +238,39 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
             개인정보는 적지 말고, 짧고 안전한 이야기만 남겨주세요.
           </div>
         </div>
-        <div className="font-tech" style={{
-          color: teamCompleted ? '#86efac' : 'rgba(255,255,255,0.7)',
-          background: teamCompleted ? 'rgba(34,197,94,0.13)' : 'rgba(255,255,255,0.06)',
-          border: `1px solid ${teamCompleted ? 'rgba(34,197,94,0.26)' : 'rgba(255,255,255,0.08)'}`,
-          borderRadius: 999,
-          padding: '0.36rem 0.62rem',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.35rem',
-          whiteSpace: 'nowrap',
-          fontSize: '0.76rem',
-        }}>
-          {teamCompleted ? <CheckCircle2 size={14} /> : <Users size={14} />}
-          {teamTarget > 0 ? `${completedCount}/${teamTarget} 완료` : '팀 미션은 2명 이상'}
-        </div>
+        {teamRewardsEnabled ? (
+          <div className="font-tech" style={{
+            color: teamCompleted ? '#86efac' : 'rgba(255,255,255,0.7)',
+            background: teamCompleted ? 'rgba(34,197,94,0.13)' : 'rgba(255,255,255,0.06)',
+            border: `1px solid ${teamCompleted ? 'rgba(34,197,94,0.26)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: 999,
+            padding: '0.36rem 0.62rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            whiteSpace: 'nowrap',
+            fontSize: '0.76rem',
+          }}>
+            {teamCompleted ? <CheckCircle2 size={14} /> : <Users size={14} />}
+            {teamTarget > 0 ? `${completedCount}/${teamTarget} 완료` : '팀 미션은 2명 이상'}
+          </div>
+        ) : (
+          <div className="font-tech" style={{
+            color: '#7dd3fc',
+            background: 'rgba(14,165,233,0.12)',
+            border: '1px solid rgba(14,165,233,0.24)',
+            borderRadius: 999,
+            padding: '0.36rem 0.62rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            whiteSpace: 'nowrap',
+            fontSize: '0.76rem',
+          }}>
+            <Sparkles size={14} />
+            개인 보상 +5
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: '0.9rem', display: 'grid', gap: '0.7rem' }}>

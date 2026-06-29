@@ -15,7 +15,6 @@ const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
 const DIRECT_MEMO_MAX_LENGTH = 2000;
-const DIRECT_MEMO_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
 const STORE_RADAR_DURATION_DAYS = 7;
 const STORE_PHOTON_SHIELD_CHARGES_PER_GIFT = 10;
@@ -3280,8 +3279,11 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
     .trim()
     .slice(0, STUDY_CREW_MISSION_MAX_LENGTH);
 
-  if (!["crew", "room"].includes(scopeType) || !scopeId) {
+  if (!["crew", "room", "openStudy"].includes(scopeType) || !scopeId) {
     throw new functions.https.HttpsError("invalid-argument", "미션 위치 정보가 올바르지 않습니다.");
+  }
+  if (scopeType === "openStudy" && !OPEN_STUDY_POOLS[scopeId]) {
+    throw new functions.https.HttpsError("invalid-argument", "오픈 스터디 구분이 올바르지 않습니다.");
   }
   if (!answer) {
     throw new functions.https.HttpsError("invalid-argument", "미션 답변을 입력해주세요.");
@@ -3291,7 +3293,9 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
   const userRef = db.collection("users").doc(uid);
   const scopeRef = scopeType === "crew"
     ? db.collection("crews").doc(scopeId)
-    : db.collection("studyRooms").doc(scopeId);
+    : scopeType === "room"
+      ? db.collection("studyRooms").doc(scopeId)
+      : db.collection("openStudyPools").doc(scopeId);
   const now = new Date();
   const dateKey = getKstDateKey(now);
   const planRef = db.collection("studyCrewMissionPlans").doc(dateKey);
@@ -3326,12 +3330,12 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
     if (!userSnap.exists) {
       throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
     }
-    if (!scopeSnap.exists) {
+    if (!scopeSnap.exists && scopeType !== "openStudy") {
       throw new functions.https.HttpsError("not-found", "미션을 남길 크루 또는 방을 찾을 수 없습니다.");
     }
 
     const userData = userSnap.data() || {};
-    const scopeData = scopeSnap.data() || {};
+    const scopeData = scopeSnap.exists ? (scopeSnap.data() || {}) : {};
     const mission = resolveStudyCrewMissionForDate(dateKey, planSnap.exists ? (planSnap.data() || {}) : null);
     if (mission.disabled) {
       throw new functions.https.HttpsError("failed-precondition", "오늘의 크루 미션이 운영자에 의해 비활성화되었습니다.");
@@ -3346,7 +3350,7 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       if ((scopeData.status || "pending") !== "approved") {
         throw new functions.https.HttpsError("failed-precondition", "승인된 크루에서만 미션을 사용할 수 있습니다.");
       }
-    } else {
+    } else if (scopeType === "room") {
       targetIds = uniqueIds(Array.isArray(scopeData.participantIds) ? scopeData.participantIds : []);
       if (!targetIds.includes(uid)) {
         throw new functions.https.HttpsError("permission-denied", "방 참여자만 오늘의 미션을 남길 수 있습니다.");
@@ -3354,6 +3358,13 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       if ((scopeData.status || "waiting") === "ended") {
         throw new functions.https.HttpsError("failed-precondition", "종료된 방에는 미션을 남길 수 없습니다.");
       }
+    } else {
+      const recommendedPoolId = getOpenStudyPoolIdFromGrade(userData);
+      const isAdminUser = userData.role === "admin";
+      if (!isAdminUser && scopeId !== "free" && scopeId !== recommendedPoolId) {
+        throw new functions.https.HttpsError("failed-precondition", "내 학년에 맞는 오픈 스터디에서만 미션을 남길 수 있습니다.");
+      }
+      targetIds = [uid];
     }
 
     targetIds = uniqueIds(targetIds);
@@ -3366,7 +3377,7 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
 
     const targetIdSet = new Set(targetIds);
     const completedTargetIds = [...responseUserIds].filter((id) => targetIdSet.has(id));
-    const teamEligible = targetIds.length >= 2;
+    const teamEligible = scopeType !== "openStudy" && targetIds.length >= 2;
     const teamCompleted = teamEligible && targetIds.every((id) => responseUserIds.has(id));
     const missionData = missionSnap.exists ? (missionSnap.data() || {}) : {};
     const teamAlreadyAwarded = Boolean(missionData.teamRewardAwardedAt);
@@ -4485,10 +4496,9 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
   const memoRef = db.collection("directMemos").doc();
 
   const result = await db.runTransaction(async (tx) => {
-    const [senderSnap, recipientSnap, limitSnap] = await Promise.all([
+    const [senderSnap, recipientSnap] = await Promise.all([
       tx.get(senderRef),
       tx.get(recipientRef),
-      tx.get(limitRef),
     ]);
 
     if (!senderSnap.exists) {
@@ -4502,17 +4512,9 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
     const recipientData = recipientSnap.data() || {};
     const nowMillis = Date.now();
     const now = admin.firestore.Timestamp.fromMillis(nowMillis);
-    const lastImmediateAt = toAdminTimestamp(limitSnap.data()?.lastImmediateSentAt);
-    const lastScheduledDeliverAt = toAdminTimestamp(limitSnap.data()?.lastScheduledDeliverAt);
-    const lastImmediateMillis = lastImmediateAt?.toMillis?.() || 0;
-    const lastScheduledDeliverMillis = lastScheduledDeliverAt?.toMillis?.() || 0;
-    const hasActiveScheduleQueue = lastScheduledDeliverMillis > nowMillis;
-    const shouldSchedule = hasActiveScheduleQueue || (lastImmediateMillis > 0 && nowMillis - lastImmediateMillis < DIRECT_MEMO_COOLDOWN_MS);
-    const deliverAtMillis = shouldSchedule
-      ? (hasActiveScheduleQueue ? lastScheduledDeliverMillis + DIRECT_MEMO_COOLDOWN_MS : nowMillis + DIRECT_MEMO_COOLDOWN_MS)
-      : nowMillis;
+    const deliverAtMillis = nowMillis;
     const deliverAt = admin.firestore.Timestamp.fromMillis(deliverAtMillis);
-    const status = shouldSchedule ? "scheduled" : "delivered";
+    const status = "delivered";
 
     const memoData = {
       senderId: uid,
@@ -4536,21 +4538,13 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
     };
 
     tx.set(memoRef, memoData);
-    if (status === "delivered") {
-      tx.set(limitRef, {
-        recipientId,
-        lastImmediateSentAt: now,
-        updatedAt: now,
-      }, { merge: true });
-      createDirectMemoNotification(tx, memoRef, memoData);
-    } else {
-      tx.set(limitRef, {
-        recipientId,
-        lastScheduledAt: now,
-        lastScheduledDeliverAt: deliverAt,
-        updatedAt: now,
-      }, { merge: true });
-    }
+    tx.set(limitRef, {
+      recipientId,
+      lastImmediateSentAt: now,
+      lastSentAt: now,
+      updatedAt: now,
+    }, { merge: true });
+    createDirectMemoNotification(tx, memoRef, memoData);
 
     return {
       memoId: memoRef.id,
