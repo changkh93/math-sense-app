@@ -10,9 +10,14 @@ import {
   addDoc, 
   updateDoc, 
   doc, 
+  deleteDoc,
+  getDocs,
+  setDoc,
   serverTimestamp,
   where,
-  increment
+  increment,
+  writeBatch,
+  limit
 } from 'firebase/firestore';
 import { 
   MessageSquare, 
@@ -24,7 +29,9 @@ import {
   Edit3, 
   ExternalLink,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Search,
+  ShieldOff
 } from 'lucide-react';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
 import { useQAMutations } from '../../hooks/useQA';
@@ -32,6 +39,7 @@ import './Admin.css';
 
 export default function TeacherQA() {
   const { verifyAnswer } = useQAMutations();
+  const [activeTab, setActiveTab] = useState('questions');
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({}); // questionId -> Array of answers
   const [loading, setLoading] = useState(true);
@@ -49,6 +57,12 @@ export default function TeacherQA() {
     title: ''
   });
   const [expandedQuestions, setExpandedQuestions] = useState({});
+  const [deletingQuestionId, setDeletingQuestionId] = useState(null);
+  const [banSearchTerm, setBanSearchTerm] = useState('');
+  const [banSearchResults, setBanSearchResults] = useState([]);
+  const [banSearchLoading, setBanSearchLoading] = useState(false);
+  const [bannedUsers, setBannedUsers] = useState([]);
+  const [banActionUid, setBanActionUid] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -120,17 +134,152 @@ export default function TeacherQA() {
     return () => unsubscribeAnswers();
   }, []);
 
-  const handleDeleteAnswer = async (answerId, questionId) => {
+  useEffect(() => {
+    const q = query(collection(db, 'agoraBannedUsers'), orderBy('bannedAt', 'desc'));
+    const unsubscribe = onSnapshot(q,
+      (snapshot) => {
+        setBannedUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      (error) => {
+        console.error('❌ Agora banned users listener error:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleDeleteAnswer = async (answer, questionId) => {
     if (!confirm('답변을 삭제하시겠습니까?')) return;
     try {
-      await deleteDoc(doc(db, 'answers', answerId));
-      // Sync answerCount
-      await updateDoc(doc(db, 'questions', questionId), {
-        answerCount: increment(-1)
-      });
+      await deleteDoc(doc(db, 'answers', answer.id));
+      if (!answer.parentAnswerId) {
+        await updateDoc(doc(db, 'questions', questionId), {
+          answerCount: increment(-1)
+        });
+      }
       alert('답변이 삭제되었습니다.');
     } catch (err) {
       console.error('Error deleting answer:', err);
+      alert('답변 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleDeleteQuestion = async (question) => {
+    const preview = String(question.content || '').slice(0, 80);
+    const confirmed = confirm(
+      `이 아고라 게시물을 삭제할까요?\n\n작성자: ${question.userName || '익명 학생'}\n내용: ${preview}${preview.length >= 80 ? '...' : ''}\n\n연결된 답변도 함께 삭제됩니다.`
+    );
+    if (!confirmed) return;
+
+    setDeletingQuestionId(question.id);
+    try {
+      const answersSnap = await getDocs(query(
+        collection(db, 'answers'),
+        where('questionId', '==', question.id)
+      ));
+      const refsToDelete = [
+        doc(db, 'questions', question.id),
+        ...answersSnap.docs.map(answerDoc => answerDoc.ref)
+      ];
+
+      for (let i = 0; i < refsToDelete.length; i += 450) {
+        const batch = writeBatch(db);
+        refsToDelete.slice(i, i + 450).forEach(ref => batch.delete(ref));
+        await batch.commit();
+      }
+
+      alert(`게시물을 삭제했습니다. 연결 답변 ${answersSnap.size}개도 함께 삭제했습니다.`);
+    } catch (err) {
+      console.error('Error deleting question:', err);
+      alert('게시물 삭제에 실패했습니다.');
+    } finally {
+      setDeletingQuestionId(null);
+    }
+  };
+
+  const handleBanSearch = async (e) => {
+    e.preventDefault();
+    const term = banSearchTerm.trim();
+    if (!term) return;
+
+    setBanSearchLoading(true);
+    setBanSearchResults([]);
+    try {
+      const termLower = term.toLowerCase();
+      const usersRef = collection(db, 'users');
+      const nameQ = query(usersRef, where('name', '>=', term), where('name', '<=', term + '\uf8ff'), limit(20));
+      const studentNameQ = query(usersRef, where('studentName', '>=', term), where('studentName', '<=', term + '\uf8ff'), limit(20));
+      const emailQ = query(usersRef, where('email', '>=', termLower), where('email', '<=', termLower + '\uf8ff'), limit(20));
+      const [nameSnap, studentNameSnap, emailSnap] = await Promise.all([
+        getDocs(nameQ),
+        getDocs(studentNameQ),
+        getDocs(emailQ)
+      ]);
+
+      const resultsMap = new Map();
+      [nameSnap, studentNameSnap, emailSnap].forEach((snap) => {
+        snap.docs.forEach(userDoc => {
+          resultsMap.set(userDoc.id, { uid: userDoc.id, ...userDoc.data() });
+        });
+      });
+
+      setBanSearchResults(Array.from(resultsMap.values()));
+    } catch (err) {
+      console.error('Error searching users for agora ban:', err);
+      alert('이용자 검색 중 오류가 발생했습니다.');
+    } finally {
+      setBanSearchLoading(false);
+    }
+  };
+
+  const handleBanUser = async (targetUser) => {
+    if (!targetUser?.uid || banActionUid) return;
+    if (targetUser.role === 'admin') {
+      alert('관리자 계정은 아고라 게시글 금지 대상으로 추가할 수 없습니다.');
+      return;
+    }
+    const displayName = targetUser.studentName || targetUser.name || targetUser.email || targetUser.uid;
+    if (!confirm(`${displayName} 학생의 아고라 게시글 작성을 금지할까요?`)) return;
+
+    setBanActionUid(targetUser.uid);
+    try {
+      await setDoc(doc(db, 'agoraBannedUsers', targetUser.uid), {
+        userId: targetUser.uid,
+        userName: targetUser.studentName || targetUser.name || '이름 없음',
+        email: targetUser.email || '',
+        role: targetUser.role || 'student',
+        bannedAt: serverTimestamp(),
+        bannedBy: auth.currentUser?.uid || '',
+        bannedByEmail: auth.currentUser?.email || ''
+      }, { merge: true });
+      setBanSearchResults(prev => prev.map(user => (
+        user.uid === targetUser.uid ? { ...user, agoraBanned: true } : user
+      )));
+    } catch (err) {
+      console.error('Error banning agora user:', err);
+      alert('아고라 게시글 금지 처리에 실패했습니다.');
+    } finally {
+      setBanActionUid('');
+    }
+  };
+
+  const handleUnbanUser = async (targetUser) => {
+    const targetUid = targetUser?.userId || targetUser?.uid || targetUser?.id;
+    if (!targetUid || banActionUid) return;
+    const displayName = targetUser.userName || targetUser.studentName || targetUser.name || targetUser.email || targetUid;
+    if (!confirm(`${displayName} 학생의 아고라 게시글 금지를 해제할까요?`)) return;
+
+    setBanActionUid(targetUid);
+    try {
+      await deleteDoc(doc(db, 'agoraBannedUsers', targetUid));
+      setBanSearchResults(prev => prev.map(user => (
+        user.uid === targetUid ? { ...user, agoraBanned: false } : user
+      )));
+    } catch (err) {
+      console.error('Error unbanning agora user:', err);
+      alert('아고라 게시글 금지 해제에 실패했습니다.');
+    } finally {
+      setBanActionUid('');
     }
   };
 
@@ -214,6 +363,120 @@ export default function TeacherQA() {
       <div className="admin-page-header">
         <h1>질문 관리 대시보드</h1>
         <div className="filter-bar">
+          <button
+            className={`filter-btn ${activeTab === 'questions' ? 'active' : ''}`}
+            onClick={() => setActiveTab('questions')}
+          >
+            <MessageSquare size={16} /> 질문 관리
+          </button>
+          <button
+            className={`filter-btn ${activeTab === 'bans' ? 'active' : ''}`}
+            onClick={() => setActiveTab('bans')}
+          >
+            <ShieldOff size={16} /> 작성 금지
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'bans' ? (
+        <div className="agora-ban-panel">
+          <section className="agora-ban-card glass">
+            <div className="agora-ban-section-header">
+              <div>
+                <h2>금지할 이용자 추가</h2>
+                <p>이름 또는 이메일 앞부분으로 학생을 검색한 뒤 아고라 게시글 작성을 금지합니다.</p>
+              </div>
+            </div>
+            <form className="agora-ban-search" onSubmit={handleBanSearch}>
+              <input
+                type="text"
+                value={banSearchTerm}
+                onChange={(e) => setBanSearchTerm(e.target.value)}
+                placeholder="학생 이름 또는 이메일 검색"
+              />
+              <button type="submit" disabled={banSearchLoading}>
+                <Search size={16} /> {banSearchLoading ? '검색 중...' : '검색'}
+              </button>
+            </form>
+
+            <div className="agora-ban-results">
+              {banSearchResults.length === 0 ? (
+                <div className="empty-msg">검색 결과가 여기에 표시됩니다.</div>
+              ) : (
+                banSearchResults.map((targetUser) => {
+                  const isBanned = targetUser.agoraBanned || bannedUsers.some(banned => banned.userId === targetUser.uid || banned.id === targetUser.uid);
+                  const isAdminAccount = targetUser.role === 'admin';
+                  return (
+                    <div key={targetUser.uid} className="agora-ban-row">
+                      <div className="agora-ban-user">
+                        <strong>{targetUser.studentName || targetUser.name || '이름 없음'}</strong>
+                        <span>{targetUser.email || '이메일 없음'} · UID: {targetUser.uid}</span>
+                      </div>
+                      {isBanned ? (
+                        <button
+                          type="button"
+                          className="agora-ban-action secondary"
+                          onClick={() => handleUnbanUser(targetUser)}
+                          disabled={banActionUid === targetUser.uid}
+                        >
+                          {banActionUid === targetUser.uid ? '처리 중...' : '금지 해제'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="agora-ban-action danger"
+                          onClick={() => handleBanUser(targetUser)}
+                          disabled={banActionUid === targetUser.uid || isAdminAccount}
+                          title={isAdminAccount ? '관리자 계정은 금지할 수 없습니다.' : '아고라 게시글 작성 금지'}
+                        >
+                          {isAdminAccount ? '관리자 제외' : banActionUid === targetUser.uid ? '처리 중...' : '게시글 금지'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </section>
+
+          <section className="agora-ban-card glass">
+            <div className="agora-ban-section-header">
+              <div>
+                <h2>금지된 이용자 목록</h2>
+                <p>목록에 있는 학생은 새 아고라 질문 게시글을 등록할 수 없습니다.</p>
+              </div>
+              <span className="agora-ban-count">{bannedUsers.length}명</span>
+            </div>
+            <div className="agora-ban-results">
+              {bannedUsers.length === 0 ? (
+                <div className="empty-msg">현재 금지된 이용자가 없습니다.</div>
+              ) : (
+                bannedUsers.map((bannedUser) => (
+                  <div key={bannedUser.id || bannedUser.userId} className="agora-ban-row">
+                    <div className="agora-ban-user">
+                      <strong>{bannedUser.userName || '이름 없음'}</strong>
+                      <span>
+                        {bannedUser.email || '이메일 없음'} · UID: {bannedUser.userId || bannedUser.id}
+                        {bannedUser.bannedAt?.toDate ? ` · ${bannedUser.bannedAt.toDate().toLocaleString()}` : ''}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="agora-ban-action secondary"
+                      onClick={() => handleUnbanUser(bannedUser)}
+                      disabled={banActionUid === (bannedUser.userId || bannedUser.id)}
+                    >
+                      {banActionUid === (bannedUser.userId || bannedUser.id) ? '처리 중...' : '금지 해제'}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+      ) : (
+      <>
+        <div className="filter-bar qa-status-filter">
           <button 
             className={`filter-btn ${filter === 'open' ? 'active' : ''}`}
             onClick={() => setFilter('open')}
@@ -233,7 +496,6 @@ export default function TeacherQA() {
             <Filter size={16} /> 전체보기
           </button>
         </div>
-      </div>
 
       {loading ? (
         <div className="loading-msg">질문을 불러오는 중...</div>
@@ -255,6 +517,16 @@ export default function TeacherQA() {
                     <span className={`status-badge ${q.status}`}>
                       {q.status === 'open' ? '답변 대기' : '답변 완료'}
                     </span>
+                    <button
+                      type="button"
+                      className="qa-delete-question-btn"
+                      onClick={() => handleDeleteQuestion(q)}
+                      disabled={deletingQuestionId === q.id}
+                      title="게시물 삭제"
+                    >
+                      <Trash2 size={14} />
+                      {deletingQuestionId === q.id ? '삭제 중...' : '게시물 삭제'}
+                    </button>
                   </div>
                 </div>
 
@@ -345,7 +617,7 @@ export default function TeacherQA() {
                                     </button>
                                   )}
                                   <button onClick={() => startEditAnswer(ans)}><Edit3 size={12} /></button>
-                                  <button onClick={() => handleDeleteAnswer(ans.id, q.id)}><Trash2 size={12} /></button>
+                                  <button onClick={() => handleDeleteAnswer(ans, q.id)}><Trash2 size={12} /></button>
                                 </div>
                               </div>
                             </>
@@ -368,6 +640,8 @@ export default function TeacherQA() {
             ))
           )}
         </div>
+      )}
+      </>
       )}
 
       <QuizPreviewModal 

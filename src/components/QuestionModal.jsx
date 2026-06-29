@@ -547,6 +547,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       const user = auth.currentUser;
       if (!user) throw new Error('로그인이 필요합니다.');
       const userRef = doc(db, 'users', user.uid);
+      const banRef = doc(db, 'agoraBannedUsers', user.uid);
+
+      const banSnap = await getDoc(banRef);
+      if (banSnap.exists()) throw new Error('AGORA_BANNED');
 
       // Fetch studentName from profile for correct display
       let resolvedName = user.displayName || '익명 학생';
@@ -609,7 +613,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
 
       await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userRef);
+        const freshBanSnap = await transaction.get(banRef);
         if (!userSnap.exists()) throw new Error('USER_NOT_FOUND');
+        if (freshBanSnap.exists()) throw new Error('AGORA_BANNED');
 
         const freshUserData = userSnap.data();
         const currentCrystals = freshUserData?.crystals || 0;
@@ -651,7 +657,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     } catch (err) {
       console.error('Error submitting question:', err);
       setError(
-        err.message === 'INSUFFICIENT_BOUNTY'
+        err.message === 'AGORA_BANNED'
+          ? '현재 아고라 게시글 작성이 제한되어 있습니다.'
+          : err.message === 'INSUFFICIENT_BOUNTY'
           ? `현상금 ${selectedBounty}광석을 걸기에는 보유 광석이 부족합니다.`
           : '질문 등록에 실패했습니다. 다시 시도해주세요.'
       );
