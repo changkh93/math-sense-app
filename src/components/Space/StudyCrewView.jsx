@@ -54,7 +54,7 @@ function getProfileCrewName(profile = {}) {
   return profile.crewName || profile.crewSnapshot?.name || '소속 크루 없음';
 }
 function getStudyInvitePreference(profile = {}) {
-  return profile.studyInvitePreference === 'closed' ? 'closed' : 'open';
+  return profile?.studyInvitePreference === 'closed' ? 'closed' : 'open';
 }
 function isStudyInviteClosed(profile = {}) {
   return getStudyInvitePreference(profile) === 'closed';
