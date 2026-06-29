@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Mail, Plus, Radio, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
@@ -52,6 +52,12 @@ function getProfileCourse(profile = {}, clusterLabelById = {}) {
 }
 function getProfileCrewName(profile = {}) {
   return profile.crewName || profile.crewSnapshot?.name || '소속 크루 없음';
+}
+function getStudyInvitePreference(profile = {}) {
+  return profile.studyInvitePreference === 'closed' ? 'closed' : 'open';
+}
+function isStudyInviteClosed(profile = {}) {
+  return getStudyInvitePreference(profile) === 'closed';
 }
 function getTimestampMs(value) {
   if (!value) return 0;
@@ -812,10 +818,14 @@ function LiveStudentDrawer({
   currentCrewId,
   hasCrew,
   inviteAction,
+  studyInvitePreference,
+  preferenceSaving,
+  onChangeStudyInvitePreference,
   onInviteStudent,
   onOpenMyCrew,
 }) {
-  const visibleStudents = students.slice(0, 24);
+  const visibleStudents = students.filter(student => student.uid !== currentUid).slice(0, 24);
+  const acceptsStudyInvites = studyInvitePreference !== 'closed';
 
   return (
     <AnimatePresence>
@@ -866,7 +876,7 @@ function LiveStudentDrawer({
                   지금 접속 중
                 </h3>
                 <div className="font-tech" style={{ color: 'rgba(255,255,255,0.52)', fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                  최근 5분 내 온라인 {students.length}명
+                  최근 5분 내 온라인 {visibleStudents.length}명
                 </div>
               </div>
               <button
@@ -879,18 +889,67 @@ function LiveStudentDrawer({
               </button>
             </div>
 
+            <div style={{
+              borderRadius: 10,
+              border: '1px solid rgba(0,243,255,0.18)',
+              background: 'rgba(0,243,255,0.06)',
+              padding: '0.8rem',
+              marginBottom: '0.85rem',
+            }}>
+              <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 900, fontSize: '0.86rem', marginBottom: '0.32rem' }}>
+                내 공부 제안 상태
+              </div>
+              <div className="font-tech" style={{ color: 'rgba(255,255,255,0.56)', fontSize: '0.72rem', lineHeight: 1.45, marginBottom: '0.65rem' }}>
+                다른 학생에게 보이는 공부 제안 버튼 상태입니다.
+              </div>
+              <div role="group" aria-label="공부 제안 수신 상태" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+                {[
+                  { value: 'open', label: '공부 제안 받는 중' },
+                  { value: 'closed', label: '공부 제안 거부' },
+                ].map((option) => {
+                  const isActive = studyInvitePreference === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className="font-tech"
+                      onClick={() => onChangeStudyInvitePreference(option.value)}
+                      disabled={preferenceSaving || isActive}
+                      style={{
+                        minHeight: 38,
+                        borderRadius: 8,
+                        border: isActive ? '1px solid rgba(0,243,255,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                        background: isActive ? 'rgba(0,243,255,0.16)' : 'rgba(255,255,255,0.04)',
+                        color: isActive ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.72)',
+                        fontWeight: 900,
+                        cursor: preferenceSaving || isActive ? 'default' : 'pointer',
+                        opacity: preferenceSaving && !isActive ? 0.55 : 1,
+                        padding: '0.48rem 0.45rem',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="font-tech" style={{ color: acceptsStudyInvites ? 'rgba(34,197,94,0.9)' : 'rgba(251,113,133,0.9)', fontSize: '0.72rem', marginTop: '0.55rem' }}>
+                {preferenceSaving ? '상태 저장 중...' : acceptsStudyInvites ? '다른 학생이 공부 제안을 보낼 수 있습니다.' : '다른 학생에게는 “공부 제안 안 받아요”로 표시됩니다.'}
+              </div>
+            </div>
+
             {visibleStudents.length === 0 ? (
               <div className="glass-card hud-border" style={{ padding: '1rem', borderRadius: 10, color: 'var(--text-muted)' }}>
-                지금은 표시할 온라인 학생이 없습니다.
+                지금은 표시할 다른 온라인 학생이 없습니다.
               </div>
             ) : (
               <div style={{ display: 'grid', gap: '0.55rem' }}>
                 {visibleStudents.map((student) => {
                   const state = formatLiveState(student.profile);
-                  const isSelf = student.uid === currentUid;
                   const isSameCrew = hasCrew && student.profile.crewId === currentCrewId;
-                  const actionLabel = isSelf ? '나' : isSameCrew ? '내 크루 보기' : '공부 제안';
+                  const inviteClosed = isStudyInviteClosed(student.profile);
+                  const actionLabel = isSameCrew ? '내 크루 보기' : inviteClosed ? '공부 제안 안 받아요' : '공부 제안';
                   const isSending = inviteAction === student.uid;
+                  const actionDisabled = inviteClosed || isSending;
                   return (
                     <div key={student.uid} style={{
                       display: 'grid',
@@ -899,8 +958,8 @@ function LiveStudentDrawer({
                       alignItems: 'center',
                       padding: '0.75rem',
                       borderRadius: 10,
-                      background: isSelf ? 'rgba(0,243,255,0.08)' : 'rgba(255,255,255,0.045)',
-                      border: isSelf ? '1px solid rgba(0,243,255,0.2)' : '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.045)',
+                      border: '1px solid rgba(255,255,255,0.08)',
                     }}>
                       <div style={{ width: 38, height: 38, borderRadius: 10, background: student.profile.crewColor || '#00d4ff', display: 'grid', placeItems: 'center', color: '#06111f', fontWeight: 900 }}>
                         {(student.name || '?').slice(0, 1)}
@@ -908,7 +967,7 @@ function LiveStudentDrawer({
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                           <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {student.name}{isSelf ? ' (나)' : ''}
+                            {student.name}
                           </div>
                           <span className="font-tech" style={{ color: state.color, fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.28rem', flexShrink: 0 }}>
                             <span style={{ width: 6, height: 6, borderRadius: 999, background: state.dot }} />
@@ -923,16 +982,16 @@ function LiveStudentDrawer({
                         </div>
                         <button
                           type="button"
-                          className={isSelf ? 'space-nav-link font-tech' : 'space-btn font-tech'}
+                          className="space-btn font-tech"
                           onClick={() => {
-                            if (isSelf) return;
+                            if (inviteClosed) return;
                             if (isSameCrew) {
                               onOpenMyCrew();
                               return;
                             }
                             onInviteStudent(student);
                           }}
-                          disabled={isSelf || isSending}
+                          disabled={actionDisabled}
                           style={{
                             marginTop: '0.65rem',
                             width: '100%',
@@ -942,9 +1001,10 @@ function LiveStudentDrawer({
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '0.38rem',
-                            background: isSelf ? 'rgba(255,255,255,0.04)' : 'rgba(0,243,255,0.1)',
-                            border: isSelf ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,243,255,0.22)',
-                            color: isSelf ? 'rgba(255,255,255,0.45)' : 'var(--crystal-cyan)',
+                            background: actionDisabled ? 'rgba(255,255,255,0.045)' : 'rgba(0,243,255,0.1)',
+                            border: actionDisabled ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,243,255,0.22)',
+                            color: actionDisabled ? 'rgba(255,255,255,0.42)' : 'var(--crystal-cyan)',
+                            cursor: actionDisabled ? 'not-allowed' : 'pointer',
                           }}
                         >
                           {isSending ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
@@ -971,6 +1031,8 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [openStudyWaitingPoolId, setOpenStudyWaitingPoolId] = useState('');
   const [livePanelOpen, setLivePanelOpen] = useState(false);
   const [liveInviteAction, setLiveInviteAction] = useState('');
+  const [studyInvitePreferenceDraft, setStudyInvitePreferenceDraft] = useState('');
+  const [studyInvitePreferenceSaving, setStudyInvitePreferenceSaving] = useState(false);
   const [inviteTargetStudent, setInviteTargetStudent] = useState(null);
   const [selectedInviteOptionId, setSelectedInviteOptionId] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
@@ -986,6 +1048,7 @@ export default function StudyCrewView({ onNavigateStore }) {
   const crew = userData?.crewSnapshot || null;
   const crewId = crew?.id || userData?.crewId || '';
   const hasCrew = !!crewId;
+  const currentStudyInvitePreference = studyInvitePreferenceDraft || getStudyInvitePreference(userData);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -993,6 +1056,12 @@ export default function StudyCrewView({ onNavigateStore }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (studyInvitePreferenceDraft && getStudyInvitePreference(userData) === studyInvitePreferenceDraft) {
+      setStudyInvitePreferenceDraft('');
+    }
+  }, [studyInvitePreferenceDraft, userData]);
 
   // Check for rejected crew (leader's snapshot preserved with rejection info)
   const rejectedCrew = useMemo(() => {
@@ -1135,6 +1204,11 @@ export default function StudyCrewView({ onNavigateStore }) {
       });
   }, [clusterLabelById, crewId, user?.uid, userProfileById]);
 
+  const livePeerCount = useMemo(
+    () => liveStudents.filter(student => student.uid !== user?.uid).length,
+    [liveStudents, user?.uid]
+  );
+
   const openStudyActivityByPool = useMemo(() => {
     const next = {};
     OPEN_STUDY_POOLS.forEach(pool => { next[pool.id] = { count: 0, names: [] }; });
@@ -1276,11 +1350,33 @@ export default function StudyCrewView({ onNavigateStore }) {
 
   const handleOpenInviteModal = (student) => {
     if (!user?.uid || !student?.uid || student.uid === user.uid) return;
+    if (isStudyInviteClosed(student.profile)) return;
     soundManager.playClick();
     const targetPoolId = selectedOpenStudyPool?.id || normalizeOpenStudyPoolIdFromGrade(student.profile.grade || student.profile.schoolGrade || student.profile.studentGrade);
     const initialOptionId = targetPoolId ? `open:${targetPoolId}` : '';
     setInviteTargetStudent(student);
     setSelectedInviteOptionId(initialOptionId);
+  };
+
+  const handleChangeStudyInvitePreference = async (preference) => {
+    if (!user?.uid || studyInvitePreferenceSaving || preference === currentStudyInvitePreference) return;
+    soundManager.playClick();
+    const previousPreference = currentStudyInvitePreference;
+    setStudyInvitePreferenceDraft(preference);
+    setStudyInvitePreferenceSaving(true);
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        studyInvitePreference: preference,
+        studyInvitePreferenceUpdatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Failed to update study invite preference:', err);
+      setStudyInvitePreferenceDraft(previousPreference);
+      alert('공부 제안 상태를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setStudyInvitePreferenceSaving(false);
+    }
   };
 
   const handleSendStudyInvite = async () => {
@@ -1357,6 +1453,9 @@ export default function StudyCrewView({ onNavigateStore }) {
           currentCrewId={crewId}
           hasCrew={hasCrew}
           inviteAction={liveInviteAction}
+          studyInvitePreference={currentStudyInvitePreference}
+          preferenceSaving={studyInvitePreferenceSaving}
+          onChangeStudyInvitePreference={handleChangeStudyInvitePreference}
           onInviteStudent={handleOpenInviteModal}
           onOpenMyCrew={() => {
             setLivePanelOpen(false);
@@ -1439,7 +1538,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                 }}
               >
                 <Radio size={18} style={{ color: 'var(--crystal-cyan)' }} />
-                지금 접속 중 {liveStudents.length}명
+                지금 접속 중 {livePeerCount}명
               </button>
             </div>
           </div>
@@ -1581,6 +1680,9 @@ export default function StudyCrewView({ onNavigateStore }) {
             currentCrewId={crewId}
             hasCrew={hasCrew}
             inviteAction={liveInviteAction}
+            studyInvitePreference={currentStudyInvitePreference}
+            preferenceSaving={studyInvitePreferenceSaving}
+            onChangeStudyInvitePreference={handleChangeStudyInvitePreference}
             onInviteStudent={handleOpenInviteModal}
             onOpenMyCrew={() => {
               setLivePanelOpen(false);
