@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import {
@@ -10,11 +10,14 @@ import {
   Clock,
   Gift,
   GraduationCap,
+  MessageCircle,
   MonitorPlay,
+  Phone,
   ShieldCheck,
   Sparkles,
   Star,
   Tent,
+  UserRound,
   Users,
   Video,
 } from 'lucide-react';
@@ -78,6 +81,13 @@ const COURSES = [
 
 const GRADES = ['초1', '초2', '초3', '초4', '초5', '초6'];
 
+const formatPhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
+
 // 메타센스 진행 방식 안내
 const HOW_IT_WORKS = [
   {
@@ -108,10 +118,10 @@ const CAMP_INFO = {
   orientation: '7월 25일(토) 저녁 7:30',
   morningTime: '오전 9:30 ~ 10:20',
   lateTime: '오전 10:30 ~ 11:20',
+  contactPhone: '010-6285-4382',
 };
 
 export default function VacationCamp() {
-  const navigate = useNavigate();
   const [counts, setCounts] = useState(null); // null = 로딩, {} = 로드됨
   const [form, setForm] = useState({
     applicantName: '',
@@ -141,7 +151,10 @@ export default function VacationCamp() {
     refreshCounts();
   }, []);
 
-  const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+  const update = (key, value) => {
+    const nextValue = key === 'parentPhone' ? formatPhone(value) : value;
+    setForm(prev => ({ ...prev, [key]: nextValue }));
+  };
   const scrollToForm = () => document.getElementById('vacation-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const selectCourse = (courseId) => {
@@ -227,13 +240,23 @@ export default function VacationCamp() {
             현재 신청 인원 <strong>{done.count}명</strong> · 개설 기준 {MIN_ATTENDEES}명
           </p>
           {reached ? (
-            <p className="complete-sub">개설 기준을 충족했습니다. 오리엔테이션({CAMP_INFO.orientation})에 안내드리겠습니다.</p>
+            <p className="complete-sub">개설 기준을 충족했습니다. 오리엔테이션에서 자세한 참여 방법을 안내드립니다.</p>
           ) : (
-            <p className="complete-sub">최소 {MIN_ATTENDEES}명이 신청되어야 과정이 개설됩니다. 주변 친구들에게도 널리 알려주세요.</p>
+            <p className="complete-sub">최소 {MIN_ATTENDEES}명이 신청되어야 과정이 개설됩니다. 개설 여부와 준비 안내는 오리엔테이션에서 함께 안내드립니다.</p>
           )}
+          <div className="complete-notice">
+            <p>
+              <Calendar size={17} />
+              <span>오리엔테이션: <strong>{CAMP_INFO.orientation}</strong></span>
+            </p>
+            <p>특강 진행 방식과 접속 방법을 안내하니 가능하면 꼭 참석해 주세요.</p>
+            <a href={`tel:${CAMP_INFO.contactPhone.replace(/\D/g, '')}`}>
+              <Phone size={17} />
+              문의전화 {CAMP_INFO.contactPhone}
+            </a>
+          </div>
           <div className="complete-actions">
-            <button type="button" onClick={() => navigate('/')}>메인으로</button>
-            <button type="button" className="secondary" onClick={() => { setDone(null); }}>신청 내용 다시 보기</button>
+            <button type="button" onClick={() => { setDone(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>닫기</button>
           </div>
         </section>
       </div>
@@ -291,6 +314,20 @@ export default function VacationCamp() {
               <Calendar size={20} />
               <strong>여름방학 특강 요약</strong>
             </div>
+            <div className="camp-snapshot">
+              <div>
+                <span>수강료</span>
+                <strong>무료</strong>
+              </div>
+              <div>
+                <span>기간</span>
+                <strong>3주</strong>
+              </div>
+              <div>
+                <span>하루 학습</span>
+                <strong>50분</strong>
+              </div>
+            </div>
             <dl className="schedule-list">
               <div><dt>기간</dt><dd>{CAMP_INFO.period}</dd></div>
               <div><dt>요일</dt><dd>{CAMP_INFO.days}</dd></div>
@@ -308,6 +345,10 @@ export default function VacationCamp() {
               </div>
               <div><dt>수강료</dt><dd><strong className="free">무료</strong></dd></div>
             </dl>
+            <button type="button" className="schedule-card-cta" onClick={scrollToForm}>
+              바로 신청하기
+              <ArrowRight size={16} />
+            </button>
           </aside>
         </section>
 
@@ -496,48 +537,92 @@ export default function VacationCamp() {
             <div className="form-title">
               <span>Application</span>
               <h2>여름방학 특강 신청</h2>
-              <p>학부모 연락처 기준으로 1과목만 신청됩니다.</p>
+              <p>학부모 연락처 기준으로 신청을 확인합니다. 같은 연락처로 다시 신청하면 과정 변경을 안내합니다.</p>
             </div>
 
             <div className="form-grid form-grid--two">
-              <input
-                value={form.applicantName}
-                onChange={(e) => update('applicantName', e.target.value)}
-                placeholder="학부모 이름"
-                required
-              />
-              <input
-                value={form.parentPhone}
-                onChange={(e) => update('parentPhone', e.target.value)}
-                placeholder="학부모 전화번호 (010-0000-0000)"
-                inputMode="tel"
-                required
-              />
+              <label className="form-field" htmlFor="vacation-applicant-name">
+                <span><UserRound size={15} /> 학부모 이름</span>
+                <input
+                  id="vacation-applicant-name"
+                  name="vacationParentName"
+                  value={form.applicantName}
+                  onChange={(e) => update('applicantName', e.target.value)}
+                  placeholder="예: 김메타"
+                  autoComplete="section-vacation-parent name"
+                  required
+                />
+              </label>
+              <label className="form-field" htmlFor="vacation-parent-phone">
+                <span><Phone size={15} /> 학부모 연락처</span>
+                <input
+                  id="vacation-parent-phone"
+                  name="vacationParentPhone"
+                  value={form.parentPhone}
+                  onChange={(e) => update('parentPhone', e.target.value)}
+                  placeholder="010-0000-0000"
+                  inputMode="tel"
+                  autoComplete="section-vacation-parent tel-national"
+                  pattern="01[016789]-?[0-9]{3,4}-?[0-9]{4}"
+                  required
+                />
+              </label>
             </div>
             <div className="form-grid form-grid--student">
-              <input
-                value={form.studentName}
-                onChange={(e) => update('studentName', e.target.value)}
-                placeholder="자녀 이름"
-                required
-              />
-              <select value={form.grade} onChange={(e) => update('grade', e.target.value)}>
-                {GRADES.map(grade => <option key={grade} value={grade}>{grade}</option>)}
-              </select>
+              <label className="form-field" htmlFor="vacation-student-name">
+                <span><GraduationCap size={15} /> 자녀 이름</span>
+                <input
+                  id="vacation-student-name"
+                  name="vacationStudentName"
+                  value={form.studentName}
+                  onChange={(e) => update('studentName', e.target.value)}
+                  placeholder="예: 이센스"
+                  autoComplete="section-vacation-student name"
+                  required
+                />
+              </label>
+              <label className="form-field" htmlFor="vacation-student-grade">
+                <span>학년</span>
+                <select
+                  id="vacation-student-grade"
+                  name="vacationStudentGrade"
+                  value={form.grade}
+                  onChange={(e) => update('grade', e.target.value)}
+                  autoComplete="off"
+                >
+                  {GRADES.map(grade => <option key={grade} value={grade}>{grade}</option>)}
+                </select>
+              </label>
             </div>
-            <select value={form.courseId} onChange={(e) => update('courseId', e.target.value)} required>
-              <option value="" disabled>과정을 선택해 주세요</option>
-              {COURSES.map(course => (
-                <option key={course.id} value={course.id}>
-                  {course.name} ({course.schedule})
-                </option>
-              ))}
-            </select>
-            <textarea
-              value={form.message}
-              onChange={(e) => update('message', e.target.value)}
-              placeholder="학생의 학습 상황이나 문의사항 (선택사항)"
-            />
+            <label className="form-field" htmlFor="vacation-course">
+              <span><BookOpen size={15} /> 신청 과정</span>
+              <select
+                id="vacation-course"
+                name="vacationCourse"
+                value={form.courseId}
+                onChange={(e) => update('courseId', e.target.value)}
+                autoComplete="off"
+                required
+              >
+                <option value="" disabled>과정을 선택해 주세요</option>
+                {COURSES.map(course => (
+                  <option key={course.id} value={course.id}>
+                    {course.name} ({course.schedule})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field" htmlFor="vacation-message">
+              <span><MessageCircle size={15} /> 학생 상황 또는 문의사항 <em>선택</em></span>
+              <textarea
+                id="vacation-message"
+                name="vacationMessage"
+                value={form.message}
+                onChange={(e) => update('message', e.target.value)}
+                placeholder="예: 분수에서 자주 헷갈려요. 오전 시간 참여 가능합니다."
+                autoComplete="off"
+              />
+            </label>
             <button type="submit" disabled={submitting}>
               {submitting ? '저장 중...' : '신청하기'}
               {!submitting && <ArrowRight size={18} />}

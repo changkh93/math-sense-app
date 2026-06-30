@@ -12,15 +12,17 @@
   --trial-blue: #60a5fa;
   --trial-violet: #8b5cf6;
   --trial-green: #4ade80;
+  --trial-amber: #fbbf24;
   --trial-red: #fb7185;
   --trial-text: #f8fbff;
   --trial-muted: rgba(232, 240, 255, 0.68);
   min-height: 100vh;
   color: var(--trial-text);
   background:
-    radial-gradient(circle at 18% 12%, rgba(111, 36, 204, 0.28), transparent 34rem),
-    radial-gradient(circle at 82% 18%, rgba(34, 211, 238, 0.16), transparent 30rem),
-    linear-gradient(180deg, #080b1f 0%, #12172b 44%, #090d1f 100%);
+    radial-gradient(circle at 15% 10%, rgba(34, 211, 238, 0.18), transparent 30rem),
+    radial-gradient(circle at 86% 16%, rgba(74, 222, 128, 0.12), transparent 28rem),
+    radial-gradient(circle at 72% 74%, rgba(251, 191, 36, 0.08), transparent 26rem),
+    linear-gradient(180deg, #080b1f 0%, #11172a 42%, #080d1d 100%);
   font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   position: relative;
   overflow-x: hidden;
@@ -111,7 +113,7 @@
 /* ============================================
    Hero
    ============================================ */
-.vacation-hero {
+.vacation .vacation-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.7fr);
   gap: 34px;
@@ -119,11 +121,11 @@
   padding: clamp(32px, 5vw, 60px) 0 clamp(48px, 7vw, 72px);
 }
 
-.hero-copy .hero-eyebrow,
+.vacation .hero-copy .hero-eyebrow,
 .vacation .section-heading span,
-.application-info > span,
-.form-title span,
-.selected-course-panel span {
+.vacation .application-info > span,
+.vacation .form-title span,
+.vacation .selected-course-panel span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -134,23 +136,23 @@
   letter-spacing: 0.08em;
 }
 
-.hero-copy h1 {
+.vacation .hero-copy h1 {
   margin: 16px 0 18px;
   max-width: 760px;
   font-size: clamp(2.3rem, 5.4vw, 4.2rem);
   line-height: 1.06;
   font-weight: 950;
-  text-shadow: 0 0 28px rgba(34, 211, 238, 0.32);
+  text-shadow: 0 0 28px rgba(34, 211, 238, 0.24);
 }
 
-.hero-accent {
-  background: linear-gradient(120deg, #22d3ee, #8b5cf6);
+.vacation .hero-accent {
+  background: linear-gradient(120deg, #22d3ee, #4ade80 58%, #fbbf24);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.hero-copy p {
+.vacation .hero-copy p {
   margin: 0;
   max-width: 640px;
   color: var(--trial-muted);
@@ -158,7 +160,7 @@
   line-height: 1.75;
 }
 
-.hero-actions {
+.vacation .hero-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -166,16 +168,16 @@
   margin-top: 30px;
 }
 
-.hero-actions button,
+.vacation .hero-actions button,
 .vacation .how-card + .how-card,
-.course-card button,
-.application-form > button {
+.vacation .course-card button,
+.vacation .application-form > button {
   border: none;
   cursor: pointer;
   font: inherit;
 }
 
-.hero-actions button {
+.vacation .hero-actions button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -187,7 +189,7 @@
   box-shadow: 0 10px 30px rgba(34, 211, 238, 0.32);
 }
 
-.hero-actions a {
+.vacation .hero-actions a {
   padding: 0.9rem 1.2rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -197,14 +199,14 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-.trial-conditions {
+.vacation .trial-conditions {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
   margin-top: 24px;
 }
 
-.trial-conditions span {
+.vacation .trial-conditions span {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -212,21 +214,25 @@
   font-size: 0.92rem;
 }
 
-.trial-conditions svg {
+.vacation .trial-conditions svg {
   color: var(--trial-cyan);
 }
 
 /* Hero 일정 요약 카드 */
-.hero-schedule-card {
-  background: linear-gradient(160deg, rgba(34, 211, 238, 0.12), rgba(139, 92, 246, 0.12));
+.vacation .hero-schedule-card {
+  background:
+    linear-gradient(160deg, rgba(34, 211, 238, 0.14), rgba(74, 222, 128, 0.08)),
+    rgba(9, 14, 33, 0.78);
   border: 1px solid var(--trial-line);
-  border-radius: 24px;
+  border-radius: 18px;
   padding: 26px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(14px);
+  position: sticky;
+  top: 18px;
 }
 
-.schedule-card-head {
+.vacation .schedule-card-head {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -235,20 +241,54 @@
   margin-bottom: 16px;
 }
 
-.schedule-list {
+.vacation .camp-snapshot {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.vacation .camp-snapshot div {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.vacation .camp-snapshot span,
+.vacation .camp-snapshot strong {
+  display: block;
+  text-align: center;
+}
+
+.vacation .camp-snapshot span {
+  color: var(--trial-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.vacation .camp-snapshot strong {
+  margin-top: 5px;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.vacation .schedule-list {
   display: grid;
   gap: 14px;
   margin: 0;
 }
 
-.schedule-list > div {
+.vacation .schedule-list > div {
   display: grid;
   grid-template-columns: 90px 1fr;
   gap: 12px;
   align-items: start;
 }
 
-.schedule-list dt {
+.vacation .schedule-list dt {
   color: var(--trial-muted);
   font-weight: 700;
   font-size: 0.9rem;
@@ -257,49 +297,67 @@
   gap: 5px;
 }
 
-.schedule-list dd {
+.vacation .schedule-list dd {
   margin: 0;
   color: var(--trial-text);
   font-size: 0.96rem;
   line-height: 1.55;
 }
 
-.schedule-list .hr {
+.vacation .schedule-list .hr {
   grid-template-columns: 1fr;
   height: 1px;
   background: rgba(255, 255, 255, 0.1);
   margin: 2px 0;
 }
 
-.schedule-list dd strong {
+.vacation .schedule-list dd strong {
   color: #fff;
 }
 
-.schedule-list dd .free {
+.vacation .schedule-list dd .free {
   color: var(--trial-green);
+}
+
+.vacation .schedule-card-cta {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #22d3ee, #4ade80);
+  color: #04121b;
+  font: inherit;
+  font-weight: 950;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 12px 26px rgba(34, 211, 238, 0.2);
 }
 
 /* ============================================
    섹션 공통
    ============================================ */
-.section-block {
+.vacation .section-block {
   margin-top: 80px;
   scroll-margin-top: 90px;
 }
 
-.section-heading {
+.vacation .section-heading {
   text-align: center;
   max-width: 760px;
   margin: 0 auto 36px;
 }
 
-.section-heading h2 {
+.vacation .section-heading h2 {
   margin: 12px 0 12px;
   font-size: clamp(1.7rem, 3.6vw, 2.6rem);
   font-weight: 900;
 }
 
-.section-heading p {
+.vacation .section-heading p {
   color: var(--trial-muted);
   font-size: clamp(1rem, 1.5vw, 1.1rem);
   line-height: 1.7;
@@ -308,27 +366,27 @@
 /* ============================================
    진행 방식 (How it works)
    ============================================ */
-.how-grid {
+.vacation .how-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 18px;
 }
 
-.how-card {
+.vacation .how-card {
   background: var(--trial-panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+  border-radius: 14px;
   padding: 26px;
   backdrop-filter: blur(10px);
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
-.how-card:hover {
+.vacation .how-card:hover {
   transform: translateY(-4px);
   border-color: var(--trial-line);
 }
 
-.how-icon {
+.vacation .how-icon {
   width: 46px;
   height: 46px;
   display: inline-flex;
@@ -340,12 +398,12 @@
   margin-bottom: 14px;
 }
 
-.how-card h3 {
+.vacation .how-card h3 {
   font-size: 1.12rem;
   margin-bottom: 8px;
 }
 
-.how-card p {
+.vacation .how-card p {
   color: var(--trial-muted);
   font-size: 0.95rem;
   line-height: 1.65;
@@ -354,7 +412,7 @@
 /* ============================================
    과정 카드
    ============================================ */
-.group-legend {
+.vacation .group-legend {
   display: flex;
   gap: 12px;
   justify-content: center;
@@ -362,7 +420,7 @@
   margin-bottom: 24px;
 }
 
-.legend-chip {
+.vacation .legend-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -374,19 +432,19 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-.legend-morning { color: var(--trial-cyan); border-color: rgba(34, 211, 238, 0.4); }
-.legend-late { color: var(--trial-violet); border-color: rgba(139, 92, 246, 0.4); }
+.vacation .legend-morning { color: var(--trial-cyan); border-color: rgba(34, 211, 238, 0.4); }
+.vacation .legend-late { color: var(--trial-violet); border-color: rgba(139, 92, 246, 0.4); }
 
-.course-grid {
+.vacation .course-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
 }
 
-.course-card {
+.vacation .course-card {
   display: flex;
   flex-direction: column;
-  border-radius: 22px;
+  border-radius: 16px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--trial-panel-strong);
@@ -394,27 +452,27 @@
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.course-card:hover {
+.vacation .course-card:hover {
   transform: translateY(-5px);
 }
 
-.course-card--selected {
+.vacation .course-card--selected {
   border-color: var(--trial-cyan);
   box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.45), 0 18px 40px rgba(34, 211, 238, 0.18);
 }
 
-.course-top {
+.vacation .course-top {
   padding: 22px 22px 14px;
   flex: 1;
 }
 
-.course-card--blue .course-top { background: linear-gradient(180deg, rgba(49, 93, 157, 0.55), transparent); }
-.course-card--violet .course-top { background: linear-gradient(180deg, rgba(135, 70, 173, 0.5), transparent); }
-.course-card--green .course-top { background: linear-gradient(180deg, rgba(47, 155, 96, 0.45), transparent); }
-.course-card--red .course-top { background: linear-gradient(180deg, rgba(217, 90, 73, 0.45), transparent); }
-.course-card--cyan .course-top { background: linear-gradient(180deg, rgba(34, 211, 238, 0.4), transparent); }
+.vacation .course-card--blue .course-top { background: linear-gradient(180deg, rgba(49, 93, 157, 0.55), transparent); }
+.vacation .course-card--violet .course-top { background: linear-gradient(180deg, rgba(135, 70, 173, 0.5), transparent); }
+.vacation .course-card--green .course-top { background: linear-gradient(180deg, rgba(47, 155, 96, 0.45), transparent); }
+.vacation .course-card--red .course-top { background: linear-gradient(180deg, rgba(217, 90, 73, 0.45), transparent); }
+.vacation .course-card--cyan .course-top { background: linear-gradient(180deg, rgba(34, 211, 238, 0.4), transparent); }
 
-.course-name-row {
+.vacation .course-name-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -422,12 +480,12 @@
   margin-bottom: 10px;
 }
 
-.course-name-row h3 {
+.vacation .course-name-row h3 {
   font-size: 1.4rem;
   font-weight: 900;
 }
 
-.time-badge {
+.vacation .time-badge {
   font-size: 0.72rem;
   font-weight: 800;
   padding: 4px 10px;
@@ -435,17 +493,17 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-.time-badge--morning { color: var(--trial-cyan); border-color: rgba(34, 211, 238, 0.45); }
-.time-badge--late { color: var(--trial-violet); border-color: rgba(139, 92, 246, 0.45); }
+.vacation .time-badge--morning { color: var(--trial-cyan); border-color: rgba(34, 211, 238, 0.45); }
+.vacation .time-badge--late { color: var(--trial-violet); border-color: rgba(139, 92, 246, 0.45); }
 
-.course-desc {
+.vacation .course-desc {
   color: var(--trial-muted);
   font-size: 0.92rem;
   line-height: 1.6;
   margin: 0 0 14px;
 }
 
-.course-meta {
+.vacation .course-meta {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -453,7 +511,7 @@
   gap: 8px;
 }
 
-.course-meta li {
+.vacation .course-meta li {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -461,21 +519,21 @@
   font-size: 0.88rem;
 }
 
-.course-meta svg {
+.vacation .course-meta svg {
   color: var(--trial-cyan);
   flex: 0 0 auto;
 }
 
-.course-meta li.prereq svg {
+.vacation .course-meta li.prereq svg {
   color: var(--trial-green);
 }
 
 /* 실시간 신청 현황 게이지 */
-.course-status {
+.vacation .course-status {
   padding: 0 22px 8px;
 }
 
-.status-bar {
+.vacation .status-bar {
   height: 9px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
@@ -483,36 +541,36 @@
   margin-bottom: 8px;
 }
 
-.status-fill {
+.vacation .status-fill {
   height: 100%;
   background: linear-gradient(90deg, #22d3ee, #8b5cf6);
   border-radius: 999px;
   transition: width 0.6s ease;
 }
 
-.status-fill--reached {
+.vacation .status-fill--reached {
   background: linear-gradient(90deg, #4ade80, #22d3ee);
 }
 
-.status-info {
+.vacation .status-info {
   display: flex;
   justify-content: space-between;
   font-size: 0.84rem;
 }
 
-.current-count {
+.vacation .current-count {
   color: var(--trial-cyan);
   font-weight: 700;
 }
 
-.min-count {
+.vacation .min-count {
   color: var(--trial-muted);
 }
 
-.course-card button {
+.vacation .course-card button {
   margin: 8px 22px 22px;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: 12px;
   font-weight: 800;
   color: #04121b;
   background: linear-gradient(120deg, #22d3ee, #60a5fa);
@@ -522,7 +580,7 @@
   gap: 8px;
 }
 
-.course-card--selected button {
+.vacation .course-card--selected button {
   background: rgba(34, 211, 238, 0.16);
   color: var(--trial-cyan);
   border: 1px solid rgba(34, 211, 238, 0.5);
@@ -531,21 +589,21 @@
 /* ============================================
    안내 섹션
    ============================================ */
-.info-grid {
+.vacation .info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px;
 }
 
-.info-card {
+.vacation .info-card {
   background: var(--trial-panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+  border-radius: 14px;
   padding: 26px;
   backdrop-filter: blur(10px);
 }
 
-.info-icon {
+.vacation .info-icon {
   width: 46px;
   height: 46px;
   display: inline-flex;
@@ -557,12 +615,12 @@
   margin-bottom: 14px;
 }
 
-.info-card h3 {
+.vacation .info-card h3 {
   font-size: 1.12rem;
   margin-bottom: 12px;
 }
 
-.info-card ul {
+.vacation .info-card ul {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -570,7 +628,7 @@
   gap: 10px;
 }
 
-.info-card li {
+.vacation .info-card li {
   position: relative;
   padding-left: 22px;
   color: var(--trial-muted);
@@ -578,7 +636,7 @@
   line-height: 1.5;
 }
 
-.info-card li::before {
+.vacation .info-card li::before {
   content: '✓';
   position: absolute;
   left: 0;
@@ -586,19 +644,19 @@
   font-weight: 900;
 }
 
-.info-card li strong {
+.vacation .info-card li strong {
   color: var(--trial-cyan);
 }
 
 /* 링크 카드(교재 구입 / 후기) */
-.info-card p {
+.vacation .info-card p {
   margin: 0 0 16px;
   color: var(--trial-muted);
   font-size: 0.92rem;
   line-height: 1.6;
 }
 
-.info-link-btn {
+.vacation .info-link-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -612,12 +670,12 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.info-link-btn:hover {
+.vacation .info-link-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 24px rgba(34, 211, 238, 0.28);
 }
 
-.info-notice {
+.vacation .info-notice {
   margin-top: 24px;
   display: flex;
   gap: 16px;
@@ -627,30 +685,30 @@
   border: 1px solid rgba(34, 211, 238, 0.25);
 }
 
-.info-notice-icon {
+.vacation .info-notice-icon {
   flex: 0 0 auto;
   color: var(--trial-cyan);
 }
 
-.info-notice-body h4 {
+.vacation .info-notice-body h4 {
   font-size: 1.05rem;
   margin-bottom: 8px;
 }
 
-.info-notice-body p {
+.vacation .info-notice-body p {
   color: var(--trial-muted);
   line-height: 1.7;
   font-size: 0.96rem;
 }
 
-.info-notice-body strong {
+.vacation .info-notice-body strong {
   color: #fff;
 }
 
 /* ============================================
    신청 레이아웃 + 폼 (PublicApplication과 동일 토큰)
    ============================================ */
-.application-layout {
+.vacation .application-layout {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: 26px;
@@ -659,92 +717,119 @@
   scroll-margin-top: 90px;
 }
 
-.application-info {
+.vacation .application-info {
   background: var(--trial-panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 22px;
+  border-radius: 16px;
   padding: 26px;
   backdrop-filter: blur(10px);
 }
 
-.application-info h2 {
+.vacation .application-info h2 {
   margin: 12px 0 8px;
   font-size: 1.6rem;
   font-weight: 900;
 }
 
-.application-info > p {
+.vacation .application-info > p {
   color: var(--trial-muted);
   line-height: 1.65;
 }
 
-.selected-course-panel {
-  border-radius: 18px;
+.vacation .selected-course-panel {
+  border-radius: 12px;
   padding: 20px;
   margin-top: 22px;
   background: rgba(34, 211, 238, 0.08);
   border: 1px solid rgba(34, 211, 238, 0.25);
 }
 
-.selected-course-panel strong,
-.selected-course-panel b {
+.vacation .selected-course-panel strong,
+.vacation .selected-course-panel b {
   display: block;
 }
 
-.selected-course-panel strong {
+.vacation .selected-course-panel strong {
   font-size: 1.3rem;
   margin-top: 8px;
 }
 
-.selected-course-panel p {
+.vacation .selected-course-panel p {
   margin: 8px 0 10px;
   color: var(--trial-muted);
 }
 
-.selected-course-panel b {
+.vacation .selected-course-panel b {
   color: var(--trial-cyan);
 }
 
-.application-form {
+.vacation .application-form {
   display: grid;
   gap: 14px;
   background: rgba(9, 14, 33, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 22px;
+  border-radius: 16px;
   padding: 26px;
 }
 
-.form-title h2 {
+.vacation .form-title h2 {
   margin: 8px 0 8px;
   font-size: 1.75rem;
   font-weight: 900;
 }
 
-.form-title p {
+.vacation .form-title p {
   color: var(--trial-muted);
 }
 
-.form-grid {
+.vacation .form-grid {
   display: grid;
   gap: 12px;
 }
 
-.form-grid--two {
+.vacation .form-grid--two {
   grid-template-columns: repeat(2, 1fr);
 }
 
-.form-grid--student {
-  grid-template-columns: minmax(0, 1fr) 130px;
+.vacation .form-grid--student {
+  grid-template-columns: minmax(0, 1fr) 132px;
 }
 
-.application-form input,
-.application-form select,
-.application-form textarea {
+.vacation .form-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vacation .form-field > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(232, 240, 255, 0.82);
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.vacation .form-field > span svg {
+  color: var(--trial-cyan);
+  flex: 0 0 auto;
+}
+
+.vacation .form-field em {
+  color: var(--trial-muted);
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.vacation .application-form input,
+.vacation .application-form select,
+.vacation .application-form textarea {
   width: 100%;
   min-height: 52px;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.075);
   color: white;
   padding: 0 15px;
   font: inherit;
@@ -752,50 +837,59 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.application-form input::placeholder,
-.application-form textarea::placeholder {
+.vacation .application-form input:-webkit-autofill,
+.vacation .application-form select:-webkit-autofill,
+.vacation .application-form textarea:-webkit-autofill {
+  -webkit-text-fill-color: #fff;
+  box-shadow: 0 0 0 1000px #17203a inset;
+  caret-color: #fff;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+.vacation .application-form input::placeholder,
+.vacation .application-form textarea::placeholder {
   color: rgba(255, 255, 255, 0.45);
 }
 
-.application-form select option {
+.vacation .application-form select option {
   background: #12172b;
   color: white;
 }
 
-.application-form textarea {
+.vacation .application-form textarea {
   min-height: 100px;
   padding: 14px 15px;
   resize: vertical;
 }
 
-.application-form input:focus,
-.application-form select:focus,
-.application-form textarea:focus {
+.vacation .application-form input:focus,
+.vacation .application-form select:focus,
+.vacation .application-form textarea:focus {
   border-color: var(--trial-cyan);
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
 }
 
-.application-form > button {
+.vacation .application-form > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   min-height: 54px;
-  border-radius: 14px;
+  border-radius: 12px;
   font-weight: 900;
   font-size: 1.04rem;
   color: #04121b;
-  background: linear-gradient(120deg, #22d3ee, #8b5cf6);
+  background: linear-gradient(120deg, #22d3ee, #4ade80);
   margin-top: 6px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
-.application-form > button:hover:not(:disabled) {
+.vacation .application-form > button:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 12px 30px rgba(34, 211, 238, 0.3);
 }
 
-.application-form > button:disabled {
+.vacation .application-form > button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
@@ -811,7 +905,7 @@
   padding: 40px 20px;
 }
 
-.complete-panel {
+.vacation .complete-panel {
   position: relative;
   z-index: 2;
   max-width: 540px;
@@ -819,12 +913,12 @@
   text-align: center;
   background: var(--trial-panel-strong);
   border: 1px solid var(--trial-line);
-  border-radius: 26px;
+  border-radius: 18px;
   padding: 44px 32px;
   backdrop-filter: blur(14px);
 }
 
-.complete-orbit {
+.vacation .complete-orbit {
   width: 76px;
   height: 76px;
   margin: 0 auto 20px;
@@ -837,27 +931,66 @@
   border: 1px solid rgba(34, 211, 238, 0.4);
 }
 
-.complete-panel h1 {
+.vacation .complete-panel h1 {
   font-size: 1.7rem;
   font-weight: 900;
   margin-bottom: 12px;
 }
 
-.complete-panel p {
+.vacation .complete-panel p {
   color: var(--trial-muted);
   line-height: 1.7;
 }
 
-.complete-panel p strong {
+.vacation .complete-panel p strong {
   color: #fff;
 }
 
-.complete-sub {
+.vacation .complete-sub {
   margin-top: 14px;
   font-size: 0.94rem;
 }
 
-.complete-actions {
+.vacation .complete-notice {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 18px;
+  border-radius: 14px;
+  text-align: left;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.24);
+}
+
+.vacation .complete-notice p,
+.vacation .complete-notice a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: rgba(232, 240, 255, 0.78);
+  line-height: 1.55;
+  text-decoration: none;
+}
+
+.vacation .complete-notice p:nth-child(2) {
+  display: block;
+  padding-left: 26px;
+  font-size: 0.92rem;
+}
+
+.vacation .complete-notice svg {
+  color: var(--trial-cyan);
+  flex: 0 0 auto;
+}
+
+.vacation .complete-notice strong,
+.vacation .complete-notice a {
+  color: #fff;
+  font-weight: 850;
+}
+
+.vacation .complete-actions {
   display: flex;
   gap: 12px;
   justify-content: center;
@@ -865,8 +998,9 @@
   margin-top: 26px;
 }
 
-.complete-actions button {
-  padding: 0.8rem 1.4rem;
+.vacation .complete-actions button {
+  min-width: 148px;
+  padding: 0.86rem 1.6rem;
   border-radius: 999px;
   font-weight: 800;
   cursor: pointer;
@@ -876,7 +1010,7 @@
   background: linear-gradient(120deg, #22d3ee, #60a5fa);
 }
 
-.complete-actions button.secondary {
+.vacation .complete-actions button.secondary {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -885,7 +1019,7 @@
 /* ============================================
    덮어쓰기 확인 모달
    ============================================ */
-.confirm-overlay {
+.vacation .confirm-overlay {
   position: fixed;
   inset: 0;
   z-index: 1200;
@@ -897,17 +1031,17 @@
   padding: 20px;
 }
 
-.confirm-modal {
+.vacation .confirm-modal {
   max-width: 440px;
   width: 100%;
   text-align: center;
   background: var(--trial-panel-strong);
   border: 1px solid var(--trial-line);
-  border-radius: 24px;
+  border-radius: 18px;
   padding: 36px 28px;
 }
 
-.confirm-icon {
+.vacation .confirm-icon {
   width: 72px;
   height: 72px;
   margin: 0 auto 16px;
@@ -919,32 +1053,32 @@
   background: rgba(34, 211, 238, 0.14);
 }
 
-.confirm-modal h3 {
+.vacation .confirm-modal h3 {
   font-size: 1.3rem;
   margin-bottom: 14px;
 }
 
-.confirm-main,
-.confirm-sub {
+.vacation .confirm-main,
+.vacation .confirm-sub {
   color: var(--trial-muted);
   line-height: 1.6;
 }
 
-.confirm-main strong,
-.confirm-sub strong {
+.vacation .confirm-main strong,
+.vacation .confirm-sub strong {
   color: #fff;
 }
 
-.confirm-actions {
+.vacation .confirm-actions {
   display: flex;
   gap: 12px;
   margin-top: 26px;
 }
 
-.confirm-actions button {
+.vacation .confirm-actions button {
   flex: 1;
   padding: 0.8rem 1rem;
-  border-radius: 14px;
+  border-radius: 12px;
   font-weight: 800;
   cursor: pointer;
   border: none;
@@ -953,7 +1087,7 @@
   background: linear-gradient(120deg, #22d3ee, #8b5cf6);
 }
 
-.confirm-actions button.secondary {
+.vacation .confirm-actions button.secondary {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -963,17 +1097,72 @@
    반응형
    ============================================ */
 @media (max-width: 900px) {
-  .vacation-hero,
-  .application-layout {
+  .vacation .vacation-hero,
+  .vacation .application-layout {
     grid-template-columns: 1fr;
+  }
+
+  .vacation .hero-schedule-card {
+    position: static;
   }
 }
 
 @media (max-width: 600px) {
   .vacation main { padding: 16px 0 60px; }
-  .section-block { margin-top: 56px; }
-  .application-layout { margin-top: 56px; }
-  .form-grid--two { grid-template-columns: 1fr; }
-  .schedule-list > div { grid-template-columns: 84px 1fr; }
+  .vacation .vacation-hero {
+    gap: 18px;
+    padding: 18px 0 36px;
+  }
+  .vacation .hero-copy h1 {
+    margin: 12px 0 12px;
+    font-size: 2.18rem;
+  }
+  .vacation .hero-copy p {
+    font-size: 0.98rem;
+    line-height: 1.62;
+  }
+  .vacation .hero-actions {
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .vacation .hero-actions a {
+    display: none;
+  }
+  .vacation .hero-actions button,
+  .vacation .hero-actions a {
+    padding: 0.78rem 1rem;
+  }
+  .vacation .trial-conditions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 16px;
+  }
+  .vacation .trial-conditions span {
+    min-width: 0;
+    white-space: nowrap;
+    font-size: 0.76rem;
+  }
+  .vacation .hero-schedule-card {
+    padding: 16px;
+  }
+  .vacation .schedule-card-head {
+    margin-bottom: 12px;
+  }
+  .vacation .hero-schedule-card .schedule-list {
+    display: none;
+  }
+  .vacation .schedule-card-cta {
+    margin-top: 12px;
+  }
+  .vacation .section-block { margin-top: 56px; }
+  .vacation .application-layout { margin-top: 56px; }
+  .vacation .form-grid--two { grid-template-columns: 1fr; }
+  .vacation .form-grid--student { grid-template-columns: 1fr; }
+  .vacation .camp-snapshot { grid-template-columns: repeat(3, 1fr); }
+  .vacation .camp-snapshot div { padding: 10px 6px; }
+  .vacation .camp-snapshot strong { font-size: 0.98rem; }
+  .vacation .schedule-list > div { grid-template-columns: 84px 1fr; }
   .vacation .public-nav nav { gap: 6px; }
+  .vacation .public-nav a:not(:last-child) { display: none; }
 }
