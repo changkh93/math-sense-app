@@ -1,0 +1,979 @@
+/*
+ * 여름방학 특강 페이지 — PublicApplication.css의 우주 테마 토큰을 그대로 차용.
+ * 같은 --trial-* 변수와 .public-app 공통 마크업(네비, 별 배경, 폼, 섹션 헤더)을 재사용한다.
+ * 컴포넌트 고유 스타일은 .vacation 스코프로 격리.
+ */
+.vacation {
+  --trial-bg: #070b1c;
+  --trial-panel: rgba(15, 22, 46, 0.76);
+  --trial-panel-strong: rgba(20, 30, 62, 0.92);
+  --trial-line: rgba(111, 226, 255, 0.22);
+  --trial-cyan: #22d3ee;
+  --trial-blue: #60a5fa;
+  --trial-violet: #8b5cf6;
+  --trial-green: #4ade80;
+  --trial-red: #fb7185;
+  --trial-text: #f8fbff;
+  --trial-muted: rgba(232, 240, 255, 0.68);
+  min-height: 100vh;
+  color: var(--trial-text);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(111, 36, 204, 0.28), transparent 34rem),
+    radial-gradient(circle at 82% 18%, rgba(34, 211, 238, 0.16), transparent 30rem),
+    linear-gradient(180deg, #080b1f 0%, #12172b 44%, #090d1f 100%);
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.vacation * {
+  box-sizing: border-box;
+}
+
+/* 별 배경은 PublicApplication과 동일 */
+.vacation .public-stars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.72;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.92) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(125, 211, 252, 0.55) 0 1px, transparent 1.5px);
+  background-size: 92px 92px, 137px 137px;
+  background-position: 12px 18px, 58px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 92%);
+}
+
+/* 네비게이션 */
+.vacation .public-nav {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  position: relative;
+  z-index: 5;
+}
+
+.vacation .public-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--trial-cyan);
+  text-decoration: none;
+  font-weight: 950;
+  text-shadow: 0 0 18px rgba(34, 211, 238, 0.58);
+}
+
+.vacation .public-brand img {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 0 9px rgba(34, 211, 238, 0.62));
+}
+
+.vacation .public-nav nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.vacation .public-nav a,
+.vacation .public-nav button {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.86);
+  border-radius: 999px;
+  padding: 0.64rem 0.94rem;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.vacation .public-nav button {
+  background: rgba(34, 211, 238, 0.16);
+  color: white;
+}
+
+.vacation main {
+  position: relative;
+  z-index: 2;
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 22px 0 90px;
+}
+
+/* ============================================
+   Hero
+   ============================================ */
+.vacation-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.7fr);
+  gap: 34px;
+  align-items: start;
+  padding: clamp(32px, 5vw, 60px) 0 clamp(48px, 7vw, 72px);
+}
+
+.hero-copy .hero-eyebrow,
+.vacation .section-heading span,
+.application-info > span,
+.form-title span,
+.selected-course-panel span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--trial-cyan);
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+}
+
+.hero-copy h1 {
+  margin: 16px 0 18px;
+  max-width: 760px;
+  font-size: clamp(2.3rem, 5.4vw, 4.2rem);
+  line-height: 1.06;
+  font-weight: 950;
+  text-shadow: 0 0 28px rgba(34, 211, 238, 0.32);
+}
+
+.hero-accent {
+  background: linear-gradient(120deg, #22d3ee, #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-copy p {
+  margin: 0;
+  max-width: 640px;
+  color: var(--trial-muted);
+  font-size: clamp(1rem, 1.7vw, 1.16rem);
+  line-height: 1.75;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 30px;
+}
+
+.hero-actions button,
+.vacation .how-card + .how-card,
+.course-card button,
+.application-form > button {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.hero-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.9rem 1.4rem;
+  border-radius: 999px;
+  font-weight: 900;
+  color: #04121b;
+  background: linear-gradient(120deg, #22d3ee, #60a5fa);
+  box-shadow: 0 10px 30px rgba(34, 211, 238, 0.32);
+}
+
+.hero-actions a {
+  padding: 0.9rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.trial-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.trial-conditions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--trial-muted);
+  font-size: 0.92rem;
+}
+
+.trial-conditions svg {
+  color: var(--trial-cyan);
+}
+
+/* Hero 일정 요약 카드 */
+.hero-schedule-card {
+  background: linear-gradient(160deg, rgba(34, 211, 238, 0.12), rgba(139, 92, 246, 0.12));
+  border: 1px solid var(--trial-line);
+  border-radius: 24px;
+  padding: 26px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(14px);
+}
+
+.schedule-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--trial-cyan);
+  font-size: 1.05rem;
+  margin-bottom: 16px;
+}
+
+.schedule-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.schedule-list > div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.schedule-list dt {
+  color: var(--trial-muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.schedule-list dd {
+  margin: 0;
+  color: var(--trial-text);
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.schedule-list .hr {
+  grid-template-columns: 1fr;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 2px 0;
+}
+
+.schedule-list dd strong {
+  color: #fff;
+}
+
+.schedule-list dd .free {
+  color: var(--trial-green);
+}
+
+/* ============================================
+   섹션 공통
+   ============================================ */
+.section-block {
+  margin-top: 80px;
+  scroll-margin-top: 90px;
+}
+
+.section-heading {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 36px;
+}
+
+.section-heading h2 {
+  margin: 12px 0 12px;
+  font-size: clamp(1.7rem, 3.6vw, 2.6rem);
+  font-weight: 900;
+}
+
+.section-heading p {
+  color: var(--trial-muted);
+  font-size: clamp(1rem, 1.5vw, 1.1rem);
+  line-height: 1.7;
+}
+
+/* ============================================
+   진행 방식 (How it works)
+   ============================================ */
+.how-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.how-card {
+  background: var(--trial-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 26px;
+  backdrop-filter: blur(10px);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.how-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--trial-line);
+}
+
+.how-icon {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: var(--trial-cyan);
+  background: rgba(34, 211, 238, 0.14);
+  margin-bottom: 14px;
+}
+
+.how-card h3 {
+  font-size: 1.12rem;
+  margin-bottom: 8px;
+}
+
+.how-card p {
+  color: var(--trial-muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+/* ============================================
+   과정 카드
+   ============================================ */
+.group-legend {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.legend-morning { color: var(--trial-cyan); border-color: rgba(34, 211, 238, 0.4); }
+.legend-late { color: var(--trial-violet); border-color: rgba(139, 92, 246, 0.4); }
+
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.course-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--trial-panel-strong);
+  backdrop-filter: blur(12px);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.course-card:hover {
+  transform: translateY(-5px);
+}
+
+.course-card--selected {
+  border-color: var(--trial-cyan);
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.45), 0 18px 40px rgba(34, 211, 238, 0.18);
+}
+
+.course-top {
+  padding: 22px 22px 14px;
+  flex: 1;
+}
+
+.course-card--blue .course-top { background: linear-gradient(180deg, rgba(49, 93, 157, 0.55), transparent); }
+.course-card--violet .course-top { background: linear-gradient(180deg, rgba(135, 70, 173, 0.5), transparent); }
+.course-card--green .course-top { background: linear-gradient(180deg, rgba(47, 155, 96, 0.45), transparent); }
+.course-card--red .course-top { background: linear-gradient(180deg, rgba(217, 90, 73, 0.45), transparent); }
+.course-card--cyan .course-top { background: linear-gradient(180deg, rgba(34, 211, 238, 0.4), transparent); }
+
+.course-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.course-name-row h3 {
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+.time-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.time-badge--morning { color: var(--trial-cyan); border-color: rgba(34, 211, 238, 0.45); }
+.time-badge--late { color: var(--trial-violet); border-color: rgba(139, 92, 246, 0.45); }
+
+.course-desc {
+  color: var(--trial-muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+
+.course-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.course-meta li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.88rem;
+}
+
+.course-meta svg {
+  color: var(--trial-cyan);
+  flex: 0 0 auto;
+}
+
+.course-meta li.prereq svg {
+  color: var(--trial-green);
+}
+
+/* 실시간 신청 현황 게이지 */
+.course-status {
+  padding: 0 22px 8px;
+}
+
+.status-bar {
+  height: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.status-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22d3ee, #8b5cf6);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+.status-fill--reached {
+  background: linear-gradient(90deg, #4ade80, #22d3ee);
+}
+
+.status-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.84rem;
+}
+
+.current-count {
+  color: var(--trial-cyan);
+  font-weight: 700;
+}
+
+.min-count {
+  color: var(--trial-muted);
+}
+
+.course-card button {
+  margin: 8px 22px 22px;
+  padding: 12px;
+  border-radius: 14px;
+  font-weight: 800;
+  color: #04121b;
+  background: linear-gradient(120deg, #22d3ee, #60a5fa);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.course-card--selected button {
+  background: rgba(34, 211, 238, 0.16);
+  color: var(--trial-cyan);
+  border: 1px solid rgba(34, 211, 238, 0.5);
+}
+
+/* ============================================
+   안내 섹션
+   ============================================ */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.info-card {
+  background: var(--trial-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 26px;
+  backdrop-filter: blur(10px);
+}
+
+.info-icon {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: var(--trial-cyan);
+  background: rgba(34, 211, 238, 0.14);
+  margin-bottom: 14px;
+}
+
+.info-card h3 {
+  font-size: 1.12rem;
+  margin-bottom: 12px;
+}
+
+.info-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.info-card li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--trial-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.info-card li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--trial-green);
+  font-weight: 900;
+}
+
+.info-card li strong {
+  color: var(--trial-cyan);
+}
+
+/* 링크 카드(교재 구입 / 후기) */
+.info-card p {
+  margin: 0 0 16px;
+  color: var(--trial-muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.info-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.92rem;
+  text-decoration: none;
+  color: #04121b;
+  background: linear-gradient(120deg, #22d3ee, #60a5fa);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.info-link-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(34, 211, 238, 0.28);
+}
+
+.info-notice {
+  margin-top: 24px;
+  display: flex;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 18px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+}
+
+.info-notice-icon {
+  flex: 0 0 auto;
+  color: var(--trial-cyan);
+}
+
+.info-notice-body h4 {
+  font-size: 1.05rem;
+  margin-bottom: 8px;
+}
+
+.info-notice-body p {
+  color: var(--trial-muted);
+  line-height: 1.7;
+  font-size: 0.96rem;
+}
+
+.info-notice-body strong {
+  color: #fff;
+}
+
+/* ============================================
+   신청 레이아웃 + 폼 (PublicApplication과 동일 토큰)
+   ============================================ */
+.application-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 26px;
+  align-items: start;
+  margin-top: 80px;
+  scroll-margin-top: 90px;
+}
+
+.application-info {
+  background: var(--trial-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  padding: 26px;
+  backdrop-filter: blur(10px);
+}
+
+.application-info h2 {
+  margin: 12px 0 8px;
+  font-size: 1.6rem;
+  font-weight: 900;
+}
+
+.application-info > p {
+  color: var(--trial-muted);
+  line-height: 1.65;
+}
+
+.selected-course-panel {
+  border-radius: 18px;
+  padding: 20px;
+  margin-top: 22px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+}
+
+.selected-course-panel strong,
+.selected-course-panel b {
+  display: block;
+}
+
+.selected-course-panel strong {
+  font-size: 1.3rem;
+  margin-top: 8px;
+}
+
+.selected-course-panel p {
+  margin: 8px 0 10px;
+  color: var(--trial-muted);
+}
+
+.selected-course-panel b {
+  color: var(--trial-cyan);
+}
+
+.application-form {
+  display: grid;
+  gap: 14px;
+  background: rgba(9, 14, 33, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  padding: 26px;
+}
+
+.form-title h2 {
+  margin: 8px 0 8px;
+  font-size: 1.75rem;
+  font-weight: 900;
+}
+
+.form-title p {
+  color: var(--trial-muted);
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.form-grid--two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.form-grid--student {
+  grid-template-columns: minmax(0, 1fr) 130px;
+}
+
+.application-form input,
+.application-form select,
+.application-form textarea {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  padding: 0 15px;
+  font: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.application-form input::placeholder,
+.application-form textarea::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.application-form select option {
+  background: #12172b;
+  color: white;
+}
+
+.application-form textarea {
+  min-height: 100px;
+  padding: 14px 15px;
+  resize: vertical;
+}
+
+.application-form input:focus,
+.application-form select:focus,
+.application-form textarea:focus {
+  border-color: var(--trial-cyan);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
+}
+
+.application-form > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  border-radius: 14px;
+  font-weight: 900;
+  font-size: 1.04rem;
+  color: #04121b;
+  background: linear-gradient(120deg, #22d3ee, #8b5cf6);
+  margin-top: 6px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.application-form > button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(34, 211, 238, 0.3);
+}
+
+.application-form > button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   완료 화면
+   ============================================ */
+.vacation--complete {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.complete-panel {
+  position: relative;
+  z-index: 2;
+  max-width: 540px;
+  width: 100%;
+  text-align: center;
+  background: var(--trial-panel-strong);
+  border: 1px solid var(--trial-line);
+  border-radius: 26px;
+  padding: 44px 32px;
+  backdrop-filter: blur(14px);
+}
+
+.complete-orbit {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--trial-cyan);
+  background: rgba(34, 211, 238, 0.14);
+  border: 1px solid rgba(34, 211, 238, 0.4);
+}
+
+.complete-panel h1 {
+  font-size: 1.7rem;
+  font-weight: 900;
+  margin-bottom: 12px;
+}
+
+.complete-panel p {
+  color: var(--trial-muted);
+  line-height: 1.7;
+}
+
+.complete-panel p strong {
+  color: #fff;
+}
+
+.complete-sub {
+  margin-top: 14px;
+  font-size: 0.94rem;
+}
+
+.complete-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 26px;
+}
+
+.complete-actions button {
+  padding: 0.8rem 1.4rem;
+  border-radius: 999px;
+  font-weight: 800;
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  color: #04121b;
+  background: linear-gradient(120deg, #22d3ee, #60a5fa);
+}
+
+.complete-actions button.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+   덮어쓰기 확인 모달
+   ============================================ */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(4, 7, 18, 0.72);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.confirm-modal {
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  background: var(--trial-panel-strong);
+  border: 1px solid var(--trial-line);
+  border-radius: 24px;
+  padding: 36px 28px;
+}
+
+.confirm-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--trial-cyan);
+  background: rgba(34, 211, 238, 0.14);
+}
+
+.confirm-modal h3 {
+  font-size: 1.3rem;
+  margin-bottom: 14px;
+}
+
+.confirm-main,
+.confirm-sub {
+  color: var(--trial-muted);
+  line-height: 1.6;
+}
+
+.confirm-main strong,
+.confirm-sub strong {
+  color: #fff;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.confirm-actions button {
+  flex: 1;
+  padding: 0.8rem 1rem;
+  border-radius: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  color: #04121b;
+  background: linear-gradient(120deg, #22d3ee, #8b5cf6);
+}
+
+.confirm-actions button.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+   반응형
+   ============================================ */
+@media (max-width: 900px) {
+  .vacation-hero,
+  .application-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .vacation main { padding: 16px 0 60px; }
+  .section-block { margin-top: 56px; }
+  .application-layout { margin-top: 56px; }
+  .form-grid--two { grid-template-columns: 1fr; }
+  .schedule-list > div { grid-template-columns: 84px 1fr; }
+  .vacation .public-nav nav { gap: 6px; }
+}

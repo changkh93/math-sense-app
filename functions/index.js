@@ -579,6 +579,100 @@ exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) =>
   return { success: true, id: ref.id };
 });
 
+// 여름방학 특강 과정 카탈로그. courseId는 이 키와 일치해야 한다.
+const VACATION_CAMP_COURSES = {
+  multiplication: "곱셈",
+  division: "나눗셈",
+  fraction: "분수",
+  decimal: "소수",
+  ratio: "비와 비례식",
+};
+
+exports.getVacationCampCounts = regionalFunctions.https.onCall(async () => {
+  const snap = await admin.firestore().collection("vacationCampApplications").get();
+  const counts = {};
+  Object.keys(VACATION_CAMP_COURSES).forEach((id) => { counts[id] = 0; });
+  snap.forEach((doc) => {
+    const courseId = doc.get("courseId");
+    if (typeof courseId === "string" && Object.prototype.hasOwnProperty.call(counts, courseId)) {
+      counts[courseId] += 1;
+    }
+  });
+  return { success: true, counts };
+});
+
+exports.submitVacationCampApplication = regionalFunctions.https.onCall(async (data) => {
+  const applicantName = cleanText(data?.applicantName, 80);
+  const parentPhone = digitsOnly(data?.parentPhone, 16);
+  const studentName = cleanText(data?.studentName, 80);
+  const grade = cleanText(data?.grade, 30);
+  const courseId = cleanText(data?.courseId, 40);
+  const message = cleanText(data?.message, 1000);
+  const overwrite = data?.overwrite === true;
+
+  if (!applicantName || parentPhone.length < 10 || !studentName || !grade) {
+    throw new functions.https.HttpsError("invalid-argument", "필수 정보를 확인해 주세요.");
+  }
+  const courseName = VACATION_CAMP_COURSES[courseId];
+  if (!courseName) {
+    throw new functions.https.HttpsError("invalid-argument", "유효하지 않은 과정입니다.");
+  }
+
+  const db = admin.firestore();
+  const collection = db.collection("vacationCampApplications");
+
+  // 학부모 연락처 기준 중복 확인 (1인 1과목)
+  const dupSnap = await collection.where("parentPhone", "==", parentPhone).limit(1).get();
+  if (!dupSnap.empty) {
+    const existing = dupSnap.docs[0];
+    if (!overwrite) {
+      const existingCourseId = existing.get("courseId") || "";
+      return {
+        success: false,
+        error: "duplicate",
+        existingCourse: VACATION_CAMP_COURSES[existingCourseId] || existingCourseId,
+        newCourse: courseName,
+      };
+    }
+    // 덮어쓰기: 기존 문서를 갱신하고 카운트를 다시 센다
+    await existing.ref.set({
+      courseId,
+      courseName,
+      applicantName,
+      parentPhone,
+      studentName,
+      grade,
+      message,
+      status: "new",
+      updatedAt: FieldValue.serverTimestamp(),
+      source: "vacation_site",
+    }, { merge: true });
+
+    const allSnap = await collection.get();
+    const count = allSnap.docs.filter((d) => d.get("courseId") === courseId).length;
+    return { success: true, id: existing.id, courseId, courseName, count };
+  }
+
+  // 신규 저장
+  const ref = await collection.add({
+    courseId,
+    courseName,
+    applicantName,
+    parentPhone,
+    studentName,
+    grade,
+    message,
+    status: "new",
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+    source: "vacation_site",
+  });
+
+  const allSnap = await collection.get();
+  const count = allSnap.docs.filter((d) => d.get("courseId") === courseId).length;
+  return { success: true, id: ref.id, courseId, courseName, count };
+});
+
 exports.registerParentProfile = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const token = context.auth?.token || {};

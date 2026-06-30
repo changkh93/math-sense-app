@@ -10,6 +10,7 @@ import LiveStatus from './pages/Admin/LiveStatus'
 import ParentManager from './pages/Admin/ParentManager'
 import CrewApproval from './pages/Admin/CrewApproval'
 import Applications from './pages/Admin/Applications'
+import VacationCampAdmin from './pages/Admin/VacationCampAdmin'
 
 import ParentDashboard from './pages/Parent/ParentDashboard'
 
@@ -34,6 +35,7 @@ import PublicProfile from './pages/Community/PublicProfile'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import InviteHandler from './pages/InviteHandler'
 import PublicApplication from './pages/PublicApplication'
+import VacationCamp from './pages/VacationCamp'
 import Signup from './pages/Signup'
 import Terms from './pages/Terms'
 
@@ -56,6 +58,7 @@ function App() {
       <Route path="/invite/:inviteCode" element={<InviteHandler />} />
       <Route path="/trial" element={<PublicApplication fixedType="trial" />} />
       <Route path="/consultation" element={<PublicApplication fixedType="consultation" />} />
+      <Route path="/vacation" element={<VacationCamp />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/terms" element={<Terms />} />
       
@@ -70,6 +73,7 @@ function App() {
         <Route path="users" element={<UserAccessManager />} />
         <Route path="parents" element={<ParentManager />} />
         <Route path="applications" element={<Applications />} />
+        <Route path="vacation-camp" element={<VacationCampAdmin />} />
         <Route path="crews" element={<CrewApproval />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="assignments" element={<AdminAssignments />} />

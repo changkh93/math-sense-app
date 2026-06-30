@@ -316,6 +316,12 @@ service cloud.firestore {
       allow create: if false;
     }
 
+    // 방학특강 신청서 — Cloud Functions가 쓰고 관리자가 관리.
+    match /vacationCampApplications/{applicationId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if false;
+    }
+
     // Monthly evaluation certificate awards. Admins grant awards; students can
     // read their own award ledger for the dashboard certificate board.
     match /monthlyEvaluationAwards/{awardId} {
