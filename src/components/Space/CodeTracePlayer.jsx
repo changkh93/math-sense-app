@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { doc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Check, ChevronLeft, Eye, EyeOff, Lightbulb, RotateCcw, Save } from 'lucide-react';
+import { Check, ChevronLeft, Eye, Lightbulb, RotateCcw, Save } from 'lucide-react';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils';
@@ -9,12 +9,57 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils';
 import { recordCrystalTransaction } from '../../utils/crystalLedger';
 import soundManager from '../../utils/SoundManager';
 
+const ANSWER_REVEAL_SECONDS = 30;
+
 function normalizeNewlines(text = '') {
   return String(text).replace(/\r\n/g, '\n');
 }
 
 function trimTrailingWhitespace(line = '') {
   return line.replace(/\s+$/g, '');
+}
+
+function normalizePythonLineForCompare(line = '') {
+  const raw = trimTrailingWhitespace(String(line || ''));
+  const indent = raw.match(/^\s*/)?.[0] || '';
+  const body = raw.slice(indent.length);
+  let result = indent;
+  let quote = '';
+  let escaped = false;
+
+  for (const char of body) {
+    if (quote) {
+      result += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        quote = '';
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      result += char;
+      continue;
+    }
+
+    if (!/\s/.test(char)) {
+      result += char;
+    }
+  }
+
+  return result;
+}
+
+function hasOnlyQuotedWhitespaceDifference(answerLine = '', studentLine = '') {
+  const normalizedAnswer = normalizePythonLineForCompare(answerLine);
+  const normalizedStudent = normalizePythonLineForCompare(studentLine);
+  if (normalizedAnswer === normalizedStudent) return false;
+  if (!/["']/.test(normalizedAnswer) && !/["']/.test(normalizedStudent)) return false;
+  return normalizedAnswer.replace(/\s/g, '') === normalizedStudent.replace(/\s/g, '');
 }
 
 function getIndent(line = '') {
@@ -30,22 +75,27 @@ function evaluateCode(answerCode, studentCode) {
   const student = normalizeNewlines(studentCode);
   const answerLines = answer.split('\n');
   const studentLines = student.split('\n');
-  const totalChars = Math.max(answer.length, 1);
+  const targetIndexes = answerLines.map((_, index) => index);
+  const targetAnswer = targetIndexes.map(index => normalizePythonLineForCompare(answerLines[index] || '')).join('\n');
+  const targetStudent = targetIndexes.map(index => normalizePythonLineForCompare(studentLines[index] || '')).join('\n');
+  const totalChars = Math.max(targetAnswer.length, targetStudent.length, 1);
 
   let sameChars = 0;
-  for (let i = 0; i < Math.min(answer.length, student.length); i += 1) {
-    if (answer[i] === student[i]) sameChars += 1;
+  for (let i = 0; i < Math.min(targetAnswer.length, targetStudent.length); i += 1) {
+    if (targetAnswer[i] === targetStudent[i]) sameChars += 1;
   }
 
   let correctLines = 0;
-  answerLines.forEach((line, index) => {
-    if (trimTrailingWhitespace(line) === trimTrailingWhitespace(studentLines[index] || '')) {
+  targetIndexes.forEach((index) => {
+    const line = answerLines[index] || '';
+    if (normalizePythonLineForCompare(line) === normalizePythonLineForCompare(studentLines[index] || '')) {
       correctLines += 1;
     }
   });
 
   const issues = [];
-  answerLines.forEach((answerLine, index) => {
+  targetIndexes.forEach((index) => {
+    const answerLine = answerLines[index] || '';
     const studentLine = studentLines[index] || '';
     if (!studentLine && answerLine) {
       issues.push(`${index + 1}번째 줄이 비어 있습니다.`);
@@ -57,6 +107,9 @@ function evaluateCode(answerCode, studentCode) {
     if (getIndent(answerLine) !== getIndent(studentLine) && answerLine.trim() === studentLine.trim()) {
       issues.push(`${index + 1}번째 줄의 들여쓰기를 정답 코드와 맞춰 보세요.`);
     }
+    if (hasOnlyQuotedWhitespaceDifference(answerLine, studentLine)) {
+      issues.push(`${index + 1}번째 줄의 따옴표 안 공백은 출력되는 글자이므로 그대로 맞춰야 합니다.`);
+    }
     if (countChar(studentLine, '(') !== countChar(studentLine, ')')) {
       issues.push(`${index + 1}번째 줄의 괄호 짝을 확인하세요.`);
     }
@@ -66,10 +119,10 @@ function evaluateCode(answerCode, studentCode) {
   });
 
   return {
-    perfect: answer === student,
+    perfect: correctLines === targetIndexes.length && targetIndexes.length > 0,
     accuracy: Math.max(0, Math.round((sameChars / totalChars) * 100)),
     correctLines,
-    totalLines: answerLines.length,
+    totalLines: targetIndexes.length,
     answerLines,
     studentLines,
     issues: issues.length ? issues.slice(0, 5) : ['특별한 문법 오류는 감지되지 않았습니다. 다른 글자나 공백을 정답 코드와 비교해 보세요.']
@@ -78,7 +131,6 @@ function evaluateCode(answerCode, studentCode) {
 
 function getModeCode(exercise, mode, visibleLines) {
   const answer = normalizeNewlines(exercise.answerCode || '');
-  if (mode === 'blank') return normalizeNewlines(exercise.blankCode || answer);
   if (mode === 'line') return answer.split('\n').slice(0, visibleLines).join('\n');
   return answer;
 }
@@ -94,9 +146,10 @@ export default function CodeTracePlayer({
 }) {
   const { user } = useAuth();
   const [exerciseIndex, setExerciseIndex] = useState(0);
-  const [mode, setMode] = useState('copy');
+  const [mode, setMode] = useState('recall');
   const [visibleLines, setVisibleLines] = useState(1);
   const [answerVisible, setAnswerVisible] = useState(true);
+  const [revealSeconds, setRevealSeconds] = useState(ANSWER_REVEAL_SECONDS);
   const [studentCode, setStudentCode] = useState('');
   const [hintIndex, setHintIndex] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
@@ -112,7 +165,10 @@ export default function CodeTracePlayer({
   }, [learningProgress?.codeTrace?.completedExerciseIds]);
 
   const exercise = exercises[exerciseIndex] || null;
-  const evaluation = useMemo(() => evaluateCode(exercise?.answerCode || '', studentCode), [exercise, studentCode]);
+  const evaluation = useMemo(
+    () => evaluateCode(exercise?.answerCode || '', studentCode),
+    [exercise, studentCode]
+  );
   const passingAccuracy = exercise?.passingAccuracy || 95;
   const currentPassed = evaluation.perfect || evaluation.accuracy >= passingAccuracy;
   const currentExerciseIds = useMemo(() => exercises.map(item => item.id || item.docId).filter(Boolean), [exercises]);
@@ -122,6 +178,26 @@ export default function CodeTracePlayer({
   );
   const allCompleted = currentExerciseIds.length > 0 && currentCompletedCount >= currentExerciseIds.length;
   const hint = exercise?.hints?.[Math.min(hintIndex, Math.max(0, (exercise?.hints?.length || 1) - 1))] || '';
+  const currentExerciseId = exercise?.id || exercise?.docId;
+  const estimatedReward = Math.max(10, Math.min(40, 20 + Math.round(evaluation.accuracy / 10) - Math.min(10, hintsUsed * 2)));
+  const unitAlreadyCompleted = !!learningProgress?.codeTrace?.completed;
+  const currentAlreadyCompleted = !!currentExerciseId && completedIds.has(currentExerciseId);
+  const willCompleteOnPass = !unitAlreadyCompleted && currentPassed && currentExerciseId && !currentAlreadyCompleted && currentCompletedCount + 1 >= currentExerciseIds.length;
+
+  useEffect(() => {
+    if (!answerVisible) return undefined;
+    setRevealSeconds(ANSWER_REVEAL_SECONDS);
+    const timer = setInterval(() => {
+      setRevealSeconds(prev => {
+        if (prev <= 1) {
+          setAnswerVisible(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [answerVisible, exerciseIndex, mode, visibleLines]);
 
   if (!exercise) {
     return (
@@ -140,26 +216,37 @@ export default function CodeTracePlayer({
     setVisibleLines(1);
     setHintIndex(0);
     setHintsUsed(0);
-    setAnswerVisible(mode !== 'recall');
+    setAnswerVisible(true);
+    setRevealSeconds(ANSWER_REVEAL_SECONDS);
   };
 
   const changeMode = (nextMode) => {
     setMode(nextMode);
     setVisibleLines(1);
-    setAnswerVisible(nextMode !== 'recall');
+    setAnswerVisible(true);
+    setRevealSeconds(ANSWER_REVEAL_SECONDS);
     setStudentCode('');
     setHintIndex(0);
     setHintsUsed(0);
   };
 
-  const markCurrentPassed = () => {
+  const revealAnswer = () => {
+    setAnswerVisible(true);
+    setRevealSeconds(ANSWER_REVEAL_SECONDS);
+  };
+
+  const markCurrentPassed = async () => {
     if (!currentPassed) return;
-    soundManager.playCorrect();
-    setCompletedIds(prev => {
-      const next = new Set(prev);
-      next.add(exercise.id || exercise.docId);
-      return next;
-    });
+    const next = new Set(completedIds);
+    next.add(currentExerciseId);
+    setCompletedIds(next);
+
+    const nextCompletedCount = currentExerciseIds.filter(id => next.has(id)).length;
+    if (nextCompletedCount >= currentExerciseIds.length) {
+      await completeCodeTrace(next);
+    } else {
+      soundManager.playCorrect();
+    }
   };
 
   const savePartialProgress = async () => {
@@ -188,12 +275,14 @@ export default function CodeTracePlayer({
     }
   };
 
-  const completeCodeTrace = async () => {
-    if (!user || !allCompleted || completionState === 'processing') return;
+  const completeCodeTrace = async (completedIdSet = completedIds) => {
+    const completedExerciseIds = currentExerciseIds.filter(id => completedIdSet.has(id));
+    const completedExerciseCount = completedExerciseIds.length;
+    if (!user || completedExerciseCount < currentExerciseIds.length || completionState === 'processing') return;
     setCompletionState('processing');
     try {
       const today = getTodayKST();
-      const reward = Math.max(10, Math.min(40, 20 + Math.round(evaluation.accuracy / 10) - Math.min(10, hintsUsed * 2)));
+      const reward = estimatedReward;
       const userRef = doc(db, 'users', user.uid);
       const progressRef = doc(db, 'users', user.uid, 'learning_progress', unitId);
       const historyRef = doc(db, 'users', user.uid, 'history', `code_trace_${today}_${unitId}`);
@@ -244,8 +333,8 @@ export default function CodeTracePlayer({
           codeTrace: {
             completed: true,
             completedAt: serverTimestamp(),
-            completedExerciseIds: currentExerciseIds.filter(id => completedIds.has(id)),
-            completedExerciseCount: currentCompletedCount,
+            completedExerciseIds,
+            completedExerciseCount,
             totalExerciseCount: exercises.length,
             bestAccuracy: Math.max(freshProgress?.codeTrace?.bestAccuracy || 0, evaluation.accuracy || 0),
             hintCount: (freshProgress?.codeTrace?.hintCount || 0) + hintsUsed,
@@ -262,7 +351,7 @@ export default function CodeTracePlayer({
           clusterId: clusterId || 'python',
           score: evaluation.accuracy,
           accuracy: evaluation.accuracy,
-          completedExerciseCount: currentCompletedCount,
+          completedExerciseCount,
           totalExerciseCount: exercises.length,
           hintCount: hintsUsed,
           crystalsEarned: actualReward,
@@ -278,7 +367,7 @@ export default function CodeTracePlayer({
               unitId,
               unitTitle: unitTitle || activeUnit?.title || '',
               accuracy: evaluation.accuracy,
-              completedExerciseCount: currentCompletedCount,
+              completedExerciseCount,
               totalExerciseCount: exercises.length
             }
           }, transaction, `code_trace_${unitId}`);
@@ -297,6 +386,14 @@ export default function CodeTracePlayer({
 
   const answerCode = getModeCode(exercise, mode, visibleLines);
   const totalLines = normalizeNewlines(exercise.answerCode || '').split('\n').length;
+  const preventAnswerCopy = (event) => {
+    event.preventDefault();
+  };
+  const preventAnswerCopyShortcut = (event) => {
+    if ((event.metaKey || event.ctrlKey) && ['a', 'c', 'x'].includes(String(event.key || '').toLowerCase())) {
+      event.preventDefault();
+    }
+  };
 
   return (
     <div className="space-bg" style={{ minHeight: '100vh', overflowY: 'auto', padding: '1rem 1rem 4rem' }}>
@@ -327,22 +424,22 @@ export default function CodeTracePlayer({
               <p className="font-tech" style={{ color: 'var(--text-muted)', margin: 0 }}>{exercise.prompt}</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {['copy', 'line', 'blank', 'recall'].map(item => (
+              {['recall', 'line'].map(item => (
                 <button
                   key={item}
                   className={`hud-btn ${mode === item ? 'primary' : 'secondary'} glass`}
                   onClick={() => changeMode(item)}
                   style={{ padding: '0.55rem 0.8rem' }}
                 >
-                  {item === 'copy' ? '보고 쓰기' : item === 'line' ? '한 줄씩' : item === 'blank' ? '빈칸' : '가리고 쓰기'}
+                  {item === 'line' ? '한 줄씩' : '가리고 쓰기'}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
-          <section className="glass-card" style={{ padding: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1rem' }}>
+          <section className="glass-card" style={{ padding: '1rem', minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 className="font-title" style={{ margin: 0, color: 'var(--planet-green)' }}>정답 코드</h3>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -351,28 +448,43 @@ export default function CodeTracePlayer({
                     다음 줄
                   </button>
                 )}
-                <button className="hud-btn secondary glass" onClick={() => setAnswerVisible(v => !v)} style={{ padding: '0.45rem 0.7rem' }}>
-                  {answerVisible ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
+                {answerVisible ? (
+                  <span className="font-tech" style={{ color: 'var(--text-muted)', padding: '0.45rem 0.2rem', fontSize: '0.82rem' }}>
+                    자동 가림 {revealSeconds}s
+                  </span>
+                ) : (
+                  <button className="hud-btn secondary glass" onClick={revealAnswer} style={{ padding: '0.45rem 0.7rem' }}>
+                    <Eye size={15} /> 보이기 30초
+                  </button>
+                )}
               </div>
             </div>
-            <pre style={{ minHeight: 300, margin: 0, padding: '1rem', borderRadius: 10, background: '#020617', color: '#e5e7eb', overflow: 'auto', whiteSpace: 'pre-wrap', filter: answerVisible ? 'none' : 'blur(5px)', userSelect: answerVisible ? 'text' : 'none', fontSize: '0.92rem', lineHeight: 1.55 }}>
+            <pre
+              tabIndex={0}
+              onCopy={preventAnswerCopy}
+              onCut={preventAnswerCopy}
+              onPaste={preventAnswerCopy}
+              onContextMenu={preventAnswerCopy}
+              onSelect={preventAnswerCopy}
+              onKeyDown={preventAnswerCopyShortcut}
+              style={{ boxSizing: 'border-box', width: '100%', maxWidth: '100%', minHeight: 300, margin: 0, padding: '1rem', borderRadius: 10, background: '#020617', color: '#e5e7eb', overflow: 'auto', whiteSpace: 'pre-wrap', filter: answerVisible ? 'none' : 'blur(5px)', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', fontSize: '0.92rem', lineHeight: 1.55 }}
+            >
               {answerCode}
             </pre>
           </section>
 
-          <section className="glass-card" style={{ padding: '1rem' }}>
+          <section className="glass-card" style={{ padding: '1rem', minWidth: 0 }}>
             <h3 className="font-title" style={{ margin: '0 0 0.75rem', color: 'var(--crystal-cyan)' }}>학생 입력</h3>
             <textarea
               value={studentCode}
               onChange={e => setStudentCode(e.target.value)}
               spellCheck={false}
               placeholder="여기에 코드를 그대로 따라 써보세요."
-              style={{ width: '100%', minHeight: 300, resize: 'vertical', background: '#020617', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55 }}
+              style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', minHeight: 300, resize: 'vertical', background: '#020617', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55 }}
             />
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-              <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!currentPassed}>
-                <Check size={16} /> 통과 기록
+              <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!currentPassed || currentAlreadyCompleted || completionState === 'processing'}>
+                <Check size={16} /> {currentAlreadyCompleted ? '통과 기록됨' : (willCompleteOnPass ? `통과 기록하고 ${estimatedReward}광석 받기` : '통과 기록')}
               </button>
               <button className="hud-btn secondary glass" onClick={() => {
                 setHintIndex(i => i + 1);
@@ -409,7 +521,9 @@ export default function CodeTracePlayer({
           )}
 
           <div className="font-tech" style={{ color: currentPassed ? 'var(--planet-green)' : 'var(--text-muted)', marginBottom: '0.75rem' }}>
-            {currentPassed ? '통과 기준을 만족했습니다. 통과 기록을 누르세요.' : `통과 기준: 정확도 ${passingAccuracy}% 이상`}
+            {currentPassed
+              ? (willCompleteOnPass ? `${estimatedReward}광석 완료 보상을 받을 수 있습니다.` : '통과 기준을 만족했습니다. 통과 기록을 누르세요.')
+              : `통과 기준: 정확도 ${passingAccuracy}% 이상`}
           </div>
 
           {!currentPassed && (
@@ -426,18 +540,18 @@ export default function CodeTracePlayer({
           }}>
             이전 코드
           </button>
-          {allCompleted ? (
+          {allCompleted && !completionState && !unitAlreadyCompleted ? (
             <motion.button whileHover={{ scale: 1.03 }} className="hud-btn primary glass" onClick={completeCodeTrace} disabled={completionState === 'processing'}>
-              <Check size={17} /> 학습 완료 · 보상 받기
+              <Check size={17} /> 완료 보상 {estimatedReward}광석 받기
             </motion.button>
-          ) : (
+          ) : !allCompleted ? (
             <button className="hud-btn primary glass" disabled={exerciseIndex >= exercises.length - 1} onClick={() => {
               setExerciseIndex(i => Math.min(exercises.length - 1, i + 1));
               resetExercise();
             }}>
               다음 코드
             </button>
-          )}
+          ) : null}
         </div>
 
         {completionState && completionState !== 'processing' && (

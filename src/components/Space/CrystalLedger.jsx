@@ -14,6 +14,7 @@ const OPERATOR_GIFT_EMAIL = 'paul@dulcine.net'
 const TX_CONFIG = {
   quiz_reward: { icon: '🪐', label: '탐사 보상', color: '#4ade80' },
   data_log_reward: { icon: '📄', label: '데이터 로그 보상', color: '#00f3ff' },
+  code_trace_reward: { icon: '⌨️', label: '코드 따라쓰기 보상', color: '#22d3ee' },
   transmission_reward: { icon: '📡', label: '트랜스미션 보상', color: '#00ff88' },
   store_purchase: { icon: '🛒', label: '스토어 구매', color: '#f87171' },
   store_gift_purchase: { icon: '🎁', label: '상점 선물 구매', color: '#f87171' },
@@ -866,6 +867,18 @@ export default function CrystalLedger({ userData }) {
                 <li>학습 완료 시 <span style={{color: 'var(--text-bright)'}}>+30</span> 광석</li>
                 <li>1분 이상 학습 후 완료 버튼 활성화</li>
                 <li>단원당 <span style={{color: 'var(--text-bright)'}}>최초 1회</span>만 지급</li>
+              </ul>
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#22d3ee', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>⌨️</span> 코드 따라쓰기
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>등록된 코드 연습을 모두 통과하면 <span style={{color: 'var(--text-bright)'}}>+10 ~ 40</span> 광석</li>
+                <li>정확도와 힌트 사용량에 따라 보상이 달라집니다</li>
+                <li>단원당 <span style={{color: 'var(--text-bright)'}}>최초 1회</span>만 완료 보상 지급</li>
+                <li>정답 코드는 복사할 수 없고, 손으로 따라 써야 합니다</li>
               </ul>
             </div>
 
