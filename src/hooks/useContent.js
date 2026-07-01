@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebase';
+import { sanitizeCodeTraceExercise } from '../utils/codeTraceSanitizer';
 
 // --- Clusters ---
 export function useClusters() {
@@ -211,7 +212,7 @@ export function useCodeExercises(unitId) {
         where('unitId', '==', unitId)
       );
       const snap = await getDocs(q);
-      const data = snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+      const data = snap.docs.map(doc => sanitizeCodeTraceExercise({ ...doc.data(), docId: doc.id }));
       return data.sort((a, b) => (a.order || 0) - (b.order || 0));
     },
     enabled: !!unitId,

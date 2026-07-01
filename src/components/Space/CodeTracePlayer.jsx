@@ -563,7 +563,7 @@ export default function CodeTracePlayer({
               onContextMenu={preventAnswerCopy}
               onSelect={preventAnswerCopy}
               onKeyDown={preventAnswerCopyShortcut}
-              style={{ boxSizing: 'border-box', width: '100%', maxWidth: '100%', minHeight: 300, margin: 0, padding: '1rem', borderRadius: 10, background: '#020617', color: '#e5e7eb', overflow: 'auto', whiteSpace: 'pre-wrap', filter: answerVisible ? 'none' : 'blur(5px)', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', fontSize: '0.92rem', lineHeight: 1.55 }}
+              style={{ boxSizing: 'border-box', width: '100%', maxWidth: '100%', minHeight: 300, margin: 0, padding: '1rem', borderRadius: 10, background: '#020617', color: '#e5e7eb', overflow: 'auto', whiteSpace: 'pre', filter: answerVisible ? 'none' : 'blur(5px)', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', fontSize: '0.92rem', lineHeight: 1.55 }}
             >
               {answerCode}
             </pre>
@@ -576,8 +576,9 @@ export default function CodeTracePlayer({
               onChange={e => setStudentCode(e.target.value)}
               onKeyDown={handleStudentKeyDown}
               spellCheck={false}
-              placeholder="여기에 코드를 그대로 따라 써보세요."
-              style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', minHeight: 300, resize: 'vertical', background: '#020617', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2 }}
+              wrap="off"
+              placeholder="코드를 따라 쓰세요."
+              style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', minHeight: 300, resize: 'vertical', background: '#020617', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2, overflow: 'auto', whiteSpace: 'pre' }}
             />
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
               <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!currentPassed || currentAlreadyCompleted || completionState === 'processing'}>

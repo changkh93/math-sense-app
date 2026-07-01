@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Code2, Copy, FileJson, Loader2, X } from 'lucide-react';
 import { collection, doc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { repairPythonCodeMarkdownArtifacts, repairPythonDunderMarkdown, sanitizeCodeTraceExercise } from '../../utils/codeTraceSanitizer';
 
 const PROMPT_TEMPLATE = `
 당신은 파이썬 초보자를 위한 "코드 따라쓰기" 콘텐츠 제작자입니다.
@@ -36,12 +37,15 @@ DATA_LOG_TEXT:
 JSON 출력 규칙:
 - 반드시 첫 글자는 {, 마지막 글자는 } 이어야 합니다.
 - \`\`\`json 같은 마크다운 코드블록을 절대 붙이지 마세요.
+- 모든 문자열에서 마크다운 강조 문법(**굵게**, __굵게__)을 절대 쓰지 마세요.
 - JSON key와 문자열 값은 반드시 큰따옴표(")로 감싸세요.
 - trailing comma, 주석, 말줄임표(...)를 넣지 마세요.
 - answerCode 대신 answerLines 배열을 사용하세요.
 - answerLines의 각 항목은 코드 한 줄만 담습니다. 한 항목 안에 실제 줄바꿈이나 \\n을 넣지 마세요.
 - 파이썬 문자열은 의미가 같다면 작은따옴표(')를 우선 사용하세요. 예: print('Hello World!')
 - 파이썬 코드 한 줄에 큰따옴표(")가 꼭 필요하면 JSON 규칙에 맞게 \\"로 이스케이프하세요.
+- __init__, __str__, __repr__, __name__, __main__처럼 앞뒤 밑줄 두 개가 의미 있는 파이썬 이름은 반드시 밑줄 그대로 출력하세요.
+- __init__를 **init** 또는 init으로 바꾸면 오답입니다.
 - hints, prompt, commonMistakes.message 안에서는 큰따옴표 기호를 직접 쓰지 말고 "큰따옴표 기호"처럼 말로 설명하세요.
 - 예를 들어 큰따옴표("")라고 쓰지 말고 큰따옴표 기호라고 쓰세요.
 - 최종 출력 전에 JSON.parse()가 가능한 순수 JSON인지 스스로 검증하세요.
@@ -55,6 +59,7 @@ JSON 출력 규칙:
 코드 정리 원칙:
 - 원문 코드의 학습 의도는 보존하되, PDF 복사 때문에 깨진 들여쓰기는 반드시 고치세요.
 - 문자열 안의 공백과 따옴표는 의미가 있으므로 함부로 바꾸지 마세요.
+- 앞뒤 밑줄 두 개가 붙은 파이썬 특수 메소드/변수 이름은 문법의 일부입니다. 마크다운으로 바꾸거나 밑줄을 삭제하지 마세요.
 - 변수명은 원문에 나온 것을 우선 사용하세요.
 - 불필요한 주석은 넣지 마세요. 단, 코드 안/밖 들여쓰기 차이를 설명해야 하는 경우 한 줄 주석은 허용합니다.
 
@@ -259,12 +264,12 @@ function parseAiJson(input) {
 function normalizeAnswerCode(raw, index) {
   if (Array.isArray(raw.answerLines)) {
     return raw.answerLines
-      .map(line => String(line ?? '').replace(/\r/g, ''))
+      .map(line => repairPythonCodeMarkdownArtifacts(String(line ?? '').replace(/\r/g, '')))
       .join('\n')
       .trim();
   }
 
-  const legacyAnswerCode = String(raw.answerCode || '').replace(/\r\n/g, '\n').trim();
+  const legacyAnswerCode = repairPythonCodeMarkdownArtifacts(String(raw.answerCode || '').replace(/\r\n/g, '\n')).trim();
   if (legacyAnswerCode) return legacyAnswerCode;
 
   throw new Error(`${index + 1}번째 exercise에 answerLines가 없습니다.`);
@@ -274,22 +279,24 @@ function normalizeExercise(raw, index, unitId, timestamp) {
   const answerCode = normalizeAnswerCode(raw, index);
   if (!answerCode) throw new Error(`${index + 1}번째 exercise의 코드가 비어 있습니다.`);
 
-  return {
+  return sanitizeCodeTraceExercise({
     id: `${unitId}_code_${index + 1}_${timestamp}`,
     unitId,
     order: index,
     title: String(raw.title || `코드 따라쓰기 ${index + 1}`).trim(),
     level: Math.max(1, Number(raw.level) || 1),
     category: String(raw.category || 'python').trim(),
-    concepts: Array.isArray(raw.concepts) ? raw.concepts.map(String).filter(Boolean) : [],
-    prompt: String(raw.prompt || '').trim(),
+    concepts: Array.isArray(raw.concepts) ? raw.concepts.map(String).filter(Boolean).map(repairPythonDunderMarkdown) : [],
+    prompt: repairPythonDunderMarkdown(String(raw.prompt || '')).trim(),
     answerCode,
-    hints: Array.isArray(raw.hints) ? raw.hints.map(String).filter(Boolean) : [],
-    commonMistakes: Array.isArray(raw.commonMistakes) ? raw.commonMistakes : [],
+    hints: Array.isArray(raw.hints) ? raw.hints.map(String).filter(Boolean).map(repairPythonDunderMarkdown) : [],
+    commonMistakes: Array.isArray(raw.commonMistakes)
+      ? raw.commonMistakes.map(item => ({ ...item, message: repairPythonDunderMarkdown(item?.message || '') }))
+      : [],
     passingAccuracy: Math.min(100, Math.max(70, Number(raw.passingAccuracy) || 95)),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
-  };
+  });
 }
 
 export default function AiCodeTraceImportModal({ isOpen, onClose, unitId }) {
