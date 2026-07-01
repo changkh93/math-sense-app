@@ -32,6 +32,7 @@ export function useLearningHistory(userId, dateStr) {
   const [dailyStats, setDailyStats] = useState({
     quizCount: 0,
     logCount: 0,
+    codeTraceCount: 0,
     totalVideoSeconds: 0,
     isAssignmentSubmitted: false,
     attentionHits: 0,
@@ -139,6 +140,7 @@ export function useLearningHistory(userId, dateStr) {
     const stats = {
       quizCount: 0,
       logCount: 0,
+      codeTraceCount: 0,
       totalVideoSeconds: 0,
       isAssignmentSubmitted: (typeof rawData.assignmentCount === 'number' ? rawData.assignmentCount : rawData.assignmentCount?.length) > 0,
       attentionHits: 0,
@@ -200,6 +202,9 @@ export function useLearningHistory(userId, dateStr) {
         trackedDataLogs.add(dedupeKey);
         stats.logCount++;
         displayType = 'data_log_read';
+      } else if (hType === 'code_trace') {
+        stats.codeTraceCount++;
+        displayType = 'code_trace';
       } else {
         stats.quizCount++;
       }
@@ -209,7 +214,9 @@ export function useLearningHistory(userId, dateStr) {
           ? '🎬'
           : displayType === 'data_log_read'
             ? '📝'
-            : '🚀';
+            : displayType === 'code_trace'
+              ? '⌨️'
+              : '🚀';
       const typeLabel =
         displayType === 'video_attention'
           ? '집중도 기록'
@@ -217,7 +224,9 @@ export function useLearningHistory(userId, dateStr) {
             ? '영상 학습'
             : displayType === 'data_log_read'
               ? '데이터 로그 열람'
-              : '현장 탐사(퀴즈)';
+              : displayType === 'code_trace'
+                ? '코드 따라쓰기'
+                : '현장 탐사(퀴즈)';
 
       aggregated.push({
         id: `quiz_${docSnap.id}`,
@@ -431,7 +440,7 @@ export function useLearningHistory(userId, dateStr) {
 
 /** Learning-only activity types for grouping */
 const LEARNING_TYPES = new Set([
-  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read'
+  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace'
 ]);
 
 /**
@@ -467,7 +476,7 @@ function resolveTitle(act) {
   // 4. Extract from the display title (strip emoji prefixes)
   const cleaned = (act.title || '')
     .replace(/^[🚀🎬📝⏳💎🛒🧊🎁✅🗣️📌]\s*/g, '')
-    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람)[:\s]*/g, '')
+    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|코드 따라쓰기)[:\s]*/g, '')
     .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
     .trim();
   if (cleaned && cleaned.length > 0) return cleaned;
@@ -491,6 +500,7 @@ function buildGroupedActivities(rawActivities) {
     let normalizedType = 'quiz';
     if (act.type === 'video_reward' || act.type === 'video_view' || act.type === 'video_attention') normalizedType = 'video';
     else if (act.type === 'data_log_read') normalizedType = 'text';
+    else if (act.type === 'code_trace') normalizedType = 'code';
 
     const groupKey = `${unitId}_${normalizedType}`;
 
@@ -583,6 +593,10 @@ function buildGroupedActivities(rawActivities) {
       group.completed = true;
     }
     if (normalizedType === 'text') group.completed = true;
+    if (normalizedType === 'code') {
+      group.completed = true;
+      group.score = act.score ?? meta.accuracy ?? group.score;
+    }
   });
 
   // Resolve titles

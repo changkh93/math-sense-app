@@ -200,6 +200,26 @@ export function useQuizzes(unitId) {
   });
 }
 
+// --- Code Trace Exercises ---
+export function useCodeExercises(unitId) {
+  return useQuery({
+    queryKey: ['codeExercises', unitId],
+    queryFn: async () => {
+      if (!unitId) return [];
+      const q = query(
+        collection(db, 'codeExercises'),
+        where('unitId', '==', unitId)
+      );
+      const snap = await getDocs(q);
+      const data = snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+      return data.sort((a, b) => (a.order || 0) - (b.order || 0));
+    },
+    enabled: !!unitId,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
+  });
+}
+
 // --- Mutations Helper ---
 export function useAdminMutations() {
   const queryClient = useQueryClient();
@@ -406,6 +426,44 @@ export function useAdminMutations() {
         await batch.commit();
       },
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['quizzes'] })
+    }),
+
+    // --- Code Trace Mutations ---
+    saveCodeExercise: useMutation({
+      mutationFn: async (exerciseData) => {
+        const id = exerciseData.id || `code_${Date.now()}`;
+        const batch = writeBatch(db);
+
+        batch.set(doc(db, 'codeExercises', id), { ...exerciseData, id }, { merge: true });
+
+        if (exerciseData.unitId) {
+          batch.update(doc(db, 'units', exerciseData.unitId), {
+            lastUpdated: serverTimestamp(),
+            'contentFlags.hasCodeTrace': true
+          });
+        }
+
+        await batch.commit();
+      },
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['codeExercises', variables.unitId] });
+        queryClient.invalidateQueries({ queryKey: ['units'] });
+      }
+    }),
+    deleteCodeExercise: useMutation({
+      mutationFn: async ({ exerciseId, unitId }) => {
+        const batch = writeBatch(db);
+        batch.delete(doc(db, 'codeExercises', exerciseId));
+        if (unitId) {
+          batch.update(doc(db, 'units', unitId), {
+            lastUpdated: serverTimestamp()
+          });
+        }
+        await batch.commit();
+      },
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['codeExercises', variables.unitId] });
+      }
     })
   };
 }

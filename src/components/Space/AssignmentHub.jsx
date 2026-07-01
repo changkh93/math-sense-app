@@ -1208,6 +1208,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const publishDailySummary = useMemo(() => ({
     quizCount: dailyStats?.quizCount || 0,
     logCount: dailyStats?.logCount || 0,
+    codeTraceCount: dailyStats?.codeTraceCount || 0,
     totalVideoSeconds: dailyStats?.totalVideoSeconds || 0,
     attentionHits: dailyStats?.attentionHits || 0,
     attentionOpportunities: dailyStats?.attentionOpportunities || 0,

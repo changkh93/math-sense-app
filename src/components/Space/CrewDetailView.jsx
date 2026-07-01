@@ -53,6 +53,7 @@ function buildTodaySummary(dailyStats) {
   if ((dailyStats?.quizCount || 0) > 0) items.push(`퀴즈 ${dailyStats.quizCount}회`);
   if ((dailyStats?.totalVideoSeconds || 0) > 0) items.push(`영상 ${Math.floor(dailyStats.totalVideoSeconds / 60)}분`);
   if ((dailyStats?.logCount || 0) > 0) items.push(`로그 ${dailyStats.logCount}회`);
+  if ((dailyStats?.codeTraceCount || 0) > 0) items.push(`코드 ${dailyStats.codeTraceCount}회`);
   if ((dailyStats?.attentionOpportunities || 0) > 0) items.push(`집중도 ${dailyStats.attentionHits}/${dailyStats.attentionOpportunities}`);
   return items.join(' · ');
 }

@@ -103,6 +103,7 @@ const MissionContentEditor = () => {
 
       // Pre-compute content flags for instant routing (no flash)
       const contentFlags = {
+        ...(unitData.contentFlags || {}),
         hasDataLog: !!(learningText?.trim() || pdfUrl?.trim()),
         hasTransmission: processedTransmissions.some(tx => tx.videoId),
         hasWorkbook: workbookPages && workbookPages.length > 0

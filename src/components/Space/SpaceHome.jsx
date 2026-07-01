@@ -444,7 +444,8 @@ function getUnitContentAvailability(unit, quizAvailabilityMap = {}) {
       : !!(unit?.learningContents?.text?.trim() || unit?.learningContents?.pdfUrl?.trim()),
     hasWorkbook: hasFlag('hasWorkbook')
       ? flags.hasWorkbook
-      : !!(unit?.workbookPages && unit.workbookPages.length > 0)
+      : !!(unit?.workbookPages && unit.workbookPages.length > 0),
+    hasCodeTrace: hasFlag('hasCodeTrace') ? flags.hasCodeTrace : false
   }
 }
 

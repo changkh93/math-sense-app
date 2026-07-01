@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 import SpaceQuizView from './SpaceQuizView'
 import WorkbookPlayer from './WorkbookPlayer'
+import CodeTracePlayer from './CodeTracePlayer'
 import QuestionModal from '../QuestionModal'
 import soundManager from '../../utils/SoundManager'
 import { InlineMath } from 'react-katex'
@@ -13,6 +14,7 @@ import TimeAttackOverlay from './TimeAttackOverlay'
 import { db, getFunctionUrl } from '../../firebase'
 import { doc, setDoc, getDoc, onSnapshot, serverTimestamp, increment } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
+import { useCodeExercises } from '../../hooks/useContent'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { isRadarActive } from '../../utils/streakUtils'
 
@@ -77,6 +79,7 @@ const SilentCrystalToast = ({ amount, visible }) => (
 const LONG_VIDEO_SECONDS = 40 * 60
 const STANDARD_VIDEO_COMPLETION_THRESHOLD = 0.95
 const LONG_VIDEO_COMPLETION_THRESHOLD = 0.85
+const VIDEO_PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2]
 
 const getVideoCompletionThreshold = (duration = 0) => (
   duration > LONG_VIDEO_SECONDS
@@ -146,7 +149,7 @@ const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
 
 // ─── YouTube Player Component ───
 // Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
-const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, onTrackingStatus, onError, isOverlay = false, autoPlay = true }, ref) => {
+const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, onTrackingStatus, onError, initialPlaybackRate = 1, isOverlay = false, autoPlay = true }, ref) => {
   const normalizedVideoId = getYouTubeVideoId(videoId)
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
@@ -157,6 +160,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   const timeUpdateInterval = useRef(null)
   const playerTargetId = useRef(`yt-player-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
   const { start: normalizedStart, end: normalizedEnd } = getNormalizedVideoRange(start, end)
+  const initialPlaybackRateRef = useRef(initialPlaybackRate)
+
+  useEffect(() => {
+    initialPlaybackRateRef.current = initialPlaybackRate
+  }, [initialPlaybackRate])
 
   useImperativeHandle(ref, () => ({
     pauseVideo: () => {
@@ -174,6 +182,17 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         return playerRef.current.getCurrentTime()
       }
       return currentTime
+    },
+    setPlaybackRate: (rate) => {
+      if (playerRef.current && typeof playerRef.current.setPlaybackRate === 'function') {
+        playerRef.current.setPlaybackRate(rate)
+      }
+    },
+    getPlaybackRate: () => {
+      if (playerRef.current && typeof playerRef.current.getPlaybackRate === 'function') {
+        return playerRef.current.getPlaybackRate()
+      }
+      return 1
     }
   }))
 
@@ -287,6 +306,9 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         events: {
           'onReady': () => {
             clearTimeout(apiTimeout)
+            if (typeof player.setPlaybackRate === 'function') {
+              player.setPlaybackRate(initialPlaybackRateRef.current)
+            }
             onTrackingStatusRef.current?.({
               event: 'api_ready',
               apiReady: true,
@@ -619,6 +641,10 @@ export default function MissionHub({
   const userId = user?.uid
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [videoError, setVideoError] = useState(false)
+  const {
+    data: codeExercises = [],
+    isLoading: loadingCodeExercises
+  } = useCodeExercises(unitId)
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -710,6 +736,12 @@ export default function MissionHub({
   const completionTimerStartedRef = useRef(false);
   const [videoTrackingWarning, setVideoTrackingWarning] = useState("");
   const [videoTrackingUnavailable, setVideoTrackingUnavailable] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(() => {
+    const savedRate = Number(localStorage.getItem(`metasense_video_rate_${unitId}`))
+    return VIDEO_PLAYBACK_RATES.includes(savedRate) ? savedRate : 1
+  });
+  const [isVideoControlZoneActive, setIsVideoControlZoneActive] = useState(false);
+  const videoControlZoneTimerRef = useRef(null);
   
   useEffect(() => {
     if (completionBonusTimeLeft === null || completionBonusTimeLeft <= 0) return;
@@ -729,15 +761,42 @@ export default function MissionHub({
   const [isUiVisible, setIsUiVisible] = useState(true);
   const idleTimerRef = useRef(null);
 
+  const handlePlaybackRateChange = useCallback((rate) => {
+    setPlaybackRate(rate)
+    localStorage.setItem(`metasense_video_rate_${unitId}`, String(rate))
+    videoPlayerRef.current?.setPlaybackRate?.(rate)
+  }, [unitId])
+
+  useEffect(() => {
+    if (currentMode !== 'video') return
+    videoPlayerRef.current?.setPlaybackRate?.(playbackRate)
+  }, [currentMode, selectedTx, playbackRate])
+
   useEffect(() => {
     if (currentMode !== 'video') return;
     
-    const handleUserActivity = () => {
+    const markVideoControlZoneActive = () => {
+      setIsVideoControlZoneActive(true)
+      if (videoControlZoneTimerRef.current) clearTimeout(videoControlZoneTimerRef.current)
+      videoControlZoneTimerRef.current = setTimeout(() => {
+        setIsVideoControlZoneActive(false)
+      }, 2600)
+    }
+
+    const handleUserActivity = (event) => {
       setIsUiVisible(true);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         setIsUiVisible(false);
       }, 3500);
+
+      if (event?.type === 'mousemove') {
+        const lowerControlBand = Math.max(window.innerHeight - 260, window.innerHeight * 0.66)
+        if (event.clientY >= lowerControlBand) markVideoControlZoneActive()
+      } else if (event?.type === 'touchstart') {
+        const touch = event.touches?.[0]
+        if (!touch || touch.clientY >= window.innerHeight * 0.58) markVideoControlZoneActive()
+      }
     };
 
     handleUserActivity();
@@ -751,6 +810,8 @@ export default function MissionHub({
       window.removeEventListener('touchstart', handleUserActivity);
       window.removeEventListener('keydown', handleUserActivity);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (videoControlZoneTimerRef.current) clearTimeout(videoControlZoneTimerRef.current);
+      setIsVideoControlZoneActive(false)
     };
   }, [currentMode]);
 
@@ -2010,6 +2071,7 @@ export default function MissionHub({
   
   const quizCompleted = bestScores[unitId] !== undefined
   const workbookCompleted = bestScores[`${unitId}_workbook`] !== undefined
+  const codeTraceCompleted = !!learningProgress?.codeTrace?.completed
 
   // --- Render Functions ---
 
@@ -2018,7 +2080,8 @@ export default function MissionHub({
     const hasTransmission = !!(missionData?.transmissions?.length > 0 && missionData.transmissions.some(tx => tx.videoId))
     const hasQuiz = !!(unitQuizzes && unitQuizzes.length > 0)
     const hasWorkbook = !!(activeUnit?.workbookPages && activeUnit.workbookPages.length > 0)
-    const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasWorkbook].filter(Boolean).length
+    const hasCodeTrace = !!(codeExercises && codeExercises.length > 0)
+    const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasWorkbook, hasCodeTrace].filter(Boolean).length
 
     return (
     <div className="mission-dashboard fade-in" style={{ width: '100%', height: '100%', overflowY: 'auto', paddingBottom: isMobile ? '5.5rem' : '3rem' }}>
@@ -2153,6 +2216,40 @@ export default function MissionHub({
               )
             },
             {
+              id: 'code',
+              shouldRender: hasCodeTrace,
+              render: () => (
+                <motion.div
+                  key="code"
+                  whileHover={{ scale: 1.03, y: -5 }}
+                  className="glass-card hud-border"
+                  onClick={() => handleModeChange('code')}
+                  style={{
+                    cursor: 'pointer', padding: isMobile ? '1rem' : '2rem', display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', textAlign: isMobile ? 'left' : 'center', gap: isMobile ? '0.85rem' : 0,
+                    border: codeTraceCompleted ? '1px solid var(--crystal-cyan)' : '1px solid var(--crystal-cyan)',
+                    background: codeTraceCompleted ? 'rgba(0, 243, 255, 0.08)' : undefined,
+                    position: 'relative'
+                  }}
+                >
+                  {codeTraceCompleted && (
+                    <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
+                  )}
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⌨️</div>
+                  <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '1rem' }}>CODE TRACE</h3>
+                  <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                    정답 코드를 따라 쓰며<br/>문법 패턴을 익힙니다.
+                  </p>
+                  {codeTraceCompleted ? (
+                    <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginTop: '0.5rem' }}>훈련 완료</span>
+                  ) : learningProgress?.codeTrace?.completedExerciseCount > 0 ? (
+                    <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                      진행 중 ({learningProgress.codeTrace.completedExerciseCount} / {codeExercises.length})
+                    </span>
+                  ) : null}
+                </motion.div>
+              )
+            },
+            {
               id: 'quiz',
               shouldRender: hasQuiz,
               render: () => (
@@ -2189,8 +2286,8 @@ export default function MissionHub({
           // Determine sorting order based on cluster
           let sortedCards = cards;
           if (clusterId === 'python') {
-            // Requested order for Python: Transmission -> Data Log -> Workbook -> Field Test
-            const pythonOrder = ['video', 'text', 'workbook', 'quiz'];
+            // Python: Transmission -> Data Log -> Code Trace -> Workbook -> Field Test
+            const pythonOrder = ['video', 'text', 'code', 'workbook', 'quiz'];
             sortedCards = cards.sort((a, b) => pythonOrder.indexOf(a.id) - pythonOrder.indexOf(b.id));
           }
 
@@ -2391,6 +2488,7 @@ export default function MissionHub({
         ? Math.min(100, Math.floor((stampCount / knownVideoDuration) * 100))
         : 0
       const creditedSeconds = Math.floor(creditedWatchSeconds)
+      const shouldDockVideoActions = isVideoControlZoneActive && !videoCompleted && !isAtEnd && !videoTrackingWarning
 
       return (
           <div className="theater-wrapper">
@@ -2402,6 +2500,7 @@ export default function MissionHub({
                     videoId={selectedTx.videoId}
                     start={initialStartPosition}
                     end={selectedTx.end}
+                    initialPlaybackRate={playbackRate}
                     onTimeUpdate={handleVideoTimeUpdate}
                     onComplete={() => setIsAtEnd(true)}
                     onTrackingStatus={handleVideoTrackingStatus}
@@ -2468,6 +2567,44 @@ export default function MissionHub({
                      인정 학습: {Math.floor(creditedSeconds / 60)}분 {creditedSeconds % 60}초 · 완료율 {completionRate}% / 기준 {completionTargetPercent}%
                    </span>
                  )}
+                 <div
+                   className="glass"
+                   style={{
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: '0.25rem',
+                     padding: '0.28rem',
+                     border: '1px solid rgba(255,255,255,0.14)',
+                     borderRadius: '10px',
+                     background: 'rgba(0,0,0,0.42)',
+                     boxShadow: '0 4px 18px rgba(0,0,0,0.28)'
+                   }}
+                   aria-label="영상 재생 속도"
+                 >
+                   {VIDEO_PLAYBACK_RATES.map((rate) => (
+                     <button
+                       key={rate}
+                       type="button"
+                       onClick={() => handlePlaybackRateChange(rate)}
+                       className="font-tech"
+                       title={`${rate}배속으로 재생`}
+                       aria-pressed={playbackRate === rate}
+                       style={{
+                         minWidth: isMobile ? '2.4rem' : '2.75rem',
+                         height: isMobile ? '2rem' : '2.15rem',
+                         border: playbackRate === rate ? '1px solid var(--crystal-cyan)' : '1px solid transparent',
+                         borderRadius: '7px',
+                         background: playbackRate === rate ? 'rgba(0, 243, 255, 0.22)' : 'transparent',
+                         color: playbackRate === rate ? '#fff' : 'rgba(255,255,255,0.72)',
+                         cursor: 'pointer',
+                         fontSize: isMobile ? '0.72rem' : '0.78rem',
+                         fontWeight: playbackRate === rate ? 800 : 600
+                       }}
+                     >
+                       {rate}x
+                     </button>
+                   ))}
+                 </div>
                  <button 
                    onClick={returnFromContent} 
                    className="hud-btn glass"
@@ -2479,7 +2616,15 @@ export default function MissionHub({
              </div>
 
              {/* Bottom HUD Overlay */}
-             <div className="theater-hud bottom-hud" style={{ opacity: (isUiVisible || videoCompleted || isAtEnd || videoTrackingWarning) ? 1 : 0, flexDirection: 'column' }}>
+             <div
+               className="theater-hud bottom-hud"
+               style={{
+                 opacity: shouldDockVideoActions ? 0 : ((isUiVisible || videoCompleted || isAtEnd || videoTrackingWarning) ? 1 : 0),
+                 visibility: shouldDockVideoActions ? 'hidden' : 'visible',
+                 pointerEvents: shouldDockVideoActions ? 'none' : undefined,
+                 flexDirection: 'column'
+               }}
+             >
                {videoTrackingWarning && (
                  <div
                    className="font-tech"
@@ -2580,6 +2725,69 @@ export default function MissionHub({
                  </motion.p>
                )}
              </div>
+
+             <AnimatePresence>
+               {shouldDockVideoActions && (
+                 <motion.div
+                   initial={{ opacity: 0, x: 18, y: '-50%', scale: 0.96 }}
+                   animate={{ opacity: 1, x: 0, y: '-50%', scale: 1 }}
+                   exit={{ opacity: 0, x: 18, y: '-50%', scale: 0.96 }}
+                   transition={{ duration: 0.18 }}
+                   style={{
+                     position: 'absolute',
+                     right: isMobile ? '0.75rem' : '1.25rem',
+                     top: '50%',
+                     zIndex: 5100,
+                     display: 'flex',
+                     flexDirection: 'column',
+                     gap: '0.55rem',
+                     pointerEvents: 'auto'
+                   }}
+                   aria-label="영상 보조 동작"
+                 >
+                   <button
+                     type="button"
+                     onClick={handleSaveVideoPosition}
+                     className="hud-btn secondary glass"
+                     title="오늘은 여기까지"
+                     style={{
+                       width: isMobile ? '3rem' : '3.25rem',
+                       height: isMobile ? '3rem' : '3.25rem',
+                       minWidth: 0,
+                       padding: 0,
+                       borderRadius: '999px',
+                       background: 'rgba(0,0,0,0.64)',
+                       border: '1px solid rgba(255,255,255,0.2)',
+                       color: '#fff',
+                       boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
+                       fontSize: '1.15rem'
+                     }}
+                   >
+                     📋
+                   </button>
+                   <button
+                     type="button"
+                     onClick={() => handleOpenQuestionModal('video')}
+                     className="hud-btn primary glass capture-hide"
+                     title="선생님께 질문하기"
+                     style={{
+                       width: isMobile ? '3rem' : '3.25rem',
+                       height: isMobile ? '3rem' : '3.25rem',
+                       minWidth: 0,
+                       padding: 0,
+                       borderRadius: '999px',
+                       background: 'rgba(0, 243, 255, 0.24)',
+                       border: '1px solid var(--crystal-cyan)',
+                       color: '#fff',
+                       boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
+                       fontSize: '1.15rem'
+                     }}
+                   >
+                     🙋
+                   </button>
+                 </motion.div>
+               )}
+             </AnimatePresence>
 
              {/* Time Attack Overlay */}
              {showTimeAttack && (
@@ -2695,6 +2903,31 @@ export default function MissionHub({
           onClose={returnFromContent}
         />
       </div>
+    )
+  }
+
+  if (currentMode === 'code') {
+    if (loadingCodeExercises) {
+      return (
+        <div className="space-bg" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: 'var(--crystal-cyan)' }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} style={{ fontSize: '3rem' }}>⌨️</motion.div>
+            <div className="font-tech" style={{ marginTop: '1rem' }}>코드 훈련 데이터 수신 중...</div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <CodeTracePlayer
+        exercises={codeExercises}
+        unitId={unitId}
+        unitTitle={activeUnit?.title}
+        activeUnit={activeUnit}
+        clusterId={clusterId}
+        learningProgress={learningProgress}
+        onClose={returnFromContent}
+      />
     )
   }
 

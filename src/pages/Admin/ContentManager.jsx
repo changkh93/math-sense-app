@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useClusters, useRegions, useChapters, useUnits, useAdminMutations } from '../../hooks/useContent';
-import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown, Rocket, Bot, RefreshCw, Users } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown, Rocket, Bot, RefreshCw, Users, Code2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AiQuizImportModal from '../../components/Admin/AiQuizImportModal';
+import AiCodeTraceImportModal from '../../components/Admin/AiCodeTraceImportModal';
 import { db } from '../../firebase';
 import { collection, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import RegionEditModal from '../../components/Admin/RegionEditModal';
@@ -50,6 +51,7 @@ const ContentManager = () => {
   const { data: regions, isLoading: loadingRegions, refetch: refetchRegions } = useRegions(selectedClusterId);
   const { saveRegion } = useAdminMutations();
   const [aiImportUnitId, setAiImportUnitId] = useState(null);
+  const [codeTraceImportUnitId, setCodeTraceImportUnitId] = useState(null);
 
   // Modals state
   const [editingRegion, setEditingRegion] = useState(null);
@@ -161,6 +163,7 @@ const ContentManager = () => {
             expandedChapters={expandedChapters}
             onToggleChapter={toggleChapter}
             onOpenAiImport={setAiImportUnitId}
+            onOpenCodeTraceImport={setCodeTraceImportUnitId}
             onEditRegion={(region) => setEditingRegion(region)}
             onManageStudents={(region) => setManagingRegionStudents(region)}
           />
@@ -171,6 +174,12 @@ const ContentManager = () => {
         isOpen={!!aiImportUnitId} 
         unitId={aiImportUnitId} 
         onClose={() => setAiImportUnitId(null)} 
+      />
+
+      <AiCodeTraceImportModal
+        isOpen={!!codeTraceImportUnitId}
+        unitId={codeTraceImportUnitId}
+        onClose={() => setCodeTraceImportUnitId(null)}
       />
 
       <RegionEditModal
@@ -189,7 +198,7 @@ const ContentManager = () => {
   );
 };
 
-const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleChapter, onOpenAiImport, onEditRegion, onManageStudents }) => {
+const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleChapter, onOpenAiImport, onOpenCodeTraceImport, onEditRegion, onManageStudents }) => {
   const { data: chapters, isLoading: loadingChapters } = useChapters(isExpanded ? region.id : null);
   const { saveRegion, deleteRegion, saveChapter } = useAdminMutations();
 
@@ -247,6 +256,7 @@ const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleCh
               isExpanded={expandedChapters[chapter.docId]}
               onToggle={() => onToggleChapter(chapter.docId)}
               onOpenAiImport={onOpenAiImport}
+              onOpenCodeTraceImport={onOpenCodeTraceImport}
               isFirst={index === 0}
               isLast={index === chapters.length - 1}
               onReorder={(dir) => {
@@ -272,7 +282,7 @@ const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleCh
   );
 };
 
-const ChapterNode = ({ chapter, isExpanded, onToggle, onOpenAiImport, isFirst, isLast, onReorder }) => {
+const ChapterNode = ({ chapter, isExpanded, onToggle, onOpenAiImport, onOpenCodeTraceImport, isFirst, isLast, onReorder }) => {
   const { data: units, isLoading: loadingUnits } = useUnits(isExpanded ? chapter.docId : null);
   const { saveChapter, deleteChapter, saveUnit } = useAdminMutations();
 
@@ -341,6 +351,7 @@ const ChapterNode = ({ chapter, isExpanded, onToggle, onOpenAiImport, isFirst, i
               key={unit.docId} 
               unit={unit} 
               onOpenAiImport={onOpenAiImport} 
+              onOpenCodeTraceImport={onOpenCodeTraceImport}
               isFirst={index === 0}
               isLast={index === units.length - 1}
               onReorder={(dir) => {
@@ -366,7 +377,7 @@ const ChapterNode = ({ chapter, isExpanded, onToggle, onOpenAiImport, isFirst, i
   );
 };
 
-const UnitNode = ({ unit, onOpenAiImport, isFirst, isLast, onReorder }) => {
+const UnitNode = ({ unit, onOpenAiImport, onOpenCodeTraceImport, isFirst, isLast, onReorder }) => {
   const { saveUnit, deleteUnit } = useAdminMutations();
 
   const handleRename = (e) => {
@@ -400,6 +411,15 @@ const UnitNode = ({ unit, onOpenAiImport, isFirst, isLast, onReorder }) => {
             style={{ color: '#8b5cf6' }}
           >
             <Sparkles size={14} />
+          </button>
+
+          <button
+            className="icon-btn"
+            onClick={(e) => { e.stopPropagation(); onOpenCodeTraceImport(unit.docId); }}
+            title="Import AI Code Trace"
+            style={{ color: '#22d3ee' }}
+          >
+            <Code2 size={14} />
           </button>
 
           {/* Navigation to Mission Content Editor */}

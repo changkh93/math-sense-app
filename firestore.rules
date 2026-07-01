@@ -117,6 +117,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Code trace exercises: students read, admins import/edit.
+    match /codeExercises/{document=**} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
     // Anonymous aggregate quiz stats. Writes are server-managed by Cloud Functions
     // so a student cannot inflate answer/reaction counts.
     match /quizQuestionStats/{statId} {
