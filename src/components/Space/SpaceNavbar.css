@@ -110,6 +110,40 @@
   opacity: 1;
 }
 
+.profile-menu-name-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--crystal-cyan);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 900;
+  cursor: pointer;
+  text-align: left;
+}
+
+.profile-menu-name-link:hover,
+.profile-menu-name-link:focus-visible {
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  outline: none;
+}
+
+.profile-menu-primary-action {
+  color: var(--crystal-cyan) !important;
+  border-color: rgba(0, 243, 255, 0.26) !important;
+  background: rgba(0, 243, 255, 0.09) !important;
+}
+
+.profile-menu-primary-action:hover,
+.profile-menu-primary-action:focus-visible {
+  background: rgba(0, 243, 255, 0.15) !important;
+  border-color: rgba(0, 243, 255, 0.42) !important;
+  outline: none;
+}
+
 .live-menu-backdrop {
   position: fixed;
   inset: 0;
@@ -607,9 +641,22 @@
     font-family: var(--font-tech);
   }
 
-  .mobile-profile-summary strong {
+  .mobile-profile-name-link {
+    justify-self: start;
+    min-height: auto !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
     color: var(--crystal-cyan);
     font-size: 1.1rem;
+    font-weight: 900;
+  }
+
+  .mobile-profile-primary-action {
+    color: var(--crystal-cyan) !important;
+    border-color: rgba(0, 243, 255, 0.26) !important;
+    background: rgba(0, 243, 255, 0.1) !important;
   }
 
   .mobile-profile-sheet button.danger {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Award, MessageCircle, Shield, Sparkles, Star, Trophy, Zap } from 'lucide-react';
+import { ArrowLeft, Award, CalendarDays, Flame, Map as MapIcon, MessageCircle, Shield, Sparkles, Star, Trophy, TrendingUp, Zap } from 'lucide-react';
 import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
@@ -24,6 +24,21 @@ const BASE_THEME_IMAGES = {
   solar_archive: goldenArchiveImage,
   deep_lab: deepSeaLabImage,
 };
+
+const CONCEPT_STATUS_META = {
+  conquered: { label: '정복', icon: '🏁', tone: '#34d399' },
+  refining: { label: '재정제 필요', icon: '🔧', tone: '#f59e0b' },
+  learning: { label: '학습 중', icon: '🛰️', tone: '#38bdf8' },
+};
+
+const KST_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+const HEATMAP_MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 
 function getMondayKSTKey() {
   const kstPart = getKSTComponents();
@@ -83,6 +98,418 @@ function mergeBadges(...badgeGroups) {
     });
 }
 
+function getTimeMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return value;
+  if (value?.toMillis) return value.toMillis();
+  if (value?.seconds) return value.seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getKSTDateKey(value) {
+  const ms = getTimeMs(value);
+  if (!ms) return '';
+  return KST_DATE_FORMATTER.format(new Date(ms));
+}
+
+function parseDateKeyAsUTC(dateKey) {
+  const [year, month, day] = String(dateKey || '').split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function formatUTCDateKey(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToDateKey(dateKey, days) {
+  const date = parseDateKeyAsUTC(dateKey);
+  if (!date) return '';
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatUTCDateKey(date);
+}
+
+function getProfileSeconds(profile = {}, keyGroups = []) {
+  for (const keys of keyGroups) {
+    for (const key of keys.seconds || []) {
+      const value = Number(profile[key]);
+      if (Number.isFinite(value) && value > 0) return Math.floor(value);
+    }
+    for (const key of keys.minutes || []) {
+      const value = Number(profile[key]);
+      if (Number.isFinite(value) && value > 0) return Math.floor(value * 60);
+    }
+    for (const key of keys.hours || []) {
+      const value = Number(profile[key]);
+      if (Number.isFinite(value) && value > 0) return Math.floor(value * 3600);
+    }
+  }
+  return 0;
+}
+
+function getHistoryLearningSeconds(entry = {}) {
+  const numericSeconds = [
+    entry.focusSeconds,
+    entry.studySeconds,
+    entry.learningSeconds,
+    entry.durationSeconds,
+    entry.timeSpentSeconds,
+    entry.totalVideoSeconds,
+  ].map(Number).find((value) => Number.isFinite(value) && value > 0);
+  if (numericSeconds) return Math.floor(numericSeconds);
+
+  const numericMinutes = [
+    entry.focusMinutes,
+    entry.studyMinutes,
+    entry.learningMinutes,
+    entry.durationMinutes,
+    entry.timeSpentMinutes,
+  ].map(Number).find((value) => Number.isFinite(value) && value > 0);
+  if (numericMinutes) return Math.floor(numericMinutes * 60);
+
+  const isFocusOnlyEvent = !!entry.attentionSource
+    && ['hit', 'miss'].includes(entry.attentionResult)
+    && entry.attentionSource !== 'completion_bonus';
+  if (isFocusOnlyEvent) return 0;
+
+  if (['video', 'video_complete', 'video_reward'].includes(entry.type)) {
+    const videoSeconds = Number(entry.videoTime || entry.sessionWatchSeconds || entry.stampedCount || 0);
+    return Number.isFinite(videoSeconds) ? Math.max(0, Math.floor(videoSeconds)) : 0;
+  }
+
+  return 0;
+}
+
+function formatDuration(seconds) {
+  const totalMinutes = Math.max(0, Math.floor((Number(seconds) || 0) / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) return `${hours.toLocaleString()}시간 ${minutes}분`;
+  if (hours > 0) return `${hours.toLocaleString()}시간`;
+  return `${minutes}분`;
+}
+
+function formatDateKeyShort(dateKey) {
+  const [, month, day] = String(dateKey || '').split('-');
+  if (!month || !day) return dateKey || '';
+  return `${Number(month)}월 ${Number(day)}일`;
+}
+
+function getChartMaxHours(maxSeconds) {
+  const maxHours = maxSeconds / 3600;
+  if (maxHours <= 2) return 4;
+  if (maxHours <= 4) return 6;
+  if (maxHours <= 8) return 10;
+  if (maxHours <= 12) return 12;
+  return Math.ceil(maxHours / 4) * 4;
+}
+
+function getHeatmapLevel(day) {
+  const minutes = day.seconds / 60;
+  const activityScore = minutes > 0 ? minutes : day.activityCount * 5;
+  if (activityScore >= 120) return 4;
+  if (activityScore >= 60) return 3;
+  if (activityScore >= 20) return 2;
+  if (activityScore > 0) return 1;
+  return 0;
+}
+
+function buildLearningStats(history = [], profile = {}) {
+  const todayKey = getTodayKST();
+  const weekStartKey = getMondayKSTKey();
+  const monthKey = todayKey.slice(0, 7);
+  const dailyMap = new Map();
+
+  history.forEach((entry) => {
+    const dateKey = getKSTDateKey(entry.timestamp || entry.completedAt || entry.createdAt || entry.updatedAt);
+    if (!dateKey) return;
+    const current = dailyMap.get(dateKey) || { dateKey, seconds: 0, activityCount: 0 };
+    current.seconds += getHistoryLearningSeconds(entry);
+    current.activityCount += 1;
+    dailyMap.set(dateKey, current);
+  });
+
+  const dailyItems = Array.from(dailyMap.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  const historyTotalSeconds = dailyItems.reduce((sum, day) => sum + day.seconds, 0);
+  const totalSeconds = getProfileSeconds(profile, [{
+    seconds: ['totalFocusSeconds', 'totalStudySeconds', 'totalLearningSeconds', 'totalVideoSeconds'],
+    minutes: ['totalFocusMinutes', 'totalStudyMinutes', 'totalLearningMinutes'],
+    hours: ['totalFocusHours', 'totalStudyHours', 'totalLearningHours'],
+  }]) || historyTotalSeconds;
+
+  const recent30 = Array.from({ length: 30 }, (_, index) => {
+    const dateKey = addDaysToDateKey(todayKey, index - 29);
+    return dailyMap.get(dateKey) || { dateKey, seconds: 0, activityCount: 0 };
+  });
+
+  const rawHeatmapStart = addDaysToDateKey(todayKey, -364);
+  const startDate = parseDateKeyAsUTC(rawHeatmapStart);
+  const leadingDays = startDate ? startDate.getUTCDay() : 0;
+  const heatmapStartKey = addDaysToDateKey(rawHeatmapStart, -leadingDays);
+  const heatmapDays = Array.from({ length: 365 + leadingDays }, (_, index) => {
+    const dateKey = addDaysToDateKey(heatmapStartKey, index);
+    const day = dailyMap.get(dateKey) || { dateKey, seconds: 0, activityCount: 0 };
+    return {
+      ...day,
+      inRange: dateKey >= rawHeatmapStart && dateKey <= todayKey,
+      level: getHeatmapLevel(day),
+    };
+  });
+
+  const heatmapWeeks = [];
+  for (let i = 0; i < heatmapDays.length; i += 7) {
+    heatmapWeeks.push(heatmapDays.slice(i, i + 7));
+  }
+
+  const monthLabels = [];
+  let lastMonth = '';
+  heatmapWeeks.forEach((week, index) => {
+    const firstVisible = week.find((day) => day.inRange);
+    if (!firstVisible) return;
+    const month = firstVisible.dateKey.slice(5, 7);
+    if (month !== lastMonth) {
+      monthLabels.push({ index, label: HEATMAP_MONTH_LABELS[Number(month) - 1] });
+      lastMonth = month;
+    }
+  });
+
+  const monthSeconds = dailyItems
+    .filter((day) => day.dateKey.startsWith(monthKey))
+    .reduce((sum, day) => sum + day.seconds, 0);
+  const weekSeconds = dailyItems
+    .filter((day) => day.dateKey >= weekStartKey && day.dateKey <= todayKey)
+    .reduce((sum, day) => sum + day.seconds, 0);
+  const todaySeconds = dailyMap.get(todayKey)?.seconds || 0;
+
+  return {
+    totalSeconds,
+    monthSeconds,
+    weekSeconds,
+    todaySeconds,
+    activeDays: dailyItems.length,
+    totalActivities: history.length,
+    recent30,
+    heatmapWeeks,
+    monthLabels,
+    hasTimedData: totalSeconds > 0 || recent30.some((day) => day.seconds > 0),
+  };
+}
+
+function LearningLineChart({ points }) {
+  const [hoveredPoint, setHoveredPoint] = React.useState(null);
+  const width = 720;
+  const height = 230;
+  const padding = { top: 22, right: 18, bottom: 34, left: 46 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const maxSeconds = Math.max(3600, ...points.map((point) => point.seconds));
+  const maxHours = getChartMaxHours(maxSeconds);
+  const ySteps = Array.from({ length: 5 }, (_, index) => Math.round((maxHours * index) / 4));
+
+  const coordinates = points.map((point, index) => {
+    const x = padding.left + (points.length <= 1 ? 0 : (plotWidth * index) / (points.length - 1));
+    const y = padding.top + plotHeight - (Math.min(point.seconds / 3600, maxHours) / maxHours) * plotHeight;
+    return { ...point, x, y };
+  });
+  const linePath = coordinates.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+  const areaPath = `${linePath} L ${padding.left + plotWidth} ${padding.top + plotHeight} L ${padding.left} ${padding.top + plotHeight} Z`;
+
+  return (
+    <div className="public-profile-chart-wrap">
+      <svg className="public-profile-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="최근 30일 학습 시간 그래프" preserveAspectRatio="none">
+        {ySteps.map((hour) => {
+          const y = padding.top + plotHeight - (hour / maxHours) * plotHeight;
+          return (
+            <g key={hour}>
+              <line x1={padding.left} y1={y} x2={padding.left + plotWidth} y2={y} className="public-profile-chart-grid" />
+              <text x={padding.left - 10} y={y + 4} textAnchor="end" className="public-profile-chart-label">{hour}h</text>
+            </g>
+          );
+        })}
+        <line x1={padding.left} y1={padding.top} x2={padding.left} y2={padding.top + plotHeight} className="public-profile-chart-axis" />
+        <line x1={padding.left} y1={padding.top + plotHeight} x2={padding.left + plotWidth} y2={padding.top + plotHeight} className="public-profile-chart-axis" />
+        <path d={areaPath} className="public-profile-chart-area" />
+        <path d={linePath} className="public-profile-chart-line" />
+        {coordinates.map((point, index) => (
+          <g key={point.dateKey}>
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={point.seconds > 0 ? 4 : 2.5}
+              className="public-profile-chart-dot"
+              tabIndex={0}
+              onMouseEnter={() => setHoveredPoint(point)}
+              onMouseLeave={() => setHoveredPoint(null)}
+              onFocus={() => setHoveredPoint(point)}
+              onBlur={() => setHoveredPoint(null)}
+            />
+            {index % 7 === 0 || index === coordinates.length - 1 ? (
+              <text x={point.x} y={height - 10} textAnchor="middle" className="public-profile-chart-label">
+                {Number(point.dateKey.slice(8, 10))}
+              </text>
+            ) : null}
+          </g>
+        ))}
+      </svg>
+      {hoveredPoint && (
+        <div
+          className="public-profile-chart-tooltip"
+          style={{
+            left: `${(hoveredPoint.x / width) * 100}%`,
+            top: `${(hoveredPoint.y / height) * 100}%`,
+          }}
+        >
+          <strong>{formatDateKeyShort(hoveredPoint.dateKey)}</strong>
+          <span>{formatDuration(hoveredPoint.seconds)}</span>
+          <small>활동 {hoveredPoint.activityCount}건</small>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LearningHeatmap({ weeks, monthLabels }) {
+  const heatmapColumns = `repeat(${weeks.length}, minmax(0, 1fr))`;
+
+  return (
+    <div className="public-profile-heatmap-scroll">
+      <div className="public-profile-heatmap-months" style={{ gridTemplateColumns: heatmapColumns }}>
+        {monthLabels.map((month) => (
+          <span key={`${month.index}-${month.label}`} style={{ gridColumnStart: month.index + 1 }}>{month.label}</span>
+        ))}
+      </div>
+      <div className="public-profile-heatmap-body">
+        <div className="public-profile-heatmap-weekdays">
+          <span>일</span>
+          <span>월</span>
+          <span>화</span>
+          <span>수</span>
+          <span>목</span>
+          <span>금</span>
+          <span>토</span>
+        </div>
+        <div className="public-profile-heatmap-grid" style={{ gridTemplateColumns: heatmapColumns }}>
+          {weeks.map((week, weekIndex) => (
+            <div key={`week-${weekIndex}`} className="public-profile-heatmap-week">
+              {week.map((day) => (
+                <span
+                  key={day.dateKey}
+                  className={`public-profile-heatmap-cell level-${day.inRange ? day.level : 0}`}
+                  title={day.inRange ? `${day.dateKey} · ${formatDuration(day.seconds)} · 활동 ${day.activityCount}건` : ''}
+                  aria-label={day.inRange ? `${day.dateKey} 학습 ${formatDuration(day.seconds)}, 활동 ${day.activityCount}건` : '범위 밖'}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getHistoryConceptTitle(entry = {}) {
+  return String(
+    entry.unitTitle
+    || entry.quizTitle
+    || entry.transmissionTitle
+    || entry.regionTitle
+    || entry.title
+    || ''
+  ).trim();
+}
+
+function buildConceptMap(history = [], refinementSignals = [], includeRefinement = false) {
+  const concepts = new Map();
+
+  history.forEach((entry) => {
+    const title = getHistoryConceptTitle(entry);
+    if (!title) return;
+
+    const key = entry.unitId || title;
+    const type = entry.type || 'quiz';
+    const score = Number(entry.score);
+    const hasScore = Number.isFinite(score);
+    const existing = concepts.get(key) || {
+      key,
+      title,
+      regionTitle: entry.regionTitle || entry.chapterTitle || '',
+      attempts: 0,
+      completed: 0,
+      bestScore: null,
+      lastAtMs: 0,
+      activityTypes: new Set(),
+      refinementCount: 0,
+    };
+
+    existing.attempts += 1;
+    existing.completed += ['quiz', 'workbook', 'video', 'datalog', 'assignment'].includes(type) ? 1 : 0;
+    existing.activityTypes.add(type);
+    existing.lastAtMs = Math.max(existing.lastAtMs, getTimeMs(entry.timestamp || entry.completedAt || entry.createdAt));
+
+    if (hasScore && (type === 'quiz' || type === 'workbook')) {
+      existing.bestScore = existing.bestScore == null ? score : Math.max(existing.bestScore, score);
+    }
+
+    if (!existing.regionTitle && (entry.regionTitle || entry.chapterTitle)) {
+      existing.regionTitle = entry.regionTitle || entry.chapterTitle;
+    }
+
+    concepts.set(key, existing);
+  });
+
+  if (includeRefinement) {
+    refinementSignals.forEach((signal) => {
+      const title = String(signal.unitTitle || signal.conceptTag || signal.quizTitle || '').trim();
+      const key = signal.unitId || title || signal.id;
+      if (!key) return;
+
+      const existing = concepts.get(key) || {
+        key,
+        title: title || '복습 대상 개념',
+        regionTitle: signal.regionTitle || '',
+        attempts: 0,
+        completed: 0,
+        bestScore: null,
+        lastAtMs: 0,
+        activityTypes: new Set(),
+        refinementCount: 0,
+      };
+
+      existing.refinementCount += 1;
+      existing.lastAtMs = Math.max(existing.lastAtMs, getTimeMs(signal.lastFailedAt || signal.updatedAt || signal.createdAt));
+      concepts.set(key, existing);
+    });
+  }
+
+  return Array.from(concepts.values())
+    .map((concept) => {
+      let status = 'learning';
+      if (includeRefinement && concept.refinementCount > 0) {
+        status = 'refining';
+      } else if ((concept.bestScore ?? 0) >= 90 || concept.completed >= 2 || concept.activityTypes.has('video') || concept.activityTypes.has('datalog')) {
+        status = 'conquered';
+      }
+
+      return {
+        ...concept,
+        status,
+        meta: CONCEPT_STATUS_META[status],
+        activityTypes: Array.from(concept.activityTypes),
+      };
+    })
+    .sort((a, b) => {
+      const statusWeight = { refining: 0, conquered: 1, learning: 2 };
+      const weightDiff = statusWeight[a.status] - statusWeight[b.status];
+      if (weightDiff !== 0) return weightDiff;
+      return b.lastAtMs - a.lastAtMs;
+    })
+    .slice(0, 10);
+}
+
 export default function PublicProfile() {
   const { uid } = useParams();
   const navigate = useNavigate();
@@ -90,6 +517,7 @@ export default function PublicProfile() {
   const [profile, setProfile] = React.useState(null);
   const [answers, setAnswers] = React.useState([]);
   const [history, setHistory] = React.useState([]);
+  const [refinementSignals, setRefinementSignals] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
 
@@ -116,6 +544,7 @@ export default function PublicProfile() {
         const profileData = { id: profileSnap.id, ...profileSnap.data() };
         let answerItems = [];
         let historyItems = [];
+        let refinementItems = [];
 
         try {
           const answerSnap = await getDocs(query(
@@ -143,10 +572,26 @@ export default function PublicProfile() {
           console.warn('공개 프로필 배지 이력 조회 실패:', historyError);
         }
 
+        if (user?.uid === uid) {
+          try {
+            const [incorrectSnap, reviewSnap] = await Promise.all([
+              getDocs(collection(db, 'users', uid, 'incorrect_questions')),
+              getDocs(query(collection(db, 'users', uid, 'review_marks'), where('status', '==', 'active'))),
+            ]);
+            refinementItems = [
+              ...incorrectSnap.docs.map((signalDoc) => ({ id: signalDoc.id, ...signalDoc.data(), source: 'incorrect' })),
+              ...reviewSnap.docs.map((signalDoc) => ({ id: signalDoc.id, ...signalDoc.data(), source: 'review' })),
+            ];
+          } catch (refinementError) {
+            console.warn('공개 프로필 개념 정제 신호 조회 실패:', refinementError);
+          }
+        }
+
         if (!cancelled) {
           setProfile(profileData);
           setAnswers(answerItems);
           setHistory(historyItems);
+          setRefinementSignals(refinementItems);
         }
       } catch (err) {
         console.error('Public profile load failed:', err);
@@ -155,6 +600,7 @@ export default function PublicProfile() {
           setProfile(null);
           setAnswers([]);
           setHistory([]);
+          setRefinementSignals([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -165,7 +611,7 @@ export default function PublicProfile() {
     return () => {
       cancelled = true;
     };
-  }, [uid]);
+  }, [uid, user?.uid]);
 
   const isOwnProfile = user?.uid === uid;
   const mondayKey = getMondayKSTKey();
@@ -187,6 +633,19 @@ export default function PublicProfile() {
   const earnedBadges = profile
     ? mergeBadges(buildCollectionBadges(profile, history), buildSocialBadges(profile))
     : [];
+  const conceptMap = React.useMemo(
+    () => buildConceptMap(history, refinementSignals, isOwnProfile),
+    [history, refinementSignals, isOwnProfile]
+  );
+  const conceptSummary = React.useMemo(() => ({
+    conquered: conceptMap.filter((concept) => concept.status === 'conquered').length,
+    refining: conceptMap.filter((concept) => concept.status === 'refining').length,
+    learning: conceptMap.filter((concept) => concept.status === 'learning').length,
+  }), [conceptMap]);
+  const learningStats = React.useMemo(
+    () => buildLearningStats(history, profile || {}),
+    [history, profile]
+  );
   const displayName = getDisplayName(profile || {});
 
   return (
@@ -306,6 +765,96 @@ export default function PublicProfile() {
                 </div>
               </div>
 
+            </section>
+
+            <section className="public-profile-panel public-profile-learning-stats">
+              <h2>
+                <CalendarDays size={18} />
+                학습 통계
+                <span className="public-profile-section-count">{learningStats.activeDays}</span>
+              </h2>
+              <div className="public-profile-learning-summary">
+                <div>
+                  <span>총 기록 시간</span>
+                  <strong>{formatDuration(learningStats.totalSeconds)}</strong>
+                  <small>활동 {learningStats.totalActivities.toLocaleString()}건</small>
+                </div>
+                <div>
+                  <span>이번 달</span>
+                  <strong>{formatDuration(learningStats.monthSeconds)}</strong>
+                  <small>월간 기록 합계</small>
+                </div>
+                <div>
+                  <span>이번 주</span>
+                  <strong>{formatDuration(learningStats.weekSeconds)}</strong>
+                  <small>월요일부터 오늘까지</small>
+                </div>
+                <div>
+                  <span>오늘</span>
+                  <strong>{formatDuration(learningStats.todaySeconds)}</strong>
+                  <small>오늘 기록된 시간</small>
+                </div>
+              </div>
+
+              <div className="public-profile-learning-chart-block">
+                <div className="public-profile-learning-block-head">
+                  <div>
+                    <h3><TrendingUp size={17} /> 최근 활동 추이</h3>
+                    <p>최근 30일 동안 기록된 학습 시간을 보여줍니다.</p>
+                  </div>
+                </div>
+                {learningStats.hasTimedData ? (
+                  <LearningLineChart points={learningStats.recent30} />
+                ) : (
+                  <p className="public-profile-muted">아직 시간 단위로 기록된 학습 활동이 없습니다.</p>
+                )}
+              </div>
+
+              <div className="public-profile-learning-chart-block">
+                <div className="public-profile-learning-block-head">
+                  <div>
+                    <h3><Flame size={17} /> 1년 히트맵</h3>
+                    <p>시간 기록과 활동 횟수를 함께 반영해 학습 밀도를 표시합니다.</p>
+                  </div>
+                </div>
+                <LearningHeatmap weeks={learningStats.heatmapWeeks} monthLabels={learningStats.monthLabels} />
+              </div>
+            </section>
+
+            <section className="public-profile-panel public-profile-concepts">
+              <h2>
+                <MapIcon size={18} />
+                나의 개념 지도
+                <span className="public-profile-section-count">{conceptMap.length}</span>
+              </h2>
+              {conceptMap.length > 0 ? (
+                <>
+                  <div className="public-profile-concept-summary">
+                    <span>정복 {conceptSummary.conquered}</span>
+                    {isOwnProfile && <span>재정제 {conceptSummary.refining}</span>}
+                    <span>학습 중 {conceptSummary.learning}</span>
+                  </div>
+                  <div className="public-profile-concept-grid" aria-label="개념 지도">
+                    {conceptMap.map((concept) => (
+                      <div key={concept.key} className={`public-profile-concept-card is-${concept.status}`}>
+                        <div className="public-profile-concept-card-head">
+                          <span style={{ color: concept.meta.tone }}>{concept.meta.icon}</span>
+                          <strong>{concept.meta.label}</strong>
+                        </div>
+                        <h3>{concept.title}</h3>
+                        {concept.regionTitle && <p>{concept.regionTitle}</p>}
+                        <div className="public-profile-concept-meta">
+                          {concept.bestScore != null && <span>최고 {concept.bestScore}점</span>}
+                          <span>{concept.completed || concept.attempts}회 탐사</span>
+                          {isOwnProfile && concept.refinementCount > 0 && <span>정제 {concept.refinementCount}개</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="public-profile-muted">아직 공개할 개념 탐사 기록이 없습니다.</p>
+              )}
             </section>
 
             <section className="public-profile-panel public-profile-badge-panel">

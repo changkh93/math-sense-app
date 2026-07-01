@@ -143,6 +143,15 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     }
   };
 
+  const handlePublicProfileClick = () => {
+    if (!user?.uid) return;
+    soundManager.playClick();
+    setIsMobileMoreOpen(false);
+    setIsProfileMenuOpen(false);
+    setIsLiveMenuOpen(false);
+    navigate(`/profile/${user.uid}`);
+  };
+
   const handleBrandClick = () => {
     soundManager.playClick();
     setIsMobileMoreOpen(false);
@@ -378,8 +387,24 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
               >
                 <div className="font-tech" style={{ color: 'var(--text-bright)', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.8rem', marginBottom: '0.5rem' }}>
                   <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>안녕하세요,</span><br/>
-                  <strong style={{ color: 'var(--crystal-cyan)', fontSize: '1.1rem' }}>{userData?.studentName || user?.displayName || '탐사원'}</strong>님 👩‍🚀
+                  <button
+                    type="button"
+                    className="profile-menu-name-link"
+                    onClick={handlePublicProfileClick}
+                    title="나의 탐험기지 보기"
+                  >
+                    {profileDisplayName}
+                  </button>
+                  님 👩‍🚀
                 </div>
+
+                <button
+                  className="space-nav-link font-tech profile-menu-primary-action"
+                  style={{ textAlign: 'left', padding: '0.8rem', width: '100%', borderRadius: '8px' }}
+                  onClick={handlePublicProfileClick}
+                >
+                  🚀 나의 탐험기지 보기
+                </button>
                 
                 <button 
                   className="space-nav-link font-tech"
@@ -590,8 +615,11 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
             <div className="mobile-sheet-handle" />
             <div className="mobile-profile-summary">
               <span>안녕하세요,</span>
-              <strong>{profileDisplayName}님</strong>
+              <button type="button" className="mobile-profile-name-link" onClick={handlePublicProfileClick}>
+                {profileDisplayName}님
+              </button>
             </div>
+            <button type="button" className="mobile-profile-primary-action" onClick={handlePublicProfileClick}>나의 탐험기지 보기</button>
             <button type="button" onClick={() => handleNavClick('profile', '/')}>프로필 수정</button>
             <button type="button" onClick={() => handleNavClick('dashboard', '/')}>성장 기록</button>
             <button
