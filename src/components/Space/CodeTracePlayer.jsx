@@ -10,6 +10,7 @@ import { recordCrystalTransaction } from '../../utils/crystalLedger';
 import soundManager from '../../utils/SoundManager';
 
 const ANSWER_REVEAL_SECONDS = 30;
+const STUDENT_INDENT = '  ';
 
 function normalizeNewlines(text = '') {
   return String(text).replace(/\r\n/g, '\n');
@@ -19,11 +20,44 @@ function trimTrailingWhitespace(line = '') {
   return line.replace(/\s+$/g, '');
 }
 
-function normalizePythonLineForCompare(line = '') {
+function getLeadingWhitespace(line = '') {
+  return String(line || '').match(/^\s*/)?.[0] || '';
+}
+
+function getIndentVisualWidth(indent = '') {
+  return Array.from(indent).reduce((sum, char) => sum + (char === '\t' ? 2 : 1), 0);
+}
+
+function isAllowedIndent(indent = '') {
+  if (!indent) return true;
+  const chars = Array.from(indent);
+  if (chars.every(char => char === '\t')) return true;
+  if (chars.every(char => char === ' ')) return chars.length % 2 === 0;
+  return getIndentVisualWidth(indent) % 2 === 0;
+}
+
+function buildIndentRankMap(lines = []) {
+  const widths = new Set([0]);
+  lines.forEach((line) => {
+    const indent = getLeadingWhitespace(line);
+    if (isAllowedIndent(indent)) widths.add(getIndentVisualWidth(indent));
+  });
+  return new Map([...widths].sort((a, b) => a - b).map((width, index) => [width, index]));
+}
+
+function normalizeIndentForCompare(line = '', indentRanks = null) {
+  const indent = getLeadingWhitespace(line);
+  const width = getIndentVisualWidth(indent);
+  if (!indentRanks) return indent;
+  if (!isAllowedIndent(indent)) return `__bad_indent_${width}__`;
+  return `__indent_${indentRanks.get(width) ?? width}__`;
+}
+
+function normalizePythonLineForCompare(line = '', indentRanks = null) {
   const raw = trimTrailingWhitespace(String(line || ''));
-  const indent = raw.match(/^\s*/)?.[0] || '';
+  const indent = getLeadingWhitespace(raw);
   const body = raw.slice(indent.length);
-  let result = indent;
+  let result = normalizeIndentForCompare(raw, indentRanks);
   let quote = '';
   let escaped = false;
 
@@ -62,10 +96,6 @@ function hasOnlyQuotedWhitespaceDifference(answerLine = '', studentLine = '') {
   return normalizedAnswer.replace(/\s/g, '') === normalizedStudent.replace(/\s/g, '');
 }
 
-function getIndent(line = '') {
-  return line.match(/^\s*/)?.[0]?.length || 0;
-}
-
 function countChar(text, char) {
   return Array.from(text || '').filter(c => c === char).length;
 }
@@ -76,8 +106,10 @@ function evaluateCode(answerCode, studentCode) {
   const answerLines = answer.split('\n');
   const studentLines = student.split('\n');
   const targetIndexes = answerLines.map((_, index) => index);
-  const targetAnswer = targetIndexes.map(index => normalizePythonLineForCompare(answerLines[index] || '')).join('\n');
-  const targetStudent = targetIndexes.map(index => normalizePythonLineForCompare(studentLines[index] || '')).join('\n');
+  const answerIndentRanks = buildIndentRankMap(answerLines);
+  const studentIndentRanks = buildIndentRankMap(studentLines);
+  const targetAnswer = targetIndexes.map(index => normalizePythonLineForCompare(answerLines[index] || '', answerIndentRanks)).join('\n');
+  const targetStudent = targetIndexes.map(index => normalizePythonLineForCompare(studentLines[index] || '', studentIndentRanks)).join('\n');
   const totalChars = Math.max(targetAnswer.length, targetStudent.length, 1);
 
   let sameChars = 0;
@@ -88,7 +120,7 @@ function evaluateCode(answerCode, studentCode) {
   let correctLines = 0;
   targetIndexes.forEach((index) => {
     const line = answerLines[index] || '';
-    if (normalizePythonLineForCompare(line) === normalizePythonLineForCompare(studentLines[index] || '')) {
+    if (normalizePythonLineForCompare(line, answerIndentRanks) === normalizePythonLineForCompare(studentLines[index] || '', studentIndentRanks)) {
       correctLines += 1;
     }
   });
@@ -104,8 +136,10 @@ function evaluateCode(answerCode, studentCode) {
     if (answerLine.trim().endsWith(':') && !studentLine.trim().endsWith(':')) {
       issues.push(`${index + 1}번째 줄 끝의 콜론(:)을 확인하세요.`);
     }
-    if (getIndent(answerLine) !== getIndent(studentLine) && answerLine.trim() === studentLine.trim()) {
-      issues.push(`${index + 1}번째 줄의 들여쓰기를 정답 코드와 맞춰 보세요.`);
+    const sameCodeWithDifferentIndent = normalizePythonLineForCompare(answerLine, answerIndentRanks) !== normalizePythonLineForCompare(studentLine, studentIndentRanks)
+      && normalizePythonLineForCompare(answerLine).replace(/^\s*/, '') === normalizePythonLineForCompare(studentLine).replace(/^\s*/, '');
+    if (sameCodeWithDifferentIndent) {
+      issues.push(`${index + 1}번째 줄의 들여쓰기 단계를 확인하세요. 탭, 스페이스 2칸, 스페이스 4칸은 같은 단계로 인정됩니다.`);
     }
     if (hasOnlyQuotedWhitespaceDifference(answerLine, studentLine)) {
       issues.push(`${index + 1}번째 줄의 따옴표 안 공백은 출력되는 글자이므로 그대로 맞춰야 합니다.`);
@@ -394,6 +428,68 @@ export default function CodeTracePlayer({
       event.preventDefault();
     }
   };
+  const handleStudentKeyDown = (event) => {
+    if (event.key !== 'Tab') return;
+    event.preventDefault();
+
+    const textarea = event.currentTarget;
+    const { selectionStart, selectionEnd, value } = textarea;
+    const hasSelection = selectionStart !== selectionEnd;
+
+    if (!hasSelection) {
+      const nextValue = `${value.slice(0, selectionStart)}${STUDENT_INDENT}${value.slice(selectionEnd)}`;
+      setStudentCode(nextValue);
+      requestAnimationFrame(() => {
+        textarea.selectionStart = selectionStart + STUDENT_INDENT.length;
+        textarea.selectionEnd = selectionStart + STUDENT_INDENT.length;
+      });
+      return;
+    }
+
+    const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
+    const lineEndIndex = value.indexOf('\n', selectionEnd);
+    const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+    const selectedBlock = value.slice(lineStart, lineEnd);
+    const lines = selectedBlock.split('\n');
+
+    if (event.shiftKey) {
+      let removedBeforeSelection = 0;
+      let removedTotal = 0;
+      const outdented = lines.map((line, index) => {
+        let removed = 0;
+        let nextLine = line;
+        if (nextLine.startsWith(STUDENT_INDENT)) {
+          removed = STUDENT_INDENT.length;
+          nextLine = nextLine.slice(STUDENT_INDENT.length);
+        } else if (nextLine.startsWith('\t')) {
+          removed = 1;
+          nextLine = nextLine.slice(1);
+        } else if (nextLine.startsWith(' ')) {
+          removed = 1;
+          nextLine = nextLine.slice(1);
+        }
+        if (index === 0) removedBeforeSelection = removed;
+        removedTotal += removed;
+        return nextLine;
+      }).join('\n');
+
+      const nextValue = `${value.slice(0, lineStart)}${outdented}${value.slice(lineEnd)}`;
+      setStudentCode(nextValue);
+      requestAnimationFrame(() => {
+        textarea.selectionStart = Math.max(lineStart, selectionStart - removedBeforeSelection);
+        textarea.selectionEnd = Math.max(textarea.selectionStart, selectionEnd - removedTotal);
+      });
+      return;
+    }
+
+    const indented = lines.map(line => `${STUDENT_INDENT}${line}`).join('\n');
+    const nextValue = `${value.slice(0, lineStart)}${indented}${value.slice(lineEnd)}`;
+    setStudentCode(nextValue);
+    requestAnimationFrame(() => {
+      textarea.selectionStart = selectionStart + STUDENT_INDENT.length;
+      textarea.selectionEnd = selectionEnd + (lines.length * STUDENT_INDENT.length);
+    });
+  };
 
   return (
     <div className="space-bg" style={{ minHeight: '100vh', overflowY: 'auto', padding: '1rem 1rem 4rem' }}>
@@ -478,9 +574,10 @@ export default function CodeTracePlayer({
             <textarea
               value={studentCode}
               onChange={e => setStudentCode(e.target.value)}
+              onKeyDown={handleStudentKeyDown}
               spellCheck={false}
               placeholder="여기에 코드를 그대로 따라 써보세요."
-              style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', minHeight: 300, resize: 'vertical', background: '#020617', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55 }}
+              style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', minHeight: 300, resize: 'vertical', background: '#020617', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2 }}
             />
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
               <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!currentPassed || currentAlreadyCompleted || completionState === 'processing'}>
