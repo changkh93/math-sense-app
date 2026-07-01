@@ -1505,7 +1505,7 @@ function SpaceHome() {
 
   // Calculate Exploration Status and Recent Region
   // bestScores: { unitDocId: bestScore } - maps each completed unit to its best quiz score
-  // unitProgressMap: { unitDocId: { quiz: true, video: true, text: true, workbook: true } }
+  // unitProgressMap: { unitDocId: { quiz: true, video: true, text: true, workbook: true, codeTrace: true } }
   const { explorationStatus, recentRegionId, bestScores, unitProgressMap } = useMemo(() => {
     const statusMap = {}
     const scores = {}
@@ -1527,10 +1527,11 @@ function SpaceHome() {
       else if (h.type === 'workbook') hType = 'workbook'
       else if (h.type === 'video') hType = 'video'
       else if (h.type === 'text') hType = 'text'
+      else if (h.type === 'code_trace') hType = 'codeTrace'
 
       // Tracking modality completion
       if (!progressMap[uid]) {
-        progressMap[uid] = { quiz: false, video: false, text: false, workbook: false }
+        progressMap[uid] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false }
       }
       progressMap[uid][hType] = true
 
@@ -1601,14 +1602,15 @@ function SpaceHome() {
         quiz: { total: 0, completed: 0 },
         video: { total: 0, completed: 0 },
         text: { total: 0, completed: 0 },
-        workbook: { total: 0, completed: 0 }
+        workbook: { total: 0, completed: 0 },
+        codeTrace: { total: 0, completed: 0 }
       }
 
       unitsData.forEach(unit => {
         // Find progress using docId or fallback id
         const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
 
-        const { hasQuiz, hasVideo, hasText, hasWorkbook } = getUnitContentAvailability(unit, quizAvailabilityMap)
+        const { hasQuiz, hasVideo, hasText, hasWorkbook, hasCodeTrace } = getUnitContentAvailability(unit, quizAvailabilityMap)
 
         if (hasQuiz) {
           counts.quiz.total++
@@ -1626,15 +1628,20 @@ function SpaceHome() {
           counts.workbook.total++
           if (uProg.workbook) counts.workbook.completed++
         }
+        if (hasCodeTrace) {
+          counts.codeTrace.total++
+          if (uProg.codeTrace) counts.codeTrace.completed++
+        }
       })
       
       // Determine if the entire chapter is finished across ALL active modalities
-      const hasAnyContent = counts.quiz.total > 0 || counts.video.total > 0 || counts.text.total > 0 || counts.workbook.total > 0
+      const hasAnyContent = counts.quiz.total > 0 || counts.video.total > 0 || counts.text.total > 0 || counts.workbook.total > 0 || counts.codeTrace.total > 0
       const isFinished = hasAnyContent && 
         (counts.quiz.total === counts.quiz.completed) &&
         (counts.video.total === counts.video.completed) &&
         (counts.text.total === counts.text.completed) &&
-        (counts.workbook.total === counts.workbook.completed)
+        (counts.workbook.total === counts.workbook.completed) &&
+        (counts.codeTrace.total === counts.codeTrace.completed)
       
       progress[chapter.docId] = {
         counts,
@@ -3934,7 +3941,7 @@ function SpaceHome() {
                             <p className="font-tech" style={{ color: '#50c878', fontSize: '0.9rem', fontWeight: 800 }}>완료 🏆</p>
                           ) : (() => {
                             const p = chapterProgress[chapter.docId].counts;
-                            const hasAny = p.quiz.total > 0 || p.video.total > 0 || p.text.total > 0 || p.workbook.total > 0;
+                            const hasAny = p.quiz.total > 0 || p.video.total > 0 || p.text.total > 0 || p.workbook.total > 0 || p.codeTrace.total > 0;
                             
                             if (!hasAny) {
                               return <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>탐험 전</p>;
@@ -3955,6 +3962,11 @@ function SpaceHome() {
                                 {p.workbook.total > 0 && (
                                   <span className="font-tech" style={{ color: p.workbook.completed === p.workbook.total ? '#50c878' : 'var(--star-gold)', fontSize: '0.85rem' }}>
                                     🧮 {p.workbook.completed}/{p.workbook.total}
+                                  </span>
+                                )}
+                                {p.codeTrace.total > 0 && (
+                                  <span className="font-tech" style={{ color: p.codeTrace.completed === p.codeTrace.total ? '#50c878' : 'var(--crystal-cyan)', fontSize: '0.85rem' }}>
+                                    ⌨️ {p.codeTrace.completed}/{p.codeTrace.total}
                                   </span>
                                 )}
                                 {p.quiz.total > 0 && (
@@ -4051,14 +4063,15 @@ function SpaceHome() {
                     ) : units?.map((unit, idx) => {
                       const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
                       
-                      const { hasQuiz, hasVideo, hasText, hasWorkbook } = getUnitContentAvailability(unit, quizAvailabilityMap)
-                      const hasAnyContent = hasQuiz || hasVideo || hasText || hasWorkbook
+                      const { hasQuiz, hasVideo, hasText, hasWorkbook, hasCodeTrace } = getUnitContentAvailability(unit, quizAvailabilityMap)
+                      const hasAnyContent = hasQuiz || hasVideo || hasText || hasWorkbook || hasCodeTrace
 
                       const isOverallCompleted = hasAnyContent &&
                         (!hasQuiz || uProg.quiz) &&
                         (!hasVideo || uProg.video) &&
                         (!hasText || uProg.text) &&
-                        (!hasWorkbook || uProg.workbook)
+                        (!hasWorkbook || uProg.workbook) &&
+                        (!hasCodeTrace || uProg.codeTrace)
 
                       const bestScore = bestScores[unit.docId]
 
@@ -4130,6 +4143,13 @@ function SpaceHome() {
                                   fontSize: '1rem',
                                   textShadow: uProg.workbook ? '0 0 10px rgba(80, 200, 120, 0.5)' : 'none'
                                 }} title="Workbook">🧮</span>
+                              )}
+                              {hasCodeTrace && (
+                                <span className="font-tech" style={{
+                                  color: uProg.codeTrace ? '#50c878' : 'rgba(255,255,255,0.3)',
+                                  fontSize: '1rem',
+                                  textShadow: uProg.codeTrace ? '0 0 10px rgba(80, 200, 120, 0.5)' : 'none'
+                                }} title="Code Trace">⌨️</span>
                               )}
                               {hasQuiz && (
                                 <span className="font-tech" style={{ 

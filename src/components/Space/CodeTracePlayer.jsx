@@ -11,6 +11,10 @@ import soundManager from '../../utils/SoundManager';
 
 const ANSWER_REVEAL_SECONDS = 30;
 const STUDENT_INDENT = '  ';
+const CODE_PANEL_MIN_HEIGHT = 300;
+const CODE_PANEL_MAX_HEIGHT = 720;
+const CODE_PANEL_LINE_HEIGHT_PX = 23;
+const CODE_PANEL_VERTICAL_PADDING_PX = 32;
 
 function normalizeNewlines(text = '') {
   return String(text).replace(/\r\n/g, '\n');
@@ -420,6 +424,14 @@ export default function CodeTracePlayer({
 
   const answerCode = getModeCode(exercise, mode, visibleLines);
   const totalLines = normalizeNewlines(exercise.answerCode || '').split('\n').length;
+  const visibleAnswerLineCount = Math.max(1, normalizeNewlines(answerCode || '').split('\n').length);
+  const codePanelHeight = Math.min(
+    CODE_PANEL_MAX_HEIGHT,
+    Math.max(
+      CODE_PANEL_MIN_HEIGHT,
+      (visibleAnswerLineCount * CODE_PANEL_LINE_HEIGHT_PX) + CODE_PANEL_VERTICAL_PADDING_PX
+    )
+  );
   const preventAnswerCopy = (event) => {
     event.preventDefault();
   };
@@ -563,7 +575,7 @@ export default function CodeTracePlayer({
               onContextMenu={preventAnswerCopy}
               onSelect={preventAnswerCopy}
               onKeyDown={preventAnswerCopyShortcut}
-              style={{ boxSizing: 'border-box', width: '100%', maxWidth: '100%', minHeight: 300, margin: 0, padding: '1rem', borderRadius: 10, background: '#020617', color: '#e5e7eb', overflow: 'auto', whiteSpace: 'pre', filter: answerVisible ? 'none' : 'blur(5px)', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', fontSize: '0.92rem', lineHeight: 1.55 }}
+              style={{ boxSizing: 'border-box', width: '100%', maxWidth: '100%', height: codePanelHeight, minHeight: CODE_PANEL_MIN_HEIGHT, maxHeight: CODE_PANEL_MAX_HEIGHT, margin: 0, padding: '1rem', borderRadius: 10, background: '#020617', color: '#e5e7eb', overflow: 'auto', whiteSpace: 'pre', filter: answerVisible ? 'none' : 'blur(5px)', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', fontSize: '0.92rem', lineHeight: 1.55 }}
             >
               {answerCode}
             </pre>
@@ -578,7 +590,7 @@ export default function CodeTracePlayer({
               spellCheck={false}
               wrap="off"
               placeholder="코드를 따라 쓰세요."
-              style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', minHeight: 300, resize: 'vertical', background: '#020617', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2, overflow: 'auto', whiteSpace: 'pre' }}
+              style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', height: codePanelHeight, minHeight: CODE_PANEL_MIN_HEIGHT, maxHeight: CODE_PANEL_MAX_HEIGHT, resize: 'vertical', background: '#020617', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2, overflow: 'auto', whiteSpace: 'pre' }}
             />
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
               <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!currentPassed || currentAlreadyCompleted || completionState === 'processing'}>
