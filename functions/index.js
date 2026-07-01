@@ -1693,9 +1693,7 @@ async function requireAdminUid(context) {
 }
 
 function getGlmApiKey() {
-  return process.env.GLM_API_KEY ||
-    functions.config()?.glm?.api_key ||
-    "";
+  return process.env.GLM_API_KEY || "";
 }
 
 function normalizeGlmMessages(messages) {
@@ -1717,7 +1715,7 @@ function normalizeGlmMessages(messages) {
 }
 
 exports.callGlmChat = regionalFunctions
-  .runWith({ timeoutSeconds: 120, memory: "512MB" })
+  .runWith({ timeoutSeconds: 120, memory: "512MB", secrets: ["GLM_API_KEY"] })
   .https.onCall(async (data, context) => {
     await requireAdminUid(context);
 
