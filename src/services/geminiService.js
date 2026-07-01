@@ -1,4 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
+import { httpsCallable } from "firebase/functions";
+import { functions as firebaseFunctions } from "../firebase";
 
 // Ensure we have an instance (if the key is missing, handle gracefully)
 let genAI = null;
@@ -166,11 +168,71 @@ export const analyzeWorkbookImage = async (base64Image, mimeType) => {
   }
 };
 
-export const generateAssignmentFeedback = async (feedbackContext, styleKey = 'balanced') => {
-  if (!genAI) {
-    throw new Error("Gemini API client not initialized");
+/**
+ * GLM(BigModel) 채팅 호출 헬퍼.
+ * vite dev 서버의 /glm-api 프록시를 통해 같은 출처로 요청한다(브라우저 CORS 회피 + 키 비노출).
+ * 키와 엔드포인트는 vite.config.js의 server.proxy['/glm-api']에서 주입된다.
+ * @param {Array<{role: string, content: string}>} messages
+ * @param {{ model?: string, json?: boolean, maxTokens?: number }} [options]
+ */
+const callGlmChat = async (messages, options = {}) => {
+  const model = options.model || import.meta.env.VITE_GLM_MODEL || 'glm-5.1'
+  const body = {
+    model,
+    messages,
+    thinking: { type: 'disabled' },
+  }
+  if (options.json) body.response_format = { type: 'json_object' }
+  if (options.maxTokens) body.max_tokens = options.maxTokens
+
+  if (!import.meta.env.DEV || import.meta.env.VITE_GLM_USE_FUNCTION === 'true') {
+    const callable = httpsCallable(firebaseFunctions, 'callGlmChat');
+    const result = await callable({
+      messages,
+      options: {
+        model,
+        json: options.json === true,
+        maxTokens: options.maxTokens || null,
+      },
+    });
+    const content = result?.data?.content;
+    if (!content) {
+      throw new Error('GLM Cloud Function 응답에 content가 없습니다.');
+    }
+    return content;
   }
 
+  let response
+  try {
+    response = await fetch('/glm-api/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (networkError) {
+    throw new Error(`GLM 프록시 호출 실패: ${networkError?.message || networkError}`)
+  }
+
+  if (!response.ok) {
+    // 4xx/5xx 본문을 그대로 노출해 1113(잔액 부족) 같은 진단을 빠르게 한다.
+    let detail = ''
+    try {
+      detail = await response.text()
+    } catch (readError) {
+      void readError
+    }
+    throw new Error(`GLM API 오류(HTTP ${response.status}): ${detail.slice(0, 500)}`)
+  }
+
+  const data = await response.json().catch(() => null)
+  const content = data?.choices?.[0]?.message?.content
+  if (!content) {
+    throw new Error('GLM 응답에 message.content가 없습니다.')
+  }
+  return content
+}
+
+export const generateAssignmentFeedback = async (feedbackContext, styleKey = 'balanced') => {
   const prompt = `
 [시스템 역할]
 너는 Math Sense의 과제 제출물을 검토하는 교육 피드백 도우미다.
@@ -251,21 +313,18 @@ studentFeedback은 학생 화면에 그대로 표시된다.
 ${JSON.stringify(feedbackContext, null, 2)}
 `;
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-    }
-  });
+  const content = await callGlmChat(
+    [{ role: 'user', content: prompt }],
+    { json: true, maxTokens: 4096 }
+  );
 
-  const parsed = parseJsonResponse(response.text);
+  const parsed = parseJsonResponse(content);
   return {
     ...parsed,
     evidence: Array.isArray(parsed.evidence) && parsed.evidence.length
       ? parsed.evidence
       : feedbackContext.evidence || [],
-    generatedBy: 'gemini',
+    generatedBy: 'glm-5.1',
     feedbackStyle: styleKey,
   };
 };

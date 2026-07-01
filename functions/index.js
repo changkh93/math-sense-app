@@ -1692,6 +1692,92 @@ async function requireAdminUid(context) {
   return uid;
 }
 
+function getGlmApiKey() {
+  return process.env.GLM_API_KEY ||
+    functions.config()?.glm?.api_key ||
+    "";
+}
+
+function normalizeGlmMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20) {
+    throw new functions.https.HttpsError("invalid-argument", "GLM 메시지 형식이 올바르지 않습니다.");
+  }
+
+  return messages.map((message) => {
+    const role = String(message?.role || "").trim();
+    const content = String(message?.content || "");
+    if (!["system", "user", "assistant"].includes(role) || !content.trim()) {
+      throw new functions.https.HttpsError("invalid-argument", "GLM 메시지 역할 또는 내용이 올바르지 않습니다.");
+    }
+    if (content.length > 200000) {
+      throw new functions.https.HttpsError("invalid-argument", "GLM 메시지가 너무 깁니다.");
+    }
+    return { role, content };
+  });
+}
+
+exports.callGlmChat = regionalFunctions
+  .runWith({ timeoutSeconds: 120, memory: "512MB" })
+  .https.onCall(async (data, context) => {
+    await requireAdminUid(context);
+
+    const apiKey = getGlmApiKey();
+    if (!apiKey) {
+      throw new functions.https.HttpsError("failed-precondition", "GLM API 키가 서버에 설정되어 있지 않습니다.");
+    }
+
+    const options = data?.options || {};
+    const model = String(options.model || "glm-5.1").slice(0, 80);
+    const body = {
+      model,
+      messages: normalizeGlmMessages(data?.messages),
+      thinking: { type: "disabled" },
+    };
+    if (options.json === true) body.response_format = { type: "json_object" };
+    if (Number.isFinite(Number(options.maxTokens)) && Number(options.maxTokens) > 0) {
+      body.max_tokens = Math.min(Math.floor(Number(options.maxTokens)), 8192);
+    }
+
+    let response;
+    let responseText = "";
+    try {
+      response = await fetch("https://open.bigmodel.cn/api/coding/paas/v4/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      responseText = await response.text();
+    } catch (error) {
+      console.error("callGlmChat network error:", error);
+      throw new functions.https.HttpsError("unavailable", "GLM API 호출에 실패했습니다.");
+    }
+
+    if (!response.ok) {
+      console.error("callGlmChat API error:", response.status, responseText.slice(0, 500));
+      throw new functions.https.HttpsError(
+        "internal",
+        `GLM API 오류(HTTP ${response.status}): ${responseText.slice(0, 500)}`
+      );
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(responseText);
+    } catch (error) {
+      console.error("callGlmChat JSON parse error:", error);
+      throw new functions.https.HttpsError("internal", "GLM API 응답을 해석하지 못했습니다.");
+    }
+
+    const content = payload?.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new functions.https.HttpsError("internal", "GLM 응답에 message.content가 없습니다.");
+    }
+    return { content, model, provider: "glm" };
+  });
+
 async function deleteQueryDocs(queryRef, stats, key) {
   const db = admin.firestore();
   let deleted = 0;

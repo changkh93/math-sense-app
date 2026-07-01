@@ -35,29 +35,77 @@ const COURSE_EXPECTATIONS = {
   },
 };
 
+// 학습 기록의 한글 제목/unitId가 NFD(분해 자모)로 저장되는 경우가 있다.
+// 정규식 매칭 전에 반드시 NFC로 정규화하지 않으면 "함수/방정식" 같은 키워드가 매칭되지 않아
+// 과정이 unknown으로 분류되고 학습 기록이 누락된다.
+const normalizeText = (value = '') => String(value || '').normalize('NFC');
+
+const KNOWN_COURSE_IDS = new Set(['cluster_elementary', 'middle-math', 'python']);
+function normalizeKnownCourseId(value = '') {
+  const normalized = normalizeCourseId(value);
+  return KNOWN_COURSE_IDS.has(normalized) ? normalized : '';
+}
+
 function normalizeCourseId(value = '') {
-  if (value === '초등수학' || value === 'cluster_elementary' || value === 'ratios') return 'cluster_elementary';
-  if (value === '중등수학' || value === 'middle-math') return 'middle-math';
-  if (value === '파이썬' || value === 'python') return 'python';
-  return value || 'unknown';
+  const text = normalizeText(value);
+  if (text === '초등수학' || text === 'cluster_elementary' || text === 'ratios') return 'cluster_elementary';
+  if (text === '중등수학' || text === 'middle-math') return 'middle-math';
+  if (text === '파이썬' || text === 'python') return 'python';
+  return text || 'unknown';
 }
 
 function inferCourseFromUnitId(unitId = '') {
-  if (/python|gameproj|sprite|pygame/i.test(unitId)) return 'python';
-  if (/ratio|ratios/i.test(unitId)) return 'cluster_elementary';
-  if (/middle|geo|algebra|equation|chap_177392/i.test(unitId)) return 'middle-math';
+  const text = normalizeText(unitId);
+  if (/python|gameproj|sprite|pygame/i.test(text)) return 'python';
+  if (/ratio|ratios/i.test(text)) return 'cluster_elementary';
+  if (/middle|geo|algebra|equation|chap_177392/i.test(text)) return 'middle-math';
   return '';
 }
 
 function inferCourseFromTitle(title = '') {
-  if (/python|파이썬|pygame|sprite|add_sound|sound|몬스터|플레이어|게임|코드/i.test(title)) return 'python';
-  if (/비와\s*비율|초등|자연수|분수|소수/i.test(title)) return 'cluster_elementary';
-  if (/중등|방정식|함수|다항식|곱셈공식|기하/i.test(title)) return 'middle-math';
+  const text = normalizeText(title);
+  if (/python|파이썬|pygame|sprite|add_sound|sound|몬스터|플레이어|게임|코드/i.test(text)) return 'python';
+  // 중등수학을 초등수학보다 먼저 검사한다. "유리수와 순환소수"처럼 중등 단원인데
+  // "소수" 키워드가 겹쳐 초등으로 오탐되는 것을 막기 위해서다(하다솜 사례).
+  // "함수"/"등식"/"정수"처럼 초등·파이썬에서도 등장하는 모호한 단어는 단독 키워드에서 뺀다.
+  // 대신 중등 전용 단원명과 단원평가/기말/기출/학년 같은 평가 키워드로 분류한다.
+  if (/중등|방정식|부등식|다항식|곱셈공식|기하|유리수|무리수|소인수분해|제곱근|거듭제곱|순환소수|절댓값|경우의\s*수|확률|통계|피타고라스|삼각비|무게중심|내심|외심|닮음|일차함수|이차함수|이차방정식|연립방정식|부등식의\s*해|기말|중간\s*평가|단원\s*평가|기출|평가\s*[0-9]+회|[0-9]학년/i.test(text)) return 'middle-math';
+  if (/비와\s*비율|초등|자연수|분수|소수|비례|비율|축척|나누기|곱하기|묶음|등분제|포함제/i.test(text)) return 'cluster_elementary';
   return '';
 }
 
 function hasMiddleMathLevelUpSignal(text = '') {
-  return /중등|방정식|부등식|등식|함수|다항식|곱셈공식|제곱근|소인수분해|완전제곱|이차|유리수|정수|절댓값|기하/i.test(text);
+  return /중등|방정식|부등식|등식|함수|다항식|곱셈공식|제곱근|소인수분해|완전제곱|이차|유리수|정수|절댓값|기하/i.test(normalizeText(text));
+}
+
+// unitId는 "reg_1774698354292_chap_..._unit_..." 형태다. 맨 앞의 reg_ segment가 region ID이며,
+// regions/{regId}.clusterId 에 정확한 과정이 들어 있다. learning_progress 문서는 clusterId 필드가
+// 없기 때문에 이 region 역조회로 과정을 정한다(정규식 오탐 방지, 하다솜/조승아 사례).
+function regionIdFromUnitLikeId(id = '') {
+  const text = normalizeText(id);
+  if (!text) return '';
+  const beforeChapter = text.match(/^(.*?)_chap(?:_|$)/);
+  if (beforeChapter?.[1]) return beforeChapter[1];
+  const generatedRegion = text.match(/^(reg_\d+)/);
+  if (generatedRegion?.[1]) return generatedRegion[1];
+  if (text.startsWith('ratios_')) return 'ratios';
+  return '';
+}
+
+// region clusterId 캐시. 한 export 실행 안에서 같은 region을 여러 번 조회하지 않도록.
+const regionClusterCache = new Map();
+async function fetchRegionClusterId(regionId = '') {
+  if (!regionId) return '';
+  if (regionClusterCache.has(regionId)) return regionClusterCache.get(regionId);
+  let clusterId = '';
+  try {
+    const snap = await db.collection('regions').doc(regionId).get();
+    clusterId = normalizeText(snap.exists ? (snap.data().clusterId || '') : '');
+  } catch (error) {
+    void error;
+  }
+  regionClusterCache.set(regionId, clusterId);
+  return clusterId;
 }
 
 function shouldIncludeCourse(itemCourse = '', normalizedCourseId = '', options = {}) {
@@ -69,19 +117,40 @@ function shouldIncludeCourse(itemCourse = '', normalizedCourseId = '', options =
 }
 
 function itemCourseId(item = {}) {
+  const explicit = normalizeKnownCourseId(item.clusterId)
+    || normalizeKnownCourseId(item.courseId)
+    || normalizeKnownCourseId(item.regionId);
+  if (explicit) return explicit;
   return normalizeCourseId(
-    item.clusterId ||
-    item.courseId ||
-    item.regionId ||
-    inferCourseFromUnitId(item.unitId || '') ||
-    inferCourseFromTitle(`${titleOf(item)} ${item.quizTitle || ''}`)
+    inferCourseFromUnitId(item.unitId || '')
+    || inferCourseFromTitle(`${titleOf(item)} ${item.quizTitle || ''}`)
   );
 }
 
-function belongsToCourse(item = {}, courseId = '', options = {}) {
+// 비동기 분류: region 역조회로 정확한 clusterId를 구한다. learning_progress처럼 clusterId 필드가
+// 없는 문서에서 정규식 오탐 없이 과정을 정한다. region 역조회가 안 되면 폴백으로 itemCourseId.
+async function resolveItemCourseId(item = {}) {
+  const explicit = normalizeKnownCourseId(item.clusterId) || normalizeKnownCourseId(item.courseId);
+  if (explicit) return explicit;
+  const regionAlias = normalizeKnownCourseId(item.regionId);
+  if (regionAlias) return regionAlias;
+
+  const explicitRegionId = normalizeText(item.regionId);
+  const regionId = explicitRegionId || regionIdFromUnitLikeId(item.unitId) || regionIdFromUnitLikeId(item.id);
+  if (regionId) {
+    const clusterId = await fetchRegionClusterId(regionId);
+    if (clusterId) return normalizeCourseId(clusterId);
+  }
+  return itemCourseId(item);
+}
+
+// 학습 row 목록을 과정 필터로 거른다. 각 row의 과정을 region 역조회로 정확히 정한다.
+async function filterItemsByCourse(items = [], courseId = '', options = {}) {
   const normalized = normalizeCourseId(courseId);
-  const itemCourse = itemCourseId(item);
-  return shouldIncludeCourse(itemCourse, normalized, options);
+  const resolved = await Promise.all(
+    items.map((item) => resolveItemCourseId(item).then((itemCourse) => ({ item, itemCourse })))
+  );
+  return resolved.filter(({ itemCourse }) => shouldIncludeCourse(itemCourse, normalized, options)).map(({ item }) => item);
 }
 
 function toMillis(value) {
@@ -230,22 +299,22 @@ function summarizeQuizRows(rows) {
   }));
 }
 
-function summarizeLearningProgress(progressDocs, start, end, courseId, options = {}) {
+async function summarizeLearningProgress(progressDocs, start, end, courseId, options = {}) {
   const videos = [];
   const inProgressQuizzes = [];
-  const normalizedCourseId = normalizeCourseId(courseId);
+
+  // 각 문서의 과정을 region 역조회로 정확히 정한 뒤 필터링한다(정규식 오탐 방지).
+  const filtered = await filterItemsByCourse(
+    progressDocs.map(doc => ({ id: doc.id, ...doc.data() })),
+    courseId,
+    options
+  );
+  const filteredIds = new Set(filtered.map(item => item.id));
 
   progressDocs.forEach(doc => {
+    if (!filteredIds.has(doc.id)) return;
     const data = doc.data();
     const unitId = doc.id;
-    const progressCourse = normalizeCourseId(
-      data.clusterId ||
-      data.courseId ||
-      data.regionId ||
-      inferCourseFromUnitId(unitId) ||
-      inferCourseFromTitle(`${data.unitTitle || ''} ${data.quizSession?.quizTitle || ''}`)
-    );
-    if (!shouldIncludeCourse(progressCourse, normalizedCourseId, options)) return;
     const updatedAt = toDate(data.updatedAt);
 
     Object.entries(data.videoProgress || {}).forEach(([transmissionId, progress]) => {
@@ -259,7 +328,7 @@ function summarizeLearningProgress(progressDocs, start, end, courseId, options =
       videos.push({
         unitId,
         transmissionId,
-        title: progress.transmissionTitle || data.unitTitle || unitId,
+        title: normalizeText(progress.transmissionTitle || data.unitTitle || unitId),
         seconds,
         completed: progress.completed === true,
         completionBonusGiven: progress.completionBonusGiven === true,
@@ -276,7 +345,7 @@ function summarizeLearningProgress(progressDocs, start, end, courseId, options =
       const incorrectCount = answers.filter(answer => answer?.isCorrect === false).length;
       inProgressQuizzes.push({
         unitId,
-        title: data.unitTitle || session.quizTitle || unitId,
+        title: normalizeText(data.unitTitle || session.quizTitle || unitId),
         answeredCount: answers.length || session.currentIdx || 0,
         currentIdx: session.currentIdx || 0,
         totalCount: session.originalTotal || session.totalCount || 0,
@@ -514,7 +583,24 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
   if (!snap) return { activityCount: 0, quizCount: 0, averageScore: null, titles: [], videos: [], inProgressQuizzes: [] };
 
   const allItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  const items = allItems.filter(item => belongsToCourse(item, courseId, options));
+
+  // 초등수학 과제에서 레벨업 예외 적용 여부를 실제 데이터로도 확인한다.
+  // 제출문 키워드 신호(호출부)가 없더라도, 같은 날짜에 middle-math history가 있으면
+  // 초등수학을 마치고 중등수학으로 넘어간 학생으로 보고 레벨업 기록을 인정한다.
+  // 각 item의 과정은 region 역조회로 정확히 정한다(정규식 오탐 방지).
+  const allResolved = await Promise.all(
+    allItems.map(item => resolveItemCourseId(item).then(itemCourse => ({ item, itemCourse })))
+  );
+  let includeMiddleMathLevelUp = options.includeMiddleMathLevelUp === true;
+  if (!includeMiddleMathLevelUp && normalizeCourseId(courseId) === 'cluster_elementary') {
+    includeMiddleMathLevelUp = allResolved.some(entry => entry.itemCourse === 'middle-math');
+  }
+  const mergedOptions = { ...options, includeMiddleMathLevelUp };
+
+  const normalizedCourseId = normalizeCourseId(courseId);
+  const items = allResolved
+    .filter(({ itemCourse }) => shouldIncludeCourse(itemCourse, normalizedCourseId, mergedOptions))
+    .map(({ item }) => item);
   const isElementary = normalizeCourseId(courseId) === 'cluster_elementary';
   const readingItems = isElementary ? items.filter(isReadingRelatedItem) : [];
   const mathItems = isElementary ? items.filter(item => !isReadingRelatedItem(item)) : items;
@@ -524,9 +610,11 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
   const dataLogItems = mathItems.filter(item => ['text', 'data_log_read'].includes(item.type));
   const attentionItems = mathItems.filter(item => item.attentionResult === 'hit' || item.attentionResult === 'miss');
   const scores = quizItems.map(item => Number(item.score)).filter(Number.isFinite);
-  const progressSummary = summarizeLearningProgress(progressSnap?.docs || [], start, end, courseId, options);
+  const progressSummary = await summarizeLearningProgress(progressSnap?.docs || [], start, end, courseId, mergedOptions);
   const videos = summarizeVideoRows(videoItems);
+  const allVideos = [...videos, ...progressSummary.videos];
   const quizzes = summarizeQuizRows(quizItems);
+  const progressActivityCount = progressSummary.inProgressQuizzes.length + progressSummary.videos.length;
   const attentionHits = attentionItems.filter(item => item.attentionResult === 'hit').length;
   const attentionMisses = attentionItems.filter(item => item.attentionResult === 'miss').length;
   const completionBonusMisses = attentionItems.filter(item => item.attentionSource === 'completion_bonus' && item.attentionResult === 'miss').length;
@@ -544,7 +632,7 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
   };
   const load = buildLearningLoadSummary({
     courseId,
-    videos,
+    videos: allVideos,
     quizzes,
     dataLogs: dataLogItems,
     inProgressQuizzes: progressSummary.inProgressQuizzes,
@@ -555,19 +643,19 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
 
   return {
     allActivityCount: allItems.length,
-    activityCount: items.length,
-    mathActivityCount: mathItems.length,
+    activityCount: items.length + progressActivityCount,
+    mathActivityCount: mathItems.length + progressActivityCount,
     readingActivityCount: readingItems.length,
-    quizCount: quizItems.length,
+    quizCount: quizItems.length + progressSummary.inProgressQuizzes.length,
     readingQuizCount: readingQuizItems.length,
-    videoCount: videos.length,
+    videoCount: allVideos.length,
     dataLogCount: dataLogItems.length,
     inProgressQuizCount: progressSummary.inProgressQuizzes.length,
     averageScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null,
     focusScore: attentionOpportunities ? Math.round((attentionHits / attentionOpportunities) * 100) : null,
     attention,
     learningLoad: load,
-    videos,
+    videos: allVideos,
     progressVideos: progressSummary.videos,
     quizzes,
     readingQuizzes: summarizeQuizRows(readingQuizItems),
@@ -585,7 +673,11 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
       completionBonusMisses ? `완료 보너스 ${completionBonusMisses}회 놓침` : '',
       progressSummary.inProgressQuizzes.length ? `진행 중 퀴즈 ${progressSummary.inProgressQuizzes.map(item => `${item.title} ${item.answeredCount}/${item.totalCount}`).join(', ')}` : '',
     ].filter(Boolean),
-    titles: [...new Set([...items.map(titleOf), ...progressSummary.inProgressQuizzes.map(item => item.title)].filter(Boolean))].slice(0, 10),
+    titles: [...new Set([
+      ...items.map(titleOf),
+      ...progressSummary.inProgressQuizzes.map(item => item.title),
+      ...progressSummary.videos.map(item => item.title),
+    ].filter(Boolean))].slice(0, 10),
     progressTitles: [...new Set(progressSummary.videos.map(item => item.title).filter(Boolean))].slice(0, 10),
     allTitles: [...new Set(allItems.map(titleOf).filter(Boolean))].slice(0, 12),
     recent: items
