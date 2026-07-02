@@ -740,8 +740,6 @@ export default function MissionHub({
     const savedRate = Number(localStorage.getItem(`metasense_video_rate_${unitId}`))
     return VIDEO_PLAYBACK_RATES.includes(savedRate) ? savedRate : 1
   });
-  const [isVideoControlZoneActive, setIsVideoControlZoneActive] = useState(false);
-  const videoControlZoneTimerRef = useRef(null);
   
   useEffect(() => {
     if (completionBonusTimeLeft === null || completionBonusTimeLeft <= 0) return;
@@ -775,28 +773,12 @@ export default function MissionHub({
   useEffect(() => {
     if (currentMode !== 'video') return;
     
-    const markVideoControlZoneActive = () => {
-      setIsVideoControlZoneActive(true)
-      if (videoControlZoneTimerRef.current) clearTimeout(videoControlZoneTimerRef.current)
-      videoControlZoneTimerRef.current = setTimeout(() => {
-        setIsVideoControlZoneActive(false)
-      }, 2600)
-    }
-
-    const handleUserActivity = (event) => {
+    const handleUserActivity = () => {
       setIsUiVisible(true);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         setIsUiVisible(false);
       }, 3500);
-
-      if (event?.type === 'mousemove') {
-        const lowerControlBand = Math.max(window.innerHeight - 260, window.innerHeight * 0.66)
-        if (event.clientY >= lowerControlBand) markVideoControlZoneActive()
-      } else if (event?.type === 'touchstart') {
-        const touch = event.touches?.[0]
-        if (!touch || touch.clientY >= window.innerHeight * 0.58) markVideoControlZoneActive()
-      }
     };
 
     handleUserActivity();
@@ -810,8 +792,6 @@ export default function MissionHub({
       window.removeEventListener('touchstart', handleUserActivity);
       window.removeEventListener('keydown', handleUserActivity);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      if (videoControlZoneTimerRef.current) clearTimeout(videoControlZoneTimerRef.current);
-      setIsVideoControlZoneActive(false)
     };
   }, [currentMode]);
 
@@ -2488,7 +2468,6 @@ export default function MissionHub({
         ? Math.min(100, Math.floor((stampCount / knownVideoDuration) * 100))
         : 0
       const creditedSeconds = Math.floor(creditedWatchSeconds)
-      const shouldDockVideoActions = isVideoControlZoneActive && !videoCompleted && !isAtEnd && !videoTrackingWarning
 
       return (
           <div className="theater-wrapper">
@@ -2618,12 +2597,7 @@ export default function MissionHub({
              {/* Bottom HUD Overlay */}
              <div
                className="theater-hud bottom-hud"
-               style={{
-                 opacity: shouldDockVideoActions ? 0 : ((isUiVisible || videoCompleted || isAtEnd || videoTrackingWarning) ? 1 : 0),
-                 visibility: shouldDockVideoActions ? 'hidden' : 'visible',
-                 pointerEvents: shouldDockVideoActions ? 'none' : undefined,
-                 flexDirection: 'column'
-               }}
+               style={{ opacity: (isUiVisible || videoCompleted || isAtEnd || videoTrackingWarning) ? 1 : 0, flexDirection: 'column' }}
              >
                {videoTrackingWarning && (
                  <div
@@ -2725,69 +2699,6 @@ export default function MissionHub({
                  </motion.p>
                )}
              </div>
-
-             <AnimatePresence>
-               {shouldDockVideoActions && (
-                 <motion.div
-                   initial={{ opacity: 0, x: 18, y: '-50%', scale: 0.96 }}
-                   animate={{ opacity: 1, x: 0, y: '-50%', scale: 1 }}
-                   exit={{ opacity: 0, x: 18, y: '-50%', scale: 0.96 }}
-                   transition={{ duration: 0.18 }}
-                   style={{
-                     position: 'absolute',
-                     right: isMobile ? '0.75rem' : '1.25rem',
-                     top: '50%',
-                     zIndex: 5100,
-                     display: 'flex',
-                     flexDirection: 'column',
-                     gap: '0.55rem',
-                     pointerEvents: 'auto'
-                   }}
-                   aria-label="영상 보조 동작"
-                 >
-                   <button
-                     type="button"
-                     onClick={handleSaveVideoPosition}
-                     className="hud-btn secondary glass"
-                     title="오늘은 여기까지"
-                     style={{
-                       width: isMobile ? '3rem' : '3.25rem',
-                       height: isMobile ? '3rem' : '3.25rem',
-                       minWidth: 0,
-                       padding: 0,
-                       borderRadius: '999px',
-                       background: 'rgba(0,0,0,0.64)',
-                       border: '1px solid rgba(255,255,255,0.2)',
-                       color: '#fff',
-                       boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
-                       fontSize: '1.15rem'
-                     }}
-                   >
-                     📋
-                   </button>
-                   <button
-                     type="button"
-                     onClick={() => handleOpenQuestionModal('video')}
-                     className="hud-btn primary glass capture-hide"
-                     title="선생님께 질문하기"
-                     style={{
-                       width: isMobile ? '3rem' : '3.25rem',
-                       height: isMobile ? '3rem' : '3.25rem',
-                       minWidth: 0,
-                       padding: 0,
-                       borderRadius: '999px',
-                       background: 'rgba(0, 243, 255, 0.24)',
-                       border: '1px solid var(--crystal-cyan)',
-                       color: '#fff',
-                       boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
-                       fontSize: '1.15rem'
-                     }}
-                   >
-                     🙋
-                   </button>
-                 </motion.div>
-               )}
-             </AnimatePresence>
 
              {/* Time Attack Overlay */}
              {showTimeAttack && (
