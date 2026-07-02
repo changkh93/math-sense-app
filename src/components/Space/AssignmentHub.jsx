@@ -1294,7 +1294,9 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
     return diffDays >= 0 && diffDays <= 6;
   }, [dateStr]);
 
-  const canEditSubmission = isWithinWindow && !isReviewed && !isSubmitted;
+  // 운영자 평가(피드백)가 완료된 과제(status === 'reviewed')만 수정 불가.
+  // submitted(대기중), needs_revision(재검토 요망) 상태는 사령부 확인 전까지 수정 가능.
+  const canEditSubmission = isWithinWindow && !isReviewed;
 
   useEffect(() => {
     let cancelled = false;
@@ -2049,49 +2051,6 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
              )}
             </div>
           </div>
-        ) : isSubmitted ? (
-          <div style={{ flex: 1, color: 'var(--text-muted)', overflowY: 'auto' }}>
-            <div className="glass-card" style={{
-              padding: '1.5rem',
-              border: '1px solid rgba(251, 191, 36, 0.45)',
-              background: 'rgba(251, 191, 36, 0.08)',
-              marginBottom: '1.5rem'
-            }}>
-              <p className="font-tech" style={{ color: 'var(--star-gold)', margin: '0 0 0.5rem', fontWeight: 900 }}>
-                ✅ 제출 완료 · 피드백 대기중
-              </p>
-              <p style={{ margin: 0, lineHeight: 1.6, color: 'var(--text-bright)' }}>
-                탐사 보고서가 정상적으로 전송되었습니다. 선생님 확인 전까지 제출된 기록을 보관합니다.
-              </p>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem', opacity: 0.9 }}>
-              <h4 style={{ color: 'var(--text-bright)', marginBottom: '1rem' }}>제출된 기록</h4>
-              <div style={{ whiteSpace: 'pre-wrap', fontSize: '1rem', lineHeight: '1.6', color: 'var(--text-muted)' }}>
-                {assignment.content}
-              </div>
-
-              {assignment.attachments?.length > 0 && (
-                <div style={{ marginTop: '1.5rem' }}>
-                  <p className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginBottom: '0.5rem' }}>첨부 파일</p>
-                  {assignment.attachments.map((att, i) => (
-                    <a key={i} href={att.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '0.5rem', borderRadius: '4px', color: 'white', marginRight: '0.5rem', marginBottom: '0.5rem', textDecoration: 'none' }}>
-                      📄 {att.name}
-                    </a>
-                  ))}
-                </div>
-              )}
-
-              {assignment.links?.length > 0 && (
-                <div style={{ marginTop: '1rem' }}>
-                  <p className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginBottom: '0.5rem' }}>첨부 링크</p>
-                  {assignment.links.map((lnk, i) => (
-                    <a key={i} href={lnk.url} target="_blank" rel="noreferrer" style={{ display: 'block', color: 'var(--neon-blue)', textDecoration: 'underline', marginBottom: '0.3rem' }}>{lnk.url}</a>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         ) : !isWithinWindow ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
@@ -2109,7 +2068,24 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          
+
+          {/* Already submitted — still editable until command feedback is published */}
+          {isSubmitted && (
+            <div className="glass-card" style={{
+              padding: '1rem 1.2rem',
+              marginBottom: '1rem',
+              border: '1px solid rgba(251, 191, 36, 0.45)',
+              background: 'rgba(251, 191, 36, 0.08)'
+            }}>
+              <p className="font-tech" style={{ color: 'var(--star-gold)', margin: 0, fontWeight: 900 }}>
+                ✅ 피드백 대기 중
+              </p>
+              <p style={{ margin: '0.35rem 0 0', lineHeight: 1.55, color: 'var(--text-bright)', fontSize: '0.88rem' }}>
+                사령부 확인 전까지 제출 내용, 첨부 링크, 첨부 파일을 다시 수정할 수 있습니다. 수정이 끝나면 다시 전송해 주세요.
+              </p>
+            </div>
+          )}
+
           <label className="font-tech" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>오늘 한 내용 정리 (필수)</label>
           <textarea 
             className="space-input" 
