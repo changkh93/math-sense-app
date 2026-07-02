@@ -15,6 +15,7 @@ const TX_CONFIG = {
   quiz_reward: { icon: '🪐', label: '탐사 보상', color: '#4ade80' },
   data_log_reward: { icon: '📄', label: '데이터 로그 보상', color: '#00f3ff' },
   code_trace_reward: { icon: '⌨️', label: '코드 따라쓰기 보상', color: '#22d3ee' },
+  code_trace_exercise_reward: { icon: '⌨️', label: 'CODE TRACE 통과 보상', color: '#a78bfa' },
   transmission_reward: { icon: '📡', label: '트랜스미션 보상', color: '#00ff88' },
   store_purchase: { icon: '🛒', label: '스토어 구매', color: '#f87171' },
   store_gift_purchase: { icon: '🎁', label: '상점 선물 구매', color: '#f87171' },
@@ -875,9 +876,9 @@ export default function CrystalLedger({ userData }) {
                 <span style={{ fontSize: '1.2em' }}>⌨️</span> 코드 따라쓰기
               </div>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                <li>등록된 코드 연습을 모두 통과하면 <span style={{color: 'var(--text-bright)'}}>+10 ~ 40</span> 광석</li>
-                <li>정확도와 힌트 사용량에 따라 보상이 달라집니다</li>
-                <li>단원당 <span style={{color: 'var(--text-bright)'}}>최초 1회</span>만 완료 보상 지급</li>
+                <li>각 코드 세트를 통과할 때마다 즉시 광석 지급</li>
+                <li>단원 전체 기준 <span style={{color: 'var(--text-bright)'}}>+30 ~ 80</span> 광석 범위</li>
+                <li>코드 세트별 <span style={{color: 'var(--text-bright)'}}>최초 1회</span>만 통과 보상 지급</li>
                 <li>정답 코드는 복사할 수 없고, 손으로 따라 써야 합니다</li>
               </ul>
             </div>

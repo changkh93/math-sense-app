@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import process from 'node:process'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -7,6 +8,13 @@ export default defineConfig(({ mode }) => {
   // loadEnv의 세 번째 인자를 ""로 주면 접두사와 무관하게 .env.local의 모든 변수를 읽는다.
   const env = loadEnv(mode, process.cwd(), '')
   const glmApiKey = env.GLM_API_KEY || ''
+  const zcodeProxy = {
+    target: 'https://open.bigmodel.cn',
+    changeOrigin: true,
+    secure: true,
+    rewrite: (path) => path.replace(/^\/(?:zcode-api|glm-api)/, '/api/coding/paas/v4'),
+    headers: glmApiKey ? { Authorization: `Bearer ${glmApiKey}` } : {},
+  }
 
   return {
     plugins: [react()],
@@ -15,16 +23,12 @@ export default defineConfig(({ mode }) => {
         'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       },
       proxy: {
-        // 브라우저는 같은 출처의 /glm-api/* 로 호출하고, dev 서버가 BigModel 코딩 전용
+        // 브라우저는 같은 출처의 /zcode-api/* 로 호출하고, dev 서버가 BigModel 코딩 전용
         // 엔드포인트로 중계한다. Authorization 헤더는 여기서만 부착하므로 클라이언트는
         // API 키를 알지 못한다.
-        '/glm-api': {
-          target: 'https://open.bigmodel.cn',
-          changeOrigin: true,
-          secure: true,
-          rewrite: (path) => path.replace(/^\/glm-api/, '/api/coding/paas/v4'),
-          headers: glmApiKey ? { Authorization: `Bearer ${glmApiKey}` } : {},
-        },
+        '/zcode-api': zcodeProxy,
+        // 기존 로컬 호출 경로와 임시 스크립트 호환용.
+        '/glm-api': zcodeProxy,
       },
     },
   }

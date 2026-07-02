@@ -2425,7 +2425,6 @@ function SpaceHome() {
             regionTitle: activeRegion?.title || "Unknown Galaxy",
             chapterId: selectedChapterDocId || "",
             clusterId: selectedClusterId,
-            score: 100,
             crystalsEarned: actualReward,
             rewardMultiplier: rewardMultiplierMeta?.multiplier || 1,
             rewardMultiplierReason: rewardMultiplierMeta?.reason || 'none',

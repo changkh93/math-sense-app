@@ -1,6 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+const MotionDiv = motion.div;
+
 /**
  * DailyLearningTimeline — Clean, grouped learning activity cards.
  * 
@@ -108,6 +110,13 @@ const TYPE_CONFIG = {
     color: '#f59e0b',
     bg: 'rgba(245, 158, 11, 0.12)',
     border: 'rgba(245, 158, 11, 0.3)'
+  },
+  code: {
+    icon: '⌨️',
+    label: 'CODE TRACE',
+    color: '#a78bfa',
+    bg: 'rgba(167, 139, 250, 0.12)',
+    border: 'rgba(167, 139, 250, 0.35)'
   }
 };
 
@@ -117,6 +126,9 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
   const quizItems = items.filter(i => i.type === 'quiz');
   const videoItems = items.filter(i => i.type === 'video');
   const textItems = items.filter(i => i.type === 'text');
+  const codeItems = items.filter(i => i.type === 'code');
+  const codeTraceCount = dailyStats?.codeTraceCount ?? codeItems.filter(i => i.completed).length;
+  const codeTraceProgressCount = dailyStats?.codeTraceProgressCount ?? codeItems.filter(i => !i.completed).length;
 
   return (
     <div style={{ padding: '1rem' }}>
@@ -165,6 +177,18 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
             label="데이터 로그" 
             value={`${dailyStats?.logCount || textItems.length}개`}
             color="#f59e0b"
+          />
+
+          {/* Code trace stat */}
+          <StatChip
+            icon="⌨️"
+            label="CODE TRACE"
+            value={
+              codeTraceProgressCount > 0
+                ? `완료 ${codeTraceCount} / 진행 ${codeTraceProgressCount}`
+                : `${codeTraceCount}회`
+            }
+            color="#a78bfa"
           />
           
           {/* Assignment stat */}
@@ -259,7 +283,7 @@ function GroupedCard({ item, index, onClick }) {
   })();
 
   return (
-    <motion.div
+    <MotionDiv
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04, duration: 0.25 }}
@@ -410,8 +434,51 @@ function GroupedCard({ item, index, onClick }) {
             완료 보너스 {item.completionCrystalMisses > 0 ? '놓침' : '획득'}
           </span>
         )}
+
+        {item.type === 'code' && (
+          <>
+            <span className="font-tech" style={{
+              color: item.completed ? '#22c55e' : '#fbbf24',
+              fontWeight: 'bold',
+              background: 'rgba(0,0,0,0.3)',
+              padding: '0.15rem 0.5rem',
+              borderRadius: '4px',
+              border: item.completed ? 'none' : '1px solid rgba(251, 191, 36, 0.25)'
+            }}>
+              {item.completed ? '완료' : '진행 중'}
+              {item.totalCount > 0 ? ` ${item.completedExerciseCount || 0}/${item.totalCount}` : ''}
+            </span>
+            {item.bestAccuracy !== null && item.bestAccuracy !== undefined && (
+              <span className="font-tech" style={{
+                color: config.color,
+                fontWeight: 'bold',
+                background: 'rgba(0,0,0,0.3)',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '4px'
+              }}>
+                정확도 {item.bestAccuracy}점
+              </span>
+            )}
+            {item.lastMode && (
+              <span className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                {item.lastMode === 'hidden' ? '가리고 쓰기' : item.lastMode === 'line' ? '한 줄씩' : item.lastMode}
+              </span>
+            )}
+            {item.crystalsEarnedTotal > 0 && (
+              <span className="font-tech" style={{
+                color: 'var(--star-gold)',
+                fontWeight: 'bold',
+                background: 'rgba(0,0,0,0.3)',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '4px'
+              }}>
+                광석 {item.crystalsEarnedTotal}개 획득
+              </span>
+            )}
+          </>
+        )}
         
       </div>
-    </motion.div>
+    </MotionDiv>
   );
 }

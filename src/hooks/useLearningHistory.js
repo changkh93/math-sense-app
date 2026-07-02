@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { doc, onSnapshot, collection as fsCollection, query as fsQuery, where as fsWhere, Timestamp as fsTimestamp } from 'firebase/firestore';
+import { onSnapshot, collection as fsCollection, query as fsQuery, where as fsWhere, Timestamp as fsTimestamp } from 'firebase/firestore';
 
 /**
  * Custom hook to fetch a user's combined learning history for a specific date.
@@ -28,11 +29,12 @@ import { doc, onSnapshot, collection as fsCollection, query as fsQuery, where as
 export function useLearningHistory(userId, dateStr) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error] = useState(null);
   const [dailyStats, setDailyStats] = useState({
     quizCount: 0,
     logCount: 0,
     codeTraceCount: 0,
+    codeTraceProgressCount: 0,
     totalVideoSeconds: 0,
     isAssignmentSubmitted: false,
     attentionHits: 0,
@@ -141,6 +143,7 @@ export function useLearningHistory(userId, dateStr) {
       quizCount: 0,
       logCount: 0,
       codeTraceCount: 0,
+      codeTraceProgressCount: 0,
       totalVideoSeconds: 0,
       isAssignmentSubmitted: (typeof rawData.assignmentCount === 'number' ? rawData.assignmentCount : rawData.assignmentCount?.length) > 0,
       attentionHits: 0,
@@ -167,6 +170,14 @@ export function useLearningHistory(userId, dateStr) {
       const isFocusOnlyEvent = isAttentionEvent && attentionSource !== 'completion_bonus';
       const unitId = data.unitId || 'unknown';
       const txId = data.transmissionId || 'default';
+      const activityType = String(data.activityType || '');
+      const hasVideoEvidence = Boolean(
+        data.transmissionId ||
+        data.videoTime ||
+        data.sessionWatchSeconds ||
+        data.stampedCount ||
+        activityType.includes('영상')
+      );
 
       if (isAttentionEvent && !trackedAttention.has(docSnap.id)) {
         trackedAttention.add(docSnap.id);
@@ -188,7 +199,12 @@ export function useLearningHistory(userId, dateStr) {
 
       if (isFocusOnlyEvent) {
         displayType = 'video_attention';
-      } else if (hType === 'video' || hType === 'video_complete' || hType === 'recovery_mastery') {
+      } else if (
+        hType === 'video' ||
+        hType === 'video_complete' ||
+        hType === 'recovery_mastery' ||
+        ((hType === 'attention' || isAttentionEvent || !data.type) && hasVideoEvidence)
+      ) {
         displayType = 'video_reward';
         // Track video time
         const vKey = getVideoKey(unitId, txId);
@@ -237,6 +253,7 @@ export function useLearningHistory(userId, dateStr) {
         crystalsEarned: data.crystalsEarned || 0,
         metadata: {
           ...data,
+          codeTraceCompleted: displayType === 'code_trace' ? true : data.codeTraceCompleted,
           videoTime: isFocusOnlyEvent ? 0 : (data.videoTime || data.sessionWatchSeconds || data.stampedCount || 0),
           attentionSource,
           attentionResult
@@ -403,6 +420,54 @@ export function useLearningHistory(userId, dateStr) {
             }
           }
         }
+
+        // Code trace progress from learning_progress.
+        if (data.codeTrace) {
+          const codeTrace = data.codeTrace;
+          const completedExerciseCount = Number(codeTrace.completedExerciseCount || 0);
+          const totalExerciseCount = Number(codeTrace.totalExerciseCount || 0);
+          const codeTraceUpdatedAt = (() => {
+            const raw = codeTrace.updatedAt || codeTrace.completedAt || data.updatedAt;
+            if (raw?.toDate) return raw.toDate();
+            if (raw?.seconds) return new Date(raw.seconds * 1000);
+            if (typeof raw === 'number') return new Date(raw);
+            return updatedAt;
+          })();
+          const isCodeTraceToday = codeTraceUpdatedAt >= dayStart && codeTraceUpdatedAt <= dayEnd;
+          const hasCodeTraceWork = completedExerciseCount > 0 || codeTrace.completed === true;
+
+          if (isCodeTraceToday && hasCodeTraceWork) {
+            const isAlreadyTracked = aggregated.some(a => a.type === 'code_trace' && a.metadata?.unitId === unitId);
+            if (!isAlreadyTracked) {
+              if (codeTrace.completed === true) stats.codeTraceCount++;
+              else stats.codeTraceProgressCount++;
+
+              aggregated.push({
+                id: `lp_code_trace_${unitId}`,
+                timestamp: codeTraceUpdatedAt,
+                type: 'code_trace',
+                title: `⌨️ CODE TRACE: ${data.unitTitle || formatUnitId(unitId)}`,
+                score: Number.isFinite(Number(codeTrace.bestAccuracy)) ? Number(codeTrace.bestAccuracy) : null,
+                crystalsEarned: 0,
+                metadata: {
+                  unitId,
+                  unitTitle: data.unitTitle || '',
+                  chapterId: data.chapterId || '',
+                  regionTitle: data.regionTitle || '',
+                  codeTraceCompleted: codeTrace.completed === true,
+                  completedExerciseCount,
+                  totalExerciseCount,
+                  bestAccuracy: Number(codeTrace.bestAccuracy || 0),
+                  crystalsEarnedTotal: Number(codeTrace.crystalsEarnedTotal || 0),
+                  earnedExerciseCount: Array.isArray(codeTrace.earnedExerciseIds) ? codeTrace.earnedExerciseIds.length : 0,
+                  lastExerciseId: codeTrace.lastExerciseId || '',
+                  lastMode: codeTrace.lastMode || '',
+                  updatedAt: codeTrace.updatedAt
+                }
+              });
+            }
+          }
+        }
       } catch (lpErr) {
         console.warn('LP processing error for doc:', docSnap.id, lpErr);
       }
@@ -475,8 +540,8 @@ function resolveTitle(act) {
 
   // 4. Extract from the display title (strip emoji prefixes)
   const cleaned = (act.title || '')
-    .replace(/^[🚀🎬📝⏳💎🛒🧊🎁✅🗣️📌]\s*/g, '')
-    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|코드 따라쓰기)[:\s]*/g, '')
+    .replace(/^(?:🚀|🎬|📝|⌨️|⏳|💎|🛒|🧊|🎁|✅|🗣️|📌)\s*/u, '')
+    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|CODE TRACE|코드 따라쓰기)[:\s]*/g, '')
     .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
     .trim();
   if (cleaned && cleaned.length > 0) return cleaned;
@@ -528,6 +593,12 @@ function buildGroupedActivities(rawActivities) {
         timeAttackMisses: 0,
         completionCrystalHits: 0,
         completionCrystalMisses: 0,
+        codeTraceCompleted: false,
+        completedExerciseCount: 0,
+        crystalsEarnedTotal: 0,
+        earnedExerciseCount: 0,
+        bestAccuracy: null,
+        lastMode: '',
         subActivities: []
       });
     }
@@ -594,8 +665,24 @@ function buildGroupedActivities(rawActivities) {
     }
     if (normalizedType === 'text') group.completed = true;
     if (normalizedType === 'code') {
-      group.completed = true;
-      group.score = act.score ?? meta.accuracy ?? group.score;
+      const isCodeComplete = meta.codeTraceCompleted === true || meta.completed === true;
+      const completedExerciseCount = Number(meta.completedExerciseCount || 0);
+      const totalExerciseCount = Number(meta.totalExerciseCount || 0);
+      const bestAccuracy = Number(meta.bestAccuracy ?? meta.accuracy ?? act.score);
+      const crystalsFromMeta = Number(meta.crystalsEarnedTotal ?? act.crystalsEarned ?? 0);
+      const earnedExerciseCount = Number(meta.earnedExerciseCount || 0);
+
+      group.completed = group.completed || isCodeComplete;
+      group.codeTraceCompleted = group.codeTraceCompleted || isCodeComplete;
+      group.completedExerciseCount = Math.max(group.completedExerciseCount || 0, completedExerciseCount);
+      group.totalCount = Math.max(group.totalCount || 0, totalExerciseCount);
+      group.crystalsEarnedTotal = Math.max(group.crystalsEarnedTotal || 0, crystalsFromMeta);
+      group.earnedExerciseCount = Math.max(group.earnedExerciseCount || 0, earnedExerciseCount);
+      if (Number.isFinite(bestAccuracy)) {
+        group.bestAccuracy = Math.max(group.bestAccuracy || 0, bestAccuracy);
+        group.score = Math.max(group.score || 0, bestAccuracy);
+      }
+      if (meta.lastMode) group.lastMode = meta.lastMode;
     }
   });
 

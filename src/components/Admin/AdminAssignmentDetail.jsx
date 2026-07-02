@@ -13,7 +13,7 @@ import {
   createFallbackAssignmentFeedback,
   saveAssignmentAiFeedback,
 } from '../../services/assignmentFeedbackService';
-import { generateAssignmentFeedback } from '../../services/geminiService';
+import { generateAssignmentFeedback } from '../../services/zcodeApiService';
 import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 import FileViewerModal from './FileViewerModal';
 import { AlertTriangle, CheckCircle, Eye, XCircle } from 'lucide-react';
@@ -171,6 +171,12 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           learningActivityCount: context.dailyLearningSummary.activityCount,
           allLearningActivityCount: context.dailyLearningSummary.allActivityCount ?? context.dailyLearningSummary.activityCount,
           excludedOtherCourseTitles: context.dailyLearningSummary.excludedOtherCourseTitles || [],
+          codeTraceCount: context.dailyLearningSummary.codeTraceCount || 0,
+          codeTraceProgressCount: context.dailyLearningSummary.codeTraceProgressCount || 0,
+          codeTraceTitles: [
+            ...(context.dailyLearningSummary.codeTraces || []).map(item => `${item.title || 'CODE TRACE'} 완료${item.accuracy != null ? ` ${item.accuracy}점` : ''}`),
+            ...(context.dailyLearningSummary.inProgressCodeTraces || []).map(item => `${item.title || 'CODE TRACE'} 진행 ${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`)
+          ],
           codeComparisonSummary: context.currentSubmission.codeComparison?.summary || '',
           darkMatterCount: context.darkMatterSummary.totalActive,
         },
@@ -362,6 +368,28 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
                 {' / 전체 '}
                 {aiFeedback?.contextSummary?.allLearningActivityCount ?? aiContext?.dailyLearningSummary?.allActivityCount ?? aiFeedback?.contextSummary?.learningActivityCount ?? aiContext?.dailyLearningSummary?.activityCount ?? 0}건
               </div>
+              {(
+                (aiFeedback?.contextSummary?.codeTraceCount || aiContext?.dailyLearningSummary?.codeTraceCount || 0) > 0 ||
+                (aiFeedback?.contextSummary?.codeTraceProgressCount || aiContext?.dailyLearningSummary?.codeTraceProgressCount || 0) > 0
+              ) && (
+                <div>
+                  CODE TRACE: 완료 {aiFeedback?.contextSummary?.codeTraceCount ?? aiContext?.dailyLearningSummary?.codeTraceCount ?? 0}건
+                  {' / 진행 '}
+                  {aiFeedback?.contextSummary?.codeTraceProgressCount ?? aiContext?.dailyLearningSummary?.codeTraceProgressCount ?? 0}건
+                  {((aiFeedback?.contextSummary?.codeTraceTitles || [
+                    ...(aiContext?.dailyLearningSummary?.codeTraces || []).map(item => `${item.title || 'CODE TRACE'} 완료${item.accuracy != null ? ` ${item.accuracy}점` : ''}`),
+                    ...(aiContext?.dailyLearningSummary?.inProgressCodeTraces || []).map(item => `${item.title || 'CODE TRACE'} 진행 ${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`)
+                  ]).length > 0) && (
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {' - '}
+                      {(aiFeedback?.contextSummary?.codeTraceTitles || [
+                        ...(aiContext?.dailyLearningSummary?.codeTraces || []).map(item => `${item.title || 'CODE TRACE'} 완료${item.accuracy != null ? ` ${item.accuracy}점` : ''}`),
+                        ...(aiContext?.dailyLearningSummary?.inProgressCodeTraces || []).map(item => `${item.title || 'CODE TRACE'} 진행 ${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`)
+                      ]).join(', ')}
+                    </span>
+                  )}
+                </div>
+              )}
               {(aiFeedback?.contextSummary?.excludedOtherCourseTitles?.length > 0 || aiContext?.dailyLearningSummary?.excludedOtherCourseTitles?.length > 0) && (
                 <div style={{ color: '#fbbf24' }}>
                   제외된 다른 과정 기록: {(aiFeedback?.contextSummary?.excludedOtherCourseTitles || aiContext?.dailyLearningSummary?.excludedOtherCourseTitles || []).join(', ')}

@@ -368,6 +368,7 @@ async function fetchAssignmentHistory(assignment) {
 async function summarizeLearningProgress(progressDocs, startMs, endMs, courseId, options = {}) {
   const videos = [];
   const inProgressQuizzes = [];
+  const inProgressCodeTraces = [];
 
   // 각 문서의 과정을 region 역조회로 정확히 정한 뒤 필터링한다(정규식 오탐 방지).
   const filtered = await filterRowsByCourse(
@@ -416,9 +417,31 @@ async function summarizeLearningProgress(progressDocs, startMs, endMs, courseId,
         updatedAtMs,
       });
     }
+
+    const codeTrace = data.codeTrace;
+    const codeTraceUpdatedAtMs = getTimestampMs(codeTrace?.updatedAt) || updatedAtMs;
+    const completedExerciseCount = Number(codeTrace?.completedExerciseCount || 0);
+    if (
+      codeTraceUpdatedAtMs
+      && codeTraceUpdatedAtMs >= startMs
+      && codeTraceUpdatedAtMs <= endMs
+      && completedExerciseCount > 0
+      && codeTrace?.completed !== true
+    ) {
+      inProgressCodeTraces.push({
+        unitId,
+        title: normalizeText(data.unitTitle || unitId),
+        completedExerciseCount,
+        totalExerciseCount: Number(codeTrace.totalExerciseCount || 0),
+        bestAccuracy: Number(codeTrace.bestAccuracy || 0),
+        lastExerciseId: codeTrace.lastExerciseId || '',
+        lastMode: codeTrace.lastMode || '',
+        updatedAtMs: codeTraceUpdatedAtMs,
+      });
+    }
   });
 
-  return { videos, inProgressQuizzes };
+  return { videos, inProgressQuizzes, inProgressCodeTraces };
 }
 
 async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}) {
@@ -433,6 +456,10 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       averageScore: null,
       titles: [],
       focusScore: null,
+      codeTraceCount: 0,
+      codeTraceProgressCount: 0,
+      codeTraces: [],
+      inProgressCodeTraces: [],
     };
   }
 
@@ -468,7 +495,8 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   const rows = allResolved
     .filter(({ row, course }) => belongsToCourse({ ...row, clusterId: course }, courseId, mergedOptions))
     .map(({ row }) => row);
-  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention'].includes(row.type || 'quiz_pass'));
+  const codeTraceRows = rows.filter((row) => row.type === 'code_trace');
+  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace'].includes(row.type || 'quiz_pass'));
   const videoRows = rows.filter((row) => ['video', 'video_complete', 'recovery_mastery'].includes(row.type));
   const textRows = rows.filter((row) => ['text', 'data_log_read'].includes(row.type));
   const dataLogRows = rows.filter((row) => row.type === 'data_log_read');
@@ -483,6 +511,7 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   );
   const inProgressQuizzes = progressSummary.inProgressQuizzes;
   const progressVideos = progressSummary.videos;
+  const inProgressCodeTraces = progressSummary.inProgressCodeTraces;
 
   const videoSeconds = videoRows.reduce((sum, row) => sum + secondsFromLearningRow(row), 0)
     + progressVideos.reduce((sum, item) => sum + (item.seconds || 0), 0);
@@ -490,12 +519,14 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   const combinedQuizCount = quizRows.length + inProgressQuizzes.length;
   for (const item of inProgressQuizzes) titleSet.add(item.title);
   for (const item of progressVideos) titleSet.add(item.title);
+  for (const row of codeTraceRows) titleSet.add(normalizeText(row.unitTitle || row.regionTitle || row.title || 'CODE TRACE'));
+  for (const item of inProgressCodeTraces) titleSet.add(item.title);
 
   return {
     date: dateStr,
     courseId: normalizeClusterId(courseId),
     allActivityCount: allRows.length,
-    activityCount: rows.length + inProgressQuizzes.length + progressVideos.length,
+    activityCount: rows.length + inProgressQuizzes.length + progressVideos.length + inProgressCodeTraces.length,
     quizCount: combinedQuizCount,
     inProgressQuizCount: inProgressQuizzes.length,
     videoCount: videoRows.length + progressVideos.length,
@@ -503,6 +534,8 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     videoMinutes: Math.round((videoSeconds / 60) * 10) / 10,
     textCount: textRows.length,
     dataLogCount: dataLogRows.length,
+    codeTraceCount: codeTraceRows.length,
+    codeTraceProgressCount: inProgressCodeTraces.length,
     averageScore: scoreRows.length ? Math.round(scoreRows.reduce((sum, score) => sum + score, 0) / scoreRows.length) : null,
     titles: Array.from(titleSet).slice(0, 8),
     videos: [
@@ -523,6 +556,15 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       score: Number.isFinite(Number(row.score)) ? Number(row.score) : null,
       type: row.type || 'quiz',
     })),
+    codeTraces: codeTraceRows.slice(0, 6).map((row) => ({
+      unitId: row.unitId || '',
+      title: normalizeText(row.unitTitle || row.regionTitle || row.title || 'CODE TRACE'),
+      accuracy: row.accuracy ?? row.score ?? null,
+      completedExerciseCount: row.completedExerciseCount ?? null,
+      totalExerciseCount: row.totalExerciseCount ?? null,
+      crystalsEarned: row.crystalsEarned || 0,
+      completed: true,
+    })),
     inProgressQuizzes: inProgressQuizzes.map((item) => ({
       title: item.title,
       answeredCount: item.answeredCount,
@@ -530,6 +572,14 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       totalCount: item.totalCount,
       correctCount: item.correctCount,
       incorrectCount: item.incorrectCount,
+    })),
+    inProgressCodeTraces: inProgressCodeTraces.map((item) => ({
+      title: item.title,
+      completedExerciseCount: item.completedExerciseCount,
+      totalExerciseCount: item.totalExerciseCount,
+      bestAccuracy: item.bestAccuracy,
+      lastExerciseId: item.lastExerciseId,
+      lastMode: item.lastMode,
     })),
     dataLogs: dataLogRows.slice(0, 6).map((row) => ({
       title: normalizeText(row.unitTitle || row.transmissionTitle || row.regionTitle || '데이터 로그'),
@@ -627,6 +677,12 @@ function buildEvidence(context) {
   } else if (dailyLearningSummary.allActivityCount > 0) {
     evidence.push(`같은 날짜 다른 과정 기록 ${dailyLearningSummary.allActivityCount}건은 확인되지만 ${context.student.courseLabel} 기록은 없음`);
   }
+  if ((dailyLearningSummary.codeTraceCount || 0) > 0) {
+    evidence.push(`CODE TRACE 완료 ${dailyLearningSummary.codeTraceCount}건 확인`);
+  }
+  if ((dailyLearningSummary.codeTraceProgressCount || 0) > 0) {
+    evidence.push(`진행 중 CODE TRACE ${dailyLearningSummary.codeTraceProgressCount}건 확인`);
+  }
   if (currentSubmission.codeComparison?.summary) {
     evidence.push(currentSubmission.codeComparison.summary);
   }
@@ -648,8 +704,11 @@ function buildFeedbackPolicyGuidance(context) {
   const videoMinutes = Number(learning.videoMinutes || 0);
   const hasLearningFollowUpActivity = Boolean(
     (learning.quizCount || 0) > 0 ||
-    (learning.dataLogCount || 0) > 0
+    (learning.dataLogCount || 0) > 0 ||
+    (learning.codeTraceCount || 0) > 0 ||
+    (learning.codeTraceProgressCount || 0) > 0
   );
+  const hasCodeTraceActivity = Boolean((learning.codeTraceCount || 0) > 0 || (learning.codeTraceProgressCount || 0) > 0);
   const hasSubmissionEvidence = Boolean(
     (submission.attachmentCount || 0) > 0 ||
     (submission.contentLength || 0) >= 80 ||
@@ -660,12 +719,13 @@ function buildFeedbackPolicyGuidance(context) {
     hasLearningFollowUpActivity
   );
   const isVeryLowLearning = !hasCourseLearningRecord || (videoMinutes < Math.max(1, targetMinutes * 0.1) && !hasLearningFollowUpActivity);
-  const isReasonableFlow = videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity;
+  const isReasonableFlow = (videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity) || hasCodeTraceActivity;
 
   return {
     targetMinutes,
     videoMinutes,
     hasLearningFollowUpActivity,
+    hasCodeTraceActivity,
     hasSubmissionEvidence,
     hasCourseLearningRecord,
     isVeryLowLearning,
@@ -674,8 +734,9 @@ function buildFeedbackPolicyGuidance(context) {
     rules: [
       '영상 시간은 전체 학습 시간이 아니다. 학생은 영상을 멈추고 풀이, 코드 작성, 실행, 수정, 정리를 할 수 있다.',
       '영상 시간이 기준의 절반 안팎이고 퀴즈, 데이터 로그, 코드 제출, 제출문 정리 중 하나 이상이 있으면 성실한 학습 흐름으로 인정한다.',
+      'Python 과제에서 CODE TRACE 완료/진행 기록은 영상/퀴즈와 다른 코드 실습 근거로 인정한다.',
       '영상 시간 숫자만으로 "기준 학습량 대비 부족"이라고 쓰지 않는다.',
-      '이미 퀴즈나 데이터 로그가 있으면 "퀴즈나 데이터 로그까지 이어가라"는 개선 문구를 쓰지 않는다.',
+      '이미 퀴즈, 데이터 로그, CODE TRACE가 있으면 "퀴즈나 데이터 로그까지 이어가라"는 개선 문구를 쓰지 않는다.',
       '개선점은 오답 이유 한 줄 정리, 코드 실행 결과, 직접 바꾼 코드 설명처럼 실제로 비어 있는 근거에서 고른다.',
       'Python은 영상 시청보다 직접 코드 작성, 실행, 오류 수정, 실행 결과 근거를 더 중요하게 본다.',
       '초등수학 과제에서 초등수학을 마친 학생이 레벨업 학습으로 중등수학을 진행한 경우, 같은 날짜 중등수학 퀴즈/영상/데이터 로그를 초등수학 과제의 수학 학습으로 인정한다. 이 경우 "수학 기록 없음"이나 "학습 기록 없음"으로 판단하지 않고 "초등수학 시간에 레벨업 학습으로 중등수학을 진행했다"고 표현한다.',
@@ -863,6 +924,11 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
   const firstAttachment = submission.attachments?.[0]?.name;
   const weakness = darkMatter.recentWeaknesses?.[0];
   const studentQuestions = submission.studentQuestions || [];
+  const codeTraceNote = (learning.codeTraceCount || 0) > 0
+    ? `CODE TRACE 완료 ${learning.codeTraceCount}건`
+    : (learning.codeTraceProgressCount || 0) > 0
+      ? `진행 중 CODE TRACE ${learning.codeTraceProgressCount}건`
+      : '';
   const questionSection = studentQuestions.length
     ? `\n\n#### 질문에 대한 답변\n${studentQuestions.map((question) => `- ${question}`).join('\n')}\n\n이 질문은 교사가 정확한 풀이 맥락을 확인해 답변해야 합니다. 현재 자동 초안에서는 질문을 누락하지 않도록 표시만 해두었습니다.`
     : '';
@@ -871,7 +937,9 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
     : '아직 비교할 과제 기록이 많지 않으므로, 이번 제출이 앞으로의 성장 기준점이 됩니다.';
 
   const learningFlowNote = policy.isReasonableFlow
-    ? `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && learning.dataLogCount ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${!learning.quizCount && !learning.dataLogCount && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
+    ? codeTraceNote
+      ? `${codeTraceNote}${learning.videoMinutes ? `과 영상 ${learning.videoMinutes}분` : ''}${learning.quizCount ? `, 퀴즈 ${learning.quizCount}건` : ''}${learning.dataLogCount ? `, 데이터 로그 ${learning.dataLogCount}건` : ''}이 확인되어, 코드를 손으로 따라 쓰는 확인 활동까지 남았습니다.`
+      : `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && learning.dataLogCount ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${!learning.quizCount && !learning.dataLogCount && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
     : '';
 
   const improvement = weakness
