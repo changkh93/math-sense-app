@@ -12,6 +12,15 @@ const WARNING_TYPE_LABELS = {
   poor_assignment_submission: '불성실 과제 제출',
   consecutive_missing_assignment: '연속 3회 미제출'
 };
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function toKstDateKey(date) {
+  return new Date(date.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function isDateKeyInRange(dateKey, startDateKey, endDateKey) {
+  return Boolean(dateKey) && dateKey >= startDateKey && dateKey <= endDateKey;
+}
 
 // ══════════════════════════════════════════════════
 // useStudentReport – Master hook
@@ -41,6 +50,8 @@ async function fetchStudentReport(userId, days) {
   startDate.setDate(startDate.getDate() - days);
   const startTs = Timestamp.fromDate(startDate);
   const endTs = Timestamp.fromDate(now);
+  const startDateKey = toKstDateKey(startDate);
+  const endDateKey = toKstDateKey(now);
 
   // ── 1. Fetch student profile ──
   const userDoc = await getDoc(doc(db, 'users', userId));
@@ -185,9 +196,9 @@ async function fetchStudentReport(userId, days) {
   const peerData = await fetchPeerComparison(activeRegions, startTs, endTs, userId);
 
   // ── Analyze ──
-  const attendanceAnalysis = analyzeAttendance(attendance, days);
+  const attendanceAnalysis = analyzeAttendance(attendance, startDateKey, endDateKey);
   const learningAnalysis = analyzeLearning(history, days);
-  const assignmentAnalysis = analyzeAssignments(assignments, days, startDate);
+  const assignmentAnalysis = analyzeAssignments(assignments, startDateKey, endDateKey);
   const warningAnalysis = analyzeAssignmentWarnings(assignmentWarnings, student.warningSummary);
   const progressAnalysis = analyzeProgress(progress, unitToRegion, chapToRegion, allHistory);
   const regionEarliestTs = {};
@@ -360,7 +371,8 @@ async function fetchPeerComparison(activeRegions, startTs, endTs, myUserId) {
 // Analyzers
 // ══════════════════════════════════════════════════
 
-function analyzeAttendance(records, days) {
+function analyzeAttendance(records, startDateKey, endDateKey) {
+  const inPeriod = records.filter(r => isDateKeyInRange(r.date, startDateKey, endDateKey));
   const overallDates = new Set();
   let overallLateCount = 0;
   const byCluster = {};
@@ -368,7 +380,7 @@ function analyzeAttendance(records, days) {
   // Day-of-week distribution (overall)
   const byDayOfWeek = [0, 0, 0, 0, 0, 0, 0]; 
 
-  records.forEach(r => {
+  inPeriod.forEach(r => {
     if (!r.date) return;
     const cid = r.clusterId || 'unknown';
     if (!byCluster[cid]) byCluster[cid] = { dateSet: new Set(), lateDays: 0 };
@@ -412,7 +424,7 @@ function analyzeAttendance(records, days) {
   return {
     totalDays,
     lateDays: overallLateCount,
-    lateRate: totalDays > 0 ? Math.round((overallLateCount / records.length) * 100) : 0,
+    lateRate: inPeriod.length > 0 ? Math.round((overallLateCount / inPeriod.length) * 100) : 0,
     longestStreak,
     byDayOfWeek,
     byCluster,
@@ -507,11 +519,8 @@ function analyzeLearning(history, days) {
   };
 }
 
-function analyzeAssignments(assignments, days, startDate) {
-  const inPeriod = assignments.filter(a => {
-    const d = a.date ? new Date(a.date + 'T00:00:00+09:00') : null;
-    return d && d >= startDate;
-  });
+function analyzeAssignments(assignments, startDateKey, endDateKey) {
+  const inPeriod = assignments.filter(a => isDateKeyInRange(a.date, startDateKey, endDateKey));
 
   const totalCount = inPeriod.length;
   const reviewed = inPeriod.filter(a => a.status === 'reviewed');
@@ -537,8 +546,8 @@ function analyzeAssignments(assignments, days, startDate) {
     if (a.status === 'needs_revision') byCluster[cid].needsRevision++;
   });
 
-  // Recent 5 assignments (all time, sorted desc)
-  const recentList = [...assignments]
+  // Recent 5 assignments inside the selected report window.
+  const recentList = [...inPeriod]
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
     .slice(0, 5);
 
