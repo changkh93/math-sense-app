@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Check, ChevronLeft, Eye, Lightbulb, RotateCcw, Save } from 'lucide-react';
+import { Check, ChevronLeft, Eye, Lightbulb, LocateFixed, RotateCcw, Save } from 'lucide-react';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils';
@@ -15,6 +15,7 @@ const CODE_PANEL_MIN_HEIGHT = 300;
 const CODE_PANEL_MAX_HEIGHT = 720;
 const CODE_PANEL_LINE_HEIGHT_PX = 23;
 const CODE_PANEL_VERTICAL_PADDING_PX = 32;
+const STRING_STRUCTURE_TOKEN = '__STRING__';
 
 // 보상: 라인 수 비례 + 반복 연습 감쇠
 // 기본 보상 = 코드 줄 수 × 1.5 (반올림, 최소 2)
@@ -27,6 +28,13 @@ const DECAY_FACTOR = 2 / 3;
 
 function normalizeNewlines(text = '') {
   return String(text).replace(/\r\n/g, '\n');
+}
+
+function visibleWhitespace(text = '') {
+  return String(text)
+    .replace(/ /g, '·')
+    .replace(/\t/g, '→ ')
+    .replace(/\n/g, '↵\n');
 }
 
 function trimTrailingWhitespace(line = '') {
@@ -113,16 +121,147 @@ function countChar(text, char) {
   return Array.from(text || '').filter(c => c === char).length;
 }
 
+function findStringLiteralEnd(code = '', startIndex = 0) {
+  const quote = code[startIndex];
+  if (quote !== '"' && quote !== "'") return -1;
+  const triple = code.slice(startIndex, startIndex + 3) === quote.repeat(3);
+  let index = startIndex + (triple ? 3 : 1);
+  let escaped = false;
+
+  while (index < code.length) {
+    const char = code[index];
+    if (escaped) {
+      escaped = false;
+      index += 1;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      index += 1;
+      continue;
+    }
+    if (triple && code.slice(index, index + 3) === quote.repeat(3)) {
+      return index + 3;
+    }
+    if (!triple && char === quote) {
+      return index + 1;
+    }
+    index += 1;
+  }
+
+  return -1;
+}
+
+function mapStringLiterals(code = '', mapper = () => STRING_STRUCTURE_TOKEN) {
+  const source = normalizeNewlines(code);
+  let output = '';
+  let index = 0;
+  while (index < source.length) {
+    const char = source[index];
+    if (char !== '"' && char !== "'") {
+      output += char;
+      index += 1;
+      continue;
+    }
+
+    const end = findStringLiteralEnd(source, index);
+    if (end < 0) {
+      output += source.slice(index);
+      break;
+    }
+
+    const literal = source.slice(index, end);
+    output += mapper(literal, index, end);
+    index = end;
+  }
+  return output;
+}
+
+function normalizePythonCodeForStructureCompare(code = '') {
+  const withoutStringContents = mapStringLiterals(code, () => STRING_STRUCTURE_TOKEN);
+  const lines = withoutStringContents.split('\n');
+  const indentRanks = buildIndentRankMap(lines);
+  return lines.map(line => normalizePythonLineForCompare(line, indentRanks)).join('\n');
+}
+
+function normalizePythonLineForStructureCompare(line = '', indentRanks = null) {
+  return normalizePythonLineForCompare(mapStringLiterals(line, () => STRING_STRUCTURE_TOKEN), indentRanks);
+}
+
+function getStringLiteralLabel(literal = '') {
+  const normalized = normalizeNewlines(literal).replace(/\n/g, '\\n');
+  const inner = normalized
+    .replace(/^(['"]{3}|['"])/, '')
+    .replace(/(['"]{3}|['"])$/, '');
+  const label = inner || normalized;
+  return label.length > 28 ? `${label.slice(0, 25)}...` : label;
+}
+
+function extractStringLiteralSuggestions(code = '') {
+  const source = normalizeNewlines(code);
+  const seen = new Set();
+  const suggestions = [];
+  let index = 0;
+
+  while (index < source.length) {
+    const char = source[index];
+    if (char !== '"' && char !== "'") {
+      index += 1;
+      continue;
+    }
+
+    const end = findStringLiteralEnd(source, index);
+    if (end < 0) break;
+    const literal = source.slice(index, end);
+    if (!seen.has(literal)) {
+      const lineStart = source.lastIndexOf('\n', index - 1) + 1;
+      const linePrefix = source.slice(lineStart, index);
+      seen.add(literal);
+      suggestions.push({
+        id: `${index}-${end}`,
+        literal,
+        label: getStringLiteralLabel(literal),
+        lineNumber: source.slice(0, index).split('\n').length,
+        linePrefix,
+        prefixKey: linePrefix.replace(/\s/g, ''),
+      });
+    }
+    index = end;
+  }
+
+  return suggestions;
+}
+
+function normalizeStringSuggestionPrefix(prefix = '') {
+  return String(prefix || '').replace(/['"]$/g, '').replace(/\s/g, '');
+}
+
+function getStringSuggestionAtCursor(suggestions = [], studentCode = '', cursor = 0) {
+  if (!suggestions.length) return null;
+  const safeCursor = Math.max(0, Math.min(cursor, studentCode.length));
+  const lineStart = studentCode.lastIndexOf('\n', safeCursor - 1) + 1;
+  const linePrefix = studentCode.slice(lineStart, safeCursor);
+  const prefixKey = normalizeStringSuggestionPrefix(linePrefix);
+  if (!prefixKey) return null;
+
+  return suggestions.find((suggestion) => (
+    prefixKey === normalizeStringSuggestionPrefix(suggestion.linePrefix) &&
+    !studentCode.slice(lineStart).includes(suggestion.literal)
+  )) || null;
+}
+
 function evaluateCode(answerCode, studentCode) {
   const answer = normalizeNewlines(answerCode);
   const student = normalizeNewlines(studentCode);
   const answerLines = answer.split('\n');
   const studentLines = student.split('\n');
-  const targetIndexes = answerLines.map((_, index) => index);
   const answerIndentRanks = buildIndentRankMap(answerLines);
   const studentIndentRanks = buildIndentRankMap(studentLines);
-  const targetAnswer = targetIndexes.map(index => normalizePythonLineForCompare(answerLines[index] || '', answerIndentRanks)).join('\n');
-  const targetStudent = targetIndexes.map(index => normalizePythonLineForCompare(studentLines[index] || '', studentIndentRanks)).join('\n');
+  const targetAnswer = normalizePythonCodeForStructureCompare(answer);
+  const targetStudent = normalizePythonCodeForStructureCompare(student);
+  const targetAnswerLines = targetAnswer.split('\n');
+  const targetStudentLines = targetStudent.split('\n');
+  const targetIndexes = targetAnswerLines.map((_, index) => index);
   const totalChars = Math.max(targetAnswer.length, targetStudent.length, 1);
 
   let sameChars = 0;
@@ -132,8 +271,7 @@ function evaluateCode(answerCode, studentCode) {
 
   let correctLines = 0;
   targetIndexes.forEach((index) => {
-    const line = answerLines[index] || '';
-    if (normalizePythonLineForCompare(line, answerIndentRanks) === normalizePythonLineForCompare(studentLines[index] || '', studentIndentRanks)) {
+    if ((targetAnswerLines[index] || '') === (targetStudentLines[index] || '')) {
       correctLines += 1;
     }
   });
@@ -143,7 +281,10 @@ function evaluateCode(answerCode, studentCode) {
     const answerLine = answerLines[index] || '';
     const studentLine = studentLines[index] || '';
     if (!studentLine && answerLine) {
-      issues.push(`${index + 1}번째 줄이 비어 있습니다.`);
+      const hasString = mapStringLiterals(answerLine) !== answerLine;
+      issues.push(hasString
+        ? `${index + 1}번째 줄의 코드 구조를 입력해 보세요. 긴 문자열은 아래 도우미나 Tab으로 채울 수 있습니다.`
+        : `${index + 1}번째 줄이 비어 있습니다.`);
       return;
     }
     if (answerLine.trim().endsWith(':') && !studentLine.trim().endsWith(':')) {
@@ -155,7 +296,7 @@ function evaluateCode(answerCode, studentCode) {
       issues.push(`${index + 1}번째 줄의 들여쓰기 단계를 확인하세요. 탭, 스페이스 2칸, 스페이스 4칸은 같은 단계로 인정됩니다.`);
     }
     if (hasOnlyQuotedWhitespaceDifference(answerLine, studentLine)) {
-      issues.push(`${index + 1}번째 줄의 따옴표 안 공백은 출력되는 글자이므로 그대로 맞춰야 합니다.`);
+      issues.push(`${index + 1}번째 줄의 문자열 내용은 자동 채우기 대상입니다. 따옴표 위치와 코드 구조를 먼저 확인하세요.`);
     }
     if (countChar(studentLine, '(') !== countChar(studentLine, ')')) {
       issues.push(`${index + 1}번째 줄의 괄호 짝을 확인하세요.`);
@@ -173,6 +314,244 @@ function evaluateCode(answerCode, studentCode) {
     answerLines,
     studentLines,
     issues: issues.length ? issues.slice(0, 5) : ['특별한 문법 오류는 감지되지 않았습니다. 다른 글자나 공백을 정답 코드와 비교해 보세요.']
+  };
+}
+
+const FULL_WIDTH_PUNCTUATION_MAP = {
+  '（': '(',
+  '）': ')',
+  '，': ',',
+  '：': ':',
+  '；': ';',
+  '［': '[',
+  '］': ']',
+  '｛': '{',
+  '｝': '}',
+  '“': '"',
+  '”': '"',
+  '‘': "'",
+  '’': "'",
+};
+
+const ISSUE_META = {
+  case: { label: '대소문자', color: '#facc15' },
+  whitespace: { label: '공백/줄바꿈', color: '#38bdf8' },
+  indent: { label: '들여쓰기', color: '#a78bfa' },
+  punctuation: { label: '문장부호', color: '#fb923c' },
+  missing: { label: '누락', color: '#f87171' },
+  extra: { label: '추가 입력', color: '#fb923c' },
+  string: { label: '문자열', color: '#34d399' },
+  typo: { label: '오탈자', color: '#f87171' },
+  formatting: { label: '표기 차이', color: '#38bdf8' },
+};
+
+function normalizeCommonPunctuation(text = '') {
+  return Array.from(String(text || '')).map(char => FULL_WIDTH_PUNCTUATION_MAP[char] || char).join('');
+}
+
+function stripAllWhitespace(text = '') {
+  return String(text || '').replace(/\s/g, '');
+}
+
+function shortenCode(text = '') {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return '(빈 줄)';
+  return trimmed.length > 46 ? `${trimmed.slice(0, 43)}...` : trimmed;
+}
+
+function classifyLineIssue(answerLine = '', studentLine = '', answerIndentRanks = null, studentIndentRanks = null) {
+  if (answerLine === studentLine) return null;
+
+  const answerTrim = answerLine.trim();
+  const studentTrim = studentLine.trim();
+  const answerNormalized = normalizePythonLineForCompare(answerLine, answerIndentRanks);
+  const studentNormalized = normalizePythonLineForCompare(studentLine, studentIndentRanks);
+  const acceptedByScoring = answerNormalized === studentNormalized;
+
+  if (answerTrim === studentTrim && getLeadingWhitespace(answerLine) !== getLeadingWhitespace(studentLine)) {
+    return 'indent';
+  }
+  if (answerLine.toLowerCase() === studentLine.toLowerCase()) {
+    return 'case';
+  }
+  if (stripAllWhitespace(answerLine) === stripAllWhitespace(studentLine)) {
+    return 'whitespace';
+  }
+  if (normalizeCommonPunctuation(studentLine) === answerLine || normalizeCommonPunctuation(studentLine.trim()) === answerTrim) {
+    return 'punctuation';
+  }
+  if (
+    mapStringLiterals(answerLine) !== answerLine &&
+    normalizePythonLineForStructureCompare(answerLine, answerIndentRanks) === normalizePythonLineForStructureCompare(studentLine, studentIndentRanks)
+  ) {
+    return 'string';
+  }
+  if (acceptedByScoring) {
+    return 'formatting';
+  }
+  return 'typo';
+}
+
+function buildCaseTokens(answerLine = '', studentLine = '') {
+  const tokens = [];
+  const maxLength = Math.max(answerLine.length, studentLine.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    const answerChar = answerLine[index] || '';
+    const studentChar = studentLine[index] || '';
+    if (answerChar && !studentChar) {
+      tokens.push({ type: 'missing', value: answerChar });
+    } else if (!answerChar && studentChar) {
+      tokens.push({ type: 'extra', value: studentChar });
+    } else if (answerChar === studentChar) {
+      tokens.push({ type: 'equal', value: studentChar });
+    } else if (answerChar.toLowerCase() === studentChar.toLowerCase()) {
+      tokens.push({ type: 'case', value: studentChar, expected: answerChar });
+    } else {
+      tokens.push({ type: 'wrong', value: studentChar, expected: answerChar });
+    }
+  }
+  return mergeAdjacentTokens(tokens);
+}
+
+function mergeAdjacentTokens(tokens = []) {
+  return tokens.reduce((merged, token) => {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.type === token.type) {
+      prev.value = `${prev.value || ''}${token.value || ''}`;
+      prev.expected = `${prev.expected || ''}${token.expected || ''}`;
+      return merged;
+    }
+    merged.push({ ...token });
+    return merged;
+  }, []);
+}
+
+function buildFallbackLineDiff(answerLine = '', studentLine = '') {
+  let prefixLength = 0;
+  while (
+    prefixLength < answerLine.length &&
+    prefixLength < studentLine.length &&
+    answerLine[prefixLength] === studentLine[prefixLength]
+  ) {
+    prefixLength += 1;
+  }
+
+  let suffixLength = 0;
+  while (
+    suffixLength < answerLine.length - prefixLength &&
+    suffixLength < studentLine.length - prefixLength &&
+    answerLine[answerLine.length - 1 - suffixLength] === studentLine[studentLine.length - 1 - suffixLength]
+  ) {
+    suffixLength += 1;
+  }
+
+  const tokens = [];
+  if (prefixLength > 0) tokens.push({ type: 'equal', value: studentLine.slice(0, prefixLength) });
+  const removed = answerLine.slice(prefixLength, answerLine.length - suffixLength);
+  const added = studentLine.slice(prefixLength, studentLine.length - suffixLength);
+  if (removed) tokens.push({ type: 'missing', value: removed });
+  if (added) tokens.push({ type: 'wrong', value: added, expected: removed });
+  if (suffixLength > 0) tokens.push({ type: 'equal', value: studentLine.slice(studentLine.length - suffixLength) });
+  return mergeAdjacentTokens(tokens);
+}
+
+function buildLineDiffTokens(answerLine = '', studentLine = '', issueType = 'typo') {
+  if (issueType === 'case') return buildCaseTokens(answerLine, studentLine);
+  if (!answerLine && studentLine) return [{ type: 'extra', value: studentLine }];
+  if (answerLine && !studentLine) return [{ type: 'missing', value: answerLine }];
+
+  const answerChars = Array.from(answerLine);
+  const studentChars = Array.from(studentLine);
+  const cellCount = answerChars.length * studentChars.length;
+  if (cellCount > 80000) return buildFallbackLineDiff(answerLine, studentLine);
+
+  const dp = Array.from({ length: answerChars.length + 1 }, () => Array(studentChars.length + 1).fill(0));
+  for (let i = 1; i <= answerChars.length; i += 1) {
+    for (let j = 1; j <= studentChars.length; j += 1) {
+      dp[i][j] = answerChars[i - 1] === studentChars[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  const tokens = [];
+  let i = answerChars.length;
+  let j = studentChars.length;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && answerChars[i - 1] === studentChars[j - 1]) {
+      tokens.push({ type: 'equal', value: studentChars[j - 1] });
+      i -= 1;
+      j -= 1;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      tokens.push({ type: issueType === 'whitespace' ? 'extra' : 'wrong', value: studentChars[j - 1] });
+      j -= 1;
+    } else if (i > 0) {
+      tokens.push({ type: 'missing', value: answerChars[i - 1] });
+      i -= 1;
+    }
+  }
+
+  return mergeAdjacentTokens(tokens.reverse());
+}
+
+function getLineIssueMessage(issue) {
+  const lineLabel = `${issue.lineNumber}번째 줄`;
+  if (issue.type === 'missing') return `${lineLabel}: 정답 코드의 이 줄이 빠져 있습니다.`;
+  if (issue.type === 'extra') return `${lineLabel}: 정답에는 없는 줄이 더 입력되었습니다.`;
+  if (issue.type === 'case') return `${lineLabel}: 대소문자를 확인하세요. Python은 ${shortenCode(issue.answerLine)}와 ${shortenCode(issue.studentLine)}를 다르게 봅니다.`;
+  if (issue.type === 'whitespace') return `${lineLabel}: 코드 내용은 거의 같지만 공백, 줄바꿈, 쉼표 뒤 간격이 다릅니다.`;
+  if (issue.type === 'indent') return `${lineLabel}: 들여쓰기 단계가 정답과 다릅니다.`;
+  if (issue.type === 'punctuation') return `${lineLabel}: 쉼표, 괄호, 콜론이 한글/전각 문자로 입력되었는지 확인하세요.`;
+  if (issue.type === 'string') return `${lineLabel}: 문자열 내용은 채점 핵심에서 제외됩니다. 필요하면 아래 문자열 도우미로 정답 문자열을 넣을 수 있습니다.`;
+  if (issue.type === 'formatting') return `${lineLabel}: 통과 판정에는 치명적이지 않지만 정답 표기와는 차이가 있습니다.`;
+  return `${lineLabel}: ${shortenCode(issue.studentLine)} 부분을 정답 ${shortenCode(issue.answerLine)}와 비교해 보세요.`;
+}
+
+function analyzeCodeDiff(answerCode = '', studentCode = '') {
+  const answer = normalizeNewlines(answerCode);
+  const student = normalizeNewlines(studentCode);
+  const answerLines = answer.split('\n');
+  const studentLines = student.split('\n');
+  const answerIndentRanks = buildIndentRankMap(answerLines);
+  const studentIndentRanks = buildIndentRankMap(studentLines);
+  const maxLines = Math.max(answerLines.length, studentLines.length);
+  const issues = [];
+  const counts = {};
+
+  for (let index = 0; index < maxLines; index += 1) {
+    const hasAnswerLine = index < answerLines.length;
+    const hasStudentLine = index < studentLines.length;
+    const answerLine = hasAnswerLine ? answerLines[index] : '';
+    const studentLine = hasStudentLine ? studentLines[index] : '';
+
+    let type = null;
+    if (hasAnswerLine && (!hasStudentLine || (!studentLine && answerLine))) {
+      type = 'missing';
+    } else if (!hasAnswerLine && studentLine) {
+      type = 'extra';
+    } else if (hasAnswerLine && hasStudentLine) {
+      type = classifyLineIssue(answerLine, studentLine, answerIndentRanks, studentIndentRanks);
+    }
+
+    if (!type) continue;
+    counts[type] = (counts[type] || 0) + 1;
+    const issue = {
+      lineIndex: index,
+      lineNumber: index + 1,
+      type,
+      answerLine,
+      studentLine,
+      tokens: buildLineDiffTokens(answerLine, studentLine, type),
+    };
+    issue.message = getLineIssueMessage(issue);
+    issues.push(issue);
+  }
+
+  return {
+    issues,
+    firstIssue: issues[0] || null,
+    counts,
+    typeLabels: Object.keys(counts).map(type => ISSUE_META[type]?.label || type),
   };
 }
 
@@ -206,8 +585,8 @@ function remainingRewardedAttempts(attempt) {
 }
 
 function getLineCombo(answerCode = '', studentCode = '') {
-  const answerLines = normalizeNewlines(answerCode).split('\n');
-  const studentLines = normalizeNewlines(studentCode).split('\n');
+  const answerLines = mapStringLiterals(normalizeNewlines(answerCode), () => STRING_STRUCTURE_TOKEN).split('\n');
+  const studentLines = mapStringLiterals(normalizeNewlines(studentCode), () => STRING_STRUCTURE_TOKEN).split('\n');
   const answerIndentRanks = buildIndentRankMap(answerLines);
   const studentIndentRanks = buildIndentRankMap(studentLines);
   let combo = 0;
@@ -216,7 +595,7 @@ function getLineCombo(answerCode = '', studentCode = '') {
     const answerLine = answerLines[i] || '';
     const studentLine = studentLines[i] || '';
     if (!studentLine && answerLine) break;
-    if (normalizePythonLineForCompare(answerLine, answerIndentRanks) !== normalizePythonLineForCompare(studentLine, studentIndentRanks)) break;
+    if (normalizePythonLineForStructureCompare(answerLine, answerIndentRanks) !== normalizePythonLineForStructureCompare(studentLine, studentIndentRanks)) break;
     combo += 1;
   }
   return combo;
@@ -258,7 +637,11 @@ export default function CodeTracePlayer({
   const [rewardBurst, setRewardBurst] = useState(null);
   const [linePulse, setLinePulse] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [analysisLevel, setAnalysisLevel] = useState('line');
+  const [showWhitespace, setShowWhitespace] = useState(true);
+  const [studentSelection, setStudentSelection] = useState({ start: 0, end: 0 });
   const previousLineComboRef = useRef(0);
+  const studentTextareaRef = useRef(null);
 
   useEffect(() => {
     const savedIds = learningProgress?.codeTrace?.completedExerciseIds;
@@ -286,6 +669,18 @@ export default function CodeTracePlayer({
   const evaluation = useMemo(
     () => evaluateCode(exercise?.answerCode || '', studentCode),
     [exercise, studentCode]
+  );
+  const analysis = useMemo(
+    () => analyzeCodeDiff(exercise?.answerCode || '', studentCode),
+    [exercise, studentCode]
+  );
+  const stringSuggestions = useMemo(
+    () => extractStringLiteralSuggestions(exercise?.answerCode || ''),
+    [exercise]
+  );
+  const activeStringSuggestion = useMemo(
+    () => getStringSuggestionAtCursor(stringSuggestions, studentCode, studentSelection.start),
+    [stringSuggestions, studentCode, studentSelection.start]
   );
   const passingAccuracy = exercise?.passingAccuracy || 95;
   const currentPassed = evaluation.perfect || evaluation.accuracy >= passingAccuracy;
@@ -339,6 +734,7 @@ export default function CodeTracePlayer({
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
     setLinePulse(null);
     previousLineComboRef.current = 0;
+    setStudentSelection({ start: 0, end: 0 });
   };
 
   // 세트를 전환하되, 떠나는 세트의 작성 코드는 초안에 저장하고
@@ -359,6 +755,7 @@ export default function CodeTracePlayer({
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
     setLinePulse(null);
     previousLineComboRef.current = 0;
+    setStudentSelection({ start: 0, end: 0 });
   };
 
   useEffect(() => {
@@ -393,6 +790,7 @@ export default function CodeTracePlayer({
       setRevealSeconds(ANSWER_REVEAL_SECONDS);
       setLinePulse(null);
       previousLineComboRef.current = 0;
+      setStudentSelection({ start: 0, end: 0 });
     }
   }, [completedIds, exerciseIndex, exercises, firstIncompleteIndex, unitAlreadyCompleted, drafts]);
 
@@ -433,6 +831,7 @@ export default function CodeTracePlayer({
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
     setStudentCode('');
     setHintIndex(0);
+    setStudentSelection({ start: 0, end: 0 });
   };
 
   const revealAnswer = () => {
@@ -797,6 +1196,91 @@ export default function CodeTracePlayer({
       event.preventDefault();
     }
   };
+  const getStudentLineRange = (lineIndex) => {
+    const lines = normalizeNewlines(studentCode).split('\n');
+    let start = 0;
+    for (let index = 0; index < Math.min(lineIndex, lines.length); index += 1) {
+      start += lines[index].length + 1;
+    }
+    const line = lines[lineIndex] || '';
+    return { start, end: start + line.length };
+  };
+  const jumpToFirstIssue = () => {
+    if (!analysis.firstIssue || !studentTextareaRef.current) return;
+    const { start, end } = getStudentLineRange(analysis.firstIssue.lineIndex);
+    const safeStart = Math.min(start, studentCode.length);
+    const safeEnd = Math.min(Math.max(start, end), studentCode.length);
+    studentTextareaRef.current.focus();
+    studentTextareaRef.current.setSelectionRange(safeStart, safeEnd);
+    studentTextareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const renderDiffTokens = (tokens = []) => tokens.map((token, index) => {
+    const displayValue = showWhitespace ? visibleWhitespace(token.value) : token.value;
+    const missingValue = showWhitespace ? visibleWhitespace(token.value) : token.value;
+    const title = token.expected ? `정답: ${token.expected}` : undefined;
+    if (token.type === 'equal') {
+      return <span key={index}>{displayValue}</span>;
+    }
+    if (token.type === 'missing') {
+      return (
+        <span key={index} className="code-trace-diff-token code-trace-diff-token--missing" title="정답에는 있지만 학생 입력에는 빠진 부분">
+          {missingValue}
+        </span>
+      );
+    }
+    if (token.type === 'extra') {
+      return (
+        <span key={index} className="code-trace-diff-token code-trace-diff-token--extra" title="정답에는 없는 추가 입력">
+          {displayValue}
+        </span>
+      );
+    }
+    if (token.type === 'case') {
+      return (
+        <span key={index} className="code-trace-diff-token code-trace-diff-token--case" title={title}>
+          {displayValue}
+        </span>
+      );
+    }
+    return (
+      <span key={index} className="code-trace-diff-token code-trace-diff-token--wrong" title={title}>
+        {displayValue}
+      </span>
+    );
+  });
+  const updateStudentSelection = (textarea = studentTextareaRef.current) => {
+    if (!textarea) return;
+    setStudentSelection({
+      start: textarea.selectionStart || 0,
+      end: textarea.selectionEnd || textarea.selectionStart || 0,
+    });
+  };
+  const insertStringLiteral = (suggestion = activeStringSuggestion) => {
+    if (!suggestion || !studentTextareaRef.current) return false;
+    const textarea = studentTextareaRef.current;
+    const { selectionStart, selectionEnd } = textarea;
+    const value = studentCode;
+    const before = value.slice(0, selectionStart);
+    const after = value.slice(selectionEnd);
+    const previousChar = before.slice(-1);
+    let insertion = suggestion.literal;
+
+    if ((previousChar === '"' || previousChar === "'") && insertion.startsWith(previousChar)) {
+      insertion = insertion.slice(1);
+    }
+
+    const nextValue = `${before}${insertion}${after}`;
+    const nextCursor = before.length + insertion.length;
+    setStudentCode(nextValue);
+    setStudentSelection({ start: nextCursor, end: nextCursor });
+    soundManager.playClick();
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.selectionStart = nextCursor;
+      textarea.selectionEnd = nextCursor;
+    });
+    return true;
+  };
   const handleStudentKeyDown = (event) => {
     if (event.key === 'Enter') {
       soundManager.playClick();
@@ -810,9 +1294,17 @@ export default function CodeTracePlayer({
     const { selectionStart, selectionEnd, value } = textarea;
     const hasSelection = selectionStart !== selectionEnd;
 
+    if (!hasSelection && activeStringSuggestion && insertStringLiteral(activeStringSuggestion)) {
+      return;
+    }
+
     if (!hasSelection) {
       const nextValue = `${value.slice(0, selectionStart)}${STUDENT_INDENT}${value.slice(selectionEnd)}`;
       setStudentCode(nextValue);
+      setStudentSelection({
+        start: selectionStart + STUDENT_INDENT.length,
+        end: selectionStart + STUDENT_INDENT.length,
+      });
       requestAnimationFrame(() => {
         textarea.selectionStart = selectionStart + STUDENT_INDENT.length;
         textarea.selectionEnd = selectionStart + STUDENT_INDENT.length;
@@ -849,9 +1341,12 @@ export default function CodeTracePlayer({
 
       const nextValue = `${value.slice(0, lineStart)}${outdented}${value.slice(lineEnd)}`;
       setStudentCode(nextValue);
+      const nextStart = Math.max(lineStart, selectionStart - removedBeforeSelection);
+      const nextEnd = Math.max(nextStart, selectionEnd - removedTotal);
+      setStudentSelection({ start: nextStart, end: nextEnd });
       requestAnimationFrame(() => {
-        textarea.selectionStart = Math.max(lineStart, selectionStart - removedBeforeSelection);
-        textarea.selectionEnd = Math.max(textarea.selectionStart, selectionEnd - removedTotal);
+        textarea.selectionStart = nextStart;
+        textarea.selectionEnd = nextEnd;
       });
       return;
     }
@@ -859,9 +1354,12 @@ export default function CodeTracePlayer({
     const indented = lines.map(line => `${STUDENT_INDENT}${line}`).join('\n');
     const nextValue = `${value.slice(0, lineStart)}${indented}${value.slice(lineEnd)}`;
     setStudentCode(nextValue);
+    const nextStart = selectionStart + STUDENT_INDENT.length;
+    const nextEnd = selectionEnd + (lines.length * STUDENT_INDENT.length);
+    setStudentSelection({ start: nextStart, end: nextEnd });
     requestAnimationFrame(() => {
-      textarea.selectionStart = selectionStart + STUDENT_INDENT.length;
-      textarea.selectionEnd = selectionEnd + (lines.length * STUDENT_INDENT.length);
+      textarea.selectionStart = nextStart;
+      textarea.selectionEnd = nextEnd;
     });
   };
 
@@ -881,6 +1379,149 @@ export default function CodeTracePlayer({
         @keyframes codeTracePassGlow {
           0%, 100% { box-shadow: 0 0 0 rgba(34,197,94,0); }
           50% { box-shadow: 0 0 24px rgba(34,197,94,0.35); }
+        }
+        .code-trace-analysis-panel {
+          margin-top: 1rem;
+          display: grid;
+          grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+          gap: 1rem;
+        }
+        .code-trace-analysis-box {
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px;
+          background: rgba(2,6,23,0.62);
+          padding: 0.9rem;
+          min-width: 0;
+        }
+        .code-trace-analysis-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.8rem;
+        }
+        .code-trace-chip-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.45rem;
+        }
+        .code-trace-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          padding: 0.28rem 0.55rem;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.12);
+          background: rgba(15,23,42,0.76);
+          color: #dbeafe;
+          font-size: 0.72rem;
+        }
+        .code-trace-string-helper {
+          margin-top: 0.7rem;
+          padding: 0.65rem;
+          border-radius: 10px;
+          border: 1px solid rgba(52,211,153,0.22);
+          background: rgba(6,78,59,0.16);
+        }
+        .code-trace-string-helper-title {
+          margin: 0 0 0.45rem;
+          color: #bbf7d0;
+          font-size: 0.75rem;
+        }
+        .code-trace-string-chip {
+          border: 1px solid rgba(52,211,153,0.28);
+          background: rgba(15,23,42,0.82);
+          color: #d1fae5;
+          border-radius: 999px;
+          padding: 0.35rem 0.6rem;
+          cursor: pointer;
+          max-width: min(100%, 20rem);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .code-trace-string-chip:hover,
+        .code-trace-string-chip.is-active {
+          border-color: rgba(52,211,153,0.72);
+          background: rgba(16,185,129,0.18);
+          color: #ecfdf5;
+        }
+        .code-trace-issue-list {
+          display: grid;
+          gap: 0.55rem;
+          margin: 0;
+          padding: 0;
+          list-style: none;
+        }
+        .code-trace-issue-item {
+          border: 1px solid rgba(255,255,255,0.08);
+          border-left: 3px solid rgba(248,113,113,0.8);
+          border-radius: 8px;
+          background: rgba(15,23,42,0.58);
+          color: #d1d5db;
+          padding: 0.65rem 0.75rem;
+          line-height: 1.45;
+        }
+        .code-trace-diff-preview {
+          margin: 0;
+          min-height: 180px;
+          max-height: 360px;
+          overflow: auto;
+          border-radius: 10px;
+          background: #020617;
+          border: 1px solid rgba(255,255,255,0.1);
+          padding: 0.85rem;
+          color: #e5e7eb;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          font-size: 0.86rem;
+          line-height: 1.55;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+        }
+        .code-trace-diff-line {
+          display: grid;
+          grid-template-columns: 3.2rem minmax(0, 1fr);
+          gap: 0.55rem;
+          min-height: 1.45rem;
+        }
+        .code-trace-diff-line-number {
+          color: rgba(148,163,184,0.72);
+          user-select: none;
+          text-align: right;
+        }
+        .code-trace-diff-token {
+          border-radius: 4px;
+          padding: 0.02rem 0.08rem;
+        }
+        .code-trace-diff-token--wrong {
+          background: rgba(248,113,113,0.24);
+          color: #fecaca;
+          text-decoration: underline;
+          text-decoration-color: rgba(248,113,113,0.9);
+          text-underline-offset: 0.18rem;
+        }
+        .code-trace-diff-token--missing {
+          background: rgba(248,113,113,0.18);
+          color: #fca5a5;
+          border-bottom: 2px solid rgba(248,113,113,0.9);
+          opacity: 0.95;
+        }
+        .code-trace-diff-token--extra {
+          background: rgba(251,146,60,0.24);
+          color: #fed7aa;
+          text-decoration: line-through;
+          text-decoration-color: rgba(251,146,60,0.9);
+        }
+        .code-trace-diff-token--case {
+          background: rgba(250,204,21,0.24);
+          color: #fef08a;
+          border-bottom: 2px solid rgba(250,204,21,0.9);
+        }
+        @media (max-width: 860px) {
+          .code-trace-analysis-panel {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
       <div style={{ maxWidth: 1220, margin: '0 auto' }}>
@@ -1027,14 +1668,40 @@ export default function CodeTracePlayer({
               </div>
             )}
             <textarea
+              ref={studentTextareaRef}
               value={studentCode}
-              onChange={e => setStudentCode(e.target.value)}
+              onChange={e => {
+                setStudentCode(e.target.value);
+                updateStudentSelection(e.target);
+              }}
+              onSelect={e => updateStudentSelection(e.target)}
+              onClick={e => updateStudentSelection(e.currentTarget)}
+              onKeyUp={e => updateStudentSelection(e.currentTarget)}
               onKeyDown={handleStudentKeyDown}
               spellCheck={false}
               wrap="off"
               placeholder="코드를 따라 쓰세요."
               style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', height: codePanelHeight, minHeight: CODE_PANEL_MIN_HEIGHT, maxHeight: CODE_PANEL_MAX_HEIGHT, resize: 'vertical', background: '#020617', color: '#f8fafc', border: currentPassed ? '1px solid rgba(34,197,94,0.55)' : '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2, overflow: 'auto', whiteSpace: 'pre', animation: currentPassed ? 'codeTracePassGlow 1.6s ease-in-out infinite' : 'none' }}
             />
+            {stringSuggestions.length > 0 && (
+              <div className="code-trace-string-helper">
+                <p className="font-tech code-trace-string-helper-title">문자열 도우미</p>
+                <div className="code-trace-chip-row">
+                  {stringSuggestions.slice(0, 8).map((suggestion) => (
+                    <button
+                      key={suggestion.id}
+                      type="button"
+                      className={`font-tech code-trace-string-chip ${activeStringSuggestion?.id === suggestion.id ? 'is-active' : ''}`}
+                      title={`${suggestion.lineNumber}번째 줄 문자열`}
+                      onMouseDown={event => event.preventDefault()}
+                      onClick={() => insertStringLiteral(suggestion)}
+                    >
+                      {suggestion.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', position: 'relative' }}>
               {rewardBurst && (
                 <div
@@ -1060,8 +1727,8 @@ export default function CodeTracePlayer({
                   currentPassed
                     ? (rewardStillAvailable
                       ? `통과하고 +${rawRewardForNextPass}광석${nextAttemptNumber > 1 ? ` (${nextAttemptNumber}회차)` : ''} 획득`
-                      : (currentAttemptCount > 0 ? '다시 통과하기 · 보상 완료' : `통과 기준 ${passingAccuracy}%`))
-                    : `통과 기준 ${passingAccuracy}%`
+                      : (currentAttemptCount > 0 ? '다시 통과하기 · 보상 완료' : `구조 기준 ${passingAccuracy}%`))
+                    : `구조 기준 ${passingAccuracy}%`
                 }
               </button>
               <button className="hud-btn secondary glass" onClick={() => {
@@ -1079,8 +1746,10 @@ export default function CodeTracePlayer({
         <section className="glass-card" style={{ padding: '1rem', marginTop: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
             {[
-              ['정확도', `${evaluation.accuracy}%`],
+              ['구조 정확도', `${evaluation.accuracy}%`],
               ['맞은 줄', `${evaluation.correctLines}/${evaluation.totalLines}`],
+              ['첫 오류', analysis.firstIssue ? `${analysis.firstIssue.lineNumber}번째 줄` : '없음'],
+              ['오류 유형', analysis.typeLabels.length ? analysis.typeLabels.slice(0, 2).join(' · ') : '없음'],
               ['라인 콤보', `${lineCombo}/${evaluation.totalLines}`],
               ['연습', currentAttemptCount > 0 ? `${currentAttemptCount}회` : '—'],
               ['획득 광석', `${crystalsEarnedTotal}`],
@@ -1107,8 +1776,8 @@ export default function CodeTracePlayer({
                   : `통과 기준을 만족했습니다. 지금 +${rawRewardForNextPass}광석을 받을 수 있습니다.`)
                 : (currentAttemptCount > 0
                   ? `이미 ${currentAttemptCount}회 통과했습니다. 다시 연습해도 광석은 더 나오지 않지만, 코드 감각을 익히는 데 도움이 됩니다.`
-                  : `통과 기준: 정확도 ${passingAccuracy}% 이상`))
-              : `통과 기준: 정확도 ${passingAccuracy}% 이상`}
+                  : `통과 기준: 구조 정확도 ${passingAccuracy}% 이상`))
+              : `통과 기준: 구조 정확도 ${passingAccuracy}% 이상`}
           </div>
 
           {!currentPassed && (
@@ -1116,6 +1785,76 @@ export default function CodeTracePlayer({
               {evaluation.issues.map((issue, index) => <li key={index}>{issue}</li>)}
             </ul>
           )}
+
+          <div className="code-trace-analysis-panel">
+            <div className="code-trace-analysis-box">
+              <div className="code-trace-analysis-toolbar">
+                <h3 className="font-title" style={{ margin: 0, color: 'var(--crystal-cyan)', fontSize: '1rem' }}>오류 분석</h3>
+                <button className="hud-btn secondary glass" onClick={jumpToFirstIssue} disabled={!analysis.firstIssue} style={{ padding: '0.42rem 0.65rem' }}>
+                  <LocateFixed size={15} /> 첫 오류
+                </button>
+              </div>
+
+              <div className="code-trace-chip-row" style={{ marginBottom: '0.8rem' }}>
+                {Object.entries(analysis.counts).length ? Object.entries(analysis.counts).map(([type, count]) => (
+                  <span key={type} className="code-trace-chip" style={{ borderColor: `${ISSUE_META[type]?.color || '#94a3b8'}66` }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 999, background: ISSUE_META[type]?.color || '#94a3b8' }} />
+                    {ISSUE_META[type]?.label || type} {count}
+                  </span>
+                )) : (
+                  <span className="code-trace-chip" style={{ borderColor: 'rgba(34,197,94,0.38)', color: '#bbf7d0' }}>정답 코드와 같습니다</span>
+                )}
+              </div>
+
+              {analysis.issues.length ? (
+                <ul className="code-trace-issue-list font-tech">
+                  {analysis.issues.slice(0, 5).map(issue => (
+                    <li key={`${issue.lineNumber}-${issue.type}`} className="code-trace-issue-item" style={{ borderLeftColor: ISSUE_META[issue.type]?.color || '#f87171' }}>
+                      {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="font-tech" style={{ margin: 0, color: '#bbf7d0' }}>현재 입력은 정답 코드와 완전히 일치합니다.</p>
+              )}
+            </div>
+
+            <div className="code-trace-analysis-box">
+              <div className="code-trace-analysis-toolbar">
+                <h3 className="font-title" style={{ margin: 0, color: 'var(--planet-green)', fontSize: '1rem' }}>오류 위치 보기</h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+                  <button className={`hud-btn ${analysisLevel === 'line' ? 'primary' : 'secondary'} glass`} onClick={() => setAnalysisLevel('line')} style={{ padding: '0.42rem 0.65rem' }}>
+                    틀린 줄
+                  </button>
+                  <button className={`hud-btn ${analysisLevel === 'char' ? 'primary' : 'secondary'} glass`} onClick={() => setAnalysisLevel('char')} style={{ padding: '0.42rem 0.65rem' }}>
+                    글자 단위
+                  </button>
+                  <button className={`hud-btn ${showWhitespace ? 'primary' : 'secondary'} glass`} onClick={() => setShowWhitespace(value => !value)} style={{ padding: '0.42rem 0.65rem' }}>
+                    공백 {showWhitespace ? '켜짐' : '꺼짐'}
+                  </button>
+                </div>
+              </div>
+
+              {analysis.issues.length ? (
+                <div className="code-trace-diff-preview">
+                  {analysis.issues.slice(0, analysisLevel === 'line' ? 8 : 12).map(issue => (
+                    <div key={`${issue.lineNumber}-${issue.type}-preview`} className="code-trace-diff-line">
+                      <span className="code-trace-diff-line-number">{issue.lineNumber}</span>
+                      <code>
+                        {analysisLevel === 'line'
+                          ? (showWhitespace
+                            ? visibleWhitespace(issue.studentLine || (issue.type === 'missing' ? '(빈 줄)' : issue.answerLine))
+                            : (issue.studentLine || (issue.type === 'missing' ? '(빈 줄)' : issue.answerLine)))
+                          : renderDiffTokens(issue.tokens)}
+                      </code>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="code-trace-diff-preview" style={{ color: '#bbf7d0' }}>정답과 다른 부분이 없습니다.</div>
+              )}
+            </div>
+          </div>
         </section>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1148,7 +1887,7 @@ export default function CodeTracePlayer({
               <>
                 <h3 className="font-title" style={{ color: 'var(--planet-green)', marginTop: 0 }}>CODE TRACE 완료</h3>
                 <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
-                  정확도 {completionState.accuracy || evaluation.accuracy}% · 이번 세트 +{completionState.actualReward || 0} 광석 · 누적 {completionState.totalEarned ?? crystalsEarnedTotal}광석
+                  구조 정확도 {completionState.accuracy || evaluation.accuracy}% · 이번 세트 +{completionState.actualReward || 0} 광석 · 누적 {completionState.totalEarned ?? crystalsEarnedTotal}광석
                 </p>
                 <button className="hud-btn primary glass" onClick={onClose}>미션 컨트롤로 돌아가기</button>
               </>
