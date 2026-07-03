@@ -618,8 +618,10 @@ function getLineFeedback(answerCode = '', studentCode = '') {
   const studentStructureLines = mapStringLiterals(normalizeNewlines(studentCode), () => STRING_STRUCTURE_TOKEN).split('\n');
   const answerIndentRanks = buildIndentRankMap(answerStructureLines);
   const studentIndentRanks = buildIndentRankMap(studentStructureLines);
+  const lineCount = Math.max(answerLines.length, studentLines.length, 1);
 
-  return answerLines.map((line, index) => {
+  return Array.from({ length: lineCount }, (_, index) => {
+    const line = answerLines[index] || '';
     const answerLine = answerStructureLines[index] || '';
     const studentLine = studentStructureLines[index] || '';
     const normalizedAnswer = normalizePythonLineForStructureCompare(answerLine, answerIndentRanks);
@@ -688,6 +690,38 @@ function getTypingTrace(answerCode = '', studentCode = '', cursor = 0) {
   };
 }
 
+function getStudentOverlayLines(answerCode = '', studentCode = '') {
+  const answerLines = normalizeNewlines(answerCode).split('\n');
+  const studentLines = normalizeNewlines(studentCode).split('\n');
+  const lineFeedback = getLineFeedback(answerCode, studentCode);
+  const lineCount = Math.max(answerLines.length, studentLines.length, lineFeedback.length, 1);
+
+  return Array.from({ length: lineCount }, (_, lineIndex) => {
+    const answerLine = answerLines[lineIndex] || '';
+    const studentLine = studentLines[lineIndex] || '';
+    const answerStringRanges = getLineStringRanges(answerLine);
+    const studentStringRanges = getLineStringRanges(studentLine);
+    const chars = Array.from(studentLine).map((char, index) => {
+      const answerChar = answerLine[index] || '';
+      let status = 'wrong';
+      if (char === answerChar) {
+        status = 'match';
+      } else if (isIndexInRange(index, answerStringRanges) && isIndexInRange(index, studentStringRanges)) {
+        status = 'string';
+      } else if (!answerChar) {
+        status = 'extra';
+      }
+      return { char, status };
+    });
+    const feedback = lineFeedback[lineIndex] || { lineNumber: lineIndex + 1, done: false, typed: false };
+    return {
+      ...feedback,
+      lineNumber: lineIndex + 1,
+      chars,
+    };
+  });
+}
+
 export default function CodeTracePlayer({
   exercises = [],
   unitId,
@@ -729,7 +763,7 @@ export default function CodeTracePlayer({
   const [studentSelection, setStudentSelection] = useState({ start: 0, end: 0 });
   const previousLineComboRef = useRef(0);
   const studentTextareaRef = useRef(null);
-  const typingTraceTextRef = useRef(null);
+  const studentOverlayRef = useRef(null);
 
   useEffect(() => {
     const savedIds = learningProgress?.codeTrace?.completedExerciseIds;
@@ -810,8 +844,8 @@ export default function CodeTracePlayer({
     () => getLineCombo(exercise?.answerCode || '', studentCode),
     [exercise, studentCode]
   );
-  const lineFeedback = useMemo(
-    () => getLineFeedback(exercise?.answerCode || '', studentCode),
+  const studentOverlayLines = useMemo(
+    () => getStudentOverlayLines(exercise?.answerCode || '', studentCode),
     [exercise, studentCode]
   );
   const typingTrace = useMemo(
@@ -906,12 +940,6 @@ export default function CodeTracePlayer({
     }, 1000);
     return () => clearInterval(timer);
   }, [answerVisible, exerciseIndex, mode, visibleLines]);
-
-  useEffect(() => {
-    const traceEl = typingTraceTextRef.current;
-    if (!traceEl) return;
-    traceEl.scrollLeft = traceEl.scrollWidth;
-  }, [typingTrace.typedChars.length, studentSelection.start, exerciseIndex]);
 
   if (!exercise) {
     return (
@@ -1359,12 +1387,19 @@ export default function CodeTracePlayer({
       end: textarea.selectionEnd || textarea.selectionStart || 0,
     });
   };
+  const syncStudentOverlayScroll = (textarea = studentTextareaRef.current) => {
+    const overlay = studentOverlayRef.current;
+    if (!textarea || !overlay) return;
+    overlay.scrollTop = textarea.scrollTop;
+    overlay.scrollLeft = textarea.scrollLeft;
+  };
   const syncStudentTypingViewport = (textarea = studentTextareaRef.current) => {
     if (!textarea) return;
     const cursor = textarea.selectionStart || 0;
     if (!isCaretAtLineEnd(textarea.value, cursor)) return;
     requestAnimationFrame(() => {
       textarea.scrollLeft = textarea.scrollWidth;
+      syncStudentOverlayScroll(textarea);
     });
   };
   const insertStringLiteral = (suggestion = activeStringSuggestion) => {
@@ -1524,6 +1559,121 @@ export default function CodeTracePlayer({
         }
         .code-trace-input-stage {
           position: relative;
+          overflow: hidden;
+          border-radius: 10px;
+          border: 1px solid rgba(255,255,255,0.12);
+          background: #020617;
+        }
+        .code-trace-input-stage.is-passed {
+          border-color: rgba(34,197,94,0.55);
+          animation: codeTracePassGlow 1.6s ease-in-out infinite;
+        }
+        .code-trace-student-overlay,
+        .code-trace-student-textarea {
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 100%;
+          min-height: ${CODE_PANEL_MIN_HEIGHT}px;
+          max-height: ${CODE_PANEL_MAX_HEIGHT}px;
+          margin: 0;
+          padding: 1rem 1rem 1rem 3rem;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          font-size: 0.92rem;
+          line-height: 1.55;
+          tab-size: 2;
+          white-space: pre;
+        }
+        .code-trace-student-overlay {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          padding-left: 0.75rem;
+          overflow: auto;
+          color: rgba(226,232,240,0.72);
+          pointer-events: none;
+          scrollbar-width: none;
+        }
+        .code-trace-student-overlay::-webkit-scrollbar {
+          display: none;
+        }
+        .code-trace-student-textarea {
+          position: relative;
+          z-index: 2;
+          display: block;
+          resize: vertical;
+          overflow: auto;
+          border: 0;
+          outline: 0;
+          background: transparent;
+          color: transparent;
+          caret-color: #f8fafc;
+          -webkit-text-fill-color: transparent;
+        }
+        .code-trace-student-textarea::placeholder {
+          color: rgba(148,163,184,0.72);
+          -webkit-text-fill-color: rgba(148,163,184,0.72);
+        }
+        .code-trace-student-textarea::selection {
+          background: rgba(56,189,248,0.28);
+        }
+        .code-trace-overlay-line {
+          display: grid;
+          grid-template-columns: 1.65rem max-content;
+          gap: 0.6rem;
+          min-height: 1.426rem;
+        }
+        .code-trace-overlay-line-number {
+          width: 1.35rem;
+          height: 1.35rem;
+          border-radius: 999px;
+          border: 1px solid rgba(148,163,184,0.22);
+          background: rgba(15,23,42,0.78);
+          color: rgba(148,163,184,0.68);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.62rem;
+          line-height: 1;
+          box-shadow: inset 0 0 8px rgba(2,6,23,0.55);
+          transform: translateY(0.04rem);
+        }
+        .code-trace-overlay-line.is-started .code-trace-overlay-line-number {
+          border-color: rgba(56,189,248,0.35);
+          color: rgba(186,230,253,0.95);
+        }
+        .code-trace-overlay-line.is-current .code-trace-overlay-line-number {
+          border-color: rgba(0,243,255,0.62);
+          box-shadow: 0 0 12px rgba(0,243,255,0.24), inset 0 0 8px rgba(2,6,23,0.55);
+        }
+        .code-trace-overlay-line.is-done .code-trace-overlay-line-number {
+          color: #052e16;
+          border-color: rgba(52,211,153,0.72);
+          background: linear-gradient(135deg, #86efac, #22c55e);
+          animation: codeTraceCheckPop 0.28s ease-out both;
+          box-shadow: 0 0 14px rgba(34,197,94,0.34);
+        }
+        .code-trace-overlay-code {
+          min-width: max-content;
+        }
+        .code-trace-overlay-char {
+          color: rgba(226,232,240,0.58);
+          border-radius: 4px;
+          transition: color 0.16s ease, background 0.16s ease, text-shadow 0.16s ease;
+        }
+        .code-trace-overlay-char.is-match,
+        .code-trace-overlay-char.is-string {
+          color: #dcfce7;
+        }
+        .code-trace-overlay-char.is-string {
+          background: rgba(52,211,153,0.12);
+        }
+        .code-trace-overlay-char.is-wrong {
+          color: #fecaca;
+          background: rgba(248,113,113,0.2);
+        }
+        .code-trace-overlay-char.is-extra {
+          color: #fed7aa;
+          background: rgba(251,146,60,0.22);
         }
         .code-trace-line-rail {
           position: absolute;
@@ -1928,34 +2078,34 @@ export default function CodeTracePlayer({
                 {linePulse.enter ? '라인 입력' : `${linePulse.count}줄 콤보`}
               </div>
             )}
-            <div className="code-trace-typing-trace">
-              <span className="font-tech code-trace-typing-line">{typingTrace.lineNumber}줄</span>
-              <code ref={typingTraceTextRef} className="code-trace-typing-text">
-                {typingTrace.typedChars.length ? typingTrace.typedChars.map((item, index) => (
-                  <span key={`${index}-${item.char}`} className={`code-trace-typing-char is-${item.status}`}>
-                    {item.char === ' ' ? '·' : item.char === '\t' ? '→' : item.char}
-                  </span>
-                )) : <span className="code-trace-typing-char"> </span>}
-                <span className="code-trace-typing-cursor">▌</span>
-              </code>
-              <span className="code-trace-typing-meter" aria-hidden="true">
-                <span style={{ width: `${Math.round(typingTrace.progress * 100)}%` }} />
-              </span>
-            </div>
-            <div className="code-trace-input-stage">
-              <div className="code-trace-line-rail">
-                {lineFeedback.slice(0, 18).map(item => (
-                  <span
-                    key={item.lineNumber}
-                    className={`code-trace-line-dot ${item.typed ? 'is-started' : ''} ${item.done ? 'is-done' : ''} ${typingTrace.lineNumber === item.lineNumber ? 'is-current' : ''}`}
-                    title={`${item.lineNumber}번째 줄`}
+            <div className={`code-trace-input-stage ${currentPassed ? 'is-passed' : ''}`}>
+              <div
+                ref={studentOverlayRef}
+                className="code-trace-student-overlay"
+                aria-hidden="true"
+                style={{ height: codePanelHeight }}
+              >
+                {studentOverlayLines.map(line => (
+                  <div
+                    key={line.lineNumber}
+                    className={`code-trace-overlay-line ${line.typed ? 'is-started' : ''} ${line.done ? 'is-done' : ''} ${typingTrace.lineNumber === line.lineNumber ? 'is-current' : ''}`}
                   >
-                    {item.done ? <Check size={11} strokeWidth={3} /> : item.lineNumber}
-                  </span>
+                    <span className="code-trace-overlay-line-number">
+                      {line.done ? <Check size={11} strokeWidth={3} /> : line.lineNumber}
+                    </span>
+                    <span className="code-trace-overlay-code">
+                      {line.chars.length ? line.chars.map((item, index) => (
+                        <span key={`${line.lineNumber}-${index}-${item.char}`} className={`code-trace-overlay-char is-${item.status}`}>
+                          {item.char === '\t' ? STUDENT_INDENT : item.char}
+                        </span>
+                      )) : '\u00a0'}
+                    </span>
+                  </div>
                 ))}
               </div>
               <textarea
                 ref={studentTextareaRef}
+                className="code-trace-student-textarea"
                 value={studentCode}
                 onChange={e => {
                   setStudentCode(e.target.value);
@@ -1971,11 +2121,12 @@ export default function CodeTracePlayer({
                   updateStudentSelection(e.currentTarget);
                   syncStudentTypingViewport(e.currentTarget);
                 }}
+                onScroll={e => syncStudentOverlayScroll(e.currentTarget)}
                 onKeyDown={handleStudentKeyDown}
                 spellCheck={false}
                 wrap="off"
                 placeholder="코드를 따라 쓰세요."
-                style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', height: codePanelHeight, minHeight: CODE_PANEL_MIN_HEIGHT, maxHeight: CODE_PANEL_MAX_HEIGHT, resize: 'vertical', background: '#020617', color: '#f8fafc', border: currentPassed ? '1px solid rgba(34,197,94,0.55)' : '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem 1rem 1rem 3rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2, overflow: 'auto', whiteSpace: 'pre', animation: currentPassed ? 'codeTracePassGlow 1.6s ease-in-out infinite' : 'none' }}
+                style={{ height: codePanelHeight }}
               />
             </div>
             {stringSuggestions.length > 0 && (
