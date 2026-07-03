@@ -24,7 +24,7 @@
 - **레벨업 감지**: 제출문 키워드 정규식뿐 아니라 “같은 날짜 history/learning_progress에 `middle-math` 기록이 존재하는지”로도 감지해야 한다. 제출문 키워드만 쓰면 “SSS 합동을 배웠다”처럼 키워드에 안 걸리는 중등 단원이 누락된다(조하람 사례).
 - **`learning_progress` 병합**: 학생이 퀴즈/영상을 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남는다. 두 컬렉션을 모두 읽지 않으면 실제 학습한 내용이 “0건”으로 잡힌다(조승아 사례).
 - **한글 NFD 인코딩**: macOS/iOS에서 입력된 한글이 NFD(분해 자모)로 저장되는 경우, 정규식/비교 전에 반드시 NFC로 정규화하지 않으면 “함수/방정식” 키워드가 매칭되지 않아 과정 분류가 실패하고 기록이 누락된다(조승아 사례).
-- **과정 추론 정규식 오탐**: `learning_progress` 문서는 `clusterId` 필드가 없어 제목/unitId 정규식으로만 과정을 추론한다. 정규식이 너무 좁으면 “1학년 1학기 기말 3회” 같은 중등 단원평가가 unknown으로 누락되고, 너무 넓으면 “유리수와 순환소수”(중등)가 “소수”에 걸려 초등으로 오탐된다(하다솜 사례). 정규식은 중등 단원명을 초등보다 먼저 검사하되, “함수/등식/정수/소수” 같은 모호한 단독 키워드는 빼고 중등 전용 합성어/단원명/평가 키워드만 쓴다.
+- **학습 메타데이터 역추적 우선**: `learning_progress` 문서에 `clusterId`가 없어도 제목/unitId 정규식으로 과정을 맞히면 안 된다. 먼저 `learning_progress/{unitId}` → `units/{unitId}.chapterId` → `chapters/{chapterId}.regionId` → `regions/{regionId}.clusterId` 순서로 역추적해 실제 과정을 찾는다. 새 CODE TRACE 진행 기록은 `learning_progress` 최상위와 `codeTrace` 내부에 `clusterId/chapterId`를 함께 저장한다. 그래야 `unit_py_math_2` 같은 파이썬 수학 단원이 “unknown”으로 빠지지 않는다(인효린 사례).
 - **Python CODE TRACE 반영**: CODE TRACE는 영상을 보는 활동도, 퀴즈를 푸는 활동도 아니지만 코드를 보고 구조를 손으로 따라 쓰는 별도 고난도 학습이다. `history.type === "code_trace"` 완료 기록과 `learning_progress.codeTrace` 진행 기록을 Python 학습 근거로 반드시 합산해야 한다. 수동 export와 운영툴 “AI 피드백 생성” 양쪽 모두 `codeTraces`, `inProgressCodeTraces`, `codeTraceCount`, `codeTraceProgressCount` 같은 요약 필드를 제공해야 하며, 이 필드가 없으면 영상 시간이 짧다는 이유만으로 Python 학습을 낮게 평가할 위험이 있다.
 
 ### CODE TRACE 코드 반영 체크리스트
@@ -34,6 +34,7 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 - `scripts/export-pending-assignment-contexts.mjs`
   - `history`에서 `type === "code_trace"`인 Python 기록을 퀴즈가 아니라 CODE TRACE로 분리한다.
   - `learning_progress`에서 `codeTrace.completedExerciseCount > 0`인 진행 기록을 `inProgressCodeTraces`로 추출한다.
+  - 진행 기록의 과정 분류는 제목/unitId 정규식이 아니라 `clusterId/courseId` 필드, `codeTrace.clusterId`, 또는 `units → chapters → regions` 역추적으로 처리한다.
   - `buildLearningLoadSummary`의 입력과 `balanceSignals`에 CODE TRACE를 포함한다.
   - `hasPractice` 또는 이에 준하는 확인 활동 판단에 완료/진행 CODE TRACE를 포함한다.
   - `learningSummary`에 `codeTraceCount`, `codeTraceProgressCount`, `codeTraces`, `inProgressCodeTraces`를 저장한다.
@@ -77,13 +78,13 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 - 위 레벨업 예외에서 영상 시간이 짧아도 같은 날짜 중등수학 퀴즈 여러 개, 데이터 로그, 다크매터 회복 기록이 있으면 “수학 기록 없음” 또는 “기록 없음으로 보완요청”으로 판단하지 않는다. 피드백에는 “초등수학 시간에 레벨업 학습으로 중등수학을 진행한 기록을 확인했다”고 명시한다.
 - 위 예외는 한 방향으로만 적용한다. 중등수학 과제(`middle-math`)에서는 초등수학(`cluster_elementary`) 영상/퀴즈/데이터 로그를 중등수학 학습량으로 인정하지 않는다.
 - 과제 과정과 다른 과정의 기록은 위 예외를 제외하고 피드백 근거에서 제외한다. 예: Python 과제에서 초등수학 `4월 평가` 진행 기록을 “Python 진행 중 퀴즈/코드”로 쓰면 안 된다.
-- 과정이 명확하지 않은 진행 중 퀴즈나 `learning_progress` 문서는 현재 과제의 학습 근거로 쓰지 않는다. 과정이 불명확하면 “다른 과정 또는 과정 미확인 기록”으로 제외하고, 피드백에는 포함하지 않는다. 단, 과정 분류 자체가 실패해서 누락된 경우는 아래 “NFD 인코딩” 항목을 반드시 확인한다.
+- 과정이 명확하지 않은 진행 중 퀴즈나 `learning_progress` 문서는 현재 과제의 학습 근거로 쓰지 않는다. 과정이 불명확하면 “다른 과정 또는 과정 미확인 기록”으로 제외하고, 피드백에는 포함하지 않는다. 단, 과정 분류 자체가 실패해서 누락된 경우는 `units → chapters → regions` 역추적과 아래 “NFD 인코딩” 항목을 반드시 확인한다.
 - `learningSummary`의 기준 필드는 `videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `progressVideos`, Python의 `codeTraces`, `inProgressCodeTraces`다. 완료 기록뿐 아니라 **진행 중 퀴즈, 부분 시청 영상, 진행 중 CODE TRACE도 학습 근거로 인정**한다. 학생이 퀴즈나 CODE TRACE를 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남을 수 있으므로, 두 컬렉션을 합쳐 보지 않으면 실제 학습이 “0건”으로 잡힌다(조승아 사례와 같은 구조).
 - `learningSummary.allTitles`는 참고용 전체 기록이고, 피드백 문장의 기준은 `learningSummary.videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `codeTraces`, `inProgressCodeTraces`다.
 - `learningSummary.progressTitles`와 `progressVideos`는 진행/부분 시청 참고용이다. 완료 영상 개수처럼 말하지 않는다.
 - `learningSummary.codeTraces`는 완료된 CODE TRACE 기록이다. 피드백에는 완료한 단원명, 정확도, 완료 exercise 수를 우선 적는다.
 - `learningSummary.inProgressCodeTraces`는 진행 중 CODE TRACE 기록이다. 피드백에는 완료로 쓰지 말고 “진행 중: 2/5, 최고 정확도 86%”처럼 현재 상태를 적는다.
-- **한글 NFD 인코딩 주의**: `history`/`learning_progress` 문서의 한글 제목/unitId/unitTitle이 NFD(분해 자모, 예: `중2_05_일차함수`)로 저장되는 경우가 있다. 코드가 정규식/비교 전에 NFC(`중2_05_일차함수`)로 정규화하지 않으면 “함수/방정식” 같은 키워드가 매칭되지 않아 과정 분류가 실패하고, 정상 학생의 기록까지 “0건/과정 미확인”으로 누락된다. 모든 과정 추론 함수(`inferCourseFromTitle`, `inferCourseFromUnitId`, `normalizeClusterId`, `learningItemCourseId`)는 입력을 NFC로 정규화한 뒤 비교해야 한다. 제출문 한글 비교(`hasMiddleMathLevelUpSignal`)도 마찬가지다.
+- **한글 NFD 인코딩 주의**: `history`/`learning_progress` 문서의 한글 제목/unitId/unitTitle이 NFD(분해 자모, 예: `중2_05_일차함수`)로 저장되는 경우가 있다. 코드가 비교 전에 NFC(`중2_05_일차함수`)로 정규화하지 않으면 `clusterId`, `regionId`, `chapterId`, 제출문 키워드 비교가 실패해 기록이 누락될 수 있다. 모든 과정 정규화/메타데이터 역추적 함수는 입력을 NFC로 정규화한 뒤 비교해야 한다. 제출문 한글 비교(`hasMiddleMathLevelUpSignal`)도 마찬가지다.
 - 초등수학에서 독서퀴즈/독서 활동만 있고 초등수학 또는 중등수학 수학 영상, 수학 퀴즈, 데이터 로그가 모두 없으면 수학 20분 학습이 비어 있다는 점을 반드시 언급한다.
 - 이때 독서 활동은 인정하되, “오늘 수학 기록은 아직 확인되지 않았어요. 다음 시간에는 수학 영상 뒤에 확인 퀴즈까지 이어가면 좋겠습니다.”처럼 부드럽게 안내한다.
 
@@ -262,23 +263,21 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 1. **초등수학 과제인데 제출문이 중등수학 내용인가?** → 레벨업 학생일 수 있다. `history`/`learning_progress`에 `clusterId: "middle-math"` 기록이 있는지 본다(조하람 사례). 레벨업 기록이 있으면 “0건”이 아니라 중등수학 학습으로 인정한다.
 2. **`learning_progress`에 진행 중 퀴즈가 남아 있는가?** → 학생이 퀴즈를 끝까지 완료하지 않으면 `history`에 안 쌓이고 `learning_progress`에만 남는다(조승아 사례). `history`만 보면 “0건”으로 나오지만 실제로는 학습했다. 진행 중 퀴즈(`quizSession.currentIdx > 0`)는 완료 퀴즈와 같은 학습 근거로 인정한다.
 3. **한글 제목/unitId가 NFD로 저장되어 과정 분류가 실패했는가?** → `unitTitle`이 `중2_05_일차함수`처럼 분해 자모라면, 코드가 NFC 정규화 없이 “함수”를 찾으면 매칭이 실패해 과정이 `unknown`으로 빠지고 기록이 누락된다(조승아 사례). 모든 한글 비교는 NFC 정규화 후 해야 한다.
-4. **과정 추론 정규식이 단원을 잘못 분류했는가?** → `learning_progress` 문서는 `clusterId` 필드가 없어 제목/unitId 정규식으로만 과정을 추론한다. 이때 오탐이 발생하면 기록이 사라진다. 대표적 오탐:
-   - “유리수와 순환소수”(중등) → “소수”가 초등 키워드에 걸려 **초등으로 오탐**. 그래서 중등 단원명(`유리수/순환소수/제곱근/...`)을 초등보다 먼저 검사해야 한다(하다솜 사례).
-   - “1학년 1학기 기말 3회”(중등 단원평가) → 단원 키워드가 없어 **unknown으로 누락**. 단원평가/기말/중간평가/기출/학년 같은 평가 키워드를 중등으로 분류해야 잡힌다(하다솜 사례).
-   - **반대 방향 오탐 주의**: “함수를 이용해 창문 그리기”(Python), “등식과 비율”(초등)처럼 초등·파이썬 문맥의 “함수/등식/정수”가 중등 키워드에 걸리면 안 된다. 따라서 “함수/등식/정수”는 단독 키워드에서 빼고, “일차함수/이차함수/연립방정식”처럼 중등 전용 합성어만 쓴다. 단, `clusterId`/`regionId`/`unitId` 필드가 있는 문서는 정규식보다 그 필드를 우선하므로, 정규식 오탐은 필드가 없는 `learning_progress`에만 영향한다.
+4. **학습 메타데이터 역추적이 빠졌는가?** → `learning_progress` 문서에 `clusterId`가 없더라도 제목/unitId 정규식으로 과정을 맞히지 않는다. `learning_progress/{unitId}` 문서 ID를 기준으로 `units/{unitId}`를 읽고, `chapterId`가 있으면 `chapters/{chapterId}`를 읽은 뒤, `regionId`로 `regions/{regionId}.clusterId`를 확인한다. 이 역추적이 빠지면 `unit_py_math_2`처럼 region id가 문서 ID에 없는 파이썬 단원이 unknown으로 누락된다(인효린 사례).
 5. **제출문에 따르면 분명히 공부했는데 기록이 없는가?** → 학생이 종이 문제집으로 풀었거나, 플랫폼 밖에서 공부했을 수 있다. 이때는 “플랫폼 기록이 없어 확인이 어렵다”고 안내하되, 제출문 구체성을 다음 행동으로 요청한다. 단, “안 했다”고 단정하지 않는다.
 
 위 항목을 모두 확인한 뒤에도 해당 과정의 완료/진행 기록이 정말로 없을 때만 “학습 기록 없음” 경보를 검토한다. 코드와 export 스크립트 양쪽 모두 이 체크리스트를 자동으로 통과해야 한다.
 
-### 과정 추론 정규식 유지 원칙
+### 과정 메타데이터 역추적 원칙
 
-`learning_progress` 문서는 `clusterId`가 없어 제목/unitId 정규식으로 과정을 추론한다. 이 정규식을 고칠 때는 다음 원칙을 반드시 지킨다. 한쪽으로만 기울면 학습 기록이 통째로 사라진다.
+`learning_progress` 문서는 진행 중 상태만 남고 `clusterId`가 비어 있을 수 있다. 이때 과정은 제목/unitId 정규식으로 추론하지 않고, 실제 콘텐츠 메타데이터를 따라가서 정한다.
 
-- **중등 단원명을 초등보다 먼저 검사**한다. 그래야 “유리수와 순환소수”처럼 “소수”가 겹치는 중등 단원이 초등으로 오탐되지 않는다(하다솜 사례).
-- **단원평가/기말/중간평가/기출/학년 키워드**는 중등 단원평가 제목(“1학년 1학기 기말 3회”)을 잡기 위해 필요하다. 빼면 중등 평가 기록이 unknown으로 누락된다(하다솜 사례).
-- **모호한 단독 키워드(“함수/등식/정수/소수”)는 쓰지 않는다.** “함수를 이용해 창문 그리기”(Python), “등식과 비율”(초등), “소수의 덧셈”(초등)이 중등로 오탐될 수 있다. 대신 “일차함수/이차함수/이차방정식/연립방정식/유리수/순환소수/제곱근”처럼 중등 전용 합성어/단원명만 쓴다.
-- **필드 우선**: `clusterId`/`regionId`/`courseId`/`unitId` 필드가 있으면 정규식보다 그 필드로 과정을 정한다. 정규식은 필드가 없는 `learning_progress`에만 최후 수단으로 작동한다. 그래서 정규식 오탐은 `learning_progress` 경로에만 영향을 주지만, 그 경로에서는 정확해야 한다.
-- **정규식 고친 뒤에는 반드시 실제 데이터로 회귀 검증**한다: (a) 하다솜(유리수/순환소수, 기말 3회 → middle-math), (b) 조승아(중2_05_일차함수 → middle-math), (c) 조하람(SSS 합동 history → middle-math 레벨업), (d) 초등·파이썬 학생 history가 중등로 오탐되지 않는지.
+- **명시 필드 우선**: `clusterId`, `courseId`, `regionId`, `codeTrace.clusterId`가 있으면 먼저 사용한다.
+- **unit 역추적**: 명시 필드가 없으면 `units/{unitId}`를 조회한다. unit 문서에 `clusterId/courseId/regionId`가 있으면 사용하고, `chapterId`만 있으면 다음 단계로 간다.
+- **chapter/region 역추적**: `chapters/{chapterId}.regionId`를 읽고, `regions/{regionId}.clusterId`로 실제 과정을 확정한다.
+- **문서 ID에 region id가 들어 있는 레거시 단원**은 `reg_..._chap_...` 구조에서 region id만 추출한 뒤 `regions/{regionId}.clusterId`를 조회한다. 이것은 과정 키워드 추론이 아니라 저장 구조 역추적이다.
+- **역추적 실패 시 제외**: 그래도 과정이 확인되지 않으면 해당 과제의 학습 근거로 쓰지 않는다. 제목에 “소수/함수/코드”가 들어 있다는 이유만으로 초등/중등/Python을 단정하지 않는다.
+- **회귀 검증**: 실제 데이터로 (a) 인효린 `unit_py_math_2` CODE TRACE → python, (b) 하다솜 중등 진행 기록 → middle-math, (c) 조승아 NFD 단원 → middle-math, (d) 조하람 SSS 합동 history → middle-math 레벨업, (e) 초등·파이썬 기록이 중등으로 오탐되지 않는지 확인한다.
 
 ## 저학습/제출 불일치 경보 처리
 
@@ -322,7 +321,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - 조하람 사례의 변형: 제출문이 “SSS 합동에 대해 배웠다”처럼 중등 기하 단원인데 제출문 키워드에 안 걸려 레벨업 감지가 실패할 수 있다. 이때는 제출문 키워드가 아니라 **같은 날짜 history/learning_progress에 `middle-math` 기록이 존재하는지**로 레벨업을 판단한다. 코드는 키워드 신호가 꺼져 있어도 `allRows`에서 `middle-math` row가 보이면 `includeMiddleMathLevelUp`을 스스로 켠다.
 - 조승아 사례(중등수학 과제, `history` 0건): 학생이 일차함수 퀴즈를 끝까지 완료하지 않아 `history`에는 아무 기록도 쌓이지 않고, `learning_progress`에만 진행 중 상태(`quizSession.currentIdx` = 19, 답 12/20)가 남았다. 이 경우 `history`만 보면 “기록 0건”으로 잘못 판단한다. `learning_progress`의 `inProgressQuizzes`까지 합쳐 봐야 “일차함수 심화문제 12/20 진행 중”이라는 실제 학습이 잡힌다. 진행 중 퀴즈는 완료 퀴즈와 같은 학습 근거로 인정한다.
 - 조승아 사례의 인코딩 함정: 그 `learning_progress` 문서의 `unitTitle`이 NFD(`중2_05_일차함수`)로 저장되어 있었다. 코드가 NFC 정규화 없이 “함수” 키워드를 찾으면 매칭이 실패해 과정이 `unknown`으로 분류되고, 중등수학 과제인데도 기록이 전부 누락된다. 한글 비교는 반드시 NFC 정규화 후 한다.
-- 하다솜 사례(중등수학 과제, 과정 추론 오탐): 6/29에 유리수·순환소수 퀴즈와 1학년 기말 3회 퀴즈를 풀었지만 두 기록 모두 `learning_progress`에만 있고 `clusterId` 필드가 없었다. 정규식 추론에서 “유리수와 순환소수”는 “소수”가 초등 키워드에 걸려 **초등으로 오탐**, “1학년 1학기 기말 3회”는 단원 키워드가 없어 **unknown으로 누락**됐다. 두 경우 모두 “0건”으로 잘못 평가됐다. 해결은 중등 단원명을 초등보다 먼저 검사하고, 단원평가/기말/학년 키워드를 중등으로 분류하는 것이다. 단, “함수/등식/정수” 같은 모호 단어는 빼서 초등·파이썬 기록이 중등로 오탐되지 않게 한다.
+- 하다솜 사례(중등수학 과제, 과정 분류 누락): 6/29에 유리수·순환소수 퀴즈와 1학년 기말 3회 퀴즈를 풀었지만 두 기록 모두 `learning_progress`에만 있고 `clusterId` 필드가 없었다. 제목 정규식으로 과정을 맞히면 초등 오탐 또는 unknown 누락이 생긴다. 해결은 `learning_progress/{unitId}`가 가리키는 `units → chapters → regions` 메타데이터를 역추적해 `middle-math`를 확인하는 것이다.
 - 중등수학 과제에 초등수학 비율/소수/분수 기록만 있는 경우에는 반대로 인정하지 않는다. “중등수학 과제 기준으로는 중등수학 기록이 확인되지 않는다”고 분리해서 안내한다.
 
 운영자 조치 제안:
@@ -460,7 +459,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - 확인되면 “초등수학 시간에 레벨업 학습으로 중등수학을 진행했고, 중등수학 퀴즈/데이터 로그가 확인된다”고 정정한다.
 - **제출문 키워드에 의존하지 않는다**: “SSS 합동을 배웠다”처럼 단원은 중등 기하인데 키워드 정규식(`기하/방정식/함수/...`)에 안 걸리면 레벨업 감지 자체가 실패한다. 키워드 신호가 꺼져 있어도, `history`/`learning_progress` 원본에서 `clusterId: "middle-math"` row가 존재하면 레벨업으로 판단한다(조하람 사례).
 - **`learning_progress`도 본다**: 퀴즈를 끝까지 완료하지 않으면 `history`에 안 쌓이고 `learning_progress`에만 진행 중 상태가 남는다. `history`만 보면 “0건”으로 나오므로, `learning_progress`의 `inProgressQuizzes`까지 합쳐 확인해야 한다(조승아 사례).
-- **한글이 NFD로 저장되어 있을 수 있다**: `learning_progress` 문서의 `unitTitle`이 `중2_05_일차함수`처럼 분해 자모면, NFC 정규화 없이 “함수” 키워드를 찾으면 매칭이 실패해 과정이 `unknown`으로 빠지고 기록이 누락된다. 과정 추론 함수는 입력을 NFC로 정규화한 뒤 비교한다(조승아 사례).
+- **한글이 NFD로 저장되어 있을 수 있다**: `learning_progress` 문서의 `unitTitle`, `unitId`, `chapterId`, `regionId`가 분해 자모로 저장될 수 있으므로 모든 비교와 메타데이터 역추적 전에 NFC 정규화가 필요하다(조승아 사례).
 
 상호작용 문장 예시:
 

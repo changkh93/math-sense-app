@@ -54,26 +54,6 @@ function normalizeCourseId(value = '') {
   return text || 'unknown';
 }
 
-function inferCourseFromUnitId(unitId = '') {
-  const text = normalizeText(unitId);
-  if (/python|gameproj|sprite|pygame/i.test(text)) return 'python';
-  if (/ratio|ratios/i.test(text)) return 'cluster_elementary';
-  if (/middle|geo|algebra|equation|chap_177392/i.test(text)) return 'middle-math';
-  return '';
-}
-
-function inferCourseFromTitle(title = '') {
-  const text = normalizeText(title);
-  if (/python|파이썬|pygame|sprite|add_sound|sound|몬스터|플레이어|게임|코드/i.test(text)) return 'python';
-  // 중등수학을 초등수학보다 먼저 검사한다. "유리수와 순환소수"처럼 중등 단원인데
-  // "소수" 키워드가 겹쳐 초등으로 오탐되는 것을 막기 위해서다(하다솜 사례).
-  // "함수"/"등식"/"정수"처럼 초등·파이썬에서도 등장하는 모호한 단어는 단독 키워드에서 뺀다.
-  // 대신 중등 전용 단원명과 단원평가/기말/기출/학년 같은 평가 키워드로 분류한다.
-  if (/중등|방정식|부등식|다항식|곱셈공식|기하|유리수|무리수|소인수분해|제곱근|거듭제곱|순환소수|절댓값|경우의\s*수|확률|통계|피타고라스|삼각비|무게중심|내심|외심|닮음|일차함수|이차함수|이차방정식|연립방정식|부등식의\s*해|기말|중간\s*평가|단원\s*평가|기출|평가\s*[0-9]+회|[0-9]학년/i.test(text)) return 'middle-math';
-  if (/비와\s*비율|초등|자연수|분수|소수|비례|비율|축척|나누기|곱하기|묶음|등분제|포함제/i.test(text)) return 'cluster_elementary';
-  return '';
-}
-
 function hasMiddleMathLevelUpSignal(text = '') {
   return /중등|방정식|부등식|등식|함수|다항식|곱셈공식|제곱근|소인수분해|완전제곱|이차|유리수|정수|절댓값|기하/i.test(normalizeText(text));
 }
@@ -108,6 +88,61 @@ async function fetchRegionClusterId(regionId = '') {
   return clusterId;
 }
 
+const chapterCourseCache = new Map();
+async function fetchChapterCourseId(chapterId = '') {
+  const normalizedChapterId = normalizeText(chapterId);
+  if (!normalizedChapterId) return '';
+  if (chapterCourseCache.has(normalizedChapterId)) return chapterCourseCache.get(normalizedChapterId);
+
+  let courseId = '';
+  try {
+    const snap = await db.collection('chapters').doc(normalizedChapterId).get();
+    if (snap.exists) {
+      const data = snap.data();
+      courseId = normalizeKnownCourseId(data.clusterId)
+        || normalizeKnownCourseId(data.courseId)
+        || normalizeKnownCourseId(data.regionId);
+      if (!courseId && data.regionId) {
+        courseId = normalizeKnownCourseId(await fetchRegionClusterId(data.regionId));
+      }
+    }
+  } catch (error) {
+    void error;
+  }
+
+  chapterCourseCache.set(normalizedChapterId, courseId);
+  return courseId;
+}
+
+const unitCourseCache = new Map();
+async function fetchUnitCourseId(unitId = '') {
+  const normalizedUnitId = normalizeText(unitId);
+  if (!normalizedUnitId) return '';
+  if (unitCourseCache.has(normalizedUnitId)) return unitCourseCache.get(normalizedUnitId);
+
+  let courseId = '';
+  try {
+    const snap = await db.collection('units').doc(normalizedUnitId).get();
+    if (snap.exists) {
+      const data = snap.data();
+      courseId = normalizeKnownCourseId(data.clusterId)
+        || normalizeKnownCourseId(data.courseId)
+        || normalizeKnownCourseId(data.regionId);
+      if (!courseId && data.regionId) {
+        courseId = normalizeKnownCourseId(await fetchRegionClusterId(data.regionId));
+      }
+      if (!courseId && data.chapterId) {
+        courseId = await fetchChapterCourseId(data.chapterId);
+      }
+    }
+  } catch (error) {
+    void error;
+  }
+
+  unitCourseCache.set(normalizedUnitId, courseId);
+  return courseId;
+}
+
 function shouldIncludeCourse(itemCourse = '', normalizedCourseId = '', options = {}) {
   if (!normalizedCourseId || normalizedCourseId === 'unknown') return true;
   if (itemCourse === normalizedCourseId) return true;
@@ -121,19 +156,25 @@ function itemCourseId(item = {}) {
     || normalizeKnownCourseId(item.courseId)
     || normalizeKnownCourseId(item.regionId);
   if (explicit) return explicit;
-  return normalizeCourseId(
-    inferCourseFromUnitId(item.unitId || '')
-    || inferCourseFromTitle(`${titleOf(item)} ${item.quizTitle || ''}`)
-  );
+  return 'unknown';
 }
 
-// 비동기 분류: region 역조회로 정확한 clusterId를 구한다. learning_progress처럼 clusterId 필드가
-// 없는 문서에서 정규식 오탐 없이 과정을 정한다. region 역조회가 안 되면 폴백으로 itemCourseId.
+// 비동기 분류: 학습 row가 가리키는 unit/chapter/region 문서를 역추적해 정확한 clusterId를 구한다.
+// learning_progress처럼 clusterId 필드가 없는 문서도 제목/unitId 정규식 추론 없이 과정 메타데이터로 분류한다.
 async function resolveItemCourseId(item = {}) {
-  const explicit = normalizeKnownCourseId(item.clusterId) || normalizeKnownCourseId(item.courseId);
+  const explicit = normalizeKnownCourseId(item.clusterId)
+    || normalizeKnownCourseId(item.courseId)
+    || normalizeKnownCourseId(item.codeTrace?.clusterId)
+    || normalizeKnownCourseId(item.codeTrace?.courseId);
   if (explicit) return explicit;
   const regionAlias = normalizeKnownCourseId(item.regionId);
   if (regionAlias) return regionAlias;
+
+  const unitCourse = await fetchUnitCourseId(item.unitId || item.id);
+  if (unitCourse) return unitCourse;
+
+  const chapterCourse = await fetchChapterCourseId(item.chapterId || item.codeTrace?.chapterId || '');
+  if (chapterCourse) return chapterCourse;
 
   const explicitRegionId = normalizeText(item.regionId);
   const regionId = explicitRegionId || regionIdFromUnitLikeId(item.unitId) || regionIdFromUnitLikeId(item.id);

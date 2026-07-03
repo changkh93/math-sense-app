@@ -541,9 +541,13 @@ export default function CodeTracePlayer({
         transaction.update(userRef, userUpdates);
         transaction.set(progressRef, {
           unitTitle: unitTitleValue,
+          chapterId: activeUnit?.chapterId || '',
+          clusterId: clusterId || 'python',
           codeTrace: {
             completed: isNowCompleted,
             ...(isNowCompleted ? { completedAt: serverTimestamp() } : {}),
+            chapterId: activeUnit?.chapterId || '',
+            clusterId: clusterId || 'python',
             completedExerciseIds,
             exerciseAttempts: freshAttempts,
             completedExerciseCount,
@@ -654,8 +658,12 @@ export default function CodeTracePlayer({
       }
       await setDoc(progressRef, {
         unitTitle: unitTitle || activeUnit?.title || '',
+        chapterId: activeUnit?.chapterId || '',
+        clusterId: clusterId || 'python',
         codeTrace: {
           completed: false,
+          chapterId: activeUnit?.chapterId || '',
+          clusterId: clusterId || 'python',
           completedExerciseIds: currentExerciseIds.filter(id => completedIds.has(id)),
           exerciseAttempts: filteredAttempts,
           drafts: filteredDrafts,
@@ -728,9 +736,13 @@ export default function CodeTracePlayer({
         transaction.update(userRef, userUpdates);
         transaction.set(progressRef, {
           unitTitle: unitTitle || activeUnit?.title || '',
+          chapterId: activeUnit?.chapterId || '',
+          clusterId: clusterId || 'python',
           codeTrace: {
             completed: true,
             completedAt: serverTimestamp(),
+            chapterId: activeUnit?.chapterId || '',
+            clusterId: clusterId || 'python',
             completedExerciseIds,
             exerciseAttempts: filteredAttempts,
             completedExerciseCount,

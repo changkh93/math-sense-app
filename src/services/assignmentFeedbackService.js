@@ -109,43 +109,86 @@ async function fetchRegionClusterId(regionId = '') {
   return clusterId;
 }
 
-// 정규식 기반 과정 추론은 region 역조회가 불가능할 때의 최후의 보루(폴백)다.
-// 이것만 쓰면 오탐/누락이 생기므로(하다솜/조승아/조하람 사례), region 역조회를 먼저 시도한다.
-function inferCourseFromUnitId(unitId = '') {
-  const text = normalizeText(unitId);
-  if (/python|pygame|sprite|gameproj|sound|monster|player/i.test(text)) return 'python';
-  if (/ratio|ratios|elementary/i.test(text)) return 'cluster_elementary';
-  if (/middle|geo|algebra|equation|chap_177392/i.test(text)) return 'middle-math';
-  return '';
-}
-
-function inferCourseFromTitle(title = '') {
-  const text = normalizeText(title);
-  if (/python|파이썬|pygame|sprite|add_sound|sound|몬스터|플레이어|게임|코드/i.test(text)) return 'python';
-  if (/중등|방정식|부등식|다항식|곱셈공식|기하|유리수|무리수|소인수분해|제곱근|거듭제곱|순환소수|절댓값|경우의\s*수|확률|통계|피타고라스|삼각비|무게중심|내심|외심|닮음|일차함수|이차함수|이차방정식|연립방정식|부등식의\s*해|기말|중간\s*평가|단원\s*평가|기출|평가\s*[0-9]+회|[0-9]학년/i.test(text)) return 'middle-math';
-  if (/비와\s*비율|초등|자연수|분수|소수|비례|비율|축척|나누기|곱하기|묶음|등분제|포함제/i.test(text)) return 'cluster_elementary';
-  return '';
-}
-
 // 동기 분류: 명시적 clusterId/courseId/regionId 필드가 있으면 그걸 쓴다.
 function learningItemCourseId(item = {}) {
   const explicit = normalizeKnownClusterId(item.clusterId)
     || normalizeKnownClusterId(item.courseId)
     || normalizeKnownClusterId(item.regionId);
   if (explicit) return explicit;
-  return normalizeClusterId(
-    inferCourseFromUnitId(item.unitId || '')
-    || inferCourseFromTitle(`${item.unitTitle || ''} ${item.transmissionTitle || ''} ${item.quizTitle || ''} ${item.regionTitle || ''}`)
-  );
+  return 'unknown';
 }
 
-// 비동기 분류: region 역조회로 정확한 clusterId를 구한다. learning_progress처럼 clusterId 필드가
-// 없는 문서에서 정규식 오탐 없이 과정을 정한다.
+const chapterCourseCache = new Map();
+async function fetchChapterCourseId(chapterId = '') {
+  const normalizedChapterId = normalizeText(chapterId);
+  if (!normalizedChapterId) return '';
+  if (chapterCourseCache.has(normalizedChapterId)) return chapterCourseCache.get(normalizedChapterId);
+
+  let courseId = '';
+  try {
+    const snap = await getDoc(doc(db, 'chapters', normalizedChapterId));
+    if (snap.exists()) {
+      const data = snap.data();
+      courseId = normalizeKnownClusterId(data.clusterId)
+        || normalizeKnownClusterId(data.courseId)
+        || normalizeKnownClusterId(data.regionId);
+      if (!courseId && data.regionId) {
+        courseId = normalizeKnownClusterId(await fetchRegionClusterId(data.regionId));
+      }
+    }
+  } catch (error) {
+    void error;
+  }
+
+  chapterCourseCache.set(normalizedChapterId, courseId);
+  return courseId;
+}
+
+const unitCourseCache = new Map();
+async function fetchUnitCourseId(unitId = '') {
+  const normalizedUnitId = normalizeText(unitId);
+  if (!normalizedUnitId) return '';
+  if (unitCourseCache.has(normalizedUnitId)) return unitCourseCache.get(normalizedUnitId);
+
+  let courseId = '';
+  try {
+    const snap = await getDoc(doc(db, 'units', normalizedUnitId));
+    if (snap.exists()) {
+      const data = snap.data();
+      courseId = normalizeKnownClusterId(data.clusterId)
+        || normalizeKnownClusterId(data.courseId)
+        || normalizeKnownClusterId(data.regionId);
+      if (!courseId && data.regionId) {
+        courseId = normalizeKnownClusterId(await fetchRegionClusterId(data.regionId));
+      }
+      if (!courseId && data.chapterId) {
+        courseId = await fetchChapterCourseId(data.chapterId);
+      }
+    }
+  } catch (error) {
+    void error;
+  }
+
+  unitCourseCache.set(normalizedUnitId, courseId);
+  return courseId;
+}
+
+// 비동기 분류: 학습 row가 가리키는 unit/chapter/region 문서를 역추적해 정확한 clusterId를 구한다.
+// learning_progress처럼 clusterId 필드가 없는 문서도 제목/unitId 정규식 추론 없이 과정 메타데이터로 분류한다.
 async function resolveLearningItemCourseId(item = {}) {
-  const explicit = normalizeKnownClusterId(item.clusterId) || normalizeKnownClusterId(item.courseId);
+  const explicit = normalizeKnownClusterId(item.clusterId)
+    || normalizeKnownClusterId(item.courseId)
+    || normalizeKnownClusterId(item.codeTrace?.clusterId)
+    || normalizeKnownClusterId(item.codeTrace?.courseId);
   if (explicit) return explicit;
   const regionAlias = normalizeKnownClusterId(item.regionId);
   if (regionAlias) return regionAlias;
+
+  const unitCourse = await fetchUnitCourseId(item.unitId || item.id);
+  if (unitCourse) return unitCourse;
+
+  const chapterCourse = await fetchChapterCourseId(item.chapterId || item.codeTrace?.chapterId || '');
+  if (chapterCourse) return chapterCourse;
 
   const explicitRegionId = normalizeText(item.regionId);
   const regionId = explicitRegionId || regionIdFromUnitLikeId(item.unitId) || regionIdFromUnitLikeId(item.id);
@@ -153,7 +196,6 @@ async function resolveLearningItemCourseId(item = {}) {
     const clusterId = await fetchRegionClusterId(regionId);
     if (clusterId) return normalizeClusterId(clusterId);
   }
-  // region 역조회가 안 되면 최후의 보루로 정규식/필드 폴백.
   return learningItemCourseId(item);
 }
 

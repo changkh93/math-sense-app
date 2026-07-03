@@ -173,10 +173,22 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           excludedOtherCourseTitles: context.dailyLearningSummary.excludedOtherCourseTitles || [],
           codeTraceCount: context.dailyLearningSummary.codeTraceCount || 0,
           codeTraceProgressCount: context.dailyLearningSummary.codeTraceProgressCount || 0,
+          codeTraces: context.dailyLearningSummary.codeTraces || [],
+          inProgressCodeTraces: context.dailyLearningSummary.inProgressCodeTraces || [],
           codeTraceTitles: [
-            ...(context.dailyLearningSummary.codeTraces || []).map(item => `${item.title || 'CODE TRACE'} 완료${item.accuracy != null ? ` ${item.accuracy}점` : ''}`),
-            ...(context.dailyLearningSummary.inProgressCodeTraces || []).map(item => `${item.title || 'CODE TRACE'} 진행 ${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`)
+            ...(context.dailyLearningSummary.codeTraces || []).map(item => {
+              const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+              const accuracy = item.accuracy != null ? ` ${item.accuracy}%` : '';
+              return `${item.title || 'CODE TRACE'} 완료 ${count}${accuracy}`;
+            }),
+            ...(context.dailyLearningSummary.inProgressCodeTraces || []).map(item => {
+              const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+              const accuracy = item.bestAccuracy != null ? ` 최고 ${item.bestAccuracy}%` : '';
+              return `${item.title || 'CODE TRACE'} 진행 ${count}${accuracy}`;
+            })
           ],
+          learningLoad: context.dailyLearningSummary.learningLoad || null,
+          attention: context.dailyLearningSummary.attention || null,
           codeComparisonSummary: context.currentSubmission.codeComparison?.summary || '',
           darkMatterCount: context.darkMatterSummary.totalActive,
         },
@@ -377,14 +389,30 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
                   {' / 진행 '}
                   {aiFeedback?.contextSummary?.codeTraceProgressCount ?? aiContext?.dailyLearningSummary?.codeTraceProgressCount ?? 0}건
                   {((aiFeedback?.contextSummary?.codeTraceTitles || [
-                    ...(aiContext?.dailyLearningSummary?.codeTraces || []).map(item => `${item.title || 'CODE TRACE'} 완료${item.accuracy != null ? ` ${item.accuracy}점` : ''}`),
-                    ...(aiContext?.dailyLearningSummary?.inProgressCodeTraces || []).map(item => `${item.title || 'CODE TRACE'} 진행 ${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`)
+                    ...(aiContext?.dailyLearningSummary?.codeTraces || []).map(item => {
+                      const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+                      const accuracy = item.accuracy != null ? ` ${item.accuracy}%` : '';
+                      return `${item.title || 'CODE TRACE'} 완료 ${count}${accuracy}`;
+                    }),
+                    ...(aiContext?.dailyLearningSummary?.inProgressCodeTraces || []).map(item => {
+                      const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+                      const accuracy = item.bestAccuracy != null ? ` 최고 ${item.bestAccuracy}%` : '';
+                      return `${item.title || 'CODE TRACE'} 진행 ${count}${accuracy}`;
+                    })
                   ]).length > 0) && (
                     <span style={{ color: 'var(--text-muted)' }}>
                       {' - '}
                       {(aiFeedback?.contextSummary?.codeTraceTitles || [
-                        ...(aiContext?.dailyLearningSummary?.codeTraces || []).map(item => `${item.title || 'CODE TRACE'} 완료${item.accuracy != null ? ` ${item.accuracy}점` : ''}`),
-                        ...(aiContext?.dailyLearningSummary?.inProgressCodeTraces || []).map(item => `${item.title || 'CODE TRACE'} 진행 ${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`)
+                        ...(aiContext?.dailyLearningSummary?.codeTraces || []).map(item => {
+                          const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+                          const accuracy = item.accuracy != null ? ` ${item.accuracy}%` : '';
+                          return `${item.title || 'CODE TRACE'} 완료 ${count}${accuracy}`;
+                        }),
+                        ...(aiContext?.dailyLearningSummary?.inProgressCodeTraces || []).map(item => {
+                          const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+                          const accuracy = item.bestAccuracy != null ? ` 최고 ${item.bestAccuracy}%` : '';
+                          return `${item.title || 'CODE TRACE'} 진행 ${count}${accuracy}`;
+                        })
                       ]).join(', ')}
                     </span>
                   )}

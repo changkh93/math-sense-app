@@ -81,6 +81,20 @@ function buildEvidence(context) {
   if (learning.inProgressQuizzes?.length) {
     evidence.push(`진행 중 퀴즈 확인: ${learning.inProgressQuizzes.map(item => `${item.title} ${item.answeredCount}/${item.totalCount}`).join(', ')}`);
   }
+  if (learning.codeTraces?.length) {
+    evidence.push(`CODE TRACE 완료 확인: ${learning.codeTraces.map(item => {
+      const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+      const accuracy = item.accuracy != null ? ` 정확도 ${item.accuracy}%` : '';
+      return `${item.title || 'CODE TRACE'} ${count}${accuracy}`;
+    }).join(', ')}`);
+  }
+  if (learning.inProgressCodeTraces?.length) {
+    evidence.push(`진행 중 CODE TRACE 확인: ${learning.inProgressCodeTraces.map(item => {
+      const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+      const accuracy = item.bestAccuracy != null ? ` 최고 정확도 ${item.bestAccuracy}%` : '';
+      return `${item.title || 'CODE TRACE'} ${count}${accuracy}`;
+    }).join(', ')}`);
+  }
   if (context.previous?.length) evidence.push(`같은 과정 이전 제출 ${context.previous.length}건 참고`);
   const previousResponses = (context.previous || []).filter(item => item.feedbackReaction || item.feedbackComment || item.feedbackResponse);
   if (previousResponses.length) {
@@ -107,7 +121,7 @@ function buildRubric(context) {
     resultVerification: assignment.attachments?.length ? 3 : 1,
     feedbackReflection: context.previous?.length ? 2 : 1,
     weaknessRecovery: darkMatter.count ? 1 : 2,
-    selfDirection: String(assignment.content || '').length >= 100 ? 2 : 1,
+    selfDirection: String(assignment.content || '').length >= 100 || learning.codeTraceCount || learning.codeTraceProgressCount ? 2 : 1,
     focusManagement: learning.attention?.opportunities
       ? Math.max(0, Math.min(3, Math.round((learning.attention.hits / learning.attention.opportunities) * 3)))
       : 2,
@@ -128,6 +142,8 @@ function calculateSuggestedBonusCrystals(context) {
   else if (load.level === '조금 부족') score += 5;
   else if (load.level === '수학 기록 없음') score -= 3;
   else if ((learning.videoCount || 0) > 0 || (learning.quizCount || 0) > 0 || (learning.inProgressQuizCount || 0) > 0) score += 3;
+
+  if ((learning.codeTraceCount || 0) > 0 || (learning.codeTraceProgressCount || 0) > 0) score += 5;
 
   if (load.hasBalancedPractice) score += 5;
   else if ((learning.videoCount || 0) > 0 && (learning.quizCount || 0) === 0 && (learning.inProgressQuizCount || 0) === 0) score += 1;
@@ -214,6 +230,22 @@ for (const context of contexts) {
       attention: context.learningSummary?.attention || null,
       learningLoad: context.learningSummary?.learningLoad || null,
       inProgressQuizCount: context.learningSummary?.inProgressQuizCount || 0,
+      codeTraceCount: context.learningSummary?.codeTraceCount || 0,
+      codeTraceProgressCount: context.learningSummary?.codeTraceProgressCount || 0,
+      codeTraces: context.learningSummary?.codeTraces || [],
+      inProgressCodeTraces: context.learningSummary?.inProgressCodeTraces || [],
+      codeTraceTitles: [
+        ...(context.learningSummary?.codeTraces || []).map(item => {
+          const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+          const accuracy = item.accuracy != null ? ` ${item.accuracy}%` : '';
+          return `${item.title || 'CODE TRACE'} 완료 ${count}${accuracy}`;
+        }),
+        ...(context.learningSummary?.inProgressCodeTraces || []).map(item => {
+          const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
+          const accuracy = item.bestAccuracy != null ? ` 최고 ${item.bestAccuracy}%` : '';
+          return `${item.title || 'CODE TRACE'} 진행 ${count}${accuracy}`;
+        }),
+      ],
       allLearningActivityCount: context.learningSummary?.allActivityCount || context.learningSummary?.activityCount || 0,
       excludedOtherCourseTitles: context.learningSummary?.excludedOtherCourseTitles || [],
       codeComparisonSummary: context.assignment?.codeComparison?.summary || '',
