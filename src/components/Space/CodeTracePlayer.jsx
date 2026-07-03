@@ -126,6 +126,11 @@ function getCursorLineIndex(code = '', cursor = 0) {
   return normalizeNewlines(String(code || '').slice(0, safeCursor)).split('\n').length - 1;
 }
 
+function isCaretAtLineEnd(code = '', cursor = 0) {
+  const safeCursor = Math.max(0, Math.min(cursor, String(code || '').length));
+  return safeCursor >= String(code || '').length || String(code || '')[safeCursor] === '\n';
+}
+
 function findStringLiteralEnd(code = '', startIndex = 0) {
   const quote = code[startIndex];
   if (quote !== '"' && quote !== "'") return -1;
@@ -724,6 +729,7 @@ export default function CodeTracePlayer({
   const [studentSelection, setStudentSelection] = useState({ start: 0, end: 0 });
   const previousLineComboRef = useRef(0);
   const studentTextareaRef = useRef(null);
+  const typingTraceTextRef = useRef(null);
 
   useEffect(() => {
     const savedIds = learningProgress?.codeTrace?.completedExerciseIds;
@@ -900,6 +906,12 @@ export default function CodeTracePlayer({
     }, 1000);
     return () => clearInterval(timer);
   }, [answerVisible, exerciseIndex, mode, visibleLines]);
+
+  useEffect(() => {
+    const traceEl = typingTraceTextRef.current;
+    if (!traceEl) return;
+    traceEl.scrollLeft = traceEl.scrollWidth;
+  }, [typingTrace.typedChars.length, studentSelection.start, exerciseIndex]);
 
   if (!exercise) {
     return (
@@ -1347,6 +1359,14 @@ export default function CodeTracePlayer({
       end: textarea.selectionEnd || textarea.selectionStart || 0,
     });
   };
+  const syncStudentTypingViewport = (textarea = studentTextareaRef.current) => {
+    if (!textarea) return;
+    const cursor = textarea.selectionStart || 0;
+    if (!isCaretAtLineEnd(textarea.value, cursor)) return;
+    requestAnimationFrame(() => {
+      textarea.scrollLeft = textarea.scrollWidth;
+    });
+  };
   const insertStringLiteral = (suggestion = activeStringSuggestion) => {
     if (!suggestion || !studentTextareaRef.current) return false;
     const textarea = studentTextareaRef.current;
@@ -1370,6 +1390,7 @@ export default function CodeTracePlayer({
       textarea.focus();
       textarea.selectionStart = nextCursor;
       textarea.selectionEnd = nextCursor;
+      syncStudentTypingViewport(textarea);
     });
     return true;
   };
@@ -1400,6 +1421,7 @@ export default function CodeTracePlayer({
       requestAnimationFrame(() => {
         textarea.selectionStart = selectionStart + STUDENT_INDENT.length;
         textarea.selectionEnd = selectionStart + STUDENT_INDENT.length;
+        syncStudentTypingViewport(textarea);
       });
       return;
     }
@@ -1439,6 +1461,7 @@ export default function CodeTracePlayer({
       requestAnimationFrame(() => {
         textarea.selectionStart = nextStart;
         textarea.selectionEnd = nextEnd;
+        syncStudentTypingViewport(textarea);
       });
       return;
     }
@@ -1452,6 +1475,7 @@ export default function CodeTracePlayer({
     requestAnimationFrame(() => {
       textarea.selectionStart = nextStart;
       textarea.selectionEnd = nextEnd;
+      syncStudentTypingViewport(textarea);
     });
   };
 
@@ -1487,7 +1511,7 @@ export default function CodeTracePlayer({
           100% { text-shadow: 0 0 12px rgba(52,211,153,0.7); }
         }
         .code-trace-student-panel {
-          overflow: hidden;
+          overflow: visible;
         }
         .code-trace-student-panel.is-complete::after {
           content: "";
@@ -1542,16 +1566,21 @@ export default function CodeTracePlayer({
           box-shadow: 0 0 14px rgba(34,197,94,0.34);
         }
         .code-trace-typing-trace {
-          margin-top: 0.62rem;
+          position: sticky;
+          top: 0.75rem;
+          z-index: 5;
+          margin: 0 0 0.62rem;
           min-height: 2.35rem;
           border-radius: 10px;
           border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(2,6,23,0.46);
+          background: rgba(15,23,42,0.88);
+          backdrop-filter: blur(12px);
           display: flex;
           align-items: center;
           gap: 0.65rem;
           padding: 0.55rem 0.7rem;
           overflow: hidden;
+          box-shadow: 0 12px 30px rgba(2,6,23,0.24);
         }
         .code-trace-typing-line {
           flex: 0 0 auto;
@@ -1562,11 +1591,15 @@ export default function CodeTracePlayer({
         .code-trace-typing-text {
           flex: 1;
           min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          overflow-x: auto;
+          overflow-y: hidden;
           white-space: pre;
+          scrollbar-width: none;
           font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
           font-size: 0.86rem;
+        }
+        .code-trace-typing-text::-webkit-scrollbar {
+          display: none;
         }
         .code-trace-typing-char {
           color: rgba(148,163,184,0.68);
@@ -1895,6 +1928,20 @@ export default function CodeTracePlayer({
                 {linePulse.enter ? '라인 입력' : `${linePulse.count}줄 콤보`}
               </div>
             )}
+            <div className="code-trace-typing-trace">
+              <span className="font-tech code-trace-typing-line">{typingTrace.lineNumber}줄</span>
+              <code ref={typingTraceTextRef} className="code-trace-typing-text">
+                {typingTrace.typedChars.length ? typingTrace.typedChars.map((item, index) => (
+                  <span key={`${index}-${item.char}`} className={`code-trace-typing-char is-${item.status}`}>
+                    {item.char === ' ' ? '·' : item.char === '\t' ? '→' : item.char}
+                  </span>
+                )) : <span className="code-trace-typing-char"> </span>}
+                <span className="code-trace-typing-cursor">▌</span>
+              </code>
+              <span className="code-trace-typing-meter" aria-hidden="true">
+                <span style={{ width: `${Math.round(typingTrace.progress * 100)}%` }} />
+              </span>
+            </div>
             <div className="code-trace-input-stage">
               <div className="code-trace-line-rail">
                 {lineFeedback.slice(0, 18).map(item => (
@@ -1913,30 +1960,23 @@ export default function CodeTracePlayer({
                 onChange={e => {
                   setStudentCode(e.target.value);
                   updateStudentSelection(e.target);
+                  syncStudentTypingViewport(e.target);
                 }}
                 onSelect={e => updateStudentSelection(e.target)}
-                onClick={e => updateStudentSelection(e.currentTarget)}
-                onKeyUp={e => updateStudentSelection(e.currentTarget)}
+                onClick={e => {
+                  updateStudentSelection(e.currentTarget);
+                  syncStudentTypingViewport(e.currentTarget);
+                }}
+                onKeyUp={e => {
+                  updateStudentSelection(e.currentTarget);
+                  syncStudentTypingViewport(e.currentTarget);
+                }}
                 onKeyDown={handleStudentKeyDown}
                 spellCheck={false}
                 wrap="off"
                 placeholder="코드를 따라 쓰세요."
                 style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', height: codePanelHeight, minHeight: CODE_PANEL_MIN_HEIGHT, maxHeight: CODE_PANEL_MAX_HEIGHT, resize: 'vertical', background: '#020617', color: '#f8fafc', border: currentPassed ? '1px solid rgba(34,197,94,0.55)' : '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem 1rem 1rem 3rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2, overflow: 'auto', whiteSpace: 'pre', animation: currentPassed ? 'codeTracePassGlow 1.6s ease-in-out infinite' : 'none' }}
               />
-            </div>
-            <div className="code-trace-typing-trace">
-              <span className="font-tech code-trace-typing-line">{typingTrace.lineNumber}줄</span>
-              <code className="code-trace-typing-text">
-                {typingTrace.typedChars.length ? typingTrace.typedChars.map((item, index) => (
-                  <span key={`${index}-${item.char}`} className={`code-trace-typing-char is-${item.status}`}>
-                    {item.char === ' ' ? '·' : item.char === '\t' ? '→' : item.char}
-                  </span>
-                )) : <span className="code-trace-typing-char"> </span>}
-                <span className="code-trace-typing-cursor">▌</span>
-              </code>
-              <span className="code-trace-typing-meter" aria-hidden="true">
-                <span style={{ width: `${Math.round(typingTrace.progress * 100)}%` }} />
-              </span>
             </div>
             {stringSuggestions.length > 0 && (
               <div className="code-trace-string-helper">
