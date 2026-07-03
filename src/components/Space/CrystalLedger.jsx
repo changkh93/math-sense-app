@@ -876,9 +876,9 @@ export default function CrystalLedger({ userData }) {
                 <span style={{ fontSize: '1.2em' }}>⌨️</span> 코드 따라쓰기
               </div>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                <li>각 코드 세트를 통과할 때마다 즉시 광석 지급</li>
-                <li>단원 전체 기준 <span style={{color: 'var(--text-bright)'}}>+30 ~ 80</span> 광석 범위</li>
-                <li>코드 세트별 <span style={{color: 'var(--text-bright)'}}>최초 1회</span>만 통과 보상 지급</li>
+                <li>코드 <span style={{color: 'var(--text-bright)'}}>줄 수 × 1.5</span> 광석 (긴 코드일수록 더 많이)</li>
+                <li>같은 세트 반복 연습 시 <span style={{color: 'var(--text-bright)'}}>2/3씩 감소</span> (15→10→7), <span style={{color: 'var(--text-bright)'}}>최대 3회</span></li>
+                <li>주말/휴일 <span style={{color: 'var(--text-bright)'}}>1.5배</span>, 수업시간 외 <span style={{color: 'var(--text-bright)'}}>1.2배</span> 적용</li>
                 <li>정답 코드는 복사할 수 없고, 손으로 따라 써야 합니다</li>
               </ul>
             </div>

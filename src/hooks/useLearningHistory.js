@@ -460,6 +460,10 @@ export function useLearningHistory(userId, dateStr) {
                   bestAccuracy: Number(codeTrace.bestAccuracy || 0),
                   crystalsEarnedTotal: Number(codeTrace.crystalsEarnedTotal || 0),
                   earnedExerciseCount: Array.isArray(codeTrace.earnedExerciseIds) ? codeTrace.earnedExerciseIds.length : 0,
+                  exerciseAttempts: codeTrace.exerciseAttempts || {},
+                  totalPracticeCount: codeTrace.exerciseAttempts
+                    ? Object.values(codeTrace.exerciseAttempts).reduce((sum, n) => sum + (Number(n) || 0), 0)
+                    : 0,
                   lastExerciseId: codeTrace.lastExerciseId || '',
                   lastMode: codeTrace.lastMode || '',
                   updatedAt: codeTrace.updatedAt
@@ -597,6 +601,7 @@ function buildGroupedActivities(rawActivities) {
         completedExerciseCount: 0,
         crystalsEarnedTotal: 0,
         earnedExerciseCount: 0,
+        totalPracticeCount: 0,
         bestAccuracy: null,
         lastMode: '',
         subActivities: []
@@ -678,6 +683,10 @@ function buildGroupedActivities(rawActivities) {
       group.totalCount = Math.max(group.totalCount || 0, totalExerciseCount);
       group.crystalsEarnedTotal = Math.max(group.crystalsEarnedTotal || 0, crystalsFromMeta);
       group.earnedExerciseCount = Math.max(group.earnedExerciseCount || 0, earnedExerciseCount);
+      const practiceCount = Number(meta.totalPracticeCount || 0);
+      if (practiceCount > 0) {
+        group.totalPracticeCount = Math.max(group.totalPracticeCount || 0, practiceCount);
+      }
       if (Number.isFinite(bestAccuracy)) {
         group.bestAccuracy = Math.max(group.bestAccuracy || 0, bestAccuracy);
         group.score = Math.max(group.score || 0, bestAccuracy);
