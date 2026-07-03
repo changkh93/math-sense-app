@@ -71,8 +71,15 @@ export default function ProfileEditView({ onBack }) {
   );
 
   useEffect(() => {
-    if (userData) {
-      setFormData({
+    if (!userData) return;
+    // 폼 초기화는 최초 1회만 수행한다.
+    // useAuth는 onSnapshot으로 userData를 실시간 갱신하므로, 사용자가 폼을
+    // 수정하는 동안 백그라운드 갱신이 들어와 입력값이 서버값으로 리셋되는
+    // 현상(약 30~40초 후 초기화)을 방지하기 위함이다.
+    setFormData((prev) => {
+      if (prev.__initialized) return prev;
+      return {
+        __initialized: true,
         studentName: userData.studentName || user?.displayName || '',
         studentPhone: userData.studentPhone || '',
         participation: userData.participation || {},
@@ -86,9 +93,10 @@ export default function ProfileEditView({ onBack }) {
         selectedBaseTheme: normalizeOwnedBaseThemes(userData).includes(userData.selectedBaseTheme)
           ? userData.selectedBaseTheme
           : normalizeOwnedBaseThemes(userData)[0]
-      });
-    }
+      };
+    });
   }, [userData, user]);
+
 
   const handleDaySelect = (clusterId, day) => {
     setFormData(prev => {

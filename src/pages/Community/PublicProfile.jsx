@@ -62,29 +62,6 @@ function getDateLabel(value) {
   }).format(date);
 }
 
-function buildSocialBadges(profile = {}) {
-  return [
-    {
-      title: '아고라 조력자',
-      icon: '🤝',
-      unlocked: (profile.helpCount || 0) >= 1,
-      desc: '채택된 답변을 보유했습니다.'
-    },
-    {
-      title: '친절한 해결사',
-      icon: '🌟',
-      unlocked: (profile.helpCount || 0) >= 5,
-      desc: '도움 5회 이상을 달성했습니다.'
-    },
-    {
-      title: '질문 개척자',
-      icon: '💬',
-      unlocked: (profile.questionCount || 0) >= 10,
-      desc: '질문 10개 이상을 남겼습니다.'
-    },
-  ];
-}
-
 function mergeBadges(...badgeGroups) {
   const seen = new Set();
   return badgeGroups
@@ -631,7 +608,7 @@ export default function PublicProfile() {
     ? `${frameTheme.glow}, 0 0 44px color-mix(in srgb, ${baseTheme.accent} 18%, transparent)`
     : frameTheme.glow;
   const earnedBadges = profile
-    ? mergeBadges(buildCollectionBadges(profile, history), buildSocialBadges(profile))
+    ? mergeBadges(buildCollectionBadges(profile, history))
     : [];
   const conceptMap = React.useMemo(
     () => buildConceptMap(history, refinementSignals, isOwnProfile),

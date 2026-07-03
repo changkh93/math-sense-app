@@ -13,7 +13,7 @@ export default function SpaceCollection({ userData, history }) {
     <div className="fade-in">
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
         <h2 style={{ fontSize: '2.5rem', color: 'var(--text-bright)', marginBottom: '0.5rem' }}>🏆 우주 도감</h2>
-        <p style={{ color: 'var(--text-muted)' }}>수학 탐험을 통해 획득한 명예와 장비를 관리하세요.</p>
+        <p style={{ color: 'var(--text-muted)' }}>수학 탐험을 통해 획득한 명예를 관리하세요.</p>
         
         <div className="glass-card" style={{ 
           marginTop: '2rem', 
@@ -27,7 +27,6 @@ export default function SpaceCollection({ userData, history }) {
           <p style={{ color: 'var(--text-bright)', marginBottom: '0.5rem', fontWeight: 700 }}>💡 도감 이용 가이드</p>
           <ul style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingLeft: '1.2rem' }}>
             <li><strong style={{ color: 'var(--star-gold)' }}>탐사 배지</strong>: 특정 목표를 달성하면 자동으로 수여되는 <strong>명예의 상징</strong>입니다.</li>
-            <li><strong style={{ color: 'var(--crystal-cyan)' }}>보유 장비</strong>: 수학 탐사로 모은 광석(Ore)에 따라 해제되는 <strong>업그레이드 아이템</strong>입니다.</li>
           </ul>
         </div>
       </div>

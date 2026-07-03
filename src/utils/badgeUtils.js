@@ -27,10 +27,35 @@ export function calculateCollectionBadgeStats(history = [], userData = {}) {
   };
 }
 
+export function buildSocialBadges(userData = {}) {
+  const profile = userData || {};
+  return [
+    {
+      title: '아고라 조력자',
+      icon: '🤝',
+      unlocked: (profile.helpCount || 0) >= 1,
+      desc: '채택된 답변을 보유했습니다.'
+    },
+    {
+      title: '친절한 해결사',
+      icon: '🌟',
+      unlocked: (profile.helpCount || 0) >= 5,
+      desc: '도움 5회 이상을 달성했습니다.'
+    },
+    {
+      title: '질문 개척자',
+      icon: '💬',
+      unlocked: (profile.questionCount || 0) >= 10,
+      desc: '질문 10개 이상을 남겼습니다.'
+    },
+  ];
+}
+
 export function buildCollectionBadges(userData = {}, history = []) {
   const quizStats = calculateCollectionBadgeStats(history, userData);
 
   return [
+    ...buildSocialBadges(userData),
     { title: '코스모스 입문', icon: '🌌', unlocked: quizStats.uniqueQuizUnits > 0, desc: '첫 번째 수학 탐사를 성공적으로 마쳤습니다.' },
     { title: '광석 수집가', icon: '💎', unlocked: (userData?.crystals || 0) >= 500, desc: '광석을 500개 이상 모았습니다. (중급 대원)' },
     { title: '은하 학자', icon: '📜', unlocked: quizStats.averageScore >= 95, desc: '평균 정답률 95% 이상을 유지 중인 엘리트 대원입니다.' },
