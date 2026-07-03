@@ -157,7 +157,16 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
       } catch (error) {
         console.warn('AI feedback generation failed; using local fallback:', error);
         payload = createFallbackAssignmentFeedback(context, feedbackStyle);
-        setAiError('AI 호출에 실패해 로컬 규칙 기반 초안을 생성했습니다. 문장을 한 번 더 확인해주세요.');
+        // AI 서버 혼잡(429/resource-exhausted)과 그 외 오류를 구분해 안내한다.
+        const errorCode = error?.code || '';
+        const isOverloaded =
+          errorCode === 'resource-exhausted' ||
+          /429|resource-exhausted|혼잡|too many|rate limit/i.test(error?.message || '');
+        setAiError(
+          isOverloaded
+            ? 'AI 서버가 일시적으로 혼잡해 응답하지 못했습니다. 잠시 후 다시 시도해 주세요. 지금은 로컬 규칙 기반 초안을 불러왔으니 문장을 한 번 더 확인해 주세요.'
+            : 'AI 호출에 실패해 로컬 규칙 기반 초안을 생성했습니다. 문장을 한 번 더 확인해주세요.'
+        );
       }
 
       const nextPayload = {

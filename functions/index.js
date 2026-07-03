@@ -1755,9 +1755,18 @@ exports.callGlmChat = regionalFunctions
 
     if (!response.ok) {
       console.error("callGlmChat API error:", response.status, responseText.slice(0, 500));
+      const status = response.status;
+      const detail = responseText.slice(0, 500);
+      // 429(과다 요청)는 BigModel 서버 측 일시적 과부하이므로 "잠시 후 재시도" 안내로 구분한다.
+      if (status === 429) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          `AI 서버가 일시적으로 혼잡해 응답하지 못했습니다(429). ${detail}`
+        );
+      }
       throw new functions.https.HttpsError(
         "internal",
-        `GLM API 오류(HTTP ${response.status}): ${responseText.slice(0, 500)}`
+        `GLM API 오류(HTTP ${status}): ${detail}`
       );
     }
 
