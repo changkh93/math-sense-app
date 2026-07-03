@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils';
 import { calculateGrowthUpdates } from '../../utils/rankingUtils';
 import { recordCrystalTransaction } from '../../utils/crystalLedger';
+import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils';
 import soundManager from '../../utils/SoundManager';
 
 const ANSWER_REVEAL_SECONDS = 30;
@@ -14,8 +15,15 @@ const CODE_PANEL_MIN_HEIGHT = 300;
 const CODE_PANEL_MAX_HEIGHT = 720;
 const CODE_PANEL_LINE_HEIGHT_PX = 23;
 const CODE_PANEL_VERTICAL_PADDING_PX = 32;
-const CODE_TRACE_MIN_UNIT_REWARD = 30;
-const CODE_TRACE_MAX_UNIT_REWARD = 80;
+
+// 보상: 라인 수 비례 + 반복 연습 감쇠
+// 기본 보상 = 코드 줄 수 × 1.5 (반올림, 최소 2)
+// 같은 세트를 반복 통과할 때마다 보상이 2/3씩 감소 (사용자 예시 15→10→7)
+// 최대 MAX_ATTEMPTS 회까지 보상 지급, 그 이후는 연습만 가능
+const LINE_REWARD_RATE = 1.5;
+const MIN_EXERCISE_REWARD = 2;
+const MAX_ATTEMPTS = 3;
+const DECAY_FACTOR = 2 / 3;
 
 function normalizeNewlines(text = '') {
   return String(text).replace(/\r\n/g, '\n');
@@ -178,22 +186,23 @@ function getExerciseId(exercise) {
   return exercise?.id || exercise?.docId || '';
 }
 
-function getUnitRewardTarget(accuracy = 0, passingAccuracy = 95) {
-  const safeAccuracy = Math.max(0, Math.min(100, Number(accuracy) || 0));
-  const safePassing = Math.max(1, Math.min(99, Number(passingAccuracy) || 95));
-  if (safeAccuracy < safePassing) return 0;
-  const ratio = (safeAccuracy - safePassing) / (100 - safePassing);
-  return Math.max(
-    CODE_TRACE_MIN_UNIT_REWARD,
-    Math.min(CODE_TRACE_MAX_UNIT_REWARD, CODE_TRACE_MIN_UNIT_REWARD + Math.round(ratio * (CODE_TRACE_MAX_UNIT_REWARD - CODE_TRACE_MIN_UNIT_REWARD)))
-  );
+// 정답 코드 줄 수 기반 기본 보상 (1회차). 라인×1.5, 반올림, 최소 2.
+function getExerciseBaseReward(answerCode = '') {
+  const lines = normalizeNewlines(answerCode).split('\n').length;
+  const raw = lines * LINE_REWARD_RATE;
+  return Math.max(MIN_EXERCISE_REWARD, Math.round(raw));
 }
 
-function distributeExerciseReward(unitRewardTarget, exerciseIndex, exerciseCount) {
-  if (!unitRewardTarget || !exerciseCount) return 0;
-  const base = Math.floor(unitRewardTarget / exerciseCount);
-  const remainder = unitRewardTarget % exerciseCount;
-  return base + (exerciseIndex < remainder ? 1 : 0);
+// 시도 횟수(1-base)에 따른 보상. 2/3 감쇠, 반올림. MAX_ATTEMPTS 초과 시 0.
+function getAttemptReward(base, attempt) {
+  const safeAttempt = Math.max(1, Math.floor(Number(attempt) || 1));
+  if (safeAttempt > MAX_ATTEMPTS) return 0;
+  return Math.round(base * Math.pow(DECAY_FACTOR, safeAttempt - 1));
+}
+
+// 시도 횟수 → 남은 보상 회차. 1=첫 보상, 2/3=감소된 보상, 0=보상 소진(연습만)
+function remainingRewardedAttempts(attempt) {
+  return Math.max(0, MAX_ATTEMPTS - Math.max(0, Math.floor(Number(attempt) || 0)));
 }
 
 function getLineCombo(answerCode = '', studentCode = '') {
@@ -231,7 +240,19 @@ export default function CodeTracePlayer({
   const [studentCode, setStudentCode] = useState('');
   const [hintIndex, setHintIndex] = useState(0);
   const [completedIds, setCompletedIds] = useState(() => new Set(learningProgress?.codeTrace?.completedExerciseIds || []));
-  const [earnedExerciseIds, setEarnedExerciseIds] = useState(() => new Set(learningProgress?.codeTrace?.earnedExerciseIds || []));
+  // 세트별 작성 초안 보존. { [exerciseId]: studentCode }. 세트를 옮겨도 돌아오면 복원됨.
+  const [drafts, setDrafts] = useState(() => ({ ...(learningProgress?.codeTrace?.drafts || {}) }));
+  // exerciseAttempts: { [exerciseId]: 시도횟수 }. 레거시 earnedExerciseIds는 시도 1회로 간주.
+  const [exerciseAttempts, setExerciseAttempts] = useState(() => {
+    const attempts = { ...(learningProgress?.codeTrace?.exerciseAttempts || {}) };
+    const legacyEarned = learningProgress?.codeTrace?.earnedExerciseIds;
+    if (Array.isArray(legacyEarned)) {
+      legacyEarned.forEach((id) => {
+        if (id && !attempts[id]) attempts[id] = 1;
+      });
+    }
+    return attempts;
+  });
   const [crystalsEarnedTotal, setCrystalsEarnedTotal] = useState(() => Number(learningProgress?.codeTrace?.crystalsEarnedTotal || 0));
   const [completionState, setCompletionState] = useState(null);
   const [rewardBurst, setRewardBurst] = useState(null);
@@ -247,25 +268,19 @@ export default function CodeTracePlayer({
   }, [learningProgress?.codeTrace?.completedExerciseIds]);
 
   useEffect(() => {
-    const savedIds = learningProgress?.codeTrace?.earnedExerciseIds;
-    if (Array.isArray(savedIds)) {
-      setEarnedExerciseIds(new Set(savedIds));
+    const attempts = { ...(learningProgress?.codeTrace?.exerciseAttempts || {}) };
+    const legacyEarned = learningProgress?.codeTrace?.earnedExerciseIds;
+    if (Array.isArray(legacyEarned)) {
+      legacyEarned.forEach((id) => {
+        if (id && !attempts[id]) attempts[id] = 1;
+      });
     }
-  }, [learningProgress?.codeTrace?.earnedExerciseIds]);
+    setExerciseAttempts(attempts);
+  }, [learningProgress?.codeTrace?.exerciseAttempts, learningProgress?.codeTrace?.earnedExerciseIds]);
 
   useEffect(() => {
     setCrystalsEarnedTotal(Number(learningProgress?.codeTrace?.crystalsEarnedTotal || 0));
   }, [learningProgress?.codeTrace?.crystalsEarnedTotal]);
-
-  const resetExercise = () => {
-    setStudentCode('');
-    setVisibleLines(1);
-    setHintIndex(0);
-    setAnswerVisible(true);
-    setRevealSeconds(ANSWER_REVEAL_SECONDS);
-    setLinePulse(null);
-    previousLineComboRef.current = 0;
-  };
 
   const exercise = exercises[exerciseIndex] || null;
   const evaluation = useMemo(
@@ -282,27 +297,69 @@ export default function CodeTracePlayer({
   const allCompleted = currentExerciseIds.length > 0 && currentCompletedCount >= currentExerciseIds.length;
   const hint = exercise?.hints?.[Math.min(hintIndex, Math.max(0, (exercise?.hints?.length || 1) - 1))] || '';
   const currentExerciseId = getExerciseId(exercise);
-  const unitRewardTarget = getUnitRewardTarget(evaluation.accuracy, passingAccuracy);
-  const currentExerciseReward = distributeExerciseReward(unitRewardTarget, exerciseIndex, currentExerciseIds.length);
+  const currentAttemptCount = Number(exerciseAttempts[currentExerciseId] || 0);
+  const exerciseBaseReward = getExerciseBaseReward(exercise?.answerCode || '');
+  const nextAttemptNumber = currentAttemptCount + 1;
+  // 이번 통과로 받을 보상(배율 적용 전). 4회차+는 0.
+  const rawRewardForNextPass = getAttemptReward(exerciseBaseReward, nextAttemptNumber);
+  const rewardStillAvailable = remainingRewardedAttempts(currentAttemptCount) > 0;
   const unitAlreadyCompleted = !!learningProgress?.codeTrace?.completed;
   const currentAlreadyCompleted = !!currentExerciseId && completedIds.has(currentExerciseId);
-  const currentRewardEarned = !!currentExerciseId && earnedExerciseIds.has(currentExerciseId);
   const willCompleteOnPass = !unitAlreadyCompleted && currentPassed && currentExerciseId && !currentAlreadyCompleted && currentCompletedCount + 1 >= currentExerciseIds.length;
   const firstIncompleteIndex = useMemo(
     () => exercises.findIndex(item => !completedIds.has(getExerciseId(item))),
     [exercises, completedIds]
   );
+  const hasIncomplete = firstIncompleteIndex >= 0;
+  const hasIncompleteElsewhere = firstIncompleteIndex >= 0 && firstIncompleteIndex !== exerciseIndex;
+  // 세트 이동은 항상 자유롭게. 단 다음/이전 인덱스 범위만 확인.
+  const canGoPrev = exerciseIndex > 0;
+  const canGoNext = exerciseIndex < exercises.length - 1;
+  // 미완료 코드로 건너뛰기 강조 버튼: 미완료가 있고 현재가 아닐 때.
   const nextIncompleteIndex = useMemo(() => {
     if (firstIncompleteIndex < 0) return -1;
     const afterCurrent = exercises.findIndex((item, index) => index > exerciseIndex && !completedIds.has(getExerciseId(item)));
     return afterCurrent >= 0 ? afterCurrent : firstIncompleteIndex;
   }, [completedIds, exerciseIndex, exercises, firstIncompleteIndex]);
-  const hasIncompleteElsewhere = firstIncompleteIndex >= 0 && firstIncompleteIndex !== exerciseIndex;
-  const canMoveToIncompleteCode = currentAlreadyCompleted && nextIncompleteIndex >= 0 && nextIncompleteIndex !== exerciseIndex;
+  const canMoveToIncompleteCode = hasIncompleteElsewhere && nextIncompleteIndex >= 0 && nextIncompleteIndex !== exerciseIndex;
   const lineCombo = useMemo(
     () => getLineCombo(exercise?.answerCode || '', studentCode),
     [exercise, studentCode]
   );
+
+  // 현재 세트의 입력을 빈 상태로 되돌림 (초기화 버튼). 초안도 함께 비움.
+  const resetExercise = () => {
+    if (currentExerciseId) {
+      setDrafts(prev => ({ ...prev, [currentExerciseId]: '' }));
+    }
+    setStudentCode('');
+    setVisibleLines(1);
+    setHintIndex(0);
+    setAnswerVisible(true);
+    setRevealSeconds(ANSWER_REVEAL_SECONDS);
+    setLinePulse(null);
+    previousLineComboRef.current = 0;
+  };
+
+  // 세트를 전환하되, 떠나는 세트의 작성 코드는 초안에 저장하고
+  // 들어가는 세트의 저장된 초안을 복원한다. 통과한 세트는 초안을 비워 깔끔하게 시작.
+  const goToExercise = (nextIndex) => {
+    if (nextIndex < 0 || nextIndex >= exercises.length || nextIndex === exerciseIndex) return;
+    const leavingId = currentExerciseId;
+    setDrafts(prev => ({
+      ...prev,
+      [leavingId]: currentAlreadyCompleted ? '' : studentCode
+    }));
+    const targetId = getExerciseId(exercises[nextIndex]);
+    setExerciseIndex(nextIndex);
+    setStudentCode(drafts[targetId] || '');
+    setVisibleLines(1);
+    setHintIndex(0);
+    setAnswerVisible(true);
+    setRevealSeconds(ANSWER_REVEAL_SECONDS);
+    setLinePulse(null);
+    previousLineComboRef.current = 0;
+  };
 
   useEffect(() => {
     previousLineComboRef.current = 0;
@@ -327,10 +384,17 @@ export default function CodeTracePlayer({
     if (!exercises.length || unitAlreadyCompleted || firstIncompleteIndex < 0) return;
     const currentId = getExerciseId(exercises[exerciseIndex]);
     if (!currentId || completedIds.has(currentId)) {
+      const targetId = getExerciseId(exercises[firstIncompleteIndex]);
       setExerciseIndex(firstIncompleteIndex);
-      resetExercise();
+      setStudentCode(drafts[targetId] || '');
+      setVisibleLines(1);
+      setHintIndex(0);
+      setAnswerVisible(true);
+      setRevealSeconds(ANSWER_REVEAL_SECONDS);
+      setLinePulse(null);
+      previousLineComboRef.current = 0;
     }
-  }, [completedIds, exerciseIndex, exercises, firstIncompleteIndex, unitAlreadyCompleted]);
+  }, [completedIds, exerciseIndex, exercises, firstIncompleteIndex, unitAlreadyCompleted, drafts]);
 
   useEffect(() => {
     if (!answerVisible) return undefined;
@@ -360,6 +424,9 @@ export default function CodeTracePlayer({
   }
 
   const changeMode = (nextMode) => {
+    if (currentExerciseId) {
+      setDrafts(prev => ({ ...prev, [currentExerciseId]: '' }));
+    }
     setMode(nextMode);
     setVisibleLines(1);
     setAnswerVisible(true);
@@ -373,7 +440,9 @@ export default function CodeTracePlayer({
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
   };
 
-  const markCurrentPassed = async () => {
+  // options.autoAdvance: 통과 후 자동으로 다음 미완료 세트로 이동할지.
+  // 통과 버튼 직접 클릭 시엔 true(기본), leaveCurrentExercise로 이동 중엔 false(목적지를 직접 제어).
+  const markCurrentPassed = async ({ autoAdvance = true } = {}) => {
     if (!user || !unitId || !currentPassed || !currentExerciseId || completionState === 'processing') return;
     setSaving(true);
 
@@ -383,6 +452,7 @@ export default function CodeTracePlayer({
       const progressRef = doc(db, 'users', user.uid, 'learning_progress', unitId);
       const historyRef = doc(db, 'users', user.uid, 'history', `code_trace_${today}_${unitId}`);
       const unitTitleValue = unitTitle || activeUnit?.title || '코드 따라쓰기';
+      const baseReward = getExerciseBaseReward(exercise?.answerCode || '');
 
       const result = await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userRef);
@@ -394,15 +464,23 @@ export default function CodeTracePlayer({
         const freshProgress = progressSnap.exists() ? progressSnap.data() : {};
         const freshCodeTrace = freshProgress.codeTrace || {};
         const freshCompletedIds = new Set(Array.isArray(freshCodeTrace.completedExerciseIds) ? freshCodeTrace.completedExerciseIds : []);
-        const freshEarnedIds = new Set(Array.isArray(freshCodeTrace.earnedExerciseIds) ? freshCodeTrace.earnedExerciseIds : []);
+        // 시도 횟수 객체 (레거시 earnedExerciseIds는 1회로 간주)
+        const freshAttempts = { ...(freshCodeTrace.exerciseAttempts || {}) };
+        const legacyEarned = freshCodeTrace.earnedExerciseIds;
+        if (Array.isArray(legacyEarned)) {
+          legacyEarned.forEach((id) => { if (id && !freshAttempts[id]) freshAttempts[id] = 1; });
+        }
         freshCompletedIds.add(currentExerciseId);
 
-        const alreadyEarned = freshEarnedIds.has(currentExerciseId);
-        const actualReward = alreadyEarned ? 0 : currentExerciseReward;
-        if (!alreadyEarned && actualReward > 0) freshEarnedIds.add(currentExerciseId);
+        // 이번 통과의 시도 번호(1-base)와 보상. 4회차+는 보상 0이지만 시도 횟수는 계속 증가.
+        const attemptNumber = (Number(freshAttempts[currentExerciseId] || 0) || 0) + 1;
+        freshAttempts[currentExerciseId] = attemptNumber;
+        const rawReward = getAttemptReward(baseReward, attemptNumber);
+        // 휴일/수업시간 외 배율 적용 (퀴즈·영상·데이터로그와 동일)
+        const multiplierMeta = applyCrystalRewardMultiplier(rawReward, { clusterId: clusterId || 'python' });
+        const actualReward = multiplierMeta.amount;
 
         const completedExerciseIds = currentExerciseIds.filter(id => freshCompletedIds.has(id));
-        const earnedExerciseIdList = currentExerciseIds.filter(id => freshEarnedIds.has(id));
         const completedExerciseCount = completedExerciseIds.length;
         const isNowCompleted = completedExerciseCount >= currentExerciseIds.length;
         const wasCompleted = !!freshCodeTrace.completed;
@@ -441,7 +519,7 @@ export default function CodeTracePlayer({
           recordCrystalTransaction(user.uid, {
             amount: actualReward,
             type: 'code_trace_exercise_reward',
-            description: `${unitTitleValue} ${exerciseIndex + 1}/${exercises.length} 통과`,
+            description: `${unitTitleValue} ${exerciseIndex + 1}/${exercises.length} 통과 (${attemptNumber}회차)`,
             metadata: {
               unitId,
               unitTitle: unitTitleValue,
@@ -449,10 +527,15 @@ export default function CodeTracePlayer({
               exerciseTitle: exercise.title || '',
               exerciseIndex: exerciseIndex + 1,
               exerciseCount: exercises.length,
+              attemptNumber,
+              baseAmount: multiplierMeta.baseAmount,
+              bonusAmount: multiplierMeta.bonusAmount,
+              rewardMultiplier: multiplierMeta.multiplier,
+              rewardMultiplierLabel: multiplierMeta.label,
               accuracy: evaluation.accuracy,
               lineCombo,
             }
-          }, transaction, `code_trace_${unitId}_${currentExerciseId}`);
+          }, transaction, `code_trace_${unitId}_${currentExerciseId}_attempt${attemptNumber}`);
         }
 
         transaction.update(userRef, userUpdates);
@@ -462,7 +545,7 @@ export default function CodeTracePlayer({
             completed: isNowCompleted,
             ...(isNowCompleted ? { completedAt: serverTimestamp() } : {}),
             completedExerciseIds,
-            earnedExerciseIds: earnedExerciseIdList,
+            exerciseAttempts: freshAttempts,
             completedExerciseCount,
             totalExerciseCount: exercises.length,
             crystalsEarnedTotal: nextCrystalsEarnedTotal,
@@ -492,9 +575,10 @@ export default function CodeTracePlayer({
 
         return {
           actualReward,
+          attemptNumber,
           completed: isNowCompleted,
           completedExerciseIds,
-          earnedExerciseIds: earnedExerciseIdList,
+          exerciseAttempts: freshAttempts,
           completedExerciseCount,
           crystalsEarnedTotal: nextCrystalsEarnedTotal,
           bestAccuracy,
@@ -502,12 +586,12 @@ export default function CodeTracePlayer({
       });
 
       setCompletedIds(new Set(result.completedExerciseIds));
-      setEarnedExerciseIds(new Set(result.earnedExerciseIds));
+      setExerciseAttempts(result.exerciseAttempts);
       setCrystalsEarnedTotal(result.crystalsEarnedTotal);
 
       if (result.actualReward > 0) {
         soundManager.playCrystal();
-        setRewardBurst({ id: Date.now(), amount: result.actualReward });
+        setRewardBurst({ id: Date.now(), amount: result.actualReward, attempt: result.attemptNumber });
       } else {
         soundManager.playCorrect();
       }
@@ -522,13 +606,16 @@ export default function CodeTracePlayer({
         return;
       }
 
-      const nextCompletedSet = new Set(result.completedExerciseIds);
-      const nextIndex = exercises.findIndex((item, index) => index > exerciseIndex && !nextCompletedSet.has(getExerciseId(item)));
-      const fallbackIndex = exercises.findIndex(item => !nextCompletedSet.has(getExerciseId(item)));
-      const targetIndex = nextIndex >= 0 ? nextIndex : fallbackIndex;
-      if (targetIndex >= 0 && targetIndex !== exerciseIndex) {
-        setExerciseIndex(targetIndex);
-        resetExercise();
+      // 통과 후 자동으로 다음 미완료 세트로 이동 (첫 통과 시에만). 반복 연습 중엔 현재 세트에 머묾.
+      // leaveCurrentExercise로 이동 중(autoAdvance=false)엔 목적지를 호출자가 제어하므로 건너뜀.
+      if (autoAdvance && result.attemptNumber === 1) {
+        const nextCompletedSet = new Set(result.completedExerciseIds);
+        const nextIndex = exercises.findIndex((item, index) => index > exerciseIndex && !nextCompletedSet.has(getExerciseId(item)));
+        const fallbackIndex = exercises.findIndex(item => !nextCompletedSet.has(getExerciseId(item)));
+        const targetIndex = nextIndex >= 0 ? nextIndex : fallbackIndex;
+        if (targetIndex >= 0 && targetIndex !== exerciseIndex) {
+          goToExercise(targetIndex);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -538,17 +625,40 @@ export default function CodeTracePlayer({
     }
   };
 
+  // 통과 가능 상태에서 다른 세트로 이동하려 할 때 광석을 놓치지 않도록 자동 통과 처리.
+  // 미통과 작성 중 이동이면 초안만 보존하고 이동.
+  const leaveCurrentExercise = async (nextIndex) => {
+    if (nextIndex < 0 || nextIndex >= exercises.length || nextIndex === exerciseIndex) return;
+    // 통과 기준 만족 + 아직 이번 회차 보상이 남은 세트 → 자동으로 통과 처리 후 목적지로 이동.
+    // autoAdvance=false 로 두어 markCurrentPassed가 다른 세트로 멋대로 보내지 않게 함.
+    if (currentPassed && rewardStillAvailable && currentExerciseId && !saving && completionState !== 'processing') {
+      await markCurrentPassed({ autoAdvance: false });
+    }
+    goToExercise(nextIndex);
+  };
+
   const savePartialProgress = async () => {
     if (!user || !unitId) return;
     setSaving(true);
     try {
       const progressRef = doc(db, 'users', user.uid, 'learning_progress', unitId);
+      const filteredAttempts = {};
+      const filteredDrafts = {};
+      currentExerciseIds.forEach((id) => {
+        if (id && exerciseAttempts[id]) filteredAttempts[id] = exerciseAttempts[id];
+        if (id && drafts[id]) filteredDrafts[id] = drafts[id];
+      });
+      // 현재 세트의 작성 코드도 초안에 포함 (방금 친 코드 보존)
+      if (currentExerciseId && studentCode && !currentAlreadyCompleted) {
+        filteredDrafts[currentExerciseId] = studentCode;
+      }
       await setDoc(progressRef, {
         unitTitle: unitTitle || activeUnit?.title || '',
         codeTrace: {
           completed: false,
           completedExerciseIds: currentExerciseIds.filter(id => completedIds.has(id)),
-          earnedExerciseIds: currentExerciseIds.filter(id => earnedExerciseIds.has(id)),
+          exerciseAttempts: filteredAttempts,
+          drafts: filteredDrafts,
           completedExerciseCount: currentCompletedCount,
           totalExerciseCount: exercises.length,
           crystalsEarnedTotal,
@@ -585,7 +695,11 @@ export default function CodeTracePlayer({
         const freshUser = userSnap.data();
         const freshProgress = progressSnap.exists() ? progressSnap.data() : {};
         const alreadyRecordedToday = historySnap.exists();
-        const earnedExerciseIdList = currentExerciseIds.filter(id => new Set(freshProgress?.codeTrace?.earnedExerciseIds || []).has(id));
+        const freshAttemptsRaw = freshProgress?.codeTrace?.exerciseAttempts || {};
+        const filteredAttempts = {};
+        currentExerciseIds.forEach((id) => {
+          if (id && freshAttemptsRaw[id]) filteredAttempts[id] = freshAttemptsRaw[id];
+        });
         const nextCrystalsEarnedTotal = Number(freshProgress?.codeTrace?.crystalsEarnedTotal || crystalsEarnedTotal || 0);
         const streakCalc = calculateStreakUpdate(freshUser);
         const streakUpdates = streakCalc.streakUpdate || {};
@@ -618,7 +732,7 @@ export default function CodeTracePlayer({
             completed: true,
             completedAt: serverTimestamp(),
             completedExerciseIds,
-            earnedExerciseIds: earnedExerciseIdList,
+            exerciseAttempts: filteredAttempts,
             completedExerciseCount,
             totalExerciseCount: exercises.length,
             crystalsEarnedTotal: nextCrystalsEarnedTotal,
@@ -798,6 +912,49 @@ export default function CodeTracePlayer({
           </div>
         </div>
 
+        {/* 세트 스텝퍼 — 각 세트의 진행 상황과 연습 횟수를 한눈에. 클릭하여 자유롭게 이동 */}
+        <div className="glass-card" style={{ padding: '0.75rem 1rem', marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginRight: '0.25rem' }}>세트</span>
+          {exercises.map((item, index) => {
+            const id = getExerciseId(item);
+            const isCurrent = index === exerciseIndex;
+            const isDone = id && completedIds.has(id);
+            const attempts = Number(exerciseAttempts[id] || 0);
+            const lineCount = normalizeNewlines(item?.answerCode || '').split('\n').length;
+            return (
+              <button
+                key={id || index}
+                onClick={() => { leaveCurrentExercise(index); }}
+                className="font-tech"
+                title={`${item?.title || `${index + 1}번`} · ${lineCount}줄${attempts > 0 ? ` · ${attempts}회 연습` : ''}`}
+                style={{
+                  minWidth: 36,
+                  padding: '0.35rem 0.55rem',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  background: isCurrent
+                    ? 'rgba(0,243,255,0.18)'
+                    : isDone
+                      ? 'rgba(34,197,94,0.12)'
+                      : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${isCurrent ? 'rgba(0,243,255,0.55)' : isDone ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  color: isCurrent ? 'var(--crystal-cyan)' : isDone ? '#22c55e' : 'var(--text-muted)',
+                  boxShadow: isCurrent ? '0 0 12px rgba(0,243,255,0.25)' : 'none'
+                }}
+              >
+                <span>{index + 1}</span>
+                {isDone && <span style={{ fontSize: '0.7rem' }}>✓</span>}
+                {attempts > 1 && <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>×{attempts}</span>}
+              </button>
+            );
+          })}
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1rem' }}>
           <section className="glass-card" style={{ padding: '1rem', minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -883,16 +1040,16 @@ export default function CodeTracePlayer({
                     pointerEvents: 'none'
                   }}
                 >
-                  +{rewardBurst.amount} 광석
+                  +{rewardBurst.amount} 광석{rewardBurst.attempt ? ` (${rewardBurst.attempt}회차)` : ''}
                 </div>
               )}
-              <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!currentPassed || currentAlreadyCompleted || completionState === 'processing' || saving}>
+              <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!currentPassed || completionState === 'processing' || saving}>
                 <Check size={16} /> {
-                  currentAlreadyCompleted
-                    ? (currentRewardEarned ? '통과 완료 · 광석 획득됨' : '통과 완료')
-                    : currentPassed
-                      ? `통과하고 +${currentExerciseReward}광석 획득`
-                      : `통과 기준 ${passingAccuracy}%`
+                  currentPassed
+                    ? (rewardStillAvailable
+                      ? `통과하고 +${rawRewardForNextPass}광석${nextAttemptNumber > 1 ? ` (${nextAttemptNumber}회차)` : ''} 획득`
+                      : (currentAttemptCount > 0 ? '다시 통과하기 · 보상 완료' : `통과 기준 ${passingAccuracy}%`))
+                    : `통과 기준 ${passingAccuracy}%`
                 }
               </button>
               <button className="hud-btn secondary glass" onClick={() => {
@@ -913,6 +1070,7 @@ export default function CodeTracePlayer({
               ['정확도', `${evaluation.accuracy}%`],
               ['맞은 줄', `${evaluation.correctLines}/${evaluation.totalLines}`],
               ['라인 콤보', `${lineCombo}/${evaluation.totalLines}`],
+              ['연습', currentAttemptCount > 0 ? `${currentAttemptCount}회` : '—'],
               ['획득 광석', `${crystalsEarnedTotal}`],
               ['완료', `${currentCompletedCount}/${exercises.length}`]
             ].map(([label, value]) => (
@@ -931,9 +1089,13 @@ export default function CodeTracePlayer({
 
           <div className="font-tech" style={{ color: currentPassed ? 'var(--planet-green)' : 'var(--text-muted)', marginBottom: '0.75rem' }}>
             {currentPassed
-              ? (currentAlreadyCompleted
-                ? '이미 통과한 코드입니다. 미완료 코드로 이동할 수 있습니다.'
-                : (willCompleteOnPass ? `마지막 세트입니다. 통과하면 +${currentExerciseReward}광석을 받고 CODE TRACE가 완료됩니다.` : `통과 기준을 만족했습니다. 지금 +${currentExerciseReward}광석을 받을 수 있습니다.`))
+              ? (rewardStillAvailable
+                ? (willCompleteOnPass
+                  ? `마지막 세트입니다. 통과하면 +${rawRewardForNextPass}광석을 받고 CODE TRACE가 완료됩니다.`
+                  : `통과 기준을 만족했습니다. 지금 +${rawRewardForNextPass}광석을 받을 수 있습니다.`)
+                : (currentAttemptCount > 0
+                  ? `이미 ${currentAttemptCount}회 통과했습니다. 다시 연습해도 광석은 더 나오지 않지만, 코드 감각을 익히는 데 도움이 됩니다.`
+                  : `통과 기준: 정확도 ${passingAccuracy}% 이상`))
               : `통과 기준: 정확도 ${passingAccuracy}% 이상`}
           </div>
 
@@ -944,26 +1106,27 @@ export default function CodeTracePlayer({
           )}
         </section>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-          <button className="hud-btn secondary glass" disabled={exerciseIndex === 0} onClick={() => {
-            setExerciseIndex(i => Math.max(0, i - 1));
-            resetExercise();
-          }}>
-            이전 코드
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="hud-btn secondary glass" disabled={!canGoPrev || saving} onClick={() => leaveCurrentExercise(exerciseIndex - 1)}>
+            <ChevronLeft size={16} /> 이전 코드
           </button>
           {allCompleted && !completionState && !unitAlreadyCompleted ? (
             <button className="hud-btn primary glass" onClick={completeCodeTrace} disabled={completionState === 'processing'}>
               <Check size={17} /> 완료 기록 마무리
             </button>
-          ) : !allCompleted ? (
-            <button className="hud-btn primary glass" disabled={!canMoveToIncompleteCode} onClick={() => {
-              setExerciseIndex(nextIncompleteIndex);
-              resetExercise();
-            }}>
-              {hasIncompleteElsewhere ? '미완료 코드로 이동' : '다음 코드'}
-            </button>
           ) : null}
+          <button className="hud-btn secondary glass" disabled={!canGoNext || saving} onClick={() => leaveCurrentExercise(exerciseIndex + 1)}>
+            다음 코드 <ChevronLeft size={16} style={{ transform: 'rotate(180deg)' }} />
+          </button>
         </div>
+
+        {hasIncomplete && canMoveToIncompleteCode && !allCompleted && !completionState && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.75rem' }}>
+            <button className="hud-btn primary glass" disabled={saving} onClick={() => leaveCurrentExercise(nextIncompleteIndex)}>
+              {hasIncompleteElsewhere ? '미통과 코드로 건너뛰기' : '미통과 코드로 이동'}
+            </button>
+          </div>
+        )}
 
         {completionState && completionState !== 'processing' && (
           <div className="glass-card hud-border" style={{ marginTop: '1rem', padding: '1rem', textAlign: 'center' }}>

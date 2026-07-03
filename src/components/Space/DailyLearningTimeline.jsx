@@ -459,6 +459,11 @@ function GroupedCard({ item, index, onClick }) {
                 정확도 {item.bestAccuracy}점
               </span>
             )}
+            {item.totalPracticeCount > 0 && (
+              <span className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                연습 {item.totalPracticeCount}회
+              </span>
+            )}
             {item.lastMode && (
               <span className="font-tech" style={{ color: 'var(--text-muted)' }}>
                 {item.lastMode === 'hidden' ? '가리고 쓰기' : item.lastMode === 'line' ? '한 줄씩' : item.lastMode}
