@@ -121,6 +121,11 @@ function countChar(text, char) {
   return Array.from(text || '').filter(c => c === char).length;
 }
 
+function getCursorLineIndex(code = '', cursor = 0) {
+  const safeCursor = Math.max(0, Math.min(cursor, String(code || '').length));
+  return normalizeNewlines(String(code || '').slice(0, safeCursor)).split('\n').length - 1;
+}
+
 function findStringLiteralEnd(code = '', startIndex = 0) {
   const quote = code[startIndex];
   if (quote !== '"' && quote !== "'") return -1;
@@ -601,6 +606,83 @@ function getLineCombo(answerCode = '', studentCode = '') {
   return combo;
 }
 
+function getLineFeedback(answerCode = '', studentCode = '') {
+  const answerLines = normalizeNewlines(answerCode).split('\n');
+  const studentLines = normalizeNewlines(studentCode).split('\n');
+  const answerStructureLines = mapStringLiterals(normalizeNewlines(answerCode), () => STRING_STRUCTURE_TOKEN).split('\n');
+  const studentStructureLines = mapStringLiterals(normalizeNewlines(studentCode), () => STRING_STRUCTURE_TOKEN).split('\n');
+  const answerIndentRanks = buildIndentRankMap(answerStructureLines);
+  const studentIndentRanks = buildIndentRankMap(studentStructureLines);
+
+  return answerLines.map((line, index) => {
+    const answerLine = answerStructureLines[index] || '';
+    const studentLine = studentStructureLines[index] || '';
+    const normalizedAnswer = normalizePythonLineForStructureCompare(answerLine, answerIndentRanks);
+    const normalizedStudent = normalizePythonLineForStructureCompare(studentLine, studentIndentRanks);
+    const done = normalizedAnswer === normalizedStudent && normalizedAnswer.length > 0;
+    const typed = Boolean(studentLines[index]);
+    const typedRatio = Math.min(1, (studentLine.length || 0) / Math.max(answerLine.length || line.length || 1, 1));
+    return {
+      lineNumber: index + 1,
+      done,
+      typed,
+      typedRatio,
+    };
+  });
+}
+
+function getLineStringRanges(line = '') {
+  const ranges = [];
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (char !== '"' && char !== "'") {
+      index += 1;
+      continue;
+    }
+    const end = findStringLiteralEnd(line, index);
+    if (end < 0) break;
+    ranges.push({ start: index, end });
+    index = end;
+  }
+  return ranges;
+}
+
+function isIndexInRange(index, ranges = []) {
+  return ranges.some(range => index >= range.start && index < range.end);
+}
+
+function getTypingTrace(answerCode = '', studentCode = '', cursor = 0) {
+  const answerLines = normalizeNewlines(answerCode).split('\n');
+  const studentLines = normalizeNewlines(studentCode).split('\n');
+  const lineIndex = getCursorLineIndex(studentCode, cursor);
+  const answerLine = answerLines[lineIndex] || '';
+  const studentLine = studentLines[lineIndex] || '';
+  const answerStringRanges = getLineStringRanges(answerLine);
+  const studentStringRanges = getLineStringRanges(studentLine);
+  const typedChars = Array.from(studentLine).map((char, index) => {
+    const answerChar = answerLine[index] || '';
+    let status = 'wrong';
+    if (char === answerChar) {
+      status = 'match';
+    } else if (isIndexInRange(index, answerStringRanges) && isIndexInRange(index, studentStringRanges)) {
+      status = 'string';
+    } else if (!answerChar) {
+      status = 'extra';
+    }
+    return { char, status };
+  });
+  const matchCount = typedChars.filter(item => item.status === 'match' || item.status === 'string').length;
+  const progress = Math.min(1, matchCount / Math.max(Array.from(answerLine).length, 1));
+
+  return {
+    lineNumber: lineIndex + 1,
+    typedChars,
+    progress,
+    complete: normalizePythonLineForStructureCompare(answerLine) === normalizePythonLineForStructureCompare(studentLine) && answerLine.length > 0,
+  };
+}
+
 export default function CodeTracePlayer({
   exercises = [],
   unitId,
@@ -700,6 +782,7 @@ export default function CodeTracePlayer({
   const rewardStillAvailable = remainingRewardedAttempts(currentAttemptCount) > 0;
   const unitAlreadyCompleted = !!learningProgress?.codeTrace?.completed;
   const currentAlreadyCompleted = !!currentExerciseId && completedIds.has(currentExerciseId);
+  const canSubmitCurrentPass = currentPassed && !currentAlreadyCompleted && !saving && completionState !== 'processing';
   const willCompleteOnPass = !unitAlreadyCompleted && currentPassed && currentExerciseId && !currentAlreadyCompleted && currentCompletedCount + 1 >= currentExerciseIds.length;
   const firstIncompleteIndex = useMemo(
     () => exercises.findIndex(item => !completedIds.has(getExerciseId(item))),
@@ -720,6 +803,14 @@ export default function CodeTracePlayer({
   const lineCombo = useMemo(
     () => getLineCombo(exercise?.answerCode || '', studentCode),
     [exercise, studentCode]
+  );
+  const lineFeedback = useMemo(
+    () => getLineFeedback(exercise?.answerCode || '', studentCode),
+    [exercise, studentCode]
+  );
+  const typingTrace = useMemo(
+    () => getTypingTrace(exercise?.answerCode || '', studentCode, studentSelection.start),
+    [exercise, studentCode, studentSelection.start]
   );
 
   // 현재 세트의 입력을 빈 상태로 되돌림 (초기화 버튼). 초안도 함께 비움.
@@ -742,13 +833,14 @@ export default function CodeTracePlayer({
   const goToExercise = (nextIndex) => {
     if (nextIndex < 0 || nextIndex >= exercises.length || nextIndex === exerciseIndex) return;
     const leavingId = currentExerciseId;
-    setDrafts(prev => ({
-      ...prev,
-      [leavingId]: currentAlreadyCompleted ? '' : studentCode
-    }));
+    const nextDrafts = { ...drafts };
+    if (leavingId) {
+      nextDrafts[leavingId] = currentPassed ? '' : studentCode;
+    }
+    setDrafts(nextDrafts);
     const targetId = getExerciseId(exercises[nextIndex]);
     setExerciseIndex(nextIndex);
-    setStudentCode(drafts[targetId] || '');
+    setStudentCode(nextDrafts[targetId] || '');
     setVisibleLines(1);
     setHintIndex(0);
     setAnswerVisible(true);
@@ -842,7 +934,7 @@ export default function CodeTracePlayer({
   // options.autoAdvance: 통과 후 자동으로 다음 미완료 세트로 이동할지.
   // 통과 버튼 직접 클릭 시엔 true(기본), leaveCurrentExercise로 이동 중엔 false(목적지를 직접 제어).
   const markCurrentPassed = async ({ autoAdvance = true } = {}) => {
-    if (!user || !unitId || !currentPassed || !currentExerciseId || completionState === 'processing') return;
+    if (!user || !unitId || !currentPassed || currentAlreadyCompleted || !currentExerciseId || completionState === 'processing') return;
     setSaving(true);
 
     try {
@@ -1034,7 +1126,7 @@ export default function CodeTracePlayer({
     if (nextIndex < 0 || nextIndex >= exercises.length || nextIndex === exerciseIndex) return;
     // 통과 기준 만족 + 아직 이번 회차 보상이 남은 세트 → 자동으로 통과 처리 후 목적지로 이동.
     // autoAdvance=false 로 두어 markCurrentPassed가 다른 세트로 멋대로 보내지 않게 함.
-    if (currentPassed && rewardStillAvailable && currentExerciseId && !saving && completionState !== 'processing') {
+    if (canSubmitCurrentPass && rewardStillAvailable && currentExerciseId) {
       await markCurrentPassed({ autoAdvance: false });
     }
     goToExercise(nextIndex);
@@ -1380,6 +1472,142 @@ export default function CodeTracePlayer({
           0%, 100% { box-shadow: 0 0 0 rgba(34,197,94,0); }
           50% { box-shadow: 0 0 24px rgba(34,197,94,0.35); }
         }
+        @keyframes codeTraceCompleteSheen {
+          0% { transform: translateX(-130%) skewX(-18deg); opacity: 0; }
+          25% { opacity: 0.8; }
+          100% { transform: translateX(160%) skewX(-18deg); opacity: 0; }
+        }
+        @keyframes codeTraceCheckPop {
+          0% { transform: scale(0.55); opacity: 0; }
+          70% { transform: scale(1.12); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes codeTraceCharGlow {
+          0% { text-shadow: 0 0 0 rgba(52,211,153,0); }
+          100% { text-shadow: 0 0 12px rgba(52,211,153,0.7); }
+        }
+        .code-trace-student-panel {
+          overflow: hidden;
+        }
+        .code-trace-student-panel.is-complete::after {
+          content: "";
+          position: absolute;
+          inset: -20%;
+          width: 45%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent);
+          animation: codeTraceCompleteSheen 1.8s ease-out infinite;
+          pointer-events: none;
+        }
+        .code-trace-input-stage {
+          position: relative;
+        }
+        .code-trace-line-rail {
+          position: absolute;
+          left: 0.7rem;
+          top: 0.9rem;
+          z-index: 2;
+          display: grid;
+          gap: 0.32rem;
+          pointer-events: none;
+        }
+        .code-trace-line-dot {
+          width: 1.35rem;
+          height: 1.35rem;
+          border-radius: 999px;
+          border: 1px solid rgba(148,163,184,0.22);
+          background: rgba(15,23,42,0.76);
+          color: rgba(148,163,184,0.68);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.62rem;
+          line-height: 1;
+          box-shadow: inset 0 0 8px rgba(2,6,23,0.55);
+          transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+        .code-trace-line-dot.is-started {
+          border-color: rgba(56,189,248,0.35);
+          color: rgba(186,230,253,0.95);
+        }
+        .code-trace-line-dot.is-current {
+          transform: scale(1.08);
+          border-color: rgba(0,243,255,0.62);
+          box-shadow: 0 0 12px rgba(0,243,255,0.24), inset 0 0 8px rgba(2,6,23,0.55);
+        }
+        .code-trace-line-dot.is-done {
+          color: #052e16;
+          border-color: rgba(52,211,153,0.72);
+          background: linear-gradient(135deg, #86efac, #22c55e);
+          animation: codeTraceCheckPop 0.28s ease-out both;
+          box-shadow: 0 0 14px rgba(34,197,94,0.34);
+        }
+        .code-trace-typing-trace {
+          margin-top: 0.62rem;
+          min-height: 2.35rem;
+          border-radius: 10px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(2,6,23,0.46);
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+          padding: 0.55rem 0.7rem;
+          overflow: hidden;
+        }
+        .code-trace-typing-line {
+          flex: 0 0 auto;
+          min-width: 2.8rem;
+          color: rgba(148,163,184,0.86);
+          font-size: 0.72rem;
+        }
+        .code-trace-typing-text {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: pre;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          font-size: 0.86rem;
+        }
+        .code-trace-typing-char {
+          color: rgba(148,163,184,0.68);
+          transition: color 0.16s ease, background 0.16s ease, text-shadow 0.16s ease;
+        }
+        .code-trace-typing-char.is-match,
+        .code-trace-typing-char.is-string {
+          color: #dcfce7;
+          animation: codeTraceCharGlow 0.24s ease-out both;
+        }
+        .code-trace-typing-char.is-string {
+          color: #bbf7d0;
+          background: rgba(52,211,153,0.12);
+          border-radius: 4px;
+        }
+        .code-trace-typing-char.is-wrong,
+        .code-trace-typing-char.is-extra {
+          color: #fecaca;
+          background: rgba(248,113,113,0.18);
+          border-radius: 4px;
+        }
+        .code-trace-typing-cursor {
+          display: inline-block;
+          width: 0.5rem;
+          color: var(--crystal-cyan);
+          animation: codeTraceCharGlow 0.9s ease-in-out infinite alternate;
+        }
+        .code-trace-typing-meter {
+          flex: 0 0 72px;
+          height: 0.38rem;
+          overflow: hidden;
+          border-radius: 999px;
+          background: rgba(148,163,184,0.16);
+        }
+        .code-trace-typing-meter span {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
+          background: linear-gradient(90deg, rgba(0,243,255,0.72), rgba(52,211,153,0.9));
+          transition: width 0.18s ease;
+        }
         .code-trace-analysis-panel {
           margin-top: 1rem;
           display: grid;
@@ -1643,7 +1871,7 @@ export default function CodeTracePlayer({
             </pre>
           </section>
 
-          <section className="glass-card" style={{ padding: '1rem', minWidth: 0, position: 'relative' }}>
+          <section className={`glass-card code-trace-student-panel ${currentPassed ? 'is-complete' : ''}`} style={{ padding: '1rem', minWidth: 0, position: 'relative' }}>
             <h3 className="font-title" style={{ margin: '0 0 0.75rem', color: 'var(--crystal-cyan)' }}>학생 입력</h3>
             {linePulse && (
               <div
@@ -1667,22 +1895,49 @@ export default function CodeTracePlayer({
                 {linePulse.enter ? '라인 입력' : `${linePulse.count}줄 콤보`}
               </div>
             )}
-            <textarea
-              ref={studentTextareaRef}
-              value={studentCode}
-              onChange={e => {
-                setStudentCode(e.target.value);
-                updateStudentSelection(e.target);
-              }}
-              onSelect={e => updateStudentSelection(e.target)}
-              onClick={e => updateStudentSelection(e.currentTarget)}
-              onKeyUp={e => updateStudentSelection(e.currentTarget)}
-              onKeyDown={handleStudentKeyDown}
-              spellCheck={false}
-              wrap="off"
-              placeholder="코드를 따라 쓰세요."
-              style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', height: codePanelHeight, minHeight: CODE_PANEL_MIN_HEIGHT, maxHeight: CODE_PANEL_MAX_HEIGHT, resize: 'vertical', background: '#020617', color: '#f8fafc', border: currentPassed ? '1px solid rgba(34,197,94,0.55)' : '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2, overflow: 'auto', whiteSpace: 'pre', animation: currentPassed ? 'codeTracePassGlow 1.6s ease-in-out infinite' : 'none' }}
-            />
+            <div className="code-trace-input-stage">
+              <div className="code-trace-line-rail">
+                {lineFeedback.slice(0, 18).map(item => (
+                  <span
+                    key={item.lineNumber}
+                    className={`code-trace-line-dot ${item.typed ? 'is-started' : ''} ${item.done ? 'is-done' : ''} ${typingTrace.lineNumber === item.lineNumber ? 'is-current' : ''}`}
+                    title={`${item.lineNumber}번째 줄`}
+                  >
+                    {item.done ? <Check size={11} strokeWidth={3} /> : item.lineNumber}
+                  </span>
+                ))}
+              </div>
+              <textarea
+                ref={studentTextareaRef}
+                value={studentCode}
+                onChange={e => {
+                  setStudentCode(e.target.value);
+                  updateStudentSelection(e.target);
+                }}
+                onSelect={e => updateStudentSelection(e.target)}
+                onClick={e => updateStudentSelection(e.currentTarget)}
+                onKeyUp={e => updateStudentSelection(e.currentTarget)}
+                onKeyDown={handleStudentKeyDown}
+                spellCheck={false}
+                wrap="off"
+                placeholder="코드를 따라 쓰세요."
+                style={{ boxSizing: 'border-box', display: 'block', width: '100%', maxWidth: '100%', height: codePanelHeight, minHeight: CODE_PANEL_MIN_HEIGHT, maxHeight: CODE_PANEL_MAX_HEIGHT, resize: 'vertical', background: '#020617', color: '#f8fafc', border: currentPassed ? '1px solid rgba(34,197,94,0.55)' : '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '1rem 1rem 1rem 3rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.92rem', lineHeight: 1.55, tabSize: 2, overflow: 'auto', whiteSpace: 'pre', animation: currentPassed ? 'codeTracePassGlow 1.6s ease-in-out infinite' : 'none' }}
+              />
+            </div>
+            <div className="code-trace-typing-trace">
+              <span className="font-tech code-trace-typing-line">{typingTrace.lineNumber}줄</span>
+              <code className="code-trace-typing-text">
+                {typingTrace.typedChars.length ? typingTrace.typedChars.map((item, index) => (
+                  <span key={`${index}-${item.char}`} className={`code-trace-typing-char is-${item.status}`}>
+                    {item.char === ' ' ? '·' : item.char === '\t' ? '→' : item.char}
+                  </span>
+                )) : <span className="code-trace-typing-char"> </span>}
+                <span className="code-trace-typing-cursor">▌</span>
+              </code>
+              <span className="code-trace-typing-meter" aria-hidden="true">
+                <span style={{ width: `${Math.round(typingTrace.progress * 100)}%` }} />
+              </span>
+            </div>
             {stringSuggestions.length > 0 && (
               <div className="code-trace-string-helper">
                 <p className="font-tech code-trace-string-helper-title">문자열 도우미</p>
@@ -1722,9 +1977,11 @@ export default function CodeTracePlayer({
                   +{rewardBurst.amount} 광석{rewardBurst.attempt ? ` (${rewardBurst.attempt}회차)` : ''}
                 </div>
               )}
-              <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!currentPassed || completionState === 'processing' || saving}>
+              <button className="hud-btn primary glass" onClick={markCurrentPassed} disabled={!canSubmitCurrentPass}>
                 <Check size={16} /> {
-                  currentPassed
+                  currentAlreadyCompleted
+                    ? '통과 완료'
+                    : currentPassed
                     ? (rewardStillAvailable
                       ? `통과하고 +${rawRewardForNextPass}광석${nextAttemptNumber > 1 ? ` (${nextAttemptNumber}회차)` : ''} 획득`
                       : (currentAttemptCount > 0 ? '다시 통과하기 · 보상 완료' : `구조 기준 ${passingAccuracy}%`))
@@ -1769,7 +2026,9 @@ export default function CodeTracePlayer({
           )}
 
           <div className="font-tech" style={{ color: currentPassed ? 'var(--planet-green)' : 'var(--text-muted)', marginBottom: '0.75rem' }}>
-            {currentPassed
+            {currentAlreadyCompleted
+              ? '이 세트는 이미 통과 처리되었습니다. 다시 눌러도 보상이나 기록을 중복 처리하지 않습니다.'
+              : currentPassed
               ? (rewardStillAvailable
                 ? (willCompleteOnPass
                   ? `마지막 세트입니다. 통과하면 +${rawRewardForNextPass}광석을 받고 CODE TRACE가 완료됩니다.`
