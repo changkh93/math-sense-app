@@ -442,13 +442,15 @@ async function resolveBattleContext({ clusterId, regionId, entryUnitId }) {
     .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
 
   const unitDocs = [];
-  for (const chapter of chapters) {
-    const unitsSnap = await db.collection("units").where("chapterId", "==", chapter.id).get();
+  const unitSnaps = await Promise.all(
+    chapters.map((chapter) => db.collection("units").where("chapterId", "==", chapter.id).get())
+  );
+  unitSnaps.forEach((unitsSnap) => {
     unitsSnap.docs
       .map((unit) => ({ id: unit.id, ...(unit.data() || {}) }))
       .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
       .forEach((unit) => unitDocs.push(unit));
-  }
+  });
 
   const ordinalByUnitId = new Map();
   unitDocs.forEach((unit, index) => {
@@ -477,9 +479,12 @@ async function resolveBattleContext({ clusterId, regionId, entryUnitId }) {
 async function buildBattleQuestionSet(context, commonCeilingOrdinal, questionCount, seed) {
   const db = admin.firestore();
   const eligibleUnits = context.units.filter((unit) => unit.ordinal <= commonCeilingOrdinal);
+  const quizSnaps = await Promise.all(
+    eligibleUnits.map((unit) => db.collection("quizzes").where("unitId", "==", unit.id).get())
+  );
   const quizDocs = [];
-  for (const unit of eligibleUnits) {
-    const snap = await db.collection("quizzes").where("unitId", "==", unit.id).get();
+  quizSnaps.forEach((snap, index) => {
+    const unit = eligibleUnits[index];
     snap.docs.forEach((quizDoc) => {
       const sanitized = sanitizeQuizForBattle(quizDoc);
       if (sanitized.question && sanitized.options.length >= 2 && getCorrectOptionKeys(quizDoc.data() || {}).length > 0) {
@@ -490,7 +495,7 @@ async function buildBattleQuestionSet(context, commonCeilingOrdinal, questionCou
         });
       }
     });
-  }
+  });
 
   const selected = shuffleBattleItems(quizDocs, seed).slice(0, questionCount);
   if (selected.length < questionCount) {
@@ -1083,13 +1088,6 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
     }
   }
 
-  const eligibleQuestionSet = await buildBattleQuestionSet(
-    contextData,
-    contextData.entryOrdinal,
-    requestedQuestionCount,
-    `${uid}_${regionId}_eligibility`
-  );
-
   const waitResult = await db.runTransaction(async (transaction) => {
     const freshTicketSnap = await transaction.get(ticketRef);
     if (freshTicketSnap.exists) {
@@ -1122,7 +1120,6 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       status: "waiting",
       matchId: "",
       questionCount: requestedQuestionCount,
-      availableQuestionCount: eligibleQuestionSet.length,
       expiresAtMs: nowMs + QUIZ_BATTLE_QUEUE_TTL_MS,
       ttlAt: Timestamp.fromMillis(nowMs + (24 * 60 * 60 * 1000)),
       createdAt: FieldValue.serverTimestamp(),
@@ -1264,11 +1261,14 @@ exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context
   });
 
   if (answerResult?.shouldFinalize) {
-    try {
-      await finalizeQuizBattleInternal(battleId, "completed");
-    } catch (err) {
+    // 답안 응답을 막지 않도록 정산은 비동기로 처리한다.
+    // 결과는 battle 문서의 onSnapshot이 status==='finished'로 반영하므로
+    // 클라이언트가 이 호출의 결과를 기다릴 필요가 없다.
+    // finalizeQuizBattleInternal은 멱등이며 finalizeQuizBattle callable이
+    // fallback으로 존재하므로, 드물게 실패해도 복구 가능하다.
+    finalizeQuizBattleInternal(battleId, "completed").catch((err) => {
       console.error("Battle finalize after answer failed", err);
-    }
+    });
   }
 
   return answerResult;

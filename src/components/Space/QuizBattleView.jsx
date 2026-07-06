@@ -135,9 +135,13 @@ export default function QuizBattleView({
 
   useEffect(() => {
     if (phase !== 'waiting') return undefined
+    // 매칭은 ticket onSnapshot이 즉시 알려준다. 이 폴링은 두 사용자가 동시에
+    // 입장해 서로의 대기 티켓을 못 본 레이스 상황을 복구하는 보조 수단일 뿐이므로
+    // 자주 실행할 필요가 없다. 호출 1회마다 여러 Firestore 쿼리가 수반되므로
+    // 간격을 넉넉히 두어 비용과 부하를 줄인다.
     const timer = setInterval(() => {
       joinQueue({ silent: true })
-    }, 8000)
+    }, 25000)
     return () => clearInterval(timer)
   }, [joinQueue, phase])
 
