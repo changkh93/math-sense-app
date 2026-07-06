@@ -933,18 +933,22 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
           if (!endedByTimer && !endedByForfeit) {
             return { status: "matched", battleId: existingTicket.matchId };
           }
-          // stale 배틀을 정산 시도(이미 끝났거나 실패해도 무방)하고 티켓을 무효화한다.
+          // stale 배틀을 정산 시도(이미 끝났거나 실패해도 무방)한다.
           try {
             await finalizeQuizBattleInternal(existingTicket.matchId, "force");
           } catch (err) {
             console.warn("Stale battle finalize on rejoin failed", err);
           }
-          await ticketRef.set({
-            status: "expired",
-            updatedAt: FieldValue.serverTimestamp(),
-          }, { merge: true });
         }
       }
+      // 여기에 도달했다면 티켓이 종료된/stale 배틀을 가리키고 있는 것이다.
+      // 다음 매칭에서 재사용할 수 있도록 티켓을 초기화한다.
+      await ticketRef.set({
+        status: "waiting",
+        matchId: "",
+        expiresAtMs: nowMs + QUIZ_BATTLE_QUEUE_TTL_MS,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
     }
   }
 
@@ -1094,16 +1098,14 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
         const freshBattleSnap = await transaction.get(db.collection("quizBattles").doc(freshTicket.matchId));
         if (freshBattleSnap.exists) {
           const freshBattle = freshBattleSnap.data() || {};
-          if (freshBattle.status !== "finished") {
-            // 트랜잭션 안에서는 별도 트랜잭션이 필요한 정산은 할 수 없으므로,
-            // 진행 가능 여부만 판별한다. stale(타이머 만료/포기)이면 재입장시키지 않는다.
-            const endedByTimer = Number(freshBattle.endsAtMs || 0) > 0 && nowMs >= Number(freshBattle.endsAtMs || 0);
-            const endedByForfeit = (freshBattle.participantUids || []).some(
-              (pUid) => freshBattle.participants?.[pUid]?.forfeited === true
-            );
-            if (!endedByTimer && !endedByForfeit) {
-              return { status: "matched", battleId: freshTicket.matchId };
-            }
+          // 배틀이 여전히 진행 중이고 stale(타이머 만료/포기)가 아니면 재입장시킨다.
+          // finished이거나 stale이면 아래로 흘러 티켓을 새 waiting으로 덮어쓴다.
+          const endedByTimer = Number(freshBattle.endsAtMs || 0) > 0 && nowMs >= Number(freshBattle.endsAtMs || 0);
+          const endedByForfeit = (freshBattle.participantUids || []).some(
+            (pUid) => freshBattle.participants?.[pUid]?.forfeited === true
+          );
+          if (freshBattle.status !== "finished" && !endedByTimer && !endedByForfeit) {
+            return { status: "matched", battleId: freshTicket.matchId };
           }
         }
       }

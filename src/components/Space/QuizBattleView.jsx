@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '../../firebase'
 import { useAuth } from '../../hooks/useAuth'
@@ -110,10 +110,18 @@ export default function QuizBattleView({
 
   useEffect(() => {
     if (phase !== 'waiting' || !ticketId) return undefined
-    const unsubscribe = onSnapshot(doc(db, 'quizBattleQueueTickets', ticketId), (snap) => {
+    const unsubscribe = onSnapshot(doc(db, 'quizBattleQueueTickets', ticketId), async (snap) => {
       if (!snap.exists()) return
       const data = snap.data()
       if (data.status === 'matched' && data.matchId) {
+        // stale 방어: 티켓이 종료된 과거 배틀을 가리키면 무시하고 대기를 유지한다.
+        // 서버가 티켓을 갱신하기 전 순간에 과거 matched 상태를 잡는 레이스를 막는다.
+        try {
+          const battleSnap = await getDoc(doc(db, 'quizBattles', data.matchId))
+          if (battleSnap.exists() && battleSnap.data()?.status === 'finished') return
+        } catch (err) {
+          console.warn('Failed to verify matched battle status', err)
+        }
         matchedRef.current = true
         setBattleId(data.matchId)
         setPhase('active')
