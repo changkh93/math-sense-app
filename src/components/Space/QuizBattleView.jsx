@@ -41,6 +41,7 @@ export default function QuizBattleView({
   const [isJoining, setIsJoining] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
   const [error, setError] = useState('')
   const [timeNow, setTimeNow] = useState(Date.now())
   const activeTicketRef = useRef('')
@@ -173,6 +174,10 @@ export default function QuizBattleView({
     return { reward, outcome }
   }, [battle, user?.uid])
 
+  // 상대가 중도에 포기(이탈)했는지 여부. 결과 화면 안내에 사용한다.
+  const opponentForfeited = !!opponentUid && battle?.participants?.[opponentUid]?.forfeited === true
+  const myForfeit = !!user?.uid && battle?.participants?.[user.uid]?.forfeited === true
+
   const toggleOption = (key, multiAnswer) => {
     if (isSubmitting || hasAnsweredCurrent || isBattleCompleteForMe) return
     setSelectedKeys(prev => {
@@ -224,6 +229,19 @@ export default function QuizBattleView({
   }
 
   const leaveBattle = async () => {
+    if (isLeaving) return
+    // 진행 중인 배틀에서 나갈 때는 서버에 포기를 알려 상대방이 즉시 결과를 볼 수 있게 한다.
+    if (battleId && phase === 'active' && !isBattleFinished) {
+      setIsLeaving(true)
+      try {
+        const forfeit = httpsCallable(functions, 'forfeitQuizBattle')
+        await forfeit({ battleId })
+      } catch (err) {
+        console.warn('Failed to forfeit quiz battle', err)
+      } finally {
+        setIsLeaving(false)
+      }
+    }
     if (phase === 'waiting') await cancelQueue()
     onExit?.()
   }
@@ -335,9 +353,16 @@ export default function QuizBattleView({
           <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>
             {resultSummary?.outcome === 'win' ? '🏆' : resultSummary?.outcome === 'loss' ? '🛡️' : '🤝'}
           </div>
-          <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '1rem' }}>
+          <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.5rem' }}>
             {resultSummary?.outcome === 'win' ? '배틀 승리' : resultSummary?.outcome === 'loss' ? '배틀 완료' : '무승부'}
           </h2>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '1rem', minHeight: '1.2rem' }}>
+            {opponentForfeited
+              ? '상대가 배틀을 떠났습니다.'
+              : myForfeit
+                ? '배틀을 중도에 떠났습니다.'
+                : ''}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
             <div className="glass-card" style={{ padding: '1rem' }}>
               <div className="font-tech" style={{ color: 'var(--text-muted)' }}>나</div>
@@ -433,8 +458,8 @@ export default function QuizBattleView({
           )}
           {error && <div style={{ color: '#f87171', marginTop: '1rem' }}>{error}</div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
-            <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.8rem 1.2rem' }}>
-              나가기
+            <button className="hud-btn secondary glass" onClick={leaveBattle} disabled={isLeaving} style={{ padding: '0.8rem 1.2rem' }}>
+              {isLeaving ? '정산 중...' : '나가기'}
             </button>
             {isBattleCompleteForMe || timeExpired ? (
               <button className="hud-btn primary glass" onClick={finalizeBattle} disabled={isFinalizing} style={{ padding: '0.8rem 1.2rem' }}>

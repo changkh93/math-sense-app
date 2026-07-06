@@ -521,7 +521,16 @@ function calculateBattleRewards(participants = {}, participantUids = []) {
 
   let winnerUid = "";
   let resultType = "draw";
-  if (aScore > bScore) {
+  // 한쪽이라도 중도 포기했으면, 남은 쪽이 점수와 무관하게 승리한다.
+  const aForfeited = a.forfeited === true;
+  const bForfeited = b.forfeited === true;
+  if (aForfeited && !bForfeited) {
+    winnerUid = bUid;
+    resultType = "win";
+  } else if (bForfeited && !aForfeited) {
+    winnerUid = aUid;
+    resultType = "win";
+  } else if (aScore > bScore) {
     winnerUid = aUid;
     resultType = "win";
   } else if (bScore > aScore) {
@@ -539,6 +548,12 @@ function calculateBattleRewards(participants = {}, participantUids = []) {
 
   const rewards = {};
   participantUids.forEach((uid) => {
+    const isForfeited = (uid === aUid ? aForfeited : bForfeited);
+    // 중도 포기한 참가자는 보상이 없다.
+    if (isForfeited) {
+      rewards[uid] = 0;
+      return;
+    }
     if (!winnerUid) {
       rewards[uid] = QUIZ_BATTLE_DRAW_REWARD;
       return;
@@ -584,7 +599,9 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
     const nowMs = Date.now();
     const allDone = participantUids.every((uid) => Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions);
     const timedOut = Number(battleData.endsAtMs || 0) > 0 && nowMs >= Number(battleData.endsAtMs || 0);
-    if (!allDone && !timedOut && finalizeReason !== "force") {
+    const hasForfeit = participantUids.some((uid) => participants?.[uid]?.forfeited === true);
+    // 한쪽이 중도 포기했거나, 강제 정산 요청이면 즉시 정산한다.
+    if (!allDone && !timedOut && !hasForfeit && finalizeReason !== "force") {
       throw new functions.https.HttpsError("failed-precondition", "아직 배틀이 종료되지 않았습니다.");
     }
 
@@ -904,8 +921,29 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
     const existingTicket = existingTicketSnap.data() || {};
     if (existingTicket.status === "matched" && existingTicket.matchId) {
       const existingBattleSnap = await db.collection("quizBattles").doc(existingTicket.matchId).get();
-      if (existingBattleSnap.exists && existingBattleSnap.data()?.status !== "finished") {
-        return { status: "matched", battleId: existingTicket.matchId };
+      if (existingBattleSnap.exists) {
+        const existingBattle = existingBattleSnap.data() || {};
+        if (existingBattle.status !== "finished") {
+          // 배틀이 아직 "계속 진행 가능한 상태"인지 확인한다.
+          // 타이머가 만료됐거나 누군가 이미 포기했다면 stale(좀비) 배틀이므로
+          // 정산한 뒤 새 매칭으로 넘어간다. 그렇지 않으면 그대로 재입장시킨다.
+          const endedByTimer = Number(existingBattle.endsAtMs || 0) > 0 && nowMs >= Number(existingBattle.endsAtMs || 0);
+          const endedByForfeit = (existingBattle.participants || {})[uid]?.forfeited === true
+            || (existingBattle.participantUids || []).some((pUid) => existingBattle.participants?.[pUid]?.forfeited === true);
+          if (!endedByTimer && !endedByForfeit) {
+            return { status: "matched", battleId: existingTicket.matchId };
+          }
+          // stale 배틀을 정산 시도(이미 끝났거나 실패해도 무방)하고 티켓을 무효화한다.
+          try {
+            await finalizeQuizBattleInternal(existingTicket.matchId, "force");
+          } catch (err) {
+            console.warn("Stale battle finalize on rejoin failed", err);
+          }
+          await ticketRef.set({
+            status: "expired",
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
       }
     }
   }
@@ -1054,8 +1092,19 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       const freshTicket = freshTicketSnap.data() || {};
       if (freshTicket.status === "matched" && freshTicket.matchId) {
         const freshBattleSnap = await transaction.get(db.collection("quizBattles").doc(freshTicket.matchId));
-        if (freshBattleSnap.exists && freshBattleSnap.data()?.status !== "finished") {
-          return { status: "matched", battleId: freshTicket.matchId };
+        if (freshBattleSnap.exists) {
+          const freshBattle = freshBattleSnap.data() || {};
+          if (freshBattle.status !== "finished") {
+            // 트랜잭션 안에서는 별도 트랜잭션이 필요한 정산은 할 수 없으므로,
+            // 진행 가능 여부만 판별한다. stale(타이머 만료/포기)이면 재입장시키지 않는다.
+            const endedByTimer = Number(freshBattle.endsAtMs || 0) > 0 && nowMs >= Number(freshBattle.endsAtMs || 0);
+            const endedByForfeit = (freshBattle.participantUids || []).some(
+              (pUid) => freshBattle.participants?.[pUid]?.forfeited === true
+            );
+            if (!endedByTimer && !endedByForfeit) {
+              return { status: "matched", battleId: freshTicket.matchId };
+            }
+          }
         }
       }
     }
@@ -1240,6 +1289,52 @@ exports.finalizeQuizBattle = regionalFunctions.https.onCall(async (data, context
   }
 
   const result = await finalizeQuizBattleInternal(battleId, "requested");
+  return { success: true, ...result };
+});
+
+exports.forfeitQuizBattle = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const battleId = cleanId(data?.battleId);
+  if (!battleId) {
+    throw new functions.https.HttpsError("invalid-argument", "배틀 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const battleRef = db.collection("quizBattles").doc(battleId);
+  const nowMs = Date.now();
+
+  // 배틀을 포기 표시한다. 이미 종료됐으면 그대로 결과를 반환한다.
+  const battleSnap = await battleRef.get();
+  if (!battleSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
+  }
+  const battleData = battleSnap.data() || {};
+  if (!Array.isArray(battleData.participantUids) || !battleData.participantUids.includes(uid)) {
+    throw new functions.https.HttpsError("permission-denied", "배틀 참가자만 포기할 수 있습니다.");
+  }
+  if (battleData.status === "finished") {
+    return {
+      success: true,
+      alreadyFinalized: true,
+      winnerUid: battleData.winnerUid || "",
+      rewards: battleData.rewards || {},
+    };
+  }
+
+  await db.runTransaction(async (transaction) => {
+    const freshSnap = await transaction.get(battleRef);
+    if (!freshSnap.exists) return;
+    const freshData = freshSnap.data() || {};
+    if (freshData.status === "finished") return;
+    transaction.update(battleRef, {
+      [`participants.${uid}.forfeited`]: true,
+      [`participants.${uid}.forfeitedAt`]: FieldValue.serverTimestamp(),
+      [`participants.${uid}.forfeitedAtMs`]: nowMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+
+  const result = await finalizeQuizBattleInternal(battleId, "forfeit");
   return { success: true, ...result };
 });
 
