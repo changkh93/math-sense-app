@@ -44,6 +44,7 @@ const REACTION_CAUSE_LABELS = {
   careless_mistake: '아는 내용 실수',
 }
 
+const QA_ROOM_URL = 'https://meet.google.com/qzg-psru-qnc'
 const REVIEW_REACTION_IDS = new Set(['uncertain_correct', 'missed_condition', 'solution_blocked', 'guessed_concept_gap', 'careless_mistake'])
 const MotionReactionPanel = motion.div
 
@@ -852,6 +853,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setIsQuestionModalOpen(false)
   }
 
+  const handleOpenQaRoom = () => {
+    const qaWindow = window.open(QA_ROOM_URL, '_blank', 'noopener,noreferrer')
+    if (qaWindow) qaWindow.opener = null
+  }
+
   const handleReSolveWrong = () => {
     soundManager.playClick()
     
@@ -1479,6 +1485,33 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   >
                     <span style={{ fontSize: '1.2rem' }}>🙋</span>
                     <span>선생님 질문</span>
+                  </button>
+
+                  {/* Q&A Room Button */}
+                  <button
+                    className="support-action-btn qna-room"
+                    onClick={handleOpenQaRoom}
+                    style={{
+                      padding: '0 1.2rem',
+                      borderRadius: '25px',
+                      height: '46px',
+                      fontSize: '0.9rem',
+                      fontWeight: 800,
+                      color: '#bfdbfe',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      cursor: 'pointer',
+                      border: '2px solid rgba(96, 165, 250, 0.65)',
+                      boxShadow: '0 0 15px rgba(96, 165, 250, 0.28)',
+                      background: 'rgba(8, 18, 38, 0.95)',
+                      whiteSpace: 'nowrap',
+                      width: isMobile ? '100%' : 'auto',
+                      justifyContent: isMobile ? 'center' : 'flex-start'
+                    }}
+                  >
+                    <span style={{ fontSize: '1.2rem' }}>🎥</span>
+                    <span>Q&amp;A방에 가기</span>
                   </button>
                 </motion.div>
               )}

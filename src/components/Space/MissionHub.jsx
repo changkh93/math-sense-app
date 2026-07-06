@@ -80,6 +80,7 @@ const LONG_VIDEO_SECONDS = 40 * 60
 const STANDARD_VIDEO_COMPLETION_THRESHOLD = 0.95
 const LONG_VIDEO_COMPLETION_THRESHOLD = 0.85
 const VIDEO_PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2]
+const QA_ROOM_URL = 'https://meet.google.com/qzg-psru-qnc'
 
 const getVideoCompletionThreshold = (duration = 0) => (
   duration > LONG_VIDEO_SECONDS
@@ -812,6 +813,14 @@ export default function MissionHub({
       captureRootSelector: '#mission-hub-capture-area'
     })
     setIsQuestionModalOpen(true)
+  }
+
+  const handleOpenQaRoom = () => {
+    if (videoPlayerRef.current) {
+      videoPlayerRef.current.pauseVideo()
+    }
+    const qaWindow = window.open(QA_ROOM_URL, '_blank', 'noopener,noreferrer')
+    if (qaWindow) qaWindow.opener = null
   }
 
   // ─── Field Test modal state ───
@@ -2665,6 +2674,22 @@ export default function MissionHub({
                  >
                    🙋 선생님께 질문하기
                  </button>
+
+                 <button
+                   onClick={handleOpenQaRoom}
+                   className="hud-btn primary glass capture-hide"
+                   style={{
+                     padding: isMobile ? '0.85rem 1rem' : '0.8rem 1.6rem',
+                     fontSize: isMobile ? '0.9rem' : '1rem',
+                     borderRadius: '10px',
+                     background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.32), rgba(59, 130, 246, 0.32))',
+                     borderColor: '#60a5fa',
+                     color: 'white',
+                     boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                   }}
+                 >
+                   🎥 Q&amp;A방
+                 </button>
                </div>
                
                <AnimatePresence>
@@ -3137,31 +3162,62 @@ export default function MissionHub({
 
        {/* Conditionally render Global FAB for text mode */}
        {(currentMode === 'text') && (
-          <button
-            onClick={() => handleOpenQuestionModal('datalog')}
-            className="hud-btn primary glass capture-hide"
+          <div
+            className="capture-hide"
             style={{
               position: 'fixed',
               bottom: isMobile ? '1rem' : '2rem',
               right: isMobile ? '1rem' : '2rem',
               left: isMobile ? '1rem' : 'auto',
-              justifyContent: 'center',
-              padding: isMobile ? '0.9rem 1rem' : '1rem 1.5rem',
-              borderRadius: '50px',
-              background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.9), rgba(34, 211, 238, 0.9))',
-              color: '#000',
-              fontWeight: 800,
-              fontSize: '1rem',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
-              border: 'none',
               zIndex: 3000,
               display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
+              flexDirection: 'column',
+              alignItems: 'stretch',
+              gap: '0.65rem'
             }}
           >
-            🙋 선생님 질문
-          </button>
+            <button
+              onClick={() => handleOpenQuestionModal('datalog')}
+              className="hud-btn primary glass"
+              style={{
+                justifyContent: 'center',
+                padding: isMobile ? '0.9rem 1rem' : '1rem 1.5rem',
+                borderRadius: '50px',
+                background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.9), rgba(34, 211, 238, 0.9))',
+                color: '#000',
+                fontWeight: 800,
+                fontSize: '1rem',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              🙋 선생님 질문
+            </button>
+
+            <button
+              onClick={handleOpenQaRoom}
+              className="hud-btn primary glass"
+              style={{
+                justifyContent: 'center',
+                padding: isMobile ? '0.85rem 1rem' : '0.9rem 1.4rem',
+                borderRadius: '50px',
+                background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.92), rgba(59, 130, 246, 0.92))',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: '1rem',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              🎥 Q&amp;A방
+            </button>
+          </div>
        )}
 
        {/* Question Modal */}
