@@ -235,6 +235,31 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Quiz Battle MVP: all writes are server-managed by Cloud Functions.
+    match /quizBattleQueueTickets/{ticketId} {
+      allow read: if isAuth() && (
+        resource.data.uid == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if false;
+    }
+
+    match /quizBattles/{battleId} {
+      allow read: if isAuth() && (
+        request.auth.uid in resource.data.participantUids ||
+        isAdmin()
+      );
+      allow write: if false;
+
+      match /answers/{answerId} {
+        allow read: if isAuth() && (
+          answerId.matches('^' + request.auth.uid + '_.*') ||
+          isAdmin()
+        );
+        allow write: if false;
+      }
+    }
+
     match /studyCrewMissionPlans/{dateKey} {
       allow read: if isAuth();
       allow write: if false;

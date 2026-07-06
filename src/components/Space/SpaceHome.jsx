@@ -3162,6 +3162,7 @@ function SpaceHome() {
         key={missionUnitId}
         unitId={missionUnitId}
         clusterId={selectedClusterId}
+        regionId={selectedRegionId || singleRegion?.id || singleRegion?.docId || activeChapter?.regionId || ''}
         activeUnit={activeUnit} 
         unitQuizzes={unitQuizzes}
         loadingQuizzes={loadingQuizzes}

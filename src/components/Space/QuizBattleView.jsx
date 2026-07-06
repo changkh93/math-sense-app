@@ -1,0 +1,459 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '../../firebase'
+import { useAuth } from '../../hooks/useAuth'
+import MissionMarkdownViewer from './MissionMarkdownViewer'
+import soundManager from '../../utils/SoundManager'
+
+const QUESTION_COUNT = 15
+
+const getParticipant = (battle, uid) => battle?.participants?.[uid] || {}
+
+const getOpponentUid = (battle, uid) => (
+  (battle?.participantUids || []).find(participantUid => participantUid !== uid) || ''
+)
+
+const formatTimeLeft = (endsAtMs) => {
+  const left = Math.max(0, Math.ceil((Number(endsAtMs || 0) - Date.now()) / 1000))
+  const min = Math.floor(left / 60)
+  const sec = String(left % 60).padStart(2, '0')
+  return `${min}:${sec}`
+}
+
+export default function QuizBattleView({
+  clusterId,
+  regionId,
+  entryUnitId,
+  entryUnitTitle,
+  onExit,
+  onSoloQuiz,
+}) {
+  const { user } = useAuth()
+  const [phase, setPhase] = useState('idle')
+  const [ticketId, setTicketId] = useState('')
+  const [battleId, setBattleId] = useState('')
+  const [battle, setBattle] = useState(null)
+  const [selectedKeys, setSelectedKeys] = useState(new Set())
+  const [answerResults, setAnswerResults] = useState({})
+  const [battleStats, setBattleStats] = useState(null)
+  const [isJoining, setIsJoining] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isFinalizing, setIsFinalizing] = useState(false)
+  const [error, setError] = useState('')
+  const [timeNow, setTimeNow] = useState(Date.now())
+  const activeTicketRef = useRef('')
+  const matchedRef = useRef(false)
+
+  useEffect(() => {
+    if (!user?.uid) return undefined
+    const unsubscribe = onSnapshot(doc(db, 'users', user.uid, 'battleStats', 'summary'), (snap) => {
+      setBattleStats(snap.exists() ? snap.data() : null)
+    }, () => {
+      setBattleStats(null)
+    })
+    return () => unsubscribe()
+  }, [user?.uid])
+
+  const joinQueue = useCallback(async ({ silent = false } = {}) => {
+    if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
+    setIsJoining(true)
+    if (!silent) {
+      setError('')
+      setPhase('waiting')
+    }
+
+    try {
+      const join = httpsCallable(functions, 'joinQuizBattleQueue')
+      const res = await join({
+        clusterId,
+        regionId,
+        entryUnitId,
+        questionCount: QUESTION_COUNT,
+      })
+      const data = res.data || {}
+      if (data.status === 'matched' && data.battleId) {
+        matchedRef.current = true
+        setBattleId(data.battleId)
+        setPhase('active')
+        soundManager.playCrystal()
+      } else {
+        activeTicketRef.current = data.ticketId || `${user.uid}_${regionId}`
+        setTicketId(activeTicketRef.current)
+        setPhase('waiting')
+      }
+    } catch (err) {
+      setError(err?.message || '배틀 대기룸에 입장하지 못했습니다.')
+      setPhase('idle')
+    } finally {
+      setIsJoining(false)
+    }
+  }, [clusterId, entryUnitId, isJoining, regionId, user?.uid])
+
+  const cancelQueue = useCallback(async () => {
+    if (!regionId || matchedRef.current) return
+    try {
+      const cancel = httpsCallable(functions, 'cancelQuizBattleQueue')
+      await cancel({ regionId })
+    } catch (err) {
+      console.warn('Failed to cancel quiz battle queue', err)
+    }
+  }, [regionId])
+
+  useEffect(() => {
+    return () => {
+      cancelQueue()
+    }
+  }, [cancelQueue])
+
+  useEffect(() => {
+    if (phase !== 'waiting' || !ticketId) return undefined
+    const unsubscribe = onSnapshot(doc(db, 'quizBattleQueueTickets', ticketId), (snap) => {
+      if (!snap.exists()) return
+      const data = snap.data()
+      if (data.status === 'matched' && data.matchId) {
+        matchedRef.current = true
+        setBattleId(data.matchId)
+        setPhase('active')
+        soundManager.playCrystal()
+      }
+    }, (err) => {
+      setError(err?.message || '배틀 대기 상태를 확인하지 못했습니다.')
+    })
+    return () => unsubscribe()
+  }, [phase, ticketId])
+
+  useEffect(() => {
+    if (phase !== 'waiting') return undefined
+    const timer = setInterval(() => {
+      joinQueue({ silent: true })
+    }, 8000)
+    return () => clearInterval(timer)
+  }, [joinQueue, phase])
+
+  useEffect(() => {
+    if (!battleId) return undefined
+    const unsubscribe = onSnapshot(doc(db, 'quizBattles', battleId), (snap) => {
+      if (!snap.exists()) {
+        setError('배틀 정보를 찾을 수 없습니다.')
+        return
+      }
+      setBattle({ id: snap.id, ...snap.data() })
+      setPhase(snap.data()?.status === 'finished' ? 'result' : 'active')
+    }, (err) => {
+      setError(err?.message || '배틀 정보를 수신하지 못했습니다.')
+    })
+    return () => unsubscribe()
+  }, [battleId])
+
+  useEffect(() => {
+    const timer = setInterval(() => setTimeNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const myParticipant = getParticipant(battle, user?.uid)
+  const opponentUid = getOpponentUid(battle, user?.uid)
+  const opponentParticipant = getParticipant(battle, opponentUid)
+  const questionSet = battle?.questionSet || []
+  const answeredCount = Number(myParticipant.answeredCount || 0)
+  const currentIndex = Math.min(answeredCount, Math.max(0, questionSet.length - 1))
+  const currentQuestion = questionSet[currentIndex]
+  const hasAnsweredCurrent = !!answerResults[currentQuestion?.questionId]
+  const isBattleFinished = battle?.status === 'finished'
+  const isBattleCompleteForMe = questionSet.length > 0 && answeredCount >= questionSet.length
+  const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
+
+  const resultSummary = useMemo(() => {
+    if (!battle || !user?.uid) return null
+    const rewards = battle.rewards || {}
+    const winnerUid = battle.winnerUid || ''
+    const reward = Number(rewards[user.uid] || 0)
+    const outcome = !winnerUid ? 'draw' : (winnerUid === user.uid ? 'win' : 'loss')
+    return { reward, outcome }
+  }, [battle, user?.uid])
+
+  const toggleOption = (key, multiAnswer) => {
+    if (isSubmitting || hasAnsweredCurrent || isBattleCompleteForMe) return
+    setSelectedKeys(prev => {
+      const next = new Set(multiAnswer ? prev : [])
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const submitAnswer = async () => {
+    if (!battleId || !currentQuestion || selectedKeys.size === 0 || isSubmitting) return
+    setIsSubmitting(true)
+    setError('')
+    try {
+      const submit = httpsCallable(functions, 'submitBattleAnswer')
+      const res = await submit({
+        battleId,
+        questionId: currentQuestion.questionId,
+        selectedOptionKeys: Array.from(selectedKeys),
+      })
+      const data = res.data || {}
+      setAnswerResults(prev => ({
+        ...prev,
+        [currentQuestion.questionId]: data,
+      }))
+      setSelectedKeys(new Set())
+      if (data.isCorrect) soundManager.playCorrect()
+      else soundManager.playWrong()
+    } catch (err) {
+      setError(err?.message || '답안을 제출하지 못했습니다.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const finalizeBattle = async () => {
+    if (!battleId || isFinalizing) return
+    setIsFinalizing(true)
+    setError('')
+    try {
+      const finalize = httpsCallable(functions, 'finalizeQuizBattle')
+      await finalize({ battleId })
+    } catch (err) {
+      setError(err?.message || '아직 배틀을 정산할 수 없습니다.')
+    } finally {
+      setIsFinalizing(false)
+    }
+  }
+
+  const leaveBattle = async () => {
+    if (phase === 'waiting') await cancelQueue()
+    onExit?.()
+  }
+
+  const panelStyle = {
+    minHeight: '100dvh',
+    width: '100%',
+    padding: '1.25rem',
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'radial-gradient(circle at 50% 0%, rgba(0, 243, 255, 0.12), transparent 35%), #050a19',
+    color: 'var(--text-bright)',
+  }
+
+  if (phase === 'idle') {
+    return (
+      <div className="space-bg" style={panelStyle}>
+        <div className="glass-card hud-border" style={{ width: 'min(720px, 100%)', padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚔️</div>
+          <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.75rem' }}>QUIZ BATTLE</h2>
+          <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+            같은 행성의 배틀 대기룸에 입장합니다.<br />
+            매칭되면 공통 학습 범위에서 15문제가 출제됩니다.
+          </p>
+          <div style={{ color: 'var(--crystal-cyan)', marginBottom: '1.5rem', fontWeight: 800 }}>
+            진입 미션: {entryUnitTitle || entryUnitId}
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+              gap: '0.6rem',
+              marginBottom: '1.5rem',
+            }}
+          >
+            {[
+              ['전적', `${battleStats?.totalMatches || 0}전`],
+              ['승', `${battleStats?.wins || 0}`],
+              ['패', `${battleStats?.losses || 0}`],
+              ['무', `${battleStats?.draws || 0}`],
+            ].map(([label, value]) => (
+              <div key={label} style={{ padding: '0.7rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{label}</div>
+                <div style={{ color: 'var(--text-bright)', fontWeight: 900 }}>{value}</div>
+              </div>
+            ))}
+          </div>
+          {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
+          <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button className="hud-btn primary glass" onClick={() => joinQueue()} disabled={isJoining} style={{ padding: '0.9rem 1.4rem' }}>
+              {isJoining ? '대기룸 접속 중...' : '배틀 대기룸 입장'}
+            </button>
+            <button className="hud-btn secondary glass" onClick={onSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
+              혼자 FIELD TEST
+            </button>
+            <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
+              돌아가기
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === 'waiting') {
+    return (
+      <div className="space-bg" style={panelStyle}>
+        <div className="glass-card hud-border" style={{ width: 'min(720px, 100%)', padding: '2rem', textAlign: 'center' }}>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
+            style={{ fontSize: '3.5rem', marginBottom: '1rem' }}
+          >
+            🛰️
+          </motion.div>
+          <h2 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.8rem' }}>배틀 상대 탐색 중</h2>
+          <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+            같은 행성의 대기룸에 들어온 탐사원을 찾고 있습니다.<br />
+            대기 상태는 자동으로 갱신됩니다.
+          </p>
+          {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
+          <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button className="hud-btn secondary glass" onClick={onSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
+              혼자 FIELD TEST로 전환
+            </button>
+            <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
+              대기 취소
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!battle || !currentQuestion) {
+    return (
+      <div className="space-bg" style={panelStyle}>
+        <div style={{ textAlign: 'center', color: 'var(--crystal-cyan)' }}>배틀 데이터를 수신 중...</div>
+      </div>
+    )
+  }
+
+  if (isBattleFinished) {
+    return (
+      <div className="space-bg" style={panelStyle}>
+        <div className="glass-card hud-border" style={{ width: 'min(780px, 100%)', padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>
+            {resultSummary?.outcome === 'win' ? '🏆' : resultSummary?.outcome === 'loss' ? '🛡️' : '🤝'}
+          </div>
+          <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '1rem' }}>
+            {resultSummary?.outcome === 'win' ? '배틀 승리' : resultSummary?.outcome === 'loss' ? '배틀 완료' : '무승부'}
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
+            <div className="glass-card" style={{ padding: '1rem' }}>
+              <div className="font-tech" style={{ color: 'var(--text-muted)' }}>나</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--crystal-cyan)' }}>{myParticipant.score || 0}</div>
+              <div style={{ color: 'var(--text-muted)' }}>{myParticipant.correctCount || 0} / {battle.questionCount}</div>
+            </div>
+            <div className="glass-card" style={{ padding: '1rem' }}>
+              <div className="font-tech" style={{ color: 'var(--text-muted)' }}>{opponentParticipant.displayName || '상대'}</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--star-gold)' }}>{opponentParticipant.score || 0}</div>
+              <div style={{ color: 'var(--text-muted)' }}>{opponentParticipant.correctCount || 0} / {battle.questionCount}</div>
+            </div>
+          </div>
+          <div style={{ color: 'var(--crystal-cyan)', fontSize: '1.25rem', fontWeight: 900, marginBottom: '1.5rem' }}>
+            +{resultSummary?.reward || 0} 광석
+          </div>
+          <button className="hud-btn primary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.6rem' }}>
+            MISSION CONTROL로 돌아가기
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-bg" style={{ ...panelStyle, alignItems: 'stretch', overflowY: 'auto' }}>
+      <div style={{ width: 'min(1040px, 100%)', margin: '0 auto', padding: '1rem 0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '0.8rem', alignItems: 'center', marginBottom: '1rem' }}>
+          <div className="glass-card" style={{ padding: '0.85rem 1rem' }}>
+            <div className="font-tech" style={{ color: 'var(--text-muted)' }}>나</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--crystal-cyan)' }}>{myParticipant.score || 0}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{myParticipant.answeredCount || 0} / {battle.questionCount}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div className="font-title" style={{ color: 'var(--star-gold)', fontSize: '1.15rem' }}>QUIZ BATTLE</div>
+            <div className="font-tech" style={{ color: timeExpired ? '#f87171' : 'var(--text-muted)' }}>{formatTimeLeft(battle.endsAtMs)}</div>
+          </div>
+          <div className="glass-card" style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+            <div className="font-tech" style={{ color: 'var(--text-muted)' }}>{opponentParticipant.displayName || '상대'}</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--star-gold)' }}>{opponentParticipant.score || 0}</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{opponentParticipant.answeredCount || 0} / {battle.questionCount}</div>
+          </div>
+        </div>
+
+        <div className="glass-card hud-border" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            QUESTION {Math.min(answeredCount + 1, battle.questionCount)} / {battle.questionCount}
+          </div>
+          {currentQuestion.imageUrl && (
+            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+              <img
+                src={currentQuestion.imageUrl}
+                alt=""
+                style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 8 }}
+              />
+            </div>
+          )}
+          <div style={{ fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '1.2rem' }}>
+            <MissionMarkdownViewer text={currentQuestion.question} />
+          </div>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            {(currentQuestion.options || []).map(option => {
+              const selected = selectedKeys.has(option.key)
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => toggleOption(option.key, currentQuestion.multiAnswer)}
+                  disabled={isSubmitting || hasAnsweredCurrent || isBattleCompleteForMe}
+                  style={{
+                    padding: '0.9rem 1rem',
+                    textAlign: 'left',
+                    borderRadius: 8,
+                    border: selected ? '2px solid var(--crystal-cyan)' : '1px solid rgba(255,255,255,0.14)',
+                    background: selected ? 'rgba(0, 243, 255, 0.12)' : 'rgba(255,255,255,0.04)',
+                    color: 'var(--text-bright)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <MissionMarkdownViewer text={option.text} />
+                </button>
+              )
+            })}
+          </div>
+          {currentQuestion.multiAnswer && (
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+              복수 정답 문제입니다. 해당하는 답을 모두 선택하세요.
+            </div>
+          )}
+          {hasAnsweredCurrent && (
+            <div style={{ marginTop: '1rem', color: answerResults[currentQuestion.questionId]?.isCorrect ? 'var(--planet-green)' : '#f87171', fontWeight: 900 }}>
+              {answerResults[currentQuestion.questionId]?.isCorrect ? '정답입니다.' : '오답입니다.'}
+            </div>
+          )}
+          {error && <div style={{ color: '#f87171', marginTop: '1rem' }}>{error}</div>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
+            <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.8rem 1.2rem' }}>
+              나가기
+            </button>
+            {isBattleCompleteForMe || timeExpired ? (
+              <button className="hud-btn primary glass" onClick={finalizeBattle} disabled={isFinalizing} style={{ padding: '0.8rem 1.2rem' }}>
+                {isFinalizing ? '정산 중...' : '결과 확인'}
+              </button>
+            ) : (
+              <button className="hud-btn primary glass" onClick={submitAnswer} disabled={selectedKeys.size === 0 || isSubmitting || hasAnsweredCurrent} style={{ padding: '0.8rem 1.2rem' }}>
+                {isSubmitting ? '전송 중...' : '답안 제출'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {isBattleCompleteForMe && !isBattleFinished && (
+          <div className="glass-card" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            내 답안 제출이 끝났습니다. 상대 제출이 끝나면 결과가 확정됩니다.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

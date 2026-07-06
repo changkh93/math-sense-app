@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useImperativeHandle } 
 import { motion, AnimatePresence } from 'framer-motion'
 
 import SpaceQuizView from './SpaceQuizView'
+import QuizBattleView from './QuizBattleView'
 import WorkbookPlayer from './WorkbookPlayer'
 import CodeTracePlayer from './CodeTracePlayer'
 import QuestionModal from '../QuestionModal'
@@ -636,7 +637,8 @@ export default function MissionHub({
   bestScores = {}, // passed from SpaceHome
   initialMode = 'briefing', // pre-computed by SpaceHome: 'briefing', 'text', 'video', 'quiz-modal'
   onNonQuizActivityComplete,
-  clusterId // added to handle cluster-specific UI
+  clusterId, // added to handle cluster-specific UI
+  regionId
 }) {
   const { user } = useAuth()
   const userId = user?.uid
@@ -2070,7 +2072,8 @@ export default function MissionHub({
     const hasQuiz = !!(unitQuizzes && unitQuizzes.length > 0)
     const hasWorkbook = !!(activeUnit?.workbookPages && activeUnit.workbookPages.length > 0)
     const hasCodeTrace = !!(codeExercises && codeExercises.length > 0)
-    const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasWorkbook, hasCodeTrace].filter(Boolean).length
+    const hasQuizBattle = hasQuiz && !!regionId
+    const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasQuizBattle, hasWorkbook, hasCodeTrace].filter(Boolean).length
 
     return (
     <div className="mission-dashboard fade-in" style={{ width: '100%', height: '100%', overflowY: 'auto', paddingBottom: isMobile ? '5.5rem' : '3rem' }}>
@@ -2269,6 +2272,33 @@ export default function MissionHub({
                   )}
                 </motion.div>
               )
+            },
+            {
+              id: 'battle',
+              shouldRender: hasQuizBattle,
+              render: () => (
+                <motion.div
+                  key="battle"
+                  whileHover={{ scale: 1.03, y: -5 }}
+                  className="glass-card hud-border"
+                  onClick={() => handleModeChange('battle')}
+                  style={{
+                    cursor: 'pointer', padding: isMobile ? '1rem' : '2rem', display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', textAlign: isMobile ? 'left' : 'center', gap: isMobile ? '0.85rem' : 0,
+                    border: '1px solid var(--star-gold)',
+                    background: 'rgba(255, 215, 0, 0.05)',
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚔️</div>
+                  <h3 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '1rem' }}>QUIZ BATTLE</h3>
+                  <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                    같은 행성의 탐사원과<br/>1:1 퀴즈 배틀을 시작합니다.
+                  </p>
+                  <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                    15문제 실시간 대기룸
+                  </span>
+                </motion.div>
+              )
             }
           ];
 
@@ -2276,7 +2306,7 @@ export default function MissionHub({
           let sortedCards = cards;
           if (clusterId === 'python') {
             // Python: Transmission -> Data Log -> Code Trace -> Workbook -> Field Test
-            const pythonOrder = ['video', 'text', 'code', 'workbook', 'quiz'];
+            const pythonOrder = ['video', 'text', 'code', 'workbook', 'quiz', 'battle'];
             sortedCards = cards.sort((a, b) => pythonOrder.indexOf(a.id) - pythonOrder.indexOf(b.id));
           }
 
@@ -2863,6 +2893,19 @@ export default function MissionHub({
         clusterId={clusterId}
         learningProgress={learningProgress}
         onClose={returnFromContent}
+      />
+    )
+  }
+
+  if (currentMode === 'battle') {
+    return (
+      <QuizBattleView
+        clusterId={clusterId}
+        regionId={regionId}
+        entryUnitId={unitId}
+        entryUnitTitle={activeUnit?.title}
+        onExit={returnFromContent}
+        onSoloQuiz={() => updateCurrentMode('quiz')}
       />
     )
   }

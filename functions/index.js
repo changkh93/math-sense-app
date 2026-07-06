@@ -1,6 +1,6 @@
 const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
-const { FieldPath, FieldValue } = require("firebase-admin/firestore");
+const { FieldPath, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const PROJECT_ID = "math-sense-1f6a8";
 const STORAGE_BUCKET = "math-sense-1f6a8.firebasestorage.app";
 try {
@@ -323,6 +323,14 @@ function normalizeOptionSummaries(optionSummaries = []) {
     }, {});
 }
 
+const QUIZ_BATTLE_QUESTION_COUNT = 15;
+const QUIZ_BATTLE_QUEUE_TTL_MS = 45 * 1000;
+const QUIZ_BATTLE_DURATION_MS = 12 * 60 * 1000;
+const QUIZ_BATTLE_CORRECT_ORE = 2;
+const QUIZ_BATTLE_WIN_BONUS = 20;
+const QUIZ_BATTLE_LOSER_COMPLETION_REWARD = 10;
+const QUIZ_BATTLE_DRAW_REWARD = 20;
+
 function addStatDelta(deltas, fieldName, amount) {
   deltas[fieldName] = (deltas[fieldName] || 0) + amount;
 }
@@ -333,6 +341,337 @@ function applyStatDeltas(statUpdates, deltas) {
       statUpdates[fieldName] = FieldValue.increment(amount);
     }
   });
+}
+
+function cleanId(value, maxLength = 180) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function getPublicStudentName(userData = {}, fallback = "탐사원") {
+  return cleanText(
+    userData.publicDisplayName ||
+    userData.studentName ||
+    userData.name ||
+    userData.displayName ||
+    fallback,
+    40
+  ) || fallback;
+}
+
+function getQuizOptionText(option) {
+  if (typeof option === "string") return option;
+  return String(option?.text || "");
+}
+
+function getCorrectOptionKeys(quizData = {}) {
+  const options = Array.isArray(quizData.options) ? quizData.options : [];
+  const directCorrectKeys = options
+    .map((option, index) => (option?.isCorrect === true ? `o${index}` : null))
+    .filter(Boolean);
+  if (directCorrectKeys.length > 0) return directCorrectKeys;
+
+  const answers = Array.isArray(quizData.answer) ? quizData.answer : [quizData.answer];
+  const answerSet = new Set(answers.map((answer) => String(answer || "").trim()).filter(Boolean));
+  return options
+    .map((option, index) => (answerSet.has(getQuizOptionText(option).trim()) ? `o${index}` : null))
+    .filter(Boolean);
+}
+
+function sanitizeQuizForBattle(docSnap) {
+  const data = docSnap.data() || {};
+  const options = (Array.isArray(data.options) ? data.options : [])
+    .slice(0, 8)
+    .map((option, index) => ({
+      key: `o${index}`,
+      text: getQuizOptionText(option).slice(0, 500),
+    }))
+    .filter((option) => option.text);
+  const correctKeys = getCorrectOptionKeys(data);
+
+  return {
+    questionId: docSnap.id,
+    sourceQuestionId: cleanId(data.id || docSnap.id),
+    unitId: cleanId(data.unitId),
+    order: Number(data.order || 0),
+    question: String(data.question || data.prompt || "").slice(0, 2000),
+    imageUrl: String(data.imageUrl || "").slice(0, 1000),
+    options,
+    multiAnswer: correctKeys.length > 1,
+  };
+}
+
+function shuffleBattleItems(items, seed = "") {
+  const arr = [...items];
+  let hash = 2166136261;
+  String(seed).split("").forEach((char) => {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  });
+  for (let i = arr.length - 1; i > 0; i--) {
+    hash = Math.imul(hash ^ (hash >>> 15), 2246822507);
+    hash = Math.imul(hash ^ (hash >>> 13), 3266489909);
+    const j = Math.abs(hash) % (i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+async function resolveBattleContext({ clusterId, regionId, entryUnitId }) {
+  const db = admin.firestore();
+  const [regionSnap, unitSnap] = await Promise.all([
+    db.collection("regions").doc(regionId).get(),
+    db.collection("units").doc(entryUnitId).get(),
+  ]);
+
+  if (!regionSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "배틀 행성을 찾을 수 없습니다.");
+  }
+  if (!unitSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "배틀 진입 미션을 찾을 수 없습니다.");
+  }
+
+  const regionData = regionSnap.data() || {};
+  const resolvedClusterId = cleanId(regionData.clusterId || clusterId || "cluster_elementary");
+  if (clusterId && resolvedClusterId !== clusterId && regionData.clusterId) {
+    throw new functions.https.HttpsError("failed-precondition", "현재 과정과 행성 정보가 일치하지 않습니다.");
+  }
+
+  const chaptersSnap = await db.collection("chapters").where("regionId", "==", regionId).get();
+  const chapters = chaptersSnap.docs
+    .map((chapter) => ({ id: chapter.id, ...(chapter.data() || {}) }))
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+
+  const unitDocs = [];
+  for (const chapter of chapters) {
+    const unitsSnap = await db.collection("units").where("chapterId", "==", chapter.id).get();
+    unitsSnap.docs
+      .map((unit) => ({ id: unit.id, ...(unit.data() || {}) }))
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+      .forEach((unit) => unitDocs.push(unit));
+  }
+
+  const ordinalByUnitId = new Map();
+  unitDocs.forEach((unit, index) => {
+    ordinalByUnitId.set(unit.id, index + 1);
+  });
+  const entryOrdinal = ordinalByUnitId.get(entryUnitId);
+  if (!entryOrdinal) {
+    throw new functions.https.HttpsError("failed-precondition", "진입 미션이 현재 행성에 속하지 않습니다.");
+  }
+
+  return {
+    clusterId: resolvedClusterId,
+    regionId,
+    regionTitle: regionData.title || regionData.name || "",
+    entryUnitId,
+    entryOrdinal,
+    units: unitDocs.map((unit) => ({
+      id: unit.id,
+      title: unit.title || "",
+      chapterId: unit.chapterId || "",
+      ordinal: ordinalByUnitId.get(unit.id),
+    })),
+  };
+}
+
+async function buildBattleQuestionSet(context, commonCeilingOrdinal, questionCount, seed) {
+  const db = admin.firestore();
+  const eligibleUnits = context.units.filter((unit) => unit.ordinal <= commonCeilingOrdinal);
+  const quizDocs = [];
+  for (const unit of eligibleUnits) {
+    const snap = await db.collection("quizzes").where("unitId", "==", unit.id).get();
+    snap.docs.forEach((quizDoc) => {
+      const sanitized = sanitizeQuizForBattle(quizDoc);
+      if (sanitized.question && sanitized.options.length >= 2 && getCorrectOptionKeys(quizDoc.data() || {}).length > 0) {
+        quizDocs.push({
+          ...sanitized,
+          unitTitle: unit.title,
+          unitOrdinal: unit.ordinal,
+        });
+      }
+    });
+  }
+
+  const selected = shuffleBattleItems(quizDocs, seed).slice(0, questionCount);
+  if (selected.length < questionCount) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `공통 범위에 배틀 문제 ${questionCount}개가 아직 준비되지 않았습니다.`
+    );
+  }
+
+  return selected.map((question, index) => ({
+    ...question,
+    battleOrder: index + 1,
+  }));
+}
+
+function getBattleParticipantData(battleData = {}, uid) {
+  return battleData.participants?.[uid] || {};
+}
+
+function calculateBattleRewards(participants = {}, participantUids = []) {
+  const [aUid, bUid] = participantUids;
+  const a = participants[aUid] || {};
+  const b = participants[bUid] || {};
+  const aScore = Number(a.score || 0);
+  const bScore = Number(b.score || 0);
+  const aCorrect = Number(a.correctCount || 0);
+  const bCorrect = Number(b.correctCount || 0);
+
+  let winnerUid = "";
+  let resultType = "draw";
+  if (aScore > bScore) {
+    winnerUid = aUid;
+    resultType = "win";
+  } else if (bScore > aScore) {
+    winnerUid = bUid;
+    resultType = "win";
+  } else if (Number(a.lastAnsweredAtMs || 0) && Number(b.lastAnsweredAtMs || 0)) {
+    if (Number(a.lastAnsweredAtMs || 0) < Number(b.lastAnsweredAtMs || 0)) {
+      winnerUid = aUid;
+      resultType = "win";
+    } else if (Number(b.lastAnsweredAtMs || 0) < Number(a.lastAnsweredAtMs || 0)) {
+      winnerUid = bUid;
+      resultType = "win";
+    }
+  }
+
+  const rewards = {};
+  participantUids.forEach((uid) => {
+    if (!winnerUid) {
+      rewards[uid] = QUIZ_BATTLE_DRAW_REWARD;
+      return;
+    }
+    const correctCount = uid === aUid ? aCorrect : bCorrect;
+    rewards[uid] = uid === winnerUid
+      ? (correctCount * QUIZ_BATTLE_CORRECT_ORE) + QUIZ_BATTLE_WIN_BONUS
+      : QUIZ_BATTLE_LOSER_COMPLETION_REWARD;
+  });
+
+  return { winnerUid, resultType, rewards };
+}
+
+async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed") {
+  const db = admin.firestore();
+  const battleRef = db.collection("quizBattles").doc(battleId);
+  let result = null;
+
+  await db.runTransaction(async (transaction) => {
+    const battleSnap = await transaction.get(battleRef);
+    if (!battleSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
+    }
+    const battleData = battleSnap.data() || {};
+    if (battleData.status === "finished") {
+      result = {
+        alreadyFinalized: true,
+        winnerUid: battleData.winnerUid || "",
+        rewards: battleData.rewards || {},
+      };
+      return;
+    }
+
+    const participantUids = Array.isArray(battleData.participantUids)
+      ? battleData.participantUids.filter(Boolean).slice(0, 2)
+      : [];
+    if (participantUids.length !== 2) {
+      throw new functions.https.HttpsError("failed-precondition", "배틀 참가자 정보가 올바르지 않습니다.");
+    }
+
+    const participants = battleData.participants || {};
+    const totalQuestions = Number(battleData.questionCount || battleData.questionSet?.length || 0);
+    const nowMs = Date.now();
+    const allDone = participantUids.every((uid) => Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions);
+    const timedOut = Number(battleData.endsAtMs || 0) > 0 && nowMs >= Number(battleData.endsAtMs || 0);
+    if (!allDone && !timedOut && finalizeReason !== "force") {
+      throw new functions.https.HttpsError("failed-precondition", "아직 배틀이 종료되지 않았습니다.");
+    }
+
+    const rewardResult = calculateBattleRewards(participants, participantUids);
+    const finalUpdates = {
+      status: "finished",
+      finishedAt: FieldValue.serverTimestamp(),
+      finishedAtMs: nowMs,
+      finalizeReason,
+      winnerUid: rewardResult.winnerUid,
+      resultType: rewardResult.resultType,
+      rewards: rewardResult.rewards,
+    };
+    transaction.update(battleRef, finalUpdates);
+
+    participantUids.forEach((uid) => {
+      const participant = participants[uid] || {};
+      const reward = Number(rewardResult.rewards[uid] || 0);
+      const userRef = db.collection("users").doc(uid);
+      const historyRef = userRef.collection("history").doc(`quiz_battle_${battleId}`);
+      const statsRef = userRef.collection("battleStats").doc("summary");
+      const txId = `quiz_battle_${battleId}`;
+      const didWin = rewardResult.winnerUid === uid;
+      const didDraw = !rewardResult.winnerUid;
+      const didLose = !didWin && !didDraw;
+
+      transaction.set(userRef, {
+        crystals: FieldValue.increment(reward),
+        totalBattleMatches: FieldValue.increment(1),
+        totalBattleWins: FieldValue.increment(didWin ? 1 : 0),
+        totalBattleLosses: FieldValue.increment(didLose ? 1 : 0),
+        totalBattleDraws: FieldValue.increment(didDraw ? 1 : 0),
+        lastBattleAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      if (reward > 0) {
+        recordCrystalTransaction(transaction, uid, txId, {
+          amount: reward,
+          type: "quiz_battle_reward",
+          description: `퀴즈 배틀 ${didWin ? "승리" : didDraw ? "무승부" : "완주"} 보상`,
+          metadata: {
+            battleId,
+            regionId: battleData.regionId || "",
+            score: Number(participant.score || 0),
+            correctCount: Number(participant.correctCount || 0),
+            winnerUid: rewardResult.winnerUid || "",
+          },
+        });
+      }
+
+      transaction.set(historyRef, {
+        type: "quiz_battle",
+        battleId,
+        unitId: battleData.entryUnitIds?.[uid] || battleData.entryUnitId || "",
+        unitTitle: participant.entryUnitTitle || "퀴즈 배틀",
+        regionId: battleData.regionId || "",
+        regionTitle: battleData.regionTitle || "",
+        chapterId: "",
+        clusterId: battleData.clusterId || "",
+        score: Number(participant.score || 0),
+        correctCount: Number(participant.correctCount || 0),
+        totalCount: totalQuestions,
+        crystalsEarned: reward,
+        battleResult: didWin ? "win" : didDraw ? "draw" : "loss",
+        opponentUid: participantUids.find((otherUid) => otherUid !== uid) || "",
+        timestamp: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(statsRef, {
+        totalMatches: FieldValue.increment(1),
+        wins: FieldValue.increment(didWin ? 1 : 0),
+        losses: FieldValue.increment(didLose ? 1 : 0),
+        draws: FieldValue.increment(didDraw ? 1 : 0),
+        totalCorrect: FieldValue.increment(Number(participant.correctCount || 0)),
+        totalScore: FieldValue.increment(Number(participant.score || 0)),
+        lastBattleAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    result = {
+      alreadyFinalized: false,
+      winnerUid: rewardResult.winnerUid,
+      rewards: rewardResult.rewards,
+    };
+  });
+
+  return result;
 }
 
 /**
@@ -536,6 +875,372 @@ exports.submitQuizSessionReactions = regionalFunctions.https.onCall(async (data,
   });
 
   return { success: true, savedCount: reactions.length };
+});
+
+exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const clusterId = cleanId(data?.clusterId || "cluster_elementary");
+  const regionId = cleanId(data?.regionId);
+  const entryUnitId = cleanId(data?.entryUnitId);
+  const requestedQuestionCount = Math.max(
+    5,
+    Math.min(QUIZ_BATTLE_QUESTION_COUNT, Number(data?.questionCount || QUIZ_BATTLE_QUESTION_COUNT))
+  );
+
+  if (!regionId || !entryUnitId) {
+    throw new functions.https.HttpsError("invalid-argument", "배틀 진입 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const nowMs = Date.now();
+  const contextData = await resolveBattleContext({ clusterId, regionId, entryUnitId });
+  const ticketId = `${uid}_${regionId}`;
+  const ticketRef = db.collection("quizBattleQueueTickets").doc(ticketId);
+  const userRef = db.collection("users").doc(uid);
+  const userSnap = await userRef.get();
+  const userData = userSnap.exists ? userSnap.data() || {} : {};
+  const existingTicketSnap = await ticketRef.get();
+  if (existingTicketSnap.exists) {
+    const existingTicket = existingTicketSnap.data() || {};
+    if (existingTicket.status === "matched" && existingTicket.matchId) {
+      const existingBattleSnap = await db.collection("quizBattles").doc(existingTicket.matchId).get();
+      if (existingBattleSnap.exists && existingBattleSnap.data()?.status !== "finished") {
+        return { status: "matched", battleId: existingTicket.matchId };
+      }
+    }
+  }
+
+  const waitingSnap = await db.collection("quizBattleQueueTickets")
+    .where("clusterId", "==", contextData.clusterId)
+    .where("regionId", "==", regionId)
+    .where("status", "==", "waiting")
+    .orderBy("createdAtMs", "asc")
+    .limit(12)
+    .get();
+
+  const candidates = waitingSnap.docs
+    .map((docSnap) => ({ id: docSnap.id, ref: docSnap.ref, data: docSnap.data() || {} }))
+    .filter((ticket) => ticket.id !== ticketId)
+    .filter((ticket) => ticket.data.uid !== uid)
+    .filter((ticket) => Number(ticket.data.expiresAtMs || 0) > nowMs);
+
+  for (const candidate of candidates) {
+    const commonCeilingOrdinal = Math.min(
+      Number(contextData.entryOrdinal || 0),
+      Number(candidate.data.entryOrdinal || 0)
+    );
+    if (!commonCeilingOrdinal) continue;
+
+    let questionSet = [];
+    try {
+      questionSet = await buildBattleQuestionSet(
+        contextData,
+        commonCeilingOrdinal,
+        requestedQuestionCount,
+        `${uid}_${candidate.data.uid}_${nowMs}`
+      );
+    } catch (err) {
+      if (err instanceof functions.https.HttpsError && err.code === "failed-precondition") {
+        continue;
+      }
+      throw err;
+    }
+
+    const battleRef = db.collection("quizBattles").doc();
+    const opponentUid = candidate.data.uid;
+    const opponentRef = db.collection("users").doc(opponentUid);
+    const opponentSnap = await opponentRef.get();
+    const opponentData = opponentSnap.exists ? opponentSnap.data() || {} : {};
+    const expiresAtMs = nowMs + QUIZ_BATTLE_DURATION_MS;
+    const participantUids = [uid, opponentUid].sort();
+
+    const matched = await db.runTransaction(async (transaction) => {
+      const [candidateSnap, ownSnap] = await Promise.all([
+        transaction.get(candidate.ref),
+        transaction.get(ticketRef),
+      ]);
+      if (!candidateSnap.exists) return false;
+      const freshCandidate = candidateSnap.data() || {};
+      if (freshCandidate.status !== "waiting" || Number(freshCandidate.expiresAtMs || 0) <= nowMs) {
+        return false;
+      }
+      if (ownSnap.exists) {
+        const ownData = ownSnap.data() || {};
+        if (ownData.status === "matched" && ownData.matchId) return false;
+      }
+
+      const participants = {};
+      participants[uid] = {
+        uid,
+        displayName: getPublicStudentName(userData),
+        score: 0,
+        correctCount: 0,
+        answeredCount: 0,
+        ready: true,
+        entryUnitId,
+        entryUnitTitle: contextData.units.find((unit) => unit.id === entryUnitId)?.title || "",
+      };
+      participants[opponentUid] = {
+        uid: opponentUid,
+        displayName: freshCandidate.displayName || getPublicStudentName(opponentData, "상대"),
+        score: 0,
+        correctCount: 0,
+        answeredCount: 0,
+        ready: true,
+        entryUnitId: freshCandidate.entryUnitId || "",
+        entryUnitTitle: freshCandidate.entryUnitTitle || "",
+      };
+
+      transaction.set(battleRef, {
+        status: "active",
+        clusterId: contextData.clusterId,
+        regionId,
+        regionTitle: contextData.regionTitle || "",
+        commonCeilingOrdinal,
+        participantUids,
+        participants,
+        entryUnitIds: {
+          [uid]: entryUnitId,
+          [opponentUid]: freshCandidate.entryUnitId || "",
+        },
+        questionCount: questionSet.length,
+        questionSet,
+        startedAt: FieldValue.serverTimestamp(),
+        startedAtMs: nowMs,
+        endsAtMs: expiresAtMs,
+        createdAt: FieldValue.serverTimestamp(),
+        createdAtMs: nowMs,
+      });
+
+      const matchPatch = {
+        status: "matched",
+        matchId: battleRef.id,
+        matchedAt: FieldValue.serverTimestamp(),
+        matchedAtMs: nowMs,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      transaction.set(candidate.ref, matchPatch, { merge: true });
+      transaction.set(ticketRef, {
+        uid,
+        displayName: getPublicStudentName(userData),
+        clusterId: contextData.clusterId,
+        regionId,
+        entryUnitId,
+        entryUnitTitle: contextData.units.find((unit) => unit.id === entryUnitId)?.title || "",
+        entryOrdinal: contextData.entryOrdinal,
+        expiresAtMs: nowMs + QUIZ_BATTLE_QUEUE_TTL_MS,
+        createdAt: FieldValue.serverTimestamp(),
+        createdAtMs: nowMs,
+        ...matchPatch,
+      }, { merge: true });
+      return true;
+    });
+
+    if (matched) {
+      return { status: "matched", battleId: battleRef.id };
+    }
+  }
+
+  const eligibleQuestionSet = await buildBattleQuestionSet(
+    contextData,
+    contextData.entryOrdinal,
+    requestedQuestionCount,
+    `${uid}_${regionId}_eligibility`
+  );
+
+  const waitResult = await db.runTransaction(async (transaction) => {
+    const freshTicketSnap = await transaction.get(ticketRef);
+    if (freshTicketSnap.exists) {
+      const freshTicket = freshTicketSnap.data() || {};
+      if (freshTicket.status === "matched" && freshTicket.matchId) {
+        const freshBattleSnap = await transaction.get(db.collection("quizBattles").doc(freshTicket.matchId));
+        if (freshBattleSnap.exists && freshBattleSnap.data()?.status !== "finished") {
+          return { status: "matched", battleId: freshTicket.matchId };
+        }
+      }
+    }
+
+    transaction.set(ticketRef, {
+      uid,
+      displayName: getPublicStudentName(userData),
+      clusterId: contextData.clusterId,
+      regionId,
+      entryUnitId,
+      entryUnitTitle: contextData.units.find((unit) => unit.id === entryUnitId)?.title || "",
+      entryOrdinal: contextData.entryOrdinal,
+      status: "waiting",
+      matchId: "",
+      questionCount: requestedQuestionCount,
+      availableQuestionCount: eligibleQuestionSet.length,
+      expiresAtMs: nowMs + QUIZ_BATTLE_QUEUE_TTL_MS,
+      ttlAt: Timestamp.fromMillis(nowMs + (24 * 60 * 60 * 1000)),
+      createdAt: FieldValue.serverTimestamp(),
+      createdAtMs: nowMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return {
+      status: "waiting",
+      ticketId,
+      expiresAtMs: nowMs + QUIZ_BATTLE_QUEUE_TTL_MS,
+    };
+  });
+
+  return waitResult;
+});
+
+exports.cancelQuizBattleQueue = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const regionId = cleanId(data?.regionId);
+  if (!regionId) {
+    throw new functions.https.HttpsError("invalid-argument", "대기 취소 정보가 올바르지 않습니다.");
+  }
+
+  const ticketRef = admin.firestore().collection("quizBattleQueueTickets").doc(`${uid}_${regionId}`);
+  await admin.firestore().runTransaction(async (transaction) => {
+    const snap = await transaction.get(ticketRef);
+    if (!snap.exists) return;
+    const ticket = snap.data() || {};
+    if (ticket.uid !== uid || ticket.status !== "waiting") return;
+    transaction.set(ticketRef, {
+      status: "cancelled",
+      cancelledAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+
+  return { success: true };
+});
+
+exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const battleId = cleanId(data?.battleId);
+  const questionId = cleanId(data?.questionId);
+  const selectedOptionKeys = Array.isArray(data?.selectedOptionKeys)
+    ? data.selectedOptionKeys.map((key) => normalizeStatKey(key)).filter(Boolean).slice(0, 8)
+    : [normalizeStatKey(data?.selectedOptionKey || "")].filter(Boolean);
+
+  if (!battleId || !questionId || selectedOptionKeys.length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", "답안 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const battleRef = db.collection("quizBattles").doc(battleId);
+  const answerRef = battleRef.collection("answers").doc(`${uid}_${questionId}`);
+  const quizRef = db.collection("quizzes").doc(questionId);
+  const nowMs = Date.now();
+  let answerResult = null;
+
+  await db.runTransaction(async (transaction) => {
+    const [battleSnap, answerSnap, quizSnap] = await Promise.all([
+      transaction.get(battleRef),
+      transaction.get(answerRef),
+      transaction.get(quizRef),
+    ]);
+
+    if (!battleSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
+    }
+    if (!quizSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "문제를 찾을 수 없습니다.");
+    }
+    if (answerSnap.exists) {
+      answerResult = {
+        alreadySubmitted: true,
+        ...(answerSnap.data() || {}),
+      };
+      return;
+    }
+
+    const battleData = battleSnap.data() || {};
+    if (battleData.status !== "active") {
+      throw new functions.https.HttpsError("failed-precondition", "진행 중인 배틀이 아닙니다.");
+    }
+    if (!Array.isArray(battleData.participantUids) || !battleData.participantUids.includes(uid)) {
+      throw new functions.https.HttpsError("permission-denied", "배틀 참가자만 답안을 제출할 수 있습니다.");
+    }
+    if (Number(battleData.endsAtMs || 0) > 0 && nowMs > Number(battleData.endsAtMs || 0) + 5000) {
+      throw new functions.https.HttpsError("deadline-exceeded", "배틀 제한 시간이 종료되었습니다.");
+    }
+    const questionSet = Array.isArray(battleData.questionSet) ? battleData.questionSet : [];
+    const questionMeta = questionSet.find((question) => question.questionId === questionId);
+    if (!questionMeta) {
+      throw new functions.https.HttpsError("failed-precondition", "이 배틀의 문제가 아닙니다.");
+    }
+
+    const correctKeys = getCorrectOptionKeys(quizSnap.data() || {});
+    const selectedSet = new Set(selectedOptionKeys);
+    const isCorrect = selectedSet.size === correctKeys.length && correctKeys.every((key) => selectedSet.has(key));
+    const scoreDelta = isCorrect ? 100 : 0;
+    const participant = getBattleParticipantData(battleData, uid);
+    const nextAnsweredCount = Number(participant.answeredCount || 0) + 1;
+    const nextCorrectCount = Number(participant.correctCount || 0) + (isCorrect ? 1 : 0);
+    const nextScore = Number(participant.score || 0) + scoreDelta;
+
+    transaction.set(answerRef, {
+      uid,
+      battleId,
+      questionId,
+      selectedOptionKeys,
+      isCorrect,
+      scoreDelta,
+      battleOrder: questionMeta.battleOrder || 0,
+      submittedAt: FieldValue.serverTimestamp(),
+      submittedAtMs: nowMs,
+    });
+    transaction.update(battleRef, {
+      [`participants.${uid}.answeredCount`]: nextAnsweredCount,
+      [`participants.${uid}.correctCount`]: nextCorrectCount,
+      [`participants.${uid}.score`]: nextScore,
+      [`participants.${uid}.lastAnsweredAtMs`]: nowMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    answerResult = {
+      alreadySubmitted: false,
+      isCorrect,
+      scoreDelta,
+      answeredCount: nextAnsweredCount,
+      correctCount: nextCorrectCount,
+      score: nextScore,
+      shouldFinalize: (battleData.participantUids || []).every((participantUid) => {
+        const count = participantUid === uid
+          ? nextAnsweredCount
+          : Number(battleData.participants?.[participantUid]?.answeredCount || 0);
+        return count >= Number(battleData.questionCount || questionSet.length || 0);
+      }),
+    };
+  });
+
+  if (answerResult?.shouldFinalize) {
+    try {
+      await finalizeQuizBattleInternal(battleId, "completed");
+    } catch (err) {
+      console.error("Battle finalize after answer failed", err);
+    }
+  }
+
+  return answerResult;
+});
+
+exports.finalizeQuizBattle = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const battleId = cleanId(data?.battleId);
+  if (!battleId) {
+    throw new functions.https.HttpsError("invalid-argument", "배틀 정보가 올바르지 않습니다.");
+  }
+
+  const battleSnap = await admin.firestore().collection("quizBattles").doc(battleId).get();
+  if (!battleSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
+  }
+  const battleData = battleSnap.data() || {};
+  if (!Array.isArray(battleData.participantUids) || !battleData.participantUids.includes(uid)) {
+    throw new functions.https.HttpsError("permission-denied", "배틀 참가자만 종료할 수 있습니다.");
+  }
+
+  const result = await finalizeQuizBattleInternal(battleId, "requested");
+  return { success: true, ...result };
 });
 
 exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) => {
