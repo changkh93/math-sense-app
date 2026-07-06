@@ -152,8 +152,17 @@ export default function QuizBattleView({
         setError('배틀 정보를 찾을 수 없습니다.')
         return
       }
-      setBattle({ id: snap.id, ...snap.data() })
-      setPhase(snap.data()?.status === 'finished' ? 'result' : 'active')
+      const raw = snap.data() || {}
+      // questionSet에 서버 채점용 correctKeys가 포함되어 있을 수 있다.
+      // 클라이언트에는 노출하지 않도록 정제한다.
+      const sanitized = {
+        ...raw,
+        questionSet: Array.isArray(raw.questionSet)
+          ? raw.questionSet.map(({ correctKeys: _omit, ...rest }) => rest)
+          : raw.questionSet,
+      }
+      setBattle({ id: snap.id, ...sanitized })
+      setPhase(raw.status === 'finished' ? 'result' : 'active')
     }, (err) => {
       setError(err?.message || '배틀 정보를 수신하지 못했습니다.')
     })

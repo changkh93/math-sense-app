@@ -397,6 +397,8 @@ function sanitizeQuizForBattle(docSnap) {
     imageUrl: String(data.imageUrl || "").slice(0, 1000),
     options,
     multiAnswer: correctKeys.length > 1,
+    // 채점용 정답 키. 클라이언트로 전송하기 전에 반드시 제거해야 한다.
+    correctKeys,
   };
 }
 
@@ -1175,22 +1177,17 @@ exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context
   const db = admin.firestore();
   const battleRef = db.collection("quizBattles").doc(battleId);
   const answerRef = battleRef.collection("answers").doc(`${uid}_${questionId}`);
-  const quizRef = db.collection("quizzes").doc(questionId);
   const nowMs = Date.now();
   let answerResult = null;
 
   await db.runTransaction(async (transaction) => {
-    const [battleSnap, answerSnap, quizSnap] = await Promise.all([
+    const [battleSnap, answerSnap] = await Promise.all([
       transaction.get(battleRef),
       transaction.get(answerRef),
-      transaction.get(quizRef),
     ]);
 
     if (!battleSnap.exists) {
       throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
-    }
-    if (!quizSnap.exists) {
-      throw new functions.https.HttpsError("not-found", "문제를 찾을 수 없습니다.");
     }
     if (answerSnap.exists) {
       answerResult = {
@@ -1216,7 +1213,8 @@ exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context
       throw new functions.https.HttpsError("failed-precondition", "이 배틀의 문제가 아닙니다.");
     }
 
-    const correctKeys = getCorrectOptionKeys(quizSnap.data() || {});
+    // 채점은 battle 문서에 저장된 correctKeys를 사용한다. 별도의 quizzes 읽기가 필요 없다.
+    const correctKeys = Array.isArray(questionMeta.correctKeys) ? questionMeta.correctKeys : [];
     const selectedSet = new Set(selectedOptionKeys);
     const isCorrect = selectedSet.size === correctKeys.length && correctKeys.every((key) => selectedSet.has(key));
     const scoreDelta = isCorrect ? 100 : 0;
