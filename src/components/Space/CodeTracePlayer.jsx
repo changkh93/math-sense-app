@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { Check, ChevronLeft, Eye, Lightbulb, LocateFixed, RotateCcw, Save } from 'lucide-react';
+import { EditorSelection, EditorState, RangeSetBuilder } from '@codemirror/state';
+import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
+import { python } from '@codemirror/lang-python';
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { Decoration, EditorView, GutterMarker, ViewPlugin, gutter, keymap } from '@codemirror/view';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils';
@@ -119,16 +124,6 @@ function hasOnlyQuotedWhitespaceDifference(answerLine = '', studentLine = '') {
 
 function countChar(text, char) {
   return Array.from(text || '').filter(c => c === char).length;
-}
-
-function getCursorLineIndex(code = '', cursor = 0) {
-  const safeCursor = Math.max(0, Math.min(cursor, String(code || '').length));
-  return normalizeNewlines(String(code || '').slice(0, safeCursor)).split('\n').length - 1;
-}
-
-function isCaretAtLineEnd(code = '', cursor = 0) {
-  const safeCursor = Math.max(0, Math.min(cursor, String(code || '').length));
-  return safeCursor >= String(code || '').length || String(code || '')[safeCursor] === '\n';
 }
 
 function findStringLiteralEnd(code = '', startIndex = 0) {
@@ -659,67 +654,317 @@ function isIndexInRange(index, ranges = []) {
   return ranges.some(range => index >= range.start && index < range.end);
 }
 
-function getTypingTrace(answerCode = '', studentCode = '', cursor = 0) {
-  const answerLines = normalizeNewlines(answerCode).split('\n');
-  const studentLines = normalizeNewlines(studentCode).split('\n');
-  const lineIndex = getCursorLineIndex(studentCode, cursor);
-  const answerLine = answerLines[lineIndex] || '';
-  const studentLine = studentLines[lineIndex] || '';
+function getCodeTraceCharStatus(answerLine = '', studentLine = '', index = 0) {
+  const answerChar = answerLine[index] || '';
+  const studentChar = studentLine[index] || '';
+  if (studentChar === answerChar) return 'match';
   const answerStringRanges = getLineStringRanges(answerLine);
   const studentStringRanges = getLineStringRanges(studentLine);
-  const typedChars = Array.from(studentLine).map((char, index) => {
-    const answerChar = answerLine[index] || '';
-    let status = 'wrong';
-    if (char === answerChar) {
-      status = 'match';
-    } else if (isIndexInRange(index, answerStringRanges) && isIndexInRange(index, studentStringRanges)) {
-      status = 'string';
-    } else if (!answerChar) {
-      status = 'extra';
-    }
-    return { char, status };
-  });
-  const matchCount = typedChars.filter(item => item.status === 'match' || item.status === 'string').length;
-  const progress = Math.min(1, matchCount / Math.max(Array.from(answerLine).length, 1));
-
-  return {
-    lineNumber: lineIndex + 1,
-    typedChars,
-    progress,
-    complete: normalizePythonLineForStructureCompare(answerLine) === normalizePythonLineForStructureCompare(studentLine) && answerLine.length > 0,
-  };
+  if (isIndexInRange(index, answerStringRanges) && isIndexInRange(index, studentStringRanges)) return 'string';
+  if (!answerChar) return 'extra';
+  return 'wrong';
 }
 
-function getStudentOverlayLines(answerCode = '', studentCode = '') {
+function buildCodeTraceDecorations(view, answerCode = '') {
+  const builder = new RangeSetBuilder();
   const answerLines = normalizeNewlines(answerCode).split('\n');
-  const studentLines = normalizeNewlines(studentCode).split('\n');
-  const lineFeedback = getLineFeedback(answerCode, studentCode);
-  const lineCount = Math.max(answerLines.length, studentLines.length, lineFeedback.length, 1);
 
-  return Array.from({ length: lineCount }, (_, lineIndex) => {
-    const answerLine = answerLines[lineIndex] || '';
-    const studentLine = studentLines[lineIndex] || '';
-    const answerStringRanges = getLineStringRanges(answerLine);
-    const studentStringRanges = getLineStringRanges(studentLine);
-    const chars = Array.from(studentLine).map((char, index) => {
-      const answerChar = answerLine[index] || '';
-      let status = 'wrong';
-      if (char === answerChar) {
-        status = 'match';
-      } else if (isIndexInRange(index, answerStringRanges) && isIndexInRange(index, studentStringRanges)) {
-        status = 'string';
-      } else if (!answerChar) {
-        status = 'extra';
-      }
-      return { char, status };
-    });
-    const feedback = lineFeedback[lineIndex] || { lineNumber: lineIndex + 1, done: false, typed: false };
-    return {
-      ...feedback,
-      lineNumber: lineIndex + 1,
-      chars,
-    };
+  for (const { from, to } of view.visibleRanges) {
+    let pos = from;
+    while (pos <= to) {
+      const line = view.state.doc.lineAt(pos);
+      const lineIndex = line.number - 1;
+      const answerLine = answerLines[lineIndex] || '';
+      const studentLine = line.text || '';
+      let charPos = line.from;
+
+      Array.from(studentLine).forEach((char, index) => {
+        const status = getCodeTraceCharStatus(answerLine, studentLine, index);
+        if (status !== 'match') {
+          builder.add(
+            charPos,
+            charPos + char.length,
+            Decoration.mark({ class: `code-trace-cm-char code-trace-cm-char--${status}` })
+          );
+        }
+        charPos += char.length;
+      });
+
+      if (line.to >= to || line.to >= view.state.doc.length) break;
+      pos = line.to + 1;
+    }
+  }
+
+  return builder.finish();
+}
+
+class CodeTraceLineMarker extends GutterMarker {
+  constructor({ lineNumber, done, typed, current }) {
+    super();
+    this.lineNumber = lineNumber;
+    this.done = done;
+    this.typed = typed;
+    this.current = current;
+  }
+
+  eq(other) {
+    return (
+      other.lineNumber === this.lineNumber
+      && other.done === this.done
+      && other.typed === this.typed
+      && other.current === this.current
+    );
+  }
+
+  toDOM() {
+    const marker = document.createElement('span');
+    marker.className = [
+      'code-trace-cm-line-marker',
+      this.typed ? 'is-started' : '',
+      this.done ? 'is-done' : '',
+      this.current ? 'is-current' : '',
+    ].filter(Boolean).join(' ');
+    marker.textContent = this.done ? '✓' : String(this.lineNumber);
+    return marker;
+  }
+}
+
+function CodeTraceEditor({
+  value,
+  answerCode,
+  height,
+  currentPassed,
+  activeStringSuggestion,
+  lineCombo,
+  editorViewRef,
+  onChange,
+  onSelectionChange,
+  onLinePulse,
+}) {
+  const hostRef = useRef(null);
+  const localViewRef = useRef(null);
+  const initialValueRef = useRef(value);
+  const latestRef = useRef({
+    answerCode,
+    activeStringSuggestion,
+    lineCombo,
+    onChange,
+    onSelectionChange,
+    onLinePulse,
   });
+
+  useEffect(() => {
+    latestRef.current = {
+      answerCode,
+      activeStringSuggestion,
+      lineCombo,
+      onChange,
+      onSelectionChange,
+      onLinePulse,
+    };
+  }, [activeStringSuggestion, answerCode, lineCombo, onChange, onLinePulse, onSelectionChange]);
+
+  useEffect(() => {
+    const view = localViewRef.current;
+    if (!view) return;
+    view.dispatch({});
+  }, [answerCode, value]);
+
+  useEffect(() => {
+    if (!hostRef.current) return undefined;
+
+    const codeTracePlugin = ViewPlugin.fromClass(class {
+      constructor(view) {
+        this.decorations = buildCodeTraceDecorations(view, latestRef.current.answerCode);
+      }
+
+      update(update) {
+        if (update.docChanged || update.viewportChanged || update.selectionSet || update.transactions.length) {
+          this.decorations = buildCodeTraceDecorations(update.view, latestRef.current.answerCode);
+        }
+      }
+    }, {
+      decorations: plugin => plugin.decorations,
+    });
+
+    const codeTraceGutter = gutter({
+      class: 'code-trace-cm-gutter',
+      lineMarker(view, line) {
+        const docLine = view.state.doc.lineAt(line.from);
+        const code = view.state.doc.toString();
+        const lineFeedback = getLineFeedback(latestRef.current.answerCode, code);
+        const item = lineFeedback[docLine.number - 1] || {
+          lineNumber: docLine.number,
+          done: false,
+          typed: Boolean(docLine.text),
+        };
+        const currentLineNumber = view.state.doc.lineAt(view.state.selection.main.head).number;
+        return new CodeTraceLineMarker({
+          lineNumber: docLine.number,
+          done: item.done,
+          typed: item.typed,
+          current: currentLineNumber === docLine.number,
+        });
+      },
+    });
+
+    const insertStringSuggestion = (view) => {
+      const suggestion = latestRef.current.activeStringSuggestion;
+      if (!suggestion) return false;
+      const selection = view.state.selection.main;
+      if (!selection.empty) return false;
+      const previousChar = view.state.doc.sliceString(Math.max(0, selection.from - 1), selection.from);
+      let insertion = suggestion.literal;
+      if ((previousChar === '"' || previousChar === "'") && insertion.startsWith(previousChar)) {
+        insertion = insertion.slice(1);
+      }
+      const nextCursor = selection.from + insertion.length;
+      view.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: insertion },
+        selection: EditorSelection.cursor(nextCursor),
+        effects: EditorView.scrollIntoView(nextCursor, { x: 'end', y: 'nearest' }),
+      });
+      soundManager.playClick();
+      return true;
+    };
+
+    const handleEnter = (view) => {
+      const selection = view.state.selection.main;
+      if (!selection.empty) return false;
+      const line = view.state.doc.lineAt(selection.from);
+      const linePrefix = view.state.doc.sliceString(line.from, selection.from);
+      const currentIndent = linePrefix.match(/^[ \t]*/)?.[0] || '';
+      const codeBeforeComment = linePrefix.replace(/#.*$/, '').trimEnd();
+      const nextIndent = `${currentIndent}${codeBeforeComment.endsWith(':') ? STUDENT_INDENT : ''}`;
+      const insertion = `\n${nextIndent}`;
+      const nextCursor = selection.from + insertion.length;
+      view.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: insertion },
+        selection: EditorSelection.cursor(nextCursor),
+        effects: EditorView.scrollIntoView(nextCursor, { x: 'start', y: 'nearest' }),
+      });
+      soundManager.playClick();
+      latestRef.current.onLinePulse?.(latestRef.current.lineCombo);
+      return true;
+    };
+
+    const editorTheme = EditorView.theme({
+      '&': {
+        height: `${height}px`,
+        minHeight: `${CODE_PANEL_MIN_HEIGHT}px`,
+        maxHeight: `${CODE_PANEL_MAX_HEIGHT}px`,
+        borderRadius: '10px',
+        border: '1px solid rgba(255,255,255,0.12)',
+        backgroundColor: '#020617',
+        color: '#f8fafc',
+        overflow: 'hidden',
+      },
+      '&.cm-focused': {
+        outline: '1px solid rgba(56,189,248,0.85)',
+      },
+      '.cm-scroller': {
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontSize: '0.92rem',
+        lineHeight: '1.55',
+        overflow: 'auto',
+      },
+      '.cm-content': {
+        padding: '1rem 1rem',
+        caretColor: '#f8fafc',
+        minHeight: `${CODE_PANEL_MIN_HEIGHT - CODE_PANEL_VERTICAL_PADDING_PX}px`,
+      },
+      '.cm-line': {
+        padding: '0',
+      },
+      '.cm-gutters': {
+        backgroundColor: '#020617',
+        color: 'rgba(148,163,184,0.72)',
+        borderRight: '1px solid rgba(148,163,184,0.08)',
+        paddingLeft: '0.65rem',
+        paddingRight: '0.4rem',
+      },
+      '.cm-activeLineGutter': {
+        backgroundColor: 'transparent',
+      },
+      '.cm-activeLine': {
+        backgroundColor: 'rgba(56,189,248,0.06)',
+      },
+      '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+        backgroundColor: 'rgba(56,189,248,0.28)',
+      },
+      '.cm-cursor': {
+        borderLeftColor: 'var(--crystal-cyan)',
+      },
+    });
+
+    const view = new EditorView({
+      parent: hostRef.current,
+      state: EditorState.create({
+        doc: initialValueRef.current,
+        extensions: [
+          history(),
+          python(),
+          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          codeTracePlugin,
+          codeTraceGutter,
+          editorTheme,
+          keymap.of([
+            {
+              key: 'Tab',
+              preventDefault: true,
+              run: view => insertStringSuggestion(view) || indentMore(view),
+            },
+            {
+              key: 'Shift-Tab',
+              preventDefault: true,
+              run: indentLess,
+            },
+            {
+              key: 'Enter',
+              preventDefault: true,
+              run: handleEnter,
+            },
+            ...historyKeymap,
+            ...defaultKeymap,
+          ]),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              latestRef.current.onChange?.(update.state.doc.toString());
+            }
+            if (update.selectionSet || update.docChanged) {
+              const selection = update.state.selection.main;
+              latestRef.current.onSelectionChange?.({
+                start: selection.from,
+                end: selection.to,
+              });
+            }
+          }),
+        ],
+      }),
+    });
+
+    localViewRef.current = view;
+    if (editorViewRef) editorViewRef.current = view;
+
+    return () => {
+      if (editorViewRef?.current === view) editorViewRef.current = null;
+      localViewRef.current = null;
+      view.destroy();
+    };
+  }, [editorViewRef, height]);
+
+  useEffect(() => {
+    const view = localViewRef.current;
+    if (!view) return;
+    const currentValue = view.state.doc.toString();
+    if (currentValue === value) return;
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: value },
+      selection: EditorSelection.cursor(Math.min(value.length, view.state.selection.main.head)),
+    });
+  }, [value]);
+
+  return <div ref={hostRef} className={`code-trace-codemirror ${currentPassed ? 'is-passed' : ''}`} />;
 }
 
 export default function CodeTracePlayer({
@@ -762,8 +1007,7 @@ export default function CodeTracePlayer({
   const [showWhitespace, setShowWhitespace] = useState(true);
   const [studentSelection, setStudentSelection] = useState({ start: 0, end: 0 });
   const previousLineComboRef = useRef(0);
-  const studentTextareaRef = useRef(null);
-  const studentOverlayRef = useRef(null);
+  const studentEditorViewRef = useRef(null);
 
   useEffect(() => {
     const savedIds = learningProgress?.codeTrace?.completedExerciseIds;
@@ -844,15 +1088,6 @@ export default function CodeTracePlayer({
     () => getLineCombo(exercise?.answerCode || '', studentCode),
     [exercise, studentCode]
   );
-  const studentOverlayLines = useMemo(
-    () => getStudentOverlayLines(exercise?.answerCode || '', studentCode),
-    [exercise, studentCode]
-  );
-  const typingTrace = useMemo(
-    () => getTypingTrace(exercise?.answerCode || '', studentCode, studentSelection.start),
-    [exercise, studentCode, studentSelection.start]
-  );
-
   // 현재 세트의 입력을 빈 상태로 되돌림 (초기화 버튼). 초안도 함께 비움.
   const resetExercise = () => {
     if (currentExerciseId) {
@@ -1338,13 +1573,16 @@ export default function CodeTracePlayer({
     return { start, end: start + line.length };
   };
   const jumpToFirstIssue = () => {
-    if (!analysis.firstIssue || !studentTextareaRef.current) return;
+    const view = studentEditorViewRef.current;
+    if (!analysis.firstIssue || !view) return;
     const { start, end } = getStudentLineRange(analysis.firstIssue.lineIndex);
     const safeStart = Math.min(start, studentCode.length);
     const safeEnd = Math.min(Math.max(start, end), studentCode.length);
-    studentTextareaRef.current.focus();
-    studentTextareaRef.current.setSelectionRange(safeStart, safeEnd);
-    studentTextareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    view.focus();
+    view.dispatch({
+      selection: EditorSelection.range(safeStart, safeEnd),
+      effects: EditorView.scrollIntoView(safeStart, { y: 'center', x: 'start' }),
+    });
   };
   const renderDiffTokens = (tokens = []) => tokens.map((token, index) => {
     const displayValue = showWhitespace ? visibleWhitespace(token.value) : token.value;
@@ -1380,161 +1618,30 @@ export default function CodeTracePlayer({
       </span>
     );
   });
-  const updateStudentSelection = (textarea = studentTextareaRef.current) => {
-    if (!textarea) return;
-    setStudentSelection({
-      start: textarea.selectionStart || 0,
-      end: textarea.selectionEnd || textarea.selectionStart || 0,
-    });
-  };
-  const syncStudentOverlayScroll = (textarea = studentTextareaRef.current) => {
-    const overlay = studentOverlayRef.current;
-    if (!textarea || !overlay) return;
-    overlay.scrollTop = textarea.scrollTop;
-    overlay.scrollLeft = textarea.scrollLeft;
-  };
-  const syncStudentTypingViewport = (textarea = studentTextareaRef.current) => {
-    if (!textarea) return;
-    const cursor = textarea.selectionStart || 0;
-    if (!isCaretAtLineEnd(textarea.value, cursor)) {
-      syncStudentOverlayScroll(textarea);
-      return;
-    }
-    requestAnimationFrame(() => {
-      textarea.scrollLeft = textarea.scrollWidth;
-      syncStudentOverlayScroll(textarea);
-    });
-  };
   const insertStringLiteral = (suggestion = activeStringSuggestion) => {
-    if (!suggestion || !studentTextareaRef.current) return false;
-    const textarea = studentTextareaRef.current;
-    const { selectionStart, selectionEnd } = textarea;
-    const value = studentCode;
-    const before = value.slice(0, selectionStart);
-    const after = value.slice(selectionEnd);
-    const previousChar = before.slice(-1);
+    const view = studentEditorViewRef.current;
+    if (!suggestion || !view) return false;
+    const selection = view.state.selection.main;
+    const previousChar = view.state.doc.sliceString(Math.max(0, selection.from - 1), selection.from);
     let insertion = suggestion.literal;
 
     if ((previousChar === '"' || previousChar === "'") && insertion.startsWith(previousChar)) {
       insertion = insertion.slice(1);
     }
 
-    const nextValue = `${before}${insertion}${after}`;
-    const nextCursor = before.length + insertion.length;
-    setStudentCode(nextValue);
-    setStudentSelection({ start: nextCursor, end: nextCursor });
-    soundManager.playClick();
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.selectionStart = nextCursor;
-      textarea.selectionEnd = nextCursor;
-      syncStudentTypingViewport(textarea);
+    const nextCursor = selection.from + insertion.length;
+    view.dispatch({
+      changes: { from: selection.from, to: selection.to, insert: insertion },
+      selection: EditorSelection.cursor(nextCursor),
+      effects: EditorView.scrollIntoView(nextCursor, { x: 'end', y: 'nearest' }),
     });
+    setStudentSelection({ start: nextCursor, end: nextCursor });
+    view.focus();
+    soundManager.playClick();
     return true;
   };
-  const handleStudentKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      const textarea = event.currentTarget;
-      const { selectionStart, selectionEnd, value } = textarea;
-      const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
-      const linePrefix = value.slice(lineStart, selectionStart);
-      const currentIndent = linePrefix.match(/^[ \t]*/)?.[0] || '';
-      const codeBeforeComment = linePrefix.replace(/#.*$/, '').trimEnd();
-      const nextIndent = `${currentIndent}${codeBeforeComment.endsWith(':') ? STUDENT_INDENT : ''}`;
-      const insertion = `\n${nextIndent}`;
-      const nextValue = `${value.slice(0, selectionStart)}${insertion}${value.slice(selectionEnd)}`;
-      const nextCursor = selectionStart + insertion.length;
-
-      setStudentCode(nextValue);
-      setStudentSelection({ start: nextCursor, end: nextCursor });
-      soundManager.playClick();
-      setLinePulse({ id: Date.now(), count: lineCombo, enter: true });
-      requestAnimationFrame(() => {
-        textarea.selectionStart = nextCursor;
-        textarea.selectionEnd = nextCursor;
-        textarea.scrollLeft = 0;
-        syncStudentOverlayScroll(textarea);
-      });
-      return;
-    }
-    if (event.key !== 'Tab') return;
-    event.preventDefault();
-
-    const textarea = event.currentTarget;
-    const { selectionStart, selectionEnd, value } = textarea;
-    const hasSelection = selectionStart !== selectionEnd;
-
-    if (!hasSelection && activeStringSuggestion && insertStringLiteral(activeStringSuggestion)) {
-      return;
-    }
-
-    if (!hasSelection) {
-      const nextValue = `${value.slice(0, selectionStart)}${STUDENT_INDENT}${value.slice(selectionEnd)}`;
-      setStudentCode(nextValue);
-      setStudentSelection({
-        start: selectionStart + STUDENT_INDENT.length,
-        end: selectionStart + STUDENT_INDENT.length,
-      });
-      requestAnimationFrame(() => {
-        textarea.selectionStart = selectionStart + STUDENT_INDENT.length;
-        textarea.selectionEnd = selectionStart + STUDENT_INDENT.length;
-        syncStudentTypingViewport(textarea);
-      });
-      return;
-    }
-
-    const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
-    const lineEndIndex = value.indexOf('\n', selectionEnd);
-    const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
-    const selectedBlock = value.slice(lineStart, lineEnd);
-    const lines = selectedBlock.split('\n');
-
-    if (event.shiftKey) {
-      let removedBeforeSelection = 0;
-      let removedTotal = 0;
-      const outdented = lines.map((line, index) => {
-        let removed = 0;
-        let nextLine = line;
-        if (nextLine.startsWith(STUDENT_INDENT)) {
-          removed = STUDENT_INDENT.length;
-          nextLine = nextLine.slice(STUDENT_INDENT.length);
-        } else if (nextLine.startsWith('\t')) {
-          removed = 1;
-          nextLine = nextLine.slice(1);
-        } else if (nextLine.startsWith(' ')) {
-          removed = 1;
-          nextLine = nextLine.slice(1);
-        }
-        if (index === 0) removedBeforeSelection = removed;
-        removedTotal += removed;
-        return nextLine;
-      }).join('\n');
-
-      const nextValue = `${value.slice(0, lineStart)}${outdented}${value.slice(lineEnd)}`;
-      setStudentCode(nextValue);
-      const nextStart = Math.max(lineStart, selectionStart - removedBeforeSelection);
-      const nextEnd = Math.max(nextStart, selectionEnd - removedTotal);
-      setStudentSelection({ start: nextStart, end: nextEnd });
-      requestAnimationFrame(() => {
-        textarea.selectionStart = nextStart;
-        textarea.selectionEnd = nextEnd;
-        syncStudentTypingViewport(textarea);
-      });
-      return;
-    }
-
-    const indented = lines.map(line => `${STUDENT_INDENT}${line}`).join('\n');
-    const nextValue = `${value.slice(0, lineStart)}${indented}${value.slice(lineEnd)}`;
-    setStudentCode(nextValue);
-    const nextStart = selectionStart + STUDENT_INDENT.length;
-    const nextEnd = selectionEnd + (lines.length * STUDENT_INDENT.length);
-    setStudentSelection({ start: nextStart, end: nextEnd });
-    requestAnimationFrame(() => {
-      textarea.selectionStart = nextStart;
-      textarea.selectionEnd = nextEnd;
-      syncStudentTypingViewport(textarea);
-    });
+  const pulseEditorLine = (combo) => {
+    setLinePulse({ id: Date.now(), count: combo, enter: true });
   };
 
   return (
@@ -1580,72 +1687,11 @@ export default function CodeTracePlayer({
           animation: codeTraceCompleteSheen 1.8s ease-out infinite;
           pointer-events: none;
         }
-        .code-trace-input-stage {
-          position: relative;
-          overflow: hidden;
-          border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.12);
-          background: #020617;
-        }
-        .code-trace-input-stage.is-passed {
-          border-color: rgba(34,197,94,0.55);
+        .code-trace-codemirror.is-passed .cm-editor {
+          border-color: rgba(34,197,94,0.55) !important;
           animation: codeTracePassGlow 1.6s ease-in-out infinite;
         }
-        .code-trace-student-overlay,
-        .code-trace-student-textarea {
-          box-sizing: border-box;
-          width: 100%;
-          max-width: 100%;
-          min-height: ${CODE_PANEL_MIN_HEIGHT}px;
-          max-height: ${CODE_PANEL_MAX_HEIGHT}px;
-          margin: 0;
-          padding: 1rem 1rem 1rem 3rem;
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-          font-size: 0.92rem;
-          line-height: 1.55;
-          tab-size: 2;
-          white-space: pre;
-        }
-        .code-trace-student-overlay {
-          position: absolute;
-          inset: 0;
-          z-index: 1;
-          padding-left: 0.75rem;
-          overflow: auto;
-          color: rgba(226,232,240,0.72);
-          pointer-events: none;
-          scrollbar-width: none;
-        }
-        .code-trace-student-overlay::-webkit-scrollbar {
-          display: none;
-        }
-        .code-trace-student-textarea {
-          position: relative;
-          z-index: 2;
-          display: block;
-          resize: vertical;
-          overflow: auto;
-          border: 0;
-          outline: 0;
-          background: transparent;
-          color: transparent;
-          caret-color: #f8fafc;
-          -webkit-text-fill-color: transparent;
-        }
-        .code-trace-student-textarea::placeholder {
-          color: rgba(148,163,184,0.72);
-          -webkit-text-fill-color: rgba(148,163,184,0.72);
-        }
-        .code-trace-student-textarea::selection {
-          background: rgba(56,189,248,0.28);
-        }
-        .code-trace-overlay-line {
-          display: grid;
-          grid-template-columns: 1.65rem max-content;
-          gap: 0.6rem;
-          min-height: 1.426rem;
-        }
-        .code-trace-overlay-line-number {
+        .code-trace-cm-line-marker {
           width: 1.35rem;
           height: 1.35rem;
           border-radius: 999px;
@@ -1660,159 +1706,35 @@ export default function CodeTracePlayer({
           box-shadow: inset 0 0 8px rgba(2,6,23,0.55);
           transform: translateY(0.04rem);
         }
-        .code-trace-overlay-line.is-started .code-trace-overlay-line-number {
+        .code-trace-cm-line-marker.is-started {
           border-color: rgba(56,189,248,0.35);
           color: rgba(186,230,253,0.95);
         }
-        .code-trace-overlay-line.is-current .code-trace-overlay-line-number {
+        .code-trace-cm-line-marker.is-current {
           border-color: rgba(0,243,255,0.62);
           box-shadow: 0 0 12px rgba(0,243,255,0.24), inset 0 0 8px rgba(2,6,23,0.55);
         }
-        .code-trace-overlay-line.is-done .code-trace-overlay-line-number {
+        .code-trace-cm-line-marker.is-done {
           color: #052e16;
           border-color: rgba(52,211,153,0.72);
           background: linear-gradient(135deg, #86efac, #22c55e);
           animation: codeTraceCheckPop 0.28s ease-out both;
           box-shadow: 0 0 14px rgba(34,197,94,0.34);
         }
-        .code-trace-overlay-code {
-          min-width: max-content;
-        }
-        .code-trace-overlay-char {
-          color: rgba(226,232,240,0.58);
+        .code-trace-cm-char {
           border-radius: 4px;
-          transition: color 0.16s ease, background 0.16s ease, text-shadow 0.16s ease;
         }
-        .code-trace-overlay-char.is-match,
-        .code-trace-overlay-char.is-string {
-          color: #dcfce7;
-        }
-        .code-trace-overlay-char.is-string {
-          background: rgba(52,211,153,0.12);
-        }
-        .code-trace-overlay-char.is-wrong {
-          color: #fecaca;
-          background: rgba(248,113,113,0.2);
-        }
-        .code-trace-overlay-char.is-extra {
-          color: #fed7aa;
-          background: rgba(251,146,60,0.22);
-        }
-        .code-trace-line-rail {
-          position: absolute;
-          left: 0.7rem;
-          top: 0.9rem;
-          z-index: 2;
-          display: grid;
-          gap: 0.32rem;
-          pointer-events: none;
-        }
-        .code-trace-line-dot {
-          width: 1.35rem;
-          height: 1.35rem;
-          border-radius: 999px;
-          border: 1px solid rgba(148,163,184,0.22);
-          background: rgba(15,23,42,0.76);
-          color: rgba(148,163,184,0.68);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 0.62rem;
-          line-height: 1;
-          box-shadow: inset 0 0 8px rgba(2,6,23,0.55);
-          transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
-        }
-        .code-trace-line-dot.is-started {
-          border-color: rgba(56,189,248,0.35);
-          color: rgba(186,230,253,0.95);
-        }
-        .code-trace-line-dot.is-current {
-          transform: scale(1.08);
-          border-color: rgba(0,243,255,0.62);
-          box-shadow: 0 0 12px rgba(0,243,255,0.24), inset 0 0 8px rgba(2,6,23,0.55);
-        }
-        .code-trace-line-dot.is-done {
-          color: #052e16;
-          border-color: rgba(52,211,153,0.72);
-          background: linear-gradient(135deg, #86efac, #22c55e);
-          animation: codeTraceCheckPop 0.28s ease-out both;
-          box-shadow: 0 0 14px rgba(34,197,94,0.34);
-        }
-        .code-trace-typing-trace {
-          position: sticky;
-          top: 0.75rem;
-          z-index: 5;
-          margin: 0 0 0.62rem;
-          min-height: 2.35rem;
-          border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(15,23,42,0.88);
-          backdrop-filter: blur(12px);
-          display: flex;
-          align-items: center;
-          gap: 0.65rem;
-          padding: 0.55rem 0.7rem;
-          overflow: hidden;
-          box-shadow: 0 12px 30px rgba(2,6,23,0.24);
-        }
-        .code-trace-typing-line {
-          flex: 0 0 auto;
-          min-width: 2.8rem;
-          color: rgba(148,163,184,0.86);
-          font-size: 0.72rem;
-        }
-        .code-trace-typing-text {
-          flex: 1;
-          min-width: 0;
-          overflow-x: auto;
-          overflow-y: hidden;
-          white-space: pre;
-          scrollbar-width: none;
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-          font-size: 0.86rem;
-        }
-        .code-trace-typing-text::-webkit-scrollbar {
-          display: none;
-        }
-        .code-trace-typing-char {
-          color: rgba(148,163,184,0.68);
-          transition: color 0.16s ease, background 0.16s ease, text-shadow 0.16s ease;
-        }
-        .code-trace-typing-char.is-match,
-        .code-trace-typing-char.is-string {
-          color: #dcfce7;
-          animation: codeTraceCharGlow 0.24s ease-out both;
-        }
-        .code-trace-typing-char.is-string {
+        .code-trace-cm-char--string {
           color: #bbf7d0;
           background: rgba(52,211,153,0.12);
-          border-radius: 4px;
         }
-        .code-trace-typing-char.is-wrong,
-        .code-trace-typing-char.is-extra {
+        .code-trace-cm-char--wrong {
           color: #fecaca;
-          background: rgba(248,113,113,0.18);
-          border-radius: 4px;
+          background: rgba(248,113,113,0.22);
         }
-        .code-trace-typing-cursor {
-          display: inline-block;
-          width: 0.5rem;
-          color: var(--crystal-cyan);
-          animation: codeTraceCharGlow 0.9s ease-in-out infinite alternate;
-        }
-        .code-trace-typing-meter {
-          flex: 0 0 72px;
-          height: 0.38rem;
-          overflow: hidden;
-          border-radius: 999px;
-          background: rgba(148,163,184,0.16);
-        }
-        .code-trace-typing-meter span {
-          display: block;
-          height: 100%;
-          border-radius: inherit;
-          background: linear-gradient(90deg, rgba(0,243,255,0.72), rgba(52,211,153,0.9));
-          transition: width 0.18s ease;
+        .code-trace-cm-char--extra {
+          color: #fed7aa;
+          background: rgba(251,146,60,0.24);
         }
         .code-trace-analysis-panel {
           margin-top: 1rem;
@@ -2101,57 +2023,18 @@ export default function CodeTracePlayer({
                 {linePulse.enter ? '라인 입력' : `${linePulse.count}줄 콤보`}
               </div>
             )}
-            <div className={`code-trace-input-stage ${currentPassed ? 'is-passed' : ''}`}>
-              <div
-                ref={studentOverlayRef}
-                className="code-trace-student-overlay"
-                aria-hidden="true"
-                style={{ height: codePanelHeight }}
-              >
-                {studentOverlayLines.map(line => (
-                  <div
-                    key={line.lineNumber}
-                    className={`code-trace-overlay-line ${line.typed ? 'is-started' : ''} ${line.done ? 'is-done' : ''} ${typingTrace.lineNumber === line.lineNumber ? 'is-current' : ''}`}
-                  >
-                    <span className="code-trace-overlay-line-number">
-                      {line.done ? <Check size={11} strokeWidth={3} /> : line.lineNumber}
-                    </span>
-                    <span className="code-trace-overlay-code">
-                      {line.chars.length ? line.chars.map((item, index) => (
-                        <span key={`${line.lineNumber}-${index}-${item.char}`} className={`code-trace-overlay-char is-${item.status}`}>
-                          {item.char === '\t' ? STUDENT_INDENT : item.char}
-                        </span>
-                      )) : '\u00a0'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <textarea
-                ref={studentTextareaRef}
-                className="code-trace-student-textarea"
-                value={studentCode}
-                onChange={e => {
-                  setStudentCode(e.target.value);
-                  updateStudentSelection(e.target);
-                  syncStudentTypingViewport(e.target);
-                }}
-                onSelect={e => updateStudentSelection(e.target)}
-                onClick={e => {
-                  updateStudentSelection(e.currentTarget);
-                  syncStudentOverlayScroll(e.currentTarget);
-                }}
-                onKeyUp={e => {
-                  updateStudentSelection(e.currentTarget);
-                  syncStudentOverlayScroll(e.currentTarget);
-                }}
-                onScroll={e => syncStudentOverlayScroll(e.currentTarget)}
-                onKeyDown={handleStudentKeyDown}
-                spellCheck={false}
-                wrap="off"
-                placeholder="코드를 따라 쓰세요."
-                style={{ height: codePanelHeight }}
-              />
-            </div>
+            <CodeTraceEditor
+              value={studentCode}
+              answerCode={exercise?.answerCode || ''}
+              height={codePanelHeight}
+              currentPassed={currentPassed}
+              activeStringSuggestion={activeStringSuggestion}
+              lineCombo={lineCombo}
+              editorViewRef={studentEditorViewRef}
+              onChange={setStudentCode}
+              onSelectionChange={setStudentSelection}
+              onLinePulse={pulseEditorLine}
+            />
             {stringSuggestions.length > 0 && (
               <div className="code-trace-string-helper">
                 <p className="font-tech code-trace-string-helper-title">문자열 도우미</p>
