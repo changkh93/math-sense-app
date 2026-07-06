@@ -525,6 +525,8 @@ function calculateBattleRewards(participants = {}, participantUids = []) {
   const bScore = Number(b.score || 0);
   const aCorrect = Number(a.correctCount || 0);
   const bCorrect = Number(b.correctCount || 0);
+  const aLastMs = Number(a.lastAnsweredAtMs || 0);
+  const bLastMs = Number(b.lastAnsweredAtMs || 0);
 
   let winnerUid = "";
   let resultType = "draw";
@@ -543,14 +545,14 @@ function calculateBattleRewards(participants = {}, participantUids = []) {
   } else if (bScore > aScore) {
     winnerUid = bUid;
     resultType = "win";
-  } else if (Number(a.lastAnsweredAtMs || 0) && Number(b.lastAnsweredAtMs || 0)) {
-    if (Number(a.lastAnsweredAtMs || 0) < Number(b.lastAnsweredAtMs || 0)) {
-      winnerUid = aUid;
-      resultType = "win";
-    } else if (Number(b.lastAnsweredAtMs || 0) < Number(a.lastAnsweredAtMs || 0)) {
-      winnerUid = bUid;
-      resultType = "win";
-    }
+  } else if (aCorrect !== bCorrect) {
+    // 점수가 같아도 정답 수가 다르면(예: 복수정답 부분 점수) 더 많이 맞힌 쪽이 승리.
+    winnerUid = aCorrect > bCorrect ? aUid : bUid;
+    resultType = "win";
+  } else if (aLastMs > 0 && bLastMs > 0 && aLastMs !== bLastMs) {
+    // 동점 동순위 타이브레이크: 더 빨리 모든 문제를 끝낸 쪽이 승리.
+    winnerUid = aLastMs < bLastMs ? aUid : bUid;
+    resultType = "win";
   }
 
   const rewards = {};

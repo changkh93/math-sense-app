@@ -44,6 +44,9 @@ export default function QuizBattleView({
   const [isLeaving, setIsLeaving] = useState(false)
   const [error, setError] = useState('')
   const [timeNow, setTimeNow] = useState(Date.now())
+  const [reveal, setReveal] = useState(false) // 답안 제출 후 정답 공개 단계
+  const [reviewMode, setReviewMode] = useState(false) // 결과 화면에서 틀린 문제 복습
+  const [reviewIndex, setReviewIndex] = useState(0)
   const activeTicketRef = useRef('')
   const matchedRef = useRef(false)
 
@@ -181,7 +184,10 @@ export default function QuizBattleView({
   const answeredCount = Number(myParticipant.answeredCount || 0)
   const currentIndex = Math.min(answeredCount, Math.max(0, questionSet.length - 1))
   const currentQuestion = questionSet[currentIndex]
-  const hasAnsweredCurrent = !!answerResults[currentQuestion?.questionId]
+  // 답안 제출 후 서버가 answeredCount를 올려 currentIndex가 이미 다음 문제를 가리킨다.
+  // 정답 공개 단계에서는 직전에 푼 문제를 보여줘야 하므로 별도 계산.
+  const revealedIndex = Math.max(0, currentIndex - 1)
+  const revealedQuestion = questionSet[revealedIndex]
   const isBattleFinished = battle?.status === 'finished'
   const isBattleCompleteForMe = questionSet.length > 0 && answeredCount >= questionSet.length
   const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
@@ -198,6 +204,15 @@ export default function QuizBattleView({
   // 상대가 중도에 포기(이탈)했는지 여부. 결과 화면 안내에 사용한다.
   const opponentForfeited = !!opponentUid && battle?.participants?.[opponentUid]?.forfeited === true
   const myForfeit = !!user?.uid && battle?.participants?.[user.uid]?.forfeited === true
+
+  // 결과 화면에서 틀린 문제를 다시 확인하기 위한 목록.
+  const wrongQuestions = useMemo(() => {
+    return questionSet.filter((q) => {
+      const result = answerResults[q.questionId]
+      return result && !result.isCorrect
+    })
+  }, [questionSet, answerResults])
+  const reviewQuestion = wrongQuestions[reviewIndex] || null
 
   const toggleOption = (key, multiAnswer) => {
     if (isSubmitting || hasAnsweredCurrent || isBattleCompleteForMe) return
@@ -221,11 +236,17 @@ export default function QuizBattleView({
         selectedOptionKeys: Array.from(selectedKeys),
       })
       const data = res.data || {}
+      const selectedSnapshot = new Set(selectedKeys)
       setAnswerResults(prev => ({
         ...prev,
-        [currentQuestion.questionId]: data,
+        [currentQuestion.questionId]: {
+          ...data,
+          selectedKeys: Array.from(selectedSnapshot),
+        },
       }))
       setSelectedKeys(new Set())
+      // 정답 공개 단계로 전환해 사용자가 결과와 정답을 충분히 확인하게 한다.
+      setReveal(true)
       if (data.isCorrect) soundManager.playCorrect()
       else soundManager.playWrong()
     } catch (err) {
@@ -233,6 +254,10 @@ export default function QuizBattleView({
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const advanceToNext = () => {
+    setReveal(false)
   }
 
   const finalizeBattle = async () => {
@@ -368,6 +393,102 @@ export default function QuizBattleView({
   }
 
   if (isBattleFinished) {
+    if (reviewMode && reviewQuestion) {
+      const myResult = answerResults[reviewQuestion.questionId] || {}
+      const mySelectedKeys = myResult.selectedKeys || []
+      return (
+        <div className="space-bg" style={{ ...panelStyle, alignItems: 'stretch', overflowY: 'auto' }}>
+          <div style={{ width: 'min(1040px, 100%)', margin: '0 auto', padding: '1rem 0' }}>
+            <div className="glass-card hud-border" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+              <div className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                틀린 문제 확인 {reviewIndex + 1} / {wrongQuestions.length}
+              </div>
+              {reviewQuestion.imageUrl && (
+                <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                  <img
+                    src={reviewQuestion.imageUrl}
+                    alt=""
+                    style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 8 }}
+                  />
+                </div>
+              )}
+              <div style={{ fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '1.2rem' }}>
+                <MissionMarkdownViewer text={reviewQuestion.question} />
+              </div>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {(reviewQuestion.options || []).map(option => {
+                  const isMyChoice = mySelectedKeys.includes(option.key)
+                  return (
+                    <div
+                      key={option.key}
+                      style={{
+                        padding: '0.9rem 1rem',
+                        textAlign: 'left',
+                        borderRadius: 8,
+                        border: isMyChoice ? '2px solid #f87171' : '1px solid rgba(255,255,255,0.14)',
+                        background: isMyChoice ? 'rgba(248, 113, 113, 0.12)' : 'rgba(255,255,255,0.02)',
+                        color: isMyChoice ? '#f87171' : 'var(--text-muted)',
+                      }}
+                    >
+                      <MissionMarkdownViewer text={option.text} />
+                      {isMyChoice && (
+                        <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', fontWeight: 900 }}>내 선택</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <div
+                className="font-tech"
+                style={{
+                  marginTop: '1rem',
+                  padding: '0.8rem 1rem',
+                  borderRadius: 8,
+                  background: 'rgba(248, 113, 113, 0.12)',
+                  color: '#f87171',
+                  fontWeight: 900,
+                }}
+              >
+                오답입니다. 다시 풀어 보세요.
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
+                <button className="hud-btn secondary glass" onClick={() => { setReviewMode(false); setReviewIndex(0) }} style={{ padding: '0.8rem 1.2rem' }}>
+                  결과로 돌아가기
+                </button>
+                <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                  <button
+                    className="hud-btn secondary glass"
+                    onClick={() => setReviewIndex(Math.max(0, reviewIndex - 1))}
+                    disabled={reviewIndex === 0}
+                    style={{ padding: '0.8rem 1.2rem' }}
+                  >
+                    이전
+                  </button>
+                  {reviewIndex < wrongQuestions.length - 1 ? (
+                    <button
+                      className="hud-btn primary glass"
+                      onClick={() => setReviewIndex(reviewIndex + 1)}
+                      style={{ padding: '0.8rem 1.2rem' }}
+                    >
+                      다음 틀린 문제
+                    </button>
+                  ) : (
+                    <button
+                      className="hud-btn primary glass"
+                      onClick={() => { setReviewMode(false); setReviewIndex(0) }}
+                      style={{ padding: '0.8rem 1.2rem' }}
+                    >
+                      완료
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="space-bg" style={panelStyle}>
         <div className="glass-card hud-border" style={{ width: 'min(780px, 100%)', padding: '2rem', textAlign: 'center' }}>
@@ -399,9 +520,16 @@ export default function QuizBattleView({
           <div style={{ color: 'var(--crystal-cyan)', fontSize: '1.25rem', fontWeight: 900, marginBottom: '1.5rem' }}>
             +{resultSummary?.reward || 0} 광석
           </div>
-          <button className="hud-btn primary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.6rem' }}>
-            MISSION CONTROL로 돌아가기
-          </button>
+          <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {wrongQuestions.length > 0 && (
+              <button className="hud-btn secondary glass" onClick={() => { setReviewMode(true); setReviewIndex(0) }} style={{ padding: '0.9rem 1.4rem' }}>
+                틀린 문제 다시 보기 ({wrongQuestions.length})
+              </button>
+            )}
+            <button className="hud-btn primary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.6rem' }}>
+              MISSION CONTROL로 돌아가기
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -429,9 +557,11 @@ export default function QuizBattleView({
 
         <div className="glass-card hud-border" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
           <div className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-            QUESTION {Math.min(answeredCount + 1, battle.questionCount)} / {battle.questionCount}
+            {reveal
+              ? `QUESTION ${Math.min(revealedIndex + 1, battle.questionCount)} / ${battle.questionCount}`
+              : `QUESTION ${Math.min(answeredCount + 1, battle.questionCount)} / ${battle.questionCount}`}
           </div>
-          {currentQuestion.imageUrl && (
+          {currentQuestion.imageUrl && !reveal && (
             <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
               <img
                 src={currentQuestion.imageUrl}
@@ -440,41 +570,96 @@ export default function QuizBattleView({
               />
             </div>
           )}
-          <div style={{ fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '1.2rem' }}>
-            <MissionMarkdownViewer text={currentQuestion.question} />
-          </div>
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            {(currentQuestion.options || []).map(option => {
-              const selected = selectedKeys.has(option.key)
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => toggleOption(option.key, currentQuestion.multiAnswer)}
-                  disabled={isSubmitting || hasAnsweredCurrent || isBattleCompleteForMe}
-                  style={{
-                    padding: '0.9rem 1rem',
-                    textAlign: 'left',
-                    borderRadius: 8,
-                    border: selected ? '2px solid var(--crystal-cyan)' : '1px solid rgba(255,255,255,0.14)',
-                    background: selected ? 'rgba(0, 243, 255, 0.12)' : 'rgba(255,255,255,0.04)',
-                    color: 'var(--text-bright)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <MissionMarkdownViewer text={option.text} />
-                </button>
-              )
-            })}
-          </div>
-          {currentQuestion.multiAnswer && (
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.75rem' }}>
-              복수 정답 문제입니다. 해당하는 답을 모두 선택하세요.
+          {reveal && revealedQuestion?.imageUrl && (
+            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+              <img
+                src={revealedQuestion.imageUrl}
+                alt=""
+                style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 8 }}
+              />
             </div>
           )}
-          {hasAnsweredCurrent && (
-            <div style={{ marginTop: '1rem', color: answerResults[currentQuestion.questionId]?.isCorrect ? 'var(--planet-green)' : '#f87171', fontWeight: 900 }}>
-              {answerResults[currentQuestion.questionId]?.isCorrect ? '정답입니다.' : '오답입니다.'}
+          <div style={{ fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '1.2rem' }}>
+            <MissionMarkdownViewer text={reveal ? (revealedQuestion?.question || '') : currentQuestion.question} />
+          </div>
+          {!reveal && (
+            <>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {(currentQuestion.options || []).map(option => {
+                  const selected = selectedKeys.has(option.key)
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => toggleOption(option.key, currentQuestion.multiAnswer)}
+                      disabled={isSubmitting || isBattleCompleteForMe}
+                      style={{
+                        padding: '0.9rem 1rem',
+                        textAlign: 'left',
+                        borderRadius: 8,
+                        border: selected ? '2px solid var(--crystal-cyan)' : '1px solid rgba(255,255,255,0.14)',
+                        background: selected ? 'rgba(0, 243, 255, 0.12)' : 'rgba(255,255,255,0.04)',
+                        color: 'var(--text-bright)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <MissionMarkdownViewer text={option.text} />
+                    </button>
+                  )
+                })}
+              </div>
+              {currentQuestion.multiAnswer && (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+                  복수 정답 문제입니다. 해당하는 답을 모두 선택하세요.
+                </div>
+              )}
+            </>
+          )}
+          {reveal && revealedQuestion && (
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {(revealedQuestion.options || []).map(option => {
+                const myResult = answerResults[revealedQuestion.questionId] || {}
+                const selectedKeysList = myResult.selectedKeys || []
+                const isMyChoice = selectedKeysList.includes(option.key)
+                return (
+                  <div
+                    key={option.key}
+                    style={{
+                      padding: '0.9rem 1rem',
+                      textAlign: 'left',
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      background: 'rgba(255,255,255,0.02)',
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    <MissionMarkdownViewer text={option.text} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {reveal && (
+            <div
+              className="font-tech"
+              style={{
+                marginTop: '1rem',
+                padding: '0.8rem 1rem',
+                borderRadius: 8,
+                background: answerResults[revealedQuestion?.questionId]?.isCorrect
+                  ? 'rgba(74, 222, 128, 0.12)'
+                  : 'rgba(248, 113, 113, 0.12)',
+                color: answerResults[revealedQuestion?.questionId]?.isCorrect ? 'var(--planet-green)' : '#f87171',
+                fontWeight: 900,
+                fontSize: '1.05rem',
+              }}
+            >
+              {answerResults[revealedQuestion?.questionId]?.isCorrect ? '정답입니다!' : '오답입니다.'}
+              {!answerResults[revealedQuestion?.questionId]?.isCorrect && (
+                <span style={{ display: 'block', marginTop: '0.4rem', fontWeight: 600, fontSize: '0.9rem' }}>
+                  위 문제를 다시 확인해 보세요.
+                </span>
+              )}
             </div>
           )}
           {error && <div style={{ color: '#f87171', marginTop: '1rem' }}>{error}</div>}
@@ -482,12 +667,16 @@ export default function QuizBattleView({
             <button className="hud-btn secondary glass" onClick={leaveBattle} disabled={isLeaving} style={{ padding: '0.8rem 1.2rem' }}>
               {isLeaving ? '정산 중...' : '나가기'}
             </button>
-            {isBattleCompleteForMe || timeExpired ? (
+            {reveal ? (
+              <button className="hud-btn primary glass" onClick={advanceToNext} style={{ padding: '0.8rem 1.2rem' }}>
+                다음 문제
+              </button>
+            ) : isBattleCompleteForMe || timeExpired ? (
               <button className="hud-btn primary glass" onClick={finalizeBattle} disabled={isFinalizing} style={{ padding: '0.8rem 1.2rem' }}>
                 {isFinalizing ? '정산 중...' : '결과 확인'}
               </button>
             ) : (
-              <button className="hud-btn primary glass" onClick={submitAnswer} disabled={selectedKeys.size === 0 || isSubmitting || hasAnsweredCurrent} style={{ padding: '0.8rem 1.2rem' }}>
+              <button className="hud-btn primary glass" onClick={submitAnswer} disabled={selectedKeys.size === 0 || isSubmitting} style={{ padding: '0.8rem 1.2rem' }}>
                 {isSubmitting ? '전송 중...' : '답안 제출'}
               </button>
             )}
