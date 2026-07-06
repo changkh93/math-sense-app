@@ -292,27 +292,17 @@ export default function SpaceRanking({ user, userData }) {
       animate={{ opacity: 1 }}
       className="fade-in"
     >
-      <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-        <h2 style={{ 
-          fontSize: '2.5rem', 
-          color: 'var(--text-bright)', 
-          marginBottom: '0.8rem',
-          textShadow: '0 0 20px var(--crystal-glow)'
-        }}>
+      <div className="space-ranking-header">
+        <h2 className="space-ranking-title">
           🏆 스텔라 관제계 (Meta Sense Universe)
         </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
+        <p className="space-ranking-subtitle">
           단순한 광석 수량이 아닌, <strong>실력, 성실함, 집중도, 성장세, 그리고 소통 능력</strong>을 종합하여 진정한 개척자를 가려냅니다. (대원 {topUsers.length}명 탐사 중)
         </p>
       </div>
 
       {/* 모드 전환 탭 */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        gap: '1rem', 
-        marginBottom: '2rem' 
-      }}>
+      <div className="space-ranking-modes">
         {[
           { id: 'sei', label: '전 우주 정거장 (SEI)', icon: '🌌' },
           { id: 'growth', label: '이번 주 급상승 (Warp Star)', icon: '☄️', isSpecial: true },
@@ -321,7 +311,7 @@ export default function SpaceRanking({ user, userData }) {
           <button
             key={mode.id}
             onClick={() => { setRankMode(mode.id); soundManager.playClick(); }}
-            className={`font-tech ${rankMode === mode.id ? 'active' : ''}`}
+            className={`space-ranking-mode-btn font-tech ${rankMode === mode.id ? 'active' : ''}`}
             style={{
               padding: '0.8rem 1.5rem',
               background: rankMode === mode.id 
@@ -569,7 +559,7 @@ export default function SpaceRanking({ user, userData }) {
                     return (
                       <React.Fragment key={u.id}>
                       <div
-                        className="ranking-row"
+                        className={`ranking-row${(isMe && !isExpanded && !hasCustomFrame) ? ' ranking-row-me' : ''}`}
                         onClick={() => setInspectUserId(inspectUserId === u.id ? null : u.id)}
                         style={{
                           display: 'grid',
@@ -588,9 +578,7 @@ export default function SpaceRanking({ user, userData }) {
                             ? `${panelTheme.glow}, inset 0 0 0 1px rgba(255,255,255,0.03)`
                             : hasCustomFrame
                               ? `${frameTheme.glow}, inset 0 0 0 1px ${frameTheme.borderColor}`
-                            : isMe
-                              ? 'inset 0 0 20px rgba(0, 243, 255, 0.2)'
-                              : 'none',
+                            : 'none',
                           borderRadius: isExpanded || isMe || hasCustomFrame ? '10px' : '0',
                           margin: isExpanded || isMe || hasCustomFrame ? '5px 0' : '0',
                           borderLeft: isExpanded
@@ -625,7 +613,7 @@ export default function SpaceRanking({ user, userData }) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
                               type="button"
-                              className="ranking-profile-link"
+                              className={`ranking-profile-link${(isMe && !isExpanded) ? ' ranking-profile-link-me' : ''}`}
                               onClick={(event) => openPublicProfile(event, u.id)}
                               aria-label={`${u.publicDisplayName || u.studentName || u.name || '무명 탐험가'}님의 탐험기지 보기`}
                               style={{

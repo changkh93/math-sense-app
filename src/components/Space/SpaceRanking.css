@@ -85,13 +85,125 @@
   text-underline-offset: 3px;
 }
 
+/* 내 순위 행 - 은은한 빛 효과로 한눈에 찾기 쉽게 */
+.ranking-row-me {
+  animation: ranking-me-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes ranking-me-glow {
+  0% {
+    box-shadow: inset 0 0 18px rgba(0, 243, 255, 0.18), 0 0 10px rgba(0, 243, 255, 0.15);
+  }
+  100% {
+    box-shadow: inset 0 0 28px rgba(0, 243, 255, 0.32), 0 0 20px rgba(0, 243, 255, 0.3);
+  }
+}
+
+/* 접근성: 애니메이션 감소 환경에서는 정지 */
+@media (prefers-reduced-motion: reduce) {
+  .ranking-row-me {
+    animation: none;
+    box-shadow: inset 0 0 24px rgba(0, 243, 255, 0.25), 0 0 15px rgba(0, 243, 255, 0.22);
+  }
+  .ranking-profile-link-me {
+    animation: none;
+  }
+}
+
+/* 내 이름 텍스트 - 부드럽게 빛나는 효과 */
+.ranking-profile-link-me {
+  animation: ranking-me-text 3s ease-in-out infinite alternate;
+}
+
+@keyframes ranking-me-text {
+  0% {
+    text-shadow: 0 0 4px rgba(0, 243, 255, 0.3);
+  }
+  100% {
+    text-shadow: 0 0 12px rgba(0, 243, 255, 0.7), 0 0 20px rgba(0, 243, 255, 0.4);
+  }
+}
+
 .ranking-profile-link-inline {
   color: var(--text-bright);
   font-weight: 700;
 }
 
+/* ─── 상단 헤더 / 모드 전환 탭 ─── */
+.space-ranking-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.space-ranking-title {
+  font-size: 2.5rem;
+  color: var(--text-bright);
+  margin-bottom: 0.8rem;
+  text-shadow: 0 0 20px var(--crystal-glow);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.2;
+}
+
+.space-ranking-subtitle {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+}
+
+.space-ranking-modes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.space-ranking-mode-btn {
+  justify-content: center;
+}
+
 @media (max-width: 768px) {
   .guide-grid {
     grid-template-columns: 1fr;
+  }
+
+  .space-ranking-header {
+    margin-bottom: 1.75rem;
+  }
+
+  .space-ranking-title {
+    font-size: 1.7rem;
+  }
+
+  .space-ranking-subtitle {
+    font-size: 0.95rem;
+  }
+
+  /* 모드 탭: 좁은 화면에서는 한 줄에 1~2개씩 자연스럽게 줄바꿈 */
+  .space-ranking-modes {
+    gap: 0.6rem;
+  }
+
+  .space-ranking-mode-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.65rem 0.9rem !important;
+    font-size: 0.82rem !important;
+    letter-spacing: 0.5px !important;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 380px) {
+  .space-ranking-title {
+    font-size: 1.45rem;
+  }
+
+  /* 매우 좁은 화면에서는 버튼이 한 줄씩 표시되도록 */
+  .space-ranking-mode-btn {
+    flex: 1 1 100%;
   }
 }
