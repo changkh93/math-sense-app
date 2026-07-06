@@ -1396,7 +1396,10 @@ export default function CodeTracePlayer({
   const syncStudentTypingViewport = (textarea = studentTextareaRef.current) => {
     if (!textarea) return;
     const cursor = textarea.selectionStart || 0;
-    if (!isCaretAtLineEnd(textarea.value, cursor)) return;
+    if (!isCaretAtLineEnd(textarea.value, cursor)) {
+      syncStudentOverlayScroll(textarea);
+      return;
+    }
     requestAnimationFrame(() => {
       textarea.scrollLeft = textarea.scrollWidth;
       syncStudentOverlayScroll(textarea);
@@ -1431,8 +1434,28 @@ export default function CodeTracePlayer({
   };
   const handleStudentKeyDown = (event) => {
     if (event.key === 'Enter') {
+      event.preventDefault();
+      const textarea = event.currentTarget;
+      const { selectionStart, selectionEnd, value } = textarea;
+      const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
+      const linePrefix = value.slice(lineStart, selectionStart);
+      const currentIndent = linePrefix.match(/^[ \t]*/)?.[0] || '';
+      const codeBeforeComment = linePrefix.replace(/#.*$/, '').trimEnd();
+      const nextIndent = `${currentIndent}${codeBeforeComment.endsWith(':') ? STUDENT_INDENT : ''}`;
+      const insertion = `\n${nextIndent}`;
+      const nextValue = `${value.slice(0, selectionStart)}${insertion}${value.slice(selectionEnd)}`;
+      const nextCursor = selectionStart + insertion.length;
+
+      setStudentCode(nextValue);
+      setStudentSelection({ start: nextCursor, end: nextCursor });
       soundManager.playClick();
       setLinePulse({ id: Date.now(), count: lineCombo, enter: true });
+      requestAnimationFrame(() => {
+        textarea.selectionStart = nextCursor;
+        textarea.selectionEnd = nextCursor;
+        textarea.scrollLeft = 0;
+        syncStudentOverlayScroll(textarea);
+      });
       return;
     }
     if (event.key !== 'Tab') return;
@@ -2115,11 +2138,11 @@ export default function CodeTracePlayer({
                 onSelect={e => updateStudentSelection(e.target)}
                 onClick={e => {
                   updateStudentSelection(e.currentTarget);
-                  syncStudentTypingViewport(e.currentTarget);
+                  syncStudentOverlayScroll(e.currentTarget);
                 }}
                 onKeyUp={e => {
                   updateStudentSelection(e.currentTarget);
-                  syncStudentTypingViewport(e.currentTarget);
+                  syncStudentOverlayScroll(e.currentTarget);
                 }}
                 onScroll={e => syncStudentOverlayScroll(e.currentTarget)}
                 onKeyDown={handleStudentKeyDown}
