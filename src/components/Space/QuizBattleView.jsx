@@ -654,10 +654,10 @@ export default function QuizBattleView({
                 fontSize: '1.05rem',
               }}
             >
-              {answerResults[revealedQuestion?.questionId]?.isCorrect ? '정답입니다!' : '오답입니다.'}
+              {answerResults[revealedQuestion?.questionId]?.isCorrect ? '정답입니다!' : '아쉽지만 오답입니다.'}
               {!answerResults[revealedQuestion?.questionId]?.isCorrect && (
                 <span style={{ display: 'block', marginTop: '0.4rem', fontWeight: 600, fontSize: '0.9rem' }}>
-                  위 문제를 다시 확인해 보세요.
+                  다음 문제로 넘어가세요.
                 </span>
               )}
             </div>
