@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Volume2, VolumeX, X } from 'lucide-react'
 
 import SpaceQuizView from './SpaceQuizView'
 import QuizBattleView from './QuizBattleView'
@@ -81,6 +82,7 @@ const LONG_VIDEO_SECONDS = 40 * 60
 const STANDARD_VIDEO_COMPLETION_THRESHOLD = 0.95
 const LONG_VIDEO_COMPLETION_THRESHOLD = 0.85
 const VIDEO_PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2]
+const VIDEO_VOLUME_DEFAULT = 80
 const QA_ROOM_URL = 'https://meet.google.com/qzg-psru-qnc'
 
 const getVideoCompletionThreshold = (duration = 0) => (
@@ -151,7 +153,7 @@ const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
 
 // ─── YouTube Player Component ───
 // Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
-const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, onTrackingStatus, onError, initialPlaybackRate = 1, isOverlay = false, autoPlay = true }, ref) => {
+const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, onTrackingStatus, onError, initialPlaybackRate = 1, initialVolume = VIDEO_VOLUME_DEFAULT, initiallyMuted = false, isOverlay = false, autoPlay = true }, ref) => {
   const normalizedVideoId = getYouTubeVideoId(videoId)
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
@@ -163,10 +165,20 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   const playerTargetId = useRef(`yt-player-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
   const { start: normalizedStart, end: normalizedEnd } = getNormalizedVideoRange(start, end)
   const initialPlaybackRateRef = useRef(initialPlaybackRate)
+  const initialVolumeRef = useRef(initialVolume)
+  const initiallyMutedRef = useRef(initiallyMuted)
 
   useEffect(() => {
     initialPlaybackRateRef.current = initialPlaybackRate
   }, [initialPlaybackRate])
+
+  useEffect(() => {
+    initialVolumeRef.current = initialVolume
+  }, [initialVolume])
+
+  useEffect(() => {
+    initiallyMutedRef.current = initiallyMuted
+  }, [initiallyMuted])
 
   useImperativeHandle(ref, () => ({
     pauseVideo: () => {
@@ -195,6 +207,27 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         return playerRef.current.getPlaybackRate()
       }
       return 1
+    },
+    setVolume: (volume) => {
+      if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
+        playerRef.current.setVolume(volume)
+      }
+    },
+    mute: () => {
+      if (playerRef.current && typeof playerRef.current.mute === 'function') {
+        playerRef.current.mute()
+      }
+    },
+    unMute: () => {
+      if (playerRef.current && typeof playerRef.current.unMute === 'function') {
+        playerRef.current.unMute()
+      }
+    },
+    isMuted: () => {
+      if (playerRef.current && typeof playerRef.current.isMuted === 'function') {
+        return playerRef.current.isMuted()
+      }
+      return false
     }
   }))
 
@@ -310,6 +343,14 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
             clearTimeout(apiTimeout)
             if (typeof player.setPlaybackRate === 'function') {
               player.setPlaybackRate(initialPlaybackRateRef.current)
+            }
+            if (typeof player.setVolume === 'function') {
+              player.setVolume(initialVolumeRef.current)
+            }
+            if (initiallyMutedRef.current && typeof player.mute === 'function') {
+              player.mute()
+            } else if (!initiallyMutedRef.current && typeof player.unMute === 'function') {
+              player.unMute()
             }
             onTrackingStatusRef.current?.({
               event: 'api_ready',
@@ -743,6 +784,15 @@ export default function MissionHub({
     const savedRate = Number(localStorage.getItem(`metasense_video_rate_${unitId}`))
     return VIDEO_PLAYBACK_RATES.includes(savedRate) ? savedRate : 1
   });
+  const [videoVolume, setVideoVolume] = useState(() => {
+    const savedVolume = Number(localStorage.getItem('metasense_video_volume'))
+    return Number.isFinite(savedVolume)
+      ? Math.max(0, Math.min(100, savedVolume))
+      : VIDEO_VOLUME_DEFAULT
+  });
+  const [isVideoMuted, setIsVideoMuted] = useState(() => localStorage.getItem('metasense_video_muted') === '1');
+  const [isMediaControlsOpen, setIsMediaControlsOpen] = useState(true);
+  const [isBottomActionsOpen, setIsBottomActionsOpen] = useState(true);
   
   useEffect(() => {
     if (completionBonusTimeLeft === null || completionBonusTimeLeft <= 0) return;
@@ -760,6 +810,7 @@ export default function MissionHub({
 
   // ─── Theater Mode HUD Timer ───
   const [isUiVisible, setIsUiVisible] = useState(true);
+  const [isBottomHudInteracting, setIsBottomHudInteracting] = useState(false);
   const idleTimerRef = useRef(null);
 
   const handlePlaybackRateChange = useCallback((rate) => {
@@ -768,10 +819,48 @@ export default function MissionHub({
     videoPlayerRef.current?.setPlaybackRate?.(rate)
   }, [unitId])
 
+  const handleVideoVolumeChange = useCallback((value) => {
+    const nextVolume = Math.max(0, Math.min(100, Number(value) || 0))
+    setVideoVolume(nextVolume)
+    localStorage.setItem('metasense_video_volume', String(nextVolume))
+    videoPlayerRef.current?.setVolume?.(nextVolume)
+
+    const nextMuted = nextVolume === 0
+    setIsVideoMuted(nextMuted)
+    localStorage.setItem('metasense_video_muted', nextMuted ? '1' : '0')
+    if (nextMuted) {
+      videoPlayerRef.current?.mute?.()
+    } else {
+      videoPlayerRef.current?.unMute?.()
+    }
+  }, [])
+
+  const handleVideoMuteToggle = useCallback(() => {
+    const nextMuted = !isVideoMuted
+    setIsVideoMuted(nextMuted)
+    localStorage.setItem('metasense_video_muted', nextMuted ? '1' : '0')
+    if (nextMuted) {
+      videoPlayerRef.current?.mute?.()
+    } else {
+      if (videoVolume === 0) {
+        setVideoVolume(VIDEO_VOLUME_DEFAULT)
+        localStorage.setItem('metasense_video_volume', String(VIDEO_VOLUME_DEFAULT))
+        videoPlayerRef.current?.setVolume?.(VIDEO_VOLUME_DEFAULT)
+      }
+      videoPlayerRef.current?.unMute?.()
+    }
+  }, [isVideoMuted, videoVolume])
+
   useEffect(() => {
     if (currentMode !== 'video') return
     videoPlayerRef.current?.setPlaybackRate?.(playbackRate)
-  }, [currentMode, selectedTx, playbackRate])
+    videoPlayerRef.current?.setVolume?.(videoVolume)
+    if (isVideoMuted || videoVolume === 0) {
+      videoPlayerRef.current?.mute?.()
+    } else {
+      videoPlayerRef.current?.unMute?.()
+    }
+  }, [currentMode, selectedTx, playbackRate, videoVolume, isVideoMuted])
 
   useEffect(() => {
     if (currentMode !== 'video') return;
@@ -781,7 +870,7 @@ export default function MissionHub({
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         setIsUiVisible(false);
-      }, 3500);
+      }, 6500);
     };
 
     handleUserActivity();
@@ -2507,6 +2596,7 @@ export default function MissionHub({
         ? Math.min(100, Math.floor((stampCount / knownVideoDuration) * 100))
         : 0
       const creditedSeconds = Math.floor(creditedWatchSeconds)
+      const shouldShowBottomHud = isBottomActionsOpen && (isUiVisible || isBottomHudInteracting || videoCompleted || isAtEnd || videoTrackingWarning)
 
       return (
           <div className="theater-wrapper">
@@ -2519,6 +2609,8 @@ export default function MissionHub({
                     start={initialStartPosition}
                     end={selectedTx.end}
                     initialPlaybackRate={playbackRate}
+                    initialVolume={videoVolume}
+                    initiallyMuted={isVideoMuted || videoVolume === 0}
                     onTimeUpdate={handleVideoTimeUpdate}
                     onComplete={() => setIsAtEnd(true)}
                     onTrackingStatus={handleVideoTrackingStatus}
@@ -2539,8 +2631,8 @@ export default function MissionHub({
              </div>
 
              {/* Top HUD Overlay */}
-             <div className="theater-hud top-hud" style={{ opacity: isUiVisible ? 1 : 0 }}>
-               <div>
+             <div className="theater-hud top-hud" style={{ opacity: (isUiVisible || isMediaControlsOpen) ? 1 : 0 }}>
+               <div style={{ minWidth: 0, flex: '1 1 560px', maxWidth: isMobile ? '100%' : '980px' }}>
                   {/* Global Back Button Integrated into Top HUD */}
                   <button 
                     className="space-nav-link font-tech"
@@ -2565,6 +2657,155 @@ export default function MissionHub({
                   <h3 className="font-title" style={{ margin: 0, color: '#fff', fontSize: isMobile ? '1rem' : '1.4rem', lineHeight: 1.3, textShadow: '0 2px 5px rgba(0,0,0,0.8)' }}>
                      <span style={{ color: 'var(--planet-green)' }}>📡 {selectedTx.title}</span>
                   </h3>
+                  {isMediaControlsOpen ? (
+                    <div
+                      className="glass"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: isMobile ? '0.5rem' : '0.65rem',
+                        width: 'fit-content',
+                        maxWidth: '100%',
+                        marginTop: '0.8rem',
+                        padding: isMobile ? '0.45rem 3rem 0.45rem 0.45rem' : '0.5rem 3.1rem 0.5rem 0.5rem',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        borderRadius: '10px',
+                        background: 'rgba(0,0,0,0.52)',
+                        boxShadow: '0 4px 18px rgba(0,0,0,0.28)',
+                        position: 'relative'
+                      }}
+                      aria-label="영상 학습 컨트롤"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setIsMediaControlsOpen(false)}
+                        className="glass"
+                        title="배속/음량 닫기"
+                        aria-label="배속/음량 닫기"
+                        style={{
+                          position: 'absolute',
+                          top: '0.45rem',
+                          right: '0.45rem',
+                          width: '2.15rem',
+                          height: '2.15rem',
+                          display: 'grid',
+                          placeItems: 'center',
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          borderRadius: '7px',
+                          background: 'rgba(255,255,255,0.06)',
+                          color: '#fff',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <X size={17} />
+                      </button>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: `repeat(${VIDEO_PLAYBACK_RATES.length}, minmax(${isMobile ? '2.7rem' : '3rem'}, 1fr))`,
+                          gap: '0.25rem',
+                          flex: isMobile ? '1 1 100%' : '0 1 26rem',
+                          minWidth: isMobile ? '100%' : '22rem'
+                        }}
+                        aria-label="영상 재생 속도"
+                      >
+                        {VIDEO_PLAYBACK_RATES.map((rate) => (
+                          <button
+                            key={rate}
+                            type="button"
+                            onClick={() => handlePlaybackRateChange(rate)}
+                            className="font-tech"
+                            title={`${rate}배속으로 재생`}
+                            aria-pressed={playbackRate === rate}
+                            style={{
+                              height: isMobile ? '2.2rem' : '2.15rem',
+                              border: playbackRate === rate ? '1px solid var(--crystal-cyan)' : '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '7px',
+                              background: playbackRate === rate ? 'rgba(0, 243, 255, 0.22)' : 'rgba(255,255,255,0.03)',
+                              color: playbackRate === rate ? '#fff' : 'rgba(255,255,255,0.76)',
+                              cursor: 'pointer',
+                              fontSize: isMobile ? '0.74rem' : '0.78rem',
+                              fontWeight: playbackRate === rate ? 800 : 600
+                            }}
+                          >
+                            {rate}x
+                          </button>
+                        ))}
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          flex: isMobile ? '1 1 100%' : '0 1 14rem',
+                          minWidth: isMobile ? '100%' : '12rem'
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={handleVideoMuteToggle}
+                          className="glass"
+                          title={isVideoMuted || videoVolume === 0 ? '소리 켜기' : '무음'}
+                          aria-label={isVideoMuted || videoVolume === 0 ? '소리 켜기' : '무음'}
+                          style={{
+                            width: '2.25rem',
+                            height: '2.15rem',
+                            display: 'grid',
+                            placeItems: 'center',
+                            border: '1px solid rgba(255,255,255,0.14)',
+                            borderRadius: '7px',
+                            background: 'rgba(255,255,255,0.06)',
+                            color: '#fff',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {isVideoMuted || videoVolume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
+                        </button>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={isVideoMuted ? 0 : videoVolume}
+                          onChange={(event) => handleVideoVolumeChange(event.target.value)}
+                          aria-label="영상 음량"
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            accentColor: 'var(--crystal-cyan)',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <span className="font-tech" style={{ width: '2.5rem', textAlign: 'right', color: 'rgba(255,255,255,0.78)', fontSize: '0.75rem' }}>
+                          {isVideoMuted ? 0 : videoVolume}%
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsMediaControlsOpen(true)}
+                      className="glass font-tech"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        marginTop: '0.8rem',
+                        padding: '0.55rem 0.75rem',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        borderRadius: '10px',
+                        background: 'rgba(0,0,0,0.52)',
+                        color: 'rgba(255,255,255,0.86)',
+                        cursor: 'pointer',
+                        fontSize: '0.78rem',
+                        boxShadow: '0 4px 18px rgba(0,0,0,0.28)'
+                      }}
+                    >
+                      {isVideoMuted || videoVolume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                      배속 {playbackRate}x · 음량 {isVideoMuted ? 0 : videoVolume}%
+                    </button>
+                  )}
                </div>
                <div style={{ display: 'flex', gap: isMobile ? '0.55rem' : '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
                  <AnimatePresence>
@@ -2585,44 +2826,6 @@ export default function MissionHub({
                      인정 학습: {Math.floor(creditedSeconds / 60)}분 {creditedSeconds % 60}초 · 완료율 {completionRate}% / 기준 {completionTargetPercent}%
                    </span>
                  )}
-                 <div
-                   className="glass"
-                   style={{
-                     display: 'flex',
-                     alignItems: 'center',
-                     gap: '0.25rem',
-                     padding: '0.28rem',
-                     border: '1px solid rgba(255,255,255,0.14)',
-                     borderRadius: '10px',
-                     background: 'rgba(0,0,0,0.42)',
-                     boxShadow: '0 4px 18px rgba(0,0,0,0.28)'
-                   }}
-                   aria-label="영상 재생 속도"
-                 >
-                   {VIDEO_PLAYBACK_RATES.map((rate) => (
-                     <button
-                       key={rate}
-                       type="button"
-                       onClick={() => handlePlaybackRateChange(rate)}
-                       className="font-tech"
-                       title={`${rate}배속으로 재생`}
-                       aria-pressed={playbackRate === rate}
-                       style={{
-                         minWidth: isMobile ? '2.4rem' : '2.75rem',
-                         height: isMobile ? '2rem' : '2.15rem',
-                         border: playbackRate === rate ? '1px solid var(--crystal-cyan)' : '1px solid transparent',
-                         borderRadius: '7px',
-                         background: playbackRate === rate ? 'rgba(0, 243, 255, 0.22)' : 'transparent',
-                         color: playbackRate === rate ? '#fff' : 'rgba(255,255,255,0.72)',
-                         cursor: 'pointer',
-                         fontSize: isMobile ? '0.72rem' : '0.78rem',
-                         fontWeight: playbackRate === rate ? 800 : 600
-                       }}
-                     >
-                       {rate}x
-                     </button>
-                   ))}
-                 </div>
                  <button 
                    onClick={returnFromContent} 
                    className="hud-btn glass"
@@ -2636,7 +2839,17 @@ export default function MissionHub({
              {/* Bottom HUD Overlay */}
              <div
                className="theater-hud bottom-hud"
-               style={{ opacity: (isUiVisible || videoCompleted || isAtEnd || videoTrackingWarning) ? 1 : 0, flexDirection: 'column' }}
+               style={{
+                 opacity: shouldShowBottomHud ? 1 : 0,
+                 visibility: shouldShowBottomHud ? 'visible' : 'hidden',
+                 pointerEvents: shouldShowBottomHud ? undefined : 'none',
+                 flexDirection: 'column'
+               }}
+               onPointerEnter={() => setIsBottomHudInteracting(true)}
+               onPointerLeave={() => setIsBottomHudInteracting(false)}
+               onTouchStart={() => setIsBottomHudInteracting(true)}
+               onFocusCapture={() => setIsBottomHudInteracting(true)}
+               onBlurCapture={() => setIsBottomHudInteracting(false)}
              >
                {videoTrackingWarning && (
                  <div
@@ -2659,7 +2872,19 @@ export default function MissionHub({
                    {videoTrackingWarning}
                  </div>
                )}
-               <div style={{ display: 'flex', gap: isMobile ? '0.65rem' : '1rem', justifyContent: 'center', width: '100%', flexDirection: isMobile ? 'column' : 'row' }}>
+               <div
+                 className="video-bottom-actions"
+                 style={{
+                   display: 'flex',
+                   gap: isMobile ? '0.65rem' : '1rem',
+                   justifyContent: 'center',
+                   alignItems: 'center',
+                   width: '100%',
+                   maxWidth: isMobile ? '100%' : '760px',
+                   margin: '0 auto',
+                   flexDirection: isMobile ? 'column' : 'row'
+                 }}
+               >
                  <button 
                    onClick={handleSaveVideoPosition}
                    className="hud-btn secondary glass"
@@ -2720,6 +2945,31 @@ export default function MissionHub({
                  >
                    🎥 Q&amp;A방
                  </button>
+                 <button
+                   type="button"
+                   onClick={() => {
+                     setIsBottomActionsOpen(false)
+                     setIsBottomHudInteracting(false)
+                   }}
+                   className="glass"
+                   title="학습 버튼 닫기"
+                   aria-label="학습 버튼 닫기"
+                   style={{
+                     width: isMobile ? '100%' : '2.75rem',
+                     height: isMobile ? '2.8rem' : '2.75rem',
+                     minWidth: isMobile ? undefined : '2.75rem',
+                     display: 'grid',
+                     placeItems: 'center',
+                     border: '1px solid rgba(255,255,255,0.18)',
+                     borderRadius: isMobile ? '10px' : '999px',
+                     background: 'rgba(0,0,0,0.62)',
+                     color: '#fff',
+                     cursor: 'pointer',
+                     boxShadow: '0 4px 16px rgba(0,0,0,0.35)'
+                   }}
+                 >
+                   <X size={18} />
+                 </button>
                </div>
                
                <AnimatePresence>
@@ -2754,6 +3004,42 @@ export default function MissionHub({
                  </motion.p>
                )}
              </div>
+
+             {!isBottomActionsOpen && (
+               <button
+                 type="button"
+                 onClick={() => {
+                   setIsBottomActionsOpen(true)
+                   setIsUiVisible(true)
+                 }}
+                 className="glass font-tech"
+                 style={{
+                   position: 'absolute',
+                   left: '50%',
+                   bottom: isMobile ? 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' : '1.1rem',
+                   transform: 'translateX(-50%)',
+                   zIndex: 5100,
+                   display: 'inline-flex',
+                   alignItems: 'center',
+                   justifyContent: 'center',
+                   gap: '0.55rem',
+                   minWidth: isMobile ? '9.5rem' : '10.5rem',
+                   minHeight: isMobile ? '3.15rem' : '3.25rem',
+                   padding: isMobile ? '0.8rem 1rem' : '0.8rem 1.1rem',
+                   border: '1px solid rgba(0, 243, 255, 0.72)',
+                   borderRadius: '14px',
+                   background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.34), rgba(34, 211, 238, 0.22))',
+                   color: '#fff',
+                   cursor: 'pointer',
+                   fontSize: isMobile ? '0.92rem' : '0.95rem',
+                   fontWeight: 800,
+                   boxShadow: '0 10px 30px rgba(0,0,0,0.5), 0 0 18px rgba(0, 243, 255, 0.18)',
+                   pointerEvents: 'auto'
+                 }}
+               >
+                 📋 학습 메뉴 열기
+               </button>
+             )}
 
              {/* Time Attack Overlay */}
              {showTimeAttack && (
