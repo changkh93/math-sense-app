@@ -24,7 +24,7 @@ class SoundManager {
       },
       wrong: {
         src: ['/sounds/wrong.mp3', '/sounds/wrong.wav'],
-        volume: this.sfxVolume * 0.8,
+        volume: this.sfxVolume,
       },
       click: {
         src: ['/sounds/click.wav', '/sounds/click.mp3'],
