@@ -438,10 +438,27 @@ async function resolveBattleContext({ clusterId, regionId, entryUnitId }) {
     throw new functions.https.HttpsError("failed-precondition", "현재 과정과 행성 정보가 일치하지 않습니다.");
   }
 
-  const chaptersSnap = await db.collection("chapters").where("regionId", "==", regionId).get();
-  const chapters = chaptersSnap.docs
-    .map((chapter) => ({ id: chapter.id, ...(chapter.data() || {}) }))
+  let chaptersSnap = await db.collection("chapters").where("regionId", "==", regionId).get();
+  // 주의: 문서 data에 내부 id 필드가 있으면 스프레드가 문서 ID(doc.id)를 덮어쓴다.
+  // units.chapterId는 문서 ID를 참조하므로, 여기서는 반드시 docId를 문서 ID로 보존해야 한다.
+  let chapters = chaptersSnap.docs
+    .map((chapter) => ({ ...chapter.data(), docId: chapter.id, id: chapter.id }))
     .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+
+  // 방어: regionId 쿼리가 인덱스/컨시스턴시 지연으로 빈 결과를 반환하는 경우가 있다.
+  // 진입 unit의 chapterId에서 역추적해 region 소속을 확정하고, 같은 region의 chapter
+  // 전체를 다시 확보한다.
+  const entryChapterId = unitSnap.data()?.chapterId || "";
+  if (chapters.length === 0 && entryChapterId) {
+    const entryChapterSnap = await db.collection("chapters").doc(entryChapterId).get();
+    if (entryChapterSnap.exists && cleanId(entryChapterSnap.data()?.regionId) === regionId) {
+      const allChaptersSnap = await db.collection("chapters").get();
+      chapters = allChaptersSnap.docs
+        .map((chapter) => ({ ...chapter.data(), docId: chapter.id, id: chapter.id }))
+        .filter((chapter) => cleanId(chapter.regionId) === regionId)
+        .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+    }
+  }
 
   const unitDocs = [];
   const unitSnaps = await Promise.all(
@@ -449,7 +466,7 @@ async function resolveBattleContext({ clusterId, regionId, entryUnitId }) {
   );
   unitSnaps.forEach((unitsSnap) => {
     unitsSnap.docs
-      .map((unit) => ({ id: unit.id, ...(unit.data() || {}) }))
+      .map((unit) => ({ ...unit.data(), docId: unit.id, id: unit.id }))
       .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
       .forEach((unit) => unitDocs.push(unit));
   });
