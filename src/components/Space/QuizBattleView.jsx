@@ -47,8 +47,15 @@ export default function QuizBattleView({
   const [reveal, setReveal] = useState(false) // 답안 제출 후 정답 공개 단계
   const [reviewMode, setReviewMode] = useState(false) // 결과 화면에서 틀린 문제 복습
   const [reviewIndex, setReviewIndex] = useState(0)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
   const activeTicketRef = useRef('')
   const matchedRef = useRef(false)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     if (!user?.uid) return undefined
@@ -415,24 +422,31 @@ export default function QuizBattleView({
               <div style={{ fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '1.2rem' }}>
                 <MissionMarkdownViewer text={reviewQuestion.question} />
               </div>
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                gap: isMobile ? '0.75rem' : '1rem'
+              }}>
                 {(reviewQuestion.options || []).map(option => {
                   const isMyChoice = mySelectedKeys.includes(option.key)
                   return (
                     <div
                       key={option.key}
+                      className="space-option-btn"
                       style={{
-                        padding: '0.9rem 1rem',
                         textAlign: 'left',
-                        borderRadius: 8,
-                        border: isMyChoice ? '2px solid #f87171' : '1px solid rgba(255,255,255,0.14)',
-                        background: isMyChoice ? 'rgba(248, 113, 113, 0.12)' : 'rgba(255,255,255,0.02)',
-                        color: isMyChoice ? '#f87171' : 'var(--text-muted)',
+                        cursor: 'default',
+                        opacity: isMyChoice ? 1 : 0.72,
+                        ...(isMyChoice ? {
+                          border: '2px solid #f87171',
+                          background: 'rgba(248, 113, 113, 0.18)',
+                          boxShadow: '0 0 12px rgba(248, 113, 113, 0.25)'
+                        } : {}),
                       }}
                     >
                       <MissionMarkdownViewer text={option.text} />
                       {isMyChoice && (
-                        <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', fontWeight: 900 }}>내 선택</span>
+                        <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', fontWeight: 900, color: '#f87171' }}>내 선택</span>
                       )}
                     </div>
                   )
@@ -584,26 +598,36 @@ export default function QuizBattleView({
           </div>
           {!reveal && (
             <>
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                gap: isMobile ? '0.75rem' : '1rem'
+              }}>
                 {(currentQuestion.options || []).map(option => {
                   const selected = selectedKeys.has(option.key)
                   return (
                     <button
                       key={option.key}
                       type="button"
+                      className="space-option-btn"
                       onClick={() => toggleOption(option.key, currentQuestion.multiAnswer)}
                       disabled={isSubmitting || isBattleCompleteForMe}
                       style={{
-                        padding: '0.9rem 1rem',
                         textAlign: 'left',
-                        borderRadius: 8,
-                        border: selected ? '2px solid var(--crystal-cyan)' : '1px solid rgba(255,255,255,0.14)',
-                        background: selected ? 'rgba(0, 243, 255, 0.12)' : 'rgba(255,255,255,0.04)',
-                        color: 'var(--text-bright)',
-                        cursor: 'pointer',
+                        opacity: isSubmitting ? 0.7 : 1,
+                        ...(selected ? {
+                          border: '2px solid var(--crystal-cyan)',
+                          background: 'rgba(0, 243, 255, 0.15)',
+                          boxShadow: '0 0 12px rgba(0, 243, 255, 0.3)'
+                        } : {}),
                       }}
                     >
-                      <MissionMarkdownViewer text={option.text} />
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {currentQuestion.multiAnswer && (
+                          <span style={{ fontSize: '1.1rem' }}>{selected ? '☑' : '☐'}</span>
+                        )}
+                        <MissionMarkdownViewer text={option.text} />
+                      </span>
                     </button>
                   )
                 })}
@@ -616,24 +640,38 @@ export default function QuizBattleView({
             </>
           )}
           {reveal && revealedQuestion && (
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: isMobile ? '0.75rem' : '1rem'
+            }}>
               {(revealedQuestion.options || []).map(option => {
                 const myResult = answerResults[revealedQuestion.questionId] || {}
                 const selectedKeysList = myResult.selectedKeys || []
                 const isMyChoice = selectedKeysList.includes(option.key)
+                const isCorrect = answerResults[revealedQuestion.questionId]?.isCorrect
                 return (
                   <div
                     key={option.key}
+                    className="space-option-btn"
                     style={{
-                      padding: '0.9rem 1rem',
                       textAlign: 'left',
-                      borderRadius: 8,
-                      border: '1px solid rgba(255,255,255,0.14)',
-                      background: 'rgba(255,255,255,0.02)',
-                      color: 'var(--text-muted)',
+                      cursor: 'default',
+                      opacity: isMyChoice ? 1 : 0.72,
+                      ...(isMyChoice ? {
+                        border: '2px solid rgba(0, 243, 255, 0.55)',
+                        background: 'linear-gradient(135deg, rgba(0,243,255,0.16), rgba(96,165,250,0.1))',
+                        boxShadow: '0 0 18px rgba(0, 243, 255, 0.2)'
+                      } : {}),
                     }}
                   >
-                    <MissionMarkdownViewer text={option.text} />
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {isMyChoice && <span style={{ fontSize: '1.1rem' }}>☑</span>}
+                      <MissionMarkdownViewer text={option.text} />
+                    </span>
+                    {isMyChoice && (
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', fontWeight: 900, color: 'var(--crystal-cyan)' }}>내 선택</span>
+                    )}
                   </div>
                 )
               })}
