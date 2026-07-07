@@ -411,12 +411,16 @@ export default function QuizBattleView({
                 틀린 문제 확인 {reviewIndex + 1} / {wrongQuestions.length}
               </div>
               {reviewQuestion.imageUrl && (
-                <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                  <img
-                    src={reviewQuestion.imageUrl}
-                    alt=""
-                    style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 8 }}
-                  />
+                <div className="space-image-card-wrapper" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                  <div className="space-image-card glass-card">
+                    <div className="image-neon-glow"></div>
+                    <img
+                      src={reviewQuestion.imageUrl}
+                      alt="문제"
+                      className="space-question-image"
+                      style={{ maxHeight: isMobile ? '40vh' : '420px' }}
+                    />
+                  </div>
                 </div>
               )}
               <div style={{ fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '1.2rem' }}>
@@ -576,21 +580,29 @@ export default function QuizBattleView({
               : `QUESTION ${Math.min(answeredCount + 1, battle.questionCount)} / ${battle.questionCount}`}
           </div>
           {currentQuestion.imageUrl && !reveal && (
-            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-              <img
-                src={currentQuestion.imageUrl}
-                alt=""
-                style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 8 }}
-              />
+            <div className="space-image-card-wrapper" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+              <div className="space-image-card glass-card">
+                <div className="image-neon-glow"></div>
+                <img
+                  src={currentQuestion.imageUrl}
+                  alt="문제"
+                  className="space-question-image"
+                  style={{ maxHeight: isMobile ? '40vh' : '420px' }}
+                />
+              </div>
             </div>
           )}
           {reveal && revealedQuestion?.imageUrl && (
-            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-              <img
-                src={revealedQuestion.imageUrl}
-                alt=""
-                style={{ maxWidth: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 8 }}
-              />
+            <div className="space-image-card-wrapper" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+              <div className="space-image-card glass-card">
+                <div className="image-neon-glow"></div>
+                <img
+                  src={revealedQuestion.imageUrl}
+                  alt="문제"
+                  className="space-question-image"
+                  style={{ maxHeight: isMobile ? '40vh' : '420px' }}
+                />
+              </div>
             </div>
           )}
           <div style={{ fontSize: '1.1rem', lineHeight: 1.7, marginBottom: '1.2rem' }}>
