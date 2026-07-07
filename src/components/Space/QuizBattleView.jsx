@@ -215,7 +215,7 @@ export default function QuizBattleView({
   const reviewQuestion = wrongQuestions[reviewIndex] || null
 
   const toggleOption = (key, multiAnswer) => {
-    if (isSubmitting || hasAnsweredCurrent || isBattleCompleteForMe) return
+    if (isSubmitting || reveal || isBattleCompleteForMe) return
     setSelectedKeys(prev => {
       const next = new Set(multiAnswer ? prev : [])
       if (next.has(key)) next.delete(key)
