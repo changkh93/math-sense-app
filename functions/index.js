@@ -377,16 +377,32 @@ function getCorrectOptionKeys(quizData = {}) {
     .filter(Boolean);
 }
 
-function sanitizeQuizForBattle(docSnap) {
+function sanitizeQuizForBattle(docSnap, optionShuffleSeed = "") {
   const data = docSnap.data() || {};
-  const options = (Array.isArray(data.options) ? data.options : [])
+  // 1) 원본 옵션과 각각의 정답 여부를 먼저 파악한다.
+  const rawOptions = (Array.isArray(data.options) ? data.options : [])
     .slice(0, 8)
     .map((option, index) => ({
-      key: `o${index}`,
+      originalIndex: index,
       text: getQuizOptionText(option).slice(0, 500),
     }))
     .filter((option) => option.text);
-  const correctKeys = getCorrectOptionKeys(data);
+
+  const correctOriginalIndices = new Set(getCorrectOptionKeys(data).map((key) => Number(key.slice(1))));
+
+  // 2) 옵션을 섞는다. seed 기반 결정적 셔플을 써야 옵션과 정답 키가 일치한다.
+  //    같은 문제라도 배틀마다(=seed마다) 정답 위치가 달라져 위치 외우기가 무효화된다.
+  const indexedWithOptions = rawOptions.map((opt, i) => ({ i, opt }));
+  const shuffled = shuffleBattleItems(indexedWithOptions, optionShuffleSeed);
+
+  // 3) 섞인 순서대로 새 키(o0, o1, ...)를 부여하고, 정답 키를 재계산한다.
+  const options = shuffled.map(({ opt }, newIndex) => ({
+    key: `o${newIndex}`,
+    text: opt.text,
+  }));
+  const correctKeys = shuffled
+    .map(({ opt }, newIndex) => (correctOriginalIndices.has(opt.originalIndex) ? `o${newIndex}` : null))
+    .filter(Boolean);
 
   return {
     questionId: docSnap.id,
@@ -505,7 +521,8 @@ async function buildBattleQuestionSet(context, commonCeilingOrdinal, questionCou
   quizSnaps.forEach((snap, index) => {
     const unit = eligibleUnits[index];
     snap.docs.forEach((quizDoc) => {
-      const sanitized = sanitizeQuizForBattle(quizDoc);
+      // 문제별로 고유한 seed를 줘 같은 문제라도 배틀마다 옵션 순서가 다르게 섞이게 한다.
+      const sanitized = sanitizeQuizForBattle(quizDoc, `${seed}_${quizDoc.id}`);
       if (sanitized.question && sanitized.options.length >= 2 && getCorrectOptionKeys(quizDoc.data() || {}).length > 0) {
         quizDocs.push({
           ...sanitized,
@@ -711,10 +728,110 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       alreadyFinalized: false,
       winnerUid: rewardResult.winnerUid,
       rewards: rewardResult.rewards,
+      participantUids,
+      questionSet: battleData.questionSet || [],
+      regionId: battleData.regionId || "",
+      regionTitle: battleData.regionTitle || "",
+      clusterId: battleData.clusterId || "",
     };
   });
 
+  // 정산 트랜잭션 이후: 각 참가자가 틀린 문제를 다크매터(users/{uid}/incorrect_questions)에
+  // 등록한다. 트랜잭션 안에서 answers 서브컬렉션을 읽으면 트랜잭션이 무거워지므로
+  // 트랜잭션 밖에서 batch write로 처리한다. 이미 종료된 배틀은 건너뛴다.
+  if (result && !result.alreadyFinalized) {
+    try {
+      await registerBattleWrongAnswers({
+        db,
+        battleRef,
+        participantUids: result.participantUids,
+        questionSet: result.questionSet,
+        regionId: result.regionId,
+        regionTitle: result.regionTitle,
+        clusterId: result.clusterId,
+      });
+    } catch (err) {
+      console.warn("registerBattleWrongAnswers failed", err);
+    }
+  }
+
   return result;
+}
+
+/**
+ * 배틀에서 각 참가자가 틀린 문제를 users/{uid}/incorrect_questions에 등록한다.
+ * 필드 테스트의 SpaceHome.handleComplete 등록 경로와 동일한 컬렉션/문서 구조를
+ * 사용해 다크매터 행성에서 자연스럽게 복습할 수 있게 한다.
+ */
+async function registerBattleWrongAnswers({ db, battleRef, participantUids, questionSet, regionId, regionTitle, clusterId }) {
+  if (!Array.isArray(participantUids) || participantUids.length === 0 || !Array.isArray(questionSet)) return;
+
+  // questionId -> question 메타데이터 맵 (unitId, unitTitle, chapterId 등)
+  const questionMetaById = new Map();
+  questionSet.forEach((q) => {
+    if (q && q.questionId) {
+      questionMetaById.set(q.questionId, {
+        questionId: q.questionId,
+        sourceQuestionId: q.sourceQuestionId || q.questionId,
+        unitId: q.unitId || "",
+        unitTitle: q.unitTitle || "",
+        chapterId: q.chapterId || "",
+      });
+    }
+  });
+
+  const batch = db.batch();
+  let hasOps = false;
+
+  for (const uid of participantUids) {
+    // 이 참가자의 모든 답안 중 오답만 수집
+    const answersSnap = await battleRef.collection("answers")
+      .where("uid", "==", uid)
+      .where("isCorrect", "==", false)
+      .get();
+    answersSnap.docs.forEach((answerDoc) => {
+      const answer = answerDoc.data() || {};
+      const questionId = answer.questionId || "";
+      if (!questionId) return;
+      // 실제 quizzes 컬렉션에 존재하는 문제 ID(=sourceQuestionId)로 등록해야
+      // 다크매터 hydrate 시 정상 로드된다.
+      const meta = questionMetaById.get(questionId) || {};
+      const docId = meta.sourceQuestionId || questionId;
+      const ref = db.collection("users").doc(uid).collection("incorrect_questions").doc(docId);
+      batch.set(ref, {
+        id: docId,
+        questionId,
+        unitId: meta.unitId || "",
+        unitTitle: meta.unitTitle || "",
+        chapterId: meta.chapterId || "",
+        regionId,
+        regionTitle,
+        clusterId,
+        source: "quiz_battle",
+        lastFailedAt: FieldValue.serverTimestamp(),
+        failCount: FieldValue.increment(1),
+      }, { merge: true });
+      hasOps = true;
+    });
+
+    // 맞힌 문제는 incorrect_questions에서 제거해 과거 오답이 정화된 상태로 유지
+    const correctSnap = await battleRef.collection("answers")
+      .where("uid", "==", uid)
+      .where("isCorrect", "==", true)
+      .get();
+    correctSnap.docs.forEach((answerDoc) => {
+      const answer = answerDoc.data() || {};
+      const questionId = answer.questionId || "";
+      if (!questionId) return;
+      const meta = questionMetaById.get(questionId) || {};
+      const docId = meta.sourceQuestionId || questionId;
+      const ref = db.collection("users").doc(uid).collection("incorrect_questions").doc(docId);
+      batch.delete(ref);
+      hasOps = true;
+    });
+  }
+
+  if (hasOps) await batch.commit();
 }
 
 /**

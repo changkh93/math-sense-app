@@ -467,7 +467,7 @@ export default function QuizBattleView({
                   fontWeight: 900,
                 }}
               >
-                오답입니다. 다시 풀어 보세요.
+                오답입니다. 다크매터 행성에서 다시 풀어 보세요.
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
                 <button className="hud-btn secondary glass" onClick={() => { setReviewMode(false); setReviewIndex(0) }} style={{ padding: '0.8rem 1.2rem' }}>
@@ -707,7 +707,7 @@ export default function QuizBattleView({
               {answerResults[revealedQuestion?.questionId]?.isCorrect ? '정답입니다!' : '아쉽지만 오답입니다.'}
               {!answerResults[revealedQuestion?.questionId]?.isCorrect && (
                 <span style={{ display: 'block', marginTop: '0.4rem', fontWeight: 600, fontSize: '0.9rem' }}>
-                  다음 문제로 넘어가세요.
+                  이 문제는 다크매터 행성에 등록됩니다. 다음 문제로 넘어가세요.
                 </span>
               )}
             </div>
