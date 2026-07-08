@@ -13,6 +13,7 @@ const OPERATOR_GIFT_EMAIL = 'paul@dulcine.net'
 // Transaction type configs
 const TX_CONFIG = {
   quiz_reward: { icon: '🪐', label: '탐사 보상', color: '#4ade80' },
+  quiz_battle_reward: { icon: '⚔️', label: '퀴즈 배틀 보상', color: '#fbbf24' },
   data_log_reward: { icon: '📄', label: '데이터 로그 보상', color: '#00f3ff' },
   code_trace_reward: { icon: '⌨️', label: '코드 따라쓰기 보상', color: '#22d3ee' },
   code_trace_exercise_reward: { icon: '⌨️', label: 'CODE TRACE 통과 보상', color: '#a78bfa' },
@@ -790,6 +791,18 @@ export default function CrystalLedger({ userData }) {
                 <li>오답 시 광석 유실 <span style={{color: '#f87171'}}>(1회차 -2, 2회차 -4...)</span></li>
                 <li>언제든 <span style={{color: 'var(--crystal-cyan)'}}>100점 달성 가능</span></li>
                 <li>오답 시 <span style={{color: '#f87171'}}>복구 대기(3~9초)</span> 발생</li>
+              </ul>
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ color: '#fbbf24', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.2em' }}>⚔️</span> 퀴즈 배틀
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                <li>승리 시 <span style={{color: 'var(--text-bright)'}}>+20</span> 보너스 + 정답당 <span style={{color: 'var(--text-bright)'}}>+2</span> 광석</li>
+                <li>패배해도 완주하면 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
+                <li>무승부 시 양쪽 모두 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
+                <li>중도 포기 시 <span style={{color: '#f87171'}}>보상 없음</span></li>
               </ul>
             </div>
             

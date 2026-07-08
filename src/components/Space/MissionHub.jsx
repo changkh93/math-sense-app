@@ -703,6 +703,7 @@ export default function MissionHub({
     const savedMode = sessionStorage.getItem(`metasense_hub_mode_${unitId}`);
     return savedMode || (initialMode === 'quiz-modal' ? 'briefing' : initialMode);
   });
+  const [battleSessionKey, setBattleSessionKey] = useState(0)
 
   // Persistence for mode
   const updateCurrentMode = (mode) => {
@@ -2129,6 +2130,9 @@ export default function MissionHub({
       setShowFieldTestModal(true)
       return
     }
+    if (mode === 'battle') {
+      setBattleSessionKey(prev => prev + 1)
+    }
     updateCurrentMode(mode)
     if (mode === 'text' || mode === 'video') {
        logActivity(`view_${mode}`)
@@ -2597,6 +2601,9 @@ export default function MissionHub({
         ? Math.min(100, Math.floor((stampCount / knownVideoDuration) * 100))
         : 0
       const creditedSeconds = Math.floor(creditedWatchSeconds)
+      const savedTxProgress = learningProgress?.videoProgress?.[txId]
+      const hasUnsavedVideoCompletion = videoCompleted && !savedTxProgress?.completed
+      const hasActiveCompletionBonus = hasUnsavedVideoCompletion && completionBonusTimeLeft !== null && completionBonusTimeLeft > 0
       const shouldShowBottomHud = isBottomActionsOpen && (isUiVisible || isBottomHudInteracting || videoCompleted || isAtEnd || videoTrackingWarning)
 
       return (
@@ -2903,7 +2910,7 @@ export default function MissionHub({
                    }}
                  >
                    {videoCompleted ? (
-                     learningProgress?.videoProgress?.[txId]?.completed ? (
+                     savedTxProgress?.completed ? (
                        <>✅ 탐사 완료 (돌아가기)</>
                      ) : (
                         completionBonusTimeLeft > 0 ? (
@@ -3014,10 +3021,16 @@ export default function MissionHub({
                <button
                  type="button"
                  onClick={() => {
+                   if (hasUnsavedVideoCompletion) {
+                     handleSaveVideoPosition()
+                     return
+                   }
                    setIsBottomActionsOpen(true)
                    setIsUiVisible(true)
                  }}
                  className="glass font-tech"
+                 title={hasUnsavedVideoCompletion ? '완료 보너스 받기' : '학습 메뉴 열기'}
+                 aria-label={hasUnsavedVideoCompletion ? '완료 보너스 받기' : '학습 메뉴 열기'}
                  style={{
                    position: 'absolute',
                    left: '50%',
@@ -3028,21 +3041,33 @@ export default function MissionHub({
                    alignItems: 'center',
                    justifyContent: 'center',
                    gap: '0.55rem',
-                   minWidth: isMobile ? '9.5rem' : '10.5rem',
+                   minWidth: hasUnsavedVideoCompletion ? (isMobile ? '13rem' : '14rem') : (isMobile ? '9.5rem' : '10.5rem'),
                    minHeight: isMobile ? '3.15rem' : '3.25rem',
                    padding: isMobile ? '0.8rem 1rem' : '0.8rem 1.1rem',
-                   border: '1px solid rgba(0, 243, 255, 0.72)',
+                   border: hasUnsavedVideoCompletion ? '1px solid rgba(0, 255, 136, 0.82)' : '1px solid rgba(0, 243, 255, 0.72)',
                    borderRadius: '14px',
-                   background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.34), rgba(34, 211, 238, 0.22))',
+                   background: hasUnsavedVideoCompletion
+                     ? 'linear-gradient(135deg, rgba(0, 255, 136, 0.34), rgba(255, 209, 102, 0.22))'
+                     : 'linear-gradient(135deg, rgba(0, 243, 255, 0.34), rgba(34, 211, 238, 0.22))',
                    color: '#fff',
                    cursor: 'pointer',
                    fontSize: isMobile ? '0.92rem' : '0.95rem',
                    fontWeight: 800,
-                   boxShadow: '0 10px 30px rgba(0,0,0,0.5), 0 0 18px rgba(0, 243, 255, 0.18)',
+                   boxShadow: hasUnsavedVideoCompletion
+                     ? '0 10px 30px rgba(0,0,0,0.5), 0 0 22px rgba(0, 255, 136, 0.22)'
+                     : '0 10px 30px rgba(0,0,0,0.5), 0 0 18px rgba(0, 243, 255, 0.18)',
                    pointerEvents: 'auto'
                  }}
                >
-                 📋 학습 메뉴 열기
+                 {hasUnsavedVideoCompletion ? (
+                   hasActiveCompletionBonus ? (
+                     <>✨ 완료 보너스 받기 · {completionBonusTimeLeft}초</>
+                   ) : (
+                     <>☑️ 학습 완료 저장</>
+                   )
+                 ) : (
+                   <>📋 학습 메뉴 열기</>
+                 )}
                </button>
              )}
 
@@ -3191,6 +3216,7 @@ export default function MissionHub({
   if (currentMode === 'battle') {
     return (
       <QuizBattleView
+        key={`${unitId}_${battleSessionKey}`}
         clusterId={clusterId}
         regionId={regionId}
         entryUnitId={unitId}

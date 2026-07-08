@@ -8,6 +8,13 @@ import MissionMarkdownViewer from './MissionMarkdownViewer'
 import soundManager from '../../utils/SoundManager'
 
 const QUESTION_COUNT = 15
+const MotionDiv = motion.div
+const BATTLE_SCOPE_UNIT = 'unit'
+const BATTLE_SCOPE_CUMULATIVE = 'cumulative'
+const BATTLE_SCOPE_LABELS = {
+  [BATTLE_SCOPE_UNIT]: '현재 유닛만',
+  [BATTLE_SCOPE_CUMULATIVE]: '이전 과정 전체',
+}
 
 const getParticipant = (battle, uid) => battle?.participants?.[uid] || {}
 
@@ -38,6 +45,10 @@ export default function QuizBattleView({
   const [selectedKeys, setSelectedKeys] = useState(new Set())
   const [answerResults, setAnswerResults] = useState({})
   const [battleStats, setBattleStats] = useState(null)
+  const [battleScope, setBattleScope] = useState(BATTLE_SCOPE_CUMULATIVE)
+  const [queueTickets, setQueueTickets] = useState([])
+  const [isLoadingQueue, setIsLoadingQueue] = useState(false)
+  const [queueListExpanded, setQueueListExpanded] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
@@ -50,6 +61,8 @@ export default function QuizBattleView({
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
   const activeTicketRef = useRef('')
   const matchedRef = useRef(false)
+  const autoFinalizeBattleRef = useRef('')
+  const cancelQueueRef = useRef(null)
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768)
@@ -67,12 +80,33 @@ export default function QuizBattleView({
     return () => unsubscribe()
   }, [user?.uid])
 
-  const joinQueue = useCallback(async ({ silent = false } = {}) => {
+  const loadQueueTickets = useCallback(async ({ silent = false } = {}) => {
+    if (!user?.uid || !clusterId || !regionId || !entryUnitId) return
+    if (!silent) setIsLoadingQueue(true)
+    try {
+      const listQueue = httpsCallable(functions, 'listQuizBattleQueue')
+      const res = await listQueue({ clusterId, regionId, entryUnitId })
+      setQueueTickets(Array.isArray(res.data?.tickets) ? res.data.tickets : [])
+    } catch (err) {
+      if (!silent) setError(err?.message || '배틀 대기자 목록을 불러오지 못했습니다.')
+    } finally {
+      if (!silent) setIsLoadingQueue(false)
+    }
+  }, [clusterId, entryUnitId, regionId, user?.uid])
+
+  useEffect(() => {
+    if (phase !== 'idle') return undefined
+    loadQueueTickets()
+    return undefined
+  }, [loadQueueTickets, phase])
+
+  const joinQueue = useCallback(async ({ silent = false, targetTicketId = '' } = {}) => {
     if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
     setIsJoining(true)
-    if (!silent) {
+    if (!silent && !targetTicketId) {
       setError('')
-      setPhase('waiting')
+    } else if (!silent) {
+      setError('')
     }
 
     try {
@@ -81,42 +115,53 @@ export default function QuizBattleView({
         clusterId,
         regionId,
         entryUnitId,
+        battleScope,
+        targetTicketId,
+        ticketId: activeTicketRef.current || ticketId,
         questionCount: QUESTION_COUNT,
       })
       const data = res.data || {}
       if (data.status === 'matched' && data.battleId) {
         matchedRef.current = true
         setBattleId(data.battleId)
+        setQueueTickets([])
         setPhase('active')
         soundManager.playCrystal()
       } else {
-        activeTicketRef.current = data.ticketId || `${user.uid}_${regionId}`
+        matchedRef.current = false
+        activeTicketRef.current = data.ticketId || activeTicketRef.current || ticketId
         setTicketId(activeTicketRef.current)
         setPhase('waiting')
       }
     } catch (err) {
       setError(err?.message || '배틀 대기룸에 입장하지 못했습니다.')
       setPhase('idle')
+      if (targetTicketId) loadQueueTickets({ silent: true })
     } finally {
       setIsJoining(false)
     }
-  }, [clusterId, entryUnitId, isJoining, regionId, user?.uid])
+  }, [battleScope, clusterId, entryUnitId, isJoining, loadQueueTickets, regionId, ticketId, user?.uid])
 
-  const cancelQueue = useCallback(async () => {
-    if (!regionId || matchedRef.current) return
+  const cancelQueue = useCallback(async ({ allowMatched = false, throwOnError = false } = {}) => {
+    if (!regionId || (!allowMatched && matchedRef.current)) return null
     try {
       const cancel = httpsCallable(functions, 'cancelQuizBattleQueue')
-      await cancel({ regionId })
+      const res = await cancel({ regionId, ticketId: activeTicketRef.current || ticketId })
+      return res.data || null
     } catch (err) {
       console.warn('Failed to cancel quiz battle queue', err)
+      if (throwOnError) throw err
+      return null
     }
-  }, [regionId])
+  }, [regionId, ticketId])
 
   useEffect(() => {
-    return () => {
-      cancelQueue()
-    }
+    cancelQueueRef.current = cancelQueue
   }, [cancelQueue])
+
+  useEffect(() => () => {
+    cancelQueueRef.current?.()
+  }, [])
 
   useEffect(() => {
     if (phase !== 'waiting' || !ticketId) return undefined
@@ -168,7 +213,11 @@ export default function QuizBattleView({
       const sanitized = {
         ...raw,
         questionSet: Array.isArray(raw.questionSet)
-          ? raw.questionSet.map(({ correctKeys: _omit, ...rest }) => rest)
+          ? raw.questionSet.map((question) => {
+            const sanitizedQuestion = { ...question }
+            delete sanitizedQuestion.correctKeys
+            return sanitizedQuestion
+          })
           : raw.questionSet,
       }
       setBattle({ id: snap.id, ...sanitized })
@@ -187,7 +236,7 @@ export default function QuizBattleView({
   const myParticipant = getParticipant(battle, user?.uid)
   const opponentUid = getOpponentUid(battle, user?.uid)
   const opponentParticipant = getParticipant(battle, opponentUid)
-  const questionSet = battle?.questionSet || []
+  const questionSet = useMemo(() => battle?.questionSet || [], [battle?.questionSet])
   const answeredCount = Number(myParticipant.answeredCount || 0)
   const currentIndex = Math.min(answeredCount, Math.max(0, questionSet.length - 1))
   const currentQuestion = questionSet[currentIndex]
@@ -198,6 +247,46 @@ export default function QuizBattleView({
   const isBattleFinished = battle?.status === 'finished'
   const isBattleCompleteForMe = questionSet.length > 0 && answeredCount >= questionSet.length
   const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
+
+  useEffect(() => {
+    if (!battleId || !user?.uid || questionSet.length === 0) return undefined
+
+    let cancelled = false
+    const loadMyAnswers = async () => {
+      try {
+        const answerSnaps = await Promise.all(
+          questionSet.map((question) => (
+            getDoc(doc(db, 'quizBattles', battleId, 'answers', `${user.uid}_${question.questionId}`))
+              .catch(() => null)
+          ))
+        )
+        if (cancelled) return
+
+        const restored = {}
+        answerSnaps.forEach((snap, index) => {
+          if (!snap?.exists?.()) return
+          const data = snap.data() || {}
+          const questionId = data.questionId || questionSet[index]?.questionId
+          if (!questionId) return
+          restored[questionId] = {
+            ...data,
+            selectedKeys: Array.isArray(data.selectedOptionKeys) ? data.selectedOptionKeys : [],
+          }
+        })
+
+        if (Object.keys(restored).length > 0) {
+          setAnswerResults(prev => ({ ...prev, ...restored }))
+        }
+      } catch (err) {
+        console.warn('Failed to restore battle answers', err)
+      }
+    }
+
+    loadMyAnswers()
+    return () => {
+      cancelled = true
+    }
+  }, [battleId, questionSet, user?.uid])
 
   const resultSummary = useMemo(() => {
     if (!battle || !user?.uid) return null
@@ -281,6 +370,58 @@ export default function QuizBattleView({
     }
   }
 
+  useEffect(() => {
+    if (!battleId || !battle || isBattleFinished || !timeExpired) return
+    if (autoFinalizeBattleRef.current === battleId) return
+
+    let cancelled = false
+    autoFinalizeBattleRef.current = battleId
+    setIsFinalizing(true)
+    setError('')
+
+    const run = async () => {
+      try {
+        const finalize = httpsCallable(functions, 'finalizeQuizBattle')
+        await finalize({ battleId })
+      } catch (err) {
+        console.warn('Auto finalize quiz battle failed', err)
+        if (!cancelled) {
+          autoFinalizeBattleRef.current = ''
+          setError(err?.message || '제한 시간이 종료되었지만 배틀 정산에 실패했습니다. 다시 시도해 주세요.')
+        }
+      } finally {
+        if (!cancelled) setIsFinalizing(false)
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [battle, battleId, isBattleFinished, timeExpired])
+
+  const handleSoloQuiz = async () => {
+    if (isLeaving) return
+    if (phase !== 'waiting') {
+      onSoloQuiz?.()
+      return
+    }
+
+    setIsLeaving(true)
+    setError('')
+    try {
+      await cancelQueue({ allowMatched: true, throwOnError: true })
+      matchedRef.current = false
+      setTicketId('')
+      activeTicketRef.current = ''
+      onSoloQuiz?.()
+    } catch (err) {
+      setError(err?.message || '대기 취소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    } finally {
+      setIsLeaving(false)
+    }
+  }
+
   const leaveBattle = async () => {
     if (isLeaving) return
     // 진행 중인 배틀에서 나갈 때는 서버에 포기를 알려 상대방이 즉시 결과를 볼 수 있게 한다.
@@ -312,17 +453,52 @@ export default function QuizBattleView({
   }
 
   if (phase === 'idle') {
+    const showQueueList = queueTickets.length > 0 && (!isMobile || queueListExpanded)
     return (
       <div className="space-bg" style={panelStyle}>
-        <div className="glass-card hud-border" style={{ width: 'min(720px, 100%)', padding: '2rem', textAlign: 'center' }}>
+        <div className="glass-card hud-border" style={{ width: 'min(860px, 100%)', padding: isMobile ? '1.25rem' : '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚔️</div>
           <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.75rem' }}>QUIZ BATTLE</h2>
           <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             같은 행성의 배틀 대기룸에 입장합니다.<br />
-            매칭되면 공통 학습 범위에서 15문제가 출제됩니다.
+            대기자를 선택하면 해당 대기방의 범위로 바로 배틀합니다.
           </p>
           <div style={{ color: 'var(--crystal-cyan)', marginBottom: '1.5rem', fontWeight: 800 }}>
             진입 미션: {entryUnitTitle || entryUnitId}
+          </div>
+          <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.5rem', textAlign: 'center' }}>
+              새 대기방 범위 선택
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '0.6rem' }}>
+              {[
+                [BATTLE_SCOPE_CUMULATIVE, '상대와 공통으로 배운 이전 과정 전체에서 출제'],
+                [BATTLE_SCOPE_UNIT, '현재 진입 미션 유닛 문제만 출제'],
+              ].map(([scope, description]) => {
+                const selected = battleScope === scope
+                return (
+                  <button
+                    key={scope}
+                    type="button"
+                    className="hud-btn glass"
+                    onClick={() => setBattleScope(scope)}
+                    style={{
+                      padding: '0.8rem 1rem',
+                      borderColor: selected ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.12)',
+                      background: selected ? 'rgba(0, 243, 255, 0.12)' : 'rgba(255,255,255,0.05)',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ color: selected ? 'var(--crystal-cyan)' : 'var(--text-bright)', fontWeight: 900 }}>
+                      {BATTLE_SCOPE_LABELS[scope]}
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.45 }}>
+                      {description}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <div
             style={{
@@ -344,12 +520,126 @@ export default function QuizBattleView({
               </div>
             ))}
           </div>
+          <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+            <div
+              style={{
+                width: '100%',
+                padding: '0.8rem 1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.8rem',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.14)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (isMobile) setQueueListExpanded(prev => !prev)
+                }}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  border: 0,
+                  background: 'transparent',
+                  color: 'var(--text-bright)',
+                  textAlign: 'left',
+                  cursor: isMobile ? 'pointer' : 'default',
+                  font: 'inherit',
+                  padding: 0,
+                }}
+              >
+                같은 행성 대기자 {isLoadingQueue ? '확인 중...' : `${queueTickets.length}명`}
+                {isMobile && queueTickets.length > 0 && (
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginLeft: '0.45rem' }}>
+                    {showQueueList ? '접기' : '보기'}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => loadQueueTickets()}
+                disabled={isLoadingQueue}
+                className="font-tech"
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  color: isLoadingQueue ? 'var(--text-muted)' : 'var(--crystal-cyan)',
+                  cursor: isLoadingQueue ? 'default' : 'pointer',
+                  fontWeight: 900,
+                  padding: '0.15rem 0',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                새로 고침
+              </button>
+            </div>
+            {showQueueList && (
+              <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.6rem', maxHeight: isMobile ? '34vh' : '260px', overflowY: 'auto' }}>
+                {queueTickets.map((ticket) => (
+                  <div
+                    key={ticket.ticketId}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: isMobile ? '1fr' : '1fr auto',
+                      gap: '0.7rem',
+                      alignItems: 'center',
+                      padding: '0.85rem 1rem',
+                      borderRadius: 8,
+                      background: 'rgba(255,255,255,0.045)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+                        <span style={{ color: 'var(--text-bright)', fontWeight: 900 }}>{ticket.displayName || '탐사원'}</span>
+                        <span
+                          className="font-tech"
+                          style={{
+                            color: ticket.battleScope === BATTLE_SCOPE_UNIT ? 'var(--star-gold)' : 'var(--crystal-cyan)',
+                            fontSize: '0.72rem',
+                            padding: '0.16rem 0.45rem',
+                            borderRadius: 999,
+                            border: '1px solid rgba(255,255,255,0.14)',
+                            background: 'rgba(0,0,0,0.18)',
+                          }}
+                        >
+                          {BATTLE_SCOPE_LABELS[ticket.battleScope] || BATTLE_SCOPE_LABELS[BATTLE_SCOPE_CUMULATIVE]}
+                        </span>
+                        <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                          {ticket.questionCount || QUESTION_COUNT}문제
+                        </span>
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.86rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+                        {ticket.entryUnitTitle || '퀴즈 유닛'} 대기 중
+                      </div>
+                    </div>
+                    <button
+                      className="hud-btn primary glass"
+                      onClick={() => joinQueue({ targetTicketId: ticket.ticketId })}
+                      disabled={isJoining}
+                      style={{ padding: '0.72rem 1rem', whiteSpace: 'nowrap' }}
+                    >
+                      바로 배틀
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!isLoadingQueue && queueTickets.length === 0 && (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', marginTop: '0.65rem' }}>
+                지금은 같은 행성에 대기 중인 학생이 없습니다.
+              </div>
+            )}
+          </div>
           {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className="hud-btn primary glass" onClick={() => joinQueue()} disabled={isJoining} style={{ padding: '0.9rem 1.4rem' }}>
               {isJoining ? '대기룸 접속 중...' : '배틀 대기룸 입장'}
             </button>
-            <button className="hud-btn secondary glass" onClick={onSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
+            <button className="hud-btn secondary glass" onClick={handleSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
               혼자 FIELD TEST
             </button>
             <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
@@ -365,22 +655,37 @@ export default function QuizBattleView({
     return (
       <div className="space-bg" style={panelStyle}>
         <div className="glass-card hud-border" style={{ width: 'min(720px, 100%)', padding: '2rem', textAlign: 'center' }}>
-          <motion.div
+          <MotionDiv
             animate={{ rotate: 360 }}
             transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
             style={{ fontSize: '3.5rem', marginBottom: '1rem' }}
           >
             🛰️
-          </motion.div>
+          </MotionDiv>
           <h2 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.8rem' }}>배틀 상대 탐색 중</h2>
           <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             같은 행성의 대기룸에 들어온 탐사원을 찾고 있습니다.<br />
             대기 상태는 자동으로 갱신됩니다.
           </p>
+          <div
+            className="font-tech"
+            style={{
+              display: 'inline-block',
+              marginBottom: '1.25rem',
+              padding: '0.35rem 0.75rem',
+              borderRadius: 999,
+              color: battleScope === BATTLE_SCOPE_UNIT ? 'var(--star-gold)' : 'var(--crystal-cyan)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              background: 'rgba(255,255,255,0.06)',
+              fontSize: '0.8rem',
+            }}
+          >
+            {BATTLE_SCOPE_LABELS[battleScope]}
+          </div>
           {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="hud-btn secondary glass" onClick={onSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
-              혼자 FIELD TEST로 전환
+            <button className="hud-btn secondary glass" onClick={handleSoloQuiz} disabled={isLeaving} style={{ padding: '0.9rem 1.4rem' }}>
+              {isLeaving ? '대기 취소 중...' : '혼자 FIELD TEST로 전환'}
             </button>
             <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
               대기 취소
@@ -661,7 +966,6 @@ export default function QuizBattleView({
                 const myResult = answerResults[revealedQuestion.questionId] || {}
                 const selectedKeysList = myResult.selectedKeys || []
                 const isMyChoice = selectedKeysList.includes(option.key)
-                const isCorrect = answerResults[revealedQuestion.questionId]?.isCorrect
                 return (
                   <div
                     key={option.key}
