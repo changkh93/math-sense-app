@@ -35,10 +35,26 @@ const restoreLostLatexCommandSlashes = (text) => {
 
 export const normalizeEscapedNewlines = (text) => {
   if (!text || typeof text !== 'string') return text;
-  return text
+  // 인라인 코드(`...`) 영역 안의 \\n 같은 리터럴은 변환하면 안 된다.
+  // 코드 표기 자체가 정답인 경우(예: 파일 입출력 단원의 "\\n") 텍스트가 사라지기 때문이다.
+  // 백틱 구간을 자리표시자로 빼두고, 변환 후에 원래 값으로 복원한다.
+  // 토큰엔 일반 텍스트에 절대 들어가지 않을 연속 기호를 쓴다.
+  const CODE_TOKEN_START = '@@INLINECODE_';
+  const codeSegments = [];
+  const withPlaceholders = text.replace(/`[^`]*`/g, (match) => {
+    const token = `${CODE_TOKEN_START}${codeSegments.length}@@`;
+    codeSegments.push(match);
+    return token;
+  });
+
+  const normalized = withPlaceholders
     .replace(/\\r\\n/g, '\n')
     .replace(/\\n(?![a-zA-Z])/g, '\n')
     .replace(/\\r(?![a-zA-Z])/g, '\n');
+
+  return codeSegments.length
+    ? normalized.replace(/@@INLINECODE_(\d+)@@/g, (_, index) => codeSegments[Number(index)] || '')
+    : normalized;
 };
 
 /**
@@ -279,8 +295,32 @@ export const parseInlineFormatting = (text, options = {}) => {
       );
     }
 
-    // 2. Split by Links: [text](url)
-    const linkParts = bmPart.split(/(\[.*?\]\(.*?\))/g);
+    // 2. Split by inline code: `code` (코드 표기가 정답인 경우 등 \\n 리터럴 보존)
+    const codeParts = bmPart.split(/(`[^`]*`)/g);
+    return codeParts.flatMap((cPart, cIndex) => {
+      if (cPart.startsWith('`') && cPart.endsWith('`') && cPart.length >= 2) {
+        return (
+          <code
+            key={`${keyPrefix}-code-${bmIndex}-${cIndex}`}
+            className="inline-code"
+            style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              backgroundColor: 'rgba(148, 163, 184, 0.16)',
+              color: 'var(--neon-blue, #38bdf8)',
+              padding: '0.12em 0.4em',
+              borderRadius: '5px',
+              fontSize: '0.92em',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {cPart.slice(1, -1)}
+          </code>
+        );
+      }
+
+    // 3. Split by Links: [text](url)
+    const linkParts = cPart.split(/(\[.*?\]\(.*?\))/g);
     
     return linkParts.flatMap((lPart, lIndex) => {
     // Check if it's a link match
@@ -364,6 +404,7 @@ export const parseInlineFormatting = (text, options = {}) => {
           });
       });
     });
+    }); // codeParts.flatMap 닫기
   });
 });
 };
