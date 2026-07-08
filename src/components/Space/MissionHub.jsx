@@ -901,7 +901,8 @@ export default function MissionHub({
       videoId: contextType === 'video' ? selectedTx?.videoId : null,
       startTime: contextType === 'video' ? Math.floor(lastVideoTimeRef.current || 0) : null,
       pdfUrl: contextType === 'datalog' ? missionData?.learningContents?.pdfUrl : null,
-      captureRootSelector: '#mission-hub-capture-area'
+      captureRootSelector: '#mission-hub-capture-area',
+      captureSelector: contextType === 'video' ? '#mission-video-capture-area' : '#mission-hub-capture-area'
     })
     setIsQuestionModalOpen(true)
   }
@@ -2600,7 +2601,11 @@ export default function MissionHub({
 
       return (
           <div className="theater-wrapper">
-             <div className="theater-aspect-box">
+             <div
+               id="mission-video-capture-area"
+               className="theater-aspect-box"
+               data-capture-target="video-player"
+             >
                {initialStartPosition !== null ? (
                  <YoutubePlayer 
                     ref={videoPlayerRef}

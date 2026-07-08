@@ -337,7 +337,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
   // screenshot down to just the on-screen rect of the learning content.
   const getCropTargetRect = () => {
     const candidates = [
+      activeContext?.captureSelector,
       activeContext?.type === 'video' ? '.theater-aspect-box' : null,
+      activeContext?.type === 'video' ? '#mission-video-capture-area' : null,
+      activeContext?.type === 'video' ? '[data-capture-target="video-player"]' : null,
       activeContext?.type === 'video' ? '.yt-iframe-wrapper' : null,
       activeContext?.captureRootSelector,
       '#mission-hub-capture-area',
@@ -377,12 +380,105 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     img.src = dataUrl;
   });
 
-  // ─── Extension Capture Helper (shared between video & PDF) ───
+  const cropVideoElementToRect = (video, rect) => {
+    const canvas = document.createElement('canvas');
+    const sourceWidth = video.videoWidth || 0;
+    const sourceHeight = video.videoHeight || 0;
+    if (!sourceWidth || !sourceHeight) return null;
+
+    if (!rect) {
+      canvas.width = sourceWidth;
+      canvas.height = sourceHeight;
+      const fullCtx = canvas.getContext('2d');
+      if (!fullCtx) return null;
+      fullCtx.drawImage(video, 0, 0, sourceWidth, sourceHeight);
+      return canvas.toDataURL('image/png');
+    }
+
+    const scaleX = sourceWidth / window.innerWidth;
+    const scaleY = sourceHeight / window.innerHeight;
+    const sx = Math.max(0, Math.round(rect.left * scaleX));
+    const sy = Math.max(0, Math.round(rect.top * scaleY));
+    const sw = Math.min(sourceWidth - sx, Math.round(rect.width * scaleX));
+    const sh = Math.min(sourceHeight - sy, Math.round(rect.height * scaleY));
+    if (sw <= 10 || sh <= 10) return null;
+
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+    return canvas.toDataURL('image/png');
+  };
+
+  // Browser-native capture for live YouTube frames. The web platform cannot
+  // read pixels from a cross-origin YouTube iframe directly, so we capture the
+  // current tab with user permission and crop it to the player area.
+  const attemptNativeVideoCapture = async () => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error('DISPLAY_MEDIA_UNSUPPORTED');
+    }
+
+    setBackgroundImage(null);
+    setIsCapturing(true);
+    document.body.classList.add('is-capturing');
+    document.body.classList.add('is-live-video-capturing');
+
+    const cropRect = getCropTargetRect();
+
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    let stream = null;
+    try {
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            cursor: 'never',
+            displaySurface: 'browser'
+          },
+          audio: false,
+          preferCurrentTab: true,
+          selfBrowserSurface: 'include',
+          surfaceSwitching: 'exclude'
+        });
+      } catch (err) {
+        if (err?.name !== 'TypeError') throw err;
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      }
+
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+
+      await new Promise((resolve, reject) => {
+        video.onloadedmetadata = resolve;
+        video.onerror = reject;
+      });
+      await video.play();
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      const dataUrl = cropVideoElementToRect(video, cropRect);
+      if (!isValidImageDataUrl(dataUrl)) {
+        throw new Error('DISPLAY_MEDIA_CAPTURE_EMPTY');
+      }
+
+      setBackgroundImage(dataUrl);
+      return true;
+    } finally {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  };
+
+  // ─── Extension Capture Helper (PDF iframe fallback) ───
   const attemptExtensionCapture = async () => {
     resolvePendingExtensionCapture({ error: 'New capture request started' });
     setIsCapturing(true);
     document.body.classList.add('is-capturing');
     document.body.classList.add('is-extension-capturing');
+    document.body.classList.add('is-live-video-capturing');
 
     // Read the content element's on-screen position before the capture, so we
     // can crop the full-tab screenshot down to just that area afterwards.
@@ -429,7 +525,13 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     // the capture root when the video box isn't present (e.g. datalog/quiz).
     let element = null;
     if (activeContext?.type === 'video') {
-      for (const selector of ['.theater-aspect-box', '.yt-iframe-wrapper']) {
+      for (const selector of [
+        activeContext?.captureSelector,
+        '#mission-video-capture-area',
+        '[data-capture-target="video-player"]',
+        '.theater-aspect-box',
+        '.yt-iframe-wrapper'
+      ].filter(Boolean)) {
         const el = document.querySelector(selector);
         if (el) { element = el; break; }
       }
@@ -464,28 +566,41 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         const isPdfDatalog = activeContext?.type === 'datalog' && activeContext?.pdfUrl;
         const isVideo = activeContext?.type === 'video';
 
-        // ── 1. Extension Capture Path (works for BOTH video and PDF iframes) ──
-        if ((isVideo || isPdfDatalog) && !forceDomCapture) {
-          const hasExtension = extensionStatus === 'detected' || await checkExtension(isVideo ? 2200 : 1400);
+        if (isVideo) {
+          if (forceDomCapture) {
+            try {
+              // DOM capture cannot read the live YouTube iframe. This path uses
+              // the app-owned thumbnail placeholder only after explicit consent.
+              shouldEnterDrawMode = await captureDomBackground();
+            } catch (videoCaptureErr) {
+              console.error('Video fallback capture failed:', videoCaptureErr);
+              setError('영상 화면 캡처를 시작하지 못했습니다. 이미지 첨부를 사용하거나 다시 시도해주세요.');
+            }
+            return;
+          }
+
+          try {
+            shouldEnterDrawMode = await attemptNativeVideoCapture();
+          } catch (videoCaptureErr) {
+            console.error('Native video capture failed:', videoCaptureErr);
+            setError(
+              videoCaptureErr?.name === 'NotAllowedError'
+                ? '현재 프레임을 캡처하려면 브라우저의 화면 공유 요청에서 현재 탭을 허용해야 합니다.'
+                : '브라우저에서 영상 현재 프레임을 캡처하지 못했습니다. 다시 시도하거나 이미지 첨부를 사용해주세요.'
+            );
+          }
+          return;
+        }
+
+        // ── 1. Extension Capture Path (PDF iframe fallback) ──
+        if (isPdfDatalog && !forceDomCapture) {
+          const hasExtension = extensionStatus === 'detected' || await checkExtension(1400);
           if (hasExtension) {
             const success = await attemptExtensionCapture();
             if (success) {
               shouldEnterDrawMode = true;
-              return; // Extension captured the full screen including iframe
+              return; // Extension captured the full screen including iframe/PDF
             }
-          }
-
-          if (isVideo) {
-            try {
-              // Browser DOM capture cannot read the live YouTube iframe, so CSS swaps
-              // it for the in-app timestamped thumbnail placeholder during capture.
-              shouldEnterDrawMode = await captureDomBackground();
-            } catch (videoFallbackErr) {
-              console.error('Video fallback capture failed:', videoFallbackErr);
-              setShowExtensionPrompt(true);
-              setError('영상 화면 캡처를 시작하지 못했습니다. 아고라 커넥트 설치 후 다시 시도하거나 이미지 첨부를 사용해주세요.');
-            }
-            return;
           }
         }
 
@@ -541,6 +656,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         setIsCapturing(false);
         document.body.classList.remove('is-capturing');
         document.body.classList.remove('is-extension-capturing');
+        document.body.classList.remove('is-live-video-capturing');
         if (shouldEnterDrawMode) {
           setIsDrawMode(true);
         }
