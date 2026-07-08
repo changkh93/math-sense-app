@@ -82,10 +82,12 @@ export default function QuestionDetail() {
   const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
   const [activeReplyAnswerId, setActiveReplyAnswerId] = useState(null);
   const [replyContent, setReplyContent] = useState('');
-  
+  const [editingAnswerId, setEditingAnswerId] = useState(null);
+  const [editAnswerContent, setEditAnswerContent] = useState('');
+
   const { data: question, isLoading: loadingQ } = useQuestionDetail(questionId);
   const { data: answers, isLoading: loadingA, error: errorA } = useQuestionAnswers(questionId);
-  const { upvote, addAnswer, acceptAnswer, selfResolve, deleteQuestion, updateQuestion } = useQAMutations();
+  const { upvote, addAnswer, acceptAnswer, selfResolve, deleteQuestion, updateQuestion, updateAnswer, deleteAnswer } = useQAMutations();
 
   const [showRewardMask, setShowRewardMask] = useState(false);
   const [rewardAmount, setRewardAmount] = useState(0);
@@ -221,6 +223,50 @@ export default function QuestionDetail() {
     } catch (error) {
       console.error("Failed to post answer reply:", error);
       alert('답글 전송 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  const handleStartEditAnswer = (answer) => {
+    setEditingAnswerId(answer.id);
+    setEditAnswerContent(answer.content);
+    setActiveReplyAnswerId(null);
+  };
+
+  const handleSaveEditAnswer = async (answer) => {
+    if (!editAnswerContent.trim()) return;
+    try {
+      await updateAnswer.mutateAsync({
+        questionId,
+        answerId: answer.id,
+        content: editAnswerContent
+      });
+      setEditingAnswerId(null);
+      setEditAnswerContent('');
+    } catch (err) {
+      console.error('Failed to update answer:', err);
+      alert(
+        err?.message?.includes('채택된 답변')
+          ? '채택된 답변은 수정할 수 없어요.'
+          : '답변 수정 중 오류가 발생했습니다. 다시 시도해주세요.'
+      );
+    }
+  };
+
+  const handleDeleteAnswer = async (answer) => {
+    if (!window.confirm('정말 이 답변을 삭제하시겠습니까?')) return;
+    try {
+      await deleteAnswer.mutateAsync({ questionId, answerId: answer.id });
+      if (editingAnswerId === answer.id) {
+        setEditingAnswerId(null);
+        setEditAnswerContent('');
+      }
+    } catch (err) {
+      console.error('Failed to delete answer:', err);
+      alert(
+        err?.message?.includes('채택된 답변')
+          ? '채택된 답변은 삭제할 수 없어요.'
+          : '답변 삭제 중 오류가 발생했습니다. 다시 시도해주세요.'
+      );
     }
   };
 
@@ -568,22 +614,25 @@ export default function QuestionDetail() {
                     (() => {
                       const replies = repliesByParent[ans.id] || [];
                       const isReplying = activeReplyAnswerId === ans.id;
+                      const isAnswerEditing = editingAnswerId === ans.id;
+                      const isAnswerOwner = ans.userId === sessionUser?.uid;
+                      const canManageAnswer = isAnswerOwner && !ans.isAccepted;
 
                       return (
-                    <MotionDiv 
-                      key={ans.id} 
+                    <MotionDiv
+                      key={ans.id}
                       className={`answer-card glass ${ans.isTeacher ? 'teacher-answer' : ''} ${ans.isAccepted ? 'accepted' : ''}`}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
                       <div className="card-header">
                         {renderAnswerIdentity(ans, '답변')}
-                        
+
                         <div className="header-right-actions">
                           {ans.isAccepted && (
                             <span className="accepted-badge"><CheckCircle size={16} /> 채택된 답변</span>
                           )}
-                          
+
                           {isOwner && !isResolved && !ans.isAccepted && (
                             <button
                               className="accept-btn-small glass"
@@ -603,14 +652,43 @@ export default function QuestionDetail() {
                               이 답변 채택하기
                             </button>
                           )}
+
+                          {canManageAnswer && !isAnswerEditing && (
+                            <div className="owner-actions">
+                              <button className="icon-btn edit-btn" onClick={() => handleStartEditAnswer(ans)} title="수정">
+                                <Edit3 size={16} />
+                              </button>
+                              <button className="icon-btn delete-btn" onClick={() => handleDeleteAnswer(ans)} title="삭제" disabled={deleteAnswer.isPending}>
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
+                      {isAnswerEditing ? (
+                        <div className="edit-answer-box">
+                          <textarea
+                            className="edit-textarea glass"
+                            value={editAnswerContent}
+                            onChange={(e) => setEditAnswerContent(e.target.value)}
+                          />
+                          <div className="edit-actions">
+                            <button className="cancel-btn glass" onClick={() => { setEditingAnswerId(null); setEditAnswerContent(''); }}>
+                              <X size={16} /> 취소
+                            </button>
+                            <button className="save-btn glass" onClick={() => handleSaveEditAnswer(ans)} disabled={updateAnswer.isPending || !editAnswerContent.trim()}>
+                              <Save size={16} /> {updateAnswer.isPending ? '저장 중...' : '저장'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
                       <div className="answer-content">
-                        {parseInlineFormatting(ans.content, { 
+                        {parseInlineFormatting(ans.content, {
                           keyPrefix: `ans-detail-${ans.id}`,
                           boldColor: ans.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)'
                         })}
                       </div>
+                      )}
                       <div className="answer-actions-row">
                         <button
                           type="button"
@@ -662,19 +740,61 @@ export default function QuestionDetail() {
 
                       {replies.length > 0 && (
                         <div className="answer-replies-list">
-                          {replies.map((reply) => (
+                          {replies.map((reply) => {
+                            const isReplyEditing = editingAnswerId === reply.id;
+                            const isReplyOwner = reply.userId === sessionUser?.uid;
+                            const canManageReply = isReplyOwner && !reply.isAccepted;
+                            return (
                             <div key={reply.id} className={`answer-reply-card ${reply.isTeacher ? 'teacher-reply' : ''}`}>
                               <div className="answer-reply-header">
                                 {renderAnswerIdentity(reply, '답글')}
+                                {canManageReply && !isReplyEditing && (
+                                  <div className="owner-actions reply-owner-actions">
+                                    <button className="icon-btn edit-btn" onClick={() => handleStartEditAnswer(reply)} title="수정">
+                                      <Edit3 size={15} />
+                                    </button>
+                                    <button className="icon-btn delete-btn" onClick={() => handleDeleteAnswer(reply)} title="삭제" disabled={deleteAnswer.isPending}>
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
+                              {isReplyEditing ? (
+                                <div className="edit-answer-box">
+                                  <textarea
+                                    className="answer-reply-textarea"
+                                    value={editAnswerContent}
+                                    onChange={(e) => setEditAnswerContent(e.target.value)}
+                                  />
+                                  <div className="answer-reply-form-actions">
+                                    <button
+                                      type="button"
+                                      className="answer-reply-cancel"
+                                      onClick={() => { setEditingAnswerId(null); setEditAnswerContent(''); }}
+                                    >
+                                      취소
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="answer-reply-submit"
+                                      disabled={updateAnswer.isPending || !editAnswerContent.trim()}
+                                      onClick={() => handleSaveEditAnswer(reply)}
+                                    >
+                                      {updateAnswer.isPending ? '저장 중...' : '저장'}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
                               <div className="answer-reply-content">
                                 {parseInlineFormatting(reply.content, {
                                   keyPrefix: `ans-reply-${reply.id}`,
                                   boldColor: reply.isTeacher ? 'var(--star-gold)' : 'var(--crystal-cyan)'
                                 })}
                               </div>
+                              )}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </MotionDiv>

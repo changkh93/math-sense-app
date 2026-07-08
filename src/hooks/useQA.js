@@ -476,6 +476,67 @@ export function useQAMutations() {
       }
     }),
 
+    // Update Answer / Reply (본인 작성 + 미채택만)
+    updateAnswer: useMutation({
+      mutationFn: async ({ answerId, content }) => {
+        const user = auth.currentUser;
+        if (!user) throw new Error('로그인이 필요합니다.');
+
+        await runTransaction(db, async (transaction) => {
+          const answerRef = doc(db, 'answers', answerId);
+          const answerSnap = await transaction.get(answerRef);
+
+          if (!answerSnap.exists()) throw new Error('답변을 찾을 수 없습니다.');
+
+          const answerData = answerSnap.data();
+          if (answerData.userId !== user.uid) throw new Error('본인 답변만 수정할 수 있습니다.');
+          if (answerData.isAccepted) throw new Error('채택된 답변은 수정할 수 없습니다.');
+
+          transaction.set(answerRef, {
+            content,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        });
+      },
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['answers', variables.questionId] });
+      }
+    }),
+
+    // Delete Answer / Reply (본인 작성 + 미채택만, 부모 답변인 경우 answerCount 감소)
+    deleteAnswer: useMutation({
+      mutationFn: async ({ questionId, answerId }) => {
+        const user = auth.currentUser;
+        if (!user) throw new Error('로그인이 필요합니다.');
+
+        await runTransaction(db, async (transaction) => {
+          const answerRef = doc(db, 'answers', answerId);
+          const answerSnap = await transaction.get(answerRef);
+
+          if (!answerSnap.exists()) throw new Error('답변을 찾을 수 없습니다.');
+
+          const answerData = answerSnap.data();
+          if (answerData.userId !== user.uid) throw new Error('본인 답변만 삭제할 수 있습니다.');
+          if (answerData.isAccepted) throw new Error('채택된 답변은 삭제할 수 없습니다.');
+
+          transaction.delete(answerRef);
+
+          // 최상위 답변(답글이 아닌)인 경우에만 question.answerCount 감소
+          if (!answerData.parentAnswerId) {
+            const questionRef = doc(db, 'questions', questionId);
+            transaction.set(questionRef, {
+              answerCount: increment(-1),
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+          }
+        });
+      },
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries({ queryKey: ['answers', variables.questionId] });
+        queryClient.invalidateQueries({ queryKey: ['question', variables.questionId] });
+      }
+    }),
+
     // Delete Question
     deleteQuestion: useMutation({
       mutationFn: async (questionId) => {
