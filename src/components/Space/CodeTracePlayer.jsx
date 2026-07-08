@@ -71,6 +71,39 @@ function buildIndentRankMap(lines = []) {
   return new Map([...widths].sort((a, b) => a - b).map((width, index) => [width, index]));
 }
 
+// 정답 코드의 들여쓰기 단위를 감지해 학생 입력란의 자동 인덴트를 정답과 맞춘다.
+// 단위 = 들여쓰기가 쓰인 줄들 중 가장 작은 non-zero 너비(= 1단계 깊이).
+// 4칸/8칸이 섞인 코드에서 빈도로 고르면 8칸이 잘못 잡히므로 최솟값을 쓴다.
+// 탭이 하나라도 있고 스페이스보다 많으면 탭, 아니면 스페이스. 감지 못하면 2칸 폴백.
+function detectIndentUnit(answerCode = '') {
+  const lines = normalizeNewlines(answerCode).split('\n');
+  let tabLines = 0;
+  let spaceLines = 0;
+  let minSpaceWidth = Infinity;
+
+  lines.forEach((line) => {
+    const indent = getLeadingWhitespace(line);
+    if (!indent) return;
+    if (/^\t+$/.test(indent)) {
+      tabLines += 1;
+      return;
+    }
+    const spaces = indent.match(/^ +/)?.[0] || '';
+    if (spaces) {
+      spaceLines += 1;
+      minSpaceWidth = Math.min(minSpaceWidth, spaces.length);
+    }
+  });
+
+  if (tabLines > 0 && tabLines >= spaceLines) return '\t';
+  // 1단계 단위 = 가장 얕은 들여쓰기 너비. 2의 배수로 정규화(최소 2).
+  if (minSpaceWidth !== Infinity) {
+    const unit = Math.max(2, minSpaceWidth % 2 === 0 ? minSpaceWidth : minSpaceWidth);
+    return ' '.repeat(unit);
+  }
+  return STUDENT_INDENT;
+}
+
 function normalizeIndentForCompare(line = '', indentRanks = null) {
   const indent = getLeadingWhitespace(line);
   const width = getIndentVisualWidth(indent);
@@ -295,10 +328,15 @@ function evaluateCode(answerCode, studentCode) {
     if (answerLine.trim().endsWith(':') && !studentLine.trim().endsWith(':')) {
       issues.push(`${index + 1}번째 줄 끝의 콜론(:)을 확인하세요.`);
     }
-    const sameCodeWithDifferentIndent = normalizePythonLineForCompare(answerLine, answerIndentRanks) !== normalizePythonLineForCompare(studentLine, studentIndentRanks)
-      && normalizePythonLineForCompare(answerLine).replace(/^\s*/, '') === normalizePythonLineForCompare(studentLine).replace(/^\s*/, '');
-    if (sameCodeWithDifferentIndent) {
-      issues.push(`${index + 1}번째 줄의 들여쓰기 단계를 확인하세요. 탭, 스페이스 2칸, 스페이스 4칸은 같은 단계로 인정됩니다.`);
+    // 들여쓰기 안내는 깊이 단계(rank)가 실제로 어긋났을 때만.
+    // 2칸/4칸/탭은 같은 깊이 단계로 정규화되므로 단계만 같으면 안내하지 않는다.
+    const answerIndentRank = normalizeIndentForCompare(answerLine, answerIndentRanks);
+    const studentIndentRank = normalizeIndentForCompare(studentLine, studentIndentRanks);
+    const sameCodeDifferentDepth = normalizePythonLineForCompare(answerLine, answerIndentRanks) !== normalizePythonLineForCompare(studentLine, studentIndentRanks)
+      && normalizePythonLineForCompare(answerLine).replace(/^\s*/, '') === normalizePythonLineForCompare(studentLine).replace(/^\s*/, '')
+      && answerIndentRank !== studentIndentRank;
+    if (sameCodeDifferentDepth) {
+      issues.push(`${index + 1}번째 줄의 들여쓰기 단계(들어가는 깊이)를 확인하세요. 탭, 스페이스 2칸, 스페이스 4칸은 같은 단계로 인정됩니다.`);
     }
     if (hasOnlyQuotedWhitespaceDifference(answerLine, studentLine)) {
       issues.push(`${index + 1}번째 줄의 문자열 내용은 자동 채우기 대상입니다. 따옴표 위치와 코드 구조를 먼저 확인하세요.`);
@@ -368,12 +406,22 @@ function classifyLineIssue(answerLine = '', studentLine = '', answerIndentRanks 
   if (answerLine === studentLine) return null;
 
   const answerTrim = answerLine.trim();
-  const studentTrim = studentLine.trim();
   const answerNormalized = normalizePythonLineForCompare(answerLine, answerIndentRanks);
   const studentNormalized = normalizePythonLineForCompare(studentLine, studentIndentRanks);
   const acceptedByScoring = answerNormalized === studentNormalized;
 
-  if (answerTrim === studentTrim && getLeadingWhitespace(answerLine) !== getLeadingWhitespace(studentLine)) {
+  // 채점 통과(깊이 단계·토큰 기준)하는 줄은 diff에도 표시하지 않는다.
+  // "통과하는데 틀렸다고 표시" 모순(2칸/4칸, 연산자 양옆 공백 등)을 제거.
+  if (acceptedByScoring) return null;
+
+  // 들여쓰기 단계(rank)가 다른 경우만 'indent'로 분류.
+  // 2칸과 4칸은 같은 깊이 단계로 정규화되므로 인정되고, 단계 자체가 어긋나면 표시.
+  // rank는 원본 줄(들여쓰기 포함)에서 뽑아야 한다. trim하면 들여쓰기가 사라져 둘 다 0단계가 됨.
+  const answerIndentRank = normalizeIndentForCompare(answerLine, answerIndentRanks);
+  const studentIndentRank = normalizeIndentForCompare(studentLine, studentIndentRanks);
+  const answerIndentless = normalizePythonLineForCompare(answerLine).replace(/^\s*/, '');
+  const studentIndentless = normalizePythonLineForCompare(studentLine).replace(/^\s*/, '');
+  if (answerIndentless === studentIndentless && answerIndentRank !== studentIndentRank) {
     return 'indent';
   }
   if (answerLine.toLowerCase() === studentLine.toLowerCase()) {
@@ -390,9 +438,6 @@ function classifyLineIssue(answerLine = '', studentLine = '', answerIndentRanks 
     normalizePythonLineForStructureCompare(answerLine, answerIndentRanks) === normalizePythonLineForStructureCompare(studentLine, studentIndentRanks)
   ) {
     return 'string';
-  }
-  if (acceptedByScoring) {
-    return 'formatting';
   }
   return 'typo';
 }
@@ -512,6 +557,48 @@ function getLineIssueMessage(issue) {
   return `${lineLabel}: ${shortenCode(issue.studentLine)} 부분을 정답 ${shortenCode(issue.answerLine)}와 비교해 보세요.`;
 }
 
+// 정답 줄과 학생 줄을 줄-수준 LCS로 최적 정렬한다.
+// 줄 하나가 빠지거나 추가되어도 그 이후 줄들이 1:1로 잘못 짝지어지지 않도록,
+// 정규화된 줄 키(깊이 단계·토큰 기반)로 공통 부분열을 찾아 정렬 결과를 반환한다.
+function alignLines(answerLines = [], studentLines = [], answerIndentRanks = null, studentIndentRanks = null) {
+  const answerKeys = answerLines.map(line => normalizePythonLineForCompare(line, answerIndentRanks));
+  const studentKeys = studentLines.map(line => normalizePythonLineForCompare(line, studentIndentRanks));
+  const aLen = answerLines.length;
+  const sLen = studentLines.length;
+
+  // 매칭 키가 같으면 "같은 줄"로 취급해 정렬의 골격을 잡는다.
+  const dp = Array.from({ length: aLen + 1 }, () => Array(sLen + 1).fill(0));
+  for (let i = aLen - 1; i >= 0; i -= 1) {
+    for (let j = sLen - 1; j >= 0; j -= 1) {
+      dp[i][j] = answerKeys[i] === studentKeys[j]
+        ? dp[i + 1][j + 1] + 1
+        : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const pairs = [];
+  let i = 0;
+  let j = 0;
+  while (i < aLen && j < sLen) {
+    if (answerKeys[i] === studentKeys[j]) {
+      pairs.push({ answerIndex: i, studentIndex: j });
+      i += 1;
+      j += 1;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      // 학생에게 없는 정답 줄(빠진 줄)
+      pairs.push({ answerIndex: i, studentIndex: -1 });
+      i += 1;
+    } else {
+      // 정답에 없는 학생 줄(추가된 줄)
+      pairs.push({ answerIndex: -1, studentIndex: j });
+      j += 1;
+    }
+  }
+  while (i < aLen) { pairs.push({ answerIndex: i, studentIndex: -1 }); i += 1; }
+  while (j < sLen) { pairs.push({ answerIndex: -1, studentIndex: j }); j += 1; }
+  return pairs;
+}
+
 function analyzeCodeDiff(answerCode = '', studentCode = '') {
   const answer = normalizeNewlines(answerCode);
   const student = normalizeNewlines(studentCode);
@@ -519,30 +606,32 @@ function analyzeCodeDiff(answerCode = '', studentCode = '') {
   const studentLines = student.split('\n');
   const answerIndentRanks = buildIndentRankMap(answerLines);
   const studentIndentRanks = buildIndentRankMap(studentLines);
-  const maxLines = Math.max(answerLines.length, studentLines.length);
+  const pairs = alignLines(answerLines, studentLines, answerIndentRanks, studentIndentRanks);
   const issues = [];
   const counts = {};
 
-  for (let index = 0; index < maxLines; index += 1) {
-    const hasAnswerLine = index < answerLines.length;
-    const hasStudentLine = index < studentLines.length;
-    const answerLine = hasAnswerLine ? answerLines[index] : '';
-    const studentLine = hasStudentLine ? studentLines[index] : '';
+  pairs.forEach((pair) => {
+    const hasAnswerLine = pair.answerIndex >= 0;
+    const hasStudentLine = pair.studentIndex >= 0;
+    const answerLine = hasAnswerLine ? answerLines[pair.answerIndex] : '';
+    const studentLine = hasStudentLine ? studentLines[pair.studentIndex] : '';
 
     let type = null;
-    if (hasAnswerLine && (!hasStudentLine || (!studentLine && answerLine))) {
+    if (hasAnswerLine && !hasStudentLine) {
       type = 'missing';
-    } else if (!hasAnswerLine && studentLine) {
+    } else if (!hasAnswerLine && hasStudentLine) {
       type = 'extra';
     } else if (hasAnswerLine && hasStudentLine) {
       type = classifyLineIssue(answerLine, studentLine, answerIndentRanks, studentIndentRanks);
     }
 
-    if (!type) continue;
+    if (!type) return;
     counts[type] = (counts[type] || 0) + 1;
     const issue = {
-      lineIndex: index,
-      lineNumber: index + 1,
+      // 학생 측 줄 번호가 없으면(빠진 줄) 정답 측 줄 번호를 표시 기준으로 사용.
+      // UI는 학생 입력 기준 1-based 줄 번호를 보여주므로 studentIndex를 우선.
+      lineIndex: hasStudentLine ? pair.studentIndex : pair.answerIndex,
+      lineNumber: (hasStudentLine ? pair.studentIndex : pair.answerIndex) + 1,
       type,
       answerLine,
       studentLine,
@@ -550,7 +639,7 @@ function analyzeCodeDiff(answerCode = '', studentCode = '') {
     };
     issue.message = getLineIssueMessage(issue);
     issues.push(issue);
-  }
+  });
 
   return {
     issues,
@@ -654,9 +743,24 @@ function isIndexInRange(index, ranges = []) {
   return ranges.some(range => index >= range.start && index < range.end);
 }
 
-function getCodeTraceCharStatus(answerLine = '', studentLine = '', index = 0) {
+function getCodeTraceCharStatus(answerLine = '', studentLine = '', index = 0, answerIndentRanks = null, studentIndentRanks = null) {
   const answerChar = answerLine[index] || '';
   const studentChar = studentLine[index] || '';
+
+  // 들여쓰기 영역(양쪽 모두 공백인 구간)은 깊이 단계(rank)로 비교한다.
+  // 2칸/4칸은 같은 깊이 단계로 정규화되므로 단계만 같으면 match 처리해서
+  // "정답은 4칸인데 학생이 2칸"일 때 공백이 갈색으로 표시되는 혼란을 막는다.
+  const answerIndent = getLeadingWhitespace(answerLine);
+  const studentIndent = getLeadingWhitespace(studentLine);
+  const answerIndentLen = answerIndent.length;
+  const studentIndentLen = studentIndent.length;
+  if (studentChar === ' ' && answerChar === ' '
+    && index < Math.min(answerIndentLen, studentIndentLen)) {
+    const answerRank = answerIndentRanks?.get(getIndentVisualWidth(answerIndent)) ?? getIndentVisualWidth(answerIndent);
+    const studentRank = studentIndentRanks?.get(getIndentVisualWidth(studentIndent)) ?? getIndentVisualWidth(studentIndent);
+    return answerRank === studentRank ? 'match' : 'wrong';
+  }
+
   if (studentChar === answerChar) return 'match';
   const answerStringRanges = getLineStringRanges(answerLine);
   const studentStringRanges = getLineStringRanges(studentLine);
@@ -668,6 +772,10 @@ function getCodeTraceCharStatus(answerLine = '', studentLine = '', index = 0) {
 function buildCodeTraceDecorations(view, answerCode = '') {
   const builder = new RangeSetBuilder();
   const answerLines = normalizeNewlines(answerCode).split('\n');
+  const studentCode = view.state.doc.toString();
+  const studentLines = normalizeNewlines(studentCode).split('\n');
+  const answerIndentRanks = buildIndentRankMap(answerLines);
+  const studentIndentRanks = buildIndentRankMap(studentLines);
 
   for (const { from, to } of view.visibleRanges) {
     let pos = from;
@@ -679,7 +787,7 @@ function buildCodeTraceDecorations(view, answerCode = '') {
       let charPos = line.from;
 
       Array.from(studentLine).forEach((char, index) => {
-        const status = getCodeTraceCharStatus(answerLine, studentLine, index);
+        const status = getCodeTraceCharStatus(answerLine, studentLine, index, answerIndentRanks, studentIndentRanks);
         if (status !== 'match') {
           builder.add(
             charPos,
@@ -736,6 +844,7 @@ function CodeTraceEditor({
   currentPassed,
   activeStringSuggestion,
   lineCombo,
+  indentUnit,
   editorViewRef,
   onChange,
   onSelectionChange,
@@ -748,6 +857,7 @@ function CodeTraceEditor({
     answerCode,
     activeStringSuggestion,
     lineCombo,
+    indentUnit,
     onChange,
     onSelectionChange,
     onLinePulse,
@@ -758,11 +868,12 @@ function CodeTraceEditor({
       answerCode,
       activeStringSuggestion,
       lineCombo,
+      indentUnit,
       onChange,
       onSelectionChange,
       onLinePulse,
     };
-  }, [activeStringSuggestion, answerCode, lineCombo, onChange, onLinePulse, onSelectionChange]);
+  }, [activeStringSuggestion, answerCode, indentUnit, lineCombo, onChange, onLinePulse, onSelectionChange]);
 
   useEffect(() => {
     const view = localViewRef.current;
@@ -835,7 +946,7 @@ function CodeTraceEditor({
       const linePrefix = view.state.doc.sliceString(line.from, selection.from);
       const currentIndent = linePrefix.match(/^[ \t]*/)?.[0] || '';
       const codeBeforeComment = linePrefix.replace(/#.*$/, '').trimEnd();
-      const nextIndent = `${currentIndent}${codeBeforeComment.endsWith(':') ? STUDENT_INDENT : ''}`;
+      const nextIndent = `${currentIndent}${codeBeforeComment.endsWith(':') ? (latestRef.current.indentUnit || STUDENT_INDENT) : ''}`;
       const insertion = `\n${nextIndent}`;
       const nextCursor = selection.from + insertion.length;
       view.dispatch({
@@ -1087,6 +1198,12 @@ export default function CodeTracePlayer({
   const lineCombo = useMemo(
     () => getLineCombo(exercise?.answerCode || '', studentCode),
     [exercise, studentCode]
+  );
+  // 정답 코드의 들여쓰기 단위를 감지해 학생 입력란의 자동 인덴트에 그대로 적용.
+  // 정답이 4칸이면 Enter 시 4칸, 탭이면 탭으로 자동 들여쓰기되어 시각적 혼란을 줄인다.
+  const indentUnit = useMemo(
+    () => detectIndentUnit(exercise?.answerCode || ''),
+    [exercise]
   );
   // 현재 세트의 입력을 빈 상태로 되돌림 (초기화 버튼). 초안도 함께 비움.
   const resetExercise = () => {
@@ -2030,6 +2147,7 @@ export default function CodeTracePlayer({
               currentPassed={currentPassed}
               activeStringSuggestion={activeStringSuggestion}
               lineCombo={lineCombo}
+              indentUnit={indentUnit}
               editorViewRef={studentEditorViewRef}
               onChange={setStudentCode}
               onSelectionChange={setStudentSelection}
