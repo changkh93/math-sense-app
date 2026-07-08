@@ -331,6 +331,52 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     };
   };
 
+  // ─── Crop helpers: focus the full-tab screenshot on the actual content ───
+  // The extension grabs the entire browser viewport, so an overlay (webcam,
+  // PiP, screen-share, another window) can bleed into the result. We crop the
+  // screenshot down to just the on-screen rect of the learning content.
+  const getCropTargetRect = () => {
+    const candidates = [
+      activeContext?.type === 'video' ? '.theater-aspect-box' : null,
+      activeContext?.type === 'video' ? '.yt-iframe-wrapper' : null,
+      activeContext?.captureRootSelector,
+      '#mission-hub-capture-area',
+      '#quiz-capture-area',
+    ].filter(Boolean);
+
+    for (const selector of candidates) {
+      const el = document.querySelector(selector);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 80 && rect.height > 60 && rect.bottom > 0 && rect.right > 0) {
+        return rect;
+      }
+    }
+    return null;
+  };
+
+  const cropDataUrlToRect = (dataUrl, rect) => new Promise((resolve) => {
+    if (!rect) { resolve(dataUrl); return; }
+    const img = new Image();
+    img.onload = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const sx = Math.max(0, Math.round(rect.left * dpr));
+      const sy = Math.max(0, Math.round(rect.top * dpr));
+      const sw = Math.min(img.width - sx, Math.round(rect.width * dpr));
+      const sh = Math.min(img.height - sy, Math.round(rect.height * dpr));
+      if (sw <= 10 || sh <= 10) { resolve(dataUrl); return; }
+      const canvas = document.createElement('canvas');
+      canvas.width = sw;
+      canvas.height = sh;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(dataUrl); return; }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+
   // ─── Extension Capture Helper (shared between video & PDF) ───
   const attemptExtensionCapture = async () => {
     resolvePendingExtensionCapture({ error: 'New capture request started' });
@@ -338,13 +384,20 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     document.body.classList.add('is-capturing');
     document.body.classList.add('is-extension-capturing');
 
+    // Read the content element's on-screen position before the capture, so we
+    // can crop the full-tab screenshot down to just that area afterwards.
+    const cropRect = getCropTargetRect();
+
+    // Wait two animation frames so framer-motion has actually painted the modal
+    // overlay as transparent before the extension grabs the visible tab.
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
     const capturePromise = new Promise(resolve => {
       captureResolveRef.current = resolve;
 
-      // CRITICAL: Wait for modal to hide via framer-motion
       setTimeout(() => {
         window.postMessage({ type: 'AGORA_CAPTURE_REQUEST' }, window.location.origin);
-      }, 300);
+      }, 220);
 
       // Timeout fallback
       captureTimerRef.current = setTimeout(() => {
@@ -354,7 +407,9 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
 
     const result = await capturePromise;
     if (result.dataUrl) {
-      setBackgroundImage(result.dataUrl);
+      const cropped = cropRect ? await cropDataUrlToRect(result.dataUrl, cropRect) : result.dataUrl;
+      const finalImage = isValidImageDataUrl(cropped) ? cropped : result.dataUrl;
+      setBackgroundImage(finalImage);
       return true; // Success
     }
     console.warn('Extension capture failed, falling back:', result.error);
@@ -365,11 +420,21 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     setBackgroundImage(null);
     setIsCapturing(true);
     document.body.classList.add('is-capturing');
-    
+
     // Wait for capture-hide / iframe-placeholder CSS to settle.
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    const element = resolveCaptureElement();
+    // For video, capture ONLY the on-screen video area (not the whole hub)
+    // so overlays/webcams elsewhere on the page are excluded. Falls back to
+    // the capture root when the video box isn't present (e.g. datalog/quiz).
+    let element = null;
+    if (activeContext?.type === 'video') {
+      for (const selector of ['.theater-aspect-box', '.yt-iframe-wrapper']) {
+        const el = document.querySelector(selector);
+        if (el) { element = el; break; }
+      }
+    }
+    if (!element) element = resolveCaptureElement();
     if (!element) {
       throw new Error('Capture target element not found');
     }
