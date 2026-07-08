@@ -329,14 +329,16 @@ export const parseInlineFormatting = (text, options = {}) => {
       const linkText = linkMatch[1];
       const linkUrl = linkMatch[2];
       return (
-        <a 
+        <a
           key={`${keyPrefix}-link-${lIndex}`}
           href={linkUrl}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ 
-            color: linkColor, 
+          style={{
+            color: linkColor,
             textDecoration: 'underline',
+            textUnderlineOffset: '0.18em',
+            overflowWrap: 'anywhere',
             cursor: 'pointer'
           }}
           onClick={(e) => e.stopPropagation()}
