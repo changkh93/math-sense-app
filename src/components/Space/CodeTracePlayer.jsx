@@ -127,11 +127,13 @@ function normalizeIndentForCompare(line = '', indentRanks = null) {
   return `__indent_${indentRanks.get(width) ?? width}__`;
 }
 
-function normalizePythonLineForCompare(line = '', indentRanks = null) {
+function normalizePythonLineForCompare(line = '') {
   const raw = trimTrailingWhitespace(String(line || ''));
   const indent = getLeadingWhitespace(raw);
   const body = raw.slice(indent.length);
-  let result = normalizeIndentForCompare(raw, indentRanks);
+  // CODE TRACE는 필수 이름과 코드 구조를 손으로 익히는 활동이다.
+  // 학생마다 2칸/4칸/탭 입력 환경이 달라 선행 공백은 채점 대상에서 제외한다.
+  let result = '';
   let quote = '';
   let escaped = false;
 
