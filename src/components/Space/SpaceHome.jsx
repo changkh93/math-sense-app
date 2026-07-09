@@ -813,7 +813,7 @@ function SpaceHome() {
     const requestedView = location.state?.view || params.get('view')
     const requestedClusterId = location.state?.clusterId || params.get('clusterId')
     const requestedDate = location.state?.date || params.get('date') || params.get('assignmentDate')
-    const validViews = new Set(['planet', 'dashboard', 'collection', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
+    const validViews = new Set(['planet', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
 
     if (requestedView && validViews.has(requestedView)) {
       if (requestedView === 'assignment_hub') {
@@ -4225,7 +4225,7 @@ function SpaceHome() {
           )}
           {currentView === 'collection' && <SpaceCollection userData={userData} history={history} />}
           {currentView === 'store' && (
-            <SpaceStore user={user} userData={userData} shouldScrollToBottom={shouldScrollStore} />
+            <SpaceStore user={user} userData={userData} shouldScrollToBottom={shouldScrollStore} history={history} />
           )}
           
           {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}

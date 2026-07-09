@@ -177,6 +177,10 @@
   position: relative;
 }
 
+.public-profile-hero--with-premium {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
 .public-profile-hero::after {
   content: "";
   position: absolute;
@@ -264,6 +268,27 @@
   margin: 0.75rem 0 0;
   color: rgba(255, 255, 255, 0.7);
   line-height: 1.5;
+}
+
+.public-profile-featured-premium-badge {
+  position: relative;
+  z-index: 1;
+  width: 132px;
+  min-height: 168px;
+  display: grid;
+  place-items: center;
+  padding: 0.35rem;
+  border-radius: 18px;
+  border: 1px solid rgba(251, 191, 36, 0.52);
+  background: radial-gradient(circle at 50% 18%, rgba(251, 191, 36, 0.2), rgba(15, 23, 42, 0.58) 68%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3), 0 0 24px rgba(251, 191, 36, 0.18);
+}
+
+.public-profile-featured-premium-badge img {
+  width: min(100%, 120px);
+  height: 158px;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.42));
 }
 
 .public-profile-tier {
@@ -733,6 +758,24 @@
   background: rgba(251, 191, 36, 0.08);
 }
 
+.public-profile-badge.is-premium {
+  flex-basis: 210px;
+  min-height: 274px;
+  place-items: center;
+  align-content: center;
+  padding: 0.65rem;
+  border-color: rgba(251, 191, 36, 0.5);
+  background: radial-gradient(circle at 50% 18%, rgba(251, 191, 36, 0.18), rgba(15, 23, 42, 0.74) 64%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28), 0 0 22px rgba(251, 191, 36, 0.18);
+}
+
+.public-profile-badge-premium-image {
+  width: min(100%, 196px);
+  height: 252px;
+  object-fit: contain;
+  filter: drop-shadow(0 20px 26px rgba(0, 0, 0, 0.4));
+}
+
 .public-profile-badge span {
   font-size: 1.6rem;
 }
@@ -873,6 +916,15 @@
     grid-template-columns: 1fr;
   }
 
+  .public-profile-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .public-profile-featured-premium-badge,
+  .public-profile-tier {
+    grid-column: span 1;
+  }
+
   .public-profile-stat-grid,
   .public-profile-sei-list,
   .public-profile-learning-summary {
@@ -885,6 +937,16 @@
 
   .public-profile-badge {
     flex-basis: 156px;
+  }
+
+  .public-profile-badge.is-premium {
+    flex-basis: 184px;
+    min-height: 238px;
+  }
+
+  .public-profile-badge-premium-image {
+    width: min(100%, 172px);
+    height: 222px;
   }
 }
 

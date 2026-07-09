@@ -17,6 +17,11 @@ import {
   isRadarActive,
 } from '../../utils/streakUtils'
 import { BASE_THEMES, buildAnswerProfileSnapshot, getBaseTheme, normalizeOwnedBaseThemes, normalizeOwnedFrames, SOCIAL_STORE_ITEMS } from '../../utils/socialUtils'
+import {
+  BADGE_UPGRADE_COST,
+  buildCollectionBadges,
+  isBadgeUpgradeOwned,
+} from '../../utils/badgeUtils'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RADAR_DURATION_MS = RADAR_DURATION_DAYS * DAY_MS
@@ -29,7 +34,7 @@ function getProfileHint(profile = {}) {
   return profile.publicTitle || profile.crewName || profile.email || ''
 }
 
-export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
+export default function SpaceStore({ userData, user, shouldScrollToBottom, history }) {
   const [purchasing, setPurchasing] = React.useState(false)
   const [purchaseMessage, setPurchaseMessage] = React.useState(null)
   const [recipients, setRecipients] = React.useState([])
@@ -39,6 +44,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
   const [giftRecipientId, setGiftRecipientId] = React.useState('')
   const [giftBusy, setGiftBusy] = React.useState(false)
   const [giftMessage, setGiftMessage] = React.useState(null)
+  const [badgeUpgradeTarget, setBadgeUpgradeTarget] = React.useState(null)
 
   React.useEffect(() => {
     if (shouldScrollToBottom) {
@@ -525,6 +531,92 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
     }
   }
 
+  // 배지 외형 업그레이드 구매. 성취 자체는 무료 자동 획득이고, 디자인만 100광석에 영구 해금한다.
+  const handleBadgeUpgradePurchase = async (badge) => {
+    if (purchasing || !user?.uid || !badge?.id) return
+    setPurchasing(true)
+    const userRef = doc(db, 'users', user.uid)
+    const nowMs = Date.now()
+    try {
+      await runTransaction(db, async (transaction) => {
+        const freshSnap = await transaction.get(userRef)
+        if (!freshSnap.exists()) throw new Error('User document not found')
+        const freshUserData = freshSnap.data()
+        const freshCrystals = freshUserData?.crystals || 0
+        if (isBadgeUpgradeOwned(freshUserData, badge.id)) throw new Error('ALREADY_OWNED')
+        if (freshCrystals < BADGE_UPGRADE_COST) throw new Error('INSUFFICIENT_CRYSTALS')
+
+        const prevUpgrades = freshUserData?.badgeUpgrades || {}
+        transaction.set(userRef, {
+          crystals: freshCrystals - BADGE_UPGRADE_COST,
+          featuredPremiumBadgeId: freshUserData?.featuredPremiumBadgeId || badge.id,
+          badgeUpgrades: {
+            ...prevUpgrades,
+            [badge.id]: {
+              ownedSkins: ['premium'],
+              selectedSkin: 'premium',
+              purchasedAtMs: nowMs,
+            },
+          },
+        }, { merge: true })
+
+        recordCrystalTransaction(user.uid, {
+          amount: -BADGE_UPGRADE_COST,
+          type: 'badge_upgrade_purchase',
+          description: `${badge.title} 배지 업그레이드`,
+          metadata: { badgeId: badge.id, skin: 'premium' },
+        }, transaction, `badge_upgrade_${badge.id}_${nowMs}`)
+      })
+
+      soundManager.playCrystal()
+      setPurchaseMessage({ type: 'success', text: `${badge.title} 배지가 프리미엄 디자인으로 업그레이드되었습니다!` })
+      setBadgeUpgradeTarget(null)
+      setTimeout(() => setPurchaseMessage(null), 3000)
+    } catch (err) {
+      console.error('Badge upgrade failed:', err)
+      const message =
+        err.message === 'INSUFFICIENT_CRYSTALS'
+          ? `광석이 부족합니다. (필요: ${BADGE_UPGRADE_COST}개)`
+          : err.message === 'ALREADY_OWNED'
+            ? '이미 업그레이드한 배지입니다.'
+            : '업그레이드에 실패했습니다. 다시 시도해주세요.'
+      setPurchaseMessage({ type: 'error', text: message })
+      setTimeout(() => setPurchaseMessage(null), 3000)
+    } finally {
+      setPurchasing(false)
+    }
+  }
+
+  const handleFeaturedPremiumBadge = async (badge) => {
+    if (purchasing || !user?.uid || !badge?.id) return
+    setPurchasing(true)
+    const userRef = doc(db, 'users', user.uid)
+    try {
+      await runTransaction(db, async (transaction) => {
+        const freshSnap = await transaction.get(userRef)
+        if (!freshSnap.exists()) throw new Error('User document not found')
+        const freshUserData = freshSnap.data()
+        if (!isBadgeUpgradeOwned(freshUserData, badge.id)) throw new Error('NOT_OWNED')
+        transaction.set(userRef, {
+          featuredPremiumBadgeId: badge.id,
+        }, { merge: true })
+      })
+
+      soundManager.playClick()
+      setPurchaseMessage({ type: 'success', text: '대표 프리미엄 배지를 변경했습니다.' })
+      setTimeout(() => setPurchaseMessage(null), 2400)
+    } catch (err) {
+      console.error('Featured premium badge update failed:', err)
+      const message = err.message === 'NOT_OWNED'
+        ? '보유한 프리미엄 배지만 대표로 설정할 수 있습니다.'
+        : '대표 배지 설정에 실패했습니다. 다시 시도해주세요.'
+      setPurchaseMessage({ type: 'error', text: message })
+      setTimeout(() => setPurchaseMessage(null), 3000)
+    } finally {
+      setPurchasing(false)
+    }
+  }
+
   const handleEquipBaseTheme = async (themeId) => {
     if (purchasing || !user?.uid || !themeId) return
     const currentThemeId = userData?.selectedBaseTheme || 'orbital'
@@ -951,6 +1043,17 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
       )}
 
       {giftModal}
+
+      {/* 🏅 탐사 배지 쇼케이스 */}
+      <BadgeShowcaseSection
+        userData={userData}
+        history={history}
+        purchasing={purchasing}
+        badgeUpgradeTarget={badgeUpgradeTarget}
+        setBadgeUpgradeTarget={setBadgeUpgradeTarget}
+        onPurchaseUpgrade={handleBadgeUpgradePurchase}
+        onSetFeaturedBadge={handleFeaturedPremiumBadge}
+      />
 
       {/* ⏳ 기간제 탐사 장비 */}
       <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem', marginTop: '3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1384,5 +1487,309 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom }) {
         ))}
       </div>
     </div>
+  )
+}
+
+// 탐사 배지 쇼케이스 섹션. 프리미엄은 소장품, 기본 배지는 성취 기록으로 분리한다.
+function BadgeShowcaseSection({ userData, history, purchasing, badgeUpgradeTarget, setBadgeUpgradeTarget, onPurchaseUpgrade, onSetFeaturedBadge }) {
+  const allBadges = React.useMemo(
+    () => buildCollectionBadges(userData, history),
+    [userData, history]
+  )
+
+  const earnedCount = allBadges.filter(b => b.unlocked).length
+  const ownedPremiumBadges = allBadges.filter((badge) => (
+    badge.unlocked && !!badge.premiumImage && isBadgeUpgradeOwned(userData, badge.id)
+  ))
+  const earnedBasicBadges = allBadges.filter((badge) => (
+    badge.unlocked && !(!!badge.premiumImage && isBadgeUpgradeOwned(userData, badge.id))
+  ))
+  const challengeBadges = allBadges.filter((badge) => !badge.unlocked)
+  const selectedFeaturedBadge = ownedPremiumBadges.find((badge) => badge.id === userData?.featuredPremiumBadgeId)
+  const featuredBadge = selectedFeaturedBadge || ownedPremiumBadges[0] || null
+  const crystals = userData?.crystals || 0
+
+  const premiumStage = (badge, options = {}) => {
+    const isOwned = !!options.owned
+    const isFeatured = !!options.featured
+    return (
+      <div
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: options.large ? 24 : 18,
+          minHeight: options.large ? 460 : 340,
+          display: 'grid',
+          placeItems: 'center',
+          padding: options.large ? '1rem' : '0.7rem',
+          background:
+            'radial-gradient(circle at 50% 18%, rgba(255, 215, 0, 0.22), rgba(5, 8, 26, 0.96) 58%), linear-gradient(135deg, rgba(0, 243, 255, 0.08), rgba(255, 215, 0, 0.08))',
+          border: isFeatured
+            ? '1px solid rgba(255, 215, 0, 0.9)'
+            : '1px solid rgba(255, 215, 0, 0.48)',
+          boxShadow: isFeatured
+            ? '0 0 0 1px rgba(255, 215, 0, 0.24), 0 0 34px rgba(255, 215, 0, 0.34), 0 0 88px rgba(0, 243, 255, 0.16)'
+            : '0 18px 46px rgba(0,0,0,0.34), 0 0 24px rgba(255, 215, 0, 0.18)',
+          opacity: isOwned ? 1 : 0.9,
+        }}
+      >
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: '-45%',
+            left: '-20%',
+            width: '42%',
+            height: '190%',
+            transform: 'rotate(20deg)',
+            background: 'linear-gradient(120deg, transparent, rgba(255,255,255,0.2), transparent)',
+            pointerEvents: 'none',
+          }}
+        />
+        <img
+          src={badge.premiumImage}
+          alt={badge.title}
+          style={{
+            width: options.large ? 'min(100%, 340px)' : 'min(100%, 235px)',
+            height: options.large ? 430 : 315,
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 24px 34px rgba(0,0,0,0.46))',
+            position: 'relative',
+            zIndex: 1,
+          }}
+        />
+      </div>
+    )
+  }
+
+  const actionButtonStyle = (variant = 'gold') => ({
+    width: '100%',
+    minHeight: 42,
+    padding: '0.62rem 0.8rem',
+    borderRadius: 12,
+    border: variant === 'ghost' ? '1px solid rgba(255, 215, 0, 0.36)' : 'none',
+    background: variant === 'ghost'
+      ? 'rgba(255, 215, 0, 0.08)'
+      : 'linear-gradient(135deg, var(--star-gold), #ffb347)',
+    color: variant === 'ghost' ? 'var(--star-gold)' : '#14131f',
+    fontWeight: 900,
+    cursor: purchasing ? 'not-allowed' : 'pointer',
+    opacity: purchasing ? 0.7 : 1,
+  })
+
+  return (
+    <>
+      <h3 style={{ color: 'var(--text-bright)', marginBottom: '0.5rem', marginTop: '3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <span>🏅 탐사 배지 쇼케이스</span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--star-gold)', fontWeight: 400, background: 'rgba(255, 215, 0, 0.12)', padding: '2px 8px', borderRadius: '8px' }}>{earnedCount}/{allBadges.length} 획득</span>
+      </h3>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+        성취한 배지를 프리미엄 디자인으로 각성시켜 보세요. 각성한 배지는 영구 소장되며, 대표 배지로 프로필에 표시됩니다.
+      </p>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0 0 1.6rem', lineHeight: 1.6 }}>
+        대표 배지는 공개 프로필 상단과 획득 배지 영역에서 가장 먼저 보입니다.
+      </p>
+
+      {ownedPremiumBadges.length > 0 && (
+        <section style={{ marginBottom: '2.4rem' }}>
+          <h4 style={{ color: 'var(--text-bright)', margin: '0 0 1rem', fontSize: '1.05rem' }}>
+            ✨ 프리미엄 컬렉션
+          </h4>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+            gap: '1rem',
+          }}>
+            {ownedPremiumBadges.map((badge) => {
+              const isFeatured = (featuredBadge?.id || userData?.featuredPremiumBadgeId) === badge.id
+              return (
+                <div key={badge.id} style={{ display: 'grid', gap: '0.75rem' }}>
+                  {premiumStage(badge, { owned: true, featured: isFeatured })}
+                  <button
+                    type="button"
+                    disabled={purchasing || isFeatured}
+                    onClick={() => onSetFeaturedBadge(badge)}
+                    style={{
+                      ...actionButtonStyle(isFeatured ? 'ghost' : 'gold'),
+                      opacity: isFeatured ? 0.78 : (purchasing ? 0.7 : 1),
+                      cursor: isFeatured || purchasing ? 'default' : 'pointer',
+                    }}
+                  >
+                    {isFeatured ? '대표 배지로 표시 중' : '대표 배지 설정'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {earnedBasicBadges.length > 0 && (
+        <section style={{ marginBottom: '2.4rem' }}>
+          <h4 style={{ color: 'var(--text-bright)', margin: '0 0 1rem', fontSize: '1.05rem' }}>
+            💎 획득한 배지
+          </h4>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '1rem',
+          }}>
+            {earnedBasicBadges.map((badge) => {
+              const canAwaken = !!badge.premiumImage
+              const insufficient = crystals < BADGE_UPGRADE_COST
+              return (
+                <div
+                  key={badge.id}
+                  className="glass-card"
+                  style={{
+                    padding: '1.15rem',
+                    minHeight: 250,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    border: '1px solid rgba(255, 215, 0, 0.24)',
+                    background: 'linear-gradient(180deg, rgba(255, 215, 0, 0.08), rgba(255,255,255,0.035))',
+                  }}
+                >
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '3rem', lineHeight: 1, marginBottom: '0.8rem' }}>{badge.icon}</div>
+                    <div style={{ color: 'var(--star-gold)', fontWeight: 900, marginBottom: '0.4rem' }}>{badge.title}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.55, minHeight: '2.6em' }}>{badge.desc}</div>
+                  </div>
+                  <div style={{ marginTop: '1rem', display: 'grid', gap: '0.4rem' }}>
+                    {canAwaken ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setBadgeUpgradeTarget(badge)}
+                          disabled={purchasing || insufficient}
+                          style={{
+                            ...actionButtonStyle(),
+                            background: insufficient ? 'rgba(239, 68, 68, 0.15)' : actionButtonStyle().background,
+                            color: insufficient ? '#ff6b6b' : actionButtonStyle().color,
+                            cursor: insufficient || purchasing ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {insufficient ? `광석 ${BADGE_UPGRADE_COST - crystals}개 부족` : '💎 프리미엄 각성'}
+                        </button>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', textAlign: 'center' }}>
+                          각성 후 영구 소장
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--planet-green)', fontSize: '0.74rem', textAlign: 'center' }}>
+                        ✅ 획득 완료
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {challengeBadges.length > 0 && (
+        <section style={{ marginBottom: '4rem' }}>
+          <h4 style={{ color: 'var(--text-bright)', margin: '0 0 1rem', fontSize: '1.05rem' }}>
+            🎖 도전할 배지
+          </h4>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+          }}>
+        {challengeBadges.map((badge) => {
+          return (
+            <div
+              key={badge.id}
+              className="glass-card"
+              style={{
+                padding: '1rem',
+                textAlign: 'center',
+                opacity: 0.55,
+                filter: 'grayscale(70%)',
+                minHeight: 206,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                border: '1px solid var(--glass-border)',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '2.75rem', lineHeight: 1, marginBottom: '0.75rem' }}>{badge.icon}</div>
+                <div style={{ fontWeight: 900, color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                  {badge.title}
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.5, marginTop: '0.45rem', minHeight: '2.5em' }}>
+                  {badge.desc}
+                </div>
+              </div>
+              <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                🔒 조건 미달성
+              </div>
+            </div>
+          )
+        })}
+          </div>
+        </section>
+      )}
+
+      {/* 업그레이드 확인 모달 */}
+      {badgeUpgradeTarget && createPortal(
+        <div onClick={() => setBadgeUpgradeTarget(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <Motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="glass-card"
+            style={{ maxWidth: '420px', width: '100%', padding: '2rem', textAlign: 'center' }}
+          >
+            <div style={{
+              display: 'grid',
+              placeItems: 'center',
+              margin: '0 auto 1.35rem',
+              minHeight: 300,
+              borderRadius: 18,
+              background: 'radial-gradient(circle at 50% 18%, rgba(255, 215, 0, 0.16), rgba(15, 23, 42, 0.18) 64%)',
+            }}>
+              {badgeUpgradeTarget.premiumImage && (
+                <img src={badgeUpgradeTarget.premiumImage} alt={badgeUpgradeTarget.title} style={{ width: 'min(100%, 260px)', height: 326, objectFit: 'contain', filter: 'drop-shadow(0 22px 30px rgba(0,0,0,0.42))' }} />
+              )}
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              {BADGE_UPGRADE_COST}광석으로 프리미엄 디자인을 각성합니다. 각성 후 영구 소장됩니다.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={() => setBadgeUpgradeTarget(null)} style={{
+                flex: 1, padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--glass-border)',
+                background: 'transparent', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer'
+              }}>
+                취소
+              </button>
+              <button
+                onClick={() => onPurchaseUpgrade(badgeUpgradeTarget)}
+                disabled={purchasing || (userData?.crystals || 0) < BADGE_UPGRADE_COST}
+                style={{
+                  flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none',
+                  background: 'linear-gradient(135deg, var(--star-gold), #ffb347)',
+                  color: '#1a1a2e',
+                  fontWeight: 800,
+                  cursor: purchasing || (userData?.crystals || 0) < BADGE_UPGRADE_COST ? 'not-allowed' : 'pointer',
+                  opacity: purchasing || (userData?.crystals || 0) < BADGE_UPGRADE_COST ? 0.65 : 1,
+                }}
+              >
+                💎 프리미엄 각성
+              </button>
+            </div>
+          </Motion.div>
+        </div>,
+        document.body
+      )}
+    </>
   )
 }

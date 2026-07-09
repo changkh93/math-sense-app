@@ -12,7 +12,7 @@ import { getEffectiveStreak, getKSTComponents, getTodayKST } from '../../utils/s
 import { calculateSEI } from '../../utils/rankingUtils';
 import { getBaseTheme, getFrameSurfaceStyles, getProfileFrame, isHallSpotlightActive } from '../../utils/socialUtils';
 import { parseInlineFormatting } from '../../utils/formatUtils';
-import { buildCollectionBadges } from '../../utils/badgeUtils';
+import { buildCollectionBadges, isBadgeUpgradeOwned } from '../../utils/badgeUtils';
 import auroraObservatoryImage from '../../assets/themes/aurora-observatory.jpg';
 import goldenArchiveImage from '../../assets/themes/golden-archive.jpg';
 import deepSeaLabImage from '../../assets/themes/deep-sea-lab.jpg';
@@ -68,7 +68,7 @@ function mergeBadges(...badgeGroups) {
     .flat()
     .filter((badge) => badge?.unlocked)
     .filter((badge) => {
-      const key = badge.title;
+      const key = badge.id || badge.title;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -608,8 +608,17 @@ export default function PublicProfile() {
     ? `${frameTheme.glow}, 0 0 44px color-mix(in srgb, ${baseTheme.accent} 18%, transparent)`
     : frameTheme.glow;
   const earnedBadges = profile
-    ? mergeBadges(buildCollectionBadges(profile, history))
+    ? mergeBadges(buildCollectionBadges(profile, history)).sort((a, b) => {
+      if (a.id === profile.featuredPremiumBadgeId) return -1;
+      if (b.id === profile.featuredPremiumBadgeId) return 1;
+      return 0;
+    })
     : [];
+  const featuredPremiumBadge = earnedBadges.find((badge) => (
+    badge.id === profile?.featuredPremiumBadgeId
+    && !!badge.premiumImage
+    && isBadgeUpgradeOwned(profile, badge.id)
+  ));
   const conceptMap = React.useMemo(
     () => buildConceptMap(history, refinementSignals, isOwnProfile),
     [history, refinementSignals, isOwnProfile]
@@ -658,7 +667,7 @@ export default function PublicProfile() {
         ) : profile ? (
           <>
             <MotionDiv
-              className="public-profile-hero"
+              className={`public-profile-hero ${featuredPremiumBadge ? 'public-profile-hero--with-premium' : ''}`}
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
@@ -686,10 +695,16 @@ export default function PublicProfile() {
                     <span className="public-profile-showcase-chip">SHOWCASE</span>
                   )}
                 </div>
-                {profile.publicSignature && (
+              {profile.publicSignature && (
                   <p className="public-profile-signature">“{profile.publicSignature}”</p>
                 )}
               </div>
+
+              {featuredPremiumBadge && (
+                <div className="public-profile-featured-premium-badge" aria-label="대표 프리미엄 배지">
+                  <img src={featuredPremiumBadge.premiumImage} alt={featuredPremiumBadge.title} />
+                </div>
+              )}
 
               <div className="public-profile-tier">
                 <span>{seiData?.tier?.icon}</span>
@@ -842,13 +857,23 @@ export default function PublicProfile() {
               </h2>
               {earnedBadges.length > 0 ? (
                 <div className="public-profile-badges" aria-label="획득한 배지 목록">
-                  {earnedBadges.map((badge) => (
-                    <div key={badge.title} className="public-profile-badge">
-                      <span>{badge.icon}</span>
-                      <strong>{badge.title}</strong>
-                      <small>{badge.desc}</small>
+                  {earnedBadges.map((badge) => {
+                    const showPremium = isBadgeUpgradeOwned(profile, badge.id)
+                      && !!badge.premiumImage;
+                    return (
+                    <div key={badge.id} className={`public-profile-badge ${showPremium ? 'is-premium' : ''}`}>
+                      {showPremium ? (
+                        <img className="public-profile-badge-premium-image" src={badge.premiumImage} alt={badge.title} />
+                      ) : (
+                        <>
+                          <span>{badge.icon}</span>
+                          <strong>{badge.title}</strong>
+                          <small>{badge.desc}</small>
+                        </>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="public-profile-muted">아직 공개할 획득 배지가 없습니다.</p>

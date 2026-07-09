@@ -172,7 +172,6 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   ];
 
   const mobileMoreNav = [
-    { view: 'collection', label: '데이터베이스', icon: '🗂️' },
     { view: 'ranking', label: '랭킹', icon: '🏅' },
     { view: 'store', label: '스토어', icon: '🎨' },
     { view: 'crew', label: '스터디크루', icon: '🛰️' },
@@ -277,12 +276,6 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           onClick={() => handleNavClick('planet', '/')}
         >
           🪐 NAV
-        </button>
-        <button 
-          className={`space-nav-link ${currentView === 'collection' ? 'active' : ''}`}
-          onClick={() => handleNavClick('collection', '/')}
-        >
-          🏆 DATABASE
         </button>
         <button
           className={`space-nav-link ${currentView === 'mistake_notebook' ? 'active' : ''}`}
@@ -537,7 +530,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         ))}
         <button
           type="button"
-          className={`mobile-bottom-tab ${isMobileMoreOpen || ['dashboard', 'collection', 'ranking', 'store', 'crew'].includes(currentView) ? 'active' : ''}`}
+          className={`mobile-bottom-tab ${isMobileMoreOpen || ['dashboard', 'ranking', 'store', 'crew'].includes(currentView) ? 'active' : ''}`}
           onClick={handleToggleMobileMore}
         >
           <span>☰</span>

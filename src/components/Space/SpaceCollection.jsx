@@ -1,5 +1,5 @@
 import React from 'react'
-import { buildCollectionBadges } from '../../utils/badgeUtils';
+import { buildCollectionBadges, isBadgeUpgradeOwned } from '../../utils/badgeUtils';
 /**
  * SpaceCollection - 우주 도감 및 배지
  */
@@ -41,30 +41,52 @@ export default function SpaceCollection({ userData, history }) {
         gap: '1.5rem',
         marginBottom: '4rem'
       }}>
-        {badges.map((badge, idx) => (
-          <div 
-            key={idx} 
-            className="glass-card" 
-            style={{ 
-              padding: '1.5rem', 
+        {badges.map((badge) => {
+          const showPremium = badge.unlocked
+            && isBadgeUpgradeOwned(userData, badge.id)
+            && !!badge.premiumImage;
+          return (
+          <div
+            key={badge.id}
+            className="glass-card"
+            style={{
+              padding: showPremium ? '0.75rem' : '1.5rem',
               textAlign: 'center',
               opacity: badge.unlocked ? 1 : 0.4,
               filter: badge.unlocked ? 'none' : 'grayscale(100%)',
-              border: badge.unlocked ? '1px solid var(--star-gold)' : '1px solid var(--glass-border)',
+              border: showPremium ? '1px solid var(--star-gold)' : (badge.unlocked ? '1px solid var(--star-gold)' : '1px solid var(--glass-border)'),
+              minHeight: showPremium ? 292 : undefined,
+              display: showPremium ? 'grid' : undefined,
+              placeItems: showPremium ? 'center' : undefined,
+              background: showPremium
+                ? 'radial-gradient(circle at 50% 18%, rgba(255, 215, 0, 0.18), rgba(23, 23, 54, 0.94) 62%)'
+                : undefined,
+              boxShadow: showPremium ? '0 16px 44px rgba(0,0,0,0.32), 0 0 26px rgba(255, 215, 0, 0.22)' : 'none',
               transition: 'transform 0.3s ease',
               cursor: 'default'
             }}
           >
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{badge.icon}</div>
-            <div style={{ fontWeight: 800, color: badge.unlocked ? 'var(--star-gold)' : 'var(--text-muted)', marginBottom: '0.5rem' }}>
-              {badge.title}
+            <div style={{ fontSize: '3rem', marginBottom: '1rem', lineHeight: 1 }}>
+              {showPremium ? (
+                <img src={badge.premiumImage} alt={badge.title} style={{ width: 'min(100%, 205px)', height: 268, objectFit: 'contain', filter: 'drop-shadow(0 20px 28px rgba(0,0,0,0.4))' }} />
+              ) : (
+                <span>{badge.icon}</span>
+              )}
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', minHeight: '3em' }}>{badge.desc}</div>
-            <div style={{ marginTop: '1rem', fontSize: '0.7rem', color: badge.unlocked ? 'var(--planet-green)' : 'var(--text-muted)' }}>
-              {badge.unlocked ? '✅ 획득 완료' : '🔒 잠겨 있음'}
-            </div>
+            {!showPremium && (
+              <>
+                <div style={{ fontWeight: 800, color: badge.unlocked ? 'var(--star-gold)' : 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                  {badge.title}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', minHeight: '3em' }}>{badge.desc}</div>
+                <div style={{ marginTop: '1rem', fontSize: '0.7rem', color: badge.unlocked ? 'var(--planet-green)' : 'var(--text-muted)' }}>
+                  {badge.unlocked ? '✅ 획득 완료' : '🔒 잠겨 있음'}
+                </div>
+              </>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
 
