@@ -69,12 +69,12 @@ export function calculateBattleData(user = {}) {
   const bestStreak = readCounter(user.battleBestStreak);
   const explicitBattleRating = readCounter(user.battleRating);
   const hasExplicitBattleRating = explicitBattleRating > 0;
-  const fallbackRating = totalMatches > 0
+  const estimatedBattleRating = totalMatches > 0
     ? BATTLE_RATING_FLOOR
       + Math.round(calculateWilsonLowerBound(wins, totalMatches) * 350)
       + Math.round(Math.min(1, totalMatches / 20) * 150)
     : 0;
-  const battleRating = hasExplicitBattleRating ? explicitBattleRating : fallbackRating;
+  const battleRating = hasExplicitBattleRating ? explicitBattleRating : 0;
 
   // 1. Rating 정규화 (최대 420). 1000=0점, 1900=420점 선형.
   const ratingNorm = BATTLE_RATING_CEIL > BATTLE_RATING_FLOOR
@@ -91,12 +91,15 @@ export function calculateBattleData(user = {}) {
   // 4. 연승 보정 (최대 50). 5연승부터 만점.
   const streakScore = Math.floor(Math.min(1, bestStreak / 5) * BATTLE_SEI_STREAK_MAX);
 
-  const score = Math.min(BATTLE_MAX_SCORE, ratingScore + winRateScore + volumeScore + streakScore);
+  const score = hasExplicitBattleRating
+    ? Math.min(BATTLE_MAX_SCORE, ratingScore + winRateScore + volumeScore + streakScore)
+    : 0;
 
   return {
     score,
     battleRating,
     explicitBattleRating,
+    estimatedBattleRating,
     hasExplicitBattleRating,
     totalMatches,
     wins,

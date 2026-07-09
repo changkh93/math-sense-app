@@ -788,7 +788,7 @@ function calculateBattleRating(summary = {}, options = {}) {
   const winRateScore = Math.round(wilsonLowerBound(wins, totalMatches) * BATTLE_RATING_WILSON_MAX);
 
   // 2. 평균 정답률 점수 (최대 250)
-  const correctRate = totalAnswered > 0 ? totalCorrect / totalAnswered : 0;
+  const correctRate = totalAnswered > 0 ? clamp(totalCorrect / totalAnswered, 0, 1) : 0;
   const correctScore = Math.round(correctRate * BATTLE_RATING_CORRECT_MAX);
 
   // 3. 참여량 신뢰도 (최대 150). 20전부터 만점, 그 전까지 선형.
@@ -918,6 +918,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       const opponentDisplayName = (participants[opponentUid] || {}).displayName || "";
       const myCorrect = Number(participant.correctCount || 0);
       const myAnswered = Number(participant.answeredCount || 0);
+      const ratingQuestionCount = totalQuestions > 0 ? totalQuestions : Math.max(myAnswered, myCorrect);
       const isComplete = totalQuestions > 0 && myAnswered >= totalQuestions;
       const isForfeit = participant.forfeited === true;
       const isPerfectWin = didWin && totalQuestions > 0 && myCorrect >= totalQuestions;
@@ -981,7 +982,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         losses: FieldValue.increment(didLose ? 1 : 0),
         draws: FieldValue.increment(didDraw ? 1 : 0),
         totalCorrect: FieldValue.increment(myCorrect),
-        totalAnswered: FieldValue.increment(myAnswered),
+        totalAnswered: FieldValue.increment(ratingQuestionCount),
         totalScore: FieldValue.increment(Number(participant.score || 0)),
         completionCount: FieldValue.increment(isComplete ? 1 : 0),
         forfeitCount: FieldValue.increment(isForfeit ? 1 : 0),
@@ -2664,7 +2665,11 @@ exports.backfillQuizBattleStats = regionalFunctions.https.onCall(async (data, co
       const isDraw = result === "draw";
       const isLoss = result === "loss";
       const correct = Number(b.correctCount || 0);
-      const answered = Number(b.answeredCount || b.totalCount || 0);
+      const answered = Math.max(
+        Number(b.answeredCount || 0),
+        Number(b.totalCount || 0),
+        Number(b.correctCount || 0)
+      );
       const total = Number(b.totalCount || 0);
       const score = Number(b.score || 0);
       const isComplete = total > 0 && answered >= total;
@@ -2817,6 +2822,7 @@ exports.backfillQuizBattleStats = regionalFunctions.https.onCall(async (data, co
       battleRating,
       battleBestStreak: summary.bestStreak || 0,
       battleCurrentStreak: summary.currentStreak || 0,
+      battleStatsSyncedAt: FieldValue.serverTimestamp(),
       totalBattleMatches: summary.totalMatches,
       totalBattleWins: summary.wins,
       totalBattleLosses: summary.losses,

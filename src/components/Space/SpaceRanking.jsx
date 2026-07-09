@@ -393,7 +393,8 @@ export default function SpaceRanking({ user, userData }) {
             순위는 <strong style={{ color: 'var(--text-bright)' }}>배틀 SEI</strong> 높은 순입니다.
             배틀 SEI는 보정 Rating, Wilson 보정 승률, 참여량, 연승을 함께 반영합니다.
             단순히 전적 수가 많은 순서가 아니며, 3전 미만은 <strong style={{ color: '#fbbf24' }}>배치 중</strong>으로 표시됩니다.
-            기존 전적은 있지만 Rating이 아직 동기화되지 않은 경우에는 임시 <strong style={{ color: '#f43f5e' }}>RATING 추정</strong>을 사용하고, 백필 후 실제 Rating으로 자동 전환됩니다.
+            기존 전적은 있지만 Rating이 아직 동기화되지 않은 경우에는 <strong style={{ color: '#fbbf24' }}>통계 동기화 중</strong>으로 표시하고,
+            공식 Rating 계산이 끝난 뒤 순위에 반영합니다.
           </div>
         </div>
       )}
@@ -774,7 +775,7 @@ export default function SpaceRanking({ user, userData }) {
                             const noBattle = matches === 0;
                             const battleData = u.seiData?.battleData || {};
                             const displayRating = battleData.battleRating || 0;
-                            const isEstimatedRating = matches > 0 && !battleData.hasExplicitBattleRating;
+                            const isSyncPending = matches > 0 && !battleData.hasExplicitBattleRating;
                             return (
                           <>
                             {/* 배틀 SEI: 배틀 아레나의 실제 순위 기준 */}
@@ -789,10 +790,10 @@ export default function SpaceRanking({ user, userData }) {
                             {/* 배틀 RATING */}
                             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                               <span style={{ color: '#f43f5e', fontWeight: 800, fontSize: '1.2rem', textShadow: '0 0 10px rgba(244,63,94,0.3)' }}>
-                                {noBattle ? '—' : displayRating}
+                                {noBattle || isSyncPending ? '—' : displayRating}
                               </span>
                               <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>
-                                {isEstimatedRating ? 'RATING 추정' : 'RATING'}
+                                {isSyncPending ? '통계 동기화 중' : 'RATING'}
                               </span>
                             </div>
                             {/* 전적 + 승률 */}
