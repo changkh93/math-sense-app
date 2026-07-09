@@ -46,27 +46,35 @@ const MissionMarkdownViewer = ({ text, imageMode = 'default' }) => {
       continue;
     }
 
-    // Handle Math Block ($$)
-    if (line.trim().startsWith('$$')) {
-      if (inMathBlock) {
-        // End of block math
+    if (inMathBlock) {
+      const closeIndex = line.indexOf('$$');
+      if (closeIndex >= 0) {
+        const mathBeforeClose = line.slice(0, closeIndex);
+        const trailingText = line.slice(closeIndex + 2).trim();
+        if (mathBeforeClose.trim()) currentMathLines.push(mathBeforeClose);
         blocks.push({ type: 'math-block', content: currentMathLines.join('\n') });
         inMathBlock = false;
         currentMathLines = [];
+        if (trailingText) blocks.push({ type: 'line', content: trailingText });
       } else {
-        // Check if it's a single-line block math: $$ math $$
-        const singleLineMatch = line.trim().match(/^\$\$(.*)\$\$$/);
-        if (singleLineMatch) {
-          blocks.push({ type: 'math-block', content: singleLineMatch[1] });
-        } else {
-          inMathBlock = true;
-        }
+        currentMathLines.push(line);
       }
       continue;
     }
 
-    if (inMathBlock) {
-      currentMathLines.push(line);
+    // Handle Math Block ($$). Also preserve text that follows a same-line closing $$.
+    if (line.trim().startsWith('$$')) {
+      const singleLineMatch = line.trim().match(/^\$\$(.*?)\$\$\s*(.*)$/);
+      if (singleLineMatch) {
+        blocks.push({ type: 'math-block', content: singleLineMatch[1] });
+        if (singleLineMatch[2]) {
+          blocks.push({ type: 'line', content: singleLineMatch[2] });
+        }
+      } else {
+        inMathBlock = true;
+        const openingContent = line.replace(/^\s*\$\$\s?/, '');
+        if (openingContent.trim()) currentMathLines.push(openingContent);
+      }
       continue;
     }
 
