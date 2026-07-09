@@ -64,10 +64,17 @@ const BATTLE_RATING_FLOOR = 1000;
 const BATTLE_RATING_CEIL = 1900;
 
 export function calculateBattleData(user = {}) {
-  const battleRating = readCounter(user.battleRating);
   const totalMatches = readCounter(user.totalBattleMatches);
   const wins = readCounter(user.totalBattleWins);
   const bestStreak = readCounter(user.battleBestStreak);
+  const explicitBattleRating = readCounter(user.battleRating);
+  const hasExplicitBattleRating = explicitBattleRating > 0;
+  const fallbackRating = totalMatches > 0
+    ? BATTLE_RATING_FLOOR
+      + Math.round(calculateWilsonLowerBound(wins, totalMatches) * 350)
+      + Math.round(Math.min(1, totalMatches / 20) * 150)
+    : 0;
+  const battleRating = hasExplicitBattleRating ? explicitBattleRating : fallbackRating;
 
   // 1. Rating 정규화 (최대 420). 1000=0점, 1900=420점 선형.
   const ratingNorm = BATTLE_RATING_CEIL > BATTLE_RATING_FLOOR
@@ -89,6 +96,8 @@ export function calculateBattleData(user = {}) {
   return {
     score,
     battleRating,
+    explicitBattleRating,
+    hasExplicitBattleRating,
     totalMatches,
     wins,
     bestStreak,

@@ -538,12 +538,17 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     .filter(({ row, course }) => belongsToCourse({ ...row, clusterId: course }, courseId, mergedOptions))
     .map(({ row }) => row);
   const codeTraceRows = rows.filter((row) => row.type === 'code_trace');
-  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace'].includes(row.type || 'quiz_pass'));
+  // 퀴즈 배틀은 점수 체계(0~1500, 정답x100)가 일반 퀴즈(0~100)와 다르므로 별도로 분리한다.
+  // 분리하지 않으면 배틀 점수가 averageScore를 오염시킨다.
+  const battleRows = rows.filter((row) => row.type === 'quiz_battle');
+  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle'].includes(row.type || 'quiz_pass'));
   const videoRows = rows.filter((row) => ['video', 'video_complete', 'recovery_mastery'].includes(row.type));
   const textRows = rows.filter((row) => ['text', 'data_log_read'].includes(row.type));
   const dataLogRows = rows.filter((row) => row.type === 'data_log_read');
   const attentionRows = rows.filter((row) => row.attentionResult === 'hit' || row.attentionResult === 'miss');
+  // averageScore는 일반 퀴즈 점수(0~100)만으로 계산한다. 배틀 점수(0~1500)는 제외.
   const scoreRows = quizRows.map((row) => Number(row.score)).filter(Number.isFinite);
+  const battleAssessment = assessBattleLearning(battleRows);
   const titleSet = new Set(rows.map((row) => normalizeText(row.unitTitle || row.transmissionTitle || row.regionTitle)).filter(Boolean));
 
   // learning_progress에서 진행 중 퀴즈/부분 시청 영상을 추가로 추출한다.

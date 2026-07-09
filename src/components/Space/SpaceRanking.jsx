@@ -160,7 +160,9 @@ export default function SpaceRanking({ user, userData }) {
           const bHasBattle = bMatches > 0;
           if (aHasBattle !== bHasBattle) return bHasBattle ? 1 : -1;
           if ((b.seiData?.battle || 0) !== (a.seiData?.battle || 0)) return (b.seiData?.battle || 0) - (a.seiData?.battle || 0);
-          if ((b.battleRating || 0) !== (a.battleRating || 0)) return (b.battleRating || 0) - (a.battleRating || 0);
+          const aRating = a.seiData?.battleData?.battleRating || 0;
+          const bRating = b.seiData?.battleData?.battleRating || 0;
+          if (bRating !== aRating) return bRating - aRating;
           const aWinRate = aMatches > 0 ? (a.totalBattleWins || 0) / aMatches : 0;
           const bWinRate = bMatches > 0 ? (b.totalBattleWins || 0) / bMatches : 0;
           if (bWinRate !== aWinRate) return bWinRate - aWinRate;
@@ -195,7 +197,7 @@ export default function SpaceRanking({ user, userData }) {
               const prevWinRate = prevMatches > 0 ? (prev.totalBattleWins || 0) / prevMatches : 0;
               const currWinRate = currMatches > 0 ? (curr.totalBattleWins || 0) / currMatches : 0;
               isTie = (prev.seiData?.battle || 0) === (curr.seiData?.battle || 0) &&
-                      (prev.battleRating || 0) === (curr.battleRating || 0) &&
+                      (prev.seiData?.battleData?.battleRating || 0) === (curr.seiData?.battleData?.battleRating || 0) &&
                       prevWinRate === currWinRate &&
                       prevMatches === currMatches;
             }
@@ -316,6 +318,7 @@ export default function SpaceRanking({ user, userData }) {
 
   const kstNow = new Date(Date.now() + 9 * 3600000);
   const isMondayMorning = kstNow.getUTCDay() === 1 && kstNow.getUTCHours() < 12;
+  const showUniverseHighlights = rankMode === 'sei';
 
   return (
     <Motion.div 
@@ -376,130 +379,153 @@ export default function SpaceRanking({ user, userData }) {
 
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '1rem',
-        marginBottom: '1.75rem'
-      }}>
-        <div className="glass-card hud-border" style={{ padding: '1.2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.8rem' }}>
-            <h3 style={{ margin: 0, color: 'var(--text-bright)' }}>🏆 이번 주 명예의 전당</h3>
-            <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-              최근 {HALL_OF_FAME_LOOKBACK_DAYS}일
-            </span>
+      {rankMode === 'battle' && (
+        <div className="glass-card hud-border" style={{
+          padding: '1rem 1.2rem',
+          marginBottom: '1.5rem',
+          borderColor: 'rgba(244, 63, 94, 0.35)',
+          background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.12), rgba(255,255,255,0.04))'
+        }}>
+          <div style={{ color: '#f43f5e', fontWeight: 900, marginBottom: '0.45rem' }}>
+            ⚔️ 배틀 아레나 랭킹 기준
           </div>
-          <div style={{ display: 'grid', gap: '0.8rem' }}>
-              <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
-                <div style={{ color: '#fbbf24', fontWeight: 800, marginBottom: '0.35rem' }}>친절한 설명상</div>
-              {hallOfFame.bestAnswer?.userId ? (
-                <button
-                  type="button"
-                  className="ranking-profile-link ranking-profile-link-inline"
-                  onClick={(event) => openPublicProfile(event, hallOfFame.bestAnswer.userId)}
-                >
-                  {hallOfFame.bestAnswer?.publicProfileSnapshot?.displayName || hallOfFame.bestAnswer?.userName || '아직 선정 중'}
-                </button>
-              ) : (
-                <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>아직 선정 중</div>
-              )}
-              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem', lineHeight: 1.45 }}>
-                {hallOfFame.bestAnswer ? (hallOfFame.bestAnswer.content || '').slice(0, 72) : '채택/인증/설명 밀도를 기준으로 계산합니다.'}
-              </div>
-            </div>
-            <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
-              <div style={{ color: '#60a5fa', fontWeight: 800, marginBottom: '0.35rem' }}>질문 개척상</div>
-              <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>
-                {hallOfFame.bestQuestion
-                  ? (hallOfFame.bestQuestion.anonymousLabel || getAnonymousLabel(hallOfFame.bestQuestion.userId))
-                  : '아직 선정 중'}
-              </div>
-              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem', lineHeight: 1.45 }}>
-                {hallOfFame.bestQuestion ? (hallOfFame.bestQuestion.content || '').slice(0, 72) : '질문자는 계속 익명으로 보호됩니다.'}
-              </div>
-            </div>
-              <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
-                <div style={{ color: '#34d399', fontWeight: 800, marginBottom: '0.35rem' }}>급상승 파일럿</div>
-              {hallOfFame.growthStar?.id ? (
-                <button
-                  type="button"
-                  className="ranking-profile-link ranking-profile-link-inline"
-                  onClick={(event) => openPublicProfile(event, hallOfFame.growthStar.id)}
-                >
-                  {hallOfFame.growthStar?.publicDisplayName || hallOfFame.growthStar?.studentName || hallOfFame.growthStar?.name || '아직 선정 중'}
-                </button>
-              ) : (
-                <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>아직 선정 중</div>
-              )}
-              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                이번 주 성장 +{hallOfFame.growthStar?.weeklyGain || 0}
-              </div>
-            </div>
+          <div className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.86rem', lineHeight: 1.65 }}>
+            순위는 <strong style={{ color: 'var(--text-bright)' }}>배틀 SEI</strong> 높은 순입니다.
+            배틀 SEI는 보정 Rating, Wilson 보정 승률, 참여량, 연승을 함께 반영합니다.
+            단순히 전적 수가 많은 순서가 아니며, 3전 미만은 <strong style={{ color: '#fbbf24' }}>배치 중</strong>으로 표시됩니다.
+            기존 전적은 있지만 Rating이 아직 동기화되지 않은 경우에는 임시 <strong style={{ color: '#f43f5e' }}>RATING 추정</strong>을 사용하고, 백필 후 실제 Rating으로 자동 전환됩니다.
           </div>
         </div>
+      )}
 
-        <div className="glass-card hud-border" style={{ padding: '1.2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.8rem' }}>
-            <h3 style={{ margin: 0, color: 'var(--text-bright)' }}>🛰️ 스터디 크루 리더보드</h3>
-            <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-              크루 상위 5팀
-            </span>
-          </div>
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            {crewLeaderboard.length === 0 ? (
-              <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.86rem' }}>
-                아직 크루가 없습니다. 상점에서 창설권을 구매하고 프로필에서 팀을 만들어보세요.
+      {showUniverseHighlights && (
+        <>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '1rem',
+            marginBottom: '1.75rem'
+          }}>
+            <div className="glass-card hud-border" style={{ padding: '1.2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.8rem' }}>
+                <h3 style={{ margin: 0, color: 'var(--text-bright)' }}>🏆 이번 주 명예의 전당</h3>
+                <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                  최근 {HALL_OF_FAME_LOOKBACK_DAYS}일
+                </span>
               </div>
-            ) : crewLeaderboard.map((crew, index) => (
-              <div key={crew.crewId} style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '1rem',
-                alignItems: 'center',
-                padding: '0.85rem 0.95rem',
-                borderRadius: '14px',
-                background: 'rgba(255,255,255,0.04)'
-              }}>
-                <div>
-                  <div style={{ color: crew.crewColor, fontWeight: 800 }}>
-                    #{index + 1} {crew.crewName}
-                  </div>
-                  <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                    멤버 {crew.memberCount}명 · 총 SEI {crew.totalSEI}
+              <div style={{ display: 'grid', gap: '0.8rem' }}>
+                  <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
+                    <div style={{ color: '#fbbf24', fontWeight: 800, marginBottom: '0.35rem' }}>친절한 설명상</div>
+                  {hallOfFame.bestAnswer?.userId ? (
+                    <button
+                      type="button"
+                      className="ranking-profile-link ranking-profile-link-inline"
+                      onClick={(event) => openPublicProfile(event, hallOfFame.bestAnswer.userId)}
+                    >
+                      {hallOfFame.bestAnswer?.publicProfileSnapshot?.displayName || hallOfFame.bestAnswer?.userName || '아직 선정 중'}
+                    </button>
+                  ) : (
+                    <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>아직 선정 중</div>
+                  )}
+                  <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem', lineHeight: 1.45 }}>
+                    {hallOfFame.bestAnswer ? (hallOfFame.bestAnswer.content || '').slice(0, 72) : '채택/인증/설명 밀도를 기준으로 계산합니다.'}
                   </div>
                 </div>
-                <div style={{ color: '#34d399', fontWeight: 800 }}>
-                  +{crew.totalWeeklyGain}
+                <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
+                  <div style={{ color: '#60a5fa', fontWeight: 800, marginBottom: '0.35rem' }}>질문 개척상</div>
+                  <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>
+                    {hallOfFame.bestQuestion
+                      ? (hallOfFame.bestQuestion.anonymousLabel || getAnonymousLabel(hallOfFame.bestQuestion.userId))
+                      : '아직 선정 중'}
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem', lineHeight: 1.45 }}>
+                    {hallOfFame.bestQuestion ? (hallOfFame.bestQuestion.content || '').slice(0, 72) : '질문자는 계속 익명으로 보호됩니다.'}
+                  </div>
+                </div>
+                  <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
+                    <div style={{ color: '#34d399', fontWeight: 800, marginBottom: '0.35rem' }}>급상승 파일럿</div>
+                  {hallOfFame.growthStar?.id ? (
+                    <button
+                      type="button"
+                      className="ranking-profile-link ranking-profile-link-inline"
+                      onClick={(event) => openPublicProfile(event, hallOfFame.growthStar.id)}
+                    >
+                      {hallOfFame.growthStar?.publicDisplayName || hallOfFame.growthStar?.studentName || hallOfFame.growthStar?.name || '아직 선정 중'}
+                    </button>
+                  ) : (
+                    <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>아직 선정 중</div>
+                  )}
+                  <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                    이번 주 성장 +{hallOfFame.growthStar?.weeklyGain || 0}
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
+            </div>
 
-      <div className="glass-card hud-border" style={{ padding: '1rem 1.2rem', marginBottom: '1.75rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ color: 'var(--text-bright)', fontWeight: 800 }}>내 쇼케이스 강조</div>
-          <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.84rem', marginTop: '0.25rem' }}>
-            보유 {userData?.hallShowcaseCredits || 0}회 · 활성 상태 {isHallSpotlightActive(userData) ? '진행 중' : '대기'}
+            <div className="glass-card hud-border" style={{ padding: '1.2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.8rem' }}>
+                <h3 style={{ margin: 0, color: 'var(--text-bright)' }}>🛰️ 스터디 크루 리더보드</h3>
+                <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                  크루 상위 5팀
+                </span>
+              </div>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {crewLeaderboard.length === 0 ? (
+                  <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.86rem' }}>
+                    아직 크루가 없습니다. 상점에서 창설권을 구매하고 프로필에서 팀을 만들어보세요.
+                  </div>
+                ) : crewLeaderboard.map((crew, index) => (
+                  <div key={crew.crewId} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    alignItems: 'center',
+                    padding: '0.85rem 0.95rem',
+                    borderRadius: '14px',
+                    background: 'rgba(255,255,255,0.04)'
+                  }}>
+                    <div>
+                      <div style={{ color: crew.crewColor, fontWeight: 800 }}>
+                        #{index + 1} {crew.crewName}
+                      </div>
+                      <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.78rem', marginTop: '0.25rem' }}>
+                        멤버 {crew.memberCount}명 · 총 SEI {crew.totalSEI}
+                      </div>
+                    </div>
+                    <div style={{ color: '#34d399', fontWeight: 800 }}>
+                      +{crew.totalWeeklyGain}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-        <button
-          onClick={handleActivateShowcase}
-          disabled={activatingShowcase || (userData?.hallShowcaseCredits || 0) < 1}
-          className="font-tech"
-          style={{
-            padding: '0.75rem 1.2rem',
-            borderRadius: '12px',
-            border: '1px solid rgba(251, 191, 36, 0.35)',
-            background: 'rgba(251, 191, 36, 0.12)',
-            color: '#fbbf24',
-            cursor: activatingShowcase ? 'wait' : 'pointer'
-          }}
-        >
-          {activatingShowcase ? '활성화 중...' : `1주 강조 활성화 (${HALL_SHOWCASE_DURATION_DAYS}일)`}
-        </button>
-      </div>
+
+          <div className="glass-card hud-border" style={{ padding: '1rem 1.2rem', marginBottom: '1.75rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ color: 'var(--text-bright)', fontWeight: 800 }}>내 쇼케이스 강조</div>
+              <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.84rem', marginTop: '0.25rem' }}>
+                보유 {userData?.hallShowcaseCredits || 0}회 · 활성 상태 {isHallSpotlightActive(userData) ? '진행 중' : '대기'}
+              </div>
+            </div>
+            <button
+              onClick={handleActivateShowcase}
+              disabled={activatingShowcase || (userData?.hallShowcaseCredits || 0) < 1}
+              className="font-tech"
+              style={{
+                padding: '0.75rem 1.2rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(251, 191, 36, 0.35)',
+                background: 'rgba(251, 191, 36, 0.12)',
+                color: '#fbbf24',
+                cursor: activatingShowcase ? 'wait' : 'pointer'
+              }}
+            >
+              {activatingShowcase ? '활성화 중...' : `1주 강조 활성화 (${HALL_SHOWCASE_DURATION_DAYS}일)`}
+            </button>
+          </div>
+        </>
+      )}
 
       <div className="glass-card hud-border ranking-main-area" style={{ 
         padding: '1.5rem', 
@@ -746,6 +772,9 @@ export default function SpaceRanking({ user, userData }) {
                             const matches = u.totalBattleMatches || 0;
                             const isPlacement = matches > 0 && matches < 3;
                             const noBattle = matches === 0;
+                            const battleData = u.seiData?.battleData || {};
+                            const displayRating = battleData.battleRating || 0;
+                            const isEstimatedRating = matches > 0 && !battleData.hasExplicitBattleRating;
                             return (
                           <>
                             {/* 배틀 SEI: 배틀 아레나의 실제 순위 기준 */}
@@ -760,9 +789,11 @@ export default function SpaceRanking({ user, userData }) {
                             {/* 배틀 RATING */}
                             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                               <span style={{ color: '#f43f5e', fontWeight: 800, fontSize: '1.2rem', textShadow: '0 0 10px rgba(244,63,94,0.3)' }}>
-                                {noBattle ? '—' : (u.battleRating || 0)}
+                                {noBattle ? '—' : displayRating}
                               </span>
-                              <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>RATING</span>
+                              <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>
+                                {isEstimatedRating ? 'RATING 추정' : 'RATING'}
+                              </span>
                             </div>
                             {/* 전적 + 승률 */}
                             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>

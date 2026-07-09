@@ -340,6 +340,48 @@ function summarizeQuizRows(rows) {
   }));
 }
 
+// 퀴즈 배틀은 일반 퀴즈와 점수 체계(0~1500, 정답x100)가 다르므로 별도로 요약한다.
+// 일반 퀴즈 점수(0~100) 평균이 배틀 점수로 오염되지 않도록 분리한다.
+function summarizeBattleRows(rows) {
+  return rows.map(item => ({
+    title: titleOf(item) || item.battleUnitTitle || '퀴즈 배틀',
+    score: Number(item.score) || 0,
+    correctCount: Number(item.correctCount) || 0,
+    totalCount: Number(item.totalCount) || 0,
+    answeredCount: Number(item.answeredCount) || 0,
+    result: item.battleResult || (item.forfeited ? 'forfeit' : ''),
+    forfeited: item.forfeited === true,
+    crystalsEarned: item.crystalsEarned || 0,
+    battleScope: item.battleScope || '',
+    timestamp: timestampToJson(item.timestamp),
+  }));
+}
+
+// 퀴즈 배틀을 학습 근거로 평가한다. 승패보다 참여 횟수와 정답률을 중심으로 본다.
+// SEI 랭킹과 동일한 철학: 패배해도 정답률과 참여가 학습 근거가 된다.
+// 단, 중도 포기(forfeited)는 성실한 복습에서 제외한다.
+function assessBattleLearning(battles = []) {
+  const completed = battles.filter(b => !b.forfeited);
+  const forfeitCount = battles.filter(b => b.forfeited).length;
+  const winCount = completed.filter(b => b.result === 'win').length;
+  const drawCount = completed.filter(b => b.result === 'draw').length;
+  const lossCount = completed.filter(b => b.result === 'loss').length;
+  const totalCorrect = completed.reduce((sum, b) => sum + (b.correctCount || 0), 0);
+  const totalQuestions = completed.reduce((sum, b) => sum + (b.totalCount || 0), 0);
+  const averageAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : null;
+  // 충분한 배틀 복습: 완료 3회 이상이거나 정답률 60% 이상 (포기 제외)
+  const isSufficientBattleReview = completed.length >= 3 || (completed.length > 0 && averageAccuracy !== null && averageAccuracy >= 60);
+  return {
+    battleCount: completed.length,
+    winCount,
+    drawCount,
+    lossCount,
+    forfeitCount,
+    averageAccuracy,
+    isSufficientBattleReview,
+  };
+}
+
 function summarizeCodeTraceRows(rows) {
   return rows.map(item => ({
     unitId: item.unitId || '',
@@ -594,7 +636,7 @@ async function getUserAssignments(uid) {
   return snap.docs.map(compactAssignment);
 }
 
-function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgressQuizzes, codeTraces, inProgressCodeTraces, attention, readingActivityCount = 0 }) {
+function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgressQuizzes, codeTraces, inProgressCodeTraces, attention, readingActivityCount = 0, battles = [] }) {
   const expectation = COURSE_EXPECTATIONS[normalizeCourseId(courseId)] || {
     label: courseId || '과정',
     totalMinutes: 0,
@@ -607,7 +649,9 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
   const target = expectation.platformTargetMinutes || 0;
   const ratio = target ? Math.round((videoMinutes / target) * 100) : null;
   const codeTraceActivityCount = (codeTraces?.length || 0) + (inProgressCodeTraces?.length || 0);
-  const hasPractice = quizzes.length > 0 || inProgressQuizzes.length > 0 || codeTraceActivityCount > 0;
+  // 퀴즈 배틀은 경쟁 복습/확인 활동으로 학습 근거에 포함한다(포기 제외).
+  const battleAssessment = assessBattleLearning(battles);
+  const hasPractice = quizzes.length > 0 || inProgressQuizzes.length > 0 || codeTraceActivityCount > 0 || battleAssessment.battleCount > 0;
   const hasConceptInput = videos.length > 0 || dataLogs.length > 0;
   const hasMathPlatformActivity = hasConceptInput || hasPractice;
   const isElementary = normalizeCourseId(courseId) === 'cluster_elementary';
@@ -627,10 +671,20 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
   if (codeTraces?.length) balanceSignals.push(`CODE TRACE 완료 ${codeTraces.length}개`);
   if (inProgressCodeTraces?.length) balanceSignals.push(`CODE TRACE 진행 중 ${inProgressCodeTraces.map(item => `${item.title} ${item.completedExerciseCount}/${item.totalExerciseCount || '?'}`).join(', ')}`);
   if (dataLogs.length) balanceSignals.push(`데이터 로그 ${dataLogs.length}개`);
+  // 퀴즈 배틀은 경쟁 복습 활동이므로 참여 횟수·승패·정답률을 함께 노출한다.
+  if (battleAssessment.battleCount > 0 || battleAssessment.forfeitCount > 0) {
+    const accStr = battleAssessment.averageAccuracy !== null ? `, 정답률 ${battleAssessment.averageAccuracy}%` : '';
+    const forfeitStr = battleAssessment.forfeitCount > 0 ? `, 포기 ${battleAssessment.forfeitCount}` : '';
+    balanceSignals.push(`퀴즈 배틀 ${battleAssessment.battleCount}회 (승 ${battleAssessment.winCount} 무 ${battleAssessment.drawCount} 패 ${battleAssessment.lossCount}${accStr}${forfeitStr})`);
+  }
   if (isElementary && readingActivityCount) balanceSignals.push(`독서/읽기 활동 ${readingActivityCount}건`);
   if (isElementary && readingActivityCount && !hasMathPlatformActivity) balanceSignals.push('독서 활동만 있고 수학 플랫폼 기록 없음');
   if (hasConceptInput && !hasPractice) balanceSignals.push('영상/개념 학습 대비 확인 활동 기록 없음');
-  if (!hasConceptInput && hasPractice) balanceSignals.push(codeTraceActivityCount > 0 ? 'CODE TRACE 중심 학습' : '퀴즈 위주 학습');
+  if (!hasConceptInput && hasPractice) {
+    if (codeTraceActivityCount > 0) balanceSignals.push('CODE TRACE 중심 학습');
+    else if (battleAssessment.battleCount > 0 && quizzes.length === 0 && inProgressQuizzes.length === 0) balanceSignals.push('퀴즈 배틀 중심 학습(복습)');
+    else balanceSignals.push('퀴즈 위주 학습');
+  }
   if (attention?.opportunities) balanceSignals.push(`집중도 광석 ${attention.hits}/${attention.opportunities}`);
 
   return {
@@ -644,11 +698,15 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
     hasMathPlatformActivity,
     readingActivityCount,
     balanceSignals,
+    battleCount: battleAssessment.battleCount,
+    battleForfeitCount: battleAssessment.forfeitCount,
+    battleAverageAccuracy: battleAssessment.averageAccuracy,
+    isSufficientBattleReview: battleAssessment.isSufficientBattleReview,
   };
 }
 
 async function getLearningSummary(uid, date, courseId = '', options = {}) {
-  if (!uid || !date) return { activityCount: 0, quizCount: 0, codeTraceCount: 0, codeTraceProgressCount: 0, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], codeTraces: [], inProgressCodeTraces: [] };
+  if (!uid || !date) return { activityCount: 0, quizCount: 0, codeTraceCount: 0, codeTraceProgressCount: 0, battleCount: 0, battleForfeitCount: 0, battleAverageAccuracy: null, isSufficientBattleReview: false, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], codeTraces: [], inProgressCodeTraces: [], battles: [] };
   const start = new Date(`${date}T00:00:00+09:00`);
   const end = new Date(`${date}T23:59:59+09:00`);
   const [snap, progressSnap] = await Promise.all([
@@ -660,7 +718,7 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     db.collection('users').doc(uid).collection('learning_progress').get().catch(() => null),
   ]);
 
-  if (!snap) return { activityCount: 0, quizCount: 0, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], codeTraces: [], inProgressCodeTraces: [] };
+  if (!snap) return { activityCount: 0, quizCount: 0, battleCount: 0, battleForfeitCount: 0, battleAverageAccuracy: null, isSufficientBattleReview: false, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], codeTraces: [], inProgressCodeTraces: [], battles: [] };
 
   const allItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -685,17 +743,23 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
   const readingItems = isElementary ? items.filter(isReadingRelatedItem) : [];
   const mathItems = isElementary ? items.filter(item => !isReadingRelatedItem(item)) : items;
   const codeTraceItems = mathItems.filter(item => item.type === 'code_trace');
-  const quizItems = mathItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace'].includes(item.type || 'quiz'));
-  const readingQuizItems = readingItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace'].includes(item.type || 'quiz'));
+  // 퀴즈 배틀은 점수 체계(0~1500)가 일반 퀴즈(0~100)와 다르므로 별도로 분리한다.
+  // 분리하지 않으면 배틀 점수가 averageScore를 오염시키고 "완료 퀴즈"에 묻혀 배틀 복습 활동이 안 보인다.
+  const battleItems = mathItems.filter(item => item.type === 'quiz_battle');
+  const quizItems = mathItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle'].includes(item.type || 'quiz'));
+  const readingQuizItems = readingItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle'].includes(item.type || 'quiz'));
   const videoItems = mathItems.filter(item => ['video', 'video_complete', 'recovery_mastery', 'attention'].includes(item.type) || item.attentionResult === 'hit' || item.attentionResult === 'miss');
   const dataLogItems = mathItems.filter(item => ['text', 'data_log_read'].includes(item.type));
   const attentionItems = mathItems.filter(item => item.attentionResult === 'hit' || item.attentionResult === 'miss');
+  // averageScore는 일반 퀴즈 점수(0~100)만으로 계산한다. 배틀 점수(0~1500)는 제외.
   const scores = quizItems.map(item => Number(item.score)).filter(Number.isFinite);
   const progressSummary = await summarizeLearningProgress(progressSnap?.docs || [], start, end, courseId, mergedOptions);
   const videos = summarizeVideoRows(videoItems);
   const allVideos = [...videos, ...progressSummary.videos];
   const quizzes = summarizeQuizRows(quizItems);
   const codeTraces = summarizeCodeTraceRows(codeTraceItems);
+  const battles = summarizeBattleRows(battleItems);
+  const battleAssessment = assessBattleLearning(battles);
   const progressActivityCount = progressSummary.inProgressQuizzes.length + progressSummary.videos.length + progressSummary.inProgressCodeTraces.length;
   const attentionHits = attentionItems.filter(item => item.attentionResult === 'hit').length;
   const attentionMisses = attentionItems.filter(item => item.attentionResult === 'miss').length;
@@ -722,6 +786,7 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     inProgressCodeTraces: progressSummary.inProgressCodeTraces,
     attention,
     readingActivityCount: readingItems.length,
+    battles,
   });
   const hasElementaryReadingOnly = isElementary && readingItems.length > 0 && !load.hasMathPlatformActivity;
 
@@ -737,6 +802,14 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     codeTraceCount: codeTraces.length,
     codeTraceProgressCount: progressSummary.inProgressCodeTraces.length,
     inProgressQuizCount: progressSummary.inProgressQuizzes.length,
+    // 퀴즈 배틀 요약 필드. 일반 퀴즈와 분리해 점수 체계를 섞지 않는다.
+    battleCount: battleAssessment.battleCount,
+    battleWinCount: battleAssessment.winCount,
+    battleDrawCount: battleAssessment.drawCount,
+    battleLossCount: battleAssessment.lossCount,
+    battleForfeitCount: battleAssessment.forfeitCount,
+    battleAverageAccuracy: battleAssessment.averageAccuracy,
+    isSufficientBattleReview: battleAssessment.isSufficientBattleReview,
     averageScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null,
     focusScore: attentionOpportunities ? Math.round((attentionHits / attentionOpportunities) * 100) : null,
     attention,
@@ -746,6 +819,7 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     quizzes,
     codeTraces,
     inProgressCodeTraces: progressSummary.inProgressCodeTraces,
+    battles,
     readingQuizzes: summarizeQuizRows(readingQuizItems),
     dataLogs: dataLogItems.map(item => ({
       title: titleOf(item),
@@ -767,6 +841,7 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
       ...progressSummary.videos.map(item => item.title),
       ...codeTraces.map(item => item.title),
       ...progressSummary.inProgressCodeTraces.map(item => item.title),
+      ...battles.map(item => item.title),
     ].filter(Boolean))].slice(0, 10),
     progressTitles: [...new Set(progressSummary.videos.map(item => item.title).filter(Boolean))].slice(0, 10),
     allTitles: [...new Set(allItems.map(titleOf).filter(Boolean))].slice(0, 12),
