@@ -4,8 +4,9 @@ import { Check, ChevronLeft, Eye, Lightbulb, LocateFixed, RotateCcw, Save } from
 import { EditorSelection, EditorState, RangeSetBuilder } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
 import { python } from '@codemirror/lang-python';
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Decoration, EditorView, GutterMarker, ViewPlugin, gutter, keymap } from '@codemirror/view';
+import { tags as syntaxTags } from '@lezer/highlight';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST } from '../../utils/streakUtils';
@@ -21,6 +22,19 @@ const CODE_PANEL_MAX_HEIGHT = 720;
 const CODE_PANEL_LINE_HEIGHT_PX = 23;
 const CODE_PANEL_VERTICAL_PADDING_PX = 32;
 const STRING_STRUCTURE_TOKEN = '__STRING__';
+const codeTraceHighlightStyle = HighlightStyle.define([
+  { tag: syntaxTags.keyword, color: '#f0abfc', fontWeight: '700' },
+  { tag: [syntaxTags.name, syntaxTags.variableName, syntaxTags.propertyName], color: '#f8fafc' },
+  { tag: syntaxTags.function(syntaxTags.variableName), color: '#93c5fd', fontWeight: '700' },
+  { tag: syntaxTags.definition(syntaxTags.variableName), color: '#67e8f9', fontWeight: '700' },
+  { tag: syntaxTags.className, color: '#fde68a', fontWeight: '700' },
+  { tag: [syntaxTags.number, syntaxTags.integer, syntaxTags.float], color: '#86efac', fontWeight: '700' },
+  { tag: [syntaxTags.string, syntaxTags.character], color: '#fca5a5' },
+  { tag: syntaxTags.comment, color: '#fdba74', fontStyle: 'italic' },
+  { tag: [syntaxTags.operator, syntaxTags.punctuation, syntaxTags.separator], color: '#e2e8f0' },
+  { tag: syntaxTags.bool, color: '#bef264', fontWeight: '700' },
+  { tag: syntaxTags.invalid, color: '#fecaca', backgroundColor: 'rgba(248,113,113,0.22)' },
+]);
 
 // 보상: 라인 수 비례 + 반복 연습 감쇠
 // 기본 보상 = 코드 줄 수 × 1.5 (반올림, 최소 2)
@@ -1095,7 +1109,7 @@ function CodeTraceEditor({
         extensions: [
           history(),
           python(),
-          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          syntaxHighlighting(codeTraceHighlightStyle, { fallback: true }),
           codeTracePlugin,
           codeTraceGutter,
           editorTheme,
