@@ -792,8 +792,8 @@ export default function MissionHub({
       : VIDEO_VOLUME_DEFAULT
   });
   const [isVideoMuted, setIsVideoMuted] = useState(() => localStorage.getItem('metasense_video_muted') === '1');
-  const [isMediaControlsOpen, setIsMediaControlsOpen] = useState(true);
-  const [isBottomActionsOpen, setIsBottomActionsOpen] = useState(true);
+  const [isMediaControlsOpen, setIsMediaControlsOpen] = useState(() => window.innerWidth >= 768);
+  const [isBottomActionsOpen, setIsBottomActionsOpen] = useState(() => window.innerWidth >= 768);
   
   useEffect(() => {
     if (completionBonusTimeLeft === null || completionBonusTimeLeft <= 0) return;
@@ -813,6 +813,14 @@ export default function MissionHub({
   const [isUiVisible, setIsUiVisible] = useState(true);
   const [isBottomHudInteracting, setIsBottomHudInteracting] = useState(false);
   const idleTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (currentMode !== 'video' || !selectedTx) return
+    setIsUiVisible(true)
+    setIsMediaControlsOpen(!isMobile)
+    setIsBottomActionsOpen(!isMobile)
+    setIsBottomHudInteracting(false)
+  }, [currentMode, selectedTx?.id, isMobile])
 
   const handlePlaybackRateChange = useCallback((rate) => {
     setPlaybackRate(rate)
@@ -871,7 +879,7 @@ export default function MissionHub({
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         setIsUiVisible(false);
-      }, 6500);
+      }, isMobile ? 2200 : 6500);
     };
 
     handleUserActivity();
@@ -886,7 +894,7 @@ export default function MissionHub({
       window.removeEventListener('keydown', handleUserActivity);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [currentMode]);
+  }, [currentMode, isMobile]);
 
   const handleOpenQuestionModal = (contextType) => {
     // If opening from video, pause the player
