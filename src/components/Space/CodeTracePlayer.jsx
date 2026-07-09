@@ -46,6 +46,21 @@ function trimTrailingWhitespace(line = '') {
   return line.replace(/\s+$/g, '');
 }
 
+function isCommentOnlyLine(line = '') {
+  return String(line || '').trimStart().startsWith('#');
+}
+
+function getTraceScoredLineEntries(code = '') {
+  return normalizeNewlines(code)
+    .split('\n')
+    .map((line, originalIndex) => ({ line, originalIndex }))
+    .filter(entry => !isCommentOnlyLine(entry.line));
+}
+
+function getTraceScoredCode(code = '') {
+  return getTraceScoredLineEntries(code).map(entry => entry.line).join('\n');
+}
+
 function getLeadingWhitespace(line = '') {
   return String(line || '').match(/^\s*/)?.[0] || '';
 }
@@ -270,6 +285,30 @@ function extractStringLiteralSuggestions(code = '') {
   return suggestions;
 }
 
+function extractCommentLineSuggestions(code = '') {
+  const seen = new Set();
+  return normalizeNewlines(code)
+    .split('\n')
+    .map((line, index) => ({
+      raw: line,
+      text: line.trimStart(),
+      lineNumber: index + 1,
+    }))
+    .filter(item => isCommentOnlyLine(item.raw))
+    .filter((item) => {
+      const key = item.text.replace(/\s+/g, ' ').trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map(item => ({
+      id: `comment-${item.lineNumber}-${item.text}`,
+      literal: item.text,
+      label: item.text.length > 34 ? `${item.text.slice(0, 31)}...` : item.text,
+      lineNumber: item.lineNumber,
+    }));
+}
+
 function normalizeStringSuggestionPrefix(prefix = '') {
   return String(prefix || '').replace(/['"]$/g, '').replace(/\s/g, '');
 }
@@ -289,10 +328,12 @@ function getStringSuggestionAtCursor(suggestions = [], studentCode = '', cursor 
 }
 
 function evaluateCode(answerCode, studentCode) {
-  const answer = normalizeNewlines(answerCode);
-  const student = normalizeNewlines(studentCode);
-  const answerLines = answer.split('\n');
-  const studentLines = student.split('\n');
+  const answerEntries = getTraceScoredLineEntries(answerCode);
+  const studentEntries = getTraceScoredLineEntries(studentCode);
+  const answerLines = answerEntries.map(entry => entry.line);
+  const studentLines = studentEntries.map(entry => entry.line);
+  const answer = answerLines.join('\n');
+  const student = studentLines.join('\n');
   const answerIndentRanks = buildIndentRankMap(answerLines);
   const studentIndentRanks = buildIndentRankMap(studentLines);
   const targetAnswer = normalizePythonCodeForStructureCompare(answer);
@@ -600,10 +641,10 @@ function alignLines(answerLines = [], studentLines = [], answerIndentRanks = nul
 }
 
 function analyzeCodeDiff(answerCode = '', studentCode = '') {
-  const answer = normalizeNewlines(answerCode);
-  const student = normalizeNewlines(studentCode);
-  const answerLines = answer.split('\n');
-  const studentLines = student.split('\n');
+  const answerEntries = getTraceScoredLineEntries(answerCode);
+  const studentEntries = getTraceScoredLineEntries(studentCode);
+  const answerLines = answerEntries.map(entry => entry.line);
+  const studentLines = studentEntries.map(entry => entry.line);
   const answerIndentRanks = buildIndentRankMap(answerLines);
   const studentIndentRanks = buildIndentRankMap(studentLines);
   const pairs = alignLines(answerLines, studentLines, answerIndentRanks, studentIndentRanks);
@@ -628,10 +669,12 @@ function analyzeCodeDiff(answerCode = '', studentCode = '') {
     if (!type) return;
     counts[type] = (counts[type] || 0) + 1;
     const issue = {
-      // 학생 측 줄 번호가 없으면(빠진 줄) 정답 측 줄 번호를 표시 기준으로 사용.
-      // UI는 학생 입력 기준 1-based 줄 번호를 보여주므로 studentIndex를 우선.
-      lineIndex: hasStudentLine ? pair.studentIndex : pair.answerIndex,
-      lineNumber: (hasStudentLine ? pair.studentIndex : pair.answerIndex) + 1,
+      lineIndex: hasStudentLine
+        ? studentEntries[pair.studentIndex]?.originalIndex ?? pair.studentIndex
+        : answerEntries[pair.answerIndex]?.originalIndex ?? pair.answerIndex,
+      lineNumber: (hasStudentLine
+        ? studentEntries[pair.studentIndex]?.originalIndex ?? pair.studentIndex
+        : answerEntries[pair.answerIndex]?.originalIndex ?? pair.answerIndex) + 1,
       type,
       answerLine,
       studentLine,
@@ -679,8 +722,8 @@ function remainingRewardedAttempts(attempt) {
 }
 
 function getLineCombo(answerCode = '', studentCode = '') {
-  const answerLines = mapStringLiterals(normalizeNewlines(answerCode), () => STRING_STRUCTURE_TOKEN).split('\n');
-  const studentLines = mapStringLiterals(normalizeNewlines(studentCode), () => STRING_STRUCTURE_TOKEN).split('\n');
+  const answerLines = mapStringLiterals(getTraceScoredCode(answerCode), () => STRING_STRUCTURE_TOKEN).split('\n');
+  const studentLines = mapStringLiterals(getTraceScoredCode(studentCode), () => STRING_STRUCTURE_TOKEN).split('\n');
   const answerIndentRanks = buildIndentRankMap(answerLines);
   const studentIndentRanks = buildIndentRankMap(studentLines);
   let combo = 0;
@@ -696,10 +739,10 @@ function getLineCombo(answerCode = '', studentCode = '') {
 }
 
 function getLineFeedback(answerCode = '', studentCode = '') {
-  const answerLines = normalizeNewlines(answerCode).split('\n');
-  const studentLines = normalizeNewlines(studentCode).split('\n');
-  const answerStructureLines = mapStringLiterals(normalizeNewlines(answerCode), () => STRING_STRUCTURE_TOKEN).split('\n');
-  const studentStructureLines = mapStringLiterals(normalizeNewlines(studentCode), () => STRING_STRUCTURE_TOKEN).split('\n');
+  const answerLines = getTraceScoredLineEntries(answerCode).map(entry => entry.line);
+  const studentLines = getTraceScoredLineEntries(studentCode).map(entry => entry.line);
+  const answerStructureLines = mapStringLiterals(answerLines.join('\n'), () => STRING_STRUCTURE_TOKEN).split('\n');
+  const studentStructureLines = mapStringLiterals(studentLines.join('\n'), () => STRING_STRUCTURE_TOKEN).split('\n');
   const answerIndentRanks = buildIndentRankMap(answerStructureLines);
   const studentIndentRanks = buildIndentRankMap(studentStructureLines);
   const lineCount = Math.max(answerLines.length, studentLines.length, 1);
@@ -771,19 +814,41 @@ function getCodeTraceCharStatus(answerLine = '', studentLine = '', index = 0, an
 
 function buildCodeTraceDecorations(view, answerCode = '') {
   const builder = new RangeSetBuilder();
-  const answerLines = normalizeNewlines(answerCode).split('\n');
+  const answerLines = getTraceScoredLineEntries(answerCode).map(entry => entry.line);
   const studentCode = view.state.doc.toString();
-  const studentLines = normalizeNewlines(studentCode).split('\n');
+  const studentRawLines = normalizeNewlines(studentCode).split('\n');
+  const studentLines = getTraceScoredLineEntries(studentCode).map(entry => entry.line);
   const answerIndentRanks = buildIndentRankMap(answerLines);
   const studentIndentRanks = buildIndentRankMap(studentLines);
+  const scoredIndexByOriginalLine = new Map();
+  let scoredIndex = 0;
+  studentRawLines.forEach((line, originalIndex) => {
+    if (isCommentOnlyLine(line)) return;
+    scoredIndexByOriginalLine.set(originalIndex, scoredIndex);
+    scoredIndex += 1;
+  });
 
   for (const { from, to } of view.visibleRanges) {
     let pos = from;
     while (pos <= to) {
       const line = view.state.doc.lineAt(pos);
       const lineIndex = line.number - 1;
-      const answerLine = answerLines[lineIndex] || '';
+      if (isCommentOnlyLine(line.text)) {
+        if (line.to >= to || line.to >= view.state.doc.length) break;
+        pos = line.to + 1;
+        continue;
+      }
+      const scoredLineIndex = scoredIndexByOriginalLine.get(lineIndex) ?? lineIndex;
+      const answerLine = answerLines[scoredLineIndex] || '';
       const studentLine = line.text || '';
+      if (
+        answerLine &&
+        normalizePythonLineForStructureCompare(answerLine, answerIndentRanks) === normalizePythonLineForStructureCompare(studentLine, studentIndentRanks)
+      ) {
+        if (line.to >= to || line.to >= view.state.doc.length) break;
+        pos = line.to + 1;
+        continue;
+      }
       let charPos = line.from;
 
       Array.from(studentLine).forEach((char, index) => {
@@ -903,8 +968,21 @@ function CodeTraceEditor({
       lineMarker(view, line) {
         const docLine = view.state.doc.lineAt(line.from);
         const code = view.state.doc.toString();
+        const rawLines = normalizeNewlines(code).split('\n');
+        if (isCommentOnlyLine(docLine.text)) {
+          return new CodeTraceLineMarker({
+            lineNumber: docLine.number,
+            done: true,
+            typed: true,
+            current: view.state.doc.lineAt(view.state.selection.main.head).number === docLine.number,
+          });
+        }
+        const scoredLineIndex = rawLines
+          .slice(0, Math.max(0, docLine.number - 1))
+          .filter(lineText => !isCommentOnlyLine(lineText))
+          .length;
         const lineFeedback = getLineFeedback(latestRef.current.answerCode, code);
-        const item = lineFeedback[docLine.number - 1] || {
+        const item = lineFeedback[scoredLineIndex] || {
           lineNumber: docLine.number,
           done: false,
           typed: Boolean(docLine.text),
@@ -1143,16 +1221,24 @@ export default function CodeTracePlayer({
   }, [learningProgress?.codeTrace?.crystalsEarnedTotal]);
 
   const exercise = exercises[exerciseIndex] || null;
+  const requiredAnswerCode = useMemo(
+    () => getTraceScoredCode(exercise?.answerCode || ''),
+    [exercise]
+  );
   const evaluation = useMemo(
-    () => evaluateCode(exercise?.answerCode || '', studentCode),
-    [exercise, studentCode]
+    () => evaluateCode(requiredAnswerCode, studentCode),
+    [requiredAnswerCode, studentCode]
   );
   const analysis = useMemo(
-    () => analyzeCodeDiff(exercise?.answerCode || '', studentCode),
-    [exercise, studentCode]
+    () => analyzeCodeDiff(requiredAnswerCode, studentCode),
+    [requiredAnswerCode, studentCode]
   );
   const stringSuggestions = useMemo(
-    () => extractStringLiteralSuggestions(exercise?.answerCode || ''),
+    () => extractStringLiteralSuggestions(requiredAnswerCode),
+    [requiredAnswerCode]
+  );
+  const commentSuggestions = useMemo(
+    () => extractCommentLineSuggestions(exercise?.answerCode || ''),
     [exercise]
   );
   const activeStringSuggestion = useMemo(
@@ -1170,7 +1256,7 @@ export default function CodeTracePlayer({
   const hint = exercise?.hints?.[Math.min(hintIndex, Math.max(0, (exercise?.hints?.length || 1) - 1))] || '';
   const currentExerciseId = getExerciseId(exercise);
   const currentAttemptCount = Number(exerciseAttempts[currentExerciseId] || 0);
-  const exerciseBaseReward = getExerciseBaseReward(exercise?.answerCode || '');
+  const exerciseBaseReward = getExerciseBaseReward(requiredAnswerCode);
   const nextAttemptNumber = currentAttemptCount + 1;
   // 이번 통과로 받을 보상(배율 적용 전). 4회차+는 0.
   const rawRewardForNextPass = getAttemptReward(exerciseBaseReward, nextAttemptNumber);
@@ -1196,14 +1282,14 @@ export default function CodeTracePlayer({
   }, [completedIds, exerciseIndex, exercises, firstIncompleteIndex]);
   const canMoveToIncompleteCode = hasIncompleteElsewhere && nextIncompleteIndex >= 0 && nextIncompleteIndex !== exerciseIndex;
   const lineCombo = useMemo(
-    () => getLineCombo(exercise?.answerCode || '', studentCode),
-    [exercise, studentCode]
+    () => getLineCombo(requiredAnswerCode, studentCode),
+    [requiredAnswerCode, studentCode]
   );
   // 정답 코드의 들여쓰기 단위를 감지해 학생 입력란의 자동 인덴트에 그대로 적용.
   // 정답이 4칸이면 Enter 시 4칸, 탭이면 탭으로 자동 들여쓰기되어 시각적 혼란을 줄인다.
   const indentUnit = useMemo(
-    () => detectIndentUnit(exercise?.answerCode || ''),
-    [exercise]
+    () => detectIndentUnit(requiredAnswerCode),
+    [requiredAnswerCode]
   );
   // 현재 세트의 입력을 빈 상태로 되돌림 (초기화 버튼). 초안도 함께 비움.
   const resetExercise = () => {
@@ -1335,7 +1421,7 @@ export default function CodeTracePlayer({
       const progressRef = doc(db, 'users', user.uid, 'learning_progress', unitId);
       const historyRef = doc(db, 'users', user.uid, 'history', `code_trace_${today}_${unitId}`);
       const unitTitleValue = unitTitle || activeUnit?.title || '코드 따라쓰기';
-      const baseReward = getExerciseBaseReward(exercise?.answerCode || '');
+      const baseReward = getExerciseBaseReward(requiredAnswerCode);
 
       const result = await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userRef);
@@ -1662,8 +1748,8 @@ export default function CodeTracePlayer({
     }
   };
 
-  const answerCode = getModeCode(exercise, mode, visibleLines);
-  const totalLines = normalizeNewlines(exercise.answerCode || '').split('\n').length;
+  const answerCode = getModeCode({ ...exercise, answerCode: requiredAnswerCode }, mode, visibleLines);
+  const totalLines = normalizeNewlines(requiredAnswerCode || '').split('\n').length;
   const visibleAnswerLineCount = Math.max(1, normalizeNewlines(answerCode || '').split('\n').length);
   const codePanelHeight = Math.min(
     CODE_PANEL_MAX_HEIGHT,
@@ -1751,6 +1837,29 @@ export default function CodeTracePlayer({
       changes: { from: selection.from, to: selection.to, insert: insertion },
       selection: EditorSelection.cursor(nextCursor),
       effects: EditorView.scrollIntoView(nextCursor, { x: 'end', y: 'nearest' }),
+    });
+    setStudentSelection({ start: nextCursor, end: nextCursor });
+    view.focus();
+    soundManager.playClick();
+    return true;
+  };
+  const insertCommentLine = (suggestion) => {
+    const view = studentEditorViewRef.current;
+    if (!suggestion || !view) return false;
+    const selection = view.state.selection.main;
+    const line = view.state.doc.lineAt(selection.from);
+    const lineText = line.text || '';
+    const currentIndent = lineText.match(/^[ \t]*/)?.[0] || '';
+    const comment = `${currentIndent}${suggestion.literal}`;
+    const lineHasContent = Boolean(lineText.trim());
+    const from = lineHasContent ? selection.from : line.from;
+    const to = lineHasContent ? selection.to : line.to;
+    const insertion = lineHasContent ? `\n${comment}\n${currentIndent}` : comment;
+    const nextCursor = from + insertion.length;
+    view.dispatch({
+      changes: { from, to, insert: insertion },
+      selection: EditorSelection.cursor(nextCursor),
+      effects: EditorView.scrollIntoView(nextCursor, { x: 'start', y: 'nearest' }),
     });
     setStudentSelection({ start: nextCursor, end: nextCursor });
     view.focus();
@@ -1902,6 +2011,13 @@ export default function CodeTracePlayer({
           color: #bbf7d0;
           font-size: 0.75rem;
         }
+        .code-trace-comment-helper {
+          border-color: rgba(251,146,60,0.22);
+          background: rgba(124,45,18,0.14);
+        }
+        .code-trace-comment-helper .code-trace-string-helper-title {
+          color: #fed7aa;
+        }
         .code-trace-string-chip {
           border: 1px solid rgba(52,211,153,0.28);
           background: rgba(15,23,42,0.82);
@@ -1919,6 +2035,15 @@ export default function CodeTracePlayer({
           border-color: rgba(52,211,153,0.72);
           background: rgba(16,185,129,0.18);
           color: #ecfdf5;
+        }
+        .code-trace-comment-chip {
+          border-color: rgba(251,146,60,0.28);
+          color: #ffedd5;
+        }
+        .code-trace-comment-chip:hover {
+          border-color: rgba(251,146,60,0.72);
+          background: rgba(251,146,60,0.16);
+          color: #fff7ed;
         }
         .code-trace-issue-list {
           display: grid;
@@ -2142,7 +2267,7 @@ export default function CodeTracePlayer({
             )}
             <CodeTraceEditor
               value={studentCode}
-              answerCode={exercise?.answerCode || ''}
+              answerCode={requiredAnswerCode}
               height={codePanelHeight}
               currentPassed={currentPassed}
               activeStringSuggestion={activeStringSuggestion}
@@ -2165,6 +2290,25 @@ export default function CodeTracePlayer({
                       title={`${suggestion.lineNumber}번째 줄 문자열`}
                       onMouseDown={event => event.preventDefault()}
                       onClick={() => insertStringLiteral(suggestion)}
+                    >
+                      {suggestion.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {commentSuggestions.length > 0 && (
+              <div className="code-trace-string-helper code-trace-comment-helper">
+                <p className="font-tech code-trace-string-helper-title">선택 주석</p>
+                <div className="code-trace-chip-row">
+                  {commentSuggestions.slice(0, 8).map((suggestion) => (
+                    <button
+                      key={suggestion.id}
+                      type="button"
+                      className="font-tech code-trace-string-chip code-trace-comment-chip"
+                      title={`${suggestion.lineNumber}번째 줄 주석 · 채점 제외`}
+                      onMouseDown={event => event.preventDefault()}
+                      onClick={() => insertCommentLine(suggestion)}
                     >
                       {suggestion.label}
                     </button>
