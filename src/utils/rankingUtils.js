@@ -51,23 +51,71 @@ export function calculateFocusData(user = {}) {
   };
 }
 
+// 배틀 축(Battle) SEI 점수. 최대 600점.
+// battleRating(1000~1900+)을 핵심으로 쓰고, 승률 신뢰도·참여량·연승을 보조 가산한다.
+// 패배해도 정답률과 참여가 battleRating에 반영되므로 단순 승패만으로 평가하지 않는다.
+export const BATTLE_MAX_SCORE = 600;
+const BATTLE_SEI_RATING_MAX = 420;
+const BATTLE_SEI_WINRATE_MAX = 80;
+const BATTLE_SEI_VOLUME_MAX = 50;
+const BATTLE_SEI_STREAK_MAX = 50;
+// battleRating의 의미있는 분포 구간. 이 구간을 벗어나면 clamp.
+const BATTLE_RATING_FLOOR = 1000;
+const BATTLE_RATING_CEIL = 1900;
+
+export function calculateBattleData(user = {}) {
+  const battleRating = readCounter(user.battleRating);
+  const totalMatches = readCounter(user.totalBattleMatches);
+  const wins = readCounter(user.totalBattleWins);
+  const bestStreak = readCounter(user.battleBestStreak);
+
+  // 1. Rating 정규화 (최대 420). 1000=0점, 1900=420점 선형.
+  const ratingNorm = BATTLE_RATING_CEIL > BATTLE_RATING_FLOOR
+    ? Math.min(1, Math.max(0, (battleRating - BATTLE_RATING_FLOOR) / (BATTLE_RATING_CEIL - BATTLE_RATING_FLOOR)))
+    : 0;
+  const ratingScore = Math.floor(ratingNorm * BATTLE_SEI_RATING_MAX);
+
+  // 2. 승률 신뢰도 (최대 80). Wilson lower bound로 표본 수까지 반영.
+  const winRateScore = Math.floor(calculateWilsonLowerBound(wins, totalMatches) * BATTLE_SEI_WINRATE_MAX);
+
+  // 3. 참여량 (최대 50). 20전부터 만점.
+  const volumeScore = Math.floor(Math.min(1, totalMatches / 20) * BATTLE_SEI_VOLUME_MAX);
+
+  // 4. 연승 보정 (최대 50). 5연승부터 만점.
+  const streakScore = Math.floor(Math.min(1, bestStreak / 5) * BATTLE_SEI_STREAK_MAX);
+
+  const score = Math.min(BATTLE_MAX_SCORE, ratingScore + winRateScore + volumeScore + streakScore);
+
+  return {
+    score,
+    battleRating,
+    totalMatches,
+    wins,
+    bestStreak,
+    ratingScore,
+    winRateScore,
+    volumeScore,
+    streakScore,
+  };
+}
+
 export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   const crystals = user.crystals || 0;
   const avgScore = user.averageScore || 0;
-  
+
   // 1. 기초 체급 (Wealth): 보유 광석 / 2 -> 누적 핵심 지표로 가중치 대폭 강화 (기존 / 10)
   const wealthScore = Math.floor(crystals / 2);
-  
+
   // 2. 전문성 (Skill): (평균 점수 * 5) + (백점 횟수 * 10) -> 실력과 마스터리 동시 반영
   const perfectCount = user.perfectCount || 0;
   const skillScore = Math.floor(avgScore * 5) + (perfectCount * 10);
-  
+
   // 3. 성실도 (Diligence): 연속 학습일 * 10 -> 선형 누적으로 꾸준함 강력 보상 (기존 log2)
   const diligenceScore = Math.floor(streak * 10);
-  
+
   // 4. 추진력 (Growth): 주간 성장 / 2 -> 주간 초기화 타격 완화 (기존 * 2)
   const growthScore = Math.floor(Math.max(0, weeklyGain) / 2);
-  
+
   // 5. 아고라 지수 (Agora): 질문 및 답변 활동 기반 -> 가중치 10%
   const helpCount = user.helpCount || 0;
   const questionCount = user.questionCount || 0;
@@ -78,8 +126,12 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   const focusData = calculateFocusData(user);
   const focusScore = focusData.score;
 
-  const totalSEI = wealthScore + skillScore + diligenceScore + growthScore + agoraScore + focusScore;
-  
+  // 7. 배틀 (Battle): 퀴즈 배틀 전적 기반. rating 정규화 + 승률 신뢰도 + 참여량 + 연승.
+  const battleData = calculateBattleData(user);
+  const battleScore = battleData.score;
+
+  const totalSEI = wealthScore + skillScore + diligenceScore + growthScore + agoraScore + focusScore + battleScore;
+
   return {
     total: totalSEI,
     wealth: wealthScore,
@@ -89,11 +141,17 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
     agora: agoraScore,
     focus: focusScore,
     focusData,
+    battle: battleScore,
+    battleData,
     tier: getTierFromSEI(totalSEI)
   };
 }
 
 export function getTierFromSEI(sei) {
+  // 기존 임계값(600/1200/2000)을 유지한다.
+  // battle 축(최대 600)이 추가되어 총점은 상향되지만, 임계값을 올리면
+  // 배틀 미참여자의 등급이 강등되는 부작용이 생긴다. 대신 battle 점수는
+  // 기존 사용자의 tier를 올리는 방향으로만 작용한다.
   if (sei >= 2000) return { name: '플래티넘 은하 수호자', label: 'Platinum', color: '#e5e4e2', icon: '🌌' };
   if (sei >= 1200) return { name: '골드 제독', label: 'Gold', color: '#ffd700', icon: '👑' };
   if (sei >= 600)  return { name: '실버 캡틴', label: 'Silver', color: '#c0c0c0', icon: '⚔️' };

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
-import { Trophy, Medal, Star, Target, Info, ShieldAlert, Zap, CircleHelp } from 'lucide-react'
 import { db, auth } from '../../firebase'
 import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, runTransaction } from 'firebase/firestore'
 import './SpaceRanking.css'
@@ -10,7 +8,7 @@ import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
 import { getEffectiveStreak, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
-import { calculateSEI, FOCUS_MAX_SCORE } from '../../utils/rankingUtils'
+import { calculateSEI, FOCUS_MAX_SCORE, BATTLE_MAX_SCORE } from '../../utils/rankingUtils'
 import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getAnonymousLabel, getFrameSurfaceStyles, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
 
 export default function SpaceRanking({ user, userData }) {
@@ -48,21 +46,43 @@ export default function SpaceRanking({ user, userData }) {
     focus: {
       title: '집중도(영상)',
       tip: '영상 중 제시되는 **광석 획득 기회**를 빠짐없이 잡으세요. 성공률과 전체 기회 수를 함께 보는 Wilson 보정 점수입니다.'
+    },
+    battle: {
+      title: '배틀(경쟁)',
+      tip: '퀴즈 배틀에 참전하세요. **battleRating**을 중심으로 승률(Wilson 보정), 참여량, 연승이 보조 반영됩니다. 패배해도 정답률과 완주 기록이 rating에 반영됩니다.'
     }
   };
 
   useEffect(() => {
 
     setLoading(true);
+    let isActive = true;
     let unsubscribeSnapshot = null;
     let cleanupTimeout = null;
 
-    const q = query(
+    const baseQuery = query(
       collection(db, 'users'),
-      limit(200) // Fetch up to 200 to allow robust local sorting. We removed orderBy('crystals') so everyone is considered.
+      limit(500)
     )
 
-    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+    unsubscribeSnapshot = onSnapshot(baseQuery, async (snapshot) => {
+      const docMap = new Map(snapshot.docs.map((userDoc) => [userDoc.id, userDoc]));
+      if (rankMode === 'battle') {
+        try {
+          // orderBy('battleRating')는 해당 필드가 없는 문서를 제외한다.
+          // 기본 목록과 병합해 개발/초기 데이터에서도 미참전 사용자가 사라지지 않게 한다.
+          const battleSnap = await getDocs(query(
+            collection(db, 'users'),
+            orderBy('battleRating', 'desc'),
+            limit(500)
+          ));
+          battleSnap.docs.forEach((userDoc) => docMap.set(userDoc.id, userDoc));
+        } catch (error) {
+          console.warn('Battle ranking query failed; falling back to base users', error);
+        }
+      }
+      if (!isActive) return;
+
       const kstPart = getKSTComponents()
       const todayKey = getTodayKST()
       const mondayOffset = (kstPart.dayOfWeek + 6) % 7
@@ -70,8 +90,8 @@ export default function SpaceRanking({ user, userData }) {
       mondayDate.setDate(mondayDate.getDate() - mondayOffset)
       const mondayKey = getTodayKST(mondayDate)
 
-      const users = snapshot.docs.map(doc => {
-        const d = doc.data()
+      const users = Array.from(docMap.values()).map(userDoc => {
+        const d = userDoc.data()
         const streak = getEffectiveStreak(d) || 0;
         const weeklyGain = d.weeklyGrowthMonday === mondayKey ? (d.weeklyGrowth || 0) : 0;
         const dailyGain = d.dailyGrowthDate === todayKey ? (d.dailyGrowth || 0) : 0;
@@ -80,7 +100,7 @@ export default function SpaceRanking({ user, userData }) {
         const seiData = calculateSEI(d, weeklyGain, streak);
 
         return {
-          id: doc.id,
+          id: userDoc.id,
           ...d,
           streak,
           dailyGain,
@@ -130,6 +150,23 @@ export default function SpaceRanking({ user, userData }) {
         });
       } else if (rankMode === 'streak') {
         users.sort((a, b) => b.streak - a.streak)
+      } else if (rankMode === 'battle') {
+        users.sort((a, b) => {
+          // 배틀 경험이 없는 사용자는 항상 뒤로 보낸다. 실제 순위는 전적 수가 아니라
+          // battle SEI를 우선한다. battleRating이 아직 0인 과거/개발 데이터도 공정하게 정렬된다.
+          const aMatches = a.totalBattleMatches || 0;
+          const bMatches = b.totalBattleMatches || 0;
+          const aHasBattle = aMatches > 0;
+          const bHasBattle = bMatches > 0;
+          if (aHasBattle !== bHasBattle) return bHasBattle ? 1 : -1;
+          if ((b.seiData?.battle || 0) !== (a.seiData?.battle || 0)) return (b.seiData?.battle || 0) - (a.seiData?.battle || 0);
+          if ((b.battleRating || 0) !== (a.battleRating || 0)) return (b.battleRating || 0) - (a.battleRating || 0);
+          const aWinRate = aMatches > 0 ? (a.totalBattleWins || 0) / aMatches : 0;
+          const bWinRate = bMatches > 0 ? (b.totalBattleWins || 0) / bMatches : 0;
+          if (bWinRate !== aWinRate) return bWinRate - aWinRate;
+          if (bMatches !== aMatches) return bMatches - aMatches;
+          return (b.seiData?.total || 0) - (a.seiData?.total || 0);
+        });
       }
       
       // 4. Dense Ranking 처리
@@ -148,6 +185,20 @@ export default function SpaceRanking({ user, userData }) {
                     (prev.crystals || 0) === (curr.crystals || 0);
           } else if (rankMode === 'streak') {
             isTie = prev.streak === curr.streak;
+          } else if (rankMode === 'battle') {
+            // 배틀 미참전자끼리는 동점으로 묶는다.
+            const prevMatches = prev.totalBattleMatches || 0;
+            const currMatches = curr.totalBattleMatches || 0;
+            if (prevMatches === 0 && currMatches === 0) {
+              isTie = true;
+            } else {
+              const prevWinRate = prevMatches > 0 ? (prev.totalBattleWins || 0) / prevMatches : 0;
+              const currWinRate = currMatches > 0 ? (curr.totalBattleWins || 0) / currMatches : 0;
+              isTie = (prev.seiData?.battle || 0) === (curr.seiData?.battle || 0) &&
+                      (prev.battleRating || 0) === (curr.battleRating || 0) &&
+                      prevWinRate === currWinRate &&
+                      prevMatches === currMatches;
+            }
           }
 
           if (!isTie) {
@@ -162,11 +213,13 @@ export default function SpaceRanking({ user, userData }) {
       setHallOfFame(prev => ({ ...prev, growthStar: growthLeaders[0] || null }))
       setLoading(false)
     }, (error) => {
+      if (!isActive) return;
       console.error("❌ SpaceRanking: Firestore error:", error)
       setLoading(false)
     })
 
     return () => {
+      isActive = false;
       if (cleanupTimeout) clearTimeout(cleanupTimeout);
       if (unsubscribeSnapshot) {
         if (!auth.currentUser) {
@@ -261,33 +314,11 @@ export default function SpaceRanking({ user, userData }) {
     navigate(`/profile/${uid}`)
   }
 
-  const rewardRules = [
-    { 
-      category: '🎯 탐사(퀴즈) 보상', 
-      icon: <Target className="rule-icon-blue" />,
-      items: [
-        { label: '문제 정답', value: '+1 💎', desc: '최고 점수 경신 시 지급' },
-        { label: '3연속 콤보', value: '+5 💎', desc: '안정적인 비행 보너스' },
-        { label: '백점 만점', value: '+10 💎', desc: '단원 최초 1회 보너스' },
-        { label: '문제 오답', value: '-2 💎', desc: '에너지 손실 (쉴드로 방어 가능)' },
-      ]
-    },
-    { 
-      category: '🤝 아고라(커뮤니티) 보상', 
-      icon: <Zap className="rule-icon-purple" />,
-      items: [
-        { label: '답변 채택', value: '+20 💎', desc: '내가 쓴 답변이 채택됨' },
-        { label: '질문 해결', value: '+5 💎', desc: '내 질문이 해결됨' },
-        { label: '선생님 인증', value: '+10 💎', desc: '최우수 답변 추가 보너스' },
-      ]
-    }
-  ];
-
   const kstNow = new Date(Date.now() + 9 * 3600000);
   const isMondayMorning = kstNow.getUTCDay() === 1 && kstNow.getUTCHours() < 12;
 
   return (
-    <motion.div 
+    <Motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="fade-in"
@@ -306,7 +337,8 @@ export default function SpaceRanking({ user, userData }) {
         {[
           { id: 'sei', label: '전 우주 정거장 (SEI)', icon: '🌌' },
           { id: 'growth', label: '이번 주 급상승 (Warp Star)', icon: '☄️', isSpecial: true },
-          { id: 'streak', label: '불멸의 항해사 (Streak)', icon: '🛡️' }
+          { id: 'streak', label: '불멸의 항해사 (Streak)', icon: '🛡️' },
+          { id: 'battle', label: '배틀 아레나 (Battle)', icon: '⚔️', isBattle: true }
         ].map(mode => (
           <button
             key={mode.id}
@@ -314,23 +346,23 @@ export default function SpaceRanking({ user, userData }) {
             className={`space-ranking-mode-btn font-tech ${rankMode === mode.id ? 'active' : ''}`}
             style={{
               padding: '0.8rem 1.5rem',
-              background: rankMode === mode.id 
-                ? (mode.isSpecial ? 'rgba(255, 69, 58, 0.2)' : 'rgba(0, 243, 255, 0.2)') 
+              background: rankMode === mode.id
+                ? (mode.isSpecial ? 'rgba(255, 69, 58, 0.2)' : mode.isBattle ? 'rgba(244, 63, 94, 0.18)' : 'rgba(0, 243, 255, 0.2)')
                 : 'rgba(255, 255, 255, 0.05)',
-              border: `1px solid ${rankMode === mode.id 
-                ? (mode.isSpecial ? '#ff453a' : 'var(--crystal-cyan)') 
+              border: `1px solid ${rankMode === mode.id
+                ? (mode.isSpecial ? '#ff453a' : mode.isBattle ? '#f43f5e' : 'var(--crystal-cyan)')
                 : 'var(--glass-border)'}`,
               borderRadius: '12px',
-              color: rankMode === mode.id 
-                ? (mode.isSpecial ? '#ff453a' : 'var(--crystal-cyan)') 
+              color: rankMode === mode.id
+                ? (mode.isSpecial ? '#ff453a' : mode.isBattle ? '#f43f5e' : 'var(--crystal-cyan)')
                 : 'var(--text-muted)',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
               textTransform: 'uppercase',
               letterSpacing: '1px',
               fontWeight: 700,
-              boxShadow: rankMode === mode.id 
-                ? (mode.isSpecial ? '0 0 15px rgba(255, 69, 58, 0.4)' : 'var(--glow-cyan)') 
+              boxShadow: rankMode === mode.id
+                ? (mode.isSpecial ? '0 0 15px rgba(255, 69, 58, 0.4)' : mode.isBattle ? '0 0 15px rgba(244, 63, 94, 0.35)' : 'var(--glow-cyan)')
                 : 'none',
               display: 'flex',
               alignItems: 'center',
@@ -477,7 +509,7 @@ export default function SpaceRanking({ user, userData }) {
         position: 'relative'
       }}>
         <AnimatePresence mode="wait">
-            <motion.div 
+            <Motion.div 
               key="ranking"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -486,38 +518,48 @@ export default function SpaceRanking({ user, userData }) {
               {/* 헤더 행 */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '60px 1.5fr 120px 100px 100px',
+                gridTemplateColumns: rankMode === 'battle' ? '60px 1.5fr 90px 110px 130px' : '60px 1.5fr 120px 100px 100px',
                 padding: '1rem',
                 borderBottom: '1px solid var(--glass-border)',
-                color: 'var(--crystal-cyan)',
+                color: rankMode === 'battle' ? '#f43f5e' : 'var(--crystal-cyan)',
                 fontWeight: 700,
                 fontSize: '0.9rem',
                 letterSpacing: '1px'
               }}>
                 <span>RANK</span>
                 <span>PILOT</span>
-                <span style={{ textAlign: 'center' }}>SEI INDEX</span>
-                <span style={{ textAlign: 'center' }}>CRYSTALS</span>
-                <span style={{ textAlign: 'right', position: 'relative' }}>
-                  GROWTH
-                  {isMondayMorning && rankMode === 'growth' && (
-                    <span style={{
-                      position: 'absolute',
-                      top: '-18px',
-                      right: '0',
-                      fontSize: '0.65rem',
-                      color: 'var(--star-gold)',
-                      whiteSpace: 'nowrap',
-                      background: 'rgba(255,215,0,0.1)',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      border: '1px solid rgba(255,215,0,0.3)',
-                      boxShadow: '0 0 10px rgba(255,215,0,0.2)'
-                    }}>
-                      New Season 🚀
+                {rankMode === 'battle' ? (
+                  <>
+                    <span style={{ textAlign: 'center' }}>배틀 SEI</span>
+                    <span style={{ textAlign: 'center' }}>RATING</span>
+                    <span style={{ textAlign: 'right' }}>전적 (승률)</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ textAlign: 'center' }}>SEI INDEX</span>
+                    <span style={{ textAlign: 'center' }}>CRYSTALS</span>
+                    <span style={{ textAlign: 'right', position: 'relative' }}>
+                      GROWTH
+                      {isMondayMorning && rankMode === 'growth' && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '-18px',
+                          right: '0',
+                          fontSize: '0.65rem',
+                          color: 'var(--star-gold)',
+                          whiteSpace: 'nowrap',
+                          background: 'rgba(255,215,0,0.1)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(255,215,0,0.3)',
+                          boxShadow: '0 0 10px rgba(255,215,0,0.2)'
+                        }}>
+                          New Season 🚀
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
+                  </>
+                )}
               </div>
 
               {/* 랭킹 리스트 */}
@@ -532,7 +574,7 @@ export default function SpaceRanking({ user, userData }) {
                     <span style={{ fontSize: '0.8rem' }}>탐사를 시작하여 광석을 채집해 보세요!</span>
                   </div>
                 ) : (
-                  topUsers.map((u, index) => {
+                  topUsers.map((u) => {
                     const isMe = u.id === user?.uid
                     const isExpanded = inspectUserId === u.id
                     const growth = rankMode === 'growth' ? (u.weeklyGain || 0) : (u.dailyGain || 0);
@@ -563,7 +605,7 @@ export default function SpaceRanking({ user, userData }) {
                         onClick={() => setInspectUserId(inspectUserId === u.id ? null : u.id)}
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '60px 1.5fr 120px 100px 100px',
+                          gridTemplateColumns: rankMode === 'battle' ? '60px 1.5fr 90px 110px 130px' : '60px 1.5fr 120px 100px 100px',
                           padding: '1.2rem 1rem',
                           borderBottom: '1px solid rgba(255,255,255,0.05)',
                           alignItems: 'center',
@@ -699,47 +741,100 @@ export default function SpaceRanking({ user, userData }) {
                           </div>
                         </div>
 
-                        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ color: tier.color || 'var(--crystal-cyan)', fontWeight: 800, fontSize: '1.2rem', textShadow: `0 0 10px ${tier.color}40` }}>
-                            {u.seiData?.total || 0}
-                          </span>
-                          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>SEI</span>
-                        </div>
+                        {rankMode === 'battle' ? (
+                          (() => {
+                            const matches = u.totalBattleMatches || 0;
+                            const isPlacement = matches > 0 && matches < 3;
+                            const noBattle = matches === 0;
+                            return (
+                          <>
+                            {/* 배틀 SEI: 배틀 아레나의 실제 순위 기준 */}
+                            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <span style={{ color: '#f43f5e', fontWeight: 800, fontSize: '1.05rem' }}>
+                                {u.seiData?.battle || 0}
+                              </span>
+                              <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
+                                /{BATTLE_MAX_SCORE}
+                              </span>
+                            </div>
+                            {/* 배틀 RATING */}
+                            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <span style={{ color: '#f43f5e', fontWeight: 800, fontSize: '1.2rem', textShadow: '0 0 10px rgba(244,63,94,0.3)' }}>
+                                {noBattle ? '—' : (u.battleRating || 0)}
+                              </span>
+                              <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>RATING</span>
+                            </div>
+                            {/* 전적 + 승률 */}
+                            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                              {noBattle ? (
+                                <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: '0.8rem' }}>
+                                  미참전
+                                </span>
+                              ) : (
+                                <>
+                                  <span style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: '0.85rem' }}>
+                                    {matches}전 {u.totalBattleWins || 0}승 {matches - (u.totalBattleWins || 0) - (u.totalBattleDraws || 0)}패{u.totalBattleDraws ? ` ${u.totalBattleDraws}무` : ''}
+                                  </span>
+                                  {isPlacement ? (
+                                    <span style={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 700 }}>
+                                      배치 중
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.7rem', color: '#22c55e', fontWeight: 700 }}>
+                                      승률 {Math.round(((u.totalBattleWins || 0) / matches) * 100)}%
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </>
+                            );
+                          })()
+                        ) : (
+                          <>
+                            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <span style={{ color: tier.color || 'var(--crystal-cyan)', fontWeight: 800, fontSize: '1.2rem', textShadow: `0 0 10px ${tier.color}40` }}>
+                                {u.seiData?.total || 0}
+                              </span>
+                              <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>SEI</span>
+                            </div>
 
-                        <span style={{ 
-                          textAlign: 'center', 
-                          color: 'var(--neon-blue)', 
-                          fontWeight: 700 
-                        }}>
-                          💎 {parseFloat(u.crystals || 0).toLocaleString()}
-                        </span>
+                            <span style={{
+                              textAlign: 'center',
+                              color: 'var(--neon-blue)',
+                              fontWeight: 700
+                            }}>
+                              💎 {parseFloat(u.crystals || 0).toLocaleString()}
+                            </span>
 
-                        <div style={{ 
-                          textAlign: 'right',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-end'
-                        }}>
-                          <span 
-                            title={growth === 0 && rankMode === 'growth' ? "첫 광석을 채집하고 이번 주 첫 번째 급상승 주인공이 되세요!" : ""}
-                            style={{ 
-                            color: growth > 0 ? 'var(--planet-green)' : growth < 0 ? '#ff4d4d' : 'rgba(255,255,255,0.4)',
-                            fontWeight: 800,
-                            fontSize: '0.9rem',
-                            cursor: growth === 0 && rankMode === 'growth' ? 'help' : 'default'
-                          }}>
-                            {growth > 0 ? `▲ ${growth}` : growth < 0 ? `▼ ${Math.abs(growth)}` : '─'}
-                          </span>
-                          <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
-                            {rankMode === 'growth' ? 'WEEKLY' : 'GROWTH'}
-                          </span>
-                        </div>
+                            <div style={{
+                              textAlign: 'right',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'flex-end'
+                            }}>
+                              <span
+                                title={growth === 0 && rankMode === 'growth' ? "첫 광석을 채집하고 이번 주 첫 번째 급상승 주인공이 되세요!" : ""}
+                                style={{
+                                color: growth > 0 ? 'var(--planet-green)' : growth < 0 ? '#ff4d4d' : 'rgba(255,255,255,0.4)',
+                                fontWeight: 800,
+                                fontSize: '0.9rem',
+                                cursor: growth === 0 && rankMode === 'growth' ? 'help' : 'default'
+                              }}>
+                                {growth > 0 ? `▲ ${growth}` : growth < 0 ? `▼ ${Math.abs(growth)}` : '─'}
+                              </span>
+                              <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
+                                {rankMode === 'growth' ? 'WEEKLY' : 'GROWTH'}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
                       
                       {/* Inline Expanded Radar Chart */}
                       <AnimatePresence>
                         {isExpanded && (
-                          <motion.div
+                          <Motion.div
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
@@ -776,6 +871,7 @@ export default function SpaceRanking({ user, userData }) {
                                   { subject: '잠재력(성장)', value: Math.min(100, (u.seiData?.growth / 200) * 100) || 0, raw: u.seiData?.growth || 0 },
                                   { subject: '소통(아고라)', value: Math.min(100, (u.seiData?.agora / 200) * 100) || 0, raw: u.seiData?.agora || 0 },
                                   { subject: '전문성(실력)', value: Math.min(100, (u.seiData?.skill / 1000) * 100) || 0, raw: u.seiData?.skill || 0 },
+                                  { subject: '배틀(경쟁)', value: Math.min(100, ((u.seiData?.battle || 0) / BATTLE_MAX_SCORE) * 100) || 0, raw: u.seiData?.battle || 0 },
                                 ]}>
                                   <PolarGrid stroke="rgba(255,255,255,0.18)" />
                                   <PolarAngleAxis dataKey="subject" tick={{ fill: panelTheme.mutedText, fontSize: 11 }} />
@@ -860,12 +956,19 @@ export default function SpaceRanking({ user, userData }) {
                                   >
                                     <span>잠재력(성장)</span><strong style={{ color: panelTheme.accent }}>{u.seiData?.growth || 0} pts</strong>
                                   </li>
-                                  <li 
+                                  <li
                                     onMouseEnter={() => setHoveredMetric('agora')}
                                     onMouseLeave={() => setHoveredMetric(null)}
                                     style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '6px', transition: 'background 0.2s', background: hoveredMetric === 'agora' ? `${panelTheme.accent}16` : 'transparent' }}
                                   >
                                     <span>소통(아고라)</span><strong style={{ color: panelTheme.accent }}>{u.seiData?.agora || 0} pts</strong>
+                                  </li>
+                                  <li
+                                    onMouseEnter={() => setHoveredMetric('battle')}
+                                    onMouseLeave={() => setHoveredMetric(null)}
+                                    style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '6px', transition: 'background 0.2s', background: hoveredMetric === 'battle' ? `${panelTheme.accent}16` : 'transparent' }}
+                                  >
+                                    <span>배틀(경쟁)</span><strong style={{ color: panelTheme.accent }}>{u.seiData?.battle || 0} pts</strong>
                                   </li>
                                 </ul>
                                 <div style={{ 
@@ -881,7 +984,7 @@ export default function SpaceRanking({ user, userData }) {
                                   transition: 'all 0.3s ease'
                                 }}>
                                   <AnimatePresence mode="wait">
-                                    <motion.div
+                                    <Motion.div
                                       key={hoveredMetric || 'default'}
                                       initial={{ opacity: 0, y: 5 }}
                                       animate={{ opacity: 1, y: 0 }}
@@ -895,13 +998,13 @@ export default function SpaceRanking({ user, userData }) {
                                         SEI_TIPS[hoveredMetric].tip.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} style={{ color: panelTheme.text }}>{part}</strong> : part) : 
                                         "항목을 호버하여 점수를 올리는 비결을 확인하세요!"
                                       }
-                                    </motion.div>
+                                    </Motion.div>
                                   </AnimatePresence>
                                 </div>
                               </div>
                               </div>
                             </div>
-                          </motion.div>
+                          </Motion.div>
                         )}
                       </AnimatePresence>
                       </React.Fragment>
@@ -909,7 +1012,7 @@ export default function SpaceRanking({ user, userData }) {
                 })
                 )}
               </div>
-            </motion.div>
+            </Motion.div>
         </AnimatePresence>
       </div>
 
@@ -925,6 +1028,6 @@ export default function SpaceRanking({ user, userData }) {
         </p>
       </div>
 
-    </motion.div>
+    </Motion.div>
   )
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { doc, getDoc, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '../../firebase'
 import { useAuth } from '../../hooks/useAuth'
@@ -63,6 +63,8 @@ export default function QuizBattleView({
   const matchedRef = useRef(false)
   const autoFinalizeBattleRef = useRef('')
   const cancelQueueRef = useRef(null)
+  const confirmedBattleEntryRef = useRef('')
+  const entryConfirmTimeoutRef = useRef('')
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768)
@@ -221,12 +223,105 @@ export default function QuizBattleView({
           : raw.questionSet,
       }
       setBattle({ id: snap.id, ...sanitized })
-      setPhase(raw.status === 'finished' ? 'result' : 'active')
+      setPhase(raw.status === 'finished' ? 'result' : raw.status === 'cancelled' ? 'cancelled' : 'active')
     }, (err) => {
       setError(err?.message || '배틀 정보를 수신하지 못했습니다.')
     })
     return () => unsubscribe()
   }, [battleId])
+
+  // 배틀 진행 상태를 users/{uid}.liveStatus.battle 서브맵에 기록한다.
+  // usePresence가 currentLocation/lastUpdatedAt을 주기적으로 덮어써도 battle 맵은
+  // 별도 키이므로 유지되며, 운영툴(LiveStatus)과 스터디룸에서 현재 배틀 단계를 볼 수 있다.
+  // 상태 업데이트 effect는 cleanup을 반환하지 않는다: 의존성 변경마다 cleanup delete가
+  // 새 set보다 늦게 도착해 실제 배틀 중인데 상태가 지워지는 race를 막기 위해서다.
+  // 언마운트 정리는 아래 별도 effect가 담당한다.
+  const liveOpponentUid = getOpponentUid(battle, user?.uid || '')
+  const liveOpponentDisplayName = battle?.participants?.[liveOpponentUid]?.displayName || ''
+  const liveMyAnsweredCount = Number(getParticipant(battle, user?.uid || '').answeredCount || 0)
+  useEffect(() => {
+    const uid = user?.uid
+    if (!uid) return
+    const mapPhaseToStatus = (p) => {
+      if (p === 'waiting') return 'waiting'
+      if (p === 'active') {
+        // battle.status가 starting이면 아직 입장 확인 단계다.
+        if (battle?.status === 'starting') return 'starting'
+        return 'active'
+      }
+      if (p === 'result') return 'result'
+      return null
+    }
+    const status = mapPhaseToStatus(phase)
+    if (status) {
+      const battlePayload = {
+        phase: status,
+        battleId: battleId || '',
+        answeredCount: liveMyAnsweredCount,
+        totalCount: Number(battle?.questionCount || 0),
+        updatedAt: serverTimestamp(),
+      }
+      // 닉네임이 없으면 키 자체를 생략해 undefined가 노출되지 않게 한다.
+      if (liveOpponentDisplayName) battlePayload.opponentDisplayName = liveOpponentDisplayName
+      setDoc(doc(db, 'users', uid), { liveStatus: { battle: battlePayload } }, { merge: true }).catch(() => {})
+    } else {
+      // idle/cancelled는 즉시 battle 맵을 제거한다. (언마운트가 아닌 phase 전환)
+      setDoc(doc(db, 'users', uid), { liveStatus: { battle: deleteField() } }, { merge: true }).catch(() => {})
+    }
+  }, [user?.uid, phase, battleId, battle?.status, battle?.questionCount, liveOpponentDisplayName, liveMyAnsweredCount])
+
+  // 언마운트 전용 정리: 컴포넌트가 내려갈 때만 liveStatus.battle을 제거한다.
+  // 빈 의존성 배열이므로 상태 업데이트 effect와 경쟁하지 않는다.
+  useEffect(() => {
+    const uid = user?.uid
+    if (!uid) return undefined
+    return () => {
+      setDoc(doc(db, 'users', uid), { liveStatus: { battle: deleteField() } }, { merge: true }).catch(() => {})
+    }
+  }, [user?.uid])
+
+  useEffect(() => {
+    if (!battleId || !battle || !user?.uid || battle.status !== 'starting') return undefined
+    if (confirmedBattleEntryRef.current === battleId) return undefined
+
+    let cancelled = false
+    confirmedBattleEntryRef.current = battleId
+    const confirmEntry = async () => {
+      try {
+        const confirm = httpsCallable(functions, 'confirmQuizBattleEntry')
+        await confirm({ battleId })
+      } catch (err) {
+        console.warn('Failed to confirm quiz battle entry', err)
+        if (!cancelled) {
+          confirmedBattleEntryRef.current = ''
+          setError(err?.message || '배틀 입장을 확인하지 못했습니다. 다시 시도해 주세요.')
+        }
+      }
+    }
+
+    confirmEntry()
+    return () => {
+      cancelled = true
+    }
+  }, [battle, battleId, user?.uid])
+
+  useEffect(() => {
+    const deadlineMs = Number(battle?.entryConfirmDeadlineMs || 0)
+    if (!battleId || !battle || battle.status !== 'starting' || !deadlineMs || timeNow < deadlineMs) return
+    if (entryConfirmTimeoutRef.current === battleId) return
+
+    entryConfirmTimeoutRef.current = battleId
+    const resolveTimeout = async () => {
+      try {
+        const confirm = httpsCallable(functions, 'confirmQuizBattleEntry')
+        await confirm({ battleId })
+      } catch (err) {
+        console.warn('Failed to resolve quiz battle entry timeout', err)
+      }
+    }
+
+    resolveTimeout()
+  }, [battle, battleId, timeNow])
 
   useEffect(() => {
     const timer = setInterval(() => setTimeNow(Date.now()), 1000)
@@ -245,6 +340,8 @@ export default function QuizBattleView({
   const revealedIndex = Math.max(0, currentIndex - 1)
   const revealedQuestion = questionSet[revealedIndex]
   const isBattleFinished = battle?.status === 'finished'
+  const isBattleStarting = battle?.status === 'starting'
+  const isBattleCancelled = battle?.status === 'cancelled'
   const isBattleCompleteForMe = questionSet.length > 0 && answeredCount >= questionSet.length
   const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
 
@@ -311,7 +408,7 @@ export default function QuizBattleView({
   const reviewQuestion = wrongQuestions[reviewIndex] || null
 
   const toggleOption = (key, multiAnswer) => {
-    if (isSubmitting || reveal || isBattleCompleteForMe) return
+    if (battle?.status !== 'active' || isSubmitting || reveal || isBattleCompleteForMe) return
     setSelectedKeys(prev => {
       const next = new Set(multiAnswer ? prev : [])
       if (next.has(key)) next.delete(key)
@@ -321,7 +418,7 @@ export default function QuizBattleView({
   }
 
   const submitAnswer = async () => {
-    if (!battleId || !currentQuestion || selectedKeys.size === 0 || isSubmitting) return
+    if (battle?.status !== 'active' || !battleId || !currentQuestion || selectedKeys.size === 0 || isSubmitting) return
     setIsSubmitting(true)
     setError('')
     try {
@@ -371,7 +468,7 @@ export default function QuizBattleView({
   }
 
   useEffect(() => {
-    if (!battleId || !battle || isBattleFinished || !timeExpired) return
+    if (!battleId || !battle || battle.status !== 'active' || isBattleFinished || !timeExpired) return
     if (autoFinalizeBattleRef.current === battleId) return
 
     let cancelled = false
@@ -691,6 +788,52 @@ export default function QuizBattleView({
               대기 취소
             </button>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isBattleCancelled) {
+    return (
+      <div className="space-bg" style={panelStyle}>
+        <div className="glass-card hud-border" style={{ width: 'min(720px, 100%)', padding: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+          <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.8rem' }}>배틀이 성립되지 않았습니다</h2>
+          <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+            상대방이 배틀 화면에 입장하지 않았거나 대기방에서 나갔습니다.<br />
+            이 경기는 승패와 보상 없이 취소되었습니다.
+          </p>
+          {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
+          <button className="hud-btn primary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
+            돌아가기
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isBattleStarting) {
+    const deadlineMs = Number(battle?.entryConfirmDeadlineMs || 0)
+    const left = deadlineMs > 0 ? Math.max(0, Math.ceil((deadlineMs - timeNow) / 1000)) : 0
+    return (
+      <div className="space-bg" style={panelStyle}>
+        <div className="glass-card hud-border" style={{ width: 'min(720px, 100%)', padding: '2rem', textAlign: 'center' }}>
+          <MotionDiv
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
+            style={{ fontSize: '3.5rem', marginBottom: '1rem' }}
+          >
+            ⚔️
+          </MotionDiv>
+          <h2 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.8rem' }}>상대 입장 확인 중</h2>
+          <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+            양쪽 학생이 모두 배틀 화면에 입장하면 타이머가 시작됩니다.<br />
+            {left > 0 ? `${left}초 안에 확인되지 않으면 배틀이 자동 취소됩니다.` : '입장 확인 시간이 종료되었습니다.'}
+          </p>
+          {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
+          <button className="hud-btn secondary glass" onClick={leaveBattle} disabled={isLeaving} style={{ padding: '0.9rem 1.4rem' }}>
+            {isLeaving ? '취소 중...' : '배틀 취소'}
+          </button>
         </div>
       </div>
     )

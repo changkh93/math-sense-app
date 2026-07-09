@@ -42,6 +42,20 @@ const LiveUserRow = ({ user, onViewDetails }) => {
   const lastUpdated = live.lastUpdatedAt?.toMillis() || 0;
   const enteredAt = live.enteredAt?.toMillis() || lastUpdated;
   const currentLocation = live.currentLocation || '메인 화면';
+  const battleLive = live.battle || {};
+  const battlePhaseLabel = (() => {
+    if (!battleLive.battleId && !battleLive.phase) return '';
+    const phase = battleLive.phase;
+    if (phase === 'waiting') return '배틀 대기 중';
+    if (phase === 'starting') return '상대 입장 확인 중';
+    if (phase === 'active') {
+      const answered = Number(battleLive.answeredCount || 0);
+      const total = Number(battleLive.totalCount || 0);
+      return total > 0 ? `배틀 진행 중: ${answered}/${total} 풀이` : '배틀 진행 중';
+    }
+    if (phase === 'result') return '배틀 결과 확인 중';
+    return '';
+  })();
 
   // Calculate times
   const timeSinceLastUpdate = now - lastUpdated;
@@ -104,8 +118,13 @@ const LiveUserRow = ({ user, onViewDetails }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
            {isStuck && <AlertTriangle size={16} color="#ffb703" />}
            <span style={{ color: isStuck ? '#ffb703' : 'white', fontWeight: isStuck ? 'bold' : 'normal' }}>
-             {currentLocation}
+             {battlePhaseLabel || currentLocation}
            </span>
+           {battlePhaseLabel && battleLive.opponentDisplayName && (
+             <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
+               vs {battleLive.opponentDisplayName}
+             </span>
+           )}
         </div>
         {user.crewId && (
            <div style={{ marginTop: 8, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -127,7 +146,7 @@ const LiveUserRow = ({ user, onViewDetails }) => {
             <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>조회 중...</span>
          ) : (
             <div style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.8)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-               {dailyStats.quizCount === 0 && dailyStats.totalVideoSeconds === 0 && dailyStats.logCount === 0 ? (
+               {dailyStats.quizCount === 0 && dailyStats.totalVideoSeconds === 0 && dailyStats.logCount === 0 && !dailyStats.battleCount ? (
                  <span style={{ color: 'rgba(255,255,255,0.4)' }}>완료된 활동 없음</span>
                ) : (
                  <>
@@ -136,11 +155,11 @@ const LiveUserRow = ({ user, onViewDetails }) => {
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>🎬 영상 시청: {Math.floor(dailyStats.totalVideoSeconds / 60)}분</span>
                         {dailyStats.attentionOpportunities > 0 && (
-                          <span style={{ 
-                            fontSize: '0.75rem', 
-                            color: 'var(--crystal-cyan)', 
-                            background: 'rgba(0, 243, 255, 0.1)', 
-                            padding: '2px 6px', 
+                          <span style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--crystal-cyan)',
+                            background: 'rgba(0, 243, 255, 0.1)',
+                            padding: '2px 6px',
                             borderRadius: '4px',
                             border: '1px solid rgba(0, 243, 255, 0.2)',
                             fontWeight: 'bold'
@@ -151,6 +170,9 @@ const LiveUserRow = ({ user, onViewDetails }) => {
                       </span>
                     )}
                    {dailyStats.logCount > 0 && <span>📝 데이터 로그: {dailyStats.logCount}회 열람</span>}
+                   {dailyStats.battleCount > 0 && (
+                     <span>⚔️ 배틀: {dailyStats.battleCount}전 {dailyStats.battleWinCount}승 {dailyStats.battleLossCount}패{dailyStats.battleDrawCount ? ` ${dailyStats.battleDrawCount}무` : ''}</span>
+                   )}
                  </>
                )}
             </div>
@@ -633,24 +655,42 @@ export default function LiveStatus() {
                ) : (
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     {selectedActivities.map((act) => (
-                      <div key={act.id} style={{ 
-                        padding: '12px', 
-                        background: 'rgba(255,255,255,0.05)', 
+                      <div key={act.id} style={{
+                        padding: '12px',
+                        background: 'rgba(255,255,255,0.05)',
                         borderRadius: '8px',
-                        borderLeft: `4px solid ${act.type === 'quiz_pass' ? '#00ffa0' : act.type === 'video_complete' ? '#a55eea' : '#45aaf2'}`
+                        borderLeft: `4px solid ${act.type === 'quiz_pass' ? '#00ffa0' : (act.type === 'video_reward' || act.type === 'video_attention' || act.type === 'video_view') ? '#a55eea' : act.type === 'quiz_battle' ? '#f43f5e' : '#45aaf2'}`
                       }}>
                          <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
                             {act.timestamp ? new Date(act.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
                          </div>
                          <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: 2 }}>{act.title}</div>
-                         {act.score !== null && (
+                         {act.type === 'quiz_battle' && act.metadata && (
+                            <div style={{ fontSize: '0.85rem', marginTop: 5, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                               <span style={{
+                                 color: act.metadata.battleResult === 'win' ? '#00ffa0'
+                                   : act.metadata.battleResult === 'loss' ? '#ff4757' : '#ffb703',
+                                 fontWeight: 'bold'
+                               }}>
+                                 {act.metadata.battleResult === 'win' ? '승리' : act.metadata.battleResult === 'loss' ? '패배' : '무승부'}{act.metadata.forfeited ? ' (포기)' : ''}
+                                 {' · '}{act.metadata.score || 0}점 · {act.metadata.correctCount || 0}/{act.metadata.totalCount || 0} 정답
+                               </span>
+                               {act.metadata.opponentDisplayName && (
+                                 <span style={{ color: 'rgba(255,255,255,0.5)' }}>vs {act.metadata.opponentDisplayName}</span>
+                               )}
+                               {act.crystalsEarned > 0 && (
+                                 <span style={{ color: '#ffd700' }}>+{act.crystalsEarned} 광석</span>
+                               )}
+                            </div>
+                         )}
+                         {act.type !== 'quiz_battle' && act.score !== null && (
                             <div style={{ fontSize: '0.85rem', color: '#00ffa0', marginTop: 5 }}>
                                점수: {act.score}점 {act.attemptCount > 1 && <span style={{color: 'rgba(255,255,255,0.5)'}}>({act.attemptCount}번째 시도)</span>}
                             </div>
                          )}
                          {act.type === 'video_attention' && (
                             <div style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', marginTop: 5 }}>
-                               <span style={{ 
+                               <span style={{
                                  color: act.metadata?.attentionResult === 'hit' ? '#00ffa0' : '#ff4757',
                                  fontWeight: 'bold'
                                }}>

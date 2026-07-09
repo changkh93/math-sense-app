@@ -44,7 +44,13 @@ export function useLearningHistory(userId, dateStr) {
     timeAttackMisses: 0,
     completionCrystalHits: 0,
     completionCrystalMisses: 0,
-    focusScore: null
+    focusScore: null,
+    battleCount: 0,
+    battleWinCount: 0,
+    battleLossCount: 0,
+    battleDrawCount: 0,
+    battleCorrectCount: 0,
+    battleQuestionCount: 0
   });
 
   // Raw data state
@@ -154,6 +160,12 @@ export function useLearningHistory(userId, dateStr) {
       completionCrystalHits: 0,
       completionCrystalMisses: 0,
       focusScore: null,
+      battleCount: 0,
+      battleWinCount: 0,
+      battleLossCount: 0,
+      battleDrawCount: 0,
+      battleCorrectCount: 0,
+      battleQuestionCount: 0,
       _videoTxMap: {}
     };
     const trackedDataLogs = new Set();
@@ -221,6 +233,16 @@ export function useLearningHistory(userId, dateStr) {
       } else if (hType === 'code_trace') {
         stats.codeTraceCount++;
         displayType = 'code_trace';
+      } else if (hType === 'quiz_battle') {
+        // 퀴즈 배틀은 일반 탐사 퀴즈와 구분되는 경쟁 활동으로 별도 집계.
+        stats.battleCount++;
+        const bResult = data.battleResult;
+        if (bResult === 'win') stats.battleWinCount++;
+        else if (bResult === 'loss') stats.battleLossCount++;
+        else if (bResult === 'draw') stats.battleDrawCount++;
+        stats.battleCorrectCount += Number(data.correctCount || 0);
+        stats.battleQuestionCount += Number(data.totalCount || 0);
+        displayType = 'quiz_battle';
       } else {
         stats.quizCount++;
       }
@@ -232,7 +254,9 @@ export function useLearningHistory(userId, dateStr) {
             ? '📝'
             : displayType === 'code_trace'
               ? '⌨️'
-              : '🚀';
+              : displayType === 'quiz_battle'
+                ? '⚔️'
+                : '🚀';
       const typeLabel =
         displayType === 'video_attention'
           ? '집중도 기록'
@@ -242,14 +266,16 @@ export function useLearningHistory(userId, dateStr) {
               ? '데이터 로그 열람'
               : displayType === 'code_trace'
                 ? '코드 따라쓰기'
-                : '현장 탐사(퀴즈)';
+                : displayType === 'quiz_battle'
+                  ? '퀴즈 배틀'
+                  : '현장 탐사(퀴즈)';
 
       aggregated.push({
         id: `quiz_${docSnap.id}`,
         timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
         type: displayType,
         title: `${typeEmoji} ${typeLabel}: ${title}`,
-        score: (displayType === 'quiz_pass' || displayType === 'quiz_in_progress') ? data.score : null,
+        score: (displayType === 'quiz_pass' || displayType === 'quiz_in_progress' || displayType === 'quiz_battle') ? data.score : null,
         crystalsEarned: data.crystalsEarned || 0,
         metadata: {
           ...data,
@@ -269,7 +295,7 @@ export function useLearningHistory(userId, dateStr) {
       const metadata = data.metadata || {};
 
       // Skip types already captured by history
-      if (tType === 'quiz_reward' || tType === 'mastery_bonus' || tType === 'quiz_penalty') return;
+      if (tType === 'quiz_reward' || tType === 'mastery_bonus' || tType === 'quiz_penalty' || tType === 'quiz_battle_reward') return;
 
       let displayType = 'general';
       let displayTitle = data.amount < 0 ? `🛒 광석 소모: ${desc}` : `💎 광석 획득: ${desc}`;
@@ -509,7 +535,7 @@ export function useLearningHistory(userId, dateStr) {
 
 /** Learning-only activity types for grouping */
 const LEARNING_TYPES = new Set([
-  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace'
+  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace', 'quiz_battle'
 ]);
 
 /**
@@ -544,8 +570,8 @@ function resolveTitle(act) {
 
   // 4. Extract from the display title (strip emoji prefixes)
   const cleaned = (act.title || '')
-    .replace(/^(?:🚀|🎬|📝|⌨️|⏳|💎|🛒|🧊|🎁|✅|🗣️|📌)\s*/u, '')
-    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|CODE TRACE|코드 따라쓰기)[:\s]*/g, '')
+    .replace(/^(?:🚀|🎬|📝|⌨️|⏳|💎|🛒|🧊|🎁|✅|🗣️|📌|⚔️)\s*/u, '')
+    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|CODE TRACE|코드 따라쓰기|퀴즈 배틀)[:\s]*/g, '')
     .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
     .trim();
   if (cleaned && cleaned.length > 0) return cleaned;
@@ -570,8 +596,12 @@ function buildGroupedActivities(rawActivities) {
     if (act.type === 'video_reward' || act.type === 'video_view' || act.type === 'video_attention') normalizedType = 'video';
     else if (act.type === 'data_log_read') normalizedType = 'text';
     else if (act.type === 'code_trace') normalizedType = 'code';
+    else if (act.type === 'quiz_battle') normalizedType = 'battle';
 
-    const groupKey = `${unitId}_${normalizedType}`;
+    // 배틀은 각 경기마다 별도 카드로 표시하기 위해 battleId 기준으로 그룹핑한다.
+    const groupKey = normalizedType === 'battle'
+      ? `battle_${meta.battleId || act.id}`
+      : `${unitId}_${normalizedType}`;
 
     if (!groupMap.has(groupKey)) {
       groupMap.set(groupKey, {
@@ -604,6 +634,13 @@ function buildGroupedActivities(rawActivities) {
         totalPracticeCount: 0,
         bestAccuracy: null,
         lastMode: '',
+        battleId: '',
+        battleResult: '',
+        battleCorrectCount: 0,
+        battleScope: '',
+        battleUnitTitle: '',
+        opponentDisplayName: '',
+        forfeited: false,
         subActivities: []
       });
     }
@@ -640,6 +677,21 @@ function buildGroupedActivities(rawActivities) {
 
     if (normalizedType === 'quiz' && meta.totalCount) {
       group.totalCount = meta.totalCount;
+    }
+
+    // Battle: 각 경기 결과 메타데이터를 그룹에 반영한다.
+    if (normalizedType === 'battle') {
+      group.score = Number(act.score ?? 0);
+      group.totalCount = Number(meta.totalCount || 0);
+      group.battleId = meta.battleId || group.battleId;
+      group.battleResult = meta.battleResult || group.battleResult;
+      group.battleCorrectCount = Number(meta.correctCount || 0);
+      group.battleScope = meta.battleScope || group.battleScope;
+      group.battleUnitTitle = meta.battleUnitTitle || group.battleUnitTitle;
+      group.opponentDisplayName = meta.opponentDisplayName || group.opponentDisplayName;
+      group.forfeited = meta.forfeited === true;
+      group.completed = true;
+      group.crystalsEarnedTotal = Math.max(group.crystalsEarnedTotal || 0, Number(act.crystalsEarned || 0));
     }
 
     // Video: accumulate max video time

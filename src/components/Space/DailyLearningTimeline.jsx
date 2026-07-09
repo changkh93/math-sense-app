@@ -117,6 +117,13 @@ const TYPE_CONFIG = {
     color: '#a78bfa',
     bg: 'rgba(167, 139, 250, 0.12)',
     border: 'rgba(167, 139, 250, 0.35)'
+  },
+  battle: {
+    icon: '⚔️',
+    label: '퀴즈 배틀',
+    color: '#f43f5e',
+    bg: 'rgba(244, 63, 94, 0.12)',
+    border: 'rgba(244, 63, 94, 0.35)'
   }
 };
 
@@ -127,8 +134,14 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
   const videoItems = items.filter(i => i.type === 'video');
   const textItems = items.filter(i => i.type === 'text');
   const codeItems = items.filter(i => i.type === 'code');
+  const battleItems = items.filter(i => i.type === 'battle');
   const codeTraceCount = dailyStats?.codeTraceCount ?? codeItems.filter(i => i.completed).length;
   const codeTraceProgressCount = dailyStats?.codeTraceProgressCount ?? codeItems.filter(i => !i.completed).length;
+
+  const battleCount = dailyStats?.battleCount ?? battleItems.length;
+  const battleCorrectRate = dailyStats?.battleQuestionCount > 0
+    ? Math.round((dailyStats.battleCorrectCount / dailyStats.battleQuestionCount) * 100)
+    : null;
 
   return (
     <div style={{ padding: '1rem' }}>
@@ -214,6 +227,16 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
                     : '#f87171'
             }
           />
+
+          {battleCount > 0 && (
+            <StatChip
+              icon="⚔️"
+              label="퀴즈 배틀"
+              value={`${battleCount}전 ${dailyStats?.battleWinCount || 0}승 ${dailyStats?.battleLossCount || 0}패${dailyStats?.battleDrawCount ? ` ${dailyStats.battleDrawCount}무` : ''}`}
+              subValue={battleCorrectRate != null ? `정답률 ${battleCorrectRate}%` : null}
+              color="#f43f5e"
+            />
+          )}
         </div>
       </div>
 
@@ -482,7 +505,55 @@ function GroupedCard({ item, index, onClick }) {
             )}
           </>
         )}
-        
+
+        {item.type === 'battle' && (
+          <>
+            <span className="font-tech" style={{
+              color: item.battleResult === 'win'
+                ? '#22c55e'
+                : item.battleResult === 'loss'
+                  ? '#f87171'
+                  : '#fbbf24',
+              fontWeight: 'bold',
+              background: 'rgba(0,0,0,0.3)',
+              padding: '0.15rem 0.5rem',
+              borderRadius: '4px'
+            }}>
+              {item.battleResult === 'win' ? '승리' : item.battleResult === 'loss' ? '패배' : '무승부'}{item.forfeited ? ' (포기)' : ''}
+            </span>
+            {item.score != null && (
+              <span className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                {item.score}점 · {item.battleCorrectCount}/{item.totalCount} 정답
+              </span>
+            )}
+            {item.opponentDisplayName && (
+              <span className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                vs {item.opponentDisplayName}
+              </span>
+            )}
+            {item.battleScope === 'unit' && item.battleUnitTitle ? (
+              <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                범위: {item.battleUnitTitle}
+              </span>
+            ) : item.battleScope === 'cumulative' ? (
+              <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                범위: 이전 과정 전체
+              </span>
+            ) : null}
+            {item.crystalsEarnedTotal > 0 && (
+              <span className="font-tech" style={{
+                color: 'var(--star-gold)',
+                fontWeight: 'bold',
+                background: 'rgba(0,0,0,0.3)',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '4px'
+              }}>
+                +{item.crystalsEarnedTotal} 광석
+              </span>
+            )}
+          </>
+        )}
+
       </div>
     </MotionDiv>
   );

@@ -325,6 +325,7 @@ function normalizeOptionSummaries(optionSummaries = []) {
 
 const QUIZ_BATTLE_QUESTION_COUNT = 15;
 const QUIZ_BATTLE_QUEUE_TTL_MS = 90 * 1000;
+const QUIZ_BATTLE_START_CONFIRM_TIMEOUT_MS = 15 * 1000;
 const QUIZ_BATTLE_DURATION_MS = 12 * 60 * 1000;
 const QUIZ_BATTLE_CORRECT_ORE = 2;
 const QUIZ_BATTLE_WIN_BONUS = 20;
@@ -741,6 +742,86 @@ function calculateBattleRewards(participants = {}, participantUids = [], totalQu
   return { winnerUid, resultType, rewards };
 }
 
+// ── battleRating 계산 (고정 공식: Wilson 승률 + 정답률 + 참여량 + 최근 활동 + 완승 보정) ──
+// 모든 입력값은 누적 summary 필드이며, finalize와 backfill이 공유한다.
+// decay는 없다: 비활동으로 인한 rating 하락은 없고, 최근 활동은 가산점만 준다.
+const BATTLE_RATING_BASE = 1000;
+const BATTLE_RATING_WILSON_MAX = 350;
+const BATTLE_RATING_CORRECT_MAX = 250;
+const BATTLE_RATING_VOLUME_MAX = 150;
+const BATTLE_RATING_RECENT_MAX = 100;
+const BATTLE_RATING_PERFECT_MAX = 100;
+const BATTLE_RATING_RECENT_WINDOW_DAYS = 30;
+const BATTLE_RATING_RECENT_FULL_BONUS_MATCHES = 20;
+
+// Wilson lower bound (95% 신뢰). 1전 1승 100%가 다전자보다 위에 오르지 않도록 보정한다.
+// rankingUtils.js의 focus 점수와 동일한 패턴을 따른다.
+function wilsonLowerBound(wins, matches, z = 1.0) {
+  if (matches <= 0) return 0;
+  const p = wins / matches;
+  const z2 = z * z;
+  const denom = 1 + z2 / matches;
+  const center = p + z2 / (2 * matches);
+  const margin = (z * Math.sqrt((p * (1 - p) + z2 / (4 * matches)) / matches)) / denom;
+  return Math.max(0, (center - margin) / denom);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * battleRating을 계산한다.
+ * @param {Object} summary - users/{uid}/battleStats/summary 문서 데이터
+ * @param {Object} [options]
+ * @param {number} [options.recentMatches] - 최근 30일 경기 수 (없으면 0)
+ * @returns {number} battleRating (정수)
+ */
+function calculateBattleRating(summary = {}, options = {}) {
+  const totalMatches = Number(summary.totalMatches || 0);
+  const wins = Number(summary.wins || 0);
+  const totalCorrect = Number(summary.totalCorrect || 0);
+  const totalAnswered = Number(summary.totalAnswered || summary.totalQuestions || 0);
+  const perfectWins = Number(summary.perfectWins || 0);
+
+  // 1. Wilson 승률 점수 (최대 350)
+  const winRateScore = Math.round(wilsonLowerBound(wins, totalMatches) * BATTLE_RATING_WILSON_MAX);
+
+  // 2. 평균 정답률 점수 (최대 250)
+  const correctRate = totalAnswered > 0 ? totalCorrect / totalAnswered : 0;
+  const correctScore = Math.round(correctRate * BATTLE_RATING_CORRECT_MAX);
+
+  // 3. 참여량 신뢰도 (최대 150). 20전부터 만점, 그 전까지 선형.
+  const volumeScore = Math.round(clamp(totalMatches / 20, 0, 1) * BATTLE_RATING_VOLUME_MAX);
+
+  // 4. 최근 30일 활동 가산점 (최대 100). 20전부터 만점.
+  const recentMatches = Number(options.recentMatches || 0);
+  const recentScore = Math.round(clamp(recentMatches / BATTLE_RATING_RECENT_FULL_BONUS_MATCHES, 0, 1) * BATTLE_RATING_RECENT_MAX);
+
+  // 5. perfect win 보정 (최대 100). 완승 5회마다 만점 접근.
+  const perfectScore = Math.round(clamp(perfectWins / 5, 0, 1) * BATTLE_RATING_PERFECT_MAX);
+
+  return BATTLE_RATING_BASE + winRateScore + correctScore + volumeScore + recentScore + perfectScore;
+}
+
+// region/opponent 집계에서 streak 재계산을 위한 헬퍼.
+// summary의 currentStreak는 finalize 시 increment로 관리되지만, backfill에서는
+// history 전체를 시간순 재생해 정확히 복원한다.
+function recomputeStreakFromHistory(historyDocs) {
+  // historyDocs: {battleResult, timestamp}를 가진 객체 배열 (시간 오름차순 정렬 가정)
+  let current = 0;
+  let best = 0;
+  for (const doc of historyDocs) {
+    if (doc.battleResult === "win") {
+      current += 1;
+      best = Math.max(best, current);
+    } else {
+      current = 0;
+    }
+  }
+  return { currentStreak: current, bestStreak: best };
+}
+
 async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed") {
   const db = admin.firestore();
   const battleRef = db.collection("quizBattles").doc(battleId);
@@ -766,8 +847,20 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         regionTitle: battleData.regionTitle || "",
         clusterId: battleData.clusterId || "",
         wrongAnswersSyncedAt: battleData.wrongAnswersSyncedAt || null,
+        battleStatsSyncedAt: battleData.battleStatsSyncedAt || null,
       };
       return;
+    }
+    if (battleData.status === "cancelled") {
+      result = {
+        alreadyCancelled: true,
+        cancelReason: battleData.cancelReason || "",
+        rewards: {},
+      };
+      return;
+    }
+    if (battleData.status === "starting") {
+      throw new functions.https.HttpsError("failed-precondition", "아직 상대 입장 확인 중입니다.");
     }
 
     const participantUids = Array.isArray(battleData.participantUids)
@@ -789,6 +882,17 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
     }
 
     const rewardResult = calculateBattleRewards(participants, participantUids, totalQuestions);
+
+    // summary에 streak 재계산이 필요하므로 각 참가자의 기존 summary를 병렬로 미리 읽는다.
+    // Firestore 트랜잭션은 모든 read가 write보다 먼저 와야 하므로, battle 문서 update 전에 읽는다.
+    const statsSnaps = await Promise.all(participantUids.map((uid) =>
+      transaction.get(db.collection("users").doc(uid).collection("battleStats").doc("summary"))
+    ));
+    const existingStats = {};
+    participantUids.forEach((uid, idx) => {
+      existingStats[uid] = statsSnaps[idx].exists ? (statsSnaps[idx].data() || {}) : {};
+    });
+
     const finalUpdates = {
       status: "finished",
       finishedAt: FieldValue.serverTimestamp(),
@@ -810,6 +914,13 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       const didWin = rewardResult.winnerUid === uid;
       const didDraw = !rewardResult.winnerUid;
       const didLose = !didWin && !didDraw;
+      const opponentUid = participantUids.find((otherUid) => otherUid !== uid) || "";
+      const opponentDisplayName = (participants[opponentUid] || {}).displayName || "";
+      const myCorrect = Number(participant.correctCount || 0);
+      const myAnswered = Number(participant.answeredCount || 0);
+      const isComplete = totalQuestions > 0 && myAnswered >= totalQuestions;
+      const isForfeit = participant.forfeited === true;
+      const isPerfectWin = didWin && totalQuestions > 0 && myCorrect >= totalQuestions;
 
       transaction.set(userRef, {
         crystals: FieldValue.increment(reward),
@@ -844,22 +955,39 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         regionTitle: battleData.regionTitle || "",
         chapterId: "",
         clusterId: battleData.clusterId || "",
+        battleScope: battleData.battleScope || "cumulative",
+        battleUnitTitle: battleData.battleUnitTitle || "",
         score: Number(participant.score || 0),
         correctCount: Number(participant.correctCount || 0),
         totalCount: totalQuestions,
+        answeredCount: Number(participant.answeredCount || 0),
+        forfeited: participant.forfeited === true,
         crystalsEarned: reward,
         battleResult: didWin ? "win" : didDraw ? "draw" : "loss",
-        opponentUid: participantUids.find((otherUid) => otherUid !== uid) || "",
+        opponentUid,
+        opponentDisplayName,
         timestamp: FieldValue.serverTimestamp(),
       }, { merge: true });
+
+      // streak 재계산: 직전 currentStreak를 읽어 승리면 +1, 아니면 0으로 리셋.
+      const prevCurrentStreak = Number(existingStats[uid]?.currentStreak || 0);
+      const prevBestStreak = Number(existingStats[uid]?.bestStreak || 0);
+      const nextCurrentStreak = didWin ? prevCurrentStreak + 1 : 0;
+      const nextBestStreak = Math.max(prevBestStreak, nextCurrentStreak);
 
       transaction.set(statsRef, {
         totalMatches: FieldValue.increment(1),
         wins: FieldValue.increment(didWin ? 1 : 0),
         losses: FieldValue.increment(didLose ? 1 : 0),
         draws: FieldValue.increment(didDraw ? 1 : 0),
-        totalCorrect: FieldValue.increment(Number(participant.correctCount || 0)),
+        totalCorrect: FieldValue.increment(myCorrect),
+        totalAnswered: FieldValue.increment(myAnswered),
         totalScore: FieldValue.increment(Number(participant.score || 0)),
+        completionCount: FieldValue.increment(isComplete ? 1 : 0),
+        forfeitCount: FieldValue.increment(isForfeit ? 1 : 0),
+        perfectWins: FieldValue.increment(isPerfectWin ? 1 : 0),
+        currentStreak: nextCurrentStreak,
+        bestStreak: nextBestStreak,
         lastBattleAt: FieldValue.serverTimestamp(),
       }, { merge: true });
     });
@@ -874,6 +1002,8 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       regionTitle: battleData.regionTitle || "",
       clusterId: battleData.clusterId || "",
       wrongAnswersSyncedAt: null,
+      battleStatsSyncedAt: null,
+      finalizeReason,
     };
   });
 
@@ -887,7 +1017,223 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
     }
   }
 
+  // 정산 트랜잭션 이후: region/opponent 통계와 battleRating을 갱신한다.
+  // 트랜잭션 외부에서 claim 패턴으로 실행해 무거운 파생 통계가 정산 지연을 유발하지 않게 한다.
+  if (result && !result.battleStatsSyncedAt) {
+    try {
+      await syncBattleStatsIfNeeded(battleId, "finalize");
+    } catch (err) {
+      console.warn("Battle stats sync failed", battleId, err);
+    }
+  }
+
   return result;
+}
+
+// region/opponent 통계와 battleRating을 트랜잭션 외부에서 갱신한다.
+// syncBattleWrongAnswersIfNeeded와 동일한 claim 패턴을 따른다.
+async function syncBattleStatsIfNeeded(battleId, source = "manual") {
+  const db = admin.firestore();
+  const battleRef = db.collection("quizBattles").doc(battleId);
+  const nowMs = Date.now();
+  const claimId = `${source}_${nowMs}_${Math.random().toString(36).slice(2, 8)}`;
+  let claimedBattle = null;
+
+  const claimed = await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(battleRef);
+    if (!snap.exists) return false;
+
+    const battleData = snap.data() || {};
+    if (battleData.status !== "finished" || battleData.battleStatsSyncedAt) return false;
+
+    const claimedAtMs = Number(battleData.battleStatsSyncClaimedAtMs || 0);
+    if (claimedAtMs > 0 && nowMs - claimedAtMs < 2 * 60 * 1000) return false;
+
+    claimedBattle = battleData;
+    transaction.set(battleRef, {
+      battleStatsSyncClaimId: claimId,
+      battleStatsSyncClaimedAt: FieldValue.serverTimestamp(),
+      battleStatsSyncClaimedAtMs: nowMs,
+      battleStatsSyncAttempts: FieldValue.increment(1),
+      battleStatsSyncSource: source,
+    }, { merge: true });
+    return true;
+  });
+
+  if (!claimed || !claimedBattle) {
+    return { success: true, synced: false, skipped: true };
+  }
+
+  try {
+    await applyBattleStats({
+      db,
+      battleId,
+      battleData: claimedBattle,
+      claimId,
+      battleRef,
+    });
+    return { success: true, synced: true };
+  } catch (err) {
+    await battleRef.set({
+      battleStatsSyncClaimId: FieldValue.delete(),
+      battleStatsSyncClaimedAt: FieldValue.delete(),
+      battleStatsSyncClaimedAtMs: FieldValue.delete(),
+      battleStatsSyncFailedAt: FieldValue.serverTimestamp(),
+      battleStatsSyncError: String(err?.message || err || "unknown").slice(0, 500),
+    }, { merge: true });
+    throw err;
+  }
+}
+
+// 한 경기의 결과를 region/opponent 통계에 반영하고, 각 참가자의 battleRating을 재계산한다.
+// summary는 이미 finalize 트랜잭션에서 increment로 갱신됐으므로 여기서는 다시 읽어서
+// 파생값(rating)만 계산한다.
+// 전체를 단일 batch로 커밋해 원자성을 보장하며, lastBattleId로 idempotency를 검사한다.
+// battleRef를 전달받아 battleStatsSyncedAt을 같은 batch에 포함한다.
+async function applyBattleStats({ db, battleId, battleData, claimId, battleRef }) {
+  const participantUids = Array.isArray(battleData.participantUids)
+    ? battleData.participantUids.filter(Boolean).slice(0, 2)
+    : [];
+  if (participantUids.length !== 2) return;
+
+  const participants = battleData.participants || {};
+  const regionId = battleData.regionId || "";
+  const regionTitle = battleData.regionTitle || "";
+  const winnerUid = battleData.winnerUid || "";
+
+  // batch에 read를 포함할 수 없으므로, 모든 read를 먼저 수행한다.
+  // 1. idempotency 검사: region/opponent 문서의 lastBattleId가 이미 현재 battleId면 skip.
+  // 2. summary read: battleRating 계산용.
+  // 3. recent matches read: rating 활동 가산점용.
+  const regionSnaps = {};
+  const opponentSnaps = {};
+  const summarySnaps = {};
+  const recentCounts = {};
+
+  await Promise.all(participantUids.map(async (uid) => {
+    const opponentUid = participantUids.find((otherUid) => otherUid !== uid) || "";
+
+    // summary read (rating 계산용)
+    const summarySnap = await db.collection("users").doc(uid)
+      .collection("battleStats").doc("summary").get();
+    summarySnaps[uid] = summarySnap.exists ? (summarySnap.data() || {}) : {};
+
+    // recent matches
+    recentCounts[uid] = await countRecentBattleMatches(db, uid);
+
+    // idempotency: region 문서 read
+    if (regionId) {
+      const regionSnap = await db.collection("users").doc(uid)
+        .collection("battleStats").doc("regions").collection("rankings").doc(regionId).get();
+      regionSnaps[uid] = regionSnap.exists ? (regionSnap.data() || {}) : null;
+    }
+
+    // idempotency: opponent 문서 read
+    if (opponentUid) {
+      const oppSnap = await db.collection("users").doc(uid)
+        .collection("battleStats").doc("opponents").collection("entries").doc(opponentUid).get();
+      opponentSnaps[uid] = oppSnap.exists ? (oppSnap.data() || {}) : null;
+    }
+  }));
+
+  // idempotency 검사: 양쪽 모두 이미 이 배틀을 처리했으면 전체 skip.
+  // (claim 패턴이 이미 2분 lock을 걸지만, lock 만료 후 재시도 시 중복을 막는다.)
+  const alreadyProcessed = participantUids.every((uid) => {
+    const regionAlready = regionId && regionSnaps[uid]?.lastBattleId === battleId;
+    const oppUid = participantUids.find((otherUid) => otherUid !== uid) || "";
+    const oppAlready = oppUid && opponentSnaps[uid]?.lastBattleId === battleId;
+    return regionAlready || oppAlready;
+  });
+  if (alreadyProcessed) {
+    await battleRef.set({
+      battleStatsSyncedAt: FieldValue.serverTimestamp(),
+      battleStatsSyncCompletedClaimId: claimId,
+      battleStatsSyncAlreadyProcessed: true,
+    }, { merge: true });
+    return;
+  }
+
+  // 단일 batch로 모든 쓰기를 원자적으로 커밋한다.
+  const batch = db.batch();
+  const nowServer = FieldValue.serverTimestamp();
+
+  participantUids.forEach((uid) => {
+    const participant = participants[uid] || {};
+    const opponentUid = participantUids.find((otherUid) => otherUid !== uid) || "";
+    const opponentDisplayName = (participants[opponentUid] || {}).displayName || "";
+    const didWin = winnerUid === uid;
+    const didDraw = !winnerUid;
+    const didLose = !didWin && !didDraw;
+    const myCorrect = Number(participant.correctCount || 0);
+    const myAnswered = Number(participant.answeredCount || 0);
+    const myScore = Number(participant.score || 0);
+
+    // region별 전적 (battleStats/regions/{regionId})
+    if (regionId) {
+      const regionRef = db.collection("users").doc(uid)
+        .collection("battleStats").doc("regions").collection("rankings").doc(regionId);
+      batch.set(regionRef, {
+        regionId,
+        regionTitle,
+        matches: FieldValue.increment(1),
+        wins: FieldValue.increment(didWin ? 1 : 0),
+        losses: FieldValue.increment(didLose ? 1 : 0),
+        draws: FieldValue.increment(didDraw ? 1 : 0),
+        correctCount: FieldValue.increment(myCorrect),
+        answeredCount: FieldValue.increment(myAnswered),
+        totalScore: FieldValue.increment(myScore),
+        lastBattleAt: nowServer,
+        lastBattleId: battleId,
+      }, { merge: true });
+    }
+
+    // 상대 전적 (battleStats/opponents/{opponentUid})
+    if (opponentUid) {
+      const opponentRef = db.collection("users").doc(uid)
+        .collection("battleStats").doc("opponents").collection("entries").doc(opponentUid);
+      batch.set(opponentRef, {
+        opponentUid,
+        opponentDisplayName,
+        matches: FieldValue.increment(1),
+        wins: FieldValue.increment(didWin ? 1 : 0),
+        losses: FieldValue.increment(didLose ? 1 : 0),
+        draws: FieldValue.increment(didDraw ? 1 : 0),
+        lastBattleId: battleId,
+        lastBattleAt: nowServer,
+      }, { merge: true });
+    }
+
+    // battleRating + streak 재계산 및 루트 반영 (같은 batch에 포함).
+    // battleBestStreak/battleCurrentStreak은 SEI battle 축의 연승 점수에서 읽힌다.
+    const summary = summarySnaps[uid] || {};
+    const battleRating = calculateBattleRating(summary, { recentMatches: recentCounts[uid] });
+    batch.set(db.collection("users").doc(uid), {
+      battleRating,
+      battleBestStreak: Number(summary.bestStreak || 0),
+      battleCurrentStreak: Number(summary.currentStreak || 0),
+      battleStatsSyncedAt: nowServer,
+    }, { merge: true });
+  });
+
+  // battleStatsSyncedAt을 같은 batch에 포함해 완전한 원자성을 보장한다.
+  // 이 batch가 성공하면 region/opponent/rating/syncedAt이 모두 함께 반영된다.
+  batch.set(battleRef, {
+    battleStatsSyncedAt: nowServer,
+    battleStatsSyncCompletedClaimId: claimId,
+  }, { merge: true });
+
+  await batch.commit();
+}
+
+// 최근 30일간 경기 수를 history에서 집계한다. battleRating의 recent 활동 가산점용.
+async function countRecentBattleMatches(db, uid) {
+  const sinceMs = Date.now() - BATTLE_RATING_RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const sinceDate = admin.firestore.Timestamp.fromMillis(sinceMs);
+  const snap = await db.collection("users").doc(uid).collection("history")
+    .where("type", "==", "quiz_battle")
+    .where("timestamp", ">=", sinceDate)
+    .get();
+  return snap.size;
 }
 
 async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
@@ -947,6 +1293,147 @@ async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
   }
 }
 
+async function cancelStartingQuizBattleInternal(battleId, reason = "entry_not_confirmed", cancelledByUid = "") {
+  const db = admin.firestore();
+  const battleRef = db.collection("quizBattles").doc(battleId);
+  const nowMs = Date.now();
+  let result = { success: true, status: "cancelled", alreadyResolved: false };
+
+  await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(battleRef);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
+    }
+    const battleData = snap.data() || {};
+    if (battleData.status === "active" || battleData.status === "finished") {
+      result = { success: true, status: battleData.status, alreadyResolved: true };
+      return;
+    }
+    if (battleData.status === "cancelled") {
+      result = { success: true, status: "cancelled", alreadyResolved: true };
+      return;
+    }
+    if (battleData.status !== "starting") {
+      throw new functions.https.HttpsError("failed-precondition", "입장 확인 중인 배틀이 아닙니다.");
+    }
+
+    transaction.set(battleRef, {
+      status: "cancelled",
+      cancelReason: reason,
+      cancelledByUid: cleanId(cancelledByUid),
+      cancelledAt: FieldValue.serverTimestamp(),
+      cancelledAtMs: nowMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    const ticketIds = battleData.ticketIds || {};
+    const participantUids = Array.isArray(battleData.participantUids) ? battleData.participantUids : [];
+    participantUids.forEach((participantUid) => {
+      const ticketId = cleanId(ticketIds[participantUid], 220);
+      if (!ticketId) return;
+      const ticketRef = db.collection("quizBattleQueueTickets").doc(ticketId);
+      transaction.set(ticketRef, {
+        status: "cancelled",
+        cancelledAt: FieldValue.serverTimestamp(),
+        cancelReason: reason,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+  });
+
+  return result;
+}
+
+async function confirmQuizBattleEntryInternal(battleId, uid) {
+  const db = admin.firestore();
+  const battleRef = db.collection("quizBattles").doc(battleId);
+  const nowMs = Date.now();
+
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(battleRef);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
+    }
+    const battleData = snap.data() || {};
+    const participantUids = Array.isArray(battleData.participantUids)
+      ? battleData.participantUids.filter(Boolean).slice(0, 2)
+      : [];
+    if (!participantUids.includes(uid)) {
+      throw new functions.https.HttpsError("permission-denied", "배틀 참가자만 입장 확인을 할 수 있습니다.");
+    }
+
+    if (battleData.status === "active" || battleData.status === "finished" || battleData.status === "cancelled") {
+      return {
+        success: true,
+        status: battleData.status,
+        startedAtMs: Number(battleData.startedAtMs || 0),
+        endsAtMs: Number(battleData.endsAtMs || 0),
+      };
+    }
+    if (battleData.status !== "starting") {
+      throw new functions.https.HttpsError("failed-precondition", "입장 확인 가능한 배틀이 아닙니다.");
+    }
+
+    const deadlineMs = Number(battleData.entryConfirmDeadlineMs || 0);
+    if (deadlineMs > 0 && nowMs > deadlineMs) {
+      transaction.set(battleRef, {
+        status: "cancelled",
+        cancelReason: "entry_confirm_timeout",
+        cancelledAt: FieldValue.serverTimestamp(),
+        cancelledAtMs: nowMs,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      const ticketIds = battleData.ticketIds || {};
+      participantUids.forEach((participantUid) => {
+        const ticketId = cleanId(ticketIds[participantUid], 220);
+        if (!ticketId) return;
+        transaction.set(db.collection("quizBattleQueueTickets").doc(ticketId), {
+          status: "cancelled",
+          cancelReason: "entry_confirm_timeout",
+          cancelledAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      });
+      return { success: true, status: "cancelled", cancelReason: "entry_confirm_timeout" };
+    }
+
+    const participants = battleData.participants || {};
+    const updatedParticipants = { ...participants };
+    updatedParticipants[uid] = {
+      ...(participants[uid] || {}),
+      entryConfirmed: true,
+      entryConfirmedAtMs: nowMs,
+    };
+    const allConfirmed = participantUids.every((participantUid) => (
+      participantUid === uid || updatedParticipants[participantUid]?.entryConfirmed === true
+    ));
+
+    const updates = {
+      [`participants.${uid}.entryConfirmed`]: true,
+      [`participants.${uid}.entryConfirmedAt`]: FieldValue.serverTimestamp(),
+      [`participants.${uid}.entryConfirmedAtMs`]: nowMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (allConfirmed) {
+      updates.status = "active";
+      updates.startedAt = FieldValue.serverTimestamp();
+      updates.startedAtMs = nowMs;
+      updates.endsAtMs = nowMs + QUIZ_BATTLE_DURATION_MS;
+      updates.entryConfirmedAt = FieldValue.serverTimestamp();
+      updates.entryConfirmedAtMs = nowMs;
+    }
+
+    transaction.update(battleRef, updates);
+    return {
+      success: true,
+      status: allConfirmed ? "active" : "starting",
+      startedAtMs: allConfirmed ? nowMs : 0,
+      endsAtMs: allConfirmed ? nowMs + QUIZ_BATTLE_DURATION_MS : 0,
+    };
+  });
+}
+
 async function forfeitQuizBattleForUid(battleId, uid) {
   const db = admin.firestore();
   const battleRef = db.collection("quizBattles").doc(battleId);
@@ -967,6 +1454,12 @@ async function forfeitQuizBattleForUid(battleId, uid) {
       winnerUid: battleData.winnerUid || "",
       rewards: battleData.rewards || {},
     };
+  }
+  if (battleData.status === "starting") {
+    return cancelStartingQuizBattleInternal(battleId, "participant_left_before_start", uid);
+  }
+  if (battleData.status === "cancelled") {
+    return { success: true, status: "cancelled", alreadyResolved: true };
   }
 
   await db.runTransaction(async (transaction) => {
@@ -1364,7 +1857,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       const existingBattleSnap = await db.collection("quizBattles").doc(existingTicket.matchId).get();
       if (existingBattleSnap.exists) {
         const existingBattle = existingBattleSnap.data() || {};
-        if (existingBattle.status !== "finished") {
+        if (existingBattle.status !== "finished" && existingBattle.status !== "cancelled") {
           // 배틀이 아직 "계속 진행 가능한 상태"인지 확인한다.
           // 타이머가 만료됐거나 누군가 이미 포기했다면 stale(좀비) 배틀이므로
           // 정산한 뒤 새 매칭으로 넘어간다. 그렇지 않으면 그대로 재입장시킨다.
@@ -1450,7 +1943,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
 
     const battleRef = db.collection("quizBattles").doc();
     const opponentUid = targetTicket.uid;
-    const expiresAtMs = nowMs + QUIZ_BATTLE_DURATION_MS;
+    const entryConfirmDeadlineMs = nowMs + QUIZ_BATTLE_START_CONFIRM_TIMEOUT_MS;
     const participantUids = [uid, opponentUid].sort();
     const matched = await db.runTransaction(async (transaction) => {
       const [freshTargetSnap, freshOwnSnap] = await Promise.all([
@@ -1484,6 +1977,8 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
         correctCount: 0,
         answeredCount: 0,
         ready: true,
+        entryConfirmed: false,
+        entryConfirmedAtMs: 0,
         entryUnitId,
         entryUnitTitle: contextData.units.find((unit) => unit.id === entryUnitId)?.title || "",
       };
@@ -1494,12 +1989,14 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
         correctCount: 0,
         answeredCount: 0,
         ready: true,
+        entryConfirmed: false,
+        entryConfirmedAtMs: 0,
         entryUnitId: targetEntryUnitId,
         entryUnitTitle: targetUnitTitle,
       };
 
       transaction.set(battleRef, {
-        status: "active",
+        status: "starting",
         clusterId: contextData.clusterId,
         regionId,
         regionTitle: contextData.regionTitle || "",
@@ -1513,11 +2010,15 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
           [uid]: entryUnitId,
           [opponentUid]: targetEntryUnitId,
         },
+        ticketIds: {
+          [uid]: ticketRef.id,
+          [opponentUid]: targetRef.id,
+        },
         questionCount: questionSet.length,
         questionSet,
-        startedAt: FieldValue.serverTimestamp(),
-        startedAtMs: nowMs,
-        endsAtMs: expiresAtMs,
+        startedAtMs: 0,
+        endsAtMs: 0,
+        entryConfirmDeadlineMs,
         createdAt: FieldValue.serverTimestamp(),
         createdAtMs: nowMs,
       });
@@ -1606,7 +2107,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
     const opponentRef = db.collection("users").doc(opponentUid);
     const opponentSnap = await opponentRef.get();
     const opponentData = opponentSnap.exists ? opponentSnap.data() || {} : {};
-    const expiresAtMs = nowMs + QUIZ_BATTLE_DURATION_MS;
+    const entryConfirmDeadlineMs = nowMs + QUIZ_BATTLE_START_CONFIRM_TIMEOUT_MS;
     const participantUids = [uid, opponentUid].sort();
 
     const matched = await db.runTransaction(async (transaction) => {
@@ -1637,6 +2138,8 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
         correctCount: 0,
         answeredCount: 0,
         ready: true,
+        entryConfirmed: false,
+        entryConfirmedAtMs: 0,
         entryUnitId,
         entryUnitTitle: contextData.units.find((unit) => unit.id === entryUnitId)?.title || "",
       };
@@ -1647,12 +2150,14 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
         correctCount: 0,
         answeredCount: 0,
         ready: true,
+        entryConfirmed: false,
+        entryConfirmedAtMs: 0,
         entryUnitId: freshCandidate.entryUnitId || "",
         entryUnitTitle: freshCandidate.entryUnitTitle || "",
       };
 
       transaction.set(battleRef, {
-        status: "active",
+        status: "starting",
         clusterId: contextData.clusterId,
         regionId,
         regionTitle: contextData.regionTitle || "",
@@ -1668,11 +2173,15 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
           [uid]: entryUnitId,
           [opponentUid]: freshCandidate.entryUnitId || "",
         },
+        ticketIds: {
+          [uid]: ticketRef.id,
+          [opponentUid]: candidate.ref.id,
+        },
         questionCount: questionSet.length,
         questionSet,
-        startedAt: FieldValue.serverTimestamp(),
-        startedAtMs: nowMs,
-        endsAtMs: expiresAtMs,
+        startedAtMs: 0,
+        endsAtMs: 0,
+        entryConfirmDeadlineMs,
         createdAt: FieldValue.serverTimestamp(),
         createdAtMs: nowMs,
       });
@@ -1733,7 +2242,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
           const endedByForfeit = (freshBattle.participantUids || []).some(
             (pUid) => freshBattle.participants?.[pUid]?.forfeited === true
           );
-          if (freshBattle.status !== "finished" && !endedByTimer && !endedByForfeit) {
+          if (freshBattle.status !== "finished" && freshBattle.status !== "cancelled" && !endedByTimer && !endedByForfeit) {
             return { status: "matched", battleId: freshTicket.matchId };
           }
         }
@@ -1951,6 +2460,16 @@ exports.finalizeQuizBattle = regionalFunctions.https.onCall(async (data, context
   return { success: true, ...result };
 });
 
+exports.confirmQuizBattleEntry = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const battleId = cleanId(data?.battleId);
+  if (!battleId) {
+    throw new functions.https.HttpsError("invalid-argument", "배틀 정보가 올바르지 않습니다.");
+  }
+
+  return confirmQuizBattleEntryInternal(battleId, uid);
+});
+
 exports.forfeitQuizBattle = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const battleId = cleanId(data?.battleId);
@@ -1987,6 +2506,32 @@ exports.sweepExpiredQuizBattles = regionalFunctions.pubsub
     return null;
   });
 
+exports.sweepUnconfirmedQuizBattles = regionalFunctions.pubsub
+  .schedule("every 1 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const nowMs = Date.now();
+    const snap = await db.collection("quizBattles")
+      .where("status", "==", "starting")
+      .where("entryConfirmDeadlineMs", "<=", nowMs)
+      .orderBy("entryConfirmDeadlineMs", "asc")
+      .limit(100)
+      .get();
+
+    if (snap.empty) return null;
+
+    await Promise.all(snap.docs.map(async (docSnap) => {
+      try {
+        await cancelStartingQuizBattleInternal(docSnap.id, "entry_confirm_timeout");
+      } catch (err) {
+        console.warn("Unconfirmed quiz battle cancel failed", docSnap.id, err);
+      }
+    }));
+
+    return null;
+  });
+
 exports.sweepUnsyncedQuizBattleWrongAnswers = regionalFunctions.pubsub
   .schedule("every 5 minutes")
   .timeZone("Asia/Seoul")
@@ -2010,6 +2555,280 @@ exports.sweepUnsyncedQuizBattleWrongAnswers = regionalFunctions.pubsub
 
     return null;
   });
+
+// 배틀 통계 동기화가 누락된 finished 배틀을 재처리한다.
+exports.sweepUnsyncedQuizBattleStats = regionalFunctions.pubsub
+  .schedule("every 5 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const snap = await db.collection("quizBattles")
+      .where("status", "==", "finished")
+      .where("battleStatsSyncedAt", "==", null)
+      .limit(100)
+      .get();
+
+    if (snap.empty) return null;
+
+    await Promise.all(snap.docs.map(async (docSnap) => {
+      try {
+        await syncBattleStatsIfNeeded(docSnap.id, "sweep");
+      } catch (err) {
+        console.warn("Unsynced quiz battle stats sync failed", docSnap.id, err);
+      }
+    }));
+
+    return null;
+  });
+
+// 관리자 전용: 기존 배틀 history에서 summary/regions/opponents/battleRating을 역산(backfill)한다.
+// 보상/광석은 절대 재지급하지 않는다. increment가 아닌 set(overwrite) 방식만 사용한다.
+// 옵션: { dryRun?: boolean, uid?: string (단일 사용자 제한), limit?: number }
+exports.backfillQuizBattleStats = regionalFunctions.https.onCall(async (data, context) => {
+  const adminUid = await requireAdminUid(context);
+  const dryRun = data?.dryRun === true;
+  const targetUid = cleanId(data?.uid, 200);
+  const userLimit = Number(data?.limit) > 0 ? Math.min(Number(data.limit), 500) : 200;
+
+  console.log(`[backfillQuizBattleStats] admin=${adminUid} dryRun=${dryRun} targetUid=${targetUid || "all"} limit=${userLimit}`);
+
+  const db = admin.firestore();
+
+  // 대상 사용자 목록 구성.
+  // uid가 지정되면 해당 사용자 doc을 직접 읽어 limit에 걸리지 않게 한다.
+  let targetUids = [];
+  if (targetUid) {
+    const directSnap = await db.collection("users").doc(targetUid).get();
+    if (directSnap.exists) {
+      const role = directSnap.get("role");
+      if (role !== "admin" && role !== "developer" && role !== "teacher") {
+        targetUids = [targetUid];
+      } else {
+        return { success: false, error: "지정한 uid는 admin/developer/teacher 계정입니다." };
+      }
+    } else {
+      return { success: false, error: "지정한 uid를 찾을 수 없습니다." };
+    }
+  } else {
+    const userSnap = await db.collection("users").limit(userLimit).get();
+    targetUids = userSnap.docs
+      .filter((d) => {
+        const role = d.get("role");
+        return role !== "admin" && role !== "developer" && role !== "teacher";
+      })
+      .map((d) => d.id);
+  }
+
+  const report = { dryRun, processedUsers: 0, skippedUsers: 0, totalBattles: 0, perUser: [] };
+
+  for (const uid of targetUids) {
+    // 사용자의 모든 quiz_battle history를 시간순으로 가져온다.
+    const historySnap = await db.collection("users").doc(uid).collection("history")
+      .where("type", "==", "quiz_battle")
+      .orderBy("timestamp", "asc")
+      .get();
+
+    if (historySnap.empty) {
+      report.skippedUsers += 1;
+      continue;
+    }
+
+    const battles = historySnap.docs.map((d) => d.data());
+    report.totalBattles += battles.length;
+
+    // summary 재구성 (set 방식)
+    const summary = {
+      totalMatches: battles.length,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      totalCorrect: 0,
+      totalAnswered: 0,
+      totalScore: 0,
+      completionCount: 0,
+      forfeitCount: 0,
+      perfectWins: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+      lastBattleAt: null,
+    };
+    const regionsMap = {}; // { regionId: {...} }
+    const opponentsMap = {}; // { opponentUid: {...} }
+
+    // streak 재계산을 위해 시간순 재생
+    let currentStreak = 0;
+    let bestStreak = 0;
+    battles.forEach((b) => {
+      const result = b.battleResult;
+      const isWin = result === "win";
+      const isDraw = result === "draw";
+      const isLoss = result === "loss";
+      const correct = Number(b.correctCount || 0);
+      const answered = Number(b.answeredCount || b.totalCount || 0);
+      const total = Number(b.totalCount || 0);
+      const score = Number(b.score || 0);
+      const isComplete = total > 0 && answered >= total;
+      const isForfeit = b.forfeited === true;
+      const isPerfectWin = isWin && total > 0 && correct >= total;
+
+      if (isWin) summary.wins += 1;
+      else if (isDraw) summary.draws += 1;
+      else summary.losses += 1;
+      summary.totalCorrect += correct;
+      summary.totalAnswered += answered;
+      summary.totalScore += score;
+      if (isComplete) summary.completionCount += 1;
+      if (isForfeit) summary.forfeitCount += 1;
+      if (isPerfectWin) summary.perfectWins += 1;
+
+      // streak
+      if (isWin) {
+        currentStreak += 1;
+        bestStreak = Math.max(bestStreak, currentStreak);
+      } else {
+        currentStreak = 0;
+      }
+
+      // region 집계
+      const regionId = b.regionId || "";
+      const ts = b.timestamp;
+      const tsMs = ts && typeof ts.toMillis === "function" ? ts.toMillis() : 0;
+      if (regionId) {
+        if (!regionsMap[regionId]) {
+          regionsMap[regionId] = {
+            regionId,
+            regionTitle: b.regionTitle || "",
+            matches: 0, wins: 0, losses: 0, draws: 0,
+            correctCount: 0, answeredCount: 0, totalScore: 0,
+            lastBattleAt: null, lastBattleId: b.battleId || "",
+            _lastBattleMs: 0,
+          };
+        }
+        const r = regionsMap[regionId];
+        r.matches += 1;
+        if (isWin) r.wins += 1;
+        else if (isDraw) r.draws += 1;
+        else r.losses += 1;
+        r.correctCount += correct;
+        r.answeredCount += answered;
+        r.totalScore += score;
+        r.lastBattleId = b.battleId || r.lastBattleId;
+        // 각 region별 마지막 배틀 시간을 정확히 추적한다.
+        if (tsMs > r._lastBattleMs) {
+          r._lastBattleMs = tsMs;
+          r.lastBattleAt = ts;
+        }
+      }
+
+      // opponent 집계
+      const oppUid = b.opponentUid || "";
+      if (oppUid) {
+        if (!opponentsMap[oppUid]) {
+          opponentsMap[oppUid] = {
+            opponentUid: oppUid,
+            opponentDisplayName: b.opponentDisplayName || "",
+            matches: 0, wins: 0, losses: 0, draws: 0,
+            lastBattleId: b.battleId || "",
+            lastBattleAt: null,
+            _lastBattleMs: 0,
+          };
+        }
+        const o = opponentsMap[oppUid];
+        o.matches += 1;
+        if (isWin) o.wins += 1;
+        else if (isDraw) o.draws += 1;
+        else o.losses += 1;
+        o.lastBattleId = b.battleId || o.lastBattleId;
+        if (b.opponentDisplayName) o.opponentDisplayName = b.opponentDisplayName;
+        // 각 opponent별 마지막 배틀 시간을 정확히 추적한다.
+        if (tsMs > o._lastBattleMs) {
+          o._lastBattleMs = tsMs;
+          o.lastBattleAt = ts;
+        }
+      }
+
+      // summary 마지막 배틀 시간
+      const currentLastMs = summary.lastBattleAt && typeof summary.lastBattleAt.toMillis === "function"
+        ? summary.lastBattleAt.toMillis() : 0;
+      if (tsMs > 0 && tsMs > currentLastMs) {
+        summary.lastBattleAt = ts;
+      }
+    });
+
+    summary.currentStreak = currentStreak;
+    summary.bestStreak = bestStreak;
+    summary.backfilledAt = FieldValue.serverTimestamp();
+
+    // _lastBattleMs 임시 필드 제거 (Firestore에 저장하지 않음)
+    Object.values(regionsMap).forEach((r) => { delete r._lastBattleMs; });
+    Object.values(opponentsMap).forEach((o) => { delete o._lastBattleMs; });
+
+    // battleRating 계산
+    const recentMatches = await countRecentBattleMatches(db, uid);
+    const battleRating = calculateBattleRating(summary, { recentMatches });
+
+    report.perUser.push({
+      uid,
+      battles: battles.length,
+      rating: battleRating,
+      wins: summary.wins, losses: summary.losses, draws: summary.draws,
+      regions: Object.keys(regionsMap).length,
+      opponents: Object.keys(opponentsMap).length,
+    });
+
+    if (dryRun) {
+      report.processedUsers += 1;
+      continue;
+    }
+
+    // 실제 쓰기: 기존 regions/opponents를 모두 삭제한 후 재생성(진짜 overwrite)한다.
+    const userRef = db.collection("users").doc(uid);
+    const regionsColRef = userRef.collection("battleStats").doc("regions").collection("rankings");
+    const opponentsColRef = userRef.collection("battleStats").doc("opponents").collection("entries");
+
+    const [existingRegions, existingOpponents] = await Promise.all([
+      regionsColRef.get(),
+      opponentsColRef.get(),
+    ]);
+
+    const batch = db.batch();
+
+    // 기존 regions/opponents 문서 삭제 (stale 방지)
+    existingRegions.forEach((d) => batch.delete(d.ref));
+    existingOpponents.forEach((d) => batch.delete(d.ref));
+
+    // summary overwrite
+    batch.set(userRef.collection("battleStats").doc("summary"), summary, { merge: true });
+
+    // regions 재생성
+    Object.entries(regionsMap).forEach(([regionId, regionStats]) => {
+      batch.set(regionsColRef.doc(regionId), regionStats, { merge: true });
+    });
+
+    // opponents 재생성
+    Object.entries(opponentsMap).forEach(([oppUid, oppStats]) => {
+      batch.set(opponentsColRef.doc(oppUid), oppStats, { merge: true });
+    });
+
+    await batch.commit();
+
+    // 루트에 battleRating + streak + 파생 카운터 반영 (winRate는 계획 합의대로 저장하지 않는다)
+    await userRef.set({
+      battleRating,
+      battleBestStreak: summary.bestStreak || 0,
+      battleCurrentStreak: summary.currentStreak || 0,
+      totalBattleMatches: summary.totalMatches,
+      totalBattleWins: summary.wins,
+      totalBattleLosses: summary.losses,
+      totalBattleDraws: summary.draws,
+    }, { merge: true });
+
+    report.processedUsers += 1;
+  }
+
+  console.log(`[backfillQuizBattleStats] completed: ${JSON.stringify({ processed: report.processedUsers, skipped: report.skippedUsers, battles: report.totalBattles })}`);
+  return { success: true, report };
+});
 
 exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) => {
   const type = cleanText(data?.type, 30);
