@@ -1,6 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Trophy, Star, Zap, Target } from 'lucide-react';
 import { useQARanking } from '../../hooks/useQA';
+import soundManager from '../../utils/SoundManager';
 import './AgoraMotivationPanel.css';
 
 const EXPLORER_LEVELS = [
@@ -59,7 +61,15 @@ function calculateLevel(crystals) {
 }
 
 export default function AgoraMotivationPanel({ userData, activeCategory, onCategoryChange }) {
+  const navigate = useNavigate();
   const { data: ranking, isLoading } = useQARanking();
+
+  const openPublicProfile = (event, uid) => {
+    event.stopPropagation();
+    if (!uid) return;
+    soundManager.playClick();
+    navigate(`/profile/${uid}`);
+  };
 
   const crystals = userData?.crystals || 0;
 
@@ -86,7 +96,14 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
             ranking.map((hero, i) => (
               <div key={hero.id} className="hall-item">
                 <span className="badge">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '✨'}</span>
-                <span className="name">{hero.studentName || hero.name || '익명 탐험가'}</span>
+                <button
+                  type="button"
+                  className="hall-item-name"
+                  onClick={(event) => openPublicProfile(event, hero.id)}
+                  aria-label={`${hero.studentName || hero.name || '익명 탐험가'}님의 프로필 보기`}
+                >
+                  {hero.studentName || hero.name || '익명 탐험가'}
+                </button>
                 <span className="count font-tech">{hero.helpCount} 도움</span>
               </div>
             ))

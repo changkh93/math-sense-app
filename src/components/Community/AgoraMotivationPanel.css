@@ -82,6 +82,26 @@
   font-size: 0.9rem;
 }
 
+.hall-item-name {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hall-item-name:hover {
+  color: var(--crystal-cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .hall-item .count {
   margin-left: auto;
   color: var(--text-muted);

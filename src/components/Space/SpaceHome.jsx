@@ -568,7 +568,9 @@ function SpaceHome() {
   const { user, userData, loading: authLoading } = useAuth()
   const [history, setHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
-  const [currentView, setCurrentView] = useState('planet') // 'planet', 'dashboard', 'collection', 'assignment_hub'
+  const [currentView, setCurrentView] = useState(() => {
+    return sessionStorage.getItem('metasense_current_view') || 'planet';
+  }) // 'planet', 'dashboard', 'collection', 'assignment_hub'
   const [transactions, setTransactions] = useState([])
   const [loadingTransactions, setLoadingTransactions] = useState(true)
   const [shouldScrollStore, setShouldScrollStore] = useState(false)
@@ -828,6 +830,11 @@ function SpaceHome() {
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location.pathname, location.search, location.state, navigate, switchRootView, updateSelectedClusterId])
+
+  // Persist currentView to session so returning from external routes (e.g. /profile/:uid) restores it
+  useEffect(() => {
+    if (currentView) sessionStorage.setItem('metasense_current_view', currentView);
+  }, [currentView])
 
   // Data Hooks
   const { data: clusters, isLoading: loadingClusters } = useClusters()

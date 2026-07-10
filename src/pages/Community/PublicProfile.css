@@ -231,6 +231,34 @@
   letter-spacing: 0;
 }
 
+.public-profile-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.public-profile-memo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 243, 255, 0.35);
+  background: rgba(0, 243, 255, 0.1);
+  color: var(--crystal-cyan);
+  font-size: 0.85rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.public-profile-memo-btn:hover {
+  background: rgba(0, 243, 255, 0.2);
+  border-color: rgba(0, 243, 255, 0.55);
+}
+
 .public-profile-title-row {
   display: flex;
   flex-wrap: wrap;

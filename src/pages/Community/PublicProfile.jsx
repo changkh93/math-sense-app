@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Award, CalendarDays, Flame, Map as MapIcon, MessageCircle, Shield, Sparkles, Star, Trophy, TrendingUp, Zap } from 'lucide-react';
+import { ArrowLeft, Award, CalendarDays, Flame, Map as MapIcon, MessageCircle, PenLine, Shield, Sparkles, Star, Trophy, TrendingUp, Zap } from 'lucide-react';
 import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
@@ -634,6 +634,11 @@ export default function PublicProfile() {
   );
   const displayName = getDisplayName(profile || {});
 
+  const handleSendMemo = () => {
+    if (!uid || isOwnProfile) return;
+    window.dispatchEvent(new CustomEvent('directmemo:compose', { detail: { uid } }));
+  };
+
   return (
     <div
       className={`public-profile-page space-bg ${isPremiumBaseTheme ? 'public-profile-page--premium' : 'public-profile-page--basic'} public-profile-page--${baseTheme.id}`}
@@ -682,7 +687,19 @@ export default function PublicProfile() {
 
               <div className="public-profile-hero-main">
                 <div className="public-profile-kicker">나의 탐험기지</div>
-                <h1>{displayName}</h1>
+                <div className="public-profile-name-row">
+                  <h1>{displayName}</h1>
+                  {!isOwnProfile && (
+                    <button
+                      type="button"
+                      className="public-profile-memo-btn"
+                      onClick={handleSendMemo}
+                      aria-label={`${displayName}님에게 편지 보내기`}
+                    >
+                      <PenLine size={15} /> 편지 쓰기
+                    </button>
+                  )}
+                </div>
                 <div className="public-profile-title-row">
                   <span>{profile.publicTitle || '성장 중인 탐험가'}</span>
                   <span className="public-profile-frame-chip" style={{ borderColor: frameTheme.borderColor, color: frameTheme.accent }}>

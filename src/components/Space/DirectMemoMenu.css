@@ -476,6 +476,27 @@
   white-space: nowrap;
 }
 
+.direct-memo-peer-link {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.direct-memo-peer-link:hover {
+  color: var(--crystal-cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .direct-memo-avatar {
   width: 26px;
   height: 26px;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, doc, limit as limitDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Archive, Check, Clock3, PenLine, Reply, Send, Trash2, UserRound, X } from 'lucide-react';
@@ -39,9 +40,10 @@ function getErrorMessage(err) {
   return '편지를 처리하지 못했습니다.';
 }
 
-function MemoCard({ memo, mode, archived, expanded, onOpen, onArchive, onReply, onDelete }) {
+function MemoCard({ memo, mode, archived, expanded, onOpen, onArchive, onReply, onDelete, onOpenProfile }) {
   const isSent = mode === 'sent';
   const peerName = isSent ? memo.recipientName : memo.senderName;
+  const peerId = isSent ? memo.recipientId : memo.senderId;
   const time = archived ? getMemoTime(memo.archiveTime) : getMemoTime(isSent ? memo.createdAt : memo.sentAt);
   const statusLabel = archived ? '보관됨' : (memo.status === 'scheduled' ? `예약 ${getMemoTime(memo.deliverAt)}` : (isSent ? (memo.isRead ? '읽음' : '배달됨') : (memo.isRead ? '읽음' : '새 편지')));
 
@@ -62,7 +64,21 @@ function MemoCard({ memo, mode, archived, expanded, onOpen, onArchive, onReply, 
       <div className="direct-memo-card-top">
         <div className="direct-memo-peer">
           <span className="direct-memo-avatar"><UserRound size={15} /></span>
-          <span>{peerName || '탐사원'}</span>
+          {peerId ? (
+            <button
+              type="button"
+              className="direct-memo-peer-link"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenProfile(peerId);
+              }}
+              aria-label={`${peerName || '탐사원'}님의 프로필 보기`}
+            >
+              {peerName || '탐사원'}
+            </button>
+          ) : (
+            <span>{peerName || '탐사원'}</span>
+          )}
         </div>
         <span className={`direct-memo-state ${memo.status === 'scheduled' ? 'scheduled' : ''}`}>
           {memo.status === 'scheduled' ? <Clock3 size={13} /> : <Check size={13} />}
@@ -115,6 +131,7 @@ function MemoCard({ memo, mode, archived, expanded, onOpen, onArchive, onReply, 
 
 export default function DirectMemoMenu() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('inbox');
   const [recipients, setRecipients] = useState([]);
@@ -130,6 +147,7 @@ export default function DirectMemoMenu() {
   const menuRef = useRef(null);
   const recipientInputRef = useRef(null);
   const protectedUntilRef = useRef(0);
+  const pendingComposeRef = useRef(null);
 
   const protectMemoInteraction = () => {
     protectedUntilRef.current = Date.now() + 350;
@@ -314,6 +332,56 @@ export default function DirectMemoMenu() {
       console.error('Failed to mark direct memo read:', err);
     }
   };
+
+  const handleOpenProfile = (uid) => {
+    if (!uid) return;
+    soundManager.playClick();
+    setIsOpen(false);
+    navigate(`/profile/${uid}`);
+  };
+
+  const startComposeForUid = (uid) => {
+    if (!uid || uid === user?.uid) return;
+    const recipient = recipients.find((item) => item.uid === uid);
+    if (!recipient) return;
+    setIsOpen(true);
+    setActiveTab('compose');
+    setRecipientId(recipient.uid);
+    setRecipientSearch('');
+    setRecipientFocused(false);
+    setMessage('');
+    window.requestAnimationFrame(() => {
+      if (recipientInputRef.current) recipientInputRef.current.focus();
+    });
+  };
+
+  useEffect(() => {
+    if (!recipients.length || !pendingComposeRef.current) return;
+    const pending = pendingComposeRef.current;
+    pendingComposeRef.current = null;
+    startComposeForUid(pending);
+  }, [recipients]);
+
+  useEffect(() => {
+    const handleRequest = (event) => {
+      const { uid } = event.detail || {};
+      if (!uid) return;
+      if (!user?.uid) {
+        setMessage('편지함을 열려면 먼저 로그인해 주세요.');
+        setIsOpen(true);
+        return;
+      }
+      soundManager.playClick();
+      if (recipients.length) {
+        startComposeForUid(uid);
+      } else {
+        pendingComposeRef.current = uid;
+        setIsOpen(true);
+      }
+    };
+    window.addEventListener('directmemo:compose', handleRequest);
+    return () => window.removeEventListener('directmemo:compose', handleRequest);
+  }, [user?.uid, recipients]);
 
   const handleReplyMemo = (memo) => {
     setActiveTab('compose');
@@ -576,6 +644,7 @@ export default function DirectMemoMenu() {
                     onArchive={() => handleArchiveMemo(memo)}
                     onReply={() => handleReplyMemo(memo)}
                     onDelete={() => handleDeleteMemo(memo)}
+                    onOpenProfile={handleOpenProfile}
                   />
                 ))
               )}
