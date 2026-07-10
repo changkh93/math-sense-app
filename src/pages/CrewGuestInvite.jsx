@@ -54,7 +54,8 @@ export default function CrewGuestInvite() {
         startedAt: Date.now(),
       };
       window.sessionStorage.setItem('crewGuestSession', JSON.stringify(session));
-      navigate('/', { replace: true });
+      window.sessionStorage.setItem('metasense_current_view', 'crew');
+      navigate('/', { replace: true, state: { view: 'crew' } });
     } catch (err) {
       setPhase('error');
       const code = err?.code || '';

@@ -583,7 +583,42 @@ function SpaceHome() {
   const [loginPassword, setLoginPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
+  const [guestInvitePanelOpen, setGuestInvitePanelOpen] = useState(false)
+  const [guestInviteLink, setGuestInviteLink] = useState('')
+  const [guestInviteError, setGuestInviteError] = useState('')
   const [signupPrompt, setSignupPrompt] = useState(null)
+
+  const handleGuestInviteLogin = useCallback(() => {
+    const rawLink = guestInviteLink.trim()
+    if (!rawLink) {
+      setGuestInviteError('전달받은 게스트 초대 링크를 붙여 넣어 주세요.')
+      return
+    }
+
+    let pathname = rawLink
+    try {
+      pathname = new URL(rawLink, window.location.origin).pathname
+    } catch {
+      // The pathname matcher below also handles a pasted relative invite link.
+    }
+
+    const match = pathname.match(/\/crew-invite\/([^/?#]+)/)
+    if (!match?.[1]) {
+      setGuestInviteError('올바른 스터디 크루 게스트 초대 링크인지 확인해 주세요.')
+      return
+    }
+
+    let crewId = match[1]
+    try {
+      crewId = decodeURIComponent(crewId)
+    } catch {
+      setGuestInviteError('초대 링크 형식이 올바르지 않습니다.')
+      return
+    }
+
+    setGuestInviteError('')
+    navigate(`/crew-invite/${encodeURIComponent(crewId)}`)
+  }, [guestInviteLink, navigate])
 
   const persistSignupPrompt = useCallback((notice = {}) => {
     const payload = {
@@ -3035,6 +3070,94 @@ function SpaceHome() {
                   >
                     Google 계정 로그인
                   </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.38)', fontSize: '0.8rem' }}>
+                    <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
+                    <span className="font-tech">GUEST</span>
+                    <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={loginLoading}
+                    onClick={() => {
+                      setGuestInvitePanelOpen((open) => !open)
+                      setGuestInviteError('')
+                    }}
+                    className="font-tech"
+                    style={{
+                      border: '1px solid rgba(134,239,172,0.42)',
+                      borderRadius: 10,
+                      background: guestInvitePanelOpen ? 'rgba(34,197,94,0.16)' : 'rgba(34,197,94,0.08)',
+                      color: '#bbf7d0',
+                      padding: '0.8rem 1rem',
+                      fontWeight: 900,
+                      cursor: loginLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '0.98rem'
+                    }}
+                  >
+                    🔗 초대 링크로 로그인하기
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {guestInvitePanelOpen && (
+                      <Motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div style={{ display: 'grid', gap: 9, paddingTop: 2 }}>
+                          <input
+                            value={guestInviteLink}
+                            onChange={(event) => {
+                              setGuestInviteLink(event.target.value)
+                              setGuestInviteError('')
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault()
+                                handleGuestInviteLogin()
+                              }
+                            }}
+                            placeholder="게스트 초대 링크를 붙여 넣어 주세요"
+                            inputMode="url"
+                            autoComplete="off"
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              border: '1px solid rgba(134,239,172,0.32)',
+                              borderRadius: 10,
+                              background: 'rgba(255,255,255,0.08)',
+                              color: 'white',
+                              padding: '0.78rem 0.9rem',
+                              fontSize: '0.92rem',
+                              outline: 'none'
+                            }}
+                          />
+                          {guestInviteError && (
+                            <div className="font-tech" style={{ color: '#fca5a5', fontSize: '0.8rem', lineHeight: 1.5, textAlign: 'left' }}>
+                              {guestInviteError}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleGuestInviteLogin}
+                            className="font-tech"
+                            style={{
+                              border: 'none',
+                              borderRadius: 10,
+                              background: 'linear-gradient(135deg, #86efac, #22d3ee)',
+                              color: '#04111f',
+                              padding: '0.78rem 1rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              fontSize: '0.92rem'
+                            }}
+                          >
+                            게스트 입장 화면으로 이동
+                          </button>
+                        </div>
+                      </Motion.div>
+                    )}
+                  </AnimatePresence>
                 </Motion.form>
               )}
             </AnimatePresence>

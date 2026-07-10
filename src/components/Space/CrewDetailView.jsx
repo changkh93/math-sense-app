@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ArrowLeft, CalendarDays, ChevronDown, Copy, Crown, Loader2, LogOut, Send, StickyNote, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Copy, Crown, Loader2, LogOut, Radio, Rocket, Send, ShieldCheck, StickyNote, Trash2, Users, Wifi } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
@@ -10,15 +10,12 @@ import soundManager from '../../utils/SoundManager';
 import CrewSettingsModal from './CrewSettingsModal';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 import { formatCrewSchedule } from './crewSchedule';
+import './CrewDetailView.css';
 
 const inputStyle = {
   width: '100%', minHeight: 46, boxSizing: 'border-box', borderRadius: 8,
   border: '1px solid rgba(0, 243, 255, 0.28)', background: 'rgba(5, 10, 24, 0.72)',
   color: 'var(--text-bright)', padding: '0.75rem 0.9rem', outline: 'none'
-};
-const panelStyle = {
-  background: 'rgba(7, 13, 30, 0.78)', border: '1px solid rgba(255,255,255,0.11)',
-  borderRadius: 8, padding: '1.2rem'
 };
 const NOTE_MAX_LENGTH = 120;
 
@@ -102,7 +99,7 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
   }, []);
 
   return (
-    <div className="glass-card hud-border" style={{ padding: '1rem', borderRadius: 10, minHeight: 204, display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+    <div className="crew-member-console">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
           {isLeader && <Crown size={14} style={{ color: '#fbbf24', flexShrink: 0 }} />}
@@ -120,7 +117,7 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
         연속 {member.currentStreak || 0}일 · {studied ? '오늘 학습 완료' : '오늘 학습 대기'}
       </div>
 
-      <div style={{ padding: '0.75rem', borderRadius: 8, background: 'rgba(2,6,23,0.46)', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '0.45rem' }}>
+      <div className="crew-member-readout">
         <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>
           현재 위치
         </div>
@@ -134,7 +131,7 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
         )}
       </div>
 
-      <div style={{ padding: '0.75rem', borderRadius: 8, background: 'rgba(2,6,23,0.46)', border: '1px solid rgba(255,255,255,0.08)', marginTop: 'auto', display: 'grid', gap: '0.45rem' }}>
+      <div className="crew-member-readout crew-member-readout-summary">
         <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>
           오늘의 요약
         </div>
@@ -161,7 +158,7 @@ export default function CrewDetailView({ onBack }) {
   const [guestAccessAction, setGuestAccessAction] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
-  const [showCrewInfo, setShowCrewInfo] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true));
+  const [showCrewInfo, setShowCrewInfo] = useState(false);
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
   const crewId = crew?.id || userData?.crewId || '';
@@ -215,7 +212,6 @@ export default function CrewDetailView({ onBack }) {
     const handleResize = () => {
       const nextIsMobile = window.innerWidth <= 768;
       setIsMobile(nextIsMobile);
-      setShowCrewInfo((prev) => nextIsMobile ? prev : true);
     };
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -412,92 +408,99 @@ export default function CrewDetailView({ onBack }) {
   if (!crew) return null;
 
   return (
-    <div style={{ maxWidth: 1120, margin: '0 auto', width: '100%', padding: isMobile ? '1rem 0.75rem 7rem' : '2rem 1rem 6rem' }}>
-      {/* Back */}
-      <button onClick={onBack} className="space-nav-link font-tech" style={{ marginBottom: isMobile ? '0.75rem' : '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: 8, minHeight: isMobile ? 40 : undefined }}>
-        <ArrowLeft size={16} /> 크루 목록으로
+    <div className="crew-bridge-shell">
+      <div className="crew-bridge-ambient" aria-hidden="true" />
+      <button onClick={onBack} className="crew-bridge-back font-tech">
+        <ArrowLeft size={15} /> 크루 목록
       </button>
 
-      {/* Crew Header */}
-      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card hud-border" style={{ padding: isMobile ? '1rem' : '1.4rem', borderRadius: 12, marginBottom: isMobile ? '0.85rem' : '1.2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ width: isMobile ? 42 : 56, height: isMobile ? 42 : 56, borderRadius: 12, background: crew.color || '#00d4ff', boxShadow: `0 0 20px ${(crew.color || '#00d4ff')}55`, flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="font-tech" style={{ color: getCrewStatusColor(status), fontWeight: 800, fontSize: '0.82rem' }}>{getCrewStatusLabel(status)}</div>
-            <h2 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.2rem 0 0', fontSize: isMobile ? '1.28rem' : '1.6rem', lineHeight: 1.25, wordBreak: 'keep-all' }}>{crew.name || userData?.crewName || '스터디 크루'}</h2>
-            <p className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', margin: '0.3rem 0 0', lineHeight: 1.5, fontSize: isMobile ? '0.86rem' : undefined }}>{crew.motto || '아직 크루 모토가 없습니다.'}</p>
+      <Motion.section
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="crew-cockpit"
+        style={{ '--crew-accent': crew.color || '#00d4ff' }}
+      >
+        <div className="crew-cockpit-scanline" aria-hidden="true" />
+        <div className="crew-cockpit-status font-tech">
+          <span><Wifi size={13} /> CREW BRIDGE · CONNECTED</span>
+          <span style={{ color: getCrewStatusColor(status) }}><ShieldCheck size={13} /> {getCrewStatusLabel(status)}</span>
+        </div>
+
+        <div className="crew-cockpit-main">
+          <div className="crew-identity">
+            <div className="crew-emblem" aria-hidden="true"><span /></div>
+            <div>
+              <div className="crew-eyebrow font-tech">ORBITAL STUDY VESSEL</div>
+              <h1 className="font-title">{crew.name || userData?.crewName || '스터디 크루'}</h1>
+              <p className="font-tech">{crew.motto || '함께 항해할 준비가 되었습니다.'}</p>
+            </div>
           </div>
-          {isMobile && (
+
+          <aside className="crew-launch-console">
+            <div className="crew-launch-label font-tech"><Radio size={14} /> FOCUS CHANNEL</div>
+            <strong className="font-title">집중 모드 준비 완료</strong>
+            <span className="font-tech">Google Meet에서 크루원과 바로 연결됩니다.</span>
             <button
               type="button"
-              className="space-nav-link font-tech"
-              onClick={() => { soundManager.playClick(); setShowCrewInfo((prev) => !prev); }}
-              style={{ width: '100%', borderRadius: 10, minHeight: 40, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}
+              className="crew-launch-button font-tech"
+              disabled={status !== 'approved' || !!roomAction || !crew.googleMeetUrl}
+              onClick={handleEnterMeet}
             >
-              {showCrewInfo ? '크루 정보 접기' : '크루 정보 펼치기'}
-              <ChevronDown size={16} style={{ transform: showCrewInfo ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }} />
+              {roomAction === 'entering' ? <Loader2 size={18} className="crew-spin" /> : <Rocket size={18} />}
+              {roomAction === 'entering' ? '항로 확인 중...' : '집중방 입장'}
             </button>
-          )}
+            {status !== 'approved' && <small className="font-tech">운영자 승인 후 항로가 열립니다.</small>}
+            {status === 'approved' && !crew.googleMeetUrl && <small className="font-tech">운영자가 집중방 좌표를 준비 중입니다.</small>}
+          </aside>
         </div>
-        {(!isMobile || showCrewInfo) && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.6rem', marginTop: '1rem' }}>
+
+        <div className="crew-flight-stats">
           {[
-            { label: '초대 코드', value: crew.inviteCode || '-', color: 'var(--text-bright)' },
-            { label: '군집', value: crew.groupName || '자유 스터디', color: 'var(--crystal-cyan)' },
-            { label: '멤버', value: `${crew.memberCount || members.length || 1}명`, color: 'var(--text-bright)' },
-            { label: '오늘 학습', value: studiedToday.length, color: 'var(--planet-green)' },
-            { label: '내 역할', value: userData?.crewRole === 'leader' ? '리더' : '멤버', color: crew.color || 'var(--crystal-cyan)' },
-          ].map(item => (
-            <div key={item.label} style={{ ...panelStyle, padding: '0.7rem' }}>
-              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>{item.label}</div>
-              <strong style={{ color: item.color, fontSize: '1rem' }}>{item.value}</strong>
+            { label: 'CREW', value: `${crew.memberCount || members.length || 1}명` },
+            { label: 'ONLINE STUDY', value: `${studiedToday.length}명` },
+            { label: 'MY ROLE', value: isGuest ? '게스트' : userData?.crewRole === 'leader' ? '리더' : '멤버' },
+            { label: 'SCHEDULE', value: formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes) },
+          ].map((item) => (
+            <div key={item.label}>
+              <span className="font-tech">{item.label}</span>
+              <strong className="font-tech">{item.value}</strong>
             </div>
           ))}
-        </div>}
-        {(!isMobile || showCrewInfo) && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '0.7rem', marginTop: '0.8rem' }}>
-          <div style={{ ...panelStyle, padding: '0.85rem' }}>
-            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginBottom: '0.35rem' }}>크루 설명</div>
-            <div className="font-tech" style={{ color: 'rgba(255,255,255,0.78)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-              {crew.description || '아직 자세한 크루 설명이 없습니다.'}
-            </div>
-          </div>
-          <div style={{ ...panelStyle, padding: '0.85rem' }}>
-            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <CalendarDays size={13} /> 정기 공부 일정
-            </div>
-            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', lineHeight: 1.55 }}>
-              {formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes)}
-            </div>
-          </div>
-        </div>}
-      </Motion.div>
-
-      {/* Google Meet Entry */}
-      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card hud-border" style={{ padding: isMobile ? '1rem' : '1.3rem', borderRadius: 12, marginBottom: '1.2rem', scrollMarginTop: 76 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div>
-            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem' }}>GOOGLE MEET</div>
-            <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: isMobile ? '1.1rem' : '1.2rem', marginTop: '0.15rem' }}>크루 집중방 입장</div>
-            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.3rem', lineHeight: 1.55 }}>
-              운영자가 준비한 Google Meet 대기방이 새 탭으로 열립니다.
-            </div>
-          </div>
-          <button
-            type="button"
-            className="space-btn cosmic-btn font-tech"
-            disabled={status !== 'approved' || !!roomAction || !crew.googleMeetUrl}
-            onClick={handleEnterMeet}
-            style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.9rem 1.25rem', minHeight: isMobile ? 52 : undefined, minWidth: isMobile ? '100%' : 180 }}
-          >
-            {roomAction === 'entering' ? '확인 중...' : '참여하기'}
-          </button>
         </div>
-        {status !== 'approved' && (
-          <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55, marginTop: '0.9rem' }}>운영자 승인 후 입장할 수 있습니다.</div>
+
+        <button
+          type="button"
+          className="crew-details-toggle font-tech"
+          onClick={() => { soundManager.playClick(); setShowCrewInfo((prev) => !prev); }}
+        >
+          {showCrewInfo ? '선박 정보 닫기' : '선박 정보 보기'}
+          <ChevronDown size={15} style={{ transform: showCrewInfo ? 'rotate(180deg)' : 'none' }} />
+        </button>
+
+        {showCrewInfo && (
+          <Motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="crew-detail-drawer">
+            <div>
+              <span className="font-tech">INVITE CODE</span>
+              <strong className="font-tech">{crew.inviteCode || '-'}</strong>
+            </div>
+            <div>
+              <span className="font-tech">SECTOR</span>
+              <strong className="font-tech">{crew.groupName || '자유 스터디'}</strong>
+            </div>
+            <div className="crew-detail-description">
+              <span className="font-tech">VESSEL LOG</span>
+              <p className="font-tech">{crew.description || '아직 기록된 크루 설명이 없습니다.'}</p>
+            </div>
+          </Motion.div>
         )}
-        {status === 'approved' && !crew.googleMeetUrl && (
-          <div className="font-tech" style={{ color: '#fbbf24', lineHeight: 1.55, marginTop: '0.9rem' }}>운영자가 Google Meet 주소를 준비 중입니다.</div>
+
+        {isGuest && (
+          <div className="crew-guest-strip font-tech">
+            <span>GUEST PASS</span>
+            체험 항해 중 · 학습 기록과 광석은 저장되지 않습니다.
+          </div>
         )}
-      </Motion.div>
+      </Motion.section>
 
       {/* Guest access management (leader) / guest badge */}
       {status === 'approved' && !isGuest && (
@@ -535,29 +538,21 @@ export default function CrewDetailView({ onBack }) {
         </Motion.div>
       )}
 
-      {isGuest && (
-        <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass-card hud-border" style={{ padding: isMobile ? '0.9rem' : '1.1rem', borderRadius: 12, marginBottom: '1.2rem', borderColor: 'rgba(34,197,94,0.24)' }}>
-          <div className="font-tech" style={{ color: '#86efac', fontWeight: 800, fontSize: '0.8rem' }}>● GUEST SESSION</div>
-          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.35rem', lineHeight: 1.55 }}>
-            회원가입 없이 체험 중입니다. 학습 기록·광석·랭킹은 저장되지 않으며, 크루 리더가 게스트 참여를 끄면 퇴장합니다.
-          </div>
-        </Motion.div>
-      )}
-
+      <div className="crew-bridge-workspace">
       {status === 'approved' && crewId && (
-        <div style={{ marginBottom: '1.2rem' }}>
+        <section className="crew-workspace-mission">
           <StudyCrewDailyMission
             scopeType="crew"
             scopeId={crewId}
             targetCount={crewMemberIds.length || enrichedMembers.length || 1}
           />
-        </div>
+        </section>
       )}
 
       {/* Members */}
-      <div style={{ marginBottom: '1.2rem' }}>
-        <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem', marginBottom: '0.6rem' }}>CREW MEMBERS</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: '0.8rem' }}>
+      <section className="crew-workspace-roster">
+        <div className="crew-section-heading font-tech"><Users size={15} /> FLIGHT CREW <span>{enrichedMembers.length}</span></div>
+        <div className="crew-roster-grid">
           {enrichedMembers.map(member => (
             <CrewMemberStudyCard
               key={member.uid}
@@ -570,10 +565,10 @@ export default function CrewDetailView({ onBack }) {
             />
           ))}
         </div>
-      </div>
+      </section>
 
       {/* Post-it Board */}
-      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card hud-border" style={{ padding: '1.2rem', borderRadius: 12, marginBottom: '1.2rem' }}>
+      <Motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="crew-workspace-comms">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
           <div>
             <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -582,7 +577,7 @@ export default function CrewDetailView({ onBack }) {
             <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.15rem', marginTop: '0.15rem' }}>함께 남기는 메모</div>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '0.55rem', alignItems: 'end', marginBottom: '1rem' }}>
+        <div className="crew-comms-composer">
           <textarea
             style={{ ...inputStyle, minHeight: 72, resize: 'vertical', lineHeight: 1.45 }}
             value={noteText}
@@ -606,7 +601,7 @@ export default function CrewDetailView({ onBack }) {
           {noteText.length}/{NOTE_MAX_LENGTH}
         </div>
         {displayNotes.length ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '0.75rem' }}>
+          <div className="crew-comms-log">
             {displayNotes.map((note, index) => {
               const { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead } = getGreetingReadMeta(note, crewMemberIds, user?.uid);
               const canDeleteNote = note.userId === user?.uid || userData?.role === 'admin';
@@ -615,16 +610,8 @@ export default function CrewDetailView({ onBack }) {
               return (
                 <div
                   key={note.id || `${note.userId}-${index}`}
-                  style={{
-                    borderRadius: 12,
-                    padding: '0.95rem 0.95rem 0.85rem',
-                    minHeight: 132,
-                    background: `${noteColor}`,
-                    border: '1px solid rgba(255,255,255,0.16)',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
-                    position: 'relative',
-                    transform: `rotate(${index % 2 === 0 ? -1.2 : 1.1}deg)`,
-                  }}
+                  className="crew-comms-message"
+                  style={{ '--note-tint': noteColor }}
                 >
                   <div style={{
                     position: 'absolute',
@@ -703,7 +690,8 @@ export default function CrewDetailView({ onBack }) {
             </div>
           </div>
         )}
-      </Motion.div>
+      </Motion.section>
+      </div>
 
       {userData?.crewRole === 'leader' && (
         <section className="glass-card hud-border" style={{ padding: '1.2rem', borderRadius: 12 }}>

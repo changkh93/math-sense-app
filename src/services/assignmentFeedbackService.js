@@ -263,6 +263,38 @@ function secondsFromLearningRow(row = {}) {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
 }
 
+// 퀴즈 배틀을 학습 근거로 평가한다. 승패보다 참여 횟수와 정답률을 중심으로 본다.
+// SEI 랭킹과 동일한 철학: 패배해도 정답률과 참여가 학습 근거가 된다.
+// 단, 중도 포기(forfeited)는 성실한 복습에서 제외한다.
+// 수동 export 스크립트(scripts/export-pending-assignment-contexts.mjs)의 assessBattleLearning과 같은 규칙을 유지한다.
+function assessBattleLearning(rows = []) {
+  const battles = rows.map((row) => ({
+    correctCount: Number(row.correctCount) || 0,
+    totalCount: Number(row.totalCount) || 0,
+    result: row.battleResult || (row.forfeited ? 'forfeit' : ''),
+    forfeited: row.forfeited === true,
+  }));
+  const completed = battles.filter((b) => !b.forfeited);
+  const forfeitCount = battles.filter((b) => b.forfeited).length;
+  const winCount = completed.filter((b) => b.result === 'win').length;
+  const drawCount = completed.filter((b) => b.result === 'draw').length;
+  const lossCount = completed.filter((b) => b.result === 'loss').length;
+  const totalCorrect = completed.reduce((sum, b) => sum + (b.correctCount || 0), 0);
+  const totalQuestions = completed.reduce((sum, b) => sum + (b.totalCount || 0), 0);
+  const averageAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : null;
+  // 충분한 배틀 복습: 완료 3회 이상이거나 정닥률 60% 이상 (포기 제외)
+  const isSufficientBattleReview = completed.length >= 3 || (completed.length > 0 && averageAccuracy !== null && averageAccuracy >= 60);
+  return {
+    battleCount: completed.length,
+    winCount,
+    drawCount,
+    lossCount,
+    forfeitCount,
+    averageAccuracy,
+    isSufficientBattleReview,
+  };
+}
+
 function dateRangeForKst(dateStr) {
   if (!dateStr) return null;
   return {
@@ -583,6 +615,22 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     dataLogCount: dataLogRows.length,
     codeTraceCount: codeTraceRows.length,
     codeTraceProgressCount: inProgressCodeTraces.length,
+    // 퀴즈 배틀 요약 필드. 일반 퀴즈와 분리해 점수 체계를 섞지 않는다.
+    battleCount: battleAssessment.battleCount,
+    battleWinCount: battleAssessment.winCount,
+    battleDrawCount: battleAssessment.drawCount,
+    battleLossCount: battleAssessment.lossCount,
+    battleForfeitCount: battleAssessment.forfeitCount,
+    battleAverageAccuracy: battleAssessment.averageAccuracy,
+    isSufficientBattleReview: battleAssessment.isSufficientBattleReview,
+    battles: battleRows.slice(0, 8).map((row) => ({
+      title: normalizeText(row.unitTitle || row.battleUnitTitle || '퀴즈 배틀'),
+      score: Number(row.score) || 0,
+      correctCount: Number(row.correctCount) || 0,
+      totalCount: Number(row.totalCount) || 0,
+      result: row.battleResult || (row.forfeited ? 'forfeit' : ''),
+      forfeited: row.forfeited === true,
+    })),
     averageScore: scoreRows.length ? Math.round(scoreRows.reduce((sum, score) => sum + score, 0) / scoreRows.length) : null,
     titles: Array.from(titleSet).slice(0, 8),
     videos: [
@@ -749,11 +797,15 @@ function buildFeedbackPolicyGuidance(context) {
   const learning = context?.dailyLearningSummary || {};
   const submission = context?.currentSubmission || {};
   const videoMinutes = Number(learning.videoMinutes || 0);
+  // 퀴즈 배틀은 경쟁 복습/확인 활동으로 학습 근거에 포함한다(포기 제외).
+  const battleCount = Number(learning.battleCount || 0);
+  const isSufficientBattleReview = learning.isSufficientBattleReview === true;
   const hasLearningFollowUpActivity = Boolean(
     (learning.quizCount || 0) > 0 ||
     (learning.dataLogCount || 0) > 0 ||
     (learning.codeTraceCount || 0) > 0 ||
-    (learning.codeTraceProgressCount || 0) > 0
+    (learning.codeTraceProgressCount || 0) > 0 ||
+    battleCount > 0
   );
   const hasCodeTraceActivity = Boolean((learning.codeTraceCount || 0) > 0 || (learning.codeTraceProgressCount || 0) > 0);
   const hasSubmissionEvidence = Boolean(
@@ -766,7 +818,8 @@ function buildFeedbackPolicyGuidance(context) {
     hasLearningFollowUpActivity
   );
   const isVeryLowLearning = !hasCourseLearningRecord || (videoMinutes < Math.max(1, targetMinutes * 0.1) && !hasLearningFollowUpActivity);
-  const isReasonableFlow = (videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity) || hasCodeTraceActivity;
+  // 충분한 배틀 복습(완료 3회+ 또는 정답률 60%+, 포기 제외)은 영상 없이도 합리적 학습 흐름으로 인정한다.
+  const isReasonableFlow = (videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity) || hasCodeTraceActivity || isSufficientBattleReview;
 
   return {
     targetMinutes,
@@ -777,6 +830,8 @@ function buildFeedbackPolicyGuidance(context) {
     hasCourseLearningRecord,
     isVeryLowLearning,
     isReasonableFlow,
+    battleCount,
+    isSufficientBattleReview,
     includesMiddleMathLevelUp: context?.includesMiddleMathLevelUp === true,
     rules: [
       '영상 시간은 전체 학습 시간이 아니다. 학생은 영상을 멈추고 풀이, 코드 작성, 실행, 수정, 정리를 할 수 있다.',
@@ -787,6 +842,8 @@ function buildFeedbackPolicyGuidance(context) {
       '개선점은 오답 이유 한 줄 정리, 코드 실행 결과, 직접 바꾼 코드 설명처럼 실제로 비어 있는 근거에서 고른다.',
       'Python은 영상 시청보다 직접 코드 작성, 실행, 오류 수정, 실행 결과 근거를 더 중요하게 본다.',
       '초등수학 과제에서 초등수학을 마친 학생이 레벨업 학습으로 중등수학을 진행한 경우, 같은 날짜 중등수학 퀴즈/영상/데이터 로그를 초등수학 과제의 수학 학습으로 인정한다. 이 경우 "수학 기록 없음"이나 "학습 기록 없음"으로 판단하지 않고 "초등수학 시간에 레벨업 학습으로 중등수학을 진행했다"고 표현한다.',
+      '퀴즈 배틀은 경쟁 복습/확인 활동이다. 승패보다 참여 횟수와 정답률을 중심으로 평가하며, 중도 포기(forfeited)는 성실 복습에서 제외한다. 완료 3회 이상이거나 정답률 60% 이상이면 영상 없이도 합리적 학습 흐름으로 인정한다.',
+      '퀴즈 배틀이 충분하면 "확인 활동이 부족하다"고 쓰지 않고, 배틀에서 틀린 개념이나 남은 약점을 다음 행동으로 연결한다.',
     ],
   };
 }
@@ -976,6 +1033,10 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
     : (learning.codeTraceProgressCount || 0) > 0
       ? `진행 중 CODE TRACE ${learning.codeTraceProgressCount}건`
       : '';
+  // 퀴즈 배틀은 참여 횟수·승패·정답률을 한 줄로 요약한다.
+  const battleNote = (learning.battleCount || 0) > 0
+    ? `퀴즈 배틀 ${learning.battleCount}회 (승 ${learning.battleWinCount || 0} 무 ${learning.battleDrawCount || 0} 패 ${learning.battleLossCount || 0}${learning.battleAverageAccuracy !== null && learning.battleAverageAccuracy !== undefined ? `, 정답률 ${learning.battleAverageAccuracy}%` : ''})`
+    : '';
   const questionSection = studentQuestions.length
     ? `\n\n#### 질문에 대한 답변\n${studentQuestions.map((question) => `- ${question}`).join('\n')}\n\n이 질문은 교사가 정확한 풀이 맥락을 확인해 답변해야 합니다. 현재 자동 초안에서는 질문을 누락하지 않도록 표시만 해두었습니다.`
     : '';
@@ -986,14 +1047,18 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
   const learningFlowNote = policy.isReasonableFlow
     ? codeTraceNote
       ? `${codeTraceNote}${learning.videoMinutes ? `과 영상 ${learning.videoMinutes}분` : ''}${learning.quizCount ? `, 퀴즈 ${learning.quizCount}건` : ''}${learning.dataLogCount ? `, 데이터 로그 ${learning.dataLogCount}건` : ''}이 확인되어, 코드를 손으로 따라 쓰는 확인 활동까지 남았습니다.`
-      : `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && learning.dataLogCount ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${!learning.quizCount && !learning.dataLogCount && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
+      : battleNote && !learning.videoMinutes && !(learning.quizCount || 0) && !(learning.dataLogCount || 0)
+        ? `${battleNote}로 기존 학습 범위를 경쟁하며 복습한 기록이 확인됩니다. 영상 없이도 배운 개념을 확인 활동으로 이어간 점은 좋습니다.`
+        : `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && learning.dataLogCount ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${battleNote ? `${learning.quizCount || learning.dataLogCount ? ', ' : ''}${battleNote}` : ''}${!learning.quizCount && !learning.dataLogCount && !battleNote && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
     : '';
 
   const improvement = weakness
     ? `${weakness}와 연결되는 부분은 다음 과제에서 한 번 더 의식해 보세요.`
-    : policy.isReasonableFlow
-      ? '다음 제출에서는 퀴즈에서 틀린 이유나 코드/풀이에서 막힌 부분을 한 줄 더 적어 주세요.'
-    : '다음 제출에서는 결과를 확인한 과정이나 막혔던 부분을 한 줄 더 적어 보세요.';
+    : (learning.battleCount || 0) > 0 && !(learning.quizCount || 0) && !(learning.dataLogCount || 0) && !learning.videoMinutes
+      ? '다음에는 배틀에서 틀린 개념 1가지를 찾아 영상이나 퀴즈로 다시 확인해 보세요. 배틀 복습 다음에 개념을 한 번 더 짚으면 더 단단해집니다.'
+      : policy.isReasonableFlow
+        ? '다음 제출에서는 퀴즈에서 틀린 이유나 코드/풀이에서 막힌 부분을 한 줄 더 적어 주세요.'
+      : '다음 제출에서는 결과를 확인한 과정이나 막혔던 부분을 한 줄 더 적어 보세요.';
   const noCourseLearningNote = policy.isVeryLowLearning
     ? `제출일에 ${courseLabel} 학습 기록은 확인되지 않습니다.`
     : '';
@@ -1027,7 +1092,12 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
       selfDirection: submission.contentLength >= 120 ? 2 : 1,
     },
     suggestedStatus: policy.isVeryLowLearning ? 'needs_revision' : hasAttachments || submission.contentLength >= 80 ? 'reviewed' : 'needs_revision',
-    suggestedBonusCrystals: policy.isVeryLowLearning ? (submission.codeComparison?.currentCodeAvailable ? 20 : 10) : policy.isReasonableFlow ? 35 : hasAttachments ? 40 : 25,
+    // 퀴즈 배틀 단독 학습은 영상이 없어도 충분하면 30~35, 약하면 25~30으로 평가한다.
+    suggestedBonusCrystals: policy.isVeryLowLearning
+      ? (submission.codeComparison?.currentCodeAvailable ? 20 : 10)
+      : policy.isReasonableFlow
+        ? (learning.isSufficientBattleReview && !learning.videoMinutes ? 30 : 35)
+        : hasAttachments ? 40 : 25,
     revisionRequest: hasAttachments ? '' : '이번 과제는 제출 글은 확인되지만 결과를 확인할 첨부 자료가 부족합니다. 실행 결과 이미지나 풀이 과정을 함께 첨부해 다시 제출해 주세요.',
     generatedBy: 'local-fallback',
   };

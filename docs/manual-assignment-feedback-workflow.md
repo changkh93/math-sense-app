@@ -19,13 +19,14 @@
 
 이 문서의 레벨업 예외, 학습 기록 필터, 진행 중 퀴즈 인정 규칙, Python CODE TRACE 인정 규칙은 단순 가이드가 아니라 **코드가 자동으로 적용해야 하는 규칙**이다. 수동 작업(export 스크립트)과 운영툴의 “AI 피드백 생성” 버튼(`assignmentFeedbackService.js`) 양쪽 모두 같은 규칙을 구현해야 한다. 한쪽만 고치면 다른 경로에서 같은 버그가 재발한다.
 
-특히 아래 네 가지는 코드 누락이 잦은 지점이므로, 문서를 고칠 때 반드시 코드도 함께 확인한다.
+특히 아래 다섯 가지는 코드 누락이 잦은 지점이므로, 문서를 고칠 때 반드시 코드도 함께 확인한다.
 
 - **레벨업 감지**: 제출문 키워드 정규식뿐 아니라 “같은 날짜 history/learning_progress에 `middle-math` 기록이 존재하는지”로도 감지해야 한다. 제출문 키워드만 쓰면 “SSS 합동을 배웠다”처럼 키워드에 안 걸리는 중등 단원이 누락된다(조하람 사례).
 - **`learning_progress` 병합**: 학생이 퀴즈/영상을 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남는다. 두 컬렉션을 모두 읽지 않으면 실제 학습한 내용이 “0건”으로 잡힌다(조승아 사례).
 - **한글 NFD 인코딩**: macOS/iOS에서 입력된 한글이 NFD(분해 자모)로 저장되는 경우, 정규식/비교 전에 반드시 NFC로 정규화하지 않으면 “함수/방정식” 키워드가 매칭되지 않아 과정 분류가 실패하고 기록이 누락된다(조승아 사례).
 - **학습 메타데이터 역추적 우선**: `learning_progress` 문서에 `clusterId`가 없어도 제목/unitId 정규식으로 과정을 맞히면 안 된다. 먼저 `learning_progress/{unitId}` → `units/{unitId}.chapterId` → `chapters/{chapterId}.regionId` → `regions/{regionId}.clusterId` 순서로 역추적해 실제 과정을 찾는다. 새 CODE TRACE 진행 기록은 `learning_progress` 최상위와 `codeTrace` 내부에 `clusterId/chapterId`를 함께 저장한다. 그래야 `unit_py_math_2` 같은 파이썬 수학 단원이 “unknown”으로 빠지지 않는다(인효린 사례).
 - **Python CODE TRACE 반영**: CODE TRACE는 영상을 보는 활동도, 퀴즈를 푸는 활동도 아니지만 코드를 보고 구조를 손으로 따라 쓰는 별도 고난도 학습이다. `history.type === "code_trace"` 완료 기록과 `learning_progress.codeTrace` 진행 기록을 Python 학습 근거로 반드시 합산해야 한다. 수동 export와 운영툴 “AI 피드백 생성” 양쪽 모두 `codeTraces`, `inProgressCodeTraces`, `codeTraceCount`, `codeTraceProgressCount` 같은 요약 필드를 제공해야 하며, 이 필드가 없으면 영상 시간이 짧다는 이유만으로 Python 학습을 낮게 평가할 위험이 있다.
+- **퀴즈 배틀 분리 평가**: 퀴즈 배틀(`history.type === "quiz_battle"`)은 점수 체계가 0~1500(정답×100)으로 일반 퀴즈(0~100)와 다르다. 배틀을 일반 퀴즈 버킷에 그냥 섞어 넣으면 `averageScore`가 오염되고 “완료 퀴즈 N개”에 묻혀 배틀 복습 활동이 보이지 않는다. 수동 export와 운영툴 “AI 피드백 생성” 양쪽 모두 `quiz_battle`을 일반 퀴즈에서 분리해 별도 요약 필드(`battles`, `battleCount`, `battleWinCount`, `battleDrawCount`, `battleLossCount`, `battleForfeitCount`, `battleAverageAccuracy`, `isSufficientBattleReview`)로 제공해야 한다. 이 필드가 없으면 영상이 없다는 이유만으로 배틀만 열심히 한 학생을 25광석으로 낮게 평가한다.
 
 ### CODE TRACE 코드 반영 체크리스트
 
@@ -48,6 +49,29 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 - CODE TRACE가 없는 기존 Python 과제, 수학 과제, 초등수학 레벨업 예외가 기존과 동일하게 동작하는지 회귀 확인한다.
 - CODE TRACE 앱 내부 보상은 과제 보너스 광석과 별개다. 코드 세트별 즉시 보상을 지급하고, 단원 전체 기준 총 30~80광석 범위가 되도록 분배한다. 중복 지급 방지는 `learning_progress.codeTrace.earnedExerciseIds`로 판단하고, 일일 학습 기록에는 `crystalsEarnedTotal`을 노출한다.
 
+### 퀴즈 배틀 코드 반영 체크리스트
+
+퀴즈 배틀 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞춘다.
+
+- `scripts/export-pending-assignment-contexts.mjs`
+  - `history`에서 `type === "quiz_battle"`인 기록을 일반 퀴즈 버킷에서 분리해 별도로 추출한다.
+  - 분리한 배틀 기록으로 `battles`, `battleCount`, `battleWinCount`, `battleDrawCount`, `battleLossCount`, `battleForfeitCount`, `battleAverageAccuracy`, `isSufficientBattleReview`를 계산해 `learningSummary`에 저장한다.
+  - `averageScore` 계산에서 배틀 점수(0~1500)를 제외한다. 일반 퀴즈 점수(0~100)만으로 평균을 낸다.
+  - `buildLearningLoadSummary`의 `hasPractice` 판단에 완료 배틀(포기 제외)을 포함한다.
+  - `balanceSignals`에 “퀴즈 배틀 N회 (승 W 무 D 패 L, 정답률 A%)”를 추가한다.
+  - 영상 없이 배틀만 있을 때는 “퀴즈 위주 학습” 대신 “퀴즈 배틀 중심 학습(복습)” 신호를 쓴다.
+- `src/services/assignmentFeedbackService.js`
+  - 운영툴 “AI 피드백 생성” 경로에서도 같은 배틀 분리와 요약 필드를 생성한다.
+  - `buildFeedbackPolicyGuidance`의 `hasLearningFollowUpActivity`, `isReasonableFlow` 판단에 충분한 배틀 복습(`isSufficientBattleReview`)을 포함한다.
+  - 폴백 보너스 산정에서 충분한 배틀 복습은 영상 없이도 30~35광석 범위로 인정한다.
+  - 자동 생성 문구에서 배틀을 “영상/퀴즈/데이터 로그”에 묻지 말고 참여 횟수·승패·정답률로 함께 언급한다.
+- 저장 검증
+  - 배틀만 여러 회 한 학생(예: 13회, 17회)의 `learningSummary.battles`와 `balanceSignals`에 배틀 요약이 노출되는지 확인한다.
+  - 영상 0분 + 배틀 충분 시 폴백 보너스가 25에 머물지 않고 30~35로 올라가는지 확인한다.
+  - 배틀 점수가 `averageScore`에 섞이지 않는지(일반 퀴즈 점수만 평균) 확인한다.
+  - 중도 포기(forfeited)가 많은 경우 충분한 복습으로 인정되지 않는지 확인한다.
+- 배틀이 없는 기존 Python/수학/초등수학 과제가 기존과 동일하게 동작하는지 회귀 확인한다.
+
 ## 정규 학습 시간 기준
 
 피드백과 보너스 광석은 아래 기준 대비로 판단한다.
@@ -62,10 +86,14 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 
 - 영상 시청은 반드시 실제 기록된 개수와 시간을 쓴다. 예: `자연수와 소수의 곱셈 #1` 1개, 4분 47초.
 - 영상 시간은 전체 학습 시간을 그대로 의미하지 않는다. 학생은 영상을 멈추고 문제를 풀거나, 코드를 작성/실행하거나, 노트에 정리하는 시간이 필요하다.
-- 따라서 중등수학/Python에서 영상 시간이 정규 기준의 절반 안팎이고 퀴즈, 데이터 로그, CODE TRACE, 코드 제출, 풀이 정리 중 일부가 함께 확인되면 성실한 학습 흐름으로 본다. 이 경우 “기준 학습량 대비 부족”을 피드백 중심 근거로 쓰지 않는다.
+- 따라서 중등수학/Python에서 영상 시간이 정규 기준의 절반 안팎이고 퀴즈, 데이터 로그, CODE TRACE, 퀴즈 배틀, 코드 제출, 풀이 정리 중 일부가 함께 확인되면 성실한 학습 흐름으로 본다. 이 경우 “기준 학습량 대비 부족”을 피드백 중심 근거로 쓰지 않는다.
+- 퀴즈 배틀은 경쟁 복습/확인 활동이다. 같은 행성 학생과 1:1로 기존 학습 범위에서 출제된 문제를 풀며, 틀린 문제는 다크매터에 등록된다. 영상 시간이 짧거나 없어도 배틀을 통해 배운 개념을 확인하고 복습한 근거로 본다. 단, 중도 포기(forfeited)는 성실한 복습에서 제외한다.
 - Python에서 CODE TRACE 완료 또는 의미 있는 진행 기록이 있으면 “영상 뒤 확인 활동”보다 강한 코드 실습 근거로 본다. CODE TRACE는 정답 코드를 보고 필수 이름, 클래스/함수 위치, 들여쓰기와 실행 흐름을 따라 쓰는 활동이므로, 영상 시간이 짧아도 완료율·정확도와 제출 설명이 좋으면 성실한 학습 흐름으로 인정한다.
 - CODE TRACE는 퀴즈 점수처럼 단순히 100점 여부만 보지 않는다. 완료한 exercise 수, 전체 exercise 수, 정확도(`accuracy` 또는 `bestAccuracy`), 학생 제출 코드/설명과의 연결을 함께 본다.
 - 진행 중 CODE TRACE도 학습 근거다. `learning_progress.codeTrace.completedExerciseCount > 0`이면 완료 전이라도 “코드 따라쓰기 진행 중”으로 언급하고, 완료로 단정하지 않는다.
+- 퀴즈 배틀은 승패가 아니라 참여 횟수와 정답률을 중심으로 평가한다(SEI 랭킹과 같은 철학). 패배해도 정답률과 참여가 학습 근거가 된다. 완료한 배틀이 3회 이상이거나 평균 정답률이 60% 이상(포기 제외)이면 충분한 복습 활동(`isSufficientBattleReview`)으로 인정한다. 이 경우 영상이 없어도 성실한 학습 흐름으로 보고 “확인 활동이 부족하다”고 쓰지 않는다.
+- 퀴즈 배틀 점수(0~1500, 정답×100)는 일반 퀴즈 점수(0~100)와 체계가 다르다. 두 점수를 섞어 `averageScore`를 계산하면 안 된다. `learningSummary.battles`와 `learningSummary.quizzes`를 분리해 본다.
+- 퀴즈 배틀이 충분하면 배틀에서 틀린 개념·남은 약점을 다음 행동으로 연결한다. “확인 활동이 부족하다”고 쓰지 않는다. 반대로 중도 포기가 많거나 정답률이 매우 낮으면 인정을 약하게 하되, “공부를 안 했다”고 단정하지 않고 남은 배틀 마무리나 약점 개념 영상 시청으로 유도한다.
 - “영상 29.9분 / 기준 50분”처럼 숫자만 놓고 부족하다고 단정하지 않는다. 퀴즈와 데이터 로그가 있고 제출문도 과제와 맞으면 “영상 뒤 확인 활동까지 이어진 점”을 먼저 인정한다.
 - 정규 기준 대비 평가는 플랫폼에 남은 직접 기록만으로 하는 보조 신호다. 학생이 플랫폼 밖에서 코드를 실행하거나 손풀이를 한 시간은 기록되지 않을 수 있으므로, 제출물의 구체성과 실행 근거를 반드시 함께 본다.
 - 같은 날 다른 행성 기록은 원칙적으로 “같은 날 다른 학습도 있었다”로만 말하고, 해당 과제의 학습량으로 합산하지 않는다.
@@ -79,11 +107,12 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 - 위 예외는 한 방향으로만 적용한다. 중등수학 과제(`middle-math`)에서는 초등수학(`cluster_elementary`) 영상/퀴즈/데이터 로그를 중등수학 학습량으로 인정하지 않는다.
 - 과제 과정과 다른 과정의 기록은 위 예외를 제외하고 피드백 근거에서 제외한다. 예: Python 과제에서 초등수학 `4월 평가` 진행 기록을 “Python 진행 중 퀴즈/코드”로 쓰면 안 된다.
 - 과정이 명확하지 않은 진행 중 퀴즈나 `learning_progress` 문서는 현재 과제의 학습 근거로 쓰지 않는다. 과정이 불명확하면 “다른 과정 또는 과정 미확인 기록”으로 제외하고, 피드백에는 포함하지 않는다. 단, 과정 분류 자체가 실패해서 누락된 경우는 `units → chapters → regions` 역추적과 아래 “NFD 인코딩” 항목을 반드시 확인한다.
-- `learningSummary`의 기준 필드는 `videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `progressVideos`, Python의 `codeTraces`, `inProgressCodeTraces`다. 완료 기록뿐 아니라 **진행 중 퀴즈, 부분 시청 영상, 진행 중 CODE TRACE도 학습 근거로 인정**한다. 학생이 퀴즈나 CODE TRACE를 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남을 수 있으므로, 두 컬렉션을 합쳐 보지 않으면 실제 학습이 “0건”으로 잡힌다(조승아 사례와 같은 구조).
-- `learningSummary.allTitles`는 참고용 전체 기록이고, 피드백 문장의 기준은 `learningSummary.videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `codeTraces`, `inProgressCodeTraces`다.
+- `learningSummary`의 기준 필드는 `videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `progressVideos`, Python의 `codeTraces`, `inProgressCodeTraces`, 그리고 퀴즈 배틀의 `battles`다. 완료 기록뿐 아니라 **진행 중 퀴즈, 부분 시청 영상, 진행 중 CODE TRACE, 퀴즈 배틀도 학습 근거로 인정**한다. 학생이 퀴즈나 CODE TRACE를 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남을 수 있으므로, 두 컬렉션을 합쳐 보지 않으면 실제 학습이 “0건”으로 잡힌다(조승아 사례와 같은 구조).
+- `learningSummary.allTitles`는 참고용 전체 기록이고, 피드백 문장의 기준은 `learningSummary.videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `codeTraces`, `inProgressCodeTraces`, `battles`다.
 - `learningSummary.progressTitles`와 `progressVideos`는 진행/부분 시청 참고용이다. 완료 영상 개수처럼 말하지 않는다.
 - `learningSummary.codeTraces`는 완료된 CODE TRACE 기록이다. 피드백에는 완료한 단원명, 정확도, 완료 exercise 수를 우선 적는다.
 - `learningSummary.inProgressCodeTraces`는 진행 중 CODE TRACE 기록이다. 피드백에는 완료로 쓰지 말고 “진행 중: 2/5, 최고 정확도 86%”처럼 현재 상태를 적는다.
+- `learningSummary.battles`는 완료/포기된 퀴즈 배틀 기록이다. 피드백에는 참여 횟수, 승패(승 W 무 D 패 L), 평균 정답률을 함께 적는다. 예: “퀴즈 배틀 5회 (승 4 무 0 패 1, 정답률 72%)로 기존 학습 범위를 경쟁하며 복습했습니다.” 배틀 점수(0~1500)는 일반 퀴즈 점수(0~100)와 섞지 않는다.
 - **한글 NFD 인코딩 주의**: `history`/`learning_progress` 문서의 한글 제목/unitId/unitTitle이 NFD(분해 자모, 예: `중2_05_일차함수`)로 저장되는 경우가 있다. 코드가 비교 전에 NFC(`중2_05_일차함수`)로 정규화하지 않으면 `clusterId`, `regionId`, `chapterId`, 제출문 키워드 비교가 실패해 기록이 누락될 수 있다. 모든 과정 정규화/메타데이터 역추적 함수는 입력을 NFC로 정규화한 뒤 비교해야 한다. 제출문 한글 비교(`hasMiddleMathLevelUpSignal`)도 마찬가지다.
 - 초등수학에서 독서퀴즈/독서 활동만 있고 초등수학 또는 중등수학 수학 영상, 수학 퀴즈, 데이터 로그가 모두 없으면 수학 20분 학습이 비어 있다는 점을 반드시 언급한다.
 - 이때 독서 활동은 인정하되, “오늘 수학 기록은 아직 확인되지 않았어요. 다음 시간에는 수학 영상 뒤에 확인 퀴즈까지 이어가면 좋겠습니다.”처럼 부드럽게 안내한다.
@@ -151,8 +180,11 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
   - Python CODE TRACE 완료/진행 현황
     - 완료 기록: `history.type === "code_trace"`의 단원명, 정확도, 완료 exercise 수, 획득 광석
     - 진행 기록: `learning_progress.codeTrace.completedExerciseCount`, `totalExerciseCount`, `bestAccuracy`, `lastMode`, `updatedAt`
+  - 퀴즈 배틀 완료/포기 현황
+    - 완료 기록: `history.type === "quiz_battle"`의 참여 횟수, 승패(win/draw/loss), 정답률(correctCount/totalCount), 중도 포기(forfeited) 여부
+    - 배틀 점수(0~1500)는 일반 퀴즈 점수(0~100)와 체계가 다르므로 분리해서 본다
   - 과정별 정규 학습량 대비 수준
-  - 영상/퀴즈/데이터 로그/CODE TRACE 균형
+  - 영상/퀴즈/데이터 로그/CODE TRACE/퀴즈 배틀 균형
   - `history`(완료 활동)와 `learning_progress`(진행 중 퀴즈/부분 시청 영상/진행 중 CODE TRACE)를 **모두** 읽어 합친다. 어느 한쪽만 읽으면 학생이 퀴즈나 CODE TRACE를 끝까지 못 끝낸 경우 “0건”으로 누락된다.
 - 매터센스/복습 기록 요약
   - 최근 오답/복습 표시 개념
@@ -198,6 +230,9 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - CODE TRACE는 “베껴 썼다”는 부정적 표현으로 다루지 않는다. 정답 코드를 보고 따라 쓰는 것이 목적이므로, 피드백에는 “필수 이름과 구조를 정확히 따라 쓰는 연습”, “클래스/함수 위치와 들여쓰기 흐름을 익히는 연습”으로 설명한다.
 - CODE TRACE만 있고 제출 코드나 실행 결과가 없을 때는 CODE TRACE 자체는 인정하되, 다음 행동은 “따라 쓴 코드에서 직접 바꾼 줄 1~2곳 또는 실행 결과를 적기”로 둔다.
 - CODE TRACE 정확도가 낮거나 완료율이 낮으면 감점 문구보다 다음 행동을 구체화한다. 예: “`__init__`, `update`, `draw`의 위치가 아직 헷갈린 신호일 수 있으니 다음 제출에서는 이 세 함수 이름을 먼저 적고 시작해 보세요.”
+- 퀴즈 배틀 기록이 있으면 영상/일반 퀴즈와 분리해 반드시 언급한다. 예: “오늘은 퀴즈 배틀 5회(승 4 무 0 패 1, 정답률 72%)로 기존 학습 범위를 경쟁하며 복습했습니다.” 승패보다 참여 횟수와 정답률을 중심으로 평가한다.
+- 퀴즈 배틀만 있고 영상·코드·일반 퀴즈가 없을 때는 배틀 자체는 인정하되, 다음 행동은 “배틀에서 틀린 개념 1가지를 영상이나 퀴즈로 다시 확인하기”로 둔다. 영상이 없다는 이유만으로 저학습 경보로 쓰지 않는다.
+- 중도 포기(forfeited)가 많거나 정닥률이 매우 낮은 배틀은 성실 복습에서 약하게 인정한다. 다만 “공부를 안 했다”고 단정하지 않고, 남은 배틀 마무리나 약점 개념 영상 시청으로 유도한다.
 - 같은 파일명 이력이 있으면 같은 파일명을 우선 비교한다. 예: 현재 `add_sound.py`는 최근 `new.py`보다 이전 `add_sound.py`와 먼저 비교해야 한다.
 - 비교 결과 코드 내용이 이전 같은 파일과 동일하면 “첨부 코드는 확인되지만 이번 제출에서 새로 개선된 코드 변화는 확인되지 않는다”고 쓴다. 동일 코드 재제출을 “이전보다 좋아진 점”으로 포장하지 않는다.
 - 반대로 영상 기록이 1분 안팎으로 짧아 경고 대상이어도, 코드 비교에서 구조적 개선이 확인되면 그 개선은 인정한다. 이때 경고 문구는 “확인 활동이 없습니다”가 아니라 “코드 개선은 확인되지만, 학습 기록과 제출 설명이 크게 맞지 않습니다”처럼 분리해서 쓴다.
@@ -213,7 +248,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - 레벨업 중등수학 기록이 확인되면 `learningSummary.mathActivityCount`가 0이더라도 피드백 근거에 중등수학 퀴즈/영상/데이터 로그를 직접 적고, `suggestedStatus`는 정상 `reviewed`를 우선 검토한다. 단, 제출문이 한 문장으로 너무 짧으면 “다음에는 퀴즈 중 헷갈린 유형 1개를 적어 달라”처럼 제출문 구체성만 보완점으로 둔다.
 - 반대로 중등수학 과제에서 초등수학 기록만 확인되는 경우에는 레벨업 예외를 적용하지 않는다. 중등수학 과제는 중등수학 기록, 중등수학 풀이 근거, 또는 해당 중등수학 첨부/코드만 학습 근거로 본다.
 - 영상 개수와 시간은 `learningSummary.videos` 기준으로만 적는다.
-- 영상만 있고 퀴즈, 데이터 로그, CODE TRACE, 코드 실행 근거, 제출문 정리 중 아무것도 없을 때만 “확인 활동이 부족하다”고 안내한다. 이미 퀴즈, 데이터 로그, CODE TRACE가 있으면 해당 확인 활동을 먼저 인정한다.
+- 영상만 있고 퀴즈, 데이터 로그, CODE TRACE, 퀴즈 배틀, 코드 실행 근거, 제출문 정리 중 아무것도 없을 때만 “확인 활동이 부족하다”고 안내한다. 이미 퀴즈, 데이터 로그, CODE TRACE, 퀴즈 배틀이 있으면 해당 확인 활동을 먼저 인정한다.
 - 퀴즈가 진행 중이면 완료로 단정하지 말고 진행도와 오답 수를 함께 언급한다.
 - `learningSummary.attention.opportunities > 0`이면 집중도 광석 획득률을 확인하고, 낮을 때는 부드럽지만 구체적으로 언급한다.
 - `learningSummary.inProgressQuizzes`가 있으면 완료 여부보다 현재 진행도와 오답 개수를 함께 본다.
@@ -244,7 +279,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 {제출물에서 확인되는 구체적 장점 + 학습 기록에서 확인되는 성실한 부분}
 
 #### 학습 기록에서 확인한 점
-{영상 시청 시간, 집중도 광석, 타임어택, 완료 보너스, 퀴즈 진행도/점수, 데이터 로그, CODE TRACE 완료/진행도/정확도, 코드 실행/수정 근거. 영상 시간은 전체 학습 시간과 다를 수 있음을 고려}
+{영상 시청 시간, 집중도 광석, 타임어택, 완료 보너스, 퀴즈 진행도/점수, 데이터 로그, CODE TRACE 완료/진행도/정확도, 퀴즈 배틀 참여 횟수/승패/정답률, 코드 실행/수정 근거. 영상 시간은 전체 학습 시간과 다를 수 있음을 고려}
 
 #### 질문에 대한 답변
 {학생이 질문한 내용에 대한 정확한 답변. 질문이 없으면 이 섹션 생략}
@@ -265,6 +300,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 3. **한글 제목/unitId가 NFD로 저장되어 과정 분류가 실패했는가?** → `unitTitle`이 `중2_05_일차함수`처럼 분해 자모라면, 코드가 NFC 정규화 없이 “함수”를 찾으면 매칭이 실패해 과정이 `unknown`으로 빠지고 기록이 누락된다(조승아 사례). 모든 한글 비교는 NFC 정규화 후 해야 한다.
 4. **학습 메타데이터 역추적이 빠졌는가?** → `learning_progress` 문서에 `clusterId`가 없더라도 제목/unitId 정규식으로 과정을 맞히지 않는다. `learning_progress/{unitId}` 문서 ID를 기준으로 `units/{unitId}`를 읽고, `chapterId`가 있으면 `chapters/{chapterId}`를 읽은 뒤, `regionId`로 `regions/{regionId}.clusterId`를 확인한다. 이 역추적이 빠지면 `unit_py_math_2`처럼 region id가 문서 ID에 없는 파이썬 단원이 unknown으로 누락된다(인효린 사례).
 5. **제출문에 따르면 분명히 공부했는데 기록이 없는가?** → 학생이 종이 문제집으로 풀었거나, 플랫폼 밖에서 공부했을 수 있다. 이때는 “플랫폼 기록이 없어 확인이 어렵다”고 안내하되, 제출문 구체성을 다음 행동으로 요청한다. 단, “안 했다”고 단정하지 않는다.
+6. **퀴즈 배틀만 있고 영상/일반 퀴즈가 0건인가?** → 학생이 배틀 데이 등으로 퀴즈 배틀만 집중적으로 했을 수 있다. `history.type === "quiz_battle"` 기록이 있으면 “학습 기록 0건”이 아니다. 배틀은 경쟁 복습 활동으로 학습 근거로 인정한다. 단, 배틀 점수(0~1500)가 일반 퀴즈 점수(0~100)와 섞여 averageScore를 오염시키지 않았는지 확인한다. 배틀이 일반 퀴즈 버킷에 묻혀 `quizCount`로만 보이는 경우도 점검한다.
 
 위 항목을 모두 확인한 뒤에도 해당 과정의 완료/진행 기록이 정말로 없을 때만 “학습 기록 없음” 경보를 검토한다. 코드와 export 스크립트 양쪽 모두 이 체크리스트를 자동으로 통과해야 한다.
 
@@ -285,7 +321,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 
 경보 조건:
 
-- 제출일 영상 시청이 1분 미만이거나 정규 기준의 10% 미만이고, 퀴즈/데이터 로그/CODE TRACE/코드 실행/제출문 정리 근거도 없다.
+- 제출일 영상 시청이 1분 미만이거나 정규 기준의 10% 미만이고, 퀴즈/데이터 로그/CODE TRACE/충분한 퀴즈 배틀(완료 3회+ 또는 정답률 60%+, 포기 제외)/코드 실행/제출문 정리 근거도 없다. 단, 충분한 퀴즈 배틀이 있으면 경보 조건에서 제외한다.
 - 현재 과제 과정의 학습 기록이 0건이다. 같은 날짜 다른 과정 기록이 있어도 원칙적으로 해당 과정 기록으로 합산하지 않는다.
 - 예외: 초등수학 과제에서 같은 날짜 중등수학 기록 또는 중등수학 풀이 정리가 확인되는 레벨업 학생은 경보 조건에서 제외한다. 이때 중등수학 기록을 초등수학 수학 학습으로 인정하고, 보너스도 초등수학 수학 20분 기준에 준해 판단한다.
 - 초등수학 과제의 제출문이 중등수학 내용인데 `learningSummary`가 비어 있거나 `수학 기록 없음`으로 보이면, 경보를 쓰기 전에 반드시 같은 날짜 `middle-math` 기록을 확인한다. `유리수`, `절댓값`, `정수와 유리수`, `방정식`, `부등식`, `완전제곱식` 등의 퀴즈/영상/데이터 로그가 있으면 경보 조건에서 제외한다.
@@ -505,6 +541,14 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 예: Python 과제에서 영상은 20~30분 수준이지만 원본 코드에 직접 수정한 흔적, 실행 결과, 오류를 고친 설명이 있으면 30~40광석까지 검토한다. Python 학습은 영상 시청보다 직접 실행과 수정 시간이 중요하다.
 
 예: Python 과제에서 영상, 퀴즈, 데이터 로그는 없지만 CODE TRACE 전체 완료와 높은 정확도가 있고 제출문이 해당 코드 구조를 설명한다면 “학습 기록 없음”이 아니다. 이 경우 30~35광석을 우선 검토하고, 다음 행동은 “따라 쓴 코드를 한 줄 응용하기”로 둔다.
+
+예: 영상 없이 퀴즈 배틀만 5회 이상 했고 평균 정답률이 60% 이상이면 충분한 복습 활동으로 인정해 30~35광석을 우선 검토한다. “영상 0분”이라는 숫자만으로 20~25광석으로 낮추지 않는다. 배틀에서 틀린 개념을 다음 행동으로 연결한다.
+
+예: 퀴즈 배틀을 13회 했고 정답률이 70% 안팎이라면, 영상이 없어도 다수 단원을 경쟁하며 복습한 성실한 활동으로 35광석까지 검토한다. 다음 행동은 “배틀에서 틀린 개념 1가지를 영상이나 퀴즈로 다시 확인하기”로 둔다.
+
+예: 퀴즈 배틀을 1~2회만 했고 정답률이 보통(50% 안팎)이라면, 복습 활동 자체는 인정하되 보너스는 25~30광석 범위에서 검토한다. 영상이나 CODE TRACE가 함께 있으면 그 근거를 우선으로 평가한다.
+
+예: 퀴즈 배틀 중 중도 포기(forfeited)가 대부분이거나 정답률이 매우 낮으면(30% 미만), 인정을 약하게 해 20~25광석 범위에서 검토한다. 다만 “공부를 안 했다”고 단정하지 않고, 남은 배틀을 끝까지 마무리하거나 약점 개념 영상을 보는 행동으로 유도한다.
 
 이전 피드백 반영 보너스:
 

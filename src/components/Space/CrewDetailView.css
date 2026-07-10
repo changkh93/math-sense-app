@@ -1,0 +1,582 @@
+.crew-bridge-shell {
+  position: relative;
+  isolation: isolate;
+  width: min(1240px, 100%);
+  margin: 0 auto;
+  padding: 1.35rem 1rem 6rem;
+}
+
+.crew-bridge-ambient {
+  position: absolute;
+  z-index: -1;
+  inset: -40px -8vw auto;
+  height: 680px;
+  pointer-events: none;
+  opacity: 0.85;
+  background:
+    linear-gradient(90deg, transparent 0 8%, rgba(0, 243, 255, 0.055) 8% 8.1%, transparent 8.1% 92%, rgba(0, 243, 255, 0.055) 92% 92.1%, transparent 92.1%),
+    radial-gradient(ellipse at 50% -5%, rgba(37, 99, 235, 0.2), transparent 58%);
+}
+
+.crew-bridge-back {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.58);
+  cursor: pointer;
+}
+
+.crew-bridge-back:hover,
+.crew-bridge-back:focus-visible {
+  color: var(--crystal-cyan);
+  border-color: rgba(0, 243, 255, 0.25);
+  background: rgba(0, 243, 255, 0.06);
+  outline: none;
+}
+
+.crew-cockpit {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  border: 1px solid color-mix(in srgb, var(--crew-accent) 32%, rgba(255, 255, 255, 0.14));
+  border-radius: 22px;
+  padding: 1rem;
+  color: #fff;
+  background:
+    linear-gradient(118deg, rgba(6, 14, 32, 0.97), rgba(15, 25, 54, 0.92) 58%, rgba(5, 12, 29, 0.98)),
+    radial-gradient(circle at 0 0, color-mix(in srgb, var(--crew-accent) 20%, transparent), transparent 40%);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 50px color-mix(in srgb, var(--crew-accent) 10%, transparent);
+}
+
+.crew-cockpit::before,
+.crew-cockpit::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.crew-cockpit::before {
+  inset: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 16px;
+}
+
+.crew-cockpit::after {
+  top: 0;
+  right: 13%;
+  width: 180px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--crew-accent), transparent);
+  box-shadow: 0 0 18px var(--crew-accent);
+}
+
+.crew-cockpit-scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.24;
+  background: repeating-linear-gradient(180deg, transparent 0 4px, rgba(255, 255, 255, 0.018) 4px 5px);
+}
+
+.crew-cockpit-status {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.15rem 0.25rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+
+.crew-cockpit-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.crew-cockpit-main {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(290px, 0.7fr);
+  gap: clamp(1rem, 3vw, 2rem);
+  align-items: center;
+  padding: clamp(1.25rem, 3vw, 2rem) 0.25rem 1.1rem;
+}
+
+.crew-identity {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.9rem, 2.5vw, 1.4rem);
+  min-width: 0;
+}
+
+.crew-emblem {
+  flex: 0 0 clamp(68px, 8vw, 92px);
+  width: clamp(68px, 8vw, 92px);
+  height: clamp(68px, 8vw, 92px);
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--crew-accent) 62%, white 8%);
+  border-radius: 28% 50% 32% 48%;
+  background: color-mix(in srgb, var(--crew-accent) 14%, rgba(5, 12, 29, 0.9));
+  box-shadow: inset 0 0 28px color-mix(in srgb, var(--crew-accent) 20%, transparent), 0 0 30px color-mix(in srgb, var(--crew-accent) 18%, transparent);
+  transform: rotate(8deg);
+}
+
+.crew-emblem span {
+  width: 36%;
+  height: 36%;
+  border-radius: 50%;
+  background: var(--crew-accent);
+  box-shadow: 0 0 20px var(--crew-accent), 20px -12px 0 -10px rgba(255, 255, 255, 0.9);
+}
+
+.crew-eyebrow {
+  margin-bottom: 0.35rem;
+  color: var(--crew-accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.crew-identity h1 {
+  margin: 0;
+  max-width: 720px;
+  color: #fff;
+  font-size: clamp(1.55rem, 3.2vw, 2.45rem);
+  line-height: 1.2;
+  text-wrap: balance;
+  text-shadow: 0 0 24px color-mix(in srgb, var(--crew-accent) 30%, transparent);
+}
+
+.crew-identity p {
+  margin: 0.55rem 0 0;
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.6;
+}
+
+.crew-launch-console {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem;
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(0, 243, 255, 0.09), rgba(2, 8, 23, 0.72));
+  box-shadow: inset 0 0 24px rgba(0, 243, 255, 0.04);
+}
+
+.crew-launch-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--crystal-cyan);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.crew-launch-console > strong {
+  font-size: 1.12rem;
+}
+
+.crew-launch-console > span,
+.crew-launch-console > small {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.crew-launch-button {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #16e5ff, #3b82f6 60%, #8b5cf6);
+  color: #03101d;
+  font-weight: 950;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.crew-launch-button:hover:not(:disabled),
+.crew-launch-button:focus-visible:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-2px);
+  outline: 2px solid rgba(0, 243, 255, 0.45);
+  outline-offset: 2px;
+}
+
+.crew-launch-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  filter: saturate(0.25);
+}
+
+.crew-spin {
+  animation: crew-spin 0.9s linear infinite;
+}
+
+@keyframes crew-spin {
+  to { transform: rotate(360deg); }
+}
+
+.crew-flight-stats {
+  position: relative;
+  display: grid;
+  grid-template-columns: 0.55fr 0.7fr 0.7fr 2fr;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(1, 6, 19, 0.28);
+}
+
+.crew-flight-stats > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.72rem 0.85rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.crew-flight-stats > div:last-child {
+  border-right: 0;
+}
+
+.crew-flight-stats span,
+.crew-detail-drawer span {
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+}
+
+.crew-flight-stats strong {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-details-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.65rem auto 0;
+  padding: 0.35rem 0.65rem;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.crew-details-toggle:hover,
+.crew-details-toggle:focus-visible {
+  color: var(--crystal-cyan);
+  outline: none;
+}
+
+.crew-details-toggle svg {
+  transition: transform 0.18s ease;
+}
+
+.crew-detail-drawer {
+  display: grid;
+  grid-template-columns: 0.6fr 0.8fr 2fr;
+  gap: 0.6rem;
+  overflow: hidden;
+}
+
+.crew-detail-drawer > div {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.crew-detail-drawer strong,
+.crew-detail-drawer p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.crew-guest-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+  padding: 0.58rem 0.75rem;
+  border: 1px solid rgba(134, 239, 172, 0.17);
+  border-radius: 10px;
+  background: rgba(34, 197, 94, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.72rem;
+}
+
+.crew-guest-strip span {
+  flex: 0 0 auto;
+  color: #86efac;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.crew-bridge-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.72fr);
+  grid-template-areas:
+    'mission roster'
+    'comms roster';
+  gap: 1rem;
+  align-items: start;
+  margin-top: 1rem;
+}
+
+.crew-workspace-mission { grid-area: mission; min-width: 0; }
+.crew-workspace-roster { grid-area: roster; min-width: 0; }
+.crew-workspace-comms { grid-area: comms; min-width: 0; }
+
+.crew-workspace-mission > * {
+  margin: 0 !important;
+}
+
+.crew-workspace-roster,
+.crew-workspace-comms {
+  border: 1px solid rgba(0, 243, 255, 0.13);
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(11, 19, 43, 0.88), rgba(5, 11, 28, 0.82));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 20px 50px rgba(0, 0, 0, 0.18);
+}
+
+.crew-workspace-roster {
+  position: sticky;
+  top: calc(var(--space-nav-height, 64px) + 1rem);
+  padding: 0.9rem;
+}
+
+.crew-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+  color: var(--crystal-cyan);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.crew-section-heading span {
+  margin-left: auto;
+  min-width: 24px;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 243, 255, 0.1);
+  text-align: center;
+}
+
+.crew-roster-grid {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.crew-member-console {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(2, 7, 20, 0.55);
+}
+
+.crew-member-readout {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.6rem;
+  border-left: 2px solid rgba(0, 243, 255, 0.32);
+  border-radius: 0 8px 8px 0;
+  background: rgba(0, 243, 255, 0.035);
+}
+
+.crew-member-readout-summary {
+  margin-top: auto;
+}
+
+.crew-workspace-comms {
+  padding: 1rem;
+}
+
+.crew-comms-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.crew-comms-log {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 0.65rem;
+}
+
+.crew-comms-message {
+  position: relative;
+  min-height: 124px;
+  padding: 0.9rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--note-tint), rgba(2, 7, 20, 0.7));
+  box-shadow: inset 3px 0 0 rgba(0, 243, 255, 0.28);
+}
+
+@media (max-width: 900px) {
+  .crew-cockpit-main {
+    grid-template-columns: 1fr;
+  }
+
+  .crew-launch-console {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .crew-launch-console > span,
+  .crew-launch-console > small {
+    grid-column: 1;
+  }
+
+  .crew-launch-button {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    min-width: 180px;
+    margin: 0;
+  }
+
+  .crew-bridge-workspace {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'mission' 'roster' 'comms';
+  }
+
+  .crew-workspace-roster {
+    position: static;
+  }
+
+  .crew-roster-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .crew-bridge-shell {
+    padding: 0.75rem 0.65rem 6.5rem;
+  }
+
+  .crew-cockpit {
+    border-radius: 17px;
+    padding: 0.75rem;
+  }
+
+  .crew-cockpit-status {
+    font-size: 0.59rem;
+    letter-spacing: 0.04em;
+  }
+
+  .crew-cockpit-main {
+    padding: 1.1rem 0.1rem 0.8rem;
+  }
+
+  .crew-identity {
+    align-items: flex-start;
+  }
+
+  .crew-emblem {
+    flex-basis: 58px;
+    width: 58px;
+    height: 58px;
+  }
+
+  .crew-identity h1 {
+    font-size: 1.35rem;
+  }
+
+  .crew-identity p {
+    font-size: 0.78rem;
+  }
+
+  .crew-launch-console {
+    grid-template-columns: 1fr;
+  }
+
+  .crew-launch-button {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+  }
+
+  .crew-flight-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crew-flight-stats > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .crew-flight-stats > div:nth-child(-n + 2) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .crew-detail-drawer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crew-detail-description {
+    grid-column: 1 / -1;
+  }
+
+  .crew-guest-strip {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .crew-workspace-comms,
+  .crew-workspace-roster {
+    padding: 0.8rem;
+    border-radius: 14px;
+  }
+
+  .crew-comms-composer {
+    grid-template-columns: 1fr;
+  }
+
+  .crew-comms-composer button {
+    width: 100%;
+    min-height: 44px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crew-spin {
+    animation: none;
+  }
+}

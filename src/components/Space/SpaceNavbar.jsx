@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc } from 'firebase/firestore';
-import { ExternalLink, MessageCircle, Video } from 'lucide-react';
+import { Bell, ExternalLink, MessageCircle, Video } from 'lucide-react';
 import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
@@ -36,6 +36,8 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   const [isMobileMoreOpen, setIsMobileMoreOpen] = React.useState(false);
   const [isLiveMenuOpen, setIsLiveMenuOpen] = React.useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
+  const [isGuestSignupPromptOpen, setIsGuestSignupPromptOpen] = React.useState(false);
+  const [isStartingSignup, setIsStartingSignup] = React.useState(false);
   const [isBrandImageFailed, setIsBrandImageFailed] = React.useState(false);
   const [isProfileImageFailed, setIsProfileImageFailed] = React.useState(false);
 
@@ -44,15 +46,42 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   }, [user?.photoURL, userData?.photoURL, userData?.profileImageUrl, userData?.avatarUrl]);
 
   React.useEffect(() => {
-    if (!isLiveMenuOpen) return undefined;
+    if (!isLiveMenuOpen && !isGuestSignupPromptOpen) return undefined;
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') setIsLiveMenuOpen(false);
+      if (event.key === 'Escape') setIsGuestSignupPromptOpen(false);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLiveMenuOpen]);
+  }, [isGuestSignupPromptOpen, isLiveMenuOpen]);
+
+  const isGuest = userData?.isGuest === true;
+
+  const openGuestSignupPrompt = () => {
+    soundManager.playClick();
+    setIsMobileMoreOpen(false);
+    setIsProfileMenuOpen(false);
+    setIsLiveMenuOpen(false);
+    setIsGuestSignupPromptOpen(true);
+  };
+
+  const handleGuestSignup = async () => {
+    if (isStartingSignup) return;
+    soundManager.playClick();
+    setIsStartingSignup(true);
+    try {
+      window.sessionStorage.removeItem('crewGuestSession');
+      await signOut(auth);
+    } catch (error) {
+      console.warn('Failed to close guest session before signup:', error);
+    } finally {
+      setIsGuestSignupPromptOpen(false);
+      setIsStartingSignup(false);
+      navigate('/signup');
+    }
+  };
 
   const handleLogout = async () => {
     soundManager.playClick();
@@ -126,6 +155,10 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   };
 
   const handleNavClick = (view, path) => {
+    if (isGuest && view !== 'planet' && view !== 'crew') {
+      openGuestSignupPrompt();
+      return;
+    }
     soundManager.playClick();
     setIsMobileMoreOpen(false);
     setIsProfileMenuOpen(false);
@@ -144,6 +177,10 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   };
 
   const handlePublicProfileClick = () => {
+    if (isGuest) {
+      openGuestSignupPrompt();
+      return;
+    }
     if (!user?.uid) return;
     soundManager.playClick();
     setIsMobileMoreOpen(false);
@@ -178,13 +215,12 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     { view: 'dashboard', label: 'LOGS', icon: '📊' }
   ];
 
-  const isGuest = userData?.isGuest === true;
-  const guestPrimaryNav = [
-    { view: 'planet', label: '학습', icon: '🪐' },
-    { view: 'crew', label: '스터디크루', icon: '🛰️' }
-  ];
-  const effectivePrimaryNav = isGuest ? guestPrimaryNav : mobilePrimaryNav;
-  const effectiveMoreNav = isGuest ? [] : mobileMoreNav;
+  const effectivePrimaryNav = mobilePrimaryNav;
+  const effectiveMoreNav = mobileMoreNav;
+  const getGuestNavState = (view) => {
+    if (!isGuest) return '';
+    return view === 'planet' || view === 'crew' ? 'guest-available' : 'guest-locked';
+  };
 
   const mobileIsAgoraActive = window.location.pathname.startsWith('/agora');
   const isUserDataReady = Boolean(userData && !userData.dataLoadError && !userData.recoveryRequired);
@@ -213,6 +249,16 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     setIsProfileMenuOpen(false);
   };
 
+  const handleProfileMenuToggle = () => {
+    if (isGuest) {
+      openGuestSignupPrompt();
+      return;
+    }
+    soundManager.playClick();
+    setIsProfileMenuOpen((open) => !open);
+    setIsMobileMoreOpen(false);
+  };
+
   return (
     <>
     <nav className="space-nav hud-border">
@@ -230,11 +276,24 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           )}
         </button>
         <div className="mobile-nav-actions">
-          <DirectMemoMenu />
-          <NotificationMenu />
+          {isGuest ? (
+            <>
+              <button type="button" className="mobile-guest-locked-action" onClick={openGuestSignupPrompt} aria-label="쪽지, 회원가입 필요">
+                <MessageCircle size={18} />
+              </button>
+              <button type="button" className="mobile-guest-locked-action" onClick={openGuestSignupPrompt} aria-label="알림, 회원가입 필요">
+                <Bell size={18} />
+              </button>
+            </>
+          ) : (
+            <>
+              <DirectMemoMenu />
+              <NotificationMenu />
+            </>
+          )}
           <button
             type="button"
-            className={`mobile-streak-btn ${currentView === 'journey' ? 'active' : ''}`}
+            className={`mobile-streak-btn ${getGuestNavState('journey')} ${currentView === 'journey' ? 'active' : ''}`}
             onClick={() => handleNavClick('journey', '/')}
             aria-label={isUserDataReady ? `연속 학습 ${effectiveStreak}일` : '연속 학습 동기화 중'}
           >
@@ -242,7 +301,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           </button>
           <button
             type="button"
-            className={`mobile-crystal-btn ${currentView === 'ledger' ? 'active' : ''}`}
+            className={`mobile-crystal-btn ${getGuestNavState('ledger')} ${currentView === 'ledger' ? 'active' : ''}`}
             onClick={() => handleNavClick('ledger', '/')}
             aria-label={isUserDataReady ? `광석 ${crystalCount}개` : '광석 동기화 중'}
           >
@@ -251,9 +310,9 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           </button>
           <button
             type="button"
-            className={`mobile-profile-btn ${isProfileMenuOpen ? 'active' : ''}`}
-            onClick={() => { soundManager.playClick(); setIsProfileMenuOpen(!isProfileMenuOpen); setIsMobileMoreOpen(false); }}
-            aria-label="프로필 메뉴 열기"
+            className={`mobile-profile-btn ${getGuestNavState('profile')} ${isProfileMenuOpen ? 'active' : ''}`}
+            onClick={handleProfileMenuToggle}
+            aria-label={isGuest ? '프로필, 회원가입 필요' : '프로필 메뉴 열기'}
           >
             <span className="mobile-profile-initial" aria-hidden="true">{profileInitial}</span>
             {shouldShowProfilePhoto ? (
@@ -280,47 +339,41 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           <img src="/m-logo.svg" alt="" />
         </button>
         <button
-          className={`space-nav-link ${currentView === 'planet' ? 'active' : ''}`}
+          className={`space-nav-link ${getGuestNavState('planet')} ${currentView === 'planet' ? 'active' : ''}`}
           onClick={() => handleNavClick('planet', '/')}
         >
           🪐 NAV
         </button>
-        {!isGuest && (
-          <>
-            <button
-              className={`space-nav-link ${currentView === 'mistake_notebook' ? 'active' : ''}`}
-              onClick={() => handleNavClick('mistake_notebook', '/')}
-            >
-              🧠 NOTE
-            </button>
-            <button
-              className={`space-nav-link ${currentView === 'ranking' ? 'active' : ''}`}
-              onClick={() => handleNavClick('ranking', '/')}
-            >
-              🏆 RANKING
-            </button>
-            <button
-              className={`space-nav-link ${currentView === 'store' ? 'active' : ''}`}
-              onClick={() => handleNavClick('store', '/')}
-            >
-              🎨 STORE
-            </button>
-          </>
-        )}
         <button
-          className={`space-nav-link ${currentView === 'crew' ? 'active' : ''}`}
+          className={`space-nav-link ${getGuestNavState('mistake_notebook')} ${currentView === 'mistake_notebook' ? 'active' : ''}`}
+          onClick={() => handleNavClick('mistake_notebook', '/')}
+        >
+          🧠 NOTE
+        </button>
+        <button
+          className={`space-nav-link ${getGuestNavState('ranking')} ${currentView === 'ranking' ? 'active' : ''}`}
+          onClick={() => handleNavClick('ranking', '/')}
+        >
+          🏆 RANKING
+        </button>
+        <button
+          className={`space-nav-link ${getGuestNavState('store')} ${currentView === 'store' ? 'active' : ''}`}
+          onClick={() => handleNavClick('store', '/')}
+        >
+          🎨 STORE
+        </button>
+        <button
+          className={`space-nav-link ${getGuestNavState('crew')} ${currentView === 'crew' ? 'active' : ''}`}
           onClick={() => handleNavClick('crew', '/')}
         >
           🛰️ STUDY CREW
         </button>
-        {!isGuest && (
-          <button
-            className={`space-nav-link agora-nav-btn ${window.location.pathname.startsWith('/agora') ? 'active' : ''}`}
-            onClick={() => handleNavClick('agora', '/agora')}
-          >
-            🏛️ STELLAR AGORA
-          </button>
-        )}
+        <button
+          className={`space-nav-link agora-nav-btn ${getGuestNavState('agora')} ${window.location.pathname.startsWith('/agora') ? 'active' : ''}`}
+          onClick={() => handleNavClick('agora', '/agora')}
+        >
+          🏛️ STELLAR AGORA
+        </button>
       </div>
       
       <div className="nav-right desktop-nav-right">
@@ -350,7 +403,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         {/* Profile Menu relative container */}
         <div className="profile-menu-anchor" style={{ position: 'relative' }}>
           <div 
-            onClick={() => { soundManager.playClick(); setIsProfileMenuOpen(!isProfileMenuOpen); }}
+            onClick={handleProfileMenuToggle}
             style={{ 
               width: '40px', 
               height: '40px', 
@@ -474,6 +527,46 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     </nav>
 
       <AnimatePresence>
+        {isGuestSignupPromptOpen && (
+          <Motion.div
+            className="guest-signup-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setIsGuestSignupPromptOpen(false)}
+          >
+            <Motion.div
+              className="guest-signup-modal hud-border"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="guest-signup-title"
+              aria-describedby="guest-signup-description"
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <span className="guest-signup-eyebrow font-tech">GUEST EXPERIENCE</span>
+              <h2 id="guest-signup-title" className="font-title">정식 회원가입이 필요한 메뉴예요</h2>
+              <p id="guest-signup-description">
+                메타센스 회원이 되면 학습 기록, 오답노트, 과제, 랭킹, 스토어와 아고라를 모두 이용할 수 있어요.
+              </p>
+              <div className="guest-signup-actions">
+                <button type="button" className="guest-signup-primary font-tech" onClick={handleGuestSignup} disabled={isStartingSignup}>
+                  {isStartingSignup ? '이동 중...' : '정식 회원가입하기'}
+                </button>
+                <button type="button" className="guest-signup-secondary font-tech" onClick={() => setIsGuestSignupPromptOpen(false)} disabled={isStartingSignup}>
+                  계속 둘러보기
+                </button>
+              </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {isLiveMenuOpen && (
           <Motion.div
             className="live-menu-backdrop"
@@ -539,7 +632,8 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           <button
             key={item.view}
             type="button"
-            className={`mobile-bottom-tab ${(item.view === 'agora' ? mobileIsAgoraActive : currentView === item.view) ? 'active' : ''}`}
+            className={`mobile-bottom-tab ${getGuestNavState(item.view)} ${(item.view === 'agora' ? mobileIsAgoraActive : currentView === item.view) ? 'active' : ''}`}
+            aria-label={isGuest && getGuestNavState(item.view) === 'guest-locked' ? `${item.label}, 회원가입 필요` : item.label}
             onClick={() => handleNavClick(item.view, item.path || '/')}
           >
             <span>{item.icon}</span>
@@ -575,7 +669,8 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
                 <button
                   key={item.view}
                   type="button"
-                  className={currentView === item.view ? 'active' : ''}
+                  className={`${getGuestNavState(item.view)} ${currentView === item.view ? 'active' : ''}`}
+                  aria-label={isGuest && getGuestNavState(item.view) === 'guest-locked' ? `${item.label}, 회원가입 필요` : item.label}
                   onClick={() => handleNavClick(item.view, '/')}
                 >
                   <span>{item.icon}</span>
