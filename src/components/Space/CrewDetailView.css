@@ -507,7 +507,20 @@
   padding: 0.15rem 0.4rem;
   border-radius: 999px;
   background: rgba(0, 243, 255, 0.1);
+  font-size: 0.62rem;
+  white-space: nowrap;
   text-align: center;
+}
+
+.crew-roster-guest-notice {
+  margin: -0.1rem 0 0.7rem;
+  padding: 0.55rem 0.62rem;
+  border: 1px solid rgba(134, 239, 172, 0.12);
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.045);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.68rem;
+  line-height: 1.5;
 }
 
 .crew-roster-grid {

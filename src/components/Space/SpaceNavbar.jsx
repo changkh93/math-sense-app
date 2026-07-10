@@ -211,6 +211,10 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   };
 
   const handleBrandClick = () => {
+    if (isGuest) {
+      handleNavClick('planet', '/');
+      return;
+    }
     soundManager.playClick();
     setIsMobileMoreOpen(false);
     setIsProfileMenuOpen(false);
@@ -288,7 +292,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           type="button"
           className="mobile-brand-btn"
           onClick={handleBrandClick}
-          aria-label="메타센스 실시간 수업 메뉴 열기"
+          aria-label={isGuest ? 'NAV로 이동' : '메타센스 실시간 수업 메뉴 열기'}
         >
           {!isBrandImageFailed ? (
             <img src="/m-logo.svg" alt="" onError={() => setIsBrandImageFailed(true)} />
@@ -355,7 +359,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           type="button"
           className="desktop-brand-btn"
           onClick={handleBrandClick}
-          aria-label="메타센스 실시간 수업 메뉴 열기"
+          aria-label={isGuest ? 'NAV로 이동' : '메타센스 실시간 수업 메뉴 열기'}
         >
           <img src="/m-logo.svg" alt="" />
         </button>
@@ -574,9 +578,12 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
               <p id="guest-signup-description">
                 메타센스 회원이 되면 학습 기록, 오답노트, 과제, 랭킹, 스토어와 아고라를 모두 이용할 수 있어요.
               </p>
+              <div className="guest-signup-age-notice font-tech" role="note">
+                만 14세 미만은 부모님이 회원가입 후 자녀 계정을 만들어야 이용할 수 있어요.
+              </div>
               <div className="guest-signup-actions">
                 <button type="button" className="guest-signup-primary font-tech" onClick={handleGuestSignup} disabled={isStartingSignup}>
-                  {isStartingSignup ? '이동 중...' : '정식 회원가입하기'}
+                  {isStartingSignup ? '이동 중...' : '부모님 회원가입'}
                 </button>
                 <button type="button" className="guest-signup-secondary font-tech" onClick={() => setIsGuestSignupPromptOpen(false)} disabled={isStartingSignup}>
                   계속 둘러보기
@@ -591,7 +598,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {isLiveMenuOpen && (
+        {isLiveMenuOpen && !isGuest && (
           <Motion.div
             className="live-menu-backdrop"
             initial={{ opacity: 0 }}

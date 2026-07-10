@@ -190,7 +190,7 @@ function CrewMemberPublicCard({ member, profile }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
           {isLeader && <Crown size={14} style={{ color: '#fbbf24', flexShrink: 0 }} />}
           <span className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {getMemberLabel(member)}
+            {getMemberLabel(profile, getMemberLabel(member))}
           </span>
         </div>
         <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
@@ -236,6 +236,18 @@ export default function CrewDetailView({ onBack }) {
     ...(Array.isArray(crew?.memberIds) ? crew.memberIds : []),
     crew?.leaderId,
   ]), [crew?.memberIds, crew?.leaderId]);
+  const rosterMembers = useMemo(() => {
+    const byId = new Map(members.filter((member) => member?.uid).map((member) => [member.uid, member]));
+    crewMemberIds.forEach((uid) => {
+      if (!byId.has(uid)) {
+        byId.set(uid, {
+          uid,
+          crewRole: uid === crew?.leaderId ? 'leader' : 'member',
+        });
+      }
+    });
+    return Array.from(byId.values());
+  }, [crew?.leaderId, crewMemberIds, members]);
   const notes = useMemo(() => liveNotes, [liveNotes]);
   const displayNotes = useMemo(() => {
     const serverKeys = new Set(notes.map((note) => `${note?.userId || ''}::${note?.text || ''}`));
@@ -254,6 +266,7 @@ export default function CrewDetailView({ onBack }) {
     const lastSeenMs = getTimestampMs(session.lastSeenAt) || getTimestampMs(session.joinedAt);
     return lastSeenMs > 0 && guestPresenceNow - lastSeenMs < 150000;
   }), [guestPresenceNow, guestSessions, isGuest, user?.uid]);
+  const activeGuestCount = Math.max(visibleGuestSessions.length, isGuest && user?.uid ? 1 : 0);
   const activeParticipantIds = useMemo(
     () => uniqueIds([...crewMemberIds, ...visibleGuestSessions.map((session) => session.uid)]),
     [crewMemberIds, visibleGuestSessions]
@@ -296,7 +309,7 @@ export default function CrewDetailView({ onBack }) {
   }, [members, user?.uid, user?.displayName, userData, visibleGuestSessions]);
 
   const enrichedMembers = useMemo(() => {
-    const next = [...members];
+    const next = [...rosterMembers];
     if (!isGuest && user?.uid && !next.some(m => m.uid === user.uid)) {
       next.unshift({ uid: user.uid, studentName: userData?.studentName || userData?.publicDisplayName || user.displayName || '나', currentStreak: userData?.currentStreak || 0, lastStreakDate: userData?.lastStreakDate || '', crewRole: userData?.crewRole || 'member' });
     }
@@ -315,7 +328,15 @@ export default function CrewDetailView({ onBack }) {
     }
     const unique = Array.from(new Map(next.map(m => [m.uid, m])).values());
     return unique.sort((a, b) => { if (a.uid === user?.uid) return -1; if (b.uid === user?.uid) return 1; if (a.crewRole === 'leader') return -1; if (b.crewRole === 'leader') return 1; if (a.isGuest !== b.isGuest) return a.isGuest ? 1 : -1; return (b.currentStreak || 0) - (a.currentStreak || 0); });
-  }, [isGuest, members, user, userData, visibleGuestSessions]);
+  }, [isGuest, rosterMembers, user, userData, visibleGuestSessions]);
+
+  const onlineFlightCrewCount = useMemo(() => {
+    const regularOnlineCount = enrichedMembers.filter((member) => {
+      if (member.isGuest) return false;
+      return getPresenceInfo(memberProfiles[member.uid]).label !== '오프라인';
+    }).length;
+    return regularOnlineCount + activeGuestCount;
+  }, [activeGuestCount, enrichedMembers, memberProfiles]);
 
   useEffect(() => {
     const ids = enrichedMembers.filter((member) => !member.isGuest).map((member) => member.uid).filter(Boolean);
@@ -608,7 +629,7 @@ export default function CrewDetailView({ onBack }) {
 
         <div className="crew-flight-stats">
           {[
-            { label: 'CREW', value: `${Math.max(crew.memberCount || members.length || 1, members.length) + visibleGuestSessions.length}명` },
+            { label: 'CREW', value: `${Math.max(crew.memberCount || rosterMembers.length || 1, rosterMembers.length) + activeGuestCount}명` },
             { label: 'ONLINE STUDY', value: `${studiedToday.length}명` },
             { label: 'MY ROLE', value: isGuest ? '게스트' : userData?.crewRole === 'leader' ? '리더' : '멤버' },
             { label: 'SCHEDULE', value: formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes) },
@@ -696,7 +717,17 @@ export default function CrewDetailView({ onBack }) {
 
       {/* Members */}
       <section className="crew-workspace-roster">
-        <div className="crew-section-heading font-tech"><Users size={15} /> FLIGHT CREW <span>{enrichedMembers.length}</span></div>
+        <div className="crew-section-heading font-tech">
+          <Users size={15} /> FLIGHT CREW
+          <span>ONLINE {onlineFlightCrewCount} / {enrichedMembers.length}</span>
+        </div>
+        {isGuest && (
+          <div className="crew-roster-guest-notice font-tech">
+            {rosterMembers.length > 0
+              ? '게스트에게는 크루원의 공개 이름, 역할과 접속 상태만 표시됩니다.'
+              : '게스트에게 공개된 크루 멤버 정보가 없습니다. 현재 접속 인원만 표시합니다.'}
+          </div>
+        )}
         <div className="crew-roster-grid">
           {enrichedMembers.map(member => (
             member.isGuest ? (
