@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { auth, googleProvider, functions } from '../firebase';
@@ -7,11 +7,24 @@ import ChildAccountCreator from '../components/Parent/ChildAccountCreator';
 
 export default function Signup() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const handoffCode = searchParams.get('handoff') || '';
   const [parentName, setParentName] = useState('');
   const [phone, setPhone] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [step, setStep] = useState('parent');
   const [loading, setLoading] = useState(false);
+  const [handoffPreview, setHandoffPreview] = useState(null);
+  const [handoffError, setHandoffError] = useState('');
+  const effectiveHandoffCode = handoffPreview ? handoffCode : '';
+
+  useEffect(() => {
+    if (!handoffCode) return;
+    const preview = httpsCallable(functions, 'previewGuardianHandoff');
+    preview({ handoffCode })
+      .then((result) => setHandoffPreview(result.data || null))
+      .catch(() => setHandoffError('게스트 체험 연결 링크가 만료되었거나 올바르지 않습니다. 일반 회원가입은 계속할 수 있습니다.'));
+  }, [handoffCode]);
 
   const handleParentSignup = async (e) => {
     e.preventDefault();
@@ -31,7 +44,7 @@ export default function Signup() {
       await signInWithPopup(auth, googleProvider);
       authenticatedForSignup = true;
       const registerParent = httpsCallable(functions, 'registerParentProfile');
-      await registerParent({ parentName, phone: phoneDigits, termsAccepted });
+      await registerParent({ parentName, phone: phoneDigits, termsAccepted, handoffCode: effectiveHandoffCode });
       setStep('child');
     } catch (err) {
       console.error(err);
@@ -74,6 +87,19 @@ export default function Signup() {
           </p>
         </section>
 
+        {handoffPreview && (
+          <section style={{ marginBottom: 20, padding: 18, borderRadius: 16, background: 'linear-gradient(135deg, rgba(34,197,94,0.13), rgba(0,212,255,0.09))', border: '1px solid rgba(34,197,94,0.28)' }}>
+            <div style={{ color: '#bbf7d0', fontWeight: 900, marginBottom: 8 }}>{handoffPreview.crewName} 게스트 체험에서 이어서 가입합니다</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, color: 'rgba(255,255,255,0.78)', fontSize: '0.86rem', lineHeight: 1.45 }}>
+              <div><strong style={{ color: '#67e8f9' }}>1</strong><br />보호자 계정</div>
+              <div><strong style={{ color: '#67e8f9' }}>2</strong><br />자녀 계정</div>
+              <div><strong style={{ color: '#67e8f9' }}>3</strong><br />크루 초대 수락</div>
+            </div>
+            <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,0.62)', lineHeight: 1.55, fontSize: '0.85rem' }}>자녀 계정 생성 후 이 크루의 초대가 14일간 보관됩니다. 별도의 참여권 구매 없이 자녀가 직접 수락할 수 있습니다.</p>
+          </section>
+        )}
+        {handoffError && <div style={{ marginBottom: 18, padding: 13, borderRadius: 12, background: 'rgba(248,113,113,0.09)', color: '#fecaca' }}>{handoffError}</div>}
+
         {step === 'parent' ? (
           <form onSubmit={handleParentSignup} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 18, padding: 26, display: 'grid', gap: 16, boxShadow: '0 24px 70px rgba(0,0,0,0.28)' }}>
             <div>
@@ -95,7 +121,7 @@ export default function Signup() {
             <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)', borderRadius: 16, padding: 18, color: '#bbf7d0' }}>
               학부모 회원가입이 완료되었습니다. 이어서 자녀 계정을 만들 수 있습니다.
             </div>
-            <ChildAccountCreator onCreated={() => navigate('/parent/dashboard')} />
+            <ChildAccountCreator handoffCode={effectiveHandoffCode} onCreated={() => navigate('/parent/dashboard')} />
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={() => navigate('/parent/dashboard')} style={{ border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: 'white', borderRadius: 12, padding: '12px 18px', cursor: 'pointer', fontWeight: 800 }}>
                 학부모 대시보드로 이동

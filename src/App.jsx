@@ -38,6 +38,7 @@ import PublicApplication from './pages/PublicApplication'
 import VacationCamp from './pages/VacationCamp'
 import Signup from './pages/Signup'
 import Terms from './pages/Terms'
+import CrewGuestInvite from './pages/CrewGuestInvite'
 
 import PrivateRoute from './components/PrivateRoute'
 
@@ -56,6 +57,8 @@ function App() {
       <Route path="/streak" element={<Navigate to="/?view=journey" replace />} />
       <Route path="/agora-connect/:uid" element={<Navigate to="/?view=journey" replace />} />
       <Route path="/invite/:inviteCode" element={<InviteHandler />} />
+      <Route path="/guest" element={<CrewGuestInvite />} />
+      <Route path="/crew-invite/:inviteToken" element={<CrewGuestInvite />} />
       <Route path="/trial" element={<PublicApplication fixedType="trial" />} />
       <Route path="/consultation" element={<PublicApplication fixedType="consultation" />} />
       <Route path="/vacation" element={<VacationCamp />} />

@@ -77,8 +77,6 @@ export function useAuth() {
     let cleanupTimeout = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      
       if (cleanupTimeout) {
         clearTimeout(cleanupTimeout);
         cleanupTimeout = null;
@@ -88,6 +86,18 @@ export function useAuth() {
         unsubscribeSnapshot();
         unsubscribeSnapshot = null;
       }
+
+      if (firebaseUser?.isAnonymous) {
+        // Anonymous Firebase Auth is reserved for the isolated crew guest page.
+        // The member app must continue to behave as logged out and must never
+        // attempt to reconstruct a users/{uid} document for a guest.
+        setUser(null);
+        setUserData(null);
+        setLoading(false);
+        return;
+      }
+
+      setUser(firebaseUser);
 
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);

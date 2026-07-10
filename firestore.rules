@@ -9,9 +9,11 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Helper to check if user is authenticated
+    // Member/parent authentication. Anonymous Firebase Auth is reserved for the
+    // isolated guest-crew callables and must not inherit normal app access.
     function isAuth() {
-      return request.auth != null;
+      return request.auth != null &&
+             request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
     function isAgoraBanned(userId) {
@@ -228,6 +230,24 @@ service cloud.firestore {
           ]);
         allow delete: if isAuth() && (request.auth.uid == participantId || isAdmin());
       }
+    }
+
+    // Guest crew experience is fully server-managed. Anonymous clients never
+    // read or write these documents directly; callables return sanitized data.
+    match /crewGuestInvites/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /crewGuestRooms/{roomId} {
+      allow read, write: if false;
+    }
+
+    match /crewGuestSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /guardianHandoffs/{handoffId} {
+      allow read, write: if false;
     }
 
     match /openStudyPools/{poolId} {

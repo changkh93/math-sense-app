@@ -4,7 +4,7 @@ import { functions } from '../../firebase';
 
 const gradeOptions = ['미취학', '초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고등'];
 
-export default function ChildAccountCreator({ compact = false, onCreated }) {
+export default function ChildAccountCreator({ compact = false, onCreated, handoffCode = '' }) {
   const [form, setForm] = useState({
     studentName: '',
     loginId: '',
@@ -25,8 +25,9 @@ export default function ChildAccountCreator({ compact = false, onCreated }) {
     setCreating(true);
     try {
       const createChild = httpsCallable(functions, 'createChildAccountForParent');
-      const result = await createChild(form);
-      setMessage(`${result.data?.studentName || form.studentName} 계정이 생성되었습니다. 아이디: ${result.data?.loginId || form.loginId}`);
+      const result = await createChild({ ...form, handoffCode });
+      const crewSuffix = result.data?.crewName ? ` ${result.data.crewName} 크루 초대도 자녀 계정에 보관했습니다.` : '';
+      setMessage(`${result.data?.studentName || form.studentName} 계정이 생성되었습니다. 아이디: ${result.data?.loginId || form.loginId}.${crewSuffix}`);
       setForm({ studentName: '', loginId: '', password: '', grade: '', birthDate: '' });
       if (onCreated) onCreated(result.data);
     } catch (err) {
