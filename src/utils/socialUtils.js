@@ -1,12 +1,37 @@
-const ANONYMOUS_LABELS = [
-  '용감한 사자',
-  '차분한 고래',
-  '반짝이는 여우',
-  '끈기 있는 거북이',
-  '영리한 부엉이',
-  '재빠른 치타',
-  '단단한 코끼리',
-  '자유로운 돌고래'
+// 공개 질문자의 익명 닉네임은 사용자 ID로부터 결정적으로 생성한다.
+// 장소/행동(36) x 성격(40) x 캐릭터(72) x 탐사선 번호(997)로
+// 1억 가지가 넘는 조합을 만들 수 있어
+// 같은 사용자는 계속 같은 이름을 쓰면서도 사용자 간 중복은 크게 줄어든다.
+const ANONYMOUS_SCENES = [
+  '새벽별을 줍는', '은하수를 건너는', '블랙홀 옆을 지나는', '달빛을 모으는',
+  '혜성 꼬리를 타는', '토성 고리를 닦는', '화성에서 길 찾는', '별자리를 그리는',
+  '우주선을 수리하는', '웜홀을 탐험하는', '성운에서 춤추는', '유성을 기다리는',
+  '달 뒷면을 걷는', '별빛으로 계산하는', '궤도를 바꾸는', '외계 신호를 듣는',
+  '태양풍을 가르는', '은하 지도를 펴는', '소행성을 피하는', '우주 먼지를 터는',
+  '평행우주를 엿보는', '시간여행을 준비하는', '로켓 연료를 채우는', '미지수를 추적하는',
+  '공식을 발명하는', '좌표평면을 달리는', '무한대를 꿈꾸는', '소수별을 세는',
+  '분수 피자를 나누는', '함수 그래프를 타는', '정답 별을 찾는', '오답 성운을 밝히는',
+  '수학 행성을 도는', '차원문을 두드리는', '별자리 퀴즈를 푸는', '우주 도서관에 사는'
+];
+
+const ANONYMOUS_TRAITS = [
+  '용감한', '차분한', '반짝이는', '끈기 있는', '영리한', '재빠른', '엉뚱한', '다정한',
+  '유쾌한', '호기심 많은', '상상력 넘치는', '논리적인', '느긋한', '야무진', '명랑한', '수줍은',
+  '재치 있는', '집중하는', '긍정적인', '대담한', '꼼꼼한', '자유로운', '든든한', '기발한',
+  '열정적인', '꿈꾸는', '똑부러진', '평화로운', '장난꾸러기', '믿음직한', '활기찬', '사려 깊은',
+  '호쾌한', '신중한', '낭만적인', '당찬', '포근한', '총명한', '상냥한', '뾰족한'
+];
+
+const ANONYMOUS_CHARACTERS = [
+  '쿼카', '라쿤', '수달', '카피바라', '레서판다', '사막여우', '북극여우', '아기 판다',
+  '알파카', '나무늘보', '미어캣', '친칠라', '햄스터', '고슴도치', '다람쥐', '청설모',
+  '토끼', '고양이', '강아지', '아기 곰', '코알라', '웜뱃', '오리너구리', '펭귄',
+  '해달', '돌고래', '범고래', '흰고래', '바다표범', '문어', '해파리', '복어',
+  '고래상어', '아홀로틀', '부엉이', '수리부엉이', '참새', '벌새', '홍학', '공작새',
+  '알바트로스', '황제펭귄', '거북이', '카멜레온', '도마뱀', '아기 용', '유니콘', '그리핀',
+  '별토끼', '달고양이', '우주고래', '화성문어', '로봇강아지', '안드로이드', '꼬마 외계인', '우주비행사',
+  '별빛 요정', '혜성 정령', '달 토끼', '성운 마법사', '궤도 기사', '로켓 정비사', '행성 탐정', '별자리 화가',
+  '공식 발명가', '미지수 추적자', '도형 건축가', '함수 서퍼', '분수 요리사', '소수 수집가', '무한대 여행자', '정답 탐험가'
 ];
 
 export const AGORA_BOUNTY_OPTIONS = [0, 10, 30, 50, 100];
@@ -165,13 +190,36 @@ export const SOCIAL_STORE_ITEMS = [
   },
 ];
 
-function hashSeed(seed = '') {
-  return Array.from(seed).reduce((acc, char, index) => acc + (char.charCodeAt(0) * (index + 1)), 0);
+function hashSeed(seed = '', salt = '') {
+  // FNV-1a: 글자 합계를 쓰던 기존 방식보다 비슷한 UID도 고르게 분산한다.
+  let hash = 2166136261;
+  const value = `${salt}:${seed}`;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  // MurmurHash3 finalizer로 연속된 ID의 하위 비트까지 충분히 섞는다.
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 0xc2b2ae35);
+  hash ^= hash >>> 16;
+  return hash >>> 0;
 }
 
 export function getAnonymousLabel(seed) {
-  if (!seed) return ANONYMOUS_LABELS[0];
-  return ANONYMOUS_LABELS[hashSeed(seed) % ANONYMOUS_LABELS.length];
+  if (!seed) return '별빛을 따라온 익명의 탐험가';
+
+  const scene = ANONYMOUS_SCENES[hashSeed(seed, 'scene') % ANONYMOUS_SCENES.length];
+  const trait = ANONYMOUS_TRAITS[hashSeed(seed, 'trait') % ANONYMOUS_TRAITS.length];
+  const character = ANONYMOUS_CHARACTERS[hashSeed(seed, 'character') % ANONYMOUS_CHARACTERS.length];
+  const explorerNumber = (hashSeed(seed, 'explorer-number') % 997) + 1;
+  return `${scene} ${trait} ${character} ${explorerNumber}호`;
+}
+
+export function getQuestionAnonymousLabel(question) {
+  if (question?.userId) return getAnonymousLabel(question.userId);
+  return question?.anonymousLabel || getAnonymousLabel(question?.id);
 }
 
 export function getProfileFrame(frameId) {

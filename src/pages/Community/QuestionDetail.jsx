@@ -7,7 +7,7 @@ import 'katex/dist/katex.min.css';
 import { db } from '../../firebase';
 import { updateDoc, doc } from 'firebase/firestore';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
-import { AGORA_BOUNTY_OPTIONS, buildAnswerProfileSnapshot, getAnonymousLabel, getProfileFrame } from '../../utils/socialUtils';
+import { AGORA_BOUNTY_OPTIONS, buildAnswerProfileSnapshot, getProfileFrame, getQuestionAnonymousLabel } from '../../utils/socialUtils';
 import { useAuth } from '../../hooks/useAuth';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
@@ -310,7 +310,7 @@ export default function QuestionDetail() {
 
   const questionAuthorLabel = question?.isPublic === false
     ? (question?.userName || '비공개 질문')
-    : (question?.anonymousLabel || getAnonymousLabel(question?.userId));
+    : getQuestionAnonymousLabel(question);
 
   const getAnswerPresentation = (answer) => {
     const liveProfile = answer.userId === sessionUser?.uid

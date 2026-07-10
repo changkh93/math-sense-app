@@ -5780,6 +5780,7 @@ exports.deleteStudyCrewGreeting = regionalFunctions.https.onCall(async (data, co
 
 exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
+  const guest = isGuestContext(context);
   const scopeType = String(data?.scopeType || "").trim();
   const scopeId = String(data?.scopeId || "").trim();
   const answer = String(data?.answer || "")
@@ -5795,6 +5796,9 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
   }
   if (!answer) {
     throw new functions.https.HttpsError("invalid-argument", "미션 답변을 입력해주세요.");
+  }
+  if (guest && scopeType !== "crew") {
+    throw new functions.https.HttpsError("permission-denied", "게스트는 초대받은 크루 미션에만 참여할 수 있습니다.");
   }
 
   const db = admin.firestore();
@@ -5835,14 +5839,16 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       tx.get(individualRewardHistoryQuery),
     ]);
 
-    if (!userSnap.exists) {
+    if (!userSnap.exists && !guest) {
       throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
     }
     if (!scopeSnap.exists && scopeType !== "openStudy") {
       throw new functions.https.HttpsError("not-found", "미션을 남길 크루 또는 방을 찾을 수 없습니다.");
     }
 
-    const userData = userSnap.data() || {};
+    const userData = guest
+      ? { role: "guest", publicDisplayName: getCrewGuestAlias(uid) }
+      : (userSnap.data() || {});
     const scopeData = scopeSnap.exists ? (scopeSnap.data() || {}) : {};
     const mission = resolveStudyCrewMissionForDate(dateKey, planSnap.exists ? (planSnap.data() || {}) : null);
     if (mission.disabled) {
@@ -5852,7 +5858,10 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
     let targetIds = [];
     if (scopeType === "crew") {
       targetIds = getCrewMemberIds(scopeData);
-      if (!targetIds.includes(uid)) {
+      if (guest && scopeData.guestAccessEnabled !== true) {
+        throw new functions.https.HttpsError("permission-denied", "현재 게스트 미션 참여가 허용되지 않습니다.");
+      }
+      if (!guest && !targetIds.includes(uid)) {
         throw new functions.https.HttpsError("permission-denied", "크루 멤버만 오늘의 미션을 남길 수 있습니다.");
       }
       if ((scopeData.status || "pending") !== "approved") {
@@ -5904,7 +5913,8 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       individualRewardCount,
       countTodayRewardHistory(individualRewardHistorySnap)
     );
-    const shouldAwardIndividual = !responseSnap.exists
+    const shouldAwardIndividual = !guest
+      && !responseSnap.exists
       && effectiveIndividualRewardCount < STUDY_CREW_MISSION_INDIVIDUAL_DAILY_LIMIT;
     const shouldCompleteTeamReward = teamCompleted && !teamAlreadyAwarded;
     const rewardUserIds = uniqueIds([
@@ -5970,6 +5980,7 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       missionId: mission.id,
       userId: uid,
       userName: getDisplayNameFromUser(userData),
+      isGuest: guest,
       answer,
       createdAt: responseSnap.exists ? (responseSnap.data()?.createdAt || now) : now,
       updatedAt: now,
@@ -6392,6 +6403,9 @@ exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) 
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError("unauthenticated", "게스트 세션을 시작해 주세요.");
   }
+  if (!isGuestContext(context)) {
+    throw new functions.https.HttpsError("permission-denied", "익명 게스트 세션으로 입장해 주세요.");
+  }
   const uid = context.auth.uid;
   const crewId = String(data?.crewId || "").trim();
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
@@ -6405,13 +6419,59 @@ exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) 
   if (crewData.guestAccessEnabled !== true) {
     throw new functions.https.HttpsError("permission-denied", "크루 리더가 게스트 참여를 허용하지 않았습니다.");
   }
+  const guestAlias = getCrewGuestAlias(uid);
+  await crewSnap.ref.collection("guestSessions").doc(uid).set({
+    uid,
+    crewId: crewSnap.id,
+    alias: guestAlias,
+    isGuest: true,
+    state: "online",
+    joinedAt: FieldValue.serverTimestamp(),
+    lastSeenAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
   return {
     crewId: crewSnap.id,
     crewName: crewData.name || "스터디 크루",
     crewColor: crewData.color || "#00d4ff",
-    guestAlias: getCrewGuestAlias(uid),
+    guestAlias,
     guestUid: uid,
   };
+});
+
+exports.touchCrewGuestPresence = regionalFunctions.https.onCall(async (data, context) => {
+  if (!isGuestContext(context)) {
+    throw new functions.https.HttpsError("permission-denied", "게스트 세션에서만 사용할 수 있습니다.");
+  }
+  const uid = context.auth.uid;
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const crewSnap = await crewRef.get();
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  const crewData = crewSnap.data() || {};
+  if (crewData.guestAccessEnabled !== true || (crewData.status || "pending") !== "approved") {
+    throw new functions.https.HttpsError("permission-denied", "현재 게스트 참여가 허용되지 않습니다.");
+  }
+  await crewRef.collection("guestSessions").doc(uid).set({
+    uid,
+    crewId,
+    alias: getCrewGuestAlias(uid),
+    isGuest: true,
+    state: "online",
+    lastSeenAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return { success: true };
+});
+
+exports.leaveCrewGuestSession = regionalFunctions.https.onCall(async (data, context) => {
+  if (!context.auth?.uid) return { success: true };
+  const uid = context.auth.uid;
+  const crewId = String(data?.crewId || "").trim();
+  if (crewId) {
+    await admin.firestore().collection("crews").doc(crewId).collection("guestSessions").doc(uid).delete();
+  }
+  return { success: true };
 });
 
 // Crew leader toggle: turn guest admission on/off for their crew.
@@ -6436,6 +6496,14 @@ exports.setCrewGuestAccess = regionalFunctions.https.onCall(async (data, context
     guestAccessUpdatedBy: uid,
     updatedAt: new Date().toISOString(),
   }, { merge: true });
+  if (!allowGuests) {
+    const guestSessionsSnap = await crewRef.collection("guestSessions").get();
+    if (!guestSessionsSnap.empty) {
+      const batch = db.batch();
+      guestSessionsSnap.docs.forEach((guestSessionDoc) => batch.delete(guestSessionDoc.ref));
+      await batch.commit();
+    }
+  }
   return { success: true, guestAccessEnabled: allowGuests };
 });
 

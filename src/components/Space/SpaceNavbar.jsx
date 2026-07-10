@@ -71,6 +71,14 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     if (isStartingSignup) return;
     soundManager.playClick();
     setIsStartingSignup(true);
+    if (userData?.crewId) {
+      try {
+        const leaveGuestSession = httpsCallable(functions, 'leaveCrewGuestSession');
+        await leaveGuestSession({ crewId: userData.crewId });
+      } catch (error) {
+        console.warn('Failed to close guest presence before signup:', error);
+      }
+    }
     try {
       window.sessionStorage.removeItem('crewGuestSession');
       await signOut(auth);
@@ -85,8 +93,21 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
 
   const handleLogout = async () => {
     soundManager.playClick();
-    await signOut(auth);
-    navigate('/');
+    if (isGuest && userData?.crewId) {
+      try {
+        const leaveGuestSession = httpsCallable(functions, 'leaveCrewGuestSession');
+        await leaveGuestSession({ crewId: userData.crewId });
+      } catch (error) {
+        console.warn('Failed to close guest presence before logout:', error);
+      }
+      window.sessionStorage.removeItem('crewGuestSession');
+      window.sessionStorage.removeItem('metasense_current_view');
+    }
+    try {
+      await signOut(auth);
+    } finally {
+      navigate('/');
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -561,6 +582,9 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
                   계속 둘러보기
                 </button>
               </div>
+              <button type="button" className="guest-session-logout font-tech" onClick={handleLogout} disabled={isStartingSignup}>
+                게스트 세션 종료 및 로그아웃
+              </button>
             </Motion.div>
           </Motion.div>
         )}

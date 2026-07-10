@@ -19,7 +19,7 @@ function getTimestampKey(value) {
 }
 
 export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount = 0, compact = false, teamRewardsEnabled = true }) {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [responses, setResponses] = useState([]);
   const [missionPlan, setMissionPlan] = useState(null);
   const [missionDay, setMissionDay] = useState(null);
@@ -45,8 +45,9 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
     return getStudyCrewMissionForDate(todayKey);
   }, [missionPlan, todayKey]);
   const scopeKey = useMemo(() => getScopeKey(scopeType, scopeId), [scopeType, scopeId]);
+  const isGuest = userData?.isGuest === true;
   const myResponse = responses.find((response) => response.userId === user?.uid) || null;
-  const completedCount = responses.length;
+  const completedCount = responses.filter((response) => response.isGuest !== true).length;
   const target = Math.max(Number(targetCount || 0), completedCount, 1);
   const teamTarget = teamRewardsEnabled && target >= 2 ? target : 0;
   const teamCompleted = teamTarget > 0 && completedCount >= teamTarget;
@@ -143,7 +144,9 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
       const result = await fn({ scopeType, scopeId, answer });
       const rewards = result?.data?.rewards || {};
       setDraft('');
-      if (rewards.individualAwarded) {
+      if (isGuest) {
+        setMessage(myResponse ? '게스트 미션 답변을 수정했습니다.' : '게스트 미션 답변을 저장했습니다.');
+      } else if (rewards.individualAwarded) {
         pushRewardToast(rewards.individualAmount || 5);
         setMessage('오늘의 미션을 완료해 +5 광석을 획득했습니다.');
       } else {
@@ -238,7 +241,22 @@ export default function StudyCrewDailyMission({ scopeType, scopeId, targetCount 
             개인정보는 적지 말고, 짧고 안전한 이야기만 남겨주세요.
           </div>
         </div>
-        {teamRewardsEnabled ? (
+        {isGuest ? (
+          <div className="font-tech" style={{
+            color: '#bbf7d0',
+            background: 'rgba(34,197,94,0.1)',
+            border: '1px solid rgba(134,239,172,0.2)',
+            borderRadius: 999,
+            padding: '0.36rem 0.62rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            whiteSpace: 'nowrap',
+            fontSize: '0.76rem',
+          }}>
+            <Sparkles size={14} /> 게스트 참여 · 보상 없음
+          </div>
+        ) : teamRewardsEnabled ? (
           <div className="font-tech" style={{
             color: teamCompleted ? '#86efac' : 'rgba(255,255,255,0.7)',
             background: teamCompleted ? 'rgba(34,197,94,0.13)' : 'rgba(255,255,255,0.06)',

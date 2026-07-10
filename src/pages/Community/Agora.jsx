@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X, ChevronDown, Loader } from 'lucide-react';
 import { usePublicQuestions, useQAMutations } from '../../hooks/useQA';
-import { getAnonymousLabel } from '../../utils/socialUtils';
+import { getQuestionAnonymousLabel } from '../../utils/socialUtils';
 import QuestionModal from '../../components/QuestionModal';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
@@ -186,7 +186,7 @@ export default function Agora() {
                 (() => {
                   const anonymousLabel = q.isPublic === false
                     ? (q.userName || '비공개 질문')
-                    : (q.anonymousLabel || getAnonymousLabel(q.userId));
+                    : getQuestionAnonymousLabel(q);
 
                   return (
                 <MotionDiv

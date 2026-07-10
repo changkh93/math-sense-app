@@ -9,7 +9,7 @@ import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Responsi
 import CometBadge from './CometBadge'
 import { getEffectiveStreak, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
 import { calculateSEI, FOCUS_MAX_SCORE, BATTLE_MAX_SCORE } from '../../utils/rankingUtils'
-import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getAnonymousLabel, getFrameSurfaceStyles, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
+import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getFrameSurfaceStyles, getQuestionAnonymousLabel, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
 
 export default function SpaceRanking({ user, userData }) {
   const navigate = useNavigate()
@@ -436,7 +436,7 @@ export default function SpaceRanking({ user, userData }) {
                   <div style={{ color: '#60a5fa', fontWeight: 800, marginBottom: '0.35rem' }}>질문 개척상</div>
                   <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>
                     {hallOfFame.bestQuestion
-                      ? (hallOfFame.bestQuestion.anonymousLabel || getAnonymousLabel(hallOfFame.bestQuestion.userId))
+                      ? getQuestionAnonymousLabel(hallOfFame.bestQuestion)
                       : '아직 선정 중'}
                   </div>
                   <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.82rem', marginTop: '0.35rem', lineHeight: 1.45 }}>

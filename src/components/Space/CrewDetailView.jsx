@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
+import { signOut } from 'firebase/auth';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ArrowLeft, ChevronDown, Copy, Crown, Loader2, LogOut, Radio, Rocket, Send, ShieldCheck, StickyNote, Trash2, Users, Wifi } from 'lucide-react';
-import { db, functions } from '../../firebase';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, ChevronDown, Copy, Crown, Loader2, LogOut, Radio, Rocket, Send, Share2, ShieldCheck, StickyNote, Trash2, Users, Wifi } from 'lucide-react';
+import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import soundManager from '../../utils/SoundManager';
@@ -143,7 +145,72 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
   );
 }
 
+function GuestCrewPresenceCard({ guest, currentUid }) {
+  const isSelf = guest.uid === currentUid;
+  const presence = isSelf ? { label: '온라인', color: 'var(--planet-green)', dot: '#22c55e' } : getPresenceInfo({
+    liveStatus: {
+      state: 'online',
+      lastUpdatedAt: guest.lastSeenAt,
+    }
+  });
+
+  return (
+    <div className="crew-member-console crew-member-console-guest">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
+        <div style={{ minWidth: 0 }}>
+          <span className="crew-guest-id font-tech">GUEST</span>
+          <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {guest.alias || '게스트 탐사원'}{isSelf ? ' (나)' : ''}
+          </div>
+        </div>
+        <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
+          {presence.label}
+        </span>
+      </div>
+      <div className="crew-member-readout">
+        <div className="font-tech" style={{ color: '#86efac', fontSize: '0.74rem', fontWeight: 800 }}>현재 위치</div>
+        <div className="font-tech" style={{ color: 'rgba(255,255,255,0.84)', fontSize: '0.82rem' }}>크루 브리지 체험 중</div>
+      </div>
+      <div className="crew-member-readout crew-member-readout-summary">
+        <div className="font-tech" style={{ color: '#86efac', fontSize: '0.74rem', fontWeight: 800 }}>임시 승무원 권한</div>
+        <div className="font-tech" style={{ color: 'rgba(255,255,255,0.68)', fontSize: '0.8rem', lineHeight: 1.45 }}>미션 · 포스트잇 참여 가능</div>
+      </div>
+    </div>
+  );
+}
+
+function CrewMemberPublicCard({ member, profile }) {
+  const presence = getPresenceInfo(profile);
+  const isLeader = member.crewRole === 'leader';
+  const currentLocation = profile?.liveStatus?.currentLocation || '현재 위치 비공개';
+  return (
+    <div className="crew-member-console">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
+          {isLeader && <Crown size={14} style={{ color: '#fbbf24', flexShrink: 0 }} />}
+          <span className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {getMemberLabel(member)}
+          </span>
+        </div>
+        <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
+          {presence.label}
+        </span>
+      </div>
+      <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+        {isLeader ? '크루 리더' : '정식 승무원'}
+      </div>
+      <div className="crew-member-readout">
+        <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>현재 위치</div>
+        <div className="font-tech" style={{ color: 'rgba(255,255,255,0.78)', fontSize: '0.8rem' }}>{currentLocation}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function CrewDetailView({ onBack }) {
+  const navigate = useNavigate();
   const { user, userData } = useAuth();
   const [roomAction, setRoomAction] = useState('');
   const [message, setMessage] = useState('');
@@ -157,7 +224,9 @@ export default function CrewDetailView({ onBack }) {
   const [leaveAction, setLeaveAction] = useState('');
   const [guestAccessAction, setGuestAccessAction] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
-  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
+  const [guestSessions, setGuestSessions] = useState([]);
+  const [guestPresenceNow, setGuestPresenceNow] = useState(() => Date.now());
+  const [guestLogoutAction, setGuestLogoutAction] = useState('');
   const [showCrewInfo, setShowCrewInfo] = useState(false);
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
@@ -179,6 +248,16 @@ export default function CrewDetailView({ onBack }) {
   const isLeader = userData?.crewRole === 'leader';
   const isGuest = userData?.isGuest === true;
   const guestAccessEnabled = crew?.guestAccessEnabled === true;
+  const liveGuestAccessEnabled = crewDocData?.guestAccessEnabled;
+  const visibleGuestSessions = useMemo(() => guestSessions.filter((session) => {
+    if (session.uid === user?.uid && isGuest) return true;
+    const lastSeenMs = getTimestampMs(session.lastSeenAt) || getTimestampMs(session.joinedAt);
+    return lastSeenMs > 0 && guestPresenceNow - lastSeenMs < 150000;
+  }), [guestPresenceNow, guestSessions, isGuest, user?.uid]);
+  const activeParticipantIds = useMemo(
+    () => uniqueIds([...crewMemberIds, ...visibleGuestSessions.map((session) => session.uid)]),
+    [crewMemberIds, visibleGuestSessions]
+  );
   const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
   const guestInviteUrl = crewId ? `${window.location.origin}/crew-invite/${crewId}` : '';
 
@@ -208,34 +287,38 @@ export default function CrewDetailView({ onBack }) {
     }
   };
 
-  useEffect(() => {
-    const handleResize = () => {
-      const nextIsMobile = window.innerWidth <= 768;
-      setIsMobile(nextIsMobile);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   const memberNameById = useMemo(() => {
     const next = new Map();
     members.forEach((member) => next.set(member.uid, getMemberLabel(member)));
+    visibleGuestSessions.forEach((guest) => next.set(guest.uid, guest.alias || '게스트 탐사원'));
     if (user?.uid) next.set(user.uid, getMemberLabel(userData, user.displayName || '나'));
     return next;
-  }, [members, user?.uid, user?.displayName, userData]);
+  }, [members, user?.uid, user?.displayName, userData, visibleGuestSessions]);
 
   const enrichedMembers = useMemo(() => {
     const next = [...members];
-    if (user?.uid && !next.some(m => m.uid === user.uid)) {
+    if (!isGuest && user?.uid && !next.some(m => m.uid === user.uid)) {
       next.unshift({ uid: user.uid, studentName: userData?.studentName || userData?.publicDisplayName || user.displayName || '나', currentStreak: userData?.currentStreak || 0, lastStreakDate: userData?.lastStreakDate || '', crewRole: userData?.crewRole || 'member' });
     }
+    visibleGuestSessions.forEach((guest) => {
+      next.push({
+        uid: guest.uid,
+        alias: guest.alias || (guest.uid === user?.uid ? userData?.publicDisplayName : '') || '게스트 탐사원',
+        isGuest: true,
+        crewRole: 'guest',
+        lastSeenAt: guest.lastSeenAt,
+        joinedAt: guest.joinedAt,
+      });
+    });
+    if (isGuest && user?.uid && !next.some((member) => member.uid === user.uid)) {
+      next.push({ uid: user.uid, alias: userData?.publicDisplayName || '게스트 탐사원', isGuest: true, crewRole: 'guest' });
+    }
     const unique = Array.from(new Map(next.map(m => [m.uid, m])).values());
-    return unique.sort((a, b) => { if (a.uid === user?.uid) return -1; if (b.uid === user?.uid) return 1; if (a.crewRole === 'leader') return -1; if (b.crewRole === 'leader') return 1; return (b.currentStreak || 0) - (a.currentStreak || 0); }).slice(0, 3);
-  }, [members, user, userData]);
+    return unique.sort((a, b) => { if (a.uid === user?.uid) return -1; if (b.uid === user?.uid) return 1; if (a.crewRole === 'leader') return -1; if (b.crewRole === 'leader') return 1; if (a.isGuest !== b.isGuest) return a.isGuest ? 1 : -1; return (b.currentStreak || 0) - (a.currentStreak || 0); });
+  }, [isGuest, members, user, userData, visibleGuestSessions]);
 
   useEffect(() => {
-    const ids = enrichedMembers.map((member) => member.uid).filter(Boolean);
+    const ids = enrichedMembers.filter((member) => !member.isGuest).map((member) => member.uid).filter(Boolean);
     if (!ids.length) {
       setMemberProfiles({});
       return undefined;
@@ -261,6 +344,40 @@ export default function CrewDetailView({ onBack }) {
     });
     return () => unsub();
   }, [crewId]);
+
+  useEffect(() => {
+    if (!crewId) {
+      setGuestSessions([]);
+      return undefined;
+    }
+    const unsub = onSnapshot(collection(db, 'crews', crewId, 'guestSessions'), (snap) => {
+      setGuestSessions(snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() })));
+    }, (err) => {
+      console.error('Failed to listen to crew guest sessions:', err);
+      setGuestSessions([]);
+    });
+    return () => unsub();
+  }, [crewId]);
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setGuestPresenceNow(Date.now()), 30000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
+  useEffect(() => {
+    if (!isGuest || !crewId) return undefined;
+    const touchPresence = async () => {
+      try {
+        const fn = httpsCallable(functions, 'touchCrewGuestPresence');
+        await fn({ crewId });
+      } catch (err) {
+        console.warn('Failed to refresh guest presence:', err);
+      }
+    };
+    touchPresence();
+    const timerId = window.setInterval(touchPresence, 45000);
+    return () => window.clearInterval(timerId);
+  }, [crewId, isGuest]);
 
   useEffect(() => {
     if (!crewId) {
@@ -376,6 +493,28 @@ export default function CrewDetailView({ onBack }) {
     finally { setRoomAction(''); }
   };
 
+  const handleGuestLogout = async () => {
+    if (!isGuest || guestLogoutAction) return;
+    setGuestLogoutAction('leaving');
+    soundManager.playClick();
+    try {
+      const leaveGuestSession = httpsCallable(functions, 'leaveCrewGuestSession');
+      await leaveGuestSession({ crewId });
+    } catch (err) {
+      console.warn('Failed to close guest presence cleanly:', err);
+    }
+    try {
+      window.sessionStorage.removeItem('crewGuestSession');
+      window.sessionStorage.removeItem('metasense_current_view');
+      await signOut(auth);
+    } catch (err) {
+      console.warn('Failed to sign out guest:', err);
+    } finally {
+      setGuestLogoutAction('');
+      navigate('/', { replace: true });
+    }
+  };
+
   const handleLeaveCrew = async () => {
     if (!crewId || leaveAction) return;
 
@@ -404,6 +543,19 @@ export default function CrewDetailView({ onBack }) {
       setLeaveAction('');
     }
   };
+
+  useEffect(() => {
+    if (!isGuest || liveGuestAccessEnabled === undefined || liveGuestAccessEnabled === true) return;
+    let cancelled = false;
+    window.sessionStorage.removeItem('crewGuestSession');
+    window.sessionStorage.removeItem('metasense_current_view');
+    signOut(auth).catch((err) => {
+      console.warn('Failed to close disabled guest session:', err);
+    }).finally(() => {
+      if (!cancelled) navigate('/', { replace: true });
+    });
+    return () => { cancelled = true; };
+  }, [isGuest, liveGuestAccessEnabled, navigate]);
 
   if (!crew) return null;
 
@@ -456,7 +608,7 @@ export default function CrewDetailView({ onBack }) {
 
         <div className="crew-flight-stats">
           {[
-            { label: 'CREW', value: `${crew.memberCount || members.length || 1}명` },
+            { label: 'CREW', value: `${Math.max(crew.memberCount || members.length || 1, members.length) + visibleGuestSessions.length}명` },
             { label: 'ONLINE STUDY', value: `${studiedToday.length}명` },
             { label: 'MY ROLE', value: isGuest ? '게스트' : userData?.crewRole === 'leader' ? '리더' : '멤버' },
             { label: 'SCHEDULE', value: formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes) },
@@ -496,46 +648,39 @@ export default function CrewDetailView({ onBack }) {
 
         {isGuest && (
           <div className="crew-guest-strip font-tech">
-            <span>GUEST PASS</span>
-            체험 항해 중 · 학습 기록과 광석은 저장되지 않습니다.
+            <div><span>GUEST PASS</span> 체험 항해 중 · 학습 기록과 광석은 저장되지 않습니다.</div>
+            <button type="button" onClick={handleGuestLogout} disabled={!!guestLogoutAction}>
+              <LogOut size={13} /> {guestLogoutAction ? '종료 중...' : '게스트 로그아웃'}
+            </button>
           </div>
         )}
       </Motion.section>
 
-      {/* Guest access management (leader) / guest badge */}
-      {status === 'approved' && !isGuest && (
-        <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass-card hud-border" style={{ padding: isMobile ? '1rem' : '1.3rem', borderRadius: 12, marginBottom: '1.2rem', borderColor: 'rgba(34,197,94,0.24)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 0 }}>
-              <div className="font-tech" style={{ color: '#86efac', fontWeight: 800, fontSize: '0.82rem' }}>GUEST ACCESS</div>
-              <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: isMobile ? '1.05rem' : '1.15rem', marginTop: '0.15rem' }}>게스트 초대</div>
-              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.3rem', lineHeight: 1.55 }}>
-                {guestAccessEnabled ? '● 게스트 참여 허용 중' : '○ 게스트 참여 중지 중'}
-              </div>
-            </div>
-            {isLeader && (
-              <button
-                type="button"
-                className={`space-btn font-tech ${guestAccessEnabled ? '' : 'cosmic-btn'}`}
-                disabled={!!guestAccessAction}
-                onClick={toggleGuestAccess}
-                style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.8rem 1.1rem', minHeight: isMobile ? 48 : undefined, minWidth: isMobile ? '100%' : 150 }}
-              >
-                {guestAccessAction ? '처리 중...' : (guestAccessEnabled ? '참여 끄기' : '참여 허용')}
-              </button>
-            )}
+      {/* Leaders always see the control. Members see it only while guest access is open. */}
+      {status === 'approved' && !isGuest && (guestAccessEnabled || isLeader) && (
+        <Motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="crew-guest-access-bar">
+          <div className="crew-guest-access-label">
+            <span className="font-tech"><Share2 size={14} /> GUEST ACCESS</span>
+            <strong className="font-tech">{guestAccessEnabled ? '외부 승무원 초대 가능' : '게스트 초대 중지'}</strong>
           </div>
           {guestAccessEnabled && guestInviteUrl && (
-            <div style={{ marginTop: '0.8rem', padding: '0.75rem 0.9rem', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
-              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.76rem', marginBottom: '0.4rem' }}>초대 링크</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div className="font-tech" style={{ flex: '1 1 200px', color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', wordBreak: 'break-all' }}>{guestInviteUrl}</div>
-                <button type="button" className="space-nav-link font-tech active" onClick={copyGuestInvite} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Copy size={14} /> 복사</button>
-              </div>
+            <div className="crew-guest-share-link">
+              <span className="font-tech">{guestInviteUrl}</span>
+              <button type="button" className="font-tech" onClick={copyGuestInvite}><Copy size={13} /> 링크 복사</button>
             </div>
           )}
-          {guestMessage && <div className="font-tech" style={{ marginTop: '0.7rem', color: guestMessage.includes('못했') || guestMessage.includes('실패') ? '#fca5a5' : '#bbf7d0', lineHeight: 1.55, fontSize: '0.8rem' }}>{guestMessage}</div>}
-        </Motion.div>
+          {isLeader && (
+            <button
+              type="button"
+              className={`crew-guest-toggle font-tech ${guestAccessEnabled ? 'is-on' : ''}`}
+              disabled={!!guestAccessAction}
+              onClick={toggleGuestAccess}
+            >
+              {guestAccessAction ? '처리 중...' : guestAccessEnabled ? '참여 끄기' : '참여 허용'}
+            </button>
+          )}
+          {guestMessage && <div className="crew-guest-access-message font-tech">{guestMessage}</div>}
+        </Motion.section>
       )}
 
       <div className="crew-bridge-workspace">
@@ -554,15 +699,21 @@ export default function CrewDetailView({ onBack }) {
         <div className="crew-section-heading font-tech"><Users size={15} /> FLIGHT CREW <span>{enrichedMembers.length}</span></div>
         <div className="crew-roster-grid">
           {enrichedMembers.map(member => (
-            <CrewMemberStudyCard
-              key={member.uid}
-              member={member}
-              profile={memberProfiles[member.uid]}
-              currentUid={user?.uid}
-              currentUserData={userData}
-              currentDisplayName={user?.displayName}
-              todayKey={todayKey}
-            />
+            member.isGuest ? (
+              <GuestCrewPresenceCard key={member.uid} guest={member} currentUid={user?.uid} />
+            ) : isGuest ? (
+              <CrewMemberPublicCard key={member.uid} member={member} profile={memberProfiles[member.uid]} />
+            ) : (
+              <CrewMemberStudyCard
+                key={member.uid}
+                member={member}
+                profile={memberProfiles[member.uid]}
+                currentUid={user?.uid}
+                currentUserData={userData}
+                currentDisplayName={user?.displayName}
+                todayKey={todayKey}
+              />
+            )
           ))}
         </div>
       </section>
@@ -603,7 +754,7 @@ export default function CrewDetailView({ onBack }) {
         {displayNotes.length ? (
           <div className="crew-comms-log">
             {displayNotes.map((note, index) => {
-              const { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead } = getGreetingReadMeta(note, crewMemberIds, user?.uid);
+              const { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead } = getGreetingReadMeta(note, activeParticipantIds, user?.uid);
               const canDeleteNote = note.userId === user?.uid || userData?.role === 'admin';
               const isPendingPost = !!note.localPending;
               const noteColor = ['rgba(250, 204, 21, 0.18)', 'rgba(45, 212, 191, 0.16)', 'rgba(96, 165, 250, 0.16)', 'rgba(251, 191, 36, 0.14)'][index % 4];

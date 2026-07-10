@@ -771,6 +771,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
         isPublic,
         isAnonymous: isPublic,
         anonymousLabel: getAnonymousLabel(user.uid),
+        anonymousLabelVersion: 2,
         quizId: activeContext?.quizId || null,
         quizContext: {
           chapterId: activeContext?.chapterId || '',

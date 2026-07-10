@@ -255,6 +255,25 @@
   outline-offset: 2px;
 }
 
+.guest-session-logout {
+  width: 100%;
+  margin-top: 0.65rem;
+  padding: 0.55rem;
+  border: 0;
+  background: transparent;
+  color: rgba(252, 165, 165, 0.78);
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.guest-session-logout:hover,
+.guest-session-logout:focus-visible {
+  color: #fecaca;
+  outline: none;
+}
+
 .live-menu-backdrop {
   position: fixed;
   inset: 0;

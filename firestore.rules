@@ -199,6 +199,11 @@ service cloud.firestore {
           isAdmin() || resource.data.userId == request.auth.uid
         );
       }
+
+      match /guestSessions/{guestId} {
+        allow read: if isAuth();
+        allow write: if false;
+      }
     }
 
     match /studyRooms/{roomId} {
