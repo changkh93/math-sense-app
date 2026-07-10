@@ -94,20 +94,6 @@ const AGORA_ASKER_RESOLVE_REWARD = 5;
 const ASSIGNMENT_SHARE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const ASSIGNMENT_SHARE_REACTION_REWARD = 1;
 const STUDENT_AUTH_DOMAIN = "student.mathsense.app";
-const CREW_GUEST_INVITE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
-const CREW_GUEST_ROOM_DURATION_MS = 2 * 60 * 60 * 1000;
-const CREW_GUEST_SESSION_DURATION_MS = 2 * 60 * 60 * 1000;
-const GUARDIAN_HANDOFF_DURATION_MS = 24 * 60 * 60 * 1000;
-const CREW_GUEST_MAX_PARTICIPANTS = 20;
-const CREW_GUEST_REACTION_COOLDOWN_MS = 5000;
-const CREW_GUEST_REACTIONS = {
-  cheer: { emoji: "👏", label: "잘했어요" },
-  together: { emoji: "🔥", label: "같이 가요" },
-  ready: { emoji: "✅", label: "준비됐어요" },
-  help: { emoji: "❓", label: "도움이 필요해요" },
-};
-const CREW_GUEST_ALIAS_ADJECTIVES = ["반짝이는", "용감한", "차분한", "호기심 많은", "따뜻한", "씩씩한"];
-const CREW_GUEST_ALIAS_NOUNS = ["여우", "수달", "고양이", "토끼", "별고래", "우주새"];
 
 function buildAssignmentHubLink(clusterId, date) {
   const params = new URLSearchParams({ view: "assignment_hub" });
@@ -2993,7 +2979,6 @@ exports.registerParentProfile = regionalFunctions.https.onCall(async (data, cont
   const phone = digitsOnly(data?.phone, 16);
   const marketingConsent = data?.marketingConsent === true;
   const termsAccepted = data?.termsAccepted === true;
-  const guardianHandoff = await getValidGuardianHandoff(data?.handoffCode);
 
   if (signInProvider !== "google.com") {
     throw new functions.https.HttpsError("failed-precondition", "Google 인증 후 학부모 회원가입을 진행해 주세요.");
@@ -3046,14 +3031,6 @@ exports.registerParentProfile = regionalFunctions.https.onCall(async (data, cont
     createdAt: parentSnap.exists ? (parentSnap.data()?.createdAt || FieldValue.serverTimestamp()) : FieldValue.serverTimestamp(),
   }, { merge: true });
 
-  if (guardianHandoff) {
-    await guardianHandoff.handoffRef.set({
-      status: "parent_registered",
-      parentUid: uid,
-      parentRegisteredAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-  }
-
   return { success: true };
 });
 
@@ -3065,10 +3042,6 @@ exports.createChildAccountForParent = regionalFunctions.https.onCall(async (data
   const password = String(data?.password || "");
   const grade = cleanText(data?.grade, 30);
   const birthDate = digitsOnly(data?.birthDate, 8);
-  const guardianHandoff = await getValidGuardianHandoff(data?.handoffCode);
-  if (guardianHandoff && guardianHandoff.handoffData.parentUid && guardianHandoff.handoffData.parentUid !== parentUid) {
-    throw new functions.https.HttpsError("permission-denied", "이 보호자 연결 링크를 사용할 수 없습니다.");
-  }
 
   if (!studentName || !grade) {
     throw new functions.https.HttpsError("invalid-argument", "자녀 이름과 학년을 입력해 주세요.");
@@ -3107,17 +3080,6 @@ exports.createChildAccountForParent = regionalFunctions.https.onCall(async (data
     parentUid,
   });
   if (birthDate) userData.birthDate = birthDate;
-  if (guardianHandoff?.handoffData?.crewId) {
-    const crewSnap = await admin.firestore().collection("crews").doc(guardianHandoff.handoffData.crewId).get();
-    if (crewSnap.exists && (crewSnap.data()?.status || "pending") === "approved") {
-      userData.pendingCrewInvitation = {
-        crewId: crewSnap.id,
-        crewName: cleanText(crewSnap.data()?.name || guardianHandoff.handoffData.crewName || "스터디 크루", 28),
-        expiresAt: Timestamp.fromMillis(Date.now() + (14 * 24 * 60 * 60 * 1000)),
-        source: "guest_guardian_handoff",
-      };
-    }
-  }
 
   await userRef.set(userData, { merge: true });
   await parentRef.set({
@@ -3125,21 +3087,11 @@ exports.createChildAccountForParent = regionalFunctions.https.onCall(async (data
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
 
-  if (guardianHandoff) {
-    await guardianHandoff.handoffRef.set({
-      status: "child_created",
-      parentUid,
-      childUid: createdUser.uid,
-      childCreatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-  }
-
   return {
     success: true,
     childUid: createdUser.uid,
     loginId,
     studentName,
-    crewName: userData.pendingCrewInvitation?.crewName || "",
   };
 });
 
@@ -4031,78 +3983,11 @@ async function requireAuthUid(context) {
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError("unauthenticated", "이 작업을 수행하려면 로그인해야 합니다.");
   }
-  if (context.auth.token?.firebase?.sign_in_provider === "anonymous") {
-    throw new functions.https.HttpsError("permission-denied", "게스트 세션에서는 회원 전용 기능을 사용할 수 없습니다.");
-  }
   return context.auth.uid;
-}
-
-async function requireCrewGuestUid(context) {
-  if (!context.auth || !context.auth.uid) {
-    throw new functions.https.HttpsError("unauthenticated", "게스트 세션을 시작해 주세요.");
-  }
-  if (context.auth.token?.firebase?.sign_in_provider !== "anonymous") {
-    throw new functions.https.HttpsError("failed-precondition", "게스트 전용 기능입니다.");
-  }
-  return context.auth.uid;
-}
-
-function buildCrewGuestAlias(seed = "") {
-  const source = String(seed || `${Date.now()}-${Math.random()}`);
-  let hash = 0;
-  for (let index = 0; index < source.length; index += 1) {
-    hash = ((hash << 5) - hash + source.charCodeAt(index)) | 0;
-  }
-  const normalized = Math.abs(hash);
-  const adjective = CREW_GUEST_ALIAS_ADJECTIVES[normalized % CREW_GUEST_ALIAS_ADJECTIVES.length];
-  const noun = CREW_GUEST_ALIAS_NOUNS[Math.floor(normalized / 7) % CREW_GUEST_ALIAS_NOUNS.length];
-  const suffix = String((normalized % 90) + 10);
-  return `${adjective} ${noun} ${suffix}`;
 }
 
 function isFutureTimestamp(value, nowMs = Date.now()) {
   return Number(value?.toMillis?.() || 0) > nowMs;
-}
-
-async function requireApprovedCrewMember(uid, crewId) {
-  const cleanCrewId = String(crewId || "").trim();
-  if (!cleanCrewId) {
-    throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
-  }
-  const crewRef = admin.firestore().collection("crews").doc(cleanCrewId);
-  const crewSnap = await crewRef.get();
-  if (!crewSnap.exists) {
-    throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
-  }
-  const crewData = crewSnap.data() || {};
-  if ((crewData.status || "pending") !== "approved") {
-    throw new functions.https.HttpsError("failed-precondition", "승인된 크루에서만 게스트 체험방을 사용할 수 있습니다.");
-  }
-  if (!getCrewMemberIds(crewData).includes(uid)) {
-    throw new functions.https.HttpsError("permission-denied", "크루 멤버만 이 기능을 사용할 수 있습니다.");
-  }
-  return { crewRef, crewSnap, crewData };
-}
-
-async function getValidGuardianHandoff(handoffCode) {
-  const cleanCode = String(handoffCode || "").trim();
-  if (!cleanCode) return null;
-  if (!/^[A-Za-z0-9]{16,80}$/.test(cleanCode)) {
-    throw new functions.https.HttpsError("invalid-argument", "보호자 연결 링크가 올바르지 않습니다.");
-  }
-  const handoffRef = admin.firestore().collection("guardianHandoffs").doc(cleanCode);
-  const handoffSnap = await handoffRef.get();
-  if (!handoffSnap.exists || !isFutureTimestamp(handoffSnap.data()?.expiresAt)) {
-    throw new functions.https.HttpsError("failed-precondition", "보호자 연결 링크가 만료되었습니다.");
-  }
-  return { handoffRef, handoffData: handoffSnap.data() || {} };
-}
-
-async function assertCrewGuestFeatureEnabled() {
-  const settingsSnap = await admin.firestore().collection("serviceConfig").doc("crewGuestExperience").get();
-  if (!settingsSnap.exists || settingsSnap.data()?.enabled !== true) {
-    throw new functions.https.HttpsError("unavailable", "게스트 크루 체험이 현재 운영자에 의해 중지되었습니다.");
-  }
 }
 
 async function requireAdminUid(context) {
@@ -5386,563 +5271,6 @@ async function refreshCrewGreetings(crewId, crewData) {
   return recentGreetings;
 }
 
-async function findActiveCrewGuestInvite(crewId, nowMs = Date.now()) {
-  const snap = await admin.firestore().collection("crewGuestInvites")
-    .where("crewId", "==", crewId)
-    .limit(20)
-    .get();
-  return snap.docs.find((docSnap) => {
-    const data = docSnap.data() || {};
-    return data.enabled !== false && isFutureTimestamp(data.expiresAt, nowMs);
-  }) || null;
-}
-
-function sanitizeCrewGuestRoom(roomSnap, viewerUid = "") {
-  if (!roomSnap?.exists) return null;
-  const data = roomSnap.data() || {};
-  const guestParticipantUids = Array.isArray(data.guestParticipantUids)
-    ? data.guestParticipantUids.filter(Boolean)
-    : [];
-  return {
-    id: roomSnap.id,
-    status: data.status || "open",
-    allowGuests: data.allowGuests === true,
-    hostUid: viewerUid ? (data.hostUid || "") : "",
-    hostName: viewerUid ? (data.hostName || "크루 멤버") : "",
-    isHost: viewerUid ? data.hostUid === viewerUid : false,
-    guestCount: guestParticipantUids.length,
-    expiresAtMs: Number(data.expiresAt?.toMillis?.() || 0),
-    recentReactions: Array.isArray(data.recentReactions)
-      ? data.recentReactions.slice(-12).map((reaction) => ({
-        alias: reaction.alias || "게스트 탐험가",
-        reactionId: reaction.reactionId || "",
-        emoji: reaction.emoji || "",
-        label: reaction.label || "",
-        createdAtMs: Number(reaction.createdAtMs || 0),
-      }))
-      : [],
-  };
-}
-
-exports.getCrewGuestAdminSettings = regionalFunctions.https.onCall(async (_data, context) => {
-  await requireAdminUid(context);
-  const snap = await admin.firestore().collection("serviceConfig").doc("crewGuestExperience").get();
-  return { enabled: snap.exists && snap.data()?.enabled === true };
-});
-
-exports.setCrewGuestAdminSettings = regionalFunctions.https.onCall(async (data, context) => {
-  const uid = await requireAdminUid(context);
-  const enabled = data?.enabled === true;
-  await admin.firestore().collection("serviceConfig").doc("crewGuestExperience").set({
-    enabled,
-    updatedAt: FieldValue.serverTimestamp(),
-    updatedBy: uid,
-  }, { merge: true });
-  return { enabled };
-});
-
-exports.getCrewGuestHostStatus = regionalFunctions.https.onCall(async (data, context) => {
-  await assertCrewGuestFeatureEnabled();
-  const uid = await requireAuthUid(context);
-  const crewId = String(data?.crewId || "").trim();
-  const { crewData } = await requireApprovedCrewMember(uid, crewId);
-  const nowMs = Date.now();
-  const inviteSnap = await findActiveCrewGuestInvite(crewId, nowMs);
-  const roomId = String(crewData.activeGuestRoomId || "").trim();
-  const roomSnap = roomId
-    ? await admin.firestore().collection("crewGuestRooms").doc(roomId).get()
-    : null;
-  const roomIsActive = roomSnap?.exists &&
-    (roomSnap.data()?.status || "open") === "open" &&
-    isFutureTimestamp(roomSnap.data()?.expiresAt, nowMs);
-
-  return {
-    invite: inviteSnap ? {
-      token: inviteSnap.id,
-      expiresAtMs: Number(inviteSnap.data()?.expiresAt?.toMillis?.() || 0),
-      useCount: Number(inviteSnap.data()?.useCount || 0),
-    } : null,
-    room: roomIsActive ? sanitizeCrewGuestRoom(roomSnap, uid) : null,
-  };
-});
-
-exports.getOrCreateCrewGuestInvite = regionalFunctions.https.onCall(async (data, context) => {
-  await assertCrewGuestFeatureEnabled();
-  const uid = await requireAuthUid(context);
-  const crewId = String(data?.crewId || "").trim();
-  const rotate = data?.rotate === true;
-  const { crewData } = await requireApprovedCrewMember(uid, crewId);
-  if (rotate && crewData.leaderId !== uid) {
-    throw new functions.https.HttpsError("permission-denied", "초대 링크 교체는 크루 리더만 할 수 있습니다.");
-  }
-
-  const db = admin.firestore();
-  const now = new Date();
-  const existingSnap = await db.collection("crewGuestInvites")
-    .where("crewId", "==", crewId)
-    .limit(20)
-    .get();
-  const active = existingSnap.docs.find((docSnap) => {
-    const invite = docSnap.data() || {};
-    return invite.enabled !== false && isFutureTimestamp(invite.expiresAt, now.getTime());
-  });
-  if (active && !rotate) {
-    return {
-      token: active.id,
-      expiresAtMs: Number(active.data()?.expiresAt?.toMillis?.() || 0),
-      useCount: Number(active.data()?.useCount || 0),
-    };
-  }
-
-  const inviteRef = db.collection("crewGuestInvites").doc();
-  const expiresAt = Timestamp.fromMillis(now.getTime() + CREW_GUEST_INVITE_DURATION_MS);
-  const batch = db.batch();
-  existingSnap.docs.forEach((docSnap) => {
-    if (docSnap.data()?.enabled !== false) {
-      batch.set(docSnap.ref, { enabled: false, revokedAt: now, revokedBy: uid }, { merge: true });
-    }
-  });
-  batch.set(inviteRef, {
-    crewId,
-    enabled: true,
-    createdBy: uid,
-    createdAt: now,
-    updatedAt: now,
-    expiresAt,
-    useCount: 0,
-  });
-  await batch.commit();
-  return { token: inviteRef.id, expiresAtMs: expiresAt.toMillis(), useCount: 0 };
-});
-
-exports.openCrewGuestRoom = regionalFunctions.https.onCall(async (data, context) => {
-  await assertCrewGuestFeatureEnabled();
-  const uid = await requireAuthUid(context);
-  const crewId = String(data?.crewId || "").trim();
-  const db = admin.firestore();
-  const { crewRef } = await requireApprovedCrewMember(uid, crewId);
-  const roomRef = db.collection("crewGuestRooms").doc();
-  let result = null;
-
-  await db.runTransaction(async (tx) => {
-    const crewSnap = await tx.get(crewRef);
-    if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
-    const crewData = crewSnap.data() || {};
-    if (!getCrewMemberIds(crewData).includes(uid)) {
-      throw new functions.https.HttpsError("permission-denied", "크루 멤버만 방을 열 수 있습니다.");
-    }
-    const activeRoomId = String(crewData.activeGuestRoomId || "").trim();
-    if (activeRoomId) {
-      const activeRoomSnap = await tx.get(db.collection("crewGuestRooms").doc(activeRoomId));
-      if (activeRoomSnap.exists) {
-        const activeRoom = activeRoomSnap.data() || {};
-        if ((activeRoom.status || "open") === "open" && isFutureTimestamp(activeRoom.expiresAt)) {
-          result = sanitizeCrewGuestRoom(activeRoomSnap, uid);
-          return;
-        }
-      }
-    }
-
-    const now = new Date();
-    const expiresAt = Timestamp.fromMillis(now.getTime() + CREW_GUEST_ROOM_DURATION_MS);
-    const userSnap = await tx.get(db.collection("users").doc(uid));
-    const hostName = userSnap.exists ? getDisplayNameFromUser(userSnap.data() || {}) : "크루 멤버";
-    tx.set(roomRef, {
-      crewId,
-      crewName: crewData.name || "스터디 크루",
-      crewColor: crewData.color || "#00d4ff",
-      hostUid: uid,
-      hostName,
-      status: "open",
-      allowGuests: false,
-      guestParticipantUids: [],
-      recentReactions: [],
-      createdAt: now,
-      updatedAt: now,
-      expiresAt,
-    });
-    tx.set(crewRef, {
-      activeGuestRoomId: roomRef.id,
-      updatedAt: now,
-    }, { merge: true });
-    result = {
-      id: roomRef.id,
-      status: "open",
-      allowGuests: false,
-      hostUid: uid,
-      hostName,
-      isHost: true,
-      guestCount: 0,
-      expiresAtMs: expiresAt.toMillis(),
-      recentReactions: [],
-    };
-  });
-
-  return { room: result };
-});
-
-exports.setCrewGuestRoomAccess = regionalFunctions.https.onCall(async (data, context) => {
-  const uid = await requireAuthUid(context);
-  const roomId = String(data?.roomId || "").trim();
-  const allowGuests = data?.allowGuests === true;
-  if (!roomId) throw new functions.https.HttpsError("invalid-argument", "방 ID가 없습니다.");
-  const roomRef = admin.firestore().collection("crewGuestRooms").doc(roomId);
-  const roomSnap = await roomRef.get();
-  if (!roomSnap.exists) throw new functions.https.HttpsError("not-found", "게스트 체험방을 찾을 수 없습니다.");
-  const room = roomSnap.data() || {};
-  if (room.hostUid !== uid) {
-    throw new functions.https.HttpsError("permission-denied", "방 개설자만 게스트 참여를 허용할 수 있습니다.");
-  }
-  if ((room.status || "open") !== "open" || !isFutureTimestamp(room.expiresAt)) {
-    throw new functions.https.HttpsError("failed-precondition", "이미 종료된 게스트 체험방입니다.");
-  }
-  await roomRef.set({
-    allowGuests,
-    ...(allowGuests ? {} : { guestParticipantUids: [] }),
-    updatedAt: new Date(),
-  }, { merge: true });
-  return { success: true, allowGuests };
-});
-
-exports.closeCrewGuestRoom = regionalFunctions.https.onCall(async (data, context) => {
-  const uid = await requireAuthUid(context);
-  const roomId = String(data?.roomId || "").trim();
-  if (!roomId) throw new functions.https.HttpsError("invalid-argument", "방 ID가 없습니다.");
-  const db = admin.firestore();
-  const roomRef = db.collection("crewGuestRooms").doc(roomId);
-  await db.runTransaction(async (tx) => {
-    const roomSnap = await tx.get(roomRef);
-    if (!roomSnap.exists) return;
-    const room = roomSnap.data() || {};
-    if (room.hostUid !== uid) {
-      throw new functions.https.HttpsError("permission-denied", "방 개설자만 체험방을 닫을 수 있습니다.");
-    }
-    const now = new Date();
-    tx.set(roomRef, {
-      status: "ended",
-      allowGuests: false,
-      guestParticipantUids: [],
-      endedAt: now,
-      updatedAt: now,
-    }, { merge: true });
-    if (room.crewId) {
-      tx.set(db.collection("crews").doc(room.crewId), {
-        activeGuestRoomId: "",
-        updatedAt: now,
-      }, { merge: true });
-    }
-  });
-  return { success: true };
-});
-
-exports.previewCrewGuestInvite = regionalFunctions.https.onCall(async (data) => {
-  await assertCrewGuestFeatureEnabled();
-  const token = String(data?.token || "").trim();
-  if (!/^[A-Za-z0-9]{16,80}$/.test(token)) {
-    throw new functions.https.HttpsError("invalid-argument", "초대 링크가 올바르지 않습니다.");
-  }
-  const db = admin.firestore();
-  const inviteSnap = await db.collection("crewGuestInvites").doc(token).get();
-  if (!inviteSnap.exists) throw new functions.https.HttpsError("not-found", "유효한 초대 링크를 찾지 못했습니다.");
-  const invite = inviteSnap.data() || {};
-  if (invite.enabled === false || !isFutureTimestamp(invite.expiresAt)) {
-    throw new functions.https.HttpsError("failed-precondition", "만료되었거나 중지된 초대 링크입니다.");
-  }
-  const crewSnap = await db.collection("crews").doc(invite.crewId || "").get();
-  if (!crewSnap.exists || (crewSnap.data()?.status || "pending") !== "approved") {
-    throw new functions.https.HttpsError("failed-precondition", "현재 게스트를 받을 수 없는 크루입니다.");
-  }
-  const crew = crewSnap.data() || {};
-  const roomId = String(crew.activeGuestRoomId || "").trim();
-  const roomSnap = roomId ? await db.collection("crewGuestRooms").doc(roomId).get() : null;
-  const activeRoom = roomSnap?.exists &&
-    (roomSnap.data()?.status || "open") === "open" &&
-    isFutureTimestamp(roomSnap.data()?.expiresAt);
-  return {
-    crew: {
-      name: cleanText(crew.name || "스터디 크루", 28),
-      motto: cleanText(crew.motto || "오늘만 함께 공부해요", 52),
-      color: crew.color || "#00d4ff",
-    },
-    room: activeRoom ? {
-      isOpen: true,
-      allowGuests: roomSnap.data()?.allowGuests === true,
-      expiresAtMs: Number(roomSnap.data()?.expiresAt?.toMillis?.() || 0),
-    } : { isOpen: false, allowGuests: false, expiresAtMs: 0 },
-  };
-});
-
-exports.joinCrewGuestRoom = regionalFunctions.https.onCall(async (data, context) => {
-  await assertCrewGuestFeatureEnabled();
-  const guestUid = await requireCrewGuestUid(context);
-  const token = String(data?.token || "").trim();
-  if (!/^[A-Za-z0-9]{16,80}$/.test(token)) {
-    throw new functions.https.HttpsError("invalid-argument", "초대 링크가 올바르지 않습니다.");
-  }
-  const db = admin.firestore();
-  const inviteRef = db.collection("crewGuestInvites").doc(token);
-  const sessionRef = db.collection("crewGuestSessions").doc(guestUid);
-  let response = null;
-
-  await db.runTransaction(async (tx) => {
-    const [inviteSnap, existingSessionSnap] = await Promise.all([
-      tx.get(inviteRef),
-      tx.get(sessionRef),
-    ]);
-    if (!inviteSnap.exists) throw new functions.https.HttpsError("not-found", "초대 링크를 찾지 못했습니다.");
-    const invite = inviteSnap.data() || {};
-    if (invite.enabled === false || !isFutureTimestamp(invite.expiresAt)) {
-      throw new functions.https.HttpsError("failed-precondition", "만료되었거나 중지된 초대 링크입니다.");
-    }
-    const crewRef = db.collection("crews").doc(invite.crewId || "");
-    const crewSnap = await tx.get(crewRef);
-    if (!crewSnap.exists || (crewSnap.data()?.status || "pending") !== "approved") {
-      throw new functions.https.HttpsError("failed-precondition", "현재 게스트를 받을 수 없는 크루입니다.");
-    }
-    const crew = crewSnap.data() || {};
-    const roomId = String(crew.activeGuestRoomId || "").trim();
-    if (!roomId) throw new functions.https.HttpsError("failed-precondition", "현재 열려 있는 게스트 체험방이 없습니다.");
-    const roomRef = db.collection("crewGuestRooms").doc(roomId);
-    const roomSnap = await tx.get(roomRef);
-    if (!roomSnap.exists) throw new functions.https.HttpsError("not-found", "게스트 체험방을 찾지 못했습니다.");
-    const room = roomSnap.data() || {};
-    if ((room.status || "open") !== "open" || !isFutureTimestamp(room.expiresAt)) {
-      throw new functions.https.HttpsError("failed-precondition", "게스트 체험방이 종료되었습니다.");
-    }
-    if (room.allowGuests !== true) {
-      throw new functions.https.HttpsError("permission-denied", "방 개설자가 아직 게스트 참여를 허용하지 않았습니다.");
-    }
-    const participantUids = Array.isArray(room.guestParticipantUids) ? room.guestParticipantUids.filter(Boolean) : [];
-    if (!participantUids.includes(guestUid) && participantUids.length >= CREW_GUEST_MAX_PARTICIPANTS) {
-      throw new functions.https.HttpsError("resource-exhausted", "게스트 체험방이 가득 찼습니다.");
-    }
-    const now = new Date();
-    const existingSession = existingSessionSnap.exists ? (existingSessionSnap.data() || {}) : {};
-    const alias = existingSession.alias || buildCrewGuestAlias(guestUid);
-    const expiresAtMs = Math.min(
-      Number(room.expiresAt?.toMillis?.() || now.getTime()),
-      now.getTime() + CREW_GUEST_SESSION_DURATION_MS
-    );
-    const expiresAt = Timestamp.fromMillis(expiresAtMs);
-    const nextParticipantUids = participantUids.includes(guestUid) ? participantUids : [...participantUids, guestUid];
-    tx.set(roomRef, { guestParticipantUids: nextParticipantUids, updatedAt: now }, { merge: true });
-    tx.set(sessionRef, {
-      uid: guestUid,
-      alias,
-      inviteId: token,
-      crewId: invite.crewId,
-      roomId,
-      status: "active",
-      createdAt: existingSession.createdAt || now,
-      joinedAt: now,
-      lastSeenAt: now,
-      expiresAt,
-    }, { merge: true });
-    if (!participantUids.includes(guestUid)) {
-      tx.set(inviteRef, { useCount: FieldValue.increment(1), lastUsedAt: now }, { merge: true });
-    }
-    response = {
-      alias,
-      roomId,
-      expiresAtMs,
-      crew: {
-        name: cleanText(crew.name || "스터디 크루", 28),
-        motto: cleanText(crew.motto || "오늘만 함께 공부해요", 52),
-        color: crew.color || "#00d4ff",
-      },
-      guestCount: nextParticipantUids.length,
-    };
-  });
-
-  return response;
-});
-
-exports.getGuestCrewRoomState = regionalFunctions.https.onCall(async (_data, context) => {
-  await assertCrewGuestFeatureEnabled();
-  const guestUid = await requireCrewGuestUid(context);
-  const db = admin.firestore();
-  const sessionRef = db.collection("crewGuestSessions").doc(guestUid);
-  const sessionSnap = await sessionRef.get();
-  if (!sessionSnap.exists) return { active: false, reason: "session-ended" };
-  const session = sessionSnap.data() || {};
-  if (session.status !== "active" || !isFutureTimestamp(session.expiresAt)) {
-    return { active: false, reason: "session-expired" };
-  }
-  const [roomSnap, crewSnap] = await Promise.all([
-    db.collection("crewGuestRooms").doc(session.roomId || "").get(),
-    db.collection("crews").doc(session.crewId || "").get(),
-  ]);
-  if (!roomSnap.exists || !crewSnap.exists) return { active: false, reason: "room-ended" };
-  const room = roomSnap.data() || {};
-  const participantUids = Array.isArray(room.guestParticipantUids) ? room.guestParticipantUids.filter(Boolean) : [];
-  if (
-    (room.status || "open") !== "open" ||
-    room.allowGuests !== true ||
-    !isFutureTimestamp(room.expiresAt) ||
-    !participantUids.includes(guestUid)
-  ) {
-    return { active: false, reason: room.allowGuests === false ? "guest-access-closed" : "room-ended" };
-  }
-  const crew = crewSnap.data() || {};
-  await sessionRef.set({ lastSeenAt: new Date() }, { merge: true });
-  return {
-    active: true,
-    alias: session.alias || "게스트 탐험가",
-    expiresAtMs: Number(session.expiresAt?.toMillis?.() || 0),
-    guestCount: participantUids.length,
-    crew: {
-      name: cleanText(crew.name || "스터디 크루", 28),
-      motto: cleanText(crew.motto || "오늘만 함께 공부해요", 52),
-      color: crew.color || "#00d4ff",
-    },
-    recentReactions: sanitizeCrewGuestRoom(roomSnap)?.recentReactions || [],
-  };
-});
-
-exports.sendCrewGuestReaction = regionalFunctions.https.onCall(async (data, context) => {
-  await assertCrewGuestFeatureEnabled();
-  const guestUid = await requireCrewGuestUid(context);
-  const reactionId = String(data?.reactionId || "").trim();
-  const reaction = CREW_GUEST_REACTIONS[reactionId];
-  if (!reaction) throw new functions.https.HttpsError("invalid-argument", "사용할 수 없는 반응입니다.");
-  const db = admin.firestore();
-  const sessionRef = db.collection("crewGuestSessions").doc(guestUid);
-  await db.runTransaction(async (tx) => {
-    const sessionSnap = await tx.get(sessionRef);
-    if (!sessionSnap.exists) throw new functions.https.HttpsError("failed-precondition", "게스트 세션이 종료되었습니다.");
-    const session = sessionSnap.data() || {};
-    if (session.status !== "active" || !isFutureTimestamp(session.expiresAt)) {
-      throw new functions.https.HttpsError("failed-precondition", "게스트 세션이 종료되었습니다.");
-    }
-    const roomRef = db.collection("crewGuestRooms").doc(session.roomId || "");
-    const roomSnap = await tx.get(roomRef);
-    if (!roomSnap.exists) throw new functions.https.HttpsError("not-found", "게스트 체험방을 찾지 못했습니다.");
-    const room = roomSnap.data() || {};
-    if ((room.status || "open") !== "open" || room.allowGuests !== true || !isFutureTimestamp(room.expiresAt)) {
-      throw new functions.https.HttpsError("permission-denied", "현재 게스트 반응을 보낼 수 없습니다.");
-    }
-    const nowMs = Date.now();
-    if (nowMs - Number(session.lastReactionAtMs || 0) < CREW_GUEST_REACTION_COOLDOWN_MS) {
-      throw new functions.https.HttpsError("resource-exhausted", "잠시 후 다시 반응해 주세요.");
-    }
-    const recentReactions = Array.isArray(room.recentReactions) ? room.recentReactions : [];
-    const nextReaction = {
-      alias: session.alias || "게스트 탐험가",
-      reactionId,
-      emoji: reaction.emoji,
-      label: reaction.label,
-      createdAtMs: nowMs,
-    };
-    tx.set(roomRef, {
-      recentReactions: [...recentReactions, nextReaction].slice(-12),
-      updatedAt: new Date(nowMs),
-    }, { merge: true });
-    tx.set(sessionRef, { lastReactionAtMs: nowMs, lastSeenAt: new Date(nowMs) }, { merge: true });
-  });
-  return { success: true };
-});
-
-exports.leaveCrewGuestRoom = regionalFunctions.https.onCall(async (_data, context) => {
-  const guestUid = await requireCrewGuestUid(context);
-  const db = admin.firestore();
-  const sessionRef = db.collection("crewGuestSessions").doc(guestUid);
-  await db.runTransaction(async (tx) => {
-    const sessionSnap = await tx.get(sessionRef);
-    if (!sessionSnap.exists) return;
-    const session = sessionSnap.data() || {};
-    const roomRef = db.collection("crewGuestRooms").doc(session.roomId || "");
-    const roomSnap = await tx.get(roomRef);
-    if (roomSnap.exists) {
-      const participantUids = Array.isArray(roomSnap.data()?.guestParticipantUids)
-        ? roomSnap.data().guestParticipantUids.filter(Boolean)
-        : [];
-      tx.set(roomRef, {
-        guestParticipantUids: participantUids.filter((uid) => uid !== guestUid),
-        updatedAt: new Date(),
-      }, { merge: true });
-    }
-    tx.delete(sessionRef);
-  });
-  return { success: true };
-});
-
-exports.createGuardianHandoff = regionalFunctions.https.onCall(async (_data, context) => {
-  await assertCrewGuestFeatureEnabled();
-  const guestUid = await requireCrewGuestUid(context);
-  const db = admin.firestore();
-  const sessionRef = db.collection("crewGuestSessions").doc(guestUid);
-  const sessionSnap = await sessionRef.get();
-  if (!sessionSnap.exists || sessionSnap.data()?.status !== "active" || !isFutureTimestamp(sessionSnap.data()?.expiresAt)) {
-    throw new functions.https.HttpsError("failed-precondition", "게스트 세션이 종료되었습니다.");
-  }
-  const session = sessionSnap.data() || {};
-  if (session.handoffId) {
-    const existing = await db.collection("guardianHandoffs").doc(session.handoffId).get();
-    if (existing.exists && isFutureTimestamp(existing.data()?.expiresAt)) {
-      return { handoffCode: existing.id, expiresAtMs: Number(existing.data()?.expiresAt?.toMillis?.() || 0) };
-    }
-  }
-  const crewSnap = await db.collection("crews").doc(session.crewId || "").get();
-  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾지 못했습니다.");
-  const handoffRef = db.collection("guardianHandoffs").doc();
-  const now = new Date();
-  const expiresAt = Timestamp.fromMillis(now.getTime() + GUARDIAN_HANDOFF_DURATION_MS);
-  const batch = db.batch();
-  batch.set(handoffRef, {
-    crewId: session.crewId,
-    crewName: cleanText(crewSnap.data()?.name || "스터디 크루", 28),
-    status: "created",
-    createdAt: now,
-    expiresAt,
-  });
-  batch.set(sessionRef, { handoffId: handoffRef.id, handoffCreatedAt: now }, { merge: true });
-  await batch.commit();
-  return { handoffCode: handoffRef.id, expiresAtMs: expiresAt.toMillis() };
-});
-
-exports.previewGuardianHandoff = regionalFunctions.https.onCall(async (data) => {
-  const handoffCode = String(data?.handoffCode || "").trim();
-  if (!/^[A-Za-z0-9]{16,80}$/.test(handoffCode)) {
-    throw new functions.https.HttpsError("invalid-argument", "보호자 연결 링크가 올바르지 않습니다.");
-  }
-  const snap = await admin.firestore().collection("guardianHandoffs").doc(handoffCode).get();
-  if (!snap.exists || !isFutureTimestamp(snap.data()?.expiresAt)) {
-    throw new functions.https.HttpsError("failed-precondition", "보호자 연결 링크가 만료되었습니다.");
-  }
-  return {
-    crewName: cleanText(snap.data()?.crewName || "스터디 크루", 28),
-    expiresAtMs: Number(snap.data()?.expiresAt?.toMillis?.() || 0),
-  };
-});
-
-exports.sweepCrewGuestExperience = regionalFunctions.pubsub
-  .schedule("every 15 minutes")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    const db = admin.firestore();
-    const now = Timestamp.now();
-    const [sessionSnap, roomSnap, inviteSnap, handoffSnap] = await Promise.all([
-      db.collection("crewGuestSessions").where("expiresAt", "<=", now).limit(100).get(),
-      db.collection("crewGuestRooms").where("expiresAt", "<=", now).limit(100).get(),
-      db.collection("crewGuestInvites").where("expiresAt", "<=", now).limit(100).get(),
-      db.collection("guardianHandoffs").where("expiresAt", "<=", now).limit(100).get(),
-    ]);
-    const batch = db.batch();
-    sessionSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-    roomSnap.docs.forEach((docSnap) => batch.set(docSnap.ref, {
-      status: "ended",
-      allowGuests: false,
-      guestParticipantUids: [],
-      endedAt: now,
-      updatedAt: now,
-    }, { merge: true }));
-    inviteSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-    handoffSnap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
-    await batch.commit();
-    await Promise.all(sessionSnap.docs.map((docSnap) => admin.auth().deleteUser(docSnap.id).catch(() => null)));
-    return null;
-  });
-
 exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const {
@@ -6103,62 +5431,6 @@ exports.joinStudyCrew = regionalFunctions.https.onCall(async (data, context) => 
   });
 
   return { success: true, crewId: crewSnap.id, inviteCode };
-});
-
-exports.acceptPendingCrewInvitation = regionalFunctions.https.onCall(async (_data, context) => {
-  const uid = await requireAuthUid(context);
-  const db = admin.firestore();
-  const userRef = db.collection("users").doc(uid);
-  const userSnap = await userRef.get();
-  if (!userSnap.exists) throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
-  const pending = userSnap.data()?.pendingCrewInvitation || null;
-  const crewId = String(pending?.crewId || "").trim();
-  if (!crewId || !isFutureTimestamp(pending?.expiresAt)) {
-    throw new functions.https.HttpsError("failed-precondition", "사용할 수 있는 크루 초대가 없습니다.");
-  }
-  const crewRef = db.collection("crews").doc(crewId);
-  let updatedCrew = null;
-
-  await db.runTransaction(async (tx) => {
-    const [freshUserSnap, crewSnap] = await Promise.all([tx.get(userRef), tx.get(crewRef)]);
-    if (!freshUserSnap.exists || !crewSnap.exists) {
-      throw new functions.https.HttpsError("not-found", "초대받은 크루를 찾지 못했습니다.");
-    }
-    const freshUser = freshUserSnap.data() || {};
-    const freshPending = freshUser.pendingCrewInvitation || null;
-    if (freshUser.crewId) {
-      throw new functions.https.HttpsError("failed-precondition", "이미 다른 크루에 속해 있습니다.");
-    }
-    if (String(freshPending?.crewId || "") !== crewId || !isFutureTimestamp(freshPending?.expiresAt)) {
-      throw new functions.https.HttpsError("failed-precondition", "크루 초대가 만료되었습니다.");
-    }
-    const crew = crewSnap.data() || {};
-    if ((crew.status || "pending") !== "approved") {
-      throw new functions.https.HttpsError("failed-precondition", "현재 참여할 수 없는 크루입니다.");
-    }
-    const nextMemberIds = uniqueIds([...(crew.memberIds || []), uid]);
-    updatedCrew = {
-      ...crew,
-      memberIds: nextMemberIds,
-      memberCount: nextMemberIds.length,
-      updatedAt: new Date(),
-    };
-    tx.set(crewRef, {
-      memberIds: nextMemberIds,
-      memberCount: nextMemberIds.length,
-      updatedAt: updatedCrew.updatedAt,
-    }, { merge: true });
-    tx.set(userRef, {
-      pendingCrewInvitation: FieldValue.delete(),
-      guestConversionAcceptedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-  });
-
-  await syncCrewToMembers(crewId, {
-    ...updatedCrew,
-    updatedAt: new Date().toISOString(),
-  });
-  return { success: true, crewId, crewName: updatedCrew?.name || "스터디 크루" };
 });
 
 exports.updateStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
@@ -6379,7 +5651,11 @@ exports.resubmitStudyCrew = regionalFunctions.https.onCall(async (data, context)
 });
 
 exports.postStudyCrewGreeting = regionalFunctions.https.onCall(async (data, context) => {
-  const uid = await requireAuthUid(context);
+  if (!context.auth || !context.auth.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "이 작업을 수행하려면 로그인해야 합니다.");
+  }
+  const uid = context.auth.uid;
+  const guest = isGuestContext(context);
   const crewId = String(data?.crewId || "").trim();
   const text = String(data?.text || "").trim().slice(0, 240);
   if (!crewId || !text) {
@@ -6392,19 +5668,29 @@ exports.postStudyCrewGreeting = regionalFunctions.https.onCall(async (data, cont
   if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
 
   const crewData = crewSnap.data() || {};
-  const memberIds = crewData.memberIds || [];
-  if (!memberIds.includes(uid) && crewData.leaderId !== uid) {
-    const adminDoc = await db.collection("users").doc(uid).get();
-    if (!adminDoc.exists || adminDoc.data().role !== "admin") {
-      throw new functions.https.HttpsError("permission-denied", "크루 멤버만 포스트잇을 남길 수 있습니다.");
+  if (guest) {
+    if (crewData.guestAccessEnabled !== true) {
+      throw new functions.https.HttpsError("permission-denied", "크루 리더가 게스트 참여를 허용하지 않았습니다.");
+    }
+  } else {
+    const memberIds = crewData.memberIds || [];
+    if (!memberIds.includes(uid) && crewData.leaderId !== uid) {
+      const adminDoc = await db.collection("users").doc(uid).get();
+      if (!adminDoc.exists || adminDoc.data().role !== "admin") {
+        throw new functions.https.HttpsError("permission-denied", "크루 멤버만 포스트잇을 남길 수 있습니다.");
+      }
     }
   }
 
   const greetingRef = crewRef.collection("greetings").doc();
+  const userName = guest
+    ? getCrewGuestAlias(uid)
+    : (context.auth.token?.name || context.auth.token?.email || "탐사원");
   const greeting = {
     crewId,
     userId: uid,
-    userName: context.auth.token?.name || context.auth.token?.email || "탐사원",
+    userName,
+    isGuest: guest,
     text,
     readBy: [uid],
     createdAt: new Date(),
@@ -7053,26 +6339,137 @@ exports.adminRemoveStudyCrewMember = regionalFunctions.https.onCall(async (data,
   return { success: true };
 });
 
-exports.enterStudyCrewMeet = regionalFunctions.https.onCall(async (data, context) => {
+// ---------------------------------------------------------------------------
+// Crew guest access (integrated waiting room experience)
+// A guest is an anonymous Firebase Auth user invited via a crew's guest link.
+// Guests share the regular crew waiting room (CrewDetailView): they can open the
+// Google Meet focus room and post greetings, but never receive a users/{uid}
+// document, learning records, crystals, or ranking.
+// ---------------------------------------------------------------------------
+
+function isGuestContext(context) {
+  return !!context.auth?.uid && context.auth?.token?.firebase?.sign_in_provider === "anonymous";
+}
+
+function getCrewGuestAlias(uid = "") {
+  const adjectives = ["반짝이는", "용감한", "차분한", "호기심 많은", "따뜻한", "씩씩한", "장난꾸러기", "똑똑한"];
+  const nouns = ["여우", "수달", "고양이", "토끼", "별고래", "우주새", "판다", "다람쥐"];
+  let hash = 0;
+  const source = String(uid || `${Date.now()}-${Math.random()}`);
+  for (let i = 0; i < source.length; i += 1) {
+    hash = ((hash << 5) - hash + source.charCodeAt(i)) | 0;
+  }
+  const normalized = Math.abs(hash);
+  const adjective = adjectives[normalized % adjectives.length];
+  const noun = nouns[Math.floor(normalized / 7) % nouns.length];
+  const suffix = String((normalized % 90) + 10);
+  return `${adjective} ${noun} ${suffix}`;
+}
+
+// Public preview used by the guest entry screen before signing in anonymously.
+// Returns just enough to render a confirm page: crew name, color, and whether
+// guests are currently admitted. No sensitive data (meet URL) is exposed.
+exports.previewCrewGuestInvite = regionalFunctions.https.onCall(async (data) => {
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+  const crewSnap = await admin.firestore().collection("crews").doc(crewId).get();
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "초대받은 크루를 찾을 수 없습니다.");
+  const crewData = crewSnap.data() || {};
+  const guestsAdmitted = crewData.guestAccessEnabled === true && (crewData.status || "pending") === "approved";
+  return {
+    crewId: crewSnap.id,
+    crewName: crewData.name || "스터디 크루",
+    crewColor: crewData.color || "#00d4ff",
+    guestsAdmitted,
+    status: crewData.status || "pending",
+  };
+});
+
+// Called after the guest has signed in anonymously. Confirms the crew still
+// admits guests and returns the crew snapshot the client uses to render the
+// waiting room directly (without a users/{uid} doc).
+exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) => {
+  if (!context.auth || !context.auth.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "게스트 세션을 시작해 주세요.");
+  }
+  const uid = context.auth.uid;
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+  const db = admin.firestore();
+  const crewSnap = await db.collection("crews").doc(crewId).get();
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "초대받은 크루를 찾을 수 없습니다.");
+  const crewData = crewSnap.data() || {};
+  if ((crewData.status || "pending") !== "approved") {
+    throw new functions.https.HttpsError("failed-precondition", "현재 입장할 수 없는 크루입니다.");
+  }
+  if (crewData.guestAccessEnabled !== true) {
+    throw new functions.https.HttpsError("permission-denied", "크루 리더가 게스트 참여를 허용하지 않았습니다.");
+  }
+  return {
+    crewId: crewSnap.id,
+    crewName: crewData.name || "스터디 크루",
+    crewColor: crewData.color || "#00d4ff",
+    guestAlias: getCrewGuestAlias(uid),
+    guestUid: uid,
+  };
+});
+
+// Crew leader toggle: turn guest admission on/off for their crew.
+// Stored on the crew document so it can be checked synchronously by every
+// guest-gated callable (enterCrewAsGuest, enterStudyCrewMeet, postStudyCrewGreeting).
+exports.setCrewGuestAccess = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  const allowGuests = data?.allowGuests === true;
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const crewSnap = await crewRef.get();
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  const crewData = crewSnap.data() || {};
+  if (crewData.leaderId !== uid) {
+    throw new functions.https.HttpsError("permission-denied", "크루 리더만 게스트 참여를 설정할 수 있습니다.");
+  }
+  await crewRef.set({
+    guestAccessEnabled: allowGuests,
+    guestAccessUpdatedAt: FieldValue.serverTimestamp(),
+    guestAccessUpdatedBy: uid,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+  return { success: true, guestAccessEnabled: allowGuests };
+});
+
+exports.enterStudyCrewMeet = regionalFunctions.https.onCall(async (data, context) => {
+  if (!context.auth || !context.auth.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "이 작업을 수행하려면 로그인해야 합니다.");
+  }
+  const uid = context.auth.uid;
+  const guest = isGuestContext(context);
   const crewId = String(data?.crewId || "").trim();
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
 
   const db = admin.firestore();
-  const [userSnap, crewSnap] = await Promise.all([
-    db.collection("users").doc(uid).get(),
-    db.collection("crews").doc(crewId).get(),
-  ]);
-  if (!userSnap.exists) throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+  const crewSnap = await db.collection("crews").doc(crewId).get();
   if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
-
-  const userData = userSnap.data() || {};
   const crewData = crewSnap.data() || {};
-  const isAdminUser = userData.role === "admin";
-  const isMember = userData.crewId === crewId || getCrewMemberIds(crewData).includes(uid);
-  if (!isAdminUser && !isMember) {
-    throw new functions.https.HttpsError("permission-denied", "같은 크루 멤버만 입장할 수 있습니다.");
+
+  if (guest) {
+    // Anonymous guest: admitted only when the crew leader has enabled guests.
+    if (crewData.guestAccessEnabled !== true) {
+      throw new functions.https.HttpsError("permission-denied", "크루 리더가 게스트 참여를 허용하지 않았습니다.");
+    }
+  } else {
+    // Regular member/admin: require membership.
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists) throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+    const userData = userSnap.data() || {};
+    const isAdminUser = userData.role === "admin";
+    const isMember = userData.crewId === crewId || getCrewMemberIds(crewData).includes(uid);
+    if (!isAdminUser && !isMember) {
+      throw new functions.https.HttpsError("permission-denied", "같은 크루 멤버만 입장할 수 있습니다.");
+    }
   }
+
   if ((crewData.status || "pending") !== "approved") {
     throw new functions.https.HttpsError("failed-precondition", "승인된 크루만 입장할 수 있습니다.");
   }

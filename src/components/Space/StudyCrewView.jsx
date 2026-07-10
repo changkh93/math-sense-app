@@ -1045,33 +1045,17 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [openFaq, setOpenFaq] = useState(null);
   const [resubmitCrew, setResubmitCrew] = useState(null); // rejected crew data for resubmission
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
-  const [pendingInviteAction, setPendingInviteAction] = useState('');
-  const [pendingInviteMessage, setPendingInviteMessage] = useState('');
 
   const crew = userData?.crewSnapshot || null;
   const crewId = crew?.id || userData?.crewId || '';
   const hasCrew = !!crewId;
-  const pendingCrewInvitation = !hasCrew && userData?.pendingCrewInvitation?.crewId &&
-    Number(userData.pendingCrewInvitation.expiresAt?.toMillis?.() || 0) > Date.now()
-    ? userData.pendingCrewInvitation
-    : null;
+  const isGuest = userData?.isGuest === true;
   const currentStudyInvitePreference = studyInvitePreferenceDraft || getStudyInvitePreference(userData);
 
-  const acceptPendingInvitation = async () => {
-    if (!pendingCrewInvitation || pendingInviteAction) return;
-    setPendingInviteAction('accepting');
-    setPendingInviteMessage('');
-    try {
-      const fn = httpsCallable(functions, 'acceptPendingCrewInvitation');
-      const result = await fn();
-      setPendingInviteMessage(`${result.data?.crewName || pendingCrewInvitation.crewName || '초대받은 크루'}에 합류했습니다.`);
-      soundManager.playLevelUp();
-    } catch (err) {
-      setPendingInviteMessage(err?.message || '초대받은 크루에 참여하지 못했습니다.');
-    } finally {
-      setPendingInviteAction('');
-    }
-  };
+  // Guests are routed straight into the invited crew's waiting room.
+  useEffect(() => {
+    if (isGuest && hasCrew) setDetailView(true);
+  }, [isGuest, hasCrew]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -1575,35 +1559,6 @@ export default function StudyCrewView({ onNavigateStore }) {
               </button>
             </div>
           </div>
-
-          {pendingCrewInvitation && (
-            <Motion.section
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              style={{
-                marginBottom: '2rem',
-                padding: isMobile ? '1rem' : '1.35rem',
-                borderRadius: 15,
-                background: 'linear-gradient(135deg, rgba(34,197,94,0.13), rgba(0,212,255,0.09))',
-                border: '1px solid rgba(34,197,94,0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '1rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div>
-                <div className="font-tech" style={{ color: '#86efac', fontWeight: 900, fontSize: '0.82rem' }}>GUEST EXPERIENCE CONTINUED</div>
-                <h3 className="font-title" style={{ margin: '0.3rem 0 0', color: 'var(--text-bright)', fontSize: '1.15rem' }}>{pendingCrewInvitation.crewName || '체험했던 크루'}의 초대가 도착했습니다</h3>
-                <p className="font-tech" style={{ margin: '0.45rem 0 0', color: 'var(--text-muted)', lineHeight: 1.55, fontSize: '0.84rem' }}>보호자 가입과 자녀 계정 생성이 완료되어 참여권 없이 한 번 수락할 수 있습니다.</p>
-                {pendingInviteMessage && <div className="font-tech" style={{ marginTop: '0.5rem', color: pendingInviteMessage.includes('못했') ? '#fca5a5' : '#bbf7d0' }}>{pendingInviteMessage}</div>}
-              </div>
-              <button type="button" onClick={acceptPendingInvitation} disabled={!!pendingInviteAction} className="space-btn cosmic-btn font-tech" style={{ borderRadius: 10, minHeight: 46, minWidth: isMobile ? '100%' : 190 }}>
-                {pendingInviteAction ? '참여 처리 중...' : '초대받은 크루 참여'}
-              </button>
-            </Motion.section>
-          )}
 
           {/* Rejected Crew Alert */}
           {rejectedCrew && (

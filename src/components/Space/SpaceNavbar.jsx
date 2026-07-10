@@ -178,6 +178,14 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     { view: 'dashboard', label: 'LOGS', icon: '📊' }
   ];
 
+  const isGuest = userData?.isGuest === true;
+  const guestPrimaryNav = [
+    { view: 'planet', label: '학습', icon: '🪐' },
+    { view: 'crew', label: '스터디크루', icon: '🛰️' }
+  ];
+  const effectivePrimaryNav = isGuest ? guestPrimaryNav : mobilePrimaryNav;
+  const effectiveMoreNav = isGuest ? [] : mobileMoreNav;
+
   const mobileIsAgoraActive = window.location.pathname.startsWith('/agora');
   const isUserDataReady = Boolean(userData && !userData.dataLoadError && !userData.recoveryRequired);
   const effectiveStreak = isUserDataReady ? getEffectiveStreak(userData) : 0;
@@ -271,63 +279,73 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         >
           <img src="/m-logo.svg" alt="" />
         </button>
-        <button 
+        <button
           className={`space-nav-link ${currentView === 'planet' ? 'active' : ''}`}
           onClick={() => handleNavClick('planet', '/')}
         >
           🪐 NAV
         </button>
+        {!isGuest && (
+          <>
+            <button
+              className={`space-nav-link ${currentView === 'mistake_notebook' ? 'active' : ''}`}
+              onClick={() => handleNavClick('mistake_notebook', '/')}
+            >
+              🧠 NOTE
+            </button>
+            <button
+              className={`space-nav-link ${currentView === 'ranking' ? 'active' : ''}`}
+              onClick={() => handleNavClick('ranking', '/')}
+            >
+              🏆 RANKING
+            </button>
+            <button
+              className={`space-nav-link ${currentView === 'store' ? 'active' : ''}`}
+              onClick={() => handleNavClick('store', '/')}
+            >
+              🎨 STORE
+            </button>
+          </>
+        )}
         <button
-          className={`space-nav-link ${currentView === 'mistake_notebook' ? 'active' : ''}`}
-          onClick={() => handleNavClick('mistake_notebook', '/')}
-        >
-          🧠 NOTE
-        </button>
-        <button 
-          className={`space-nav-link ${currentView === 'ranking' ? 'active' : ''}`}
-          onClick={() => handleNavClick('ranking', '/')}
-        >
-          🏆 RANKING
-        </button>
-        <button 
-          className={`space-nav-link ${currentView === 'store' ? 'active' : ''}`}
-          onClick={() => handleNavClick('store', '/')}
-        >
-          🎨 STORE
-        </button>
-        <button 
           className={`space-nav-link ${currentView === 'crew' ? 'active' : ''}`}
           onClick={() => handleNavClick('crew', '/')}
         >
           🛰️ STUDY CREW
         </button>
-        <button 
-          className={`space-nav-link agora-nav-btn ${window.location.pathname.startsWith('/agora') ? 'active' : ''}`}
-          onClick={() => handleNavClick('agora', '/agora')}
-        >
-          🏛️ STELLAR AGORA
-        </button>
+        {!isGuest && (
+          <button
+            className={`space-nav-link agora-nav-btn ${window.location.pathname.startsWith('/agora') ? 'active' : ''}`}
+            onClick={() => handleNavClick('agora', '/agora')}
+          >
+            🏛️ STELLAR AGORA
+          </button>
+        )}
       </div>
       
       <div className="nav-right desktop-nav-right">
-        <DirectMemoMenu />
-        <NotificationMenu />
-        <div 
-          onClick={() => handleNavClick('journey', '/')}
-          style={{ cursor: 'pointer', display: 'flex' }}
-          title="별자리 항해 기록 보기"
-        >
-          {isUserDataReady ? <CometBadge streak={effectiveStreak} /> : <span className="desktop-sync-dots">…</span>}
-        </div>
-        <div 
-          className={`crystal-counter font-tech ${currentView === 'ledger' ? 'ledger-open' : ''}`}
-          onClick={() => handleNavClick('ledger', '/')}
-          style={{ cursor: 'pointer' }}
-          title="광석 입출금 내역 보기"
-        >
-          <div className="crystal-icon"></div>
-          <span>{isUserDataReady ? `${crystalCount} (광석)` : '동기화 중'}</span>
-        </div>
+        {!isGuest && <DirectMemoMenu />}
+        {!isGuest && <NotificationMenu />}
+        {!isGuest && (
+          <div
+            onClick={() => handleNavClick('journey', '/')}
+            style={{ cursor: 'pointer', display: 'flex' }}
+            title="별자리 항해 기록 보기"
+          >
+            {isUserDataReady ? <CometBadge streak={effectiveStreak} /> : <span className="desktop-sync-dots">…</span>}
+          </div>
+        )}
+        {!isGuest && (
+          <div
+            className={`crystal-counter font-tech ${currentView === 'ledger' ? 'ledger-open' : ''}`}
+            onClick={() => handleNavClick('ledger', '/')}
+            style={{ cursor: 'pointer' }}
+            title="광석 입출금 내역 보기"
+          >
+            <div className="crystal-icon"></div>
+            <span>{isUserDataReady ? `${crystalCount} (광석)` : '동기화 중'}</span>
+          </div>
+        )}
 
         {/* Profile Menu relative container */}
         <div className="profile-menu-anchor" style={{ position: 'relative' }}>
@@ -517,7 +535,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       </AnimatePresence>
 
       <div className="mobile-bottom-nav">
-        {mobilePrimaryNav.map(item => (
+        {effectivePrimaryNav.map(item => (
           <button
             key={item.view}
             type="button"
@@ -553,7 +571,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
               <button type="button" onClick={() => setIsMobileMoreOpen(false)} aria-label="더보기 닫기">✕</button>
             </div>
             <div className="mobile-more-grid">
-              {mobileMoreNav.map(item => (
+              {effectiveMoreNav.map(item => (
                 <button
                   key={item.view}
                   type="button"

@@ -88,11 +88,39 @@ export function useAuth() {
       }
 
       if (firebaseUser?.isAnonymous) {
-        // Anonymous Firebase Auth is reserved for the isolated crew guest page.
-        // The member app must continue to behave as logged out and must never
-        // attempt to reconstruct a users/{uid} document for a guest.
-        setUser(null);
-        setUserData(null);
+        // Anonymous Firebase Auth = crew guest. The guest entry screen
+        // (CrewGuestInvite) stores the invited crew id + alias in sessionStorage
+        // so the member app can route them straight into that crew's waiting
+        // room. Guests never receive a users/{uid} document and are confined to
+        // the NAV and STUDY CREW views by SpaceNavbar/SpaceHome.
+        let guestCrew = null;
+        try {
+          const raw = window.sessionStorage.getItem('crewGuestSession');
+          if (raw) guestCrew = JSON.parse(raw);
+        } catch { guestCrew = null; }
+        if (!guestCrew?.crewId) {
+          // No active guest session: treat as logged out so the login screen shows.
+          setUser(null);
+          setUserData(null);
+          setLoading(false);
+          return;
+        }
+        setUser(firebaseUser);
+        setUserData({
+          role: 'guest',
+          isGuest: true,
+          uid: firebaseUser.uid,
+          crewId: guestCrew.crewId,
+          crewName: guestCrew.crewName || '스터디 크루',
+          crewColor: guestCrew.crewColor || '#00d4ff',
+          crewSnapshot: {
+            id: guestCrew.crewId,
+            name: guestCrew.crewName || '스터디 크루',
+            color: guestCrew.crewColor || '#00d4ff',
+          },
+          studentName: guestCrew.guestAlias || '게스트',
+          publicDisplayName: guestCrew.guestAlias || '게스트',
+        });
         setLoading(false);
         return;
       }

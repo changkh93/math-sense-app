@@ -497,16 +497,14 @@ export default function CrewApproval() {
   const [meetDrafts, setMeetDrafts] = useState({});
   const [editDrafts, setEditDrafts] = useState({});
   const [message, setMessage] = useState('');
-  const [guestExperienceEnabled, setGuestExperienceEnabled] = useState(false);
 
   const refreshData = async () => {
     setLoading(true);
     setMessage('');
     try {
-      const [crewResult, poolResult, guestSettingsResult] = await Promise.all([
+      const [crewResult, poolResult] = await Promise.all([
         httpsCallable(functions, 'listStudyCrews')(),
         httpsCallable(functions, 'listOpenStudyPoolsAdmin')(),
-        httpsCallable(functions, 'getCrewGuestAdminSettings')(),
       ]);
       const hydratedCrews = await hydrateCrewProfiles(crewResult?.data?.crews || []);
       setCrews(hydratedCrews);
@@ -516,7 +514,6 @@ export default function CrewApproval() {
         ...Object.fromEntries((poolResult?.data?.pools || []).map(pool => [`pool:${pool.id}`, pool.googleMeetUrl || ''])),
       });
       setEditDrafts(Object.fromEntries(hydratedCrews.map(crew => [crew.id, buildCrewEditDraft(crew)])));
-      setGuestExperienceEnabled(guestSettingsResult?.data?.enabled !== false);
     } catch (err) {
       console.error('Failed to load study crew admin data:', err);
       setMessage('스터디 크루 정보를 불러오지 못했습니다.');
@@ -639,25 +636,6 @@ export default function CrewApproval() {
     }
   };
 
-  const toggleGuestExperience = async () => {
-    const nextEnabled = !guestExperienceEnabled;
-    const prompt = nextEnabled
-      ? '전체 크루의 게스트 체험 기능을 다시 켤까요?'
-      : '전체 크루의 게스트 초대와 활성 세션을 즉시 중지할까요?';
-    if (!window.confirm(prompt)) return;
-    setBusyId('guest-settings');
-    try {
-      const result = await httpsCallable(functions, 'setCrewGuestAdminSettings')({ enabled: nextEnabled });
-      setGuestExperienceEnabled(result?.data?.enabled === true);
-      setMessage(nextEnabled ? '게스트 크루 체험을 전체 활성화했습니다.' : '게스트 크루 체험을 전체 중지했습니다.');
-    } catch (err) {
-      console.error('Failed to update crew guest settings:', err);
-      alert(err?.message || '게스트 체험 설정을 변경하지 못했습니다.');
-    } finally {
-      setBusyId('');
-    }
-  };
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
@@ -668,9 +646,6 @@ export default function CrewApproval() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-          <button type="button" className={`admin-btn ${guestExperienceEnabled ? 'secondary' : 'danger'}`} onClick={toggleGuestExperience} disabled={busyId === 'guest-settings'} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Users size={15} /> {guestExperienceEnabled ? '게스트 체험 전체 켜짐' : '게스트 체험 전체 중지됨'}
-          </button>
           <button type="button" className="admin-btn secondary" onClick={refreshData} disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
             <RefreshCw size={15} /> 새로고침
           </button>

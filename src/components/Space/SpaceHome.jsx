@@ -763,14 +763,18 @@ function SpaceHome() {
     setPendingRegion(null);
     setAccessError(null);
     setIsBoosting(false);
-    setCurrentView(view);
+    // Crew guests may only access NAV (planet) and STUDY CREW (crew); anything
+    // else falls back to the planet so they can never leave those two views.
+    const guest = userData?.isGuest === true;
+    const allowedView = guest && view !== 'planet' && view !== 'crew' ? 'planet' : view;
+    setCurrentView(allowedView);
     updateSelectedRegionId(null);
     updateSelectedChapterDocId(null);
     clearMissionSelection();
     setShouldScrollStore(false);
     if (isDarkMatterMode) stopDarkMatterMode();
     resetViewportForRootView();
-  }, [clearMissionSelection, isDarkMatterMode, resetViewportForRootView, stopDarkMatterMode, updateSelectedChapterDocId, updateSelectedRegionId]);
+  }, [clearMissionSelection, isDarkMatterMode, resetViewportForRootView, stopDarkMatterMode, updateSelectedChapterDocId, updateSelectedRegionId, userData?.isGuest]);
 
   const isRecheckDue = useCallback((mark) => {
     if (mark?.status !== 'recheck_pending') return false
@@ -3031,32 +3035,6 @@ function SpaceHome() {
                   >
                     Google 계정 로그인
                   </button>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.38)', fontSize: '0.8rem' }}>
-                    <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
-                    <span className="font-tech">GUEST</span>
-                    <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
-                  </div>
-                  <button
-                    type="button"
-                    disabled={loginLoading}
-                    onClick={() => navigate('/guest')}
-                    className="font-tech"
-                    style={{
-                      border: '1px solid rgba(34,197,94,0.3)',
-                      borderRadius: 10,
-                      background: 'rgba(34,197,94,0.1)',
-                      color: '#bbf7d0',
-                      padding: '0.8rem 1rem',
-                      fontWeight: 850,
-                      cursor: loginLoading ? 'not-allowed' : 'pointer',
-                      fontSize: '0.95rem'
-                    }}
-                  >
-                    초대 링크로 게스트 체험
-                  </button>
-                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.48)', fontSize: '0.75rem', lineHeight: 1.5, textAlign: 'center' }}>
-                    방 개설자가 허용한 크루 체험방만 입장할 수 있으며 기록은 저장되지 않습니다.
-                  </div>
                 </Motion.form>
               )}
             </AnimatePresence>

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ArrowLeft, CalendarDays, ChevronDown, Copy, Crown, DoorOpen, Link2, Loader2, LogOut, Send, ShieldCheck, StickyNote, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChevronDown, Copy, Crown, Loader2, LogOut, Send, StickyNote, Trash2, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
@@ -158,8 +158,7 @@ export default function CrewDetailView({ onBack }) {
   const [memberProfiles, setMemberProfiles] = useState({});
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [leaveAction, setLeaveAction] = useState('');
-  const [guestExperience, setGuestExperience] = useState({ invite: null, room: null });
-  const [guestAction, setGuestAction] = useState('');
+  const [guestAccessAction, setGuestAccessAction] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
   const [showCrewInfo, setShowCrewInfo] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : true));
@@ -181,112 +180,34 @@ export default function CrewDetailView({ onBack }) {
   const todayKey = getTodayKey();
   const studiedToday = members.filter(m => m.lastStreakDate === todayKey);
   const isLeader = userData?.crewRole === 'leader';
+  const isGuest = userData?.isGuest === true;
+  const guestAccessEnabled = crew?.guestAccessEnabled === true;
   const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
+  const guestInviteUrl = crewId ? `${window.location.origin}/crew-invite/${crewId}` : '';
 
-  const loadGuestExperience = async ({ quiet = false } = {}) => {
-    if (!crewId || status !== 'approved') return;
-    if (!quiet) setGuestAction('loading');
-    try {
-      const fn = httpsCallable(functions, 'getCrewGuestHostStatus');
-      const result = await fn({ crewId });
-      setGuestExperience(result.data || { invite: null, room: null });
-      if (!quiet) setGuestMessage('');
-    } catch (err) {
-      if (!quiet) setGuestMessage(getFunctionsErrorMessage(err, '게스트 체험방 상태를 확인하지 못했습니다.'));
-    } finally {
-      if (!quiet) setGuestAction('');
-    }
-  };
-
-  useEffect(() => {
-    if (!crewId || status !== 'approved') return undefined;
-    loadGuestExperience();
-    const timer = window.setInterval(() => loadGuestExperience({ quiet: true }), 10000);
-    return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crewId, status]);
-
-  const ensureGuestInvite = async ({ rotate = false } = {}) => {
-    if (!crewId || guestAction) return;
-    if (rotate && !window.confirm('기존 게스트 초대 링크를 폐기하고 새 링크를 만들까요?')) return;
-    setGuestAction(rotate ? 'rotating-link' : 'creating-link');
+  const toggleGuestAccess = async () => {
+    if (!crewId || guestAccessAction || !isLeader) return;
+    const nextValue = !guestAccessEnabled;
+    setGuestAccessAction('toggling');
     setGuestMessage('');
     try {
-      const fn = httpsCallable(functions, 'getOrCreateCrewGuestInvite');
-      const result = await fn({ crewId, rotate });
-      setGuestExperience((prev) => ({ ...prev, invite: result.data || null }));
-      setGuestMessage(rotate ? '새 초대 링크를 만들었습니다.' : '게스트 초대 링크를 만들었습니다.');
+      const fn = httpsCallable(functions, 'setCrewGuestAccess');
+      await fn({ crewId, allowGuests: nextValue });
+      setGuestMessage(nextValue ? '게스트 참여를 허용했습니다. 초대 링크로 입장할 수 있습니다.' : '게스트 참여를 중지했습니다.');
     } catch (err) {
-      setGuestMessage(getFunctionsErrorMessage(err, '초대 링크를 만들지 못했습니다.'));
+      setGuestMessage(err?.message || '게스트 참여 설정을 바꾸지 못했습니다.');
     } finally {
-      setGuestAction('');
+      setGuestAccessAction('');
     }
   };
 
   const copyGuestInvite = async () => {
-    const token = guestExperience.invite?.token;
-    if (!token) return;
-    const url = `${window.location.origin}/crew-invite/${token}`;
+    if (!guestInviteUrl) return;
     try {
-      await navigator.clipboard.writeText(url);
-      setGuestMessage('게스트 초대 링크를 복사했습니다. 방 개설자가 참여를 허용해야 입장할 수 있습니다.');
+      await navigator.clipboard.writeText(guestInviteUrl);
+      setGuestMessage('게스트 초대 링크를 복사했습니다.');
     } catch {
-      setGuestMessage(url);
-    }
-  };
-
-  const openGuestRoom = async () => {
-    if (!crewId || guestAction) return;
-    setGuestAction('opening-room');
-    setGuestMessage('게스트 체험방을 여는 중...');
-    try {
-      const fn = httpsCallable(functions, 'openCrewGuestRoom');
-      const result = await fn({ crewId });
-      setGuestExperience((prev) => ({ ...prev, room: result.data?.room || null }));
-      setGuestMessage('체험방을 열었습니다. 게스트 참여는 아직 꺼져 있습니다. 방 개설자가 직접 허용해 주세요.');
-    } catch (err) {
-      setGuestMessage(getFunctionsErrorMessage(err, '게스트 체험방을 열지 못했습니다.'));
-    } finally {
-      setGuestAction('');
-    }
-  };
-
-  const toggleGuestAccess = async () => {
-    const room = guestExperience.room;
-    if (!room?.id || !room.isHost || guestAction) return;
-    const nextValue = !room.allowGuests;
-    if (!nextValue && room.guestCount > 0 && !window.confirm('게스트 참여를 끄면 현재 게스트도 즉시 체험방에서 나가게 됩니다. 계속할까요?')) return;
-    setGuestAction('toggling-access');
-    setGuestMessage('');
-    try {
-      const fn = httpsCallable(functions, 'setCrewGuestRoomAccess');
-      await fn({ roomId: room.id, allowGuests: nextValue });
-      setGuestExperience((prev) => ({
-        ...prev,
-        room: { ...prev.room, allowGuests: nextValue, ...(nextValue ? {} : { guestCount: 0 }) },
-      }));
-      setGuestMessage(nextValue ? '게스트 참여를 허용했습니다. 초대 링크로 입장할 수 있습니다.' : '게스트 참여를 중지했습니다.');
-    } catch (err) {
-      setGuestMessage(getFunctionsErrorMessage(err, '게스트 참여 설정을 바꾸지 못했습니다.'));
-    } finally {
-      setGuestAction('');
-    }
-  };
-
-  const closeGuestRoom = async () => {
-    const room = guestExperience.room;
-    if (!room?.id || !room.isHost || guestAction) return;
-    if (!window.confirm('게스트 체험방을 종료할까요? 현재 참여 중인 게스트 세션도 종료됩니다.')) return;
-    setGuestAction('closing-room');
-    try {
-      const fn = httpsCallable(functions, 'closeCrewGuestRoom');
-      await fn({ roomId: room.id });
-      setGuestExperience((prev) => ({ ...prev, room: null }));
-      setGuestMessage('게스트 체험방을 종료했습니다.');
-    } catch (err) {
-      setGuestMessage(getFunctionsErrorMessage(err, '게스트 체험방을 종료하지 못했습니다.'));
-    } finally {
-      setGuestAction('');
+      setGuestMessage(guestInviteUrl);
     }
   };
 
@@ -550,91 +471,6 @@ export default function CrewDetailView({ onBack }) {
         </div>}
       </Motion.div>
 
-      {status === 'approved' && (
-        <Motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card hud-border"
-          style={{ padding: isMobile ? '1rem' : '1.3rem', borderRadius: 12, marginBottom: '1.2rem', borderColor: 'rgba(34,197,94,0.24)' }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 0 }}>
-              <div className="font-tech" style={{ color: '#86efac', fontWeight: 900, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <ShieldCheck size={15} /> SAFE GUEST CREW
-              </div>
-              <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.25rem 0 0', fontSize: isMobile ? '1.1rem' : '1.25rem' }}>게스트 체험방</h3>
-              <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: '0.45rem 0 0', maxWidth: 660, fontSize: '0.84rem' }}>
-                초대받은 친구는 자동 별명과 버튼형 반응만 사용합니다. 방을 연 사람이 게스트 참여를 직접 허용한 동안에만 입장할 수 있습니다.
-              </p>
-            </div>
-            {!guestExperience.room && (
-              <button type="button" className="space-btn cosmic-btn font-tech" onClick={openGuestRoom} disabled={!!guestAction} style={{ borderRadius: 9, minHeight: 44, minWidth: isMobile ? '100%' : 170 }}>
-                <DoorOpen size={16} style={{ verticalAlign: -3, marginRight: 6 }} />{guestAction === 'opening-room' ? '여는 중...' : '체험방 열기'}
-              </button>
-            )}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.1fr) minmax(260px, 0.9fr)', gap: '0.8rem', marginTop: '1rem' }}>
-            <div style={{ ...panelStyle, padding: '0.95rem' }}>
-              <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 850, display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Link2 size={15} /> 게스트 초대 링크</div>
-              {guestExperience.invite ? (
-                <>
-                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.68)', fontSize: '0.78rem', marginTop: '0.55rem', wordBreak: 'break-all', lineHeight: 1.45 }}>
-                    {`${window.location.origin}/crew-invite/${guestExperience.invite.token}`}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: '0.75rem' }}>
-                    <button type="button" className="space-nav-link font-tech active" onClick={copyGuestInvite} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Copy size={14} /> 링크 복사</button>
-                    {isLeader && <button type="button" className="space-nav-link font-tech" onClick={() => ensureGuestInvite({ rotate: true })} disabled={!!guestAction} style={{ borderRadius: 8 }}>새 링크로 교체</button>}
-                  </div>
-                </>
-              ) : (
-                <button type="button" className="space-nav-link font-tech active" onClick={() => ensureGuestInvite()} disabled={!!guestAction} style={{ borderRadius: 8, marginTop: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Link2 size={14} /> {guestAction === 'creating-link' ? '만드는 중...' : '초대 링크 만들기'}
-                </button>
-              )}
-            </div>
-
-            <div style={{ ...panelStyle, padding: '0.95rem' }}>
-              <div className="font-tech" style={{ color: '#86efac', fontWeight: 850 }}>방 개설자 승인</div>
-              {guestExperience.room ? (
-                <>
-                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', marginTop: '0.5rem', lineHeight: 1.55, fontSize: '0.82rem' }}>
-                    개설자 {guestExperience.room.hostName || '크루 멤버'} · 게스트 {guestExperience.room.guestCount || 0}명
-                  </div>
-                  <div style={{ marginTop: '0.55rem', color: guestExperience.room.allowGuests ? '#bbf7d0' : '#fde68a', fontWeight: 850 }}>
-                    {guestExperience.room.allowGuests ? '● 게스트 입장 허용 중' : '● 게스트 입장 차단 중'}
-                  </div>
-                  {guestExperience.room.isHost ? (
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: '0.75rem' }}>
-                      <button type="button" className={`space-nav-link font-tech ${guestExperience.room.allowGuests ? '' : 'active'}`} onClick={toggleGuestAccess} disabled={!!guestAction} style={{ borderRadius: 8 }}>
-                        {guestExperience.room.allowGuests ? '게스트 참여 끄기' : '게스트 참여 허용'}
-                      </button>
-                      <button type="button" className="space-nav-link font-tech" onClick={closeGuestRoom} disabled={!!guestAction} style={{ borderRadius: 8, color: '#fca5a5' }}>체험방 종료</button>
-                    </div>
-                  ) : (
-                    <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.7rem', fontSize: '0.78rem', lineHeight: 1.5 }}>게스트 허용과 방 종료는 방 개설자만 변경할 수 있습니다.</div>
-                  )}
-                </>
-              ) : (
-                <div className="font-tech" style={{ color: 'var(--text-muted)', marginTop: '0.55rem', lineHeight: 1.55, fontSize: '0.82rem' }}>체험방이 열리기 전에는 초대 링크가 있어도 게스트가 입장할 수 없습니다.</div>
-              )}
-            </div>
-          </div>
-
-          {guestExperience.room?.recentReactions?.length > 0 && (
-            <div style={{ marginTop: '0.8rem', padding: '0.85rem', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
-              <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 850, marginBottom: '0.45rem' }}>게스트 반응</div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {guestExperience.room.recentReactions.slice(-6).reverse().map((reaction, index) => (
-                  <span key={`${reaction.createdAtMs}-${index}`} className="font-tech" style={{ padding: '0.42rem 0.58rem', borderRadius: 999, background: 'rgba(0,212,255,0.08)', color: 'rgba(255,255,255,0.78)', fontSize: '0.75rem' }}>{reaction.emoji} {reaction.alias} · {reaction.label}</span>
-                ))}
-              </div>
-            </div>
-          )}
-          {guestMessage && <div className="font-tech" style={{ marginTop: '0.8rem', color: guestMessage.includes('못했') || guestMessage.includes('실패') ? '#fca5a5' : '#bbf7d0', lineHeight: 1.55, fontSize: '0.82rem' }}>{guestMessage}</div>}
-        </Motion.section>
-      )}
-
       {/* Google Meet Entry */}
       <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card hud-border" style={{ padding: isMobile ? '1rem' : '1.3rem', borderRadius: 12, marginBottom: '1.2rem', scrollMarginTop: 76 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -662,6 +498,51 @@ export default function CrewDetailView({ onBack }) {
           <div className="font-tech" style={{ color: '#fbbf24', lineHeight: 1.55, marginTop: '0.9rem' }}>운영자가 Google Meet 주소를 준비 중입니다.</div>
         )}
       </Motion.div>
+
+      {/* Guest access management (leader) / guest badge */}
+      {status === 'approved' && !isGuest && (
+        <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass-card hud-border" style={{ padding: isMobile ? '1rem' : '1.3rem', borderRadius: 12, marginBottom: '1.2rem', borderColor: 'rgba(34,197,94,0.24)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0 }}>
+              <div className="font-tech" style={{ color: '#86efac', fontWeight: 800, fontSize: '0.82rem' }}>GUEST ACCESS</div>
+              <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: isMobile ? '1.05rem' : '1.15rem', marginTop: '0.15rem' }}>게스트 초대</div>
+              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.3rem', lineHeight: 1.55 }}>
+                {guestAccessEnabled ? '● 게스트 참여 허용 중' : '○ 게스트 참여 중지 중'}
+              </div>
+            </div>
+            {isLeader && (
+              <button
+                type="button"
+                className={`space-btn font-tech ${guestAccessEnabled ? '' : 'cosmic-btn'}`}
+                disabled={!!guestAccessAction}
+                onClick={toggleGuestAccess}
+                style={{ borderRadius: 8, padding: isMobile ? '1rem 1.1rem' : '0.8rem 1.1rem', minHeight: isMobile ? 48 : undefined, minWidth: isMobile ? '100%' : 150 }}
+              >
+                {guestAccessAction ? '처리 중...' : (guestAccessEnabled ? '참여 끄기' : '참여 허용')}
+              </button>
+            )}
+          </div>
+          {guestAccessEnabled && guestInviteUrl && (
+            <div style={{ marginTop: '0.8rem', padding: '0.75rem 0.9rem', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
+              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.76rem', marginBottom: '0.4rem' }}>초대 링크</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="font-tech" style={{ flex: '1 1 200px', color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', wordBreak: 'break-all' }}>{guestInviteUrl}</div>
+                <button type="button" className="space-nav-link font-tech active" onClick={copyGuestInvite} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><Copy size={14} /> 복사</button>
+              </div>
+            </div>
+          )}
+          {guestMessage && <div className="font-tech" style={{ marginTop: '0.7rem', color: guestMessage.includes('못했') || guestMessage.includes('실패') ? '#fca5a5' : '#bbf7d0', lineHeight: 1.55, fontSize: '0.8rem' }}>{guestMessage}</div>}
+        </Motion.div>
+      )}
+
+      {isGuest && (
+        <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass-card hud-border" style={{ padding: isMobile ? '0.9rem' : '1.1rem', borderRadius: 12, marginBottom: '1.2rem', borderColor: 'rgba(34,197,94,0.24)' }}>
+          <div className="font-tech" style={{ color: '#86efac', fontWeight: 800, fontSize: '0.8rem' }}>● GUEST SESSION</div>
+          <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.35rem', lineHeight: 1.55 }}>
+            회원가입 없이 체험 중입니다. 학습 기록·광석·랭킹은 저장되지 않으며, 크루 리더가 게스트 참여를 끄면 퇴장합니다.
+          </div>
+        </Motion.div>
+      )}
 
       {status === 'approved' && crewId && (
         <div style={{ marginBottom: '1.2rem' }}>
