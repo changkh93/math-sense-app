@@ -176,7 +176,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   };
 
   const handleNavClick = (view, path) => {
-    if (isGuest && view !== 'planet' && view !== 'crew') {
+    if (isGuest && view !== 'planet' && view !== 'crew' && view !== 'battle') {
       openGuestSignupPrompt();
       return;
     }
@@ -228,12 +228,13 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
 
   const mobilePrimaryNav = [
     { view: 'planet', label: '학습', icon: '🪐' },
+    { view: 'battle', label: '배틀', icon: '⚔️' },
     { view: 'mistake_notebook', label: '오답', icon: '🧠' },
-    { view: 'assignment_hub', label: '과제', icon: '🛰️' },
     { view: 'agora', label: '아고라', icon: '🏛️', path: '/agora' }
   ];
 
   const mobileMoreNav = [
+    { view: 'assignment_hub', label: '과제', icon: '🛰️' },
     { view: 'ranking', label: '랭킹', icon: '🏅' },
     { view: 'store', label: '스토어', icon: '🎨' },
     { view: 'crew', label: '스터디크루', icon: '🛰️' },
@@ -244,7 +245,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   const effectiveMoreNav = mobileMoreNav;
   const getGuestNavState = (view) => {
     if (!isGuest) return '';
-    return view === 'planet' || view === 'crew' ? 'guest-available' : 'guest-locked';
+    return view === 'planet' || view === 'crew' || view === 'battle' ? 'guest-available' : 'guest-locked';
   };
 
   const mobileIsAgoraActive = window.location.pathname.startsWith('/agora');
@@ -368,6 +369,12 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           onClick={() => handleNavClick('planet', '/')}
         >
           🪐 NAV
+        </button>
+        <button
+          className={`space-nav-link ${getGuestNavState('battle')} ${currentView === 'battle' ? 'active' : ''}`}
+          onClick={() => handleNavClick('battle', '/')}
+        >
+          ⚔️ BATTLE
         </button>
         <button
           className={`space-nav-link ${getGuestNavState('mistake_notebook')} ${currentView === 'mistake_notebook' ? 'active' : ''}`}

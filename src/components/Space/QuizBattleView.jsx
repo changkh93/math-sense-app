@@ -34,10 +34,13 @@ export default function QuizBattleView({
   regionId,
   entryUnitId,
   entryUnitTitle,
+  initialBattleScope = BATTLE_SCOPE_CUMULATIVE,
+  opponentMode = 'pvp',
+  rangeLabel = '',
   onExit,
   onSoloQuiz,
 }) {
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const [phase, setPhase] = useState('idle')
   const [ticketId, setTicketId] = useState('')
   const [battleId, setBattleId] = useState('')
@@ -45,7 +48,7 @@ export default function QuizBattleView({
   const [selectedKeys, setSelectedKeys] = useState(new Set())
   const [answerResults, setAnswerResults] = useState({})
   const [battleStats, setBattleStats] = useState(null)
-  const [battleScope, setBattleScope] = useState(BATTLE_SCOPE_CUMULATIVE)
+  const [battleScope, setBattleScope] = useState(initialBattleScope)
   const [queueTickets, setQueueTickets] = useState([])
   const [isLoadingQueue, setIsLoadingQueue] = useState(false)
   const [queueListExpanded, setQueueListExpanded] = useState(false)
@@ -65,6 +68,13 @@ export default function QuizBattleView({
   const cancelQueueRef = useRef(null)
   const confirmedBattleEntryRef = useRef('')
   const entryConfirmTimeoutRef = useRef('')
+  const aiAdvanceTimerRef = useRef(null)
+  const isAIMode = opponentMode === 'ai'
+  const isScopeLocked = Boolean(rangeLabel)
+
+  useEffect(() => {
+    if (phase === 'idle') setBattleScope(initialBattleScope)
+  }, [initialBattleScope, phase])
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768)
@@ -83,7 +93,7 @@ export default function QuizBattleView({
   }, [user?.uid])
 
   const loadQueueTickets = useCallback(async ({ silent = false } = {}) => {
-    if (!user?.uid || !clusterId || !regionId || !entryUnitId) return
+    if (isAIMode || !user?.uid || !clusterId || !regionId || !entryUnitId) return
     if (!silent) setIsLoadingQueue(true)
     try {
       const listQueue = httpsCallable(functions, 'listQuizBattleQueue')
@@ -94,13 +104,32 @@ export default function QuizBattleView({
     } finally {
       if (!silent) setIsLoadingQueue(false)
     }
-  }, [clusterId, entryUnitId, regionId, user?.uid])
+  }, [clusterId, entryUnitId, isAIMode, regionId, user?.uid])
 
   useEffect(() => {
-    if (phase !== 'idle') return undefined
+    if (phase !== 'idle' || isAIMode) return undefined
     loadQueueTickets()
     return undefined
-  }, [loadQueueTickets, phase])
+  }, [isAIMode, loadQueueTickets, phase])
+
+  const startAIBattle = useCallback(async () => {
+    if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
+    setIsJoining(true)
+    setError('')
+    try {
+      const start = httpsCallable(functions, 'startAIQuizBattle')
+      const res = await start({ clusterId, regionId, entryUnitId, battleScope, questionCount: QUESTION_COUNT })
+      if (!res.data?.battleId) throw new Error('AI 배틀 좌표를 생성하지 못했습니다.')
+      matchedRef.current = true
+      setBattleId(res.data.battleId)
+      setPhase('active')
+      soundManager.playCrystal()
+    } catch (err) {
+      setError(err?.message || 'AI 배틀을 시작하지 못했습니다.')
+    } finally {
+      setIsJoining(false)
+    }
+  }, [battleScope, clusterId, entryUnitId, isJoining, regionId, user?.uid])
 
   const joinQueue = useCallback(async ({ silent = false, targetTicketId = '' } = {}) => {
     if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
@@ -241,7 +270,7 @@ export default function QuizBattleView({
   const liveMyAnsweredCount = Number(getParticipant(battle, user?.uid || '').answeredCount || 0)
   useEffect(() => {
     const uid = user?.uid
-    if (!uid) return
+    if (!uid || userData?.isGuest === true) return
     const mapPhaseToStatus = (p) => {
       if (p === 'waiting') return 'waiting'
       if (p === 'active') {
@@ -268,17 +297,17 @@ export default function QuizBattleView({
       // idle/cancelled는 즉시 battle 맵을 제거한다. (언마운트가 아닌 phase 전환)
       setDoc(doc(db, 'users', uid), { liveStatus: { battle: deleteField() } }, { merge: true }).catch(() => {})
     }
-  }, [user?.uid, phase, battleId, battle?.status, battle?.questionCount, liveOpponentDisplayName, liveMyAnsweredCount])
+  }, [user?.uid, userData?.isGuest, phase, battleId, battle?.status, battle?.questionCount, liveOpponentDisplayName, liveMyAnsweredCount])
 
   // 언마운트 전용 정리: 컴포넌트가 내려갈 때만 liveStatus.battle을 제거한다.
   // 빈 의존성 배열이므로 상태 업데이트 effect와 경쟁하지 않는다.
   useEffect(() => {
     const uid = user?.uid
-    if (!uid) return undefined
+    if (!uid || userData?.isGuest === true) return undefined
     return () => {
       setDoc(doc(db, 'users', uid), { liveStatus: { battle: deleteField() } }, { merge: true }).catch(() => {})
     }
-  }, [user?.uid])
+  }, [user?.uid, userData?.isGuest])
 
   useEffect(() => {
     if (!battleId || !battle || !user?.uid || battle.status !== 'starting') return undefined
@@ -343,6 +372,7 @@ export default function QuizBattleView({
   const isBattleStarting = battle?.status === 'starting'
   const isBattleCancelled = battle?.status === 'cancelled'
   const isBattleCompleteForMe = questionSet.length > 0 && answeredCount >= questionSet.length
+  const isOpponentComplete = questionSet.length > 0 && Number(opponentParticipant.answeredCount || 0) >= questionSet.length
   const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
 
   useEffect(() => {
@@ -442,6 +472,14 @@ export default function QuizBattleView({
       setReveal(true)
       if (data.isCorrect) soundManager.playCorrect()
       else soundManager.playWrong()
+      if (battle?.isAI === true) {
+        if (aiAdvanceTimerRef.current) clearTimeout(aiAdvanceTimerRef.current)
+        const isLastAnswer = Number(data.answeredCount || 0) >= Number(battle.questionCount || QUESTION_COUNT)
+        aiAdvanceTimerRef.current = setTimeout(() => {
+          const advanceAI = httpsCallable(functions, 'advanceAIQuizBattle')
+          advanceAI({ battleId }).catch((err) => console.warn('AI progress update failed', err))
+        }, (isLastAnswer ? 2400 : 900) + Math.floor(Math.random() * 1700))
+      }
     } catch (err) {
       setError(err?.message || '답안을 제출하지 못했습니다.')
     } finally {
@@ -452,6 +490,10 @@ export default function QuizBattleView({
   const advanceToNext = () => {
     setReveal(false)
   }
+
+  useEffect(() => () => {
+    if (aiAdvanceTimerRef.current) clearTimeout(aiAdvanceTimerRef.current)
+  }, [])
 
   const finalizeBattle = async () => {
     if (!battleId || isFinalizing) return
@@ -557,13 +599,13 @@ export default function QuizBattleView({
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚔️</div>
           <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.75rem' }}>QUIZ BATTLE</h2>
           <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-            같은 행성의 배틀 대기룸에 입장합니다.<br />
-            대기자를 선택하면 해당 대기방의 범위로 바로 배틀합니다.
+            {isAIMode ? '전술 AI NOVA-7이 내 풀이 속도에 맞춰 함께 달립니다.' : '같은 범위에 도전하는 탐사원과 실시간으로 대결합니다.'}<br />
+            {isAIMode ? 'AI전 광석은 일반 대전의 1/3이며, 약 70%의 승리 경험으로 조율됩니다.' : '대기자를 선택하면 해당 대기방으로 바로 연결됩니다.'}
           </p>
           <div style={{ color: 'var(--crystal-cyan)', marginBottom: '1.5rem', fontWeight: 800 }}>
-            진입 미션: {entryUnitTitle || entryUnitId}
+            퀴즈 범위: {rangeLabel || entryUnitTitle || entryUnitId}
           </div>
-          <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+          {!isScopeLocked && <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
             <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.5rem', textAlign: 'center' }}>
               새 대기방 범위 선택
             </div>
@@ -596,7 +638,7 @@ export default function QuizBattleView({
                 )
               })}
             </div>
-          </div>
+          </div>}
           <div
             style={{
               display: 'grid',
@@ -617,7 +659,7 @@ export default function QuizBattleView({
               </div>
             ))}
           </div>
-          <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+          {!isAIMode && <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
             <div
               style={{
                 width: '100%',
@@ -730,15 +772,20 @@ export default function QuizBattleView({
                 지금은 같은 행성에 대기 중인 학생이 없습니다.
               </div>
             )}
-          </div>
+          </div>}
+          {userData?.isGuest === true && (
+            <div className="font-tech" style={{ color: 'var(--star-gold)', marginBottom: '1rem', fontSize: '0.82rem' }}>
+              GUEST RUN · 내 전적과 광석은 저장되지 않지만 상대방의 경기 기록에는 반영됩니다.
+            </div>
+          )}
           {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="hud-btn primary glass" onClick={() => joinQueue()} disabled={isJoining} style={{ padding: '0.9rem 1.4rem' }}>
-              {isJoining ? '대기룸 접속 중...' : '배틀 대기룸 입장'}
+            <button className="hud-btn primary glass" onClick={isAIMode ? startAIBattle : () => joinQueue()} disabled={isJoining} style={{ padding: '0.9rem 1.4rem' }}>
+              {isJoining ? '배틀 좌표 생성 중...' : isAIMode ? 'NOVA-7과 대결 시작' : '배틀 대기룸 입장'}
             </button>
-            <button className="hud-btn secondary glass" onClick={handleSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
+            {!isAIMode && onSoloQuiz && <button className="hud-btn secondary glass" onClick={handleSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
               혼자 FIELD TEST
-            </button>
+            </button>}
             <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
               돌아가기
             </button>
@@ -1168,6 +1215,10 @@ export default function QuizBattleView({
               <button className="hud-btn primary glass" onClick={advanceToNext} style={{ padding: '0.8rem 1.2rem' }}>
                 다음 문제
               </button>
+            ) : isBattleCompleteForMe && battle?.isAI === true && !isOpponentComplete && !timeExpired ? (
+              <button className="hud-btn primary glass" disabled style={{ padding: '0.8rem 1.2rem' }}>
+                NOVA-7 계산 중…
+              </button>
             ) : isBattleCompleteForMe || timeExpired ? (
               <button className="hud-btn primary glass" onClick={finalizeBattle} disabled={isFinalizing} style={{ padding: '0.8rem 1.2rem' }}>
                 {isFinalizing ? '정산 중...' : '결과 확인'}
@@ -1182,7 +1233,7 @@ export default function QuizBattleView({
 
         {isBattleCompleteForMe && !isBattleFinished && (
           <div className="glass-card" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            내 답안 제출이 끝났습니다. 상대 제출이 끝나면 결과가 확정됩니다.
+            내 답안 제출이 끝났습니다. {battle?.isAI === true ? 'NOVA-7이 마지막 답안을 계산하고 있습니다.' : '상대 제출이 끝나면 결과가 확정됩니다.'}
           </div>
         )}
       </div>

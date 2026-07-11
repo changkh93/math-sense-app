@@ -334,6 +334,11 @@ const QUIZ_BATTLE_DRAW_REWARD = 20;
 const QUIZ_BATTLE_SCOPE_CUMULATIVE = "cumulative";
 const QUIZ_BATTLE_SCOPE_UNIT = "unit";
 const QUIZ_BATTLE_MIN_UNIT_QUESTION_COUNT = 5;
+const QUIZ_BATTLE_AI_REWARD_DIVISOR = 3;
+
+function isPersistentBattleParticipant(participant = {}) {
+  return participant.isGuest !== true && participant.isAI !== true;
+}
 
 function addStatDelta(deltas, fieldName, amount) {
   deltas[fieldName] = (deltas[fieldName] || 0) + amount;
@@ -846,6 +851,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         regionId: battleData.regionId || "",
         regionTitle: battleData.regionTitle || "",
         clusterId: battleData.clusterId || "",
+        isAI: battleData.isAI === true,
         wrongAnswersSyncedAt: battleData.wrongAnswersSyncedAt || null,
         battleStatsSyncedAt: battleData.battleStatsSyncedAt || null,
       };
@@ -882,14 +888,23 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
     }
 
     const rewardResult = calculateBattleRewards(participants, participantUids, totalQuestions);
+    participantUids.forEach((uid) => {
+      const participant = participants[uid] || {};
+      if (!isPersistentBattleParticipant(participant)) {
+        rewardResult.rewards[uid] = 0;
+      } else if (battleData.isAI === true) {
+        rewardResult.rewards[uid] = Math.floor(Number(rewardResult.rewards[uid] || 0) / QUIZ_BATTLE_AI_REWARD_DIVISOR);
+      }
+    });
+    const persistentParticipantUids = participantUids.filter((uid) => isPersistentBattleParticipant(participants[uid] || {}));
 
     // summary에 streak 재계산이 필요하므로 각 참가자의 기존 summary를 병렬로 미리 읽는다.
     // Firestore 트랜잭션은 모든 read가 write보다 먼저 와야 하므로, battle 문서 update 전에 읽는다.
-    const statsSnaps = await Promise.all(participantUids.map((uid) =>
+    const statsSnaps = await Promise.all(persistentParticipantUids.map((uid) =>
       transaction.get(db.collection("users").doc(uid).collection("battleStats").doc("summary"))
     ));
     const existingStats = {};
-    participantUids.forEach((uid, idx) => {
+    persistentParticipantUids.forEach((uid, idx) => {
       existingStats[uid] = statsSnaps[idx].exists ? (statsSnaps[idx].data() || {}) : {};
     });
 
@@ -906,6 +921,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
 
     participantUids.forEach((uid) => {
       const participant = participants[uid] || {};
+      if (!isPersistentBattleParticipant(participant)) return;
       const reward = Number(rewardResult.rewards[uid] || 0);
       const userRef = db.collection("users").doc(uid);
       const historyRef = userRef.collection("history").doc(`quiz_battle_${battleId}`);
@@ -957,6 +973,8 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         chapterId: "",
         clusterId: battleData.clusterId || "",
         battleScope: battleData.battleScope || "cumulative",
+        opponentType: battleData.isAI === true ? "ai" : (participants[opponentUid]?.isGuest === true ? "guest" : "member"),
+        isAIBattle: battleData.isAI === true,
         battleUnitTitle: battleData.battleUnitTitle || "",
         score: Number(participant.score || 0),
         correctCount: Number(participant.correctCount || 0),
@@ -1002,6 +1020,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       regionId: battleData.regionId || "",
       regionTitle: battleData.regionTitle || "",
       clusterId: battleData.clusterId || "",
+      isAI: battleData.isAI === true,
       wrongAnswersSyncedAt: null,
       battleStatsSyncedAt: null,
       finalizeReason,
@@ -1026,6 +1045,12 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
     } catch (err) {
       console.warn("Battle stats sync failed", battleId, err);
     }
+  }
+
+  if (result?.isAI === true) {
+    await db.collection("quizBattleAISecrets").doc(battleId).delete().catch((err) => {
+      console.warn("AI battle secret cleanup failed", battleId, err);
+    });
   }
 
   return result;
@@ -1092,12 +1117,15 @@ async function syncBattleStatsIfNeeded(battleId, source = "manual") {
 // 전체를 단일 batch로 커밋해 원자성을 보장하며, lastBattleId로 idempotency를 검사한다.
 // battleRef를 전달받아 battleStatsSyncedAt을 같은 batch에 포함한다.
 async function applyBattleStats({ db, battleId, battleData, claimId, battleRef }) {
-  const participantUids = Array.isArray(battleData.participantUids)
+  const allParticipantUids = Array.isArray(battleData.participantUids)
     ? battleData.participantUids.filter(Boolean).slice(0, 2)
     : [];
-  if (participantUids.length !== 2) return;
-
   const participants = battleData.participants || {};
+  const participantUids = allParticipantUids.filter((uid) => isPersistentBattleParticipant(participants[uid] || {}));
+  if (participantUids.length === 0) {
+    await battleRef.set({ battleStatsSyncedAt: FieldValue.serverTimestamp() }, { merge: true });
+    return;
+  }
   const regionId = battleData.regionId || "";
   const regionTitle = battleData.regionTitle || "";
   const winnerUid = battleData.winnerUid || "";
@@ -1112,7 +1140,7 @@ async function applyBattleStats({ db, battleId, battleData, claimId, battleRef }
   const recentCounts = {};
 
   await Promise.all(participantUids.map(async (uid) => {
-    const opponentUid = participantUids.find((otherUid) => otherUid !== uid) || "";
+    const opponentUid = allParticipantUids.find((otherUid) => otherUid !== uid) || "";
 
     // summary read (rating 계산용)
     const summarySnap = await db.collection("users").doc(uid)
@@ -1141,7 +1169,7 @@ async function applyBattleStats({ db, battleId, battleData, claimId, battleRef }
   // (claim 패턴이 이미 2분 lock을 걸지만, lock 만료 후 재시도 시 중복을 막는다.)
   const alreadyProcessed = participantUids.every((uid) => {
     const regionAlready = regionId && regionSnaps[uid]?.lastBattleId === battleId;
-    const oppUid = participantUids.find((otherUid) => otherUid !== uid) || "";
+    const oppUid = allParticipantUids.find((otherUid) => otherUid !== uid) || "";
     const oppAlready = oppUid && opponentSnaps[uid]?.lastBattleId === battleId;
     return regionAlready || oppAlready;
   });
@@ -1160,7 +1188,7 @@ async function applyBattleStats({ db, battleId, battleData, claimId, battleRef }
 
   participantUids.forEach((uid) => {
     const participant = participants[uid] || {};
-    const opponentUid = participantUids.find((otherUid) => otherUid !== uid) || "";
+    const opponentUid = allParticipantUids.find((otherUid) => otherUid !== uid) || "";
     const opponentDisplayName = (participants[opponentUid] || {}).displayName || "";
     const didWin = winnerUid === uid;
     const didDraw = !winnerUid;
@@ -1274,7 +1302,9 @@ async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
       db,
       battleRef,
       battleId,
-      participantUids: Array.isArray(claimedBattle.participantUids) ? claimedBattle.participantUids : [],
+      participantUids: Array.isArray(claimedBattle.participantUids)
+        ? claimedBattle.participantUids.filter((uid) => isPersistentBattleParticipant(claimedBattle.participants?.[uid] || {}))
+        : [],
       questionSet: Array.isArray(claimedBattle.questionSet) ? claimedBattle.questionSet : [],
       regionId: claimedBattle.regionId || "",
       regionTitle: claimedBattle.regionTitle || "",
@@ -1812,6 +1842,7 @@ exports.listQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
 
 exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
+  const isGuestUser = isGuestContext(context);
   const clusterId = cleanId(data?.clusterId || "cluster_elementary");
   const regionId = cleanId(data?.regionId);
   const entryUnitId = cleanId(data?.entryUnitId);
@@ -1834,7 +1865,9 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
   let ticketId = ticketRef.id;
   const userRef = db.collection("users").doc(uid);
   const userSnap = await userRef.get();
-  const userData = userSnap.exists ? userSnap.data() || {} : {};
+  const userData = userSnap.exists
+    ? (userSnap.data() || {})
+    : (isGuestUser ? { publicDisplayName: getCrewGuestAlias(uid), isGuest: true } : {});
   let existingTicketSnap = ownTicket?.snap || await ticketRef.get();
   if (
     existingTicketSnap.exists &&
@@ -1974,6 +2007,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       participants[uid] = {
         uid,
         displayName: getPublicStudentName(userData),
+        isGuest: isGuestUser,
         score: 0,
         correctCount: 0,
         answeredCount: 0,
@@ -1986,6 +2020,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       participants[opponentUid] = {
         uid: opponentUid,
         displayName: freshTarget.displayName || "상대",
+        isGuest: freshTarget.isGuest === true,
         score: 0,
         correctCount: 0,
         answeredCount: 0,
@@ -2035,6 +2070,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       transaction.set(ticketRef, {
         uid,
         displayName: getPublicStudentName(userData),
+        isGuest: isGuestUser,
         clusterId: contextData.clusterId,
         regionId,
         entryUnitId,
@@ -2135,6 +2171,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       participants[uid] = {
         uid,
         displayName: getPublicStudentName(userData),
+        isGuest: isGuestUser,
         score: 0,
         correctCount: 0,
         answeredCount: 0,
@@ -2147,6 +2184,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       participants[opponentUid] = {
         uid: opponentUid,
         displayName: freshCandidate.displayName || getPublicStudentName(opponentData, "상대"),
+        isGuest: freshCandidate.isGuest === true,
         score: 0,
         correctCount: 0,
         answeredCount: 0,
@@ -2198,6 +2236,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
       transaction.set(ticketRef, {
         uid,
         displayName: getPublicStudentName(userData),
+        isGuest: isGuestUser,
         clusterId: contextData.clusterId,
         regionId,
         entryUnitId,
@@ -2253,6 +2292,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
     transaction.set(ticketRef, {
       uid,
       displayName: getPublicStudentName(userData),
+      isGuest: isGuestUser,
       clusterId: contextData.clusterId,
       regionId,
       entryUnitId,
@@ -2329,6 +2369,175 @@ exports.cancelQuizBattleQueue = regionalFunctions.https.onCall(async (data, cont
   }
 
   return { success: true, status: cancelStatus };
+});
+
+exports.startAIQuizBattle = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const isGuestUser = isGuestContext(context);
+  const clusterId = cleanId(data?.clusterId || "cluster_elementary");
+  const regionId = cleanId(data?.regionId);
+  const entryUnitId = cleanId(data?.entryUnitId);
+  const battleScope = normalizeBattleScope(data?.battleScope);
+  const requestedQuestionCount = Math.max(
+    QUIZ_BATTLE_MIN_UNIT_QUESTION_COUNT,
+    Math.min(QUIZ_BATTLE_QUESTION_COUNT, Number(data?.questionCount || QUIZ_BATTLE_QUESTION_COUNT))
+  );
+
+  if (!regionId || !entryUnitId) {
+    throw new functions.https.HttpsError("invalid-argument", "AI 배틀 진입 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const nowMs = Date.now();
+  const contextData = await resolveBattleContext({ clusterId, regionId, entryUnitId });
+  const questionSet = await buildBattleQuestionSet(
+    contextData,
+    contextData.entryOrdinal,
+    requestedQuestionCount,
+    `${uid}_ai_${nowMs}`,
+    { battleScope, unitId: entryUnitId }
+  );
+  const userSnap = await db.collection("users").doc(uid).get();
+  const userData = userSnap.exists
+    ? (userSnap.data() || {})
+    : (isGuestUser ? { publicDisplayName: getCrewGuestAlias(uid) } : {});
+  const battleRef = db.collection("quizBattles").doc();
+  const aiSecretRef = db.collection("quizBattleAISecrets").doc(battleRef.id);
+  const aiUid = `ai_${battleRef.id}`;
+  const entryUnitTitle = contextData.units.find((unit) => unit.id === entryUnitId)?.title || "";
+  const participantUids = [uid, aiUid];
+
+  const createBatch = db.batch();
+  createBatch.set(battleRef, {
+    status: "active",
+    isAI: true,
+    aiParticipantUid: aiUid,
+    clusterId: contextData.clusterId,
+    regionId,
+    regionTitle: contextData.regionTitle || "",
+    battleScope,
+    battleUnitId: battleScope === QUIZ_BATTLE_SCOPE_UNIT ? entryUnitId : "",
+    battleUnitTitle: battleScope === QUIZ_BATTLE_SCOPE_UNIT ? entryUnitTitle : "",
+    commonCeilingOrdinal: contextData.entryOrdinal,
+    participantUids,
+    participants: {
+      [uid]: {
+        uid,
+        displayName: getPublicStudentName(userData),
+        isGuest: isGuestUser,
+        score: 0,
+        correctCount: 0,
+        answeredCount: 0,
+        ready: true,
+        entryConfirmed: true,
+        entryConfirmedAtMs: nowMs,
+        entryUnitId,
+        entryUnitTitle,
+      },
+      [aiUid]: {
+        uid: aiUid,
+        displayName: "NOVA-7",
+        isAI: true,
+        score: 0,
+        correctCount: 0,
+        answeredCount: 0,
+        ready: true,
+        entryConfirmed: true,
+        entryConfirmedAtMs: nowMs,
+        entryUnitId,
+        entryUnitTitle,
+      },
+    },
+    entryUnitIds: { [uid]: entryUnitId, [aiUid]: entryUnitId },
+    questionCount: questionSet.length,
+    questionSet,
+    startedAt: FieldValue.serverTimestamp(),
+    startedAtMs: nowMs,
+    endsAtMs: nowMs + QUIZ_BATTLE_DURATION_MS,
+    createdAt: FieldValue.serverTimestamp(),
+    createdAtMs: nowMs,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  createBatch.set(aiSecretRef, {
+    battleId: battleRef.id,
+    userUid: uid,
+    userFavored: Math.random() < 0.7,
+    createdAt: FieldValue.serverTimestamp(),
+    ttlAt: Timestamp.fromMillis(nowMs + (7 * 24 * 60 * 60 * 1000)),
+  });
+  await createBatch.commit();
+
+  return { status: "active", battleId: battleRef.id };
+});
+
+exports.advanceAIQuizBattle = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const battleId = cleanId(data?.battleId);
+  if (!battleId) {
+    throw new functions.https.HttpsError("invalid-argument", "AI 배틀 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const battleRef = db.collection("quizBattles").doc(battleId);
+  const aiSecretRef = db.collection("quizBattleAISecrets").doc(battleId);
+  const nowMs = Date.now();
+  let shouldFinalize = false;
+  let aiProgress = null;
+
+  await db.runTransaction(async (transaction) => {
+    const [battleSnap, aiSecretSnap] = await Promise.all([
+      transaction.get(battleRef),
+      transaction.get(aiSecretRef),
+    ]);
+    if (!battleSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "AI 배틀을 찾을 수 없습니다.");
+    }
+    const battleData = battleSnap.data() || {};
+    const aiSecret = aiSecretSnap.exists ? (aiSecretSnap.data() || {}) : {};
+    if (battleData.isAI !== true || battleData.status !== "active") return;
+    if (!Array.isArray(battleData.participantUids) || !battleData.participantUids.includes(uid)) {
+      throw new functions.https.HttpsError("permission-denied", "배틀 참가자만 AI 진행을 요청할 수 있습니다.");
+    }
+
+    const aiUid = cleanId(battleData.aiParticipantUid);
+    const aiParticipant = battleData.participants?.[aiUid] || {};
+    const myParticipant = battleData.participants?.[uid] || {};
+    const totalQuestions = Number(battleData.questionCount || battleData.questionSet?.length || 0);
+    const myAnswered = Math.min(totalQuestions, Number(myParticipant.answeredCount || 0));
+    const myCorrect = Math.min(myAnswered, Number(myParticipant.correctCount || 0));
+    const currentAIAnswered = Math.min(totalQuestions, Number(aiParticipant.answeredCount || 0));
+    let nextAIAnswered = Math.max(currentAIAnswered, Math.min(myAnswered, currentAIAnswered + 1));
+    let nextAICorrect = Math.min(nextAIAnswered, Number(aiParticipant.correctCount || 0));
+
+    if (myAnswered >= totalQuestions) {
+      nextAIAnswered = totalQuestions;
+      nextAICorrect = aiSecret.userFavored === true
+        ? Math.max(0, myCorrect - 1)
+        : Math.min(totalQuestions, myCorrect + 1);
+    } else if (nextAIAnswered > currentAIAnswered) {
+      const stepIsCorrect = ((nextAIAnswered + battleId.length) % 5) < 3;
+      nextAICorrect = Math.min(nextAIAnswered, Number(aiParticipant.correctCount || 0) + (stepIsCorrect ? 1 : 0));
+    }
+
+    const aiLastAnsweredAtMs = myAnswered >= totalQuestions && aiSecret.userFavored !== true
+      ? Math.max(1, Number(myParticipant.lastAnsweredAtMs || nowMs) - 1)
+      : nowMs;
+
+    transaction.update(battleRef, {
+      [`participants.${aiUid}.answeredCount`]: nextAIAnswered,
+      [`participants.${aiUid}.correctCount`]: nextAICorrect,
+      [`participants.${aiUid}.score`]: nextAICorrect * 100,
+      [`participants.${aiUid}.lastAnsweredAtMs`]: aiLastAnsweredAtMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    shouldFinalize = myAnswered >= totalQuestions && nextAIAnswered >= totalQuestions;
+    aiProgress = { answeredCount: nextAIAnswered, correctCount: nextAICorrect, score: nextAICorrect * 100 };
+  });
+
+  if (shouldFinalize) {
+    await finalizeQuizBattleInternal(battleId, "completed");
+  }
+  return { success: true, finalized: shouldFinalize, ai: aiProgress };
 });
 
 exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context) => {

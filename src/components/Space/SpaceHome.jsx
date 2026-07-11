@@ -29,6 +29,7 @@ import MistakeNotebookPlanet from './MistakeNotebookPlanet'
 import WarpGateDocking from './WarpGateDocking'
 import ProfileEditView from './ProfileEditView' // Profile Management
 import StudyCrewView from './StudyCrewView'
+import QuizBattleHub from './QuizBattleHub'
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
@@ -798,10 +799,10 @@ function SpaceHome() {
     setPendingRegion(null);
     setAccessError(null);
     setIsBoosting(false);
-    // Crew guests may only access NAV (planet) and STUDY CREW (crew); anything
-    // else falls back to the planet so they can never leave those two views.
+    // Crew guests can explore NAV, STUDY CREW and the public QUIZ BATTLE arena.
     const guest = userData?.isGuest === true;
-    const allowedView = guest && view !== 'planet' && view !== 'crew' ? 'planet' : view;
+    const guestAvailableViews = new Set(['planet', 'crew', 'battle']);
+    const allowedView = guest && !guestAvailableViews.has(view) ? 'planet' : view;
     setCurrentView(allowedView);
     updateSelectedRegionId(null);
     updateSelectedChapterDocId(null);
@@ -854,7 +855,7 @@ function SpaceHome() {
     const requestedView = location.state?.view || params.get('view')
     const requestedClusterId = location.state?.clusterId || params.get('clusterId')
     const requestedDate = location.state?.date || params.get('date') || params.get('assignmentDate')
-    const validViews = new Set(['planet', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
+    const validViews = new Set(['planet', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
 
     if (requestedView && validViews.has(requestedView)) {
       if (requestedView === 'assignment_hub') {
@@ -1184,6 +1185,7 @@ function SpaceHome() {
     if (currentView === 'dashboard') return '대시보드 방문 중';
     if (currentView === 'collection') return '도감 방문 중';
     if (currentView === 'crew') return '스터디 크루 방문 중';
+    if (currentView === 'battle') return '퀴즈 배틀 아레나 도전 중';
     if (currentView === 'assignment_hub') return '항행 일지(과제) 작성 중';
     if (currentView === 'mistake_notebook') return '오답노트 행성 복습 중';
     return '우주 공간(메인) 대기 중';
@@ -3359,6 +3361,15 @@ function SpaceHome() {
             soundManager.playClick();
           }} 
         />
+      </div>
+    )
+  }
+
+  if (currentView === 'battle') {
+    return (
+      <div className="space-bg" style={{ minHeight: '100dvh', overflowY: 'auto' }}>
+        <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
+        <QuizBattleHub onBack={() => { switchRootView('planet'); soundManager.playWarp(); }} />
       </div>
     )
   }

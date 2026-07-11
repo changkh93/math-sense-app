@@ -267,6 +267,11 @@ service cloud.firestore {
       }
     }
 
+    // AI 대전의 70% 결과 곡선은 서버만 읽고 쓴다.
+    match /quizBattleAISecrets/{battleId} {
+      allow read, write: if false;
+    }
+
     match /studyCrewMissionPlans/{dateKey} {
       allow read: if isAuth();
       allow write: if false;
