@@ -7,9 +7,10 @@ import { Howl, Howler } from 'howler'
 class SoundManager {
   constructor() {
     this.sounds = {}
+    this.soundVolumes = {}
     this.bgm = null
     this.isMuted = false
-    this.sfxVolume = 0.15 // 0.6에서 대폭 하향하여 학습 영상 소리를 방해하지 않도록 조정
+    this.sfxVolume = 0.2 // 학습 영상 소리를 방해하지 않으면서 피드백이 분명히 들리는 수준
     
     // 사운드 초기화
     this.initSounds()
@@ -23,7 +24,9 @@ class SoundManager {
         volume: this.sfxVolume,
       },
       wrong: {
-        src: ['/sounds/wrong.mp3', '/sounds/wrong.wav'],
+        // 기존 wrong.mp3는 0.19초/-19.5dB로, 공통 효과음 볼륨(15%) 적용 시
+        // 사실상 들리지 않는다. 충분히 인지 가능한 오류 버저음을 우선 사용한다.
+        src: ['/metasense-promo/remote-sfx/error-buzz.wav', '/sounds/wrong.mp3'],
         volume: this.sfxVolume,
       },
       click: {
@@ -50,6 +53,7 @@ class SoundManager {
 
     // Howl 인스턴스 생성
     Object.entries(soundDefs).forEach(([key, config]) => {
+      this.soundVolumes[key] = config.volume
       this.sounds[key] = new Howl({
         ...config,
         onloaderror: (id, error) => {
@@ -60,23 +64,25 @@ class SoundManager {
   }
 
   // 효과음 재생
-  play(soundName) {
+  play(soundName, volumeMultiplier = 1) {
     if (this.isMuted) return
     
     const sound = this.sounds[soundName]
     if (sound) {
-      sound.play()
+      const soundId = sound.play()
+      const baseVolume = this.soundVolumes[soundName] ?? this.sfxVolume
+      sound.volume(Math.min(1, baseVolume * volumeMultiplier), soundId)
     }
   }
 
   // 정답 효과음
-  playCorrect() {
-    this.play('correct')
+  playCorrect(volumeMultiplier = 1) {
+    this.play('correct', volumeMultiplier)
   }
 
   // 오답 효과음
-  playWrong() {
-    this.play('wrong')
+  playWrong(volumeMultiplier = 1) {
+    this.play('wrong', volumeMultiplier)
   }
 
   // 클릭 효과음

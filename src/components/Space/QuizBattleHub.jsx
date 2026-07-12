@@ -75,6 +75,7 @@ export default function QuizBattleHub({ onBack, onSoloQuiz }) {
     setScope({
       entryUnitId: getId(lastUnit),
       battleScope: 'cumulative',
+      selectionKind: 'region',
       label: `${getTitle(selectedRegion, '선택 리전')} · 전범위`,
       detail: '이 리전의 첫 개념부터 마지막 유닛까지',
     })
@@ -86,6 +87,7 @@ export default function QuizBattleHub({ onBack, onSoloQuiz }) {
     setScope({
       entryUnitId: getId(lastUnit),
       battleScope: 'cumulative',
+      selectionKind: 'chapter',
       label: `${getTitle(selectedChapter, '선택 챕터')}까지`,
       detail: '리전 시작부터 이 챕터의 마지막 유닛까지',
     })
@@ -151,7 +153,7 @@ export default function QuizBattleHub({ onBack, onSoloQuiz }) {
           <div className="battle-range-column">
             <div className="battle-range-column__title">CHAPTERS</div>
             {!effectiveRegionId ? <div className="battle-empty">먼저 리전을 선택하세요.</div> : chaptersLoading ? <div className="battle-empty">챕터 분석 중…</div> : <>
-              <button type="button" className={scope?.label?.includes('전범위') ? 'is-active is-full' : 'is-full'} onClick={selectRegionFull} disabled={!allUnits.length}>◎ 전범위</button>
+              <button type="button" className={scope?.selectionKind === 'region' ? 'is-active is-full' : 'is-full'} onClick={selectRegionFull} disabled={!allUnits.length}>◎ 전범위</button>
               {chapters.map((chapter) => (
                 <button key={getId(chapter)} type="button" className={getId(chapter) === chapterId ? 'is-active' : ''} onClick={() => { setChapterId(getId(chapter)); setScope(null) }}>
                   <span>{getTitle(chapter, '이름 없는 챕터')}</span><i>›</i>
@@ -162,9 +164,9 @@ export default function QuizBattleHub({ onBack, onSoloQuiz }) {
           <div className="battle-range-column battle-range-column--units">
             <div className="battle-range-column__title">UNITS / SCOPE</div>
             {!chapterId ? <div className="battle-empty">챕터를 선택하거나 전범위를 고르세요.</div> : unitsLoading ? <div className="battle-empty">유닛 스캔 중…</div> : <>
-              <button type="button" className={scope?.label?.includes('까지') ? 'is-active is-full' : 'is-full'} onClick={selectChapterFull}>◉ 이 챕터까지</button>
+              <button type="button" className={scope?.selectionKind === 'chapter' ? 'is-active is-full' : 'is-full'} onClick={selectChapterFull}>◉ 이 챕터까지</button>
               {selectedUnits.map((unit) => (
-                <button key={getId(unit)} type="button" className={scope?.entryUnitId === getId(unit) && scope?.battleScope === 'unit' ? 'is-active' : ''} onClick={() => setScope({ entryUnitId: getId(unit), battleScope: 'unit', label: getTitle(unit, '선택 유닛'), detail: '이 유닛에서만 출제' })}>
+                <button key={getId(unit)} type="button" className={scope?.selectionKind === 'unit' && scope?.entryUnitId === getId(unit) ? 'is-active' : ''} onClick={() => setScope({ entryUnitId: getId(unit), battleScope: 'cumulative', selectionKind: 'unit', label: `${getTitle(unit, '선택 유닛')}까지`, detail: '리전 시작부터 선택한 유닛까지 누적 출제' })}>
                   <span>{getTitle(unit, '이름 없는 유닛')}</span><i>+</i>
                 </button>
               ))}

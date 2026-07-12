@@ -16,6 +16,7 @@ const BATTLE_SCOPE_LABELS = {
   [BATTLE_SCOPE_UNIT]: '현재 유닛만',
   [BATTLE_SCOPE_CUMULATIVE]: '이전 과정 전체',
 }
+const BATTLE_FEEDBACK_VOLUME_MULTIPLIER = 1.75
 
 const getParticipant = (battle, uid) => battle?.participants?.[uid] || {}
 
@@ -65,6 +66,7 @@ export default function QuizBattleView({
   const [isLeaving, setIsLeaving] = useState(false)
   const [error, setError] = useState('')
   const [integrityNotice, setIntegrityNotice] = useState('')
+  const [resultDismissEnabled, setResultDismissEnabled] = useState(false)
   const [timeNow, setTimeNow] = useState(Date.now())
   const [reveal, setReveal] = useState(false) // 답안 제출 후 정답 공개 단계
   const [reviewMode, setReviewMode] = useState(false) // 결과 화면에서 틀린 문제 복습
@@ -78,6 +80,7 @@ export default function QuizBattleView({
   const entryConfirmTimeoutRef = useRef('')
   const aiAdvanceTimerRef = useRef(null)
   const lastIntegrityReportRef = useRef(0)
+  const resultLockedRef = useRef(false)
   const isAIMode = opponentMode === 'ai'
   const isScopeLocked = Boolean(rangeLabel)
   const aiTrainingData = useMemo(() => calculateBattleData(userData || {}), [userData])
@@ -244,13 +247,21 @@ export default function QuizBattleView({
   }, [joinQueue, phase])
 
   useEffect(() => {
+    resultLockedRef.current = false
+  }, [battleId])
+
+  useEffect(() => {
     if (!battleId) return undefined
     const unsubscribe = onSnapshot(doc(db, 'quizBattles', battleId), (snap) => {
       if (!snap.exists()) {
+        if (resultLockedRef.current) return
         setError('배틀 정보를 찾을 수 없습니다.')
         return
       }
       const raw = snap.data() || {}
+      // 결과 화면은 사용자가 버튼을 누르기 전까지 고정한다. 정산 후 파생 통계가
+      // 동기화되는 동안 늦게 도착한 비종료 스냅샷이 결과를 덮지 못하게 한다.
+      if (resultLockedRef.current && raw.status !== 'finished') return
       // questionSet에 서버 채점용 correctKeys가 포함되어 있을 수 있다.
       // 클라이언트에는 노출하지 않도록 정제한다.
       const sanitized = {
@@ -264,7 +275,12 @@ export default function QuizBattleView({
           : raw.questionSet,
       }
       setBattle({ id: snap.id, ...sanitized })
-      setPhase(raw.status === 'finished' ? 'result' : raw.status === 'cancelled' ? 'cancelled' : 'active')
+      if (raw.status === 'finished') {
+        resultLockedRef.current = true
+        setPhase('result')
+      } else {
+        setPhase(raw.status === 'cancelled' ? 'cancelled' : 'active')
+      }
     }, (err) => {
       setError(err?.message || '배틀 정보를 수신하지 못했습니다.')
     })
@@ -386,6 +402,20 @@ export default function QuizBattleView({
   const isBattleCompleteForMe = questionSet.length > 0 && answeredCount >= questionSet.length
   const isOpponentComplete = questionSet.length > 0 && Number(opponentParticipant.answeredCount || 0) >= questionSet.length
   const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
+
+  useEffect(() => {
+    if (!isBattleFinished) {
+      setResultDismissEnabled(false)
+      return undefined
+    }
+
+    // 패배 결과에는 오답 복습 버튼이 추가되어, 직전 화면의 오른쪽 액션 버튼과
+    // 'MISSION CONTROL로 돌아가기'가 같은 위치에 놓인다. 정산 중 연속 클릭/탭이
+    // 새 버튼으로 넘어가는 click-through를 막기 위해 결과 액션을 잠시 잠근다.
+    setResultDismissEnabled(false)
+    const timer = window.setTimeout(() => setResultDismissEnabled(true), 1600)
+    return () => window.clearTimeout(timer)
+  }, [battleId, isBattleFinished])
 
   useEffect(() => {
     if (!battleId || battle?.status !== 'active' || isBattleFinished) return undefined
@@ -537,8 +567,8 @@ export default function QuizBattleView({
       setSelectedKeys(new Set())
       // 정답 공개 단계로 전환해 사용자가 결과와 정답을 충분히 확인하게 한다.
       setReveal(true)
-      if (data.isCorrect) soundManager.playCorrect()
-      else soundManager.playWrong()
+      if (data.isCorrect) soundManager.playCorrect(BATTLE_FEEDBACK_VOLUME_MULTIPLIER)
+      else soundManager.playWrong(BATTLE_FEEDBACK_VOLUME_MULTIPLIER)
       if (battle?.isAI === true) {
         if (aiAdvanceTimerRef.current) clearTimeout(aiAdvanceTimerRef.current)
         const isLastAnswer = Number(data.answeredCount || 0) >= Number(battle.questionCount || QUESTION_COUNT)
@@ -633,17 +663,23 @@ export default function QuizBattleView({
 
   const leaveBattle = async () => {
     if (isLeaving) return
-    // 진행 중인 배틀에서 나갈 때는 서버에 포기를 알려 상대방이 즉시 결과를 볼 수 있게 한다.
+    // 진행 중 '나가기'는 서버에 포기를 알리고 결과 화면에 머문다.
+    // forfeit 요청을 기다리는 동안 onSnapshot이 먼저 finished 결과를 보여줄 수 있다.
+    // 여기서 이어서 onExit까지 실행하면 결과가 잠시 보인 뒤 자동으로 닫히므로,
+    // 포기 정산이 끝난 뒤 반드시 return하고 결과 화면의 명시적 버튼만 종료를 담당한다.
     if (battleId && phase === 'active' && !isBattleFinished) {
       setIsLeaving(true)
+      setError('')
       try {
         const forfeit = httpsCallable(functions, 'forfeitQuizBattle')
         await forfeit({ battleId })
       } catch (err) {
         console.warn('Failed to forfeit quiz battle', err)
+        setError(err?.message || '배틀 포기 정산에 실패했습니다. 다시 시도해 주세요.')
       } finally {
         setIsLeaving(false)
       }
+      return
     }
     if (phase === 'waiting') await cancelQueue()
     if (document.fullscreenElement && document.exitFullscreen) {
@@ -1087,7 +1123,7 @@ export default function QuizBattleView({
             {resultSummary?.outcome === 'win' ? '🏆' : resultSummary?.outcome === 'loss' ? '🛡️' : '🤝'}
           </div>
           <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.5rem' }}>
-            {resultSummary?.outcome === 'win' ? '배틀 승리' : resultSummary?.outcome === 'loss' ? '배틀 완료' : '무승부'}
+            {resultSummary?.outcome === 'win' ? '배틀 승리' : resultSummary?.outcome === 'loss' ? '배틀 패배' : '무승부'}
           </h2>
           <div className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '1rem', minHeight: '1.2rem' }}>
             {opponentForfeited
@@ -1129,12 +1165,12 @@ export default function QuizBattleView({
           )}
           <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             {wrongQuestions.length > 0 && (
-              <button className="hud-btn secondary glass" onClick={() => { setReviewMode(true); setReviewIndex(0) }} style={{ padding: '0.9rem 1.4rem' }}>
+              <button className="hud-btn secondary glass" onClick={() => { setReviewMode(true); setReviewIndex(0) }} disabled={!resultDismissEnabled} style={{ padding: '0.9rem 1.4rem' }}>
                 틀린 문제 다시 보기 ({wrongQuestions.length})
               </button>
             )}
-            <button className="hud-btn primary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.6rem' }}>
-              MISSION CONTROL로 돌아가기
+            <button className="hud-btn primary glass" onClick={() => { if (resultDismissEnabled) leaveBattle() }} disabled={!resultDismissEnabled || isLeaving} style={{ padding: '0.9rem 1.6rem' }}>
+              {resultDismissEnabled ? 'MISSION CONTROL로 돌아가기' : '결과 확인 중…'}
             </button>
           </div>
         </div>
