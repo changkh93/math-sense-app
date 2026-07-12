@@ -52,13 +52,16 @@ export function calculateFocusData(user = {}) {
 }
 
 // 배틀 축(Battle) SEI 점수. 최대 600점.
-// battleRating(1000~1900+)을 핵심으로 쓰고, 승률 신뢰도·참여량·연승을 보조 가산한다.
+// PVP battleRating을 핵심으로 쓰고, NOVA-7 훈련은 정답률·완주 기준 최대 60점만 보조 반영한다.
 // 패배해도 정답률과 참여가 battleRating에 반영되므로 단순 승패만으로 평가하지 않는다.
 export const BATTLE_MAX_SCORE = 600;
+export const AI_BATTLE_TRAINING_MAX_SCORE = 60;
 const BATTLE_SEI_RATING_MAX = 420;
 const BATTLE_SEI_WINRATE_MAX = 80;
 const BATTLE_SEI_VOLUME_MAX = 50;
 const BATTLE_SEI_STREAK_MAX = 50;
+const AI_BATTLE_ACCURACY_MAX = 40;
+const AI_BATTLE_COMPLETION_MAX = 20;
 // battleRating의 의미있는 분포 구간. 이 구간을 벗어나면 clamp.
 const BATTLE_RATING_FLOOR = 1000;
 const BATTLE_RATING_CEIL = 1900;
@@ -67,6 +70,10 @@ export function calculateBattleData(user = {}) {
   const totalMatches = readCounter(user.totalBattleMatches);
   const wins = readCounter(user.totalBattleWins);
   const bestStreak = readCounter(user.battleBestStreak);
+  const aiMatches = readCounter(user.aiBattleMatches);
+  const aiCompletedMatches = readCounter(user.aiBattleCompletedMatches);
+  const aiCorrect = readCounter(user.aiBattleCorrect);
+  const aiAnswered = Math.max(aiCorrect, readCounter(user.aiBattleAnswered));
   const explicitBattleRating = readCounter(user.battleRating);
   const hasExplicitBattleRating = explicitBattleRating > 0;
   const estimatedBattleRating = totalMatches > 0
@@ -91,12 +98,31 @@ export function calculateBattleData(user = {}) {
   // 4. 연승 보정 (최대 50). 5연승부터 만점.
   const streakScore = Math.floor(Math.min(1, bestStreak / 5) * BATTLE_SEI_STREAK_MAX);
 
-  const score = hasExplicitBattleRating
+  const competitiveScore = hasExplicitBattleRating
     ? Math.min(BATTLE_MAX_SCORE, ratingScore + winRateScore + volumeScore + streakScore)
     : 0;
+  const aiAccuracyScore = Math.floor(
+    calculateWilsonLowerBound(aiCorrect, aiAnswered) * AI_BATTLE_ACCURACY_MAX
+  );
+  const aiCompletionScore = Math.floor(
+    Math.min(1, aiCompletedMatches / 10) * AI_BATTLE_COMPLETION_MAX
+  );
+  const aiTrainingScore = Math.min(
+    AI_BATTLE_TRAINING_MAX_SCORE,
+    aiAccuracyScore + aiCompletionScore
+  );
+  const score = Math.min(BATTLE_MAX_SCORE, competitiveScore + aiTrainingScore);
 
   return {
     score,
+    competitiveScore,
+    aiTrainingScore,
+    aiMatches,
+    aiCompletedMatches,
+    aiCorrect,
+    aiAnswered,
+    aiAccuracyScore,
+    aiCompletionScore,
     battleRating,
     explicitBattleRating,
     estimatedBattleRating,
@@ -138,7 +164,7 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   const focusData = calculateFocusData(user);
   const focusScore = focusData.score;
 
-  // 7. 배틀 (Battle): 퀴즈 배틀 전적 기반. rating 정규화 + 승률 신뢰도 + 참여량 + 연승.
+  // 7. 배틀 (Battle): PVP 공식 전적 + 제한된 NOVA-7 훈련 점수.
   const battleData = calculateBattleData(user);
   const battleScore = battleData.score;
 
@@ -154,6 +180,8 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
     focus: focusScore,
     focusData,
     battle: battleScore,
+    battleCompetitive: battleData.competitiveScore,
+    battleTraining: battleData.aiTrainingScore,
     battleData,
     tier: getTierFromSEI(totalSEI)
   };

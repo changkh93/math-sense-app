@@ -49,7 +49,7 @@ export default function SpaceRanking({ user, userData }) {
     },
     battle: {
       title: '배틀(경쟁)',
-      tip: '퀴즈 배틀에 참전하세요. **battleRating**을 중심으로 승률(Wilson 보정), 참여량, 연승이 보조 반영됩니다. 패배해도 정답률과 완주 기록이 rating에 반영됩니다.'
+      tip: 'PVP는 **battleRating**과 공식 승률·연승에 반영됩니다. NOVA-7 훈련은 아레나 순위에서 제외되고, 정답률과 완주에 따라 전체 SEI에 최대 60점만 반영됩니다.'
     }
   };
 
@@ -159,7 +159,7 @@ export default function SpaceRanking({ user, userData }) {
           const aHasBattle = aMatches > 0;
           const bHasBattle = bMatches > 0;
           if (aHasBattle !== bHasBattle) return bHasBattle ? 1 : -1;
-          if ((b.seiData?.battle || 0) !== (a.seiData?.battle || 0)) return (b.seiData?.battle || 0) - (a.seiData?.battle || 0);
+          if ((b.seiData?.battleCompetitive || 0) !== (a.seiData?.battleCompetitive || 0)) return (b.seiData?.battleCompetitive || 0) - (a.seiData?.battleCompetitive || 0);
           const aRating = a.seiData?.battleData?.battleRating || 0;
           const bRating = b.seiData?.battleData?.battleRating || 0;
           if (bRating !== aRating) return bRating - aRating;
@@ -196,7 +196,7 @@ export default function SpaceRanking({ user, userData }) {
             } else {
               const prevWinRate = prevMatches > 0 ? (prev.totalBattleWins || 0) / prevMatches : 0;
               const currWinRate = currMatches > 0 ? (curr.totalBattleWins || 0) / currMatches : 0;
-              isTie = (prev.seiData?.battle || 0) === (curr.seiData?.battle || 0) &&
+              isTie = (prev.seiData?.battleCompetitive || 0) === (curr.seiData?.battleCompetitive || 0) &&
                       (prev.seiData?.battleData?.battleRating || 0) === (curr.seiData?.battleData?.battleRating || 0) &&
                       prevWinRate === currWinRate &&
                       prevMatches === currMatches;
@@ -392,6 +392,7 @@ export default function SpaceRanking({ user, userData }) {
           <div className="font-tech" style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.86rem', lineHeight: 1.65 }}>
             순위는 <strong style={{ color: 'var(--text-bright)' }}>배틀 SEI</strong> 높은 순입니다.
             배틀 SEI는 보정 Rating, Wilson 보정 승률, 참여량, 연승을 함께 반영합니다.
+            NOVA-7 훈련 기록은 배틀 아레나 순위·공식 승률·연승에서 제외됩니다.
             단순히 전적 수가 많은 순서가 아니며, 3전 미만은 <strong style={{ color: '#fbbf24' }}>배치 중</strong>으로 표시됩니다.
             기존 전적은 있지만 Rating이 아직 동기화되지 않은 경우에는 <strong style={{ color: '#fbbf24' }}>통계 동기화 중</strong>으로 표시하고,
             공식 Rating 계산이 끝난 뒤 순위에 반영합니다.
@@ -781,7 +782,7 @@ export default function SpaceRanking({ user, userData }) {
                             {/* 배틀 SEI: 배틀 아레나의 실제 순위 기준 */}
                             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                               <span style={{ color: '#f43f5e', fontWeight: 800, fontSize: '1.05rem' }}>
-                                {u.seiData?.battle || 0}
+                                {u.seiData?.battleCompetitive || 0}
                               </span>
                               <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
                                 /{BATTLE_MAX_SCORE}
@@ -1000,7 +1001,13 @@ export default function SpaceRanking({ user, userData }) {
                                     onMouseLeave={() => setHoveredMetric(null)}
                                     style={{ display: 'flex', justifyContent: 'space-between', cursor: 'help', padding: '4px 8px', borderRadius: '6px', transition: 'background 0.2s', background: hoveredMetric === 'battle' ? `${panelTheme.accent}16` : 'transparent' }}
                                   >
-                                    <span>배틀(경쟁)</span><strong style={{ color: panelTheme.accent }}>{u.seiData?.battle || 0} pts</strong>
+                                    <span>배틀(PVP+AI 훈련)</span>
+                                    <strong style={{ color: panelTheme.accent }}>
+                                      {u.seiData?.battle || 0} pts
+                                      <small style={{ display: 'block', fontWeight: 500, opacity: 0.72 }}>
+                                        PVP {u.seiData?.battleCompetitive || 0} + AI {u.seiData?.battleTraining || 0}
+                                      </small>
+                                    </strong>
                                   </li>
                                 </ul>
                                 <div style={{ 

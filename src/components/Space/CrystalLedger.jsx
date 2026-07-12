@@ -803,6 +803,7 @@ export default function CrystalLedger({ userData }) {
                 <li>패배해도 완주하면 <span style={{color: 'var(--text-bright)'}}>+10</span> 광석</li>
                 <li>무승부 시 양쪽 모두 <span style={{color: 'var(--text-bright)'}}>+20</span> 광석</li>
                 <li>NOVA-7 대전은 계산된 배틀 보상의 <span style={{color: 'var(--text-bright)'}}>1/3</span> 지급 <span style={{color: 'var(--text-muted)'}}>(소수점 버림)</span></li>
+                <li>NOVA-7은 공식 승률·연승·아레나 순위에서 제외되며, 정답률·완주에 따라 전체 SEI에 <span style={{color: 'var(--text-bright)'}}>최대 60점</span> 반영</li>
                 <li>현재 학습 중인 <span style={{color: 'var(--text-bright)'}}>과정과 리전</span>에서만 참여 가능</li>
                 <li>배틀 광석은 하루 최대 <span style={{color: 'var(--text-bright)'}}>500개</span></li>
                 <li>같은 범위 또는 같은 상대는 하루 <span style={{color: 'var(--text-bright)'}}>3회</span>까지만 보상·공식 전적 반영</li>

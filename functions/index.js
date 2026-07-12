@@ -973,10 +973,12 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       );
       const repeatEligible = scopeCount < QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT
         && opponentCount < QUIZ_BATTLE_DAILY_OPPONENT_LIMIT;
-      const competitiveEligible = accessEligible && repeatEligible;
+      const rewardEligible = accessEligible && repeatEligible;
+      const competitiveEligible = rewardEligible && battleData.isAI !== true;
+      const aiTrainingEligible = rewardEligible && battleData.isAI === true;
       const requestedReward = Number(rewardResult.rewards[uid] || 0);
       const remainingDailyOre = Math.max(0, QUIZ_BATTLE_DAILY_ORE_CAP - Number(limitData.totalOre || 0));
-      const reward = competitiveEligible ? Math.min(requestedReward, remainingDailyOre) : 0;
+      const reward = rewardEligible ? Math.min(requestedReward, remainingDailyOre) : 0;
       let reason = "";
       if (!accessEligible) reason = "battle_access_inactive";
       else if (scopeCount >= QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT) reason = "scope_repeat_limit";
@@ -990,7 +992,9 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         requestedReward,
         reason,
         accessEligible,
+        rewardEligible,
         competitiveEligible,
+        aiTrainingEligible,
         scopeKey,
         opponentKey,
       };
@@ -1014,6 +1018,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       const reward = Number(rewardResult.rewards[uid] || 0);
       const rewardPolicy = rewardPolicies[uid] || {};
       const competitiveEligible = rewardPolicy.competitiveEligible === true;
+      const aiTrainingEligible = rewardPolicy.aiTrainingEligible === true;
       const userRef = db.collection("users").doc(uid);
       const historyRef = userRef.collection("history").doc(`quiz_battle_${battleId}`);
       const statsRef = userRef.collection("battleStats").doc("summary");
@@ -1037,6 +1042,10 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         totalBattleWins: FieldValue.increment(competitiveEligible && didWin ? 1 : 0),
         totalBattleLosses: FieldValue.increment(competitiveEligible && didLose ? 1 : 0),
         totalBattleDraws: FieldValue.increment(competitiveEligible && didDraw ? 1 : 0),
+        aiBattleMatches: FieldValue.increment(aiTrainingEligible ? 1 : 0),
+        aiBattleCompletedMatches: FieldValue.increment(aiTrainingEligible && isComplete ? 1 : 0),
+        aiBattleCorrect: FieldValue.increment(aiTrainingEligible ? myCorrect : 0),
+        aiBattleAnswered: FieldValue.increment(aiTrainingEligible ? Math.max(myAnswered, myCorrect) : 0),
         lastBattleAt: FieldValue.serverTimestamp(),
       }, { merge: true });
 
@@ -1085,6 +1094,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         crystalsEarned: reward,
         rewardLimitReason: rewardPolicy.reason || "",
         competitiveEligible,
+        aiTrainingEligible,
         battleResult: didWin ? "win" : didDraw ? "draw" : "loss",
         opponentUid,
         opponentDisplayName,
@@ -1370,7 +1380,12 @@ async function countRecentBattleMatches(db, uid) {
     .where("type", "==", "quiz_battle")
     .where("timestamp", ">=", sinceDate)
     .get();
-  return snap.docs.filter((docSnap) => docSnap.data()?.competitiveEligible !== false).length;
+  return snap.docs.filter((docSnap) => {
+    const battle = docSnap.data() || {};
+    if (battle.competitiveEligible === true) return true;
+    // 플래그 도입 전 기록은 AI전만 제외하고 기존 PVP 기록을 유지한다.
+    return battle.competitiveEligible === undefined && battle.isAIBattle !== true;
+  }).length;
 }
 
 async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
@@ -3020,10 +3035,32 @@ exports.backfillQuizBattleStats = regionalFunctions.https.onCall(async (data, co
       continue;
     }
 
-    const battles = historySnap.docs
-      .map((d) => d.data())
-      .filter((battle) => battle.competitiveEligible !== false);
-    report.totalBattles += battles.length;
+    const allBattles = historySnap.docs.map((d) => d.data());
+    const isAIHistory = (battle) => battle.isAIBattle === true || battle.opponentType === "ai";
+    const battles = allBattles.filter((battle) => (
+      !isAIHistory(battle) && battle.competitiveEligible !== false
+    ));
+    const aiDailyCounts = {};
+    const aiTrainingBattles = allBattles.filter((battle) => {
+      if (!isAIHistory(battle) || battle.aiTrainingEligible === false) return false;
+      const date = battle.timestamp?.toDate?.();
+      const dateKey = date instanceof Date ? getBattleKstDateKey(date.getTime()) : "legacy";
+      const count = Number(aiDailyCounts[dateKey] || 0);
+      if (count >= QUIZ_BATTLE_DAILY_OPPONENT_LIMIT) return false;
+      aiDailyCounts[dateKey] = count + 1;
+      return true;
+    });
+    const aiTrainingStats = aiTrainingBattles.reduce((acc, battle) => {
+      const total = Number(battle.totalCount || 0);
+      const correct = Number(battle.correctCount || 0);
+      const answered = Math.max(Number(battle.answeredCount || 0), correct);
+      acc.matches += 1;
+      acc.completedMatches += total > 0 && answered >= total ? 1 : 0;
+      acc.correct += correct;
+      acc.answered += answered;
+      return acc;
+    }, { matches: 0, completedMatches: 0, correct: 0, answered: 0 });
+    report.totalBattles += allBattles.length;
 
     // summary 재구성 (set 방식)
     const summary = {
@@ -3163,6 +3200,7 @@ exports.backfillQuizBattleStats = regionalFunctions.https.onCall(async (data, co
     report.perUser.push({
       uid,
       battles: battles.length,
+      aiTrainingBattles: aiTrainingStats.matches,
       rating: battleRating,
       wins: summary.wins, losses: summary.losses, draws: summary.draws,
       regions: Object.keys(regionsMap).length,
@@ -3215,6 +3253,10 @@ exports.backfillQuizBattleStats = regionalFunctions.https.onCall(async (data, co
       totalBattleWins: summary.wins,
       totalBattleLosses: summary.losses,
       totalBattleDraws: summary.draws,
+      aiBattleMatches: aiTrainingStats.matches,
+      aiBattleCompletedMatches: aiTrainingStats.completedMatches,
+      aiBattleCorrect: aiTrainingStats.correct,
+      aiBattleAnswered: aiTrainingStats.answered,
     }, { merge: true });
 
     report.processedUsers += 1;

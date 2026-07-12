@@ -4,6 +4,7 @@ import { doc, getDoc, onSnapshot, setDoc, deleteField, serverTimestamp } from 'f
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '../../firebase'
 import { useAuth } from '../../hooks/useAuth'
+import { calculateBattleData } from '../../utils/rankingUtils'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import soundManager from '../../utils/SoundManager'
 
@@ -79,6 +80,7 @@ export default function QuizBattleView({
   const lastIntegrityReportRef = useRef(0)
   const isAIMode = opponentMode === 'ai'
   const isScopeLocked = Boolean(rangeLabel)
+  const aiTrainingData = useMemo(() => calculateBattleData(userData || {}), [userData])
 
   useEffect(() => {
     if (phase === 'idle') setBattleScope(initialBattleScope)
@@ -671,7 +673,7 @@ export default function QuizBattleView({
           <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.75rem' }}>QUIZ BATTLE</h2>
           <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             {isAIMode ? '전술 AI NOVA-7이 내 풀이 속도에 맞춰 함께 달립니다.' : '같은 범위에 도전하는 탐사원과 실시간으로 대결합니다.'}<br />
-            {isAIMode ? 'AI전 광석은 일반 대전의 1/3입니다.' : '대기자를 선택하면 해당 대기방으로 바로 연결됩니다.'}
+            {isAIMode ? 'AI전 광석은 일반 대전의 1/3이며, 공식 전적 대신 훈련 SEI에 제한적으로 반영됩니다.' : '대기자를 선택하면 해당 대기방으로 바로 연결됩니다.'}
           </p>
           <div style={{ color: 'var(--crystal-cyan)', marginBottom: '1.5rem', fontWeight: 800 }}>
             퀴즈 범위: {rangeLabel || entryUnitTitle || entryUnitId}
@@ -718,12 +720,17 @@ export default function QuizBattleView({
               marginBottom: '1.5rem',
             }}
           >
-            {[
-              ['전적', `${battleStats?.totalMatches || 0}전`],
+            {(isAIMode ? [
+              ['AI 훈련', `${aiTrainingData.aiMatches || 0}회`],
+              ['완주', `${aiTrainingData.aiCompletedMatches || 0}회`],
+              ['정답률', `${aiTrainingData.aiAnswered > 0 ? Math.round((aiTrainingData.aiCorrect / aiTrainingData.aiAnswered) * 100) : 0}%`],
+              ['훈련 SEI', `${aiTrainingData.aiTrainingScore || 0}/60`],
+            ] : [
+              ['공식 전적', `${battleStats?.totalMatches || 0}전`],
               ['승', `${battleStats?.wins || 0}`],
               ['패', `${battleStats?.losses || 0}`],
               ['무', `${battleStats?.draws || 0}`],
-            ].map(([label, value]) => (
+            ]).map(([label, value]) => (
               <div key={label} style={{ padding: '0.7rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{label}</div>
                 <div style={{ color: 'var(--text-bright)', fontWeight: 900 }}>{value}</div>
@@ -1104,6 +1111,11 @@ export default function QuizBattleView({
           <div style={{ color: 'var(--crystal-cyan)', fontSize: '1.25rem', fontWeight: 900, marginBottom: '1.5rem' }}>
             +{resultSummary?.reward || 0} 광석
           </div>
+          {battle?.isAI === true && (
+            <div className="font-tech" style={{ color: 'var(--text-muted)', margin: '-0.8rem 0 1.5rem', lineHeight: 1.6 }}>
+              NOVA-7전은 AI 훈련 기록과 제한된 훈련 SEI에 반영되며, 공식 승률·연승·배틀 아레나 순위에는 반영되지 않습니다.
+            </div>
+          )}
           {resultSummary?.rewardPolicy?.reason && (
             <div className="font-tech" style={{ color: 'var(--star-gold)', margin: '-0.8rem 0 1.5rem', lineHeight: 1.6 }}>
               {{
