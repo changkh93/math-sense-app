@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, limit } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from '../../firebase';
 import { useClusters } from '../../hooks/useContent';
 import { AlertTriangle, Search, Trash2, User as UserIcon } from 'lucide-react';
 import { STUDENT_GRADE_OPTIONS, getGradeLabel, normalizeGradeValue } from '../../utils/monthlyEvaluationAwards';
 import './Admin.css';
+import { EnrollmentEditor } from '../../components/Admin/FamilyBillingAdminPanel';
 
 const DAY_MAP = {
   '1': '월',
@@ -148,7 +149,10 @@ function UserAccessManager() {
         processSnap(specSnap);
       }
 
-      const fetchedUsers = Array.from(resultsMap.values());
+      const fetchedUsers = await Promise.all(Array.from(resultsMap.values()).map(async (row) => {
+        const enrollmentSnap = await getDoc(doc(db, 'studentEnrollments', row.uid));
+        return { ...row, enrollment: enrollmentSnap.exists() ? enrollmentSnap.data() : { status: 'trial' } };
+      }));
       setUsers(fetchedUsers);
       
       if (fetchedUsers.length === 0) {
@@ -417,6 +421,13 @@ function UserAccessManager() {
                     )}
                   </button>
                 </div>
+
+                {user.role !== 'admin' && user.role !== 'parent' && <div style={{ marginBottom: '18px' }}>
+                  <h4 style={{ margin: '0 0 9px', color: '#86efac' }}>학생별 유료 수강 상태</h4>
+                  <EnrollmentEditor
+                    child={{ uid: user.uid, name: user.studentName || user.name || user.email, enrollment: user.enrollment }}
+                  />
+                </div>}
 
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>

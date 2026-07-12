@@ -5,6 +5,7 @@ import { storage, db } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { compressImage } from '../../utils/storageUtils';
 import { Plus, Trash2, Save, X, Image as ImageIcon, Check, Edit3, ArrowLeft } from 'lucide-react';
+import { auditQuizOptionLengths } from '../../utils/quizOptionLengthAudit';
 
 const QuizEditor = () => {
   const { unitId } = useParams();
@@ -22,6 +23,9 @@ const QuizEditor = () => {
   
   const [editingQuiz, setEditingQuiz] = useState(null); // null = list, {} = new, {id...} = edit
   const [uploading, setUploading] = useState(false);
+  const optionLengthAudit = editingQuiz
+    ? auditQuizOptionLengths(editingQuiz.options)
+    : null;
 
   const handleEdit = (quiz) => setEditingQuiz(quiz);
   const handleAddNew = () => setEditingQuiz({
@@ -41,6 +45,13 @@ const QuizEditor = () => {
     if (correctCount === 0) {
       alert('정답을 최소 1개 이상 선택해주세요.');
       return;
+    }
+    if (optionLengthAudit?.suspicious) {
+      const shouldContinue = confirm(
+        `정답이 유일하게 가장 깁니다 (${optionLengthAudit.correctLength}자, 오답 최대 ${optionLengthAudit.longestIncorrectLength}자).\n` +
+        '학생이 길이만 보고 정답을 추측할 수 있습니다. 그래도 저장하시겠습니까?'
+      );
+      if (!shouldContinue) return;
     }
     saveQuiz.mutate(editingQuiz, {
       onSuccess: () => setEditingQuiz(null)
@@ -281,6 +292,24 @@ const QuizEditor = () => {
                 }}>+ Add Option</button>
               )}
             </div>
+            {optionLengthAudit?.suspicious && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: '0.75rem',
+                  padding: '0.75rem 0.9rem',
+                  border: '1px solid rgba(251, 191, 36, 0.55)',
+                  borderRadius: '8px',
+                  background: 'rgba(251, 191, 36, 0.08)',
+                  color: '#fbbf24',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.5
+                }}
+              >
+                선택지 길이 단서 경고: 정답 {optionLengthAudit.correctLength}자 / 오답 최대 {optionLengthAudit.longestIncorrectLength}자입니다.
+                정답을 간결하게 줄이거나 오답도 같은 수준의 구체성으로 작성하세요.
+              </div>
+            )}
           </div>
 
           <div className="form-group">

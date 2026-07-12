@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { collection, doc, onSnapshot, orderBy, query, setDoc, serverTimestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { ClipboardList, Phone, Gift, CheckCircle2 } from 'lucide-react';
-import { db } from '../../firebase';
+import { db, functions } from '../../firebase';
 import './Admin.css';
 
 const statusLabels = {
@@ -23,6 +24,47 @@ function formatPhone(phone = '') {
   if (digits.length === 11) return digits.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
   return phone || '-';
 }
+
+function ReferralApplicationEditor({ app }) {
+  const [trialStartDate, setTrialStartDate] = useState(app.trialStartDate || '');
+  const [trialEndDate, setTrialEndDate] = useState(app.trialEndDate || '');
+  const [referralStatus, setReferralStatus] = useState(app.referralStatus || 'applied');
+  const [referredStudentUid, setReferredStudentUid] = useState(app.referredStudentUid || '');
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!reason.trim()) return alert('변경 사유를 입력해 주세요.');
+    setSaving(true);
+    try {
+      const fn = httpsCallable(functions, 'adminConfigureReferralApplication');
+      await fn({ applicationId: app.id, trialStartDate, trialEndDate, referralStatus, referredStudentUid, reason });
+      setReason('');
+    } catch (error) {
+      alert(error?.message || '추천 체험 정보 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.18)' }}>
+      <strong style={{ color: '#86efac', fontSize: 13 }}>추천 1달 무료체험 운영</strong>
+      <div style={{ marginTop: 9, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(130px, 1fr))', gap: 8 }}>
+        <label style={{ fontSize: 11, color: '#94a3b8' }}>운영자 지정 시작일<input type="date" value={trialStartDate} onChange={(e) => setTrialStartDate(e.target.value)} style={fieldStyle} /></label>
+        <label style={{ fontSize: 11, color: '#94a3b8' }}>운영자 지정 종료일<input type="date" value={trialEndDate} onChange={(e) => setTrialEndDate(e.target.value)} style={fieldStyle} /></label>
+        <label style={{ fontSize: 11, color: '#94a3b8' }}>전환 상태<select value={referralStatus} onChange={(e) => setReferralStatus(e.target.value)} style={fieldStyle}>
+          <option value="applied">신청 완료</option><option value="trial_scheduled">체험 예정</option><option value="trial_active">무료체험 중</option><option value="trial_ended">체험 종료</option><option value="paid_active">유료 전환</option><option value="cancelled">종료</option><option value="rejected">혜택 제외</option>
+        </select></label>
+        <label style={{ fontSize: 11, color: '#94a3b8' }}>전환된 학생 UID<input value={referredStudentUid} onChange={(e) => setReferredStudentUid(e.target.value)} placeholder="회원가입 후 입력" style={fieldStyle} /></label>
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="변경 사유" style={fieldStyle} />
+        <button type="button" onClick={save} disabled={saving} className="secondary-btn" style={{ padding: '9px 12px' }}>{saving ? '저장 중...' : '체험·전환 저장'}</button>
+      </div>
+    </div>
+  );
+}
+
+const fieldStyle = { width: '100%', boxSizing: 'border-box', marginTop: 4, padding: '8px 9px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.14)', background: '#171827', color: 'white' };
 
 export default function Applications() {
   const [applications, setApplications] = useState([]);
@@ -107,6 +149,8 @@ export default function Applications() {
                     </div>
                   )}
                 </div>
+
+                {(app.referralInviteId || app.referredStudentName || app.referrerParentPhone) && <ReferralApplicationEditor app={app} />}
 
                 <div style={{ display: 'grid', gap: 8, minWidth: 180 }}>
                   <select

@@ -353,6 +353,46 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Referral and tuition data is calculated by trusted Cloud Functions.
+    // Clients may read only their own family/student records; every mutation is
+    // routed through a callable function so validation and audit logs cannot be
+    // bypassed.
+    match /familyBillingAccounts/{parentId} {
+      allow read: if isAuth() && (request.auth.uid == parentId || isAdmin());
+      allow write: if false;
+    }
+
+    match /studentEnrollments/{studentId} {
+      allow read: if isAuth() && (
+        request.auth.uid == studentId ||
+        isLinkedParentOf(studentId) ||
+        isAdmin()
+      );
+      allow write: if false;
+    }
+
+    match /referralInvites/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /referrals/{referralId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /familyBillingStatements/{statementId} {
+      allow read: if isAuth() && (
+        resource.data.parentUid == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if false;
+    }
+
+    match /adminAuditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Public applications are written by Cloud Functions and managed by admins.
     match /applications/{applicationId} {
       allow read, update, delete: if isAdmin();

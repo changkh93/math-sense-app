@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
@@ -235,6 +235,8 @@ export default function PublicApplication({ fixedType }) {
   const navigate = useNavigate();
   const type = fixedType || params.type || 'trial';
   const isTrial = type === 'trial';
+  const referralToken = useMemo(() => new URLSearchParams(window.location.search).get('ref') || '', []);
+  const [referralPreview, setReferralPreview] = useState(null);
   const [form, setForm] = useState({
     applicantName: '',
     parentPhone: '',
@@ -248,6 +250,28 @@ export default function PublicApplication({ fixedType }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!isTrial || !referralToken) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const preview = httpsCallable(functions, 'previewReferralInvite');
+        const result = await preview({ token: referralToken });
+        if (!cancelled) setReferralPreview(result.data || null);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Referral invite preview failed:', error);
+          setReferralPreview({ valid: false });
+        }
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [isTrial, referralToken]);
+
+  const isReferralTrial = Boolean(referralPreview?.valid);
+  const referralChecking = Boolean(isTrial && referralToken && !referralPreview);
 
   const title = isTrial ? '무료체험 신청' : '전화상담 신청';
   const eyebrow = isTrial ? '1주일 무료체험' : '학부모 전화상담';
@@ -270,10 +294,15 @@ export default function PublicApplication({ fixedType }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (referralChecking) return;
     setSubmitting(true);
     try {
       const submit = httpsCallable(functions, 'submitPublicApplication');
-      await submit({ type: isTrial ? 'trial' : 'consultation', ...form });
+      await submit({
+        type: isTrial ? 'trial' : 'consultation',
+        ...form,
+        referralToken: isReferralTrial ? referralToken : ''
+      });
       setDone(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -319,7 +348,7 @@ export default function PublicApplication({ fixedType }) {
       <main>
         <section className="trial-hero">
           <div className="hero-copy">
-            <div className="hero-eyebrow">{eyebrow}</div>
+            <div className="hero-eyebrow">{isReferralTrial ? '추천 혜택 · 1달 무료체험' : eyebrow}</div>
             <h1>우리 아이가 스스로 공부하는 힘을 키울 수 있을까요?</h1>
             <p>
               시켜야만 하는 공부는 오래가지 않습니다. 메타센스는 아이가 매일 접속해 스스로 학습하고,
@@ -614,7 +643,19 @@ export default function PublicApplication({ fixedType }) {
             </select>
             <input value={form.preferredTime} onChange={(e) => update('preferredTime', e.target.value)} placeholder="연락 가능 시간 예: 평일 14시 이후" />
 
-            {isTrial && (
+            {isTrial && isReferralTrial && (
+              <div className="referral-box referral-box--optional">
+                <div className="referral-header">
+                  <Gift size={18} />
+                  <strong>추천 혜택 확인 <span className="referral-badge">1달 무료</span></strong>
+                </div>
+                <p className="referral-hint">
+                  <b>{referralPreview.inviterLabel}</b>님의 추천 링크가 확인되었습니다. 체험 시작일은 담당자아 협의하여 지정합니다.
+                </p>
+              </div>
+            )}
+
+            {isTrial && !isReferralTrial && (
               <div className="referral-box referral-box--optional">
                 <div className="referral-header">
                   <Gift size={18} />
@@ -627,7 +668,7 @@ export default function PublicApplication({ fixedType }) {
             )}
 
             <textarea value={form.message} onChange={(e) => update('message', e.target.value)} placeholder="상담이 필요한 내용 또는 학생의 학습 상황" />
-            <button type="submit" disabled={submitting}>
+            <button type="submit" disabled={submitting || referralChecking}>
               {submitting ? '저장 중...' : title}
               {!submitting && <ArrowRight size={18} />}
             </button>

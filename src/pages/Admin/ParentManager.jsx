@@ -5,6 +5,7 @@ import { httpsCallable } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
 import { db, functions } from '../../firebase';
 import { Phone, UserPlus, Search, Trash2, Link2, Users, Eye, EyeOff, Key } from 'lucide-react';
+import FamilyBillingAdminPanel from '../../components/Admin/FamilyBillingAdminPanel';
 import './Admin.css';
 
 // Secondary Firebase app for creating parent accounts without logging out the admin
@@ -395,6 +396,8 @@ export default function ParentManager() {
                       </button>
                     </div>
                   </div>
+
+                  <FamilyBillingAdminPanel parent={parent} />
 
                   {/* Connected Children */}
                   <div style={{ marginTop: '10px' }}>

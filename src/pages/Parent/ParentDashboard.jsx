@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { db, auth, functions } from '../../firebase';
@@ -8,10 +8,11 @@ import { useLearningHistory } from '../../hooks/useLearningHistory';
 import { useAdminUserAllAssignments, useAdminUserAllAttendance, useStudentAssignmentWarnings } from '../../hooks/useAssignments';
 import { getTodayKST } from '../../utils/streakUtils';
 import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight, KeyRound, Eye, EyeOff, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import StudentReport from '../../components/Report/StudentReport';
 import DailyLearningTimeline from '../../components/Space/DailyLearningTimeline';
 import ChildAccountCreator from '../../components/Parent/ChildAccountCreator';
+import ReferralBillingCard from '../../components/Parent/ReferralBillingCard';
 
 // -------------------------------------------------------------
 // Helper: format relative time
@@ -954,6 +955,8 @@ export default function ParentDashboard() {
           </div>
         ) : (
           <>
+            <ReferralBillingCard />
+
             <div style={{ marginBottom: '20px' }}>
               <h2 style={{ margin: '0 0 4px', fontSize: '1.3rem' }}>자녀 학습 현황</h2>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'rgba(255,255,255,0.4)' }}>

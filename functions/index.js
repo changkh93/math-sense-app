@@ -11,6 +11,7 @@ try {
 } catch (e) {}
 const cors = require("cors")({ origin: true });
 const fetch = require("node-fetch");
+const referralBilling = require("./referralBilling");
 const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
@@ -3272,9 +3273,29 @@ exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) =>
   const referrerParentPhone = digitsOnly(data?.referrerParentPhone, 16);
   const preferredTime = cleanText(data?.preferredTime, 80);
   const selectedCourse = cleanText(data?.selectedCourse, 80);
+  const referralToken = cleanText(data?.referralToken, 200);
 
   if (!applicantName || parentPhone.length < 10 || !studentName || !grade) {
     throw new functions.https.HttpsError("invalid-argument", "필수 정보를 확인해 주세요.");
+  }
+
+  const referralInvite = referralToken ? await referralBilling.resolveInvite(referralToken) : null;
+  if (referralToken && !referralInvite) {
+    throw new functions.https.HttpsError("invalid-argument", "만료된 추천 링크가 압니다.");
+  }
+  let referralAttribution = referralInvite;
+  if (!referralAttribution && referrerParentPhone) {
+    const legacyParentSnap = await admin.firestore().collection("parents")
+      .where("phone", "==", referrerParentPhone).limit(1).get();
+    if (!legacyParentSnap.empty && legacyParentSnap.docs[0].data()?.isDeleted !== true) {
+      referralAttribution = {
+        id: `legacy_parent_${legacyParentSnap.docs[0].id}`,
+        referrerParentUid: legacyParentSnap.docs[0].id,
+        referrerStudentUid: null,
+        source: "legacy_manual",
+        crewId: null,
+      };
+    }
   }
 
   const payload = {
@@ -3289,12 +3310,40 @@ exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) =>
     selectedCourse,
     referredStudentName,
     referrerParentPhone,
+    referralInviteId: referralAttribution?.id || null,
+    referralSource: referralAttribution?.source || (referredStudentName || referrerParentPhone ? "legacy_manual_unmatched" : null),
+    referrerParentUid: referralAttribution?.referrerParentUid || null,
+    referrerStudentUid: referralAttribution?.referrerStudentUid || null,
+    referralStatus: referralAttribution ? "applied" : null,
+    oneMonthReferralTrial: Boolean(referralAttribution || referredStudentName || referrerParentPhone),
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     source: "public_site",
   };
 
-  const ref = await admin.firestore().collection("applications").add(payload);
+  const db = admin.firestore();
+  const ref = db.collection("applications").doc();
+  const referralId = referralAttribution ? `application_${ref.id}` : null;
+  const batch = db.batch();
+  batch.set(ref, { ...payload, referralId });
+  if (referralAttribution) {
+    batch.set(db.collection("referrals").doc(referralId), {
+      applicationId: ref.id,
+      inviteId: referralAttribution.id,
+      referrerParentUid: referralAttribution.referrerParentUid,
+      referrerStudentUid: referralAttribution.referrerStudentUid || null,
+      source: referralAttribution.source,
+      crewId: referralAttribution.crewId || null,
+      applicantStudentName: studentName,
+      referredStudentName: studentName,
+      referredParentUid: null,
+      referredStudentUid: null,
+      status: "applied",
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+  await batch.commit();
   return { success: true, id: ref.id };
 });
 
@@ -4746,6 +4795,15 @@ async function deleteUserOwnedData(uid, options = {}) {
     await deleteQueryDocs(db.collection("directMemos").where("senderId", "==", uid), stats, "directMemosDeleted");
     await deleteQueryDocs(db.collection("directMemos").where("recipientId", "==", uid), stats, "directMemosDeleted");
     await deleteQueryDocs(db.collection("starMessages").where("userId", "==", uid), stats, "starMessagesDeleted");
+    await deleteQueryDocs(db.collection("referrals").where("referrerStudentUid", "==", uid), stats, "referralsDeleted");
+    await deleteQueryDocs(db.collection("referrals").where("referredStudentUid", "==", uid), stats, "referralsDeleted");
+    await deleteQueryDocs(db.collection("referralInvites").where("referrerStudentUid", "==", uid), stats, "referralInvitesDeleted");
+    const enrollmentRef = db.collection("studentEnrollments").doc(uid);
+    const enrollmentSnap = await enrollmentRef.get();
+    if (enrollmentSnap.exists) {
+      await enrollmentRef.delete();
+      stats.studentEnrollmentDeleted = 1;
+    }
 
     stage = "nested-link-cleanup";
     await deleteDirectMemoLimitsForRecipient(db, uid, stats);
@@ -4846,6 +4904,17 @@ async function deleteParentOwnedData(parentUid) {
   if (parentUserSnap.exists) {
     const result = await deleteUserOwnedData(parentUid);
     stats.parentUserDocumentCleanup = result.stats;
+  }
+
+  await deleteQueryDocs(db.collection("familyBillingStatements").where("parentUid", "==", parentUid), stats, "familyBillingStatementsDeleted");
+  await deleteQueryDocs(db.collection("referrals").where("referrerParentUid", "==", parentUid), stats, "referralsDeleted");
+  await deleteQueryDocs(db.collection("referrals").where("referredParentUid", "==", parentUid), stats, "referralsDeleted");
+  await deleteQueryDocs(db.collection("referralInvites").where("referrerParentUid", "==", parentUid), stats, "referralInvitesDeleted");
+  const billingAccountRef = db.collection("familyBillingAccounts").doc(parentUid);
+  const billingAccountSnap = await billingAccountRef.get();
+  if (billingAccountSnap.exists) {
+    await billingAccountRef.delete();
+    stats.familyBillingAccountDeleted = 1;
   }
 
   await db.recursiveDelete(parentRef);
@@ -6796,10 +6865,17 @@ function getCrewGuestAlias(uid = "") {
 // guests are currently admitted. No sensitive data (meet URL) is exposed.
 exports.previewCrewGuestInvite = regionalFunctions.https.onCall(async (data) => {
   const crewId = String(data?.crewId || "").trim();
+  const inviteToken = cleanText(data?.inviteToken, 200);
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
   const crewSnap = await admin.firestore().collection("crews").doc(crewId).get();
   if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "초대받은 크루를 찾을 수 없습니다.");
   const crewData = crewSnap.data() || {};
+  const referralInvite = inviteToken ? await referralBilling.resolveInvite(inviteToken) : null;
+  const referralTracked = Boolean(
+    referralInvite &&
+    referralInvite.source === "crew_guest_invite" &&
+    referralInvite.crewId === crewSnap.id
+  );
   const guestsAdmitted = crewData.guestAccessEnabled === true && (crewData.status || "pending") === "approved";
   return {
     crewId: crewSnap.id,
@@ -6807,6 +6883,7 @@ exports.previewCrewGuestInvite = regionalFunctions.https.onCall(async (data) => 
     crewColor: crewData.color || "#00d4ff",
     guestsAdmitted,
     status: crewData.status || "pending",
+    referralTracked,
   };
 });
 
@@ -6822,11 +6899,16 @@ exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) 
   }
   const uid = context.auth.uid;
   const crewId = String(data?.crewId || "").trim();
+  const inviteToken = cleanText(data?.inviteToken, 200);
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
   const db = admin.firestore();
   const crewSnap = await db.collection("crews").doc(crewId).get();
   if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "초대받은 크루를 찾을 수 없습니다.");
   const crewData = crewSnap.data() || {};
+  const referralInvite = inviteToken ? await referralBilling.resolveInvite(inviteToken) : null;
+  const trackedInvite = referralInvite && referralInvite.source === "crew_guest_invite" && referralInvite.crewId === crewSnap.id
+    ? referralInvite
+    : null;
   if ((crewData.status || "pending") !== "approved") {
     throw new functions.https.HttpsError("failed-precondition", "현재 입장할 수 없는 크루입니다.");
   }
@@ -6842,6 +6924,9 @@ exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) 
     state: "online",
     joinedAt: FieldValue.serverTimestamp(),
     lastSeenAt: FieldValue.serverTimestamp(),
+    referralInviteId: trackedInvite?.id || null,
+    referrerParentUid: trackedInvite?.referrerParentUid || null,
+    referrerStudentUid: trackedInvite?.referrerStudentUid || null,
   }, { merge: true });
   return {
     crewId: crewSnap.id,
@@ -6849,6 +6934,8 @@ exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) 
     crewColor: crewData.color || "#00d4ff",
     guestAlias,
     guestUid: uid,
+    referralTracked: Boolean(trackedInvite),
+    referralToken: trackedInvite ? inviteToken : null,
   };
 });
 
@@ -8581,3 +8668,15 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
 
   return { success: true, deletedCrew: false };
 });
+
+// Referral attribution, family billing, and monthly tuition statements.
+exports.getOrCreateReferralInvite = referralBilling.getOrCreateReferralInvite;
+exports.previewReferralInvite = referralBilling.previewReferralInvite;
+exports.getParentReferralDashboard = referralBilling.getParentReferralDashboard;
+exports.adminGetFamilyBillingDashboard = referralBilling.adminGetFamilyBillingDashboard;
+exports.adminUpdateFamilyBilling = referralBilling.adminUpdateFamilyBilling;
+exports.adminUpdateStudentEnrollment = referralBilling.adminUpdateStudentEnrollment;
+exports.adminConfigureReferralApplication = referralBilling.adminConfigureReferralApplication;
+exports.adminPrepareFamilyBillingStatement = referralBilling.adminPrepareFamilyBillingStatement;
+exports.adminMarkBillingNoticeSent = referralBilling.adminMarkBillingNoticeSent;
+exports.prepareMonthlyFamilyBillingStatements = referralBilling.prepareMonthlyFamilyBillingStatements;

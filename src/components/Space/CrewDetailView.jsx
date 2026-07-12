@@ -228,6 +228,7 @@ export default function CrewDetailView({ onBack }) {
   const [guestPresenceNow, setGuestPresenceNow] = useState(() => Date.now());
   const [guestLogoutAction, setGuestLogoutAction] = useState('');
   const [showCrewInfo, setShowCrewInfo] = useState(false);
+  const [guestInviteUrl, setGuestInviteUrl] = useState('');
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
   const crewId = crew?.id || userData?.crewId || '';
@@ -272,7 +273,31 @@ export default function CrewDetailView({ onBack }) {
     [crewMemberIds, visibleGuestSessions]
   );
   const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
-  const guestInviteUrl = crewId ? `${window.location.origin}/crew-invite/${crewId}` : '';
+
+  useEffect(() => {
+    if (!crewId || !guestAccessEnabled || isGuest || !user?.uid) {
+      setGuestInviteUrl('');
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const fn = httpsCallable(functions, 'getOrCreateReferralInvite');
+        const result = await fn({ source: 'crew_guest_invite', crewId });
+        const token = result.data?.token || '';
+        if (!cancelled && token) {
+          setGuestInviteUrl(`${window.location.origin}/crew-invite/${crewId}?invite=${encodeURIComponent(token)}`);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setGuestInviteUrl(`${window.location.origin}/crew-invite/${crewId}`);
+          setGuestMessage(error?.message || '추천 추적 링크를 만들지 못해 기본 게스트 링크를 표시합니다.');
+        }
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [crewId, guestAccessEnabled, isGuest, user?.uid]);
 
   const toggleGuestAccess = async () => {
     if (!crewId || guestAccessAction || !isLeader) return;
@@ -670,6 +695,14 @@ export default function CrewDetailView({ onBack }) {
         {isGuest && (
           <div className="crew-guest-strip font-tech">
             <div><span>GUEST PASS</span> 체험 항해 중 · 학습 기록과 광석은 저장되지 않습니다.</div>
+            {userData?.referralTracked && userData?.referralToken && (
+              <button
+                type="button"
+                onClick={() => navigate(`/trial?ref=${encodeURIComponent(userData.referralToken)}`)}
+              >
+                <Rocket size={13} /> 1달 무료체험 신청
+              </button>
+            )}
             <button type="button" onClick={handleGuestLogout} disabled={!!guestLogoutAction}>
               <LogOut size={13} /> {guestLogoutAction ? '종료 중...' : '게스트 로그아웃'}
             </button>

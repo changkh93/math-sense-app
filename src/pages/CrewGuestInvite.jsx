@@ -9,6 +9,7 @@ import { auth, functions } from '../firebase';
 // Flow: preview crew -> signInAnonymously -> enterCrewAsGuest -> stash session -> redirect to /
 export default function CrewGuestInvite() {
   const { crewId } = useParams();
+  const inviteToken = new URLSearchParams(window.location.search).get('invite') || '';
   const navigate = useNavigate();
   const [phase, setPhase] = useState(() => (crewId ? 'preview' : 'error')); // preview | entering | error
   const [preview, setPreview] = useState(null);
@@ -20,7 +21,7 @@ export default function CrewGuestInvite() {
     const run = async () => {
       try {
         const fn = httpsCallable(functions, 'previewCrewGuestInvite');
-        const result = await fn({ crewId });
+        const result = await fn({ crewId, inviteToken });
         if (!cancelled) {
           setPreview(result.data || null);
           if (!result.data?.guestsAdmitted) {
@@ -36,7 +37,7 @@ export default function CrewGuestInvite() {
     };
     run();
     return () => { cancelled = true; };
-  }, [crewId]);
+  }, [crewId, inviteToken]);
 
   const handleEnter = async () => {
     setPhase('entering');
@@ -44,13 +45,15 @@ export default function CrewGuestInvite() {
     try {
       await signInAnonymously(auth);
       const fn = httpsCallable(functions, 'enterCrewAsGuest');
-      const result = await fn({ crewId });
+      const result = await fn({ crewId, inviteToken });
       const data = result.data || {};
       const session = {
         crewId: data.crewId || crewId,
         crewName: data.crewName,
         crewColor: data.crewColor,
         guestAlias: data.guestAlias,
+        referralToken: data.referralTracked ? inviteToken : '',
+        referralTracked: data.referralTracked === true,
         startedAt: Date.now(),
       };
       window.sessionStorage.setItem('crewGuestSession', JSON.stringify(session));

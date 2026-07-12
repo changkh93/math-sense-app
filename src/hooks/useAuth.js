@@ -108,6 +108,8 @@ export function useAuth() {
         setUserData({
           role: 'guest',
           isGuest: true,
+          referralToken: guestCrew.referralToken || '',
+          referralTracked: guestCrew.referralTracked === true,
           uid: firebaseUser.uid,
           crewId: guestCrew.crewId,
           crewName: guestCrew.crewName || '스터디 크루',

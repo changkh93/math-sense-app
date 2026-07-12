@@ -9,6 +9,7 @@
     "build:ext": "bash scripts/build-ext.sh",
     "lint": "eslint .",
     "test:streak": "node scripts/test-streak-utils.mjs",
+    "test:referral": "node scripts/test-referral-billing-core.cjs",
     "preview": "vite preview",
     "video:studio": "remotion studio video/index.jsx",
     "video:render:metasense": "remotion render video/index.jsx MetasenseShort out/metasense-promo-raw.mp4 --codec=h264 --pixel-format=yuv420p",
