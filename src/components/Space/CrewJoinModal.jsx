@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { Hash, ShoppingBag, Users, X } from 'lucide-react';
+import { Hash, Users, X } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
-import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
 
 function getFunctionsErrorMessage(err, fallback) {
@@ -14,15 +13,11 @@ function getFunctionsErrorMessage(err, fallback) {
   return fallback;
 }
 
-export default function CrewJoinModal({ isOpen, onClose, crew, onNavigateStore }) {
-  const { userData } = useAuth();
+export default function CrewJoinModal({ isOpen, onClose, crew }) {
   const [joinCode, setJoinCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
-
-  const joinPasses = userData?.crewJoinPasses || 0;
-  const hasPass = joinPasses > 0;
 
   const handleJoin = async () => {
     if (busy || !joinCode.trim()) return;
@@ -34,7 +29,7 @@ export default function CrewJoinModal({ isOpen, onClose, crew, onNavigateStore }
       const joinCrew = httpsCallable(functions, 'joinStudyCrew');
       await joinCrew({ inviteCode: joinCode.trim().toUpperCase() });
       setSuccess(true);
-      setMessage('크루에 합류했습니다! 참여권 1개가 사용되었습니다.');
+      setMessage('크루에 합류했습니다!');
       soundManager.playLevelUp();
       setTimeout(() => {
         onClose(true); // true = refresh needed
@@ -115,36 +110,8 @@ export default function CrewJoinModal({ isOpen, onClose, crew, onNavigateStore }
             </div>
           )}
 
-          {/* Pass check */}
-          {!hasPass ? (
-            <div style={{
-              padding: '1.1rem', borderRadius: 10,
-              background: 'rgba(251, 191, 36, 0.08)',
-              border: '1px solid rgba(251, 191, 36, 0.22)',
-              marginBottom: '1rem'
-            }}>
-              <div className="font-tech" style={{ color: '#fbbf24', fontWeight: 700, marginBottom: '0.4rem' }}>
-                ⚠ 참여권이 없습니다
-              </div>
-              <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55, fontSize: '0.88rem' }}>
-                크루에 참여하려면 참여권 1개가 필요합니다. 스토어에서 300광석으로 구매할 수 있습니다.
-              </div>
-              <button
-                className="space-btn cosmic-btn font-tech"
-                onClick={() => { 
-                  soundManager.playClick(); 
-                  onClose(); 
-                  if (onNavigateStore) onNavigateStore(true); // true means scroll to bottom
-                }}
-                style={{ marginTop: '0.8rem', padding: '0.7rem 1.1rem', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
-              >
-                <ShoppingBag size={15} /> 스토어로 이동
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Code input */}
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '0.8rem' }}>
+          {/* Code input */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '0.8rem' }}>
                 <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>
                   <Hash size={14} style={{ verticalAlign: -2 }} /> 초대 코드 입력
                 </span>
@@ -164,24 +131,18 @@ export default function CrewJoinModal({ isOpen, onClose, crew, onNavigateStore }
                   }}
                 />
                 <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                  크루 리더에게 받은 초대 코드를 입력하면 참여권 1개가 사용됩니다.
+                  크루 리더에게 받은 초대 코드를 입력하면 누구나 합류할 수 있습니다.
                 </span>
               </label>
 
-              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '0.8rem' }}>
-                보유 참여권: <strong style={{ color: 'var(--crystal-cyan)' }}>{joinPasses}개</strong>
-              </div>
-
-              <button
-                className="space-btn cosmic-btn font-tech"
-                disabled={busy || !joinCode.trim() || success}
-                onClick={handleJoin}
-                style={{ width: '100%', padding: '0.85rem 1.2rem', borderRadius: 8, fontSize: '1rem' }}
-              >
-                {busy ? '참여 중...' : success ? '✅ 합류 완료!' : '참여권으로 합류하기'}
-              </button>
-            </>
-          )}
+          <button
+            className="space-btn cosmic-btn font-tech"
+            disabled={busy || !joinCode.trim() || success}
+            onClick={handleJoin}
+            style={{ width: '100%', padding: '0.85rem 1.2rem', borderRadius: 8, fontSize: '1rem' }}
+          >
+            {busy ? '참여 중...' : success ? '✅ 합류 완료!' : '크루에 합류하기'}
+          </button>
 
           {/* Message */}
           {message && (

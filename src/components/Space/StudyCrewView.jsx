@@ -84,7 +84,7 @@ function getMemoErrorMessage(err) {
 
 const FAQ_ITEMS = [
   { q: '스터디 크루란 무엇인가요?', a: '스터디 크루는 함께 공부할 멤버를 정하고 Google Meet에서 만나 학습 리듬을 유지하는 프리미엄 스터디 그룹입니다.' },
-  { q: '창설권과 참여권의 차이는 무엇인가요?', a: '창설권(1,000광석)은 새 크루를 만들 때 필요하고, 참여권(300광석)은 다른 크루에 합류할 때 필요합니다. 두 가지 모두 스토어에서 구매할 수 있습니다.' },
+  { q: '스터디 크루에는 어떻게 참여하나요?', a: '승인된 크루의 초대 코드가 있으면 누구나 무료로 합류할 수 있습니다. 새 크루를 만들 때만 창설권(1,000광석)이 필요합니다.' },
   { q: '집중방은 어떻게 사용하나요?', a: '오픈 스터디나 내 크루에서 참여하기를 누르면 운영자가 준비한 Google Meet 대기방으로 입장합니다.' },
   { q: '몇 명까지 참여할 수 있나요?', a: '입장 가능 인원과 운영 방식은 등록된 Google Meet 정책을 따릅니다.' },
   { q: '크루 승인은 얼마나 걸리나요?', a: '운영자가 크루 이름과 모토를 확인한 후 승인합니다. 보통 1~2일 이내에 처리됩니다.' },
@@ -1749,17 +1749,6 @@ export default function StudyCrewView({ onNavigateStore }) {
               </div>
             )}
 
-            {/* No pass hint */}
-            {!hasCrew && (userData?.crewJoinPasses || 0) === 0 && directoryCrews.length > 0 && (
-              <div style={{ marginTop: '1.5rem', padding: '1rem', borderRadius: 12, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.18)' }}>
-                <div className="font-tech" style={{ color: '#fbbf24', fontSize: '0.9rem', lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <span>💡</span>
-                  <span>크루에 참여하려면 참여권이 필요합니다.{' '}
-                  <button onClick={() => { soundManager.playClick(); if (onNavigateStore) onNavigateStore(true); }} style={{ background: 'none', border: 'none', color: 'var(--crystal-cyan)', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}>스토어에서 구매하기 →</button>
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Why Study Crew */}
@@ -1828,7 +1817,6 @@ export default function StudyCrewView({ onNavigateStore }) {
         isOpen={!!joinTarget}
         crew={joinTarget && typeof joinTarget === 'object' ? joinTarget : null}
         onClose={() => setJoinTarget(null)}
-        onNavigateStore={onNavigateStore}
       />
     </>
   );

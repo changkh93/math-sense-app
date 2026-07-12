@@ -74,14 +74,6 @@ const STORE_ITEM_GIFT_CATALOG = {
     recipientField: "crewCreationPasses",
     transferAmount: 1,
   },
-  crew_join_pass: {
-    name: "스터디 크루 참여권",
-    cost: 300,
-    ownedMode: "count",
-    senderField: "crewJoinPasses",
-    recipientField: "crewJoinPasses",
-    transferAmount: 1,
-  },
 };
 const OPERATOR_GIFT_EMAIL = "paul@dulcine.net";
 const ASSIGNMENT_MISSING_LOOKBACK_DAYS = 7;
@@ -174,7 +166,6 @@ function buildDefaultStudentUserData({ uid, email, studentName, loginId, grade, 
     hallShowcaseCredits: 0,
     hallSpotlightUntilMs: 0,
     crewCreationPasses: 0,
-    crewJoinPasses: 0,
     crewId: "",
     crewName: "",
     crewRole: "",
@@ -5828,9 +5819,6 @@ exports.joinStudyCrew = regionalFunctions.https.onCall(async (data, context) => 
     if (freshUser.crewId) {
       throw new functions.https.HttpsError("failed-precondition", "이미 다른 크루에 속해 있습니다.");
     }
-    if ((freshUser.crewJoinPasses || 0) < 1) {
-      throw new functions.https.HttpsError("failed-precondition", "스터디 크루 참여권이 필요합니다. 스토어에서 300광석으로 구매해주세요.");
-    }
     if (crewData.status === "rejected") {
       throw new functions.https.HttpsError("failed-precondition", "참여할 수 없는 크루입니다.");
     }
@@ -5848,10 +5836,6 @@ exports.joinStudyCrew = regionalFunctions.https.onCall(async (data, context) => 
       memberCount: nextMemberIds.length,
       updatedAt: updatedCrew.updatedAt,
     }, { merge: true });
-    tx.set(userRef, {
-      crewJoinPasses: admin.firestore.FieldValue.increment(-1),
-    }, { merge: true });
-
     return updatedCrew;
   });
 

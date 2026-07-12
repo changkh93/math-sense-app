@@ -164,7 +164,6 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     if (item.id === 'photon_shield') return Math.floor((userData?.shieldCharges || 0) / PHOTON_SHIELD_CHARGES_PER_PURCHASE)
     if (item.id === 'hall_showcase_credit') return userData?.hallShowcaseCredits || 0
     if (item.id === 'crew_creation_pass') return userData?.crewCreationPasses || 0
-    if (item.id === 'crew_join_pass') return userData?.crewJoinPasses || 0
     return 0
   }
 
@@ -429,17 +428,6 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
           return { purchasedCount: currentPasses + 1 }
         }
 
-        if (item.id === 'crew_join_pass') {
-          const currentPasses = freshUserData?.crewJoinPasses || 0
-          transaction.set(userRef, {
-            crystals: freshCrystals - item.cost,
-            crewJoinPasses: currentPasses + 1,
-          }, { merge: true })
-
-          recordPurchaseTransaction()
-          return { purchasedCount: currentPasses + 1 }
-        }
-
         throw new Error('UNSUPPORTED_ITEM')
       })
 
@@ -484,11 +472,6 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
         setPurchaseMessage({
           type: 'success',
           text: `스터디 크루 창설권 ${txResult.purchasedCount}개 보유 중입니다.`
-        })
-      } else if (item.id === 'crew_join_pass') {
-        setPurchaseMessage({
-          type: 'success',
-          text: `스터디 크루 참여권 ${txResult.purchasedCount}개 보유 중입니다.`
         })
       }
 
@@ -1450,9 +1433,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.6 }}>{item.description}</p>
             <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', marginBottom: '1rem' }}>
-              {item.id === 'crew_creation_pass'
-                ? `보유 창설권: ${userData?.crewCreationPasses || 0}개`
-                : `보유 참여권: ${userData?.crewJoinPasses || 0}개`}
+              보유 창설권: {userData?.crewCreationPasses || 0}개
             </div>
             <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem' }}>
             <button

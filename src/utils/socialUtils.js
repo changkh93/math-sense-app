@@ -42,7 +42,6 @@ export const AGORA_PARTIAL_REFUND_RATIO = 0.5;
 export const HALL_OF_FAME_LOOKBACK_DAYS = 7;
 export const HALL_SHOWCASE_DURATION_DAYS = 7;
 export const CREW_CREATION_COST = 1000;
-export const CREW_JOIN_COST = 300;
 
 export const PROFILE_FRAMES = [
   {
@@ -179,14 +178,6 @@ export const SOCIAL_STORE_ITEMS = [
     cost: CREW_CREATION_COST,
     type: 'crew',
     description: '나만의 스터디 크루를 만들고 이름, 모토, 엠블럼 색상을 설정할 수 있습니다.',
-  },
-  {
-    id: 'crew_join_pass',
-    name: '스터디 크루 참여권',
-    icon: '🎟️',
-    cost: CREW_JOIN_COST,
-    type: 'crew',
-    description: '초대 코드를 가진 크루에 합류할 때 사용하는 참여권입니다.',
   },
 ];
 
