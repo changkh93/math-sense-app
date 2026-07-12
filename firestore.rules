@@ -267,7 +267,7 @@ service cloud.firestore {
       }
     }
 
-    // AI 대전의 70% 결과 곡선은 서버만 읽고 쓴다.
+    // AI 대전의 내부 진행 상태는 서버만 읽고 쓴다.
     match /quizBattleAISecrets/{battleId} {
       allow read, write: if false;
     }

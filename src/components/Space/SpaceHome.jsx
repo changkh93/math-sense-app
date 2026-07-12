@@ -3369,7 +3369,19 @@ function SpaceHome() {
     return (
       <div className="space-bg" style={{ minHeight: '100dvh', overflowY: 'auto' }}>
         <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
-        <QuizBattleHub onBack={() => { switchRootView('planet'); soundManager.playWarp(); }} />
+        <QuizBattleHub
+          onBack={() => { switchRootView('planet'); soundManager.playWarp(); }}
+          onSoloQuiz={({ clusterId, regionId, unitId }) => {
+            updateSelectedClusterId(clusterId)
+            updateSelectedRegionId(regionId)
+            updateSelectedChapterDocId(null)
+            updateSelectedUnitDocId(null)
+            setQuickQuizUnitId(unitId)
+            setQuickQuizMode('quiz')
+            setCurrentView('planet')
+            soundManager.playWarp()
+          }}
+        />
       </div>
     )
   }

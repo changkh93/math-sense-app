@@ -335,6 +335,48 @@ const QUIZ_BATTLE_SCOPE_CUMULATIVE = "cumulative";
 const QUIZ_BATTLE_SCOPE_UNIT = "unit";
 const QUIZ_BATTLE_MIN_UNIT_QUESTION_COUNT = 5;
 const QUIZ_BATTLE_AI_REWARD_DIVISOR = 3;
+const QUIZ_BATTLE_DAILY_ORE_CAP = 500;
+const QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT = 3;
+const QUIZ_BATTLE_DAILY_OPPONENT_LIMIT = 3;
+
+function getBattleKstDateKey(nowMs = Date.now()) {
+  return new Date(nowMs + (9 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+}
+
+function isQuizBattleClusterAccessActive(userData = {}, clusterId = "") {
+  const access = userData.clusterAccess;
+  // clusterAccess가 생성되기 전의 레거시 계정만 초등수학 기본 권한을 유지한다.
+  if (!access || typeof access !== "object") return clusterId === "cluster_elementary";
+  return access[clusterId] === "active";
+}
+
+function isQuizBattleRegionAccessActive(userData = {}, regionId = "") {
+  const access = userData.regionAccess;
+  return Boolean(access && typeof access === "object" && access[regionId] === "active");
+}
+
+function isQuizBattleAccessActive(userData = {}, clusterId = "", regionId = "") {
+  return isQuizBattleClusterAccessActive(userData, clusterId)
+    && isQuizBattleRegionAccessActive(userData, regionId);
+}
+
+function assertQuizBattleAccess(userData = {}, clusterId = "", regionId = "") {
+  if (!isQuizBattleAccessActive(userData, clusterId, regionId)) {
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "현재 학습 중인 과정과 리전에서만 퀴즈 배틀에 참여할 수 있습니다."
+    );
+  }
+}
+
+function getBattleRewardScopeKey(battleData = {}, participant = {}) {
+  return normalizeStatKey([
+    battleData.clusterId,
+    battleData.regionId,
+    battleData.battleScope,
+    battleData.battleUnitId || participant.entryUnitId || battleData.commonCeilingOrdinal,
+  ].join("_"));
+}
 
 function isPersistentBattleParticipant(participant = {}) {
   return participant.isGuest !== true && participant.isAI !== true;
@@ -897,15 +939,61 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       }
     });
     const persistentParticipantUids = participantUids.filter((uid) => isPersistentBattleParticipant(participants[uid] || {}));
+    const dateKey = getBattleKstDateKey(nowMs);
 
-    // summary에 streak 재계산이 필요하므로 각 참가자의 기존 summary를 병렬로 미리 읽는다.
+    // 정산 정책과 streak 재계산에 필요한 문서를 모든 write보다 먼저 읽는다.
     // Firestore 트랜잭션은 모든 read가 write보다 먼저 와야 하므로, battle 문서 update 전에 읽는다.
-    const statsSnaps = await Promise.all(persistentParticipantUids.map((uid) =>
-      transaction.get(db.collection("users").doc(uid).collection("battleStats").doc("summary"))
-    ));
+    const [statsSnaps, userSnaps, rewardLimitSnaps] = await Promise.all([
+      Promise.all(persistentParticipantUids.map((uid) =>
+        transaction.get(db.collection("users").doc(uid).collection("battleStats").doc("summary"))
+      )),
+      Promise.all(persistentParticipantUids.map((uid) =>
+        transaction.get(db.collection("users").doc(uid))
+      )),
+      Promise.all(persistentParticipantUids.map((uid) =>
+        transaction.get(db.collection("users").doc(uid).collection("battleRewardLimits").doc(dateKey))
+      )),
+    ]);
     const existingStats = {};
+    const rewardPolicies = {};
     persistentParticipantUids.forEach((uid, idx) => {
       existingStats[uid] = statsSnaps[idx].exists ? (statsSnaps[idx].data() || {}) : {};
+      const participant = participants[uid] || {};
+      const userData = userSnaps[idx].exists ? (userSnaps[idx].data() || {}) : {};
+      const limitData = rewardLimitSnaps[idx].exists ? (rewardLimitSnaps[idx].data() || {}) : {};
+      const opponentUid = participantUids.find((otherUid) => otherUid !== uid) || "";
+      const opponentKey = battleData.isAI === true ? "nova_7" : normalizeStatKey(opponentUid);
+      const scopeKey = getBattleRewardScopeKey(battleData, participant);
+      const scopeCount = Number(limitData.scopeCounts?.[scopeKey] || 0);
+      const opponentCount = Number(limitData.opponentCounts?.[opponentKey] || 0);
+      const accessEligible = isQuizBattleAccessActive(
+        userData,
+        battleData.clusterId || "",
+        battleData.regionId || ""
+      );
+      const repeatEligible = scopeCount < QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT
+        && opponentCount < QUIZ_BATTLE_DAILY_OPPONENT_LIMIT;
+      const competitiveEligible = accessEligible && repeatEligible;
+      const requestedReward = Number(rewardResult.rewards[uid] || 0);
+      const remainingDailyOre = Math.max(0, QUIZ_BATTLE_DAILY_ORE_CAP - Number(limitData.totalOre || 0));
+      const reward = competitiveEligible ? Math.min(requestedReward, remainingDailyOre) : 0;
+      let reason = "";
+      if (!accessEligible) reason = "battle_access_inactive";
+      else if (scopeCount >= QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT) reason = "scope_repeat_limit";
+      else if (opponentCount >= QUIZ_BATTLE_DAILY_OPPONENT_LIMIT) reason = "opponent_repeat_limit";
+      else if (remainingDailyOre <= 0) reason = "daily_ore_cap";
+      else if (reward < requestedReward) reason = "daily_ore_cap_partial";
+
+      rewardResult.rewards[uid] = reward;
+      rewardPolicies[uid] = {
+        reward,
+        requestedReward,
+        reason,
+        accessEligible,
+        competitiveEligible,
+        scopeKey,
+        opponentKey,
+      };
     });
 
     const finalUpdates = {
@@ -916,6 +1004,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       winnerUid: rewardResult.winnerUid,
       resultType: rewardResult.resultType,
       rewards: rewardResult.rewards,
+      rewardPolicies,
     };
     transaction.update(battleRef, finalUpdates);
 
@@ -923,9 +1012,12 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       const participant = participants[uid] || {};
       if (!isPersistentBattleParticipant(participant)) return;
       const reward = Number(rewardResult.rewards[uid] || 0);
+      const rewardPolicy = rewardPolicies[uid] || {};
+      const competitiveEligible = rewardPolicy.competitiveEligible === true;
       const userRef = db.collection("users").doc(uid);
       const historyRef = userRef.collection("history").doc(`quiz_battle_${battleId}`);
       const statsRef = userRef.collection("battleStats").doc("summary");
+      const rewardLimitRef = userRef.collection("battleRewardLimits").doc(dateKey);
       const txId = `quiz_battle_${battleId}`;
       const didWin = rewardResult.winnerUid === uid;
       const didDraw = !rewardResult.winnerUid;
@@ -941,11 +1033,20 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
 
       transaction.set(userRef, {
         crystals: FieldValue.increment(reward),
-        totalBattleMatches: FieldValue.increment(1),
-        totalBattleWins: FieldValue.increment(didWin ? 1 : 0),
-        totalBattleLosses: FieldValue.increment(didLose ? 1 : 0),
-        totalBattleDraws: FieldValue.increment(didDraw ? 1 : 0),
+        totalBattleMatches: FieldValue.increment(competitiveEligible ? 1 : 0),
+        totalBattleWins: FieldValue.increment(competitiveEligible && didWin ? 1 : 0),
+        totalBattleLosses: FieldValue.increment(competitiveEligible && didLose ? 1 : 0),
+        totalBattleDraws: FieldValue.increment(competitiveEligible && didDraw ? 1 : 0),
         lastBattleAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(rewardLimitRef, {
+        dateKey,
+        totalOre: FieldValue.increment(reward),
+        completedMatches: FieldValue.increment(1),
+        scopeCounts: { [rewardPolicy.scopeKey]: FieldValue.increment(1) },
+        opponentCounts: { [rewardPolicy.opponentKey]: FieldValue.increment(1) },
+        updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
 
       if (reward > 0) {
@@ -982,6 +1083,8 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         answeredCount: Number(participant.answeredCount || 0),
         forfeited: participant.forfeited === true,
         crystalsEarned: reward,
+        rewardLimitReason: rewardPolicy.reason || "",
+        competitiveEligible,
         battleResult: didWin ? "win" : didDraw ? "draw" : "loss",
         opponentUid,
         opponentDisplayName,
@@ -994,21 +1097,23 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       const nextCurrentStreak = didWin ? prevCurrentStreak + 1 : 0;
       const nextBestStreak = Math.max(prevBestStreak, nextCurrentStreak);
 
-      transaction.set(statsRef, {
-        totalMatches: FieldValue.increment(1),
-        wins: FieldValue.increment(didWin ? 1 : 0),
-        losses: FieldValue.increment(didLose ? 1 : 0),
-        draws: FieldValue.increment(didDraw ? 1 : 0),
-        totalCorrect: FieldValue.increment(myCorrect),
-        totalAnswered: FieldValue.increment(ratingQuestionCount),
-        totalScore: FieldValue.increment(Number(participant.score || 0)),
-        completionCount: FieldValue.increment(isComplete ? 1 : 0),
-        forfeitCount: FieldValue.increment(isForfeit ? 1 : 0),
-        perfectWins: FieldValue.increment(isPerfectWin ? 1 : 0),
-        currentStreak: nextCurrentStreak,
-        bestStreak: nextBestStreak,
-        lastBattleAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
+      if (competitiveEligible) {
+        transaction.set(statsRef, {
+          totalMatches: FieldValue.increment(1),
+          wins: FieldValue.increment(didWin ? 1 : 0),
+          losses: FieldValue.increment(didLose ? 1 : 0),
+          draws: FieldValue.increment(didDraw ? 1 : 0),
+          totalCorrect: FieldValue.increment(myCorrect),
+          totalAnswered: FieldValue.increment(ratingQuestionCount),
+          totalScore: FieldValue.increment(Number(participant.score || 0)),
+          completionCount: FieldValue.increment(isComplete ? 1 : 0),
+          forfeitCount: FieldValue.increment(isForfeit ? 1 : 0),
+          perfectWins: FieldValue.increment(isPerfectWin ? 1 : 0),
+          currentStreak: nextCurrentStreak,
+          bestStreak: nextBestStreak,
+          lastBattleAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
     });
 
     result = {
@@ -1121,7 +1226,10 @@ async function applyBattleStats({ db, battleId, battleData, claimId, battleRef }
     ? battleData.participantUids.filter(Boolean).slice(0, 2)
     : [];
   const participants = battleData.participants || {};
-  const participantUids = allParticipantUids.filter((uid) => isPersistentBattleParticipant(participants[uid] || {}));
+  const participantUids = allParticipantUids.filter((uid) => (
+    isPersistentBattleParticipant(participants[uid] || {})
+    && battleData.rewardPolicies?.[uid]?.competitiveEligible !== false
+  ));
   if (participantUids.length === 0) {
     await battleRef.set({ battleStatsSyncedAt: FieldValue.serverTimestamp() }, { merge: true });
     return;
@@ -1262,7 +1370,7 @@ async function countRecentBattleMatches(db, uid) {
     .where("type", "==", "quiz_battle")
     .where("timestamp", ">=", sinceDate)
     .get();
-  return snap.size;
+  return snap.docs.filter((docSnap) => docSnap.data()?.competitiveEligible !== false).length;
 }
 
 async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
@@ -1803,6 +1911,7 @@ exports.submitQuizSessionReactions = regionalFunctions.https.onCall(async (data,
 
 exports.listQuizBattleQueue = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
+  const isGuestUser = isGuestContext(context);
   const clusterId = cleanId(data?.clusterId || "cluster_elementary");
   const regionId = cleanId(data?.regionId);
   const entryUnitId = cleanId(data?.entryUnitId);
@@ -1813,6 +1922,14 @@ exports.listQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
   const db = admin.firestore();
   const nowMs = Date.now();
   const contextData = await resolveBattleContext({ clusterId, regionId, entryUnitId });
+  if (!isGuestUser) {
+    const userSnap = await db.collection("users").doc(uid).get();
+    assertQuizBattleAccess(
+      userSnap.exists ? (userSnap.data() || {}) : {},
+      contextData.clusterId,
+      regionId
+    );
+  }
   const waitingSnap = await db.collection("quizBattleQueueTickets")
     .where("clusterId", "==", contextData.clusterId)
     .where("regionId", "==", regionId)
@@ -1868,6 +1985,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
   const userData = userSnap.exists
     ? (userSnap.data() || {})
     : (isGuestUser ? { publicDisplayName: getCrewGuestAlias(uid), isGuest: true } : {});
+  if (!isGuestUser) assertQuizBattleAccess(userData, contextData.clusterId, regionId);
   let existingTicketSnap = ownTicket?.snap || await ticketRef.get();
   if (
     existingTicketSnap.exists &&
@@ -2390,6 +2508,11 @@ exports.startAIQuizBattle = regionalFunctions.https.onCall(async (data, context)
   const db = admin.firestore();
   const nowMs = Date.now();
   const contextData = await resolveBattleContext({ clusterId, regionId, entryUnitId });
+  const userSnap = await db.collection("users").doc(uid).get();
+  const userData = userSnap.exists
+    ? (userSnap.data() || {})
+    : (isGuestUser ? { publicDisplayName: getCrewGuestAlias(uid) } : {});
+  if (!isGuestUser) assertQuizBattleAccess(userData, contextData.clusterId, regionId);
   const questionSet = await buildBattleQuestionSet(
     contextData,
     contextData.entryOrdinal,
@@ -2397,10 +2520,6 @@ exports.startAIQuizBattle = regionalFunctions.https.onCall(async (data, context)
     `${uid}_ai_${nowMs}`,
     { battleScope, unitId: entryUnitId }
   );
-  const userSnap = await db.collection("users").doc(uid).get();
-  const userData = userSnap.exists
-    ? (userSnap.data() || {})
-    : (isGuestUser ? { publicDisplayName: getCrewGuestAlias(uid) } : {});
   const battleRef = db.collection("quizBattles").doc();
   const aiSecretRef = db.collection("quizBattleAISecrets").doc(battleRef.id);
   const aiUid = `ai_${battleRef.id}`;
@@ -2511,9 +2630,11 @@ exports.advanceAIQuizBattle = regionalFunctions.https.onCall(async (data, contex
 
     if (myAnswered >= totalQuestions) {
       nextAIAnswered = totalQuestions;
-      nextAICorrect = aiSecret.userFavored === true
+      const minimumAICorrect = Math.ceil(totalQuestions * 0.5);
+      const tunedAICorrect = aiSecret.userFavored === true
         ? Math.max(0, myCorrect - 1)
         : Math.min(totalQuestions, myCorrect + 1);
+      nextAICorrect = Math.min(totalQuestions, Math.max(minimumAICorrect, tunedAICorrect));
     } else if (nextAIAnswered > currentAIAnswered) {
       const stepIsCorrect = ((nextAIAnswered + battleId.length) % 5) < 3;
       nextAICorrect = Math.min(nextAIAnswered, Number(aiParticipant.correctCount || 0) + (stepIsCorrect ? 1 : 0));
@@ -2648,6 +2769,62 @@ exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context
   }
 
   return answerResult;
+});
+
+exports.reportQuizBattleIntegrityEvent = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const battleId = cleanId(data?.battleId);
+  const eventType = ["visibility_hidden", "window_blur", "fullscreen_exit"].includes(data?.eventType)
+    ? data.eventType
+    : "focus_lost";
+  if (!battleId) {
+    throw new functions.https.HttpsError("invalid-argument", "배틀 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const battleRef = db.collection("quizBattles").doc(battleId);
+  const nowMs = Date.now();
+  let violationCount = 0;
+  let forfeited = false;
+
+  await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(battleRef);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
+    }
+    const battleData = snap.data() || {};
+    if (battleData.status !== "active") return;
+    if (!Array.isArray(battleData.participantUids) || !battleData.participantUids.includes(uid)) {
+      throw new functions.https.HttpsError("permission-denied", "배틀 참가자만 이탈 상태를 기록할 수 있습니다.");
+    }
+
+    const participant = battleData.participants?.[uid] || {};
+    const previousMs = Number(participant.lastIntegrityEventAtMs || 0);
+    violationCount = Number(participant.integrityViolationCount || 0);
+    // visibilitychange와 blur가 한 번의 이탈에서 함께 발생하는 중복 이벤트를 합친다.
+    if (nowMs - previousMs < 3000) return;
+
+    violationCount += 1;
+    forfeited = violationCount >= 3;
+    const updates = {
+      [`participants.${uid}.integrityViolationCount`]: violationCount,
+      [`participants.${uid}.lastIntegrityEventType`]: eventType,
+      [`participants.${uid}.lastIntegrityEventAtMs`]: nowMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (forfeited) {
+      updates[`participants.${uid}.forfeited`] = true;
+      updates[`participants.${uid}.forfeitedAt`] = FieldValue.serverTimestamp();
+      updates[`participants.${uid}.forfeitedAtMs`] = nowMs;
+      updates[`participants.${uid}.forfeitReason`] = "focus_integrity";
+    }
+    transaction.update(battleRef, updates);
+  });
+
+  if (forfeited) {
+    await finalizeQuizBattleInternal(battleId, "integrity_forfeit");
+  }
+  return { success: true, violationCount, forfeited };
 });
 
 exports.finalizeQuizBattle = regionalFunctions.https.onCall(async (data, context) => {
@@ -2843,7 +3020,9 @@ exports.backfillQuizBattleStats = regionalFunctions.https.onCall(async (data, co
       continue;
     }
 
-    const battles = historySnap.docs.map((d) => d.data());
+    const battles = historySnap.docs
+      .map((d) => d.data())
+      .filter((battle) => battle.competitiveEligible !== false);
     report.totalBattles += battles.length;
 
     // summary 재구성 (set 방식)

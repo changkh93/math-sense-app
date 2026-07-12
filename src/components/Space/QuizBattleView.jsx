@@ -29,6 +29,12 @@ const formatTimeLeft = (endsAtMs) => {
   return `${min}:${sec}`
 }
 
+const enterBattleFocusMode = () => {
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {})
+  }
+}
+
 export default function QuizBattleView({
   clusterId,
   regionId,
@@ -57,6 +63,7 @@ export default function QuizBattleView({
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
   const [error, setError] = useState('')
+  const [integrityNotice, setIntegrityNotice] = useState('')
   const [timeNow, setTimeNow] = useState(Date.now())
   const [reveal, setReveal] = useState(false) // 답안 제출 후 정답 공개 단계
   const [reviewMode, setReviewMode] = useState(false) // 결과 화면에서 틀린 문제 복습
@@ -69,6 +76,7 @@ export default function QuizBattleView({
   const confirmedBattleEntryRef = useRef('')
   const entryConfirmTimeoutRef = useRef('')
   const aiAdvanceTimerRef = useRef(null)
+  const lastIntegrityReportRef = useRef(0)
   const isAIMode = opponentMode === 'ai'
   const isScopeLocked = Boolean(rangeLabel)
 
@@ -114,6 +122,7 @@ export default function QuizBattleView({
 
   const startAIBattle = useCallback(async () => {
     if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
+    enterBattleFocusMode()
     setIsJoining(true)
     setError('')
     try {
@@ -133,6 +142,7 @@ export default function QuizBattleView({
 
   const joinQueue = useCallback(async ({ silent = false, targetTicketId = '' } = {}) => {
     if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
+    if (!silent) enterBattleFocusMode()
     setIsJoining(true)
     if (!silent && !targetTicketId) {
       setError('')
@@ -376,6 +386,61 @@ export default function QuizBattleView({
   const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
 
   useEffect(() => {
+    if (!battleId || battle?.status !== 'active' || isBattleFinished) return undefined
+
+    let blurTimer = null
+    const reportIntegrityEvent = async (eventType) => {
+      const now = Date.now()
+      if (now - lastIntegrityReportRef.current < 4000) return
+      lastIntegrityReportRef.current = now
+      try {
+        const report = httpsCallable(functions, 'reportQuizBattleIntegrityEvent')
+        const res = await report({ battleId, eventType })
+        const count = Number(res.data?.violationCount || 0)
+        if (res.data?.forfeited) {
+          setIntegrityNotice('집중 화면 이탈이 반복되어 이번 배틀이 종료되었습니다.')
+        } else if (count > 0) {
+          setIntegrityNotice(`집중 화면 이탈이 감지되었습니다. 반복 시 배틀이 종료됩니다. (${count}/3)`)
+        }
+      } catch (err) {
+        console.warn('Battle integrity event report failed', err)
+      }
+    }
+    const handleVisibility = () => {
+      if (document.hidden) reportIntegrityEvent('visibility_hidden')
+    }
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) reportIntegrityEvent('fullscreen_exit')
+    }
+    const handleBlur = () => {
+      blurTimer = window.setTimeout(() => {
+        if (!document.hasFocus()) reportIntegrityEvent('window_blur')
+      }, 1500)
+    }
+    const handleFocus = () => {
+      if (blurTimer) window.clearTimeout(blurTimer)
+    }
+    const handleBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    window.addEventListener('blur', handleBlur)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      if (blurTimer) window.clearTimeout(blurTimer)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [battle?.status, battleId, isBattleFinished])
+
+  useEffect(() => {
     if (!battleId || !user?.uid || questionSet.length === 0) return undefined
 
     let cancelled = false
@@ -421,7 +486,7 @@ export default function QuizBattleView({
     const winnerUid = battle.winnerUid || ''
     const reward = Number(rewards[user.uid] || 0)
     const outcome = !winnerUid ? 'draw' : (winnerUid === user.uid ? 'win' : 'loss')
-    return { reward, outcome }
+    return { reward, outcome, rewardPolicy: battle.rewardPolicies?.[user.uid] || null }
   }, [battle, user?.uid])
 
   // 상대가 중도에 포기(이탈)했는지 여부. 결과 화면 안내에 사용한다.
@@ -553,6 +618,9 @@ export default function QuizBattleView({
       matchedRef.current = false
       setTicketId('')
       activeTicketRef.current = ''
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {})
+      }
       onSoloQuiz?.()
     } catch (err) {
       setError(err?.message || '대기 취소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
@@ -576,6 +644,9 @@ export default function QuizBattleView({
       }
     }
     if (phase === 'waiting') await cancelQueue()
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {})
+    }
     onExit?.()
   }
 
@@ -600,7 +671,7 @@ export default function QuizBattleView({
           <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.75rem' }}>QUIZ BATTLE</h2>
           <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             {isAIMode ? '전술 AI NOVA-7이 내 풀이 속도에 맞춰 함께 달립니다.' : '같은 범위에 도전하는 탐사원과 실시간으로 대결합니다.'}<br />
-            {isAIMode ? 'AI전 광석은 일반 대전의 1/3이며, 약 70%의 승리 경험으로 조율됩니다.' : '대기자를 선택하면 해당 대기방으로 바로 연결됩니다.'}
+            {isAIMode ? 'AI전 광석은 일반 대전의 1/3입니다.' : '대기자를 선택하면 해당 대기방으로 바로 연결됩니다.'}
           </p>
           <div style={{ color: 'var(--crystal-cyan)', marginBottom: '1.5rem', fontWeight: 800 }}>
             퀴즈 범위: {rangeLabel || entryUnitTitle || entryUnitId}
@@ -1033,6 +1104,17 @@ export default function QuizBattleView({
           <div style={{ color: 'var(--crystal-cyan)', fontSize: '1.25rem', fontWeight: 900, marginBottom: '1.5rem' }}>
             +{resultSummary?.reward || 0} 광석
           </div>
+          {resultSummary?.rewardPolicy?.reason && (
+            <div className="font-tech" style={{ color: 'var(--star-gold)', margin: '-0.8rem 0 1.5rem', lineHeight: 1.6 }}>
+              {{
+                battle_access_inactive: '현재 접근 허용된 과정 또는 리전이 아니라 광석과 공식 전적에서 제외되었습니다.',
+                scope_repeat_limit: '오늘 같은 범위의 보상·공식 전적 반영 횟수를 모두 사용했습니다.',
+                opponent_repeat_limit: '오늘 같은 상대와의 보상·공식 전적 반영 횟수를 모두 사용했습니다.',
+                daily_ore_cap: '오늘의 퀴즈 배틀 광석 상한에 도달했습니다.',
+                daily_ore_cap_partial: '오늘의 남은 배틀 광석 한도까지만 지급되었습니다.',
+              }[resultSummary.rewardPolicy.reason] || '공정 플레이 정책에 따라 연습 경기로 기록되었습니다.'}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             {wrongQuestions.length > 0 && (
               <button className="hud-btn secondary glass" onClick={() => { setReviewMode(true); setReviewIndex(0) }} style={{ padding: '0.9rem 1.4rem' }}>
@@ -1066,6 +1148,10 @@ export default function QuizBattleView({
             <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--star-gold)' }}>{opponentParticipant.score || 0}</div>
             <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{opponentParticipant.answeredCount || 0} / {battle.questionCount}</div>
           </div>
+        </div>
+
+        <div className="font-tech" style={{ color: integrityNotice ? '#fbbf24' : 'var(--text-muted)', fontSize: '0.78rem', textAlign: 'center', margin: '-0.25rem 0 0.8rem' }}>
+          {integrityNotice || '집중 모드 · 탭/창/사이드바로 포커스를 옮기면 이탈로 기록됩니다.'}
         </div>
 
         <div className="glass-card hud-border" style={{ padding: '1.25rem', marginBottom: '1rem' }}>

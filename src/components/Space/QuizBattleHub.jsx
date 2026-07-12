@@ -17,14 +17,24 @@ const COURSE_META = [
 const getId = (item) => item?.docId || item?.id || ''
 const getTitle = (item, fallback = '') => item?.title || item?.name || fallback
 
-export default function QuizBattleHub({ onBack }) {
+export default function QuizBattleHub({ onBack, onSoloQuiz }) {
   const { userData } = useAuth()
   const { data: clusters = [], isLoading: clustersLoading } = useClusters()
   const [clusterId, setClusterId] = useState('')
-  const effectiveClusterId = clusterId || getId(clusters[0])
+  const clusterAccess = userData?.clusterAccess || { cluster_elementary: 'active' }
+  const authorizedClusters = userData?.isGuest === true
+    ? clusters
+    : clusters.filter((cluster) => clusterAccess[getId(cluster)] === 'active')
+  const selectedClusterIsAuthorized = authorizedClusters.some((cluster) => getId(cluster) === clusterId)
+  const effectiveClusterId = selectedClusterIsAuthorized ? clusterId : getId(authorizedClusters[0])
   const { data: regions = [], isLoading: regionsLoading } = useRegions(effectiveClusterId, { enabled: Boolean(effectiveClusterId) })
   const [regionId, setRegionId] = useState('')
-  const { data: chapters = [], isLoading: chaptersLoading } = useChapters(regionId)
+  const regionAccess = userData?.regionAccess || {}
+  const authorizedRegions = userData?.isGuest === true
+    ? regions
+    : regions.filter((region) => regionAccess[getId(region)] === 'active')
+  const effectiveRegionId = authorizedRegions.some((region) => getId(region) === regionId) ? regionId : ''
+  const { data: chapters = [], isLoading: chaptersLoading } = useChapters(effectiveRegionId)
   const [chapterId, setChapterId] = useState('')
   const [scope, setScope] = useState(null)
   const [mode, setMode] = useState('pvp')
@@ -39,7 +49,7 @@ export default function QuizBattleHub({ onBack }) {
           .map((docSnap) => ({ ...docSnap.data(), docId: docSnap.id }))
           .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
       },
-      enabled: Boolean(regionId),
+      enabled: Boolean(effectiveRegionId),
       staleTime: 5 * 60 * 1000,
     })),
   })
@@ -49,11 +59,11 @@ export default function QuizBattleHub({ onBack }) {
   const allUnits = chapters.flatMap((chapter) => unitsByChapter[getId(chapter)] || [])
   const selectedChapter = chapters.find((chapter) => getId(chapter) === chapterId)
   const selectedUnits = unitsByChapter[chapterId] || []
-  const selectedCluster = clusters.find((cluster) => getId(cluster) === effectiveClusterId)
-  const selectedRegion = regions.find((region) => getId(region) === regionId)
+  const selectedCluster = authorizedClusters.find((cluster) => getId(cluster) === effectiveClusterId)
+  const selectedRegion = authorizedRegions.find((region) => getId(region) === effectiveRegionId)
   const unitsLoading = unitQueries.some((item) => item.isLoading)
 
-  const courseCards = clusters.map((cluster, index) => {
+  const courseCards = authorizedClusters.map((cluster, index) => {
     const searchable = `${getId(cluster)} ${getTitle(cluster)}`
     const meta = COURSE_META.find((item) => item.match.test(searchable)) || COURSE_META[index % COURSE_META.length]
     return { ...cluster, _meta: meta }
@@ -85,13 +95,18 @@ export default function QuizBattleHub({ onBack }) {
     return (
       <QuizBattleView
         clusterId={effectiveClusterId}
-        regionId={regionId}
+        regionId={effectiveRegionId}
         entryUnitId={scope.entryUnitId}
         entryUnitTitle={scope.label}
         initialBattleScope={scope.battleScope}
         opponentMode={mode}
         rangeLabel={scope.label}
         onExit={() => setLaunched(false)}
+        onSoloQuiz={() => onSoloQuiz?.({
+          clusterId: effectiveClusterId,
+          regionId: effectiveRegionId,
+          unitId: scope.entryUnitId,
+        })}
       />
     )
   }
@@ -110,7 +125,7 @@ export default function QuizBattleHub({ onBack }) {
       <section className="battle-deck">
         <div className="battle-deck__step"><span>01</span><div><b>COURSE</b><small>어떤 지식 우주에서 싸울까요?</small></div></div>
         <div className="battle-course-grid">
-          {clustersLoading ? <div className="battle-empty">과정 좌표를 불러오는 중…</div> : courseCards.map((cluster) => {
+          {clustersLoading ? <div className="battle-empty">과정 좌표를 불러오는 중…</div> : courseCards.length === 0 ? <div className="battle-empty">운영툴에서 접근 허용된 과정이 없습니다.</div> : courseCards.map((cluster) => {
             const id = getId(cluster)
             const selected = id === effectiveClusterId
             return (
@@ -127,7 +142,7 @@ export default function QuizBattleHub({ onBack }) {
         <div className="battle-range-grid">
           <div className="battle-range-column">
             <div className="battle-range-column__title">REGIONS</div>
-            {regionsLoading ? <div className="battle-empty">리전 탐색 중…</div> : regions.map((region) => (
+            {regionsLoading ? <div className="battle-empty">리전 탐색 중…</div> : authorizedRegions.length === 0 ? <div className="battle-empty">이 과정에서 접근 허용된 리전이 없습니다.</div> : authorizedRegions.map((region) => (
               <button key={getId(region)} type="button" className={getId(region) === regionId ? 'is-active' : ''} onClick={() => { setRegionId(getId(region)); setChapterId(''); setScope(null) }}>
                 <span>{getTitle(region, '이름 없는 리전')}</span><i>›</i>
               </button>
@@ -135,7 +150,7 @@ export default function QuizBattleHub({ onBack }) {
           </div>
           <div className="battle-range-column">
             <div className="battle-range-column__title">CHAPTERS</div>
-            {!regionId ? <div className="battle-empty">먼저 리전을 선택하세요.</div> : chaptersLoading ? <div className="battle-empty">챕터 분석 중…</div> : <>
+            {!effectiveRegionId ? <div className="battle-empty">먼저 리전을 선택하세요.</div> : chaptersLoading ? <div className="battle-empty">챕터 분석 중…</div> : <>
               <button type="button" className={scope?.label?.includes('전범위') ? 'is-active is-full' : 'is-full'} onClick={selectRegionFull} disabled={!allUnits.length}>◎ 전범위</button>
               {chapters.map((chapter) => (
                 <button key={getId(chapter)} type="button" className={getId(chapter) === chapterId ? 'is-active' : ''} onClick={() => { setChapterId(getId(chapter)); setScope(null) }}>
@@ -167,12 +182,13 @@ export default function QuizBattleHub({ onBack }) {
               <span>⚔️</span><div><b>LIVE CHALLENGER</b><small>대기자 선택 또는 자동 매칭 · 일반 광석</small></div>
             </button>
             <button type="button" className={mode === 'ai' ? 'is-selected' : ''} onClick={() => setMode('ai')}>
-              <span>◈</span><div><b>NOVA-7 AI</b><small>내 속도에 적응 · 승리 경험 70% · 광석 1/3</small></div>
+              <span>◈</span><div><b>NOVA-7 AI</b><small>내 속도에 적응 · 광석 1/3</small></div>
             </button>
           </div>
         </div>
 
         {userData?.isGuest === true && <div className="battle-guest-note"><b>GUEST RUN</b> 모든 배틀에 참여할 수 있습니다. 내 전적·광석은 저장되지 않으며 상대방 전적에는 게스트전으로 반영됩니다.</div>}
+        <div className="battle-guest-note"><b>FAIR PLAY</b> 현재 학습 중인 과정과 리전에서만 참여할 수 있습니다. 하루 배틀 광석은 최대 500개이며, 같은 범위 또는 같은 상대와의 반복 대결은 하루 3회까지만 보상·공식 전적에 반영됩니다. AI 사용 및 부정행위가 적발되면 퀴즈 배틀에서 영구 퇴출될 수 있습니다.</div>
         <button type="button" className="battle-launch" disabled={!scope} onClick={() => setLaunched(true)}>
           <span>{scope ? `${mode === 'ai' ? 'NOVA-7' : '배틀 대기룸'}으로 출격` : '먼저 퀴즈 범위를 선택하세요'}</span><i>→</i>
         </button>
