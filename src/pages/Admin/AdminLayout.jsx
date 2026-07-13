@@ -53,6 +53,10 @@ const AdminLayout = () => {
             <UserCheck size={20} />
             <span>스터디 크루 관리</span>
           </Link>
+          <Link to="/admin/crew-guests" className="nav-link">
+            <ShieldAlert size={20} />
+            <span>게스트 회원 관리</span>
+          </Link>
           <Link to="/admin/content" className="nav-link">
             <Layers size={20} />
             <span>Content Manager</span>

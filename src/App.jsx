@@ -39,6 +39,7 @@ import VacationCamp from './pages/VacationCamp'
 import Signup from './pages/Signup'
 import Terms from './pages/Terms'
 import CrewGuestInvite from './pages/CrewGuestInvite'
+import CrewGuestManager from './pages/Admin/CrewGuestManager'
 
 import PrivateRoute from './components/PrivateRoute'
 
@@ -77,6 +78,7 @@ function App() {
         <Route path="applications" element={<Applications />} />
         <Route path="vacation-camp" element={<VacationCampAdmin />} />
         <Route path="crews" element={<CrewApproval />} />
+        <Route path="crew-guests" element={<CrewGuestManager />} />
         <Route path="content" element={<ContentManager />} />
         <Route path="assignments" element={<AdminAssignments />} />
         <Route path="monthly-evaluations" element={<MonthlyEvaluationAwards />} />

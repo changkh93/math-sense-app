@@ -4,6 +4,16 @@ import { signInAnonymously } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from '../firebase';
 
+function getGuestInstallationId() {
+  const key = 'metasense_guest_installation_id';
+  let value = window.localStorage.getItem(key) || '';
+  if (!value) {
+    value = globalThis.crypto?.randomUUID?.() || `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(key, value);
+  }
+  return value;
+}
+
 // Guest entry screen for the crew waiting room.
 // Route: /crew-invite/:crewId
 // Flow: preview crew -> signInAnonymously -> enterCrewAsGuest -> stash session -> redirect to /
@@ -40,12 +50,17 @@ export default function CrewGuestInvite() {
   }, [crewId, inviteToken]);
 
   const handleEnter = async () => {
+    if (preview?.isOwnInviteTest || preview?.registeredUserActive) {
+      window.sessionStorage.setItem('metasense_current_view', 'crew');
+      navigate('/?view=crew', { replace: true, state: { view: 'crew' } });
+      return;
+    }
     setPhase('entering');
     setMessage('');
     try {
       await signInAnonymously(auth);
       const fn = httpsCallable(functions, 'enterCrewAsGuest');
-      const result = await fn({ crewId, inviteToken });
+      const result = await fn({ crewId, inviteToken, installationId: getGuestInstallationId() });
       const data = result.data || {};
       const session = {
         crewId: data.crewId || crewId,
@@ -92,6 +107,19 @@ export default function CrewGuestInvite() {
             초대받은 스터디 크루의 대기룸과 집중방(Google Meet)을 회원가입 없이 체험할 수 있습니다.
           </p>
 
+          {preview?.isOwnInviteTest && (
+            <div style={{ marginBottom: 18, padding: '14px 16px', borderRadius: 12, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.3)', color: '#cffafe', textAlign: 'left', fontSize: '0.86rem', lineHeight: 1.65 }}>
+              <strong style={{ display: 'block', color: '#67e8f9', marginBottom: 4 }}>내 초대 링크 테스트 중</strong>
+              현재 로그인한 회원이 만든 링크입니다. 게스트에게 보이는 초대 화면만 확인하며, 별도의 게스트 계정은 생성되지 않습니다. 이벤트 인원과 부정사용 지표에도 포함되지 않습니다.
+            </div>
+          )}
+          {preview?.registeredUserActive && !preview?.isOwnInviteTest && (
+            <div style={{ marginBottom: 18, padding: '14px 16px', borderRadius: 12, background: 'rgba(251,191,36,0.09)', border: '1px solid rgba(251,191,36,0.28)', color: '#fef3c7', textAlign: 'left', fontSize: '0.86rem', lineHeight: 1.65 }}>
+              <strong style={{ display: 'block', color: '#fde68a', marginBottom: 4 }}>정식 회원으로 로그인되어 있습니다</strong>
+              현재 회원 로그인을 게스트 계정으로 바꾸지 않습니다. 게스트 초대는 로그인하지 않은 친구의 브라우저에서 열어 주세요.
+            </div>
+          )}
+
           <div style={{ textAlign: 'left', background: 'rgba(0,0,0,0.18)', borderRadius: 12, padding: '14px 16px', marginBottom: 22, fontSize: '0.84rem', color: 'rgba(255,255,255,0.72)', lineHeight: 1.6 }}>
             <div style={{ marginBottom: 6 }}>✓ 크루 대기룸과 집중방(Google Meet) 입장</div>
             <div style={{ marginBottom: 6 }}>✓ 크루 멤버에게 포스트잇 메시지 작성</div>
@@ -109,7 +137,7 @@ export default function CrewGuestInvite() {
               disabled={phase === 'entering' || !preview?.guestsAdmitted}
               style={{ width: '100%', border: 'none', borderRadius: 13, padding: '15px 18px', background: (phase === 'entering' || !preview?.guestsAdmitted) ? 'rgba(0,212,255,0.35)' : 'linear-gradient(135deg, #00d4ff, #7c3aed)', color: 'white', fontWeight: 900, fontSize: '1.05rem', cursor: (phase === 'entering' || !preview?.guestsAdmitted) ? 'not-allowed' : 'pointer' }}
             >
-              {phase === 'entering' ? '입장 중...' : '게스트로 입장하기'}
+              {preview?.isOwnInviteTest ? '테스트 완료 · 내 크루로 돌아가기' : preview?.registeredUserActive ? '현재 계정으로 메타센스 돌아가기' : phase === 'entering' ? '입장 중...' : '게스트로 입장하기'}
             </button>
           )}
 

@@ -401,6 +401,69 @@
   font-size: 0.78rem;
 }
 
+.crew-guest-access-label .crew-guest-benefit-copy {
+  display: block;
+  margin-top: 0.35rem;
+  color: rgba(226, 232, 240, 0.88);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  font-weight: 700;
+  text-shadow: 0 0 12px rgba(103, 232, 249, 0.18);
+}
+
+.crew-growth-status {
+  margin: 0 0 1.15rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 15px;
+  background: linear-gradient(135deg, rgba(76, 29, 149, 0.18), rgba(3, 12, 30, 0.82));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.crew-growth-status__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.crew-growth-status__head span,
+.crew-growth-status__head strong { display: block; }
+.crew-growth-status__head span { color: #67e8f9; font-size: 0.7rem; font-weight: 900; letter-spacing: 1px; }
+.crew-growth-status__head strong { margin-top: 0.25rem; color: #f8fafc; font-size: 1.05rem; }
+.crew-growth-status__head > b { color: #fde68a; font-size: 1rem; }
+
+.crew-growth-status__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.crew-growth-status__metrics > div {
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: rgba(2, 8, 23, 0.6);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.crew-growth-status__metrics span,
+.crew-growth-status__metrics strong { display: block; }
+.crew-growth-status__metrics span { color: #8d99b3; font-size: 0.72rem; }
+.crew-growth-status__metrics strong { margin-top: 0.25rem; color: #e2e8f0; font-size: 1rem; }
+
+.crew-growth-status__rules {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  color: rgba(226,232,240,0.7);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.crew-growth-status__rules strong { color: #c4b5fd; }
+
 .crew-guest-share-link {
   min-width: 0;
   display: flex;
@@ -647,6 +710,8 @@
 }
 
 @media (max-width: 600px) {
+  .crew-growth-status__metrics { grid-template-columns: 1fr 1fr; }
+  .crew-growth-status__head { align-items: flex-start; }
   .crew-bridge-shell {
     padding: 0.75rem 0.65rem 6.5rem;
   }

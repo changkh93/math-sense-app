@@ -7,6 +7,10 @@ const REGION = "asia-northeast3";
 const regionalFunctions = functions.region(REGION);
 const ENROLLMENT_PAID_STATUSES = new Set(["active_paid", "cancel_scheduled"]);
 const REFERRAL_RATES = [0, 0.2, 0.5, 1];
+const SOLAPI_SECRET_NAMES = ["SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_SENDER_NUMBER"];
+const TUITION_ACCOUNT_TEXT = "KEB하나연행 784-910004-58404 (장기홍)";
+const CORRECT_TUITION_ACCOUNT_TEXT = "KEB하나은행 784-910004-58404 (장기홍)";
+const DEFAULT_PUBLIC_APP_URL = "https://math-sense-1f6a8.web.app";
 
 function cleanText(value, maxLength = 200) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
@@ -74,6 +78,78 @@ function tokenHash(token) {
 
 function newShareToken() {
   return crypto.randomBytes(24).toString("base64url");
+}
+
+function normalizePhone(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function normalizeLmsText(value) {
+  return String(value || "")
+    .normalize("NFC")
+    .replace("\uB2E4\uC74C \uB2EC ", "")
+    .replace("\uC218\uAC15\uAE30\uAC04", "\uC218\uAC15 \uAE30\uAC04")
+    .replace("\uC785\uAE08\uACC4\uC88C", "\uC785\uAE08 \uACC4\uC88C")
+    .replace("\uB0A9\uBD80 \uC608\uC815\uAE08\uC561", "\uB0A9\uBD80 \uC608\uC815 \uAE08\uC561")
+    .replace("\uB0A9\uBD80 \uC608\uC815\uADF8\uB9E5", "\uB0A9\uBD80 \uC608\uC815 \uAE08\uC561")
+    .replace("\uC720\uB8CC \uC218\uAC00 \uC911\uC774\uBA74", "\uC720\uB8CC \uC218\uAC15 \uC911\uC774\uBA74")
+    .replace("\uCD94\uCC9C \uB9C1\uD2B8", "\uCD94\uCC9C \uB9C1\uD06C");
+}
+
+function publicAppUrl() {
+  return String(process.env.METASENSE_PUBLIC_URL || DEFAULT_PUBLIC_APP_URL).replace(/\/$/, "");
+}
+
+function _buildTuitionNoticeTextLegacy({ parentName, monthKey, start, end, baseFee, discountRate, finalFee, referralUrl }) {
+  const month = Number(String(monthKey || "").slice(5));
+  const greeting = cleanText(parentName, 40)
+    ? `안녕하세요, ${cleanText(parentName, 40)} 학부모님.`
+    : "안녕하세요, 학부모님.";
+  return [
+    `[메타센스] ${month}월 수강료 안내`,
+    greeting,
+    `다음 달 ${month}월 수강료를 안ᄂ드립니다.`,
+    "",
+    `수강기간: ${start} ~ ${end}`,
+    `납부 예정그맥: ${formatWon(finalFee)}`,
+    `(기본 ${formatWon(baseFee)} · 추천 ${Math.round((Number(discountRate) || 0) * 100)}% 할인)`,
+    "",
+    "입금계좌",
+    TUITION_ACCOUNT_TEXT,
+    "",
+    "추천 혜택",
+    "안내에 따라 안내드린 유료 수강 친구 1가구 20% · 2가구 50% · 3가구 이상 100% 할인",
+    "1달 무료체험 추천링트",
+    referralUrl,
+    "",
+    "감사합니다.",
+  ].join("\n");
+}
+
+function buildTuitionNoticeText({ parentName, monthKey, start, end, baseFee, discountRate, finalFee, referralUrl }) {
+  const month = Number(String(monthKey || "").slice(5));
+  const greeting = cleanText(parentName, 40)
+    ? `안녕하세요, ${cleanText(parentName, 40)}님.`
+    : "안녕하세요, 학부모님.";
+  return [
+    `[메타센스] ${month}월 수강료 안내`,
+    greeting,
+    `다음 달 ${month}월 수강료를 안내드립니다.`,
+    "",
+    `수강기간: ${start} ~ ${end}`,
+    `납부 예정그맥: ${formatWon(finalFee)}`,
+    `(기본 ${formatWon(baseFee)} · 추천 ${Math.round((Number(discountRate) || 0) * 100)}% 할인)`,
+    "",
+    "입금계좌",
+    CORRECT_TUITION_ACCOUNT_TEXT,
+    "",
+    "추천 혜택",
+    "추천한 친구가 유료 수가 중이면 1가구 20% · 2가구 50% · 3가구 이상 100% 할인",
+    "1달 무료체험 추천 링트",
+    referralUrl,
+    "",
+    "감사합니다.",
+  ].join("\n");
 }
 
 function maskName(value) {
@@ -192,23 +268,56 @@ async function addAudit(adminUid, action, targetType, targetId, before, after, r
   });
 }
 
+async function ensureParentReferralInvite(parentUid, parentData = null) {
+  const db = admin.firestore();
+  const resolvedParent = parentData || (await db.collection("parents").doc(parentUid).get()).data() || {};
+  const inviteId = `parent_${parentUid}`;
+  const inviteRef = db.collection("referralInvites").doc(inviteId);
+  const existing = await inviteRef.get();
+  let token = existing.exists ? existing.data()?.shareToken : "";
+  if (!token || existing.data()?.active === false) token = newShareToken();
+  await inviteRef.set({
+    tokenHash: tokenHash(token),
+    shareToken: token,
+    referrerParentUid: parentUid,
+    referrerStudentUid: null,
+    inviterName: resolvedParent.name || "학부모",
+    source: "parent_trial_link",
+    crewId: null,
+    active: true,
+    updatedAt: FieldValue.serverTimestamp(),
+    createdAt: existing.exists ? (existing.data()?.createdAt || FieldValue.serverTimestamp()) : FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return { token, inviteId, referralUrl: `${publicAppUrl()}/trial?ref=${encodeURIComponent(token)}` };
+}
+
 async function prepareStatement(parentUid, monthKey, actorUid = "system") {
   const db = admin.firestore();
-  const snapshot = await getFamilyBillingSnapshot(parentUid, monthKey);
+  const [snapshot, parentSnap] = await Promise.all([
+    getFamilyBillingSnapshot(parentUid, monthKey),
+    db.collection("parents").doc(parentUid).get(),
+  ]);
+  if (!parentSnap.exists || parentSnap.data()?.isDeleted) {
+    throw new Error(`Parent not found: ${parentUid}`);
+  }
+  const parentData = parentSnap.data() || {};
+  const invite = await ensureParentReferralInvite(parentUid, parentData);
   const statementId = `${parentUid}_${monthKey}`;
   const statementRef = db.collection("familyBillingStatements").doc(statementId);
   const existing = await statementRef.get();
   const previous = existing.exists ? existing.data() || {} : {};
   const revision = existing.exists ? (Number(previous.revision) || 1) + 1 : 1;
   const { start, end } = monthBounds(monthKey);
-  const noticeText = [
-    `[메타센스] ${Number(monthKey.slice(5))}월 수강료 안내`,
-    `기본 수강료: ${formatWon(snapshot.baseFee)}`,
-    `추천 혜택: ${Math.round(snapshot.discountRate * 100)}% 할인`,
-    `최종 수강료: ${formatWon(snapshot.finalFee)}`,
-    `수강 기간: ${start} ~ ${end}`,
-    `유료 수강 중인 추천 가구 ${snapshot.activeReferralCount}명이 반영되었습니다.`,
-  ].join("\n");
+  const noticeText = normalizeLmsText(buildTuitionNoticeText({
+    parentName: parentData.name,
+    monthKey,
+    start,
+    end,
+    baseFee: snapshot.baseFee,
+    discountRate: snapshot.discountRate,
+    finalFee: snapshot.finalFee,
+    referralUrl: invite.referralUrl,
+  }));
   const history = Array.isArray(previous.revisionHistory) ? previous.revisionHistory.slice(-9) : [];
   if (existing.exists) {
     history.push({
@@ -221,6 +330,11 @@ async function prepareStatement(parentUid, monthKey, actorUid = "system") {
       revisedAt: new Date().toISOString(),
     });
   }
+  const unchangedAfterSend = previous.noticeStatus === "sent"
+    && previous.noticeText === noticeText
+    && Number(previous.baseFee) === snapshot.baseFee
+    && Number(previous.finalFee) === snapshot.finalFee
+    && Number(previous.activeReferralCount) === snapshot.activeReferralCount;
   const payload = {
     parentUid,
     billingMonth: monthKey,
@@ -232,8 +346,10 @@ async function prepareStatement(parentUid, monthKey, actorUid = "system") {
     discountAmount: snapshot.discountAmount,
     finalFee: snapshot.finalFee,
     qualifiedReferralIds: snapshot.qualifiedReferralIds,
+    recipientPhone: normalizePhone(parentData.phone || parentData.phoneNumber || parentData.contact),
+    referralUrl: invite.referralUrl,
     noticeText,
-    noticeStatus: previous.noticeStatus === "sent" ? "revised" : "prepared",
+    noticeStatus: unchangedAfterSend ? "sent" : (previous.noticeStatus === "sent" ? "revised" : "prepared"),
     revision,
     revisionHistory: history,
     preparedBy: actorUid,
@@ -539,6 +655,107 @@ const adminPrepareFamilyBillingStatement = regionalFunctions.https.onCall(async 
   return { success: true, statement: { ...statement, preparedAt: null, updatedAt: null } };
 });
 
+function safeProviderError(error) {
+  return cleanText(error?.message || error?.code || "SOLAPI 발송에 실패했습니다.", 500);
+}
+
+async function sendBillingStatementViaSolapi(statementId, actorUid = "system") {
+  const db = admin.firestore();
+  const statementRef = db.collection("familyBillingStatements").doc(statementId);
+  const statementSnap = await statementRef.get();
+  if (!statementSnap.exists) throw new Error(`Billing statement not found: ${statementId}`);
+  const statement = statementSnap.data() || {};
+  const to = normalizePhone(statement.recipientPhone);
+  const from = normalizePhone(process.env.SOLAPI_SENDER_NUMBER);
+  if (!/^010\d{8}$/.test(to)) throw new Error("학부모 연락처가 010으로 시작하는 11자리가 아닙니다.");
+  if (!/^\d{8,11}$/.test(from)) throw new Error("SOLAPI에 등록된 발신번호를 Firebase Secret에 설정해 주세요.");
+  if (!process.env.SOLAPI_API_KEY || !process.env.SOLAPI_API_SECRET) {
+    throw new Error("SOLAPI API 인증정보가 Firebase Secret에 설정되지 않았습니다.");
+  }
+
+  const jobId = `${statement.parentUid}_${statement.billingMonth}_tuition`;
+  const jobRef = db.collection("messageJobs").doc(jobId);
+  const acquired = await db.runTransaction(async (transaction) => {
+    const jobSnap = await transaction.get(jobRef);
+    const job = jobSnap.exists ? jobSnap.data() || {} : {};
+    if (job.status === "sent") return false;
+    const startedAt = job.attemptStartedAt?.toMillis?.() || 0;
+    if (job.status === "sending" && Date.now() - startedAt < 15 * 60 * 1000) return false;
+    transaction.set(jobRef, {
+      kind: "monthly_tuition_lms",
+      parentUid: statement.parentUid,
+      statementId,
+      billingMonth: statement.billingMonth,
+      to,
+      status: "sending",
+      attemptCount: (Number(job.attemptCount) || 0) + 1,
+      attemptStartedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: jobSnap.exists ? (job.createdAt || FieldValue.serverTimestamp()) : FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return true;
+  });
+  if (!acquired) return { success: true, skipped: true, jobId };
+
+  try {
+    const { SolapiMessageService } = require("solapi");
+    const service = new SolapiMessageService(process.env.SOLAPI_API_KEY, process.env.SOLAPI_API_SECRET);
+    const result = await service.send({
+      to,
+      from,
+      text: normalizeLmsText(statement.noticeText),
+      subject: normalizeLmsText(`[메타센스] ${Number(String(statement.billingMonth).slice(5))}월 수강료 안내`),
+      type: "LMS",
+      autoTypeDetect: false,
+      customFields: { jobId, statementId },
+    }, { showMessageList: true });
+    const sentPayload = {
+      status: "sent",
+      provider: "solapi",
+      providerGroupId: cleanText(result?.groupId || result?.groupInfo?.groupId, 160) || null,
+      providerMessageId: cleanText(result?.messageList?.[0]?.messageId, 160) || null,
+      providerStatusCode: cleanText(result?.messageList?.[0]?.statusCode, 40) || null,
+      sentAt: FieldValue.serverTimestamp(),
+      sentBy: actorUid,
+      lastError: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    await Promise.all([
+      jobRef.set(sentPayload, { merge: true }),
+      statementRef.set({
+        noticeStatus: "sent",
+        noticeSentAt: FieldValue.serverTimestamp(),
+        noticeSentBy: actorUid,
+        messageJobId: jobId,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true }),
+    ]);
+    return { success: true, skipped: false, jobId };
+  } catch (error) {
+    const message = safeProviderError(error);
+    await Promise.all([
+      jobRef.set({ status: "failed", lastError: message, failedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+      statementRef.set({ noticeStatus: "failed", noticeError: message, messageJobId: jobId, updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+    ]);
+    throw new Error(message);
+  }
+}
+
+const adminSendFamilyBillingNotice = regionalFunctions
+  .runWith({ timeoutSeconds: 120, secrets: SOLAPI_SECRET_NAMES })
+  .https.onCall(async (data, context) => {
+    const adminUid = await requireAdmin(context);
+    const statementId = cleanText(data?.statementId, 220);
+    if (!statementId) throw new functions.https.HttpsError("invalid-argument", "명세 ID가 피요합니다.");
+    try {
+      const result = await sendBillingStatementViaSolapi(statementId, adminUid);
+      await addAudit(adminUid, "send_billing_notice_solapi", "familyBillingStatement", statementId, null, { skipped: result.skipped }, "SOLAPI LMS 수동 발송");
+      return result;
+    } catch (error) {
+      throw new functions.https.HttpsError("internal", safeProviderError(error));
+    }
+  });
+
 const adminMarkBillingNoticeSent = regionalFunctions.https.onCall(async (data, context) => {
   const adminUid = await requireAdmin(context);
   const statementId = cleanText(data?.statementId, 220);
@@ -551,19 +768,34 @@ const adminMarkBillingNoticeSent = regionalFunctions.https.onCall(async (data, c
   return { success: true };
 });
 
-const prepareMonthlyFamilyBillingStatements = regionalFunctions.pubsub
+const prepareMonthlyFamilyBillingStatements = regionalFunctions
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: SOLAPI_SECRET_NAMES })
+  .pubsub
   .schedule("0 9 25 * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
     const targetMonth = addMonths(currentMonthKey(), 1);
     const accounts = await db.collection("familyBillingAccounts").get();
-    let prepared = 0;
-    for (const accountDoc of accounts.docs) {
-      await prepareStatement(accountDoc.id, targetMonth, "system_monthly_25");
-      prepared += 1;
+    const results = [];
+    for (let index = 0; index < accounts.docs.length; index += 5) {
+      const chunk = accounts.docs.slice(index, index + 5);
+      const chunkResults = await Promise.all(chunk.map(async (accountDoc) => {
+        try {
+          const statement = await prepareStatement(accountDoc.id, targetMonth, "system_monthly_25");
+          const sent = await sendBillingStatementViaSolapi(statement.id, "system_monthly_25");
+          return { parentUid: accountDoc.id, ok: true, skipped: sent.skipped };
+        } catch (error) {
+          console.error(`[prepareMonthlyFamilyBillingStatements] ${accountDoc.id}: ${safeProviderError(error)}`);
+          return { parentUid: accountDoc.id, ok: false };
+        }
+      }));
+      results.push(...chunkResults);
     }
-    console.log(`[prepareMonthlyFamilyBillingStatements] ${targetMonth}: ${prepared}`);
+    const sent = results.filter((row) => row.ok && !row.skipped).length;
+    const skipped = results.filter((row) => row.ok && row.skipped).length;
+    const failed = results.filter((row) => !row.ok).length;
+    console.log(`[prepareMonthlyFamilyBillingStatements] ${targetMonth}: sent=${sent}, skipped=${skipped}, failed=${failed}`);
     return null;
   });
 
@@ -576,9 +808,10 @@ module.exports = {
   adminUpdateStudentEnrollment,
   adminConfigureReferralApplication,
   adminPrepareFamilyBillingStatement,
+  adminSendFamilyBillingNotice,
   adminMarkBillingNoticeSent,
   prepareMonthlyFamilyBillingStatements,
   resolveInvite,
   tokenHash,
-  __test: { referralRate, scheduledFee, enrollmentActiveForMonth, addMonths, monthBounds },
+  __test: { referralRate, scheduledFee, enrollmentActiveForMonth, addMonths, monthBounds, buildTuitionNoticeText, normalizePhone, normalizeLmsText },
 };

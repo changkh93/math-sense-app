@@ -1044,6 +1044,8 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [detailView, setDetailView] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
   const [resubmitCrew, setResubmitCrew] = useState(null); // rejected crew data for resubmission
+  const [growthEventOpen, setGrowthEventOpen] = useState(false);
+  const [growthEvent, setGrowthEvent] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
   const crew = userData?.crewSnapshot || null;
@@ -1051,6 +1053,25 @@ export default function StudyCrewView({ onNavigateStore }) {
   const hasCrew = !!crewId;
   const isGuest = userData?.isGuest === true;
   const currentStudyInvitePreference = studyInvitePreferenceDraft || getStudyInvitePreference(userData);
+
+  useEffect(() => {
+    if (!crewId || !user?.uid) {
+      setGrowthEvent(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const fn = httpsCallable(functions, 'getCrewGrowthEventProgress');
+        const result = await fn({ crewId });
+        if (!cancelled) setGrowthEvent(result.data || null);
+      } catch (err) {
+        console.warn('Crew growth event progress load failed:', err);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [crewId, user?.uid]);
 
   // Guests are routed straight into the invited crew's waiting room.
   useEffect(() => {
@@ -1638,6 +1659,44 @@ export default function StudyCrewView({ onNavigateStore }) {
               </button>
             </Motion.div>
           )}
+
+          <Motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              marginBottom: '2.4rem', borderRadius: 20, overflow: 'hidden',
+              border: '1px solid rgba(167,139,250,0.4)',
+              background: 'radial-gradient(circle at 90% 10%, rgba(0,243,255,0.2), transparent 32%), linear-gradient(135deg, rgba(76,29,149,0.72), rgba(6,18,40,0.94))',
+              boxShadow: '0 22px 55px rgba(76,29,149,0.25)'
+            }}
+          >
+            <div style={{ padding: isMobile ? '1.25rem' : '1.7rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: '1.2rem', alignItems: 'center' }}>
+              <div>
+                <div className="font-tech" style={{ color: '#67e8f9', fontWeight: 900, letterSpacing: 1.3, fontSize: '0.76rem' }}>CREW 20 · GROWTH EVENT</div>
+                <h3 className="font-title" style={{ margin: '0.45rem 0 0.55rem', fontSize: isMobile ? '1.45rem' : '2rem', color: 'white' }}>함께 20명을 채우면 정식 크루원 모두 1,000광석</h3>
+                <p className="font-tech" style={{ margin: 0, color: 'rgba(255,255,255,0.72)', lineHeight: 1.6, fontSize: '0.9rem' }}>
+                  정식 크루원과 활동을 완료한 게스트가 달성 인원에 함께 집계됩니다. 초대자별 게스트 기여 인원 제한은 없습니다.
+                </p>
+              </div>
+              <div style={{ minWidth: isMobile ? 0 : 245 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e9d5ff', fontWeight: 900, marginBottom: 7 }}><span>우리 크루</span><span>{growthEvent?.eligibleCount ?? (hasCrew ? '…' : 0)} / 20</span></div>
+                <div style={{ height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}><div style={{ width: `${Math.min(100, ((growthEvent?.eligibleCount || 0) / 20) * 100)}%`, height: '100%', background: 'linear-gradient(90deg,#22d3ee,#8b5cf6,#fbbf24)', transition: 'width .4s ease' }} /></div>
+                <div className="font-tech" style={{ color: growthEvent?.rewarded ? '#86efac' : 'rgba(255,255,255,0.58)', fontSize: '0.72rem', marginTop: 7 }}>{growthEvent?.rewarded ? '달성 확정 · 정식 크루원 1,000광석 지급 완료' : growthEvent?.verificationEndsAtMs ? `20명 달성 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(growthEvent.verificationEndsAtMs))}까지 검증 중` : growthEvent ? `정회원 ${growthEvent.memberCount} · 활동 게스트 ${growthEvent.activeGuestCount} · 확인 중 ${growthEvent.pendingGuestCount}` : hasCrew ? '진행도를 불러오는 중' : '크루에 참여하면 진행도가 표시됩니다'}</div>
+              </div>
+            </div>
+            <div style={{ padding: '0 2rem 1.5rem', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => setGrowthEventOpen((open) => !open)} className="space-btn font-tech" style={{ padding: '0.7rem 1rem', borderRadius: 10, color: '#e9d5ff' }}>{growthEventOpen ? '안내 접기' : '이벤트 참여 방법과 혜택 보기'}</button>
+              {hasCrew && !isGuest && <button type="button" onClick={() => setDetailView(true)} className="space-btn cosmic-btn font-tech" style={{ padding: '0.7rem 1rem', borderRadius: 10 }}>외부 승무원 초대 링크 복사하기</button>}
+            </div>
+            <AnimatePresence>{growthEventOpen && (
+              <Motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', padding: isMobile ? '1.2rem' : '1.5rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
+                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.2)' }}><strong style={{ color: '#67e8f9' }}>참여 방법</strong><ol className="font-tech" style={{ color: 'rgba(255,255,255,0.76)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0 }}><li>내 크루의 GUEST ACCESS에서 외부 승무원 초대 링크를 복사합니다. 개인별 링크 하나로 여러 친구를 제한 없이 초대할 수 있습니다.</li><li>친구에게 링크를 보내 게스트로 메타센스를 체험하게 합니다.</li><li>게스트가 첫 입장 24시간 후, 일반 퀴즈 배틀 2회·실제 답변 10문제를 완료하면 자동으로 활동 게스트에 집계됩니다. AI 대결은 집계하지 않습니다.</li><li>동일 기기 중복 등 명확한 부정 신호는 자동 제외되고, 의심 계정은 운영툴에서 사후 정지·삭제할 수 있습니다.</li><li>정회원+활동 게스트 20명을 48시간 유지하면 달성이 확정됩니다.</li></ol></div>
+                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.2)' }}><strong style={{ color: '#fde68a' }}>초대 혜택</strong><ul className="font-tech" style={{ color: 'rgba(255,255,255,0.76)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0 }}><li>초대받은 친구: 메타센스 1개월 무료 체험</li><li>친구가 유료 수강 등록하면 초대한 정회원 가구의 수강료 할인</li><li>유료 등록 1가구 20% · 2가구 50% · 3가구 이상 100%</li><li>20명 달성 보상: 당시 정식 크루원에게 각 1,000광석</li></ul><p className="font-tech" style={{ color: '#fca5a5', fontSize: '0.75rem', lineHeight: 1.55, marginBottom: 0 }}>게스트는 달성 인원에는 기여하지만 광석 계정이 없어 1,000광석 지급 대상에서는 제외됩니다. 동일 기기 중복·비정상 활동은 운영자 검토 후 제외될 수 있습니다.</p></div>
+                </div>
+              </Motion.div>
+            )}</AnimatePresence>
+          </Motion.section>
 
           {/* Open Study Section */}
           <div style={{ marginBottom: '3.5rem' }}>

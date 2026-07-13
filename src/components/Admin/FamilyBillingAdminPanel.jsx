@@ -98,10 +98,19 @@ export default function FamilyBillingAdminPanel({ parent }) {
     await load();
   };
 
-  const markSent = async (statementId) => {
-    const fn = httpsCallable(functions, 'adminMarkBillingNoticeSent');
-    await fn({ statementId });
-    await load();
+  const sendNotice = async (statementId) => {
+    if (!window.confirm('해당 학부모에게 수강료 안내 LMS를 발송할까요?')) return;
+    setLoading(true);
+    try {
+      const fn = httpsCallable(functions, 'adminSendFamilyBillingNotice');
+      const result = await fn({ statementId });
+      alert(result.data?.skipped ? '이미 발송된 명세라 재발송하지 않았습니다.' : 'SOLAPI LMS 발송이 완료되었습니다.');
+      await load();
+    } catch (error) {
+      alert(error?.message || 'SOLAPI LMS 발송에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const nextStatement = data?.statements?.find((row) => row.billingMonth === effectiveMonth);
@@ -141,8 +150,10 @@ export default function FamilyBillingAdminPanel({ parent }) {
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button type="button" onClick={prepare} className="secondary-btn" style={{ padding: '8px 11px' }}><Calculator size={14} /> {effectiveMonth} 명세 생성</button>
                 {nextStatement && <button type="button" onClick={() => navigator.clipboard.writeText(nextStatement.noticeText || '')} className="secondary-btn" style={{ padding: '8px 11px' }}><Copy size={14} /> 문구 복사</button>}
-                {nextStatement && nextStatement.noticeStatus !== 'sent' && <button type="button" onClick={() => markSent(nextStatement.id)} className="secondary-btn" style={{ padding: '8px 11px' }}><Send size={14} /> 발송 완료</button>}
+                {nextStatement && nextStatement.noticeStatus !== 'sent' && <button type="button" onClick={() => sendNotice(nextStatement.id)} className="secondary-btn" style={{ padding: '8px 11px' }}><Send size={14} /> SOLAPI LMS 발송</button>}
               </div>
+              {nextStatement?.noticeStatus === 'sent' && <div style={{ color: '#86efac', fontSize: 12 }}>발송 완료</div>}
+              {nextStatement?.noticeStatus === 'failed' && <div style={{ color: '#fecaca', fontSize: 12 }}>발송 실패: {nextStatement.noticeError || '원인을 확인해 주세요.'}</div>}
               {nextStatement && <pre style={{ whiteSpace: 'pre-wrap', margin: 0, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.2)', color: '#cbd5e1', fontSize: 11 }}>{nextStatement.noticeText}</pre>}
             </>
           )}

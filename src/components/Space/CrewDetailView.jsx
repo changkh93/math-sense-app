@@ -158,7 +158,7 @@ function GuestCrewPresenceCard({ guest, currentUid }) {
     <div className="crew-member-console crew-member-console-guest">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
         <div style={{ minWidth: 0 }}>
-          <span className="crew-guest-id font-tech">GUEST</span>
+          <span className="crew-guest-id font-tech">GUEST · {String(guest.uid || '').slice(-6).toUpperCase()}</span>
           <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {guest.alias || '게스트 탐사원'}{isSelf ? ' (나)' : ''}
           </div>
@@ -229,6 +229,7 @@ export default function CrewDetailView({ onBack }) {
   const [guestLogoutAction, setGuestLogoutAction] = useState('');
   const [showCrewInfo, setShowCrewInfo] = useState(false);
   const [guestInviteUrl, setGuestInviteUrl] = useState('');
+  const [growthEvent, setGrowthEvent] = useState(null);
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
   const crewId = crew?.id || userData?.crewId || '';
@@ -273,6 +274,26 @@ export default function CrewDetailView({ onBack }) {
     [crewMemberIds, visibleGuestSessions]
   );
   const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
+
+  useEffect(() => {
+    if (!crewId || !user?.uid) {
+      setGrowthEvent(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const fn = httpsCallable(functions, 'getCrewGrowthEventProgress');
+        const result = await fn({ crewId });
+        if (!cancelled) setGrowthEvent(result.data || null);
+      } catch (err) {
+        console.warn('Crew growth event progress load failed:', err);
+      }
+    };
+    load();
+    const timerId = window.setInterval(load, 60000);
+    return () => { cancelled = true; window.clearInterval(timerId); };
+  }, [crewId, user?.uid]);
 
   useEffect(() => {
     if (!crewId || !guestAccessEnabled || isGuest || !user?.uid) {
@@ -694,7 +715,7 @@ export default function CrewDetailView({ onBack }) {
 
         {isGuest && (
           <div className="crew-guest-strip font-tech">
-            <div><span>GUEST PASS</span> 체험 항해 중 · 학습 기록과 광석은 저장되지 않습니다.</div>
+            <div><span>GUEST PASS</span> 1개월 무료 체험 · 첫 입장 24시간 후 일반 퀴즈 배틀 2회와 실제 답변 10문제를 완료하면 활동 게스트로 자동 집계됩니다. AI 대결은 제외됩니다.</div>
             {userData?.referralTracked && userData?.referralToken && (
               <button
                 type="button"
@@ -716,6 +737,7 @@ export default function CrewDetailView({ onBack }) {
           <div className="crew-guest-access-label">
             <span className="font-tech"><Share2 size={14} /> GUEST ACCESS</span>
             <strong className="font-tech">{guestAccessEnabled ? '외부 승무원 초대 가능' : '게스트 초대 중지'}</strong>
+            {guestAccessEnabled && <small className="crew-guest-benefit-copy font-tech">링크로 초대된 친구는 1개월 무료 체험을 신청할 수 있습니다. 이 개인 링크 하나로 여러 친구를 제한 없이 초대할 수 있습니다.</small>}
           </div>
           {guestAccessEnabled && guestInviteUrl && (
             <div className="crew-guest-share-link">
@@ -735,6 +757,27 @@ export default function CrewDetailView({ onBack }) {
           )}
           {guestMessage && <div className="crew-guest-access-message font-tech">{guestMessage}</div>}
         </Motion.section>
+      )}
+
+      {status === 'approved' && crewId && (
+        <section className="crew-growth-status">
+          <div className="crew-growth-status__head">
+            <div><span className="font-tech">CREW 20 EVENT</span><strong className="font-title">크루 구성 현황</strong></div>
+            <b className="font-tech">{growthEvent?.eligibleCount ?? '…'} / 20명</b>
+          </div>
+          <div className="crew-growth-status__metrics">
+            <div><span>정식 크루원</span><strong>{growthEvent?.memberCount ?? crewMemberIds.length}명</strong></div>
+            <div><span>활동 게스트</span><strong>{growthEvent?.activeGuestCount ?? 0}명</strong></div>
+            <div><span>체험·확인 중</span><strong>{growthEvent?.pendingGuestCount ?? activeGuestCount}명</strong></div>
+            <div><span>현재 접속 게스트</span><strong>{activeGuestCount}명</strong></div>
+          </div>
+          <div className="crew-growth-status__rules font-tech">
+            <strong>부정 방지·집계 규정</strong>
+            <span>첫 입장 24시간 + 일반 퀴즈 배틀 2회 + 실제 답변 10문제를 완료하면 자동 집계됩니다.</span>
+            <span>AI 대결은 제외되며, 동일 기기 중복은 자동 제외됩니다. 동일 IP의 단시간 다량 생성과 비정상 활동은 운영툴에서 사후 검토하여 로그인 정지·삭제할 수 있습니다.</span>
+            <span>멤버별 고유 링크는 1회용이 아닙니다. 같은 링크 하나로 여러 친구를 제한 없이 초대할 수 있으며, 친구마다 별도의 게스트 UID가 발급됩니다.</span>
+          </div>
+        </section>
       )}
 
       <div className="crew-bridge-workspace">

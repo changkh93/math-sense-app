@@ -1,5 +1,6 @@
 const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 const { FieldPath, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const PROJECT_ID = "math-sense-1f6a8";
 const STORAGE_BUCKET = "math-sense-1f6a8.firebasestorage.app";
@@ -15,6 +16,7 @@ const referralBilling = require("./referralBilling");
 const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
+const guestSecurityFunctions = regionalFunctions.runWith({ secrets: ["GUEST_ABUSE_HASH_SECRET"] });
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
 const STORE_RADAR_DURATION_DAYS = 7;
@@ -1158,6 +1160,12 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
     await db.collection("quizBattleAISecrets").doc(battleId).delete().catch((err) => {
       console.warn("AI battle secret cleanup failed", battleId, err);
     });
+  }
+
+  try {
+    await recordCrewGuestBattleActivity(battleId);
+  } catch (err) {
+    console.warn("Crew growth guest battle activity sync failed", battleId, err);
   }
 
   return result;
@@ -5912,6 +5920,9 @@ exports.joinStudyCrew = regionalFunctions.https.onCall(async (data, context) => 
     ...txResult,
     updatedAt: new Date().toISOString(),
   });
+  await reconcileCrewGrowthEvent(crewSnap.id).catch((err) => {
+    console.warn("Crew growth event sync after member join failed", crewSnap.id, err);
+  });
 
   return { success: true, crewId: crewSnap.id, inviteCode };
 });
@@ -6841,6 +6852,156 @@ exports.adminRemoveStudyCrewMember = regionalFunctions.https.onCall(async (data,
 // document, learning records, crystals, or ranking.
 // ---------------------------------------------------------------------------
 
+const CREW_GROWTH_EVENT_TARGET = 20;
+const CREW_GROWTH_EVENT_REWARD = 1000;
+const CREW_GROWTH_EVENT_MIN_BATTLES = 2;
+const CREW_GROWTH_EVENT_MIN_ANSWERS = 10;
+const CREW_GROWTH_EVENT_MIN_AGE_MS = 24 * 60 * 60 * 1000;
+const CREW_GROWTH_EVENT_HOLD_MS = 48 * 60 * 60 * 1000;
+
+function getRequestIp(context) {
+  const forwarded = String(context?.rawRequest?.headers?.["x-forwarded-for"] || "");
+  return cleanText(forwarded.split(",")[0] || context?.rawRequest?.ip || "", 80);
+}
+
+function guestSecurityHash(value) {
+  const secret = process.env.GUEST_ABUSE_HASH_SECRET;
+  if (!secret || !value) return "";
+  return crypto.createHmac("sha256", secret).update(String(value)).digest("hex");
+}
+
+function timestampMillis(value) {
+  if (value?.toMillis) return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return Number(value || 0);
+}
+
+function isCrewGrowthGuestEligible(record = {}, nowMs = Date.now()) {
+  const reviewStatus = record.eventReviewStatus || "clear";
+  if (["deleted", "suspended"].includes(record.status) || reviewStatus !== "clear") return false;
+  const firstJoinedAtMs = Number(record.firstJoinedAtMs || timestampMillis(record.firstJoinedAt));
+  return Number(record.completedBattleCount || 0) >= CREW_GROWTH_EVENT_MIN_BATTLES &&
+    Number(record.totalBattleAnswers || 0) >= CREW_GROWTH_EVENT_MIN_ANSWERS &&
+    firstJoinedAtMs > 0 && nowMs - firstJoinedAtMs >= CREW_GROWTH_EVENT_MIN_AGE_MS;
+}
+
+async function loadCrewGrowthEventProgress(crewId, nowMs = Date.now()) {
+  const db = admin.firestore();
+  const [crewSnap, guestSnap] = await Promise.all([
+    db.collection("crews").doc(crewId).get(),
+    db.collection("crewGuestAccounts").where("crewId", "==", crewId).get(),
+  ]);
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  const crew = crewSnap.data() || {};
+  const rawMemberIds = Array.from(new Set([crew.leaderId, ...(crew.memberIds || [])].filter(Boolean)));
+  const memberSnaps = await Promise.all(rawMemberIds.map((uid) => db.collection("users").doc(uid).get()));
+  const memberIds = rawMemberIds.filter((uid, index) => memberSnaps[index].exists && !isDeletedMemberData(memberSnaps[index].data() || {}));
+  const guests = guestSnap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
+  const activeGuests = guests.filter((guest) => isCrewGrowthGuestEligible(guest, nowMs));
+  const pendingGuests = guests.filter((guest) => guest.status !== "deleted" && !isCrewGrowthGuestEligible(guest, nowMs));
+  return {
+    crewRef: crewSnap.ref,
+    crew,
+    memberIds,
+    guests,
+    activeGuests,
+    pendingGuests,
+    memberCount: memberIds.length,
+    activeGuestCount: activeGuests.length,
+    eligibleCount: memberIds.length + activeGuests.length,
+  };
+}
+
+async function reconcileCrewGrowthEvent(crewId, { allowReward = false } = {}) {
+  const db = admin.firestore();
+  const nowMs = Date.now();
+  const progress = await loadCrewGrowthEventProgress(crewId, nowMs);
+  const event = progress.crew.growthEvent2026 || {};
+  if (event.rewardedAt) return { ...progress, event };
+
+  if (progress.eligibleCount < CREW_GROWTH_EVENT_TARGET) {
+    if (event.achievedAtMs) {
+      await progress.crewRef.set({ growthEvent2026: { ...event, achievedAt: null, achievedAtMs: 0, verificationEndsAt: null, verificationEndsAtMs: 0, updatedAt: FieldValue.serverTimestamp() } }, { merge: true });
+    }
+    return { ...progress, event: { ...event, achievedAtMs: 0, verificationEndsAtMs: 0 } };
+  }
+
+  if (!event.achievedAtMs) {
+    const nextEvent = {
+      achievedAt: FieldValue.serverTimestamp(),
+      achievedAtMs: nowMs,
+      verificationEndsAt: Timestamp.fromMillis(nowMs + CREW_GROWTH_EVENT_HOLD_MS),
+      verificationEndsAtMs: nowMs + CREW_GROWTH_EVENT_HOLD_MS,
+      rewardedAt: null,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    await progress.crewRef.set({ growthEvent2026: nextEvent }, { merge: true });
+    return { ...progress, event: nextEvent };
+  }
+
+  if (!allowReward || nowMs < Number(event.verificationEndsAtMs || 0)) return { ...progress, event };
+
+  await db.runTransaction(async (transaction) => {
+    const freshCrewSnap = await transaction.get(progress.crewRef);
+    const freshCrew = freshCrewSnap.data() || {};
+    if (freshCrew.growthEvent2026?.rewardedAt) return;
+    const userRefs = progress.memberIds.map((uid) => db.collection("users").doc(uid));
+    const userSnaps = await Promise.all(userRefs.map((userRef) => transaction.get(userRef)));
+    const rewardedMemberIds = progress.memberIds.filter((uid, index) => userSnaps[index].exists && !isDeletedMemberData(userSnaps[index].data() || {}));
+    rewardedMemberIds.forEach((uid) => {
+      const userRef = db.collection("users").doc(uid);
+      transaction.set(userRef, {
+        crystals: FieldValue.increment(CREW_GROWTH_EVENT_REWARD),
+        lastCrewGrowthRewardAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      recordCrystalTransaction(transaction, uid, `crew_growth_20_${crewId}`, {
+        amount: CREW_GROWTH_EVENT_REWARD,
+        type: "crew_growth_event_reward",
+        description: "스터디 크루 20명 달성 이벤트 보상",
+        metadata: { crewId, target: CREW_GROWTH_EVENT_TARGET },
+      });
+    });
+    transaction.set(progress.crewRef, {
+      growthEvent2026: {
+        ...freshCrew.growthEvent2026,
+        rewardedAt: FieldValue.serverTimestamp(),
+        rewardedAtMs: nowMs,
+        rewardedMemberIds,
+        rewardAmount: CREW_GROWTH_EVENT_REWARD,
+        finalEligibleCount: progress.eligibleCount,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+    }, { merge: true });
+  });
+  return loadCrewGrowthEventProgress(crewId, nowMs);
+}
+
+async function recordCrewGuestBattleActivity(battleId) {
+  const db = admin.firestore();
+  const battleSnap = await db.collection("quizBattles").doc(battleId).get();
+  if (!battleSnap.exists || battleSnap.data()?.status !== "finished" || battleSnap.data()?.isAI === true) return;
+  const battle = battleSnap.data() || {};
+  const guestUids = (battle.participantUids || []).filter((uid) => battle.participants?.[uid]?.isGuest === true);
+  await Promise.all(guestUids.map(async (uid) => {
+    const participant = battle.participants?.[uid] || {};
+    const accountRef = db.collection("crewGuestAccounts").doc(uid);
+    const completionRef = accountRef.collection("battleCompletions").doc(battleId);
+    await db.runTransaction(async (transaction) => {
+      const [accountSnap, completionSnap] = await Promise.all([transaction.get(accountRef), transaction.get(completionRef)]);
+      if (!accountSnap.exists || completionSnap.exists) return;
+      transaction.set(completionRef, { battleId, answeredCount: Number(participant.answeredCount || 0), completedAt: FieldValue.serverTimestamp() });
+      transaction.set(accountRef, {
+        completedBattleCount: FieldValue.increment(1),
+        totalBattleAnswers: FieldValue.increment(Number(participant.answeredCount || 0)),
+        lastBattleAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+    const accountSnap = await accountRef.get();
+    if (accountSnap.exists && accountSnap.data()?.crewId) await reconcileCrewGrowthEvent(accountSnap.data().crewId);
+  }));
+}
+
 function isGuestContext(context) {
   return !!context.auth?.uid && context.auth?.token?.firebase?.sign_in_provider === "anonymous";
 }
@@ -6863,7 +7024,7 @@ function getCrewGuestAlias(uid = "") {
 // Public preview used by the guest entry screen before signing in anonymously.
 // Returns just enough to render a confirm page: crew name, color, and whether
 // guests are currently admitted. No sensitive data (meet URL) is exposed.
-exports.previewCrewGuestInvite = regionalFunctions.https.onCall(async (data) => {
+exports.previewCrewGuestInvite = regionalFunctions.https.onCall(async (data, context) => {
   const crewId = String(data?.crewId || "").trim();
   const inviteToken = cleanText(data?.inviteToken, 200);
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
@@ -6876,6 +7037,14 @@ exports.previewCrewGuestInvite = regionalFunctions.https.onCall(async (data) => 
     referralInvite.source === "crew_guest_invite" &&
     referralInvite.crewId === crewSnap.id
   );
+  const isOwnInviteTest = Boolean(
+    context.auth?.uid &&
+    referralInvite?.referrerStudentUid &&
+    referralInvite.referrerStudentUid === context.auth.uid
+  );
+  const registeredUserActive = Boolean(
+    context.auth?.uid && context.auth?.token?.firebase?.sign_in_provider !== "anonymous"
+  );
   const guestsAdmitted = crewData.guestAccessEnabled === true && (crewData.status || "pending") === "approved";
   return {
     crewId: crewSnap.id,
@@ -6884,13 +7053,15 @@ exports.previewCrewGuestInvite = regionalFunctions.https.onCall(async (data) => 
     guestsAdmitted,
     status: crewData.status || "pending",
     referralTracked,
+    isOwnInviteTest,
+    registeredUserActive,
   };
 });
 
 // Called after the guest has signed in anonymously. Confirms the crew still
 // admits guests and returns the crew snapshot the client uses to render the
 // waiting room directly (without a users/{uid} doc).
-exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) => {
+exports.enterCrewAsGuest = guestSecurityFunctions.https.onCall(async (data, context) => {
   if (!context.auth || !context.auth.uid) {
     throw new functions.https.HttpsError("unauthenticated", "게스트 세션을 시작해 주세요.");
   }
@@ -6900,6 +7071,7 @@ exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) 
   const uid = context.auth.uid;
   const crewId = String(data?.crewId || "").trim();
   const inviteToken = cleanText(data?.inviteToken, 200);
+  const installationId = cleanText(data?.installationId, 200);
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
   const db = admin.firestore();
   const crewSnap = await db.collection("crews").doc(crewId).get();
@@ -6916,7 +7088,27 @@ exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) 
     throw new functions.https.HttpsError("permission-denied", "크루 리더가 게스트 참여를 허용하지 않았습니다.");
   }
   const guestAlias = getCrewGuestAlias(uid);
-  await crewSnap.ref.collection("guestSessions").doc(uid).set({
+  const nowMs = Date.now();
+  const ipHash = guestSecurityHash(getRequestIp(context));
+  const installationHash = guestSecurityHash(installationId);
+  const accountRef = db.collection("crewGuestAccounts").doc(uid);
+  const [existingAccount, sameDeviceSnap, sameIpSnap] = await Promise.all([
+    accountRef.get(),
+    installationHash ? db.collection("crewGuestAccounts").where("installationHash", "==", installationHash).limit(20).get() : Promise.resolve(null),
+    ipHash ? db.collection("crewGuestAccounts").where("ipHash", "==", ipHash).limit(50).get() : Promise.resolve(null),
+  ]);
+  if (existingAccount.exists && ["suspended", "deleted"].includes(existingAccount.data()?.status)) {
+    throw new functions.https.HttpsError("permission-denied", "운영자에 의해 중지된 게스트 계정입니다.");
+  }
+  const duplicateDevice = Boolean(sameDeviceSnap?.docs.some((docSnap) => docSnap.id !== uid && docSnap.data()?.crewId === crewId && docSnap.data()?.status !== "deleted"));
+  const recentSameIpCount = sameIpSnap?.docs.filter((docSnap) => docSnap.id !== uid && docSnap.data()?.crewId === crewId && nowMs - Number(docSnap.data()?.firstJoinedAtMs || 0) <= 60 * 60 * 1000).length || 0;
+  const riskFlags = [
+    ...(duplicateDevice ? ["duplicate_device"] : []),
+    ...(recentSameIpCount >= 2 ? ["ip_burst_3_plus"] : []),
+  ];
+  const eventReviewStatus = duplicateDevice ? "excluded" : (recentSameIpCount >= 2 ? "review" : (existingAccount.data()?.eventReviewStatus || "clear"));
+
+  await Promise.all([crewSnap.ref.collection("guestSessions").doc(uid).set({
     uid,
     crewId: crewSnap.id,
     alias: guestAlias,
@@ -6927,7 +7119,28 @@ exports.enterCrewAsGuest = regionalFunctions.https.onCall(async (data, context) 
     referralInviteId: trackedInvite?.id || null,
     referrerParentUid: trackedInvite?.referrerParentUid || null,
     referrerStudentUid: trackedInvite?.referrerStudentUid || null,
-  }, { merge: true });
+  }, { merge: true }), accountRef.set({
+    uid,
+    crewId: crewSnap.id,
+    crewName: crewData.name || "스터디 크루",
+    alias: guestAlias,
+    status: "active",
+    referralInviteId: trackedInvite?.id || null,
+    referrerParentUid: trackedInvite?.referrerParentUid || null,
+    referrerStudentUid: trackedInvite?.referrerStudentUid || null,
+    installationHash,
+    ipHash,
+    isDuplicateDevice: duplicateDevice,
+    recentSameIpCount: recentSameIpCount + 1,
+    ...(riskFlags.length ? { riskFlags: FieldValue.arrayUnion(...riskFlags) } : {}),
+    eventReviewStatus,
+    firstJoinedAt: existingAccount.exists ? (existingAccount.data()?.firstJoinedAt || FieldValue.serverTimestamp()) : FieldValue.serverTimestamp(),
+    firstJoinedAtMs: existingAccount.exists ? Number(existingAccount.data()?.firstJoinedAtMs || nowMs) : nowMs,
+    lastJoinedAt: FieldValue.serverTimestamp(),
+    lastSeenAt: FieldValue.serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(nowMs + (30 * 24 * 60 * 60 * 1000)),
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true })]);
   return {
     crewId: crewSnap.id,
     crewName: crewData.name || "스터디 크루",
@@ -6954,14 +7167,32 @@ exports.touchCrewGuestPresence = regionalFunctions.https.onCall(async (data, con
   if (crewData.guestAccessEnabled !== true || (crewData.status || "pending") !== "approved") {
     throw new functions.https.HttpsError("permission-denied", "현재 게스트 참여가 허용되지 않습니다.");
   }
-  await crewRef.collection("guestSessions").doc(uid).set({
-    uid,
-    crewId,
-    alias: getCrewGuestAlias(uid),
-    isGuest: true,
-    state: "online",
-    lastSeenAt: FieldValue.serverTimestamp(),
-  }, { merge: true });
+  const guestAccountRef = db.collection("crewGuestAccounts").doc(uid);
+  const guestAccountSnap = await guestAccountRef.get();
+  if (guestAccountSnap.exists && ["suspended", "deleted"].includes(guestAccountSnap.data()?.status)) {
+    throw new functions.https.HttpsError("permission-denied", "운영자에 의해 중지된 게스트 계정입니다.");
+  }
+  await Promise.all([
+    crewRef.collection("guestSessions").doc(uid).set({
+      uid,
+      crewId,
+      alias: getCrewGuestAlias(uid),
+      isGuest: true,
+      state: "online",
+      lastSeenAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(Date.now() + (30 * 24 * 60 * 60 * 1000)),
+    }, { merge: true }),
+    guestAccountRef.set({
+      uid,
+      crewId,
+      crewName: crewData.name || "스터디 크루",
+      alias: getCrewGuestAlias(uid),
+      status: "active",
+      ...(!guestAccountSnap.exists ? { eventReviewStatus: "clear", firstJoinedAt: FieldValue.serverTimestamp(), firstJoinedAtMs: Date.now() } : {}),
+      lastSeenAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true }),
+  ]);
   return { success: true };
 });
 
@@ -6974,6 +7205,153 @@ exports.leaveCrewGuestSession = regionalFunctions.https.onCall(async (data, cont
   }
   return { success: true };
 });
+
+exports.getCrewGrowthEventProgress = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = cleanId(data?.crewId, 160);
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+  const db = admin.firestore();
+  const [crewSnap, guestSnap] = await Promise.all([
+    db.collection("crews").doc(crewId).get(),
+    db.collection("crewGuestAccounts").doc(uid).get(),
+  ]);
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  const crew = crewSnap.data() || {};
+  const isMember = crew.leaderId === uid || (crew.memberIds || []).includes(uid);
+  const isCrewGuest = guestSnap.exists && guestSnap.data()?.crewId === crewId;
+  if (!isMember && !isCrewGuest) throw new functions.https.HttpsError("permission-denied", "이 크루의 이벤트만 확인할 수 있습니다.");
+  const progress = await reconcileCrewGrowthEvent(crewId);
+  return {
+    target: CREW_GROWTH_EVENT_TARGET,
+    reward: CREW_GROWTH_EVENT_REWARD,
+    memberCount: progress.memberCount,
+    activeGuestCount: progress.activeGuestCount,
+    pendingGuestCount: progress.pendingGuests.length,
+    eligibleCount: progress.eligibleCount,
+    achievedAtMs: Number(progress.event?.achievedAtMs || 0),
+    verificationEndsAtMs: Number(progress.event?.verificationEndsAtMs || 0),
+    rewarded: Boolean(progress.event?.rewardedAt),
+  };
+});
+
+exports.adminListCrewGuestAccounts = regionalFunctions.https.onCall(async (data, context) => {
+  await requireAdminUid(context);
+  const crewId = cleanId(data?.crewId, 160);
+  let queryRef = admin.firestore().collection("crewGuestAccounts");
+  if (crewId) queryRef = queryRef.where("crewId", "==", crewId);
+  const snap = await queryRef.limit(300).get();
+  const nowMs = Date.now();
+  const guests = snap.docs.map((docSnap) => {
+    const row = docSnap.data() || {};
+    return {
+      uid: docSnap.id,
+      alias: row.alias || "게스트 탐사원",
+      crewId: row.crewId || "",
+      crewName: row.crewName || "",
+      status: row.status || "active",
+      eventReviewStatus: row.eventReviewStatus || "clear",
+      riskFlags: row.riskFlags || [],
+      completedBattleCount: Number(row.completedBattleCount || 0),
+      totalBattleAnswers: Number(row.totalBattleAnswers || 0),
+      firstJoinedAtMs: Number(row.firstJoinedAtMs || 0),
+      lastSeenAtMs: timestampMillis(row.lastSeenAt || row.updatedAt),
+      recentSameIpCount: Number(row.recentSameIpCount || 0),
+      referralInviteId: row.referralInviteId || "",
+      referrerStudentUid: row.referrerStudentUid || "",
+      eventEligible: isCrewGrowthGuestEligible(row, nowMs),
+    };
+  }).sort((a, b) => b.firstJoinedAtMs - a.firstJoinedAtMs);
+  return { guests };
+});
+
+exports.adminReviewCrewGuestAccount = regionalFunctions.https.onCall(async (data, context) => {
+  const adminUid = await requireAdminUid(context);
+  const guestUid = cleanId(data?.guestUid, 200);
+  const status = cleanId(data?.status, 30);
+  if (!guestUid || !["clear", "review", "excluded"].includes(status)) {
+    throw new functions.https.HttpsError("invalid-argument", "검토 정보를 확인해 주세요.");
+  }
+  const ref = admin.firestore().collection("crewGuestAccounts").doc(guestUid);
+  const snap = await ref.get();
+  if (!snap.exists) throw new functions.https.HttpsError("not-found", "게스트 계정을 찾을 수 없습니다.");
+  await ref.set({ eventReviewStatus: status, reviewedBy: adminUid, reviewedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  if (snap.data()?.crewId) await reconcileCrewGrowthEvent(snap.data().crewId);
+  return { success: true };
+});
+
+exports.adminSetCrewGuestSuspended = regionalFunctions.https.onCall(async (data, context) => {
+  const adminUid = await requireAdminUid(context);
+  const guestUid = cleanId(data?.guestUid, 200);
+  const suspended = data?.suspended === true;
+  if (!guestUid) throw new functions.https.HttpsError("invalid-argument", "게스트 UID가 없습니다.");
+  const db = admin.firestore();
+  const accountRef = db.collection("crewGuestAccounts").doc(guestUid);
+  const accountSnap = await accountRef.get();
+  if (!accountSnap.exists) throw new functions.https.HttpsError("not-found", "게스트 계정을 찾을 수 없습니다.");
+  const account = accountSnap.data() || {};
+  if (account.status === "deleted") throw new functions.https.HttpsError("failed-precondition", "이미 삭제된 계정입니다.");
+  await Promise.all([
+    admin.auth().updateUser(guestUid, { disabled: suspended }),
+    suspended && account.crewId ? db.collection("crews").doc(account.crewId).collection("guestSessions").doc(guestUid).delete() : Promise.resolve(),
+    accountRef.set({
+      status: suspended ? "suspended" : "active",
+      eventReviewStatus: suspended ? "excluded" : "clear",
+      suspensionUpdatedBy: adminUid,
+      suspensionUpdatedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true }),
+  ]);
+  if (account.crewId) await reconcileCrewGrowthEvent(account.crewId);
+  return { success: true, suspended };
+});
+
+exports.adminDeleteCrewGuestAccount = regionalFunctions.https.onCall(async (data, context) => {
+  const adminUid = await requireAdminUid(context);
+  const guestUid = cleanId(data?.guestUid, 200);
+  if (!guestUid) throw new functions.https.HttpsError("invalid-argument", "게스트 UID가 없습니다.");
+  const db = admin.firestore();
+  const accountRef = db.collection("crewGuestAccounts").doc(guestUid);
+  const accountSnap = await accountRef.get();
+  if (!accountSnap.exists) throw new functions.https.HttpsError("not-found", "게스트 계정을 찾을 수 없습니다.");
+  const account = accountSnap.data() || {};
+  await Promise.all([
+    admin.auth().deleteUser(guestUid).catch((err) => {
+      if (err?.code !== "auth/user-not-found") throw err;
+    }),
+    account.crewId ? db.collection("crews").doc(account.crewId).collection("guestSessions").doc(guestUid).delete() : Promise.resolve(),
+    accountRef.set({ status: "deleted", eventReviewStatus: "excluded", deletedBy: adminUid, deletedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
+  ]);
+  if (account.crewId) await reconcileCrewGrowthEvent(account.crewId);
+  return { success: true };
+});
+
+exports.finalizeCrewGrowthEvents = regionalFunctions.pubsub
+  .schedule("every 1 hours")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const snap = await admin.firestore().collection("crews").where("status", "==", "approved").get();
+    await Promise.all(snap.docs.map((docSnap) => reconcileCrewGrowthEvent(docSnap.id, { allowReward: true }).catch((err) => {
+      console.warn("Crew growth event reconciliation failed", docSnap.id, err);
+    })));
+    return null;
+  });
+
+exports.cleanupExpiredCrewGuestAccounts = regionalFunctions.pubsub
+  .schedule("every 24 hours")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const snap = await db.collection("crewGuestAccounts").where("expiresAt", "<=", Timestamp.now()).limit(200).get();
+    await Promise.all(snap.docs.map(async (docSnap) => {
+      const row = docSnap.data() || {};
+      await Promise.all([
+        admin.auth().deleteUser(docSnap.id).catch(() => {}),
+        row.crewId ? db.collection("crews").doc(row.crewId).collection("guestSessions").doc(docSnap.id).delete().catch(() => {}) : Promise.resolve(),
+        db.recursiveDelete(docSnap.ref),
+      ]);
+    }));
+    return null;
+  });
 
 // Crew leader toggle: turn guest admission on/off for their crew.
 // Stored on the crew document so it can be checked synchronously by every
@@ -8664,6 +9042,9 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
       ...cleanup.nextCrewData,
       updatedAt: new Date().toISOString(),
     });
+    await reconcileCrewGrowthEvent(crewId).catch((err) => {
+      console.warn("Crew growth event sync after member leave failed", crewId, err);
+    });
   }
 
   return { success: true, deletedCrew: false };
@@ -8678,5 +9059,6 @@ exports.adminUpdateFamilyBilling = referralBilling.adminUpdateFamilyBilling;
 exports.adminUpdateStudentEnrollment = referralBilling.adminUpdateStudentEnrollment;
 exports.adminConfigureReferralApplication = referralBilling.adminConfigureReferralApplication;
 exports.adminPrepareFamilyBillingStatement = referralBilling.adminPrepareFamilyBillingStatement;
+exports.adminSendFamilyBillingNotice = referralBilling.adminSendFamilyBillingNotice;
 exports.adminMarkBillingNoticeSent = referralBilling.adminMarkBillingNoticeSent;
 exports.prepareMonthlyFamilyBillingStatements = referralBilling.prepareMonthlyFamilyBillingStatements;

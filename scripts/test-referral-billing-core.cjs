@@ -32,5 +32,28 @@ assert.deepEqual(core.monthBounds('2028-02'), {
   end: '2028-02-29',
 });
 assert.equal(core.addMonths('2026-12', 1), '2027-01');
+assert.equal(core.normalizePhone('010-1234-5678'), '01012345678');
+
+const notice = core.buildTuitionNoticeText({
+  parentName: '김학부모',
+  monthKey: '2026-08',
+  start: '2026-08-01',
+  end: '2026-08-31',
+  baseFee: 250000,
+  discountRate: 0.5,
+  finalFee: 125000,
+  referralUrl: 'https://math-sense-1f6a8.web.app/trial?ref=test-token',
+});
+assert.match(notice, /125,000원/);
+assert.match(notice, /추천 50% 할인/);
+assert.match(notice, /KEB하나은행 784-910004-58404 \(장기홍\)/);
+assert.match(notice, /\/trial\?ref=test-token/);
+const normalizedNotice = core.normalizeLmsText(notice);
+assert.equal(normalizedNotice, normalizedNotice.normalize('NFC'));
+assert.match(normalizedNotice, /\uB0A9\uBD80 \uC608\uC815 \uAE08\uC561: 125,000\uC6D0/);
+assert.match(normalizedNotice, /\uC218\uAC15 \uAE30\uAC04:/);
+assert.match(normalizedNotice, /\uC720\uB8CC \uC218\uAC15 \uC911\uC774\uBA74/);
+assert.match(normalizedNotice, /\uCD94\uCC9C \uB9C1\uD06C/);
+assert.doesNotMatch(normalizedNotice, /[\u1100-\u11ff]/);
 
 console.log('Referral billing core tests passed.');
