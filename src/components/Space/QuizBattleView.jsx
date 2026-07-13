@@ -76,6 +76,7 @@ export default function QuizBattleView({
   const [challengingUid, setChallengingUid] = useState('')
   const [challengeNotice, setChallengeNotice] = useState('')
   const [isJoining, setIsJoining] = useState(false)
+  const [joiningMode, setJoiningMode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
@@ -263,6 +264,7 @@ export default function QuizBattleView({
     if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
     enterBattleFocusMode()
     setIsJoining(true)
+    setJoiningMode('ai')
     setError('')
     try {
       const start = httpsCallable(functions, 'startAIQuizBattle')
@@ -276,6 +278,7 @@ export default function QuizBattleView({
       setError(err?.message || 'AI 배틀을 시작하지 못했습니다.')
     } finally {
       setIsJoining(false)
+      setJoiningMode('')
     }
   }, [battleScope, clusterId, entryUnitId, isJoining, regionId, user?.uid])
 
@@ -283,6 +286,7 @@ export default function QuizBattleView({
     if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
     if (!silent) enterBattleFocusMode()
     setIsJoining(true)
+    setJoiningMode(targetTicketId ? 'direct' : 'queue')
     if (!silent && !targetTicketId) {
       setError('')
     } else if (!silent) {
@@ -323,6 +327,7 @@ export default function QuizBattleView({
       }
     } finally {
       setIsJoining(false)
+      setJoiningMode('')
     }
   }, [battleScope, clusterId, entryUnitId, isJoining, loadOnlineOpponents, loadQueueTickets, regionId, ticketId, user?.uid])
 
@@ -831,7 +836,7 @@ export default function QuizBattleView({
   const panelStyle = {
     minHeight: '100dvh',
     width: '100%',
-    padding: '1.25rem',
+    padding: isMobile ? '1rem 1rem 7rem' : '1.25rem',
     boxSizing: 'border-box',
     display: 'flex',
     alignItems: 'center',
@@ -852,8 +857,8 @@ export default function QuizBattleView({
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚔️</div>
           <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.75rem' }}>QUIZ BATTLE</h2>
           <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-            {isAIMode ? '전술 AI NOVA-7이 내 풀이 속도에 맞춰 함께 달립니다.' : '같은 범위에 도전하는 탐사원과 실시간으로 대결합니다.'}<br />
-            {isAIMode ? 'AI전 광석은 일반 대전의 1/3이며, 공식 전적 대신 훈련 SEI에 제한적으로 반영됩니다.' : '온라인 탐사원에게 도전하거나 자동 매칭 대기룸에 입장하세요.'}
+            {isAIMode ? '전술 AI NOVA-7이 내 풀이 속도에 맞춰 함께 달립니다.' : '같은 범위의 탐사원과 실시간으로 대결하거나 NOVA-7과 즉시 훈련합니다.'}<br />
+            {isAIMode ? 'AI전 광석은 일반 대전의 1/3이며, 공식 전적 대신 훈련 SEI에 제한적으로 반영됩니다.' : '상대를 직접 선택하거나 아래에서 원하는 대결 방식을 고르세요.'}
           </p>
           <div style={{ color: 'var(--crystal-cyan)', marginBottom: '1.5rem', fontWeight: 800 }}>
             퀴즈 범위: {rangeLabel || entryUnitTitle || entryUnitId}
@@ -895,7 +900,7 @@ export default function QuizBattleView({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+              gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
               gap: '0.6rem',
               marginBottom: '1.5rem',
             }}
@@ -1154,16 +1159,74 @@ export default function QuizBattleView({
             </div>
           )}
           {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
-          <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="hud-btn primary glass" onClick={isAIMode ? startAIBattle : () => joinQueue()} disabled={isJoining || Boolean(outgoingChallenge)} style={{ padding: '0.9rem 1.4rem' }}>
-              {isJoining ? '배틀 좌표 생성 중...' : outgoingChallenge ? '도전 응답 대기 중' : isAIMode ? 'NOVA-7과 대결 시작' : '자동 매칭 대기룸 입장'}
-            </button>
-            {!isAIMode && onSoloQuiz && <button className="hud-btn secondary glass" onClick={handleSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
-              혼자 FIELD TEST
-            </button>}
-            <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
-              돌아가기
-            </button>
+          <div style={{ marginTop: isMobile ? '0.3rem' : '0.55rem' }}>
+            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.72rem', letterSpacing: '0.1em', marginBottom: '0.55rem' }}>
+              {isAIMode ? 'AI BATTLE START' : '대결 방식 선택'}
+            </div>
+            <div style={{
+              width: 'min(620px, 100%)',
+              margin: '0 auto',
+              display: 'grid',
+              gridTemplateColumns: isAIMode ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))',
+              gap: isMobile ? '0.55rem' : '0.75rem',
+            }}>
+              {!isAIMode && (
+                <button
+                  type="button"
+                  className="hud-btn primary glass"
+                  onClick={() => joinQueue()}
+                  disabled={isJoining || Boolean(outgoingChallenge)}
+                  style={{
+                    minHeight: isMobile ? 82 : 92,
+                    padding: isMobile ? '0.8rem 0.55rem' : '0.95rem 1rem',
+                    borderColor: 'rgba(0,243,255,0.5)',
+                    background: 'linear-gradient(145deg, rgba(0,243,255,0.17), rgba(32,77,145,0.2))',
+                  }}
+                >
+                  <span style={{ display: 'block', fontWeight: 900, fontSize: isMobile ? '0.9rem' : '1rem' }}>
+                    {joiningMode === 'queue' ? '연결 중…' : outgoingChallenge ? '도전 대기 중' : isMobile ? '자동 매칭' : '자동 매칭 대기룸 입장'}
+                  </span>
+                  <span className="font-tech" style={{ display: 'block', marginTop: '0.3rem', color: 'var(--text-muted)', fontSize: isMobile ? '0.65rem' : '0.72rem', lineHeight: 1.35 }}>
+                    탐사원과 실시간 대결
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                className="hud-btn primary glass"
+                onClick={startAIBattle}
+                disabled={isJoining || Boolean(outgoingChallenge)}
+                style={{
+                  minHeight: isMobile ? 82 : 92,
+                  padding: isMobile ? '0.8rem 0.55rem' : '0.95rem 1rem',
+                  borderColor: 'rgba(124,92,255,0.7)',
+                  background: 'linear-gradient(145deg, rgba(124,92,255,0.25), rgba(0,243,255,0.1))',
+                  boxShadow: '0 10px 28px rgba(124,92,255,0.16)',
+                }}
+              >
+                <span style={{ display: 'block', fontWeight: 900, fontSize: isMobile ? '0.9rem' : '1rem' }}>
+                  {joiningMode === 'ai' ? 'NOVA-7 호출 중…' : 'NOVA-7 AI'}
+                </span>
+                <span className="font-tech" style={{ display: 'block', marginTop: '0.3rem', color: 'var(--text-muted)', fontSize: isMobile ? '0.65rem' : '0.72rem', lineHeight: 1.35 }}>
+                  즉시 대결 · 광석 1/3
+                </span>
+              </button>
+            </div>
+            <div style={{
+              width: isMobile ? '100%' : 'auto',
+              marginTop: '0.7rem',
+              display: 'grid',
+              gridTemplateColumns: isMobile ? `repeat(${!isAIMode && onSoloQuiz ? 2 : 1}, minmax(0, 1fr))` : 'repeat(2, auto)',
+              justifyContent: isMobile ? 'stretch' : 'center',
+              gap: '0.55rem',
+            }}>
+              {!isAIMode && onSoloQuiz && <button className="hud-btn secondary glass" onClick={handleSoloQuiz} style={{ minHeight: 44, padding: isMobile ? '0.7rem 0.5rem' : '0.72rem 1.1rem', fontSize: isMobile ? '0.78rem' : undefined }}>
+                FIELD TEST
+              </button>}
+              <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ minHeight: 44, padding: isMobile ? '0.7rem 0.5rem' : '0.72rem 1.1rem', fontSize: isMobile ? '0.78rem' : undefined }}>
+                돌아가기
+              </button>
+            </div>
           </div>
         </div>
       </div>
