@@ -10,6 +10,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import soundManager from '../../utils/SoundManager';
 import CrewSettingsModal from './CrewSettingsModal';
+import CrewCrystalChest from './CrewCrystalChest';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 import { formatCrewSchedule } from './crewSchedule';
 import './CrewDetailView.css';
@@ -778,6 +779,10 @@ export default function CrewDetailView({ onBack }) {
             <span>멤버별 고유 링크는 1회용이 아닙니다. 같은 링크 하나로 여러 친구를 제한 없이 초대할 수 있으며, 친구마다 별도의 게스트 UID가 발급됩니다.</span>
           </div>
         </section>
+      )}
+
+      {status === 'approved' && crewId && (
+        <CrewCrystalChest crewId={crewId} isGuest={isGuest} />
       )}
 
       <div className="crew-bridge-workspace">

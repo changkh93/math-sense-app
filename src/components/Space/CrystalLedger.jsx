@@ -30,6 +30,7 @@ const TX_CONFIG = {
   teacher_verify: { icon: '👨‍🏫', label: '교사 검증 보상', color: '#4ade80' },
   study_crew_mission: { icon: '🛰️', label: '스터디 크루 미션', color: '#38bdf8' },
   study_crew_team_mission: { icon: '🤝', label: '스터디 크루 팀 미션', color: '#4ade80' },
+  crew_crystal_chest_reward: { icon: '🎁', label: '크루 공동 광석 상자', color: '#facc15' },
   attendance_reward: { icon: '🚀', label: '출석 도킹 보상', color: '#38bdf8' },
   streak_bonus: { icon: '🔥', label: '연속 학습 보너스', color: '#fbbf24' },
   assignment_missing_penalty: { icon: '📝', label: '과제 미제출 차감', color: '#fb7185' },

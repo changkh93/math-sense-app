@@ -1,0 +1,49 @@
+.crew-crystal-chest { position: relative; overflow: hidden; margin: 1rem 0 1.25rem; padding: 1.2rem; border: 1px solid rgba(250,204,21,.28); border-radius: 16px; background: radial-gradient(circle at 12% 0%, rgba(250,204,21,.12), transparent 34%), linear-gradient(145deg, rgba(8,18,42,.96), rgba(4,9,24,.98)); box-shadow: inset 0 0 34px rgba(250,204,21,.035), 0 18px 54px rgba(0,0,0,.2); }
+.crew-crystal-chest__glow { position:absolute; inset:-60% auto auto 52%; width:42%; aspect-ratio:1; border-radius:50%; background:rgba(34,211,238,.13); filter:blur(70px); pointer-events:none; }
+.crew-crystal-chest__head { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.85rem; }
+.crew-crystal-chest__head>div:nth-child(2) { display:grid; gap:.16rem; }
+.crew-crystal-chest__head span { color:#67e8f9; font-size:.7rem; letter-spacing:.12em; }
+.crew-crystal-chest__head strong { color:#fff; font-size:1.08rem; }
+.crew-crystal-chest__head>b { display:flex; align-items:center; gap:.35rem; color:#fde68a; padding:.48rem .72rem; border:1px solid rgba(250,204,21,.22); border-radius:999px; background:rgba(250,204,21,.07); }
+.crew-crystal-chest__icon { position:relative; display:grid; place-items:center; width:46px; height:46px; color:#fde047; border:1px solid rgba(250,204,21,.32); border-radius:14px; background:linear-gradient(145deg,rgba(250,204,21,.16),rgba(34,211,238,.08)); box-shadow:0 0 28px rgba(250,204,21,.12); }
+.crew-crystal-chest__icon svg:last-child { position:absolute; top:5px; right:4px; color:#67e8f9; }
+.crew-crystal-chest__track { position:relative; height:15px; margin:1rem 0 .55rem; overflow:hidden; border:1px solid rgba(255,255,255,.11); border-radius:999px; background:rgba(0,0,0,.36); }
+.crew-crystal-chest__track>div { height:100%; min-width:2px; position:relative; border-radius:inherit; background:linear-gradient(90deg,#06b6d4,#60a5fa 48%,#facc15); box-shadow:0 0 22px rgba(34,211,238,.42); }
+.crew-crystal-chest__track span { position:absolute; inset:2px 5px auto; height:3px; border-radius:99px; background:rgba(255,255,255,.55); }
+.crew-crystal-chest__meta { display:flex; justify-content:space-between; gap:.8rem; flex-wrap:wrap; color:rgba(255,255,255,.58); font-size:.72rem; }
+.crew-crystal-chest__meta span:last-child { display:flex; align-items:center; gap:.3rem; color:#a5f3fc; }
+.crew-crystal-chest__body { display:grid; grid-template-columns:minmax(0,1fr) minmax(230px,.34fr); gap:.9rem; margin-top:1rem; }
+.crew-crystal-chest__feed,.crew-crystal-chest__rules { border:1px solid rgba(255,255,255,.08); border-radius:12px; background:rgba(1,7,20,.52); }
+.crew-crystal-chest__section-title { padding:.72rem .8rem .48rem; color:#67e8f9; font-size:.68rem; letter-spacing:.1em; }
+.crew-crystal-chest__event { display:grid; grid-template-columns:30px minmax(0,1fr) auto; align-items:center; gap:.65rem; padding:.65rem .8rem; border-top:1px solid rgba(255,255,255,.06); }
+.crew-crystal-chest__event>div { display:grid; place-items:center; width:30px; height:30px; color:#fde047; border-radius:9px; background:rgba(250,204,21,.1); }
+.crew-crystal-chest__event p { margin:0; color:rgba(255,255,255,.72); font-size:.78rem; line-height:1.4; }
+.crew-crystal-chest__event p strong { color:#fff; }
+.crew-crystal-chest__event p span { display:block; color:#fde68a; font-size:.7rem; }
+.crew-crystal-chest__event time { color:rgba(255,255,255,.38); font-size:.62rem; }
+.crew-crystal-chest__empty { padding:1rem .8rem; color:rgba(255,255,255,.42); font-size:.72rem; }
+.crew-crystal-chest__rules { display:flex; flex-direction:column; gap:.45rem; padding:.8rem; color:rgba(255,255,255,.53); font-size:.66rem; line-height:1.45; }
+.crew-crystal-chest__rules strong { color:#fde68a; font-size:.74rem; }
+.crew-crystal-chest__rules button { display:flex; align-items:center; justify-content:center; gap:.35rem; margin-top:auto; padding:.48rem; color:#e0f2fe; border:1px solid rgba(34,211,238,.22); border-radius:8px; background:rgba(34,211,238,.08); cursor:pointer; }
+.crew-crystal-chest__message { margin-top:.7rem; color:#a7f3d0; font-size:.72rem; text-align:center; }
+.crew-chest-celebration { position:fixed; inset:0; z-index:160; display:grid; place-items:center; padding:1rem; background:rgba(1,4,15,.82); backdrop-filter:blur(12px); }
+.crew-chest-celebration__card { position:relative; width:min(520px,calc(100vw - 2rem)); overflow:hidden; padding:2.15rem 1.5rem 1.45rem; border:1px solid rgba(250,204,21,.42); border-radius:24px; background:radial-gradient(circle at 50% 8%,rgba(250,204,21,.2),transparent 35%),linear-gradient(155deg,#0c1b3c,#070a1c 72%); box-shadow:0 30px 100px rgba(0,0,0,.62),0 0 70px rgba(250,204,21,.11); text-align:center; }
+.crew-chest-celebration__close { position:absolute; z-index:2; top:.8rem; right:.8rem; display:grid; place-items:center; width:34px; height:34px; color:rgba(255,255,255,.68); border:1px solid rgba(255,255,255,.12); border-radius:50%; background:rgba(0,0,0,.2); cursor:pointer; }
+.crew-chest-celebration__gift { position:relative; display:grid; place-items:center; width:104px; height:104px; margin:0 auto 1rem; color:#facc15; border:1px solid rgba(250,204,21,.34); border-radius:32px; background:linear-gradient(145deg,rgba(250,204,21,.19),rgba(34,211,238,.12)); box-shadow:0 0 55px rgba(250,204,21,.18); animation:crew-chest-float 2.4s ease-in-out infinite; }
+.crew-chest-celebration__gift svg:last-child { position:absolute; right:12px; bottom:12px; color:#67e8f9; }
+.crew-chest-celebration__card>span { color:#67e8f9; font-size:.68rem; letter-spacing:.13em; }
+.crew-chest-celebration__card h2 { margin:.45rem 0 .6rem; color:#fff; font-size:1.65rem; }
+.crew-chest-celebration__card p { margin:0 auto 1rem; max-width:410px; color:rgba(255,255,255,.7); line-height:1.6; }
+.crew-chest-celebration__card p strong { color:#fde68a; }
+.crew-chest-celebration__claim,.crew-chest-celebration__applause { width:100%; display:flex; align-items:center; justify-content:center; gap:.45rem; border-radius:12px; cursor:pointer; font-weight:900; }
+.crew-chest-celebration__claim { min-height:52px; color:#06101d; border:0; background:linear-gradient(100deg,#22d3ee,#60a5fa 52%,#facc15); box-shadow:0 12px 36px rgba(34,211,238,.18); }
+.crew-chest-celebration__applause { min-height:44px; margin-top:.65rem; color:#e0f2fe; border:1px solid rgba(34,211,238,.28); background:rgba(34,211,238,.08); }
+.crew-chest-celebration button:disabled { opacity:.62; cursor:default; }
+.crew-chest-celebration__reward { display:flex; align-items:center; justify-content:center; gap:.5rem; min-height:70px; color:#fde047; font:bold 2rem var(--font-title, sans-serif); text-shadow:0 0 24px rgba(250,204,21,.45); }
+.crew-chest-celebration__guest { padding:.75rem; color:rgba(255,255,255,.66); border:1px solid rgba(255,255,255,.1); border-radius:12px; background:rgba(255,255,255,.04); font-size:.72rem; }
+.crew-chest-celebration__card small { display:block; margin-top:.65rem; color:#a7f3d0; }
+.crew-chest-celebration__stars i { position:absolute; width:5px; height:5px; border-radius:50%; background:#fde68a; box-shadow:0 0 13px #facc15; animation:crew-star-pulse 1.4s ease-in-out infinite alternate; }
+.crew-chest-celebration__stars i:nth-child(1){left:12%;top:18%}.crew-chest-celebration__stars i:nth-child(2){left:22%;top:42%;animation-delay:.3s}.crew-chest-celebration__stars i:nth-child(3){right:14%;top:24%;animation-delay:.6s}.crew-chest-celebration__stars i:nth-child(4){right:24%;top:47%;animation-delay:.9s}.crew-chest-celebration__stars i:nth-child(5){left:49%;top:5%;animation-delay:.45s}
+@keyframes crew-chest-float { 50% { transform:translateY(-7px) rotate(1deg); } }
+@keyframes crew-star-pulse { to { transform:scale(2.1); opacity:.35; } }
+@media (max-width:760px){.crew-crystal-chest__head{grid-template-columns:auto minmax(0,1fr)}.crew-crystal-chest__head>b{grid-column:1/-1;justify-self:stretch;justify-content:center}.crew-crystal-chest__body{grid-template-columns:1fr}.crew-crystal-chest__event{grid-template-columns:30px minmax(0,1fr)}.crew-crystal-chest__event time{grid-column:2}.crew-crystal-chest__meta{display:grid}.crew-chest-celebration__card{padding-inline:1rem}}

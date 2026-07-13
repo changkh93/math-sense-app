@@ -6858,6 +6858,12 @@ const CREW_GROWTH_EVENT_MIN_BATTLES = 2;
 const CREW_GROWTH_EVENT_MIN_ANSWERS = 10;
 const CREW_GROWTH_EVENT_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 const CREW_GROWTH_EVENT_HOLD_MS = 48 * 60 * 60 * 1000;
+const CREW_CRYSTAL_CHEST_TARGET = 100;
+const CREW_CRYSTAL_CHEST_PERFECT_ASSIGNMENT = 20;
+const CREW_CRYSTAL_CHEST_MEMBER_REWARD = 5;
+const CREW_CRYSTAL_CHEST_CONTRIBUTOR_DAILY_LIMIT = 40;
+const CREW_CRYSTAL_CHEST_DAILY_COMPLETION_LIMIT = 2;
+const CREW_CRYSTAL_CHEST_MEMBER_DAILY_CLAIM_LIMIT = 10;
 
 function getRequestIp(context) {
   const forwarded = String(context?.rawRequest?.headers?.["x-forwarded-for"] || "");
@@ -8008,6 +8014,166 @@ exports.notifyAssignmentWarningCreated = regionalFunctions.firestore
     return null;
   });
 
+async function contributePerfectAssignmentToCrewChest(assignmentId, assignment = {}) {
+  const userId = cleanId(assignment.userId, 160);
+  if (!userId || Number(assignment.bonusCrystals || 0) !== 40 || assignment.status !== "reviewed") {
+    return { contributed: false, reason: "not_qualified" };
+  }
+
+  const db = admin.firestore();
+  const userRef = db.collection("users").doc(userId);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) return { contributed: false, reason: "user_not_found" };
+  const userData = userSnap.data() || {};
+  const crewId = cleanId(userData.crewId, 160);
+  if (!crewId || userData.isGuest === true) return { contributed: false, reason: "no_regular_crew" };
+
+  const crewRef = db.collection("crews").doc(crewId);
+  const contributionRef = crewRef.collection("crystalChestEvents").doc(assignmentId);
+  const dateKey = getKSTDateString();
+  const contributorDailyRef = crewRef.collection("crystalChestContributorDays").doc(`${dateKey}_${userId}`);
+  const crewDailyRef = crewRef.collection("crystalChestDays").doc(dateKey);
+  const contributorName = cleanText(getDisplayNameFromUser(userData), 40) || "크루 대원";
+  const now = new Date();
+
+  return db.runTransaction(async (transaction) => {
+    const [crewSnap, contributionSnap, contributorDailySnap, crewDailySnap] = await Promise.all([
+      transaction.get(crewRef),
+      transaction.get(contributionRef),
+      transaction.get(contributorDailyRef),
+      transaction.get(crewDailyRef),
+    ]);
+    if (!crewSnap.exists) return { contributed: false, reason: "crew_not_found" };
+    if (contributionSnap.exists) return { contributed: false, reason: "already_recorded" };
+
+    const crew = crewSnap.data() || {};
+    const memberIds = getCrewMemberIds(crew);
+    if (crew.status !== "approved" || !memberIds.includes(userId)) {
+      return { contributed: false, reason: "not_approved_member" };
+    }
+
+    const contributorDaily = contributorDailySnap.exists ? (contributorDailySnap.data() || {}) : {};
+    const crewDaily = crewDailySnap.exists ? (crewDailySnap.data() || {}) : {};
+    const contributedToday = Number(contributorDaily.contributedAmount || 0);
+    const completedToday = Number(crewDaily.completedCount || 0);
+    const withinContributorLimit = contributedToday < CREW_CRYSTAL_CHEST_CONTRIBUTOR_DAILY_LIMIT;
+    const withinCrewLimit = completedToday < CREW_CRYSTAL_CHEST_DAILY_COMPLETION_LIMIT;
+    const acceptedAmount = withinContributorLimit && withinCrewLimit
+      ? Math.min(
+          CREW_CRYSTAL_CHEST_PERFECT_ASSIGNMENT,
+          CREW_CRYSTAL_CHEST_CONTRIBUTOR_DAILY_LIMIT - contributedToday
+        )
+      : 0;
+
+    const chest = crew.crystalChest && typeof crew.crystalChest === "object" ? crew.crystalChest : {};
+    const previousEnergy = Math.max(0, Math.min(CREW_CRYSTAL_CHEST_TARGET - 1, Number(chest.energy || 0)));
+    const nextRawEnergy = previousEnergy + acceptedAmount;
+    const boxCompleted = acceptedAmount > 0 && nextRawEnergy >= CREW_CRYSTAL_CHEST_TARGET;
+    const nextCycle = Math.max(0, Number(chest.cycle || 0)) + (boxCompleted ? 1 : 0);
+    const contributorIds = uniqueIds([...(Array.isArray(chest.currentContributorIds) ? chest.currentContributorIds : []), ...(acceptedAmount > 0 ? [userId] : [])]);
+    const contributorNamesById = {
+      ...(chest.currentContributorNamesById && typeof chest.currentContributorNamesById === "object" ? chest.currentContributorNamesById : {}),
+      ...(acceptedAmount > 0 ? { [userId]: contributorName } : {}),
+    };
+    const rewardRef = boxCompleted
+      ? crewRef.collection("crystalChestRewards").doc(`cycle_${nextCycle}`)
+      : null;
+
+    transaction.set(contributionRef, {
+      crewId,
+      assignmentId,
+      contributorId: userId,
+      contributorName,
+      type: "perfect_assignment",
+      title: "과제 피드백 40광석 달성",
+      requestedAmount: CREW_CRYSTAL_CHEST_PERFECT_ASSIGNMENT,
+      acceptedAmount,
+      boxCompleted,
+      cycle: nextCycle,
+      dateKey,
+      assignmentDate: cleanText(assignment.date, 20),
+      clusterId: cleanText(assignment.clusterId, 80),
+      reason: acceptedAmount > 0
+        ? "accepted"
+        : withinCrewLimit ? "contributor_daily_limit" : "crew_daily_completion_limit",
+      createdAt: now,
+    });
+
+    if (acceptedAmount > 0) {
+      transaction.set(contributorDailyRef, {
+        crewId,
+        userId,
+        dateKey,
+        contributionCount: Number(contributorDaily.contributionCount || 0) + 1,
+        contributedAmount: contributedToday + acceptedAmount,
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    transaction.set(crewDailyRef, {
+      crewId,
+      dateKey,
+      completedCount: completedToday + (boxCompleted ? 1 : 0),
+      contributionAmount: Number(crewDaily.contributionAmount || 0) + acceptedAmount,
+      updatedAt: now,
+    }, { merge: true });
+
+    transaction.set(crewRef, {
+      crystalChest: {
+        energy: boxCompleted ? nextRawEnergy - CREW_CRYSTAL_CHEST_TARGET : nextRawEnergy,
+        target: CREW_CRYSTAL_CHEST_TARGET,
+        cycle: nextCycle,
+        currentContributorIds: boxCompleted ? [] : contributorIds,
+        currentContributorNamesById: boxCompleted ? {} : contributorNamesById,
+        lastContributorId: userId,
+        lastContributorName: contributorName,
+        lastContributionAmount: acceptedAmount,
+        lastContributionAt: now,
+        dailyCompletionLimit: CREW_CRYSTAL_CHEST_DAILY_COMPLETION_LIMIT,
+        memberReward: CREW_CRYSTAL_CHEST_MEMBER_REWARD,
+        updatedAt: now,
+      },
+    }, { merge: true });
+
+    if (boxCompleted && rewardRef) {
+      transaction.set(rewardRef, {
+        crewId,
+        cycle: nextCycle,
+        rewardAmount: CREW_CRYSTAL_CHEST_MEMBER_REWARD,
+        eligibleMemberIds: memberIds,
+        claimedMemberIds: [],
+        contributorIds,
+        contributorNames: contributorIds.map((id) => contributorNamesById[id] || "크루 대원"),
+        applauseUserIds: [],
+        applauseCount: 0,
+        dateKey,
+        status: "ready",
+        createdAt: now,
+      });
+      memberIds.forEach((memberId) => {
+        transaction.set(db.collection("notifications").doc(`crew_chest_ready_${crewId}_${nextCycle}_${memberId}`), {
+          recipientId: memberId,
+          type: "crew_crystal_chest_ready",
+          message: `${contributorIds.map((id) => contributorNamesById[id]).filter(Boolean).slice(0, 3).join(", ")} 대원의 성취로 크루 광석 상자가 완성되었습니다.`,
+          link: "/?view=crew",
+          isRead: false,
+          createdAt: now,
+          metadata: { crewId, rewardId: rewardRef.id, cycle: nextCycle, rewardAmount: CREW_CRYSTAL_CHEST_MEMBER_REWARD },
+        }, { merge: true });
+      });
+    }
+
+    return {
+      contributed: acceptedAmount > 0,
+      acceptedAmount,
+      boxCompleted,
+      cycle: nextCycle,
+      energy: boxCompleted ? nextRawEnergy - CREW_CRYSTAL_CHEST_TARGET : nextRawEnergy,
+      reason: acceptedAmount > 0 ? "accepted" : withinCrewLimit ? "contributor_daily_limit" : "crew_daily_completion_limit",
+    };
+  });
+}
+
 exports.notifyAssignmentHighBonus = regionalFunctions.firestore
   .document("assignments/{assignmentId}")
   .onWrite(async (change, context) => {
@@ -8022,23 +8188,227 @@ exports.notifyAssignmentHighBonus = regionalFunctions.firestore
     if (!after.userId || !afterQualified || beforeQualified) return null;
 
     const clusterLabel = getAssignmentNotificationClusterLabel(after.clusterId);
-    await admin.firestore().collection("notifications").doc(`assignment_bonus_${context.params.assignmentId}`).set({
-      recipientId: after.userId,
-      type: "assignment_bonus",
-      message: `${clusterLabel} 과제에서 보너스 광석 ${Math.floor(afterBonus)}점을 받았습니다.`,
-      link: buildAssignmentHubLink(after.clusterId, after.date),
-      isRead: false,
-      createdAt: FieldValue.serverTimestamp(),
-      metadata: {
-        assignmentId: context.params.assignmentId,
-        clusterId: after.clusterId || "",
-        date: after.date || "",
-        bonusCrystals: afterBonus,
-      },
-    }, { merge: true });
+    await Promise.all([
+      admin.firestore().collection("notifications").doc(`assignment_bonus_${context.params.assignmentId}`).set({
+        recipientId: after.userId,
+        type: "assignment_bonus",
+        message: `${clusterLabel} 과제에서 보너스 광석 ${Math.floor(afterBonus)}점을 받았습니다.`,
+        link: buildAssignmentHubLink(after.clusterId, after.date),
+        isRead: false,
+        createdAt: FieldValue.serverTimestamp(),
+        metadata: {
+          assignmentId: context.params.assignmentId,
+          clusterId: after.clusterId || "",
+          date: after.date || "",
+          bonusCrystals: afterBonus,
+        },
+      }, { merge: true }),
+      contributePerfectAssignmentToCrewChest(context.params.assignmentId, after),
+    ]);
 
     return null;
   });
+
+async function requireCrewChestAccess(uid, crewId, guest = false) {
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const [crewSnap, guestAccountSnap] = await Promise.all([
+    crewRef.get(),
+    guest ? db.collection("crewGuestAccounts").doc(uid).get() : Promise.resolve(null),
+  ]);
+  if (!crewSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  }
+  const crew = crewSnap.data() || {};
+  if (guest) {
+    const account = guestAccountSnap?.exists ? (guestAccountSnap.data() || {}) : {};
+    if (account.crewId !== crewId || ["deleted", "suspended"].includes(account.status)) {
+      throw new functions.https.HttpsError("permission-denied", "이 크루의 게스트만 상자 현황을 볼 수 있습니다.");
+    }
+  } else if (!getCrewMemberIds(crew).includes(uid)) {
+    throw new functions.https.HttpsError("permission-denied", "크루 멤버만 상자 현황을 볼 수 있습니다.");
+  }
+  return { crewRef, crew };
+}
+
+exports.getCrewCrystalChest = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = cleanId(data?.crewId, 160);
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+  const guest = isGuestContext(context);
+  const { crewRef, crew } = await requireCrewChestAccess(uid, crewId, guest);
+  const [eventsSnap, rewardsSnap] = await Promise.all([
+    crewRef.collection("crystalChestEvents").orderBy("createdAt", "desc").limit(10).get(),
+    crewRef.collection("crystalChestRewards").orderBy("createdAt", "desc").limit(8).get(),
+  ]);
+  const events = eventsSnap.docs
+    .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() || {}) }))
+    .filter((event) => Number(event.acceptedAmount || 0) > 0)
+    .map((event) => ({
+      id: event.id,
+      type: event.type || "perfect_assignment",
+      title: event.title || "과제 피드백 40광석 달성",
+      contributorId: event.contributorId || "",
+      contributorName: event.contributorName || "크루 대원",
+      acceptedAmount: Number(event.acceptedAmount || 0),
+      boxCompleted: event.boxCompleted === true,
+      cycle: Number(event.cycle || 0),
+      dateKey: event.dateKey || "",
+      createdAtMs: timestampMillis(event.createdAt),
+    }));
+  const rewards = rewardsSnap.docs.map((docSnap) => {
+    const reward = docSnap.data() || {};
+    const eligible = Array.isArray(reward.eligibleMemberIds) && reward.eligibleMemberIds.includes(uid);
+    const claimed = Array.isArray(reward.claimedMemberIds) && reward.claimedMemberIds.includes(uid);
+    return {
+      id: docSnap.id,
+      cycle: Number(reward.cycle || 0),
+      rewardAmount: Number(reward.rewardAmount || CREW_CRYSTAL_CHEST_MEMBER_REWARD),
+      contributorNames: Array.isArray(reward.contributorNames) ? reward.contributorNames.slice(0, 10) : [],
+      applauseCount: Number(reward.applauseCount || 0),
+      applaudedByMe: Array.isArray(reward.applauseUserIds) && reward.applauseUserIds.includes(uid),
+      eligible: !guest && eligible,
+      claimed: !guest && claimed,
+      available: !guest && eligible && !claimed,
+      createdAtMs: timestampMillis(reward.createdAt),
+    };
+  });
+  const chest = crew.crystalChest && typeof crew.crystalChest === "object" ? crew.crystalChest : {};
+  return {
+    crewId,
+    isGuest: guest,
+    energy: Number(chest.energy || 0),
+    target: Number(chest.target || CREW_CRYSTAL_CHEST_TARGET),
+    cycle: Number(chest.cycle || 0),
+    memberReward: CREW_CRYSTAL_CHEST_MEMBER_REWARD,
+    perfectAssignmentContribution: CREW_CRYSTAL_CHEST_PERFECT_ASSIGNMENT,
+    contributorDailyLimit: CREW_CRYSTAL_CHEST_CONTRIBUTOR_DAILY_LIMIT,
+    dailyCompletionLimit: CREW_CRYSTAL_CHEST_DAILY_COMPLETION_LIMIT,
+    memberDailyClaimLimit: CREW_CRYSTAL_CHEST_MEMBER_DAILY_CLAIM_LIMIT,
+    currentContributorNames: Object.values(chest.currentContributorNamesById || {}).slice(0, 10),
+    events,
+    rewards,
+    availableRewards: rewards.filter((reward) => reward.available),
+  };
+});
+
+exports.claimCrewCrystalChestReward = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  if (isGuestContext(context)) {
+    throw new functions.https.HttpsError("permission-denied", "게스트는 광석을 수령할 수 없지만 축하와 박수에는 참여할 수 있습니다.");
+  }
+  const crewId = cleanId(data?.crewId, 160);
+  const rewardId = cleanId(data?.rewardId, 160);
+  if (!crewId || !rewardId) throw new functions.https.HttpsError("invalid-argument", "상자 보상 정보가 올바르지 않습니다.");
+  await requireCrewChestAccess(uid, crewId, false);
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const rewardRef = crewRef.collection("crystalChestRewards").doc(rewardId);
+  const userRef = db.collection("users").doc(uid);
+  const dateKey = getKSTDateString();
+  const claimDayRef = userRef.collection("crewCrystalChestClaimDays").doc(dateKey);
+  const txId = `crew_chest_${crewId}_${rewardId}`;
+  const crystalTxRef = userRef.collection("crystal_transactions").doc(txId);
+
+  return db.runTransaction(async (transaction) => {
+    const [rewardSnap, userSnap, claimDaySnap, existingTxSnap] = await Promise.all([
+      transaction.get(rewardRef),
+      transaction.get(userRef),
+      transaction.get(claimDayRef),
+      transaction.get(crystalTxRef),
+    ]);
+    if (!rewardSnap.exists) throw new functions.https.HttpsError("not-found", "수령할 상자를 찾을 수 없습니다.");
+    if (!userSnap.exists) throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+    if (existingTxSnap.exists) return { success: true, alreadyClaimed: true, amount: 0 };
+
+    const reward = rewardSnap.data() || {};
+    const eligibleMemberIds = Array.isArray(reward.eligibleMemberIds) ? reward.eligibleMemberIds : [];
+    const claimedMemberIds = Array.isArray(reward.claimedMemberIds) ? reward.claimedMemberIds : [];
+    if (!eligibleMemberIds.includes(uid)) {
+      throw new functions.https.HttpsError("permission-denied", "상자가 완성될 때 함께한 정식 크루원만 받을 수 있습니다.");
+    }
+    if (claimedMemberIds.includes(uid)) return { success: true, alreadyClaimed: true, amount: 0 };
+
+    const rewardAmount = Math.max(0, Number(reward.rewardAmount || CREW_CRYSTAL_CHEST_MEMBER_REWARD));
+    const claimDay = claimDaySnap.exists ? (claimDaySnap.data() || {}) : {};
+    const claimedToday = Number(claimDay.claimedAmount || 0);
+    if (claimedToday + rewardAmount > CREW_CRYSTAL_CHEST_MEMBER_DAILY_CLAIM_LIMIT) {
+      throw new functions.https.HttpsError("resource-exhausted", `오늘은 크루 상자에서 최대 ${CREW_CRYSTAL_CHEST_MEMBER_DAILY_CLAIM_LIMIT}광석까지 받을 수 있습니다. 내일 다시 열어주세요.`);
+    }
+
+    const userData = userSnap.data() || {};
+    transaction.set(userRef, {
+      crystals: Number(userData.crystals || 0) + rewardAmount,
+      ...calculateGrowthUpdates(userData, rewardAmount),
+      lastCrewCrystalChestClaimAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    recordCrystalTransaction(transaction, uid, txId, {
+      amount: rewardAmount,
+      type: "crew_crystal_chest_reward",
+      description: "크루 공동 광석 상자 보상",
+      metadata: { crewId, rewardId, cycle: Number(reward.cycle || 0), contributorNames: reward.contributorNames || [] },
+    });
+    transaction.set(rewardRef, {
+      claimedMemberIds: FieldValue.arrayUnion(uid),
+      lastClaimedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    transaction.set(claimDayRef, {
+      crewId,
+      dateKey,
+      claimedAmount: claimedToday + rewardAmount,
+      claimCount: Number(claimDay.claimCount || 0) + 1,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    transaction.set(db.collection("notifications").doc(`crew_chest_ready_${crewId}_${Number(reward.cycle || 0)}_${uid}`), {
+      isRead: true,
+      readAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return { success: true, alreadyClaimed: false, amount: rewardAmount };
+  });
+});
+
+exports.applaudCrewCrystalChest = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = cleanId(data?.crewId, 160);
+  const rewardId = cleanId(data?.rewardId, 160);
+  if (!crewId || !rewardId) throw new functions.https.HttpsError("invalid-argument", "상자 정보가 올바르지 않습니다.");
+  const guest = isGuestContext(context);
+  const { crewRef } = await requireCrewChestAccess(uid, crewId, guest);
+  const rewardRef = crewRef.collection("crystalChestRewards").doc(rewardId);
+  const result = await admin.firestore().runTransaction(async (transaction) => {
+    const rewardSnap = await transaction.get(rewardRef);
+    if (!rewardSnap.exists) throw new functions.https.HttpsError("not-found", "축하할 상자를 찾을 수 없습니다.");
+    const reward = rewardSnap.data() || {};
+    const applauseUserIds = Array.isArray(reward.applauseUserIds) ? reward.applauseUserIds : [];
+    if (applauseUserIds.includes(uid)) {
+      return { added: false, applauseCount: Number(reward.applauseCount || applauseUserIds.length), contributorIds: reward.contributorIds || [] };
+    }
+    const applauseCount = Math.max(Number(reward.applauseCount || 0), applauseUserIds.length) + 1;
+    transaction.set(rewardRef, {
+      applauseUserIds: FieldValue.arrayUnion(uid),
+      applauseCount,
+      lastApplaudedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return { added: true, applauseCount, contributorIds: reward.contributorIds || [], cycle: Number(reward.cycle || 0) };
+  });
+  if (result.added && Array.isArray(result.contributorIds) && result.contributorIds.length > 0) {
+    const batch = admin.firestore().batch();
+    result.contributorIds.slice(0, 20).forEach((contributorId) => {
+      batch.set(admin.firestore().collection("notifications").doc(`crew_chest_applause_${crewId}_${rewardId}_${contributorId}`), {
+        recipientId: contributorId,
+        type: "crew_crystal_chest_applause",
+        message: `크루원 ${result.applauseCount}명이 광석 상자에 기여한 활약에 박수를 보냈습니다!`,
+        link: "/?view=crew",
+        isRead: false,
+        createdAt: FieldValue.serverTimestamp(),
+        metadata: { crewId, rewardId, cycle: result.cycle || 0, applauseCount: result.applauseCount },
+      }, { merge: true });
+    });
+    await batch.commit();
+  }
+  return { success: true, applauded: result.added, applauseCount: result.applauseCount };
+});
 
 exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
