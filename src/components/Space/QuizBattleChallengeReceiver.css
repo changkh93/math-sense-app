@@ -1,0 +1,199 @@
+.battle-challenge-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  color: #f8fbff;
+}
+
+.battle-challenge-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(1, 5, 18, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.battle-challenge-card {
+  position: relative;
+  width: min(620px, 100%);
+  overflow: hidden;
+  padding: clamp(22px, 4vw, 38px);
+  border: 1px solid rgba(0, 243, 255, 0.5);
+  border-radius: 24px;
+  background:
+    linear-gradient(145deg, rgba(10, 27, 58, 0.98), rgba(5, 10, 29, 0.99)),
+    #050a1d;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.72), 0 0 54px rgba(0, 213, 255, 0.16), inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.battle-challenge-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0, rgba(0, 243, 255, 0.05) 50%, transparent 51%);
+  background-size: 100% 8px;
+  opacity: 0.28;
+}
+
+.battle-challenge-header,
+.battle-challenge-opponent,
+.battle-challenge-actions {
+  display: flex;
+  align-items: center;
+}
+
+.battle-challenge-header {
+  position: relative;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.battle-challenge-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #00f3ff;
+  font: 800 12px/1.2 var(--font-tech, sans-serif);
+  letter-spacing: 0.18em;
+}
+
+.battle-challenge-kicker i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #32f6a0;
+  box-shadow: 0 0 12px #32f6a0;
+  animation: battle-challenge-pulse 1.1s infinite;
+}
+
+.battle-challenge-header h2 {
+  margin: 8px 0 0;
+  font: 900 clamp(25px, 5vw, 38px)/1.1 var(--font-title, sans-serif);
+}
+
+.battle-challenge-timer {
+  min-width: 88px;
+  padding: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 14px;
+  color: #fbbf24;
+  text-align: center;
+  font: 800 11px/1 var(--font-tech, sans-serif);
+  letter-spacing: 0.12em;
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.battle-challenge-timer span {
+  display: block;
+  margin-bottom: 5px;
+  color: #fff;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.battle-challenge-opponent {
+  position: relative;
+  gap: 15px;
+  margin: 26px 0 20px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.battle-challenge-avatar {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  place-items: center;
+  border: 1px solid rgba(0, 243, 255, 0.4);
+  border-radius: 18px;
+  color: #00f3ff;
+  font-size: 28px;
+  background: radial-gradient(circle at 35% 30%, rgba(0, 243, 255, 0.28), rgba(76, 29, 149, 0.18));
+}
+
+.battle-challenge-opponent small,
+.battle-challenge-opponent span {
+  display: block;
+  color: #8493b3;
+  font: 700 11px/1.2 var(--font-tech, sans-serif);
+  letter-spacing: 0.12em;
+}
+
+.battle-challenge-opponent strong {
+  display: block;
+  margin: 5px 0;
+  font-size: 20px;
+}
+
+.battle-challenge-spec {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.battle-challenge-spec div {
+  min-width: 0;
+  padding: 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.battle-challenge-spec div:last-child { border-right: 0; }
+.battle-challenge-spec dt { color: #8290ad; font-size: 11px; }
+.battle-challenge-spec dd { margin: 6px 0 0; color: #f8fbff; font-size: 13px; font-weight: 800; line-height: 1.45; overflow-wrap: anywhere; }
+
+.battle-challenge-safety {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(50, 246, 160, 0.22);
+  border-radius: 14px;
+  background: rgba(50, 246, 160, 0.07);
+}
+
+.battle-challenge-safety > span { color: #32f6a0; font-weight: 900; }
+.battle-challenge-safety p { margin: 0; color: #aebbd3; font-size: 13px; line-height: 1.55; }
+.battle-challenge-safety b { color: #dfffee; }
+.battle-challenge-error { position: relative; margin-bottom: 12px; color: #fca5a5; font-size: 13px; text-align: center; }
+
+.battle-challenge-actions {
+  position: relative;
+  gap: 12px;
+}
+
+.battle-challenge-actions button {
+  min-height: 54px;
+  border-radius: 14px;
+  font: 900 15px/1 var(--font-title, sans-serif);
+  cursor: pointer;
+}
+
+.battle-challenge-actions button:disabled { cursor: wait; opacity: 0.62; }
+.battle-challenge-decline { flex: 0 0 38%; border: 1px solid rgba(255, 255, 255, 0.18); color: #d1d8e8; background: rgba(255, 255, 255, 0.06); }
+.battle-challenge-accept { flex: 1; border: 0; color: #03111f; background: linear-gradient(110deg, #14d8ee, #7c5cff); box-shadow: 0 12px 32px rgba(0, 213, 255, 0.2); }
+.battle-challenge-accept span { margin-left: 8px; }
+
+@keyframes battle-challenge-pulse {
+  50% { opacity: 0.35; transform: scale(0.75); }
+}
+
+@media (max-width: 580px) {
+  .battle-challenge-layer { align-items: end; padding: 10px; }
+  .battle-challenge-card { border-radius: 22px; }
+  .battle-challenge-spec { grid-template-columns: 1fr; }
+  .battle-challenge-spec div { border-right: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.09); }
+  .battle-challenge-spec div:last-child { border-bottom: 0; }
+  .battle-challenge-actions { flex-direction: column-reverse; }
+  .battle-challenge-actions button { width: 100%; flex-basis: auto; }
+}

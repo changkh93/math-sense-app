@@ -251,6 +251,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Direct battle invitations are created and resolved only by Cloud Functions.
+    // The recipient listens to their own fixed document id; the challenger may
+    // listen to that same document until it is accepted, declined, or expires.
+    match /quizBattleChallenges/{challengeId} {
+      allow get: if isAuth() && (
+        challengeId == request.auth.uid ||
+        resource.data.challengerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list, write: if false;
+    }
+
+    match /quizBattleChallengeLocks/{userId} {
+      allow read, write: if false;
+    }
+
     match /quizBattles/{battleId} {
       allow read: if isAuth() && (
         request.auth.uid in resource.data.participantUids ||

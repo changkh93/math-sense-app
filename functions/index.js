@@ -332,6 +332,9 @@ const QUIZ_BATTLE_AI_REWARD_DIVISOR = 3;
 const QUIZ_BATTLE_DAILY_ORE_CAP = 500;
 const QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT = 3;
 const QUIZ_BATTLE_DAILY_OPPONENT_LIMIT = 3;
+const QUIZ_BATTLE_CHALLENGE_TTL_MS = 75 * 1000;
+const QUIZ_BATTLE_ONLINE_WINDOW_MS = 2 * 60 * 1000;
+const QUIZ_BATTLE_DIRECT_CONFIRM_TIMEOUT_MS = 25 * 1000;
 
 function getBattleKstDateKey(nowMs = Date.now()) {
   return new Date(nowMs + (9 * 60 * 60 * 1000)).toISOString().slice(0, 10);
@@ -361,6 +364,33 @@ function assertQuizBattleAccess(userData = {}, clusterId = "", regionId = "") {
       "현재 학습 중인 과정과 리전에서만 퀴즈 배틀에 참여할 수 있습니다."
     );
   }
+}
+
+function isQuizBattleGuestProfile(userData = {}) {
+  return userData.isGuest === true || userData.role === "guest";
+}
+
+function isUserInActiveQuizBattle(userData = {}) {
+  const phase = cleanId(userData?.liveStatus?.battle?.phase, 30);
+  return ["waiting", "starting", "active"].includes(phase);
+}
+
+function isPendingChallenge(data = {}, nowMs = Date.now()) {
+  return data.status === "pending" && Number(data.expiresAtMs || 0) > nowMs;
+}
+
+function isBlockingBattleTicket(data = {}, nowMs = Date.now()) {
+  return data.status === "waiting" && Number(data.expiresAtMs || 0) > nowMs;
+}
+
+function getBattlePresenceLabel(presence = {}) {
+  const currentLocation = cleanText(presence.currentLocation || "메인 화면", 80);
+  if (/배틀/.test(currentLocation)) return "다른 배틀 준비 중";
+  if (/퀴즈/.test(currentLocation)) return "퀴즈 학습 중";
+  if (/영상|개념/.test(currentLocation)) return "개념 학습 중";
+  if (/스터디|크루/.test(currentLocation)) return "스터디 크루 활동 중";
+  if (/과제/.test(currentLocation)) return "과제 학습 중";
+  return currentLocation || "온라인";
 }
 
 function getBattleRewardScopeKey(battleData = {}, participant = {}) {
@@ -1924,6 +1954,438 @@ exports.submitQuizSessionReactions = regionalFunctions.https.onCall(async (data,
   return { success: true, savedCount: reactions.length };
 });
 
+exports.listQuizBattleOnlineOpponents = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const isGuestUser = isGuestContext(context);
+  const clusterId = cleanId(data?.clusterId || "cluster_elementary");
+  const regionId = cleanId(data?.regionId);
+  const entryUnitId = cleanId(data?.entryUnitId);
+  if (!regionId || !entryUnitId) {
+    throw new functions.https.HttpsError("invalid-argument", "온라인 상대 조회 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const nowMs = Date.now();
+  const contextData = await resolveBattleContext({ clusterId, regionId, entryUnitId });
+  const requesterSnap = await db.collection("users").doc(uid).get();
+  const requesterData = requesterSnap.exists ? (requesterSnap.data() || {}) : {};
+  if (!isGuestUser) assertQuizBattleAccess(requesterData, contextData.clusterId, regionId);
+
+  const cutoff = Timestamp.fromMillis(nowMs - QUIZ_BATTLE_ONLINE_WINDOW_MS);
+  const [presenceSnap, waitingSnap] = await Promise.all([
+    db.collection("liveStatuses")
+      .where("lastUpdatedAt", ">=", cutoff)
+      .orderBy("lastUpdatedAt", "desc")
+      .limit(50)
+      .get(),
+    db.collection("quizBattleQueueTickets")
+      .where("clusterId", "==", contextData.clusterId)
+      .where("regionId", "==", regionId)
+      .where("status", "==", "waiting")
+      .where("expiresAtMs", ">", nowMs)
+      .orderBy("expiresAtMs", "asc")
+      .limit(50)
+      .get(),
+  ]);
+  const waitingUids = new Set(waitingSnap.docs.map((ticketDoc) => cleanId(ticketDoc.data()?.uid)));
+  const presenceRows = presenceSnap.docs
+    .filter((presenceDoc) => presenceDoc.id !== uid)
+    .filter((presenceDoc) => !waitingUids.has(presenceDoc.id))
+    .map((presenceDoc) => ({ uid: presenceDoc.id, ...(presenceDoc.data() || {}) }))
+    .filter((presence) => presence.state === "online");
+
+  if (presenceRows.length === 0) {
+    return { opponents: [], refreshedAtMs: nowMs, onlineWindowSeconds: QUIZ_BATTLE_ONLINE_WINDOW_MS / 1000 };
+  }
+
+  const userRefs = presenceRows.map((presence) => db.collection("users").doc(presence.uid));
+  const userSnaps = await db.getAll(...userRefs);
+  const userByUid = new Map(userSnaps.map((snap) => [snap.id, snap.exists ? (snap.data() || {}) : {}]));
+  const blockedRoles = new Set(["admin", "parent", "teacher", "operator"]);
+
+  const opponents = presenceRows.reduce((rows, presence) => {
+    const profile = userByUid.get(presence.uid) || {};
+    const role = cleanId(profile.role || presence.role, 30).toLowerCase();
+    const isGuest = isQuizBattleGuestProfile(profile) || role === "guest";
+    const hasAccess = isGuest || isQuizBattleAccessActive(profile, contextData.clusterId, regionId);
+    if (!hasAccess || blockedRoles.has(role) || profile.isDeleted === true || profile.accountStatus === "deleted") return rows;
+    if (isUserInActiveQuizBattle(profile)) return rows;
+
+    rows.push({
+      uid: presence.uid,
+      displayName: getPublicStudentName({ ...presence, ...profile }),
+      gradeLabel: cleanText(presence.gradeLabel || profile.gradeLabel || profile.grade || "", 30),
+      crewName: cleanText(presence.crewName || profile.crewName || "", 50),
+      locationLabel: getBattlePresenceLabel(presence),
+      isGuest,
+      lastSeenMs: Number(presence.lastUpdatedAt?.toMillis?.() || nowMs),
+    });
+    return rows;
+  }, []);
+
+  return {
+    opponents: opponents.slice(0, 30),
+    refreshedAtMs: nowMs,
+    onlineWindowSeconds: QUIZ_BATTLE_ONLINE_WINDOW_MS / 1000,
+  };
+});
+
+exports.createQuizBattleChallenge = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const isGuestUser = isGuestContext(context);
+  const targetUid = cleanId(data?.targetUid, 180);
+  const clusterId = cleanId(data?.clusterId || "cluster_elementary");
+  const regionId = cleanId(data?.regionId);
+  const entryUnitId = cleanId(data?.entryUnitId);
+  const battleScope = normalizeBattleScope(data?.battleScope);
+  const rangeLabel = cleanText(data?.rangeLabel || "선택한 퀴즈 범위", 120);
+  const requestedQuestionCount = Math.max(
+    5,
+    Math.min(QUIZ_BATTLE_QUESTION_COUNT, Number(data?.questionCount || QUIZ_BATTLE_QUESTION_COUNT))
+  );
+  if (!targetUid || targetUid === uid || !regionId || !entryUnitId) {
+    throw new functions.https.HttpsError("invalid-argument", "도전장 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const nowMs = Date.now();
+  const expiresAtMs = nowMs + QUIZ_BATTLE_CHALLENGE_TTL_MS;
+  const contextData = await resolveBattleContext({ clusterId, regionId, entryUnitId });
+  const [challengerSnap, targetSnap, targetPresenceSnap] = await Promise.all([
+    db.collection("users").doc(uid).get(),
+    db.collection("users").doc(targetUid).get(),
+    db.collection("liveStatuses").doc(targetUid).get(),
+  ]);
+  const challengerData = challengerSnap.exists
+    ? (challengerSnap.data() || {})
+    : (isGuestUser ? { publicDisplayName: getCrewGuestAlias(uid), isGuest: true } : {});
+  const targetData = targetSnap.exists ? (targetSnap.data() || {}) : {};
+  const targetPresence = targetPresenceSnap.exists ? (targetPresenceSnap.data() || {}) : {};
+  const targetRole = cleanId(targetData.role || targetPresence.role, 30).toLowerCase();
+  if (!isGuestUser) assertQuizBattleAccess(challengerData, contextData.clusterId, regionId);
+  if (
+    !targetSnap.exists ||
+    ["admin", "parent", "teacher", "operator"].includes(targetRole) ||
+    (!isQuizBattleGuestProfile(targetData) && !isQuizBattleAccessActive(targetData, contextData.clusterId, regionId))
+  ) {
+    throw new functions.https.HttpsError("failed-precondition", "상대방은 현재 이 행성의 배틀에 참여할 수 없습니다.");
+  }
+  const targetLastSeenMs = Number(targetPresence.lastUpdatedAt?.toMillis?.() || 0);
+  if (targetPresence.state !== "online" || targetLastSeenMs < nowMs - QUIZ_BATTLE_ONLINE_WINDOW_MS) {
+    throw new functions.https.HttpsError("failed-precondition", "상대방이 방금 오프라인이 되었습니다. 목록을 새로 고침해 주세요.");
+  }
+  if (isUserInActiveQuizBattle(challengerData) || isUserInActiveQuizBattle(targetData)) {
+    throw new functions.https.HttpsError("failed-precondition", "상대방 또는 내가 이미 다른 배틀을 진행 중입니다.");
+  }
+  const [challengerTicket, targetTicket] = await Promise.all([
+    findOwnQuizBattleTicket(db, uid, regionId),
+    findOwnQuizBattleTicket(db, targetUid, regionId),
+  ]);
+  if (
+    isBlockingBattleTicket(challengerTicket?.snap?.data?.() || {}, nowMs) ||
+    isBlockingBattleTicket(targetTicket?.snap?.data?.() || {}, nowMs)
+  ) {
+    throw new functions.https.HttpsError("failed-precondition", "상대방 또는 내가 자동 매칭 대기룸에 있습니다.");
+  }
+
+  const challengeRef = db.collection("quizBattleChallenges").doc(targetUid);
+  const challengerLockRef = db.collection("quizBattleChallengeLocks").doc(uid);
+  const targetLockRef = db.collection("quizBattleChallengeLocks").doc(targetUid);
+  const ownIncomingRef = db.collection("quizBattleChallenges").doc(uid);
+  const requestId = db.collection("quizBattleChallengeRequests").doc().id;
+  const entryUnit = contextData.units.find((unit) => unit.id === entryUnitId) || {};
+  const challengerName = isGuestUser ? getCrewGuestAlias(uid) : getPublicStudentName(challengerData);
+  const recipientName = getPublicStudentName(targetData, "탐사원");
+
+  await db.runTransaction(async (transaction) => {
+    const [challengeSnap, challengerLockSnap, targetLockSnap, ownIncomingSnap] = await Promise.all([
+      transaction.get(challengeRef),
+      transaction.get(challengerLockRef),
+      transaction.get(targetLockRef),
+      transaction.get(ownIncomingRef),
+    ]);
+    if (challengeSnap.exists && isPendingChallenge(challengeSnap.data() || {}, nowMs)) {
+      throw new functions.https.HttpsError("already-exists", "상대방이 다른 도전장을 확인 중입니다.");
+    }
+    if (challengerLockSnap.exists && isPendingChallenge(challengerLockSnap.data() || {}, nowMs)) {
+      throw new functions.https.HttpsError("already-exists", "이미 보낸 도전장의 응답을 기다리고 있습니다.");
+    }
+    if (targetLockSnap.exists && isPendingChallenge(targetLockSnap.data() || {}, nowMs)) {
+      throw new functions.https.HttpsError("failed-precondition", "상대방이 다른 탐사원의 응답을 기다리고 있습니다.");
+    }
+    if (ownIncomingSnap.exists && isPendingChallenge(ownIncomingSnap.data() || {}, nowMs)) {
+      throw new functions.https.HttpsError("failed-precondition", "먼저 도착한 도전장에 응답해 주세요.");
+    }
+
+    const payload = {
+      requestId,
+      status: "pending",
+      challengerId: uid,
+      challengerName,
+      challengerIsGuest: isGuestUser,
+      recipientId: targetUid,
+      recipientName,
+      clusterId: contextData.clusterId,
+      regionId,
+      regionTitle: contextData.regionTitle || "",
+      entryUnitId,
+      entryUnitTitle: cleanText(entryUnit.title || "퀴즈 유닛", 100),
+      entryOrdinal: Number(contextData.entryOrdinal || 0),
+      battleScope,
+      rangeLabel,
+      questionCount: requestedQuestionCount,
+      durationSeconds: QUIZ_BATTLE_DURATION_MS / 1000,
+      createdAt: FieldValue.serverTimestamp(),
+      createdAtMs: nowMs,
+      expiresAtMs,
+      ttlAt: Timestamp.fromMillis(expiresAtMs + (24 * 60 * 60 * 1000)),
+    };
+    transaction.set(challengeRef, payload);
+    transaction.set(challengerLockRef, {
+      requestId,
+      challengeDocId: targetUid,
+      recipientId: targetUid,
+      recipientName,
+      status: "pending",
+      createdAt: FieldValue.serverTimestamp(),
+      createdAtMs: nowMs,
+      expiresAtMs,
+      ttlAt: Timestamp.fromMillis(expiresAtMs + (24 * 60 * 60 * 1000)),
+    });
+  });
+
+  return {
+    challengeId: targetUid,
+    requestId,
+    status: "pending",
+    recipientName,
+    expiresAtMs,
+  };
+});
+
+exports.respondQuizBattleChallenge = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const response = cleanId(data?.response, 20);
+  const requestId = cleanId(data?.requestId, 220);
+  if (!["accept", "decline"].includes(response) || !requestId) {
+    throw new functions.https.HttpsError("invalid-argument", "도전장 응답이 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const nowMs = Date.now();
+  const challengeRef = db.collection("quizBattleChallenges").doc(uid);
+  const challengeSnap = await challengeRef.get();
+  if (!challengeSnap.exists) throw new functions.https.HttpsError("not-found", "도전장을 찾을 수 없습니다.");
+  const challenge = challengeSnap.data() || {};
+  if (challenge.recipientId !== uid || challenge.requestId !== requestId) {
+    throw new functions.https.HttpsError("permission-denied", "응답할 수 없는 도전장입니다.");
+  }
+  const challengerLockRef = db.collection("quizBattleChallengeLocks").doc(challenge.challengerId);
+
+  if (response === "decline") {
+    await db.runTransaction(async (transaction) => {
+      const [freshChallengeSnap, lockSnap] = await Promise.all([
+        transaction.get(challengeRef),
+        transaction.get(challengerLockRef),
+      ]);
+      const fresh = freshChallengeSnap.exists ? (freshChallengeSnap.data() || {}) : {};
+      if (fresh.requestId !== requestId || fresh.status !== "pending") return;
+      transaction.set(challengeRef, {
+        status: "declined",
+        respondedAt: FieldValue.serverTimestamp(),
+        respondedAtMs: nowMs,
+      }, { merge: true });
+      if (lockSnap.exists && lockSnap.data()?.requestId === requestId) {
+        transaction.set(challengerLockRef, {
+          status: "declined",
+          respondedAt: FieldValue.serverTimestamp(),
+          respondedAtMs: nowMs,
+        }, { merge: true });
+      }
+    });
+    return { success: true, status: "declined" };
+  }
+
+  if (!isPendingChallenge(challenge, nowMs)) {
+    throw new functions.https.HttpsError("deadline-exceeded", "도전장 응답 시간이 지났습니다.");
+  }
+  const contextData = await resolveBattleContext({
+    clusterId: challenge.clusterId,
+    regionId: challenge.regionId,
+    entryUnitId: challenge.entryUnitId,
+  });
+  const [challengerSnap, recipientSnap, challengerPresenceSnap] = await Promise.all([
+    db.collection("users").doc(challenge.challengerId).get(),
+    db.collection("users").doc(uid).get(),
+    db.collection("liveStatuses").doc(challenge.challengerId).get(),
+  ]);
+  const challengerIsGuest = challenge.challengerIsGuest === true;
+  const recipientIsGuest = isGuestContext(context);
+  const challengerData = challengerSnap.exists
+    ? (challengerSnap.data() || {})
+    : (challengerIsGuest ? { publicDisplayName: challenge.challengerName, isGuest: true } : {});
+  const recipientData = recipientSnap.exists ? (recipientSnap.data() || {}) : {};
+  if (!challengerIsGuest) assertQuizBattleAccess(challengerData, contextData.clusterId, contextData.regionId);
+  if (!recipientIsGuest && !isQuizBattleGuestProfile(recipientData)) {
+    assertQuizBattleAccess(recipientData, contextData.clusterId, contextData.regionId);
+  }
+  const challengerLastSeenMs = Number(challengerPresenceSnap.data()?.lastUpdatedAt?.toMillis?.() || 0);
+  if (!challengerPresenceSnap.exists || challengerPresenceSnap.data()?.state !== "online" || challengerLastSeenMs < nowMs - QUIZ_BATTLE_ONLINE_WINDOW_MS) {
+    throw new functions.https.HttpsError("failed-precondition", "도전자가 오프라인이 되었습니다.");
+  }
+  if (isUserInActiveQuizBattle(challengerData) || isUserInActiveQuizBattle(recipientData)) {
+    throw new functions.https.HttpsError("failed-precondition", "이미 다른 배틀이 진행 중입니다.");
+  }
+  const [challengerQueueTicket, recipientQueueTicket] = await Promise.all([
+    findOwnQuizBattleTicket(db, challenge.challengerId, contextData.regionId),
+    findOwnQuizBattleTicket(db, uid, contextData.regionId),
+  ]);
+  if (
+    isBlockingBattleTicket(challengerQueueTicket?.snap?.data?.() || {}, nowMs) ||
+    isBlockingBattleTicket(recipientQueueTicket?.snap?.data?.() || {}, nowMs)
+  ) {
+    throw new functions.https.HttpsError("failed-precondition", "자동 매칭이 먼저 시작되어 이 도전장을 수락할 수 없습니다.");
+  }
+
+  const questionSet = await buildBattleQuestionSet(
+    contextData,
+    Number(challenge.entryOrdinal || contextData.entryOrdinal),
+    Number(challenge.questionCount || QUIZ_BATTLE_QUESTION_COUNT),
+    `${challenge.challengerId}_${uid}_${requestId}`,
+    { battleScope: challenge.battleScope, unitId: challenge.entryUnitId }
+  );
+  const battleRef = db.collection("quizBattles").doc();
+  const participantUids = [challenge.challengerId, uid].sort();
+  const entryConfirmDeadlineMs = Date.now() + QUIZ_BATTLE_DIRECT_CONFIRM_TIMEOUT_MS;
+  const participants = {};
+  participants[challenge.challengerId] = {
+    uid: challenge.challengerId,
+    displayName: challenge.challengerName || getPublicStudentName(challengerData),
+    isGuest: challengerIsGuest,
+    score: 0,
+    correctCount: 0,
+    answeredCount: 0,
+    ready: true,
+    entryConfirmed: false,
+    entryConfirmedAtMs: 0,
+    entryUnitId: challenge.entryUnitId,
+    entryUnitTitle: challenge.entryUnitTitle || "",
+  };
+  participants[uid] = {
+    uid,
+    displayName: getPublicStudentName(recipientData),
+    isGuest: recipientIsGuest,
+    score: 0,
+    correctCount: 0,
+    answeredCount: 0,
+    ready: true,
+    entryConfirmed: false,
+    entryConfirmedAtMs: 0,
+    entryUnitId: challenge.entryUnitId,
+    entryUnitTitle: challenge.entryUnitTitle || "",
+  };
+
+  await db.runTransaction(async (transaction) => {
+    const [freshChallengeSnap, lockSnap] = await Promise.all([
+      transaction.get(challengeRef),
+      transaction.get(challengerLockRef),
+    ]);
+    const fresh = freshChallengeSnap.exists ? (freshChallengeSnap.data() || {}) : {};
+    if (fresh.requestId !== requestId || !isPendingChallenge(fresh, Date.now())) {
+      throw new functions.https.HttpsError("aborted", "도전장이 만료되었거나 이미 처리되었습니다.");
+    }
+    if (!lockSnap.exists || lockSnap.data()?.requestId !== requestId || !isPendingChallenge(lockSnap.data() || {}, Date.now())) {
+      throw new functions.https.HttpsError("aborted", "도전자가 다른 화면으로 이동해 도전이 취소되었습니다.");
+    }
+    transaction.set(battleRef, {
+      status: "starting",
+      matchSource: "direct_challenge",
+      challengeRequestId: requestId,
+      clusterId: contextData.clusterId,
+      regionId: contextData.regionId,
+      regionTitle: contextData.regionTitle || "",
+      battleScope: normalizeBattleScope(challenge.battleScope),
+      battleUnitId: normalizeBattleScope(challenge.battleScope) === QUIZ_BATTLE_SCOPE_UNIT ? challenge.entryUnitId : "",
+      battleUnitTitle: normalizeBattleScope(challenge.battleScope) === QUIZ_BATTLE_SCOPE_UNIT ? (challenge.entryUnitTitle || "") : "",
+      commonCeilingOrdinal: Number(challenge.entryOrdinal || contextData.entryOrdinal),
+      participantUids,
+      participants,
+      entryUnitIds: {
+        [challenge.challengerId]: challenge.entryUnitId,
+        [uid]: challenge.entryUnitId,
+      },
+      ticketIds: {},
+      questionCount: questionSet.length,
+      questionSet,
+      startedAtMs: 0,
+      endsAtMs: 0,
+      entryConfirmDeadlineMs,
+      createdAt: FieldValue.serverTimestamp(),
+      createdAtMs: nowMs,
+    });
+    transaction.set(challengeRef, {
+      status: "accepted",
+      battleId: battleRef.id,
+      respondedAt: FieldValue.serverTimestamp(),
+      respondedAtMs: nowMs,
+    }, { merge: true });
+    transaction.set(challengerLockRef, {
+      status: "accepted",
+      battleId: battleRef.id,
+      respondedAt: FieldValue.serverTimestamp(),
+      respondedAtMs: nowMs,
+    }, { merge: true });
+  });
+
+  return {
+    success: true,
+    status: "accepted",
+    battleId: battleRef.id,
+    challenge: {
+      clusterId: contextData.clusterId,
+      regionId: contextData.regionId,
+      entryUnitId: challenge.entryUnitId,
+      entryUnitTitle: challenge.entryUnitTitle || "",
+      battleScope: normalizeBattleScope(challenge.battleScope),
+      rangeLabel: challenge.rangeLabel || challenge.entryUnitTitle || "퀴즈 배틀",
+    },
+  };
+});
+
+exports.cancelQuizBattleChallenge = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const requestId = cleanId(data?.requestId, 220);
+  if (!requestId) throw new functions.https.HttpsError("invalid-argument", "취소할 도전장 정보가 없습니다.");
+  const db = admin.firestore();
+  const lockRef = db.collection("quizBattleChallengeLocks").doc(uid);
+  const lockSnap = await lockRef.get();
+  if (!lockSnap.exists || lockSnap.data()?.requestId !== requestId) {
+    return { success: true, status: "cancelled" };
+  }
+  const challengeRef = db.collection("quizBattleChallenges").doc(cleanId(lockSnap.data()?.challengeDocId, 180));
+  const nowMs = Date.now();
+  await db.runTransaction(async (transaction) => {
+    const [freshLockSnap, challengeSnap] = await Promise.all([
+      transaction.get(lockRef),
+      transaction.get(challengeRef),
+    ]);
+    if (!freshLockSnap.exists || freshLockSnap.data()?.requestId !== requestId) return;
+    if (challengeSnap.exists && challengeSnap.data()?.requestId === requestId && challengeSnap.data()?.status === "pending") {
+      transaction.set(challengeRef, {
+        status: "cancelled",
+        cancelledAt: FieldValue.serverTimestamp(),
+        cancelledAtMs: nowMs,
+      }, { merge: true });
+    }
+    transaction.set(lockRef, {
+      status: "cancelled",
+      cancelledAt: FieldValue.serverTimestamp(),
+      cancelledAtMs: nowMs,
+    }, { merge: true });
+  });
+  return { success: true, status: "cancelled" };
+});
+
 exports.listQuizBattleQueue = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const isGuestUser = isGuestContext(context);
@@ -1991,6 +2453,16 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
 
   const db = admin.firestore();
   const nowMs = Date.now();
+  const [outgoingChallengeLockSnap, incomingChallengeSnap] = await Promise.all([
+    db.collection("quizBattleChallengeLocks").doc(uid).get(),
+    db.collection("quizBattleChallenges").doc(uid).get(),
+  ]);
+  if (
+    (outgoingChallengeLockSnap.exists && isPendingChallenge(outgoingChallengeLockSnap.data() || {}, nowMs)) ||
+    (incomingChallengeSnap.exists && isPendingChallenge(incomingChallengeSnap.data() || {}, nowMs))
+  ) {
+    throw new functions.https.HttpsError("failed-precondition", "진행 중인 도전장에 먼저 응답하거나 도전장을 회수해 주세요.");
+  }
   const contextData = await resolveBattleContext({ clusterId, regionId, entryUnitId });
   let ownTicket = await findOwnQuizBattleTicket(db, uid, regionId, cleanId(data?.ticketId, 220));
   let ticketRef = ownTicket?.ref || db.collection("quizBattleQueueTickets").doc();

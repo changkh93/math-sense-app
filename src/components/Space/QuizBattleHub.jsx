@@ -17,7 +17,7 @@ const COURSE_META = [
 const getId = (item) => item?.docId || item?.id || ''
 const getTitle = (item, fallback = '') => item?.title || item?.name || fallback
 
-export default function QuizBattleHub({ onBack, onSoloQuiz }) {
+export default function QuizBattleHub({ acceptedBattle, onDirectBattleExit, onBack, onSoloQuiz }) {
   const { userData } = useAuth()
   const { data: clusters = [], isLoading: clustersLoading } = useClusters()
   const [clusterId, setClusterId] = useState('')
@@ -39,6 +39,10 @@ export default function QuizBattleHub({ onBack, onSoloQuiz }) {
   const [scope, setScope] = useState(null)
   const [mode, setMode] = useState('pvp')
   const [launched, setLaunched] = useState(false)
+  const [dismissedDirectBattleId, setDismissedDirectBattleId] = useState('')
+  const directBattle = acceptedBattle?.battleId && acceptedBattle.battleId !== dismissedDirectBattleId
+    ? acceptedBattle
+    : null
 
   const unitQueries = useQueries({
     queries: chapters.map((chapter) => ({
@@ -91,6 +95,30 @@ export default function QuizBattleHub({ onBack, onSoloQuiz }) {
       label: `${getTitle(selectedChapter, '선택 챕터')}까지`,
       detail: '리전 시작부터 이 챕터의 마지막 유닛까지',
     })
+  }
+
+  if (directBattle?.battleId) {
+    return (
+      <QuizBattleView
+        clusterId={directBattle.clusterId}
+        regionId={directBattle.regionId}
+        entryUnitId={directBattle.entryUnitId}
+        entryUnitTitle={directBattle.entryUnitTitle || directBattle.rangeLabel}
+        initialBattleScope={directBattle.battleScope || 'cumulative'}
+        opponentMode="pvp"
+        rangeLabel={directBattle.rangeLabel || directBattle.entryUnitTitle}
+        initialBattleId={directBattle.battleId}
+        onExit={() => {
+          setDismissedDirectBattleId(directBattle.battleId)
+          onDirectBattleExit?.()
+        }}
+        onSoloQuiz={() => onSoloQuiz?.({
+          clusterId: directBattle.clusterId,
+          regionId: directBattle.regionId,
+          unitId: directBattle.entryUnitId,
+        })}
+      />
+    )
   }
 
   if (launched && scope) {
@@ -181,7 +209,7 @@ export default function QuizBattleHub({ onBack, onSoloQuiz }) {
           </div>
           <div className="battle-opponents">
             <button type="button" className={mode === 'pvp' ? 'is-selected' : ''} onClick={() => setMode('pvp')}>
-              <span>⚔️</span><div><b>LIVE CHALLENGER</b><small>대기자 선택 또는 자동 매칭 · 일반 광석</small></div>
+              <span>⚔️</span><div><b>LIVE CHALLENGER</b><small>온라인 탐사원에게 도전 또는 자동 매칭 · 일반 광석</small></div>
             </button>
             <button type="button" className={mode === 'ai' ? 'is-selected' : ''} onClick={() => setMode('ai')}>
               <span>◈</span><div><b>NOVA-7 AI</b><small>내 속도에 적응 · 광석 1/3</small></div>

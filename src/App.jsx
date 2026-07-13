@@ -40,6 +40,7 @@ import Signup from './pages/Signup'
 import Terms from './pages/Terms'
 import CrewGuestInvite from './pages/CrewGuestInvite'
 import CrewGuestManager from './pages/Admin/CrewGuestManager'
+import QuizBattleChallengeReceiver from './components/Space/QuizBattleChallengeReceiver'
 
 import PrivateRoute from './components/PrivateRoute'
 
@@ -52,7 +53,9 @@ function App() {
   }, []);
 
   return (
-    <Routes>
+    <>
+      <QuizBattleChallengeReceiver />
+      <Routes>
       <Route path="/" element={<SpaceHome />} />
       <Route path="/journey" element={<Navigate to="/?view=journey" replace />} />
       <Route path="/streak" element={<Navigate to="/?view=journey" replace />} />
@@ -115,7 +118,8 @@ function App() {
       <Route path="/parent" element={<Navigate to="/" replace />} />
       <Route path="/parent/dashboard" element={<ParentDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   )
 }
 

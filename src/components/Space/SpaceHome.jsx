@@ -588,6 +588,8 @@ function SpaceHome() {
   const [guestInviteLink, setGuestInviteLink] = useState('')
   const [guestInviteError, setGuestInviteError] = useState('')
   const [signupPrompt, setSignupPrompt] = useState(null)
+  const [acceptedQuizBattle, setAcceptedQuizBattle] = useState(null)
+  const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
 
   const handleGuestInviteLogin = useCallback(() => {
     const rawLink = guestInviteLink.trim()
@@ -855,9 +857,20 @@ function SpaceHome() {
     const requestedView = location.state?.view || params.get('view')
     const requestedClusterId = location.state?.clusterId || params.get('clusterId')
     const requestedDate = location.state?.date || params.get('date') || params.get('assignmentDate')
+    const incomingQuizBattle = location.state?.acceptedQuizBattle
     const validViews = new Set(['planet', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
 
     if (requestedView && validViews.has(requestedView)) {
+      if (requestedView === 'battle' && incomingQuizBattle?.battleId) {
+        setAcceptedQuizBattle(incomingQuizBattle)
+        const storedReturnView = sessionStorage.getItem('metasense_current_view') || 'planet'
+        setQuizBattleReturnView(storedReturnView === 'battle' ? 'planet' : storedReturnView)
+        // A direct challenge must not clear the interrupted region and unit.
+        // Keeping those coordinates lets the student resume after the battle.
+        setCurrentView('battle')
+        navigate(location.pathname, { replace: true, state: {} })
+        return
+      }
       if (requestedView === 'assignment_hub') {
         if (requestedClusterId) updateSelectedClusterId(requestedClusterId)
         if (/^\d{4}-\d{2}-\d{2}$/.test(String(requestedDate || ''))) {
@@ -3370,6 +3383,11 @@ function SpaceHome() {
       <div className="space-bg" style={{ minHeight: '100dvh', overflowY: 'auto' }}>
         <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
         <QuizBattleHub
+          acceptedBattle={acceptedQuizBattle}
+          onDirectBattleExit={() => {
+            setAcceptedQuizBattle(null)
+            setCurrentView(quizBattleReturnView || 'planet')
+          }}
           onBack={() => { switchRootView('planet'); soundManager.playWarp(); }}
           onSoloQuiz={({ clusterId, regionId, unitId }) => {
             updateSelectedClusterId(clusterId)

@@ -18,6 +18,14 @@ const BATTLE_SCOPE_LABELS = {
 }
 const BATTLE_FEEDBACK_VOLUME_MULTIPLIER = 1.75
 
+const getBattleChallengeError = (error, fallback) => {
+  const message = String(error?.message || '').trim()
+  if (!message || message.toLowerCase() === 'internal' || /functions\/(internal|not-found)/i.test(String(error?.code || ''))) {
+    return fallback
+  }
+  return message
+}
+
 const getParticipant = (battle, uid) => battle?.participants?.[uid] || {}
 
 const getOpponentUid = (battle, uid) => (
@@ -45,6 +53,7 @@ export default function QuizBattleView({
   initialBattleScope = BATTLE_SCOPE_CUMULATIVE,
   opponentMode = 'pvp',
   rangeLabel = '',
+  initialBattleId = '',
   onExit,
   onSoloQuiz,
 }) {
@@ -60,6 +69,12 @@ export default function QuizBattleView({
   const [queueTickets, setQueueTickets] = useState([])
   const [isLoadingQueue, setIsLoadingQueue] = useState(false)
   const [queueListExpanded, setQueueListExpanded] = useState(false)
+  const [onlineOpponents, setOnlineOpponents] = useState([])
+  const [isLoadingOnline, setIsLoadingOnline] = useState(false)
+  const [onlineListExpanded, setOnlineListExpanded] = useState(false)
+  const [outgoingChallenge, setOutgoingChallenge] = useState(null)
+  const [challengingUid, setChallengingUid] = useState('')
+  const [challengeNotice, setChallengeNotice] = useState('')
   const [isJoining, setIsJoining] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
@@ -81,9 +96,29 @@ export default function QuizBattleView({
   const aiAdvanceTimerRef = useRef(null)
   const lastIntegrityReportRef = useRef(0)
   const resultLockedRef = useRef(false)
+  const outgoingChallengeRef = useRef(null)
   const isAIMode = opponentMode === 'ai'
   const isScopeLocked = Boolean(rangeLabel)
   const aiTrainingData = useMemo(() => calculateBattleData(userData || {}), [userData])
+
+  useEffect(() => {
+    outgoingChallengeRef.current = outgoingChallenge
+  }, [outgoingChallenge])
+
+  useEffect(() => () => {
+    const active = outgoingChallengeRef.current
+    if (!active?.requestId) return
+    const cancelChallenge = httpsCallable(functions, 'cancelQuizBattleChallenge')
+    cancelChallenge({ requestId: active.requestId }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!initialBattleId || battleId) return
+    matchedRef.current = true
+    setBattleId(initialBattleId)
+    setPhase('active')
+    enterBattleFocusMode()
+  }, [battleId, initialBattleId])
 
   useEffect(() => {
     if (phase === 'idle') setBattleScope(initialBattleScope)
@@ -105,6 +140,20 @@ export default function QuizBattleView({
     return () => unsubscribe()
   }, [user?.uid])
 
+  const loadOnlineOpponents = useCallback(async ({ silent = false } = {}) => {
+    if (isAIMode || !user?.uid || !clusterId || !regionId || !entryUnitId) return
+    if (!silent) setIsLoadingOnline(true)
+    try {
+      const listOnline = httpsCallable(functions, 'listQuizBattleOnlineOpponents')
+      const res = await listOnline({ clusterId, regionId, entryUnitId })
+      setOnlineOpponents(Array.isArray(res.data?.opponents) ? res.data.opponents : [])
+    } catch (err) {
+      if (!silent) setError(getBattleChallengeError(err, '온라인 탐사원 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'))
+    } finally {
+      if (!silent) setIsLoadingOnline(false)
+    }
+  }, [clusterId, entryUnitId, isAIMode, regionId, user?.uid])
+
   const loadQueueTickets = useCallback(async ({ silent = false } = {}) => {
     if (isAIMode || !user?.uid || !clusterId || !regionId || !entryUnitId) return
     if (!silent) setIsLoadingQueue(true)
@@ -113,7 +162,7 @@ export default function QuizBattleView({
       const res = await listQueue({ clusterId, regionId, entryUnitId })
       setQueueTickets(Array.isArray(res.data?.tickets) ? res.data.tickets : [])
     } catch (err) {
-      if (!silent) setError(err?.message || '배틀 대기자 목록을 불러오지 못했습니다.')
+      if (!silent) setError(getBattleChallengeError(err, '배틀 대기룸을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'))
     } finally {
       if (!silent) setIsLoadingQueue(false)
     }
@@ -121,9 +170,94 @@ export default function QuizBattleView({
 
   useEffect(() => {
     if (phase !== 'idle' || isAIMode) return undefined
+    loadOnlineOpponents()
     loadQueueTickets()
-    return undefined
-  }, [isAIMode, loadQueueTickets, phase])
+    const onlineTimer = setInterval(() => loadOnlineOpponents({ silent: true }), 30000)
+    const queueTimer = setInterval(() => loadQueueTickets({ silent: true }), 15000)
+    return () => {
+      clearInterval(onlineTimer)
+      clearInterval(queueTimer)
+    }
+  }, [isAIMode, loadOnlineOpponents, loadQueueTickets, phase])
+
+  const sendChallenge = useCallback(async (opponent) => {
+    if (!opponent?.uid || challengingUid || outgoingChallenge || isJoining) return
+    setChallengingUid(opponent.uid)
+    setError('')
+    setChallengeNotice('')
+    try {
+      const createChallenge = httpsCallable(functions, 'createQuizBattleChallenge')
+      const res = await createChallenge({
+        targetUid: opponent.uid,
+        clusterId,
+        regionId,
+        entryUnitId,
+        battleScope,
+        rangeLabel: rangeLabel || entryUnitTitle || '선택한 퀴즈 범위',
+        questionCount: QUESTION_COUNT,
+      })
+      setOutgoingChallenge({
+        challengeId: res.data?.challengeId || opponent.uid,
+        requestId: res.data?.requestId,
+        recipientName: res.data?.recipientName || opponent.displayName || '탐사원',
+        expiresAtMs: Number(res.data?.expiresAtMs || (Date.now() + 75000)),
+      })
+      soundManager.playClick()
+    } catch (err) {
+      setError(getBattleChallengeError(err, '도전장을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.'))
+      loadOnlineOpponents({ silent: true })
+    } finally {
+      setChallengingUid('')
+    }
+  }, [battleScope, challengingUid, clusterId, entryUnitId, entryUnitTitle, isJoining, loadOnlineOpponents, outgoingChallenge, rangeLabel, regionId])
+
+  const cancelOutgoingChallenge = useCallback(async ({ silent = false } = {}) => {
+    const active = outgoingChallenge
+    if (!active?.requestId) return
+    try {
+      const cancelChallenge = httpsCallable(functions, 'cancelQuizBattleChallenge')
+      await cancelChallenge({ requestId: active.requestId })
+      if (!silent) setChallengeNotice('도전장을 회수했습니다.')
+    } catch (err) {
+      if (!silent) setError(getBattleChallengeError(err, '도전장을 회수하지 못했습니다. 잠시 후 다시 시도해 주세요.'))
+    } finally {
+      setOutgoingChallenge(null)
+    }
+  }, [outgoingChallenge])
+
+  useEffect(() => {
+    if (!outgoingChallenge?.challengeId || !outgoingChallenge?.requestId) return undefined
+    const activeRequestId = outgoingChallenge.requestId
+    return onSnapshot(doc(db, 'quizBattleChallenges', outgoingChallenge.challengeId), (snap) => {
+      if (!snap.exists()) return
+      const data = snap.data() || {}
+      if (data.requestId !== activeRequestId) return
+      if (data.status === 'accepted' && data.battleId) {
+        matchedRef.current = true
+        setBattleId(data.battleId)
+        setOutgoingChallenge(null)
+        setPhase('active')
+        enterBattleFocusMode()
+        soundManager.playCrystal()
+      } else if (data.status === 'declined') {
+        setOutgoingChallenge(null)
+        setChallengeNotice(`${data.recipientName || '상대 탐사원'}님이 이번 도전을 정중히 거절했습니다.`)
+        loadOnlineOpponents({ silent: true })
+      } else if (data.status === 'cancelled') {
+        setOutgoingChallenge(null)
+      }
+    }, (err) => {
+      console.warn('Failed to listen to outgoing battle challenge', err)
+      setOutgoingChallenge(null)
+    })
+  }, [loadOnlineOpponents, outgoingChallenge?.challengeId, outgoingChallenge?.requestId])
+
+  useEffect(() => {
+    if (!outgoingChallenge?.expiresAtMs || timeNow < outgoingChallenge.expiresAtMs) return
+    setChallengeNotice(`${outgoingChallenge.recipientName || '상대 탐사원'}님이 응답하지 않아 도전장이 종료되었습니다.`)
+    setOutgoingChallenge(null)
+    loadOnlineOpponents({ silent: true })
+  }, [loadOnlineOpponents, outgoingChallenge, timeNow])
 
   const startAIBattle = useCallback(async () => {
     if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
@@ -171,6 +305,7 @@ export default function QuizBattleView({
         matchedRef.current = true
         setBattleId(data.battleId)
         setQueueTickets([])
+        setOnlineOpponents([])
         setPhase('active')
         soundManager.playCrystal()
       } else {
@@ -182,11 +317,14 @@ export default function QuizBattleView({
     } catch (err) {
       setError(err?.message || '배틀 대기룸에 입장하지 못했습니다.')
       setPhase('idle')
-      if (targetTicketId) loadQueueTickets({ silent: true })
+      if (targetTicketId) {
+        loadQueueTickets({ silent: true })
+        loadOnlineOpponents({ silent: true })
+      }
     } finally {
       setIsJoining(false)
     }
-  }, [battleScope, clusterId, entryUnitId, isJoining, loadQueueTickets, regionId, ticketId, user?.uid])
+  }, [battleScope, clusterId, entryUnitId, isJoining, loadOnlineOpponents, loadQueueTickets, regionId, ticketId, user?.uid])
 
   const cancelQueue = useCallback(async ({ allowMatched = false, throwOnError = false } = {}) => {
     if (!regionId || (!allowMatched && matchedRef.current)) return null
@@ -298,7 +436,7 @@ export default function QuizBattleView({
   const liveMyAnsweredCount = Number(getParticipant(battle, user?.uid || '').answeredCount || 0)
   useEffect(() => {
     const uid = user?.uid
-    if (!uid || userData?.isGuest === true) return
+    if (!uid) return
     const mapPhaseToStatus = (p) => {
       if (p === 'waiting') return 'waiting'
       if (p === 'active') {
@@ -325,17 +463,17 @@ export default function QuizBattleView({
       // idle/cancelled는 즉시 battle 맵을 제거한다. (언마운트가 아닌 phase 전환)
       setDoc(doc(db, 'users', uid), { liveStatus: { battle: deleteField() } }, { merge: true }).catch(() => {})
     }
-  }, [user?.uid, userData?.isGuest, phase, battleId, battle?.status, battle?.questionCount, liveOpponentDisplayName, liveMyAnsweredCount])
+  }, [user?.uid, phase, battleId, battle?.status, battle?.questionCount, liveOpponentDisplayName, liveMyAnsweredCount])
 
   // 언마운트 전용 정리: 컴포넌트가 내려갈 때만 liveStatus.battle을 제거한다.
   // 빈 의존성 배열이므로 상태 업데이트 effect와 경쟁하지 않는다.
   useEffect(() => {
     const uid = user?.uid
-    if (!uid || userData?.isGuest === true) return undefined
+    if (!uid) return undefined
     return () => {
       setDoc(doc(db, 'users', uid), { liveStatus: { battle: deleteField() } }, { merge: true }).catch(() => {})
     }
-  }, [user?.uid, userData?.isGuest])
+  }, [user?.uid])
 
   useEffect(() => {
     if (!battleId || !battle || !user?.uid || battle.status !== 'starting') return undefined
@@ -639,6 +777,7 @@ export default function QuizBattleView({
   const handleSoloQuiz = async () => {
     if (isLeaving) return
     if (phase !== 'waiting') {
+      if (outgoingChallenge) await cancelOutgoingChallenge({ silent: true })
       onSoloQuiz?.()
       return
     }
@@ -682,6 +821,7 @@ export default function QuizBattleView({
       return
     }
     if (phase === 'waiting') await cancelQueue()
+    if (outgoingChallenge) await cancelOutgoingChallenge({ silent: true })
     if (document.fullscreenElement && document.exitFullscreen) {
       document.exitFullscreen().catch(() => {})
     }
@@ -702,6 +842,10 @@ export default function QuizBattleView({
 
   if (phase === 'idle') {
     const showQueueList = queueTickets.length > 0 && (!isMobile || queueListExpanded)
+    const showOnlineList = onlineOpponents.length > 0 && (!isMobile || onlineListExpanded)
+    const challengeSecondsLeft = outgoingChallenge
+      ? Math.max(0, Math.ceil((outgoingChallenge.expiresAtMs - timeNow) / 1000))
+      : 0
     return (
       <div className="space-bg" style={panelStyle}>
         <div className="glass-card hud-border" style={{ width: 'min(860px, 100%)', padding: isMobile ? '1.25rem' : '2rem', textAlign: 'center' }}>
@@ -709,7 +853,7 @@ export default function QuizBattleView({
           <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.75rem' }}>QUIZ BATTLE</h2>
           <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             {isAIMode ? '전술 AI NOVA-7이 내 풀이 속도에 맞춰 함께 달립니다.' : '같은 범위에 도전하는 탐사원과 실시간으로 대결합니다.'}<br />
-            {isAIMode ? 'AI전 광석은 일반 대전의 1/3이며, 공식 전적 대신 훈련 SEI에 제한적으로 반영됩니다.' : '대기자를 선택하면 해당 대기방으로 바로 연결됩니다.'}
+            {isAIMode ? 'AI전 광석은 일반 대전의 1/3이며, 공식 전적 대신 훈련 SEI에 제한적으로 반영됩니다.' : '온라인 탐사원에게 도전하거나 자동 매칭 대기룸에 입장하세요.'}
           </p>
           <div style={{ color: 'var(--crystal-cyan)', marginBottom: '1.5rem', fontWeight: 800 }}>
             퀴즈 범위: {rangeLabel || entryUnitTitle || entryUnitId}
@@ -773,6 +917,106 @@ export default function QuizBattleView({
               </div>
             ))}
           </div>
+          {!isAIMode && <section style={{ marginBottom: '1rem', textAlign: 'left' }}>
+            <div style={{
+              border: '1px solid rgba(251,191,36,0.3)',
+              borderRadius: 14,
+              overflow: 'hidden',
+              background: 'linear-gradient(120deg, rgba(251,191,36,0.08), rgba(255,255,255,0.025))',
+            }}>
+              <div style={{
+                padding: '0.85rem 1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.8rem',
+                borderBottom: showQueueList ? '1px solid rgba(251,191,36,0.16)' : 0,
+              }}>
+                <button
+                  type="button"
+                  onClick={() => { if (isMobile) setQueueListExpanded(prev => !prev) }}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: 0,
+                    border: 0,
+                    background: 'transparent',
+                    color: 'var(--text-bright)',
+                    textAlign: 'left',
+                    cursor: isMobile ? 'pointer' : 'default',
+                    font: 'inherit',
+                  }}
+                >
+                  <span className="font-tech" style={{ display: 'block', color: 'var(--star-gold)', fontSize: '0.7rem', letterSpacing: '0.12em', marginBottom: '0.25rem' }}>
+                    ⚡ BATTLE WAITING ROOM
+                  </span>
+                  <strong>즉시 배틀 가능 {isLoadingQueue ? '확인 중…' : `${queueTickets.length}명`}</strong>
+                  {isMobile && queueTickets.length > 0 && (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.4rem' }}>{showQueueList ? '접기' : '보기'}</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="font-tech"
+                  onClick={() => loadQueueTickets()}
+                  disabled={isLoadingQueue}
+                  style={{ border: 0, padding: '0.2rem', background: 'transparent', color: isLoadingQueue ? 'var(--text-muted)' : 'var(--star-gold)', fontWeight: 900, cursor: isLoadingQueue ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  새로 고침
+                </button>
+              </div>
+
+              <div className="font-tech" style={{ padding: '0.7rem 1rem 0', color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.5 }}>
+                이미 대기룸에 입장해 출전 준비를 마친 탐사원입니다. 선택하면 도전장 없이 즉시 배틀이 시작됩니다.
+              </div>
+
+              {showQueueList && (
+                <div style={{ display: 'grid', gap: '0.6rem', padding: '0.75rem 1rem 1rem', maxHeight: isMobile ? '30vh' : '230px', overflowY: 'auto' }}>
+                  {queueTickets.map((ticket) => (
+                    <div key={ticket.ticketId} style={{
+                      display: 'grid',
+                      gridTemplateColumns: isMobile ? '1fr' : '1fr auto',
+                      gap: '0.7rem',
+                      alignItems: 'center',
+                      padding: '0.85rem',
+                      border: '1px solid rgba(251,191,36,0.2)',
+                      borderRadius: 10,
+                      background: 'rgba(4,9,25,0.58)',
+                    }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.32rem' }}>
+                          <i style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--star-gold)', boxShadow: '0 0 9px rgba(251,191,36,0.85)' }} />
+                          <strong style={{ color: 'var(--text-bright)' }}>{ticket.displayName || '탐사원'}</strong>
+                          <span className="font-tech" style={{ color: ticket.battleScope === BATTLE_SCOPE_UNIT ? 'var(--star-gold)' : 'var(--crystal-cyan)', fontSize: '0.68rem' }}>
+                            {BATTLE_SCOPE_LABELS[ticket.battleScope] || BATTLE_SCOPE_LABELS[BATTLE_SCOPE_CUMULATIVE]}
+                          </span>
+                          <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>{ticket.questionCount || QUESTION_COUNT}문제</span>
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+                          {ticket.entryUnitTitle || '퀴즈 유닛'} · 대기 {ticket.secondsLeft || 0}초 남음
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="hud-btn primary glass"
+                        onClick={() => joinQueue({ targetTicketId: ticket.ticketId })}
+                        disabled={isJoining || Boolean(outgoingChallenge)}
+                        style={{ padding: '0.7rem 1rem', whiteSpace: 'nowrap', borderColor: 'rgba(251,191,36,0.55)' }}
+                      >
+                        {isJoining ? '연결 중…' : '즉시 배틀'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!isLoadingQueue && queueTickets.length === 0 && (
+                <div style={{ padding: '0.75rem 1rem 1rem', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>
+                  현재 대기룸에서 출전을 기다리는 탐사원이 없습니다.
+                </div>
+              )}
+            </div>
+          </section>}
           {!isAIMode && <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
             <div
               style={{
@@ -790,7 +1034,7 @@ export default function QuizBattleView({
               <button
                 type="button"
                 onClick={() => {
-                  if (isMobile) setQueueListExpanded(prev => !prev)
+                  if (isMobile) setOnlineListExpanded(prev => !prev)
                 }}
                 style={{
                   flex: 1,
@@ -804,23 +1048,26 @@ export default function QuizBattleView({
                   padding: 0,
                 }}
               >
-                같은 행성 대기자 {isLoadingQueue ? '확인 중...' : `${queueTickets.length}명`}
-                {isMobile && queueTickets.length > 0 && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <i style={{ width: 8, height: 8, borderRadius: '50%', background: '#32f6a0', boxShadow: '0 0 10px #32f6a0' }} />
+                  온라인 탐사원 · 도전 신청 가능 {isLoadingOnline ? '확인 중...' : `${onlineOpponents.length}명`}
+                </span>
+                {isMobile && onlineOpponents.length > 0 && (
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginLeft: '0.45rem' }}>
-                    {showQueueList ? '접기' : '보기'}
+                    {showOnlineList ? '접기' : '보기'}
                   </span>
                 )}
               </button>
               <button
                 type="button"
-                onClick={() => loadQueueTickets()}
-                disabled={isLoadingQueue}
+                onClick={() => loadOnlineOpponents()}
+                disabled={isLoadingOnline}
                 className="font-tech"
                 style={{
                   border: 0,
                   background: 'transparent',
-                  color: isLoadingQueue ? 'var(--text-muted)' : 'var(--crystal-cyan)',
-                  cursor: isLoadingQueue ? 'default' : 'pointer',
+                  color: isLoadingOnline ? 'var(--text-muted)' : 'var(--crystal-cyan)',
+                  cursor: isLoadingOnline ? 'default' : 'pointer',
                   fontWeight: 900,
                   padding: '0.15rem 0',
                   whiteSpace: 'nowrap',
@@ -829,11 +1076,37 @@ export default function QuizBattleView({
                 새로 고침
               </button>
             </div>
-            {showQueueList && (
+            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.76rem', margin: '0.55rem 0 0.8rem', lineHeight: 1.5 }}>
+              대기룸에는 없지만 최근 2분 안에 접속했고, 현재 계정 권한으로 이 행성을 학습할 수 있는 탐사원입니다. 선택하면 퀴즈 범위를 담은 도전장이 전달됩니다.
+            </div>
+            {outgoingChallenge && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : '1fr auto',
+                alignItems: 'center',
+                gap: '0.85rem',
+                marginBottom: '0.8rem',
+                padding: '1rem',
+                borderRadius: 12,
+                border: '1px solid rgba(251,191,36,0.35)',
+                background: 'linear-gradient(120deg, rgba(251,191,36,0.1), rgba(124,92,255,0.08))',
+              }}>
+                <div>
+                  <div className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.72rem', letterSpacing: '0.12em', marginBottom: '0.35rem' }}>CHALLENGE SENT · {challengeSecondsLeft} SEC</div>
+                  <strong style={{ color: 'var(--text-bright)' }}>{outgoingChallenge.recipientName}님의 응답을 기다리는 중</strong>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.3rem' }}>상대 화면에 퀴즈 범위와 학습 기록 보존 안내가 전달되었습니다.</div>
+                </div>
+                <button type="button" className="hud-btn secondary glass" onClick={() => cancelOutgoingChallenge()} style={{ padding: '0.65rem 0.9rem', whiteSpace: 'nowrap' }}>도전 회수</button>
+              </div>
+            )}
+            {challengeNotice && !outgoingChallenge && (
+              <div className="font-tech" style={{ color: 'var(--star-gold)', margin: '0 0 0.75rem', fontSize: '0.8rem' }}>{challengeNotice}</div>
+            )}
+            {showOnlineList && !outgoingChallenge && (
               <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.6rem', maxHeight: isMobile ? '34vh' : '260px', overflowY: 'auto' }}>
-                {queueTickets.map((ticket) => (
+                {onlineOpponents.map((opponent) => (
                   <div
-                    key={ticket.ticketId}
+                    key={opponent.uid}
                     style={{
                       display: 'grid',
                       gridTemplateColumns: isMobile ? '1fr' : '1fr auto',
@@ -847,43 +1120,31 @@ export default function QuizBattleView({
                   >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
-                        <span style={{ color: 'var(--text-bright)', fontWeight: 900 }}>{ticket.displayName || '탐사원'}</span>
-                        <span
-                          className="font-tech"
-                          style={{
-                            color: ticket.battleScope === BATTLE_SCOPE_UNIT ? 'var(--star-gold)' : 'var(--crystal-cyan)',
-                            fontSize: '0.72rem',
-                            padding: '0.16rem 0.45rem',
-                            borderRadius: 999,
-                            border: '1px solid rgba(255,255,255,0.14)',
-                            background: 'rgba(0,0,0,0.18)',
-                          }}
-                        >
-                          {BATTLE_SCOPE_LABELS[ticket.battleScope] || BATTLE_SCOPE_LABELS[BATTLE_SCOPE_CUMULATIVE]}
-                        </span>
-                        <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                          {ticket.questionCount || QUESTION_COUNT}문제
-                        </span>
+                        <i style={{ width: 7, height: 7, borderRadius: '50%', background: '#32f6a0', boxShadow: '0 0 8px #32f6a0' }} />
+                        <span style={{ color: 'var(--text-bright)', fontWeight: 900 }}>{opponent.displayName || '탐사원'}</span>
+                        {opponent.gradeLabel && <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.72rem' }}>{opponent.gradeLabel}</span>}
+                        {opponent.crewName && <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>· {opponent.crewName}</span>}
+                        {opponent.isGuest && <span className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.68rem' }}>GUEST</span>}
                       </div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.86rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>
-                        {ticket.entryUnitTitle || '퀴즈 유닛'} 대기 중
+                        {opponent.locationLabel || '메타센스 학습 중'} · 도전 수신 가능
                       </div>
                     </div>
                     <button
                       className="hud-btn primary glass"
-                      onClick={() => joinQueue({ targetTicketId: ticket.ticketId })}
-                      disabled={isJoining}
+                      onClick={() => sendChallenge(opponent)}
+                      disabled={isJoining || Boolean(challengingUid)}
                       style={{ padding: '0.72rem 1rem', whiteSpace: 'nowrap' }}
                     >
-                      바로 배틀
+                      {challengingUid === opponent.uid ? '전송 중…' : '도전 신청'}
                     </button>
                   </div>
                 ))}
               </div>
             )}
-            {!isLoadingQueue && queueTickets.length === 0 && (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', marginTop: '0.65rem' }}>
-                지금은 같은 행성에 대기 중인 학생이 없습니다.
+            {!isLoadingOnline && onlineOpponents.length === 0 && !outgoingChallenge && (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', marginTop: '0.65rem', padding: '0.8rem' }}>
+                지금 바로 도전할 수 있는 탐사원이 없습니다.<br />자동 매칭 대기룸에 들어가면 다음 상대와 연결됩니다.
               </div>
             )}
           </div>}
@@ -894,8 +1155,8 @@ export default function QuizBattleView({
           )}
           {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="hud-btn primary glass" onClick={isAIMode ? startAIBattle : () => joinQueue()} disabled={isJoining} style={{ padding: '0.9rem 1.4rem' }}>
-              {isJoining ? '배틀 좌표 생성 중...' : isAIMode ? 'NOVA-7과 대결 시작' : '배틀 대기룸 입장'}
+            <button className="hud-btn primary glass" onClick={isAIMode ? startAIBattle : () => joinQueue()} disabled={isJoining || Boolean(outgoingChallenge)} style={{ padding: '0.9rem 1.4rem' }}>
+              {isJoining ? '배틀 좌표 생성 중...' : outgoingChallenge ? '도전 응답 대기 중' : isAIMode ? 'NOVA-7과 대결 시작' : '자동 매칭 대기룸 입장'}
             </button>
             {!isAIMode && onSoloQuiz && <button className="hud-btn secondary glass" onClick={handleSoloQuiz} style={{ padding: '0.9rem 1.4rem' }}>
               혼자 FIELD TEST
@@ -966,7 +1227,7 @@ export default function QuizBattleView({
           </p>
           {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           <button className="hud-btn primary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
-            돌아가기
+            {initialBattleId ? '학습 화면으로 돌아가기' : '돌아가기'}
           </button>
         </div>
       </div>
@@ -1170,7 +1431,7 @@ export default function QuizBattleView({
               </button>
             )}
             <button className="hud-btn primary glass" onClick={() => { if (resultDismissEnabled) leaveBattle() }} disabled={!resultDismissEnabled || isLeaving} style={{ padding: '0.9rem 1.6rem' }}>
-              {resultDismissEnabled ? 'MISSION CONTROL로 돌아가기' : '결과 확인 중…'}
+              {resultDismissEnabled ? (initialBattleId ? '학습 화면으로 돌아가기' : 'MISSION CONTROL로 돌아가기') : '결과 확인 중…'}
             </button>
           </div>
         </div>
