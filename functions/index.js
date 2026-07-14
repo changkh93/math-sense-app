@@ -17,6 +17,9 @@ const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
 const guestSecurityFunctions = regionalFunctions.runWith({ secrets: ["GUEST_ABUSE_HASH_SECRET"] });
+// 답안 제출은 배틀의 매 문항에서 호출되므로 콜드 스타트를 제거한다.
+// 다른 배틀 함수까지 무분별하게 상시 인스턴스를 두지 않아 고정 비용은 한 함수로 제한한다.
+const quizBattleHotFunctions = regionalFunctions.runWith({ minInstances: 1, memory: "256MB", timeoutSeconds: 60 });
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
 const STORE_RADAR_DURATION_DAYS = 7;
@@ -329,12 +332,159 @@ const QUIZ_BATTLE_SCOPE_CUMULATIVE = "cumulative";
 const QUIZ_BATTLE_SCOPE_UNIT = "unit";
 const QUIZ_BATTLE_MIN_UNIT_QUESTION_COUNT = 5;
 const QUIZ_BATTLE_AI_REWARD_DIVISOR = 3;
+const QUIZ_BATTLE_AI_FAVORED_PROFILE_RATE = 0.3;
+const QUIZ_BATTLE_AI_DEFAULT_USER_ACCURACY = 0.75;
+const QUIZ_BATTLE_AI_MIN_USER_ACCURACY = 0.5;
+const QUIZ_BATTLE_AI_MAX_USER_ACCURACY = 0.93;
 const QUIZ_BATTLE_DAILY_ORE_CAP = 500;
 const QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT = 3;
 const QUIZ_BATTLE_DAILY_OPPONENT_LIMIT = 3;
 const QUIZ_BATTLE_CHALLENGE_TTL_MS = 75 * 1000;
 const QUIZ_BATTLE_ONLINE_WINDOW_MS = 2 * 60 * 1000;
 const QUIZ_BATTLE_DIRECT_CONFIRM_TIMEOUT_MS = 25 * 1000;
+const QUIZ_BATTLE_SCHEMA_VERSION = 2;
+
+function getQuizBattleRefs(db, battleId) {
+  return {
+    battleRef: db.collection("quizBattles").doc(battleId),
+    stateRef: db.collection("quizBattleStates").doc(battleId),
+    gradingRef: db.collection("quizBattleGradingKeys").doc(battleId),
+  };
+}
+
+function splitQuizBattleQuestionSet(questionSet = []) {
+  const gradingQuestions = {};
+  const publicQuestions = (Array.isArray(questionSet) ? questionSet : []).map((question, index) => {
+    const safeQuestion = { ...(question || {}) };
+    const questionId = cleanId(safeQuestion.questionId, 220);
+    gradingQuestions[questionId] = {
+      correctKeys: Array.isArray(safeQuestion.correctKeys)
+        ? safeQuestion.correctKeys.map((key) => normalizeStatKey(key)).filter(Boolean).slice(0, 8)
+        : [],
+      battleOrder: Number(safeQuestion.battleOrder || index + 1),
+    };
+    delete safeQuestion.correctKeys;
+    return safeQuestion;
+  });
+  return { publicQuestions, gradingQuestions };
+}
+
+function buildSplitQuizBattleDocuments(battleData = {}) {
+  const { publicQuestions, gradingQuestions } = splitQuizBattleQuestionSet(battleData.questionSet);
+  const publicBattle = {
+    schemaVersion: QUIZ_BATTLE_SCHEMA_VERSION,
+    participantUids: Array.isArray(battleData.participantUids) ? battleData.participantUids : [],
+    questionSet: publicQuestions,
+    questionCount: Number(battleData.questionCount || publicQuestions.length || 0),
+    clusterId: battleData.clusterId || "",
+    regionId: battleData.regionId || "",
+    regionTitle: battleData.regionTitle || "",
+    battleScope: battleData.battleScope || QUIZ_BATTLE_SCOPE_CUMULATIVE,
+    battleUnitId: battleData.battleUnitId || "",
+    battleUnitTitle: battleData.battleUnitTitle || "",
+    commonCeilingOrdinal: Number(battleData.commonCeilingOrdinal || 0),
+    isAI: battleData.isAI === true,
+    aiParticipantUid: battleData.aiParticipantUid || "",
+    entryUnitIds: battleData.entryUnitIds || {},
+    createdAt: battleData.createdAt || FieldValue.serverTimestamp(),
+    createdAtMs: Number(battleData.createdAtMs || Date.now()),
+  };
+  const battleState = {
+    ...battleData,
+    schemaVersion: QUIZ_BATTLE_SCHEMA_VERSION,
+    battleId: battleData.battleId || "",
+    wrongAnswersSyncedAt: battleData.wrongAnswersSyncedAt || null,
+    battleStatsSyncedAt: battleData.battleStatsSyncedAt || null,
+  };
+  delete battleState.questionSet;
+  const grading = {
+    schemaVersion: QUIZ_BATTLE_SCHEMA_VERSION,
+    battleId: battleData.battleId || "",
+    questionCount: publicBattle.questionCount,
+    questions: gradingQuestions,
+    createdAt: battleData.createdAt || FieldValue.serverTimestamp(),
+  };
+  return { publicBattle, battleState, grading };
+}
+
+function setSplitQuizBattleDocuments(writer, refs, battleData) {
+  const documents = buildSplitQuizBattleDocuments({ ...battleData, battleId: refs.battleRef.id });
+  writer.set(refs.battleRef, documents.publicBattle);
+  writer.set(refs.stateRef, documents.battleState);
+  writer.set(refs.gradingRef, documents.grading);
+}
+
+async function getQuizBattleRuntimeTarget(db, battleId) {
+  const refs = getQuizBattleRefs(db, battleId);
+  const stateSnap = await refs.stateRef.get();
+  if (stateSnap.exists) {
+    return { ...refs, runtimeRef: refs.stateRef, runtimeSnap: stateSnap, isSplit: true };
+  }
+  const battleSnap = await refs.battleRef.get();
+  return { ...refs, runtimeRef: refs.battleRef, runtimeSnap: battleSnap, isSplit: false };
+}
+
+async function getMergedQuizBattle(db, battleId) {
+  const refs = getQuizBattleRefs(db, battleId);
+  const [battleSnap, stateSnap] = await Promise.all([refs.battleRef.get(), refs.stateRef.get()]);
+  if (!battleSnap.exists && !stateSnap.exists) return null;
+  return {
+    ...(battleSnap.exists ? (battleSnap.data() || {}) : {}),
+    ...(stateSnap.exists ? (stateSnap.data() || {}) : {}),
+    questionSet: battleSnap.exists ? (battleSnap.data()?.questionSet || []) : [],
+    _runtimeRef: stateSnap.exists ? refs.stateRef : refs.battleRef,
+    _isSplit: stateSnap.exists,
+  };
+}
+
+function buildQuizBattleAIAnswerPlan(userData = {}, totalQuestions = QUIZ_BATTLE_QUESTION_COUNT) {
+  const safeTotal = Math.max(1, Math.floor(Number(totalQuestions || QUIZ_BATTLE_QUESTION_COUNT)));
+  const historicalCorrect = Math.max(0, Number(userData.aiBattleCorrect || 0));
+  const historicalAnswered = Math.max(historicalCorrect, Number(userData.aiBattleAnswered || 0));
+  const averageScore = Number(userData.averageScore || 0);
+  let estimatedUserAccuracy = QUIZ_BATTLE_AI_DEFAULT_USER_ACCURACY;
+
+  if (historicalAnswered >= QUIZ_BATTLE_QUESTION_COUNT) {
+    estimatedUserAccuracy = historicalCorrect / historicalAnswered;
+  } else if (Number(userData.totalQuizzes || 0) > 0 && averageScore > 0) {
+    estimatedUserAccuracy = averageScore / 100;
+  }
+  estimatedUserAccuracy = Math.max(
+    QUIZ_BATTLE_AI_MIN_USER_ACCURACY,
+    Math.min(QUIZ_BATTLE_AI_MAX_USER_ACCURACY, estimatedUserAccuracy)
+  );
+
+  // 현재 배틀 점수와 무관하게 시작 시 한 번만 프로필을 선택한다.
+  // 30%는 NOVA 우세, 70%는 이용자 우세 프로필이며 실제 승패는 양쪽의
+  // 사전 계획/실제 풀이 결과에 따라 자연스럽게 결정된다.
+  const aiFavoredProfile = Math.random() < QUIZ_BATTLE_AI_FAVORED_PROFILE_RATE;
+  const expectedUserCorrect = Math.max(
+    Math.ceil(safeTotal * QUIZ_BATTLE_AI_MIN_USER_ACCURACY),
+    Math.min(safeTotal, Math.round(safeTotal * estimatedUserAccuracy))
+  );
+  const targetCorrectCount = Math.max(
+    Math.ceil(safeTotal * QUIZ_BATTLE_AI_MIN_USER_ACCURACY),
+    Math.min(safeTotal, expectedUserCorrect + (aiFavoredProfile ? 1 : -1))
+  );
+  const answerPlan = Array.from(
+    { length: safeTotal },
+    (_, index) => index < targetCorrectCount
+  );
+
+  // 정답 수는 고정하되 어느 문항에서 맞힐지는 매 배틀 무작위로 섞는다.
+  for (let index = answerPlan.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [answerPlan[index], answerPlan[swapIndex]] = [answerPlan[swapIndex], answerPlan[index]];
+  }
+
+  return {
+    version: 1,
+    aiFavoredProfile,
+    estimatedUserAccuracy,
+    targetCorrectCount,
+    answerPlan,
+  };
+}
 
 function getBattleKstDateKey(nowMs = Date.now()) {
   return new Date(nowMs + (9 * 60 * 60 * 1000)).toISOString().slice(0, 10);
@@ -893,13 +1043,60 @@ function recomputeStreakFromHistory(historyDocs) {
   return { currentStreak: current, bestStreak: best };
 }
 
+async function markQuizBattleResolving(runtimeRef, finalizeReason) {
+  const db = admin.firestore();
+  const nowMs = Date.now();
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(runtimeRef);
+    if (!snap.exists) {
+      throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
+    }
+    const battleData = snap.data() || {};
+    if (["resolving", "finished", "cancelled"].includes(battleData.status)) return battleData.status;
+    if (battleData.status === "starting") {
+      throw new functions.https.HttpsError("failed-precondition", "아직 상대 입장 확인 중입니다.");
+    }
+    const participantUids = Array.isArray(battleData.participantUids)
+      ? battleData.participantUids.filter(Boolean).slice(0, 2)
+      : [];
+    const participants = battleData.participants || {};
+    const totalQuestions = Number(battleData.questionCount || 0);
+    const allDone = participantUids.length === 2
+      && participantUids.every((uid) => Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions);
+    const timedOut = Number(battleData.endsAtMs || 0) > 0 && nowMs >= Number(battleData.endsAtMs || 0);
+    const hasForfeit = participantUids.some((uid) => participants?.[uid]?.forfeited === true);
+    if (!allDone && !timedOut && !hasForfeit && finalizeReason !== "force") {
+      throw new functions.https.HttpsError("failed-precondition", "아직 배틀이 종료되지 않았습니다.");
+    }
+    const outcome = calculateBattleRewards(participants, participantUids, totalQuestions);
+    transaction.update(runtimeRef, {
+      status: "resolving",
+      winnerUid: outcome.winnerUid,
+      resultType: outcome.resultType,
+      resolvingReason: finalizeReason,
+      resolvedAt: FieldValue.serverTimestamp(),
+      resolvedAtMs: nowMs,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return "resolving";
+  });
+}
+
 async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed") {
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const runtimeTarget = await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.battleRef;
+  const runtimeRef = runtimeTarget.runtimeRef;
   let result = null;
 
+  // 신규 분리 구조에서는 승패만 먼저 작은 상태 문서에 확정한다. 클라이언트는
+  // 즉시 결과를 볼 수 있고, 아래의 광석/전적 원자 정산은 이어서 안전하게 수행된다.
+  if (runtimeTarget.isSplit) {
+    await markQuizBattleResolving(runtimeRef, finalizeReason);
+  }
+
   await db.runTransaction(async (transaction) => {
-    const battleSnap = await transaction.get(battleRef);
+    const battleSnap = await transaction.get(runtimeRef);
     if (!battleSnap.exists) {
       throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
     }
@@ -1034,7 +1231,7 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
       rewards: rewardResult.rewards,
       rewardPolicies,
     };
-    transaction.update(battleRef, finalUpdates);
+    transaction.update(runtimeRef, finalUpdates);
 
     participantUids.forEach((uid) => {
       const participant = participants[uid] || {};
@@ -1192,6 +1389,12 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
     });
   }
 
+  if (runtimeTarget.isSplit && (result?.alreadyFinalized || result?.winnerUid !== undefined)) {
+    await runtimeTarget.gradingRef.delete().catch((err) => {
+      console.warn("Battle grading key cleanup failed", battleId, err);
+    });
+  }
+
   try {
     await recordCrewGuestBattleActivity(battleId);
   } catch (err) {
@@ -1205,7 +1408,8 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
 // syncBattleWrongAnswersIfNeeded와 동일한 claim 패턴을 따른다.
 async function syncBattleStatsIfNeeded(battleId, source = "manual") {
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const runtimeTarget = await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.runtimeRef;
   const nowMs = Date.now();
   const claimId = `${source}_${nowMs}_${Math.random().toString(36).slice(2, 8)}`;
   let claimedBattle = null;
@@ -1420,13 +1624,15 @@ async function countRecentBattleMatches(db, uid) {
 
 async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const runtimeTarget = await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.battleRef;
+  const markerRef = runtimeTarget.runtimeRef;
   const nowMs = Date.now();
   const claimId = `${source}_${nowMs}_${Math.random().toString(36).slice(2, 8)}`;
   let claimedBattle = null;
 
   const claimed = await db.runTransaction(async (transaction) => {
-    const snap = await transaction.get(battleRef);
+    const snap = await transaction.get(markerRef);
     if (!snap.exists) return false;
 
     const battleData = snap.data() || {};
@@ -1436,7 +1642,7 @@ async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
     if (claimedAtMs > 0 && nowMs - claimedAtMs < 2 * 60 * 1000) return false;
 
     claimedBattle = battleData;
-    transaction.set(battleRef, {
+    transaction.set(markerRef, {
       wrongAnswersSyncClaimId: claimId,
       wrongAnswersSyncClaimedAt: FieldValue.serverTimestamp(),
       wrongAnswersSyncClaimedAtMs: nowMs,
@@ -1451,14 +1657,19 @@ async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
   }
 
   try {
+    const contentSnap = runtimeTarget.isSplit ? await battleRef.get() : null;
+    const questionSet = runtimeTarget.isSplit
+      ? (contentSnap?.data()?.questionSet || [])
+      : (Array.isArray(claimedBattle.questionSet) ? claimedBattle.questionSet : []);
     await registerBattleWrongAnswers({
       db,
       battleRef,
+      markerRef,
       battleId,
       participantUids: Array.isArray(claimedBattle.participantUids)
         ? claimedBattle.participantUids.filter((uid) => isPersistentBattleParticipant(claimedBattle.participants?.[uid] || {}))
         : [],
-      questionSet: Array.isArray(claimedBattle.questionSet) ? claimedBattle.questionSet : [],
+      questionSet,
       regionId: claimedBattle.regionId || "",
       regionTitle: claimedBattle.regionTitle || "",
       clusterId: claimedBattle.clusterId || "",
@@ -1466,7 +1677,7 @@ async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
     });
     return { success: true, synced: true };
   } catch (err) {
-    await battleRef.set({
+    await markerRef.set({
       wrongAnswersSyncClaimId: FieldValue.delete(),
       wrongAnswersSyncClaimedAt: FieldValue.delete(),
       wrongAnswersSyncClaimedAtMs: FieldValue.delete(),
@@ -1479,7 +1690,8 @@ async function syncBattleWrongAnswersIfNeeded(battleId, source = "manual") {
 
 async function cancelStartingQuizBattleInternal(battleId, reason = "entry_not_confirmed", cancelledByUid = "") {
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const runtimeTarget = await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.runtimeRef;
   const nowMs = Date.now();
   let result = { success: true, status: "cancelled", alreadyResolved: false };
 
@@ -1509,6 +1721,7 @@ async function cancelStartingQuizBattleInternal(battleId, reason = "entry_not_co
       cancelledAtMs: nowMs,
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
+    if (runtimeTarget.isSplit) transaction.delete(runtimeTarget.gradingRef);
 
     const ticketIds = battleData.ticketIds || {};
     const participantUids = Array.isArray(battleData.participantUids) ? battleData.participantUids : [];
@@ -1530,7 +1743,8 @@ async function cancelStartingQuizBattleInternal(battleId, reason = "entry_not_co
 
 async function confirmQuizBattleEntryInternal(battleId, uid) {
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const runtimeTarget = await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.runtimeRef;
   const nowMs = Date.now();
 
   return db.runTransaction(async (transaction) => {
@@ -1567,6 +1781,7 @@ async function confirmQuizBattleEntryInternal(battleId, uid) {
         cancelledAtMs: nowMs,
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
+      if (runtimeTarget.isSplit) transaction.delete(runtimeTarget.gradingRef);
       const ticketIds = battleData.ticketIds || {};
       participantUids.forEach((participantUid) => {
         const ticketId = cleanId(ticketIds[participantUid], 220);
@@ -1620,10 +1835,11 @@ async function confirmQuizBattleEntryInternal(battleId, uid) {
 
 async function forfeitQuizBattleForUid(battleId, uid) {
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const runtimeTarget = await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.runtimeRef;
   const nowMs = Date.now();
 
-  const battleSnap = await battleRef.get();
+  const battleSnap = runtimeTarget.runtimeSnap;
   if (!battleSnap.exists) {
     throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
   }
@@ -1639,6 +1855,14 @@ async function forfeitQuizBattleForUid(battleId, uid) {
       rewards: battleData.rewards || {},
     };
   }
+  if (battleData.status === "resolving") {
+    return {
+      success: true,
+      status: "resolving",
+      winnerUid: battleData.winnerUid || "",
+      settlementPending: true,
+    };
+  }
   if (battleData.status === "starting") {
     return cancelStartingQuizBattleInternal(battleId, "participant_left_before_start", uid);
   }
@@ -1650,7 +1874,7 @@ async function forfeitQuizBattleForUid(battleId, uid) {
     const freshSnap = await transaction.get(battleRef);
     if (!freshSnap.exists) return;
     const freshData = freshSnap.data() || {};
-    if (freshData.status === "finished") return;
+    if (["resolving", "finished"].includes(freshData.status)) return;
     transaction.update(battleRef, {
       [`participants.${uid}.forfeited`]: true,
       [`participants.${uid}.forfeitedAt`]: FieldValue.serverTimestamp(),
@@ -1668,7 +1892,7 @@ async function forfeitQuizBattleForUid(battleId, uid) {
  * 필드 테스트의 SpaceHome.handleComplete 등록 경로와 동일한 컬렉션/문서 구조를
  * 사용해 다크매터 행성에서 자연스럽게 복습할 수 있게 한다.
  */
-async function registerBattleWrongAnswers({ db, battleRef, battleId, participantUids, questionSet, regionId, regionTitle, clusterId, claimId }) {
+async function registerBattleWrongAnswers({ db, battleRef, markerRef = battleRef, battleId, participantUids, questionSet, regionId, regionTitle, clusterId, claimId }) {
   const safeParticipantUids = Array.isArray(participantUids) ? participantUids.filter(Boolean) : [];
   const safeQuestionSet = Array.isArray(questionSet) ? questionSet : [];
 
@@ -1738,7 +1962,7 @@ async function registerBattleWrongAnswers({ db, battleRef, battleId, participant
     });
   }
 
-  batch.set(battleRef, {
+  batch.set(markerRef, {
     wrongAnswersSyncedAt: FieldValue.serverTimestamp(),
     wrongAnswersSyncClaimId: FieldValue.delete(),
     wrongAnswersSyncClaimedAt: FieldValue.delete(),
@@ -2255,6 +2479,7 @@ exports.respondQuizBattleChallenge = regionalFunctions.https.onCall(async (data,
     { battleScope: challenge.battleScope, unitId: challenge.entryUnitId }
   );
   const battleRef = db.collection("quizBattles").doc();
+  const battleRefs = getQuizBattleRefs(db, battleRef.id);
   const participantUids = [challenge.challengerId, uid].sort();
   const entryConfirmDeadlineMs = Date.now() + QUIZ_BATTLE_DIRECT_CONFIRM_TIMEOUT_MS;
   const participants = {};
@@ -2297,7 +2522,7 @@ exports.respondQuizBattleChallenge = regionalFunctions.https.onCall(async (data,
     if (!lockSnap.exists || lockSnap.data()?.requestId !== requestId || !isPendingChallenge(lockSnap.data() || {}, Date.now())) {
       throw new functions.https.HttpsError("aborted", "도전자가 다른 화면으로 이동해 도전이 취소되었습니다.");
     }
-    transaction.set(battleRef, {
+    setSplitQuizBattleDocuments(transaction, battleRefs, {
       status: "starting",
       matchSource: "direct_challenge",
       challengeRequestId: requestId,
@@ -2493,9 +2718,8 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
   if (existingTicketSnap.exists) {
     const existingTicket = existingTicketSnap.data() || {};
     if (existingTicket.status === "matched" && existingTicket.matchId) {
-      const existingBattleSnap = await db.collection("quizBattles").doc(existingTicket.matchId).get();
-      if (existingBattleSnap.exists) {
-        const existingBattle = existingBattleSnap.data() || {};
+      const existingBattle = await getMergedQuizBattle(db, existingTicket.matchId);
+      if (existingBattle) {
         if (existingBattle.status !== "finished" && existingBattle.status !== "cancelled") {
           // 배틀이 아직 "계속 진행 가능한 상태"인지 확인한다.
           // 타이머가 만료됐거나 누군가 이미 포기했다면 stale(좀비) 배틀이므로
@@ -2581,6 +2805,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
     );
 
     const battleRef = db.collection("quizBattles").doc();
+    const battleRefs = getQuizBattleRefs(db, battleRef.id);
     const opponentUid = targetTicket.uid;
     const entryConfirmDeadlineMs = nowMs + QUIZ_BATTLE_START_CONFIRM_TIMEOUT_MS;
     const participantUids = [uid, opponentUid].sort();
@@ -2636,7 +2861,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
         entryUnitTitle: targetUnitTitle,
       };
 
-      transaction.set(battleRef, {
+      setSplitQuizBattleDocuments(transaction, battleRefs, {
         status: "starting",
         clusterId: contextData.clusterId,
         regionId,
@@ -2745,6 +2970,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
     }
 
     const battleRef = db.collection("quizBattles").doc();
+    const battleRefs = getQuizBattleRefs(db, battleRef.id);
     const opponentUid = candidate.data.uid;
     const opponentRef = db.collection("users").doc(opponentUid);
     const opponentSnap = await opponentRef.get();
@@ -2800,7 +3026,7 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
         entryUnitTitle: freshCandidate.entryUnitTitle || "",
       };
 
-      transaction.set(battleRef, {
+      setSplitQuizBattleDocuments(transaction, battleRefs, {
         status: "starting",
         clusterId: contextData.clusterId,
         regionId,
@@ -2878,9 +3104,15 @@ exports.joinQuizBattleQueue = regionalFunctions.https.onCall(async (data, contex
     if (freshTicketSnap.exists) {
       const freshTicket = freshTicketSnap.data() || {};
       if (freshTicket.status === "matched" && freshTicket.matchId) {
-        const freshBattleSnap = await transaction.get(db.collection("quizBattles").doc(freshTicket.matchId));
-        if (freshBattleSnap.exists) {
-          const freshBattle = freshBattleSnap.data() || {};
+        const freshRefs = getQuizBattleRefs(db, freshTicket.matchId);
+        const [freshStateSnap, freshBattleSnap] = await Promise.all([
+          transaction.get(freshRefs.stateRef),
+          transaction.get(freshRefs.battleRef),
+        ]);
+        const freshBattle = freshStateSnap.exists
+          ? (freshStateSnap.data() || {})
+          : (freshBattleSnap.exists ? (freshBattleSnap.data() || {}) : null);
+        if (freshBattle) {
           // 배틀이 여전히 진행 중이고 stale(타이머 만료/포기)가 아니면 재입장시킨다.
           // finished이거나 stale이면 아래로 흘러 티켓을 새 waiting으로 덮어쓴다.
           const endedByTimer = Number(freshBattle.endsAtMs || 0) > 0 && nowMs >= Number(freshBattle.endsAtMs || 0);
@@ -3008,13 +3240,15 @@ exports.startAIQuizBattle = regionalFunctions.https.onCall(async (data, context)
     { battleScope, unitId: entryUnitId }
   );
   const battleRef = db.collection("quizBattles").doc();
+  const battleRefs = getQuizBattleRefs(db, battleRef.id);
   const aiSecretRef = db.collection("quizBattleAISecrets").doc(battleRef.id);
   const aiUid = `ai_${battleRef.id}`;
   const entryUnitTitle = contextData.units.find((unit) => unit.id === entryUnitId)?.title || "";
   const participantUids = [uid, aiUid];
+  const aiAnswerPlan = buildQuizBattleAIAnswerPlan(userData, questionSet.length);
 
   const createBatch = db.batch();
-  createBatch.set(battleRef, {
+  setSplitQuizBattleDocuments(createBatch, battleRefs, {
     status: "active",
     isAI: true,
     aiParticipantUid: aiUid,
@@ -3067,7 +3301,11 @@ exports.startAIQuizBattle = regionalFunctions.https.onCall(async (data, context)
   createBatch.set(aiSecretRef, {
     battleId: battleRef.id,
     userUid: uid,
-    userFavored: Math.random() < 0.7,
+    planVersion: aiAnswerPlan.version,
+    aiFavoredProfile: aiAnswerPlan.aiFavoredProfile,
+    estimatedUserAccuracy: aiAnswerPlan.estimatedUserAccuracy,
+    targetCorrectCount: aiAnswerPlan.targetCorrectCount,
+    answerPlan: aiAnswerPlan.answerPlan,
     createdAt: FieldValue.serverTimestamp(),
     ttlAt: Timestamp.fromMillis(nowMs + (7 * 24 * 60 * 60 * 1000)),
   });
@@ -3084,7 +3322,14 @@ exports.advanceAIQuizBattle = regionalFunctions.https.onCall(async (data, contex
   }
 
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const splitRefs = getQuizBattleRefs(db, battleId);
+  // 신규 클라이언트는 공개 문제 문서의 schemaVersion을 함께 보내므로 별도의
+  // 사전 존재 확인 read 없이 곧바로 작은 상태/채점 문서 트랜잭션으로 진입한다.
+  // 구형 클라이언트와 이미 진행 중인 레거시 배틀만 호환 탐색을 수행한다.
+  const runtimeTarget = Number(data?.schemaVersion || 0) >= QUIZ_BATTLE_SCHEMA_VERSION
+    ? { ...splitRefs, runtimeRef: splitRefs.stateRef, isSplit: true }
+    : await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.runtimeRef;
   const aiSecretRef = db.collection("quizBattleAISecrets").doc(battleId);
   const nowMs = Date.now();
   let shouldFinalize = false;
@@ -3110,45 +3355,42 @@ exports.advanceAIQuizBattle = regionalFunctions.https.onCall(async (data, contex
     const myParticipant = battleData.participants?.[uid] || {};
     const totalQuestions = Number(battleData.questionCount || battleData.questionSet?.length || 0);
     const myAnswered = Math.min(totalQuestions, Number(myParticipant.answeredCount || 0));
-    const myCorrect = Math.min(myAnswered, Number(myParticipant.correctCount || 0));
     const currentAIAnswered = Math.min(totalQuestions, Number(aiParticipant.answeredCount || 0));
-    let nextAIAnswered = Math.max(currentAIAnswered, Math.min(myAnswered, currentAIAnswered + 1));
+    const canAdvance = currentAIAnswered < totalQuestions && currentAIAnswered < myAnswered;
+    const nextAIAnswered = canAdvance ? currentAIAnswered + 1 : currentAIAnswered;
     let nextAICorrect = Math.min(nextAIAnswered, Number(aiParticipant.correctCount || 0));
 
-    if (myAnswered >= totalQuestions) {
-      nextAIAnswered = totalQuestions;
-      const minimumAICorrect = Math.ceil(totalQuestions * 0.5);
-      const tunedAICorrect = aiSecret.userFavored === true
-        ? Math.max(0, myCorrect - 1)
-        : Math.min(totalQuestions, myCorrect + 1);
-      nextAICorrect = Math.min(totalQuestions, Math.max(minimumAICorrect, tunedAICorrect));
-    } else if (nextAIAnswered > currentAIAnswered) {
-      const stepIsCorrect = ((nextAIAnswered + battleId.length) % 5) < 3;
+    if (canAdvance) {
+      const storedPlan = Array.isArray(aiSecret.answerPlan) ? aiSecret.answerPlan : [];
+      // 배포 시점에 이미 진행 중이던 구형 배틀은 기존의 문항별 패턴만 사용하고,
+      // 마지막 점수 보정은 적용하지 않는다.
+      const stepIsCorrect = storedPlan.length >= totalQuestions
+        ? storedPlan[currentAIAnswered] === true
+        : ((nextAIAnswered + battleId.length) % 5) < 3;
       nextAICorrect = Math.min(nextAIAnswered, Number(aiParticipant.correctCount || 0) + (stepIsCorrect ? 1 : 0));
+      transaction.update(battleRef, {
+        [`participants.${aiUid}.answeredCount`]: nextAIAnswered,
+        [`participants.${aiUid}.correctCount`]: nextAICorrect,
+        [`participants.${aiUid}.score`]: nextAICorrect * 100,
+        [`participants.${aiUid}.lastAnsweredAtMs`]: nowMs,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     }
-
-    const aiLastAnsweredAtMs = myAnswered >= totalQuestions && aiSecret.userFavored !== true
-      ? Math.max(1, Number(myParticipant.lastAnsweredAtMs || nowMs) - 1)
-      : nowMs;
-
-    transaction.update(battleRef, {
-      [`participants.${aiUid}.answeredCount`]: nextAIAnswered,
-      [`participants.${aiUid}.correctCount`]: nextAICorrect,
-      [`participants.${aiUid}.score`]: nextAICorrect * 100,
-      [`participants.${aiUid}.lastAnsweredAtMs`]: aiLastAnsweredAtMs,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
     shouldFinalize = myAnswered >= totalQuestions && nextAIAnswered >= totalQuestions;
     aiProgress = { answeredCount: nextAIAnswered, correctCount: nextAICorrect, score: nextAICorrect * 100 };
   });
 
   if (shouldFinalize) {
-    await finalizeQuizBattleInternal(battleId, "completed");
+    if (runtimeTarget.isSplit) {
+      await markQuizBattleResolving(battleRef, "completed");
+    } else {
+      await finalizeQuizBattleInternal(battleId, "completed");
+    }
   }
   return { success: true, finalized: shouldFinalize, ai: aiProgress };
 });
 
-exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context) => {
+exports.submitBattleAnswer = quizBattleHotFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const battleId = cleanId(data?.battleId);
   const questionId = cleanId(data?.questionId);
@@ -3161,16 +3403,20 @@ exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context
   }
 
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const splitRefs = getQuizBattleRefs(db, battleId);
+  const runtimeTarget = Number(data?.schemaVersion || 0) >= QUIZ_BATTLE_SCHEMA_VERSION
+    ? { ...splitRefs, runtimeRef: splitRefs.stateRef, isSplit: true }
+    : await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.battleRef;
+  const runtimeRef = runtimeTarget.runtimeRef;
   const answerRef = battleRef.collection("answers").doc(`${uid}_${questionId}`);
   const nowMs = Date.now();
   let answerResult = null;
 
   await db.runTransaction(async (transaction) => {
-    const [battleSnap, answerSnap] = await Promise.all([
-      transaction.get(battleRef),
-      transaction.get(answerRef),
-    ]);
+    const reads = [transaction.get(runtimeRef), transaction.get(answerRef)];
+    if (runtimeTarget.isSplit) reads.push(transaction.get(runtimeTarget.gradingRef));
+    const [battleSnap, answerSnap, gradingSnap] = await Promise.all(reads);
 
     if (!battleSnap.exists) {
       throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
@@ -3194,12 +3440,15 @@ exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context
       throw new functions.https.HttpsError("deadline-exceeded", "배틀 제한 시간이 종료되었습니다.");
     }
     const questionSet = Array.isArray(battleData.questionSet) ? battleData.questionSet : [];
-    const questionMeta = questionSet.find((question) => question.questionId === questionId);
+    const questionMeta = runtimeTarget.isSplit
+      ? gradingSnap?.data()?.questions?.[questionId]
+      : questionSet.find((question) => question.questionId === questionId);
     if (!questionMeta) {
       throw new functions.https.HttpsError("failed-precondition", "이 배틀의 문제가 아닙니다.");
     }
 
-    // 채점은 battle 문서에 저장된 correctKeys를 사용한다. 별도의 quizzes 읽기가 필요 없다.
+    // 신규 배틀은 클라이언트가 읽을 수 없는 전용 키 문서에서만 채점한다.
+    // 배포 전 시작된 구형 배틀은 기존 battle.questionSet의 키를 사용한다.
     const correctKeys = Array.isArray(questionMeta.correctKeys) ? questionMeta.correctKeys : [];
     const selectedSet = new Set(selectedOptionKeys);
     const isCorrect = selectedSet.size === correctKeys.length && correctKeys.every((key) => selectedSet.has(key));
@@ -3220,7 +3469,7 @@ exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context
       submittedAt: FieldValue.serverTimestamp(),
       submittedAtMs: nowMs,
     });
-    transaction.update(battleRef, {
+    transaction.update(runtimeRef, {
       [`participants.${uid}.answeredCount`]: nextAnsweredCount,
       [`participants.${uid}.correctCount`]: nextCorrectCount,
       [`participants.${uid}.score`]: nextScore,
@@ -3245,14 +3494,19 @@ exports.submitBattleAnswer = regionalFunctions.https.onCall(async (data, context
   });
 
   if (answerResult?.shouldFinalize) {
-    // 답안 응답을 막지 않도록 정산은 비동기로 처리한다.
-    // 결과는 battle 문서의 onSnapshot이 status==='finished'로 반영하므로
-    // 클라이언트가 이 호출의 결과를 기다릴 필요가 없다.
-    // finalizeQuizBattleInternal은 멱등이며 finalizeQuizBattle callable이
-    // fallback으로 존재하므로, 드물게 실패해도 복구 가능하다.
-    finalizeQuizBattleInternal(battleId, "completed").catch((err) => {
+    // 신규 배틀은 승패만 작은 상태 문서에 먼저 확정하고 즉시 응답한다. 이어지는
+    // 금전/전적 정산은 resolving 상태 트리거가 책임지므로 런타임 종료에도 유실되지
+    // 않는다. 레거시 단일 문서 배틀만 기존 동기 정산 경로를 유지한다.
+    try {
+      if (runtimeTarget.isSplit) {
+        await markQuizBattleResolving(runtimeRef, "completed");
+      } else {
+        await finalizeQuizBattleInternal(battleId, "completed");
+      }
+    } catch (err) {
       console.error("Battle finalize after answer failed", err);
-    });
+      answerResult.settlementPending = true;
+    }
   }
 
   return answerResult;
@@ -3269,7 +3523,8 @@ exports.reportQuizBattleIntegrityEvent = regionalFunctions.https.onCall(async (d
   }
 
   const db = admin.firestore();
-  const battleRef = db.collection("quizBattles").doc(battleId);
+  const runtimeTarget = await getQuizBattleRuntimeTarget(db, battleId);
+  const battleRef = runtimeTarget.runtimeRef;
   const nowMs = Date.now();
   let violationCount = 0;
   let forfeited = false;
@@ -3321,7 +3576,8 @@ exports.finalizeQuizBattle = regionalFunctions.https.onCall(async (data, context
     throw new functions.https.HttpsError("invalid-argument", "배틀 정보가 올바르지 않습니다.");
   }
 
-  const battleSnap = await admin.firestore().collection("quizBattles").doc(battleId).get();
+  const runtimeTarget = await getQuizBattleRuntimeTarget(admin.firestore(), battleId);
+  const battleSnap = runtimeTarget.runtimeSnap;
   if (!battleSnap.exists) {
     throw new functions.https.HttpsError("not-found", "배틀을 찾을 수 없습니다.");
   }
@@ -3354,22 +3610,62 @@ exports.forfeitQuizBattle = regionalFunctions.https.onCall(async (data, context)
   return forfeitQuizBattleForUid(battleId, uid);
 });
 
+// 승패 공개(resolving)와 무거운 광석/전적 정산을 실행 단위까지 분리한다.
+// Firestore 이벤트가 정산을 재시도하므로 답안 callable은 빠르게 반환할 수 있다.
+exports.settleResolvingQuizBattle = regionalFunctions.firestore
+  .document("quizBattleStates/{battleId}")
+  .onUpdate(async (change, context) => {
+    const beforeStatus = change.before.data()?.status || "";
+    const afterStatus = change.after.data()?.status || "";
+    if (beforeStatus === "resolving" || afterStatus !== "resolving") return null;
+    try {
+      await finalizeQuizBattleInternal(context.params.battleId, change.after.data()?.resolvingReason || "completed");
+    } catch (err) {
+      console.error("Resolving quiz battle settlement failed", context.params.battleId, err);
+      throw err;
+    }
+    return null;
+  });
+
+async function getQuizBattleSweepDocs(db, { status, rangeField = "", upperBound = 0, nullField = "" }) {
+  const snapshots = await Promise.all(["quizBattleStates", "quizBattles"].map(async (collectionName) => {
+    let query = db.collection(collectionName).where("status", "==", status);
+    if (rangeField) {
+      query = query.where(rangeField, "<=", upperBound).orderBy(rangeField, "asc");
+    }
+    if (nullField) query = query.where(nullField, "==", null);
+    return query.limit(100).get();
+  }));
+  const byId = new Map();
+  snapshots.forEach((snapshot) => snapshot.docs.forEach((docSnap) => byId.set(docSnap.id, docSnap)));
+  return Array.from(byId.values());
+}
+
 exports.sweepExpiredQuizBattles = regionalFunctions.pubsub
   .schedule("every 1 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
     const nowMs = Date.now();
-    const snap = await db.collection("quizBattles")
-      .where("status", "==", "active")
-      .where("endsAtMs", "<=", nowMs)
-      .orderBy("endsAtMs", "asc")
-      .limit(100)
-      .get();
+    const [expiredDocs, unresolvedDocs] = await Promise.all([
+      getQuizBattleSweepDocs(db, {
+        status: "active",
+        rangeField: "endsAtMs",
+        upperBound: nowMs,
+      }),
+      getQuizBattleSweepDocs(db, {
+        status: "resolving",
+        rangeField: "resolvedAtMs",
+        upperBound: nowMs - 5000,
+      }),
+    ]);
+    const docs = Array.from(new Map(
+      [...expiredDocs, ...unresolvedDocs].map((docSnap) => [docSnap.id, docSnap])
+    ).values());
 
-    if (snap.empty) return null;
+    if (docs.length === 0) return null;
 
-    await Promise.all(snap.docs.map(async (docSnap) => {
+    await Promise.all(docs.map(async (docSnap) => {
       try {
         await finalizeQuizBattleInternal(docSnap.id, "timeout");
       } catch (err) {
@@ -3386,16 +3682,15 @@ exports.sweepUnconfirmedQuizBattles = regionalFunctions.pubsub
   .onRun(async () => {
     const db = admin.firestore();
     const nowMs = Date.now();
-    const snap = await db.collection("quizBattles")
-      .where("status", "==", "starting")
-      .where("entryConfirmDeadlineMs", "<=", nowMs)
-      .orderBy("entryConfirmDeadlineMs", "asc")
-      .limit(100)
-      .get();
+    const docs = await getQuizBattleSweepDocs(db, {
+      status: "starting",
+      rangeField: "entryConfirmDeadlineMs",
+      upperBound: nowMs,
+    });
 
-    if (snap.empty) return null;
+    if (docs.length === 0) return null;
 
-    await Promise.all(snap.docs.map(async (docSnap) => {
+    await Promise.all(docs.map(async (docSnap) => {
       try {
         await cancelStartingQuizBattleInternal(docSnap.id, "entry_confirm_timeout");
       } catch (err) {
@@ -3411,15 +3706,14 @@ exports.sweepUnsyncedQuizBattleWrongAnswers = regionalFunctions.pubsub
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
-    const snap = await db.collection("quizBattles")
-      .where("status", "==", "finished")
-      .where("wrongAnswersSyncedAt", "==", null)
-      .limit(100)
-      .get();
+    const docs = await getQuizBattleSweepDocs(db, {
+      status: "finished",
+      nullField: "wrongAnswersSyncedAt",
+    });
 
-    if (snap.empty) return null;
+    if (docs.length === 0) return null;
 
-    await Promise.all(snap.docs.map(async (docSnap) => {
+    await Promise.all(docs.map(async (docSnap) => {
       try {
         await syncBattleWrongAnswersIfNeeded(docSnap.id, "sweep");
       } catch (err) {
@@ -3436,15 +3730,14 @@ exports.sweepUnsyncedQuizBattleStats = regionalFunctions.pubsub
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
-    const snap = await db.collection("quizBattles")
-      .where("status", "==", "finished")
-      .where("battleStatsSyncedAt", "==", null)
-      .limit(100)
-      .get();
+    const docs = await getQuizBattleSweepDocs(db, {
+      status: "finished",
+      nullField: "battleStatsSyncedAt",
+    });
 
-    if (snap.empty) return null;
+    if (docs.length === 0) return null;
 
-    await Promise.all(snap.docs.map(async (docSnap) => {
+    await Promise.all(docs.map(async (docSnap) => {
       try {
         await syncBattleStatsIfNeeded(docSnap.id, "sweep");
       } catch (err) {
@@ -7456,9 +7749,8 @@ async function reconcileCrewGrowthEvent(crewId, { allowReward = false } = {}) {
 
 async function recordCrewGuestBattleActivity(battleId) {
   const db = admin.firestore();
-  const battleSnap = await db.collection("quizBattles").doc(battleId).get();
-  if (!battleSnap.exists || battleSnap.data()?.status !== "finished" || battleSnap.data()?.isAI === true) return;
-  const battle = battleSnap.data() || {};
+  const battle = await getMergedQuizBattle(db, battleId);
+  if (!battle || battle.status !== "finished" || battle.isAI === true) return;
   const guestUids = (battle.participantUids || []).filter((uid) => battle.participants?.[uid]?.isGuest === true);
   await Promise.all(guestUids.map(async (uid) => {
     const participant = battle.participants?.[uid] || {};

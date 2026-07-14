@@ -62,6 +62,8 @@ export default function QuizBattleView({
   const [ticketId, setTicketId] = useState('')
   const [battleId, setBattleId] = useState('')
   const [battle, setBattle] = useState(null)
+  const [battleContent, setBattleContent] = useState(null)
+  const [battleRuntime, setBattleRuntime] = useState(null)
   const [selectedKeys, setSelectedKeys] = useState(new Set())
   const [answerResults, setAnswerResults] = useState({})
   const [battleStats, setBattleStats] = useState(null)
@@ -95,6 +97,7 @@ export default function QuizBattleView({
   const confirmedBattleEntryRef = useRef('')
   const entryConfirmTimeoutRef = useRef('')
   const aiAdvanceTimerRef = useRef(null)
+  const aiAdvanceInFlightRef = useRef(false)
   const lastIntegrityReportRef = useRef(0)
   const resultLockedRef = useRef(false)
   const outgoingChallengeRef = useRef(null)
@@ -361,7 +364,10 @@ export default function QuizBattleView({
         // stale 방어: 티켓이 종료된 과거 배틀을 가리키면 무시하고 대기를 유지한다.
         // 서버가 티켓을 갱신하기 전 순간에 과거 matched 상태를 잡는 레이스를 막는다.
         try {
-          const battleSnap = await getDoc(doc(db, 'quizBattles', data.matchId))
+          const stateSnap = await getDoc(doc(db, 'quizBattleStates', data.matchId))
+          const battleSnap = stateSnap.exists()
+            ? stateSnap
+            : await getDoc(doc(db, 'quizBattles', data.matchId))
           if (battleSnap.exists() && battleSnap.data()?.status === 'finished') return
         } catch (err) {
           console.warn('Failed to verify matched battle status', err)
@@ -391,22 +397,19 @@ export default function QuizBattleView({
 
   useEffect(() => {
     resultLockedRef.current = false
+    setBattleContent(null)
+    setBattleRuntime(null)
   }, [battleId])
 
   useEffect(() => {
     if (!battleId) return undefined
-    const unsubscribe = onSnapshot(doc(db, 'quizBattles', battleId), (snap) => {
+    const unsubscribeContent = onSnapshot(doc(db, 'quizBattles', battleId), (snap) => {
       if (!snap.exists()) {
         if (resultLockedRef.current) return
         setError('배틀 정보를 찾을 수 없습니다.')
         return
       }
       const raw = snap.data() || {}
-      // 결과 화면은 사용자가 버튼을 누르기 전까지 고정한다. 정산 후 파생 통계가
-      // 동기화되는 동안 늦게 도착한 비종료 스냅샷이 결과를 덮지 못하게 한다.
-      if (resultLockedRef.current && raw.status !== 'finished') return
-      // questionSet에 서버 채점용 correctKeys가 포함되어 있을 수 있다.
-      // 클라이언트에는 노출하지 않도록 정제한다.
       const sanitized = {
         ...raw,
         questionSet: Array.isArray(raw.questionSet)
@@ -417,18 +420,38 @@ export default function QuizBattleView({
           })
           : raw.questionSet,
       }
-      setBattle({ id: snap.id, ...sanitized })
-      if (raw.status === 'finished') {
-        resultLockedRef.current = true
-        setPhase('result')
-      } else {
-        setPhase(raw.status === 'cancelled' ? 'cancelled' : 'active')
-      }
+      setBattleContent({ id: snap.id, ...sanitized })
     }, (err) => {
-      setError(err?.message || '배틀 정보를 수신하지 못했습니다.')
+      setError(err?.message || '배틀 문제를 수신하지 못했습니다.')
     })
-    return () => unsubscribe()
+    const unsubscribeRuntime = onSnapshot(doc(db, 'quizBattleStates', battleId), (snap) => {
+      setBattleRuntime(snap.exists() ? { id: snap.id, ...snap.data() } : null)
+    }, (err) => {
+      setError(err?.message || '배틀 진행 상태를 수신하지 못했습니다.')
+    })
+    return () => {
+      unsubscribeContent()
+      unsubscribeRuntime()
+    }
   }, [battleId])
+
+  useEffect(() => {
+    if (!battleContent) return
+    const merged = battleRuntime
+      ? { ...battleContent, ...battleRuntime, questionSet: battleContent.questionSet || [] }
+      : battleContent
+    if (!merged.status) return
+    // 기존 진행 중 배틀은 공개 문서 하나만 사용하고, 신규 배틀은 작은 상태
+    // 문서를 병합한다. 결과에 도달한 뒤에는 파생 동기화 스냅샷이 화면을 되돌리지 못한다.
+    if (resultLockedRef.current && !['resolving', 'finished'].includes(merged.status)) return
+    setBattle(merged)
+    if (['resolving', 'finished'].includes(merged.status)) {
+      resultLockedRef.current = true
+      setPhase('result')
+    } else {
+      setPhase(merged.status === 'cancelled' ? 'cancelled' : 'active')
+    }
+  }, [battleContent, battleRuntime])
 
   // 배틀 진행 상태를 users/{uid}.liveStatus.battle 서브맵에 기록한다.
   // usePresence가 currentLocation/lastUpdatedAt을 주기적으로 덮어써도 battle 맵은
@@ -539,15 +562,49 @@ export default function QuizBattleView({
   // 정답 공개 단계에서는 직전에 푼 문제를 보여줘야 하므로 별도 계산.
   const revealedIndex = Math.max(0, currentIndex - 1)
   const revealedQuestion = questionSet[revealedIndex]
-  const isBattleFinished = battle?.status === 'finished'
+  const isBattleSettled = battle?.status === 'finished'
+  const isBattleFinished = ['resolving', 'finished'].includes(battle?.status)
   const isBattleStarting = battle?.status === 'starting'
   const isBattleCancelled = battle?.status === 'cancelled'
   const isBattleCompleteForMe = questionSet.length > 0 && answeredCount >= questionSet.length
   const isOpponentComplete = questionSet.length > 0 && Number(opponentParticipant.answeredCount || 0) >= questionSet.length
   const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
+  const aiAnsweredCount = Number(opponentParticipant.answeredCount || 0)
 
   useEffect(() => {
-    if (!isBattleFinished) {
+    if (
+      !battleId
+      || battle?.isAI !== true
+      || battle?.status !== 'active'
+      || questionSet.length === 0
+      || aiAnsweredCount >= answeredCount
+    ) return undefined
+
+    // 이용자가 빠르게 다음 문제로 넘어가도 기존 AI 진행을 버리지 않는다.
+    // 스냅샷의 격차를 기준으로 NOVA가 사전 계획된 답을 한 문항씩 따라온다.
+    const userFinished = answeredCount >= questionSet.length
+    const delay = (userFinished ? 1100 : 650) + Math.floor(Math.random() * 700)
+    aiAdvanceTimerRef.current = window.setTimeout(async () => {
+      if (aiAdvanceInFlightRef.current) return
+      aiAdvanceInFlightRef.current = true
+      try {
+        const advanceAI = httpsCallable(functions, 'advanceAIQuizBattle')
+        await advanceAI({ battleId, schemaVersion: Number(battle?.schemaVersion || 0) })
+      } catch (err) {
+        console.warn('AI progress update failed', err)
+      } finally {
+        aiAdvanceInFlightRef.current = false
+      }
+    }, delay)
+
+    return () => {
+      if (aiAdvanceTimerRef.current) window.clearTimeout(aiAdvanceTimerRef.current)
+      aiAdvanceTimerRef.current = null
+    }
+  }, [aiAnsweredCount, answeredCount, battle?.isAI, battle?.schemaVersion, battle?.status, battleId, questionSet.length])
+
+  useEffect(() => {
+    if (!isBattleSettled) {
       setResultDismissEnabled(false)
       return undefined
     }
@@ -558,7 +615,7 @@ export default function QuizBattleView({
     setResultDismissEnabled(false)
     const timer = window.setTimeout(() => setResultDismissEnabled(true), 1600)
     return () => window.clearTimeout(timer)
-  }, [battleId, isBattleFinished])
+  }, [battleId, isBattleSettled])
 
   useEffect(() => {
     if (!battleId || battle?.status !== 'active' || isBattleFinished) return undefined
@@ -695,6 +752,7 @@ export default function QuizBattleView({
       const submit = httpsCallable(functions, 'submitBattleAnswer')
       const res = await submit({
         battleId,
+        schemaVersion: Number(battle?.schemaVersion || 0),
         questionId: currentQuestion.questionId,
         selectedOptionKeys: Array.from(selectedKeys),
       })
@@ -710,16 +768,12 @@ export default function QuizBattleView({
       setSelectedKeys(new Set())
       // 정답 공개 단계로 전환해 사용자가 결과와 정답을 충분히 확인하게 한다.
       setReveal(true)
-      if (data.isCorrect) soundManager.playCorrect(BATTLE_FEEDBACK_VOLUME_MULTIPLIER)
-      else soundManager.playWrong(BATTLE_FEEDBACK_VOLUME_MULTIPLIER)
-      if (battle?.isAI === true) {
-        if (aiAdvanceTimerRef.current) clearTimeout(aiAdvanceTimerRef.current)
-        const isLastAnswer = Number(data.answeredCount || 0) >= Number(battle.questionCount || QUESTION_COUNT)
-        aiAdvanceTimerRef.current = setTimeout(() => {
-          const advanceAI = httpsCallable(functions, 'advanceAIQuizBattle')
-          advanceAI({ battleId }).catch((err) => console.warn('AI progress update failed', err))
-        }, (isLastAnswer ? 2400 : 900) + Math.floor(Math.random() * 1700))
-      }
+      // React가 채점 결과를 먼저 그린 뒤 효과음을 재생한다. 오디오 디코딩/재생이
+      // 느린 기기에서도 결과 표시가 소리에 막히지 않는다.
+      window.requestAnimationFrame(() => {
+        if (data.isCorrect) soundManager.playCorrect(BATTLE_FEEDBACK_VOLUME_MULTIPLIER)
+        else soundManager.playWrong(BATTLE_FEEDBACK_VOLUME_MULTIPLIER)
+      })
     } catch (err) {
       setError(err?.message || '답안을 제출하지 못했습니다.')
     } finally {
@@ -1469,7 +1523,7 @@ export default function QuizBattleView({
             </div>
           </div>
           <div style={{ color: 'var(--crystal-cyan)', fontSize: '1.25rem', fontWeight: 900, marginBottom: '1.5rem' }}>
-            +{resultSummary?.reward || 0} 광석
+            {isBattleSettled ? `+${resultSummary?.reward || 0} 광석` : '광석·전적 정산 중…'}
           </div>
           {battle?.isAI === true && (
             <div className="font-tech" style={{ color: 'var(--text-muted)', margin: '-0.8rem 0 1.5rem', lineHeight: 1.6 }}>
@@ -1683,7 +1737,7 @@ export default function QuizBattleView({
               </button>
             ) : (
               <button className="hud-btn primary glass" onClick={submitAnswer} disabled={selectedKeys.size === 0 || isSubmitting} style={{ padding: '0.8rem 1.2rem' }}>
-                {isSubmitting ? '전송 중...' : '답안 제출'}
+                {isSubmitting ? '채점 중…' : '답안 제출'}
               </button>
             )}
           </div>

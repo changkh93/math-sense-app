@@ -183,6 +183,54 @@
       ]
     },
     {
+      "collectionGroup": "quizBattles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "resolvedAtMs", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "quizBattleStates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "endsAtMs", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "quizBattleStates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "entryConfirmDeadlineMs", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "quizBattleStates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "wrongAnswersSyncedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "quizBattleStates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "battleStatsSyncedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "quizBattleStates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "resolvedAtMs", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "history",
       "queryScope": "COLLECTION",
       "fields": [
