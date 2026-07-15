@@ -6,6 +6,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { compressImage } from '../../utils/storageUtils';
 import { Plus, Trash2, Save, X, Image as ImageIcon, Check, Edit3, ArrowLeft } from 'lucide-react';
 import { auditQuizOptionLengths } from '../../utils/quizOptionLengthAudit';
+import { auditQuizOptionStyle } from '../../utils/quizOptionStyleAudit';
 
 const QuizEditor = () => {
   const { unitId } = useParams();
@@ -26,6 +27,9 @@ const QuizEditor = () => {
   const optionLengthAudit = editingQuiz
     ? auditQuizOptionLengths(editingQuiz.options)
     : null;
+  const optionStyleAudit = editingQuiz
+    ? auditQuizOptionStyle(editingQuiz.options)
+    : null;
 
   const handleEdit = (quiz) => setEditingQuiz(quiz);
   const handleAddNew = () => setEditingQuiz({
@@ -44,6 +48,13 @@ const QuizEditor = () => {
     const correctCount = editingQuiz.options.filter(o => o.isCorrect).length;
     if (correctCount === 0) {
       alert('정답을 최소 1개 이상 선택해주세요.');
+      return;
+    }
+    if (optionStyleAudit?.suspicious) {
+      alert(
+        '선택지에 정답 단서가 되는 반복 문구가 포함되어 있습니다.\n' +
+        '“작품의 맥락에서”, “해당 장면의 구체적인 단서”, “~라는 설명” 같은 표현을 지우고 핵심 답안만 자연스럽게 작성해주세요.'
+      );
       return;
     }
     if (optionLengthAudit?.suspicious) {
@@ -308,6 +319,24 @@ const QuizEditor = () => {
               >
                 선택지 길이 단서 경고: 정답 {optionLengthAudit.correctLength}자 / 오답 최대 {optionLengthAudit.longestIncorrectLength}자입니다.
                 정답을 간결하게 줄이거나 오답도 같은 수준의 구체성으로 작성하세요.
+              </div>
+            )}
+            {optionStyleAudit?.suspicious && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: '0.75rem',
+                  padding: '0.75rem 0.9rem',
+                  border: '1px solid rgba(248, 113, 113, 0.6)',
+                  borderRadius: '8px',
+                  background: 'rgba(248, 113, 113, 0.08)',
+                  color: '#fca5a5',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.5
+                }}
+              >
+                선택지 문체 단서 경고: “작품의 맥락에서”, “해당 장면의 구체적인 단서”, “~라는 설명”처럼
+                오답에만 반복되는 메타 문구는 저장할 수 없습니다. 핵심 내용만 자연스럽고 평행한 형식으로 작성하세요.
               </div>
             )}
           </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
-import { db, auth, functions } from '../../firebase';
+import { ACCOUNT_DELETION_CALL_TIMEOUT_MS, db, auth, functions } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import { useAdminUserAllAssignments, useAdminUserAllAttendance, useStudentAssignmentWarnings } from '../../hooks/useAssignments';
@@ -859,7 +859,9 @@ export default function ParentDashboard() {
     window.sessionStorage.setItem('accountDeletionInProgress', currentUser.uid);
 
     try {
-      const deleteAccount = httpsCallable(functions, 'deleteCurrentUserAccount');
+      const deleteAccount = httpsCallable(functions, 'deleteCurrentUserAccount', {
+        timeout: ACCOUNT_DELETION_CALL_TIMEOUT_MS
+      });
       await deleteAccount({ confirmText });
       try {
         await signOut(auth);

@@ -4,6 +4,7 @@ import { X, Copy, Check, FileJson, Sparkles, Loader2 } from 'lucide-react';
 import { useAdminMutations } from '../../hooks/useContent'; 
 import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { auditQuizOptionStyle } from '../../utils/quizOptionStyleAudit';
 
 const PROMPT_TEMPLATE = `
 첨부한 파일의 문제와 옵션을 수정하지 말고, 그대로 퀴즈 포맷으로 변환해 주세요. 
@@ -48,6 +49,7 @@ IV. [중요: 선택지 길이와 구체성 균형]
 2. 정답이 긴 설명문이면 오답도 같은 수준의 완결된 설명문으로 작성하고, 핵심 용어만 묻는 문제라면 정답을 포함한 모든 보기를 짧은 용어로 통일하세요.
 3. 각 보기의 글자 수는 정답 글자 수의 대략 65~125% 범위로 맞추고, 적어도 하나의 오답은 정답과 같거나 조금 더 길게 작성하세요.
 4. 길이만 늘리기 위한 군더더기, 정답의 동의어·부분 정답, 터무니없는 오답은 금지합니다.
+5. “작품의 맥락에서”, “해당 장면의 구체적인 단서”, “작품 전체의 인물·사건 흐름을 기준으로”, “~라는 설명”처럼 정오 판단 과정 자체를 말하는 메타 문구를 선택지에 쓰지 마세요. 각 보기는 질문에 바로 답하는 자연스러운 문장 또는 명사구여야 합니다.
 
 결과는 반드시 아래의 JSON 형식을 엄격히 따라주세요:
 
@@ -110,6 +112,18 @@ export default function AiQuizImportModal({ isOpen, onClose, unitId }) {
 
       if (!Array.isArray(data.questions)) {
         throw new Error('JSON structure must contain "questions" array.');
+      }
+
+      const styleIssues = data.questions.flatMap((question, questionIndex) => {
+        const audit = auditQuizOptionStyle(question.options);
+        return audit.matches.map((match) => ({ questionIndex, ...match }));
+      });
+      if (styleIssues.length) {
+        const questionNumbers = [...new Set(styleIssues.map((issue) => issue.questionIndex + 1))].slice(0, 10);
+        throw new Error(
+          `정답 단서가 되는 반복 문구가 포함된 문제가 있습니다: ${questionNumbers.join(', ')}번. ` +
+          '“작품의 맥락에서”, “해당 장면의 구체적인 단서”, “~라는 설명” 같은 표현을 제거해주세요.'
+        );
       }
 
       setParsedData(data);

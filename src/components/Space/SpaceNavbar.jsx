@@ -4,7 +4,7 @@ import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc } from 'firebase/firestore';
 import { Bell, ExternalLink, MessageCircle, Video } from 'lucide-react';
-import { auth, db, functions } from '../../firebase';
+import { ACCOUNT_DELETION_CALL_TIMEOUT_MS, auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
@@ -156,7 +156,9 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     window.sessionStorage.setItem('accountDeletionInProgress', user.uid);
 
     try {
-      const deleteAccount = httpsCallable(functions, 'deleteCurrentUserAccount');
+      const deleteAccount = httpsCallable(functions, 'deleteCurrentUserAccount', {
+        timeout: ACCOUNT_DELETION_CALL_TIMEOUT_MS
+      });
       await deleteAccount({ confirmText });
       try {
         await signOut(auth);

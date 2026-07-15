@@ -15,6 +15,7 @@ const firebaseConfig = {
 };
 
 export const FUNCTIONS_REGION = "asia-northeast3";
+export const ACCOUNT_DELETION_CALL_TIMEOUT_MS = 10 * 60 * 1000;
 
 const app = initializeApp(firebaseConfig);
 const shouldUseFunctionsEmulator =

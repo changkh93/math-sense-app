@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, query, where, getDocs, getDoc, doc, updateDoc, limit } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { auth, db, functions } from '../../firebase';
+import { ACCOUNT_DELETION_CALL_TIMEOUT_MS, auth, db, functions } from '../../firebase';
 import { useClusters } from '../../hooks/useContent';
 import { AlertTriangle, Search, Trash2, User as UserIcon } from 'lucide-react';
 import { STUDENT_GRADE_OPTIONS, getGradeLabel, normalizeGradeValue } from '../../utils/monthlyEvaluationAwards';
@@ -314,7 +314,9 @@ function UserAccessManager() {
 
     setDeletingUid(targetUser.uid);
     try {
-      const deleteUserAccount = httpsCallable(functions, 'adminDeleteUserAccount');
+      const deleteUserAccount = httpsCallable(functions, 'adminDeleteUserAccount', {
+        timeout: ACCOUNT_DELETION_CALL_TIMEOUT_MS
+      });
       const result = await deleteUserAccount({
         targetUid: targetUser.uid,
         confirmText
