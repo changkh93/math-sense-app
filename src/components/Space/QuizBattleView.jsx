@@ -82,6 +82,7 @@ export default function QuizBattleView({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
+  const [isUpdatingReception, setIsUpdatingReception] = useState(false)
   const [error, setError] = useState('')
   const [integrityNotice, setIntegrityNotice] = useState('')
   const [resultDismissEnabled, setResultDismissEnabled] = useState(false)
@@ -103,6 +104,8 @@ export default function QuizBattleView({
   const isAIMode = opponentMode === 'ai'
   const isScopeLocked = Boolean(rangeLabel)
   const aiTrainingData = useMemo(() => calculateBattleData(userData || {}), [userData])
+  const challengeMutedUntilMs = Number(userData?.quizBattlePreferences?.challengeMutedUntilMs || 0)
+  const isChallengeReceptionMuted = challengeMutedUntilMs > timeNow
 
   useEffect(() => {
     if (!initialBattleId || battleId) return
@@ -186,6 +189,22 @@ export default function QuizBattleView({
       if (!silent) setIsLoadingQueue(false)
     }
   }, [clusterId, entryUnitId, isAIMode, regionId, user?.uid])
+
+  const enableChallengeReception = useCallback(async () => {
+    if (!user?.uid || isUpdatingReception) return
+    setIsUpdatingReception(true)
+    setError('')
+    try {
+      const updateReception = httpsCallable(functions, 'setQuizBattleChallengeReception')
+      await updateReception({ enabled: true })
+      setChallengeNotice('이제 온라인 도전을 다시 받을 수 있습니다.')
+      loadOnlineOpponents({ silent: true })
+    } catch (err) {
+      setError(getBattleChallengeError(err, '도전 수신 설정을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.'))
+    } finally {
+      setIsUpdatingReception(false)
+    }
+  }, [isUpdatingReception, loadOnlineOpponents, user?.uid])
 
   useEffect(() => {
     if (phase !== 'idle' || isAIMode) return undefined
@@ -1099,6 +1118,33 @@ export default function QuizBattleView({
             </div>
           </section>}
           {!isAIMode && <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+            {isChallengeReceptionMuted && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.8rem',
+                marginBottom: '0.8rem',
+                padding: '0.8rem 1rem',
+                border: '1px solid rgba(251,191,36,0.28)',
+                borderRadius: 12,
+                background: 'rgba(251,191,36,0.07)',
+              }}>
+                <div>
+                  <strong style={{ display: 'block', color: 'var(--star-gold)', fontSize: '0.88rem' }}>오늘은 온라인 도전을 받지 않습니다.</strong>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>자정에 자동으로 다시 활성화됩니다.</span>
+                </div>
+                <button
+                  type="button"
+                  className="hud-btn secondary glass"
+                  disabled={isUpdatingReception}
+                  onClick={enableChallengeReception}
+                  style={{ padding: '0.62rem 0.85rem', whiteSpace: 'nowrap' }}
+                >
+                  {isUpdatingReception ? '변경 중…' : '다시 받기'}
+                </button>
+              </div>
+            )}
             <div
               style={{
                 width: '100%',

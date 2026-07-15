@@ -345,6 +345,8 @@ const QUIZ_BATTLE_DIRECT_CONFIRM_TIMEOUT_MS = 45 * 1000;
 const QUIZ_BATTLE_CHALLENGE_ACCEPT_LEASE_MS = 90 * 1000;
 const QUIZ_BATTLE_CHALLENGE_RECOVERY_GRACE_MS = 30 * 1000;
 const QUIZ_BATTLE_CHALLENGE_AUDIT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const QUIZ_BATTLE_KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const QUIZ_BATTLE_DAY_MS = 24 * 60 * 60 * 1000;
 const QUIZ_BATTLE_SCHEMA_VERSION = 2;
 
 function getQuizBattleRefs(db, battleId) {
@@ -547,6 +549,15 @@ function isBlockingChallenge(data = {}, nowMs = Date.now()) {
 
 function isBlockingBattleTicket(data = {}, nowMs = Date.now()) {
   return data.status === "waiting" && Number(data.expiresAtMs || 0) > nowMs;
+}
+
+function getQuizBattleKstNextMidnightMs(nowMs = Date.now()) {
+  return (Math.floor((nowMs + QUIZ_BATTLE_KST_OFFSET_MS) / QUIZ_BATTLE_DAY_MS) + 1) *
+    QUIZ_BATTLE_DAY_MS - QUIZ_BATTLE_KST_OFFSET_MS;
+}
+
+function isQuizBattleChallengeReceptionMuted(userData = {}, nowMs = Date.now()) {
+  return Number(userData?.quizBattlePreferences?.challengeMutedUntilMs || 0) > nowMs;
 }
 
 function getBattlePresenceLabel(presence = {}) {
@@ -2293,6 +2304,7 @@ exports.listQuizBattleOnlineOpponents = regionalFunctions.https.onCall(async (da
     const hasAccess = isGuest || isQuizBattleAccessActive(profile, contextData.clusterId, regionId);
     if (!hasAccess || blockedRoles.has(role) || profile.isDeleted === true || profile.accountStatus === "deleted") return rows;
     if (isUserInActiveQuizBattle(profile)) return rows;
+    if (isQuizBattleChallengeReceptionMuted(profile, nowMs)) return rows;
 
     rows.push({
       uid: presence.uid,
@@ -2310,6 +2322,36 @@ exports.listQuizBattleOnlineOpponents = regionalFunctions.https.onCall(async (da
     opponents: opponents.slice(0, 30),
     refreshedAtMs: nowMs,
     onlineWindowSeconds: QUIZ_BATTLE_ONLINE_WINDOW_MS / 1000,
+  };
+});
+
+exports.setQuizBattleChallengeReception = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  if (typeof data?.enabled !== "boolean") {
+    throw new functions.https.HttpsError("invalid-argument", "도전 수신 설정이 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const nowMs = Date.now();
+  const mutedUntilMs = data.enabled ? 0 : getQuizBattleKstNextMidnightMs(nowMs);
+  const userRef = db.collection("users").doc(uid);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists || isQuizBattleGuestProfile(userSnap.data() || {})) {
+    throw new functions.https.HttpsError("failed-precondition", "회원 계정에서만 도전 수신 설정을 변경할 수 있습니다.");
+  }
+
+  await userRef.set({
+    quizBattlePreferences: {
+      challengeMutedUntilMs: mutedUntilMs,
+      challengeReceptionUpdatedAt: FieldValue.serverTimestamp(),
+      challengeReceptionUpdatedAtMs: nowMs,
+    },
+  }, { merge: true });
+
+  return {
+    success: true,
+    enabled: data.enabled,
+    mutedUntilMs,
   };
 });
 
@@ -2334,9 +2376,10 @@ exports.createQuizBattleChallenge = regionalFunctions.https.onCall(async (data, 
   const nowMs = Date.now();
   const expiresAtMs = nowMs + QUIZ_BATTLE_CHALLENGE_TTL_MS;
   const contextData = await resolveBattleContext({ clusterId, regionId, entryUnitId });
+  const targetUserRef = db.collection("users").doc(targetUid);
   const [challengerSnap, targetSnap, targetPresenceSnap] = await Promise.all([
     db.collection("users").doc(uid).get(),
-    db.collection("users").doc(targetUid).get(),
+    targetUserRef.get(),
     db.collection("liveStatuses").doc(targetUid).get(),
   ]);
   const challengerData = challengerSnap.exists
@@ -2352,6 +2395,9 @@ exports.createQuizBattleChallenge = regionalFunctions.https.onCall(async (data, 
     (!isQuizBattleGuestProfile(targetData) && !isQuizBattleAccessActive(targetData, contextData.clusterId, regionId))
   ) {
     throw new functions.https.HttpsError("failed-precondition", "상대방은 현재 이 행성의 배틀에 참여할 수 없습니다.");
+  }
+  if (isQuizBattleChallengeReceptionMuted(targetData, nowMs)) {
+    throw new functions.https.HttpsError("failed-precondition", "상대방이 오늘은 도전을 받지 않습니다.");
   }
   const targetLastSeenMs = Number(targetPresence.lastUpdatedAt?.toMillis?.() || 0);
   if (targetPresence.state !== "online" || targetLastSeenMs < nowMs - QUIZ_BATTLE_ONLINE_WINDOW_MS) {
@@ -2382,12 +2428,16 @@ exports.createQuizBattleChallenge = regionalFunctions.https.onCall(async (data, 
   const recipientName = getPublicStudentName(targetData, "탐사원");
 
   await db.runTransaction(async (transaction) => {
-    const [challengeSnap, challengerLockSnap, targetLockSnap, ownIncomingSnap] = await Promise.all([
+    const [challengeSnap, challengerLockSnap, targetLockSnap, ownIncomingSnap, freshTargetSnap] = await Promise.all([
       transaction.get(challengeRef),
       transaction.get(challengerLockRef),
       transaction.get(targetLockRef),
       transaction.get(ownIncomingRef),
+      transaction.get(targetUserRef),
     ]);
+    if (!freshTargetSnap.exists || isQuizBattleChallengeReceptionMuted(freshTargetSnap.data() || {}, nowMs)) {
+      throw new functions.https.HttpsError("failed-precondition", "상대방이 오늘은 도전을 받지 않습니다.");
+    }
     if (challengeSnap.exists && isBlockingChallenge(challengeSnap.data() || {}, nowMs)) {
       throw new functions.https.HttpsError("already-exists", "상대방이 다른 도전장을 확인 중입니다.");
     }
@@ -2465,7 +2515,7 @@ exports.respondQuizBattleChallenge = regionalFunctions.https.onCall(async (data,
   const uid = await requireAuthUid(context);
   const response = cleanId(data?.response, 20);
   const requestId = cleanId(data?.requestId, 220);
-  if (!["accept", "decline"].includes(response) || !requestId) {
+  if (!["accept", "decline", "mute_today"].includes(response) || !requestId) {
     throw new functions.https.HttpsError("invalid-argument", "도전장 응답이 올바르지 않습니다.");
   }
 
@@ -2481,7 +2531,9 @@ exports.respondQuizBattleChallenge = regionalFunctions.https.onCall(async (data,
   const challengerLockRef = db.collection("quizBattleChallengeLocks").doc(challenge.challengerId);
   const requestRef = db.collection("quizBattleChallengeRequests").doc(requestId);
 
-  if (response === "decline") {
+  if (["decline", "mute_today"].includes(response)) {
+    const muteUntilMs = response === "mute_today" ? getQuizBattleKstNextMidnightMs(nowMs) : 0;
+    const recipientRef = db.collection("users").doc(uid);
     await db.runTransaction(async (transaction) => {
       const [freshChallengeSnap, lockSnap, requestSnap] = await Promise.all([
         transaction.get(challengeRef),
@@ -2489,31 +2541,37 @@ exports.respondQuizBattleChallenge = regionalFunctions.https.onCall(async (data,
         transaction.get(requestRef),
       ]);
       const fresh = freshChallengeSnap.exists ? (freshChallengeSnap.data() || {}) : {};
-      if (fresh.requestId !== requestId || fresh.status !== "pending") return;
-      transaction.set(challengeRef, {
-        status: "declined",
-        respondedAt: FieldValue.serverTimestamp(),
-        respondedAtMs: nowMs,
-      }, { merge: true });
-      if (lockSnap.exists && lockSnap.data()?.requestId === requestId) {
-        transaction.set(challengerLockRef, {
+      if (fresh.requestId === requestId && fresh.status === "pending") {
+        const declineUpdate = {
           status: "declined",
           respondedAt: FieldValue.serverTimestamp(),
           respondedAtMs: nowMs,
-        }, { merge: true });
+        };
+        transaction.set(challengeRef, declineUpdate, { merge: true });
+        if (lockSnap.exists && lockSnap.data()?.requestId === requestId) {
+          transaction.set(challengerLockRef, declineUpdate, { merge: true });
+        }
+        if (requestSnap.exists) {
+          transaction.set(requestRef, {
+            ...declineUpdate,
+            event: response === "mute_today" ? "declined_and_muted_today" : "declined",
+            ...(response === "mute_today" ? { recipientMutedUntilMs: muteUntilMs } : {}),
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs,
+          }, { merge: true });
+        }
       }
-      if (requestSnap.exists) {
-        transaction.set(requestRef, {
-          status: "declined",
-          event: "declined",
-          respondedAt: FieldValue.serverTimestamp(),
-          respondedAtMs: nowMs,
-          updatedAt: FieldValue.serverTimestamp(),
-          updatedAtMs: nowMs,
+      if (response === "mute_today") {
+        transaction.set(recipientRef, {
+          quizBattlePreferences: {
+            challengeMutedUntilMs: muteUntilMs,
+            challengeMutedAt: FieldValue.serverTimestamp(),
+            challengeMutedAtMs: nowMs,
+          },
         }, { merge: true });
       }
     });
-    return { success: true, status: "declined" };
+    return { success: true, status: "declined", mutedUntilMs: muteUntilMs };
   }
 
   // 수락 버튼을 누르는 순간 서버 상태를 먼저 선점한다. 이후 문제 구성이나

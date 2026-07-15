@@ -167,6 +167,21 @@
 .battle-challenge-safety b { color: #dfffee; }
 .battle-challenge-error { position: relative; margin-bottom: 12px; color: #fca5a5; font-size: 13px; text-align: center; }
 
+.battle-challenge-mute {
+  position: relative;
+  width: 100%;
+  min-height: 42px;
+  margin: 0 0 10px;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 12px;
+  color: #f5cf73;
+  font: 800 13px/1 var(--font-tech, sans-serif);
+  cursor: pointer;
+  background: rgba(251, 191, 36, 0.07);
+}
+
+.battle-challenge-mute:disabled { cursor: wait; opacity: 0.62; }
+
 .battle-challenge-actions {
   position: relative;
   gap: 12px;

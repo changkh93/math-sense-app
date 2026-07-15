@@ -148,7 +148,7 @@ export default function QuizBattleChallengeReceiver() {
           ...(result.data.challenge || {}),
         })
       }
-      if (response === 'decline') setChallenge(null)
+      if (['decline', 'mute_today'].includes(response)) setChallenge(null)
     } catch (err) {
       setError(getResponseError(err))
     } finally {
@@ -197,6 +197,14 @@ export default function QuizBattleChallengeReceiver() {
         </div>
 
         {error && <div className="battle-challenge-error">{error}</div>}
+        <button
+          type="button"
+          className="battle-challenge-mute"
+          disabled={Boolean(action) || isAccepting || isAcceptRetry}
+          onClick={() => respond('mute_today')}
+        >
+          {action === 'mute_today' ? '설정 중…' : '오늘은 도전 받지 않기'}
+        </button>
         <div className="battle-challenge-actions">
           <button type="button" className="battle-challenge-decline" disabled={Boolean(action) || isAccepting || isAcceptRetry} onClick={() => respond('decline')}>
             {action === 'decline' ? '전송 중…' : '이번에는 거절'}
