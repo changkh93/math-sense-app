@@ -24,7 +24,7 @@ const NOTE_MAX_LENGTH = 120;
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '인증 완료' : s === 'rejected' ? '반려됨' : '운영자 승인 대기'; }
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
-function getMemberLabel(m, f = '크루 멤버') { return m?.studentName || m?.publicDisplayName || m?.displayName || f; }
+function getMemberLabel(m, f = '크루 멤버') { return m?.publicDisplayName || m?.studentName || m?.name || m?.displayName || f; }
 function getTodayKey() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()); }
 function getPresenceInfo(profile) {
   const liveStatus = profile?.liveStatus;
@@ -84,17 +84,22 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
   const { dailyStats, loading } = useLearningHistory(member?.uid, todayKey);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const isSelf = member.uid === currentUid;
-  const isLeader = member.crewRole === 'leader';
-  const studied = member.lastStreakDate === todayKey;
+  // Some older crews only keep memberIds and do not have a populated members array.
+  // Merge the live user profile so those crews still show identity and learning state.
+  const resolvedMember = {
+    ...member,
+    ...(profile || {}),
+    ...(isSelf ? (currentUserData || {}) : {}),
+  };
+  const isLeader = resolvedMember.crewRole === 'leader';
+  const studied = resolvedMember.lastStreakDate === todayKey;
   const presence = getPresenceInfo(profile);
   const liveStatus = profile?.liveStatus || {};
   const currentLocation = liveStatus.currentLocation || '접속 기록 없음';
   const enteredMs = getTimestampMs(liveStatus.enteredAt) || getTimestampMs(liveStatus.lastUpdatedAt);
   const elapsedLabel = enteredMs ? formatElapsedCompact(nowMs - enteredMs) : '';
   const summaryText = buildTodaySummary(dailyStats);
-  const displayName = isSelf
-    ? getMemberLabel(currentUserData, currentDisplayName || '나')
-    : getMemberLabel(member);
+  const displayName = getMemberLabel(resolvedMember, isSelf ? (currentDisplayName || '나') : '크루 멤버');
 
   useEffect(() => {
     const timerId = window.setInterval(() => setNowMs(Date.now()), 60000);
@@ -117,7 +122,7 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
       </div>
 
       <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-        연속 {member.currentStreak || 0}일 · {studied ? '오늘 학습 완료' : '오늘 학습 대기'}
+        연속 {resolvedMember.currentStreak || 0}일 · {studied ? '오늘 학습 완료' : '오늘 학습 대기'}
       </div>
 
       <div className="crew-member-readout">
@@ -259,7 +264,11 @@ export default function CrewDetailView({ onBack }) {
   }, [notes, pendingNotes]);
   const status = crew?.status || userData?.crewStatus || 'pending';
   const todayKey = getTodayKey();
-  const studiedToday = members.filter(m => m.lastStreakDate === todayKey);
+  const studiedToday = rosterMembers.filter((member) => {
+    const profile = memberProfiles[member.uid] || {};
+    const selfData = member.uid === user?.uid ? (userData || {}) : {};
+    return (selfData.lastStreakDate || profile.lastStreakDate || member.lastStreakDate) === todayKey;
+  });
   const isLeader = userData?.crewRole === 'leader';
   const isGuest = userData?.isGuest === true;
   const guestAccessEnabled = crew?.guestAccessEnabled === true;
@@ -349,11 +358,13 @@ export default function CrewDetailView({ onBack }) {
 
   const memberNameById = useMemo(() => {
     const next = new Map();
-    members.forEach((member) => next.set(member.uid, getMemberLabel(member)));
+    rosterMembers.forEach((member) => {
+      next.set(member.uid, getMemberLabel(memberProfiles[member.uid], getMemberLabel(member)));
+    });
     visibleGuestSessions.forEach((guest) => next.set(guest.uid, guest.alias || '게스트 탐사원'));
     if (user?.uid) next.set(user.uid, getMemberLabel(userData, user.displayName || '나'));
     return next;
-  }, [members, user?.uid, user?.displayName, userData, visibleGuestSessions]);
+  }, [memberProfiles, rosterMembers, user?.uid, user?.displayName, userData, visibleGuestSessions]);
 
   const enrichedMembers = useMemo(() => {
     const next = [...rosterMembers];
