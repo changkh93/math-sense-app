@@ -124,7 +124,10 @@ export default function CrewGuestManager() {
               <td style={{ padding: 12 }}><strong>{guest.alias}</strong><div style={{ color: '#64748b', fontSize: 10, maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis' }}>{guest.uid}</div></td>
               <td style={{ padding: 12 }}>{guest.crewName || guest.crewId}</td>
               <td style={{ padding: 12, color: '#94a3b8', fontSize: 11, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{guest.referrerStudentUid || '-'}</td>
-              <td style={{ padding: 12 }}>{guest.completedBattleCount}전 · {guest.totalBattleAnswers}답</td>
+              <td style={{ padding: 12 }}>
+                {guest.completedBattleCount}전 · {guest.totalBattleAnswers}답
+                <div style={{ color: '#64748b', fontSize: 10, marginTop: 3 }}>탐사원 {guest.completedPvpBattleCount || 0} · NOVA-7 {guest.completedAIBattleCount || 0}</div>
+              </td>
               <td style={{ padding: 12 }}><span style={{ color: guest.eventEligible ? '#86efac' : '#fbbf24', fontWeight: 800 }}>{guest.eventEligible ? '활동 게스트' : STATUS_LABELS[guest.eventReviewStatus] || '체험 중'}</span></td>
               <td style={{ padding: 12, color: guest.riskFlags?.length ? '#fca5a5' : '#64748b', fontSize: 12 }}>{guest.riskFlags?.join(', ') || '없음'}{guest.recentSameIpCount >= 3 ? ` · 동일 IP ${guest.recentSameIpCount}` : ''}</td>
               <td style={{ padding: 12, fontSize: 12 }}>{formatTime(guest.firstJoinedAtMs)}</td>

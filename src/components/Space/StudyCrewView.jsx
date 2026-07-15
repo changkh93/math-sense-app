@@ -1675,13 +1675,13 @@ export default function StudyCrewView({ onNavigateStore }) {
                 <div className="font-tech" style={{ color: '#67e8f9', fontWeight: 900, letterSpacing: 1.3, fontSize: '0.76rem' }}>CREW 20 · GROWTH EVENT</div>
                 <h3 className="font-title" style={{ margin: '0.45rem 0 0.55rem', fontSize: isMobile ? '1.45rem' : '2rem', color: 'white' }}>함께 20명을 채우면 정식 크루원 모두 1,000광석</h3>
                 <p className="font-tech" style={{ margin: 0, color: 'rgba(255,255,255,0.72)', lineHeight: 1.6, fontSize: '0.9rem' }}>
-                  정식 크루원과 활동을 완료한 게스트가 달성 인원에 함께 집계됩니다. 초대자별 게스트 기여 인원 제한은 없습니다.
+                  정식 크루원과 활동을 완료한 게스트가 달성 인원에 함께 집계됩니다. 한 계정은 이벤트 전체에서 한 번만 달성 인원과 보상 대상이 될 수 있습니다.
                 </p>
               </div>
               <div style={{ minWidth: isMobile ? 0 : 245 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e9d5ff', fontWeight: 900, marginBottom: 7 }}><span>우리 크루</span><span>{growthEvent?.eligibleCount ?? (hasCrew ? '…' : 0)} / 20</span></div>
                 <div style={{ height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}><div style={{ width: `${Math.min(100, ((growthEvent?.eligibleCount || 0) / 20) * 100)}%`, height: '100%', background: 'linear-gradient(90deg,#22d3ee,#8b5cf6,#fbbf24)', transition: 'width .4s ease' }} /></div>
-                <div className="font-tech" style={{ color: growthEvent?.rewarded ? '#86efac' : 'rgba(255,255,255,0.58)', fontSize: '0.72rem', marginTop: 7 }}>{growthEvent?.rewarded ? '달성 확정 · 정식 크루원 1,000광석 지급 완료' : growthEvent?.verificationEndsAtMs ? `20명 달성 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(growthEvent.verificationEndsAtMs))}까지 검증 중` : growthEvent ? `정회원 ${growthEvent.memberCount} · 활동 게스트 ${growthEvent.activeGuestCount} · 확인 중 ${growthEvent.pendingGuestCount}` : hasCrew ? '진행도를 불러오는 중' : '크루에 참여하면 진행도가 표시됩니다'}</div>
+                <div className="font-tech" style={{ color: growthEvent?.rewarded ? '#86efac' : 'rgba(255,255,255,0.58)', fontSize: '0.72rem', marginTop: 7 }}>{growthEvent?.rewarded ? '달성 확정 · 최초 자격 명단의 정식 크루원에게 1,000광석 지급 완료' : growthEvent?.verificationEndsAtMs ? `20명 달성 · 고정 명단 ${growthEvent.snapshotRetainedCount || 0}/${growthEvent.snapshotEligibleCount || 20}명 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(growthEvent.verificationEndsAtMs))}까지 검증 중` : growthEvent ? `이벤트 대상 정회원 ${growthEvent.eventEligibleMemberCount ?? growthEvent.memberCount} · 참여 완료 제외 ${growthEvent.eventCompletedMemberCount || 0} · 활동 게스트 ${growthEvent.activeGuestCount}` : hasCrew ? '진행도를 불러오는 중' : '크루에 참여하면 진행도가 표시됩니다'}</div>
               </div>
             </div>
             <div style={{ padding: '0 2rem 1.5rem', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1691,8 +1691,8 @@ export default function StudyCrewView({ onNavigateStore }) {
             <AnimatePresence>{growthEventOpen && (
               <Motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', padding: isMobile ? '1.2rem' : '1.5rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
-                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.2)' }}><strong style={{ color: '#67e8f9' }}>참여 방법</strong><ol className="font-tech" style={{ color: 'rgba(255,255,255,0.76)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0 }}><li>내 크루의 GUEST ACCESS에서 외부 승무원 초대 링크를 복사합니다. 개인별 링크 하나로 여러 친구를 제한 없이 초대할 수 있습니다.</li><li>친구에게 링크를 보내 게스트로 메타센스를 체험하게 합니다.</li><li>게스트가 첫 입장 24시간 후, 일반 퀴즈 배틀 2회·실제 답변 10문제를 완료하면 자동으로 활동 게스트에 집계됩니다. AI 대결은 집계하지 않습니다.</li><li>동일 기기 중복 등 명확한 부정 신호는 자동 제외되고, 의심 계정은 운영툴에서 사후 정지·삭제할 수 있습니다.</li><li>정회원+활동 게스트 20명을 48시간 유지하면 달성이 확정됩니다.</li></ol></div>
-                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.2)' }}><strong style={{ color: '#fde68a' }}>초대 혜택</strong><ul className="font-tech" style={{ color: 'rgba(255,255,255,0.76)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0 }}><li>초대받은 친구: 메타센스 1개월 무료 체험</li><li>친구가 유료 수강 등록하면 초대한 정회원 가구의 수강료 할인</li><li>유료 등록 1가구 20% · 2가구 50% · 3가구 이상 100%</li><li>20명 달성 보상: 당시 정식 크루원에게 각 1,000광석</li></ul><p className="font-tech" style={{ color: '#fca5a5', fontSize: '0.75rem', lineHeight: 1.55, marginBottom: 0 }}>게스트는 달성 인원에는 기여하지만 광석 계정이 없어 1,000광석 지급 대상에서는 제외됩니다. 동일 기기 중복·비정상 활동은 운영자 검토 후 제외될 수 있습니다.</p></div>
+                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.2)' }}><strong style={{ color: '#67e8f9' }}>참여 방법</strong><ol className="font-tech" style={{ color: 'rgba(255,255,255,0.76)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0 }}><li>내 크루의 GUEST ACCESS에서 외부 승무원 초대 링크를 복사합니다. 개인별 링크 하나로 여러 친구를 제한 없이 초대할 수 있습니다.</li><li>친구에게 링크를 보내 게스트로 메타센스를 체험하게 합니다.</li><li>게스트가 첫 입장 24시간 후, 퀴즈 배틀 2회·실제 답변 10문제를 완료하면 자동으로 활동 게스트에 집계됩니다. 탐사원 대전과 NOVA-7 AI 대결 모두 인정됩니다.</li><li>동일 기기 중복 등 명확한 부정 신호는 자동 제외되고, 의심 계정은 운영툴에서 사후 정지·삭제할 수 있습니다.</li><li>정회원+활동 게스트 20명을 48시간 유지하면 달성이 확정됩니다.</li></ol></div>
+                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.2)' }}><strong style={{ color: '#fde68a' }}>초대 혜택</strong><ul className="font-tech" style={{ color: 'rgba(255,255,255,0.76)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0 }}><li>초대받은 친구: 메타센스 1개월 무료 체험</li><li>친구가 유료 수강 등록하면 초대한 정회원 가구의 수강료 할인</li><li>유료 등록 1가구 20% · 2가구 50% · 3가구 이상 100%</li><li>20명 달성 보상: 고정 명단을 48시간 유지한 정식 크루원에게 각 1,000광석</li><li>이미 보상을 받은 계정은 다른 크루에 가입할 수 있지만 이벤트 인원·보상에는 다시 포함되지 않습니다.</li></ul><p className="font-tech" style={{ color: '#fca5a5', fontSize: '0.75rem', lineHeight: 1.55, marginBottom: 0 }}>게스트는 달성 인원에는 기여하지만 광석 계정이 없어 1,000광석 지급 대상에서는 제외됩니다. 동일 기기 중복·비정상 활동은 운영자 검토 후 제외될 수 있습니다.</p></div>
                 </div>
               </Motion.div>
             )}</AnimatePresence>
@@ -1875,6 +1875,7 @@ export default function StudyCrewView({ onNavigateStore }) {
       <CrewJoinModal
         isOpen={!!joinTarget}
         crew={joinTarget && typeof joinTarget === 'object' ? joinTarget : null}
+        eventParticipationCompleted={Boolean(userData?.crewGrowthEvent2026RewardedAt || userData?.crewGrowthEvent2026RewardedAtMs || userData?.lastCrewGrowthRewardAt)}
         onClose={() => setJoinTarget(null)}
       />
     </>

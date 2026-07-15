@@ -716,7 +716,7 @@ export default function CrewDetailView({ onBack }) {
 
         {isGuest && (
           <div className="crew-guest-strip font-tech">
-            <div><span>GUEST PASS</span> 1개월 무료 체험 · 첫 입장 24시간 후 일반 퀴즈 배틀 2회와 실제 답변 10문제를 완료하면 활동 게스트로 자동 집계됩니다. AI 대결은 제외됩니다.</div>
+            <div><span>GUEST PASS</span> 1개월 무료 체험 · 첫 입장 24시간 후 퀴즈 배틀 2회와 실제 답변 10문제를 완료하면 활동 게스트로 자동 집계됩니다. 탐사원·NOVA-7 대결 모두 인정됩니다.</div>
             {userData?.referralTracked && userData?.referralToken && (
               <button
                 type="button"
@@ -768,14 +768,19 @@ export default function CrewDetailView({ onBack }) {
           </div>
           <div className="crew-growth-status__metrics">
             <div><span>정식 크루원</span><strong>{growthEvent?.memberCount ?? crewMemberIds.length}명</strong></div>
+            <div><span>이벤트 대상 정회원</span><strong>{growthEvent?.eventEligibleMemberCount ?? growthEvent?.memberCount ?? crewMemberIds.length}명</strong></div>
             <div><span>활동 게스트</span><strong>{growthEvent?.activeGuestCount ?? 0}명</strong></div>
+            <div><span>참여 완료·재집계 제외</span><strong>{growthEvent?.eventCompletedMemberCount ?? 0}명</strong></div>
             <div><span>체험·확인 중</span><strong>{growthEvent?.pendingGuestCount ?? activeGuestCount}명</strong></div>
             <div><span>현재 접속 게스트</span><strong>{activeGuestCount}명</strong></div>
           </div>
           <div className="crew-growth-status__rules font-tech">
             <strong>부정 방지·집계 규정</strong>
-            <span>첫 입장 24시간 + 일반 퀴즈 배틀 2회 + 실제 답변 10문제를 완료하면 자동 집계됩니다.</span>
-            <span>AI 대결은 제외되며, 동일 기기 중복은 자동 제외됩니다. 동일 IP의 단시간 다량 생성과 비정상 활동은 운영툴에서 사후 검토하여 로그인 정지·삭제할 수 있습니다.</span>
+            <span>첫 입장 24시간 + 퀴즈 배틀 2회 + 실제 답변 10문제를 완료하면 자동 집계됩니다.</span>
+            <span>탐사원 대전과 NOVA-7 AI 대결을 모두 인정합니다. 동일 기기 중복은 자동 제외되며, 동일 IP의 단시간 다량 생성과 비정상 활동은 운영툴에서 사후 검토하여 로그인 정지·삭제할 수 있습니다.</span>
+            <span>20명 도달 순간의 명단이 48시간 고정됩니다. 중간에 새로 가입한 회원은 이탈자를 대신할 수 없으며, 인원이 부족해지면 검증이 다시 시작됩니다.</span>
+            <span>한 계정은 이벤트 전체에서 한 번만 달성 인원과 1,000광석 대상이 될 수 있습니다. 보상 후 다른 크루 가입은 가능하지만 이벤트에는 재집계되지 않습니다.</span>
+            {growthEvent?.currentUserEventCompleted && <span style={{ color: '#f0abfc' }}>내 계정은 이벤트 참여를 이미 완료해 현재 크루의 달성 인원에서 제외됩니다.</span>}
             <span>멤버별 고유 링크는 1회용이 아닙니다. 같은 링크 하나로 여러 친구를 제한 없이 초대할 수 있으며, 친구마다 별도의 게스트 UID가 발급됩니다.</span>
           </div>
         </section>

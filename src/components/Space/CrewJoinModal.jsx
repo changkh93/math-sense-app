@@ -13,7 +13,7 @@ function getFunctionsErrorMessage(err, fallback) {
   return fallback;
 }
 
-export default function CrewJoinModal({ isOpen, onClose, crew }) {
+export default function CrewJoinModal({ isOpen, onClose, crew, eventParticipationCompleted = false }) {
   const [joinCode, setJoinCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -107,6 +107,12 @@ export default function CrewJoinModal({ isOpen, onClose, crew }) {
                   <span>{crew.groupName || '자유 스터디'}</span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {eventParticipationCompleted && (
+            <div className="font-tech" style={{ marginBottom: '1rem', padding: '0.75rem 0.85rem', borderRadius: 9, border: '1px solid rgba(240,171,252,0.28)', background: 'rgba(126,34,206,0.1)', color: '#f0abfc', fontSize: '0.78rem', lineHeight: 1.55 }}>
+              크루 가입과 활동은 가능합니다. 다만 이 계정은 CREW 20 이벤트 참여를 이미 완료해, 새 크루의 달성 인원과 1,000광석 대상에는 다시 포함되지 않습니다.
             </div>
           )}
 

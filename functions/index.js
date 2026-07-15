@@ -5791,6 +5791,9 @@ async function loadMemberSummaries(memberIds = []) {
         currentStreak: data.currentStreak || 0,
         lastStreakDate: data.lastStreakDate || "",
         crewRole: data.crewRole || "",
+        crewGrowthEvent2026RewardedAtMs: Number(data.crewGrowthEvent2026RewardedAtMs || timestampMillis(data.crewGrowthEvent2026RewardedAt || data.lastCrewGrowthRewardAt)),
+        crewGrowthEvent2026CrewId: data.crewGrowthEvent2026CrewId || "",
+        crewGrowthEvent2026CampaignId: data.crewGrowthEvent2026CampaignId || (data.lastCrewGrowthRewardAt ? CREW_GROWTH_EVENT_CAMPAIGN_ID : ""),
       });
     });
   });
@@ -5805,6 +5808,9 @@ async function loadMemberSummaries(memberIds = []) {
     currentStreak: 0,
     lastStreakDate: "",
     crewRole: "",
+    crewGrowthEvent2026RewardedAtMs: 0,
+    crewGrowthEvent2026CrewId: "",
+    crewGrowthEvent2026CampaignId: "",
   });
 }
 
@@ -7619,6 +7625,7 @@ exports.adminRemoveStudyCrewMember = regionalFunctions.https.onCall(async (data,
 
 const CREW_GROWTH_EVENT_TARGET = 20;
 const CREW_GROWTH_EVENT_REWARD = 1000;
+const CREW_GROWTH_EVENT_CAMPAIGN_ID = "crew_growth_20_2026";
 const CREW_GROWTH_EVENT_MIN_BATTLES = 2;
 const CREW_GROWTH_EVENT_MIN_ANSWERS = 10;
 const CREW_GROWTH_EVENT_MIN_AGE_MS = 24 * 60 * 60 * 1000;
@@ -7656,6 +7663,64 @@ function isCrewGrowthGuestEligible(record = {}, nowMs = Date.now()) {
     firstJoinedAtMs > 0 && nowMs - firstJoinedAtMs >= CREW_GROWTH_EVENT_MIN_AGE_MS;
 }
 
+function getCrewGuestBattleBreakdown(record = {}) {
+  const storedTotal = Math.max(0, Number(record.completedBattleCount || 0));
+  const ai = Math.max(0, Number(record.completedAIBattleCount || 0));
+  // AI가 집계에 포함되기 전의 기존 기록은 전부 PVP였다.
+  // 유형별 필드가 없는 기존 게스트도 운영툴에서 정확히 표시되도록 복원한다.
+  const pvp = record.completedPvpBattleCount === undefined
+    ? Math.max(0, storedTotal - ai)
+    : Math.max(0, Number(record.completedPvpBattleCount || 0));
+  return { total: Math.max(storedTotal, pvp + ai), pvp, ai };
+}
+
+function hasCrewGrowthEventReward(record = {}) {
+  // lastCrewGrowthRewardAt은 전역 참여 원장 도입 전에 이미 지급된 계정을 이전하기 위한 호환 필드다.
+  return Boolean(
+    record.crewGrowthEvent2026RewardedAt ||
+    Number(record.crewGrowthEvent2026RewardedAtMs || 0) > 0 ||
+    record.crewGrowthEvent2026CrewId ||
+    record.lastCrewGrowthRewardAt
+  );
+}
+
+function getCrewGrowthRewardClaimRef(db, uid) {
+  return db.collection("crewGrowthRewardClaims").doc(`${CREW_GROWTH_EVENT_CAMPAIGN_ID}_${uid}`);
+}
+
+function getCrewGrowthSnapshotState(progress, event = {}) {
+  const snapshotMemberIds = Array.isArray(event.snapshotMemberIds) ? event.snapshotMemberIds.filter(Boolean) : [];
+  const snapshotGuestUids = Array.isArray(event.snapshotGuestUids) ? event.snapshotGuestUids.filter(Boolean) : [];
+  const eligibleMemberSet = new Set(progress.eventEligibleMemberIds || []);
+  const activeGuestSet = new Set((progress.activeGuests || []).map((guest) => guest.uid));
+  const retainedMemberIds = snapshotMemberIds.filter((uid) => eligibleMemberSet.has(uid));
+  const retainedGuestUids = snapshotGuestUids.filter((uid) => activeGuestSet.has(uid));
+  return {
+    snapshotMemberIds,
+    snapshotGuestUids,
+    retainedMemberIds,
+    retainedGuestUids,
+    retainedCount: retainedMemberIds.length + retainedGuestUids.length,
+  };
+}
+
+function buildResetCrewGrowthEvent(event = {}, nowMs = Date.now(), reason = "participant_changed") {
+  return {
+    ...event,
+    achievedAt: null,
+    achievedAtMs: 0,
+    verificationEndsAt: null,
+    verificationEndsAtMs: 0,
+    snapshotMemberIds: [],
+    snapshotGuestUids: [],
+    snapshotEligibleCount: 0,
+    verificationResetReason: reason,
+    verificationResetAt: FieldValue.serverTimestamp(),
+    verificationResetAtMs: nowMs,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
 async function loadCrewGrowthEventProgress(crewId, nowMs = Date.now()) {
   const db = admin.firestore();
   const [crewSnap, guestSnap] = await Promise.all([
@@ -7666,7 +7731,14 @@ async function loadCrewGrowthEventProgress(crewId, nowMs = Date.now()) {
   const crew = crewSnap.data() || {};
   const rawMemberIds = Array.from(new Set([crew.leaderId, ...(crew.memberIds || [])].filter(Boolean)));
   const memberSnaps = await Promise.all(rawMemberIds.map((uid) => db.collection("users").doc(uid).get()));
-  const memberIds = rawMemberIds.filter((uid, index) => memberSnaps[index].exists && !isDeletedMemberData(memberSnaps[index].data() || {}));
+  const memberRecords = rawMemberIds.map((uid, index) => ({
+    uid,
+    exists: memberSnaps[index].exists,
+    data: memberSnaps[index].exists ? (memberSnaps[index].data() || {}) : {},
+  })).filter((member) => member.exists && member.data.crewId === crewId && !isDeletedMemberData(member.data));
+  const memberIds = memberRecords.map((member) => member.uid);
+  const eventCompletedMemberIds = memberRecords.filter((member) => hasCrewGrowthEventReward(member.data)).map((member) => member.uid);
+  const eventEligibleMemberIds = memberRecords.filter((member) => !hasCrewGrowthEventReward(member.data)).map((member) => member.uid);
   const guests = guestSnap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
   const activeGuests = guests.filter((guest) => isCrewGrowthGuestEligible(guest, nowMs));
   const pendingGuests = guests.filter((guest) => guest.status !== "deleted" && !isCrewGrowthGuestEligible(guest, nowMs));
@@ -7674,12 +7746,16 @@ async function loadCrewGrowthEventProgress(crewId, nowMs = Date.now()) {
     crewRef: crewSnap.ref,
     crew,
     memberIds,
+    eventEligibleMemberIds,
+    eventCompletedMemberIds,
     guests,
     activeGuests,
     pendingGuests,
     memberCount: memberIds.length,
+    eventEligibleMemberCount: eventEligibleMemberIds.length,
+    eventCompletedMemberCount: eventCompletedMemberIds.length,
     activeGuestCount: activeGuests.length,
-    eligibleCount: memberIds.length + activeGuests.length,
+    eligibleCount: eventEligibleMemberIds.length + activeGuests.length,
   };
 }
 
@@ -7687,12 +7763,13 @@ async function reconcileCrewGrowthEvent(crewId, { allowReward = false } = {}) {
   const db = admin.firestore();
   const nowMs = Date.now();
   const progress = await loadCrewGrowthEventProgress(crewId, nowMs);
-  const event = progress.crew.growthEvent2026 || {};
+  let event = progress.crew.growthEvent2026 || {};
   if (event.rewardedAt) return { ...progress, event };
 
   if (progress.eligibleCount < CREW_GROWTH_EVENT_TARGET) {
     if (event.achievedAtMs) {
-      await progress.crewRef.set({ growthEvent2026: { ...event, achievedAt: null, achievedAtMs: 0, verificationEndsAt: null, verificationEndsAtMs: 0, updatedAt: FieldValue.serverTimestamp() } }, { merge: true });
+      event = buildResetCrewGrowthEvent(event, nowMs, "eligible_count_below_target");
+      await progress.crewRef.set({ growthEvent2026: event }, { merge: true });
     }
     return { ...progress, event: { ...event, achievedAtMs: 0, verificationEndsAtMs: 0 } };
   }
@@ -7703,6 +7780,10 @@ async function reconcileCrewGrowthEvent(crewId, { allowReward = false } = {}) {
       achievedAtMs: nowMs,
       verificationEndsAt: Timestamp.fromMillis(nowMs + CREW_GROWTH_EVENT_HOLD_MS),
       verificationEndsAtMs: nowMs + CREW_GROWTH_EVENT_HOLD_MS,
+      snapshotMemberIds: progress.eventEligibleMemberIds,
+      snapshotGuestUids: progress.activeGuests.map((guest) => guest.uid),
+      snapshotEligibleCount: progress.eligibleCount,
+      campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID,
       rewardedAt: null,
       updatedAt: FieldValue.serverTimestamp(),
     };
@@ -7710,47 +7791,123 @@ async function reconcileCrewGrowthEvent(crewId, { allowReward = false } = {}) {
     return { ...progress, event: nextEvent };
   }
 
-  if (!allowReward || nowMs < Number(event.verificationEndsAtMs || 0)) return { ...progress, event };
+  // 스냅샷 도입 전에 검증을 시작한 크루는 현재 자격 명단을 최초 명단으로 한 번만 이전한다.
+  if (!Array.isArray(event.snapshotMemberIds) || !Array.isArray(event.snapshotGuestUids)) {
+    event = {
+      ...event,
+      snapshotMemberIds: progress.eventEligibleMemberIds,
+      snapshotGuestUids: progress.activeGuests.map((guest) => guest.uid),
+      snapshotEligibleCount: progress.eligibleCount,
+      campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID,
+      snapshotMigratedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    await progress.crewRef.set({ growthEvent2026: event }, { merge: true });
+  }
 
+  const snapshotState = getCrewGrowthSnapshotState(progress, event);
+  if (snapshotState.retainedCount < CREW_GROWTH_EVENT_TARGET) {
+    event = buildResetCrewGrowthEvent(event, nowMs, "snapshot_participant_changed");
+    await progress.crewRef.set({ growthEvent2026: event }, { merge: true });
+    return { ...progress, event, snapshotState: { ...snapshotState, retainedCount: 0 } };
+  }
+
+  if (!allowReward || nowMs < Number(event.verificationEndsAtMs || 0)) return { ...progress, event, snapshotState };
+
+  let rewardAborted = false;
   await db.runTransaction(async (transaction) => {
     const freshCrewSnap = await transaction.get(progress.crewRef);
     const freshCrew = freshCrewSnap.data() || {};
-    if (freshCrew.growthEvent2026?.rewardedAt) return;
-    const userRefs = progress.memberIds.map((uid) => db.collection("users").doc(uid));
-    const userSnaps = await Promise.all(userRefs.map((userRef) => transaction.get(userRef)));
-    const rewardedMemberIds = progress.memberIds.filter((uid, index) => userSnaps[index].exists && !isDeletedMemberData(userSnaps[index].data() || {}));
-    rewardedMemberIds.forEach((uid) => {
-      const userRef = db.collection("users").doc(uid);
+    const freshEvent = freshCrew.growthEvent2026 || {};
+    if (freshEvent.rewardedAt) return;
+    if (Number(freshEvent.achievedAtMs || 0) !== Number(event.achievedAtMs || 0)) {
+      rewardAborted = true;
+      return;
+    }
+
+    const snapshotMemberIds = Array.isArray(freshEvent.snapshotMemberIds) ? freshEvent.snapshotMemberIds.filter(Boolean) : [];
+    const snapshotGuestUids = Array.isArray(freshEvent.snapshotGuestUids) ? freshEvent.snapshotGuestUids.filter(Boolean) : [];
+    const userRefs = snapshotMemberIds.map((uid) => db.collection("users").doc(uid));
+    const claimRefs = snapshotMemberIds.map((uid) => getCrewGrowthRewardClaimRef(db, uid));
+    const guestRefs = snapshotGuestUids.map((uid) => db.collection("crewGuestAccounts").doc(uid));
+    const [userSnaps, claimSnaps, guestSnaps] = await Promise.all([
+      Promise.all(userRefs.map((userRef) => transaction.get(userRef))),
+      Promise.all(claimRefs.map((claimRef) => transaction.get(claimRef))),
+      Promise.all(guestRefs.map((guestRef) => transaction.get(guestRef))),
+    ]);
+    const freshMemberSet = new Set(Array.from(new Set([freshCrew.leaderId, ...(freshCrew.memberIds || [])].filter(Boolean))));
+    const retainedMemberIds = snapshotMemberIds.filter((uid, index) => {
+      if (!freshMemberSet.has(uid) || !userSnaps[index].exists || claimSnaps[index].exists) return false;
+      const userData = userSnaps[index].data() || {};
+      return !isDeletedMemberData(userData) && userData.crewId === crewId && !hasCrewGrowthEventReward(userData);
+    });
+    const retainedGuestUids = snapshotGuestUids.filter((uid, index) => {
+      if (!guestSnaps[index].exists) return false;
+      const guestData = guestSnaps[index].data() || {};
+      return guestData.crewId === crewId && isCrewGrowthGuestEligible(guestData, nowMs);
+    });
+    const retainedCount = retainedMemberIds.length + retainedGuestUids.length;
+    if (retainedCount < CREW_GROWTH_EVENT_TARGET) {
+      rewardAborted = true;
+      transaction.set(progress.crewRef, {
+        growthEvent2026: buildResetCrewGrowthEvent(freshEvent, nowMs, "payout_snapshot_changed"),
+      }, { merge: true });
+      return;
+    }
+
+    const retainedMemberSet = new Set(retainedMemberIds);
+    const skippedPreviouslyRewardedMemberIds = snapshotMemberIds.filter((uid) => !retainedMemberSet.has(uid));
+    retainedMemberIds.forEach((uid) => {
+      const memberIndex = snapshotMemberIds.indexOf(uid);
+      const userRef = userRefs[memberIndex];
+      const claimRef = claimRefs[memberIndex];
       transaction.set(userRef, {
         crystals: FieldValue.increment(CREW_GROWTH_EVENT_REWARD),
         lastCrewGrowthRewardAt: FieldValue.serverTimestamp(),
+        crewGrowthEvent2026RewardedAt: FieldValue.serverTimestamp(),
+        crewGrowthEvent2026RewardedAtMs: nowMs,
+        crewGrowthEvent2026CrewId: crewId,
+        crewGrowthEvent2026CampaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID,
       }, { merge: true });
-      recordCrystalTransaction(transaction, uid, `crew_growth_20_${crewId}`, {
+      transaction.set(claimRef, {
+        campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID,
+        uid,
+        crewId,
+        amount: CREW_GROWTH_EVENT_REWARD,
+        rewardedAt: FieldValue.serverTimestamp(),
+        rewardedAtMs: nowMs,
+      });
+      recordCrystalTransaction(transaction, uid, CREW_GROWTH_EVENT_CAMPAIGN_ID, {
         amount: CREW_GROWTH_EVENT_REWARD,
         type: "crew_growth_event_reward",
         description: "스터디 크루 20명 달성 이벤트 보상",
-        metadata: { crewId, target: CREW_GROWTH_EVENT_TARGET },
+        metadata: { crewId, target: CREW_GROWTH_EVENT_TARGET, campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID },
       });
     });
     transaction.set(progress.crewRef, {
       growthEvent2026: {
-        ...freshCrew.growthEvent2026,
+        ...freshEvent,
         rewardedAt: FieldValue.serverTimestamp(),
         rewardedAtMs: nowMs,
-        rewardedMemberIds,
+        rewardedMemberIds: retainedMemberIds,
+        skippedPreviouslyRewardedMemberIds,
         rewardAmount: CREW_GROWTH_EVENT_REWARD,
-        finalEligibleCount: progress.eligibleCount,
+        finalEligibleCount: retainedCount,
+        finalRetainedGuestUids: retainedGuestUids,
+        campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID,
         updatedAt: FieldValue.serverTimestamp(),
       },
     }, { merge: true });
   });
-  return loadCrewGrowthEventProgress(crewId, nowMs);
+  const refreshed = await loadCrewGrowthEventProgress(crewId, nowMs);
+  return { ...refreshed, event: refreshed.crew.growthEvent2026 || {}, rewardAborted };
 }
 
 async function recordCrewGuestBattleActivity(battleId) {
   const db = admin.firestore();
   const battle = await getMergedQuizBattle(db, battleId);
-  if (!battle || battle.status !== "finished" || battle.isAI === true) return;
+  if (!battle || battle.status !== "finished") return;
+  const isAIBattle = battle.isAI === true;
   const guestUids = (battle.participantUids || []).filter((uid) => battle.participants?.[uid]?.isGuest === true);
   await Promise.all(guestUids.map(async (uid) => {
     const participant = battle.participants?.[uid] || {};
@@ -7759,9 +7916,18 @@ async function recordCrewGuestBattleActivity(battleId) {
     await db.runTransaction(async (transaction) => {
       const [accountSnap, completionSnap] = await Promise.all([transaction.get(accountRef), transaction.get(completionRef)]);
       if (!accountSnap.exists || completionSnap.exists) return;
-      transaction.set(completionRef, { battleId, answeredCount: Number(participant.answeredCount || 0), completedAt: FieldValue.serverTimestamp() });
+      const battleCounts = getCrewGuestBattleBreakdown(accountSnap.data() || {});
+      transaction.set(completionRef, {
+        battleId,
+        battleType: isAIBattle ? "ai" : "pvp",
+        isAIBattle,
+        answeredCount: Number(participant.answeredCount || 0),
+        completedAt: FieldValue.serverTimestamp(),
+      });
       transaction.set(accountRef, {
-        completedBattleCount: FieldValue.increment(1),
+        completedBattleCount: battleCounts.total + 1,
+        completedAIBattleCount: battleCounts.ai + (isAIBattle ? 1 : 0),
+        completedPvpBattleCount: battleCounts.pvp + (isAIBattle ? 0 : 1),
         totalBattleAnswers: FieldValue.increment(Number(participant.answeredCount || 0)),
         lastBattleAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
@@ -7991,16 +8157,29 @@ exports.getCrewGrowthEventProgress = regionalFunctions.https.onCall(async (data,
   const isCrewGuest = guestSnap.exists && guestSnap.data()?.crewId === crewId;
   if (!isMember && !isCrewGuest) throw new functions.https.HttpsError("permission-denied", "이 크루의 이벤트만 확인할 수 있습니다.");
   const progress = await reconcileCrewGrowthEvent(crewId);
+  const event = progress.event || progress.crew.growthEvent2026 || {};
+  const snapshotState = getCrewGrowthSnapshotState(progress, event);
+  const displayEligibleCount = event.rewardedAt
+    ? Math.max(CREW_GROWTH_EVENT_TARGET, Number(event.finalEligibleCount || 0))
+    : event.achievedAtMs
+      ? snapshotState.retainedCount
+      : progress.eligibleCount;
   return {
+    campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID,
     target: CREW_GROWTH_EVENT_TARGET,
     reward: CREW_GROWTH_EVENT_REWARD,
     memberCount: progress.memberCount,
+    eventEligibleMemberCount: progress.eventEligibleMemberCount,
+    eventCompletedMemberCount: progress.eventCompletedMemberCount,
     activeGuestCount: progress.activeGuestCount,
     pendingGuestCount: progress.pendingGuests.length,
-    eligibleCount: progress.eligibleCount,
-    achievedAtMs: Number(progress.event?.achievedAtMs || 0),
-    verificationEndsAtMs: Number(progress.event?.verificationEndsAtMs || 0),
-    rewarded: Boolean(progress.event?.rewardedAt),
+    eligibleCount: displayEligibleCount,
+    snapshotEligibleCount: Number(event.snapshotEligibleCount || 0),
+    snapshotRetainedCount: snapshotState.retainedCount,
+    achievedAtMs: Number(event.achievedAtMs || 0),
+    verificationEndsAtMs: Number(event.verificationEndsAtMs || 0),
+    rewarded: Boolean(event.rewardedAt),
+    currentUserEventCompleted: progress.eventCompletedMemberIds.includes(uid),
   };
 });
 
@@ -8013,6 +8192,7 @@ exports.adminListCrewGuestAccounts = regionalFunctions.https.onCall(async (data,
   const nowMs = Date.now();
   const guests = snap.docs.map((docSnap) => {
     const row = docSnap.data() || {};
+    const battleCounts = getCrewGuestBattleBreakdown(row);
     return {
       uid: docSnap.id,
       alias: row.alias || "게스트 탐사원",
@@ -8021,7 +8201,9 @@ exports.adminListCrewGuestAccounts = regionalFunctions.https.onCall(async (data,
       status: row.status || "active",
       eventReviewStatus: row.eventReviewStatus || "clear",
       riskFlags: row.riskFlags || [],
-      completedBattleCount: Number(row.completedBattleCount || 0),
+      completedBattleCount: battleCounts.total,
+      completedAIBattleCount: battleCounts.ai,
+      completedPvpBattleCount: battleCounts.pvp,
       totalBattleAnswers: Number(row.totalBattleAnswers || 0),
       firstJoinedAtMs: Number(row.firstJoinedAtMs || 0),
       lastSeenAtMs: timestampMillis(row.lastSeenAt || row.updatedAt),

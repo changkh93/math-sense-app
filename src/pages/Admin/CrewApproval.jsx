@@ -62,6 +62,9 @@ async function loadMemberProfiles(crews = []) {
         crewRole: data.crewRole || '',
         currentStreak: data.currentStreak || 0,
         lastStreakDate: data.lastStreakDate || '',
+        crewGrowthEvent2026RewardedAtMs: Number(data.crewGrowthEvent2026RewardedAtMs || data.crewGrowthEvent2026RewardedAt?.toMillis?.() || data.lastCrewGrowthRewardAt?.toMillis?.() || 0),
+        crewGrowthEvent2026CrewId: data.crewGrowthEvent2026CrewId || '',
+        crewGrowthEvent2026CampaignId: data.crewGrowthEvent2026CampaignId || (data.lastCrewGrowthRewardAt ? 'crew_growth_20_2026' : ''),
       });
     });
   }
@@ -758,6 +761,19 @@ export default function CrewApproval() {
                     )}
                   </div>
 
+                  {status === 'approved' && (
+                    <div style={{ marginTop: '0.9rem', padding: '0.8rem 0.9rem', borderRadius: 10, background: 'rgba(126,34,206,0.1)', border: '1px solid rgba(192,132,252,0.22)', color: '#ddd6fe', fontSize: '0.8rem', lineHeight: 1.55 }}>
+                      <strong style={{ color: '#f0abfc' }}>CREW 20 EVENT</strong>
+                      {' · '}
+                      {crew.growthEvent2026?.rewardedAtMs
+                        ? `지급 완료 ${crew.growthEvent2026.rewardedMemberIds?.length || 0}명`
+                        : crew.growthEvent2026?.verificationEndsAtMs
+                          ? `고정 명단 ${Number(crew.growthEvent2026.snapshotMemberIds?.length || 0) + Number(crew.growthEvent2026.snapshotGuestUids?.length || 0)}명 검증 중`
+                          : '달성 인원 모집 중'}
+                      {' · '}이벤트 참여 완료 회원 {members.filter((member) => member.crewGrowthEvent2026RewardedAtMs > 0).length}명
+                    </div>
+                  )}
+
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))', gap: '0.8rem', marginTop: '1rem' }}>
                     <label style={{ display: 'grid', gap: '0.35rem' }}>
                       <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>크루 이름</span>
@@ -827,8 +843,16 @@ export default function CrewApproval() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   <span style={{ color: '#f8fafc', fontWeight: 700, overflowWrap: 'anywhere' }}>{getMemberName(member)}</span>
                                   <span style={{ color: isLeader ? '#fde68a' : '#bae6fd', fontSize: '0.76rem', fontWeight: 700 }}>{isLeader ? '리더' : '멤버'}</span>
+                                  {member.crewGrowthEvent2026RewardedAtMs > 0 && (
+                                    <span style={{ color: '#f0abfc', fontSize: '0.72rem', fontWeight: 800 }}>이벤트 참여 완료 · 타 크루 재집계 제외</span>
+                                  )}
                                 </div>
                                 <div style={{ color: '#94a3b8', fontSize: '0.78rem', overflowWrap: 'anywhere' }}>UID {member.uid}</div>
+                                {member.crewGrowthEvent2026RewardedAtMs > 0 && (
+                                  <div style={{ color: '#a78bfa', fontSize: '0.7rem', marginTop: 2 }}>
+                                    지급 크루 {member.crewGrowthEvent2026CrewId || '기존 지급 기록'} · {new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short' }).format(new Date(member.crewGrowthEvent2026RewardedAtMs))}
+                                  </div>
+                                )}
                               </div>
                               <button type="button" title="멤버 탈퇴 처리" onClick={() => removeCrewMember(crew, member)} disabled={!!busyId} style={{ border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(69,10,10,0.5)', color: '#fecaca', borderRadius: 8, width: 34, height: 34, display: 'inline-grid', placeItems: 'center', cursor: 'pointer', flexShrink: 0 }}>
                                 <UserMinus size={15} />
