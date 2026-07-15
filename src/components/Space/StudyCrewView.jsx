@@ -10,6 +10,7 @@ import soundManager from '../../utils/SoundManager';
 import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
 import CrewDetailView from './CrewDetailView';
+import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 import { formatCrewSchedule } from './crewSchedule';
 
@@ -1070,7 +1071,8 @@ export default function StudyCrewView({ onNavigateStore }) {
       }
     };
     load();
-    return () => { cancelled = true; };
+    const timerId = window.setInterval(load, 60000);
+    return () => { cancelled = true; window.clearInterval(timerId); };
   }, [crewId, user?.uid]);
 
   // Guests are routed straight into the invited crew's waiting room.
@@ -1684,6 +1686,17 @@ export default function StudyCrewView({ onNavigateStore }) {
                 <div className="font-tech" style={{ color: growthEvent?.rewarded ? '#86efac' : 'rgba(255,255,255,0.58)', fontSize: '0.72rem', marginTop: 7 }}>{growthEvent?.rewarded ? '달성 확정 · 최초 자격 명단의 정식 크루원에게 1,000광석 지급 완료' : growthEvent?.verificationEndsAtMs ? `20명 달성 · 고정 명단 ${growthEvent.snapshotRetainedCount || 0}/${growthEvent.snapshotEligibleCount || 20}명 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(growthEvent.verificationEndsAtMs))}까지 검증 중` : growthEvent ? `이벤트 대상 정회원 ${growthEvent.eventEligibleMemberCount ?? growthEvent.memberCount} · 참여 완료 제외 ${growthEvent.eventCompletedMemberCount || 0} · 활동 게스트 ${growthEvent.activeGuestCount}` : hasCrew ? '진행도를 불러오는 중' : '크루에 참여하면 진행도가 표시됩니다'}</div>
               </div>
             </div>
+            {hasCrew && (
+              <div style={{ padding: isMobile ? '0 1.25rem' : '0 2rem' }}>
+                <CrewGrowthRewardExperience
+                  crewId={crewId}
+                  progress={growthEvent}
+                  onProgressChange={setGrowthEvent}
+                  compact
+                  isGuest={isGuest}
+                />
+              </div>
+            )}
             <div style={{ padding: '0 2rem 1.5rem', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button type="button" onClick={() => setGrowthEventOpen((open) => !open)} className="space-btn font-tech" style={{ padding: '0.7rem 1rem', borderRadius: 10, color: '#e9d5ff' }}>{growthEventOpen ? '안내 접기' : '이벤트 참여 방법과 혜택 보기'}</button>
               {hasCrew && !isGuest && <button type="button" onClick={() => setDetailView(true)} className="space-btn cosmic-btn font-tech" style={{ padding: '0.7rem 1rem', borderRadius: 10 }}>외부 승무원 초대 링크 복사하기</button>}

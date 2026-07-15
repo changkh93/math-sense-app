@@ -8118,9 +8118,13 @@ async function reconcileCrewGrowthEvent(crewId, { allowReward = false } = {}) {
         campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID,
         uid,
         crewId,
+        crewName: freshCrew.name || "스터디 크루",
         amount: CREW_GROWTH_EVENT_REWARD,
         rewardedAt: FieldValue.serverTimestamp(),
         rewardedAtMs: nowMs,
+        openedAt: null,
+        openedAtMs: 0,
+        reaction: "",
       });
       recordCrystalTransaction(transaction, uid, CREW_GROWTH_EVENT_CAMPAIGN_ID, {
         amount: CREW_GROWTH_EVENT_REWARD,
@@ -8136,6 +8140,8 @@ async function reconcileCrewGrowthEvent(crewId, { allowReward = false } = {}) {
         rewardedAtMs: nowMs,
         rewardedMemberIds: retainedMemberIds,
         skippedPreviouslyRewardedMemberIds,
+        openedMemberIds: [],
+        reactionCounts: {},
         rewardAmount: CREW_GROWTH_EVENT_REWARD,
         finalEligibleCount: retainedCount,
         finalRetainedGuestUids: retainedGuestUids,
@@ -8424,8 +8430,139 @@ exports.getCrewGrowthEventProgress = regionalFunctions.https.onCall(async (data,
     achievedAtMs: Number(event.achievedAtMs || 0),
     verificationEndsAtMs: Number(event.verificationEndsAtMs || 0),
     rewarded: Boolean(event.rewardedAt),
+    rewardedAtMs: Number(event.rewardedAtMs || timestampMillis(event.rewardedAt)),
+    rewardedMemberCount: Array.isArray(event.rewardedMemberIds) ? event.rewardedMemberIds.length : 0,
+    openedMemberCount: Array.isArray(event.openedMemberIds) ? event.openedMemberIds.length : 0,
+    reactionCounts: event.reactionCounts || {},
     currentUserEventCompleted: progress.eventCompletedMemberIds.includes(uid),
   };
+});
+
+function serializeCrewGrowthCelebration(claim = {}, crew = {}) {
+  const event = crew.growthEvent2026 || {};
+  const reactionCounts = event.reactionCounts || {};
+  return {
+    available: Boolean(claim.uid && claim.crewId),
+    campaignId: claim.campaignId || CREW_GROWTH_EVENT_CAMPAIGN_ID,
+    crewId: claim.crewId || "",
+    crewName: claim.crewName || crew.name || "스터디 크루",
+    amount: Number(claim.amount || CREW_GROWTH_EVENT_REWARD),
+    rewardedAtMs: Number(claim.rewardedAtMs || timestampMillis(claim.rewardedAt)),
+    opened: Boolean(claim.openedAt || Number(claim.openedAtMs || 0) > 0),
+    openedAtMs: Number(claim.openedAtMs || timestampMillis(claim.openedAt)),
+    reaction: ["applause", "launch", "thanks"].includes(claim.reaction) ? claim.reaction : "",
+    rewardedMemberCount: Array.isArray(event.rewardedMemberIds) ? event.rewardedMemberIds.length : 0,
+    openedMemberCount: Array.isArray(event.openedMemberIds) ? event.openedMemberIds.length : 0,
+    reactionCounts: {
+      applause: Math.max(0, Number(reactionCounts.applause || 0)),
+      launch: Math.max(0, Number(reactionCounts.launch || 0)),
+      thanks: Math.max(0, Number(reactionCounts.thanks || 0)),
+    },
+  };
+}
+
+async function loadCrewGrowthCelebration(uid) {
+  const db = admin.firestore();
+  const claimSnap = await getCrewGrowthRewardClaimRef(db, uid).get();
+  if (!claimSnap.exists) {
+    return { available: false, campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID };
+  }
+  const claim = claimSnap.data() || {};
+  const crewSnap = claim.crewId ? await db.collection("crews").doc(claim.crewId).get() : null;
+  return serializeCrewGrowthCelebration(claim, crewSnap?.exists ? (crewSnap.data() || {}) : {});
+}
+
+exports.getCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  return loadCrewGrowthCelebration(uid);
+});
+
+exports.openCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const db = admin.firestore();
+  const claimRef = getCrewGrowthRewardClaimRef(db, uid);
+  const openedAtMs = Date.now();
+
+  await db.runTransaction(async (transaction) => {
+    const claimSnap = await transaction.get(claimRef);
+    if (!claimSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "개봉할 CREW 20 보급 상자가 없습니다.");
+    }
+    const claim = claimSnap.data() || {};
+    if (claim.campaignId && claim.campaignId !== CREW_GROWTH_EVENT_CAMPAIGN_ID) {
+      throw new functions.https.HttpsError("failed-precondition", "현재 이벤트의 보급 상자가 아닙니다.");
+    }
+    const crewId = cleanId(claim.crewId, 160);
+    const crewRef = crewId ? db.collection("crews").doc(crewId) : null;
+    const crewSnap = crewRef ? await transaction.get(crewRef) : null;
+
+    if (!claim.openedAt && !Number(claim.openedAtMs || 0)) {
+      transaction.set(claimRef, {
+        openedAt: FieldValue.serverTimestamp(),
+        openedAtMs,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    if (crewRef && crewSnap?.exists) {
+      transaction.update(crewRef, {
+        "growthEvent2026.openedMemberIds": FieldValue.arrayUnion(uid),
+        "growthEvent2026.updatedAt": FieldValue.serverTimestamp(),
+      });
+    }
+  });
+
+  return loadCrewGrowthCelebration(uid);
+});
+
+exports.reactCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const reaction = cleanId(data?.reaction, 20);
+  const allowedReactions = ["applause", "launch", "thanks"];
+  if (!allowedReactions.includes(reaction)) {
+    throw new functions.https.HttpsError("invalid-argument", "축하 반응을 확인해 주세요.");
+  }
+
+  const db = admin.firestore();
+  const claimRef = getCrewGrowthRewardClaimRef(db, uid);
+  await db.runTransaction(async (transaction) => {
+    const claimSnap = await transaction.get(claimRef);
+    if (!claimSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "CREW 20 보급 상자가 없습니다.");
+    }
+    const claim = claimSnap.data() || {};
+    if (!claim.openedAt && !Number(claim.openedAtMs || 0)) {
+      throw new functions.https.HttpsError("failed-precondition", "보급 상자를 먼저 열어주세요.");
+    }
+    const crewId = cleanId(claim.crewId, 160);
+    const crewRef = crewId ? db.collection("crews").doc(crewId) : null;
+    const crewSnap = crewRef ? await transaction.get(crewRef) : null;
+    const previousReaction = allowedReactions.includes(claim.reaction) ? claim.reaction : "";
+    if (previousReaction === reaction) return;
+
+    transaction.set(claimRef, {
+      reaction,
+      reactionAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    if (crewRef && crewSnap?.exists) {
+      const event = crewSnap.data()?.growthEvent2026 || {};
+      const currentCounts = event.reactionCounts || {};
+      const nextCounts = {
+        applause: Math.max(0, Number(currentCounts.applause || 0)),
+        launch: Math.max(0, Number(currentCounts.launch || 0)),
+        thanks: Math.max(0, Number(currentCounts.thanks || 0)),
+      };
+      if (previousReaction) nextCounts[previousReaction] = Math.max(0, nextCounts[previousReaction] - 1);
+      nextCounts[reaction] += 1;
+      transaction.update(crewRef, {
+        "growthEvent2026.reactionCounts": nextCounts,
+        "growthEvent2026.updatedAt": FieldValue.serverTimestamp(),
+      });
+    }
+  });
+
+  return loadCrewGrowthCelebration(uid);
 });
 
 exports.adminListCrewGuestAccounts = regionalFunctions.https.onCall(async (data, context) => {

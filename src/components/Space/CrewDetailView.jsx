@@ -11,6 +11,7 @@ import { useLearningHistory } from '../../hooks/useLearningHistory';
 import soundManager from '../../utils/SoundManager';
 import CrewSettingsModal from './CrewSettingsModal';
 import CrewCrystalChest from './CrewCrystalChest';
+import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 import { formatCrewSchedule } from './crewSchedule';
 import './CrewDetailView.css';
@@ -785,6 +786,12 @@ export default function CrewDetailView({ onBack }) {
             <div><span>체험·확인 중</span><strong>{growthEvent?.pendingGuestCount ?? activeGuestCount}명</strong></div>
             <div><span>현재 접속 게스트</span><strong>{activeGuestCount}명</strong></div>
           </div>
+          <CrewGrowthRewardExperience
+            crewId={crewId}
+            progress={growthEvent}
+            onProgressChange={setGrowthEvent}
+            isGuest={isGuest}
+          />
           <div className="crew-growth-status__rules font-tech">
             <strong>부정 방지·집계 규정</strong>
             <span>첫 입장 24시간 + 퀴즈 배틀 2회 + 실제 답변 10문제를 완료하면 자동 집계됩니다.</span>
