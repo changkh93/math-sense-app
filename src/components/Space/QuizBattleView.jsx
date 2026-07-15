@@ -100,21 +100,9 @@ export default function QuizBattleView({
   const aiAdvanceInFlightRef = useRef(false)
   const lastIntegrityReportRef = useRef(0)
   const resultLockedRef = useRef(false)
-  const outgoingChallengeRef = useRef(null)
   const isAIMode = opponentMode === 'ai'
   const isScopeLocked = Boolean(rangeLabel)
   const aiTrainingData = useMemo(() => calculateBattleData(userData || {}), [userData])
-
-  useEffect(() => {
-    outgoingChallengeRef.current = outgoingChallenge
-  }, [outgoingChallenge])
-
-  useEffect(() => () => {
-    const active = outgoingChallengeRef.current
-    if (!active?.requestId) return
-    const cancelChallenge = httpsCallable(functions, 'cancelQuizBattleChallenge')
-    cancelChallenge({ requestId: active.requestId }).catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (!initialBattleId || battleId) return
@@ -143,6 +131,33 @@ export default function QuizBattleView({
     })
     return () => unsubscribe()
   }, [user?.uid])
+
+  useEffect(() => {
+    if (!user?.uid || isAIMode) return undefined
+    // 새로고침 뒤에도 보낸 도전의 잠금 상태를 복원한다. accepted가 되면
+    // 고정 도전 문서 응답을 기다리지 않고 같은 배틀로 즉시 진입한다.
+    return onSnapshot(doc(db, 'quizBattleChallengeLocks', user.uid), (snap) => {
+      const lock = snap.exists() ? snap.data() : null
+      if (!lock?.requestId) return
+      if (['pending', 'accepting'].includes(lock.status)) {
+        const deadlineMs = lock.status === 'accepting'
+          ? Number(lock.acceptingLeaseExpiresAtMs || 0)
+          : Number(lock.expiresAtMs || 0)
+        if (deadlineMs > Date.now()) {
+          setOutgoingChallenge((current) => ({
+            challengeId: lock.challengeDocId || lock.recipientId || current?.challengeId,
+            requestId: lock.requestId,
+            recipientName: lock.recipientName || current?.recipientName || '탐사원',
+            expiresAtMs: deadlineMs,
+          }))
+        }
+      } else if (lock.status !== 'accepted') {
+        setOutgoingChallenge((current) => current?.requestId === lock.requestId ? null : current)
+      }
+    }, (err) => {
+      console.warn('Failed to restore outgoing battle challenge', err)
+    })
+  }, [isAIMode, user?.uid])
 
   const loadOnlineOpponents = useCallback(async ({ silent = false } = {}) => {
     if (isAIMode || !user?.uid || !clusterId || !regionId || !entryUnitId) return
@@ -218,14 +233,21 @@ export default function QuizBattleView({
   const cancelOutgoingChallenge = useCallback(async ({ silent = false } = {}) => {
     const active = outgoingChallenge
     if (!active?.requestId) return
+    let shouldClear = false
     try {
       const cancelChallenge = httpsCallable(functions, 'cancelQuizBattleChallenge')
-      await cancelChallenge({ requestId: active.requestId })
-      if (!silent) setChallengeNotice('도전장을 회수했습니다.')
+      const result = await cancelChallenge({ requestId: active.requestId })
+      const status = result.data?.status
+      shouldClear = !['accepting', 'accepted', 'active'].includes(status)
+      if (!silent) {
+        setChallengeNotice(shouldClear
+          ? (status === 'cancelled' ? '도전장을 회수했습니다.' : '도전장이 종료되었습니다.')
+          : '상대방이 이미 도전을 수락하고 있어 배틀 연결을 계속합니다.')
+      }
     } catch (err) {
       if (!silent) setError(getBattleChallengeError(err, '도전장을 회수하지 못했습니다. 잠시 후 다시 시도해 주세요.'))
     } finally {
-      setOutgoingChallenge(null)
+      if (shouldClear) setOutgoingChallenge(null)
     }
   }, [outgoingChallenge])
 

@@ -264,6 +264,12 @@ service cloud.firestore {
     }
 
     match /quizBattleChallengeLocks/{userId} {
+      allow get: if isAuth() && (userId == request.auth.uid || isAdmin());
+      allow list, write: if false;
+    }
+
+    // 신청·수락·입장 실패를 추적하기 위한 서버 전용 이력이다.
+    match /quizBattleChallengeRequests/{requestId} {
       allow read, write: if false;
     }
 
