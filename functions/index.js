@@ -771,6 +771,8 @@ async function buildBattleQuestionSet(context, commonCeilingOrdinal, questionCou
   const db = admin.firestore();
   const battleScope = normalizeBattleScope(options.battleScope);
   const unitId = cleanId(options.unitId || context.entryUnitId);
+  const allowPartialQuestionSet = options.allowPartialQuestionSet === true;
+  const rangeLabel = cleanText(options.insufficientRangeLabel || "공통 범위", 40);
   const eligibleUnits = battleScope === QUIZ_BATTLE_SCOPE_UNIT
     ? context.units.filter((unit) => unit.id === unitId)
     : context.units.filter((unit) => unit.ordinal <= commonCeilingOrdinal);
@@ -796,10 +798,19 @@ async function buildBattleQuestionSet(context, commonCeilingOrdinal, questionCou
     });
   });
 
-  const effectiveQuestionCount = battleScope === QUIZ_BATTLE_SCOPE_UNIT
+  if (quizDocs.length === 0) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      `${rangeLabel}에 배틀 가능한 문제가 아직 준비되지 않았습니다.`
+    );
+  }
+
+  const effectiveQuestionCount = allowPartialQuestionSet
+    ? Math.min(questionCount, quizDocs.length)
+    : battleScope === QUIZ_BATTLE_SCOPE_UNIT
     ? Math.min(questionCount, quizDocs.length)
     : questionCount;
-  if (battleScope === QUIZ_BATTLE_SCOPE_UNIT && quizDocs.length < QUIZ_BATTLE_MIN_UNIT_QUESTION_COUNT) {
+  if (!allowPartialQuestionSet && battleScope === QUIZ_BATTLE_SCOPE_UNIT && quizDocs.length < QUIZ_BATTLE_MIN_UNIT_QUESTION_COUNT) {
     throw new functions.https.HttpsError(
       "failed-precondition",
       `이 유닛에는 배틀 가능한 문제가 ${QUIZ_BATTLE_MIN_UNIT_QUESTION_COUNT}개 미만입니다.`
@@ -810,7 +821,7 @@ async function buildBattleQuestionSet(context, commonCeilingOrdinal, questionCou
   if (selected.length < effectiveQuestionCount) {
     throw new functions.https.HttpsError(
       "failed-precondition",
-      `공통 범위에 배틀 문제 ${effectiveQuestionCount}개가 아직 준비되지 않았습니다.`
+      `${rangeLabel}에 배틀 문제 ${effectiveQuestionCount}개가 아직 준비되지 않았습니다.`
     );
   }
 
@@ -3540,7 +3551,12 @@ exports.startAIQuizBattle = regionalFunctions.https.onCall(async (data, context)
     contextData.entryOrdinal,
     requestedQuestionCount,
     `${uid}_ai_${nowMs}`,
-    { battleScope, unitId: entryUnitId }
+    {
+      battleScope,
+      unitId: entryUnitId,
+      allowPartialQuestionSet: isGuestUser,
+      insufficientRangeLabel: "선택한 범위",
+    }
   );
   const battleRef = db.collection("quizBattles").doc();
   const battleRefs = getQuizBattleRefs(db, battleRef.id);

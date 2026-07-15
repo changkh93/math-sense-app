@@ -1277,7 +1277,7 @@ export default function QuizBattleView({
           </div>}
           {userData?.isGuest === true && (
             <div className="font-tech" style={{ color: 'var(--star-gold)', marginBottom: '1rem', fontSize: '0.82rem' }}>
-              GUEST RUN · 내 전적과 광석은 저장되지 않지만 상대방의 경기 기록에는 반영됩니다.
+              GUEST RUN · NOVA-7전은 선택 범위에 준비된 문제를 최대 15개까지 출제합니다. 내 전적과 광석은 저장되지 않지만 상대방의 경기 기록에는 반영됩니다.
             </div>
           )}
           {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}

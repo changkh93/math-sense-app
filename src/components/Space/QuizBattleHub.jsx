@@ -217,7 +217,7 @@ export default function QuizBattleHub({ acceptedBattle, onDirectBattleExit, onBa
           </div>
         </div>
 
-        {userData?.isGuest === true && <div className="battle-guest-note"><b>GUEST RUN</b> 모든 배틀에 참여할 수 있습니다. 내 전적·광석은 저장되지 않으며 상대방 전적에는 게스트전으로 반영됩니다.</div>}
+        {userData?.isGuest === true && <div className="battle-guest-note"><b>GUEST RUN</b> 모든 과정과 범위의 배틀에 참여할 수 있습니다. NOVA-7전은 선택 범위에 준비된 문제를 최대 15개까지 출제합니다. 내 전적·광석은 저장되지 않으며 상대방 전적에는 게스트전으로 반영됩니다.</div>}
         <div className="battle-guest-note"><b>FAIR PLAY</b> 현재 학습 중인 과정과 리전에서만 참여할 수 있습니다. 하루 배틀 광석은 최대 500개이며, 같은 범위 또는 같은 상대와의 반복 대결은 하루 3회까지만 보상·공식 전적에 반영됩니다. AI 사용 및 부정행위가 적발되면 퀴즈 배틀에서 영구 퇴출될 수 있습니다.</div>
         <button type="button" className="battle-launch" disabled={!scope} onClick={() => setLaunched(true)}>
           <span>{scope ? `${mode === 'ai' ? 'NOVA-7' : '배틀 대기룸'}으로 출격` : '먼저 퀴즈 범위를 선택하세요'}</span><i>→</i>
