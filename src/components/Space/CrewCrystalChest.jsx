@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { httpsCallable } from 'firebase/functions';
 import { BookOpenCheck, Gem, Gift, Hand, Loader2, Sparkles, X } from 'lucide-react';
@@ -29,6 +30,12 @@ export default function CrewCrystalChest({ crewId, isGuest = false }) {
   const [message, setMessage] = useState('');
   const [celebrateReward, setCelebrateReward] = useState(null);
   const [claimedAmount, setClaimedAmount] = useState(0);
+  const closeButtonRef = useRef(null);
+
+  const closeCelebration = useCallback(() => {
+    setCelebrateReward(null);
+    setClaimedAmount(0);
+  }, []);
 
   const loadChest = useCallback(async ({ openReward = true } = {}) => {
     if (!crewId) return;
@@ -54,6 +61,29 @@ export default function CrewCrystalChest({ crewId, isGuest = false }) {
     const timerId = window.setInterval(() => loadChest({ openReward: false }), 45000);
     return () => window.clearInterval(timerId);
   }, [loadChest]);
+
+  useEffect(() => {
+    if (!celebrateReward || typeof document === 'undefined') return undefined;
+
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    const previousOverscrollBehavior = body.style.overscrollBehavior;
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+
+    const focusTimer = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closeCelebration();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(focusTimer);
+      document.removeEventListener('keydown', handleKeyDown);
+      body.style.overflow = previousOverflow;
+      body.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [celebrateReward, closeCelebration]);
 
   const latestReward = chest?.rewards?.[0] || null;
   const progress = Math.min(100, Math.max(0, ((chest?.energy || 0) / Math.max(1, chest?.target || 100)) * 100));
@@ -158,15 +188,32 @@ export default function CrewCrystalChest({ crewId, isGuest = false }) {
         {message && <div className="crew-crystal-chest__message font-tech">{message}</div>}
       </section>
 
-      <AnimatePresence>
-        {celebrateReward && (
-          <Motion.div className="crew-chest-celebration" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <Motion.div className="crew-chest-celebration__card" initial={{ scale: 0.82, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}>
-              <button className="crew-chest-celebration__close" type="button" onClick={() => { setCelebrateReward(null); setClaimedAmount(0); }} aria-label="닫기"><X size={18} /></button>
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {celebrateReward && (
+            <Motion.div
+              className="crew-chest-celebration"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) closeCelebration();
+              }}
+            >
+              <Motion.div
+                className="crew-chest-celebration__card"
+                initial={{ scale: 0.82, y: 30 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="crew-chest-celebration-title"
+              >
+              <button ref={closeButtonRef} className="crew-chest-celebration__close" type="button" onClick={closeCelebration} aria-label="광석 상자 닫기"><X size={18} /></button>
               <div className="crew-chest-celebration__stars" aria-hidden="true"><i /><i /><i /><i /><i /></div>
               <div className="crew-chest-celebration__gift"><Gift size={54} /><Gem size={23} /></div>
               <span className="font-tech">SUPPLY CHEST · CYCLE {celebrateReward.cycle}</span>
-              <h2 className="font-title">크루 광석 상자 완성!</h2>
+              <h2 id="crew-chest-celebration-title" className="font-title">크루 광석 상자 완성!</h2>
               <p><strong>{celebrateReward.contributorNames?.join(' · ') || '우리 크루 대원'}</strong>의 빛나는 성취가 모여 상자가 열렸습니다.</p>
               {claimedAmount > 0 ? (
                 <Motion.div className="crew-chest-celebration__reward" initial={{ scale: 0.4 }} animate={{ scale: [0.4, 1.2, 1] }}>
@@ -186,10 +233,12 @@ export default function CrewCrystalChest({ crewId, isGuest = false }) {
                 {celebrateReward.applaudedByMe ? '박수를 보냈어요' : '기여한 대원들에게 박수 보내기'} · {celebrateReward.applauseCount || 0}
               </button>
               {message && <small className="font-tech">{message}</small>}
+              </Motion.div>
             </Motion.div>
-          </Motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </>
   );
 }
