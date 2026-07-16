@@ -1711,6 +1711,43 @@ export default function StudyCrewView({ onNavigateStore }) {
             )}</AnimatePresence>
           </Motion.section>
 
+          {/* Directory Section — user-created crews are the primary discovery experience. */}
+          <div style={{ marginBottom: '3.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+              <div>
+                <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '1px' }}>CREW DIRECTORY</div>
+                <h3 className="font-title" style={{ color: 'var(--text-bright)', margin: '0.35rem 0 0', fontSize: isMobile ? '1.35rem' : '1.6rem' }}>
+                  탐사원들이 직접 만든 크루
+                </h3>
+                <p className="font-tech" style={{ color: 'var(--text-muted)', margin: '0.45rem 0 0', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                  목표와 공부 리듬이 맞는 크루를 찾아 함께 항해하세요.
+                </p>
+              </div>
+              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>총 {directoryCrews.length}개의 크루 활동 중</div>
+            </div>
+
+            {directoryCrews.length === 0 ? (
+              <div className="glass-card hud-border" style={{ padding: '4rem 2rem', textAlign: 'center', borderRadius: 16 }}>
+                <Users size={48} style={{ color: 'rgba(255,255,255,0.1)', marginBottom: '1rem' }} />
+                <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>아직 생성된 크루가 없습니다. 첫 번째 크루를 만들어보세요!</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: isMobile ? '0.85rem' : '1.5rem' }}>
+                {sortedCrews.map(c => (
+                  <CrewCard
+                    key={c.id}
+                    crew={c}
+                    userUid={user?.uid}
+                    userCrewId={crewId}
+                    onClick={handleCrewCardClick}
+                    onlineCount={crewOnlineCounts[c.id] || 0}
+                    founderProfile={liveStatusById[c.leaderId || c.leaderUid || ''] || null}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Open Study Section */}
           <div style={{ marginBottom: '3.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
@@ -1792,36 +1829,6 @@ export default function StudyCrewView({ onNavigateStore }) {
             }}
             onSend={handleSendStudyInvite}
           />
-
-          {/* Directory Section */}
-          <div style={{ marginBottom: '4rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '1px' }}>CREW DIRECTORY</div>
-              <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>총 {directoryCrews.length}개의 크루 활동 중</div>
-            </div>
-
-            {directoryCrews.length === 0 ? (
-              <div className="glass-card hud-border" style={{ padding: '4rem 2rem', textAlign: 'center', borderRadius: 16 }}>
-                <Users size={48} style={{ color: 'rgba(255,255,255,0.1)', marginBottom: '1rem' }} />
-                <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>아직 생성된 크루가 없습니다. 첫 번째 크루를 만들어보세요!</div>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: isMobile ? '0.85rem' : '1.5rem' }}>
-                {sortedCrews.map(c => (
-                  <CrewCard
-                    key={c.id}
-                    crew={c}
-                    userUid={user?.uid}
-                    userCrewId={crewId}
-                    onClick={handleCrewCardClick}
-                    onlineCount={crewOnlineCounts[c.id] || 0}
-                    founderProfile={liveStatusById[c.leaderId || c.leaderUid || ''] || null}
-                  />
-                ))}
-              </div>
-            )}
-
-          </div>
 
           {/* Why Study Crew */}
           <div style={{ marginBottom: '3.5rem' }}>
