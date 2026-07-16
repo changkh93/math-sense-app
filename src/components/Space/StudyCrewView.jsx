@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Crown, Edit3, Loader2, Mail, Plus, Radio, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Copy, Crown, Edit3, Link, Loader2, Mail, Plus, Radio, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
+import { copyMeetText, getGoogleMeetCode, openGoogleMeet } from '../../utils/googleMeetNavigation';
 import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
 import CrewDetailView from './CrewDetailView';
@@ -495,7 +496,7 @@ function OpenStudyCard({ pool, recommended, disabled, joining, onJoin, activity 
   );
 }
 
-function OpenStudyWaitingRoom({ pool, activity, activeStudents, recommended, joining, onBack, onEnterMeet, onOpenLivePanel, isMobile }) {
+function OpenStudyWaitingRoom({ pool, activity, activeStudents, recommended, joining, meetMessage, onBack, onEnterMeet, onCopyMeet, onOpenLivePanel, isMobile }) {
   return (
     <div className="fade-in" style={{ minHeight: '100vh', padding: isMobile ? '1rem 0.75rem 6.5rem' : '2rem 1rem 6rem' }}>
       <div style={{ maxWidth: 980, margin: '0 auto', width: '100%' }}>
@@ -572,7 +573,7 @@ function OpenStudyWaitingRoom({ pool, activity, activeStudents, recommended, joi
                 오픈 스터디 집중방 입장
               </h3>
               <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.45rem', lineHeight: 1.55 }}>
-                준비된 Meet 대기방이 새 탭으로 열립니다.
+                iPad에서는 현재 탭으로 안전하게 이동합니다. 입장이 되지 않으면 회의 코드를 복사해 Meet 앱에서 참여하세요.
               </div>
             </div>
             <button
@@ -585,7 +586,32 @@ function OpenStudyWaitingRoom({ pool, activity, activeStudents, recommended, joi
               {joining ? <Loader2 size={17} className="spin" /> : <Sparkles size={17} />}
               {joining ? '입장 확인 중...' : 'Google Meet 입장'}
             </button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.45rem', minWidth: isMobile ? '100%' : 260 }}>
+              <button
+                type="button"
+                className="space-nav-link font-tech"
+                onClick={() => onCopyMeet(pool.id, 'code')}
+                disabled={joining}
+                style={{ minHeight: 38, borderRadius: 10, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Copy size={14} /> 회의 코드
+              </button>
+              <button
+                type="button"
+                className="space-nav-link font-tech"
+                onClick={() => onCopyMeet(pool.id, 'link')}
+                disabled={joining}
+                style={{ minHeight: 38, borderRadius: 10, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Link size={14} /> 링크 복사
+              </button>
+            </div>
           </div>
+          {meetMessage && (
+            <div className="font-tech" role="status" style={{ color: /못|실패|없/.test(meetMessage) ? '#fca5a5' : '#8cf3d0', fontSize: '0.78rem', lineHeight: 1.5, marginTop: '0.75rem', overflowWrap: 'anywhere' }}>
+              {meetMessage}
+            </div>
+          )}
         </section>
 
         <div style={{ marginBottom: '1rem' }}>
@@ -1029,6 +1055,8 @@ export default function StudyCrewView({ onNavigateStore }) {
   const { data: clusters = [] } = useClusters();
   const [directoryCrews, setDirectoryCrews] = useState([]);
   const [openStudyAction, setOpenStudyAction] = useState('');
+  const [openStudyMeetUrls, setOpenStudyMeetUrls] = useState({});
+  const [openStudyMeetMessage, setOpenStudyMeetMessage] = useState('');
   const [openStudyWaitingPoolId, setOpenStudyWaitingPoolId] = useState('');
   const [livePanelOpen, setLivePanelOpen] = useState(false);
   const [liveInviteAction, setLiveInviteAction] = useState('');
@@ -1366,23 +1394,57 @@ export default function StudyCrewView({ onNavigateStore }) {
   const handleJoinOpenStudy = (poolId) => {
     if (!user?.uid) return;
     soundManager.playClick();
+    setOpenStudyMeetMessage('');
     setOpenStudyWaitingPoolId(poolId);
+  };
+
+  const getVerifiedOpenStudyMeetUrl = async (poolId) => {
+    if (openStudyMeetUrls[poolId]) return openStudyMeetUrls[poolId];
+    const enterOpenStudyMeet = httpsCallable(functions, 'enterOpenStudyMeet');
+    const res = await enterOpenStudyMeet({ poolId });
+    const googleMeetUrl = String(res?.data?.googleMeetUrl || '').trim();
+    if (!googleMeetUrl) throw new Error('Google Meet 주소가 아직 준비되지 않았습니다.');
+    setOpenStudyMeetUrls((prev) => ({ ...prev, [poolId]: googleMeetUrl }));
+    return googleMeetUrl;
   };
 
   const handleEnterOpenStudyMeet = async (poolId) => {
     if (!user?.uid || openStudyAction) return;
     soundManager.playClick();
     setOpenStudyAction(poolId);
+    setOpenStudyMeetMessage('안전한 집중방 좌표를 확인 중입니다...');
 
     try {
-      const enterOpenStudyMeet = httpsCallable(functions, 'enterOpenStudyMeet');
-      const res = await enterOpenStudyMeet({ poolId });
-      const googleMeetUrl = res?.data?.googleMeetUrl || '';
-      if (!googleMeetUrl) throw new Error('Google Meet 주소가 아직 준비되지 않았습니다.');
-      window.open(googleMeetUrl, '_blank', 'noopener,noreferrer');
+      const googleMeetUrl = await getVerifiedOpenStudyMeetUrl(poolId);
+      setOpenStudyMeetMessage('Google Meet으로 이동합니다.');
+      setOpenStudyAction('');
+      openGoogleMeet(googleMeetUrl);
     } catch (err) {
       console.error('Failed to join open study room:', err);
-      alert(err?.message || '오픈 스터디에 참여하지 못했습니다.');
+      setOpenStudyMeetMessage(err?.message || '오픈 스터디에 참여하지 못했습니다.');
+      setOpenStudyAction('');
+    }
+  };
+
+  const handleCopyOpenStudyMeet = async (poolId, kind) => {
+    if (!user?.uid || openStudyAction) return;
+    soundManager.playClick();
+    setOpenStudyAction(poolId);
+    setOpenStudyMeetMessage('집중방 좌표를 확인 중입니다...');
+    try {
+      const googleMeetUrl = await getVerifiedOpenStudyMeetUrl(poolId);
+      const value = kind === 'code' ? getGoogleMeetCode(googleMeetUrl) : googleMeetUrl;
+      if (!value) throw new Error('복사할 회의 정보를 찾지 못했습니다.');
+      const copied = await copyMeetText(value);
+      if (!copied) {
+        window.prompt(kind === 'code' ? '회의 코드를 길게 눌러 복사해 주세요.' : 'Meet 링크를 길게 눌러 복사해 주세요.', value);
+      }
+      setOpenStudyMeetMessage(copied
+        ? (kind === 'code' ? `회의 코드 ${value}를 복사했습니다.` : 'Google Meet 링크를 복사했습니다.')
+        : '자동 복사가 제한되어 직접 복사할 수 있는 창을 열었습니다.');
+    } catch (err) {
+      console.error('Failed to copy open study room access:', err);
+      setOpenStudyMeetMessage(err?.message || '집중방 정보를 복사하지 못했습니다.');
     } finally {
       setOpenStudyAction('');
     }
@@ -1480,8 +1542,10 @@ export default function StudyCrewView({ onNavigateStore }) {
           activeStudents={selectedOpenStudyStudents}
           recommended={selectedOpenStudyPool.id === recommendedOpenStudyPoolId}
           joining={openStudyAction === selectedOpenStudyPool.id}
+          meetMessage={openStudyMeetMessage}
           onBack={() => setOpenStudyWaitingPoolId('')}
           onEnterMeet={handleEnterOpenStudyMeet}
+          onCopyMeet={handleCopyOpenStudyMeet}
           onOpenLivePanel={() => setLivePanelOpen(true)}
           isMobile={isMobile}
         />

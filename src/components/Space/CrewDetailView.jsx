@@ -9,6 +9,7 @@ import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import soundManager from '../../utils/SoundManager';
+import { copyMeetText, getGoogleMeetCode, openGoogleMeet } from '../../utils/googleMeetNavigation';
 import CrewSettingsModal from './CrewSettingsModal';
 import CrewCrystalChest from './CrewCrystalChest';
 import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
@@ -221,6 +222,8 @@ export default function CrewDetailView({ onBack }) {
   const { user, userData } = useAuth();
   const [roomAction, setRoomAction] = useState('');
   const [message, setMessage] = useState('');
+  const [meetAccessUrl, setMeetAccessUrl] = useState('');
+  const [meetMessage, setMeetMessage] = useState('');
   const [noteText, setNoteText] = useState('');
   const [pendingNotes, setPendingNotes] = useState([]);
   const [activeNoteAction, setActiveNoteAction] = useState('');
@@ -557,20 +560,53 @@ export default function CrewDetailView({ onBack }) {
     handlePostNote();
   };
 
+  const getVerifiedMeetUrl = async () => {
+    if (meetAccessUrl) return meetAccessUrl;
+    const fn = httpsCallable(functions, 'enterStudyCrewMeet');
+    const res = await fn({ crewId });
+    const googleMeetUrl = String(res?.data?.googleMeetUrl || '').trim();
+    if (!googleMeetUrl) throw new Error('Google Meet 주소가 아직 준비되지 않았습니다.');
+    setMeetAccessUrl(googleMeetUrl);
+    return googleMeetUrl;
+  };
+
   const handleEnterMeet = async () => {
     if (!crewId || roomAction) return;
     setRoomAction('entering');
-    setMessage('Google Meet 대기방 확인 중...');
+    setMeetMessage('안전한 집중방 좌표를 확인 중입니다...');
     soundManager.playClick();
     try {
-      const fn = httpsCallable(functions, 'enterStudyCrewMeet');
-      const res = await fn({ crewId });
-      const googleMeetUrl = res?.data?.googleMeetUrl || '';
-      if (!googleMeetUrl) throw new Error('Google Meet 주소가 아직 준비되지 않았습니다.');
-      window.open(googleMeetUrl, '_blank', 'noopener,noreferrer');
-      setMessage('Google Meet 대기방을 새 탭으로 열었습니다.');
-    } catch (e) { setMessage(getFunctionsErrorMessage(e, e?.message || '입장 실패.')); }
-    finally { setRoomAction(''); }
+      const googleMeetUrl = await getVerifiedMeetUrl();
+      setMeetMessage('Google Meet으로 이동합니다.');
+      setRoomAction('');
+      openGoogleMeet(googleMeetUrl);
+    } catch (e) {
+      setMeetMessage(getFunctionsErrorMessage(e, e?.message || '집중방에 입장하지 못했습니다.'));
+      setRoomAction('');
+    }
+  };
+
+  const handleCopyMeetAccess = async (kind) => {
+    if (!crewId || roomAction) return;
+    setRoomAction(kind === 'code' ? 'copying-code' : 'copying-link');
+    setMeetMessage('집중방 좌표를 확인 중입니다...');
+    soundManager.playClick();
+    try {
+      const googleMeetUrl = await getVerifiedMeetUrl();
+      const value = kind === 'code' ? getGoogleMeetCode(googleMeetUrl) : googleMeetUrl;
+      if (!value) throw new Error('복사할 회의 정보를 찾지 못했습니다.');
+      const copied = await copyMeetText(value);
+      if (!copied) {
+        window.prompt(kind === 'code' ? '회의 코드를 길게 눌러 복사해 주세요.' : 'Meet 링크를 길게 눌러 복사해 주세요.', value);
+      }
+      setMeetMessage(copied
+        ? (kind === 'code' ? `회의 코드 ${value}를 복사했습니다.` : 'Google Meet 링크를 복사했습니다.')
+        : '자동 복사가 제한되어 직접 복사할 수 있는 창을 열었습니다.');
+    } catch (e) {
+      setMeetMessage(getFunctionsErrorMessage(e, e?.message || '집중방 정보를 복사하지 못했습니다.'));
+    } finally {
+      setRoomAction('');
+    }
   };
 
   const handleGuestLogout = async () => {
@@ -681,6 +717,21 @@ export default function CrewDetailView({ onBack }) {
               {roomAction === 'entering' ? <Loader2 size={18} className="crew-spin" /> : <Rocket size={18} />}
               {roomAction === 'entering' ? '항로 확인 중...' : '집중방 입장'}
             </button>
+            {status === 'approved' && crew.googleMeetUrl && (
+              <div className="crew-meet-fallbacks">
+                <button type="button" className="font-tech" disabled={!!roomAction} onClick={() => handleCopyMeetAccess('code')}>
+                  <Copy size={13} /> 회의 코드 복사
+                </button>
+                <button type="button" className="font-tech" disabled={!!roomAction} onClick={() => handleCopyMeetAccess('link')}>
+                  <Share2 size={13} /> 링크 복사
+                </button>
+              </div>
+            )}
+            {meetMessage && (
+              <small className={`crew-meet-message font-tech ${/못|실패|없/.test(meetMessage) ? 'is-error' : ''}`} role="status">
+                {meetMessage}
+              </small>
+            )}
             {status !== 'approved' && <small className="font-tech">운영자 승인 후 항로가 열립니다.</small>}
             {status === 'approved' && !crew.googleMeetUrl && <small className="font-tech">운영자가 집중방 좌표를 준비 중입니다.</small>}
           </aside>

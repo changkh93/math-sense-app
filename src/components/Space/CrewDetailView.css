@@ -228,6 +228,40 @@
   filter: saturate(0.25);
 }
 
+.crew-meet-fallbacks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.crew-meet-fallbacks button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  border-radius: 9px;
+  background: rgba(0, 212, 255, 0.06);
+  color: rgba(219, 249, 255, 0.78);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.crew-meet-fallbacks button:disabled {
+  opacity: 0.42;
+  cursor: wait;
+}
+
+.crew-meet-message {
+  color: #8cf3d0 !important;
+  overflow-wrap: anywhere;
+}
+
+.crew-meet-message.is-error {
+  color: #fca5a5 !important;
+}
+
 .crew-spin {
   animation: crew-spin 0.9s linear infinite;
 }
@@ -682,6 +716,11 @@
     margin: 0;
   }
 
+  .crew-meet-fallbacks,
+  .crew-meet-message {
+    grid-column: 1;
+  }
+
   .crew-bridge-workspace {
     grid-template-columns: 1fr;
     grid-template-areas: 'mission' 'roster' 'comms';
@@ -756,6 +795,11 @@
     grid-column: 1;
     grid-row: auto;
     width: 100%;
+  }
+
+  .crew-meet-fallbacks,
+  .crew-meet-message {
+    grid-column: 1;
   }
 
   .crew-flight-stats {
