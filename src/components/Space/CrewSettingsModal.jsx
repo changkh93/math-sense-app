@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { Crown, Edit3, X } from 'lucide-react';
+import { Crown, Edit3, LockKeyhole, ShieldCheck, X } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
@@ -97,6 +97,19 @@ export default function CrewSettingsModal({ isOpen, onClose, crew }) {
   }, [clusters]);
 
   const selectedGroup = groupOptions.find((option) => option.id === formData.groupId) || groupOptions[0];
+  const nameLockUntilMs = Number(crew?.nameChangeLockedUntilMs || 0);
+  const isNameLocked = crew?.status === 'approved' && nameLockUntilMs > Date.now();
+  const nameLockRemainingDays = isNameLocked
+    ? Math.max(1, Math.ceil((nameLockUntilMs - Date.now()) / (24 * 60 * 60 * 1000)))
+    : 0;
+  const nameUnlockDate = isNameLocked
+    ? new Intl.DateTimeFormat('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'Asia/Seoul',
+      }).format(new Date(nameLockUntilMs))
+    : '';
 
   const normalizedSchedule = useMemo(() => {
     const scheduleDays = normalizeScheduleDays(formData.scheduleDays);
@@ -150,7 +163,7 @@ export default function CrewSettingsModal({ isOpen, onClose, crew }) {
       onClose(true);
     } catch (err) {
       console.error('Failed to update crew settings:', err);
-      setMessage(err?.message || '크루 설정 저장에 실패했습니다.');
+      setMessage(String(err?.message || '크루 설정 저장에 실패했습니다.').replace(/^FirebaseError:\s*/i, ''));
     } finally {
       setBusy(false);
     }
@@ -204,7 +217,7 @@ export default function CrewSettingsModal({ isOpen, onClose, crew }) {
                 크루 설정
               </h3>
               <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                자주 바꾸지 않는 값이므로 여기서만 수정합니다.
+                크루 정보는 즉시 반영되며, 이름 변경에는 별도 보호 규칙이 적용됩니다.
               </div>
             </div>
             <button
@@ -225,7 +238,7 @@ export default function CrewSettingsModal({ isOpen, onClose, crew }) {
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>크루 이름</span>
               <input
-                style={inputStyle}
+                style={{ ...inputStyle, opacity: isNameLocked ? 0.58 : 1 }}
                 value={formData.name}
                 onChange={(e) => {
                   setIsDirty(true);
@@ -233,8 +246,31 @@ export default function CrewSettingsModal({ isOpen, onClose, crew }) {
                 }}
                 placeholder="예: 오메가 증명단"
                 maxLength={28}
-                disabled={busy}
+                disabled={busy || isNameLocked}
               />
+              <div
+                className="font-tech"
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.45rem',
+                  padding: '0.65rem 0.75rem',
+                  borderRadius: 8,
+                  color: isNameLocked ? '#fcd34d' : '#a7f3d0',
+                  background: isNameLocked ? 'rgba(251, 191, 36, 0.07)' : 'rgba(16, 185, 129, 0.06)',
+                  border: `1px solid ${isNameLocked ? 'rgba(251, 191, 36, 0.18)' : 'rgba(16, 185, 129, 0.16)'}`,
+                  fontSize: '0.76rem',
+                  lineHeight: 1.55,
+                }}
+              >
+                {isNameLocked ? <LockKeyhole size={14} style={{ flexShrink: 0, marginTop: 2 }} /> : <ShieldCheck size={14} style={{ flexShrink: 0, marginTop: 2 }} />}
+                <span>
+                  {isNameLocked
+                    ? `이름 보호 기간이 ${nameLockRemainingDays}일 남았습니다. ${nameUnlockDate}부터 변경할 수 있어요.`
+                    : '이름은 7일에 한 번 변경할 수 있습니다. 공백·대소문자·구분자만 다른 유사 이름도 중복으로 처리됩니다.'}
+                  <br />공식 서비스·운영진으로 오인될 수 있는 이름은 사용할 수 없습니다.
+                </span>
+              </div>
             </label>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>

@@ -25,6 +25,7 @@ const inputStyle = {
 function getFunctionsErrorMessage(err, fallback) {
   const code = err?.code || '';
   if (code.includes('not-found')) return '해당 초대 코드를 가진 크루를 찾지 못했습니다.';
+  if (code.includes('already-exists') && err?.message) return err.message;
   if (code.includes('failed-precondition') && err?.message) return err.message;
   if (code.includes('invalid-argument') && err?.message) return err.message;
   return fallback;
@@ -277,6 +278,10 @@ export default function CrewCreateModal({ isOpen, onClose, onNavigateStore, reje
                     maxLength={28}
                     disabled={busy || success}
                   />
+                  <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.55 }}>
+                    2~28자 · 한글/영문/숫자 사용 · 공백·대소문자·구분자만 다른 유사 이름도 중복으로 처리됩니다.
+                    <br />공식·운영진 사칭 이름은 사용할 수 없으며, 승인 후 이름은 7일 동안 잠깁니다.
+                  </div>
                 </label>
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>

@@ -549,7 +549,7 @@ export default function CrewApproval() {
       await refreshData();
     } catch (err) {
       console.error('Failed to approve crew:', err);
-      alert('크루 승인 처리에 실패했습니다.');
+      alert(err?.message || '크루 승인 처리에 실패했습니다.');
     } finally {
       setBusyId('');
     }
@@ -791,6 +791,19 @@ export default function CrewApproval() {
                       <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>색상</span>
                       <input value={draft.color} onChange={(e) => setCrewDraft(crew.id, { color: e.target.value })} style={fieldStyle} />
                     </label>
+                  </div>
+                  <div style={{ marginTop: '0.65rem', padding: '0.7rem 0.8rem', borderRadius: 8, background: 'rgba(14,116,144,0.08)', border: '1px solid rgba(34,211,238,0.16)', color: '#a5f3fc', fontSize: '0.78rem', lineHeight: 1.55 }}>
+                    <strong>이름 보호:</strong> 공백·대소문자·구분자만 다른 유사 이름도 중복으로 차단됩니다. 리더는 7일에 한 번 변경할 수 있고, 운영자 수정도 이력에 기록됩니다.
+                    {Array.isArray(crew.nameHistory) && crew.nameHistory.length > 0 && (
+                      <div style={{ marginTop: '0.35rem', color: '#94a3b8' }}>
+                        최근 이름: {crew.nameHistory.slice(-3).reverse().map((entry) => (
+                          <span key={`${entry.changedAtMs || 0}:${entry.name || ''}`} style={{ marginRight: '0.55rem' }}>
+                            {entry.name || '(이름 없음)'}
+                            {entry.changedAtMs ? ` (${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short' }).format(new Date(entry.changedAtMs))})` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <label style={{ display: 'grid', gap: '0.35rem', marginTop: '0.8rem' }}>
                     <span style={{ color: '#cbd5e1', fontSize: '0.86rem', fontWeight: 700 }}>설명</span>

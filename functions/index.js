@@ -5488,6 +5488,10 @@ function buildCrewSnapshot(crewId, crewData, memberSummaries = [], greetings = [
     googleMeetUrl: crewData.googleMeetUrl || '',
     googleMeetUpdatedAt: crewData.googleMeetUpdatedAt || null,
     googleMeetUpdatedBy: crewData.googleMeetUpdatedBy || '',
+    nameCanonical: crewData.nameCanonical || '',
+    nameChangeLockedUntilMs: Number(crewData.nameChangeLockedUntilMs || 0),
+    nameChangedAtMs: Number(crewData.nameChangedAtMs || 0),
+    nameChangeCount: Number(crewData.nameChangeCount || 0),
     memberCount: crewData.memberCount || memberSummaries.length || 0,
     memberIds: crewData.memberIds || memberSummaries.map((m) => m.uid),
     members: memberSummaries,
@@ -5497,6 +5501,99 @@ function buildCrewSnapshot(crewId, crewData, memberSummaries = [], greetings = [
 }
 
 const CREW_SCHEDULE_DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const CREW_NAME_POLICY_VERSION = 1;
+const CREW_NAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const CREW_NAME_REGISTRY_COLLECTION = "crewNameRegistry";
+const CREW_NAME_RESERVED_CANONICALS = [
+  "메타센스",
+  "metasense",
+  "msense",
+  "공식",
+  "official",
+  "운영진",
+  "관리자",
+  "admin",
+];
+
+function normalizeCrewNameDisplay(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function canonicalizeCrewName(value) {
+  return String(value ?? "")
+    .replace(/[ㅣ|｜Ⅰ]/gu, "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/\s+[il]\s+/gu, "")
+    .replace(/[^0-9a-z가-힣ㄱ-ㅎㅏ-ㅣ]/gu, "");
+}
+
+function validateCrewNamePolicy(value) {
+  const name = normalizeCrewNameDisplay(value);
+  const length = Array.from(name).length;
+  if (length < 2 || length > 28) {
+    throw new functions.https.HttpsError("invalid-argument", "크루 이름은 2~28자로 입력해주세요.");
+  }
+  if (!/^[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ\s·|ㅣ_-]+$/u.test(name)) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "크루 이름에는 한글, 영문, 숫자와 공백·구분자(· | - _)만 사용할 수 있습니다.",
+    );
+  }
+
+  const canonical = canonicalizeCrewName(name);
+  if (Array.from(canonical).length < 2) {
+    throw new functions.https.HttpsError("invalid-argument", "구분자를 제외한 이름을 2자 이상 입력해주세요.");
+  }
+  if (CREW_NAME_RESERVED_CANONICALS.some((reserved) => canonical.includes(reserved))) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "공식 서비스나 운영진으로 오인될 수 있는 이름은 사용할 수 없습니다.",
+    );
+  }
+  return { name, canonical };
+}
+
+function crewNameRegistryRef(db, canonical) {
+  return db.collection(CREW_NAME_REGISTRY_COLLECTION).doc(`v${CREW_NAME_POLICY_VERSION}_${canonical}`);
+}
+
+function isCrewNameClaimActive(crewData = {}) {
+  return !["rejected", "deleted", "archived"].includes(String(crewData.status || "pending"));
+}
+
+async function assertCrewNameAvailable(db, canonical, excludeCrewId = "") {
+  // Legacy crews do not have nameCanonical yet, so scan names as a compatibility bridge.
+  const snap = await db.collection("crews").select("name", "nameCanonical", "status").get();
+  const collision = snap.docs.find((docSnap) => {
+    if (docSnap.id === excludeCrewId) return false;
+    const crewData = docSnap.data() || {};
+    if (!isCrewNameClaimActive(crewData)) return false;
+    const existingCanonical = crewData.nameCanonical || canonicalizeCrewName(crewData.name || "");
+    return existingCanonical && existingCanonical === canonical;
+  });
+  if (collision) {
+    throw new functions.https.HttpsError(
+      "already-exists",
+      "이미 사용 중이거나 매우 유사한 크루 이름입니다. 다른 이름을 선택해주세요.",
+    );
+  }
+}
+
+function getCrewNameLockUntilMs(crewData = {}) {
+  const explicitLock = Number(crewData.nameChangeLockedUntilMs || 0);
+  if (explicitLock > 0) return explicitLock;
+  const changedAtMs = Number(crewData.nameChangedAtMs || 0);
+  return changedAtMs > 0 ? changedAtMs + CREW_NAME_CHANGE_COOLDOWN_MS : 0;
+}
+
+function getCrewNameHistory(crewData, nextEntry) {
+  const previous = Array.isArray(crewData?.nameHistory) ? crewData.nameHistory : [];
+  return [...previous.slice(-9), nextEntry];
+}
 
 function normalizeCrewSchedule(scheduleDays, scheduleTimes) {
   const validDayKeys = new Set(CREW_SCHEDULE_DAY_KEYS);
@@ -6872,15 +6969,12 @@ exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) =
     clusterName = "",
   } = data || {};
 
-  const cleanName = String(name).trim().slice(0, 28);
+  const { name: cleanName, canonical: nameCanonical } = validateCrewNamePolicy(name);
   const cleanMotto = String(motto).trim().slice(0, 52);
   const cleanDescription = String(description).trim().slice(0, 500);
   const normalizedSchedule = normalizeCrewSchedule(data?.scheduleDays, data?.scheduleTimes);
-  if (!cleanName) {
-    throw new functions.https.HttpsError("invalid-argument", "크루 이름을 입력해주세요.");
-  }
-
   const db = admin.firestore();
+  await assertCrewNameAvailable(db, nameCanonical);
   const userRef = db.collection("users").doc(uid);
   const userSnap = await userRef.get();
   if (!userSnap.exists) {
@@ -6891,10 +6985,17 @@ exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) =
   }
 
   const crewRef = db.collection("crews").doc();
+  const nameRegistryRef = crewNameRegistryRef(db, nameCanonical);
   const inviteCode = Array.from(`${uid}-${cleanName}-${crewRef.id}`).reduce((acc, ch, idx) => acc + ((ch.charCodeAt(0) * (idx + 7)) % 36).toString(36), "").toUpperCase().slice(0, 6).padEnd(6, "A");
   const createdAt = new Date();
   const crewData = {
     name: cleanName,
+    nameCanonical,
+    namePolicyVersion: CREW_NAME_POLICY_VERSION,
+    nameChangeLockedUntilMs: 0,
+    nameChangedAtMs: 0,
+    nameChangeCount: 0,
+    nameHistory: [],
     motto: cleanMotto,
     description: cleanDescription,
     color,
@@ -6920,7 +7021,10 @@ exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) =
   };
 
   await db.runTransaction(async (tx) => {
-    const freshUserSnap = await tx.get(userRef);
+    const [freshUserSnap, registrySnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(nameRegistryRef),
+    ]);
     if (!freshUserSnap.exists) {
       throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
     }
@@ -6932,9 +7036,23 @@ exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) =
     if ((freshUser.crewCreationPasses || 0) < 1) {
       throw new functions.https.HttpsError("failed-precondition", "스터디 크루 창설권이 필요합니다. 스토어에서 1000광석으로 구매해주세요.");
     }
+    if (registrySnap.exists && registrySnap.data()?.crewId !== crewRef.id) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "이미 사용 중이거나 매우 유사한 크루 이름입니다. 다른 이름을 선택해주세요.",
+      );
+    }
 
     // Note: pass is NOT consumed here. It is consumed when admin approves the crew.
     tx.set(crewRef, crewData);
+    tx.set(nameRegistryRef, {
+      crewId: crewRef.id,
+      name: cleanName,
+      canonical: nameCanonical,
+      policyVersion: CREW_NAME_POLICY_VERSION,
+      claimedAt: createdAt,
+      updatedAt: createdAt,
+    });
   });
 
   await syncCrewToMembers(crewRef.id, {
@@ -7028,14 +7146,27 @@ exports.updateStudyCrew = regionalFunctions.https.onCall(async (data, context) =
   if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
 
   const crewData = crewSnap.data() || {};
+  let isAdmin = false;
   if (crewData.leaderId !== uid) {
     const adminDoc = await db.collection("users").doc(uid).get();
     if (!adminDoc.exists || adminDoc.data().role !== "admin") {
       throw new functions.https.HttpsError("permission-denied", "크루 리더만 수정할 수 있습니다.");
     }
+    isAdmin = true;
   }
 
-  const nextName = String(data?.name || crewData.name || "").trim().slice(0, 28);
+  const requestedName = normalizeCrewNameDisplay(data?.name ?? crewData.name ?? "");
+  const initialNameChanged = requestedName !== normalizeCrewNameDisplay(crewData.name || "");
+  const initialNamePolicy = initialNameChanged
+    ? validateCrewNamePolicy(requestedName)
+    : {
+        name: crewData.name || requestedName,
+        canonical: crewData.nameCanonical || canonicalizeCrewName(crewData.name || requestedName),
+      };
+  if (initialNameChanged) {
+    await assertCrewNameAvailable(db, initialNamePolicy.canonical, crewId);
+  }
+
   const nextMotto = String(data?.motto || crewData.motto || "").trim().slice(0, 52);
   const nextDescription = String(data?.description ?? crewData.description ?? "").trim().slice(0, 500);
   const nextColor = String(data?.color || crewData.color || "#00d4ff");
@@ -7048,28 +7179,120 @@ exports.updateStudyCrew = regionalFunctions.https.onCall(async (data, context) =
     data?.scheduleTimes ?? crewData.scheduleTimes,
   );
 
-  const updatedCrew = {
-    ...crewData,
-    name: nextName,
-    motto: nextMotto,
-    description: nextDescription,
-    color: nextColor,
-    groupId: nextGroupId,
-    groupName: nextGroupName,
-    clusterId: nextClusterId,
-    clusterName: nextClusterName,
-    ...nextSchedule,
-    updatedAt: new Date(),
-  };
+  let updatedCrew;
+  let nameChangeResult = null;
+  await db.runTransaction(async (tx) => {
+    const freshCrewSnap = await tx.get(crewRef);
+    if (!freshCrewSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+    }
+    const freshCrew = freshCrewSnap.data() || {};
+    if (freshCrew.leaderId !== uid && !isAdmin) {
+      throw new functions.https.HttpsError("permission-denied", "크루 리더만 수정할 수 있습니다.");
+    }
 
-  await crewRef.set(updatedCrew, { merge: true });
+    const freshCurrentName = normalizeCrewNameDisplay(freshCrew.name || "");
+    const nameChanged = requestedName !== freshCurrentName;
+    const nextNamePolicy = nameChanged
+      ? validateCrewNamePolicy(requestedName)
+      : {
+          name: freshCrew.name || requestedName,
+          canonical: freshCrew.nameCanonical || canonicalizeCrewName(freshCrew.name || requestedName),
+        };
+    const oldCanonical = freshCrew.nameCanonical || canonicalizeCrewName(freshCrew.name || "");
+    const newRegistryRef = nameChanged && isCrewNameClaimActive(freshCrew)
+      ? crewNameRegistryRef(db, nextNamePolicy.canonical)
+      : null;
+    const oldRegistryRef = nameChanged && oldCanonical && oldCanonical !== nextNamePolicy.canonical
+      ? crewNameRegistryRef(db, oldCanonical)
+      : null;
+    const [newRegistrySnap, oldRegistrySnap] = await Promise.all([
+      newRegistryRef ? tx.get(newRegistryRef) : Promise.resolve(null),
+      oldRegistryRef ? tx.get(oldRegistryRef) : Promise.resolve(null),
+    ]);
+
+    const now = new Date();
+    const nowMs = now.getTime();
+    if (nameChanged && freshCrew.status === "approved" && !isAdmin) {
+      const lockUntilMs = getCrewNameLockUntilMs(freshCrew);
+      if (lockUntilMs > nowMs) {
+        const availableDate = new Intl.DateTimeFormat("ko-KR", {
+          timeZone: "Asia/Seoul",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }).format(new Date(lockUntilMs));
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          `크루 이름은 7일에 한 번 변경할 수 있습니다. ${availableDate}부터 다시 변경할 수 있어요.`,
+        );
+      }
+    }
+    if (newRegistrySnap?.exists && newRegistrySnap.data()?.crewId !== crewId) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "이미 사용 중이거나 매우 유사한 크루 이름입니다. 다른 이름을 선택해주세요.",
+      );
+    }
+
+    const nameFields = nameChanged ? {
+      name: nextNamePolicy.name,
+      nameCanonical: nextNamePolicy.canonical,
+      namePolicyVersion: CREW_NAME_POLICY_VERSION,
+      nameChangedAt: now,
+      nameChangedAtMs: nowMs,
+      nameChangeLockedUntilMs: nowMs + CREW_NAME_CHANGE_COOLDOWN_MS,
+      nameChangeCount: Number(freshCrew.nameChangeCount || 0) + 1,
+      nameHistory: getCrewNameHistory(freshCrew, {
+        name: freshCrew.name || "",
+        changedAtMs: nowMs,
+        changedBy: uid,
+        source: isAdmin ? "admin" : "leader",
+      }),
+    } : {};
+
+    updatedCrew = {
+      ...freshCrew,
+      ...nameFields,
+      motto: nextMotto,
+      description: nextDescription,
+      color: nextColor,
+      groupId: nextGroupId,
+      groupName: nextGroupName,
+      clusterId: nextClusterId,
+      clusterName: nextClusterName,
+      ...nextSchedule,
+      updatedAt: now,
+    };
+    tx.set(crewRef, updatedCrew, { merge: true });
+
+    if (newRegistryRef) {
+      tx.set(newRegistryRef, {
+        crewId,
+        name: nextNamePolicy.name,
+        canonical: nextNamePolicy.canonical,
+        policyVersion: CREW_NAME_POLICY_VERSION,
+        claimedAt: newRegistrySnap?.exists ? (newRegistrySnap.data()?.claimedAt || now) : now,
+        updatedAt: now,
+      }, { merge: true });
+    }
+    if (oldRegistryRef && oldRegistrySnap?.exists && oldRegistrySnap.data()?.crewId === crewId) {
+      tx.delete(oldRegistryRef);
+    }
+    if (nameChanged) {
+      nameChangeResult = {
+        changed: true,
+        nextAllowedAtMs: nowMs + CREW_NAME_CHANGE_COOLDOWN_MS,
+      };
+    }
+  });
+
   await syncCrewToMembers(crewId, {
-    ...crewData,
     ...updatedCrew,
     updatedAt: new Date().toISOString(),
   });
 
-  return { success: true };
+  return { success: true, nameChange: nameChangeResult };
 });
 
 exports.reviewStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
@@ -7089,37 +7312,69 @@ exports.reviewStudyCrew = regionalFunctions.https.onCall(async (data, context) =
 
   const crewData = crewSnap.data() || {};
   if (action === "approve") {
-    // Consume creation pass from leader on approval
-    const leaderId = crewData.leaderId;
-    if (leaderId) {
-      const leaderRef = db.collection("users").doc(leaderId);
-      const leaderSnap = await leaderRef.get();
-      if (leaderSnap.exists && (leaderSnap.data()?.crewCreationPasses || 0) >= 1) {
-        await leaderRef.set({
-          crewCreationPasses: admin.firestore.FieldValue.increment(-1),
-          rejectedCrewId: "",
-        }, { merge: true });
+    const namePolicy = validateCrewNamePolicy(crewData.name || "");
+    await assertCrewNameAvailable(db, namePolicy.canonical, crewId);
+    const registryRef = crewNameRegistryRef(db, namePolicy.canonical);
+    let updatedCrew;
+    await db.runTransaction(async (tx) => {
+      const freshCrewSnap = await tx.get(crewRef);
+      if (!freshCrewSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
       }
-    }
+      const freshCrew = freshCrewSnap.data() || {};
+      if (freshCrew.status !== "pending") {
+        throw new functions.https.HttpsError("failed-precondition", "승인 대기 중인 크루만 승인할 수 있습니다.");
+      }
+      if (normalizeCrewNameDisplay(freshCrew.name || "") !== namePolicy.name) {
+        throw new functions.https.HttpsError("aborted", "크루 이름이 방금 변경되었습니다. 목록을 새로고침한 뒤 다시 승인해주세요.");
+      }
+      const leaderRef = freshCrew.leaderId ? db.collection("users").doc(freshCrew.leaderId) : null;
+      const [leaderSnap, registrySnap] = await Promise.all([
+        leaderRef ? tx.get(leaderRef) : Promise.resolve(null),
+        tx.get(registryRef),
+      ]);
+      if (registrySnap.exists && registrySnap.data()?.crewId !== crewId) {
+        throw new functions.https.HttpsError(
+          "already-exists",
+          "이미 사용 중이거나 매우 유사한 크루 이름입니다. 다른 이름을 선택해주세요.",
+        );
+      }
+      if (!leaderSnap?.exists || Number(leaderSnap.data()?.crewCreationPasses || 0) < 1) {
+        throw new functions.https.HttpsError("failed-precondition", "크루 리더에게 스터디 크루 창설권이 필요합니다.");
+      }
 
-    const updatedCrew = {
-      ...crewData,
-      status: "approved",
-      rejectionReason: "",
-      activeStudyRoomId: crewData.activeStudyRoomId || "",
-      activeStudyRoomStatus: crewData.activeStudyRoomStatus || "",
-      studyRoomCapacity: crewData.studyRoomCapacity || 0,
-      approvedAt: new Date(),
-      updatedAt: new Date(),
-    };
-    await crewRef.set(updatedCrew, { merge: true });
+      const now = new Date();
+      const nowMs = now.getTime();
+      updatedCrew = {
+        ...freshCrew,
+        name: namePolicy.name,
+        nameCanonical: namePolicy.canonical,
+        namePolicyVersion: CREW_NAME_POLICY_VERSION,
+        nameChangeLockedUntilMs: nowMs + CREW_NAME_CHANGE_COOLDOWN_MS,
+        status: "approved",
+        rejectionReason: "",
+        activeStudyRoomId: freshCrew.activeStudyRoomId || "",
+        activeStudyRoomStatus: freshCrew.activeStudyRoomStatus || "",
+        studyRoomCapacity: freshCrew.studyRoomCapacity || 0,
+        approvedAt: now,
+        updatedAt: now,
+      };
+      tx.set(leaderRef, {
+        crewCreationPasses: admin.firestore.FieldValue.increment(-1),
+        rejectedCrewId: "",
+      }, { merge: true });
+      tx.set(crewRef, updatedCrew, { merge: true });
+      tx.set(registryRef, {
+        crewId,
+        name: namePolicy.name,
+        canonical: namePolicy.canonical,
+        policyVersion: CREW_NAME_POLICY_VERSION,
+        claimedAt: registrySnap.exists ? (registrySnap.data()?.claimedAt || now) : now,
+        updatedAt: now,
+      }, { merge: true });
+    });
     await syncCrewToMembers(crewId, {
-      ...crewData,
-      status: "approved",
-      rejectionReason: "",
-      activeStudyRoomId: crewData.activeStudyRoomId || "",
-      activeStudyRoomStatus: crewData.activeStudyRoomStatus || "",
-      studyRoomCapacity: crewData.studyRoomCapacity || 0,
+      ...updatedCrew,
       approvedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -7140,7 +7395,15 @@ exports.reviewStudyCrew = regionalFunctions.https.onCall(async (data, context) =
     rejectedAt: new Date(),
     updatedAt: new Date(),
   };
-  await crewRef.set(updatedCrew, { merge: true });
+  const rejectedCanonical = crewData.nameCanonical || canonicalizeCrewName(crewData.name || "");
+  const rejectedRegistryRef = rejectedCanonical ? crewNameRegistryRef(db, rejectedCanonical) : null;
+  await db.runTransaction(async (tx) => {
+    const registrySnap = rejectedRegistryRef ? await tx.get(rejectedRegistryRef) : null;
+    tx.set(crewRef, updatedCrew, { merge: true });
+    if (registrySnap?.exists && registrySnap.data()?.crewId === crewId) {
+      tx.delete(rejectedRegistryRef);
+    }
+  });
   await syncCrewToMembers(crewId, {
     ...crewData,
     status: "rejected",
@@ -7169,14 +7432,10 @@ exports.resubmitStudyCrew = regionalFunctions.https.onCall(async (data, context)
     clusterName = "",
   } = data || {};
 
-  const cleanName = String(name).trim().slice(0, 28);
+  const { name: cleanName, canonical: nameCanonical } = validateCrewNamePolicy(name);
   const cleanMotto = String(motto).trim().slice(0, 52);
   const cleanDescription = String(description).trim().slice(0, 500);
   const normalizedSchedule = normalizeCrewSchedule(data?.scheduleDays, data?.scheduleTimes);
-  if (!cleanName) {
-    throw new functions.https.HttpsError("invalid-argument", "크루 이름을 입력해주세요.");
-  }
-
   const db = admin.firestore();
   const crewRef = db.collection("crews").doc(crewId);
   const crewSnap = await crewRef.get();
@@ -7202,27 +7461,92 @@ exports.resubmitStudyCrew = regionalFunctions.https.onCall(async (data, context)
   if (userSnap.data()?.crewId) {
     throw new functions.https.HttpsError("failed-precondition", "이미 다른 크루에 속해 있습니다.");
   }
+  await assertCrewNameAvailable(db, nameCanonical, crewId);
 
-  const updatedCrew = {
-    ...crewData,
-    name: cleanName,
-    motto: cleanMotto,
-    description: cleanDescription,
-    color,
-    groupId,
-    groupName,
-    clusterId,
-    clusterName,
-    ...normalizedSchedule,
-    status: "pending",
-    rejectionReason: "",
-    memberIds: [uid],
-    memberCount: 1,
-    resubmittedAt: new Date(),
-    updatedAt: new Date(),
-  };
+  const newRegistryRef = crewNameRegistryRef(db, nameCanonical);
+  let updatedCrew;
+  await db.runTransaction(async (tx) => {
+    const freshCrewSnap = await tx.get(crewRef);
+    if (!freshCrewSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+    }
+    const freshCrew = freshCrewSnap.data() || {};
+    const oldCanonical = freshCrew.nameCanonical || canonicalizeCrewName(freshCrew.name || "");
+    const oldRegistryRef = oldCanonical && oldCanonical !== nameCanonical
+      ? crewNameRegistryRef(db, oldCanonical)
+      : null;
+    const [freshUserSnap, newRegistrySnap, oldRegistrySnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(newRegistryRef),
+      oldRegistryRef ? tx.get(oldRegistryRef) : Promise.resolve(null),
+    ]);
+    if (freshCrew.leaderId !== uid) {
+      throw new functions.https.HttpsError("permission-denied", "크루 리더만 재신청할 수 있습니다.");
+    }
+    if (freshCrew.status !== "rejected") {
+      throw new functions.https.HttpsError("failed-precondition", "반려된 크루만 재신청할 수 있습니다.");
+    }
+    if (!freshUserSnap.exists || Number(freshUserSnap.data()?.crewCreationPasses || 0) < 1) {
+      throw new functions.https.HttpsError("failed-precondition", "스터디 크루 창설권이 필요합니다.");
+    }
+    if (freshUserSnap.data()?.crewId) {
+      throw new functions.https.HttpsError("failed-precondition", "이미 다른 크루에 속해 있습니다.");
+    }
+    if (newRegistrySnap.exists && newRegistrySnap.data()?.crewId !== crewId) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "이미 사용 중이거나 매우 유사한 크루 이름입니다. 다른 이름을 선택해주세요.",
+      );
+    }
 
-  await crewRef.set(updatedCrew, { merge: true });
+    const now = new Date();
+    const nowMs = now.getTime();
+    const nameChanged = normalizeCrewNameDisplay(freshCrew.name || "") !== cleanName;
+    updatedCrew = {
+      ...freshCrew,
+      name: cleanName,
+      nameCanonical,
+      namePolicyVersion: CREW_NAME_POLICY_VERSION,
+      nameChangeLockedUntilMs: 0,
+      ...(nameChanged ? {
+        nameChangedAt: now,
+        nameChangedAtMs: nowMs,
+        nameChangeCount: Number(freshCrew.nameChangeCount || 0) + 1,
+        nameHistory: getCrewNameHistory(freshCrew, {
+          name: freshCrew.name || "",
+          changedAtMs: nowMs,
+          changedBy: uid,
+          source: "resubmit",
+        }),
+      } : {}),
+      motto: cleanMotto,
+      description: cleanDescription,
+      color,
+      groupId,
+      groupName,
+      clusterId,
+      clusterName,
+      ...normalizedSchedule,
+      status: "pending",
+      rejectionReason: "",
+      memberIds: [uid],
+      memberCount: 1,
+      resubmittedAt: now,
+      updatedAt: now,
+    };
+    tx.set(crewRef, updatedCrew, { merge: true });
+    tx.set(newRegistryRef, {
+      crewId,
+      name: cleanName,
+      canonical: nameCanonical,
+      policyVersion: CREW_NAME_POLICY_VERSION,
+      claimedAt: newRegistrySnap.exists ? (newRegistrySnap.data()?.claimedAt || now) : now,
+      updatedAt: now,
+    }, { merge: true });
+    if (oldRegistryRef && oldRegistrySnap?.exists && oldRegistrySnap.data()?.crewId === crewId) {
+      tx.delete(oldRegistryRef);
+    }
+  });
 
   // Re-associate leader with this crew
   await syncCrewToMembers(crewId, {
@@ -7776,7 +8100,7 @@ exports.listOpenStudyPoolsAdmin = regionalFunctions.https.onCall(async (_data, c
 });
 
 exports.adminUpdateStudyCrewDetails = regionalFunctions.https.onCall(async (data, context) => {
-  await requireAdminUid(context);
+  const adminUid = await requireAdminUid(context);
   const crewId = String(data?.crewId || "").trim();
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
 
@@ -7790,29 +8114,100 @@ exports.adminUpdateStudyCrewDetails = regionalFunctions.https.onCall(async (data
     data?.scheduleDays ?? crewData.scheduleDays,
     data?.scheduleTimes ?? crewData.scheduleTimes,
   );
-  const now = new Date();
-  const updatedCrew = {
-    ...crewData,
-    name: String(data?.name ?? crewData.name ?? "").trim().slice(0, 28),
-    motto: String(data?.motto ?? crewData.motto ?? "").trim().slice(0, 52),
-    description: String(data?.description ?? crewData.description ?? "").trim().slice(0, 500),
-    color: String(data?.color ?? crewData.color ?? "#00d4ff").trim().slice(0, 30) || "#00d4ff",
-    groupId: String(data?.groupId ?? crewData.groupId ?? "none").trim().slice(0, 80) || "none",
-    groupName: String(data?.groupName ?? crewData.groupName ?? "자유 스터디").trim().slice(0, 80) || "자유 스터디",
-    clusterId: String(data?.clusterId ?? crewData.clusterId ?? "").trim().slice(0, 120),
-    clusterName: String(data?.clusterName ?? crewData.clusterName ?? "").trim().slice(0, 120),
-    ...normalizedSchedule,
-    updatedAt: now,
-  };
-
-  if (!updatedCrew.name) {
-    throw new functions.https.HttpsError("invalid-argument", "크루 이름을 입력해주세요.");
+  const requestedName = normalizeCrewNameDisplay(data?.name ?? crewData.name ?? "");
+  const initialNameChanged = requestedName !== normalizeCrewNameDisplay(crewData.name || "");
+  const initialNamePolicy = initialNameChanged
+    ? validateCrewNamePolicy(requestedName)
+    : {
+        name: crewData.name || requestedName,
+        canonical: crewData.nameCanonical || canonicalizeCrewName(crewData.name || requestedName),
+      };
+  if (initialNameChanged) {
+    await assertCrewNameAvailable(db, initialNamePolicy.canonical, crewId);
   }
 
-  await crewRef.set(updatedCrew, { merge: true });
+  let updatedCrew;
+  await db.runTransaction(async (tx) => {
+    const freshCrewSnap = await tx.get(crewRef);
+    if (!freshCrewSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+    }
+    const freshCrew = freshCrewSnap.data() || {};
+    const nameChanged = requestedName !== normalizeCrewNameDisplay(freshCrew.name || "");
+    const nextNamePolicy = nameChanged
+      ? validateCrewNamePolicy(requestedName)
+      : {
+          name: freshCrew.name || requestedName,
+          canonical: freshCrew.nameCanonical || canonicalizeCrewName(freshCrew.name || requestedName),
+        };
+    const oldCanonical = freshCrew.nameCanonical || canonicalizeCrewName(freshCrew.name || "");
+    const newRegistryRef = nameChanged && isCrewNameClaimActive(freshCrew)
+      ? crewNameRegistryRef(db, nextNamePolicy.canonical)
+      : null;
+    const oldRegistryRef = nameChanged && oldCanonical && oldCanonical !== nextNamePolicy.canonical
+      ? crewNameRegistryRef(db, oldCanonical)
+      : null;
+    const [newRegistrySnap, oldRegistrySnap] = await Promise.all([
+      newRegistryRef ? tx.get(newRegistryRef) : Promise.resolve(null),
+      oldRegistryRef ? tx.get(oldRegistryRef) : Promise.resolve(null),
+    ]);
+    if (newRegistrySnap?.exists && newRegistrySnap.data()?.crewId !== crewId) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "이미 사용 중이거나 매우 유사한 크루 이름입니다. 다른 이름을 선택해주세요.",
+      );
+    }
+
+    const now = new Date();
+    const nowMs = now.getTime();
+    updatedCrew = {
+      ...freshCrew,
+      ...(nameChanged ? {
+        name: nextNamePolicy.name,
+        nameCanonical: nextNamePolicy.canonical,
+        namePolicyVersion: CREW_NAME_POLICY_VERSION,
+        nameChangedAt: now,
+        nameChangedAtMs: nowMs,
+        nameChangeLockedUntilMs: freshCrew.status === "approved"
+          ? nowMs + CREW_NAME_CHANGE_COOLDOWN_MS
+          : 0,
+        nameChangeCount: Number(freshCrew.nameChangeCount || 0) + 1,
+        nameHistory: getCrewNameHistory(freshCrew, {
+          name: freshCrew.name || "",
+          changedAtMs: nowMs,
+          changedBy: adminUid,
+          source: "admin",
+        }),
+      } : {}),
+      motto: String(data?.motto ?? freshCrew.motto ?? "").trim().slice(0, 52),
+      description: String(data?.description ?? freshCrew.description ?? "").trim().slice(0, 500),
+      color: String(data?.color ?? freshCrew.color ?? "#00d4ff").trim().slice(0, 30) || "#00d4ff",
+      groupId: String(data?.groupId ?? freshCrew.groupId ?? "none").trim().slice(0, 80) || "none",
+      groupName: String(data?.groupName ?? freshCrew.groupName ?? "자유 스터디").trim().slice(0, 80) || "자유 스터디",
+      clusterId: String(data?.clusterId ?? freshCrew.clusterId ?? "").trim().slice(0, 120),
+      clusterName: String(data?.clusterName ?? freshCrew.clusterName ?? "").trim().slice(0, 120),
+      ...normalizedSchedule,
+      updatedAt: now,
+    };
+    tx.set(crewRef, updatedCrew, { merge: true });
+    if (newRegistryRef) {
+      tx.set(newRegistryRef, {
+        crewId,
+        name: nextNamePolicy.name,
+        canonical: nextNamePolicy.canonical,
+        policyVersion: CREW_NAME_POLICY_VERSION,
+        claimedAt: newRegistrySnap?.exists ? (newRegistrySnap.data()?.claimedAt || now) : now,
+        updatedAt: now,
+      }, { merge: true });
+    }
+    if (oldRegistryRef && oldRegistrySnap?.exists && oldRegistrySnap.data()?.crewId === crewId) {
+      tx.delete(oldRegistryRef);
+    }
+  });
+
   await syncCrewToMembers(crewId, {
     ...updatedCrew,
-    updatedAt: now.toISOString(),
+    updatedAt: new Date().toISOString(),
   });
   return { success: true };
 });
@@ -10760,6 +11155,9 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
     }
 
     const isLeader = crewData.leaderId === uid;
+    const nameCanonical = crewData.nameCanonical || canonicalizeCrewName(crewData.name || "");
+    const nameRegistryRef = isLeader && nameCanonical ? crewNameRegistryRef(db, nameCanonical) : null;
+    const nameRegistrySnap = nameRegistryRef ? await tx.get(nameRegistryRef) : null;
     if (isLeader && memberIds.length > 1) {
       throw new functions.https.HttpsError("failed-precondition", "리더는 혼자 남았을 때만 탈퇴할 수 있습니다.");
     }
@@ -10782,6 +11180,9 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
         if (!cleanup.deleteRoomIds.includes(roomDoc.id)) cleanup.deleteRoomIds.push(roomDoc.id);
       });
       tx.delete(crewRef);
+      if (nameRegistrySnap?.exists && nameRegistrySnap.data()?.crewId === crewId) {
+        tx.delete(nameRegistryRef);
+      }
       return;
     }
 
