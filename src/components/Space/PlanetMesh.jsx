@@ -2,6 +2,8 @@ import { useRef, useMemo, Suspense, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Sphere, useTexture, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
+import ModularShip from './ModularShip'
+import { DEFAULT_SHIP_LOADOUT } from '../../utils/shipCatalog'
 
 const IMAGE_PLANET_TYPES = new Set([
   'middle_math_core',
@@ -238,11 +240,12 @@ export function OrbitingSpaceship({
   orbitRadius = 3.5, 
   baseSpeed = 0.5, 
   equipment = {}, 
+  shipCustomization = {},
   isBoosting = false 
 }) {
   const shipRef = useRef()
-  const engineRef = useRef()
   const angleRef = useRef(0)
+  const [isOccluded, setIsOccluded] = useState(false)
 
   const effectiveSpeed = useMemo(() => {
     let s = baseSpeed
@@ -251,59 +254,42 @@ export function OrbitingSpaceship({
     return s
   }, [baseSpeed, equipment.engine, isBoosting])
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     angleRef.current += delta * effectiveSpeed
     if (shipRef.current) {
       shipRef.current.position.x = Math.cos(angleRef.current) * orbitRadius
       shipRef.current.position.z = Math.sin(angleRef.current) * orbitRadius
       shipRef.current.position.y = Math.sin(angleRef.current * 2) * 0.3
-      shipRef.current.rotation.y = -angleRef.current + Math.PI / 2
-    }
-    
-    if (engineRef.current) {
-      const scale = isBoosting ? 2 + Math.sin(state.clock.elapsedTime * 20) * 0.5 : 1
-      engineRef.current.scale.set(scale, scale, scale)
     }
   })
 
+  const mapLoadout = useMemo(() => ({
+    ...DEFAULT_SHIP_LOADOUT,
+    ...shipCustomization,
+  }), [shipCustomization])
+  const mapShipSize = isBoosting ? 96 : 82
+
   return (
     <group ref={shipRef}>
-      <mesh>
-        <coneGeometry args={[0.15, 0.4, 8]} />
-        <meshStandardMaterial 
-          color={isBoosting ? "#ffcc00" : "#00d4ff"} 
-          emissive={isBoosting ? "#ffcc00" : "#00d4ff"} 
-          emissiveIntensity={isBoosting ? 2 : 0.5} 
-        />
-      </mesh>
-
-      <mesh ref={engineRef} position={[0, -0.25, 0]}>
-        <coneGeometry args={[0.08, 0.2, 8]} />
-        <meshBasicMaterial 
-          color={isBoosting ? "#ff3300" : "#ff6b35"} 
-          transparent 
-          opacity={0.8} 
-        />
-      </mesh>
-
-      {equipment.radar && (
-        <mesh position={[0, 0.1, 0.1]}>
-          <sphereGeometry args={[0.05, 8, 8]} />
-          <meshStandardMaterial color="#00ffcc" emissive="#00ffcc" emissiveIntensity={1} />
-        </mesh>
-      )}
-
-      {equipment.shield && (
-        <mesh>
-          <sphereGeometry args={[0.4, 16, 16]} />
-          <meshBasicMaterial 
-            color="#00d4ff" 
-            transparent 
-            opacity={0.2} 
-            wireframe 
+      <Html
+        center
+        occlude
+        onOcclude={setIsOccluded}
+        zIndexRange={[80, 1]}
+        style={{ pointerEvents: 'none', userSelect: 'none' }}
+      >
+        <div
+          className={`orbiting-modular-ship ${isBoosting ? 'is-boosting' : ''} ${isOccluded ? 'is-occluded' : ''}`}
+          style={{ width: mapShipSize, height: mapShipSize }}
+        >
+          <ModularShip
+            loadout={mapLoadout}
+            size={mapShipSize}
+            title="현재 행성을 탐사 중인 나의 탐사선"
+            animate={false}
           />
-        </mesh>
-      )}
+        </div>
+      </Html>
     </group>
   )
 }
@@ -320,6 +306,7 @@ export default function PlanetMesh({
   showFormulas = true,
   status = 'not_started',
   equipment = {}, 
+  shipCustomization = {},
   isBoosting = false,
   isLocked = false,
   ...props 
@@ -524,6 +511,7 @@ export default function PlanetMesh({
         <OrbitingSpaceship 
           orbitRadius={size * 1.8} 
           equipment={equipment} 
+          shipCustomization={shipCustomization}
           isBoosting={isBoosting} 
         />
       )}

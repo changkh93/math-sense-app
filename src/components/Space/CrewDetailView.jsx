@@ -14,6 +14,8 @@ import CrewSettingsModal from './CrewSettingsModal';
 import CrewCrystalChest from './CrewCrystalChest';
 import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
+import ModularShip from './ModularShip';
+import { getShipGrade } from '../../utils/shipCatalog';
 import { formatCrewSchedule } from './crewSchedule';
 import './CrewDetailView.css';
 
@@ -123,6 +125,15 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
         </span>
       </div>
 
+      <div className="crew-member-ship-dock">
+        <ModularShip userData={resolvedMember} size={92} animate={false} />
+        <div>
+          <span>PERSONAL EXPLORER</span>
+          <strong>{getShipGrade(resolvedMember).name}</strong>
+          <small>{resolvedMember.shipCustomization?.engine === 'engine-dark' ? '암흑물질 엔진 장착' : '정찰선 계열'}</small>
+        </div>
+      </div>
+
       <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
         연속 {resolvedMember.currentStreak || 0}일 · {studied ? '오늘 학습 완료' : '오늘 학습 대기'}
       </div>
@@ -205,6 +216,14 @@ function CrewMemberPublicCard({ member, profile }) {
           <span style={{ width: 7, height: 7, borderRadius: 999, background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
           {presence.label}
         </span>
+      </div>
+      <div className="crew-member-ship-dock">
+        <ModularShip userData={{ ...member, ...(profile || {}) }} size={92} animate={false} />
+        <div>
+          <span>PERSONAL EXPLORER</span>
+          <strong>{getShipGrade({ ...member, ...(profile || {}) }).name}</strong>
+          <small>격납고 신호 연결됨</small>
+        </div>
       </div>
       <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
         {isLeader ? '크루 리더' : '정식 승무원'}

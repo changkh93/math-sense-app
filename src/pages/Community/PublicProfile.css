@@ -167,7 +167,7 @@
 
 .public-profile-hero {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) 190px auto;
   gap: 1.3rem;
   align-items: center;
   padding: 1.5rem;
@@ -178,7 +178,7 @@
 }
 
 .public-profile-hero--with-premium {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) 190px auto auto;
 }
 
 .public-profile-hero::after {
@@ -212,6 +212,53 @@
   min-width: 0;
   position: relative;
   z-index: 1;
+}
+
+.public-profile-ship {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  align-self: stretch;
+  min-height: 150px;
+  overflow: hidden;
+  border: 1px solid rgba(102, 244, 255, 0.18);
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 45%, rgba(47, 139, 255, 0.17), rgba(4, 12, 28, 0.42) 68%);
+}
+
+.public-profile-ship .modular-ship {
+  position: absolute;
+  top: -20px;
+}
+
+.public-profile-ship > div:last-child {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 1.9rem 0.7rem 0.6rem;
+  background: linear-gradient(transparent, rgba(4, 12, 28, 0.94) 55%);
+  text-align: center;
+}
+
+.public-profile-ship span,
+.public-profile-ship strong {
+  display: block;
+}
+
+.public-profile-ship span {
+  color: rgba(102, 244, 255, 0.7);
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.public-profile-ship strong {
+  margin-top: 0.2rem;
+  color: #f8fbff;
+  font-size: 0.7rem;
 }
 
 .public-profile-kicker {
@@ -946,6 +993,15 @@
 
   .public-profile-hero {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .public-profile-ship {
+    grid-column: 1 / -1;
+    min-height: 190px;
+  }
+
+  .public-profile-ship .modular-ship {
+    top: -8px;
   }
 
   .public-profile-featured-premium-badge,

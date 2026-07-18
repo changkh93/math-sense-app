@@ -97,6 +97,7 @@ function SceneContent({
   recentRegionId,
   explorationStatus = {},
   equipment = {},
+  shipCustomization = {},
   isBoosting = false,
   onSelectDarkMatter,
   onSelectDarkMatterRefinery,
@@ -223,6 +224,7 @@ function SceneContent({
                showSpaceship={selectedRegionId === planet.id || (!selectedRegionId && recentRegionId === planet.id)} 
                status={explorationStatus[planet.id] || 'not_started'}
                equipment={equipment}
+               shipCustomization={shipCustomization}
                isBoosting={isBoosting}
                isLocked={planet.isLocked}
                onClick={(e) => {

@@ -1,0 +1,122 @@
+.ship-hangar {
+  --hangar-cyan: #66f4ff;
+  --hangar-blue: #2f8bff;
+  position: relative;
+  overflow: hidden;
+  max-width: 1180px;
+  margin: 0 auto 4rem;
+  border: 1px solid rgba(102, 244, 255, 0.32);
+  border-radius: 28px;
+  background: linear-gradient(145deg, rgba(7, 18, 39, 0.96), rgba(13, 8, 37, 0.97));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35), inset 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.ship-hangar__ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 24% 45%, rgba(47, 139, 255, 0.2), transparent 28%),
+    radial-gradient(circle at 87% 14%, rgba(166, 77, 255, 0.13), transparent 25%),
+    linear-gradient(rgba(102, 244, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(102, 244, 255, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, 42px 42px, 42px 42px;
+}
+
+.ship-hangar__header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 2rem 2.2rem 1.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ship-hangar__eyebrow { display: flex; align-items: center; gap: .5rem; color: var(--hangar-cyan); font-size: .72rem; font-weight: 900; letter-spacing: .16em; }
+.ship-hangar__header h2 { margin: .55rem 0 .45rem; color: #f8fbff; font-size: clamp(1.65rem, 4vw, 2.35rem); letter-spacing: -.035em; }
+.ship-hangar__header p { max-width: 650px; margin: 0; color: rgba(218, 232, 255, .68); font-size: .9rem; line-height: 1.65; }
+.ship-hangar__wallet { display: grid; grid-template-columns: auto auto; align-items: center; gap: .2rem .55rem; min-width: 160px; padding: .8rem 1rem; border: 1px solid rgba(102, 244, 255, .24); border-radius: 14px; background: rgba(102, 244, 255, .06); color: var(--hangar-cyan); }
+.ship-hangar__wallet span { color: rgba(218, 232, 255, .58); font-size: .72rem; }
+.ship-hangar__wallet strong { grid-column: 2; color: #fff; font-size: 1.15rem; }
+
+.ship-hangar__layout { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(360px, .92fr) minmax(420px, 1.08fr); min-height: 640px; }
+.ship-hangar__bay { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 1.7rem; border-right: 1px solid rgba(255,255,255,.08); background: linear-gradient(180deg, rgba(5,15,34,.3), rgba(5,15,34,.7)); }
+.ship-hangar__grade { position: relative; z-index: 2; display: grid; justify-items: start; }
+.ship-hangar__grade span { color: var(--hangar-cyan); font-size: .66rem; font-weight: 900; letter-spacing: .14em; }
+.ship-hangar__grade strong { margin-top: .3rem; color: #fff; font-size: 1.1rem; }
+.ship-hangar__grade small { margin-top: .22rem; color: rgba(255,255,255,.36); font-size: .65rem; letter-spacing: .18em; }
+.ship-hangar__ship-stage { position: relative; display: grid; flex: 1; min-height: 420px; place-items: center; }
+.ship-hangar__ship-stage::after { content: ''; position: absolute; left: 12%; right: 12%; bottom: 7%; height: 38px; border-radius: 50%; background: rgba(71, 226, 255, .25); filter: blur(22px); }
+.ship-hangar__ship-stage .modular-ship { z-index: 2; max-width: 100%; }
+.ship-hangar__orbit { position: absolute; border: 1px solid rgba(102,244,255,.17); border-radius: 50%; transform: rotate(-18deg); }
+.ship-hangar__orbit--outer { width: 390px; height: 215px; }
+.ship-hangar__orbit--inner { width: 300px; height: 168px; border-style: dashed; animation: hangar-orbit 18s linear infinite; }
+.ship-hangar__scanline { position: absolute; z-index: 3; left: 8%; right: 8%; height: 1px; top: 25%; background: linear-gradient(90deg, transparent, rgba(102,244,255,.7), transparent); box-shadow: 0 0 12px rgba(102,244,255,.5); animation: hangar-scan 4s ease-in-out infinite; pointer-events: none; }
+.ship-hangar__preview-chip { position: absolute; z-index: 4; right: 8%; top: 16%; padding: .32rem .55rem; border: 1px solid rgba(255,205,83,.5); border-radius: 999px; color: #ffd75e; background: rgba(255,191,43,.08); font-size: .62rem; font-weight: 900; letter-spacing: .14em; }
+.ship-hangar__specs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem; }
+.ship-hangar__specs div { padding: .7rem; border: 1px solid rgba(255,255,255,.07); border-radius: 11px; background: rgba(255,255,255,.025); }
+.ship-hangar__specs span, .ship-hangar__specs strong { display: block; }
+.ship-hangar__specs span { color: rgba(255,255,255,.4); font-size: .65rem; }
+.ship-hangar__specs strong { margin-top: .18rem; color: #eafcff; font-size: .78rem; }
+
+.ship-hangar__console { display: flex; min-width: 0; flex-direction: column; padding: 1.35rem; }
+.ship-hangar__slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: .45rem; margin-bottom: 1rem; }
+.ship-hangar__slots button { min-width: 0; padding: .65rem .7rem; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; color: rgba(255,255,255,.52); background: rgba(255,255,255,.025); text-align: left; cursor: pointer; }
+.ship-hangar__slots button.is-active { border-color: rgba(102,244,255,.48); color: var(--hangar-cyan); background: rgba(102,244,255,.09); box-shadow: inset 0 0 18px rgba(40,174,255,.08); }
+.ship-hangar__slots span, .ship-hangar__slots small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ship-hangar__slots span { font-size: .75rem; font-weight: 900; }
+.ship-hangar__slots small { margin-top: .25rem; color: rgba(255,255,255,.36); font-size: .61rem; }
+.ship-hangar__parts { display: grid; gap: .5rem; max-height: 236px; overflow-y: auto; padding-right: .2rem; }
+.ship-hangar__parts > button { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: .7rem; width: 100%; padding: .68rem; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; color: rgba(255,255,255,.5); background: rgba(255,255,255,.02); text-align: left; cursor: pointer; }
+.ship-hangar__parts > button:hover, .ship-hangar__parts > button.is-selected { border-color: rgba(102,244,255,.35); background: rgba(102,244,255,.065); }
+.ship-hangar__parts > button.is-equipped { box-shadow: inset 3px 0 var(--hangar-cyan); }
+.ship-part-token { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.05); }
+.ship-part-token--rare { color: #69c6ff; background: rgba(52,140,255,.12); }
+.ship-part-token--epic { color: #c68cff; background: rgba(165,85,255,.12); }
+.ship-part-token--legend { color: #ffd970; background: rgba(255,185,43,.12); }
+.ship-part-copy { min-width: 0; }
+.ship-part-copy > div { display: flex; align-items: center; gap: .5rem; }
+.ship-part-copy strong { overflow: hidden; color: #eaf2ff; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
+.ship-part-copy em { padding: .14rem .32rem; border-radius: 4px; color: rgba(255,255,255,.54); background: rgba(255,255,255,.06); font-size: .56rem; font-style: normal; }
+.ship-part-copy em[data-tier="LEGEND"] { color: #ffd970; }
+.ship-part-copy small { display: block; margin-top: .2rem; color: rgba(255,255,255,.38); font-size: .66rem; }
+.ship-hangar__selection { margin-top: 1rem; padding: 1rem; border: 1px solid rgba(102,244,255,.16); border-radius: 15px; background: linear-gradient(135deg, rgba(102,244,255,.055), rgba(115,72,255,.04)); }
+.ship-hangar__selection-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.ship-hangar__selection-top span { color: var(--hangar-cyan); font-size: .63rem; font-weight: 900; letter-spacing: .1em; }
+.ship-hangar__selection-top h3 { margin: .25rem 0 0; color: #fff; font-size: 1rem; }
+.ship-hangar__selection-top > strong { display: inline-flex; align-items: center; gap: .3rem; color: #fff; font-size: .82rem; }
+.ship-hangar__selection > p { margin: .55rem 0 .75rem; color: rgba(223,234,255,.58); font-size: .74rem; line-height: 1.55; }
+.ship-hangar__unlock > div { display: flex; align-items: center; gap: .35rem; color: #ffce66; font-size: .67rem; }
+.ship-hangar__unlock strong { margin-left: auto; }
+.ship-hangar__unlock i { display: block; height: 4px; margin-top: .4rem; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
+.ship-hangar__unlock i span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffb92b, #fff08a); }
+.ship-hangar__unlock.is-complete > div { color: #73f4c8; }
+.ship-hangar__unlock.is-complete i span { background: linear-gradient(90deg, #20d9af, #83ffe1); }
+.ship-hangar__action { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; margin-top: .8rem; padding: .78rem; border: 1px solid rgba(102,244,255,.45); border-radius: 11px; color: #06131f; background: linear-gradient(135deg, #94fbff, #50bbff); font-size: .78rem; font-weight: 950; cursor: pointer; box-shadow: 0 8px 24px rgba(43,185,255,.18); }
+.ship-hangar__action:disabled { border-color: rgba(255,255,255,.1); color: rgba(255,255,255,.35); background: rgba(255,255,255,.05); box-shadow: none; cursor: not-allowed; }
+
+@keyframes hangar-orbit { to { transform: rotate(342deg); } }
+@keyframes hangar-scan { 0%, 100% { top: 25%; opacity: .15; } 50% { top: 78%; opacity: .8; } }
+
+@media (max-width: 900px) {
+  .ship-hangar__layout { grid-template-columns: 1fr; }
+  .ship-hangar__bay { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .ship-hangar__ship-stage { min-height: 390px; }
+}
+
+@media (max-width: 600px) {
+  .ship-hangar { border-radius: 20px; }
+  .ship-hangar__header { flex-direction: column; padding: 1.35rem; }
+  .ship-hangar__wallet { width: 100%; box-sizing: border-box; }
+  .ship-hangar__bay, .ship-hangar__console { padding: 1rem; }
+  .ship-hangar__ship-stage { min-height: 330px; }
+  .ship-hangar__ship-stage .modular-ship { width: 300px !important; height: 300px !important; }
+  .ship-hangar__orbit--outer { width: 310px; height: 170px; }
+  .ship-hangar__orbit--inner { width: 245px; height: 132px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ship-hangar__orbit, .ship-hangar__scanline { animation: none !important; }
+}

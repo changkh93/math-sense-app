@@ -1,0 +1,100 @@
+.modular-ship {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  aspect-ratio: 1;
+  isolation: isolate;
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.4));
+}
+
+.modular-ship svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.modular-ship__engine {
+  transform-origin: 256px 354px;
+  animation: modular-engine-pulse 0.72s ease-in-out infinite alternate;
+}
+
+.modular-ship__engine.is-warp {
+  animation-duration: 0.36s;
+}
+
+.modular-ship__trail {
+  animation: modular-trail-breathe 1.8s ease-in-out infinite alternate;
+}
+
+.modular-ship__companion {
+  transform-origin: 256px 256px;
+  animation: modular-companion-float 3.6s ease-in-out infinite;
+}
+
+.modular-ship__cockpit.is-holo {
+  animation: modular-holo-flicker 3.8s linear infinite;
+}
+
+.orbiting-modular-ship {
+  position: relative;
+  display: grid;
+  place-items: center;
+  opacity: 1;
+  transform: scale(1);
+  filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.52));
+  transition:
+    opacity 0.32s ease-in-out,
+    transform 0.32s ease-in-out,
+    width 0.25s ease,
+    height 0.25s ease,
+    filter 0.25s ease;
+  will-change: opacity, transform;
+}
+
+.orbiting-modular-ship::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  right: 20%;
+  bottom: 7%;
+  left: 20%;
+  height: 12%;
+  border-radius: 50%;
+  background: rgba(52, 220, 255, 0.36);
+  filter: blur(8px);
+}
+
+.orbiting-modular-ship.is-boosting {
+  filter: drop-shadow(0 0 12px rgba(255, 196, 56, 0.72));
+}
+
+.orbiting-modular-ship.is-occluded {
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+@keyframes modular-engine-pulse {
+  from { opacity: 0.72; transform: scaleY(0.9); }
+  to { opacity: 1; transform: scaleY(1.09); }
+}
+
+@keyframes modular-trail-breathe {
+  from { opacity: 0.62; }
+  to { opacity: 1; }
+}
+
+@keyframes modular-companion-float {
+  0%, 100% { transform: translate(0, -3px); }
+  50% { transform: translate(3px, 7px); }
+}
+
+@keyframes modular-holo-flicker {
+  0%, 96%, 100% { opacity: 1; }
+  97% { opacity: 0.72; }
+  98% { opacity: 0.95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modular-ship * { animation: none !important; }
+}

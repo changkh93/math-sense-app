@@ -5,6 +5,8 @@ import { db } from '../../firebase'
 import { useAuth } from '../../hooks/useAuth'
 import { useChapters, useClusters, useRegions } from '../../hooks/useContent'
 import QuizBattleView from './QuizBattleView'
+import ModularShip from './ModularShip'
+import { getShipGrade } from '../../utils/shipCatalog'
 import './QuizBattleHub.css'
 
 const COURSE_META = [
@@ -150,6 +152,14 @@ export default function QuizBattleHub({ acceptedBattle, onDirectBattleExit, onBa
         <h1>QUIZ BATTLE</h1>
         <p>먼저 전장을 고르세요. 배운 범위만 정확히 지정하고, 사람 또는 NOVA-7과 바로 대결합니다.</p>
         <div className="battle-hub__pulse"><span /> ARENA NETWORK ONLINE</div>
+        <div className="battle-ship-dock">
+          <ModularShip userData={userData} size={154} animate={false} />
+          <div>
+            <span>YOUR BATTLE CRAFT</span>
+            <strong>{getShipGrade(userData).name}</strong>
+            <small>선택한 부품 그대로 배틀 대기룸에 입장합니다</small>
+          </div>
+        </div>
       </header>
 
       <section className="battle-deck">

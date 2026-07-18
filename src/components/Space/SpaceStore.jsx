@@ -22,6 +22,13 @@ import {
   buildCollectionBadges,
   isBadgeUpgradeOwned,
 } from '../../utils/badgeUtils'
+import ShipHangar from './ShipHangar'
+import {
+  getShipAchievementStats,
+  getShipItemUnlock,
+  normalizeOwnedShipItems,
+  normalizeShipLoadout,
+} from '../../utils/shipCatalog'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RADAR_DURATION_MS = RADAR_DURATION_DAYS * DAY_MS
@@ -514,6 +521,96 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     }
   }
 
+  const handleShipItemAction = async (item) => {
+    if (purchasing || !user?.uid || !item?.id || !item?.slot) return
+    setPurchasing(true)
+    const userRef = doc(db, 'users', user.uid)
+    const nowMs = Date.now()
+
+    try {
+      const result = await runTransaction(db, async (transaction) => {
+        const freshSnap = await transaction.get(userRef)
+        if (!freshSnap.exists()) throw new Error('User document not found')
+
+        const freshUserData = freshSnap.data()
+        const freshOwned = normalizeOwnedShipItems(freshUserData)
+        const isOwned = freshOwned.includes(item.id)
+        const currentLoadout = normalizeShipLoadout(freshUserData)
+
+        if (currentLoadout[item.slot] === item.id) {
+          return { mode: 'already_equipped' }
+        }
+
+        if (isOwned) {
+          transaction.set(userRef, {
+            shipCustomization: { ...currentLoadout, [item.slot]: item.id },
+          }, { merge: true })
+          return { mode: 'equipped' }
+        }
+
+        const unlock = getShipItemUnlock(item, getShipAchievementStats(freshUserData, history))
+        if (!unlock.unlocked) throw new Error('SHIP_ACHIEVEMENT_LOCKED')
+
+        const freshCrystals = Number(freshUserData?.crystals || 0)
+        if (freshCrystals < item.cost) throw new Error('INSUFFICIENT_CRYSTALS')
+
+        transaction.set(userRef, {
+          crystals: freshCrystals - item.cost,
+          ownedShipItems: [...freshOwned, item.id],
+          shipCustomization: { ...currentLoadout, [item.slot]: item.id },
+        }, { merge: true })
+
+        recordCrystalTransaction(user.uid, {
+          amount: -item.cost,
+          type: 'ship_part_purchase',
+          description: `${item.name} 탐사선 부품 구매`,
+          metadata: { itemId: item.id, slot: item.slot, family: 'scout' },
+        }, transaction, `ship_part_${item.id}_${nowMs}`)
+
+        return { mode: 'purchased' }
+      })
+
+      soundManager.playCrystal()
+      setPurchaseMessage({
+        type: 'success',
+        text: result.mode === 'purchased'
+          ? `${item.name} 구매 완료! 나의 탐사선에 바로 장착했습니다.`
+          : result.mode === 'equipped'
+            ? `${item.name} 장착 완료! 모든 탐사 화면에 반영됩니다.`
+            : `${item.name}은 이미 장착 중입니다.`,
+      })
+
+      try {
+        const freshUserSnap = await getDoc(userRef)
+        const freshUserData = freshUserSnap.exists() ? freshUserSnap.data() : userData
+        const answersSnap = await getDocs(query(collection(db, 'answers'), where('userId', '==', user.uid)))
+        if (!answersSnap.empty) {
+          const batch = writeBatch(db)
+          const snapshot = buildAnswerProfileSnapshot(
+            freshUserData,
+            freshUserData?.publicDisplayName || freshUserData?.studentName || user.displayName || '탐험가',
+          )
+          answersSnap.docs.forEach((answerDoc) => batch.update(answerDoc.ref, { publicProfileSnapshot: snapshot }))
+          await batch.commit()
+        }
+      } catch (syncErr) {
+        console.warn('탐사선 장착 후 답변 스냅샷 동기화 실패:', syncErr)
+      }
+      setTimeout(() => setPurchaseMessage(null), 3200)
+    } catch (err) {
+      console.error('Ship item action failed:', err)
+      const message = err.message === 'INSUFFICIENT_CRYSTALS'
+        ? `광석이 부족합니다. (필요: ${item.cost}개)`
+        : err.message === 'SHIP_ACHIEVEMENT_LOCKED'
+          ? '이 부품의 학습 성취 조건을 먼저 달성해주세요.'
+          : '탐사선 부품 작업에 실패했습니다. 다시 시도해주세요.'
+      setPurchaseMessage({ type: 'error', text: message })
+      setTimeout(() => setPurchaseMessage(null), 3200)
+    } finally {
+      setPurchasing(false)
+    }
+  }
+
   // 배지 외형 업그레이드 구매. 성취 자체는 무료 자동 획득이고, 디자인만 100광석에 영구 해금한다.
   const handleBadgeUpgradePurchase = async (badge) => {
     if (purchasing || !user?.uid || !badge?.id) return
@@ -984,8 +1081,8 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
   return (
     <div className="fade-in">
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-        <h2 style={{ fontSize: '2.5rem', color: 'var(--text-bright)', marginBottom: '0.5rem' }}>🎨 소셜 커스텀 상점</h2>
-        <p style={{ color: 'var(--text-muted)' }}>광석을 써서 질문의 판을 열고, 답변자 프로필과 스터디 크루를 드러내세요.</p>
+        <h2 style={{ fontSize: '2.5rem', color: 'var(--text-bright)', marginBottom: '0.5rem' }}>🚀 탐사선 격납고 & 커스텀 상점</h2>
+        <p style={{ color: 'var(--text-muted)' }}>나만의 탐사선을 조립하고, 광석으로 우주 전역에 남을 개성을 해금하세요.</p>
         
         <div style={{
           marginTop: '1.5rem',
@@ -1026,6 +1123,13 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
       )}
 
       {giftModal}
+
+      <ShipHangar
+        userData={userData}
+        history={history}
+        busy={purchasing}
+        onAction={handleShipItemAction}
+      />
 
       {/* 🏅 탐사 배지 쇼케이스 */}
       <BadgeShowcaseSection

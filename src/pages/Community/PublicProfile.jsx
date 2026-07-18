@@ -8,11 +8,13 @@ import { useAuth } from '../../hooks/useAuth';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import StarField from '../../components/Space/StarField';
 import CometBadge from '../../components/Space/CometBadge';
+import ModularShip from '../../components/Space/ModularShip';
 import { getEffectiveStreak, getKSTComponents, getTodayKST } from '../../utils/streakUtils';
 import { calculateSEI } from '../../utils/rankingUtils';
 import { getBaseTheme, getFrameSurfaceStyles, getProfileFrame, isHallSpotlightActive } from '../../utils/socialUtils';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import { buildCollectionBadges, isBadgeUpgradeOwned } from '../../utils/badgeUtils';
+import { getShipGrade } from '../../utils/shipCatalog';
 import auroraObservatoryImage from '../../assets/themes/aurora-observatory.jpg';
 import goldenArchiveImage from '../../assets/themes/golden-archive.jpg';
 import deepSeaLabImage from '../../assets/themes/deep-sea-lab.jpg';
@@ -715,6 +717,14 @@ export default function PublicProfile() {
               {profile.publicSignature && (
                   <p className="public-profile-signature">“{profile.publicSignature}”</p>
                 )}
+              </div>
+
+              <div className="public-profile-ship" aria-label={`${displayName}님의 탐사선`}>
+                <ModularShip userData={profile} size={190} animate={false} />
+                <div>
+                  <span>PERSONAL EXPLORER</span>
+                  <strong>{getShipGrade(profile).name}</strong>
+                </div>
               </div>
 
               {featuredPremiumBadge && (

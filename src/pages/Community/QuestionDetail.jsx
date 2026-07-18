@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth';
 import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
+import ModularShip from '../../components/Space/ModularShip';
 import confetti from 'canvas-confetti';
 import './QuestionDetail.css';
 
@@ -348,6 +349,11 @@ export default function QuestionDetail() {
     };
     const identityCardContent = (
       <>
+        {!answer.isTeacher && (
+          <div className="answer-identity-ship" aria-hidden="true">
+            <ModularShip userData={profile} size={64} animate={false} />
+          </div>
+        )}
         <div className="answer-identity-top">
           <span className="answer-identity-name">{displayName}</span>
           {signature && !answer.isTeacher && (
@@ -393,7 +399,7 @@ export default function QuestionDetail() {
         {canOpenPublicProfile ? (
           <button
             type="button"
-            className="answer-identity-card answer-identity-card-link"
+            className={`answer-identity-card answer-identity-card-link ${!answer.isTeacher ? 'has-ship' : ''}`}
             style={identityCardStyle}
             onClick={() => navigate(`/profile/${answer.userId}`)}
             aria-label={`${displayName}님의 탐험기지 보기`}
@@ -401,7 +407,7 @@ export default function QuestionDetail() {
             {identityCardContent}
           </button>
         ) : (
-          <div className="answer-identity-card" style={identityCardStyle}>
+          <div className={`answer-identity-card ${!answer.isTeacher ? 'has-ship' : ''}`} style={identityCardStyle}>
             {identityCardContent}
           </div>
         )}

@@ -317,6 +317,8 @@ export function buildAnswerProfileSnapshot(userData = {}, fallbackName = '탐험
     helpCount: profile.helpCount,
     questionCount: profile.questionCount,
     hallSpotlightUntilMs: profile.hallSpotlightUntilMs,
+    shipCustomization: userData?.shipCustomization || {},
+    ownedShipItems: Array.isArray(userData?.ownedShipItems) ? userData.ownedShipItems : [],
   };
 }
 

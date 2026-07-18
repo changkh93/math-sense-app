@@ -125,6 +125,23 @@
   min-width: 180px;
 }
 
+.answer-identity-card.has-ship {
+  position: relative;
+  min-height: 66px;
+  padding-left: 72px;
+  justify-content: center;
+}
+
+.answer-identity-ship {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 64px;
+  height: 64px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
 button.answer-identity-card {
   text-align: left;
   color: inherit;
