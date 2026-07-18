@@ -1,0 +1,190 @@
+.crew-directory-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.crew-directory-card::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(38, 220, 255, .035), transparent 34%);
+}
+
+.crew-directory-hangar {
+  --crew-directory-accent: #00d4ff;
+  position: relative;
+  height: 152px;
+  margin: -1.1rem -1.1rem 1rem;
+  overflow: hidden;
+  border-bottom: 1px solid color-mix(in srgb, var(--crew-directory-accent) 22%, rgba(255,255,255,.08));
+  background:
+    radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--crew-directory-accent) 18%, transparent), transparent 44%),
+    linear-gradient(155deg, rgba(4, 13, 34, .96), rgba(2, 7, 21, .88));
+}
+
+.crew-directory-hangar__space {
+  position: absolute;
+  inset: 0;
+  opacity: .5;
+  background-image:
+    linear-gradient(rgba(86, 220, 255, .04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(86, 220, 255, .04) 1px, transparent 1px),
+    radial-gradient(circle, rgba(255,255,255,.65) 0 1px, transparent 1.5px);
+  background-size: 28px 28px, 28px 28px, 67px 49px;
+  mask-image: linear-gradient(#000, transparent 92%);
+}
+
+.crew-directory-hangar__ship {
+  position: absolute;
+  z-index: 1;
+  inset: 2px 0 34px;
+  transition: transform .35s ease, filter .35s ease;
+}
+
+.crew-directory-card:hover .crew-directory-hangar__ship {
+  transform: translateY(-2px) scale(1.04);
+  filter: brightness(1.12) saturate(1.12);
+}
+
+.crew-mothership--directory {
+  width: 100%;
+  height: 118px;
+  min-height: 118px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.crew-mothership--directory > svg {
+  inset: -7% -10%;
+  width: 120%;
+  height: 114%;
+  overflow: visible;
+  filter: drop-shadow(0 9px 12px rgba(0,0,0,.6)) drop-shadow(0 0 7px color-mix(in srgb, var(--mothership-accent) 42%, transparent));
+}
+
+.crew-mothership--directory .crew-mothership__space {
+  display: none;
+}
+
+.crew-directory-hangar__level,
+.crew-directory-hangar__modules {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  pointer-events: none;
+}
+
+.crew-directory-hangar__level { left: 12px; }
+.crew-directory-hangar__modules { right: 12px; justify-content: flex-end; }
+.crew-directory-hangar__level span,
+.crew-directory-hangar__modules span,
+.crew-directory-hangar__modules b {
+  padding: .2rem .4rem;
+  border: 1px solid rgba(100, 229, 255, .18);
+  border-radius: 999px;
+  color: rgba(150, 239, 255, .8);
+  background: rgba(2, 12, 31, .72);
+  font-size: .53rem;
+  letter-spacing: .07em;
+}
+
+.crew-directory-hangar__level strong {
+  color: rgba(237, 253, 255, .82);
+  font-size: .62rem;
+}
+
+.crew-directory-hangar__modules b {
+  border-color: rgba(255, 205, 84, .28);
+  color: #ffe18b;
+}
+
+.crew-directory-hangar__dock {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .48rem;
+  min-height: 43px;
+  padding: .45rem .75rem;
+  color: #75eaff;
+  background: linear-gradient(90deg, rgba(3, 15, 36, .97), rgba(7, 23, 45, .92));
+  backdrop-filter: blur(8px);
+}
+
+.crew-directory-hangar__dock div { min-width: 0; }
+.crew-directory-hangar__dock span,
+.crew-directory-hangar__dock strong { display: block; }
+.crew-directory-hangar__dock span { color: #66e8ff; font-size: .54rem; letter-spacing: .08em; }
+.crew-directory-hangar__dock strong { margin-top: .08rem; overflow: hidden; color: rgba(255,255,255,.76); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
+.crew-directory-hangar__dock small { display: flex; align-items: center; gap: .2rem; color: #ffe197; font-size: .55rem; white-space: nowrap; }
+
+.crew-directory-hangar__progress {
+  position: absolute;
+  z-index: 6;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(255,255,255,.08);
+}
+
+.crew-directory-hangar__progress i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #24d9ff, #fff0a2);
+  box-shadow: 0 0 10px rgba(67, 225, 255, .75);
+  transition: width .45s ease;
+}
+
+.crew-directory-hangar.is-building .crew-directory-hangar__dock > svg {
+  animation: crew-directory-hammer 1.5s ease-in-out infinite;
+}
+
+.crew-directory-guide {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .65rem;
+  margin: -0.25rem 0 1.1rem;
+}
+
+.crew-directory-guide > div {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-width: 0;
+  padding: .62rem .75rem;
+  border: 1px solid rgba(82, 220, 255, .12);
+  border-radius: 10px;
+  color: rgba(255,255,255,.54);
+  background: linear-gradient(115deg, rgba(17, 58, 87, .18), rgba(8, 14, 32, .45));
+  font: 700 .72rem var(--font-tech, monospace);
+}
+
+.crew-directory-guide svg { flex: 0 0 auto; color: #54e2ff; }
+.crew-directory-guide b { color: #d9faff; }
+
+@keyframes crew-directory-hammer {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(12deg); }
+}
+
+@media (max-width: 768px) {
+  .crew-directory-guide { grid-template-columns: 1fr; }
+  .crew-directory-hangar { height: 146px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crew-directory-card:hover .crew-directory-hangar__ship { transform: none; }
+  .crew-directory-hangar.is-building .crew-directory-hangar__dock > svg { animation: none; }
+}

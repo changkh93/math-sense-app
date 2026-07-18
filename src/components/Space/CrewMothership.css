@@ -9,6 +9,10 @@
 .crew-mothership__comms { transform-origin: 600px 72px; animation: mothership-comms-scan 4.5s ease-in-out infinite alternate; }
 .crew-mothership__engines { transform-origin: 600px 420px; animation: mothership-engine-pulse .8s ease-in-out infinite alternate; }
 .crew-mothership__research { animation: mothership-research-pulse 2.4s ease-in-out infinite alternate; }
+.crew-mothership__dock-lights { pointer-events: none; }
+.crew-mothership__dock-lights-glow { transform-origin: 600px 394px; animation: mothership-dock-glow 2.4s ease-in-out infinite alternate; }
+.crew-mothership__dock-lane-flow { animation: mothership-dock-flow 1.8s linear infinite; }
+.crew-mothership__dock-beacon-halo { transform-box: fill-box; transform-origin: center; animation: mothership-dock-beacon 1.35s ease-out infinite; }
 .crew-mothership__docked { position: absolute; z-index: 3; filter: saturate(.9); }
 .crew-mothership__docked--1 { left: 10%; bottom: 13%; transform: rotate(10deg); }
 .crew-mothership__docked--2 { right: 10%; bottom: 16%; transform: rotate(-12deg); }
@@ -17,6 +21,10 @@
 .crew-mothership__readout span { color: var(--mothership-accent); font: 900 .59rem var(--font-tech,monospace); letter-spacing: .11em; }
 .crew-mothership__readout strong { margin-top: .2rem; color: #fff; font-size: .9rem; }
 .crew-mothership__readout small { margin-top: .18rem; color: rgba(255,255,255,.44); font: 700 .57rem var(--font-tech,monospace); }
+.crew-mothership__module-readout { position: absolute; z-index: 4; right: 16px; bottom: 14px; display: grid; max-width: 48%; padding: .62rem .75rem; border-right: 2px solid #31dcff; background: linear-gradient(270deg, rgba(2,18,36,.9), transparent); text-align: right; }
+.crew-mothership__module-readout span { color: #66eaff; font: 900 .55rem var(--font-tech,monospace); letter-spacing: .12em; }
+.crew-mothership__module-readout strong { margin-top: .18rem; overflow: hidden; color: #e4ffff; font-size: .73rem; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 0 12px rgba(44,224,255,.5); }
+.crew-mothership__module-readout small { margin-top: .16rem; color: rgba(111,236,255,.65); font: 800 .52rem var(--font-tech,monospace); letter-spacing: .04em; }
 .crew-mothership--nav { width: 78px; height: 42px; min-height: 42px; overflow: visible; border: 0; background: transparent; }
 .crew-mothership--nav > svg { inset: -20% -10%; width: 120%; height: 140%; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--mothership-accent) 58%, transparent)); }
 .crew-mothership--nav .crew-mothership__space, .crew-mothership--map .crew-mothership__space { display: none; }
@@ -26,6 +34,10 @@
 @keyframes mothership-ring-spin { to{transform:rotate(360deg)} }
 @keyframes mothership-comms-scan { from{transform:rotate(-3deg)} to{transform:rotate(3deg)} }
 @keyframes mothership-research-pulse { from{opacity:.68} to{opacity:1} }
+@keyframes mothership-dock-flow { to{stroke-dashoffset:-82} }
+@keyframes mothership-dock-glow { from{opacity:.35;transform:scale(.96)} to{opacity:.95;transform:scale(1.03)} }
+@keyframes mothership-dock-beacon { 0%{opacity:.2;transform:scale(.72)} 60%{opacity:.76} 100%{opacity:0;transform:scale(1.38)} }
 @keyframes crew-star-pulse { from{opacity:.3;transform:scale(.7)} to{opacity:1;transform:scale(1.25)} }
-@media(max-width:700px){.crew-mothership--hero{min-height:300px}.crew-mothership__docked--3{display:none}.crew-mothership__readout{left:10px;bottom:10px}}
+@media(max-width:700px){.crew-mothership--hero{min-height:300px}.crew-mothership__docked--3{display:none}.crew-mothership__readout{left:10px;bottom:10px}.crew-mothership__module-readout{right:10px;bottom:10px;max-width:52%}}
+@media(max-width:480px){.crew-mothership__module-readout strong{font-size:.62rem}.crew-mothership__module-readout small{display:none}}
 @media(prefers-reduced-motion:reduce){.crew-mothership *{animation:none!important}}

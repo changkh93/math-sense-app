@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Copy, Crown, Edit3, Link, Loader2, Mail, Plus, Radio, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Copy, Crown, Edit3, Gem, Hammer, Link, Loader2, Mail, Plus, Radio, Rocket, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
@@ -12,8 +12,15 @@ import CrewJoinModal from './CrewJoinModal';
 import CrewCreateModal from './CrewCreateModal';
 import CrewDetailView from './CrewDetailView';
 import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
+import CrewMothership from './CrewMothership';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 import { formatCrewSchedule } from './crewSchedule';
+import {
+  CREW_MOTHERSHIP_MODULE_MAP,
+  getCrewMothershipLevel,
+  getEquippedCrewModules,
+} from '../../utils/crewMothershipCatalog';
+import './StudyCrewDirectory.css';
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '활동 중' : s === 'rejected' ? '반려됨' : '승인 대기'; }
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
@@ -277,6 +284,49 @@ function FounderLetterPanel({ crew, founderId, founderName, currentUid }) {
   );
 }
 
+function CrewDirectoryHangar({ crew, isMyCrew, isApproved }) {
+  const level = getCrewMothershipLevel(crew);
+  const equippedModules = getEquippedCrewModules(crew);
+  const project = crew?.currentMothershipProject?.status === 'funding' ? crew.currentMothershipProject : null;
+  const projectModule = project ? CREW_MOTHERSHIP_MODULE_MAP[project.itemId] : null;
+  const requiredOre = Math.max(1, Number(project?.requiredOre || projectModule?.cost || 1));
+  const contributedOre = Math.max(0, Number(project?.contributedOre || 0));
+  const projectProgress = project ? Math.min(1, contributedOre / requiredOre) : 0;
+  const dockStatus = !isApproved
+    ? { label: '건설소 잠금', detail: '크루 승인 후 공동 건설이 열립니다.' }
+    : project
+      ? { label: '공동 건설 중', detail: projectModule?.name || project.itemName || '모함 시설 조립 중' }
+      : equippedModules.length > 0
+        ? { label: '건설소 대기', detail: `시설 ${equippedModules.length}개 운용 · 다음 목표 준비 중` }
+        : { label: '공동 건설소', detail: '첫 모함 시설을 함께 건설해 보세요.' };
+
+  return (
+    <div className={`crew-directory-hangar ${project ? 'is-building' : ''}`} style={{ '--crew-directory-accent': crew.color || '#00d4ff' }}>
+      <div className="crew-directory-hangar__space" aria-hidden="true" />
+      <div className="crew-directory-hangar__ship">
+        <CrewMothership crew={crew} variant="directory" />
+      </div>
+      <div className="crew-directory-hangar__level font-tech">
+        <span>LV.{level.level}</span>
+        <strong>{level.name}</strong>
+      </div>
+      <div className="crew-directory-hangar__modules font-tech">
+        {isMyCrew && <b>MY CREW</b>}
+        <span>MODULE {equippedModules.length}</span>
+      </div>
+      <div className="crew-directory-hangar__dock">
+        <Hammer size={15} />
+        <div>
+          <span className="font-tech">{dockStatus.label}</span>
+          <strong>{dockStatus.detail}</strong>
+        </div>
+        {project && <small className="font-tech"><Gem size={11} /> {contributedOre.toLocaleString()} / {requiredOre.toLocaleString()}</small>}
+      </div>
+      {project && <div className="crew-directory-hangar__progress" aria-label={`${Math.round(projectProgress * 100)}% 건설 완료`}><i style={{ width: `${projectProgress * 100}%` }} /></div>}
+    </div>
+  );
+}
+
 function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founderProfile = null }) {
   const leaderId = crew.leaderId || crew.leaderUid || '';
   const founderName = getProfileName(founderProfile || {}, crew.leaderName || '창설자 정보 없음');
@@ -305,6 +355,7 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
       whileHover={{ scale: 1.02, borderColor: 'rgba(0, 243, 255, 0.4)' }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onClick(crew)}
+      className="crew-directory-card"
       style={{
         background: 'rgba(7, 13, 30, 0.82)',
         border: isMyCrew ? '1px solid rgba(0, 243, 255, 0.35)' : '1px solid rgba(255,255,255,0.09)',
@@ -313,6 +364,7 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
         boxShadow: isMyCrew ? '0 0 20px rgba(0,243,255,0.08)' : 'none'
       }}
     >
+      <CrewDirectoryHangar crew={crew} isMyCrew={isMyCrew} isApproved={isApproved} />
       <div style={{ display: 'flex', alignItems: 'start', gap: '0.85rem' }}>
         <div style={{
           width: 44, height: 44, borderRadius: 10, flexShrink: 0,
@@ -1784,10 +1836,15 @@ export default function StudyCrewView({ onNavigateStore }) {
                   탐사원들이 직접 만든 크루
                 </h3>
                 <p className="font-tech" style={{ color: 'var(--text-muted)', margin: '0.45rem 0 0', fontSize: '0.9rem', lineHeight: 1.55 }}>
-                  목표와 공부 리듬이 맞는 크루를 찾아 함께 항해하세요.
+                  모함의 성장과 공동 건설 현황을 살펴보고, 함께 키우고 싶은 크루를 선택하세요.
                 </p>
               </div>
               <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>총 {directoryCrews.length}개의 크루 활동 중</div>
+            </div>
+
+            <div className="crew-directory-guide" aria-label="크루 모함 성장 안내">
+              <div><Rocket size={16} /><span><b>모함 외형</b>은 정식 멤버 1·10·20·40·80명에서 성장</span></div>
+              <div><Hammer size={16} /><span><b>모함 시설</b>은 멤버들이 광석을 모아 공동 건설</span></div>
             </div>
 
             {directoryCrews.length === 0 ? (

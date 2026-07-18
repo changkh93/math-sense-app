@@ -1,6 +1,7 @@
 import React from 'react'
 import ModularShip from './ModularShip'
 import {
+  CREW_MOTHERSHIP_MODULE_MAP,
   getCrewMothershipLevel,
   getCrewMothershipStats,
   getEquippedCrewModules,
@@ -42,7 +43,13 @@ function MothershipSvg({ crew, compact = false }) {
         <radialGradient id={`${id}-purple`}>
           <stop offset="0" stopColor="#fff" /><stop offset=".28" stopColor="#deb8ff" /><stop offset=".7" stopColor="#8b39ff" /><stop offset="1" stopColor="#3d086f" stopOpacity="0" />
         </radialGradient>
+        <linearGradient id={`${id}-dock`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#26cfff" stopOpacity=".08" />
+          <stop offset=".5" stopColor="#d9ffff" />
+          <stop offset="1" stopColor="#28e4ff" stopOpacity=".18" />
+        </linearGradient>
         <filter id={`${id}-glow`} x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        <filter id={`${id}-dock-glow`} x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="14" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
       </defs>
 
       {station && <g className="crew-mothership__station-frame">
@@ -80,6 +87,28 @@ function MothershipSvg({ crew, compact = false }) {
         {[284, 336, 388, 812, 864, 916].map(x => <rect key={x} x={x} y="346" width="28" height="8" rx="4" fill={hasLights ? '#fff58c' : '#61f4ff'} filter={hasLights ? `url(#${id}-glow)` : undefined} />)}
       </g>}
 
+      {hasLights && <g className="crew-mothership__dock-lights">
+        <ellipse className="crew-mothership__dock-lights-glow" cx="600" cy="394" rx="420" ry="116" fill="none" stroke="#22dbff" strokeWidth="18" opacity=".08" />
+        <g className="crew-mothership__dock-lane crew-mothership__dock-lane--port">
+          <path d="M468 326 C405 329 346 358 266 416" fill="none" stroke="#26dfff" strokeWidth="21" strokeLinecap="round" opacity=".12" />
+          <path className="crew-mothership__dock-lane-flow" d="M468 326 C405 329 346 358 266 416" fill="none" stroke={`url(#${id}-dock)`} strokeWidth="7" strokeLinecap="round" strokeDasharray="23 18" />
+          <path d="M296 378 L250 416 L290 456 L333 416 Z" fill="#071b37" stroke="#77f3ff" strokeWidth="8" />
+          <circle className="crew-mothership__dock-beacon-halo" cx="288" cy="416" r="42" fill="none" stroke="#1bdcff" strokeWidth="8" opacity=".45" filter={`url(#${id}-dock-glow)`} />
+          <circle cx="288" cy="416" r="16" fill="#edffff" stroke="#20ddff" strokeWidth="7" filter={`url(#${id}-dock-glow)`} />
+          <path d="M288 388 V444 M260 416 H316" stroke="#c9ffff" strokeWidth="4" opacity=".72" />
+          {!compact && <text x="210" y="482" fill="#75efff" fontSize="22" fontWeight="900" letterSpacing="5">DOCK 01</text>}
+        </g>
+        <g className="crew-mothership__dock-lane crew-mothership__dock-lane--starboard">
+          <path d="M732 326 C795 329 854 358 934 416" fill="none" stroke="#26dfff" strokeWidth="21" strokeLinecap="round" opacity=".12" />
+          <path className="crew-mothership__dock-lane-flow" d="M732 326 C795 329 854 358 934 416" fill="none" stroke={`url(#${id}-dock)`} strokeWidth="7" strokeLinecap="round" strokeDasharray="23 18" />
+          <path d="M904 378 L950 416 L910 456 L867 416 Z" fill="#071b37" stroke="#77f3ff" strokeWidth="8" />
+          <circle className="crew-mothership__dock-beacon-halo" cx="912" cy="416" r="42" fill="none" stroke="#1bdcff" strokeWidth="8" opacity=".45" filter={`url(#${id}-dock-glow)`} />
+          <circle cx="912" cy="416" r="16" fill="#edffff" stroke="#20ddff" strokeWidth="7" filter={`url(#${id}-dock-glow)`} />
+          <path d="M912 388 V444 M884 416 H940" stroke="#c9ffff" strokeWidth="4" opacity=".72" />
+          {!compact && <text x="866" y="482" fill="#75efff" fontSize="22" fontWeight="900" letterSpacing="5">DOCK 02</text>}
+        </g>
+      </g>}
+
       <g className="crew-mothership__body">
         <path d="M600 92 C520 123 458 205 446 304 C454 390 507 446 600 481 C693 446 746 390 754 304 C742 205 680 123 600 92 Z" fill={`url(#${id}-body)`} stroke="#a5fbff" strokeWidth="9" />
         <path d="M600 107 C572 166 560 261 565 409" fill="none" stroke="#fff" strokeWidth="13" strokeLinecap="round" opacity=".34" />
@@ -114,7 +143,7 @@ function MothershipSvg({ crew, compact = false }) {
       </g>}
 
       {!compact && <g className="crew-mothership__beacons">
-        {[477, 723].map(x => <circle key={x} cx={x} cy="303" r="8" fill={hasLights ? '#fff47f' : '#9dffff'} filter={`url(#${id}-glow)`} />)}
+        {[477, 723].map(x => <circle key={x} cx={x} cy="303" r={hasLights ? 11 : 8} fill={hasLights ? '#d8ffff' : '#9dffff'} stroke={hasLights ? '#22ddff' : 'none'} strokeWidth={hasLights ? 5 : 0} filter={`url(#${id}-glow)`} />)}
       </g>}
     </svg>
   )
@@ -123,6 +152,8 @@ function MothershipSvg({ crew, compact = false }) {
 export default function CrewMothership({ crew = {}, memberProfiles = [], variant = 'hero' }) {
   const level = getCrewMothershipLevel(crew)
   const stats = getCrewMothershipStats(crew)
+  const equippedModuleIds = getEquippedCrewModules(crew)
+  const equippedModules = equippedModuleIds.map((moduleId) => CREW_MOTHERSHIP_MODULE_MAP[moduleId]).filter(Boolean)
   const compact = variant !== 'hero'
   const docked = compact ? [] : memberProfiles.filter(Boolean).slice(0, 3)
   return (
@@ -137,7 +168,12 @@ export default function CrewMothership({ crew = {}, memberProfiles = [], variant
       {!compact && <div className="crew-mothership__readout">
         <span>CREW MOTHERSHIP · LV.{level.level}</span>
         <strong>{level.name}</strong>
-        <small>MISSION XP {stats.xp.toLocaleString()} · MODULES {getEquippedCrewModules(crew).length}</small>
+        <small>MISSION XP {stats.xp.toLocaleString()} · MODULES {equippedModuleIds.length}</small>
+      </div>}
+      {!compact && equippedModules.length > 0 && <div className="crew-mothership__module-readout">
+        <span>ACTIVE MODULE</span>
+        <strong>{equippedModules.map((module) => module.name).join(' · ')}</strong>
+        <small>{equippedModules.some((module) => module.id === 'dock-lights') ? 'CYAN DOCKING ROUTE · 점등 중' : 'MOTHERSHIP SYSTEM · 작동 중'}</small>
       </div>}
     </div>
   )
