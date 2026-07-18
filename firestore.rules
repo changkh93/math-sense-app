@@ -204,6 +204,11 @@ service cloud.firestore {
         allow read: if isAuth();
         allow write: if false;
       }
+
+      match /mothershipOperations/{operationId} {
+        // 광석 중복 차감 방지용 서버 전용 ledger
+        allow read, write: if false;
+      }
     }
 
     match /studyRooms/{roomId} {
