@@ -530,6 +530,12 @@ function RegionPlanetVisual({ imageSrc, title, icon, isMobile, isLocked }) {
 
 const REFINERY_CAUSE_IDS = ['concept_gap', 'equation_setup', 'missed_condition', 'calculation_error', 'no_checking']
 const LOGIN_NOTICE_KEY = 'metasenseLoginNotice'
+const ROOT_VIEWS = new Set(['planet', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
+
+function getRequestedRootView(location) {
+  const requestedView = location.state?.view || new URLSearchParams(location.search).get('view')
+  return ROOT_VIEWS.has(requestedView) ? requestedView : ''
+}
 
 function normalizeRefineryCause(causeId) {
   return ({
@@ -570,7 +576,9 @@ function SpaceHome() {
   const [history, setHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [currentView, setCurrentView] = useState(() => {
-    return sessionStorage.getItem('metasense_current_view') || 'planet';
+    const requestedView = getRequestedRootView(location)
+    const savedView = sessionStorage.getItem('metasense_current_view')
+    return requestedView || (ROOT_VIEWS.has(savedView) ? savedView : 'planet')
   }) // 'planet', 'dashboard', 'collection', 'assignment_hub'
   const [transactions, setTransactions] = useState([])
   const [loadingTransactions, setLoadingTransactions] = useState(true)
@@ -805,6 +813,8 @@ function SpaceHome() {
     const guest = userData?.isGuest === true;
     const guestAvailableViews = new Set(['planet', 'crew', 'battle']);
     const allowedView = guest && !guestAvailableViews.has(view) ? 'planet' : view;
+    // Persist synchronously so a route remount cannot briefly restore NAV.
+    sessionStorage.setItem('metasense_current_view', allowedView);
     setCurrentView(allowedView);
     updateSelectedRegionId(null);
     updateSelectedChapterDocId(null);
@@ -858,9 +868,7 @@ function SpaceHome() {
     const requestedClusterId = location.state?.clusterId || params.get('clusterId')
     const requestedDate = location.state?.date || params.get('date') || params.get('assignmentDate')
     const incomingQuizBattle = location.state?.acceptedQuizBattle
-    const validViews = new Set(['planet', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
-
-    if (requestedView && validViews.has(requestedView)) {
+    if (requestedView && ROOT_VIEWS.has(requestedView)) {
       if (requestedView === 'battle' && incomingQuizBattle?.battleId) {
         setAcceptedQuizBattle(incomingQuizBattle)
         const storedReturnView = sessionStorage.getItem('metasense_current_view') || 'planet'

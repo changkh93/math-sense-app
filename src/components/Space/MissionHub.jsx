@@ -19,20 +19,10 @@ import { useAuth } from '../../hooks/useAuth'
 import { useCodeExercises } from '../../hooks/useContent'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { isRadarActive } from '../../utils/streakUtils'
+import { getEmbeddablePdfUrl, normalizePdfUrl } from '../../utils/pdfUrlUtils'
 
 // Mock Data for demonstration - In production this would come from Firestore
 // (Mock data removed — use only real Firestore data)
-
-// ─── PDF URL Transformer (Google Drive support) ───
-const getEmbeddablePdfUrl = (url) => {
-  if (!url) return null;
-  // Handle Google Drive /view links
-  const driveViewMatch = url.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
-  if (driveViewMatch && driveViewMatch[1]) {
-    return `https://drive.google.com/file/d/${driveViewMatch[1]}/preview`;
-  }
-  return url;
-};
 
 // ─── Silent Crystal Toast ───
 const SilentCrystalToast = ({ amount, visible }) => (
@@ -1112,11 +1102,18 @@ export default function MissionHub({
           end: activeUnit.videoConfig.end
         }] : [])
 
+    const learningContents = activeUnit?.learningContents
+      ? {
+          ...activeUnit.learningContents,
+          pdfUrl: normalizePdfUrl(activeUnit.learningContents.pdfUrl)
+        }
+      : null
+
     setMissionData({
       title: activeUnit?.title || "Unknown Mission",
       videoConfig: activeUnit?.videoConfig || null,
       transmissions: defaultTxList,
-      learningContents: activeUnit?.learningContents || null
+      learningContents
     })
 
     // Restore selectedTx from sessionStorage if available

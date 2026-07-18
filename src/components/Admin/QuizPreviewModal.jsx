@@ -1,4 +1,5 @@
 import React from 'react';
+import { getEmbeddablePdfUrl } from '../../utils/pdfUrlUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
@@ -10,15 +11,6 @@ import 'katex/dist/katex.min.css';
 import ReactDOM from 'react-dom';
 
 // Helper to transform Google Drive view links to preview links
-const getEmbeddablePdfUrl = (url) => {
-  if (!url) return null;
-  const driveViewMatch = url.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
-  if (driveViewMatch && driveViewMatch[1]) {
-    return `https://drive.google.com/file/d/${driveViewMatch[1]}/preview`;
-  }
-  return url;
-};
-
 export default function QuizPreviewModal({ 
   isOpen, 
   onClose, 

@@ -191,8 +191,9 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     if (path === '/agora') {
       navigate('/agora');
     } else if (!isHome) {
-      // Navigate to home and tell it which view to show
-      navigate('/', { state: { view } });
+      // Keep the requested root view in both the URL and route state. SpaceHome
+      // can then select it on its very first render instead of flashing NAV.
+      navigate(`/?view=${encodeURIComponent(view)}`, { state: { view } });
     } else {
       // Already on home page, just change view
       if (onViewChange) onViewChange(view);

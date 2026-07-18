@@ -32,6 +32,10 @@
     ],
     "rewrites": [
       {
+        "source": "/pdfs/**",
+        "destination": "/pdf-not-found.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
