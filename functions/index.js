@@ -5048,7 +5048,9 @@ exports.resetChildPasswordForParent = regionalFunctions.https.onCall(async (data
 /**
  * acceptAgoraAnswer
  *
- * Atomically marks an Agora answer as accepted and pays server-managed rewards.
+ * Atomically marks an Agora answer as accepted and transfers the base reward
+ * from the asker to the answerer. Any bounty was already escrowed when the
+ * question was created and is paid in addition to the asker-funded base reward.
  * This must run with Admin SDK privileges because the asker cannot directly
  * update another student's user balance under Firestore security rules.
  */
@@ -5105,6 +5107,18 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
 
       const lockedBounty = getLockedBountyAmount(questionData);
       const totalAnswerReward = AGORA_BASE_ACCEPT_REWARD + lockedBounty;
+      const askerData = askerSnap.exists ? askerSnap.data() || {} : {};
+      const askerCrystals = Number(askerData.crystals || 0);
+
+      // The +20 acceptance reward is a student-to-student transfer, not a
+      // system mint. Teacher/admin answers and the asker's own answer do not
+      // receive the student reward, so they do not charge the asker either.
+      if (answererRef && askerCrystals < AGORA_BASE_ACCEPT_REWARD) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          `답변을 채택하려면 내 광석 ${AGORA_BASE_ACCEPT_REWARD}개가 필요해요.`
+        );
+      }
       const now = FieldValue.serverTimestamp();
       const agoraRewardMetadata = buildAgoraRewardMetadata(questionId, answerId, questionData, askerUid);
 
@@ -5132,7 +5146,7 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
         recordCrystalTransaction(transaction, answererUid, `answer-accepted-${questionId}`, {
           amount: AGORA_BASE_ACCEPT_REWARD,
           type: "answer_accepted",
-          description: "답변이 채택되었습니다",
+          description: "질문자에게서 채택 보상을 받았습니다",
           metadata: agoraRewardMetadata,
         });
 
@@ -5146,11 +5160,20 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
         }
       }
 
-      const askerData = askerSnap.exists ? askerSnap.data() || {} : {};
+      const askerPaidReward = answererRef ? AGORA_BASE_ACCEPT_REWARD : 0;
       transaction.set(askerRef, {
-        crystals: Number(askerData.crystals || 0) + AGORA_ASKER_RESOLVE_REWARD,
+        crystals: askerCrystals - askerPaidReward + AGORA_ASKER_RESOLVE_REWARD,
         ...calculateGrowthUpdates(askerData, AGORA_ASKER_RESOLVE_REWARD),
       }, { merge: true });
+
+      if (askerPaidReward > 0) {
+        recordCrystalTransaction(transaction, askerUid, `answer-payment-${questionId}`, {
+          amount: -askerPaidReward,
+          type: "agora_answer_payment",
+          description: "채택한 답변에 기본 보상을 지급했습니다",
+          metadata: agoraRewardMetadata,
+        });
+      }
 
       recordCrystalTransaction(transaction, askerUid, `question-resolved-${questionId}`, {
         amount: AGORA_ASKER_RESOLVE_REWARD,

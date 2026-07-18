@@ -23,6 +23,7 @@ const TX_CONFIG = {
   store_item_gift_sent: { icon: '🎁', label: '상점 아이템 선물', color: '#60a5fa' },
   store_item_gift_received: { icon: '🎁', label: '상점 아이템 수령', color: '#4ade80' },
   answer_accepted: { icon: '💬', label: '답변 채택 보상', color: '#4ade80' },
+  agora_answer_payment: { icon: '💬', label: '채택 보상 지급', color: '#f87171' },
   agora_bounty_award: { icon: '💎', label: '현상금 질문 보상', color: '#4ade80' },
   agora_bounty_lock: { icon: '🎯', label: '현상금 예치', color: '#f87171' },
   question_resolved: { icon: '✅', label: '질문 해결 보상', color: '#4ade80' },
@@ -830,7 +831,7 @@ export default function CrystalLedger({ userData }) {
               </div>
               <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
                 <li>질문 등록 시 <span style={{color: 'var(--text-bright)'}}>+5</span></li>
-                <li>내 답변 채택 시 <span style={{color: 'var(--text-bright)'}}>+20</span></li>
+                <li>내 답변 채택 시 질문자에게서 <span style={{color: 'var(--text-bright)'}}>+20</span></li>
                 <li>선생님 인증 추가 <span style={{color: 'var(--text-bright)'}}>+10</span></li>
               </ul>
             </div>

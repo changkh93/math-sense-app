@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X, ChevronDown, Loader } from 'lucide-react';
+import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X, ChevronDown, Loader, Megaphone } from 'lucide-react';
 import { usePublicQuestions, useQAMutations } from '../../hooks/useQA';
 import { getQuestionAnonymousLabel } from '../../utils/socialUtils';
 import QuestionModal from '../../components/QuestionModal';
@@ -118,6 +118,16 @@ export default function Agora() {
             <p className="font-tech subtitle">궁금한 개념을 묻고, 성단의 친구들과 짧은 한마디를 나누어보세요!</p>
           </div>
         </header>
+
+        <aside className="agora-rules-notice glass" aria-label="아고라 운영 공지">
+          <div className="agora-rules-icon" aria-hidden="true">
+            <Megaphone size={21} />
+          </div>
+          <div>
+            <strong>아고라 운영 원칙</strong>
+            <p>아고라는 수학 질문과 풀이를 나누는 공간이에요. 특정 친구에게 현상금을 전달하기 위한 글은 등록할 수 없습니다. 궁금한 문제와 막힌 부분을 구체적으로 작성해 주세요.</p>
+          </div>
+        </aside>
 
         <div className="agora-controls">
           <div className="agora-filters">

@@ -637,13 +637,19 @@ export default function QuestionDetail() {
                             <button
                               className="accept-btn-small glass"
                               onClick={async () => {
-                                if (window.confirm('이 답변을 채택하시겠습니까? (보상이 지급됩니다)')) {
+                                const bountyNotice = (question.bountyAmount || 0) > 0
+                                  ? `\n예치된 현상금 ${question.bountyAmount}개도 함께 지급됩니다.`
+                                  : '';
+                                if (window.confirm(`이 답변을 채택하면 내 광석 20개가 답변자에게 지급됩니다.${bountyNotice}`)) {
                                   try {
                                     await acceptAnswer.mutateAsync({ questionId, answerId: ans.id });
                                     triggerVictory(5);
                                   } catch (err) {
                                     console.error('채택 실패:', err);
-                                    alert('답변 채택 중 오류가 발생했습니다: ' + err.message);
+                                    const message = err?.message?.includes('내 광석 20개가 필요')
+                                      ? '채택 보상을 지급하려면 광석 20개가 필요해요.'
+                                      : `답변 채택 중 오류가 발생했습니다: ${err.message}`;
+                                    alert(message);
                                   }
                                 }
                               }}
