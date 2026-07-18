@@ -108,10 +108,44 @@
 .crew-cockpit-main {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(290px, 0.7fr);
+  grid-template-columns: minmax(0, 1.6fr) minmax(290px, 0.65fr);
   gap: clamp(1rem, 3vw, 2rem);
   align-items: center;
   padding: clamp(1.25rem, 3vw, 2rem) 0.25rem 1.1rem;
+}
+
+.crew-mothership-hero {
+  position: relative;
+  min-width: 0;
+}
+
+.crew-mothership-hero__copy {
+  position: absolute;
+  z-index: 6;
+  top: 16px;
+  left: 18px;
+  max-width: 58%;
+  padding: 0.7rem 1rem 1.8rem 0.8rem;
+  background: linear-gradient(90deg, rgba(2, 8, 25, 0.88), rgba(2, 8, 25, 0));
+  pointer-events: none;
+}
+
+.crew-mothership-hero__copy h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.4rem, 3vw, 2.25rem);
+  line-height: 1.15;
+  text-shadow: 0 0 24px color-mix(in srgb, var(--crew-accent) 36%, transparent);
+}
+
+.crew-mothership-hero__copy p {
+  margin: 0.42rem 0 0;
+  overflow: hidden;
+  color: rgba(255,255,255,0.58);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crew-identity {
@@ -273,7 +307,7 @@
 .crew-flight-stats {
   position: relative;
   display: grid;
-  grid-template-columns: 0.55fr 0.7fr 0.7fr 2fr;
+  grid-template-columns: 0.5fr 0.55fr 1.15fr 0.7fr 1.8fr;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(1, 6, 19, 0.28);
@@ -817,6 +851,17 @@
     padding: 1.1rem 0.1rem 0.8rem;
   }
 
+  .crew-mothership-hero__copy {
+    top: 10px;
+    left: 8px;
+    max-width: 76%;
+    padding-left: 0.45rem;
+  }
+
+  .crew-mothership-hero__copy h1 {
+    font-size: 1.25rem;
+  }
+
   .crew-identity {
     align-items: flex-start;
   }
@@ -856,6 +901,10 @@
 
   .crew-flight-stats > div:nth-child(2) {
     border-right: 0;
+  }
+
+  .crew-flight-stats > div:last-child {
+    grid-column: 1 / -1;
   }
 
   .crew-flight-stats > div:nth-child(-n + 2) {

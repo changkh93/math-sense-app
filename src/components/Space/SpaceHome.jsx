@@ -35,6 +35,7 @@ import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
 import DarkMatterRefineryView from './DarkMatterRefineryView'
 import StudyStreamRoomView from './StudyStreamRoomView'
+import CrewMothershipFlyby from './CrewMothershipFlyby'
 import { useGlobalActiveRoomId } from '../../utils/roomState'
 import CrystalLedger from './CrystalLedger'
 import { useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments'
@@ -3539,6 +3540,10 @@ function SpaceHome() {
           </Motion.div>
         )}
       </AnimatePresence>
+
+      {currentView === 'planet' && selectedClusterId && !selectedRegionId && !is2DMode && !isMobile && userData?.crewId && !userData?.isGuest && (
+        <CrewMothershipFlyby crewId={userData.crewId} />
+      )}
 
       {/* Scan line removed */}
       

@@ -1,0 +1,31 @@
+.crew-mothership { position: relative; isolation: isolate; overflow: hidden; width: 100%; min-width: 0; border: 1px solid color-mix(in srgb, var(--mothership-accent) 24%, transparent); background: radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--mothership-accent) 14%, transparent), rgba(2, 7, 22, .76) 58%); }
+.crew-mothership--hero { min-height: 360px; border-radius: 20px; }
+.crew-mothership--hero::after { content: ''; position: absolute; z-index: -1; left: 15%; right: 15%; bottom: 8%; height: 30px; border-radius: 50%; background: color-mix(in srgb, var(--mothership-accent) 32%, transparent); filter: blur(24px); }
+.crew-mothership > svg { position: absolute; inset: 3% 2% 4%; width: 96%; height: 92%; overflow: visible; filter: drop-shadow(0 22px 25px rgba(0,0,0,.45)); }
+.crew-mothership__space { position: absolute; inset: 0; opacity: .62; background-image: radial-gradient(circle, rgba(255,255,255,.8) 0 1px, transparent 1.5px); background-size: 61px 53px; mask-image: linear-gradient(#000, transparent 92%); }
+.crew-mothership__space i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #fff; box-shadow: 0 0 9px #9df8ff; animation: crew-star-pulse 2.8s ease-in-out infinite alternate; }
+.crew-mothership__space i:nth-child(1){left:12%;top:23%}.crew-mothership__space i:nth-child(2){left:83%;top:16%;animation-delay:.5s}.crew-mothership__space i:nth-child(3){left:76%;top:73%;animation-delay:1.1s}.crew-mothership__space i:nth-child(4){left:28%;top:79%;animation-delay:1.7s}.crew-mothership__space i:nth-child(5){left:52%;top:11%;animation-delay:2.2s}
+.crew-mothership__ring { transform-origin: 600px 305px; animation: mothership-ring-spin 24s linear infinite; }
+.crew-mothership__comms { transform-origin: 600px 72px; animation: mothership-comms-scan 4.5s ease-in-out infinite alternate; }
+.crew-mothership__engines { transform-origin: 600px 420px; animation: mothership-engine-pulse .8s ease-in-out infinite alternate; }
+.crew-mothership__research { animation: mothership-research-pulse 2.4s ease-in-out infinite alternate; }
+.crew-mothership__docked { position: absolute; z-index: 3; filter: saturate(.9); }
+.crew-mothership__docked--1 { left: 10%; bottom: 13%; transform: rotate(10deg); }
+.crew-mothership__docked--2 { right: 10%; bottom: 16%; transform: rotate(-12deg); }
+.crew-mothership__docked--3 { right: 18%; top: 12%; transform: rotate(8deg) scale(.78); opacity: .82; }
+.crew-mothership__readout { position: absolute; z-index: 4; left: 16px; bottom: 14px; display: grid; padding: .65rem .8rem; border-left: 2px solid var(--mothership-accent); background: linear-gradient(90deg, rgba(2,8,25,.88), transparent); }
+.crew-mothership__readout span { color: var(--mothership-accent); font: 900 .59rem var(--font-tech,monospace); letter-spacing: .11em; }
+.crew-mothership__readout strong { margin-top: .2rem; color: #fff; font-size: .9rem; }
+.crew-mothership__readout small { margin-top: .18rem; color: rgba(255,255,255,.44); font: 700 .57rem var(--font-tech,monospace); }
+.crew-mothership--nav { width: 78px; height: 42px; min-height: 42px; overflow: visible; border: 0; background: transparent; }
+.crew-mothership--nav > svg { inset: -20% -10%; width: 120%; height: 140%; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--mothership-accent) 58%, transparent)); }
+.crew-mothership--nav .crew-mothership__space, .crew-mothership--map .crew-mothership__space { display: none; }
+.crew-mothership--map { width: clamp(176px, 15vw, 250px); height: clamp(88px, 7.5vw, 126px); min-height: 88px; overflow: visible; border: 0; background: transparent; }
+.crew-mothership--map > svg { inset: -18% -8%; width: 116%; height: 136%; filter: drop-shadow(0 8px 14px rgba(0,0,0,.58)) drop-shadow(0 0 9px color-mix(in srgb, var(--mothership-accent) 48%, transparent)); }
+@keyframes mothership-engine-pulse { from{opacity:.68;transform:scaleY(.9)} to{opacity:1;transform:scaleY(1.08)} }
+@keyframes mothership-ring-spin { to{transform:rotate(360deg)} }
+@keyframes mothership-comms-scan { from{transform:rotate(-3deg)} to{transform:rotate(3deg)} }
+@keyframes mothership-research-pulse { from{opacity:.68} to{opacity:1} }
+@keyframes crew-star-pulse { from{opacity:.3;transform:scale(.7)} to{opacity:1;transform:scale(1.25)} }
+@media(max-width:700px){.crew-mothership--hero{min-height:300px}.crew-mothership__docked--3{display:none}.crew-mothership__readout{left:10px;bottom:10px}}
+@media(prefers-reduced-motion:reduce){.crew-mothership *{animation:none!important}}

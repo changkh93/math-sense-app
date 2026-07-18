@@ -16,6 +16,9 @@ import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 import ModularShip from './ModularShip';
 import { getShipGrade } from '../../utils/shipCatalog';
+import CrewMothership from './CrewMothership';
+import CrewConstructionDock from './CrewConstructionDock';
+import { getCrewMothershipLevel, getCrewMothershipStats } from '../../utils/crewMothershipCatalog';
 import { formatCrewSchedule } from './crewSchedule';
 import './CrewDetailView.css';
 
@@ -287,11 +290,6 @@ export default function CrewDetailView({ onBack }) {
   }, [notes, pendingNotes]);
   const status = crew?.status || userData?.crewStatus || 'pending';
   const todayKey = getTodayKey();
-  const studiedToday = rosterMembers.filter((member) => {
-    const profile = memberProfiles[member.uid] || {};
-    const selfData = member.uid === user?.uid ? (userData || {}) : {};
-    return (selfData.lastStreakDate || profile.lastStreakDate || member.lastStreakDate) === todayKey;
-  });
   const isLeader = userData?.crewRole === 'leader';
   const isGuest = userData?.isGuest === true;
   const guestAccessEnabled = crew?.guestAccessEnabled === true;
@@ -307,6 +305,11 @@ export default function CrewDetailView({ onBack }) {
     [crewMemberIds, visibleGuestSessions]
   );
   const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
+  const mothershipLevel = getCrewMothershipLevel(crew);
+  const mothershipStats = getCrewMothershipStats(crew);
+  const mothershipDockedProfiles = useMemo(() => Object.entries(memberProfiles)
+    .filter(([, profile]) => profile)
+    .map(([uid, profile]) => ({ uid, ...profile })), [memberProfiles]);
 
   useEffect(() => {
     if (!crewId || !user?.uid) {
@@ -714,13 +717,13 @@ export default function CrewDetailView({ onBack }) {
         </div>
 
         <div className="crew-cockpit-main">
-          <div className="crew-identity">
-            <div className="crew-emblem" aria-hidden="true"><span /></div>
-            <div>
+          <div className="crew-mothership-hero">
+            <div className="crew-mothership-hero__copy">
               <div className="crew-eyebrow font-tech">ORBITAL STUDY VESSEL</div>
               <h1 className="font-title">{crew.name || userData?.crewName || '스터디 크루'}</h1>
               <p className="font-tech">{crew.motto || '함께 항해할 준비가 되었습니다.'}</p>
             </div>
+            <CrewMothership crew={crew} memberProfiles={mothershipDockedProfiles} variant="hero" />
           </div>
 
           <aside className="crew-launch-console">
@@ -759,8 +762,9 @@ export default function CrewDetailView({ onBack }) {
         <div className="crew-flight-stats">
           {[
             { label: 'CREW', value: `${Math.max(crew.memberCount || rosterMembers.length || 1, rosterMembers.length) + activeGuestCount}명` },
-            { label: 'ONLINE STUDY', value: `${studiedToday.length}명` },
-            { label: 'MY ROLE', value: isGuest ? '게스트' : userData?.crewRole === 'leader' ? '리더' : '멤버' },
+            { label: 'ONLINE', value: `${onlineFlightCrewCount}명` },
+            { label: 'MOTHERSHIP', value: `Lv.${mothershipLevel.level} ${mothershipLevel.name}` },
+            { label: 'MISSION XP', value: `${mothershipStats.xp.toLocaleString()} XP` },
             { label: 'SCHEDULE', value: formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes) },
           ].map((item) => (
             <div key={item.label}>
@@ -775,7 +779,7 @@ export default function CrewDetailView({ onBack }) {
           className="crew-details-toggle font-tech"
           onClick={() => { soundManager.playClick(); setShowCrewInfo((prev) => !prev); }}
         >
-          {showCrewInfo ? '선박 정보 닫기' : '선박 정보 보기'}
+          {showCrewInfo ? '모함 정보 닫기' : '모함 살펴보기'}
           <ChevronDown size={15} style={{ transform: showCrewInfo ? 'rotate(180deg)' : 'none' }} />
         </button>
 
@@ -790,7 +794,7 @@ export default function CrewDetailView({ onBack }) {
               <strong className="font-tech">{crew.groupName || '자유 스터디'}</strong>
             </div>
             <div className="crew-detail-description">
-              <span className="font-tech">VESSEL LOG</span>
+              <span className="font-tech">MOTHERSHIP LOG</span>
               <p className="font-tech">{crew.description || '아직 기록된 크루 설명이 없습니다.'}</p>
             </div>
           </Motion.div>
@@ -813,6 +817,16 @@ export default function CrewDetailView({ onBack }) {
           </div>
         )}
       </Motion.section>
+
+      {status === 'approved' && crewId && (
+        <CrewConstructionDock
+          crew={crew}
+          crewId={crewId}
+          userData={{ ...userData, uid: user?.uid }}
+          isLeader={isLeader}
+          isGuest={isGuest}
+        />
+      )}
 
       {/* Leaders always see the control. Members see it only while guest access is open. */}
       {status === 'approved' && !isGuest && (guestAccessEnabled || isLeader) && (

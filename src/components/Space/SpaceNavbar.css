@@ -30,6 +30,54 @@
   gap: 0.5rem;
 }
 
+.crew-nav-link {
+  min-width: 134px;
+  display: grid !important;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.18rem 0.5rem !important;
+  text-align: left;
+}
+
+.crew-nav-visual {
+  width: 54px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+}
+
+.crew-nav-visual .crew-mothership--nav {
+  width: 54px;
+  height: 32px;
+  min-height: 32px;
+}
+
+.crew-nav-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.08rem;
+}
+
+.crew-nav-copy strong,
+.crew-nav-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-nav-copy strong {
+  color: #effdff;
+  font-size: 0.7rem;
+}
+
+.crew-nav-copy small {
+  color: var(--crystal-cyan);
+  font-family: var(--font-tech);
+  font-size: 0.57rem;
+  letter-spacing: 0.04em;
+}
+
 .desktop-brand-btn {
   width: 40px;
   height: 40px;
@@ -426,6 +474,17 @@
     padding: 0.4rem 0.6rem;
     font-size: 0.8rem;
   }
+
+  .crew-nav-link {
+    min-width: 112px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    padding: 0.12rem 0.32rem !important;
+  }
+
+  .crew-nav-visual,
+  .crew-nav-visual .crew-mothership--nav {
+    width: 44px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -670,6 +729,12 @@
   .mobile-bottom-tab span {
     font-size: 1.05rem;
     line-height: 1;
+  }
+
+  .mobile-bottom-tab > .crew-mothership--nav {
+    width: 44px;
+    height: 24px;
+    min-height: 24px;
   }
 
   .mobile-bottom-tab strong {

@@ -7996,6 +7996,21 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       }, { merge: true });
     });
 
+    if (scopeType === "crew" && shouldCompleteTeamReward) {
+      const mothershipStats = getCrewMothershipServerStats(scopeData);
+      const nextMothershipXP = mothershipStats.xp + 20;
+      tx.set(scopeRef, {
+        mothershipXP: nextMothershipXP,
+        mothershipStats: {
+          ...mothershipStats,
+          missionsCompleted: mothershipStats.missionsCompleted + 1,
+          xp: nextMothershipXP,
+          lastMissionCompletedAt: now,
+          lastMissionDateKey: dateKey,
+        },
+      }, { merge: true });
+    }
+
     rewardResult = {
       individualAwarded: shouldAwardIndividual,
       individualAmount: shouldAwardIndividual ? STUDY_CREW_MISSION_INDIVIDUAL_REWARD : 0,
@@ -8384,6 +8399,235 @@ const CREW_CRYSTAL_CHEST_MEMBER_REWARD = 5;
 const CREW_CRYSTAL_CHEST_CONTRIBUTOR_DAILY_LIMIT = 40;
 const CREW_CRYSTAL_CHEST_DAILY_COMPLETION_LIMIT = 2;
 const CREW_CRYSTAL_CHEST_MEMBER_DAILY_CLAIM_LIMIT = 10;
+const CREW_MOTHERSHIP_DAILY_CONTRIBUTION_LIMIT = 100;
+const CREW_MOTHERSHIP_CONTRIBUTION_AMOUNTS = new Set([5, 10, 20, 50]);
+const CREW_MOTHERSHIP_LEVELS = [
+  { level: 1, minMembers: 1 },
+  { level: 2, minMembers: 10 },
+  { level: 3, minMembers: 20 },
+  { level: 4, minMembers: 40 },
+  { level: 5, minMembers: 80 },
+];
+const CREW_MOTHERSHIP_MODULES = {
+  "dock-lights": { slot: "lights", name: "시안 도킹 라이트", cost: 150, minLevel: 1 },
+  "storage-gold": { slot: "storage", name: "황금 광석 저장고", cost: 300, minLevel: 1 },
+  "comms-array": { slot: "communication", name: "아고라 통신 배열", cost: 450, minLevel: 2 },
+  "research-dark": { slot: "research", name: "다크 매터 연구소", cost: 700, minLevel: 2, achievement: { field: "missionsCompleted", value: 5 } },
+  "archive-gold": { slot: "archive", name: "황금 항해 기록소", cost: 900, minLevel: 3, achievement: { field: "chestCycles", value: 3 } },
+  "ring-orbital": { slot: "ring", name: "아틀라스 궤도 링", cost: 1500, minLevel: 4, achievement: { field: "missionsCompleted", value: 15 } },
+  "warp-gate": { slot: "special", name: "공동 워프 게이트", cost: 3000, minLevel: 5, achievement: { field: "missionsCompleted", value: 30 } },
+};
+const crewMothershipFunctions = regionalFunctions.runWith({
+  maxInstances: 10,
+  memory: "256MB",
+  timeoutSeconds: 60,
+});
+
+function getCrewMothershipLevelValue(crew = {}) {
+  const memberCount = Math.max(1, Number(crew.memberCount || 0), getCrewMemberIds(crew).length);
+  return [...CREW_MOTHERSHIP_LEVELS].reverse().find((entry) => memberCount >= entry.minMembers)?.level || 1;
+}
+
+function getCrewMothershipServerStats(crew = {}) {
+  const stored = crew.mothershipStats && typeof crew.mothershipStats === "object" ? crew.mothershipStats : {};
+  return {
+    missionsCompleted: Math.max(0, Number(stored.missionsCompleted || 0)),
+    chestCycles: Math.max(0, Number(stored.chestCycles || 0), Number(crew.crystalChest?.cycle || 0)),
+    totalContributedOre: Math.max(0, Number(stored.totalContributedOre || 0)),
+    completedProjects: Math.max(0, Number(stored.completedProjects || 0)),
+    xp: Math.max(0, Number(stored.xp || 0), Number(crew.mothershipXP || 0)),
+  };
+}
+
+function assertCrewMothershipModuleUnlocked(module, crew) {
+  if (getCrewMothershipLevelValue(crew) < module.minLevel) {
+    throw new functions.https.HttpsError("failed-precondition", `모함 Lv.${module.minLevel}부터 건설할 수 있습니다.`);
+  }
+  if (module.achievement) {
+    const stats = getCrewMothershipServerStats(crew);
+    if (Number(stats[module.achievement.field] || 0) < module.achievement.value) {
+      throw new functions.https.HttpsError("failed-precondition", "아직 공동 성취 해금 조건을 달성하지 못했습니다.");
+    }
+  }
+}
+
+exports.startCrewMothershipProject = crewMothershipFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  if (isGuestContext(context)) {
+    throw new functions.https.HttpsError("permission-denied", "게스트는 공동 건설을 시작할 수 없습니다.");
+  }
+  const crewId = cleanId(data?.crewId, 160);
+  const itemId = cleanId(data?.itemId, 80);
+  const module = CREW_MOTHERSHIP_MODULES[itemId];
+  if (!crewId || !module) {
+    throw new functions.https.HttpsError("invalid-argument", "건설할 모함 시설 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const projectId = `${itemId}_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+  const now = new Date();
+  await db.runTransaction(async (tx) => {
+    const crewSnap = await tx.get(crewRef);
+    if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+    const crew = crewSnap.data() || {};
+    if (crew.status !== "approved") throw new functions.https.HttpsError("failed-precondition", "승인된 크루에서만 공동 건설을 시작할 수 있습니다.");
+    if (crew.leaderId !== uid) throw new functions.https.HttpsError("permission-denied", "크루 리더만 건설 목표를 선택할 수 있습니다.");
+    if (crew.currentMothershipProject?.status === "funding") throw new functions.https.HttpsError("already-exists", "이미 진행 중인 공동 건설 프로젝트가 있습니다.");
+    if ((Array.isArray(crew.ownedMothershipModules) ? crew.ownedMothershipModules : []).includes(itemId)) {
+      throw new functions.https.HttpsError("already-exists", "이미 건설한 시설입니다.");
+    }
+    assertCrewMothershipModuleUnlocked(module, crew);
+    tx.set(crewRef, {
+      currentMothershipProject: {
+        projectId,
+        itemId,
+        itemName: module.name,
+        requiredOre: module.cost,
+        contributedOre: 0,
+        contributorCount: 0,
+        status: "funding",
+        startedBy: uid,
+        startedAt: now,
+        updatedAt: now,
+      },
+      updatedAt: now,
+    }, { merge: true });
+  });
+  return { success: true, projectId, itemId };
+});
+
+exports.contributeCrewMothershipOre = crewMothershipFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  if (isGuestContext(context)) {
+    throw new functions.https.HttpsError("permission-denied", "게스트는 광석을 지원할 수 없습니다.");
+  }
+  const crewId = cleanId(data?.crewId, 160);
+  const requestedAmount = Math.floor(Number(data?.amount || 0));
+  const operationId = String(data?.operationId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);
+  if (!crewId || !operationId || !CREW_MOTHERSHIP_CONTRIBUTION_AMOUNTS.has(requestedAmount)) {
+    throw new functions.https.HttpsError("invalid-argument", "광석 지원 요청이 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const userRef = db.collection("users").doc(uid);
+  const operationRef = crewRef.collection("mothershipOperations").doc(`${uid}_${operationId}`);
+  const now = new Date();
+  const dateKey = getKSTDateString(now);
+  let result = null;
+
+  await db.runTransaction(async (tx) => {
+    const [crewSnap, userSnap, operationSnap] = await Promise.all([
+      tx.get(crewRef),
+      tx.get(userRef),
+      tx.get(operationRef),
+    ]);
+    if (operationSnap.exists) {
+      result = operationSnap.data()?.result || { success: true, duplicate: true };
+      return;
+    }
+    if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+    if (!userSnap.exists) throw new functions.https.HttpsError("failed-precondition", "사용자 정보를 찾을 수 없습니다.");
+
+    const crew = crewSnap.data() || {};
+    const userData = userSnap.data() || {};
+    const project = crew.currentMothershipProject || {};
+    if (crew.status !== "approved" || !getCrewMemberIds(crew).includes(uid) || userData.crewId !== crewId) {
+      throw new functions.https.HttpsError("permission-denied", "이 크루의 정식 멤버만 광석을 지원할 수 있습니다.");
+    }
+    if (project.status !== "funding" || !CREW_MOTHERSHIP_MODULES[project.itemId]) {
+      throw new functions.https.HttpsError("failed-precondition", "현재 진행 중인 공동 건설이 없습니다.");
+    }
+    const remaining = Math.max(0, Number(project.requiredOre || 0) - Number(project.contributedOre || 0));
+    if (remaining <= 0) throw new functions.https.HttpsError("failed-precondition", "이미 건설이 완료되었습니다.");
+    const acceptedAmount = Math.min(requestedAmount, remaining);
+    const contributedToday = userData.crewMothershipContributionDate === dateKey
+      ? Math.max(0, Number(userData.crewMothershipContributionAmount || 0))
+      : 0;
+    if (contributedToday + acceptedAmount > CREW_MOTHERSHIP_DAILY_CONTRIBUTION_LIMIT) {
+      throw new functions.https.HttpsError("resource-exhausted", `하루 최대 ${CREW_MOTHERSHIP_DAILY_CONTRIBUTION_LIMIT}광석까지 지원할 수 있습니다.`);
+    }
+    const crystals = Math.max(0, Number(userData.crystals || 0));
+    if (crystals < acceptedAmount) throw new functions.https.HttpsError("failed-precondition", "보유 광석이 부족합니다.");
+
+    const module = CREW_MOTHERSHIP_MODULES[project.itemId];
+    const nextContributedOre = Number(project.contributedOre || 0) + acceptedAmount;
+    const completed = nextContributedOre >= Number(project.requiredOre || module.cost);
+    const previousContributors = Array.isArray(project.contributorIds) ? project.contributorIds : [];
+    const contributorIds = uniqueIds([...previousContributors, uid]);
+    const stats = getCrewMothershipServerStats(crew);
+    const completionXP = completed ? 50 : 0;
+    const nextXP = stats.xp + completionXP;
+    const nextProject = {
+      ...project,
+      contributedOre: nextContributedOre,
+      contributorIds,
+      contributorCount: contributorIds.length,
+      status: completed ? "completed" : "funding",
+      updatedAt: now,
+      ...(completed ? { completedAt: now, completedBy: uid } : {}),
+    };
+    const ownedModules = uniqueIds([
+      ...(Array.isArray(crew.ownedMothershipModules) ? crew.ownedMothershipModules : []),
+      ...(completed ? [project.itemId] : []),
+    ]);
+    const equippedModules = {
+      ...(crew.equippedMothershipModules && typeof crew.equippedMothershipModules === "object" ? crew.equippedMothershipModules : {}),
+      ...(completed ? { [module.slot]: project.itemId } : {}),
+    };
+
+    result = {
+      success: true,
+      acceptedAmount,
+      completed,
+      itemId: project.itemId,
+      projectId: project.projectId,
+      crystalsRemaining: crystals - acceptedAmount,
+    };
+    tx.set(userRef, {
+      crystals: crystals - acceptedAmount,
+      crewMothershipContributionDate: dateKey,
+      crewMothershipContributionAmount: contributedToday + acceptedAmount,
+      updatedAt: now,
+    }, { merge: true });
+    tx.set(crewRef, {
+      currentMothershipProject: nextProject,
+      ownedMothershipModules: ownedModules,
+      equippedMothershipModules: equippedModules,
+      mothershipXP: nextXP,
+      mothershipStats: {
+        ...stats,
+        xp: nextXP,
+        totalContributedOre: stats.totalContributedOre + acceptedAmount,
+        completedProjects: stats.completedProjects + (completed ? 1 : 0),
+      },
+      updatedAt: now,
+    }, { merge: true });
+    recordCrystalTransaction(tx, uid, `crew-mothership-${crewId}-${operationId}`, {
+      amount: -acceptedAmount,
+      type: "crew_mothership_contribution",
+      description: `${module.name} 공동 건설 지원`,
+      metadata: { crewId, itemId: project.itemId, projectId: project.projectId, requestedAmount, acceptedAmount },
+    });
+    tx.set(operationRef, { crewId, uid, operationId, dateKey, createdAt: now, result });
+
+    if (completed) {
+      getCrewMemberIds(crew).forEach((memberId) => {
+        tx.set(db.collection("notifications").doc(`crew_mothership_${project.projectId}_${memberId}`), {
+          recipientId: memberId,
+          type: "crew_mothership_completed",
+          message: `${module.name} 건설이 완료되어 크루 모함에 장착되었습니다.`,
+          link: "/?view=crew",
+          isRead: false,
+          createdAt: now,
+          metadata: { crewId, itemId: project.itemId, projectId: project.projectId },
+        }, { merge: true });
+      });
+    }
+  });
+  return result;
+});
 
 function getRequestIp(context) {
   const forwarded = String(context?.rawRequest?.headers?.["x-forwarded-for"] || "");
@@ -9964,6 +10208,19 @@ async function contributePerfectAssignmentToCrewChest(assignmentId, assignment =
         memberReward: CREW_CRYSTAL_CHEST_MEMBER_REWARD,
         updatedAt: now,
       },
+      ...(boxCompleted ? (() => {
+        const mothershipStats = getCrewMothershipServerStats(crew);
+        const nextMothershipXP = mothershipStats.xp + 20;
+        return {
+          mothershipXP: nextMothershipXP,
+          mothershipStats: {
+            ...mothershipStats,
+            chestCycles: nextCycle,
+            xp: nextMothershipXP,
+            lastChestCompletedAt: now,
+          },
+        };
+      })() : {}),
     }, { merge: true });
 
     if (boxCompleted && rewardRef) {

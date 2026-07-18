@@ -1,0 +1,88 @@
+.crew-mothership-flyby {
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  bottom: clamp(72px, 8vh, 128px);
+  width: 100vw;
+  height: 140px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.crew-mothership-flyby__vessel {
+  position: relative;
+  width: max-content;
+  opacity: 0;
+  transform: translate3d(-24vw, 12px, 0) scale(.9);
+  filter: saturate(.82) brightness(.86);
+  animation: crew-mothership-map-crossing 150s linear -24s infinite;
+  will-change: transform, opacity;
+}
+
+.crew-mothership-flyby__vessel::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 18%;
+  right: 18%;
+  bottom: 8px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(79, 226, 255, .2);
+  filter: blur(16px);
+}
+
+.crew-mothership-flyby__signal {
+  position: absolute;
+  left: 54%;
+  bottom: -2px;
+  min-width: 112px;
+  padding: .34rem .5rem;
+  border-left: 1px solid rgba(104, 238, 255, .5);
+  background: linear-gradient(90deg, rgba(3, 10, 28, .72), transparent);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.crew-mothership-flyby__signal span,
+.crew-mothership-flyby__signal strong {
+  display: block;
+}
+
+.crew-mothership-flyby__signal span {
+  color: rgba(109, 238, 255, .74);
+  font-size: .48rem;
+  letter-spacing: .1em;
+}
+
+.crew-mothership-flyby__signal strong {
+  max-width: 150px;
+  margin-top: .12rem;
+  overflow: hidden;
+  color: rgba(238, 253, 255, .76);
+  font-size: .58rem;
+  text-overflow: ellipsis;
+}
+
+@keyframes crew-mothership-map-crossing {
+  0% { opacity: 0; transform: translate3d(-24vw, 12px, 0) scale(.9); }
+  7% { opacity: .42; }
+  28% { transform: translate3d(18vw, -5px, 0) scale(.94); }
+  52% { opacity: .58; transform: translate3d(53vw, 5px, 0) scale(1); }
+  78% { transform: translate3d(88vw, -7px, 0) scale(.96); }
+  93% { opacity: .38; }
+  100% { opacity: 0; transform: translate3d(124vw, 9px, 0) scale(.9); }
+}
+
+@media (max-width: 767px) {
+  .crew-mothership-flyby { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crew-mothership-flyby__vessel {
+    margin-left: 5vw;
+    opacity: .4;
+    transform: none;
+    animation: none;
+  }
+}

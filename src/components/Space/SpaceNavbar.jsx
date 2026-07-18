@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { Bell, ExternalLink, MessageCircle, Video } from 'lucide-react';
 import { ACCOUNT_DELETION_CALL_TIMEOUT_MS, auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,7 +11,9 @@ import { motion as Motion, AnimatePresence } from 'framer-motion';
 import NotificationMenu from './NotificationMenu';
 import DirectMemoMenu from './DirectMemoMenu';
 import CometBadge from './CometBadge';
+import CrewMothership from './CrewMothership';
 import { getEffectiveStreak } from '../../utils/streakUtils';
+import { getCrewMothershipLevel } from '../../utils/crewMothershipCatalog';
 import './SpaceNavbar.css';
 
 const LIVE_SUPPORT_LINKS = [
@@ -40,6 +42,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   const [isStartingSignup, setIsStartingSignup] = React.useState(false);
   const [isBrandImageFailed, setIsBrandImageFailed] = React.useState(false);
   const [isProfileImageFailed, setIsProfileImageFailed] = React.useState(false);
+  const [crewNavData, setCrewNavData] = React.useState(null);
 
   React.useEffect(() => {
     setIsProfileImageFailed(false);
@@ -58,6 +61,26 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   }, [isGuestSignupPromptOpen, isLiveMenuOpen]);
 
   const isGuest = userData?.isGuest === true;
+
+  React.useEffect(() => {
+    const crewId = String(userData?.crewId || '').trim();
+    setCrewNavData(null);
+    if (!crewId) return undefined;
+    return onSnapshot(doc(db, 'crews', crewId), (snapshot) => {
+      setCrewNavData(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
+    }, (error) => {
+      console.warn('Crew mothership nav sync failed:', error);
+    });
+  }, [userData?.crewId]);
+
+  const navCrew = crewNavData || (userData?.crewId ? {
+    id: userData.crewId,
+    name: userData.crewName || '스터디 크루',
+    color: userData.crewColor || '#36d9ff',
+    memberCount: Number(userData.crewMemberCount || 1),
+    leaderId: userData.crewRole === 'leader' ? user?.uid : '',
+  } : null);
+  const navMothershipLevel = navCrew ? getCrewMothershipLevel(navCrew) : null;
 
   const openGuestSignupPrompt = () => {
     soundManager.playClick();
@@ -232,7 +255,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   const mobilePrimaryNav = [
     { view: 'planet', label: '학습', icon: '🪐' },
     { view: 'battle', label: '배틀', icon: '⚔️' },
-    { view: 'crew', label: '스터디크루', icon: '🛰️' },
+    { view: 'crew', label: navCrew ? '크루 모함' : '스터디크루', icon: '🛰️' },
     { view: 'agora', label: '아고라', icon: '🏛️', path: '/agora' }
   ];
 
@@ -398,10 +421,16 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           🎨 STORE
         </button>
         <button
-          className={`space-nav-link ${getGuestNavState('crew')} ${currentView === 'crew' ? 'active' : ''}`}
+          className={`space-nav-link crew-nav-link ${getGuestNavState('crew')} ${currentView === 'crew' ? 'active' : ''}`}
           onClick={() => handleNavClick('crew', '/')}
+          title={navCrew ? `${navCrew.name} · ${navMothershipLevel.name}` : '스터디 크루 찾기'}
         >
-          🛰️ STUDY CREW
+          {navCrew ? (
+            <>
+              <span className="crew-nav-visual" aria-hidden="true"><CrewMothership crew={navCrew} variant="nav" /></span>
+              <span className="crew-nav-copy"><strong>{navCrew.name || 'CREW'}</strong><small>모함 Lv.{navMothershipLevel.level}</small></span>
+            </>
+          ) : <>🛰️ STUDY CREW</>}
         </button>
         <button
           className={`space-nav-link agora-nav-btn ${getGuestNavState('agora')} ${window.location.pathname.startsWith('/agora') ? 'active' : ''}`}
@@ -677,7 +706,9 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
             aria-label={isGuest && getGuestNavState(item.view) === 'guest-locked' ? `${item.label}, 회원가입 필요` : item.label}
             onClick={() => handleNavClick(item.view, item.path || '/')}
           >
-            <span>{item.icon}</span>
+            {item.view === 'crew' && navCrew
+              ? <CrewMothership crew={navCrew} variant="nav" />
+              : <span>{item.icon}</span>}
             <strong>{item.label}</strong>
           </button>
         ))}
