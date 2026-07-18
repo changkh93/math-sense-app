@@ -1,9 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { doc, getDoc, onSnapshot, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
+import {
+  collection,
+  deleteField,
+  doc,
+  getDoc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '../../firebase'
 import { useAuth } from '../../hooks/useAuth'
+import { useQuizBattlePresence } from '../../hooks/useQuizBattlePresence'
 import { calculateBattleData } from '../../utils/rankingUtils'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import soundManager from '../../utils/SoundManager'
@@ -71,8 +84,6 @@ export default function QuizBattleView({
   const [queueTickets, setQueueTickets] = useState([])
   const [isLoadingQueue, setIsLoadingQueue] = useState(false)
   const [queueListExpanded, setQueueListExpanded] = useState(false)
-  const [onlineOpponents, setOnlineOpponents] = useState([])
-  const [isLoadingOnline, setIsLoadingOnline] = useState(false)
   const [onlineListExpanded, setOnlineListExpanded] = useState(false)
   const [outgoingChallenge, setOutgoingChallenge] = useState(null)
   const [challengingUid, setChallengingUid] = useState('')
@@ -99,6 +110,7 @@ export default function QuizBattleView({
   const entryConfirmTimeoutRef = useRef('')
   const aiAdvanceTimerRef = useRef(null)
   const aiAdvanceInFlightRef = useRef(false)
+  const queueMatchAttemptRef = useRef('')
   const lastIntegrityReportRef = useRef(0)
   const resultLockedRef = useRef(false)
   const isAIMode = opponentMode === 'ai'
@@ -106,6 +118,23 @@ export default function QuizBattleView({
   const aiTrainingData = useMemo(() => calculateBattleData(userData || {}), [userData])
   const challengeMutedUntilMs = Number(userData?.quizBattlePreferences?.challengeMutedUntilMs || 0)
   const isChallengeReceptionMuted = challengeMutedUntilMs > timeNow
+  const waitingUids = useMemo(
+    () => new Set(queueTickets.map((ticket) => ticket.uid).filter(Boolean)),
+    [queueTickets],
+  )
+  const {
+    onlineOpponents,
+    isLoadingOnline,
+    presenceError,
+  } = useQuizBattlePresence({
+    enabled: !isAIMode && phase === 'idle',
+    user,
+    userData,
+    clusterId,
+    regionId,
+    phase,
+    waitingUids,
+  })
 
   useEffect(() => {
     if (!initialBattleId || battleId) return
@@ -162,33 +191,41 @@ export default function QuizBattleView({
     })
   }, [isAIMode, user?.uid])
 
-  const loadOnlineOpponents = useCallback(async ({ silent = false } = {}) => {
-    if (isAIMode || !user?.uid || !clusterId || !regionId || !entryUnitId) return
-    if (!silent) setIsLoadingOnline(true)
-    try {
-      const listOnline = httpsCallable(functions, 'listQuizBattleOnlineOpponents')
-      const res = await listOnline({ clusterId, regionId, entryUnitId })
-      setOnlineOpponents(Array.isArray(res.data?.opponents) ? res.data.opponents : [])
-    } catch (err) {
-      if (!silent) setError(getBattleChallengeError(err, '온라인 탐사원 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'))
-    } finally {
-      if (!silent) setIsLoadingOnline(false)
+  useEffect(() => {
+    if (!['idle', 'waiting'].includes(phase) || isAIMode || !user?.uid || !clusterId || !regionId) {
+      setQueueTickets([])
+      setIsLoadingQueue(false)
+      return undefined
     }
-  }, [clusterId, entryUnitId, isAIMode, regionId, user?.uid])
 
-  const loadQueueTickets = useCallback(async ({ silent = false } = {}) => {
-    if (isAIMode || !user?.uid || !clusterId || !regionId || !entryUnitId) return
-    if (!silent) setIsLoadingQueue(true)
-    try {
-      const listQueue = httpsCallable(functions, 'listQuizBattleQueue')
-      const res = await listQueue({ clusterId, regionId, entryUnitId })
-      setQueueTickets(Array.isArray(res.data?.tickets) ? res.data.tickets : [])
-    } catch (err) {
-      if (!silent) setError(getBattleChallengeError(err, '배틀 대기룸을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'))
-    } finally {
-      if (!silent) setIsLoadingQueue(false)
-    }
-  }, [clusterId, entryUnitId, isAIMode, regionId, user?.uid])
+    setIsLoadingQueue(true)
+    const waitingQuery = query(
+      collection(db, 'quizBattleQueueTickets'),
+      where('clusterId', '==', clusterId),
+      where('regionId', '==', regionId),
+      where('status', '==', 'waiting'),
+      orderBy('createdAtMs', 'asc'),
+      limit(40),
+    )
+
+    return onSnapshot(waitingQuery, (snap) => {
+      const nowMs = Date.now()
+      const tickets = snap.docs
+        .map((ticketSnap) => ({ ticketId: ticketSnap.id, ...(ticketSnap.data() || {}) }))
+        .filter((ticket) => ticket.uid !== user.uid && Number(ticket.expiresAtMs || 0) > nowMs)
+      setQueueTickets(tickets)
+      setIsLoadingQueue(false)
+    }, (err) => {
+      console.warn('Failed to listen to quiz battle queue', err)
+      setQueueTickets([])
+      setIsLoadingQueue(false)
+      setError('배틀 대기룸을 실시간으로 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    })
+  }, [clusterId, isAIMode, phase, regionId, user?.uid])
+
+  useEffect(() => {
+    if (presenceError) setError(presenceError)
+  }, [presenceError])
 
   const enableChallengeReception = useCallback(async () => {
     if (!user?.uid || isUpdatingReception) return
@@ -198,25 +235,12 @@ export default function QuizBattleView({
       const updateReception = httpsCallable(functions, 'setQuizBattleChallengeReception')
       await updateReception({ enabled: true })
       setChallengeNotice('이제 온라인 도전을 다시 받을 수 있습니다.')
-      loadOnlineOpponents({ silent: true })
     } catch (err) {
       setError(getBattleChallengeError(err, '도전 수신 설정을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.'))
     } finally {
       setIsUpdatingReception(false)
     }
-  }, [isUpdatingReception, loadOnlineOpponents, user?.uid])
-
-  useEffect(() => {
-    if (phase !== 'idle' || isAIMode) return undefined
-    loadOnlineOpponents()
-    loadQueueTickets()
-    const onlineTimer = setInterval(() => loadOnlineOpponents({ silent: true }), 30000)
-    const queueTimer = setInterval(() => loadQueueTickets({ silent: true }), 15000)
-    return () => {
-      clearInterval(onlineTimer)
-      clearInterval(queueTimer)
-    }
-  }, [isAIMode, loadOnlineOpponents, loadQueueTickets, phase])
+  }, [isUpdatingReception, user?.uid])
 
   const sendChallenge = useCallback(async (opponent) => {
     if (!opponent?.uid || challengingUid || outgoingChallenge || isJoining) return
@@ -243,11 +267,10 @@ export default function QuizBattleView({
       soundManager.playClick()
     } catch (err) {
       setError(getBattleChallengeError(err, '도전장을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.'))
-      loadOnlineOpponents({ silent: true })
     } finally {
       setChallengingUid('')
     }
-  }, [battleScope, challengingUid, clusterId, entryUnitId, entryUnitTitle, isJoining, loadOnlineOpponents, outgoingChallenge, rangeLabel, regionId])
+  }, [battleScope, challengingUid, clusterId, entryUnitId, entryUnitTitle, isJoining, outgoingChallenge, rangeLabel, regionId])
 
   const cancelOutgoingChallenge = useCallback(async ({ silent = false } = {}) => {
     const active = outgoingChallenge
@@ -287,7 +310,6 @@ export default function QuizBattleView({
       } else if (data.status === 'declined') {
         setOutgoingChallenge(null)
         setChallengeNotice(`${data.recipientName || '상대 탐사원'}님이 이번 도전을 정중히 거절했습니다.`)
-        loadOnlineOpponents({ silent: true })
       } else if (data.status === 'cancelled') {
         setOutgoingChallenge(null)
       }
@@ -295,14 +317,13 @@ export default function QuizBattleView({
       console.warn('Failed to listen to outgoing battle challenge', err)
       setOutgoingChallenge(null)
     })
-  }, [loadOnlineOpponents, outgoingChallenge?.challengeId, outgoingChallenge?.requestId])
+  }, [outgoingChallenge?.challengeId, outgoingChallenge?.requestId])
 
   useEffect(() => {
     if (!outgoingChallenge?.expiresAtMs || timeNow < outgoingChallenge.expiresAtMs) return
     setChallengeNotice(`${outgoingChallenge.recipientName || '상대 탐사원'}님이 응답하지 않아 도전장이 종료되었습니다.`)
     setOutgoingChallenge(null)
-    loadOnlineOpponents({ silent: true })
-  }, [loadOnlineOpponents, outgoingChallenge, timeNow])
+  }, [outgoingChallenge, timeNow])
 
   const startAIBattle = useCallback(async () => {
     if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
@@ -353,7 +374,6 @@ export default function QuizBattleView({
         matchedRef.current = true
         setBattleId(data.battleId)
         setQueueTickets([])
-        setOnlineOpponents([])
         setPhase('active')
         soundManager.playCrystal()
       } else {
@@ -365,15 +385,11 @@ export default function QuizBattleView({
     } catch (err) {
       setError(err?.message || '배틀 대기룸에 입장하지 못했습니다.')
       setPhase('idle')
-      if (targetTicketId) {
-        loadQueueTickets({ silent: true })
-        loadOnlineOpponents({ silent: true })
-      }
     } finally {
       setIsJoining(false)
       setJoiningMode('')
     }
-  }, [battleScope, clusterId, entryUnitId, isJoining, loadOnlineOpponents, loadQueueTickets, regionId, ticketId, user?.uid])
+  }, [battleScope, clusterId, entryUnitId, isJoining, regionId, ticketId, user?.uid])
 
   const cancelQueue = useCallback(async ({ allowMatched = false, throwOnError = false } = {}) => {
     if (!regionId || (!allowMatched && matchedRef.current)) return null
@@ -425,16 +441,18 @@ export default function QuizBattleView({
   }, [phase, ticketId])
 
   useEffect(() => {
-    if (phase !== 'waiting') return undefined
-    // 매칭은 ticket onSnapshot이 즉시 알려준다. 이 폴링은 두 사용자가 동시에
-    // 입장해 서로의 대기 티켓을 못 본 레이스 상황을 복구하는 보조 수단일 뿐이므로
-    // 자주 실행할 필요가 없다. 호출 1회마다 여러 Firestore 쿼리가 수반되므로
-    // 간격을 넉넉히 두어 비용과 부하를 줄인다.
-    const timer = setInterval(() => {
-      joinQueue({ silent: true })
-    }, 25000)
-    return () => clearInterval(timer)
-  }, [joinQueue, phase])
+    if (phase !== 'waiting' || isJoining || queueTickets.length === 0) {
+      if (phase !== 'waiting') queueMatchAttemptRef.current = ''
+      return
+    }
+
+    // 다른 대기 티켓이 생긴 순간에만 매칭을 재시도한다. 시간 기반 폴링 없이
+    // Firestore snapshot 변화가 동시 입장 race 복구를 직접 촉발한다.
+    const candidateKey = queueTickets.map((ticket) => ticket.ticketId).sort().join('|')
+    if (!candidateKey || queueMatchAttemptRef.current === candidateKey) return
+    queueMatchAttemptRef.current = candidateKey
+    joinQueue({ silent: true })
+  }, [isJoining, joinQueue, phase, queueTickets])
 
   useEffect(() => {
     resultLockedRef.current = false
@@ -1055,15 +1073,12 @@ export default function QuizBattleView({
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.4rem' }}>{showQueueList ? '접기' : '보기'}</span>
                   )}
                 </button>
-                <button
-                  type="button"
+                <span
                   className="font-tech"
-                  onClick={() => loadQueueTickets()}
-                  disabled={isLoadingQueue}
-                  style={{ border: 0, padding: '0.2rem', background: 'transparent', color: isLoadingQueue ? 'var(--text-muted)' : 'var(--star-gold)', fontWeight: 900, cursor: isLoadingQueue ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
+                  style={{ color: isLoadingQueue ? 'var(--text-muted)' : 'var(--star-gold)', fontWeight: 900, whiteSpace: 'nowrap', fontSize: '0.72rem' }}
                 >
-                  새로 고침
-                </button>
+                  {isLoadingQueue ? '연결 중' : '● 실시간'}
+                </span>
               </div>
 
               <div className="font-tech" style={{ padding: '0.7rem 1rem 0', color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.5 }}>
@@ -1093,7 +1108,7 @@ export default function QuizBattleView({
                           <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>{ticket.questionCount || QUESTION_COUNT}문제</span>
                         </div>
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>
-                          {ticket.entryUnitTitle || '퀴즈 유닛'} · 대기 {ticket.secondsLeft || 0}초 남음
+                          {ticket.entryUnitTitle || '퀴즈 유닛'} · 대기 {Math.max(0, Math.ceil((Number(ticket.expiresAtMs || 0) - timeNow) / 1000))}초 남음
                         </div>
                       </div>
                       <button
@@ -1185,23 +1200,18 @@ export default function QuizBattleView({
                   </span>
                 )}
               </button>
-              <button
-                type="button"
-                onClick={() => loadOnlineOpponents()}
-                disabled={isLoadingOnline}
+              <span
                 className="font-tech"
                 style={{
-                  border: 0,
-                  background: 'transparent',
                   color: isLoadingOnline ? 'var(--text-muted)' : 'var(--crystal-cyan)',
-                  cursor: isLoadingOnline ? 'default' : 'pointer',
                   fontWeight: 900,
                   padding: '0.15rem 0',
                   whiteSpace: 'nowrap',
+                  fontSize: '0.72rem',
                 }}
               >
-                새로 고침
-              </button>
+                {isLoadingOnline ? '연결 중' : '● 실시간'}
+              </span>
             </div>
             <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.76rem', margin: '0.55rem 0 0.8rem', lineHeight: 1.5 }}>
               대기룸에는 없지만 최근 2분 안에 접속했고, 현재 계정 권한으로 이 행성을 학습할 수 있는 탐사원입니다. 선택하면 퀴즈 범위를 담은 도전장이 전달됩니다.

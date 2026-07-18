@@ -1,0 +1,24 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "quizBattlePresence": {
+      "$clusterId": {
+        "$regionId": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            "connections": {
+              "$connectionId": {
+                ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'displayName', 'phase', 'updatedAtMs']) && newData.child('uid').val() === $uid && newData.child('displayName').isString() && newData.child('displayName').val().length <= 40 && newData.child('phase').isString() && newData.child('phase').val().matches(/^(idle|waiting|active|result)$/) && newData.child('updatedAtMs').isNumber())"
+              }
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

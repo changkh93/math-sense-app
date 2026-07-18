@@ -244,10 +244,13 @@ service cloud.firestore {
 
     // Quiz Battle MVP: all writes are server-managed by Cloud Functions.
     match /quizBattleQueueTickets/{ticketId} {
-      allow read: if isAuth() && (
+      allow get: if isAuth() && (
         resource.data.uid == request.auth.uid ||
         isAdmin()
       );
+      // 대기 중인 공개 티켓만 실시간 목록 쿼리에 노출한다. 쿼리는 반드시
+      // status == waiting 조건을 포함해야 하며 쓰기는 계속 서버만 담당한다.
+      allow list: if isAuth() && resource.data.status == 'waiting';
       allow write: if false;
     }
 

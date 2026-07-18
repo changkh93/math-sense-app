@@ -17,12 +17,17 @@ const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
 const guestSecurityFunctions = regionalFunctions.runWith({ secrets: ["GUEST_ABUSE_HASH_SECRET"] });
-// 답안 제출은 배틀의 매 문항에서 호출되므로 콜드 스타트를 제거한다.
-// 다른 배틀 함수까지 무분별하게 상시 인스턴스를 두지 않아 고정 비용은 한 함수로 제한한다.
-const quizBattleHotFunctions = regionalFunctions.runWith({ minInstances: 1, memory: "256MB", timeoutSeconds: 60 });
+// 퀴즈 배틀은 콜드 스타트를 허용해 유휴 인스턴스 비용을 없앤다.
+// 동시에 최대 인스턴스를 제한해 비정상 트래픽이나 호출량 급증에 따른 비용을 통제한다.
+const quizBattleFunctions = regionalFunctions.runWith({
+  maxInstances: 10,
+  memory: "256MB",
+  timeoutSeconds: 60,
+});
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
 const STORE_RADAR_DURATION_DAYS = 7;
+const QUIZ_BATTLE_TIE_TOLERANCE_MS = 3000;
 const STORE_PHOTON_SHIELD_CHARGES_PER_GIFT = 10;
 const STORE_ITEM_GIFT_CATALOG = {
   cryo_core: {
@@ -973,9 +978,15 @@ function calculateBattleRewards(participants = {}, participantUids = [], totalQu
     // 점수가 같아도 정답 수가 다르면(예: 복수정답 부분 점수) 더 많이 맞힌 쪽이 승리.
     winnerUid = aCorrect > bCorrect ? aUid : bUid;
     resultType = "win";
-  } else if (aCompleted && bCompleted && aLastMs > 0 && bLastMs > 0 && aLastMs !== bLastMs) {
-    // 동점 동순위 타이브레이크: 둘 다 완주한 경우에만 더 빨리 끝낸 쪽이 승리.
-    // 제한시간 종료 시 둘 다 미완주인 동점 경기는 무승부로 둔다.
+  } else if (
+    aCompleted &&
+    bCompleted &&
+    aLastMs > 0 &&
+    bLastMs > 0 &&
+    Math.abs(aLastMs - bLastMs) > QUIZ_BATTLE_TIE_TOLERANCE_MS
+  ) {
+    // 함수 콜드 스타트와 네트워크 지연을 승패로 확대하지 않도록 완주 시각이
+    // 3초 이내면 무승부로 처리하고, 그보다 차이가 클 때만 빠른 쪽이 승리한다.
     winnerUid = aLastMs < bLastMs ? aUid : bUid;
     resultType = "win";
   }
@@ -3709,7 +3720,7 @@ exports.advanceAIQuizBattle = regionalFunctions.https.onCall(async (data, contex
   return { success: true, finalized: shouldFinalize, ai: aiProgress };
 });
 
-exports.submitBattleAnswer = quizBattleHotFunctions.https.onCall(async (data, context) => {
+exports.submitBattleAnswer = quizBattleFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const battleId = cleanId(data?.battleId);
   const questionId = cleanId(data?.questionId);
