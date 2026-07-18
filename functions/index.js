@@ -8497,6 +8497,83 @@ exports.startCrewMothershipProject = crewMothershipFunctions.https.onCall(async 
   return { success: true, projectId, itemId };
 });
 
+exports.getCrewMothershipContributionSummary = crewMothershipFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  if (isGuestContext(context)) {
+    throw new functions.https.HttpsError("permission-denied", "게스트는 공동 건설 지원 내역을 볼 수 없습니다.");
+  }
+  const crewId = cleanId(data?.crewId, 160);
+  if (!crewId) {
+    throw new functions.https.HttpsError("invalid-argument", "크루 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const crewSnap = await crewRef.get();
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  const crew = crewSnap.data() || {};
+  if (crew.status !== "approved" || !getCrewMemberIds(crew).includes(uid)) {
+    throw new functions.https.HttpsError("permission-denied", "이 크루의 정식 멤버만 지원 내역을 볼 수 있습니다.");
+  }
+
+  const project = crew.currentMothershipProject || {};
+  const projectId = cleanText(project.projectId, 180);
+  if (!projectId || project.status !== "funding") {
+    return { success: true, projectId: "", totalContributedOre: 0, contributors: [] };
+  }
+
+  const operationsSnap = await crewRef.collection("mothershipOperations")
+    .where("result.projectId", "==", projectId)
+    .get();
+  const aggregated = new Map();
+  operationsSnap.docs.forEach((operationSnap) => {
+    const operation = operationSnap.data() || {};
+    const contributorId = cleanId(operation.uid, 160);
+    const amount = Math.max(0, Number(operation.result?.acceptedAmount || 0));
+    if (!contributorId || amount <= 0) return;
+    const previous = aggregated.get(contributorId) || { amount: 0, lastSupportedAtMs: 0 };
+    aggregated.set(contributorId, {
+      amount: previous.amount + amount,
+      lastSupportedAtMs: Math.max(previous.lastSupportedAtMs, timestampMillis(operation.createdAt)),
+    });
+  });
+
+  // 신규 집계 필드는 빠른 대체 경로이며, 배포 전 지원분은 위 서버 원장에서 복원한다.
+  const storedAmounts = project.contributionsByUser && typeof project.contributionsByUser === "object"
+    ? project.contributionsByUser
+    : {};
+  Object.entries(storedAmounts).forEach(([contributorId, storedAmount]) => {
+    const amount = Math.max(0, Number(storedAmount || 0));
+    if (!contributorId || amount <= 0 || aggregated.has(contributorId)) return;
+    aggregated.set(contributorId, { amount, lastSupportedAtMs: 0 });
+  });
+
+  const contributorIds = [...aggregated.keys()];
+  const userSnaps = contributorIds.length
+    ? await db.getAll(...contributorIds.map((contributorId) => db.collection("users").doc(contributorId)))
+    : [];
+  const namesById = new Map(userSnaps.map((userSnap) => [
+    userSnap.id,
+    cleanText(getDisplayNameFromUser(userSnap.data() || {}), 40) || "크루원",
+  ]));
+  const storedNames = project.contributorNamesById && typeof project.contributorNamesById === "object"
+    ? project.contributorNamesById
+    : {};
+  const contributors = contributorIds.map((contributorId) => ({
+    uid: contributorId,
+    name: namesById.get(contributorId) || cleanText(storedNames[contributorId], 40) || "크루원",
+    amount: aggregated.get(contributorId).amount,
+    lastSupportedAtMs: aggregated.get(contributorId).lastSupportedAtMs,
+  })).sort((a, b) => b.lastSupportedAtMs - a.lastSupportedAtMs || a.name.localeCompare(b.name, "ko"));
+
+  return {
+    success: true,
+    projectId,
+    totalContributedOre: contributors.reduce((sum, contributor) => sum + contributor.amount, 0),
+    contributors,
+  };
+});
+
 exports.contributeCrewMothershipOre = crewMothershipFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   if (isGuestContext(context)) {
@@ -8556,6 +8633,14 @@ exports.contributeCrewMothershipOre = crewMothershipFunctions.https.onCall(async
     const completed = nextContributedOre >= Number(project.requiredOre || module.cost);
     const previousContributors = Array.isArray(project.contributorIds) ? project.contributorIds : [];
     const contributorIds = uniqueIds([...previousContributors, uid]);
+    const contributionsByUser = {
+      ...(project.contributionsByUser && typeof project.contributionsByUser === "object" ? project.contributionsByUser : {}),
+      [uid]: Math.max(0, Number(project.contributionsByUser?.[uid] || 0)) + acceptedAmount,
+    };
+    const contributorNamesById = {
+      ...(project.contributorNamesById && typeof project.contributorNamesById === "object" ? project.contributorNamesById : {}),
+      [uid]: cleanText(getDisplayNameFromUser(userData), 40) || "크루원",
+    };
     const stats = getCrewMothershipServerStats(crew);
     const completionXP = completed ? 50 : 0;
     const nextXP = stats.xp + completionXP;
@@ -8564,6 +8649,8 @@ exports.contributeCrewMothershipOre = crewMothershipFunctions.https.onCall(async
       contributedOre: nextContributedOre,
       contributorIds,
       contributorCount: contributorIds.length,
+      contributionsByUser,
+      contributorNamesById,
       status: completed ? "completed" : "funding",
       updatedAt: now,
       ...(completed ? { completedAt: now, completedBy: uid } : {}),
