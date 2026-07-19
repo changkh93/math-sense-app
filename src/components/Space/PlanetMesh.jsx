@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Sphere, useTexture, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import ModularShip from './ModularShip'
-import { DEFAULT_SHIP_LOADOUT } from '../../utils/shipCatalog'
+import { getActiveShipFamily, normalizeShipLoadout } from '../../utils/shipCatalog'
 
 const IMAGE_PLANET_TYPES = new Set([
   'middle_math_core',
@@ -240,6 +240,7 @@ export function OrbitingSpaceship({
   orbitRadius = 3.5, 
   baseSpeed = 0.5, 
   equipment = {}, 
+  shipData = {},
   shipCustomization = {},
   isBoosting = false 
 }) {
@@ -263,11 +264,10 @@ export function OrbitingSpaceship({
     }
   })
 
-  const mapLoadout = useMemo(() => ({
-    ...DEFAULT_SHIP_LOADOUT,
-    ...shipCustomization,
-  }), [shipCustomization])
-  const mapShipSize = isBoosting ? 96 : 82
+  const resolvedShipData = useMemo(() => Object.keys(shipData || {}).length ? shipData : { shipCustomization }, [shipData, shipCustomization])
+  const mapFamily = useMemo(() => getActiveShipFamily(resolvedShipData), [resolvedShipData])
+  const mapLoadout = useMemo(() => normalizeShipLoadout(resolvedShipData, mapFamily), [resolvedShipData, mapFamily])
+  const mapShipSize = mapFamily === 'pathfinder' ? (isBoosting ? 120 : 104) : (isBoosting ? 96 : 82)
 
   return (
     <group ref={shipRef}>
@@ -284,6 +284,7 @@ export function OrbitingSpaceship({
         >
           <ModularShip
             loadout={mapLoadout}
+            family={mapFamily}
             size={mapShipSize}
             title="현재 행성을 탐사 중인 나의 탐사선"
             animate={false}
@@ -306,6 +307,7 @@ export default function PlanetMesh({
   showFormulas = true,
   status = 'not_started',
   equipment = {}, 
+  shipData = {},
   shipCustomization = {},
   isBoosting = false,
   isLocked = false,
@@ -511,6 +513,7 @@ export default function PlanetMesh({
         <OrbitingSpaceship 
           orbitRadius={size * 1.8} 
           equipment={equipment} 
+          shipData={shipData}
           shipCustomization={shipCustomization}
           isBoosting={isBoosting} 
         />

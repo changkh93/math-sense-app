@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion as Motion } from 'framer-motion'
-import { normalizeShipLoadout } from '../../utils/shipCatalog'
+import { getActiveShipFamily, getShipItemFamily, normalizeShipLoadout, SHIP_ITEM_MAP } from '../../utils/shipCatalog'
+import PathfinderShipArtwork from './PathfinderShipArtwork'
 import './ModularShip.css'
 
 function ShipArtwork({ loadout, title }) {
@@ -133,17 +134,21 @@ function ShipArtwork({ loadout, title }) {
   )
 }
 
-export default function ModularShip({ userData, loadout: loadoutProp, size = 160, title, className = '', animate = true }) {
-  const loadout = loadoutProp || normalizeShipLoadout(userData)
+export default function ModularShip({ userData, loadout: loadoutProp, family: familyProp, size = 160, title, className = '', animate = true }) {
+  const inferredItem = loadoutProp && Object.values(loadoutProp).map((itemId) => SHIP_ITEM_MAP[itemId]).find(Boolean)
+  const family = familyProp || (inferredItem ? getShipItemFamily(inferredItem) : getActiveShipFamily(userData))
+  const loadout = loadoutProp || normalizeShipLoadout(userData, family)
   return (
     <Motion.div
-      className={`modular-ship ${className}`}
+      className={`modular-ship modular-ship--${family} ${className}`}
       style={{ width: size, height: size }}
       initial={animate ? { opacity: 0, scale: 0.92 } : false}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 180, damping: 18 }}
     >
-      <ShipArtwork loadout={loadout} title={title} />
+      {family === 'pathfinder'
+        ? <PathfinderShipArtwork loadout={loadout} title={title} />
+        : <ShipArtwork loadout={loadout} title={title} />}
     </Motion.div>
   )
 }

@@ -36,6 +36,22 @@
   animation: modular-holo-flicker 3.8s linear infinite;
 }
 
+.modular-ship--pathfinder { filter: drop-shadow(0 18px 25px rgba(0, 0, 0, .55)) drop-shadow(0 0 10px rgba(62, 220, 255, .2)); }
+.pathfinder-ship__halo-energy { animation: pathfinder-halo-flow 7s linear infinite; }
+.pathfinder-ship__halo--front .pathfinder-ship__halo-energy { animation-direction: reverse; }
+.pathfinder-ship__engine { transform-origin: 320px 380px; animation: pathfinder-engine-pulse .72s ease-in-out infinite alternate; }
+.pathfinder-ship__engine.is-trinity { animation-duration: .42s; }
+.pathfinder-ship__core.is-online { transform-origin: 320px 286px; animation: pathfinder-core-pulse 1.8s ease-in-out infinite; }
+.pathfinder-ship__drones { transform-origin: 320px 286px; animation: pathfinder-drone-float 3.8s ease-in-out infinite; }
+.pathfinder-ship__trail { animation: modular-trail-breathe 1.25s ease-in-out infinite alternate; }
+.modular-ship--pathfinder:hover .pathfinder-ship__engine { opacity: 1; filter: brightness(1.2); }
+.modular-ship--pathfinder:hover .pathfinder-ship__halo-energy { stroke-width: 13px; filter: brightness(1.25); }
+.modular-ship--pathfinder:hover .pathfinder-ship__core { filter: brightness(1.2); }
+.modular-ship--pathfinder .pathfinder-ship__outer-frame,
+.modular-ship--pathfinder .pathfinder-ship__wings { transition: filter .28s ease; }
+.modular-ship--pathfinder:hover .pathfinder-ship__outer-frame,
+.modular-ship--pathfinder:hover .pathfinder-ship__wings { filter: brightness(1.08); }
+
 .orbiting-modular-ship {
   position: relative;
   display: grid;
@@ -94,6 +110,11 @@
   97% { opacity: 0.72; }
   98% { opacity: 0.95; }
 }
+
+@keyframes pathfinder-halo-flow { to { stroke-dashoffset: -240; } }
+@keyframes pathfinder-engine-pulse { from { opacity: .72; transform: scaleY(.88); } to { opacity: 1; transform: scaleY(1.08); } }
+@keyframes pathfinder-core-pulse { 0%, 100% { opacity: .82; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.06); } }
+@keyframes pathfinder-drone-float { 0%, 100% { transform: translateY(-3px); } 50% { transform: translateY(7px); } }
 
 @media (prefers-reduced-motion: reduce) {
   .modular-ship * { animation: none !important; }

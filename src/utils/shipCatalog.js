@@ -1,10 +1,26 @@
 export const SHIP_SLOT_ORDER = ['hull', 'wings', 'cockpit', 'engine', 'trail', 'companion']
+export const PATHFINDER_SLOT_ORDER = ['hull', 'wings', 'cockpit', 'engine', 'core', 'orbital', 'trail', 'companion']
+
+export const SHIP_FAMILIES = {
+  scout: {
+    id: 'scout', name: '정찰선 계열', code: 'SCOUT FAMILY', grade: 2,
+    description: '기민하고 아기자기한 개인 탐사선', slotOrder: SHIP_SLOT_ORDER,
+  },
+  pathfinder: {
+    id: 'pathfinder', name: '헤일로급 심우주 개척함', code: 'HALO-CLASS DEEP-SPACE PATHFINDER', grade: 3,
+    description: '헤일로 링과 삼중 추진계를 갖춘 대형 개척함', slotOrder: PATHFINDER_SLOT_ORDER,
+  },
+}
+
+export const PATHFINDER_HULL_ID = 'pathfinder-genesis'
 
 export const SHIP_SLOT_META = {
   hull: { label: '선체', shortLabel: '선체' },
   wings: { label: '날개', shortLabel: '날개' },
   cockpit: { label: '조종석', shortLabel: '조종석' },
   engine: { label: '엔진', shortLabel: '엔진' },
+  core: { label: '에너지 코어', shortLabel: '코어' },
+  orbital: { label: '궤도 모듈', shortLabel: '궤도' },
   trail: { label: '비행 궤적', shortLabel: '궤적' },
   companion: { label: '동행 장치', shortLabel: '동행' },
 }
@@ -97,9 +113,53 @@ export const SHIP_ITEMS = [
     tagline: '호기심 많은 우주 생명체가 빛으로 신호를 보냅니다',
     unlock: { type: 'quiz', value: 50, label: '퀴즈 탐사 50회' },
   },
+  {
+    id: PATHFINDER_HULL_ID, family: 'pathfinder', slot: 'hull', name: '제네시스 프레임', englishName: 'GENESIS FRAME', tier: 'LEGEND', cost: 4000,
+    tagline: '백금 장갑과 심우주 항법 골격을 통째로 건조하는 Grade 03의 중심 선체',
+    requiresScoutGrade: 2,
+  },
+  {
+    id: 'pathfinder-twin-nova', family: 'pathfinder', slot: 'wings', name: '트윈 노바윙', englishName: 'TWIN NOVA WINGS', tier: 'LEGEND', cost: 1500,
+    tagline: '뒤로 휘어진 광폭 이중 날개가 작은 화면에서도 개척함의 실루엣을 각인합니다',
+    requiresFamily: 'pathfinder',
+  },
+  {
+    id: 'pathfinder-prism', family: 'pathfinder', slot: 'cockpit', name: '프리즘 브리지', englishName: 'PRISM BRIDGE', tier: 'EPIC', cost: 900,
+    tagline: '빛을 거의 반사하지 않는 흑청색 프리즘 유리와 백금 캐노피 프레임',
+    requiresFamily: 'pathfinder',
+  },
+  {
+    id: 'pathfinder-trinity', family: 'pathfinder', slot: 'engine', name: '트리니티 이온 드라이브', englishName: 'TRINITY ION DRIVE', tier: 'LEGEND', cost: 1400,
+    tagline: '청록 중심과 보라 외곽 불꽃을 내뿜는 세 개의 독립 심우주 추진기',
+    requiresFamily: 'pathfinder',
+  },
+  {
+    id: 'pathfinder-quantum-core', family: 'pathfinder', slot: 'core', name: '퀀텀 코어', englishName: 'QUANTUM CORE', tier: 'LEGEND', cost: 900,
+    tagline: '선체 중앙의 모든 에너지 라인을 깨우는 맥동형 양자 동력핵',
+    requiresFamily: 'pathfinder',
+  },
+  {
+    id: 'pathfinder-halo-ring', family: 'pathfinder', slot: 'orbital', name: '헤일로 링', englishName: 'HALO RING', tier: 'LEGEND', cost: 800,
+    tagline: '선체 앞뒤를 감싸며 회전하는 청록·보라 이중 위상 궤도 장치',
+    requiresFamily: 'pathfinder',
+  },
+  {
+    id: 'pathfinder-warp-afterglow', family: 'pathfinder', slot: 'trail', name: '워프 잔광', englishName: 'WARP AFTERGLOW', tier: 'EPIC', cost: 300,
+    tagline: '세 엔진의 빛이 하나의 길고 날카로운 공간 잔상으로 합쳐집니다',
+    requiresFamily: 'pathfinder',
+  },
+  {
+    id: 'pathfinder-sentinel-drones', family: 'pathfinder', slot: 'companion', name: '센티널 드론 편대', englishName: 'SENTINEL DRONES', tier: 'EPIC', cost: 200,
+    tagline: '개척함 양옆을 호위하며 항로를 스캔하는 쌍둥이 정찰 드론',
+    requiresFamily: 'pathfinder',
+  },
 ]
 
 export const SHIP_ITEM_MAP = Object.fromEntries(SHIP_ITEMS.map((item) => [item.id, item]))
+
+export function getShipItemFamily(item) {
+  return item?.family || 'scout'
+}
 
 export function normalizeOwnedShipItems(userData = {}) {
   return Array.from(new Set([
@@ -108,14 +168,31 @@ export function normalizeOwnedShipItems(userData = {}) {
   ])).filter((itemId) => Boolean(SHIP_ITEM_MAP[itemId]))
 }
 
-export function normalizeShipLoadout(userData = {}) {
+export function ownsShipFamily(userData = {}, family = 'scout') {
+  if (family === 'scout') return true
+  return normalizeOwnedShipItems(userData).includes(PATHFINDER_HULL_ID)
+}
+
+export function getActiveShipFamily(userData = {}) {
+  return userData?.activeShipFamily === 'pathfinder' && ownsShipFamily(userData, 'pathfinder') ? 'pathfinder' : 'scout'
+}
+
+export function getShipFamilySlotOrder(family = 'scout') {
+  return SHIP_FAMILIES[family]?.slotOrder || SHIP_SLOT_ORDER
+}
+
+export function normalizeShipLoadout(userData = {}, familyOverride) {
+  const family = familyOverride || getActiveShipFamily(userData)
   const owned = new Set(normalizeOwnedShipItems(userData))
-  const stored = userData?.shipCustomization || {}
-  return SHIP_SLOT_ORDER.reduce((result, slot) => {
+  const stored = family === 'scout'
+    ? (userData?.shipLoadouts?.scout || userData?.shipCustomization || {})
+    : (userData?.shipLoadouts?.pathfinder || {})
+  return getShipFamilySlotOrder(family).reduce((result, slot) => {
     const candidate = stored[slot]
-    result[slot] = candidate && SHIP_ITEM_MAP[candidate]?.slot === slot && owned.has(candidate)
+    const validCandidate = candidate && SHIP_ITEM_MAP[candidate]?.slot === slot && getShipItemFamily(SHIP_ITEM_MAP[candidate]) === family && owned.has(candidate)
+    result[slot] = validCandidate
       ? candidate
-      : DEFAULT_SHIP_LOADOUT[slot]
+      : family === 'scout' ? DEFAULT_SHIP_LOADOUT[slot] : null
     return result
   }, {})
 }
@@ -135,7 +212,13 @@ export function getShipAchievementStats(userData = {}, history = []) {
   }
 }
 
-export function getShipItemUnlock(item, stats = {}) {
+export function getShipItemUnlock(item, stats = {}, userData = {}) {
+  if (item?.requiresScoutGrade && getShipGrade(userData, 'scout').level < item.requiresScoutGrade) {
+    return { unlocked: false, current: getShipGrade(userData, 'scout').level, target: item.requiresScoutGrade, progress: 0, label: '성간 정찰선 Grade 02 달성' }
+  }
+  if (item?.requiresFamily && !ownsShipFamily(userData, item.requiresFamily)) {
+    return { unlocked: false, current: 0, target: 1, progress: 0, label: '제네시스 프레임 건조 후 해금' }
+  }
   if (!item?.unlock) return { unlocked: true, current: 0, target: 0, progress: 1, label: '즉시 구매 가능' }
   const current = Number(stats[item.unlock.type] || 0)
   const target = Number(item.unlock.value || 0)
@@ -148,13 +231,29 @@ export function getShipItemUnlock(item, stats = {}) {
   }
 }
 
-export function getShipGrade(userData = {}) {
+export function getShipGrade(userData = {}, familyOverride) {
+  const family = familyOverride || getActiveShipFamily(userData)
+  if (family === 'pathfinder') return { level: 3, name: '헤일로급 심우주 개척함', code: 'HALO-CLASS DEEP-SPACE PATHFINDER' }
   const upgradeCount = Math.max(0, normalizeOwnedShipItems(userData).length - DEFAULT_OWNED_SHIP_ITEMS.length)
-  if (upgradeCount >= 10) return { level: 5, name: '전설의 심우주선', code: 'DEEP LEGEND' }
-  if (upgradeCount >= 7) return { level: 4, name: '은하 항해선', code: 'GALAXY CLASS' }
-  if (upgradeCount >= 4) return { level: 3, name: '행성 개척선', code: 'PIONEER CLASS' }
   if (upgradeCount >= 1) return { level: 2, name: '성간 정찰선', code: 'STELLAR SCOUT' }
   return { level: 1, name: '기본 탐사선', code: 'CADET SCOUT' }
+}
+
+export function getShipFamilyProgress(userData = {}, family = 'pathfinder') {
+  const familyItems = SHIP_ITEMS.filter((item) => getShipItemFamily(item) === family)
+  const owned = new Set(normalizeOwnedShipItems(userData))
+  const totalCost = familyItems.reduce((sum, item) => sum + Number(item.cost || 0), 0)
+  const spentCost = familyItems.reduce((sum, item) => sum + (owned.has(item.id) ? Number(item.cost || 0) : 0), 0)
+  const ownedCount = familyItems.filter((item) => owned.has(item.id)).length
+  return {
+    totalCost,
+    spentCost,
+    remainingCost: Math.max(0, totalCost - spentCost),
+    ownedCount,
+    totalCount: familyItems.length,
+    progress: totalCost > 0 ? spentCost / totalCost : 1,
+    complete: ownedCount === familyItems.length,
+  }
 }
 
 export function buildShipPreviewLoadout(loadout, previewItem) {

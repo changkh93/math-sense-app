@@ -16,7 +16,7 @@ import CrewCrystalChest from './CrewCrystalChest';
 import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 import ModularShip from './ModularShip';
-import { getShipGrade } from '../../utils/shipCatalog';
+import { getActiveShipFamily, getShipGrade } from '../../utils/shipCatalog';
 import CrewMothership from './CrewMothership';
 import CrewConstructionDock from './CrewConstructionDock';
 import { getCrewMothershipLevel, getCrewMothershipStats } from '../../utils/crewMothershipCatalog';
@@ -134,7 +134,7 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
         <div>
           <span>PERSONAL EXPLORER</span>
           <strong>{getShipGrade(resolvedMember).name}</strong>
-          <small>{resolvedMember.shipCustomization?.engine === 'engine-dark' ? '암흑물질 엔진 장착' : '정찰선 계열'}</small>
+          <small>{getActiveShipFamily(resolvedMember) === 'pathfinder' ? 'GRADE 03 · 개척함 계열' : resolvedMember.shipCustomization?.engine === 'engine-dark' ? '암흑물질 엔진 장착' : '정찰선 계열'}</small>
         </div>
       </div>
 

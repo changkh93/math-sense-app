@@ -25,9 +25,11 @@ import {
 import ShipHangar from './ShipHangar'
 import {
   getShipAchievementStats,
+  getShipItemFamily,
   getShipItemUnlock,
   normalizeOwnedShipItems,
   normalizeShipLoadout,
+  ownsShipFamily,
 } from '../../utils/shipCatalog'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -533,22 +535,28 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
         if (!freshSnap.exists()) throw new Error('User document not found')
 
         const freshUserData = freshSnap.data()
+        const family = getShipItemFamily(item)
         const freshOwned = normalizeOwnedShipItems(freshUserData)
         const isOwned = freshOwned.includes(item.id)
-        const currentLoadout = normalizeShipLoadout(freshUserData)
+        const currentLoadout = normalizeShipLoadout(freshUserData, family)
+        const nextLoadout = { ...currentLoadout, [item.slot]: item.id }
+        const nextShipLoadouts = { ...(freshUserData?.shipLoadouts || {}), [family]: nextLoadout }
+        const familyWrite = {
+          activeShipFamily: family,
+          shipLoadouts: nextShipLoadouts,
+          ...(family === 'scout' ? { shipCustomization: nextLoadout } : {}),
+        }
 
         if (currentLoadout[item.slot] === item.id) {
           return { mode: 'already_equipped' }
         }
 
         if (isOwned) {
-          transaction.set(userRef, {
-            shipCustomization: { ...currentLoadout, [item.slot]: item.id },
-          }, { merge: true })
+          transaction.set(userRef, familyWrite, { merge: true })
           return { mode: 'equipped' }
         }
 
-        const unlock = getShipItemUnlock(item, getShipAchievementStats({ ...freshUserData, learningSummary: userData?.learningSummary }, history))
+        const unlock = getShipItemUnlock(item, getShipAchievementStats({ ...freshUserData, learningSummary: userData?.learningSummary }, history), freshUserData)
         if (!unlock.unlocked) throw new Error('SHIP_ACHIEVEMENT_LOCKED')
 
         const freshCrystals = Number(freshUserData?.crystals || 0)
@@ -557,14 +565,14 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
         transaction.set(userRef, {
           crystals: freshCrystals - item.cost,
           ownedShipItems: [...freshOwned, item.id],
-          shipCustomization: { ...currentLoadout, [item.slot]: item.id },
+          ...familyWrite,
         }, { merge: true })
 
         recordCrystalTransaction(user.uid, {
           amount: -item.cost,
           type: 'ship_part_purchase',
           description: `${item.name} 탐사선 부품 구매`,
-          metadata: { itemId: item.id, slot: item.slot, family: 'scout' },
+          metadata: { itemId: item.id, slot: item.slot, family },
         }, transaction, `ship_part_${item.id}_${nowMs}`)
 
         return { mode: 'purchased' }
@@ -605,6 +613,43 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
           ? '이 부품의 학습 성취 조건을 먼저 달성해주세요.'
           : '탐사선 부품 작업에 실패했습니다. 다시 시도해주세요.'
       setPurchaseMessage({ type: 'error', text: message })
+      setTimeout(() => setPurchaseMessage(null), 3200)
+    } finally {
+      setPurchasing(false)
+    }
+  }
+
+  const handleShipFamilyAction = async (family) => {
+    if (purchasing || !user?.uid || !['scout', 'pathfinder'].includes(family)) return
+    setPurchasing(true)
+    const userRef = doc(db, 'users', user.uid)
+    try {
+      await runTransaction(db, async (transaction) => {
+        const freshSnap = await transaction.get(userRef)
+        if (!freshSnap.exists()) throw new Error('User document not found')
+        const freshUserData = freshSnap.data()
+        if (!ownsShipFamily(freshUserData, family)) throw new Error('SHIP_FAMILY_LOCKED')
+        transaction.set(userRef, { activeShipFamily: family }, { merge: true })
+      })
+      try {
+        const freshUserSnap = await getDoc(userRef)
+        const freshUserData = freshUserSnap.exists() ? freshUserSnap.data() : userData
+        const answersSnap = await getDocs(query(collection(db, 'answers'), where('userId', '==', user.uid)))
+        if (!answersSnap.empty) {
+          const batch = writeBatch(db)
+          const snapshot = buildAnswerProfileSnapshot(freshUserData, freshUserData?.publicDisplayName || freshUserData?.studentName || user.displayName || '탐험가')
+          answersSnap.docs.forEach((answerDoc) => batch.update(answerDoc.ref, { publicProfileSnapshot: snapshot }))
+          await batch.commit()
+        }
+      } catch (syncErr) {
+        console.warn('함급 전환 후 답변 스냅샷 동기화 실패:', syncErr)
+      }
+      soundManager.playWarp()
+      setPurchaseMessage({ type: 'success', text: `${family === 'pathfinder' ? '심우주 개척함' : '정찰선'} 출격 준비 완료! 모든 탐사 화면에 반영됩니다.` })
+      setTimeout(() => setPurchaseMessage(null), 3200)
+    } catch (err) {
+      console.error('Ship family action failed:', err)
+      setPurchaseMessage({ type: 'error', text: '함급 전환에 실패했습니다. 다시 시도해주세요.' })
       setTimeout(() => setPurchaseMessage(null), 3200)
     } finally {
       setPurchasing(false)
@@ -1129,6 +1174,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
         history={history}
         busy={purchasing}
         onAction={handleShipItemAction}
+        onFamilyAction={handleShipFamilyAction}
       />
 
       {/* 🏅 탐사 배지 쇼케이스 */}

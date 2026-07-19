@@ -14,7 +14,7 @@ import { calculateSEI } from '../../utils/rankingUtils';
 import { getBaseTheme, getFrameSurfaceStyles, getProfileFrame, isHallSpotlightActive } from '../../utils/socialUtils';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import { buildCollectionBadges, isBadgeUpgradeOwned } from '../../utils/badgeUtils';
-import { getShipGrade } from '../../utils/shipCatalog';
+import { getActiveShipFamily, getShipGrade } from '../../utils/shipCatalog';
 import auroraObservatoryImage from '../../assets/themes/aurora-observatory.jpg';
 import goldenArchiveImage from '../../assets/themes/golden-archive.jpg';
 import deepSeaLabImage from '../../assets/themes/deep-sea-lab.jpg';
@@ -719,8 +719,11 @@ export default function PublicProfile() {
                 )}
               </div>
 
-              <div className="public-profile-ship" aria-label={`${displayName}님의 탐사선`}>
-                <ModularShip userData={profile} size={190} animate={false} />
+              <div
+                className={`public-profile-ship ${getActiveShipFamily(profile) === 'pathfinder' ? 'is-pathfinder' : ''}`}
+                aria-label={`${displayName}님의 탐사선`}
+              >
+                <ModularShip userData={profile} size={getActiveShipFamily(profile) === 'pathfinder' ? 230 : 190} animate={false} />
                 <div>
                   <span>PERSONAL EXPLORER</span>
                   <strong>{getShipGrade(profile).name}</strong>

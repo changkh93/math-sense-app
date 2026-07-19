@@ -41,15 +41,35 @@
 .ship-hangar__wallet span { color: rgba(218, 232, 255, .58); font-size: .72rem; }
 .ship-hangar__wallet strong { grid-column: 2; color: #fff; font-size: 1.15rem; }
 
+.ship-hangar__families { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; padding: .9rem 2.2rem; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(2,8,24,.48); }
+.ship-hangar__families button { position: relative; display: grid; min-width: 0; padding: .72rem .9rem; overflow: hidden; border: 1px solid rgba(255,255,255,.08); border-radius: 13px; color: rgba(255,255,255,.48); background: rgba(255,255,255,.025); text-align: left; cursor: pointer; }
+.ship-hangar__families button::after { content: ''; position: absolute; inset: auto 0 0; height: 2px; background: transparent; }
+.ship-hangar__families button.is-selected { border-color: rgba(102,244,255,.42); color: #fff; background: linear-gradient(135deg, rgba(53,203,255,.1), rgba(117,76,255,.08)); }
+.ship-hangar__families button.is-selected::after { background: linear-gradient(90deg, #57f3ff, #8b63ff); box-shadow: 0 0 12px #57f3ff; }
+.ship-hangar__families button.is-active { box-shadow: inset 3px 0 #65f7d6; }
+.ship-hangar__families span { color: #72eaff; font-size: .58rem; font-weight: 900; letter-spacing: .12em; }
+.ship-hangar__families strong { margin-top: .18rem; overflow: hidden; color: inherit; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+.ship-hangar__families small { margin-top: .22rem; color: rgba(255,255,255,.36); font-size: .61rem; }
+
 .ship-hangar__layout { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(360px, .92fr) minmax(420px, 1.08fr); min-height: 640px; }
+.ship-hangar__layout--pathfinder { min-height: 710px; }
 .ship-hangar__bay { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 1.7rem; border-right: 1px solid rgba(255,255,255,.08); background: linear-gradient(180deg, rgba(5,15,34,.3), rgba(5,15,34,.7)); }
+.ship-hangar__bay--pathfinder { background: radial-gradient(circle at 50% 47%, rgba(64,109,255,.16), transparent 34%), linear-gradient(180deg, rgba(5,15,34,.32), rgba(5,8,29,.86)); }
 .ship-hangar__grade { position: relative; z-index: 2; display: grid; justify-items: start; }
 .ship-hangar__grade span { color: var(--hangar-cyan); font-size: .66rem; font-weight: 900; letter-spacing: .14em; }
 .ship-hangar__grade strong { margin-top: .3rem; color: #fff; font-size: 1.1rem; }
 .ship-hangar__grade small { margin-top: .22rem; color: rgba(255,255,255,.36); font-size: .65rem; letter-spacing: .18em; }
+.ship-hangar__construction { position: relative; z-index: 3; margin-top: .85rem; padding: .7rem .8rem; border: 1px solid rgba(139,99,255,.25); border-radius: 12px; background: rgba(91,69,207,.075); }
+.ship-hangar__construction > div { display: flex; justify-content: space-between; gap: 1rem; color: rgba(255,255,255,.5); font-size: .64rem; }
+.ship-hangar__construction strong { color: #e9e4ff; }
+.ship-hangar__construction i { display: block; height: 5px; margin-top: .55rem; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.08); }
+.ship-hangar__construction i span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#36e7ff,#8a63ff,#ffc75a); box-shadow: 0 0 12px rgba(83,218,255,.7); }
+.ship-hangar__construction small { display: block; margin-top: .42rem; color: rgba(255,255,255,.38); font-size: .6rem; }
 .ship-hangar__ship-stage { position: relative; display: grid; flex: 1; min-height: 420px; place-items: center; }
 .ship-hangar__ship-stage::after { content: ''; position: absolute; left: 12%; right: 12%; bottom: 7%; height: 38px; border-radius: 50%; background: rgba(71, 226, 255, .25); filter: blur(22px); }
 .ship-hangar__ship-stage .modular-ship { z-index: 2; max-width: 100%; }
+.ship-hangar__bay--pathfinder .ship-hangar__ship-stage { min-height: 455px; }
+.ship-hangar__bay--pathfinder .ship-hangar__ship-stage::after { right: 3%; left: 3%; height: 54px; background: linear-gradient(90deg, rgba(64,224,255,.2), rgba(111,74,255,.27)); }
 .ship-hangar__orbit { position: absolute; border: 1px solid rgba(102,244,255,.17); border-radius: 50%; transform: rotate(-18deg); }
 .ship-hangar__orbit--outer { width: 390px; height: 215px; }
 .ship-hangar__orbit--inner { width: 300px; height: 168px; border-style: dashed; animation: hangar-orbit 18s linear infinite; }
@@ -60,9 +80,12 @@
 .ship-hangar__specs span, .ship-hangar__specs strong { display: block; }
 .ship-hangar__specs span { color: rgba(255,255,255,.4); font-size: .65rem; }
 .ship-hangar__specs strong { margin-top: .18rem; color: #eafcff; font-size: .78rem; }
+.ship-hangar__deploy { display: flex; align-items: center; justify-content: center; gap: .45rem; margin-top: .75rem; padding: .72rem; border: 1px solid rgba(111,244,220,.42); border-radius: 11px; color: #cbfff5; background: rgba(43,210,177,.09); font-size: .72rem; font-weight: 900; cursor: pointer; }
+.ship-hangar__deploy:disabled { opacity: .45; cursor: wait; }
 
 .ship-hangar__console { display: flex; min-width: 0; flex-direction: column; padding: 1.35rem; }
 .ship-hangar__slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: .45rem; margin-bottom: 1rem; }
+.ship-hangar__slots.is-pathfinder { grid-template-columns: repeat(4, 1fr); }
 .ship-hangar__slots button { min-width: 0; padding: .65rem .7rem; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; color: rgba(255,255,255,.52); background: rgba(255,255,255,.025); text-align: left; cursor: pointer; }
 .ship-hangar__slots button.is-active { border-color: rgba(102,244,255,.48); color: var(--hangar-cyan); background: rgba(102,244,255,.09); box-shadow: inset 0 0 18px rgba(40,174,255,.08); }
 .ship-hangar__slots span, .ship-hangar__slots small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -86,6 +109,7 @@
 .ship-hangar__selection-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .ship-hangar__selection-top span { color: var(--hangar-cyan); font-size: .63rem; font-weight: 900; letter-spacing: .1em; }
 .ship-hangar__selection-top h3 { margin: .25rem 0 0; color: #fff; font-size: 1rem; }
+.ship-hangar__selection-top h3 + small { display: block; margin-top: .2rem; color: rgba(128,230,255,.48); font-size: .55rem; font-weight: 800; letter-spacing: .12em; }
 .ship-hangar__selection-top > strong { display: inline-flex; align-items: center; gap: .3rem; color: #fff; font-size: .82rem; }
 .ship-hangar__selection > p { margin: .55rem 0 .75rem; color: rgba(223,234,255,.58); font-size: .74rem; line-height: 1.55; }
 .ship-hangar__unlock > div { display: flex; align-items: center; gap: .35rem; color: #ffce66; font-size: .67rem; }
@@ -109,12 +133,15 @@
 @media (max-width: 600px) {
   .ship-hangar { border-radius: 20px; }
   .ship-hangar__header { flex-direction: column; padding: 1.35rem; }
+  .ship-hangar__families { padding: .8rem 1rem; }
   .ship-hangar__wallet { width: 100%; box-sizing: border-box; }
   .ship-hangar__bay, .ship-hangar__console { padding: 1rem; }
   .ship-hangar__ship-stage { min-height: 330px; }
   .ship-hangar__ship-stage .modular-ship { width: 300px !important; height: 300px !important; }
+  .ship-hangar__bay--pathfinder .ship-hangar__ship-stage .modular-ship { width: 350px !important; height: 350px !important; }
   .ship-hangar__orbit--outer { width: 310px; height: 170px; }
   .ship-hangar__orbit--inner { width: 245px; height: 132px; }
+  .ship-hangar__slots.is-pathfinder { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

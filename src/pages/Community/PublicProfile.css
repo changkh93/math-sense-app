@@ -232,6 +232,14 @@
   top: -20px;
 }
 
+.public-profile-ship.is-pathfinder {
+  min-height: 180px;
+}
+
+.public-profile-ship.is-pathfinder .modular-ship {
+  top: -14px;
+}
+
 .public-profile-ship > div:last-child {
   position: absolute;
   z-index: 2;
@@ -1002,6 +1010,10 @@
 
   .public-profile-ship .modular-ship {
     top: -8px;
+  }
+
+  .public-profile-ship.is-pathfinder {
+    min-height: 215px;
   }
 
   .public-profile-featured-premium-badge,

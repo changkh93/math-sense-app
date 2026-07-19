@@ -285,6 +285,10 @@ export function getPublicProfile(userData = {}, fallbackName = '탐험가') {
     questionCount: safeUserData.questionCount || 0,
     hallSpotlightUntilMs: safeUserData.hallSpotlightUntilMs || 0,
     selectedBaseTheme: getBaseTheme(safeUserData.selectedBaseTheme).id,
+    activeShipFamily: safeUserData.activeShipFamily || 'scout',
+    shipLoadouts: safeUserData.shipLoadouts || {},
+    shipCustomization: safeUserData.shipCustomization || {},
+    ownedShipItems: Array.isArray(safeUserData.ownedShipItems) ? safeUserData.ownedShipItems : [],
   };
 }
 
@@ -317,6 +321,8 @@ export function buildAnswerProfileSnapshot(userData = {}, fallbackName = '탐험
     helpCount: profile.helpCount,
     questionCount: profile.questionCount,
     hallSpotlightUntilMs: profile.hallSpotlightUntilMs,
+    activeShipFamily: userData?.activeShipFamily || 'scout',
+    shipLoadouts: userData?.shipLoadouts || {},
     shipCustomization: userData?.shipCustomization || {},
     ownedShipItems: Array.isArray(userData?.ownedShipItems) ? userData.ownedShipItems : [],
   };

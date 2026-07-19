@@ -2,6 +2,8 @@
 
 .battle-ship-dock{position:absolute;right:0;bottom:20px;display:flex;align-items:center;width:300px;height:122px;overflow:hidden;border:1px solid rgba(99,224,255,.18);border-radius:18px;background:radial-gradient(circle at 22% 50%,rgba(0,229,255,.14),rgba(9,16,39,.82) 62%);text-align:left;box-shadow:inset 0 1px rgba(255,255,255,.05)}
 .battle-ship-dock .modular-ship{margin-left:-12px}
+.battle-ship-dock.is-pathfinder{width:340px;height:140px}
+.battle-ship-dock.is-pathfinder .modular-ship{margin-left:-18px}
 .battle-ship-dock>div:last-child{min-width:0;margin-left:-8px;padding-right:12px}
 .battle-ship-dock span,.battle-ship-dock strong,.battle-ship-dock small{display:block}
 .battle-ship-dock span{color:#65efff;font:800 9px var(--font-tech,monospace);letter-spacing:.12em}

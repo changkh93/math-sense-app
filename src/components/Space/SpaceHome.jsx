@@ -3563,6 +3563,7 @@ function SpaceHome() {
               }}
               darkMatterCount={darkMatterCount}
               equipment={equipment}
+              shipData={userData}
               shipCustomization={userData?.shipCustomization || {}}
               isBoosting={isBoosting}
             />
