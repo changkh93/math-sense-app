@@ -1,21 +1,87 @@
 /* global module */
 
 const GALAXY_ITEM_CATALOG = {
-  star_lamp: { name: "별빛 램프", icon: "✦", cost: 25, material: "stardust", materialCost: 0, kind: "decor" },
-  lumen_tree: { name: "루멘 나무", icon: "🌳", cost: 60, material: "biofiber", materialCost: 2, kind: "nature" },
-  crystal_pond: { name: "수정 연못", icon: "💠", cost: 110, material: "crystalGlass", materialCost: 2, kind: "nature" },
-  rover_bay: { name: "탐사 로버 정비소", icon: "🛠️", cost: 160, material: "alloy", materialCost: 3, kind: "facility" },
-  observatory: { name: "성운 관측소", icon: "🔭", cost: 240, material: "crystalGlass", materialCost: 4, kind: "facility" },
-  friend_greenhouse: { name: "별빛 공동 온실", icon: "🏡", cost: 180, material: "biofiber", materialCost: 4, kind: "social" },
+  star_lamp: {
+    name: "별빛 램프", icon: "✦", iconId: "sparkles", cost: 25, material: "stardust", materialCost: 0, kind: "decor",
+    description: "귀환 지점을 은은하게 밝히는 첫 번째 개척 조명입니다.",
+    effect: "주변에 따뜻한 별빛과 귀환 포인트를 만듭니다.",
+    setName: "귀환의 빛", previewTone: "#ffe28a",
+  },
+  lumen_tree: {
+    name: "루멘 나무", icon: "♧", iconId: "tree-pine", cost: 60, material: "biofiber", materialCost: 2, kind: "nature",
+    description: "행성의 밤에도 빛을 머금는 대표 생태 식물입니다.",
+    effect: "행성에 발광 수관과 생태 구역의 중심을 만듭니다.",
+    setName: "루멘 생태계", previewTone: "#72efad",
+  },
+  crystal_pond: {
+    name: "수정 연못", icon: "◈", iconId: "waves", cost: 110, material: "crystalGlass", materialCost: 2, kind: "nature",
+    description: "수정 입자가 수면을 따라 흐르는 작은 휴식 공간입니다.",
+    effect: "반사 수면과 부유 입자로 행성에 물가 풍경을 더합니다.",
+    setName: "루멘 생태계", previewTone: "#62ddff",
+  },
+  rover_bay: {
+    name: "탐사 로버 정비소", icon: "⌂", iconId: "wrench", cost: 160, material: "alloy", materialCost: 3, kind: "facility",
+    description: "귀환한 로버를 정비하고 다음 원정을 준비하는 전초 시설입니다.",
+    effect: "탐사 구역을 알아보기 쉬운 정비 거점으로 바꿉니다.",
+    setName: "개척 전초기지", previewTone: "#ffad70",
+  },
+  observatory: {
+    name: "성운 관측소", icon: "◎", iconId: "telescope", cost: 240, material: "crystalGlass", materialCost: 4, kind: "facility",
+    description: "멀리 끊어진 아스트라 항로의 신호를 관측하는 시설입니다.",
+    effect: "행성 스카이라인에 회전 관측 장치와 푸른 신호광을 더합니다.",
+    setName: "개척 전초기지", previewTone: "#91b9ff",
+  },
+  friend_greenhouse: {
+    name: "별빛 공동 온실", icon: "◇", iconId: "warehouse", cost: 180, material: "biofiber", materialCost: 4, kind: "social",
+    description: "친구가 찾아와 물을 주고 생태 흔적을 남길 수 있는 공동 공간입니다.",
+    effect: "방문 도움 행동의 목적지가 되는 투명 온실을 만듭니다.",
+    setName: "연결의 정원", previewTone: "#8fffd1",
+  },
+  prism_pathlight: {
+    name: "프리즘 길잡이", icon: "⌁", iconId: "route", cost: 45, material: "stardust", materialCost: 1, kind: "decor",
+    description: "착륙장과 주요 시설 사이의 길을 표시하는 낮은 유도등입니다.",
+    effect: "걸어갈 방향을 보여주는 연속 빛 표식을 만듭니다.",
+    setName: "귀환의 빛", previewTone: "#79eaff",
+  },
+  starflower_garden: {
+    name: "별꽃 정원", icon: "❋", iconId: "flower-2", cost: 90, material: "biofiber", materialCost: 3, kind: "nature",
+    description: "친구의 물주기 신호에 어울리는 작은 발광 꽃밭입니다.",
+    effect: "정원 구역에 색 변화가 있는 꽃 군락을 더합니다.",
+    setName: "연결의 정원", previewTone: "#ff9fcb",
+  },
+  creature_habitat: {
+    name: "루미 생명체 쉼터", icon: "◌", iconId: "egg", cost: 145, material: "biofiber", materialCost: 4, kind: "ecology",
+    description: "작은 행성 생명체가 머물 수 있도록 만든 안전한 보금자리입니다.",
+    effect: "생명체 돌보기 행동을 위한 생태 랜드마크를 만듭니다.",
+    setName: "루멘 생태계", previewTone: "#c6f58a",
+  },
+  signal_plaza: {
+    name: "귀환 신호 광장", icon: "⌾", iconId: "radio-tower", cost: 135, material: "crystalGlass", materialCost: 3, kind: "social",
+    description: "방문자의 인사와 감탄 신호가 모이는 작은 행성 광장입니다.",
+    effect: "친구 방문 흔적을 보여줄 중심 광장과 신호 비콘을 만듭니다.",
+    setName: "항로 연결망", previewTone: "#a995ff",
+  },
+  expedition_beacon: {
+    name: "원정대 비콘", icon: "△", iconId: "satellite-dish", cost: 210, material: "alloy", materialCost: 4, kind: "facility",
+    description: "미지의 섹터로 향하는 탐사 신호를 증폭하는 전초 비콘입니다.",
+    effect: "탐사 관문 근처에 장거리 통신 표식과 회전 신호를 더합니다.",
+    setName: "개척 전초기지", previewTone: "#ff8c68",
+  },
+  route_gateway: {
+    name: "아스트라 항로문", icon: "⬡", iconId: "orbit", cost: 320, material: "alloy", materialCost: 6, kind: "social",
+    description: "오래 연결된 친구의 행성을 향해 빛나는 대형 항로 구조물입니다.",
+    effect: "행성에 전시 가치가 높은 워프 랜드마크를 세웁니다.",
+    setName: "항로 연결망", previewTone: "#68f0d0",
+  },
 };
 
 const GALAXY_THEMES = new Set(["forest", "ocean", "crystal", "desert", "mechanical", "ice"]);
 const GALAXY_PLAY_STYLES = new Set(["decorate", "explore", "collect", "cooperate", "photo"]);
 const GALAXY_VISIT_ACTIONS = {
-  water: { label: "별꽃에 물주기", icon: "💧", stat: "gardenVitality" },
-  repair: { label: "시설 수리하기", icon: "🔧", stat: "facilityHealth" },
-  feed: { label: "생명체 돌보기", icon: "🌱", stat: "creatureHappiness" },
-  admire: { label: "감탄 신호 남기기", icon: "✨", stat: "admirationCount" },
+  water: { label: "별꽃에 물주기", icon: "▽", iconId: "droplets", stat: "gardenVitality", connectionXp: 6 },
+  repair: { label: "시설 수리하기", icon: "⌁", iconId: "wrench", stat: "facilityHealth", connectionXp: 7 },
+  feed: { label: "생명체 돌보기", icon: "♧", iconId: "sprout", stat: "creatureHappiness", connectionXp: 6 },
+  admire: { label: "감탄 신호 남기기", icon: "✦", iconId: "sparkles", stat: "admirationCount", connectionXp: 4 },
 };
 const GALAXY_SAFE_VISIT_MESSAGES = new Set([
   "새로운 풍경이 정말 멋져!",
@@ -38,6 +104,29 @@ const GALAXY_WORLD_NODE_ACTIONS = {
   wild_soil: "plant",
 };
 
+const GALAXY_BUILD_RADIUS = 14.2;
+const GALAXY_BUILD_MIN_SPACING = 2.1;
+const GALAXY_BUILD_RESERVED_POSITIONS = [
+  [9.2, 7.8], [7.8, -7.3], [11.7, 3.2], [-10.5, 7.4], [4.8, -8.7],
+  [-12.2, 1.5], [1.2, -12.4], [12.4, 0.2],
+];
+
+const GALAXY_RELATIONSHIP_LEVEL_THRESHOLDS = [0, 20, 60, 140, 300];
+const GALAXY_VISIT_NODE_ACTIONS = {
+  crystal_north: "admire",
+  fiber_grove: "water",
+  ancient_scrap: "repair",
+  broken_beacon: "repair",
+  wild_soil: "feed",
+};
+const GALAXY_VISIT_NODE_POSITIONS = {
+  crystal_north: [9.2, 7.8],
+  fiber_grove: [7.8, -7.3],
+  ancient_scrap: [11.7, 3.2],
+  broken_beacon: [-10.5, 7.4],
+  wild_soil: [4.8, -8.7],
+};
+
 const LEARNING_ORE_EXCLUDED_TYPES = new Set([
   "crystal_gift_received",
   "crystal_gift_sent",
@@ -48,6 +137,8 @@ const LEARNING_ORE_EXCLUDED_TYPES = new Set([
   "crew_mothership_contribution",
   "galaxy_build",
 ]);
+const GALAXY_LEARNING_LEDGER_VERSION = 2;
+const GALAXY_LEARNING_BACKFILL_LIMIT = 200;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number(value) || 0));
@@ -68,6 +159,49 @@ function containsUnsafePublicText(value) {
 
 function uniqueIds(values = []) {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function getGalaxyRelationshipId(firstUid, secondUid) {
+  return [cleanId(firstUid), cleanId(secondUid)].sort().join("__");
+}
+
+function getGalaxyRelationshipProgress(connectionXp = 0) {
+  const safeXp = Math.max(0, Math.floor(Number(connectionXp) || 0));
+  let routeLevel = 1;
+  GALAXY_RELATIONSHIP_LEVEL_THRESHOLDS.forEach((threshold, index) => {
+    if (safeXp >= threshold) routeLevel = index + 1;
+  });
+  const nextThresholdIndex = Math.min(routeLevel, GALAXY_RELATIONSHIP_LEVEL_THRESHOLDS.length - 1);
+  return {
+    connectionXp: safeXp,
+    routeLevel,
+    nextLevelXp: GALAXY_RELATIONSHIP_LEVEL_THRESHOLDS[nextThresholdIndex],
+  };
+}
+
+function parseGalaxyVisitPosition(value) {
+  if (value == null) return { provided: false, value: null };
+  let x;
+  let z;
+  if (Array.isArray(value)) {
+    if (value.length !== 3) return { provided: true, value: null };
+    [x, , z] = value;
+  } else if (typeof value === "object") {
+    x = value.x;
+    z = value.z;
+  } else {
+    return { provided: true, value: null };
+  }
+  if (typeof x !== "number" || !Number.isFinite(x) || typeof z !== "number" || !Number.isFinite(z)) {
+    return { provided: true, value: null };
+  }
+  return {
+    provided: true,
+    value: {
+      x: Math.round(clamp(x, -16, 16) * 100) / 100,
+      z: Math.round(clamp(z, -16, 16) * 100) / 100,
+    },
+  };
 }
 
 function getCrewMemberIds(crew = {}) {
@@ -153,9 +287,9 @@ function buildStarterPlanet(uid, user, learningState, now) {
     playStyles: ["decorate", "explore"],
     visitMode: "crew",
     layout: [
-      { instanceId: "starter_dome", itemId: "starter_dome", icon: "🛖", name: "개척자 돔", x: 48, y: 48, rotation: 0, locked: true },
-      { instanceId: "starter_tree", itemId: "lumen_tree", icon: "🌳", name: "첫 루멘 나무", x: 25, y: 58, rotation: 0, locked: true },
-      { instanceId: "starter_lamp", itemId: "star_lamp", icon: "✦", name: "귀환등", x: 70, y: 62, rotation: 0, locked: true },
+      { instanceId: "starter_dome", itemId: "starter_dome", icon: "⬡", iconId: "house", name: "개척자 돔", x: 48, y: 48, rotation: 0, locked: true },
+      { instanceId: "starter_tree", itemId: "lumen_tree", icon: "♧", iconId: "tree-pine", name: "첫 루멘 나무", x: 25, y: 58, rotation: 0, locked: true },
+      { instanceId: "starter_lamp", itemId: "star_lamp", icon: "✦", iconId: "sparkles", name: "귀환등", x: 70, y: 62, rotation: 0, locked: true },
     ],
     materials: { stardust: 8, biofiber: 4, crystalGlass: 2, alloy: 1 },
     stats: { gardenVitality: 60, facilityHealth: 70, creatureHappiness: 55, admirationCount: 0, visits: 0 },
@@ -176,15 +310,73 @@ function isEligibleLearningOreTransaction(data = {}) {
   return true;
 }
 
-async function calculateLifetimeLearningOre(db, uid, user = {}) {
-  const existing = Math.max(0, Number(user.lifetimeLearningCrystalsEarned || 0));
-  const currentBalance = Math.max(0, Number(user.crystals || 0));
-  const txSnap = await db.collection("users").doc(uid).collection("crystal_transactions").get();
-  const ledgerTotal = txSnap.docs.reduce((sum, snap) => {
-    const row = snap.data() || {};
-    return sum + (isEligibleLearningOreTransaction(row) ? Number(row.amount || 0) : 0);
-  }, 0);
-  return Math.max(existing, currentBalance, Math.floor(ledgerTotal));
+async function calculateLifetimeLearningOre(db, admin, userRef, user = {}) {
+  const currentTotal = Math.max(0, Number(user.galaxyLearningOreV2Total || 0));
+  const isComplete = Number(user.galaxyLearningLedgerVersion || 0) >= GALAXY_LEARNING_LEDGER_VERSION
+    && user.galaxyLearningLedgerComplete === true;
+  if (isComplete) return { total: currentTotal, complete: true };
+
+  let ledgerQuery = userRef.collection("crystal_transactions")
+    .orderBy(admin.firestore.FieldPath.documentId())
+    .limit(GALAXY_LEARNING_BACKFILL_LIMIT);
+  const cursor = cleanId(user.galaxyLearningBackfillCursor, 180);
+  if (cursor) ledgerQuery = ledgerQuery.startAfter(cursor);
+  const ledgerSnap = await ledgerQuery.get();
+
+  if (ledgerSnap.empty) {
+    return db.runTransaction(async (transaction) => {
+      const freshUserSnap = await transaction.get(userRef);
+      const freshTotal = Math.max(0, Number(freshUserSnap.data()?.galaxyLearningOreV2Total || currentTotal));
+      transaction.set(userRef, {
+        galaxyLearningLedgerVersion: GALAXY_LEARNING_LEDGER_VERSION,
+        galaxyLearningLedgerComplete: true,
+        galaxyLearningOreV2Total: freshTotal,
+        lifetimeLearningCrystalsEarned: freshTotal,
+        galaxyLearningLedgerSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { total: freshTotal, complete: true };
+    });
+  }
+
+  const eligibleRows = ledgerSnap.docs
+    .map((snap) => ({ id: snap.id, row: snap.data() || {} }))
+    .filter(({ row }) => isEligibleLearningOreTransaction(row));
+  const markerRefs = eligibleRows.map(({ id }) => userRef.collection("galaxyLearningOreEvents").doc(id));
+  const nextCursor = ledgerSnap.docs[ledgerSnap.docs.length - 1].id;
+  const pageComplete = ledgerSnap.size < GALAXY_LEARNING_BACKFILL_LIMIT;
+
+  return db.runTransaction(async (transaction) => {
+    const [freshUserSnap, ...markerSnaps] = await Promise.all([
+      transaction.get(userRef),
+      ...markerRefs.map((ref) => transaction.get(ref)),
+    ]);
+    const freshUser = freshUserSnap.data() || {};
+    const baseTotal = Math.max(0, Number(freshUser.galaxyLearningOreV2Total || 0));
+    let delta = 0;
+    eligibleRows.forEach(({ id, row }, index) => {
+      if (markerSnaps[index]?.exists) return;
+      const amount = Math.max(0, Math.floor(Number(row.amount || 0)));
+      if (!amount) return;
+      delta += amount;
+      transaction.set(markerRefs[index], {
+        transactionId: id,
+        amount,
+        type: cleanId(row.type, 80),
+        source: "backfill",
+        recordedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+    const total = baseTotal + delta;
+    transaction.set(userRef, {
+      galaxyLearningLedgerVersion: GALAXY_LEARNING_LEDGER_VERSION,
+      galaxyLearningLedgerComplete: pageComplete,
+      galaxyLearningBackfillCursor: nextCursor,
+      galaxyLearningOreV2Total: total,
+      lifetimeLearningCrystalsEarned: total,
+      galaxyLearningLedgerSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return { total, complete: pageComplete };
+  });
 }
 
 function serializeValue(value) {
@@ -200,6 +392,41 @@ function serializeValue(value) {
 module.exports = function registerGalaxyGame({ functions, admin, regionalFunctions }) {
   const db = admin.firestore();
   const FieldValue = admin.firestore.FieldValue;
+
+  const rollupGalaxyLearningOre = regionalFunctions.firestore
+    .document("users/{uid}/crystal_transactions/{transactionId}")
+    .onCreate(async (snapshot, context) => {
+      const row = snapshot.data() || {};
+      if (!isEligibleLearningOreTransaction(row)) return null;
+      const uid = cleanId(context.params.uid, 180);
+      const transactionId = cleanId(context.params.transactionId, 180);
+      const amount = Math.max(0, Math.floor(Number(row.amount || 0)));
+      if (!uid || !transactionId || !amount) return null;
+      const userRef = db.collection("users").doc(uid);
+      const markerRef = userRef.collection("galaxyLearningOreEvents").doc(transactionId);
+      return db.runTransaction(async (transaction) => {
+        const [markerSnap, userSnap] = await Promise.all([
+          transaction.get(markerRef),
+          transaction.get(userRef),
+        ]);
+        if (markerSnap.exists || !userSnap.exists) return;
+        const user = userSnap.data() || {};
+        const total = Math.max(0, Number(user.galaxyLearningOreV2Total || 0)) + amount;
+        transaction.set(userRef, {
+          galaxyLearningLedgerVersion: GALAXY_LEARNING_LEDGER_VERSION,
+          galaxyLearningOreV2Total: total,
+          lifetimeLearningCrystalsEarned: total,
+          galaxyLearningLedgerSyncedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        transaction.set(markerRef, {
+          transactionId,
+          amount,
+          type: cleanId(row.type, 80),
+          source: "trigger",
+          recordedAt: FieldValue.serverTimestamp(),
+        });
+      });
+    });
 
   function requireUid(context) {
     if (!context.auth?.uid) throw new functions.https.HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -226,14 +453,17 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     return { id: crewSnap.id, ...crew, memberIds };
   }
 
-  async function syncLearningState(uid, userRef, user) {
-    const lifetimeLearningOre = await calculateLifetimeLearningOre(db, uid, user);
-    const shipHullTier = Math.max(Number(user.galaxyShipHullTier || 1), getShipHullTier(lifetimeLearningOre));
+  async function syncLearningState(userRef, user) {
+    const learningLedger = await calculateLifetimeLearningOre(db, admin, userRef, user);
+    const lifetimeLearningOre = learningLedger.total;
+    const shipHullTier = getShipHullTier(lifetimeLearningOre);
     const currentResonance = buildAbilitySnapshot(user, lifetimeLearningOre);
     const previousValues = user.gameAbilitySnapshot?.values || {};
     const values = Object.fromEntries(Object.entries(currentResonance.values).map(([abilityId, level]) => [
       abilityId,
-      Math.max(Number(previousValues[abilityId] || 1), Number(level || 1)),
+      abilityId === "construction"
+        ? Number(level || 1)
+        : Math.max(Number(previousValues[abilityId] || 1), Number(level || 1)),
     ]));
     const abilitySnapshot = {
       version: 2,
@@ -241,12 +471,11 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       resonance: currentResonance.values,
     };
     await userRef.set({
-      lifetimeLearningCrystalsEarned: lifetimeLearningOre,
       galaxyShipHullTier: shipHullTier,
       gameAbilitySnapshot: abilitySnapshot,
       galaxyLearningSyncedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
-    return { lifetimeLearningOre, shipHullTier, abilitySnapshot };
+    return { lifetimeLearningOre, shipHullTier, abilitySnapshot, learningLedgerComplete: learningLedger.complete };
   }
 
   async function ensurePlanet(uid, user, learningState = null) {
@@ -254,9 +483,9 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     let planetSnap = await planetRef.get();
     if (!planetSnap.exists) {
       const state = learningState || {
-        lifetimeLearningOre: Math.max(0, Number(user.lifetimeLearningCrystalsEarned || user.crystals || 0)),
-        shipHullTier: Math.max(1, Number(user.galaxyShipHullTier || 1)),
-        abilitySnapshot: buildAbilitySnapshot(user, Number(user.lifetimeLearningCrystalsEarned || user.crystals || 0)),
+        lifetimeLearningOre: Math.max(0, Number(user.galaxyLearningOreV2Total || 0)),
+        shipHullTier: getShipHullTier(Number(user.galaxyLearningOreV2Total || 0)),
+        abilitySnapshot: buildAbilitySnapshot(user, Number(user.galaxyLearningOreV2Total || 0)),
       };
       await planetRef.create(buildStarterPlanet(uid, user, state, FieldValue.serverTimestamp()));
       planetSnap = await planetRef.get();
@@ -281,7 +510,11 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const memberIds = getCrewMemberIds(crewSnap.data() || {}).filter((id) => id !== uid).slice(0, 40);
     if (!memberIds.length) return [];
     const refs = memberIds.flatMap((memberId) => [db.collection("users").doc(memberId), db.collection("galaxyPlanets").doc(memberId)]);
-    const snaps = await db.getAll(...refs);
+    const relationshipRefs = memberIds.map((memberId) => db.collection("galaxyRelationships").doc(getGalaxyRelationshipId(uid, memberId)));
+    const [snaps, relationshipSnaps] = await Promise.all([
+      db.getAll(...refs),
+      db.getAll(...relationshipRefs),
+    ]);
     const rows = [];
     for (let index = 0; index < memberIds.length; index += 1) {
       const memberId = memberIds[index];
@@ -290,13 +523,20 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       if (!userSnap?.exists || userSnap.data()?.isDeleted === true) continue;
       const member = userSnap.data() || {};
       const planet = planetSnap?.exists ? planetSnap.data() || {} : {};
+      const relationship = relationshipSnaps[index]?.exists ? relationshipSnaps[index].data() || {} : {};
+      const route = getGalaxyRelationshipProgress(relationship.connectionXp);
       rows.push({
         uid: memberId,
         displayName: getPublicName(member),
         planetName: cleanText(planet.planetName || `${getPublicName(member)}의 미개척 별`, 40),
         theme: GALAXY_THEMES.has(planet.theme) ? planet.theme : "forest",
+        visitMode: planet.visitMode === "private" ? "private" : "crew",
         shipHullTier: Math.max(1, Number(planet.shipHullTier || member.galaxyShipHullTier || 1)),
         tagline: cleanText(planet.tagline || "아직 첫 신호를 기다리고 있어요.", 80),
+        routeLevel: route.routeLevel,
+        connectionXp: route.connectionXp,
+        nextLevelXp: route.nextLevelXp,
+        interactionCount: Math.max(0, Math.floor(Number(relationship.interactionCount) || 0)),
       });
     }
     return rows;
@@ -305,7 +545,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
   const openGalaxyHome = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
     const { userRef, user } = await requireMember(uid);
-    const learningState = await syncLearningState(uid, userRef, user);
+    const learningState = await syncLearningState(userRef, user);
     const ownPlanet = await ensurePlanet(uid, user, learningState);
     const targetUid = cleanId(data?.targetUid) || uid;
     let targetPlanet = ownPlanet;
@@ -316,6 +556,9 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const targetUserSnap = await db.collection("users").doc(targetUid).get();
       if (!targetUserSnap.exists) throw new functions.https.HttpsError("not-found", "친구 정보를 찾을 수 없습니다.");
       targetPlanet = await ensurePlanet(targetUid, targetUserSnap.data() || {});
+      if (targetPlanet.data.visitMode === "private") {
+        throw new functions.https.HttpsError("permission-denied", "현재 방문을 받지 않는 행성입니다.");
+      }
     }
 
     const [neighbors, eventSnap] = await Promise.all([
@@ -360,10 +603,31 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     if (!item) throw new functions.https.HttpsError("invalid-argument", "건설할 수 없는 시설입니다.");
     const { userRef, user } = await requireMember(uid);
     const planet = await ensurePlanet(uid, user);
-    const operationRef = db.collection("galaxyOperations").doc();
-    const txRef = userRef.collection("crystal_transactions").doc(`galaxy-build-${operationRef.id}`);
+    const requestedOperationId = cleanId(data?.operationId, 120);
+    if (requestedOperationId && !/^[A-Za-z0-9_-]{8,120}$/.test(requestedOperationId)) {
+      throw new functions.https.HttpsError("invalid-argument", "건설 요청 식별자가 올바르지 않습니다.");
+    }
+    const operationId = requestedOperationId || userRef.collection("galaxyOperations").doc().id;
+    const operationRef = userRef.collection("galaxyOperations").doc(operationId);
+    const txRef = userRef.collection("crystal_transactions").doc(`galaxy-build-${operationId}`);
     const result = await db.runTransaction(async (transaction) => {
-      const [userSnap, planetSnap] = await Promise.all([transaction.get(userRef), transaction.get(planet.ref)]);
+      const [operationSnap, userSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(userRef),
+        transaction.get(planet.ref),
+      ]);
+      if (operationSnap.exists) {
+        const previous = operationSnap.data() || {};
+        if (previous.itemId !== itemId) {
+          throw new functions.https.HttpsError("already-exists", "이미 다른 시설에 사용된 건설 요청입니다.");
+        }
+        return {
+          placed: previous.placed,
+          wallet: Math.max(0, Number(previous.wallet || 0)),
+          materials: previous.materials || {},
+          deduplicated: true,
+        };
+      }
       const currentUser = userSnap.data() || {};
       const currentPlanet = planetSnap.data() || {};
       const wallet = Math.max(0, Number(currentUser.crystals || 0));
@@ -373,13 +637,24 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       if (wallet < item.cost) throw new functions.https.HttpsError("failed-precondition", "학습 광석이 부족합니다.");
       if (materialCount < item.materialCost) throw new functions.https.HttpsError("failed-precondition", `${item.name} 건설에 필요한 게임 재료가 부족합니다.`);
       if (layout.length >= 36) throw new functions.https.HttpsError("failed-precondition", "현재 구역에 더 이상 시설을 놓을 수 없습니다.");
-      const instanceId = `${itemId}_${operationRef.id.slice(0, 10)}`;
+      const instanceId = `${itemId}_${operationId.slice(0, 10)}`;
       const slot = layout.length;
       const requestedX = Number(data?.x);
       const requestedY = Number(data?.y);
-      const x = Number.isFinite(requestedX) ? clamp(requestedX, 8, 92) : 16 + ((slot * 19) % 68);
-      const y = Number.isFinite(requestedY) ? clamp(requestedY, 12, 88) : 24 + ((slot * 23) % 58);
-      const placed = { instanceId, itemId, icon: item.icon, name: item.name, x, y, rotation: 0, locked: false };
+      const x = Number.isFinite(requestedX) ? clamp(requestedX, 7.4, 92.6) : 16 + ((slot * 19) % 68);
+      const y = Number.isFinite(requestedY) ? clamp(requestedY, 7.4, 92.6) : 24 + ((slot * 23) % 58);
+      const worldX = (x - 50) / 3;
+      const worldZ = (y - 50) / 3;
+      if (Math.hypot(worldX, worldZ) > GALAXY_BUILD_RADIUS) {
+        throw new functions.https.HttpsError("invalid-argument", "행성 건설 구역 밖에는 시설을 놓을 수 없습니다.");
+      }
+      if (layout.some((entry) => Math.hypot(x - Number(entry.x || 50), y - Number(entry.y || 50)) < GALAXY_BUILD_MIN_SPACING * 3)) {
+        throw new functions.https.HttpsError("failed-precondition", "다른 시설과 겹치지 않는 위치를 선택해주세요.");
+      }
+      if (GALAXY_BUILD_RESERVED_POSITIONS.some(([reservedX, reservedZ]) => Math.hypot(worldX - reservedX, worldZ - reservedZ) < 2)) {
+        throw new functions.https.HttpsError("failed-precondition", "탐사 지점과 겹치지 않는 위치를 선택해주세요.");
+      }
+      const placed = { instanceId, itemId, icon: item.icon, iconId: item.iconId, name: item.name, x, y, rotation: 0, locked: false };
       materials[item.material] = materialCount - item.materialCost;
       transaction.set(userRef, { crystals: wallet - item.cost }, { merge: true });
       transaction.set(planet.ref, { layout: [...layout, placed], materials, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
@@ -390,7 +665,16 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         metadata: { itemId, instanceId: placed.instanceId, source: "buildGalaxyItem" },
         timestamp: FieldValue.serverTimestamp(),
       });
-      transaction.set(operationRef, { uid, type: "build", itemId, amount: item.cost, createdAt: FieldValue.serverTimestamp() });
+      transaction.set(operationRef, {
+        uid,
+        type: "build",
+        itemId,
+        amount: item.cost,
+        placed,
+        wallet: wallet - item.cost,
+        materials,
+        createdAt: FieldValue.serverTimestamp(),
+      });
       return { placed, wallet: wallet - item.cost, materials };
     });
     return serializeValue({ success: true, ...result });
@@ -399,8 +683,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
   const moveGalaxyItem = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
     const instanceId = cleanId(data?.instanceId, 120);
-    const x = clamp(data?.x, 7, 93);
-    const y = clamp(data?.y, 12, 88);
+    const x = clamp(data?.x, 7.4, 92.6);
+    const y = clamp(data?.y, 7.4, 92.6);
     const rotation = ((Math.round(Number(data?.rotation || 0) / 45) * 45) % 360 + 360) % 360;
     const { user } = await requireMember(uid);
     const planet = await ensurePlanet(uid, user);
@@ -422,6 +706,32 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const action = GALAXY_VISIT_ACTIONS[actionId];
     const visitMessage = GALAXY_SAFE_VISIT_MESSAGES.has(data?.message) ? data.message : "";
     if (!targetUid || targetUid === uid || !action) throw new functions.https.HttpsError("invalid-argument", "방문 행동 정보가 올바르지 않습니다.");
+    const rawNodeId = data?.nodeId;
+    const nodeId = rawNodeId == null || rawNodeId === "" ? "" : cleanId(rawNodeId, 80);
+    if (nodeId && (typeof rawNodeId !== "string" || rawNodeId.trim().length > 80 || !/^[A-Za-z0-9_-]{1,80}$/.test(nodeId))) {
+      throw new functions.https.HttpsError("invalid-argument", "방문 위치 식별자가 올바르지 않습니다.");
+    }
+    if (nodeId && !GALAXY_VISIT_NODE_ACTIONS[nodeId]) {
+      throw new functions.https.HttpsError("invalid-argument", "알 수 없는 방문 위치입니다.");
+    }
+    if (nodeId && GALAXY_VISIT_NODE_ACTIONS[nodeId] !== actionId) {
+      throw new functions.https.HttpsError("invalid-argument", "이 위치에서 남길 수 없는 방문 행동입니다.");
+    }
+    const parsedPosition = parseGalaxyVisitPosition(data?.position);
+    if (parsedPosition.provided && !parsedPosition.value) {
+      throw new functions.https.HttpsError("invalid-argument", "방문 장면 좌표가 올바르지 않습니다.");
+    }
+    if (parsedPosition.provided && !nodeId) {
+      throw new functions.https.HttpsError("invalid-argument", "방문 장면 좌표에는 위치 식별자가 필요합니다.");
+    }
+    const expectedPosition = nodeId ? GALAXY_VISIT_NODE_POSITIONS[nodeId] : null;
+    if (parsedPosition.value && expectedPosition && Math.hypot(
+      parsedPosition.value.x - expectedPosition[0],
+      parsedPosition.value.z - expectedPosition[1],
+    ) > 0.75) {
+      throw new functions.https.HttpsError("invalid-argument", "방문 장면 좌표가 위치 식별자와 일치하지 않습니다.");
+    }
+    const visitPosition = expectedPosition ? { x: expectedPosition[0], z: expectedPosition[1] } : null;
     const { user: actor } = await requireMember(uid);
     const sharedCrew = await getSharedCrew(uid, targetUid, actor);
     if (!sharedCrew) throw new functions.https.HttpsError("permission-denied", "같은 크루 친구에게만 도움을 줄 수 있습니다.");
@@ -435,9 +745,11 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const dayKey = getKstDayKey();
     const dailyRef = db.collection("galaxyOperations").doc(`visit_${dayKey}_${uid}_${targetUid}`);
     const eventRef = targetPlanet.ref.collection("visitEvents").doc();
+    const relationshipId = getGalaxyRelationshipId(uid, targetUid);
+    const relationshipRef = db.collection("galaxyRelationships").doc(relationshipId);
     const result = await db.runTransaction(async (transaction) => {
-      const [dailySnap, targetSnap, actorSnap] = await Promise.all([
-        transaction.get(dailyRef), transaction.get(targetPlanet.ref), transaction.get(actorPlanet.ref),
+      const [dailySnap, targetSnap, actorSnap, relationshipSnap] = await Promise.all([
+        transaction.get(dailyRef), transaction.get(targetPlanet.ref), transaction.get(actorPlanet.ref), transaction.get(relationshipRef),
       ]);
       const daily = dailySnap.data() || {};
       const count = Math.max(0, Number(daily.count || 0));
@@ -452,21 +764,60 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const materials = { ...(actorData.materials || {}) };
       const rewarded = count < 3;
       if (rewarded) materials.stardust = Math.max(0, Number(materials.stardust || 0)) + 1;
-      transaction.set(targetPlanet.ref, { stats, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      transaction.set(actorPlanet.ref, { materials, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      transaction.set(dailyRef, { actorId: uid, targetId: targetUid, dayKey, count: count + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      transaction.set(eventRef, {
+      const relationship = relationshipSnap.data() || {};
+      const relationshipProgress = getGalaxyRelationshipProgress(
+        Math.max(0, Number(relationship.connectionXp || 0)) + action.connectionXp,
+      );
+      const interactionCount = Math.max(0, Math.floor(Number(relationship.interactionCount) || 0)) + 1;
+      const lastAction = {
+        actionId,
+        actorId: uid,
+        targetId: targetUid,
+        message: visitMessage,
+        at: FieldValue.serverTimestamp(),
+        ...(nodeId ? { nodeId } : {}),
+        ...(visitPosition ? { position: visitPosition } : {}),
+      };
+      const relationshipUpdate = {
+        memberIds: [uid, targetUid].sort(),
+        crewId: sharedCrew.id,
+        connectionXp: relationshipProgress.connectionXp,
+        interactionCount,
+        routeLevel: relationshipProgress.routeLevel,
+        lastAction,
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(!relationshipSnap.exists ? { createdAt: FieldValue.serverTimestamp() } : {}),
+      };
+      const eventData = {
         ownerId: targetUid,
         actorId: uid,
         actorName: getPublicName(actor),
         actionId,
         actionLabel: action.label,
         actionIcon: action.icon,
+        actionIconId: action.iconId,
         message: visitMessage,
+        relationshipId,
+        relationshipLevel: relationshipProgress.routeLevel,
+        connectionXpGained: action.connectionXp,
         seen: false,
         createdAt: FieldValue.serverTimestamp(),
-      });
-      return { rewarded, material: rewarded ? "stardust" : "" };
+        ...(nodeId ? { nodeId } : {}),
+        ...(visitPosition ? { position: visitPosition } : {}),
+      };
+      transaction.set(targetPlanet.ref, { stats, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(actorPlanet.ref, { materials, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(dailyRef, { actorId: uid, targetId: targetUid, dayKey, count: count + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(relationshipRef, relationshipUpdate, { merge: true });
+      transaction.set(eventRef, eventData);
+      return {
+        rewarded,
+        material: rewarded ? "stardust" : "",
+        relationshipId,
+        routeLevel: relationshipProgress.routeLevel,
+        connectionXp: relationshipProgress.connectionXp,
+        nextLevelXp: relationshipProgress.nextLevelXp,
+      };
     });
     return { success: true, ...result };
   });
@@ -475,14 +826,34 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const uid = requireUid(context);
     const route = ["nebula", "comet", "ruins"].includes(data?.route) ? data.route : "nebula";
     const partnerUid = cleanId(data?.partnerUid);
-    const { user } = await requireMember(uid);
+    const { userRef, user } = await requireMember(uid);
     if (partnerUid && partnerUid !== uid && !(await getSharedCrew(uid, partnerUid, user))) {
       throw new functions.https.HttpsError("permission-denied", "같은 크루 친구만 릴레이 파트너로 선택할 수 있습니다.");
     }
     const planet = await ensurePlanet(uid, user);
-    const missionRef = db.collection("galaxyOperations").doc();
+    const requestedOperationId = cleanId(data?.operationId, 120);
+    if (requestedOperationId && !/^[A-Za-z0-9_-]{8,120}$/.test(requestedOperationId)) {
+      throw new functions.https.HttpsError("invalid-argument", "탐사 요청 식별자가 올바르지 않습니다.");
+    }
+    const operationId = requestedOperationId || userRef.collection("galaxyOperations").doc().id;
+    const missionRef = userRef.collection("galaxyOperations").doc(operationId);
     const result = await db.runTransaction(async (transaction) => {
-      const snap = await transaction.get(planet.ref);
+      const [operationSnap, snap] = await Promise.all([
+        transaction.get(missionRef),
+        transaction.get(planet.ref),
+      ]);
+      if (operationSnap.exists) {
+        const previous = operationSnap.data() || {};
+        if (previous.type !== "galaxy_mission" || previous.route !== route) {
+          throw new functions.https.HttpsError("already-exists", "이미 다른 탐사에 사용된 요청입니다.");
+        }
+        return {
+          reward: previous.reward,
+          bonus: Math.max(0, Number(previous.bonus || 0)),
+          nextMissionAtMs: Math.max(0, Number(previous.nextMissionAtMs || 0)),
+          deduplicated: true,
+        };
+      }
       const current = snap.data() || {};
       const nowMs = Date.now();
       const lastMissionAtMs = Math.max(0, Number(current.lastMissionAtMs || 0));
@@ -507,18 +878,28 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         lastMission: { route, title: reward.title, partnerUid: partnerUid || "", completedAtMs: nowMs },
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
-      transaction.set(missionRef, { uid, type: "galaxy_mission", route, reward, partnerUid: partnerUid || "", createdAt: FieldValue.serverTimestamp() });
-      return { reward, bonus, nextMissionAtMs: nowMs + cooldownMs };
+      transaction.set(missionRef, {
+        uid,
+        type: "galaxy_mission",
+        route,
+        reward,
+        bonus,
+        partnerUid: partnerUid || "",
+        nextMissionAtMs: nowMs + cooldownMs,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return { reward, bonus, nextMissionAtMs: nowMs + cooldownMs, deduplicated: false };
     });
-    if (partnerUid && partnerUid !== uid) {
-      const partnerEventRef = db.collection("galaxyPlanets").doc(partnerUid).collection("visitEvents").doc();
+    if (partnerUid && partnerUid !== uid && !result.deduplicated) {
+      const partnerEventRef = db.collection("galaxyPlanets").doc(partnerUid).collection("visitEvents").doc(operationId);
       await partnerEventRef.set({
         ownerId: partnerUid,
         actorId: uid,
         actorName: getPublicName(user),
         actionId: "relay",
         actionLabel: "함께 비동기 탐사 릴레이를 완주했어요",
-        actionIcon: "🚀",
+        actionIcon: "△",
+        actionIconId: "rocket",
         message: "우리의 항로가 기억 기록소에 남았습니다.",
         seen: false,
         createdAt: FieldValue.serverTimestamp(),
@@ -567,7 +948,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         updates.layout = [...layout, {
           instanceId: `sprout_${nowMs}_${nodeId.slice(0, 18)}`,
           itemId: "wild_sprout",
-          icon: "🌱",
+          icon: "♧",
+          iconId: "sprout",
           name: "직접 심은 루멘 새싹",
           x,
           y,
@@ -605,6 +987,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
   });
 
   return {
+    rollupGalaxyLearningOre,
     openGalaxyHome,
     saveGalaxyPassport,
     buildGalaxyItem,

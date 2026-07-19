@@ -68,10 +68,15 @@ function ClusterSelector({ clusters, onSelect, onEnterFrontier }) {
             <div style={{ position: 'absolute', right: '8%', top: '13%', width: '180px', aspectRatio: 1, borderRadius: '50%', background: 'radial-gradient(circle at 32% 25%, #dcffe8, #4bc389 34%, #216579 60%, #17284d 78%)', boxShadow: 'inset -25px -22px 35px rgba(0,0,0,.5), 0 0 60px rgba(80,235,177,.34)' }} />
             <div style={{ position: 'absolute', right: '4%', top: '33%', width: '260px', height: '58px', borderRadius: '50%', border: '1px solid rgba(175,248,255,.45)', transform: 'rotate(-13deg)' }} />
             <div style={{ position: 'relative', zIndex: 2, maxWidth: '390px', minHeight: '350px', boxSizing: 'border-box', padding: '2.2rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ color: '#75f3ba', fontSize: '.72rem', fontWeight: 900, letterSpacing: '.16em' }}>SOCIAL WORLD · LIVE</span>
+              <span style={{ color: '#75f3ba', fontSize: '.72rem', fontWeight: 900, letterSpacing: '.16em' }}>LIVING PLANET · ASYNC SOCIAL</span>
               <h2 style={{ margin: '.5rem 0', fontSize: 'clamp(2.2rem, 5vw, 3.7rem)', lineHeight: 1, letterSpacing: '-.055em' }}>아스트라<br/>프론티어</h2>
-              <p style={{ margin: '.6rem 0 1.3rem', color: '#b4c4d9', lineHeight: 1.55 }}>자유롭게 걸으며 나의 행성을 만들고,<br/>친구의 세계와 새로운 항로를 함께 개척하세요.</p>
-              <strong style={{ alignSelf: 'flex-start', padding: '.7rem 1rem', borderRadius: '999px', color: '#071511', background: 'linear-gradient(135deg,#7ff4bd,#63dcff)', fontSize: '.8rem' }}>프론티어에 착륙하기 →</strong>
+              <p style={{ margin: '.6rem 0 1rem', color: '#b4c4d9', lineHeight: 1.55 }}>암흑 폭풍으로 끊어진 별의 기억을 되살리고,<br/>친구의 행성과 새로운 항로를 연결하세요.</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem', marginBottom: '1.25rem' }}>
+                {['학습으로 확장되는 행성', '친구가 남긴 흔적', '탐사와 건설'].map((label) => (
+                  <span key={label} style={{ padding: '.36rem .55rem', border: '1px solid rgba(160,244,210,.18)', borderRadius: '999px', color: '#bad7cd', background: 'rgba(109,245,176,.07)', fontSize: '.66rem', fontWeight: 700 }}>{label}</span>
+                ))}
+              </div>
+              <strong style={{ alignSelf: 'flex-start', padding: '.7rem 1rem', borderRadius: '999px', color: '#071511', background: 'linear-gradient(135deg,#7ff4bd,#63dcff)', fontSize: '.8rem' }}>내 별의 귀환 신호 확인하기 →</strong>
             </div>
           </Motion.button>
 
