@@ -1,4 +1,4 @@
-import { useRef, useMemo, Suspense, useState } from 'react'
+import { useRef, useMemo, useEffect, Suspense, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Sphere, useTexture, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -10,6 +10,12 @@ const IMAGE_PLANET_TYPES = new Set([
   'middle_math_analytics',
   'middle_math_geometry',
   'middle_math_exam',
+  'middle_math_numbers_expressions',
+  'middle_math_absolute_geometry',
+  'middle_math_functions_statistics',
+  'middle_math_school_exam',
+  'elementary_mistake_notebook',
+  'elementary_monthly_evaluation',
   'python_foundation',
   'python_advanced',
   'python_data',
@@ -23,10 +29,19 @@ function getTexturePathForPlanetType(planetType) {
   if (planetType === 'ocean') return '/assets/planets/ocean.png'
   if (planetType === 'castle') return '/assets/planets/castle.png'
   if (planetType === 'cloud') return '/assets/planets/cloud.png'
+  if (planetType === 'dark_matter') return '/assets/planets/dark-matter.webp'
+  if (planetType === 'stellar_archive') return '/assets/planets/stellar-archive.webp'
+  if (planetType === 'dark_matter_refinery') return '/assets/planets/dark-matter-refinery.webp'
   if (planetType === 'middle_math_core') return '/assets/planets/middle-math-core.png'
   if (planetType === 'middle_math_analytics') return '/assets/planets/middle-math-analytics.png'
   if (planetType === 'middle_math_geometry') return '/assets/planets/middle-math-geometry.png'
   if (planetType === 'middle_math_exam') return '/assets/planets/middle-math-exam.png'
+  if (planetType === 'middle_math_numbers_expressions') return '/assets/planets/middle-math-numbers-expressions.webp'
+  if (planetType === 'middle_math_absolute_geometry') return '/assets/planets/middle-math-absolute-geometry.webp'
+  if (planetType === 'middle_math_functions_statistics') return '/assets/planets/middle-math-functions-statistics.webp'
+  if (planetType === 'middle_math_school_exam') return '/assets/planets/middle-math-school-exam.webp'
+  if (planetType === 'elementary_mistake_notebook') return '/assets/planets/elementary-mistake-notebook.webp'
+  if (planetType === 'elementary_monthly_evaluation') return '/assets/planets/elementary-monthly-evaluation.webp'
   if (planetType === 'python_foundation') return '/assets/planets/python-foundation.png'
   if (planetType === 'python_advanced') return '/assets/planets/python-advanced.png'
   if (planetType === 'python_data') return '/assets/planets/python-data.png'
@@ -37,18 +52,45 @@ function getTexturePathForPlanetType(planetType) {
 /**
  * 텍스처를 사용하는 행성 재질 (Suspense 적용)
  */
-function TexturePlanetMaterial({ texturePath, planetTexture, color, isLocked, planetType }) {
-  const activeTexture = useTexture(texturePath)
+function TexturePlanetMaterial({ texturePath, isLocked, planetType }) {
+  const loadedTexture = useTexture(texturePath)
+  const activeTexture = useMemo(() => {
+    const preparedTexture = loadedTexture.clone()
+    preparedTexture.colorSpace = THREE.SRGBColorSpace
+    preparedTexture.wrapS = THREE.RepeatWrapping
+    preparedTexture.wrapT = THREE.ClampToEdgeWrapping
+    preparedTexture.anisotropy = 8
+    preparedTexture.needsUpdate = true
+    return preparedTexture
+  }, [loadedTexture])
+
+  useEffect(() => () => activeTexture.dispose(), [activeTexture])
+
+  const emissiveColor = isLocked ? '#000000' : (
+    planetType === 'lava' ? '#ff4500' :
+    planetType === 'forest' ? '#1b5e20' :
+    planetType === 'castle' ? '#fbc02d' :
+    planetType === 'dark_matter' ? '#32106b' :
+    planetType === 'stellar_archive' ? '#9a5200' :
+    planetType === 'dark_matter_refinery' ? '#8a4300' :
+    '#000000'
+  )
+  const emissiveIntensity = isLocked ? 0 : (
+    planetType === 'dark_matter' ? 0.34 :
+    planetType === 'stellar_archive' ? 0.24 :
+    planetType === 'dark_matter_refinery' ? 0.28 :
+    planetType === 'lava' ? 0.3 :
+    0.2
+  )
+  const isMetallicWorld = planetType === 'stellar_archive' || planetType === 'dark_matter_refinery'
   
   return (
     <meshStandardMaterial
       map={activeTexture}
-      roughness={isLocked ? 0.9 : 0.6}
-      metalness={isLocked ? 0.8 : (planetType === 'crystal' ? 0.6 : 0.1)}
-      emissive={isLocked ? '#000000' : (planetType === 'lava' ? '#ff4500' : 
-                planetType === 'forest' ? '#1b5e20' : 
-                planetType === 'castle' ? '#fbc02d' : '#000000')}
-      emissiveIntensity={isLocked ? 0 : (planetType === 'lava' ? 0.3 : 0.2)}
+      roughness={isLocked ? 0.9 : (isMetallicWorld ? 0.48 : 0.6)}
+      metalness={isLocked ? 0.8 : (isMetallicWorld ? 0.32 : (planetType === 'crystal' ? 0.6 : 0.1))}
+      emissive={emissiveColor}
+      emissiveIntensity={emissiveIntensity}
       color="#ffffff"
     />
   )
@@ -73,7 +115,7 @@ function ProceduralPlanetMaterial({ planetTexture, color, isLocked, planetType }
 /**
  * 완성형 이미지 행성을 3D 장면 안에 그대로 보이게 하는 스프라이트 렌더러
  */
-function ImageSpritePlanet({ texturePath, size, isLocked }) {
+function ImageSpritePlanet({ texturePath, size, isLocked, planetType }) {
   const activeTexture = useTexture(texturePath)
 
   const spriteTexture = useMemo(() => {
@@ -107,7 +149,8 @@ function ImageSpritePlanet({ texturePath, size, isLocked }) {
       )
 
       const brightness = Math.max(data[i], data[i + 1], data[i + 2]) / 255
-      const glowAlpha = THREE.MathUtils.clamp((brightness - 0.06) / 0.22, 0, 1)
+      const backgroundFloor = planetType?.startsWith('elementary_') ? 0.12 : 0.06
+      const glowAlpha = THREE.MathUtils.clamp((brightness - backgroundFloor) / 0.22, 0, 1)
       data[i + 3] = Math.round(Math.max(radialAlpha, glowAlpha) * 255)
     }
 
@@ -117,7 +160,7 @@ function ImageSpritePlanet({ texturePath, size, isLocked }) {
     processedTexture.colorSpace = THREE.SRGBColorSpace
     processedTexture.needsUpdate = true
     return processedTexture
-  }, [activeTexture])
+  }, [activeTexture, planetType])
 
   return (
     <sprite scale={[size * 2.55, size * 2.55, 1]}>
@@ -142,8 +185,6 @@ function PlanetMaterialKey({ planetType, planetTexture, color, isLocked }) {
     return (
       <TexturePlanetMaterial 
         texturePath={texturePath} 
-        planetTexture={planetTexture} 
-        color={color} 
         isLocked={isLocked}
         planetType={planetType}
       />
@@ -381,6 +422,12 @@ export default function PlanetMesh({
     } else if (planetType === 'dark_matter') {
       baseColor = '#1a0033'
       secondaryColor = '#6b21a8'
+    } else if (planetType === 'stellar_archive') {
+      baseColor = '#071729'
+      secondaryColor = '#d88914'
+    } else if (planetType === 'dark_matter_refinery') {
+      baseColor = '#111015'
+      secondaryColor = '#f59e0b'
     }
 
     const gradient = ctx.createLinearGradient(0, 0, 512, 256)
@@ -460,6 +507,7 @@ export default function PlanetMesh({
               texturePath={texturePath}
               size={size}
               isLocked={isLocked}
+              planetType={planetType}
             />
           </Suspense>
         ) : (

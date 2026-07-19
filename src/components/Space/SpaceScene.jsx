@@ -14,14 +14,20 @@ const MIDDLE_MATH_PLANET_STYLES = [
 function getMiddleMathPlanetStyle(region, index) {
   const title = region?.title || ''
 
+  if (title.includes('수와 연산') || title.includes('문자와 식')) {
+    return { planetType: 'middle_math_numbers_expressions', planetColor: '#22d3ee' }
+  }
+  if (title.includes('내신기출') || title.includes('기출문제')) {
+    return { planetType: 'middle_math_school_exam', planetColor: '#fb7185' }
+  }
   if (title.includes('기본개념')) {
     return { planetType: 'middle_math_core', planetColor: '#59c8ff' }
   }
   if (title.includes('함수') || title.includes('확률') || title.includes('통계')) {
-    return { planetType: 'middle_math_analytics', planetColor: '#9a73ff' }
+    return { planetType: 'middle_math_functions_statistics', planetColor: '#2dd4bf' }
   }
   if (title.includes('기하')) {
-    return { planetType: 'middle_math_geometry', planetColor: '#bc8fff' }
+    return { planetType: 'middle_math_absolute_geometry', planetColor: '#86efac' }
   }
   if (title.includes('평가') || title.includes('모의')) {
     return { planetType: 'middle_math_exam', planetColor: '#ffbe72' }
@@ -134,7 +140,9 @@ function SceneContent({
       let planetType = 'default'
       let planetColor = '#4a90e2'
       
-      if (region.clusterId === 'middle-math' || region.clusterId === '중등수학') {
+      if (region.title?.includes('월간평가')) {
+        planetType = 'elementary_monthly_evaluation'; planetColor = '#6d8dff'
+      } else if (region.clusterId === 'middle-math' || region.clusterId === '중등수학') {
         const middleMathStyle = getMiddleMathPlanetStyle(region, i)
         planetType = middleMathStyle.planetType
         planetColor = middleMathStyle.planetColor
@@ -278,7 +286,7 @@ function SceneContent({
             <PlanetMesh 
               color="#ffaa00" 
               size={0.8} 
-              planetType="crystal" /* Special distinct look */
+              planetType="stellar_archive"
               showSpaceship={false}
               showFormulas={true}
               onClick={(e) => {
@@ -317,11 +325,11 @@ function SceneContent({
         <group position={[4.8, 0.3, -1.2]}>
           <Float speed={1.7} rotationIntensity={0.55} floatIntensity={1} floatingRange={[-0.25, 0.25]}>
             <PlanetMesh
-              color="#14b8a6"
+              color="#8b5cf6"
               size={0.65}
-              planetType="cloud"
+              planetType="elementary_mistake_notebook"
               showSpaceship={false}
-              showFormulas={true}
+              showFormulas={false}
               onClick={(e) => {
                 e.stopPropagation();
                 if (onSelectMistakeNotebook) onSelectMistakeNotebook();
@@ -401,7 +409,7 @@ function SceneContent({
             <PlanetMesh
               color="#f59e0b"
               size={0.45}
-              planetType="crystal"
+              planetType="dark_matter_refinery"
               speed={0.01 + Math.min(0.02, (darkMatterCount || 0) * 0.001)}
               showSpaceship={false}
               showFormulas={true}
