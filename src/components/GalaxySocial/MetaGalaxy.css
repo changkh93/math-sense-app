@@ -197,3 +197,87 @@
 @media (prefers-reduced-motion: reduce) {
   .meta-galaxy * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+/* Astra Frontier immersive game shell */
+.meta-galaxy.frontier-immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #06101d;
+  user-select: none;
+}
+
+.frontier-game-stage { position: absolute; inset: 0; overflow: hidden; background: #081020; touch-action: none; }
+.frontier-game-stage canvas { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; outline: none; }
+.frontier-world-name { position: absolute; top: 1.25rem; left: 1.25rem; z-index: 12; display: grid; gap: .18rem; padding: .62rem .8rem; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; color: white; background: rgba(4,10,23,.58); backdrop-filter: blur(10px); pointer-events: none; }
+.frontier-world-name span { color: #73f0b5; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: .56rem; font-weight: 900; letter-spacing: .13em; }
+.frontier-world-name strong { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .82rem; }
+
+.frontier-learning-route { position: fixed; z-index: 3050; left: 1.25rem; bottom: 1.25rem; display: flex; align-items: center; gap: .6rem; padding: .5rem .72rem; border: 1px solid rgba(255,255,255,.13); border-radius: 12px; color: #cad6e7; text-align: left; background: rgba(3,8,18,.66); backdrop-filter: blur(12px); cursor: pointer; opacity: .78; transition: opacity .2s, transform .2s, border-color .2s; }
+.frontier-learning-route:hover { opacity: 1; transform: translateY(-2px); border-color: rgba(94,232,255,.35); }
+.frontier-learning-route > span { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 9px; color: #8eeaff; background: rgba(94,232,255,.1); }
+.frontier-learning-route small,.frontier-learning-route strong { display: block; }.frontier-learning-route small { color: #6d7e99; font-size: .48rem; letter-spacing: .12em; }.frontier-learning-route strong { font-size: .65rem; }
+
+.frontier-ore-capsule { position: fixed; z-index: 3040; top: 1.2rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: .65rem; min-width: 140px; padding: .48rem .82rem; border: 1px solid rgba(94,232,255,.22); border-radius: 999px; color: white; background: rgba(4,10,23,.68); backdrop-filter: blur(14px); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.frontier-ore-capsule small,.frontier-ore-capsule strong { display: block; }.frontier-ore-capsule small { color: #7891ae; font-size: .48rem; letter-spacing: .1em; }.frontier-ore-capsule strong { margin-top: 1px; font-size: .82rem; }
+
+.frontier-resource-hud { position: absolute; z-index: 12; top: 1.2rem; right: 1.2rem; display: flex; gap: .35rem; }
+.frontier-resource-hud button { display: flex; align-items: center; gap: .35rem; min-width: 52px; padding: .43rem .58rem; border: 1px solid rgba(255,255,255,.09); border-radius: 999px; color: white; background: rgba(4,10,23,.6); backdrop-filter: blur(10px); cursor: pointer; }
+.frontier-resource-hud strong { font-size: .7rem; }
+
+.frontier-pack-button,.frontier-social-button { position: absolute; z-index: 14; right: 1.2rem; display: grid; place-items: center; width: 60px; height: 60px; border: 1px solid rgba(255,255,255,.13); border-radius: 18px; color: white; background: rgba(5,12,27,.66); backdrop-filter: blur(12px); box-shadow: 0 12px 30px rgba(0,0,0,.24); cursor: pointer; }
+.frontier-pack-button { bottom: 6rem; }.frontier-social-button { bottom: 10.2rem; }
+.frontier-pack-button:hover,.frontier-social-button:hover { border-color: rgba(94,232,255,.43); background: rgba(24,58,79,.72); transform: translateY(-2px); }
+.frontier-pack-button > span:first-child,.frontier-social-button > span:first-child { font-size: 1.35rem; }.frontier-pack-button > span:last-child,.frontier-social-button > span:last-child { color: #8ea0b8; font-size: .45rem; letter-spacing: .08em; font-weight: 900; }
+
+.frontier-utility-dock { position: fixed; z-index: 3040; top: 50%; right: 1.15rem; transform: translateY(-50%); display: grid; gap: .45rem; }
+.frontier-utility-dock button { position: relative; display: grid; place-items: center; gap: .13rem; width: 54px; min-height: 52px; padding: .4rem; border: 1px solid rgba(255,255,255,.1); border-radius: 15px; color: white; background: rgba(4,10,23,.6); backdrop-filter: blur(10px); cursor: pointer; }
+.frontier-utility-dock button:hover { border-color: rgba(109,245,176,.35); background: rgba(21,61,60,.72); }.frontier-utility-dock span { font-size: 1.05rem; }.frontier-utility-dock small { color: #91a0b7; font-size: .48rem; }.frontier-utility-dock b { position: absolute; right: -4px; top: -4px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; color: #06101b; background: #ffd56a; font-size: .55rem; }
+
+.frontier-control-hint { position: absolute; z-index: 12; left: 50%; bottom: 1.25rem; transform: translateX(-50%); display: flex; align-items: center; gap: .3rem; padding: .42rem .6rem; border-radius: 11px; color: #8291a9; background: rgba(4,10,23,.52); backdrop-filter: blur(8px); font-size: .55rem; pointer-events: none; }
+.frontier-control-hint kbd,.frontier-interaction-prompt kbd { display: grid; place-items: center; min-width: 23px; height: 23px; padding: 0 4px; border: 1px solid rgba(255,255,255,.16); border-bottom-width: 3px; border-radius: 6px; color: #dff7ff; background: rgba(255,255,255,.08); font: 800 .58rem ui-monospace,monospace; }
+.frontier-control-hint span { margin: 0 .3rem 0 .05rem; }
+
+.frontier-interaction-prompt { position: absolute; z-index: 15; left: 50%; bottom: 4.7rem; transform: translateX(-50%); display: grid; grid-template-columns: 34px 1fr 28px; align-items: center; gap: .65rem; min-width: 245px; padding: .58rem .7rem; border: 1px solid rgba(109,245,176,.3); border-radius: 14px; color: white; background: rgba(5,14,25,.78); backdrop-filter: blur(14px); box-shadow: 0 14px 35px rgba(0,0,0,.3); pointer-events: none; }
+.frontier-interaction-prompt > span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: #83f4bc; background: rgba(109,245,176,.1); font-size: 1.05rem; }.frontier-interaction-prompt small,.frontier-interaction-prompt strong { display: block; }.frontier-interaction-prompt small { color: #6b8e89; font-size: .45rem; letter-spacing: .12em; }.frontier-interaction-prompt strong { margin-top: 2px; font-size: .68rem; }
+
+.frontier-mission-hud { position: absolute; z-index: 16; top: 5.1rem; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: 38px minmax(160px,250px) 46px; align-items: center; gap: .65rem; padding: .62rem .75rem; border: 1px solid rgba(167,139,250,.38); border-radius: 15px; color: white; background: rgba(18,13,43,.82); backdrop-filter: blur(14px); box-shadow: 0 15px 38px rgba(0,0,0,.3); }
+.frontier-mission-hud > span { font-size: 1.5rem; }.frontier-mission-hud small,.frontier-mission-hud strong { display: block; }.frontier-mission-hud small { color: #a78bfa; font-size: .48rem; letter-spacing: .1em; }.frontier-mission-hud strong { margin-top: 2px; font-size: .74rem; }.frontier-mission-hud i { display: block; height: 4px; margin-top: 5px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.1); }.frontier-mission-hud b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#9b7cff,#5ee8ff); }.frontier-mission-hud em { display: grid; place-items: center; width: 42px; height: 42px; border: 2px solid rgba(255,255,255,.17); border-radius: 50%; color: #ffe28b; font: 900 .9rem ui-monospace,monospace; }
+
+.frontier-build-mode { position: absolute; z-index: 18; left: 50%; top: 5.1rem; transform: translateX(-50%); display: grid; grid-template-columns: 1fr auto; column-gap: 1rem; padding: .65rem .75rem .65rem 1rem; border: 1px solid rgba(109,245,176,.38); border-radius: 14px; color: white; background: rgba(8,34,32,.84); backdrop-filter: blur(14px); }.frontier-build-mode strong,.frontier-build-mode span { display: block; }.frontier-build-mode strong { font-size: .72rem; }.frontier-build-mode span { color: #83aa9e; font-size: .55rem; }.frontier-build-mode button { grid-column: 2; grid-row: 1/3; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; color: white; background: rgba(255,255,255,.07); cursor: pointer; }
+.frontier-action-button,.frontier-joystick { display: none; }
+
+.frontier-game-toast { position: fixed; z-index: 3090; left: 50%; top: 1.2rem; transform: translateX(-50%); display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: min(500px,calc(100vw - 2rem)); box-sizing: border-box; padding: .75rem .9rem; border-radius: 13px; font-size: .72rem; backdrop-filter: blur(16px); box-shadow: 0 15px 40px rgba(0,0,0,.35); }.frontier-game-toast.success { color: #d0ffe4; border: 1px solid rgba(109,245,176,.35); background: rgba(17,69,55,.86); }.frontier-game-toast.error { color: #ffd6da; border: 1px solid rgba(255,113,130,.38); background: rgba(86,24,37,.88); }.frontier-game-toast button { border: 0; color: inherit; background: transparent; cursor: pointer; font-size: 1rem; }
+.frontier-network-busy { position: fixed; z-index: 3080; left: 1.25rem; top: 5rem; display: flex; align-items: center; gap: .4rem; padding: .42rem .6rem; border-radius: 999px; color: #a8bfd3; background: rgba(4,10,23,.7); font-size: .55rem; }.frontier-network-busy i { width: 8px; height: 8px; border: 2px solid rgba(94,232,255,.25); border-top-color: #5ee8ff; border-radius: 50%; animation: galaxy-spin .8s linear infinite; }
+
+.frontier-menu-backdrop { position: fixed; z-index: 3070; inset: 0; display: flex; justify-content: flex-end; padding: 1rem; box-sizing: border-box; background: rgba(2,5,13,.56); backdrop-filter: blur(5px); }
+.frontier-menu-panel { width: min(720px,100%); height: 100%; overflow-y: auto; box-sizing: border-box; padding: 1.25rem; border: 1px solid rgba(255,255,255,.11); border-radius: 24px; color: white; background: linear-gradient(155deg,rgba(17,26,48,.97),rgba(7,12,26,.98)); box-shadow: -25px 0 70px rgba(0,0,0,.38); }
+.frontier-menu-panel > header { position: sticky; top: -1.25rem; z-index: 3; display: flex; justify-content: space-between; align-items: center; margin: -1.25rem -1.25rem 1rem; padding: 1.25rem; background: rgba(11,18,35,.94); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.08); }.frontier-menu-panel > header span { color: #65e9b0; font-size: .55rem; font-weight: 900; letter-spacing: .14em; }.frontier-menu-panel > header h2 { margin: .22rem 0 0; font-size: 1.45rem; }.frontier-menu-panel > header button { width: 38px; height: 38px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; color: white; background: rgba(255,255,255,.06); cursor: pointer; font-size: 1.2rem; }
+.frontier-build-menu > p { color: #95a5bc; font-size: .78rem; line-height: 1.55; }
+.frontier-build-catalog { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: 1rem; }.frontier-build-catalog button { display: grid; grid-template-columns: 45px 1fr; gap: .7rem; align-items: center; min-height: 92px; padding: .8rem; border: 1px solid rgba(255,255,255,.08); border-radius: 15px; text-align: left; color: white; background: rgba(255,255,255,.035); cursor: pointer; }.frontier-build-catalog button:hover:not(:disabled) { border-color: rgba(109,245,176,.35); background: rgba(109,245,176,.08); }.frontier-build-catalog button:disabled { opacity: .38; cursor: not-allowed; }.frontier-build-catalog button > span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: rgba(255,255,255,.07); font-size: 1.5rem; }.frontier-build-catalog strong,.frontier-build-catalog small { display: block; }.frontier-build-catalog small { margin-top: 3px; color: #7f8fa8; font-size: .6rem; }.frontier-build-catalog b { grid-column: 2; color: #74edba; font-size: .62rem; }
+.frontier-relay-setting { padding: .8rem; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: rgba(255,255,255,.035); }.frontier-relay-setting label { display: flex; align-items: center; justify-content: space-between; gap: .8rem; color: #d9e5f2; font-size: .72rem; font-weight: 800; }.frontier-relay-setting select,.frontier-social-menu select { padding: .55rem .65rem; border: 1px solid rgba(255,255,255,.11); border-radius: 10px; color: white; background: #111a31; }.frontier-relay-setting small { display: block; margin-top: .45rem; color: #74859e; font-size: .6rem; }
+.frontier-neighbor-list { display: grid; gap: .6rem; margin-top: 1rem; }.frontier-neighbor-list > button { display: grid; grid-template-columns: 80px 1fr auto; gap: .8rem; align-items: center; padding: .75rem; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; text-align: left; color: white; background: rgba(255,255,255,.035); cursor: pointer; }.frontier-neighbor-list > button:hover { border-color: rgba(94,232,255,.32); background: rgba(94,232,255,.07); }.frontier-neighbor-list .neighbor-planet { width: 68px; height: 68px; margin: 0; }.frontier-neighbor-list small,.frontier-neighbor-list strong,.frontier-neighbor-list p { display: block; margin: 0; }.frontier-neighbor-list small { color: #71849f; font-size: .56rem; }.frontier-neighbor-list strong { margin: .18rem 0; }.frontier-neighbor-list p { color: #8e9db3; font-size: .65rem; }.frontier-neighbor-list > button > b { color: #68e9ff; font-size: .6rem; }
+.frontier-passport-menu { display: grid; grid-template-columns: .9fr 1.1fr; gap: .8rem; }.frontier-passport-menu .galaxy-passport-preview { min-height: 540px; }.passport-editor-shell { padding: 1rem; border: 1px solid rgba(255,255,255,.08); border-radius: 20px; background: rgba(255,255,255,.03); }
+
+@media (max-width: 780px) {
+  .frontier-world-name { top: max(.7rem,env(safe-area-inset-top)); left: .7rem; padding: .48rem .58rem; }.frontier-world-name strong { max-width: 145px; }
+  .frontier-ore-capsule { top: max(.7rem,env(safe-area-inset-top)); left: auto; right: .7rem; transform: none; min-width: 105px; padding: .4rem .58rem; }
+  .frontier-resource-hud { top: 4.3rem; right: .65rem; display: grid; }.frontier-resource-hud button { min-width: 45px; }
+  .frontier-pack-button,.frontier-social-button { right: .7rem; width: 52px; height: 52px; border-radius: 16px; }.frontier-pack-button { bottom: calc(6.7rem + env(safe-area-inset-bottom)); }.frontier-social-button { bottom: calc(10.5rem + env(safe-area-inset-bottom)); }
+  .frontier-utility-dock { top: 7.5rem; left: .7rem; right: auto; transform: none; }.frontier-utility-dock button { width: 48px; min-height: 47px; }
+  .frontier-control-hint { display: none; }
+  .frontier-joystick { position: absolute; z-index: 18; left: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); display: block; width: 112px; height: 112px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; background: rgba(4,10,23,.32); backdrop-filter: blur(5px); touch-action: none; }.frontier-joystick::before { content: ''; position: absolute; inset: 25%; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; }.frontier-joystick > i { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px; border: 1px solid rgba(109,245,176,.35); border-radius: 50%; background: rgba(109,245,176,.2); box-shadow: 0 8px 18px rgba(0,0,0,.25); }
+  .frontier-action-button { position: absolute; z-index: 19; right: .85rem; bottom: calc(1rem + env(safe-area-inset-bottom)); display: grid; place-items: center; width: 82px; height: 82px; border: 1px solid rgba(109,245,176,.38); border-radius: 50%; color: white; background: rgba(21,91,69,.72); backdrop-filter: blur(10px); box-shadow: 0 12px 30px rgba(0,0,0,.3); }.frontier-action-button span { font-size: 1.5rem; }.frontier-action-button strong { font-size: .55rem; }
+  .frontier-interaction-prompt { bottom: calc(7.4rem + env(safe-area-inset-bottom)); min-width: min(260px,calc(100vw - 8rem)); }
+  .frontier-learning-route { left: 50%; bottom: calc(.7rem + env(safe-area-inset-bottom)); transform: translateX(-50%); padding: .38rem .52rem; opacity: .62; }.frontier-learning-route:hover { transform: translateX(-50%) translateY(-2px); }.frontier-learning-route > span { display: none; }.frontier-learning-route small { display: none; }.frontier-learning-route strong { font-size: .55rem; }
+  .frontier-mission-hud { top: 4.5rem; width: min(330px,calc(100vw - 6rem)); box-sizing: border-box; grid-template-columns: 30px 1fr 38px; }.frontier-mission-hud em { width: 35px; height: 35px; }
+  .frontier-build-mode { top: 4.5rem; width: min(300px,calc(100vw - 5rem)); box-sizing: border-box; }
+  .frontier-game-toast { top: 4.4rem; }
+  .frontier-menu-backdrop { padding: 0; }.frontier-menu-panel { width: 100%; border-radius: 0; border: 0; padding: 1rem; }.frontier-menu-panel > header { margin: -1rem -1rem 1rem; top: -1rem; padding: 1rem; }
+  .frontier-build-catalog { grid-template-columns: 1fr; }.frontier-passport-menu { grid-template-columns: 1fr; }.frontier-passport-menu .galaxy-passport-preview { min-height: auto; }.frontier-relay-setting label { display: grid; }.frontier-neighbor-list > button { grid-template-columns: 60px 1fr auto; }.frontier-neighbor-list .neighbor-planet { width: 52px; height: 52px; }
+}

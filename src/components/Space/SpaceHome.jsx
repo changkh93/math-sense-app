@@ -3402,8 +3402,7 @@ function SpaceHome() {
 
   if (currentView === 'galaxy') {
     return (
-      <div className="space-bg" style={{ minHeight: '100dvh', overflowY: 'auto', background: '#03050c' }}>
-        <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
+      <div style={{ minHeight: '100dvh', overflow: 'hidden', background: '#03050c' }}>
         <MetaGalaxy
           user={user}
           userData={userData}
@@ -3754,6 +3753,10 @@ function SpaceHome() {
           <div style={{ pointerEvents: 'auto', width: '100%' }}>
             <ClusterSelector 
               clusters={activeClusters}
+              onEnterFrontier={() => {
+                switchRootView('galaxy');
+                soundManager.playWarp();
+              }}
               onSelect={(id) => {
                 selectCluster(id);
                 soundManager.playWarp();

@@ -23,6 +23,20 @@ const GALAXY_SAFE_VISIT_MESSAGES = new Set([
   "정원을 조금 돌보고 갔어.",
   "이 행성의 색 조합이 좋아!",
 ]);
+const GALAXY_WORLD_ACTIONS = {
+  crystal: { material: "crystalGlass", amount: 1, label: "수정 파편을 채집했습니다." },
+  fiber: { material: "biofiber", amount: 1, label: "루멘 섬유를 채집했습니다." },
+  salvage: { material: "alloy", amount: 1, label: "고대 합금을 회수했습니다." },
+  beacon: { material: "stardust", amount: 1, label: "신호기를 수리하고 별가루를 찾았습니다.", stat: "facilityHealth" },
+  plant: { material: "stardust", amount: 0, label: "황무지에 루멘 새싹을 심었습니다.", plants: true },
+};
+const GALAXY_WORLD_NODE_ACTIONS = {
+  crystal_north: "crystal",
+  fiber_grove: "fiber",
+  ancient_scrap: "salvage",
+  broken_beacon: "beacon",
+  wild_soil: "plant",
+};
 
 const LEARNING_ORE_EXCLUDED_TYPES = new Set([
   "crystal_gift_received",
@@ -361,8 +375,10 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       if (layout.length >= 36) throw new functions.https.HttpsError("failed-precondition", "현재 구역에 더 이상 시설을 놓을 수 없습니다.");
       const instanceId = `${itemId}_${operationRef.id.slice(0, 10)}`;
       const slot = layout.length;
-      const x = 16 + ((slot * 19) % 68);
-      const y = 24 + ((slot * 23) % 58);
+      const requestedX = Number(data?.x);
+      const requestedY = Number(data?.y);
+      const x = Number.isFinite(requestedX) ? clamp(requestedX, 8, 92) : 16 + ((slot * 19) % 68);
+      const y = Number.isFinite(requestedY) ? clamp(requestedY, 12, 88) : 24 + ((slot * 23) % 58);
       const placed = { instanceId, itemId, icon: item.icon, name: item.name, x, y, rotation: 0, locked: false };
       materials[item.material] = materialCount - item.materialCost;
       transaction.set(userRef, { crystals: wallet - item.cost }, { merge: true });
@@ -511,6 +527,69 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     return serializeValue({ success: true, ...result });
   });
 
+  const performGalaxyWorldAction = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    const actionId = cleanId(data?.actionId, 40);
+    const nodeId = cleanId(data?.nodeId, 80);
+    const worldX = clamp(data?.x, -16, 16);
+    const worldZ = clamp(data?.z, -16, 16);
+    const action = GALAXY_WORLD_ACTIONS[actionId];
+    if (!action || GALAXY_WORLD_NODE_ACTIONS[nodeId] !== actionId) {
+      throw new functions.https.HttpsError("invalid-argument", "월드 상호작용 정보가 올바르지 않습니다.");
+    }
+    const { user } = await requireMember(uid);
+    const planet = await ensurePlanet(uid, user);
+    const operationRef = db.collection("galaxyOperations").doc(`world_${uid}_${nodeId}`);
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(planet.ref),
+      ]);
+      const nowMs = Date.now();
+      const availableAtMs = Math.max(0, Number(operationSnap.data()?.availableAtMs || 0));
+      if (availableAtMs > nowMs) {
+        throw new functions.https.HttpsError("resource-exhausted", "이 자원은 아직 다시 생성되지 않았습니다.");
+      }
+      const current = planetSnap.data() || {};
+      const materials = { ...(current.materials || {}) };
+      const layout = Array.isArray(current.layout) ? current.layout : [];
+      const stats = { ...(current.stats || {}) };
+      if (action.amount > 0) {
+        materials[action.material] = Math.max(0, Number(materials[action.material] || 0)) + action.amount;
+      }
+      if (action.stat) stats[action.stat] = clamp(Number(stats[action.stat] || 0) + 6, 0, 100);
+
+      const updates = { materials, stats, updatedAt: FieldValue.serverTimestamp() };
+      if (action.plants) {
+        if (layout.length >= 36) throw new functions.https.HttpsError("failed-precondition", "행성에 더 이상 새싹을 심을 공간이 없습니다.");
+        const x = clamp(50 + worldX * 3, 8, 92);
+        const y = clamp(50 + worldZ * 3, 12, 88);
+        updates.layout = [...layout, {
+          instanceId: `sprout_${nowMs}_${nodeId.slice(0, 18)}`,
+          itemId: "wild_sprout",
+          icon: "🌱",
+          name: "직접 심은 루멘 새싹",
+          x,
+          y,
+          rotation: 0,
+          locked: false,
+        }];
+      }
+
+      transaction.set(planet.ref, updates, { merge: true });
+      transaction.set(operationRef, {
+        uid,
+        type: "galaxy_world_action",
+        actionId,
+        nodeId,
+        availableAtMs: nowMs + (action.plants ? 60 * 60 * 1000 : 5 * 60 * 1000),
+        lastCompletedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { material: action.material, amount: action.amount, label: action.label };
+    });
+    return { success: true, ...result };
+  });
+
   const markGalaxyEventsSeen = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
     await requireMember(uid);
@@ -532,6 +611,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     moveGalaxyItem,
     performGalaxyVisitAction,
     runGalaxyMission,
+    performGalaxyWorldAction,
     markGalaxyEventsSeen,
   };
 };
