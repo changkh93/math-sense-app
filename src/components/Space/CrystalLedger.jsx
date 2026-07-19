@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { motion as Motion } from 'framer-motion'
-import { collection, doc, getDoc, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { Gift, Search, Send, UserRound, X } from 'lucide-react'
 import { db, auth, functions } from '../../firebase'
@@ -216,7 +216,9 @@ export default function CrystalLedger({ userData }) {
       return undefined
     }
 
-    const unsubscribeRecipients = onSnapshot(collection(db, 'users'), (snapshot) => {
+    let cancelled = false
+    getDocs(collection(db, 'users')).then((snapshot) => {
+      if (cancelled) return
       const list = snapshot.docs
         .map(docSnap => ({ uid: docSnap.id, ...docSnap.data() }))
         .filter(profile => profile.uid !== user.uid && profile.role !== 'parent' && profile.role !== 'admin')
@@ -224,12 +226,11 @@ export default function CrystalLedger({ userData }) {
 
       setRecipients(list)
       setSelectedRecipientId(prev => (prev && list.some(item => item.uid === prev) ? prev : ''))
-    }, (error) => {
+    }).catch((error) => {
       console.error('Crystal transfer recipients error:', error)
-      setRecipients([])
+      if (!cancelled) setRecipients([])
     })
-
-    return () => unsubscribeRecipients()
+    return () => { cancelled = true }
   }, [])
 
   // Filter transactions

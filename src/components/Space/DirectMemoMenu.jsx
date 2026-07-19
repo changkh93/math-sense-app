@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, limit as limitDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, limit as limitDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Archive, Check, Clock3, PenLine, Reply, Send, Trash2, UserRound, X } from 'lucide-react';
 import { db, functions } from '../../firebase';
@@ -9,6 +9,8 @@ import soundManager from '../../utils/SoundManager';
 import './DirectMemoMenu.css';
 
 const MEMO_MAX_LENGTH = 2000;
+const RECIPIENT_CACHE_TTL_MS = 10 * 60 * 1000;
+let recipientDirectoryCache = { loadedAt: 0, rows: [] };
 
 function getProfileName(profile = {}, fallback = '탐사원') {
   return profile.publicDisplayName || profile.studentName || profile.name || profile.displayName || fallback;
@@ -165,24 +167,34 @@ export default function DirectMemoMenu() {
   }, []);
 
   useEffect(() => {
-    if (!user?.uid) {
-      setRecipients([]);
+    if (!user?.uid || !isOpen) {
+      if (!user?.uid) setRecipients([]);
       return undefined;
     }
 
-    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
-      const list = snap.docs
-        .map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }))
-        .filter((profile) => profile.uid !== user.uid && profile.role !== 'parent' && (profile.role !== 'admin' || profile.email === 'paul@dulcine.net'))
-        .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'));
-      setRecipients(list);
-      setRecipientId((prev) => (prev && list.some((item) => item.uid === prev) ? prev : ''));
-    }, (err) => {
-      console.error('Failed to load direct memo recipients:', err);
-      setRecipients([]);
-    });
-    return () => unsub();
-  }, [user?.uid]);
+    let cancelled = false;
+    const loadRecipients = async () => {
+      try {
+        let rows = recipientDirectoryCache.rows;
+        if (!rows.length || Date.now() - recipientDirectoryCache.loadedAt > RECIPIENT_CACHE_TTL_MS) {
+          const snap = await getDocs(query(collection(db, 'users'), limitDocs(200)));
+          rows = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
+          recipientDirectoryCache = { loadedAt: Date.now(), rows };
+        }
+        if (cancelled) return;
+        const list = rows
+          .filter((profile) => profile.uid !== user.uid && profile.role !== 'parent' && (profile.role !== 'admin' || profile.email === 'paul@dulcine.net'))
+          .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'));
+        setRecipients(list);
+        setRecipientId((prev) => (prev && list.some((item) => item.uid === prev) ? prev : ''));
+      } catch (err) {
+        console.error('Failed to load direct memo recipients:', err);
+        setRecipients([]);
+      }
+    }
+    loadRecipients();
+    return () => { cancelled = true; };
+  }, [isOpen, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return undefined;
@@ -204,22 +216,25 @@ export default function DirectMemoMenu() {
   }, [user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid) return undefined;
+    if (!user?.uid || !isOpen || activeTab !== 'sent') return undefined;
+    let cancelled = false;
     const sentQuery = query(
       collection(db, 'directMemos'),
       where('senderId', '==', user.uid),
       orderBy('createdAt', 'desc'),
       limitDocs(40)
     );
-    const unsub = onSnapshot(sentQuery, (snap) => {
-      setSent(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
-    }, (err) => {
+    getDocs(sentQuery).then((snap) => {
+      if (!cancelled) setSent(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
+    }).catch((err) => {
       console.error('Failed to load sent direct memos:', err);
-      setMessage(getErrorMessage(err));
-      setSent([]);
+      if (!cancelled) {
+        setMessage(getErrorMessage(err));
+        setSent([]);
+      }
     });
-    return () => unsub();
-  }, [user?.uid]);
+    return () => { cancelled = true; };
+  }, [activeTab, isOpen, user?.uid]);
 
   const visibleInbox = useMemo(() => {
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;

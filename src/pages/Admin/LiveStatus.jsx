@@ -5,6 +5,7 @@ import { Activity, Clock, AlertTriangle, X, Play, RefreshCw, FileText, CheckCirc
 import { useClusters } from '../../hooks/useContent';
 import { useAdminTodayAttendance } from '../../hooks/useAssignments';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
+import { useAllUserPresence } from '../../hooks/useRealtimePresence';
 import { getTodayKST, getKSTComponents, KST_DAY_LABELS, scheduleIncludesDay } from '../../utils/streakUtils';
 import './Admin.css';
 
@@ -201,7 +202,8 @@ export default function LiveStatus() {
   const { data: todayAttendance = [], isLoading: attendanceLoading } = useAdminTodayAttendance(todayStr);
 
   const [selectedClusterId, setSelectedClusterId] = useState('all');
-  const [users, setUsers] = useState([]);
+  const [userProfiles, setUserProfiles] = useState([]);
+  const presenceByUid = useAllUserPresence(true);
   const [parentsMap, setParentsMap] = useState({});
   const [crewsMap, setCrewsMap] = useState({});
   const [loading, setLoading] = useState(true);
@@ -257,29 +259,7 @@ export default function LiveStatus() {
         // Exclude admins and parent accounts
         .filter(u => u.role !== 'admin' && u.role !== 'parent');
 
-      // Sort: online first, then away, then offline. Within each group, sort by recency.
-      const statusPriority = (u) => {
-        const live = u.liveStatus || {};
-        const state = live.state || 'offline';
-        const lastUpdated = live.lastUpdatedAt?.toMillis() || 0;
-        const timeSince = Date.now() - lastUpdated;
-        
-        if (state === 'online' && timeSince < 5 * 60000) return 0; // Online
-        if ((state === 'away' && timeSince < 30 * 60000) || (state === 'online' && timeSince >= 5 * 60000 && timeSince < 15 * 60000)) return 1; // Away
-        return 2; // Offline
-      };
-
-      allUsers.sort((a, b) => {
-        const pa = statusPriority(a);
-        const pb = statusPriority(b);
-        if (pa !== pb) return pa - pb;
-        // Within same priority, sort by last updated descending
-        const aTime = a.liveStatus?.lastUpdatedAt?.toMillis() || 0;
-        const bTime = b.liveStatus?.lastUpdatedAt?.toMillis() || 0;
-        return bTime - aTime;
-      });
-
-      setUsers(allUsers);
+      setUserProfiles(allUsers);
       setLoading(false);
     }, (error) => {
       console.error("LiveStatus fetch error:", error);
@@ -288,6 +268,27 @@ export default function LiveStatus() {
 
     return () => unsubscribe();
   }, []);
+
+  const users = useMemo(() => {
+    const nowMs = nowDate.getTime();
+    const statusPriority = (user) => {
+      const live = user.liveStatus || {};
+      const state = live.state || 'offline';
+      const lastUpdated = live.lastUpdatedAt?.toMillis() || 0;
+      const timeSince = nowMs - lastUpdated;
+      if (state === 'online' && timeSince < 5 * 60000) return 0;
+      if ((state === 'away' && timeSince < 30 * 60000) || (state === 'online' && timeSince < 15 * 60000)) return 1;
+      return 2;
+    };
+    return userProfiles.map((profile) => ({
+      ...profile,
+      liveStatus: presenceByUid[profile.uid]?.liveStatus || { state: 'offline' },
+    })).sort((a, b) => {
+      const priorityDiff = statusPriority(a) - statusPriority(b);
+      if (priorityDiff) return priorityDiff;
+      return (b.liveStatus?.lastUpdatedAt?.toMillis() || 0) - (a.liveStatus?.lastUpdatedAt?.toMillis() || 0);
+    });
+  }, [nowDate, presenceByUid, userProfiles]);
 
   // Filter by cluster
   const filteredUsers = useMemo(() => {
@@ -310,7 +311,7 @@ export default function LiveStatus() {
           const live = u.liveStatus || {};
           const state = live.state || 'offline';
           const lastUpdated = live.lastUpdatedAt?.toMillis() || 0;
-          const timeSince = Date.now() - lastUpdated;
+          const timeSince = nowDate.getTime() - lastUpdated;
           
           const isOffline = state === 'offline' || 
                             (state === 'away' && timeSince >= 30 * 60000) || 
@@ -328,7 +329,7 @@ export default function LiveStatus() {
     });
     
     return { onlineWithoutCrew: online, offlineWithoutCrew: offline, usersByCrew: byCrew };
-  }, [filteredUsers, crewsMap]);
+  }, [filteredUsers, crewsMap, nowDate]);
 
   // --- Late Students Calculation ---
   const lateStudentsList = useMemo(() => {

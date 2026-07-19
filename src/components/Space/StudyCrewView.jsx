@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, serverTimestamp, updateDoc, where, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Copy, Crown, Edit3, Gem, Hammer, Link, Loader2, Mail, Plus, Radio, Rocket, Send, ShieldCheck, Sparkles, UserRound, Users } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
+import { useAllUserPresence } from '../../hooks/useRealtimePresence';
 import soundManager from '../../utils/SoundManager';
 import { copyMeetText, getGoogleMeetCode, openGoogleMeet } from '../../utils/googleMeetNavigation';
 import CrewJoinModal from './CrewJoinModal';
@@ -1117,9 +1118,20 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [inviteTargetStudent, setInviteTargetStudent] = useState(null);
   const [selectedInviteOptionId, setSelectedInviteOptionId] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
-  const [crewOnlineCounts, setCrewOnlineCounts] = useState({});
-  const [liveStatusById, setLiveStatusById] = useState({});
-  const [liveStatusRefreshAt, setLiveStatusRefreshAt] = useState(() => Date.now());
+  const realtimePresenceByUid = useAllUserPresence(Boolean(user?.uid));
+  const { crewOnlineCounts, liveStatusById } = useMemo(() => {
+    const nextCounts = {};
+    const nextStatuses = {};
+    Object.entries(realtimePresenceByUid).forEach(([uid, status]) => {
+      nextStatuses[uid] = status;
+      const live = status?.liveStatus || {};
+      if (status?.role === 'admin' || status?.role === 'parent') return;
+      const statusCrewId = status?.crewId;
+      if (!statusCrewId || live.state !== 'online') return;
+      nextCounts[statusCrewId] = (nextCounts[statusCrewId] || 0) + 1;
+    });
+    return { crewOnlineCounts: nextCounts, liveStatusById: nextStatuses };
+  }, [realtimePresenceByUid]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
   const [detailView, setDetailView] = useState(false);
@@ -1216,44 +1228,6 @@ export default function StudyCrewView({ onNavigateStore }) {
       setDirectoryCrews(crews);
     }, err => console.error('Crew directory error:', err));
     return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    const recentCutoff = Timestamp.fromMillis(liveStatusRefreshAt - 5 * 60 * 1000);
-    const liveQuery = query(
-      collection(db, 'liveStatuses'),
-      where('lastUpdatedAt', '>=', recentCutoff),
-      orderBy('lastUpdatedAt', 'desc'),
-      limit(40)
-    );
-
-    const unsub = onSnapshot(liveQuery, snap => {
-      const nextCounts = {};
-      const nextStatuses = {};
-
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data() || {};
-        const status = { uid: data.uid || docSnap.id, liveStatus: data, ...data };
-        nextStatuses[docSnap.id] = status;
-        if (data.role === 'admin' || data.role === 'parent') return;
-        const crewId = data.crewId;
-        if (!crewId) return;
-        const isOnline = data.state === 'online';
-        if (!isOnline) return;
-
-        nextCounts[crewId] = (nextCounts[crewId] || 0) + 1;
-      });
-
-      setCrewOnlineCounts(nextCounts);
-      setLiveStatusById(nextStatuses);
-    }, err => console.error('Crew online count error:', err));
-
-    return () => unsub();
-  }, [liveStatusRefreshAt]);
-
-  useEffect(() => {
-    const timer = setInterval(() => setLiveStatusRefreshAt(Date.now()), 60 * 1000);
-    return () => clearInterval(timer);
   }, []);
 
   const sortedCrews = useMemo(() => {

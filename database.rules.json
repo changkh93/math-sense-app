@@ -2,6 +2,24 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "userPresence": {
+      ".read": "auth != null",
+      "$uid": {
+        "lastSeenMs": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isNumber()"
+        },
+        "connections": {
+          "$connectionId": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'state', 'currentLocation', 'updatedAtMs', 'enteredAtMs']) && newData.child('uid').val() === $uid && newData.child('state').val().matches(/^(online|away)$/) && newData.child('currentLocation').isString() && newData.child('currentLocation').val().length <= 120 && newData.child('updatedAtMs').isNumber() && newData.child('enteredAtMs').isNumber())"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "quizBattlePresence": {
       "$clusterId": {
         "$regionId": {

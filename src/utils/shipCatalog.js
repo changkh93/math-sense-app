@@ -121,14 +121,15 @@ export function normalizeShipLoadout(userData = {}) {
 }
 
 export function getShipAchievementStats(userData = {}, history = []) {
+  const summaryStats = userData?.learningSummary?.stats || {}
   const quizRows = history.filter((row) => !['video', 'text'].includes(row?.type))
   const darkMatterRows = history.filter((row) => String(row?.unitId || '').includes('dark_matter'))
   return {
-    quiz: Math.max(Number(userData?.quizCount || 0), quizRows.length),
-    perfect: Math.max(Number(userData?.perfectCount || 0), quizRows.filter((row) => Number(row?.score) === 100).length),
+    quiz: Math.max(Number(userData?.quizCount || 0), Number(summaryStats.quizAttempts || 0), quizRows.length),
+    perfect: Math.max(Number(userData?.perfectCount || 0), Number(summaryStats.perfectAttempts || 0), quizRows.filter((row) => Number(row?.score) === 100).length),
     streak: Number(userData?.currentStreak || 0),
     darkMatter: Math.max(
-      Number(userData?.darkMatterRecoveredCount || userData?.darkMatterMasteredCount || 0),
+      Number(userData?.darkMatterRecoveredCount || userData?.darkMatterMasteredCount || 0), Number(summaryStats.darkMatterRecovered || 0),
       darkMatterRows.filter((row) => Number(row?.score || 0) >= 80).length,
     ),
   }

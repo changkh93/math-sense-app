@@ -380,6 +380,20 @@ service cloud.firestore {
       }
     }
 
+    // Server-maintained compact rollup used instead of loading every history document.
+    match /learningSummaries/{userId} {
+      allow read: if isAuth() && (
+        request.auth.uid == userId ||
+        isAdmin() ||
+        isLinkedParentOf(userId)
+      );
+      allow write: if false;
+    }
+
+    match /leaderboardCaches/{cacheId} {
+      allow read, write: if false;
+    }
+
     // Server-managed crystal gifting audit and daily limit documents.
     match /crystalTransfers/{transferId} {
       allow read: if isAuth() && (

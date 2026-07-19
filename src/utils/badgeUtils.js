@@ -48,6 +48,23 @@ const BADGE_PREMIUM_IMAGES = {
 export const UPGRADABLE_BADGE_IDS = Object.keys(BADGE_PREMIUM_IMAGES);
 
 export function calculateCollectionBadgeStats(history = [], userData = {}) {
+  const summary = userData?.learningSummary;
+  if (summary?.schemaVersion === 1) {
+    const bestScores = (summary.units || [])
+      .map((unit) => unit.bestQuizScore ?? unit.bestWorkbookScore)
+      .filter((score) => Number.isFinite(Number(score)))
+      .map(Number);
+    const stats = summary.stats || {};
+    return {
+      quizAttempts: Number(stats.quizAttempts || 0),
+      quizScoreSum: Number(stats.quizScoreSum || 0),
+      quizAverageScore: Number(stats.quizAttempts || 0) > 0 ? Number(stats.quizScoreSum || 0) / Number(stats.quizAttempts) : 0,
+      perfectAttempts: Number(stats.perfectAttempts || 0),
+      uniqueQuizUnits: bestScores.length,
+      averageScore: bestScores.length ? bestScores.reduce((sum, score) => sum + score, 0) / bestScores.length : 0,
+      perfectUnits: bestScores.filter((score) => score === 100).length,
+    };
+  }
   const scoredQuizEntries = (history || []).filter(entry => {
     const type = entry?.type || 'quiz';
     return (type === 'quiz' || type === 'workbook') && typeof entry.score === 'number';

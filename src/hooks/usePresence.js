@@ -1,127 +1,113 @@
-import { useEffect, useRef } from 'react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { useEffect, useMemo, useRef } from 'react'
+import {
+  onDisconnect,
+  onValue,
+  push,
+  ref,
+  remove,
+  serverTimestamp,
+  set,
+} from 'firebase/database'
+import { realtimeDb } from '../firebase'
 
-/**
- * Tracks user's current location and tab visibility, efficiently sending updates to Firestore
- * @param {string} userId
- * @param {string} clusterId
- * @param {string} currentLocation description like `분수의 나눗셈 (개념 영상)`
- * @param {string} unitId 
- * @param {string} activeRoomId
- * @param {string} clusterName
- * @param {object} publicProfile
- */
-export function usePresence(userId, clusterId, currentLocation, unitId, activeRoomId = null, clusterName = '', publicProfile = {}) {
-  const lastLocationRef = useRef(null);
-  const lastUnitIdRef = useRef(null);
-  const lastRoomIdRef = useRef(null);
+const safePathSegment = (value) => String(value || '')
+  .trim()
+  .split('')
+  .map((character) => '.#$[]/'.includes(character) ? '_' : character)
+  .join('')
+  .slice(0, 180)
+
+const cleanText = (value, maxLength) => String(value || '').trim().slice(0, maxLength)
+
+export function usePresence(userId, clusterId, currentLocation, unitId, activeRoomId, clusterName, publicProfile = {}) {
+  const connectionRef = useRef(null)
+  const enteredAtMsRef = useRef(null)
+
+  const payload = useMemo(() => ({
+    uid: cleanText(userId, 180),
+    state: typeof document !== 'undefined' && document.hidden ? 'away' : 'online',
+    currentLocation: cleanText(currentLocation || '메인 화면', 120),
+    clusterId: cleanText(clusterId || 'cluster_elementary', 100),
+    clusterName: cleanText(clusterName, 80),
+    unitId: cleanText(unitId, 180),
+    activeRoomId: cleanText(activeRoomId, 180),
+    publicDisplayName: cleanText(publicProfile.publicDisplayName, 40),
+    studentName: cleanText(publicProfile.studentName, 40),
+    name: cleanText(publicProfile.name, 40),
+    displayName: cleanText(publicProfile.displayName, 40),
+    gradeLabel: cleanText(publicProfile.gradeLabel || publicProfile.grade || publicProfile.schoolGrade || publicProfile.studentGrade, 30),
+    crewId: cleanText(publicProfile.crewId, 180),
+    crewName: cleanText(publicProfile.crewName, 80),
+    crewColor: cleanText(publicProfile.crewColor, 30),
+    role: cleanText(publicProfile.role, 30),
+    studyInvitePreference: cleanText(publicProfile.studyInvitePreference || 'open', 30),
+  }), [activeRoomId, clusterId, clusterName, currentLocation, publicProfile, unitId, userId])
+
+  const latestPayloadRef = useRef(payload)
+  useEffect(() => {
+    enteredAtMsRef.current = Date.now()
+    latestPayloadRef.current = payload
+    if (!connectionRef.current) return
+    set(connectionRef.current, {
+      ...payload,
+      enteredAtMs: enteredAtMsRef.current,
+      updatedAt: serverTimestamp(),
+      updatedAtMs: Date.now(),
+    }).catch((error) => console.warn('Failed to update realtime presence', error))
+  }, [payload])
 
   useEffect(() => {
-    if (!userId) return;
+    const safeUid = safePathSegment(userId)
+    if (!safeUid) return undefined
+    enteredAtMsRef.current = Date.now()
 
-    let timeoutId;
-    let heartbeatId;
+    const connectionsRef = ref(realtimeDb, `userPresence/${safeUid}/connections`)
+    const currentConnectionRef = push(connectionsRef)
+    const connectedRef = ref(realtimeDb, '.info/connected')
+    const lastSeenRef = ref(realtimeDb, `userPresence/${safeUid}/lastSeenMs`)
+    const disconnectConnection = onDisconnect(currentConnectionRef)
+    const disconnectLastSeen = onDisconnect(lastSeenRef)
+    connectionRef.current = currentConnectionRef
 
-    const updatePresence = async (state, isNewLocation = false) => {
+    const writeCurrentState = (state) => set(currentConnectionRef, {
+      ...latestPayloadRef.current,
+      state,
+      enteredAtMs: enteredAtMsRef.current,
+      updatedAt: serverTimestamp(),
+      updatedAtMs: Date.now(),
+    })
+
+    const unsubscribeConnected = onValue(connectedRef, async (snapshot) => {
+      if (snapshot.val() !== true) return
       try {
-        const userRef = doc(db, 'users', userId);
-        const liveStatusRef = doc(db, 'liveStatuses', userId);
-        const timestamp = serverTimestamp();
-        const liveStatus = {
-          state: state,
-          lastUpdatedAt: timestamp,
-          currentLocation: currentLocation || '메인 화면',
-          clusterId: clusterId || 'cluster_elementary',
-          unitId: unitId || null,
-          activeRoomId: activeRoomId || null
-        };
-
-        if (clusterName) {
-          liveStatus.clusterName = clusterName;
-        }
-        
-        const mergeData = {
-          liveStatus
-        };
-
-        if (isNewLocation) {
-          mergeData.liveStatus.enteredAt = timestamp;
-        }
-
-        const liveStatusData = {
-          uid: userId,
-          ...liveStatus,
-          publicDisplayName: publicProfile.publicDisplayName || '',
-          studentName: publicProfile.studentName || '',
-          name: publicProfile.name || '',
-          displayName: publicProfile.displayName || '',
-          gradeLabel: publicProfile.gradeLabel || '',
-          grade: publicProfile.grade || '',
-          schoolGrade: publicProfile.schoolGrade || '',
-          studentGrade: publicProfile.studentGrade || '',
-          selectedCourse: publicProfile.selectedCourse || '',
-          courseName: publicProfile.courseName || '',
-          currentCourse: publicProfile.currentCourse || '',
-          crewId: publicProfile.crewId || '',
-          crewName: publicProfile.crewName || '',
-          crewColor: publicProfile.crewColor || '',
-          crewSnapshot: publicProfile.crewSnapshot || null,
-          role: publicProfile.role || '',
-          studyInvitePreference: publicProfile.studyInvitePreference || 'open'
-        };
-
-        if (isNewLocation) {
-          liveStatusData.enteredAt = timestamp;
-        }
-
-        await Promise.all([
-          setDoc(userRef, mergeData, { merge: true }),
-          setDoc(liveStatusRef, liveStatusData, { merge: true })
-        ]);
-        
-      } catch (err) {
-        console.error("Presence update failed:", err);
+        await disconnectConnection.remove()
+        await disconnectLastSeen.set(serverTimestamp())
+        await writeCurrentState(document.hidden ? 'away' : 'online')
+      } catch (error) {
+        console.warn('Failed to establish realtime presence', error)
       }
-    };
+    })
 
+    let awayTimer = null
     const handleVisibilityChange = () => {
-      clearTimeout(timeoutId);
+      window.clearTimeout(awayTimer)
       if (document.hidden) {
-        timeoutId = setTimeout(() => {
-          updatePresence('away', false);
-        }, 3000);
+        awayTimer = window.setTimeout(() => writeCurrentState('away').catch(() => {}), 3000)
       } else {
-        updatePresence('online', false);
+        writeCurrentState('online').catch(() => {})
       }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    const isNewLocation = 
-      lastLocationRef.current !== currentLocation || 
-      lastUnitIdRef.current !== unitId ||
-      lastRoomIdRef.current !== activeRoomId;
-
-    if (isNewLocation) {
-      lastLocationRef.current = currentLocation;
-      lastUnitIdRef.current = unitId;
-      lastRoomIdRef.current = activeRoomId;
-      // Send immediately instead of debouncing
-      updatePresence(document.hidden ? 'away' : 'online', true);
     }
-
-    // Heartbeat every 45 seconds (reduced from 60 to be more reliable)
-    heartbeatId = setInterval(() => {
-      if (!document.hidden) {
-         updatePresence('online', false);
-      }
-    }, 45000); 
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearTimeout(timeoutId);
-      clearInterval(heartbeatId);
-    };
-  }, [userId, clusterId, currentLocation, unitId, activeRoomId, clusterName, publicProfile]);
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.clearTimeout(awayTimer)
+      unsubscribeConnected()
+      connectionRef.current = null
+      disconnectConnection.cancel().catch(() => {})
+      disconnectLastSeen.cancel().catch(() => {})
+      set(lastSeenRef, serverTimestamp()).catch(() => {})
+      remove(currentConnectionRef).catch(() => {})
+    }
+  }, [userId])
 }

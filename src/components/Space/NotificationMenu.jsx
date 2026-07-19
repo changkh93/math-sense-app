@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { AlertTriangle, Award, CalendarX, Gem, Mail, Megaphone, MessageCircle } from 'lucide-react';
 import { getEvaluationPeriodLabel, getScholarshipCourseLabel } from '../../utils/scholarshipAwards';
@@ -83,7 +83,8 @@ export default function NotificationMenu() {
     const q = query(
       collection(db, 'notifications'),
       where('recipientId', '==', user.uid),
-      orderBy('createdAt', 'desc') // Requires composite index usually
+      orderBy('createdAt', 'desc'),
+      limit(30)
     );
 
     unsubscribeSnapshot = onSnapshot(q, (snapshot) => {

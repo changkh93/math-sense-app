@@ -11,7 +11,7 @@ const JOURNEY_LOADING_FAILSAFE_MS = 8000;
 
 function hasLearningActivity(stats) {
   if (!stats) return false;
-  return (stats.quizzes || 0) > 0 || (stats.videos || 0) > 0 || (stats.texts || 0) > 0 || (stats.workbooks || 0) > 0;
+  return (stats.quizzes || 0) > 0 || (stats.videos || 0) > 0 || (stats.texts || 0) > 0 || (stats.workbooks || 0) > 0 || (stats.codeTraces || 0) > 0;
 }
 
 function getActiveDatesFromDailyStats(dailyStats) {
@@ -61,7 +61,7 @@ function getMonthWindow(monthStr) {
   };
 }
 
-export default function SpaceJourney({ userData, initialHistory, initialTransactions, parentLoading }) {
+export default function SpaceJourney({ userData, initialHistory, initialDailyStats, initialTransactions, parentLoading }) {
   const [history, setHistory] = useState(initialHistory || []);
   const [loading, setLoading] = useState(parentLoading || !initialHistory);
   
@@ -160,8 +160,9 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
 
   // 집계 스탯
   const dailyStats = useMemo(() => {
-    const map = new Map();
-    history.forEach(h => {
+    const hasSummary = Array.isArray(initialDailyStats) && initialDailyStats.length > 0;
+    const map = new Map((initialDailyStats || []).map((row) => [row.date, { ...row }]));
+    if (!hasSummary) history.forEach(h => {
       if (!h.timestamp) return;
       const d = h.timestamp.toDate ? h.timestamp.toDate() : new Date(h.timestamp);
       const dateStr = getTodayKST(d);
@@ -204,7 +205,9 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
       } else if (t.type === 'transmission_reward' || t.type === 'data_log_reward') {
         // Fallback for missing history logs
         // Note: We use a simple count if history didn't record it
-        const historyOnDate = history.some(h => getTodayKST(h.timestamp?.toDate?.() || h.timestamp) === dateStr);
+        const historyOnDate = hasSummary
+          ? map.has(dateStr)
+          : history.some(h => getTodayKST(h.timestamp?.toDate?.() || h.timestamp) === dateStr);
         if (!historyOnDate) {
           if (t.type === 'transmission_reward') existing.videos += 1;
           if (t.type === 'data_log_reward') existing.texts += 1;
@@ -216,7 +219,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     });
 
     return map;
-  }, [history, transactions]);
+  }, [history, initialDailyStats, transactions]);
 
   // Cryo Core Stats - Inferred from (purchased vs remaining) + logged usage
   const coreStats = useMemo(() => {
@@ -288,6 +291,7 @@ export default function SpaceJourney({ userData, initialHistory, initialTransact
     let minDate = todayKST;
     const oldestRenderableDate = addDaysKST(todayKST, -(JOURNEY_MAX_RENDER_DAYS - 1));
     const activeDates = Array.from(getActiveDatesFromDailyStats(dailyStats)).sort();
+    if (activeDates[0] && activeDates[0] < minDate) minDate = activeDates[0];
     const lastJourneyDate = userData?.lastStreakDate || activeDates[activeDates.length - 1] || todayKST;
 
     if (journeyStreak > 0 && lastJourneyDate) {

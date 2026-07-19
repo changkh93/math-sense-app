@@ -4,6 +4,7 @@ import { httpsCallable } from 'firebase/functions';
 import { Camera, CameraOff, Hash, MessageSquare, MessageSquareOff, Mic, MicOff, PhoneOff, Radio, Send, UserMinus, UserRound, Users, Video } from 'lucide-react';
 import Peer from 'peerjs';
 import { db, functions } from '../../firebase';
+import { useAllUserPresence } from '../../hooks/useRealtimePresence';
 import soundManager from '../../utils/SoundManager';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 
@@ -739,6 +740,7 @@ function buildLiveLocationLine(liveStatus, nowMs) {
 }
 
 export default function StudyStreamRoomView({ roomId, user, userData, crew, onLeave }) {
+  const presenceByUid = useAllUserPresence(Boolean(user?.uid));
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [localStream, setLocalStream] = useState(null);
@@ -755,7 +757,6 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
   const [mediaAction, setMediaAction] = useState('');
   const [mediaSessionRevision, setMediaSessionRevision] = useState(0);
   const [mediaStatus, setMediaStatus] = useState({ ...INITIAL_MEDIA_STATUS, phase: 'starting' });
-  const [participantProfiles, setParticipantProfiles] = useState({});
   const [miniWindowOpen, setMiniWindowOpen] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
@@ -938,23 +939,6 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  useEffect(() => {
-    const participantIds = Array.from(new Set(participants.map((participant) => participant.uid).filter(Boolean)));
-    if (!participantIds.length) {
-      setParticipantProfiles({});
-      return undefined;
-    }
-
-    const unsubscribers = participantIds.map((participantUid) => onSnapshot(doc(db, 'users', participantUid), (snap) => {
-      setParticipantProfiles((prev) => ({
-        ...prev,
-        [participantUid]: snap.exists() ? snap.data() : null,
-      }));
-    }));
-
-    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, [participants]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1622,10 +1606,10 @@ export default function StudyStreamRoomView({ roomId, user, userData, crew, onLe
         stream: remoteEntry?.stream || null,
         role: participant.role,
         chatMessage: participant.chatMessage || '',
-        liveStatus: participantProfiles[participant.uid]?.liveStatus || null,
+        liveStatus: presenceByUid[participant.uid]?.liveStatus || null,
       };
     });
-  const localLiveStatusLine = buildLiveLocationLine(participantProfiles[user.uid]?.liveStatus || userData?.liveStatus, nowMs);
+  const localLiveStatusLine = buildLiveLocationLine(presenceByUid[user.uid]?.liveStatus, nowMs);
   const visibleRemoteTiles = remoteTiles.slice(0, 2);
   const isCompactRoom = viewport.width <= 860;
   const isCompactLandscapeRoom = isCompactRoom && viewport.width > viewport.height;

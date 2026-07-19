@@ -5,6 +5,7 @@ import { httpsCallable } from 'firebase/functions';
 import { ACCOUNT_DELETION_CALL_TIMEOUT_MS, db, auth, functions } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
+import { useUserPresence } from '../../hooks/useRealtimePresence';
 import { useAdminUserAllAssignments, useAdminUserAllAttendance, useStudentAssignmentWarnings } from '../../hooks/useAssignments';
 import { getTodayKST } from '../../utils/streakUtils';
 import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight, KeyRound, Eye, EyeOff, X } from 'lucide-react';
@@ -237,6 +238,7 @@ const ChildCard = ({ childUid }) => {
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState('');
   const [resettingPassword, setResettingPassword] = useState(false);
+  const childPresence = useUserPresence(childUid);
   
   const isToday = selectedDate === getTodayKST();
 
@@ -301,7 +303,7 @@ const ChildCard = ({ childUid }) => {
     );
   }
 
-  const live = childData.liveStatus || {};
+  const live = childPresence?.liveStatus || { state: 'offline' };
   const state = live.state || 'offline';
   const lastUpdated = live.lastUpdatedAt?.toMillis() || 0;
   const enteredAt = live.enteredAt?.toMillis() || lastUpdated;

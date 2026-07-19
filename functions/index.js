@@ -24,6 +24,11 @@ const quizBattleFunctions = regionalFunctions.runWith({
   memory: "256MB",
   timeoutSeconds: 60,
 });
+const costOptimizedDataFunctions = regionalFunctions.runWith({
+  maxInstances: 3,
+  memory: "256MB",
+  timeoutSeconds: 60,
+});
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
 const STORE_RADAR_DURATION_DAYS = 7;
@@ -246,6 +251,311 @@ function getKSTWeekMondayString(date = new Date()) {
   const kstMidnightUtcMs = Date.UTC(parts.year, parts.month - 1, parts.day) - (9 * 60 * 60 * 1000);
   return getKSTDateString(new Date(kstMidnightUtcMs - (mondayOffset * 24 * 60 * 60 * 1000)));
 }
+
+const LEARNING_SUMMARY_SCHEMA_VERSION = 1;
+const LEARNING_SUMMARY_MAX_DAYS = 540;
+
+function historyTimestampMs(data = {}) {
+  const value = data.timestamp || data.completedAt || data.createdAt;
+  if (value?.toMillis) return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  const parsed = new Date(value || 0).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function historyActivityType(data = {}) {
+  if (!data.type || data.type === "quiz") return "quiz";
+  if (data.type === "workbook") return "workbook";
+  if (data.type === "video") return "video";
+  if (data.type === "text") return "text";
+  if (data.type === "code_trace") return "codeTrace";
+  return "other";
+}
+
+function blankDailyLearningStats(date) {
+  return { date, quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0, videos: 0, texts: 0, workbooks: 0, codeTraces: 0 };
+}
+
+function applyHistoryToDailyStats(dailyMap, data, direction) {
+  if (!data) return;
+  const timestampMs = historyTimestampMs(data);
+  if (!timestampMs) return;
+  const date = getKSTDateString(new Date(timestampMs));
+  const stats = dailyMap.get(date) || blankDailyLearningStats(date);
+  const type = historyActivityType(data);
+  if (type === "quiz") {
+    stats.quizzes += direction;
+    stats.scoreSum += direction * Number(data.score || 0);
+    if (Number(data.score) === 100) stats.perfCount += direction;
+  } else if (type === "workbook") stats.workbooks += direction;
+  else if (type === "video") stats.videos += direction;
+  else if (type === "text") stats.texts += direction;
+  else if (type === "codeTrace") stats.codeTraces += direction;
+  stats.crystals += direction * Number(data.crystalsEarned || 0);
+
+  const activityCount = stats.quizzes + stats.videos + stats.texts + stats.workbooks + stats.codeTraces;
+  if (activityCount <= 0) dailyMap.delete(date);
+  else dailyMap.set(date, stats);
+}
+
+function buildUnitLearningSummary(unitId, rows = []) {
+  if (!unitId || rows.length === 0) return null;
+  const result = {
+    unitId,
+    clusterId: "",
+    regionId: "",
+    chapterId: "",
+    lastActivityMs: 0,
+    modalities: { quiz: false, workbook: false, video: false, text: false, codeTrace: false },
+    bestQuizScore: null,
+    bestWorkbookScore: null,
+  };
+  rows.forEach((data) => {
+    const type = historyActivityType(data);
+    if (Object.prototype.hasOwnProperty.call(result.modalities, type)) result.modalities[type] = true;
+    if (type === "quiz" && Number.isFinite(Number(data.score))) {
+      result.bestQuizScore = Math.max(result.bestQuizScore ?? -Infinity, Number(data.score));
+    }
+    if (type === "workbook" && Number.isFinite(Number(data.score))) {
+      result.bestWorkbookScore = Math.max(result.bestWorkbookScore ?? -Infinity, Number(data.score));
+    }
+    const timestampMs = historyTimestampMs(data);
+    if (timestampMs >= result.lastActivityMs) {
+      result.lastActivityMs = timestampMs;
+      result.clusterId = cleanText(data.clusterId, 120);
+      result.regionId = cleanText(data.regionId, 180);
+      result.chapterId = cleanText(data.chapterId, 180);
+    }
+  });
+  return result;
+}
+
+function buildLearningSummary(historyDocs = []) {
+  const dailyMap = new Map();
+  const unitRows = new Map();
+  const stats = { quizAttempts: 0, quizScoreSum: 0, perfectAttempts: 0, darkMatterRecovered: 0 };
+
+  historyDocs.forEach((row) => {
+    const data = row.data ? row.data() : row;
+    applyHistoryToDailyStats(dailyMap, data, 1);
+    if (data.unitId) {
+      if (!unitRows.has(data.unitId)) unitRows.set(data.unitId, []);
+      unitRows.get(data.unitId).push(data);
+    }
+    const type = historyActivityType(data);
+    if (type === "quiz" || type === "workbook") {
+      stats.quizAttempts += 1;
+      stats.quizScoreSum += Number(data.score || 0);
+      if (Number(data.score) === 100) stats.perfectAttempts += 1;
+    }
+    if (String(data.unitId || "").includes("dark_matter") && Number(data.score || 0) >= 80) {
+      stats.darkMatterRecovered += 1;
+    }
+  });
+
+  const oldestAllowed = getKSTDateString(new Date(Date.now() - (LEARNING_SUMMARY_MAX_DAYS * 24 * 60 * 60 * 1000)));
+  const daily = Array.from(dailyMap.values()).filter((row) => row.date >= oldestAllowed).sort((a, b) => a.date.localeCompare(b.date));
+  const units = Array.from(unitRows.entries()).map(([unitId, rows]) => buildUnitLearningSummary(unitId, rows)).filter(Boolean);
+  return {
+    schemaVersion: LEARNING_SUMMARY_SCHEMA_VERSION,
+    totalHistoryCount: historyDocs.length,
+    daily,
+    units,
+    stats,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
+async function rebuildLearningSummary(uid) {
+  const db = admin.firestore();
+  const historySnap = await db.collection("users").doc(uid).collection("history").get();
+  const summary = buildLearningSummary(historySnap.docs);
+  await db.collection("learningSummaries").doc(uid).set(summary);
+  return { ...summary, updatedAt: null };
+}
+
+exports.getOrRebuildLearningSummary = costOptimizedDataFunctions.https.onCall(async (_data, context) => {
+  const uid = await requireAuthUid(context);
+  const summaryRef = admin.firestore().collection("learningSummaries").doc(uid);
+  const summarySnap = await summaryRef.get();
+  if (summarySnap.exists && summarySnap.data()?.schemaVersion === LEARNING_SUMMARY_SCHEMA_VERSION) {
+    return { ready: true, rebuilt: false };
+  }
+  await rebuildLearningSummary(uid);
+  return { ready: true, rebuilt: true };
+});
+
+exports.syncLearningSummary = costOptimizedDataFunctions.firestore
+  .document("users/{uid}/history/{historyId}")
+  .onWrite(async (change, context) => {
+    const uid = context.params.uid;
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    const db = admin.firestore();
+    const summaryRef = db.collection("learningSummaries").doc(uid);
+    const current = await summaryRef.get();
+    if (!current.exists || current.data()?.schemaVersion !== LEARNING_SUMMARY_SCHEMA_VERSION) {
+      await rebuildLearningSummary(uid);
+      return null;
+    }
+
+    const affectedUnitIds = Array.from(new Set([before?.unitId, after?.unitId].filter(Boolean)));
+    const unitSummaries = new Map();
+    await Promise.all(affectedUnitIds.map(async (unitId) => {
+      const snap = await db.collection("users").doc(uid).collection("history").where("unitId", "==", unitId).get();
+      unitSummaries.set(unitId, buildUnitLearningSummary(unitId, snap.docs.map((doc) => doc.data())));
+    }));
+
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(summaryRef);
+      if (!freshSnap.exists) return;
+      const fresh = freshSnap.data() || {};
+      const dailyMap = new Map((fresh.daily || []).map((row) => [row.date, { ...row }]));
+      applyHistoryToDailyStats(dailyMap, before, -1);
+      applyHistoryToDailyStats(dailyMap, after, 1);
+
+      const unitsById = new Map((fresh.units || []).map((row) => [row.unitId, row]));
+      affectedUnitIds.forEach((unitId) => {
+        const next = unitSummaries.get(unitId);
+        if (next) unitsById.set(unitId, next);
+        else unitsById.delete(unitId);
+      });
+
+      const stats = { quizAttempts: 0, quizScoreSum: 0, perfectAttempts: 0, darkMatterRecovered: 0, ...(fresh.stats || {}) };
+      const applyStats = (data, direction) => {
+        if (!data) return;
+        const type = historyActivityType(data);
+        if (type === "quiz" || type === "workbook") {
+          stats.quizAttempts += direction;
+          stats.quizScoreSum += direction * Number(data.score || 0);
+          if (Number(data.score) === 100) stats.perfectAttempts += direction;
+        }
+        if (String(data.unitId || "").includes("dark_matter") && Number(data.score || 0) >= 80) stats.darkMatterRecovered += direction;
+      };
+      applyStats(before, -1);
+      applyStats(after, 1);
+
+      transaction.set(summaryRef, {
+        schemaVersion: LEARNING_SUMMARY_SCHEMA_VERSION,
+        totalHistoryCount: Math.max(0, Number(fresh.totalHistoryCount || 0) + (after ? 1 : 0) - (before ? 1 : 0)),
+        daily: Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-LEARNING_SUMMARY_MAX_DAYS),
+        units: Array.from(unitsById.values()),
+        stats,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+    return null;
+  });
+
+const LEADERBOARD_CACHE_TTL_MS = 10 * 60 * 1000;
+
+exports.getCachedLeaderboard = costOptimizedDataFunctions.https.onCall(async (data, context) => {
+  await requireAuthUid(context);
+  const requestedScopes = [
+    ["unitId", cleanId(data?.unitId, 180)],
+    ["chapterId", cleanId(data?.chapterId, 180)],
+    ["regionId", cleanId(data?.regionId, 180)],
+  ].filter(([, value]) => value);
+  if (requestedScopes.length !== 1) {
+    throw new functions.https.HttpsError("invalid-argument", "랭킹 범위를 하나만 지정해 주세요.");
+  }
+
+  const [field, value] = requestedScopes[0];
+  const scopeKey = `${field}:${value}`;
+  const cacheId = crypto.createHash("sha256").update(scopeKey).digest("hex");
+  const db = admin.firestore();
+  const cacheRef = db.collection("leaderboardCaches").doc(cacheId);
+  const cacheSnap = await cacheRef.get();
+  const nowMs = Date.now();
+  if (cacheSnap.exists && Number(cacheSnap.data()?.expiresAtMs || 0) > nowMs) {
+    return { rankings: cacheSnap.data().rankings || [], cached: true };
+  }
+
+  const historySnap = await db.collectionGroup("history").where(field, "==", value).get();
+  const userScores = {};
+  historySnap.docs.forEach((historyDoc) => {
+    const row = historyDoc.data() || {};
+    if (row.type && row.type !== "quiz") return;
+    if (row.score === undefined || row.score === null) return;
+    const uid = historyDoc.ref.parent.parent?.id;
+    const unitId = cleanId(row.unitId, 180);
+    if (!uid || !unitId) return;
+    const timestampMs = historyTimestampMs(row) || nowMs;
+    if (!userScores[uid]) userScores[uid] = { units: {}, totalCrystals: 0, firstTimestamp: timestampMs };
+    const userScore = userScores[uid];
+    if (!userScore.units[unitId]) {
+      userScore.units[unitId] = {
+        bestScore: Number(row.score),
+        initialScore: Number(row.initialScore ?? row.score),
+        attemptCount: Number(row.attemptCount || 1),
+        firstTimestamp: timestampMs,
+      };
+    } else {
+      const unit = userScore.units[unitId];
+      unit.bestScore = Math.max(unit.bestScore, Number(row.score));
+      unit.attemptCount += Number(row.attemptCount || 1);
+      if (timestampMs < unit.firstTimestamp) {
+        unit.firstTimestamp = timestampMs;
+        unit.initialScore = Number(row.initialScore ?? row.score);
+      }
+    }
+    userScore.totalCrystals += Number(row.crystalsEarned || 0);
+    userScore.firstTimestamp = Math.min(userScore.firstTimestamp, timestampMs);
+  });
+
+  const userIds = Object.keys(userScores);
+  const nameByUid = {};
+  if (userIds.length) {
+    const profileSnaps = await db.getAll(...userIds.map((uid) => db.collection("users").doc(uid)));
+    profileSnaps.forEach((profileSnap) => {
+      const profile = profileSnap.data() || {};
+      nameByUid[profileSnap.id] = cleanText(profile.publicDisplayName || profile.studentName || profile.name || "무명 탐험가", 40);
+    });
+  }
+
+  const rankings = Object.entries(userScores).map(([uid, scoreData]) => {
+    const units = Object.values(scoreData.units);
+    const scores = units.map((unit) => unit.bestScore);
+    const totalScore = scores.reduce((sum, score) => sum + score, 0);
+    const unitCount = scores.length;
+    return {
+      id: uid,
+      name: nameByUid[uid] || "무명 탐험가",
+      avgScore: Math.round((unitCount ? totalScore / unitCount : 0) * 10) / 10,
+      avgInitialScore: Math.round((unitCount ? units.reduce((sum, unit) => sum + unit.initialScore, 0) / unitCount : 0) * 10) / 10,
+      totalAttemptCount: units.reduce((sum, unit) => sum + unit.attemptCount, 0),
+      totalScore,
+      unitCount,
+      perfectCount: scores.filter((score) => score === 100).length,
+      totalCrystals: scoreData.totalCrystals,
+      firstTimestamp: scoreData.firstTimestamp,
+      bestScores: scoreData.units,
+    };
+  });
+
+  rankings.sort((a, b) => (
+    b.avgScore - a.avgScore ||
+    b.avgInitialScore - a.avgInitialScore ||
+    b.totalCrystals - a.totalCrystals ||
+    b.totalAttemptCount - a.totalAttemptCount ||
+    b.unitCount - a.unitCount ||
+    a.firstTimestamp - b.firstTimestamp
+  ));
+  rankings.forEach((row, index) => {
+    if (index === 0) row.rank = 1;
+    else {
+      const previous = rankings[index - 1];
+      const tied = previous.avgScore === row.avgScore && previous.avgInitialScore === row.avgInitialScore &&
+        previous.totalCrystals === row.totalCrystals && previous.totalAttemptCount === row.totalAttemptCount &&
+        previous.unitCount === row.unitCount && previous.firstTimestamp === row.firstTimestamp;
+      row.rank = tied ? previous.rank : index + 1;
+    }
+  });
+
+  await cacheRef.set({ scopeKey, rankings, generatedAtMs: nowMs, expiresAtMs: nowMs + LEADERBOARD_CACHE_TTL_MS });
+  return { rankings, cached: false };
+});
+
 
 function calculateGrowthUpdates(userData, earnedAmount) {
   if (!earnedAmount || earnedAmount <= 0 || !userData) return {};

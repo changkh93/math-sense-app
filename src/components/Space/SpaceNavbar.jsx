@@ -31,6 +31,22 @@ const LIVE_SUPPORT_LINKS = [
   }
 ];
 
+function useCompactNavbar() {
+  const [compact, setCompact] = React.useState(() => (
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false
+  ));
+
+  React.useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)');
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+
+  return compact;
+}
+
 export default function SpaceNavbar({ currentView, onViewChange }) {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
@@ -43,6 +59,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   const [isBrandImageFailed, setIsBrandImageFailed] = React.useState(false);
   const [isProfileImageFailed, setIsProfileImageFailed] = React.useState(false);
   const [crewNavData, setCrewNavData] = React.useState(null);
+  const isCompactNavbar = useCompactNavbar();
 
   React.useEffect(() => {
     setIsProfileImageFailed(false);
@@ -337,12 +354,12 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
                 <Bell size={18} />
               </button>
             </>
-          ) : (
+          ) : isCompactNavbar ? (
             <>
               <DirectMemoMenu />
               <NotificationMenu />
             </>
-          )}
+          ) : null}
           <button
             type="button"
             className={`mobile-streak-btn ${getGuestNavState('journey')} ${currentView === 'journey' ? 'active' : ''}`}
@@ -441,8 +458,8 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       </div>
       
       <div className="nav-right desktop-nav-right">
-        {!isGuest && <DirectMemoMenu />}
-        {!isGuest && <NotificationMenu />}
+        {!isGuest && !isCompactNavbar && <DirectMemoMenu />}
+        {!isGuest && !isCompactNavbar && <NotificationMenu />}
         {!isGuest && (
           <div
             onClick={() => handleNavClick('journey', '/')}

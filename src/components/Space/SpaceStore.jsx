@@ -1,7 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { motion as Motion } from 'framer-motion'
-import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { Gift, Search, Send, UserRound, X } from 'lucide-react'
 import { db, functions } from '../../firebase'
@@ -65,25 +65,25 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
   }, [shouldScrollToBottom]);
 
   React.useEffect(() => {
-    if (!user?.uid) {
+    if (!user?.uid || !giftItem) {
       setRecipients([])
       return undefined
     }
-
-    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+    let cancelled = false
+    getDocs(collection(db, 'users')).then((snapshot) => {
+      if (cancelled) return
       const list = snapshot.docs
         .map(docSnap => ({ uid: docSnap.id, ...docSnap.data() }))
         .filter(profile => profile.uid !== user.uid && profile.role !== 'parent' && profile.role !== 'admin')
         .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'))
       setRecipients(list)
       setGiftRecipientId(prev => (prev && list.some(item => item.uid === prev) ? prev : ''))
-    }, (error) => {
+    }).catch((error) => {
       console.error('Store gift recipients error:', error)
-      setRecipients([])
+      if (!cancelled) setRecipients([])
     })
-
-    return () => unsubscribe()
-  }, [user?.uid])
+    return () => { cancelled = true }
+  }, [giftItem, user?.uid])
 
   const cryoCooldownRemainingMs = getStreakFreezePurchaseCooldownRemainingMs(userData)
   const cryoCooldownRemainingDays = cryoCooldownRemainingMs > 0 ? Math.ceil(cryoCooldownRemainingMs / DAY_MS) : 0
@@ -548,7 +548,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
           return { mode: 'equipped' }
         }
 
-        const unlock = getShipItemUnlock(item, getShipAchievementStats(freshUserData, history))
+        const unlock = getShipItemUnlock(item, getShipAchievementStats({ ...freshUserData, learningSummary: userData?.learningSummary }, history))
         if (!unlock.unlocked) throw new Error('SHIP_ACHIEVEMENT_LOCKED')
 
         const freshCrystals = Number(freshUserData?.crystals || 0)

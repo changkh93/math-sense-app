@@ -74,6 +74,30 @@ function buildRewardMultiplierMetadata(multiplierMeta) {
   }
 }
 
+function summaryTimestamp(millis) {
+  const value = Number(millis || 0)
+  return value > 0 ? { toMillis: () => value, toDate: () => new Date(value) } : null
+}
+
+function buildSummaryProgressHistory(summary) {
+  return (summary?.units || []).flatMap((unit) => {
+    const base = {
+      unitId: unit.unitId,
+      clusterId: unit.clusterId,
+      regionId: unit.regionId,
+      chapterId: unit.chapterId,
+      timestamp: summaryTimestamp(unit.lastActivityMs),
+    }
+    const rows = []
+    if (unit.modalities?.quiz) rows.push({ ...base, type: 'quiz', score: Number(unit.bestQuizScore || 0) })
+    if (unit.modalities?.workbook) rows.push({ ...base, type: 'workbook', score: Number(unit.bestWorkbookScore || 0) })
+    if (unit.modalities?.video) rows.push({ ...base, type: 'video', score: 100 })
+    if (unit.modalities?.text) rows.push({ ...base, type: 'text', score: 100 })
+    if (unit.modalities?.codeTrace) rows.push({ ...base, type: 'code_trace', score: 100 })
+    return rows
+  })
+}
+
 const MIDDLE_MATH_REGION_IMAGES = {
   core: '/assets/planets/middle-math-core.png',
   analytics: '/assets/planets/middle-math-analytics.png',
@@ -574,7 +598,7 @@ function SpaceHome() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, userData, loading: authLoading } = useAuth()
-  const [history, setHistory] = useState([])
+  const [learningSummary, setLearningSummary] = useState(null)
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [currentView, setCurrentView] = useState(() => {
     const requestedView = getRequestedRootView(location)
@@ -1500,34 +1524,34 @@ function SpaceHome() {
   const [streakCelebration, setStreakCelebration] = useState(null)
 
   useEffect(() => {
-    if (!user) return
-    let unsubscribeSnapshot = null;
-    let cleanupTimeout = null;
-    
-    const historyRef = collection(db, 'users', user.uid, 'history')
-    const q = query(historyRef, orderBy('timestamp', 'desc'))
-    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-      const historyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      setHistory(historyData)
-      setLoadingHistory(false)
-    }, (err) => {
-      console.error('[SpaceHome] Failed to subscribe history:', err)
-      setHistory([])
+    if (!user?.uid) return undefined
+    let requestedBackfill = false
+    const summaryRef = doc(db, 'learningSummaries', user.uid)
+    return onSnapshot(summaryRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setLearningSummary(snapshot.data())
+        setLoadingHistory(false)
+        return
+      }
+      if (requestedBackfill) return
+      requestedBackfill = true
+      httpsCallable(functions, 'getOrRebuildLearningSummary')({}).catch((error) => {
+        console.warn('Learning summary backfill failed:', error)
+        setLoadingHistory(false)
+      })
+    }, (error) => {
+      console.warn('Learning summary subscription failed:', error)
       setLoadingHistory(false)
     })
-    return () => {
-      if (cleanupTimeout) clearTimeout(cleanupTimeout);
-      if (unsubscribeSnapshot) {
-        if (!auth.currentUser) {
-           unsubscribeSnapshot();
-        } else {
-           cleanupTimeout = setTimeout(() => {
-             if (unsubscribeSnapshot) unsubscribeSnapshot();
-           }, 100);
-        }
-      }
-    };
-  }, [user])
+  }, [user?.uid])
+
+  const history = useMemo(() => buildSummaryProgressHistory(learningSummary), [learningSummary])
+  const effectiveHistory = history
+  const historyTotalCount = Number(learningSummary?.totalHistoryCount ?? 0)
+  const userDataWithLearningSummary = useMemo(() => ({
+    ...(userData || {}),
+    learningSummary,
+  }), [learningSummary, userData])
 
   // Fetch Transactions for Streak Sync
   useEffect(() => {
@@ -1555,7 +1579,11 @@ function SpaceHome() {
     if (!user || !userData || loadingHistory || loadingTransactions) return;
     
     // 1. Calculate the ground truth streak from history and transactions
-    const activeDates = extractLearningActivityDates(history, transactions);
+    const activeDates = learningSummary?.daily?.length
+      ? new Set(learningSummary.daily.filter((row) => (
+          Number(row.quizzes || 0) + Number(row.videos || 0) + Number(row.texts || 0) + Number(row.workbooks || 0) + Number(row.codeTraces || 0) > 0
+        )).map((row) => row.date))
+      : extractLearningActivityDates(history, transactions);
 
     // Simple daily stats for extractDefendedDates (Key: YYYY-MM-DD)
     const dailyStatsObj = {};
@@ -1571,7 +1599,7 @@ function SpaceHome() {
     if (calculatedStreak !== storedStreak && (history.length > 0 || transactions.length > 0)) {
       console.warn(`[StreakAudit] Drift detected. Calculated: ${calculatedStreak}, Stored: ${storedStreak}.`);
     }
-  }, [user, userData, history, transactions, loadingHistory, loadingTransactions]);
+  }, [user, userData, history, learningSummary, transactions, loadingHistory, loadingTransactions]);
 
   // Calculate Exploration Status and Recent Region
   // bestScores: { unitDocId: bestScore } - maps each completed unit to its best quiz score
@@ -1587,7 +1615,7 @@ function SpaceHome() {
     }
 
     // Build bestScores and unitProgressMap from history
-    history.forEach(h => {
+    effectiveHistory.forEach(h => {
       const uid = h.unitId
       if (!uid) return
 
@@ -1616,13 +1644,13 @@ function SpaceHome() {
       }
     })
 
-    if (history.length === 0) {
+    if (effectiveHistory.length === 0) {
       regions?.forEach(r => statusMap[r.id] = 'not_started')
       return { explorationStatus: statusMap, recentRegionId: null, bestScores: scores, unitProgressMap: {} }
     }
     
     regions.forEach(region => {
-      const isAnySolved = history.some(h => {
+      const isAnySolved = effectiveHistory.some(h => {
         return h.unitId?.startsWith(region.id) || h.regionId === region.id
       })
 
@@ -1634,8 +1662,8 @@ function SpaceHome() {
     })
 
     // Find the most recent region WITHIN the current cluster
-    if (history.length > 0) {
-      const latestMatchingEntry = history.find(h => 
+    if (effectiveHistory.length > 0) {
+      const latestMatchingEntry = effectiveHistory.find(h =>
         (h.clusterId && h.clusterId === selectedClusterId) || 
         regions.some(r => h.unitId?.startsWith(r.id) || h.regionId === r.id)
       )
@@ -1647,7 +1675,7 @@ function SpaceHome() {
     }
 
     return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores, unitProgressMap: progressMap }
-  }, [regions, history, selectedClusterId])
+  }, [effectiveHistory, regions, selectedClusterId])
 
   // Calculate chapter progress dynamically from Firestore data
   const chapterProgress = useMemo(() => {
@@ -3347,6 +3375,7 @@ function SpaceHome() {
           <SpaceJourney
             userData={userData}
             initialHistory={history}
+            initialDailyStats={learningSummary?.daily || null}
             initialTransactions={transactions}
             parentLoading={loadingHistory || loadingTransactions}
           />
@@ -3435,7 +3464,7 @@ function SpaceHome() {
         return (
           <DarkMatterRefineryView
             questions={darkMatterQuestions}
-            totalHistoryCount={history.length}
+            totalHistoryCount={historyTotalCount}
             stats={darkMatterStats}
             onComplete={handleComplete}
             onExit={stopDarkMatterMode}
@@ -3450,7 +3479,7 @@ function SpaceHome() {
       return (
         <DarkMatterView 
           questions={darkMatterQuestions}
-          totalHistoryCount={history.length}
+          totalHistoryCount={historyTotalCount}
           onStartQuiz={(qs) => setActiveDarkMatterQuizQs(qs)}
           onExit={stopDarkMatterMode}
         />
@@ -4412,9 +4441,9 @@ function SpaceHome() {
               darkMatterCount={darkMatterCount}
             />
           )}
-          {currentView === 'collection' && <SpaceCollection userData={userData} history={history} />}
+          {currentView === 'collection' && <SpaceCollection userData={userDataWithLearningSummary} history={history} />}
           {currentView === 'store' && (
-            <SpaceStore user={user} userData={userData} shouldScrollToBottom={shouldScrollStore} history={history} />
+            <SpaceStore user={user} userData={userDataWithLearningSummary} shouldScrollToBottom={shouldScrollStore} history={history} />
           )}
           
           {currentView === 'ranking' && <SpaceRanking user={user} userData={userData} regions={regions} />}
@@ -4422,6 +4451,7 @@ function SpaceHome() {
             <SpaceJourney 
               userData={userData} 
               initialHistory={history} 
+              initialDailyStats={learningSummary?.daily || null}
               initialTransactions={transactions}
               parentLoading={loadingHistory || loadingTransactions}
             />

@@ -8,6 +8,7 @@ import { ArrowLeft, ChevronDown, Copy, Crown, Loader2, LogOut, Radio, Rocket, Se
 import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
+import { useAllUserPresence } from '../../hooks/useRealtimePresence';
 import soundManager from '../../utils/SoundManager';
 import { copyMeetText, getGoogleMeetCode, openGoogleMeet } from '../../utils/googleMeetNavigation';
 import CrewSettingsModal from './CrewSettingsModal';
@@ -262,6 +263,13 @@ export default function CrewDetailView({ onBack }) {
   const [showCrewInfo, setShowCrewInfo] = useState(false);
   const [guestInviteUrl, setGuestInviteUrl] = useState('');
   const [growthEvent, setGrowthEvent] = useState(null);
+  const presenceByUid = useAllUserPresence(Boolean(user?.uid));
+  const effectiveMemberProfiles = useMemo(() => Object.fromEntries(
+    Object.entries(memberProfiles).map(([uid, profile]) => [uid, profile ? {
+      ...profile,
+      liveStatus: presenceByUid[uid]?.liveStatus || { state: 'offline' },
+    } : profile])
+  ), [memberProfiles, presenceByUid]);
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
   const crewId = crew?.id || userData?.crewId || '';
@@ -307,9 +315,9 @@ export default function CrewDetailView({ onBack }) {
   const canLeaderDeleteCrew = isLeader && crewMemberIds.length <= 1;
   const mothershipLevel = getCrewMothershipLevel(crew);
   const mothershipStats = getCrewMothershipStats(crew);
-  const mothershipDockedProfiles = useMemo(() => Object.entries(memberProfiles)
+  const mothershipDockedProfiles = useMemo(() => Object.entries(effectiveMemberProfiles)
     .filter(([, profile]) => profile)
-    .map(([uid, profile]) => ({ uid, ...profile })), [memberProfiles]);
+    .map(([uid, profile]) => ({ uid, ...profile })), [effectiveMemberProfiles]);
 
   useEffect(() => {
     if (!crewId || !user?.uid) {
@@ -385,12 +393,12 @@ export default function CrewDetailView({ onBack }) {
   const memberNameById = useMemo(() => {
     const next = new Map();
     rosterMembers.forEach((member) => {
-      next.set(member.uid, getMemberLabel(memberProfiles[member.uid], getMemberLabel(member)));
+      next.set(member.uid, getMemberLabel(effectiveMemberProfiles[member.uid], getMemberLabel(member)));
     });
     visibleGuestSessions.forEach((guest) => next.set(guest.uid, guest.alias || '게스트 탐사원'));
     if (user?.uid) next.set(user.uid, getMemberLabel(userData, user.displayName || '나'));
     return next;
-  }, [memberProfiles, rosterMembers, user?.uid, user?.displayName, userData, visibleGuestSessions]);
+  }, [effectiveMemberProfiles, rosterMembers, user?.uid, user?.displayName, userData, visibleGuestSessions]);
 
   const enrichedMembers = useMemo(() => {
     const next = [...rosterMembers];
@@ -417,10 +425,10 @@ export default function CrewDetailView({ onBack }) {
   const onlineFlightCrewCount = useMemo(() => {
     const regularOnlineCount = enrichedMembers.filter((member) => {
       if (member.isGuest) return false;
-      return getPresenceInfo(memberProfiles[member.uid]).label !== '오프라인';
+      return getPresenceInfo(effectiveMemberProfiles[member.uid]).label !== '오프라인';
     }).length;
     return regularOnlineCount + activeGuestCount;
-  }, [activeGuestCount, enrichedMembers, memberProfiles]);
+  }, [activeGuestCount, effectiveMemberProfiles, enrichedMembers]);
 
   useEffect(() => {
     const ids = enrichedMembers.filter((member) => !member.isGuest).map((member) => member.uid).filter(Boolean);
@@ -921,12 +929,12 @@ export default function CrewDetailView({ onBack }) {
             member.isGuest ? (
               <GuestCrewPresenceCard key={member.uid} guest={member} currentUid={user?.uid} />
             ) : isGuest ? (
-              <CrewMemberPublicCard key={member.uid} member={member} profile={memberProfiles[member.uid]} />
+              <CrewMemberPublicCard key={member.uid} member={member} profile={effectiveMemberProfiles[member.uid]} />
             ) : (
               <CrewMemberStudyCard
                 key={member.uid}
                 member={member}
-                profile={memberProfiles[member.uid]}
+                profile={effectiveMemberProfiles[member.uid]}
                 currentUid={user?.uid}
                 currentUserData={userData}
                 currentDisplayName={user?.displayName}
