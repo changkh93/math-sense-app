@@ -30,6 +30,9 @@
 .crew-mothership--nav .crew-mothership__space, .crew-mothership--map .crew-mothership__space { display: none; }
 .crew-mothership--map { width: clamp(176px, 15vw, 250px); height: clamp(88px, 7.5vw, 126px); min-height: 88px; overflow: visible; border: 0; background: transparent; }
 .crew-mothership--map > svg { inset: -18% -8%; width: 116%; height: 136%; filter: drop-shadow(0 8px 14px rgba(0,0,0,.58)) drop-shadow(0 0 9px color-mix(in srgb, var(--mothership-accent) 48%, transparent)); }
+.crew-mothership--leaderboard { width: 112px; height: 66px; min-height: 66px; overflow: visible; border: 0; background: transparent; }
+.crew-mothership--leaderboard > svg { inset: -19% -12%; width: 124%; height: 138%; filter: drop-shadow(0 8px 10px rgba(0,0,0,.58)) drop-shadow(0 0 7px color-mix(in srgb, var(--mothership-accent) 52%, transparent)); }
+.crew-mothership--leaderboard .crew-mothership__space { display: none; }
 @keyframes mothership-engine-pulse { from{opacity:.68;transform:scaleY(.9)} to{opacity:1;transform:scaleY(1.08)} }
 @keyframes mothership-ring-spin { to{transform:rotate(360deg)} }
 @keyframes mothership-comms-scan { from{transform:rotate(-3deg)} to{transform:rotate(3deg)} }

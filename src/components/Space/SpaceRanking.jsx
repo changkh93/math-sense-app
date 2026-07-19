@@ -7,9 +7,38 @@ import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
+import CrewMothership from './CrewMothership'
+import ModularShip from './ModularShip'
 import { getEffectiveStreak, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
 import { calculateSEI, FOCUS_MAX_SCORE, BATTLE_MAX_SCORE } from '../../utils/rankingUtils'
 import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getFrameSurfaceStyles, getQuestionAnonymousLabel, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
+import { getCrewMothershipLevel, getEquippedCrewModules } from '../../utils/crewMothershipCatalog'
+
+function CrewLeaderboardVessel({ summary, crew, rank }) {
+  const resolvedCrew = crew || {
+    id: summary.crewId,
+    name: summary.crewName,
+    color: summary.crewColor,
+    memberCount: summary.memberCount,
+  }
+  const level = getCrewMothershipLevel(resolvedCrew)
+  const moduleCount = getEquippedCrewModules(resolvedCrew).length
+  const memberCount = Math.max(Number(resolvedCrew.memberCount || 0), Number(summary.memberCount || 0), 1)
+
+  return (
+    <div className={`ranking-crew-vessel ranking-crew-vessel--${Math.min(rank, 3)}`} style={{ '--ranking-crew-accent': resolvedCrew.color || summary.crewColor || '#00f3ff' }}>
+      <div className="ranking-crew-vessel__ship">
+        <CrewMothership crew={resolvedCrew} variant="leaderboard" />
+      </div>
+      <div className="ranking-crew-vessel__copy">
+        <div><span>#{rank}</span><strong>{resolvedCrew.name || summary.crewName}</strong></div>
+        <small className="font-tech">LV.{level.level} {level.name} · 멤버 {memberCount}명 · 시설 {moduleCount}</small>
+        <small className="font-tech">총 SEI {summary.totalSEI.toLocaleString()}</small>
+      </div>
+      <div className="ranking-crew-vessel__growth font-tech"><span>WEEKLY</span><strong>+{summary.totalWeeklyGain.toLocaleString()}</strong></div>
+    </div>
+  )
+}
 
 export default function SpaceRanking({ user, userData }) {
   const navigate = useNavigate()
@@ -19,8 +48,23 @@ export default function SpaceRanking({ user, userData }) {
   const [inspectUserId, setInspectUserId] = useState(null)
   const [hoveredMetric, setHoveredMetric] = useState(null)
   const [crewLeaderboard, setCrewLeaderboard] = useState([])
+  const [rankingCrewsById, setRankingCrewsById] = useState({})
   const [hallOfFame, setHallOfFame] = useState({ bestAnswer: null, bestQuestion: null, growthStar: null })
   const [activatingShowcase, setActivatingShowcase] = useState(false)
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'crews'), (snapshot) => {
+      const next = {}
+      snapshot.docs.forEach((crewDoc) => {
+        const crew = crewDoc.data() || {}
+        if (crew.status === 'approved') next[crewDoc.id] = { id: crewDoc.id, ...crew }
+      })
+      setRankingCrewsById(next)
+    }, (error) => {
+      console.warn('Crew mothership ranking sync failed:', error)
+    })
+    return () => unsubscribe()
+  }, [])
 
   const SEI_TIPS = {
     skill: {
@@ -137,7 +181,7 @@ export default function SpaceRanking({ user, userData }) {
           if (b.totalWeeklyGain !== a.totalWeeklyGain) return b.totalWeeklyGain - a.totalWeeklyGain
           return b.totalSEI - a.totalSEI
         })
-        .slice(0, 5)
+        .slice(0, 3)
 
       // Sort based on current rankMode
       if (rankMode === 'sei') {
@@ -402,21 +446,21 @@ export default function SpaceRanking({ user, userData }) {
 
       {showUniverseHighlights && (
         <>
-          <div style={{
+          <div className="ranking-highlights-grid" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
             gap: '1rem',
             marginBottom: '1.75rem'
           }}>
-            <div className="glass-card hud-border" style={{ padding: '1.2rem' }}>
+            <div className="glass-card hud-border ranking-highlight-panel" style={{ padding: '1.2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.8rem' }}>
                 <h3 style={{ margin: 0, color: 'var(--text-bright)' }}>🏆 이번 주 명예의 전당</h3>
                 <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                   최근 {HALL_OF_FAME_LOOKBACK_DAYS}일
                 </span>
               </div>
-              <div style={{ display: 'grid', gap: '0.8rem' }}>
-                  <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
+              <div className="ranking-highlight-list" style={{ display: 'grid', gap: '0.8rem' }}>
+                  <div className="ranking-highlight-card" style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
                     <div style={{ color: '#fbbf24', fontWeight: 800, marginBottom: '0.35rem' }}>친절한 설명상</div>
                   {hallOfFame.bestAnswer?.userId ? (
                     <button
@@ -433,7 +477,7 @@ export default function SpaceRanking({ user, userData }) {
                     {hallOfFame.bestAnswer ? (hallOfFame.bestAnswer.content || '').slice(0, 72) : '채택/인증/설명 밀도를 기준으로 계산합니다.'}
                   </div>
                 </div>
-                <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
+                <div className="ranking-highlight-card" style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
                   <div style={{ color: '#60a5fa', fontWeight: 800, marginBottom: '0.35rem' }}>질문 개척상</div>
                   <div style={{ color: 'var(--text-bright)', fontWeight: 700 }}>
                     {hallOfFame.bestQuestion
@@ -444,7 +488,7 @@ export default function SpaceRanking({ user, userData }) {
                     {hallOfFame.bestQuestion ? (hallOfFame.bestQuestion.content || '').slice(0, 72) : '질문자는 계속 익명으로 보호됩니다.'}
                   </div>
                 </div>
-                  <div style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
+                  <div className="ranking-highlight-card" style={{ padding: '0.9rem', borderRadius: '14px', background: 'rgba(255,255,255,0.04)' }}>
                     <div style={{ color: '#34d399', fontWeight: 800, marginBottom: '0.35rem' }}>급상승 파일럿</div>
                   {hallOfFame.growthStar?.id ? (
                     <button
@@ -464,40 +508,25 @@ export default function SpaceRanking({ user, userData }) {
               </div>
             </div>
 
-            <div className="glass-card hud-border" style={{ padding: '1.2rem' }}>
+            <div className="glass-card hud-border ranking-highlight-panel" style={{ padding: '1.2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '0.8rem' }}>
                 <h3 style={{ margin: 0, color: 'var(--text-bright)' }}>🛰️ 스터디 크루 리더보드</h3>
                 <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                  크루 상위 5팀
+                  크루 상위 3팀
                 </span>
               </div>
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
+              <div className="ranking-highlight-list ranking-highlight-list--crews" style={{ display: 'grid', gap: '0.75rem' }}>
                 {crewLeaderboard.length === 0 ? (
                   <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.86rem' }}>
                     아직 크루가 없습니다. 상점에서 창설권을 구매하고 프로필에서 팀을 만들어보세요.
                   </div>
                 ) : crewLeaderboard.map((crew, index) => (
-                  <div key={crew.crewId} style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    alignItems: 'center',
-                    padding: '0.85rem 0.95rem',
-                    borderRadius: '14px',
-                    background: 'rgba(255,255,255,0.04)'
-                  }}>
-                    <div>
-                      <div style={{ color: crew.crewColor, fontWeight: 800 }}>
-                        #{index + 1} {crew.crewName}
-                      </div>
-                      <div style={{ color: 'rgba(255,255,255,0.62)', fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                        멤버 {crew.memberCount}명 · 총 SEI {crew.totalSEI}
-                      </div>
-                    </div>
-                    <div style={{ color: '#34d399', fontWeight: 800 }}>
-                      +{crew.totalWeeklyGain}
-                    </div>
-                  </div>
+                  <CrewLeaderboardVessel
+                    key={crew.crewId}
+                    summary={crew}
+                    crew={rankingCrewsById[crew.crewId]}
+                    rank={index + 1}
+                  />
                 ))}
               </div>
             </div>
@@ -679,7 +708,16 @@ export default function SpaceRanking({ user, userData }) {
                         }}>
                           {u.displayRank}
                         </span>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div className={`ranking-pilot-cell ${isPodium ? 'is-podium' : ''}`}>
+                          <div className="ranking-pilot-ship" style={{ '--ranking-ship-accent': tier.color || '#35dfff' }}>
+                            <ModularShip
+                              userData={u}
+                              size={isPodium ? 76 : 68}
+                              animate={false}
+                              title={`${u.publicDisplayName || u.studentName || u.name || '무명 탐험가'}의 탐사선`}
+                            />
+                          </div>
+                          <div className="ranking-pilot-copy" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
                               type="button"
@@ -767,6 +805,7 @@ export default function SpaceRanking({ user, userData }) {
                               </span>
                             )}
                           </div>
+                        </div>
                         </div>
 
                         {rankMode === 'battle' ? (

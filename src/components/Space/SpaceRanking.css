@@ -129,6 +129,103 @@
   font-weight: 700;
 }
 
+.ranking-highlights-grid { align-items: stretch; }
+
+.ranking-highlight-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.ranking-highlight-list {
+  grid-template-rows: repeat(3, 1fr);
+  flex: 1 1 auto;
+}
+
+.ranking-highlight-card,
+.ranking-highlight-list--crews > .ranking-crew-vessel {
+  min-height: 0;
+}
+
+.ranking-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 92px;
+}
+
+.ranking-pilot-cell {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  min-width: 0;
+}
+
+.ranking-pilot-copy { min-width: 0; }
+
+.ranking-pilot-ship {
+  position: relative;
+  display: grid;
+  flex: 0 0 78px;
+  width: 78px;
+  height: 78px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ranking-ship-accent) 24%, transparent);
+  border-radius: 18px 18px 25px 25px;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--ranking-ship-accent) 15%, transparent), rgba(2,8,24,.32) 66%);
+  transition: border-color .25s ease, background .25s ease, filter .25s ease;
+}
+
+.ranking-pilot-ship::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  right: 18%;
+  bottom: 9px;
+  left: 18%;
+  height: 9px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ranking-ship-accent) 40%, transparent);
+  filter: blur(8px);
+}
+
+.ranking-pilot-ship .modular-ship {
+  filter: drop-shadow(0 8px 9px rgba(0,0,0,.52));
+  transition: transform .25s ease, filter .25s ease;
+}
+
+.ranking-pilot-ship .modular-ship * { animation: none !important; }
+.ranking-row:hover .ranking-pilot-ship { border-color: color-mix(in srgb, var(--ranking-ship-accent) 52%, transparent); filter: brightness(1.12); }
+.ranking-row:hover .ranking-pilot-ship .modular-ship { transform: translateY(-3px) scale(1.04); filter: drop-shadow(0 10px 13px color-mix(in srgb, var(--ranking-ship-accent) 36%, rgba(0,0,0,.5))); }
+.ranking-pilot-cell.is-podium .ranking-pilot-ship { box-shadow: inset 0 0 18px color-mix(in srgb, var(--ranking-ship-accent) 12%, transparent), 0 0 14px color-mix(in srgb, var(--ranking-ship-accent) 12%, transparent); }
+
+.ranking-crew-vessel {
+  --ranking-crew-accent: #00f3ff;
+  display: grid;
+  grid-template-columns: 116px minmax(0,1fr) auto;
+  align-items: center;
+  gap: .65rem;
+  min-height: 78px;
+  padding: .38rem .7rem .38rem .3rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ranking-crew-accent) 14%, rgba(255,255,255,.06));
+  border-radius: 14px;
+  background: radial-gradient(circle at 12% 50%, color-mix(in srgb, var(--ranking-crew-accent) 11%, transparent), transparent 27%), rgba(255,255,255,.035);
+  transition: border-color .25s ease, background .25s ease;
+}
+
+.ranking-crew-vessel:hover { border-color: color-mix(in srgb, var(--ranking-crew-accent) 38%, transparent); background-color: rgba(255,255,255,.055); }
+.ranking-crew-vessel__ship { display: grid; place-items: center; transition: transform .3s ease, filter .3s ease; }
+.ranking-crew-vessel:hover .ranking-crew-vessel__ship { transform: translateX(3px) scale(1.04); filter: brightness(1.12); }
+.ranking-crew-vessel__copy { min-width: 0; }
+.ranking-crew-vessel__copy > div { display: flex; align-items: center; gap: .42rem; min-width: 0; }
+.ranking-crew-vessel__copy > div span { color: #7deaff; font-size: .72rem; font-weight: 950; }
+.ranking-crew-vessel--1 .ranking-crew-vessel__copy > div span { color: #ffe072; text-shadow: 0 0 9px rgba(255,208,64,.5); }
+.ranking-crew-vessel--2 .ranking-crew-vessel__copy > div span { color: #d8e6ef; }
+.ranking-crew-vessel--3 .ranking-crew-vessel__copy > div span { color: #e39a57; }
+.ranking-crew-vessel__copy strong { overflow: hidden; color: var(--ranking-crew-accent); font-size: .83rem; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-crew-vessel__copy small { display: block; margin-top: .15rem; color: rgba(255,255,255,.5); font-size: .55rem; line-height: 1.35; }
+.ranking-crew-vessel__growth { display: grid; justify-items: end; }
+.ranking-crew-vessel__growth span { color: rgba(255,255,255,.32); font-size: .48rem; letter-spacing: .08em; }
+.ranking-crew-vessel__growth strong { margin-top: .16rem; color: #4ce0ad; font-size: .78rem; }
+
 /* ─── 상단 헤더 / 모드 전환 탭 ─── */
 .space-ranking-header {
   text-align: center;
@@ -206,4 +303,13 @@
   .space-ranking-mode-btn {
     flex: 1 1 100%;
   }
+}
+
+@media (max-width: 768px) {
+  .ranking-pilot-cell { gap: .45rem; }
+  .ranking-pilot-ship { flex-basis: 58px; width: 58px; height: 58px; border-radius: 13px 13px 18px 18px; }
+  .ranking-pilot-ship .modular-ship { width: 56px !important; height: 56px !important; }
+  .ranking-crew-vessel { grid-template-columns: 82px minmax(0,1fr) auto; gap: .35rem; padding-right: .48rem; }
+  .crew-mothership--leaderboard { width: 80px; height: 52px; min-height: 52px; }
+  .ranking-crew-vessel__copy small:first-of-type { display: none; }
 }
