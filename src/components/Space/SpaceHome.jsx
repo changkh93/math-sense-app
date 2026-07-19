@@ -47,6 +47,7 @@ import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
+import { mergeSummaryWithRecentHistory } from '../../utils/learningSummaryUtils'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
@@ -72,30 +73,6 @@ function buildRewardMultiplierMetadata(multiplierMeta) {
     rewardMultiplierDate: multiplierMeta.dateStr,
     ...(multiplierMeta.rewardAmountBeforeCap ? { rewardAmountBeforeCap: multiplierMeta.rewardAmountBeforeCap } : {})
   }
-}
-
-function summaryTimestamp(millis) {
-  const value = Number(millis || 0)
-  return value > 0 ? { toMillis: () => value, toDate: () => new Date(value) } : null
-}
-
-function buildSummaryProgressHistory(summary) {
-  return (summary?.units || []).flatMap((unit) => {
-    const base = {
-      unitId: unit.unitId,
-      clusterId: unit.clusterId,
-      regionId: unit.regionId,
-      chapterId: unit.chapterId,
-      timestamp: summaryTimestamp(unit.lastActivityMs),
-    }
-    const rows = []
-    if (unit.modalities?.quiz) rows.push({ ...base, type: 'quiz', score: Number(unit.bestQuizScore || 0) })
-    if (unit.modalities?.workbook) rows.push({ ...base, type: 'workbook', score: Number(unit.bestWorkbookScore || 0) })
-    if (unit.modalities?.video) rows.push({ ...base, type: 'video', score: 100 })
-    if (unit.modalities?.text) rows.push({ ...base, type: 'text', score: 100 })
-    if (unit.modalities?.codeTrace) rows.push({ ...base, type: 'code_trace', score: 100 })
-    return rows
-  })
 }
 
 const MIDDLE_MATH_REGION_IMAGES = {
@@ -504,6 +481,20 @@ function getPythonRegionImage(region) {
   return PYTHON_REGION_IMAGES.foundation
 }
 
+const WESTERN_CLASSIC_REGION_IMAGES = {
+  neverland: '/assets/planets/western-classic-neverland.webp',
+  nobel: '/assets/planets/western-classic-nobel.webp',
+  heritage: '/assets/planets/western-classic-heritage.webp'
+}
+
+function getWesternClassicRegionImage(region) {
+  const title = region?.title || ''
+
+  if (title.includes('네버랜드')) return WESTERN_CLASSIC_REGION_IMAGES.neverland
+  if (title.includes('노벨문학상')) return WESTERN_CLASSIC_REGION_IMAGES.nobel
+  return WESTERN_CLASSIC_REGION_IMAGES.heritage
+}
+
 function RegionPlanetVisual({ imageSrc, title, icon, isMobile, isLocked }) {
   const [imageFailed, setImageFailed] = useState(false)
   const visualSize = isMobile ? 72 : 112
@@ -599,6 +590,7 @@ function SpaceHome() {
   const location = useLocation()
   const { user, userData, loading: authLoading } = useAuth()
   const [learningSummary, setLearningSummary] = useState(null)
+  const [recentCompletionHistory, setRecentCompletionHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [currentView, setCurrentView] = useState(() => {
     const requestedView = getRequestedRootView(location)
@@ -1525,18 +1517,17 @@ function SpaceHome() {
 
   useEffect(() => {
     if (!user?.uid) return undefined
-    let requestedBackfill = false
+    let requestedValidation = false
     const summaryRef = doc(db, 'learningSummaries', user.uid)
     return onSnapshot(summaryRef, (snapshot) => {
       if (snapshot.exists()) {
         setLearningSummary(snapshot.data())
         setLoadingHistory(false)
-        return
       }
-      if (requestedBackfill) return
-      requestedBackfill = true
-      httpsCallable(functions, 'getOrRebuildLearningSummary')({}).catch((error) => {
-        console.warn('Learning summary backfill failed:', error)
+      if (requestedValidation) return
+      requestedValidation = true
+      httpsCallable(functions, 'getOrRebuildLearningSummary')({ validateFreshness: true }).catch((error) => {
+        console.warn('Learning summary validation failed:', error)
         setLoadingHistory(false)
       })
     }, (error) => {
@@ -1545,7 +1536,31 @@ function SpaceHome() {
     })
   }, [user?.uid])
 
-  const history = useMemo(() => buildSummaryProgressHistory(learningSummary), [learningSummary])
+  useEffect(() => {
+    if (!user?.uid || !todayKSTForAttendance) {
+      setRecentCompletionHistory([])
+      return undefined
+    }
+    const startTime = Timestamp.fromDate(new Date(`${todayKSTForAttendance}T00:00:00+09:00`))
+    const recentHistoryQuery = query(
+      collection(db, 'users', user.uid, 'history'),
+      where('timestamp', '>=', startTime)
+    )
+    return onSnapshot(recentHistoryQuery, (snapshot) => {
+      setRecentCompletionHistory(snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      })))
+    }, (error) => {
+      console.warn('Recent completion history subscription failed:', error)
+      setRecentCompletionHistory([])
+    })
+  }, [todayKSTForAttendance, user?.uid])
+
+  const history = useMemo(
+    () => mergeSummaryWithRecentHistory(learningSummary, recentCompletionHistory),
+    [learningSummary, recentCompletionHistory]
+  )
   const effectiveHistory = history
   const historyTotalCount = Number(learningSummary?.totalHistoryCount ?? 0)
   const userDataWithLearningSummary = useMemo(() => ({
@@ -4002,6 +4017,7 @@ function SpaceHome() {
                     const isCompleted = explorationStatus[region.id] === 'completed';
                     const middleMathRegionImage = selectedClusterId === 'middle-math' ? getMiddleMathRegionImage(region) : null;
                     const pythonRegionImage = selectedClusterId === 'python' ? getPythonRegionImage(region) : null;
+                    const westernClassicRegionImage = selectedClusterId === 'western-classic' ? getWesternClassicRegionImage(region) : null;
                     
                     return (
                     <Motion.div
@@ -4058,7 +4074,7 @@ function SpaceHome() {
                       <div style={{ position: 'relative', zIndex: 1 }}>
                         {is2DMode && (
                           <RegionPlanetVisual
-                            imageSrc={middleMathRegionImage || pythonRegionImage}
+                            imageSrc={middleMathRegionImage || pythonRegionImage || westernClassicRegionImage}
                             title={region.title}
                             icon={region.icon}
                             isMobile={isMobile}

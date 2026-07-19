@@ -62,6 +62,18 @@ function getPythonPlanetStyle(region, index) {
   return PYTHON_PLANET_STYLES[index % PYTHON_PLANET_STYLES.length]
 }
 
+function getWesternClassicPlanetStyle(region) {
+  const title = region?.title || ''
+
+  if (title.includes('네버랜드')) {
+    return { planetType: 'western_classic_neverland', planetColor: '#2dd4bf' }
+  }
+  if (title.includes('노벨문학상')) {
+    return { planetType: 'western_classic_nobel', planetColor: '#f4d58d' }
+  }
+  return { planetType: 'western_classic_heritage', planetColor: '#a855f7' }
+}
+
 /**
  * 워프 효과를 위한 고속 별 이동
  */
@@ -150,6 +162,10 @@ function SceneContent({
         const pythonStyle = getPythonPlanetStyle(region, i)
         planetType = pythonStyle.planetType
         planetColor = pythonStyle.planetColor
+      } else if (region.clusterId === 'western-classic' || region.clusterId === '서양고전') {
+        const classicStyle = getWesternClassicPlanetStyle(region)
+        planetType = classicStyle.planetType
+        planetColor = classicStyle.planetColor
       } else if (region.title.includes('아디테라')) {
         planetType = 'forest'; planetColor = '#348c31'
       } else if (region.title.includes('디비디아')) {
@@ -230,6 +246,7 @@ function SceneContent({
                color={planet.planetColor} 
                size={1.2} 
                planetType={planet.planetType}
+               showFormulas={!planet.planetType.startsWith('western_classic_')}
                showSpaceship={selectedRegionId === planet.id || (!selectedRegionId && recentRegionId === planet.id)} 
                status={explorationStatus[planet.id] || 'not_started'}
                equipment={equipment}

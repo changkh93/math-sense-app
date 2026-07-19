@@ -11,6 +11,7 @@
     "test:streak": "node scripts/test-streak-utils.mjs",
     "test:pdf-url": "node scripts/test-pdf-url-utils.mjs",
     "test:referral": "node scripts/test-referral-billing-core.cjs",
+    "test:learning-summary": "node scripts/test-learning-summary-utils.mjs",
     "preview": "vite preview",
     "video:studio": "remotion studio video/index.jsx",
     "video:render:metasense": "remotion render video/index.jsx MetasenseShort out/metasense-promo-raw.mp4 --codec=h264 --pixel-format=yuv420p",

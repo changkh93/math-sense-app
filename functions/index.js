@@ -376,13 +376,24 @@ async function rebuildLearningSummary(uid) {
 
 exports.getOrRebuildLearningSummary = costOptimizedDataFunctions.https.onCall(async (_data, context) => {
   const uid = await requireAuthUid(context);
+  const db = admin.firestore();
+  const historyRef = db.collection("users").doc(uid).collection("history");
   const summaryRef = admin.firestore().collection("learningSummaries").doc(uid);
   const summarySnap = await summaryRef.get();
   if (summarySnap.exists && summarySnap.data()?.schemaVersion === LEARNING_SUMMARY_SCHEMA_VERSION) {
-    return { ready: true, rebuilt: false };
+    const [latestHistorySnap, historyCountSnap] = await Promise.all([
+      historyRef.orderBy("timestamp", "desc").limit(1).get(),
+      historyRef.count().get(),
+    ]);
+    const summary = summarySnap.data() || {};
+    const latestHistoryMs = latestHistorySnap.empty ? 0 : historyTimestampMs(latestHistorySnap.docs[0].data());
+    const summaryUpdatedMs = summary.updatedAt?.toMillis ? summary.updatedAt.toMillis() : 0;
+    const actualHistoryCount = Number(historyCountSnap.data().count || 0);
+    const isStale = actualHistoryCount !== Number(summary.totalHistoryCount || 0) || latestHistoryMs > summaryUpdatedMs;
+    if (!isStale) return { ready: true, rebuilt: false };
   }
   await rebuildLearningSummary(uid);
-  return { ready: true, rebuilt: true };
+  return { ready: true, rebuilt: true, reason: summarySnap.exists ? "stale" : "missing" };
 });
 
 exports.syncLearningSummary = costOptimizedDataFunctions.firestore
