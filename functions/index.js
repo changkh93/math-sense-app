@@ -29,6 +29,12 @@ const costOptimizedDataFunctions = regionalFunctions.runWith({
   memory: "256MB",
   timeoutSeconds: 60,
 });
+
+Object.assign(exports, require("./galaxyGame")({
+  functions,
+  admin,
+  regionalFunctions,
+}));
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
 const STORE_RADAR_DURATION_DAYS = 7;
@@ -156,6 +162,9 @@ async function requireParentDoc(uid) {
 function buildDefaultStudentUserData({ uid, email, studentName, loginId, grade, parentUid }) {
   return {
     crystals: 0,
+    lifetimeLearningCrystalsEarned: 0,
+    galaxyShipHullTier: 1,
+    gameAbilitySnapshot: null,
     totalQuizzes: 0,
     totalScore: 0,
     averageScore: 0,

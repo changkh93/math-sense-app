@@ -622,12 +622,17 @@ export default function SpaceDashboard({ user, userData, onQuizSelect, regions, 
     return navState.chapterTitle
   }, [navState])
 
-  // Calculate spaceship level dynamically from crystals
+  // 선체 단계는 소비 가능한 현재 잔액이 아니라 영구 누적 학습 광석과
+  // 이미 해금한 단계에서 계산한다. 게임 건설 후 선체가 강등되지 않는다.
   const crystals = userData?.crystals || 0;
+  const lifetimeLearningCrystals = Math.max(
+    Number(userData?.lifetimeLearningCrystalsEarned || 0),
+    Number(crystals || 0)
+  );
   const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 5000];
-  let spaceLevel = 1;
+  let spaceLevel = Math.max(1, Number(userData?.galaxyShipHullTier || userData?.spaceshipLevel || 1));
   for (let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
-    if (crystals >= LEVEL_THRESHOLDS[i]) spaceLevel = i + 1;
+    if (lifetimeLearningCrystals >= LEVEL_THRESHOLDS[i]) spaceLevel = Math.max(spaceLevel, i + 1);
     else break;
   }
 

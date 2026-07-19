@@ -30,6 +30,7 @@ import WarpGateDocking from './WarpGateDocking'
 import ProfileEditView from './ProfileEditView' // Profile Management
 import StudyCrewView from './StudyCrewView'
 import QuizBattleHub from './QuizBattleHub'
+import MetaGalaxy from '../GalaxySocial/MetaGalaxy'
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
@@ -546,7 +547,7 @@ function RegionPlanetVisual({ imageSrc, title, icon, isMobile, isLocked }) {
 
 const REFINERY_CAUSE_IDS = ['concept_gap', 'equation_setup', 'missed_condition', 'calculation_error', 'no_checking']
 const LOGIN_NOTICE_KEY = 'metasenseLoginNotice'
-const ROOT_VIEWS = new Set(['planet', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
+const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
 
 function getRequestedRootView(location) {
   const requestedView = location.state?.view || new URLSearchParams(location.search).get('view')
@@ -3395,6 +3396,19 @@ function SpaceHome() {
             parentLoading={loadingHistory || loadingTransactions}
           />
         </main>
+      </div>
+    )
+  }
+
+  if (currentView === 'galaxy') {
+    return (
+      <div className="space-bg" style={{ minHeight: '100dvh', overflowY: 'auto', background: '#03050c' }}>
+        <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
+        <MetaGalaxy
+          user={user}
+          userData={userData}
+          onBack={() => { switchRootView('planet'); soundManager.playWarp(); }}
+        />
       </div>
     )
   }

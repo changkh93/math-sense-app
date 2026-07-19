@@ -5,6 +5,9 @@ import { auth, db } from '../firebase';
 
 const buildDefaultUserData = (firebaseUser, extra = {}) => ({
   crystals: 0,
+  lifetimeLearningCrystalsEarned: 0,
+  galaxyShipHullTier: 1,
+  gameAbilitySnapshot: null,
   totalQuizzes: 0,
   totalScore: 0,
   averageScore: 0,
@@ -145,6 +148,9 @@ export function useAuth() {
 
           setUserData({
             crystals: 0,
+            lifetimeLearningCrystalsEarned: 0,
+            galaxyShipHullTier: 1,
+            gameAbilitySnapshot: null,
             totalQuizzes: 0,
             totalScore: 0,
             spaceshipLevel: 1,

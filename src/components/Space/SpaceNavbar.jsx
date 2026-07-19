@@ -271,12 +271,13 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
 
   const mobilePrimaryNav = [
     { view: 'planet', label: '학습', icon: '🪐' },
+    { view: 'galaxy', label: '내 행성', icon: '🌍' },
     { view: 'battle', label: '배틀', icon: '⚔️' },
-    { view: 'crew', label: navCrew ? '크루 모함' : '스터디크루', icon: '🛰️' },
-    { view: 'agora', label: '아고라', icon: '🏛️', path: '/agora' }
+    { view: 'crew', label: navCrew ? '크루 모함' : '스터디크루', icon: '🛰️' }
   ];
 
   const mobileMoreNav = [
+    { view: 'agora', label: '아고라', icon: '🏛️', path: '/agora' },
     { view: 'assignment_hub', label: '과제', icon: '🛰️' },
     { view: 'ranking', label: '랭킹', icon: '🏅' },
     { view: 'store', label: '스토어', icon: '🎨' },
@@ -412,6 +413,12 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
           onClick={() => handleNavClick('planet', '/')}
         >
           🪐 NAV
+        </button>
+        <button
+          className={`space-nav-link ${getGuestNavState('galaxy')} ${currentView === 'galaxy' ? 'active' : ''}`}
+          onClick={() => handleNavClick('galaxy', '/')}
+        >
+          🌍 GALAXY
         </button>
         <button
           className={`space-nav-link ${getGuestNavState('battle')} ${currentView === 'battle' ? 'active' : ''}`}

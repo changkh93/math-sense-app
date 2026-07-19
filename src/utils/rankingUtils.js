@@ -138,11 +138,17 @@ export function calculateBattleData(user = {}) {
 }
 
 export function calculateSEI(user, weeklyGain = 0, streak = 0) {
+  // 소비 가능한 현재 잔액과 영구 학습 성취를 분리한다. 행성/탐사선에
+  // 광석을 써도 Wealth와 이미 얻은 게임 능력이 내려가서는 안 된다.
   const crystals = user.crystals || 0;
+  const lifetimeLearningCrystals = Math.max(
+    Number(user.lifetimeLearningCrystalsEarned || 0),
+    Number(crystals || 0)
+  );
   const avgScore = user.averageScore || 0;
 
   // 1. 기초 체급 (Wealth): 보유 광석 / 2 -> 누적 핵심 지표로 가중치 대폭 강화 (기존 / 10)
-  const wealthScore = Math.floor(crystals / 2);
+  const wealthScore = Math.floor(lifetimeLearningCrystals / 2);
 
   // 2. 전문성 (Skill): (평균 점수 * 5) + (백점 횟수 * 10) -> 실력과 마스터리 동시 반영
   const perfectCount = user.perfectCount || 0;
