@@ -1,15 +1,49 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Float, Sparkles } from '@react-three/drei'
+import { Float, OrbitControls, Sparkles, Stars } from '@react-three/drei'
 import { Bot, Compass, Flower2, Gem, Radio, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
 import { GALAXY_MISSION_ROUTES } from '../../utils/galaxyGame'
+import WorldTerrain from './GalaxyTerrain3D'
+import {
+  BUILD_RADIUS,
+  VILLAGE_BEACON_POSITION,
+  WORLD_RADIUS,
+  WORLD_ZONES as ZONES,
+  getAvailableVillageSlots,
+  isVillageBeaconAvailable,
+  isBridgeDeck,
+  isRiverWater,
+  terrainHeight,
+  terrainSlope,
+  walkSurfaceHeight,
+} from './GalaxyTerrainModel'
 
-const WORLD_RADIUS = 20
-const BUILD_RADIUS = 14.2
 const createMissionOperationId = () => globalThis.crypto?.randomUUID?.()
   || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 const PLAYER_SPEED = 6
+const PLAYER_TURN_SPEED = Math.PI * 2.4
+const PLAYER_MOVE_START_ANGLE = THREE.MathUtils.degToRad(25)
+const PLAYER_MOVE_FULL_ANGLE = THREE.MathUtils.degToRad(6)
+const CHARACTER_SCALE = .56
+const CAMERA_TARGET_HEIGHT = .84
+const CAMERA_MIN_POLAR = .24
+const CAMERA_MAX_POLAR = Math.PI * .58
+const MOUSE_LOOK_YAW_SENSITIVITY = .0026
+const MOUSE_LOOK_PITCH_SENSITIVITY = .0021
+const MOUSE_LOOK_MAX_FRAME_DELTA = 420
+const MOUSE_LOOK_REENTRY_GAP_MS = 180
+const MOUSE_LOOK_REENTRY_DISTANCE = 160
+
+function createMovementIntent() {
+  return {
+    active: false,
+    basisForward: new THREE.Vector3(),
+    basisRight: new THREE.Vector3(),
+    targetYaw: 0,
+    lastTurnSign: 1,
+  }
+}
 
 const BIOMES = {
   forest: {
@@ -38,21 +72,6 @@ const BIOMES = {
   },
 }
 
-const ZONES = [
-  { id: 'landing', label: '착륙장', shortLabel: '착륙', position: [0, 5], color: '#7cf2bd' },
-  { id: 'habitat', label: '주거 구역', shortLabel: '기지', position: [-7.5, -4.5], color: '#74c7ff' },
-  { id: 'ecology', label: '생태 구역', shortLabel: '생태', position: [6.8, -6.2], color: '#8df2a7' },
-  { id: 'expedition', label: '탐사 구역', shortLabel: '탐사', position: [8.7, 5.4], color: '#c89cff' },
-  { id: 'plaza', label: '친구 광장', shortLabel: '광장', position: [-8.8, 7], color: '#ffd17c' },
-]
-
-const TERRACES = [
-  { position: [-7.5, -4.5], radius: 4.2, height: .22 },
-  { position: [6.8, -6.2], radius: 4.6, height: .3 },
-  { position: [8.7, 5.4], radius: 4.1, height: .42 },
-  { position: [-8.8, 7], radius: 3.9, height: .18 },
-]
-
 const RESOURCE_NODES = [
   { id: 'crystal_north', kind: 'resource', actionId: 'crystal', label: '수정 파편 채집', position: [9.2, .8, 7.8] },
   { id: 'fiber_grove', kind: 'resource', actionId: 'fiber', label: '루멘 섬유 채집', position: [7.8, .7, -7.3] },
@@ -63,7 +82,7 @@ const RESOURCE_NODES = [
 
 const GUIDE_NODE = { id: 'lumi_guide', kind: 'guide', actionId: 'guide', label: '루미의 귀환 브리핑 듣기', position: [1.5, 1.1, 4.4] }
 
-const ROVER_NODE = { id: 'landing_rover', kind: 'rover', actionId: 'rover', label: '탐사 로버 제어 열기', position: [-1.45, .46, 4.85] }
+const ROVER_NODE = { id: 'landing_rover', kind: 'rover', actionId: 'rover', label: '탐사 로버 제어 열기', position: [-1.45, .25, 4.85] }
 
 const ROVER_STATUS_LABELS = {
   idle: '다음 원정 설정하기',
@@ -81,8 +100,10 @@ const MISSION_PORTALS = [
 const MISSION_PICKUPS = {
   nebula: [[-10, -7], [-5, -11], [1, -10], [6, -8], [10, -3], [7, 3], [-1, 7], [-8, 3]],
   comet: [[-11, 2], [-8, 8], [-3, 11], [3, 9], [9, 7], [11, 1], [6, -4], [-3, -5]],
-  ruins: [[-10, -6], [-5, -9], [2, -11], [8, -7], [11, -1], [7, 6], [0, 9], [-8, 6]],
+  ruins: [[-11, -6.5], [-5, -9], [2, -11], [8, -7], [11, -1], [7, 6], [0, 9], [-8, 6]],
 }
+
+const MISSION_PICKUP_RESERVED_POINTS = Object.values(MISSION_PICKUPS).flat()
 
 const BIOME_PROP_POSITIONS = [
   [-15, -9, .7], [-11.5, -13, 1.1], [-5, -15, .65], [4, -15.3, 1.2], [12, -11.5, .7], [15, -5, 1],
@@ -90,21 +111,27 @@ const BIOME_PROP_POSITIONS = [
   [-3.7, -9.5, .55], [3.5, -10.5, .55], [10.2, 10.2, .5], [-10.8, -7.5, .6],
 ]
 
-function terrainHeight(x, z) {
-  let height = 0
-  TERRACES.forEach((terrace) => {
-    const distance = Math.hypot(x - terrace.position[0], z - terrace.position[1])
-    if (distance < terrace.radius - .45) height = Math.max(height, terrace.height)
-  })
-  return height
-}
-
 function worldPositionFromLayout(item = {}) {
   return [
     THREE.MathUtils.clamp((Number(item.x || 50) - 50) / 3, -15, 15),
     0,
     THREE.MathUtils.clamp((Number(item.y || 50) - 50) / 3, -15, 15),
   ]
+}
+
+function resolveMissionPickupPosition(x, z, blockers = []) {
+  const candidates = [
+    [x, z],
+    [x + 1.7, z], [x - 1.7, z], [x, z + 1.7], [x, z - 1.7],
+    [x + 1.3, z + 1.3], [x - 1.3, z + 1.3], [x + 1.3, z - 1.3], [x - 1.3, z - 1.3],
+    [x + 2.35, z], [x - 2.35, z], [x, z + 2.35], [x, z - 2.35],
+  ]
+  return candidates.find(([candidateX, candidateZ]) => (
+    Math.hypot(candidateX, candidateZ) < WORLD_RADIUS - .9
+    && (!isRiverWater(candidateX, candidateZ) || isBridgeDeck(candidateX, candidateZ))
+    && (isBridgeDeck(candidateX, candidateZ) || terrainSlope(candidateX, candidateZ) <= 1.08)
+    && blockers.every((position) => Math.hypot(candidateX - position[0], candidateZ - position[2]) >= 1.65)
+  )) || [x, z]
 }
 
 function ModelMaterial({ color, emissive = '#000000', emissiveIntensity = 0, metalness = .15, roughness = .55, ghost = false }) {
@@ -126,10 +153,19 @@ function ModelMaterial({ color, emissive = '#000000', emissiveIntensity = 0, met
 function RoundedLumenTree({ scale = 1, color = '#58c985', ghost = false }) {
   return (
     <group scale={scale}>
+      {[[-.2, .42, .08, -.48], [.22, .52, -.06, .48]].map(([x, y, z, tilt], index) => (
+        <mesh key={`root_${index}`} position={[x, y, z]} rotation={[0, 0, tilt]} castShadow={!ghost}><cylinderGeometry args={[.08, .13, .72, 7]} /><ModelMaterial color="#684735" roughness={.94} ghost={ghost} /></mesh>
+      ))}
       <mesh position={[0, .65, 0]} castShadow={!ghost}><cylinderGeometry args={[.16, .25, 1.3, 9]} /><ModelMaterial color="#79543d" roughness={.9} ghost={ghost} /></mesh>
+      {[[-.3, 1.22, .05, -.68], [.32, 1.3, -.04, .72]].map(([x, y, z, tilt], index) => (
+        <mesh key={`branch_${index}`} position={[x, y, z]} rotation={[0, 0, tilt]} castShadow={!ghost}><cylinderGeometry args={[.065, .11, .7, 7]} /><ModelMaterial color="#79543d" roughness={.9} ghost={ghost} /></mesh>
+      ))}
       <mesh position={[0, 1.55, 0]} scale={[.95, 1.05, .95]} castShadow={!ghost}><dodecahedronGeometry args={[.78, 1]} /><ModelMaterial color={color} emissive="#174c31" emissiveIntensity={.22} roughness={.78} ghost={ghost} /></mesh>
       <mesh position={[-.42, 1.95, .08]} scale={.72} castShadow={!ghost}><dodecahedronGeometry args={[.62, 1]} /><ModelMaterial color="#8be8a5" emissive="#1e5c39" emissiveIntensity={.28} roughness={.76} ghost={ghost} /></mesh>
       <mesh position={[.44, 1.85, -.08]} scale={.64} castShadow={!ghost}><dodecahedronGeometry args={[.62, 1]} /><ModelMaterial color="#6ed794" emissive="#1e5c39" emissiveIntensity={.24} roughness={.76} ghost={ghost} /></mesh>
+      {[[-.56, 1.76, .4], [.18, 2.12, .35], [.57, 1.64, .28]].map(([x, y, z], index) => (
+        <mesh key={`fruit_${index}`} position={[x, y, z]}><sphereGeometry args={[.075, 9, 7]} /><ModelMaterial color="#c6fff0" emissive="#66f1bd" emissiveIntensity={1.8} roughness={.2} ghost={ghost} /></mesh>
+      ))}
     </group>
   )
 }
@@ -181,19 +217,28 @@ export function StructureModel({ itemId, ghost = false }) {
   if (itemId === 'friend_greenhouse') {
     return (
       <group>
-        <mesh position={[0, .72, 0]} castShadow={!ghost}><boxGeometry args={[2.15, 1.4, 1.75]} /><meshPhysicalMaterial color={ghost ? '#71f3bf' : '#8fffd1'} transparent opacity={ghost ? .35 : .35} roughness={.12} metalness={.05} depthWrite={!ghost} /></mesh>
-        <mesh position={[0, 1.62, 0]} rotation={[0, 0, Math.PI / 4]} castShadow={!ghost}><boxGeometry args={[1.5, 1.5, 1.78]} /><ModelMaterial color="#c8fff0" metalness={.35} roughness={.3} ghost={ghost} /></mesh>
-        {[-.55, 0, .55].map((x) => <mesh key={x} position={[x, .28, .22]}><sphereGeometry args={[.25, 12, 9]} /><ModelMaterial color="#77dc86" emissive="#1b5730" emissiveIntensity={.35} ghost={ghost} /></mesh>)}
+        <mesh position={[0, .08, 0]} receiveShadow><boxGeometry args={[2.5, .16, 2.05]} /><ModelMaterial color="#304b50" metalness={.48} roughness={.55} ghost={ghost} /></mesh>
+        <mesh position={[0, .8, 0]}><boxGeometry args={[2.18, 1.35, 1.7]} /><meshPhysicalMaterial color={ghost ? '#71f3bf' : '#a9fbe4'} transparent opacity={ghost ? .28 : .22} roughness={.08} metalness={.08} clearcoat={.65} depthWrite={!ghost} /></mesh>
+        {[-1.08, 1.08].flatMap((x) => [-.84, .84].map((z) => <mesh key={`${x}_${z}`} position={[x, .83, z]} castShadow={!ghost}><boxGeometry args={[.08, 1.52, .08]} /><ModelMaterial color="#547579" metalness={.65} roughness={.28} ghost={ghost} /></mesh>))}
+        {[-.54, .54].map((x) => <mesh key={`roof_${x}`} position={[x, 1.66, 0]} rotation={[0, 0, x < 0 ? -.43 : .43]} castShadow={!ghost}><boxGeometry args={[1.22, .08, 1.78]} /><meshPhysicalMaterial color={ghost ? '#71f3bf' : '#d2fff4'} transparent opacity={ghost ? .3 : .3} roughness={.1} metalness={.12} depthWrite={!ghost} /></mesh>)}
+        <mesh position={[0, 1.91, 0]}><boxGeometry args={[.08, .08, 1.84]} /><ModelMaterial color="#7da09f" metalness={.72} roughness={.24} ghost={ghost} /></mesh>
+        {[-.52, .52].map((x) => <group key={`bed_${x}`} position={[x, .2, -.05]}><mesh><boxGeometry args={[.62, .22, 1.28]} /><ModelMaterial color="#6b523e" roughness={.94} ghost={ghost} /></mesh>{[-.38, 0, .38].map((z) => <mesh key={z} position={[0, .27, z]}><sphereGeometry args={[.17, 10, 8]} /><ModelMaterial color={x < 0 ? '#6edf89' : '#7bc7a1'} emissive="#174e2b" emissiveIntensity={.28} ghost={ghost} /></mesh>)}</group>)}
+        <mesh position={[0, .7, .89]}><boxGeometry args={[.58, 1.16, .08]} /><ModelMaterial color="#5ce0cc" emissive="#167d72" emissiveIntensity={.5} metalness={.42} roughness={.22} ghost={ghost} /></mesh>
       </group>
     )
   }
   if (itemId === 'rover_bay') {
     return (
       <group>
-        <mesh position={[0, .35, 0]} castShadow={!ghost}><boxGeometry args={[2.25, .7, 1.75]} /><ModelMaterial color="#3b4f65" metalness={.7} roughness={.3} ghost={ghost} /></mesh>
-        <mesh position={[0, 1.22, -.35]} rotation={[0, 0, -.12]} castShadow={!ghost}><boxGeometry args={[2.05, .16, 1.5]} /><ModelMaterial color="#7388a2" metalness={.8} roughness={.22} ghost={ghost} /></mesh>
-        <mesh position={[0, .6, .92]}><boxGeometry args={[1.2, .2, .08]} /><ModelMaterial color="#ffaf65" emissive="#a94817" emissiveIntensity={1.3} ghost={ghost} /></mesh>
-        {[-.72, .72].map((x) => <mesh key={x} position={[x, .18, .68]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.22, .08, 8, 16]} /><ModelMaterial color="#1b2635" metalness={.55} ghost={ghost} /></mesh>)}
+        <mesh position={[0, .08, 0]} receiveShadow><boxGeometry args={[2.7, .16, 2.35]} /><ModelMaterial color="#26394c" metalness={.6} roughness={.42} ghost={ghost} /></mesh>
+        {[-.48, .48].map((x) => <mesh key={`rail_${x}`} position={[x, .17, .15]}><boxGeometry args={[.11, .09, 1.9]} /><ModelMaterial color="#a8bbc7" metalness={.88} roughness={.18} ghost={ghost} /></mesh>)}
+        <mesh position={[0, .82, -.98]} castShadow={!ghost}><boxGeometry args={[2.45, 1.48, .22]} /><ModelMaterial color="#3c5369" metalness={.68} roughness={.32} ghost={ghost} /></mesh>
+        {[-1.08, 1.08].map((x) => <mesh key={`post_${x}`} position={[x, 1.05, 0]} castShadow={!ghost}><boxGeometry args={[.2, 1.95, .24]} /><ModelMaterial color="#71869d" metalness={.78} roughness={.22} ghost={ghost} /></mesh>)}
+        <mesh position={[0, 1.94, 0]} castShadow={!ghost}><boxGeometry args={[2.36, .2, .28]} /><ModelMaterial color="#8297ab" metalness={.82} roughness={.2} ghost={ghost} /></mesh>
+        <mesh position={[.35, 1.7, .08]} rotation={[0, 0, -.5]}><boxGeometry args={[.14, .85, .14]} /><ModelMaterial color="#c3d2d9" metalness={.82} roughness={.18} ghost={ghost} /></mesh>
+        <mesh position={[.57, 1.31, .08]}><sphereGeometry args={[.15, 10, 8]} /><ModelMaterial color="#ffb066" emissive="#b54c1f" emissiveIntensity={1.25} ghost={ghost} /></mesh>
+        {[-.72, 0, .72].map((x) => <mesh key={`status_${x}`} position={[x, 1.27, -.865]}><boxGeometry args={[.22, .1, .05]} /><ModelMaterial color={x === 0 ? '#72f0c1' : '#68dffc'} emissive={x === 0 ? '#28976e' : '#227795'} emissiveIntensity={1.4} ghost={ghost} /></mesh>)}
+        <mesh position={[0, .18, 1.18]} rotation={[-.13, 0, 0]}><boxGeometry args={[1.5, .12, .62]} /><ModelMaterial color="#4c6072" metalness={.58} roughness={.45} ghost={ghost} /></mesh>
       </group>
     )
   }
@@ -225,18 +270,25 @@ export function StructureModel({ itemId, ghost = false }) {
   if (itemId === 'creature_habitat') {
     return (
       <group>
-        <mesh position={[0, .28, 0]} castShadow={!ghost}><cylinderGeometry args={[1.25, 1.42, .55, 20]} /><ModelMaterial color="#405a55" roughness={.75} ghost={ghost} /></mesh>
-        <mesh position={[0, .95, -.18]} scale={[1.12, .8, .9]} castShadow={!ghost}><sphereGeometry args={[.9, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2]} /><ModelMaterial color="#c7e99c" emissive="#38612b" emissiveIntensity={.2} ghost={ghost} /></mesh>
-        <mesh position={[0, .58, .72]}><circleGeometry args={[.4, 18]} /><ModelMaterial color="#223b3b" ghost={ghost} /></mesh>
+        <mesh position={[0, .07, 0]} receiveShadow><cylinderGeometry args={[1.55, 1.68, .14, 24]} /><ModelMaterial color="#354c43" roughness={.94} ghost={ghost} /></mesh>
+        <mesh position={[-.25, .78, -.25]} scale={[1.2, .82, 1]} castShadow={!ghost}><sphereGeometry args={[1.02, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2]} /><ModelMaterial color="#92b978" emissive="#29472a" emissiveIntensity={.18} roughness={.84} ghost={ghost} /></mesh>
+        <mesh position={[-.25, .52, .72]}><circleGeometry args={[.46, 20]} /><ModelMaterial color="#1d3232" roughness={.95} ghost={ghost} /></mesh>
+        <mesh position={[-.25, .35, .2]} rotation={[-Math.PI / 2, 0, 0]}><torusGeometry args={[.48, .12, 8, 24]} /><ModelMaterial color="#b88755" roughness={.95} ghost={ghost} /></mesh>
+        {[-1.38, -.7, .62, 1.3].map((x) => <mesh key={`fence_${x}`} position={[x, .42, .62]}><cylinderGeometry args={[.045, .065, .78, 7]} /><ModelMaterial color="#8e795f" roughness={.92} ghost={ghost} /></mesh>)}
+        <mesh position={[-.04, .6, .62]}><boxGeometry args={[2.78, .06, .06]} /><ModelMaterial color="#8e795f" roughness={.92} ghost={ghost} /></mesh>
+        <group position={[1.02, .28, -.35]}><mesh><cylinderGeometry args={[.3, .4, .42, 10]} /><ModelMaterial color="#536d6b" metalness={.38} roughness={.48} ghost={ghost} /></mesh><mesh position={[0, .29, 0]}><cylinderGeometry args={[.22, .28, .18, 10]} /><ModelMaterial color="#79e0ac" emissive="#267151" emissiveIntensity={.65} ghost={ghost} /></mesh></group>
       </group>
     )
   }
   if (itemId === 'signal_plaza') {
     return (
       <group>
-        <mesh position={[0, .1, 0]} receiveShadow><cylinderGeometry args={[1.65, 1.8, .2, 28]} /><ModelMaterial color="#41556d" metalness={.45} roughness={.45} ghost={ghost} /></mesh>
-        <mesh position={[0, 1.02, 0]} castShadow={!ghost}><cylinderGeometry args={[.12, .24, 1.85, 10]} /><ModelMaterial color="#8092ad" metalness={.8} ghost={ghost} /></mesh>
-        {[.62, 1.02, 1.42].map((y, index) => <mesh key={y} position={[0, y, 0]} rotation={[Math.PI / 2, 0, index * .4]}><torusGeometry args={[.42 + index * .12, .035, 8, 28]} /><ModelMaterial color="#a997ff" emissive="#664ac8" emissiveIntensity={1.5} ghost={ghost} /></mesh>)}
+        <mesh position={[0, .08, 0]} receiveShadow><cylinderGeometry args={[1.82, 1.96, .16, 32]} /><ModelMaterial color="#34485e" metalness={.48} roughness={.48} ghost={ghost} /></mesh>
+        <mesh position={[0, .22, 0]} receiveShadow><cylinderGeometry args={[1.38, 1.55, .16, 28]} /><ModelMaterial color="#536982" metalness={.55} roughness={.38} ghost={ghost} /></mesh>
+        <mesh position={[0, 1.15, 0]} castShadow={!ghost}><cylinderGeometry args={[.11, .26, 1.9, 10]} /><ModelMaterial color="#8ea2ba" metalness={.82} roughness={.2} ghost={ghost} /></mesh>
+        {[.7, 1.12, 1.52].map((y, index) => <mesh key={y} position={[0, y, 0]} rotation={[Math.PI / 2, 0, index * .4]}><torusGeometry args={[.4 + index * .13, .034, 8, 28]} /><ModelMaterial color="#b39cff" emissive="#6e51d1" emissiveIntensity={1.7} ghost={ghost} /></mesh>)}
+        <mesh position={[0, 2.14, 0]} rotation={[0, .35, 0]}><octahedronGeometry args={[.28, 0]} /><ModelMaterial color="#efe3ff" emissive="#aa79ff" emissiveIntensity={2.3} metalness={.25} roughness={.15} ghost={ghost} /></mesh>
+        {[0, Math.PI * .5, Math.PI, Math.PI * 1.5].map((angle) => <group key={angle} position={[Math.sin(angle) * 1.42, .38, Math.cos(angle) * 1.42]} rotation={[0, angle, 0]}><mesh><boxGeometry args={[.72, .12, .26]} /><ModelMaterial color="#8192a2" metalness={.55} roughness={.4} ghost={ghost} /></mesh><mesh position={[0, -.18, 0]}><boxGeometry args={[.55, .3, .08]} /><ModelMaterial color="#4d6075" metalness={.58} roughness={.42} ghost={ghost} /></mesh></group>)}
       </group>
     )
   }
@@ -292,41 +344,29 @@ export function StructurePreview3D({ itemId }) {
   )
 }
 
+function structureFootprint(itemId) {
+  if (itemId === 'star_lamp' || itemId === 'prism_pathlight') return .46
+  if (itemId === 'wild_sprout') return .42
+  if (itemId === 'lumen_tree') return .78
+  if (itemId === 'crystal_pond' || itemId === 'starflower_garden') return 1.28
+  if (itemId === 'signal_plaza' || itemId === 'route_gateway') return 1.52
+  return 1.14
+}
+
 function PlacedStructure({ item, selected, onSelect }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
+  const footprint = structureFootprint(item.itemId)
   return (
-    <group position={position} rotation={[0, THREE.MathUtils.degToRad(Number(item.rotation || 0)), 0]} onClick={(event) => { event.stopPropagation(); onSelect?.(item) }}>
+    <group position={position} rotation={[0, THREE.MathUtils.degToRad(Number(item.rotation || 0)), 0]} onClick={(event) => { if (event.delta > 4) return; event.stopPropagation(); onSelect?.(item) }}>
+      <mesh position={[0, .045, 0]} receiveShadow><cylinderGeometry args={[footprint, footprint + .12, .09, 24]} /><meshStandardMaterial color="#293d48" roughness={.94} /></mesh>
       <StructureModel itemId={item.itemId} />
       {selected && (
         <mesh position={[0, .07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[1.5, 1.72, 36]} />
+          <ringGeometry args={[footprint + .24, footprint + .42, 36]} />
           <meshBasicMaterial color="#6ce7ff" transparent opacity={.9} depthWrite={false} />
         </mesh>
       )}
-    </group>
-  )
-}
-
-function PathSegment({ from, to, color }) {
-  const dx = to[0] - from[0]
-  const dz = to[1] - from[1]
-  const length = Math.hypot(dx, dz)
-  const angle = Math.atan2(dx, dz)
-  return (
-    <group position={[(from[0] + to[0]) / 2, .08, (from[1] + to[1]) / 2]} rotation={[0, angle, 0]}>
-      <mesh receiveShadow><boxGeometry args={[1.22, .12, length]} /><meshStandardMaterial color={color} roughness={.95} /></mesh>
-      {[-.48, .48].map((x) => <mesh key={x} position={[x, .08, 0]}><boxGeometry args={[.035, .04, length * .96]} /><meshStandardMaterial color="#d9fff4" emissive={color} emissiveIntensity={.35} /></mesh>)}
-    </group>
-  )
-}
-
-function LandingPad({ palette }) {
-  return (
-    <group position={[0, .08, 5]}>
-      <mesh receiveShadow><cylinderGeometry args={[2.45, 2.65, .18, 36]} /><meshStandardMaterial color="#33495b" metalness={.45} roughness={.55} /></mesh>
-      <mesh position={[0, .11, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.45, 2.04, 40]} /><meshBasicMaterial color={palette.glow} transparent opacity={.55} /></mesh>
-      {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((rotation) => <mesh key={rotation} position={[Math.sin(rotation) * 2.15, .2, Math.cos(rotation) * 2.15]}><boxGeometry args={[.16, .12, .48]} /><meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={1.2} /></mesh>)}
     </group>
   )
 }
@@ -339,6 +379,7 @@ function RoverControl({ palette, status = 'idle' }) {
   const isActive = normalizedStatus === 'active'
   const isReady = normalizedStatus === 'ready'
   const statusColor = isReady ? '#ffe08a' : isActive ? '#75eaff' : normalizedStatus === 'claimed' ? '#8af0bf' : palette.glow
+  const [roverX, roverOffsetY, roverZ] = ROVER_NODE.position
 
   useFrame((state, delta) => {
     const elapsed = state.clock.elapsedTime
@@ -359,12 +400,12 @@ function RoverControl({ palette, status = 'idle' }) {
   })
 
   return (
-    <group position={ROVER_NODE.position} rotation={[0, -.35, 0]}>
+    <group position={[roverX, terrainHeight(roverX, roverZ) + roverOffsetY, roverZ]} rotation={[0, -.35, 0]}>
       <mesh position={[0, .25, 0]} castShadow><boxGeometry args={[1.35, .46, .92]} /><meshStandardMaterial color="#dcecf2" metalness={.48} roughness={.32} /></mesh>
       <mesh position={[.12, .67, -.03]} castShadow><boxGeometry args={[.74, .42, .64]} /><meshStandardMaterial color="#5fbfda" emissive="#185e78" emissiveIntensity={isActive ? 1.15 : .45} metalness={.42} roughness={.25} /></mesh>
       <mesh position={[0, .27, .5]}><boxGeometry args={[.88, .14, .08]} /><meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={isReady ? 2.7 : 1.35} toneMapped={false} /></mesh>
       {[-.48, .48].flatMap((x) => [-.43, .43].map((z) => (
-        <mesh key={`${x}_${z}`} position={[x, .05, z]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <mesh key={`${x}_${z}`} position={[x, .05, z]} rotation={[0, Math.PI / 2, 0]} castShadow>
           <torusGeometry args={[.2, .075, 8, 18]} />
           <meshStandardMaterial color="#172230" metalness={.72} roughness={.42} />
         </mesh>
@@ -397,45 +438,56 @@ function BiomeProp({ kind, position, scale = 1, palette, index }) {
   if (kind === 'ocean') {
     return (
       <group position={position} scale={scale} rotation={[0, index * .55, 0]}>
-        {[-.45, 0, .42].map((x, i) => <mesh key={x} position={[x, .48 + i * .16, 0]} rotation={[0, 0, i === 1 ? .12 : -.16]} castShadow><capsuleGeometry args={[.13 + i * .03, .7 + i * .2, 5, 8]} /><meshStandardMaterial color={i === 1 ? '#58e0b3' : '#7d8fe8'} emissive={i === 1 ? '#17654d' : '#31346f'} emissiveIntensity={.35} roughness={.7} /></mesh>)}
-        <mesh position={[0, .08, 0]}><cylinderGeometry args={[.72, .9, .16, 14]} /><meshStandardMaterial color="#24516a" roughness={.9} /></mesh>
+        <mesh position={[0, .08, 0]} scale={[1.15, .45, .9]}><dodecahedronGeometry args={[.74, 0]} /><meshStandardMaterial color="#244d63" roughness={.92} /></mesh>
+        {[-.46, -.12, .28, .55].map((x, i) => <group key={x} position={[x, .25, i % 2 ? -.08 : .1]} rotation={[0, i * .8, i % 2 ? .12 : -.16]}><mesh position={[0, .42, 0]} castShadow><cylinderGeometry args={[.1 + i * .012, .16, .82 + i * .14, 8]} /><meshStandardMaterial color={i % 2 ? '#5cd3b0' : '#7e83da'} emissive={i % 2 ? '#145746' : '#2e3167'} emissiveIntensity={.38} roughness={.68} /></mesh><mesh position={[0, .9 + i * .06, 0]} scale={[.7, 1, .7]}><icosahedronGeometry args={[.25 + i * .025, 1]} /><meshStandardMaterial color={i % 2 ? '#8ce8c6' : '#bc95ef'} emissive={i % 2 ? '#1c6650' : '#54317e'} emissiveIntensity={.45} roughness={.55} /></mesh></group>)}
+        {[[-.68, .25], [.66, -.28], [.12, .5]].map(([x, z], i) => <mesh key={`${x}_${z}`} position={[x, .25, z]} rotation={[-Math.PI / 2, 0, i * .7]}><torusGeometry args={[.14 + i * .025, .045, 7, 16]} /><meshStandardMaterial color={i % 2 ? '#ffbb9e' : '#8de9ee'} emissive={i % 2 ? '#8d4634' : '#276f73'} emissiveIntensity={.38} roughness={.5} /></mesh>)}
       </group>
     )
   }
   if (kind === 'crystal') return <group position={position} rotation={[0, index * .4, 0]}><CrystalCluster color={index % 2 ? '#ce8eff' : '#78e5ff'} scale={scale * .8} /></group>
   if (kind === 'desert') {
     return (
-      <group position={position} scale={scale} rotation={[0, index * .77, -.06]}>
-        <mesh position={[0, .55, 0]} castShadow><capsuleGeometry args={[.35, .9, 6, 10]} /><meshStandardMaterial color="#b4774e" roughness={.95} /></mesh>
-        <mesh position={[.28, .55, 0]} rotation={[0, 0, -.65]}><capsuleGeometry args={[.12, .45, 5, 8]} /><meshStandardMaterial color="#d09458" roughness={.9} /></mesh>
+      <group position={position} scale={scale} rotation={[0, index * .77, 0]}>
+        <mesh position={[0, .72, 0]} rotation={[0, 0, 0]} castShadow><torusGeometry args={[.62, .18, 8, 24, Math.PI]} /><meshStandardMaterial color="#bd7c4c" roughness={.96} /></mesh>
+        {[-.62, .62].map((x) => <mesh key={x} position={[x, .42, 0]} scale={[.78, 1.25, .88]} castShadow><dodecahedronGeometry args={[.36, 0]} /><meshStandardMaterial color={x < 0 ? '#9e603f' : '#c58651'} roughness={.98} /></mesh>)}
+        <mesh position={[.05, 1.37, 0]} scale={[1.25, .45, .7]} rotation={[0, 0, -.08]} castShadow><dodecahedronGeometry args={[.38, 0]} /><meshStandardMaterial color="#d39a5f" roughness={.94} /></mesh>
+        {[[-.85, -.25, .24], [.78, .32, .2], [.25, -.48, .17]].map(([x, z, size]) => <mesh key={`${x}_${z}`} position={[x, size * .55, z]} scale={[1.35, .65, 1]}><dodecahedronGeometry args={[size, 0]} /><meshStandardMaterial color="#7e5140" roughness={1} /></mesh>)}
       </group>
     )
   }
   if (kind === 'mechanical') {
     return (
       <group position={position} scale={scale} rotation={[0, index * .48, 0]}>
-        <mesh position={[0, .6, 0]} castShadow><cylinderGeometry args={[.22, .42, 1.2, 8]} /><meshStandardMaterial color="#536b78" metalness={.8} roughness={.3} /></mesh>
-        <mesh position={[0, 1.25, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.42, .08, 8, 20]} /><meshStandardMaterial color={palette.glow} emissive={palette.glow} emissiveIntensity={.9} metalness={.65} /></mesh>
+        <mesh position={[0, .1, 0]}><cylinderGeometry args={[.68, .82, .2, 12]} /><meshStandardMaterial color="#344854" metalness={.76} roughness={.35} /></mesh>
+        <mesh position={[0, .78, 0]} castShadow><cylinderGeometry args={[.28, .46, 1.38, 10]} /><meshStandardMaterial color="#5c737d" metalness={.84} roughness={.26} /></mesh>
+        {[.38, .7, 1.02].map((y) => <mesh key={y} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.37, .055, 7, 20]} /><meshStandardMaterial color="#8198a0" metalness={.9} roughness={.18} /></mesh>)}
+        <mesh position={[0, 1.53, 0]} castShadow><cylinderGeometry args={[.48, .33, .34, 10]} /><meshStandardMaterial color="#465d69" metalness={.82} roughness={.26} /></mesh>
+        {[0, Math.PI * .5, Math.PI, Math.PI * 1.5].map((angle) => <mesh key={angle} position={[Math.sin(angle) * .43, 1.52, Math.cos(angle) * .43]} rotation={[0, angle, 0]}><boxGeometry args={[.18, .12, .08]} /><meshStandardMaterial color={palette.glow} emissive={palette.glow} emissiveIntensity={1.35} toneMapped={false} /></mesh>)}
+        <group position={[.46, .66, 0]}><mesh position={[.18, 0, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[.075, .075, .42, 8]} /><meshStandardMaterial color="#9cb1b7" metalness={.9} roughness={.18} /></mesh><mesh position={[.39, -.2, 0]}><cylinderGeometry args={[.075, .075, .42, 8]} /><meshStandardMaterial color="#9cb1b7" metalness={.9} roughness={.18} /></mesh></group>
+        <mesh position={[0, 1.82, 0]} rotation={[-Math.PI / 2, 0, 0]}><torusGeometry args={[.3, .055, 8, 24]} /><meshStandardMaterial color={palette.glow} emissive={palette.glow} emissiveIntensity={1.15} metalness={.7} /></mesh>
       </group>
     )
   }
   return (
-    <group position={position} scale={scale} rotation={[0, index * .5, .08]}>
-      <mesh position={[0, .7, 0]} castShadow><octahedronGeometry args={[.78, 0]} /><meshPhysicalMaterial color="#c9f6ff" transparent opacity={.75} roughness={.12} metalness={.2} /></mesh>
-      <mesh position={[.48, .32, .14]} scale={.55} castShadow><octahedronGeometry args={[.66, 0]} /><meshPhysicalMaterial color="#8ed8f4" transparent opacity={.7} roughness={.15} /></mesh>
+    <group position={position} scale={scale} rotation={[0, index * .5, 0]}>
+      <mesh position={[0, .12, 0]} scale={[1.3, .45, 1]}><dodecahedronGeometry args={[.72, 0]} /><meshStandardMaterial color="#5e91aa" roughness={.76} /></mesh>
+      {[[-.5, .66, .05, .66, -.12], [0, .98, 0, .98, .05], [.52, .58, -.02, .6, .16]].map(([x, y, z, size, tilt], i) => <mesh key={i} position={[x, y, z]} rotation={[tilt, i * .4, tilt]} scale={[.72, 1.35, .72]} castShadow><octahedronGeometry args={[size, 0]} /><meshPhysicalMaterial color={i === 1 ? '#d9fbff' : '#9ee5f5'} transparent opacity={.78} roughness={.1} metalness={.18} transmission={.04} /></mesh>)}
+      <mesh position={[0, .42, .42]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.58, .065, 7, 24, Math.PI]} /><meshStandardMaterial color="#bdeeff" emissive="#5aaecb" emissiveIntensity={.52} metalness={.35} roughness={.25} /></mesh>
+      {[[-.7, .18], [.72, -.12]].map(([x, z]) => <mesh key={x} position={[x, .23, z]} rotation={[0, 0, x < 0 ? -.25 : .25]}><coneGeometry args={[.16, .62, 6]} /><meshPhysicalMaterial color="#c9f7ff" transparent opacity={.76} roughness={.12} /></mesh>)}
     </group>
   )
 }
 
 function Creature({ position, color, index = 0 }) {
   const group = useRef()
+  const groundY = terrainHeight(position[0], position[2]) + position[1]
   useFrame((state) => {
     if (!group.current) return
-    group.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 1.4 + index) * .08
+    group.current.position.y = groundY + Math.sin(state.clock.elapsedTime * 1.4 + index) * .08
     group.current.rotation.y = Math.sin(state.clock.elapsedTime * .32 + index) * .35 + index
   })
   return (
-    <group ref={group} position={position}>
+    <group ref={group} position={[position[0], groundY, position[2]]}>
       <mesh position={[0, .38, 0]} scale={[.75, .62, .9]} castShadow><sphereGeometry args={[.62, 18, 12]} /><meshStandardMaterial color={color} roughness={.58} /></mesh>
       <mesh position={[0, .65, .45]} scale={[.68, .6, .65]} castShadow><sphereGeometry args={[.5, 16, 10]} /><meshStandardMaterial color={color} roughness={.55} /></mesh>
       {[-.2, .2].map((x) => <mesh key={x} position={[x, .72, .84]}><sphereGeometry args={[.055, 9, 7]} /><meshStandardMaterial color="#10202b" roughness={.25} /></mesh>)}
@@ -447,13 +499,14 @@ function Creature({ position, color, index = 0 }) {
 
 function LumiGuide({ palette }) {
   const group = useRef()
+  const groundY = terrainHeight(GUIDE_NODE.position[0], GUIDE_NODE.position[2])
   useFrame((state) => {
     if (!group.current) return
-    group.current.position.y = 1.2 + Math.sin(state.clock.elapsedTime * 1.8) * .12
+    group.current.position.y = groundY + 1.2 + Math.sin(state.clock.elapsedTime * 1.8) * .12
     group.current.rotation.y = Math.sin(state.clock.elapsedTime * .7) * .18
   })
   return (
-    <group ref={group} position={[1.5, 1.2, 4.4]}>
+    <group ref={group} position={[1.5, groundY + 1.2, 4.4]}>
       <mesh castShadow><sphereGeometry args={[.42, 18, 12]} /><meshStandardMaterial color="#e9f8fa" metalness={.45} roughness={.28} /></mesh>
       <mesh position={[0, .01, .36]} scale={[.72, .43, .18]}><sphereGeometry args={[.38, 16, 10]} /><meshStandardMaterial color="#152d42" metalness={.65} roughness={.18} /></mesh>
       {[-.14, .14].map((x) => <mesh key={x} position={[x, .04, .51]}><sphereGeometry args={[.045, 8, 6]} /><meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={2.5} /></mesh>)}
@@ -477,7 +530,8 @@ function ResourceHalo({ color }) {
 }
 
 function ResourceNode({ node, palette }) {
-  const [x, y, z] = node.position
+  const [x, , z] = node.position
+  const y = terrainHeight(x, z)
   if (node.actionId === 'crystal') return <group position={[x, y, z]}><CrystalCluster color={palette.glow} /><ResourceHalo color={palette.glow} /></group>
   if (node.actionId === 'fiber') return <group position={[x, y, z]}><RoundedLumenTree scale={.72} color={palette.glow} /><Sparkles count={8} scale={[2, 2.5, 2]} color={palette.particle} size={1.5} speed={.25} /><ResourceHalo color="#7cf2bd" /></group>
   if (node.actionId === 'salvage') return <group position={[x, y, z]} rotation={[0, .6, -.12]}><mesh position={[0, .45, 0]} castShadow><dodecahedronGeometry args={[.82, 0]} /><meshStandardMaterial color="#56677a" metalness={.85} roughness={.3} /></mesh><mesh position={[.2, .5, .62]}><boxGeometry args={[.9, .16, .1]} /><meshStandardMaterial color="#ffb167" emissive="#a34819" emissiveIntensity={1.2} /></mesh><ResourceHalo color="#ffb167" /></group>
@@ -487,8 +541,9 @@ function ResourceNode({ node, palette }) {
 
 function MissionPortal({ portal, active }) {
   const color = portal.route === 'nebula' ? '#b08cff' : portal.route === 'comet' ? '#ff9a5c' : '#68e9ff'
+  const portalY = terrainHeight(portal.position[0], portal.position[2]) + .72
   return (
-    <group position={portal.position}>
+    <group position={[portal.position[0], portalY, portal.position[2]]}>
       <mesh position={[0, -.44, 0]} castShadow><cylinderGeometry args={[.85, 1.05, .5, 16]} /><meshStandardMaterial color="#293950" metalness={.7} roughness={.3} /></mesh>
       {[-1.15, 1.15].map((x) => <mesh key={x} position={[x, .65, 0]} castShadow><boxGeometry args={[.32, 2.1, .55]} /><meshStandardMaterial color="#42546e" metalness={.67} roughness={.3} /></mesh>)}
       <Float speed={1.1} floatIntensity={.12}>
@@ -512,91 +567,281 @@ function DistantWorlds({ palette }) {
   )
 }
 
-function WorldTerrain({ palette }) {
-  return (
-    <group>
-      <mesh position={[0, -1.28, 0]} receiveShadow><cylinderGeometry args={[WORLD_RADIUS, WORLD_RADIUS - 2.3, 2.55, 64]} /><meshStandardMaterial color={palette.edge} roughness={.94} /></mesh>
-      <mesh position={[0, -.1, 0]} receiveShadow><cylinderGeometry args={[WORLD_RADIUS, WORLD_RADIUS, .36, 64]} /><meshStandardMaterial color={palette.ground} roughness={.92} /></mesh>
-      <mesh position={[0, -1.04, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[39, 72]} /><meshPhysicalMaterial color={palette.water} transparent opacity={.73} roughness={.12} metalness={.05} /></mesh>
-      {TERRACES.map((terrace) => (
-        <mesh key={`${terrace.position[0]}_${terrace.position[1]}`} position={[terrace.position[0], terrace.height / 2, terrace.position[1]]} receiveShadow>
-          <cylinderGeometry args={[terrace.radius, terrace.radius + .32, terrace.height, 42]} />
-          <meshStandardMaterial color={palette.groundDeep} roughness={.94} />
-        </mesh>
-      ))}
-      {ZONES.filter((zone) => zone.id !== 'landing').map((zone) => (
-        <mesh key={zone.id} position={[zone.position[0], terrainHeight(zone.position[0], zone.position[1]) + .035, zone.position[1]]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[2.2, 2.27, 42]} />
-          <meshBasicMaterial color={zone.color} transparent opacity={.25} depthWrite={false} />
-        </mesh>
-      ))}
-      {ZONES.filter((zone) => zone.id !== 'landing').map((zone) => <PathSegment key={`path_${zone.id}`} from={[0, 2.8]} to={zone.position} color={palette.path} />)}
-      <LandingPad palette={palette} />
-    </group>
-  )
-}
-
-function Astronaut({ inputRef, interactables, blockers, pickups, paused, onNearbyChange, onCollect, onPositionChange }) {
+function Astronaut({ inputRef, interactables, blockers, pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange }) {
+  const { gl } = useThree()
   const group = useRef()
   const body = useRef()
+  const leftArm = useRef()
+  const rightArm = useRef()
+  const leftLeg = useRef()
+  const rightLeg = useRef()
+  const controls = useRef()
+  const controlsReady = useRef(false)
   const keys = useRef(new Set())
   const nearbySignature = useRef('')
   const collectLock = useRef(new Set())
   const lastPublishAt = useRef(0)
-  const { camera, size } = useThree()
-  const cameraTarget = useMemo(() => new THREE.Vector3(), [])
-  const lookTarget = useMemo(() => new THREE.Vector3(), [])
+  const hoverLook = useRef({ pendingX: 0, pendingY: 0, lastX: null, lastY: null, lastTime: null, orbiting: false })
+  const movementIntent = useRef(createMovementIntent())
+  const movementVectors = useRef({
+    forward: new THREE.Vector3(),
+    right: new THREE.Vector3(),
+    moveDirection: new THREE.Vector3(),
+    desiredTarget: new THREE.Vector3(),
+    followDelta: new THREE.Vector3(),
+    cameraOffset: new THREE.Vector3(),
+    cameraSpherical: new THREE.Spherical(),
+  })
+
+  const resetFreeLook = useCallback(() => {
+    hoverLook.current.pendingX = 0
+    hoverLook.current.pendingY = 0
+    hoverLook.current.lastX = null
+    hoverLook.current.lastY = null
+    hoverLook.current.lastTime = null
+  }, [])
 
   useEffect(() => {
-    const down = (event) => {
-      if (paused || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
-      keys.current.add(event.code)
-    }
-    const up = (event) => keys.current.delete(event.code)
-    window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up) }
-  }, [paused])
-
-  useEffect(() => {
-    if (paused) {
+    const resetInput = () => {
       keys.current.clear()
       inputRef.current.x = 0
       inputRef.current.z = 0
+      movementIntent.current.active = false
+    }
+    const isInteractiveTarget = (target) => target?.closest?.('input, textarea, select, button, a, [contenteditable="true"], [role="dialog"]')
+    const down = (event) => {
+      if (paused || isInteractiveTarget(event.target)) return
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].includes(event.code)) {
+        event.preventDefault()
+        keys.current.add(event.code)
+      }
+    }
+    const up = (event) => keys.current.delete(event.code)
+    const visibility = () => { if (document.hidden) resetInput() }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', resetInput)
+    document.addEventListener('visibilitychange', visibility)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', resetInput)
+      document.removeEventListener('visibilitychange', visibility)
     }
   }, [inputRef, paused])
 
-  useFrame((state, delta) => {
+  useEffect(() => {
+    if (!paused) return
+    keys.current.clear()
+    inputRef.current.x = 0
+    inputRef.current.z = 0
+    movementIntent.current.active = false
+  }, [inputRef, paused])
+
+  useEffect(() => {
+    const canvas = gl.domElement
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const updateReducedMotion = () => {
+      if (reducedMotion.matches) resetFreeLook()
+    }
+    const updateHoverLook = (event) => {
+      const look = hoverLook.current
+      if (
+        paused
+        || !freeLookEnabled
+        || reducedMotion.matches
+        || look.orbiting
+        || event.pointerType !== 'mouse'
+        || event.buttons !== 0
+        || event.target !== canvas
+      ) {
+        resetFreeLook()
+        return
+      }
+      if (look.lastX !== null && look.lastY !== null) {
+        const deltaX = event.clientX - look.lastX
+        const deltaY = event.clientY - look.lastY
+        const eventGap = look.lastTime === null ? 0 : event.timeStamp - look.lastTime
+        const resumedWithPointerJump = eventGap > MOUSE_LOOK_REENTRY_GAP_MS
+          && Math.hypot(deltaX, deltaY) > MOUSE_LOOK_REENTRY_DISTANCE
+        if (!resumedWithPointerJump) {
+          look.pendingX += THREE.MathUtils.clamp(deltaX, -MOUSE_LOOK_MAX_FRAME_DELTA, MOUSE_LOOK_MAX_FRAME_DELTA)
+          look.pendingY += THREE.MathUtils.clamp(deltaY, -MOUSE_LOOK_MAX_FRAME_DELTA, MOUSE_LOOK_MAX_FRAME_DELTA)
+        }
+      }
+      look.lastX = event.clientX
+      look.lastY = event.clientY
+      look.lastTime = event.timeStamp
+    }
+    const resetWhenHidden = () => { if (document.hidden) resetFreeLook() }
+
+    window.addEventListener('pointermove', updateHoverLook, { passive: true })
+    window.addEventListener('blur', resetFreeLook)
+    canvas.addEventListener('pointerleave', resetFreeLook)
+    canvas.addEventListener('pointerdown', resetFreeLook)
+    document.addEventListener('visibilitychange', resetWhenHidden)
+    reducedMotion.addEventListener?.('change', updateReducedMotion)
+    return () => {
+      window.removeEventListener('pointermove', updateHoverLook)
+      window.removeEventListener('blur', resetFreeLook)
+      canvas.removeEventListener('pointerleave', resetFreeLook)
+      canvas.removeEventListener('pointerdown', resetFreeLook)
+      document.removeEventListener('visibilitychange', resetWhenHidden)
+      reducedMotion.removeEventListener?.('change', updateReducedMotion)
+    }
+  }, [freeLookEnabled, gl, paused, resetFreeLook])
+
+  useEffect(() => {
+    resetFreeLook()
+  }, [freeLookEnabled, paused, resetFreeLook])
+
+  useFrame((state, frameDelta) => {
     if (!group.current) return
+    if (!movementIntent.current?.basisForward || !movementIntent.current?.basisRight) {
+      movementIntent.current = createMovementIntent()
+    }
+    const delta = Math.min(frameDelta, .05)
+    const orbitCamera = controls.current?.object
+    const {
+      forward,
+      right,
+      moveDirection,
+      desiredTarget,
+      followDelta,
+      cameraOffset,
+      cameraSpherical,
+    } = movementVectors.current
+    const look = hoverLook.current
+    const canFreeLook = Boolean(orbitCamera && controls.current && freeLookEnabled && !paused && !look.orbiting)
+    const mouseDeltaX = canFreeLook ? THREE.MathUtils.clamp(look.pendingX, -MOUSE_LOOK_MAX_FRAME_DELTA, MOUSE_LOOK_MAX_FRAME_DELTA) : 0
+    const mouseDeltaY = canFreeLook ? THREE.MathUtils.clamp(look.pendingY, -MOUSE_LOOK_MAX_FRAME_DELTA, MOUSE_LOOK_MAX_FRAME_DELTA) : 0
+    const manualLookYaw = -mouseDeltaX * MOUSE_LOOK_YAW_SENSITIVITY
+    look.pendingX -= mouseDeltaX
+    look.pendingY -= mouseDeltaY
+
+    if (canFreeLook && (mouseDeltaX || mouseDeltaY)) {
+      cameraOffset.subVectors(orbitCamera.position, controls.current.target)
+      cameraSpherical.setFromVector3(cameraOffset)
+      cameraSpherical.theta += manualLookYaw
+      cameraSpherical.phi = THREE.MathUtils.clamp(
+        cameraSpherical.phi - mouseDeltaY * MOUSE_LOOK_PITCH_SENSITIVITY,
+        CAMERA_MIN_POLAR,
+        CAMERA_MAX_POLAR,
+      )
+      cameraSpherical.makeSafe()
+      orbitCamera.position.copy(controls.current.target).add(cameraOffset.setFromSpherical(cameraSpherical))
+      orbitCamera.lookAt(controls.current.target)
+    }
+
     const keyboardX = paused ? 0 : (keys.current.has('KeyD') || keys.current.has('ArrowRight') ? 1 : 0) - (keys.current.has('KeyA') || keys.current.has('ArrowLeft') ? 1 : 0)
     const keyboardZ = paused ? 0 : (keys.current.has('KeyS') || keys.current.has('ArrowDown') ? 1 : 0) - (keys.current.has('KeyW') || keys.current.has('ArrowUp') ? 1 : 0)
-    const moveX = paused ? 0 : keyboardX || Number(inputRef.current.x || 0)
-    const moveZ = paused ? 0 : keyboardZ || Number(inputRef.current.z || 0)
-    const length = Math.hypot(moveX, moveZ)
-    const moving = length > .05
-    if (moving) {
-      const normalizedX = moveX / Math.max(1, length)
-      const normalizedZ = moveZ / Math.max(1, length)
-      const nextX = group.current.position.x + normalizedX * PLAYER_SPEED * delta
-      const nextZ = group.current.position.z + normalizedZ * PLAYER_SPEED * delta
-      const inWorld = Math.hypot(nextX, nextZ) < WORLD_RADIUS - 1
-      const blocked = blockers.some((position) => Math.hypot(nextX - position[0], nextZ - position[2]) < 1.12)
-      if (inWorld && !blocked) {
+    const moveX = paused ? 0 : THREE.MathUtils.clamp(keyboardX + Number(inputRef.current.x || 0), -1, 1)
+    const moveZ = paused ? 0 : THREE.MathUtils.clamp(keyboardZ + Number(inputRef.current.z || 0), -1, 1)
+    const inputLength = Math.hypot(moveX, moveZ)
+    const moving = inputLength > .05 && !look.orbiting
+    let movementAmount = 0
+    if (orbitCamera) {
+      orbitCamera.getWorldDirection(forward)
+      forward.setY(0)
+      if (forward.lengthSq() < .0001) forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y))
+      forward.normalize()
+      right.crossVectors(forward, orbitCamera.up).normalize()
+    }
+
+    if (moving && orbitCamera) {
+      const intent = movementIntent.current
+      if (!intent.active) {
+        intent.active = true
+        intent.basisForward.copy(forward)
+        intent.basisRight.copy(right)
+      } else if (manualLookYaw) {
+        intent.basisForward.applyAxisAngle(orbitCamera.up, manualLookYaw)
+        intent.basisRight.applyAxisAngle(orbitCamera.up, manualLookYaw)
+      }
+
+      moveDirection.copy(intent.basisRight).multiplyScalar(moveX).addScaledVector(intent.basisForward, -moveZ)
+      const inputStrength = Math.min(1, moveDirection.length())
+      moveDirection.normalize()
+      intent.targetYaw = Math.atan2(moveDirection.x, moveDirection.z)
+
+      const currentViewYaw = Math.atan2(forward.x, forward.z)
+      let yawDelta = Math.atan2(
+        Math.sin(intent.targetYaw - currentViewYaw),
+        Math.cos(intent.targetYaw - currentViewYaw),
+      )
+      if (Math.abs(Math.abs(yawDelta) - Math.PI) < .0001) yawDelta = intent.lastTurnSign * Math.PI
+      else if (Math.abs(yawDelta) > .001) intent.lastTurnSign = Math.sign(yawDelta)
+      const turnStep = THREE.MathUtils.clamp(yawDelta, -PLAYER_TURN_SPEED * delta, PLAYER_TURN_SPEED * delta)
+
+      if (turnStep) {
+        cameraOffset.subVectors(orbitCamera.position, controls.current.target)
+        cameraSpherical.setFromVector3(cameraOffset)
+        cameraSpherical.theta += turnStep
+        cameraSpherical.makeSafe()
+        orbitCamera.position.copy(controls.current.target).add(cameraOffset.setFromSpherical(cameraSpherical))
+        orbitCamera.lookAt(controls.current.target)
+      }
+
+      const nextFacingYaw = currentViewYaw + turnStep
+      group.current.rotation.y = nextFacingYaw
+      const remainingTurn = Math.atan2(
+        Math.sin(intent.targetYaw - nextFacingYaw),
+        Math.cos(intent.targetYaw - nextFacingYaw),
+      )
+      const facingStrength = THREE.MathUtils.smoothstep(
+        Math.cos(Math.abs(remainingTurn)),
+        Math.cos(PLAYER_MOVE_START_ANGLE),
+        Math.cos(PLAYER_MOVE_FULL_ANGLE),
+      )
+      movementAmount = inputStrength * facingStrength
+      moveDirection.set(Math.sin(nextFacingYaw), 0, Math.cos(nextFacingYaw))
+
+      const nextX = group.current.position.x + moveDirection.x * PLAYER_SPEED * delta * movementAmount
+      const nextZ = group.current.position.z + moveDirection.z * PLAYER_SPEED * delta * movementAmount
+      const inWorld = Math.hypot(nextX, nextZ) < WORLD_RADIUS - .8
+      const blockedByObject = blockers.some((position) => Math.hypot(nextX - position[0], nextZ - position[2]) < 1.12)
+      const blockedByRiver = isRiverWater(nextX, nextZ) && !isBridgeDeck(nextX, nextZ)
+      const blockedBySlope = !isBridgeDeck(nextX, nextZ) && terrainSlope(nextX, nextZ) > 1.08
+      if (inWorld && !blockedByObject && !blockedByRiver && !blockedBySlope) {
         group.current.position.x = nextX
         group.current.position.z = nextZ
       }
-      group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, Math.atan2(normalizedX, normalizedZ), Math.min(1, delta * 10))
-      if (body.current) body.current.position.y = .76 + Math.sin(state.clock.elapsedTime * 11) * .075
-    } else if (body.current) body.current.position.y = THREE.MathUtils.lerp(body.current.position.y, .76, delta * 6)
+    } else {
+      movementIntent.current.active = false
+      if (orbitCamera) {
+        const targetYaw = Math.atan2(forward.x, forward.z)
+        const yawDelta = Math.atan2(Math.sin(targetYaw - group.current.rotation.y), Math.cos(targetYaw - group.current.rotation.y))
+        group.current.rotation.y += yawDelta * (1 - Math.exp(-delta * 14))
+      }
+    }
 
-    group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, terrainHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 7))
+    const locomoting = moving && movementAmount > .03
+    const stride = locomoting ? Math.sin(state.clock.elapsedTime * 13.5) * .52 : 0
+    if (body.current) body.current.position.y = THREE.MathUtils.lerp(body.current.position.y, locomoting ? Math.abs(Math.sin(state.clock.elapsedTime * 13.5)) * .035 : 0, delta * 10)
+    if (leftArm.current) leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, -stride, delta * 11)
+    if (rightArm.current) rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, stride, delta * 11)
+    if (leftLeg.current) leftLeg.current.rotation.x = THREE.MathUtils.lerp(leftLeg.current.rotation.x, stride * .72, delta * 11)
+    if (rightLeg.current) rightLeg.current.rotation.x = THREE.MathUtils.lerp(rightLeg.current.rotation.x, -stride * .72, delta * 11)
+
+    group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkSurfaceHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
     const player = group.current.position
-    const portrait = size.height > size.width * 1.15
-    const offset = portrait ? [7.2, 7.6, 9.6] : [5.8, 5.25, 6.9]
-    cameraTarget.set(player.x + offset[0], player.y + offset[1], player.z + offset[2])
-    camera.position.lerp(cameraTarget, Math.min(1, delta * 3.8))
-    lookTarget.set(player.x, player.y + .68, player.z)
-    camera.lookAt(lookTarget)
+
+    if (controls.current && orbitCamera) {
+      desiredTarget.set(player.x, player.y + CAMERA_TARGET_HEIGHT, player.z)
+      if (!controlsReady.current) {
+        controls.current.target.copy(desiredTarget)
+        controlsReady.current = true
+      } else {
+        const followStrength = 1 - Math.exp(-delta * 10)
+        followDelta.subVectors(desiredTarget, controls.current.target).multiplyScalar(followStrength)
+        controls.current.target.add(followDelta)
+        orbitCamera.position.add(followDelta)
+      }
+      const minimumCameraY = terrainHeight(orbitCamera.position.x, orbitCamera.position.z) + .6
+      if (orbitCamera.position.y < minimumCameraY) {
+        orbitCamera.position.setY(THREE.MathUtils.lerp(orbitCamera.position.y, minimumCameraY, Math.min(1, delta * 12)))
+      }
+    }
 
     if (!paused) {
       let nearest = null
@@ -625,30 +870,77 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, onNearb
 
     const liveIds = new Set(pickups.map((pickup) => pickup.id))
     collectLock.current.forEach((id) => { if (!liveIds.has(id)) collectLock.current.delete(id) })
-    if (state.clock.elapsedTime - lastPublishAt.current > .12) {
+    if (state.clock.elapsedTime - lastPublishAt.current > .22) {
       lastPublishAt.current = state.clock.elapsedTime
       onPositionChange?.({ x: player.x, z: player.z })
     }
-  })
+  }, -2)
 
   return (
-    <group ref={group} position={[0, 0, 5]}>
-      <group ref={body} position={[0, .76, 0]}>
-        <mesh position={[0, .72, 0]} scale={[.9, 1.05, .82]} castShadow><capsuleGeometry args={[.38, .72, 8, 12]} /><meshStandardMaterial color="#e9f4f6" roughness={.38} /></mesh>
-        <mesh position={[0, 1.58, 0]} castShadow><sphereGeometry args={[.52, 20, 14]} /><meshStandardMaterial color="#f0f8f8" metalness={.1} roughness={.28} /></mesh>
-        <mesh position={[0, 1.56, .4]} scale={[1, .78, .38]}><sphereGeometry args={[.39, 20, 12]} /><meshPhysicalMaterial color="#65d9ff" transparent opacity={.66} metalness={.48} roughness={.07} /></mesh>
-        <mesh position={[0, .9, -.4]} castShadow><boxGeometry args={[.68, .78, .32]} /><meshStandardMaterial color="#415678" metalness={.62} roughness={.28} /></mesh>
-        {[-.3, .3].map((x) => <mesh key={`leg_${x}`} position={[x, .08, 0]} castShadow><capsuleGeometry args={[.13, .5, 6, 9]} /><meshStandardMaterial color="#d8e7ea" roughness={.42} /></mesh>)}
-        {[-.52, .52].map((x) => <mesh key={`arm_${x}`} position={[x, .75, 0]} rotation={[0, 0, x < 0 ? -.16 : .16]} castShadow><capsuleGeometry args={[.11, .58, 6, 9]} /><meshStandardMaterial color="#e0edef" roughness={.4} /></mesh>)}
-        <mesh position={[0, .83, .37]}><circleGeometry args={[.12, 14]} /><meshStandardMaterial color="#7cf2bd" emissive="#2a9b71" emissiveIntensity={1.2} /></mesh>
-        <pointLight position={[0, 1.4, .65]} color="#78eaff" intensity={.35} distance={3} />
+    <>
+      <OrbitControls
+        ref={controls}
+        makeDefault
+        enabled={!paused}
+        target={[0, CAMERA_TARGET_HEIGHT, 5]}
+        enablePan={false}
+        enableDamping
+        dampingFactor={.08}
+        rotateSpeed={.56}
+        zoomSpeed={.78}
+        minDistance={4.8}
+        maxDistance={13.5}
+        minPolarAngle={CAMERA_MIN_POLAR}
+        maxPolarAngle={CAMERA_MAX_POLAR}
+        mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
+        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+        onStart={() => {
+          hoverLook.current.orbiting = true
+          movementIntent.current.active = false
+          resetFreeLook()
+        }}
+        onEnd={() => {
+          hoverLook.current.orbiting = false
+          movementIntent.current.active = false
+          resetFreeLook()
+        }}
+      />
+      <group ref={group} position={[0, terrainHeight(0, 5), 5]} scale={CHARACTER_SCALE}>
+        <group ref={body}>
+          <mesh position={[0, 1.2, 0]} scale={[.92, 1, .8]} castShadow><capsuleGeometry args={[.39, .72, 8, 14]} /><meshStandardMaterial color="#e8f2f3" roughness={.34} metalness={.08} /></mesh>
+          <mesh position={[0, 1.18, .35]}><boxGeometry args={[.5, .42, .08]} /><meshStandardMaterial color="#253e54" metalness={.5} roughness={.25} /></mesh>
+          <mesh position={[0, 1.18, .405]}><boxGeometry args={[.28, .08, .035]} /><meshStandardMaterial color="#7cf2bd" emissive="#2a9b71" emissiveIntensity={1.5} toneMapped={false} /></mesh>
+          <mesh position={[0, .72, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.34, .055, 7, 20]} /><meshStandardMaterial color="#4e6478" metalness={.62} roughness={.28} /></mesh>
+          <mesh position={[0, 2, 0]} castShadow><sphereGeometry args={[.53, 24, 18]} /><meshStandardMaterial color="#f2f8f8" metalness={.12} roughness={.24} /></mesh>
+          <mesh position={[0, 1.98, .43]} scale={[1, .78, .4]}><sphereGeometry args={[.4, 22, 14]} /><meshPhysicalMaterial color="#67dfff" transparent opacity={.68} metalness={.5} roughness={.05} clearcoat={.7} /></mesh>
+          <mesh position={[0, 2, .08]}><torusGeometry args={[.46, .035, 8, 28]} /><meshStandardMaterial color="#b7c8ce" metalness={.66} roughness={.2} /></mesh>
+          <mesh position={[0, 1.22, -.4]} castShadow><boxGeometry args={[.7, .86, .34]} /><meshStandardMaterial color="#3d5572" metalness={.62} roughness={.25} /></mesh>
+          <mesh position={[0, 1.33, -.585]}><boxGeometry args={[.38, .35, .06]} /><meshStandardMaterial color="#69e7ff" emissive="#176d84" emissiveIntensity={.7} /></mesh>
+          <group ref={leftArm} position={[-.5, 1.48, 0]} rotation={[0, 0, -.14]}>
+            <mesh position={[0, -.3, 0]} castShadow><capsuleGeometry args={[.12, .48, 6, 10]} /><meshStandardMaterial color="#dce9eb" roughness={.38} /></mesh>
+            <mesh position={[0, -.61, .03]}><sphereGeometry args={[.15, 10, 8]} /><meshStandardMaterial color="#7c91a2" metalness={.38} /></mesh>
+          </group>
+          <group ref={rightArm} position={[.5, 1.48, 0]} rotation={[0, 0, .14]}>
+            <mesh position={[0, -.3, 0]} castShadow><capsuleGeometry args={[.12, .48, 6, 10]} /><meshStandardMaterial color="#dce9eb" roughness={.38} /></mesh>
+            <mesh position={[0, -.61, .03]}><sphereGeometry args={[.15, 10, 8]} /><meshStandardMaterial color="#7c91a2" metalness={.38} /></mesh>
+          </group>
+          <group ref={leftLeg} position={[-.25, .61, 0]}>
+            <mesh position={[0, -.28, 0]} castShadow><capsuleGeometry args={[.14, .42, 6, 10]} /><meshStandardMaterial color="#d7e5e7" roughness={.4} /></mesh>
+            <mesh position={[0, -.62, .12]} scale={[1.1, .7, 1.45]} castShadow><boxGeometry args={[.28, .2, .38]} /><meshStandardMaterial color="#40566c" metalness={.4} roughness={.35} /></mesh>
+          </group>
+          <group ref={rightLeg} position={[.25, .61, 0]}>
+            <mesh position={[0, -.28, 0]} castShadow><capsuleGeometry args={[.14, .42, 6, 10]} /><meshStandardMaterial color="#d7e5e7" roughness={.4} /></mesh>
+            <mesh position={[0, -.62, .12]} scale={[1.1, .7, 1.45]} castShadow><boxGeometry args={[.28, .2, .38]} /><meshStandardMaterial color="#40566c" metalness={.4} roughness={.35} /></mesh>
+          </group>
+          <pointLight position={[0, 1.55, .6]} color="#78eaff" intensity={.2} distance={2.6} />
+        </group>
+        <group position={[.78, 1.55, -.18]}>
+          <mesh castShadow><sphereGeometry args={[.18, 12, 9]} /><meshStandardMaterial color="#dcecf2" metalness={.5} roughness={.25} /></mesh>
+          <mesh position={[0, 0, .16]}><sphereGeometry args={[.055, 8, 6]} /><meshStandardMaterial color="#7cf2bd" emissive="#4ee1a5" emissiveIntensity={2} /></mesh>
+        </group>
+        <mesh position={[0, .025, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[.56, 24]} /><meshBasicMaterial color="#000" transparent opacity={.2} depthWrite={false} /></mesh>
       </group>
-      <group position={[.78, 1.25, -.18]}>
-        <mesh castShadow><sphereGeometry args={[.18, 12, 9]} /><meshStandardMaterial color="#dcecf2" metalness={.5} roughness={.25} /></mesh>
-        <mesh position={[0, 0, .16]}><sphereGeometry args={[.055, 8, 6]} /><meshStandardMaterial color="#7cf2bd" emissive="#4ee1a5" emissiveIntensity={2} /></mesh>
-      </group>
-      <mesh position={[0, .04, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[.56, 20]} /><meshBasicMaterial color="#000" transparent opacity={.22} /></mesh>
-    </group>
+    </>
   )
 }
 
@@ -662,13 +954,37 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
   }), [roverStatus, roverStatusLabel])
   const interactables = useMemo(() => [...RESOURCE_NODES, ...MISSION_PORTALS, GUIDE_NODE, roverNode], [roverNode])
   const blockers = useMemo(() => layout.filter((item) => item.itemId !== 'wild_sprout').map(worldPositionFromLayout), [layout])
-  const playerBlockers = useMemo(() => [...blockers, ROVER_NODE.position], [blockers])
+  const villageSlots = useMemo(() => getAvailableVillageSlots(blockers), [blockers])
+  const showVillageBeacon = useMemo(() => isVillageBeaconAvailable(blockers), [blockers])
+  const groundDetailClearings = useMemo(() => [
+    ...blockers.map((position) => ({ x: position[0], z: position[2], radius: 1.55 })),
+    ...villageSlots.map((slot) => ({ x: slot.position[0], z: slot.position[1], radius: 1.48 })),
+    ...(showVillageBeacon ? [{ x: VILLAGE_BEACON_POSITION[0], z: VILLAGE_BEACON_POSITION[1], radius: 1.4 }] : []),
+    ...RESOURCE_NODES.map((item) => ({ x: item.position[0], z: item.position[2], radius: .9 })),
+    ...MISSION_PORTALS.map((item) => ({ x: item.position[0], z: item.position[2], radius: 1.35 })),
+    { x: GUIDE_NODE.position[0], z: GUIDE_NODE.position[2], radius: .8 },
+    { x: ROVER_NODE.position[0], z: ROVER_NODE.position[2], radius: 1.05 },
+  ], [blockers, showVillageBeacon, villageSlots])
+  const playerBlockers = useMemo(() => [
+    ...blockers,
+    ROVER_NODE.position,
+    ...villageSlots.map((slot) => [slot.position[0], terrainHeight(slot.position[0], slot.position[1]), slot.position[1]]),
+    ...(showVillageBeacon ? [[VILLAGE_BEACON_POSITION[0], terrainHeight(...VILLAGE_BEACON_POSITION), VILLAGE_BEACON_POSITION[1]]] : []),
+  ], [blockers, showVillageBeacon, villageSlots])
+  const pickupBlockers = useMemo(() => [
+    ...playerBlockers,
+    ...RESOURCE_NODES.map((item) => item.position),
+    ...MISSION_PORTALS.map((item) => item.position),
+  ], [playerBlockers])
   const pickups = useMemo(() => {
     if (!activeMission) return []
     return (MISSION_PICKUPS[activeMission.route] || [])
-      .map(([x, z], index) => ({ id: `${activeMission.route}_${index}`, position: [x, terrainHeight(x, z) + .9, z] }))
+      .map(([x, z], index) => {
+        const [safeX, safeZ] = resolveMissionPickupPosition(x, z, pickupBlockers)
+        return { id: `${activeMission.route}_${index}`, position: [safeX, terrainHeight(safeX, safeZ) + .9, safeZ] }
+      })
       .filter((pickup) => !collectedIds.has(pickup.id))
-  }, [activeMission, collectedIds])
+  }, [activeMission, collectedIds, pickupBlockers])
   const [hoverPoint, setHoverPoint] = useState(null)
   const isBuildPointValid = useCallback((point) => {
     if (!point) return false
@@ -676,20 +992,39 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
     if (Math.hypot(x, z) > BUILD_RADIUS) return false
     if (blockers.some((position) => Math.hypot(x - position[0], z - position[2]) < 2.1)) return false
     if ([...RESOURCE_NODES, ...MISSION_PORTALS, ROVER_NODE].some((item) => Math.hypot(x - item.position[0], z - item.position[2]) < 2)) return false
+    if (villageSlots.some((slot) => Math.hypot(x - slot.position[0], z - slot.position[1]) < 1.9)) return false
+    if (showVillageBeacon && Math.hypot(x - VILLAGE_BEACON_POSITION[0], z - VILLAGE_BEACON_POSITION[1]) < 1.9) return false
+    if (MISSION_PICKUP_RESERVED_POINTS.some(([pickupX, pickupZ]) => Math.hypot(x - pickupX, z - pickupZ) < 2)) return false
+    if (isRiverWater(x, z) || isBridgeDeck(x, z) || terrainSlope(x, z) > .42) return false
     return true
-  }, [blockers])
+  }, [blockers, showVillageBeacon, villageSlots])
   const hoverValid = useMemo(() => isBuildPointValid(hoverPoint), [hoverPoint, isBuildPointValid])
 
   return (
     <>
       <color attach="background" args={[palette.sky]} />
-      <fog attach="fog" args={[palette.fog, 24, 62]} />
-      <hemisphereLight args={['#bfe7ff', palette.groundDeep, 1.45]} />
-      <directionalLight position={[10, 16, 8]} intensity={2.1} color={palette.light} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} />
+      <fogExp2 attach="fog" args={[palette.fog, .017]} />
+      <hemisphereLight args={['#c8edff', palette.groundDeep, 1.22]} />
+      <directionalLight position={[10, 16, 8]} intensity={2.05} color={palette.light} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-normalBias={.04} shadow-bias={-.0004} />
+      <directionalLight position={[-12, 7, -9]} intensity={.32} color={palette.accent} />
       <ambientLight intensity={.24} />
+      <Stars radius={72} depth={34} count={720} factor={2.2} saturation={.18} fade speed={.08} />
       <Sparkles count={70} scale={[48, 20, 48]} position={[0, 9, 0]} size={1.25} color={palette.particle} speed={.12} />
       <DistantWorlds palette={palette} />
-      <WorldTerrain palette={palette} />
+      <WorldTerrain
+        palette={palette}
+        villageSlots={villageSlots}
+        showVillageBeacon={showVillageBeacon}
+        detailClearings={groundDetailClearings}
+        buildItem={buildItem}
+        onBuildHover={(point) => setHoverPoint([point.x, terrainHeight(point.x, point.z), point.z])}
+        onBuildCommit={(point) => {
+          const nextPoint = [point.x, terrainHeight(point.x, point.z), point.z]
+          setHoverPoint(nextPoint)
+          if (isBuildPointValid(nextPoint)) onBuildAt?.(point.x, point.z)
+          else onInvalidBuild?.()
+        }}
+      />
 
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
       {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} onSelect={onSelectStructure} />)}
@@ -707,23 +1042,6 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
         </Float>
       ))}
 
-      <mesh
-        position={[0, .58, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        visible={Boolean(buildItem)}
-        onPointerMove={(event) => { event.stopPropagation(); setHoverPoint([event.point.x, terrainHeight(event.point.x, event.point.z), event.point.z]) }}
-        onPointerDown={(event) => {
-          if (!buildItem) return
-          event.stopPropagation()
-          const point = [event.point.x, terrainHeight(event.point.x, event.point.z), event.point.z]
-          setHoverPoint(point)
-          if (isBuildPointValid(point)) onBuildAt?.(event.point.x, event.point.z)
-          else onInvalidBuild?.()
-        }}
-      >
-        <circleGeometry args={[BUILD_RADIUS, 64]} />
-        <meshBasicMaterial color="#5ee8ff" transparent opacity={buildItem ? .018 : 0} side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
       {buildItem && hoverPoint && (
         <group position={hoverPoint}>
           <mesh position={[0, .06, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.15, 1.38, 32]} /><meshBasicMaterial color={hoverValid ? '#63f5b0' : '#ff7182'} transparent opacity={.9} depthWrite={false} /></mesh>
@@ -731,7 +1049,7 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
         </group>
       )}
 
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} pickups={pickups} paused={paused} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} />
     </>
   )
 }
@@ -940,13 +1258,17 @@ export default function GalaxyWorld3D({
   const collect = useCallback((id) => setCollectedIds((current) => current.has(id) ? current : new Set([...current, id])), [])
 
   return (
-    <div className={`frontier-game-stage${paused ? ' paused' : ''}`}>
+    <div className={`frontier-game-stage${paused ? ' paused' : ''}`} onContextMenu={(event) => event.preventDefault()}>
       <Canvas
         shadows
         frameloop={paused ? 'demand' : 'always'}
         dpr={[1, 1.5]}
         camera={{ position: [6, 5.4, 12], fov: 48, near: .1, far: 120 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping
+          gl.toneMappingExposure = 1.04
+        }}
       >
         <FrontierScene
           planet={planet}
@@ -999,7 +1321,7 @@ export default function GalaxyWorld3D({
         </div>
       )}
       {!selectedBuildItem && nearby && !paused && <InteractionPrompt nearby={nearby} />}
-      <div className="frontier-control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>이동</span><kbd>E</kbd><span>상호작용</span></div>
+      <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>방향 전환 후 전진</span><kbd>마우스 이동량</kbd><span>시점·캐릭터 방향</span><kbd>휠</kbd><span>줌</span><kbd>E</kbd><span>상호작용</span></div>
       <TouchJoystick inputRef={inputRef} disabled={paused} />
       {nearby && !selectedBuildItem && !paused && (
         <button type="button" className="frontier-action-button" onClick={interact}>

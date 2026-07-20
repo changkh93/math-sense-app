@@ -881,9 +881,14 @@
   gap: .28rem;
   padding: .4rem .55rem;
   transform: translateX(-50%);
+  border: 1px solid rgba(139, 210, 231, .1);
   border-radius: 11px;
   color: #8092a7;
+  background: rgba(4, 13, 24, .58);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .16);
+  backdrop-filter: blur(8px);
   font-size: .57rem;
+  white-space: nowrap;
   pointer-events: none;
 }
 .frontier-control-hint kbd,
