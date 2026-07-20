@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Check,
   ImagePlus,
+  Gem,
+  Leaf,
   MapPin,
+  Package,
   Pencil,
   Save,
   ShieldCheck,
@@ -13,6 +17,13 @@ import { StructurePreview3D } from './GalaxyWorld3D'
 
 const WORLD_COORD_LIMIT = 14.2
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+const ACTION_REWARDS = {
+  water: { material: 'biofiber', label: '바이오 섬유', amount: 1, Icon: Leaf, className: 'biofiber', purpose: '나무와 정원을 키우는 생태 재료예요.' },
+  repair: { material: 'alloy', label: '혜성 합금', amount: 1, Icon: Package, className: 'alloy', purpose: '로버와 항로 시설을 만드는 기계 재료예요.' },
+  feed: { material: 'stardust', label: '별가루', amount: 1, Icon: Sparkles, className: 'stardust', purpose: '빛과 장식을 만드는 기본 재료예요.' },
+  admire: { material: 'crystalGlass', label: '수정 유리', amount: 1, Icon: Gem, className: 'crystalGlass', purpose: '관측과 신호 시설을 만드는 투명 재료예요.' },
+}
 
 const toWorldCoordinate = (value) => Number((((Number(value) || 50) - 50) / 3).toFixed(1))
 
@@ -31,7 +42,9 @@ export default function GalaxyObjectDialog({
   catalogItem,
   isOwner,
   busy,
+  errorMessage,
   missionLabel,
+  missionAction,
   closeButtonRef,
   onClose,
   onSave,
@@ -44,6 +57,8 @@ export default function GalaxyObjectDialog({
   const [fileError, setFileError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [saveComplete, setSaveComplete] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const localPreviewUrl = useMemo(() => imageFile ? URL.createObjectURL(imageFile) : '', [imageFile])
   useEffect(() => () => {
@@ -59,6 +74,10 @@ export default function GalaxyObjectDialog({
   const saving = busy === `object:update:${item.instanceId}`
   const deleting = busy === `object:delete:${item.instanceId}`
   const missionBusy = busy === `object:mission:${item.instanceId}`
+  const saveInProgress = saving
+  const displayedSaveError = saveError || (isEditing ? errorMessage : '')
+  const reward = ACTION_REWARDS[missionAction] || ACTION_REWARDS.admire
+  const RewardIcon = reward.Icon
 
   const chooseImage = (event) => {
     const file = event.target.files?.[0] || null
@@ -80,8 +99,14 @@ export default function GalaxyObjectDialog({
   const submit = async (event) => {
     event.preventDefault()
     if (!isOwner || saving || deleting) return
+    setSaveError('')
     const result = await onSave?.({ ...form, imageFile, removeImage })
-    if (result) setIsEditing(false)
+    if (result) {
+      setIsEditing(false)
+      setSaveComplete(true)
+      return
+    }
+    setSaveError(errorMessage || '저장하지 못했습니다. 입력 내용과 인터넷 연결을 확인한 뒤 다시 시도해 주세요.')
   }
 
   const startEditing = () => {
@@ -89,6 +114,8 @@ export default function GalaxyObjectDialog({
     setImageFile(null)
     setRemoveImage(false)
     setFileError('')
+    setSaveError('')
+    setSaveComplete(false)
     setConfirmDelete(false)
     setIsEditing(true)
   }
@@ -99,6 +126,7 @@ export default function GalaxyObjectDialog({
     setImageFile(null)
     setRemoveImage(false)
     setFileError('')
+    setSaveError('')
     setConfirmDelete(false)
     setIsEditing(false)
   }
@@ -130,6 +158,8 @@ export default function GalaxyObjectDialog({
 
           <form className="frontier-object-editor" onSubmit={submit}>
             <div className="frontier-object-owner-badge"><ShieldCheck size={16} aria-hidden="true" /><span><strong>내 월드 객체</strong><small>이름·설명·이미지·좌표를 변경할 수 있습니다.</small></span></div>
+
+            {displayedSaveError && <p className="frontier-object-save-error" role="alert">{displayedSaveError}</p>}
 
             <label>
               <span>객체 이름</span>
@@ -177,6 +207,14 @@ export default function GalaxyObjectDialog({
           <div className="frontier-object-hero__content">
             <h3>{objectName}</h3>
             <p>{description}</p>
+            <section className={`frontier-object-reward material-${reward.className}`} aria-label="이 시설에서 얻는 재료">
+              <span><RewardIcon size={20} aria-hidden="true" /></span>
+              <div>
+                <small>이 시설 가까이에서 <kbd>E</kbd> 키를 누르면</small>
+                <strong>{reward.label} {reward.amount}개를 얻어요</strong>
+                <p>{reward.purpose}</p>
+              </div>
+            </section>
             <div className="frontier-object-hero__actions">
               {isOwner ? (
                 <button type="button" className="galaxy-primary-btn" onClick={startEditing}><Pencil size={16} aria-hidden="true" /> 수정</button>
@@ -186,6 +224,21 @@ export default function GalaxyObjectDialog({
             </div>
           </div>
         </section>
+      )}
+      {saveInProgress && (
+        <div className="frontier-object-save-state" role="status" aria-live="assertive" aria-busy="true">
+          <span><Save size={24} aria-hidden="true" /></span>
+          <strong>변경사항을 저장하고 있어요</strong>
+          <p>{imageFile ? '이미지를 올린 뒤 이름·설명·위치를 저장합니다.' : '이름·설명·위치를 행성에 저장합니다.'}</p>
+        </div>
+      )}
+      {saveComplete && (
+        <div className="frontier-object-save-state is-complete" role="alertdialog" aria-modal="true" aria-labelledby="frontier-object-save-complete-title">
+          <span><Check size={25} aria-hidden="true" /></span>
+          <strong id="frontier-object-save-complete-title">저장 완료</strong>
+          <p>수정한 이름, 설명, 이미지와 위치가 행성에 반영됐습니다.</p>
+          <button type="button" className="galaxy-primary-btn" autoFocus onClick={onClose}>확인</button>
+        </div>
       )}
     </section>
   )

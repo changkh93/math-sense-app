@@ -1378,7 +1378,9 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                 catalogItem={selectedObjectCatalog}
                 isOwner={isOwner}
                 busy={busy}
+                errorMessage={error}
                 missionLabel={selectedObjectMission?.label}
+                missionAction={selectedObjectMission?.actionId}
                 closeButtonRef={objectDialogCloseRef}
                 onClose={closeObjectDialog}
                 onSave={saveGalaxyObject}
