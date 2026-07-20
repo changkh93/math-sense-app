@@ -103,6 +103,12 @@ const GALAXY_WORLD_NODE_ACTIONS = {
   broken_beacon: "beacon",
   wild_soil: "plant",
 };
+const GALAXY_STRUCTURE_ACTION_REWARDS = {
+  water: { material: "biofiber", amount: 1, label: "돌봄을 마치고 바이오 섬유 1개를 얻었습니다." },
+  repair: { material: "alloy", amount: 1, label: "정비를 마치고 고대 합금 1개를 회수했습니다." },
+  feed: { material: "stardust", amount: 1, label: "생명체를 돌보고 별가루 1개를 얻었습니다." },
+  admire: { material: "crystalGlass", amount: 1, label: "관측 기록을 남기고 수정 유리 1개를 발견했습니다." },
+};
 
 const GALAXY_DAILY_EVENT_VERSION = 1;
 const GALAXY_DAILY_EVENT_OPERATION_TYPE = "galaxy_daily_event";
@@ -2931,6 +2937,56 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     return { success: true, ...result };
   });
 
+  const performGalaxyStructureAction = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    const rawInstanceId = data?.instanceId;
+    const instanceId = cleanId(rawInstanceId, 120);
+    if (
+      typeof rawInstanceId !== "string"
+      || rawInstanceId.trim() !== rawInstanceId
+      || rawInstanceId.length > 120
+      || !/^[A-Za-z0-9_-]{1,120}$/.test(instanceId)
+    ) throw new functions.https.HttpsError("invalid-argument", "시설 식별자가 올바르지 않습니다.");
+
+    const { user } = await requireMember(uid);
+    const planet = await ensurePlanet(uid, user);
+    const operationRef = db.collection("galaxyOperations").doc(`structure_${uid}_${instanceId}`);
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(planet.ref),
+      ]);
+      const planetData = planetSnap.data() || {};
+      const layout = Array.isArray(planetData.layout) ? planetData.layout : [];
+      const structure = layout.find((entry) => entry?.instanceId === instanceId) || null;
+      if (!structure) throw new functions.https.HttpsError("not-found", "행성에서 해당 시설을 찾을 수 없습니다.");
+      const actionId = getGalaxyStructureVisitAction(structure.itemId);
+      const reward = GALAXY_STRUCTURE_ACTION_REWARDS[actionId];
+      if (!reward) throw new functions.https.HttpsError("failed-precondition", "이 시설에서는 아직 수행할 활동이 없습니다.");
+
+      const nowMs = Date.now();
+      const availableAtMs = Math.max(0, Number(operationSnap.data()?.availableAtMs || 0));
+      if (availableAtMs > nowMs) {
+        throw new functions.https.HttpsError("resource-exhausted", "이 시설은 아직 다음 활동을 준비하고 있습니다.", { availableAtMs });
+      }
+
+      const materials = { ...(planetData.materials || {}) };
+      materials[reward.material] = Math.max(0, Number(materials[reward.material] || 0)) + reward.amount;
+      transaction.set(planet.ref, { materials, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(operationRef, {
+        uid,
+        type: "galaxy_structure_action",
+        instanceId,
+        itemId: structure.itemId || "",
+        actionId,
+        availableAtMs: nowMs + 5 * 60 * 1000,
+        lastCompletedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { materials, label: reward.label, material: reward.material, amount: reward.amount, availableAtMs: nowMs + 5 * 60 * 1000 };
+    });
+    return serializeValue({ success: true, ...result });
+  });
+
   const markGalaxyEventsSeen = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
     await requireMember(uid);
@@ -2965,6 +3021,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     claimGalaxyRoverExpedition,
     runGalaxyMission,
     performGalaxyWorldAction,
+    performGalaxyStructureAction,
     markGalaxyEventsSeen,
   };
 };

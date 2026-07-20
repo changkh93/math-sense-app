@@ -644,6 +644,10 @@ function MissionPortal({ portal, active }) {
   const portalY = terrainHeight(portal.position[0], portal.position[2]) + .72
   return (
     <group position={[portal.position[0], portalY, portal.position[2]]}>
+      <mesh position={[0, 2.4, 0]}>
+        <cylinderGeometry args={[.16, .72, 4.8, 20, 1, true]} />
+        <meshBasicMaterial color={color} transparent opacity={.1} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
       <mesh position={[0, -.44, 0]} castShadow><cylinderGeometry args={[.85, 1.05, .5, 16]} /><meshStandardMaterial color="#293950" metalness={.7} roughness={.3} /></mesh>
       {[-1.15, 1.15].map((x) => <mesh key={x} position={[x, .65, 0]} castShadow><boxGeometry args={[.32, 2.1, .55]} /><meshStandardMaterial color="#42546e" metalness={.67} roughness={.3} /></mesh>)}
       <Float speed={1.1} floatIntensity={.12}>
@@ -652,6 +656,12 @@ function MissionPortal({ portal, active }) {
       </Float>
       <Sparkles count={12} scale={[2.4, 2.4, .8]} color={color} size={1.6} speed={.28} />
       <ResourceHalo color={color} />
+      <Html position={[0, 3.1, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+        <div className="frontier-mission-portal-label">
+          <small>탐사 관문</small>
+          <strong><kbd>E</kbd> 탐사 시작</strong>
+        </div>
+      </Html>
     </group>
   )
 }

@@ -719,9 +719,9 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     }
     if (missionCooldown.ready) return {
       id: 'field-expedition',
-      eyebrow: '오늘의 현장 탐사',
-      title: '탐사 관문에서 신호 조각 5개를 회수하세요',
-      detail: '원하는 항로를 선택하고 월드 곳곳의 조각을 모아 희귀 건설 재료를 확보하세요.',
+      eyebrow: '45초 탐사 · 건설 재료 보상',
+      title: '빛나는 고리 관문에 가서 E키를 누르세요',
+      detail: '보라·주황·하늘색 고리 중 하나에서 시작한 뒤 신호 조각 5개를 모으면 건설 재료를 얻습니다.',
       progress: 0,
       total: 5,
       action: 'world',
@@ -961,11 +961,22 @@ export default function MetaGalaxy({ user, userData, onBack }) {
 
   const performObjectMission = async (item = selectedObject) => {
     if (!item?.instanceId) return null
-    if (isOwner) {
-      flash('내 행성의 객체 정보는 가까이에서 F 키를 눌러 확인할 수 있어요.')
-      return null
-    }
     const mission = getStructureVisitAction(item.itemId)
+    if (isOwner) {
+      const result = await runAction(
+        `object:mission:${item.instanceId}`,
+        () => callGalaxy('performGalaxyStructureAction', { instanceId: item.instanceId }),
+        (missionResult) => missionResult?.label || `${mission.label}을 완료했습니다.`,
+      )
+      if (!result) return null
+      setHome((current) => {
+        if (!current) return current
+        const ownPlanet = current.ownPlanet || {}
+        const nextOwnPlanet = { ...ownPlanet, materials: result.materials || ownPlanet.materials || {} }
+        return { ...current, ownPlanet: nextOwnPlanet, planet: targetUid === user?.uid ? nextOwnPlanet : current.planet }
+      })
+      return result
+    }
     const result = await runAction(
       `object:mission:${item.instanceId}`,
       () => callGalaxy('performGalaxyVisitAction', {
@@ -1185,7 +1196,9 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     }
     setArrivalOpen(false)
     setMenu('')
-    flash(isOwner ? '월드의 빛나는 탐사 관문으로 이동해 항로를 시작하세요.' : '가까운 생태 지점에서 도움 행동을 남겨보세요.')
+    flash(isOwner
+      ? '지도 가장자리의 보라·주황·하늘색 빛 고리로 가세요. 가까이에서 E키를 누르면 45초 탐사가 시작됩니다.'
+      : '가까운 생태 지점에서 도움 행동을 남겨보세요.')
   }
 
   const beginBuild = (itemId) => {
