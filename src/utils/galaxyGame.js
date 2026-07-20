@@ -94,6 +94,100 @@ export const GALAXY_MISSION_ROUTES = {
   },
 }
 
+const GALAXY_ROVER_BASE_DURATION_MS = 8 * 60 * 60 * 1000
+const GALAXY_ROVER_BAY_DURATION_MS = 6 * 60 * 60 * 1000
+
+export const GALAXY_ROVER_ROUTES = {
+  nebula: {
+    label: '성운 생태 원정',
+    shortLabel: '성운',
+    iconId: 'cloud',
+    ability: 'detection',
+    abilityLabel: '탐지 공명',
+    rewardMaterial: 'biofiber',
+    reward: '바이오 섬유',
+    baseReward: 4,
+    durationMs: GALAXY_ROVER_BASE_DURATION_MS,
+    roverBayDurationMs: GALAXY_ROVER_BAY_DURATION_MS,
+    accent: '#9e8cff',
+    copy: '빛나는 포자 지대를 지나 미지의 생태 표본을 추적합니다.',
+    discoveries: [
+      { id: 'nebula_lumen_spore', name: '루멘 포자낭', rarity: 'common', description: '성운 바람을 머금고 은은하게 빛나는 생태 표본입니다.' },
+      { id: 'nebula_aether_seed', name: '에테르 씨앗', rarity: 'rare', description: '중력이 약한 곳에서만 싹을 틔우는 부유 종자입니다.' },
+      { id: 'nebula_whale_echo', name: '성운고래의 메아리', rarity: 'legendary', description: '아주 오래된 거대 생명체가 남긴 공명 기록입니다.' },
+    ],
+  },
+  comet: {
+    label: '혜성 구조 원정',
+    shortLabel: '혜성',
+    iconId: 'comet',
+    ability: 'piloting',
+    abilityLabel: '조종 감각',
+    rewardMaterial: 'alloy',
+    reward: '혜성 합금',
+    baseReward: 2,
+    durationMs: GALAXY_ROVER_BASE_DURATION_MS,
+    roverBayDurationMs: GALAXY_ROVER_BAY_DURATION_MS,
+    accent: '#ff9b65',
+    copy: '불안정한 꼬리 궤도를 따라 오래된 구조 신호를 회수합니다.',
+    discoveries: [
+      { id: 'comet_iron_scale', name: '혜성 철편', rarity: 'common', description: '수많은 항해를 견딘 단단한 외피 조각입니다.' },
+      { id: 'comet_tail_crystal', name: '꼬리빛 결정', rarity: 'rare', description: '혜성 꼬리의 빛이 결정처럼 굳어진 희귀 표본입니다.' },
+      { id: 'comet_rescue_capsule', name: '개척자 구조 캡슐', rarity: 'legendary', description: '첫 아스트라 개척대의 항해 기록이 잠든 캡슐입니다.' },
+    ],
+  },
+  ruins: {
+    label: '고대 정거장 원정',
+    shortLabel: '유적',
+    iconId: 'satellite',
+    ability: 'precision',
+    abilityLabel: '정밀 제어',
+    rewardMaterial: 'crystalGlass',
+    reward: '수정 유리',
+    baseReward: 2,
+    durationMs: GALAXY_ROVER_BASE_DURATION_MS,
+    roverBayDurationMs: GALAXY_ROVER_BAY_DURATION_MS,
+    accent: '#65dff5',
+    copy: '멈춘 정거장의 장치를 복원해 사라진 항로의 기억을 읽습니다.',
+    discoveries: [
+      { id: 'ruins_station_seal', name: '정거장 인장', rarity: 'common', description: '옛 항로 관리자가 사용하던 수정 표식입니다.' },
+      { id: 'ruins_prism_memory', name: '프리즘 기억핵', rarity: 'rare', description: '빛의 결을 따라 장면을 보존하는 고대 저장 장치입니다.' },
+      { id: 'ruins_astra_chart', name: '잃어버린 아스트라 성도', rarity: 'legendary', description: '폭풍 이전의 모든 항로가 새겨진 별자리 지도입니다.' },
+    ],
+  },
+}
+
+export const GALAXY_ROVER_DISCOVERIES = Object.values(GALAXY_ROVER_ROUTES)
+  .flatMap((route) => route.discoveries)
+
+export function getGalaxyRoverStatus(expedition, nowMs = Date.now()) {
+  if (!expedition || typeof expedition !== 'object') return 'idle'
+
+  const status = String(expedition.status || '').trim().toLowerCase()
+  const hasIdentity = Boolean(expedition.operationId || expedition.id || expedition.route)
+  if (!hasIdentity || status === 'idle' || status === 'none') return 'idle'
+  if (expedition.claimedAtMs || ['claimed', 'collected'].includes(status)) return 'claimed'
+  if (['ready', 'returned'].includes(status)) return 'ready'
+
+  const returnsAtMs = Number(expedition.returnsAtMs || expedition.readyAtMs || expedition.returnAtMs || 0)
+  if (returnsAtMs > 0 && Number(nowMs || 0) >= returnsAtMs) return 'ready'
+  return 'active'
+}
+
+export function formatGalaxyRoverRemainingTime(remainingMs) {
+  const safeRemainingMs = Math.max(0, Number(remainingMs) || 0)
+  if (!safeRemainingMs) return '귀환 완료'
+
+  const totalMinutes = Math.max(1, Math.ceil(safeRemainingMs / 60000))
+  const days = Math.floor(totalMinutes / (24 * 60))
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+  const minutes = totalMinutes % 60
+
+  if (days > 0) return `${days}일 ${hours}시간 후`
+  if (hours > 0) return `${hours}시간 ${minutes}분 후`
+  return `${minutes}분 후`
+}
+
 export const GALAXY_ROUTE_LEVELS = [
   { level: 1, minXp: 0, nextLevelXp: 20, label: '첫 신호', iconId: 'radio' },
   { level: 2, minXp: 20, nextLevelXp: 60, label: '안정 항로', iconId: 'route' },

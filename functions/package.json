@@ -4,6 +4,8 @@
   "scripts": {
     "lint": "eslint .",
     "test:galaxy-backfill": "node galaxyGame.backfill.test.cjs",
+    "test:galaxy-rover": "node galaxyGame.rover.test.cjs",
+    "test:galaxy": "npm run test:galaxy-backfill && npm run test:galaxy-rover",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

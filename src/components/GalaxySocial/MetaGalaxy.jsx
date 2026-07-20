@@ -62,9 +62,12 @@ import {
   GALAXY_PLAY_STYLES,
   GALAXY_THEMES,
   MATERIAL_LABELS,
+  formatGalaxyRoverRemainingTime,
   formatGalaxyTime,
+  getGalaxyRoverStatus,
   getMissionCooldown,
 } from '../../utils/galaxyGame'
+import GalaxyRoverPanel from './GalaxyRoverPanel'
 import GalaxyWorld3D, { StructurePreview3D } from './GalaxyWorld3D'
 import './MetaGalaxy.css'
 
@@ -171,7 +174,7 @@ const BUILD_ITEM_STORIES = {
   rover_bay: {
     overline: '새로운 놀이의 출발점',
     promise: '탐사 로버가 돌아와 정비를 받는 기지를 세워 원정의 목적지를 만듭니다.',
-    effect: '탐사 구역의 핵심 시설이자 다음 로버 시스템의 기반이 됩니다.',
+    effect: '장거리 로버 원정 시간을 8시간에서 6시간으로 단축합니다.',
     set: '개척 탐사 세트',
   },
   observatory: {
@@ -196,6 +199,7 @@ const FALLBACK_BUILD_STORY = {
 }
 
 const MENU_META = {
+  rover: { overline: 'OFFLINE EXPEDITION', title: '루미 로버 원정 관제', Icon: Satellite },
   build: { overline: 'PLANET CONSTRUCTION', title: '욕망을 여는 건설 설계소', Icon: Hammer },
   neighbors: { overline: 'CONNECTED ROUTES', title: '이웃 항로 은하 지도', Icon: Route },
   logs: { overline: 'RETURN SIGNALS', title: '귀환 신호 타임라인', Icon: Radio },
@@ -400,8 +404,13 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     if (!quiet) setLoading(true)
     setError('')
     try {
+      const clientSentAtMs = Date.now()
       const data = await callGalaxy('openGalaxyHome', { targetUid: nextTargetUid })
-      setHome(data)
+      const clientReceivedAtMs = Date.now()
+      const serverClockOffsetMs = Number.isFinite(Number(data?.serverNowMs))
+        ? Number(data.serverNowMs) - Math.round((clientSentAtMs + clientReceivedAtMs) / 2)
+        : 0
+      setHome({ ...data, serverClockOffsetMs })
       setTargetUid(nextTargetUid || user.uid)
     } catch (err) {
       setError(err?.message || '행성 신호를 불러오지 못했습니다.')
@@ -457,7 +466,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   }, [user?.uid])
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 30000)
+    const timer = window.setInterval(() => setNowMs(Date.now()), 15000)
     return () => window.clearInterval(timer)
   }, [])
 
@@ -507,10 +516,24 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   const catalog = home?.catalog || {}
   const unreadCount = events.filter((event) => !event.seen).length
   const wallet = Math.max(0, Number(home?.wallet ?? userData?.crystals ?? 0))
-  const missionCooldown = getMissionCooldown(ownPlanet.lastMissionAtMs, nowMs)
+  const galaxyNowMs = nowMs + Number(home?.serverClockOffsetMs || 0)
+  const missionCooldown = getMissionCooldown(ownPlanet.lastMissionAtMs, galaxyNowMs)
   const currentTheme = GALAXY_THEMES[planet.theme] || GALAXY_THEMES.forest
   const ownTheme = GALAXY_THEMES[ownPlanet.theme] || GALAXY_THEMES.forest
   const ownLayout = Array.isArray(ownPlanet.layout) ? ownPlanet.layout : []
+  const roverExpedition = ownPlanet.roverExpedition || null
+  const roverStatus = getGalaxyRoverStatus(roverExpedition, galaxyNowMs)
+  const roverReadyAtMs = Number(roverExpedition?.returnsAtMs || roverExpedition?.readyAtMs || 0)
+  const roverRemainingLabel = formatGalaxyRoverRemainingTime(Math.max(0, roverReadyAtMs - galaxyNowMs))
+  const hasRoverBay = ownLayout.some((item) => item?.itemId === 'rover_bay' && item?.locked !== true)
+  const hasExpeditionBeacon = ownLayout.some((item) => item?.itemId === 'expedition_beacon' && item?.locked !== true)
+  const roverStatusLabel = roverStatus === 'ready'
+    ? '귀환 상자 수신하기'
+    : roverStatus === 'active'
+      ? `귀환 ${roverRemainingLabel}`
+      : roverStatus === 'claimed'
+        ? '다음 원정 준비'
+        : '장거리 원정 준비'
   const builtCount = ownLayout.filter((item) => !item.locked && item.itemId !== 'wild_sprout').length
   const catalogEntries = Object.entries(catalog)
   const effectiveFocusedBuildItemId = focusedBuildItemId && catalog[focusedBuildItemId] ? focusedBuildItemId : catalogEntries[0]?.[0] || ''
@@ -524,6 +547,15 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   } : focusedBuildStoryBase
 
   const todayObjective = useMemo(() => {
+    if (isOwner && roverStatus === 'ready') return {
+      id: 'rover-return',
+      eyebrow: '오늘의 최우선 귀환 임무',
+      title: '로버 귀환 상자를 열어 발견물을 확인하세요',
+      detail: '서버에 보존된 원정 재료와 새로운 발견 기록을 한 번만 안전하게 수령합니다.',
+      progress: 1,
+      total: 1,
+      action: 'rover',
+    }
     if (unreadCount > 0) return {
       id: 'signals',
       eyebrow: '오늘의 귀환 임무',
@@ -542,25 +574,43 @@ export default function MetaGalaxy({ user, userData, onBack }) {
       total: 1,
       action: 'build',
     }
+    if (isOwner && ['idle', 'claimed'].includes(roverStatus)) return {
+      id: 'rover-dispatch',
+      eyebrow: '오늘의 장거리 원정',
+      title: '밤사이 탐사할 로버 항로를 선택하세요',
+      detail: `지금 출항하면 ${hasRoverBay ? '6시간' : '8시간'} 뒤 재료와 발견 기록이 귀환합니다. 게임을 닫아도 원정은 계속됩니다.`,
+      progress: 0,
+      total: 1,
+      action: 'rover',
+    }
     if (missionCooldown.ready) return {
-      id: 'expedition',
-      eyebrow: '오늘의 탐사 임무',
+      id: 'field-expedition',
+      eyebrow: '오늘의 현장 탐사',
       title: '탐사 관문에서 신호 조각 5개를 회수하세요',
       detail: '원하는 항로를 선택하고 월드 곳곳의 조각을 모아 희귀 건설 재료를 확보하세요.',
       progress: 0,
       total: 5,
       action: 'world',
     }
+    if (isOwner && roverStatus === 'active') return {
+      id: 'rover-active',
+      eyebrow: '장거리 원정 진행 중',
+      title: `로버가 ${roverRemainingLabel} 돌아옵니다`,
+      detail: '원정이 진행되는 동안 행성을 건설하거나 이웃 항로에 도움 신호를 남겨보세요.',
+      progress: 0,
+      total: 1,
+      action: 'rover',
+    }
     return {
       id: 'route-care',
       eyebrow: '오늘의 항로 임무',
       title: isOwner ? '행성을 돌보고 다음 귀환을 준비하세요' : '친구의 행성에 도움 신호를 남기세요',
-      detail: isOwner ? `탐사 로버 정비 완료까지 ${missionCooldown.label}` : '가까운 생태·시설 지점에서 안전한 도움 행동을 남길 수 있습니다.',
+      detail: isOwner ? `현장 탐사 관문 재충전까지 ${missionCooldown.label}` : '가까운 생태·시설 지점에서 안전한 도움 행동을 남길 수 있습니다.',
       progress: 0,
       total: 1,
       action: isOwner ? 'build' : 'world',
     }
-  }, [builtCount, isOwner, missionCooldown.label, missionCooldown.ready, unreadCount, wallet])
+  }, [builtCount, hasRoverBay, isOwner, missionCooldown.label, missionCooldown.ready, roverRemainingLabel, roverStatus, unreadCount, wallet])
 
   const overnightSummary = useMemo(() => {
     const latestEvent = events[0]
@@ -695,6 +745,81 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     return result
   }, [missionPartnerUid, runAction, targetUid, user?.uid])
 
+  const dispatchRover = async (route) => {
+    if (!isOwner) return null
+    const result = await runAction(
+      'rover:dispatch',
+      () => callGalaxy('startGalaxyRoverExpedition', { route, operationId: createOperationId() }),
+      (dispatchResult) => {
+        const title = dispatchResult?.expedition?.routeTitle || '장거리 로버 원정'
+        const readyAt = formatGalaxyTime(dispatchResult?.expedition?.readyAtMs)
+        return `${title}을 시작했습니다.${readyAt ? ` ${readyAt} 귀환 예정입니다.` : ''}`
+      },
+    )
+    if (!result?.expedition) return null
+    const receivedAtMs = Date.now()
+    setHome((current) => {
+      if (!current) return current
+      const nextOwnPlanet = { ...current.ownPlanet, roverExpedition: result.expedition }
+      return {
+        ...current,
+        serverNowMs: result.serverNowMs || current.serverNowMs,
+        serverClockOffsetMs: Number.isFinite(Number(result.serverNowMs))
+          ? Number(result.serverNowMs) - receivedAtMs
+          : current.serverClockOffsetMs,
+        ownPlanet: nextOwnPlanet,
+        ...(targetUid === user?.uid ? { planet: nextOwnPlanet } : {}),
+      }
+    })
+    setNowMs(receivedAtMs)
+    return result
+  }
+
+  const claimRover = async () => {
+    if (!isOwner || !roverExpedition?.operationId) {
+      flash('수령할 로버 원정 기록을 찾지 못했습니다. 관제 화면을 다시 열어 주세요.')
+      return null
+    }
+    const result = await runAction(
+      'rover:claim',
+      () => callGalaxy('claimGalaxyRoverExpedition', { operationId: roverExpedition.operationId }),
+      (claimResult) => {
+        const reward = claimResult?.claimResult?.reward || {}
+        const discovery = claimResult?.claimResult?.discovery || {}
+        return `${reward.title || '원정 재료'} ${reward.amount || 0}개와 ${discovery.name || '새 발견 기록'}을 수령했습니다.`
+      },
+    )
+    if (!result?.expedition || !result?.claimResult) return null
+    const receivedAtMs = Date.now()
+    setHome((current) => {
+      if (!current) return current
+      const currentDiscoveries = Array.isArray(current.ownPlanet?.roverDiscoveries)
+        ? current.ownPlanet.roverDiscoveries
+        : []
+      const discovery = result.claimResult.discovery
+      const nextDiscoveries = discovery?.id && !currentDiscoveries.some((entry) => entry?.id === discovery.id)
+        ? [...currentDiscoveries, { ...discovery, discoveredAtMs: result.claimResult.claimedAtMs }]
+        : currentDiscoveries
+      const nextOwnPlanet = {
+        ...current.ownPlanet,
+        roverExpedition: result.expedition,
+        roverDiscoveries: nextDiscoveries,
+        materials: result.claimResult.materials || current.ownPlanet?.materials || {},
+      }
+      return {
+        ...current,
+        serverNowMs: result.serverNowMs || current.serverNowMs,
+        serverClockOffsetMs: Number.isFinite(Number(result.serverNowMs))
+          ? Number(result.serverNowMs) - receivedAtMs
+          : current.serverClockOffsetMs,
+        ownPlanet: nextOwnPlanet,
+        ...(targetUid === user?.uid ? { planet: nextOwnPlanet } : {}),
+      }
+    })
+    setNowMs(receivedAtMs)
+    return result
+  }
+
   const savePassport = async (form) => {
     const result = await runAction('passport', () => callGalaxy('saveGalaxyPassport', form), '탐험가 패스포트가 갱신되었습니다.')
     if (!result) return
@@ -723,6 +848,10 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   }
 
   const handleObjectiveAction = () => {
+    if (todayObjective.action === 'rover') {
+      openGameMenu('rover')
+      return
+    }
     if (todayObjective.action === 'logs') {
       openLogs()
       return
@@ -759,7 +888,10 @@ export default function MetaGalaxy({ user, userData, onBack }) {
         planet={planet}
         materials={(isOwner ? planet : ownPlanet).materials || {}}
         missionReady={isOwner && missionCooldown.ready}
-        missionCooldownLabel={isOwner ? missionCooldown.label : '탐사 의뢰는 내 행성에서 출항할 수 있어요'}
+        missionCooldownLabel={isOwner ? missionCooldown.label : '현장 탐사는 내 행성에서 출발할 수 있어요'}
+        roverStatus={isOwner ? roverStatus : 'idle'}
+        roverStatusLabel={isOwner ? roverStatusLabel : '내 행성에서 원정 가능'}
+        onOpenRover={() => openGameMenu('rover')}
         selectedBuildItem={selectedBuildItem}
         onCancelBuild={() => setSelectedBuildItem('')}
         onBuildAt={buildItemAt}
@@ -812,6 +944,9 @@ export default function MetaGalaxy({ user, userData, onBack }) {
       </button>
 
       <nav className="frontier-command-dock" aria-label="프론티어 명령 독">
+        <button type="button" className={menu === 'rover' ? 'active' : ''} onClick={() => openGameMenu('rover')} aria-label={roverStatus === 'ready' ? '로버 귀환 상자 열기' : '로버 원정 관제 열기'}>
+          <Satellite size={21} aria-hidden="true" /><small>로버</small>{isOwner && roverStatus === 'ready' && <b>!</b>}
+        </button>
         <button type="button" className={menu === 'build' ? 'active' : ''} onClick={() => openGameMenu('build')}>
           <Backpack size={21} aria-hidden="true" /><small>건설</small>
         </button>
@@ -865,12 +1000,22 @@ export default function MetaGalaxy({ user, userData, onBack }) {
               <div className="frontier-arrival-grid">
                 <BriefingCard Icon={Sparkles} overline="귀환 후 행성 변화" title={events.length ? '새로운 기억이 도착했어요' : '귀환등이 항로를 지켰어요'} detail={overnightSummary} />
                 <BriefingCard Icon={Radio} overline="수신 신호" title={unreadCount ? `읽지 않은 신호 ${unreadCount}개` : '새 신호를 기다리는 중'} detail={unreadCount ? '타임라인에서 친구의 도움과 메시지를 확인할 수 있어요.' : '이웃 행성을 방문해 첫 도움 신호를 보내면 새로운 왕복 항로가 시작됩니다.'} />
-                <BriefingCard Icon={Satellite} overline="탐사 로버 상태" title={missionCooldown.ready ? '출항 준비 완료' : '귀환 후 정비 중'} detail={missionCooldown.ready ? '세 항로 중 하나를 선택해 희귀 건설 재료를 회수할 수 있어요.' : `${missionCooldown.label} 다시 출항할 수 있어요.`} />
+                <BriefingCard
+                  Icon={Satellite}
+                  overline="장거리 로버 상태"
+                  title={roverStatus === 'ready' ? '귀환 상자가 도착했어요' : roverStatus === 'active' ? '로버가 원정 중이에요' : '새 원정을 설정할 수 있어요'}
+                  detail={roverStatus === 'ready'
+                    ? '원정 관제에서 재료와 새로운 발견 기록을 안전하게 수령하세요.'
+                    : roverStatus === 'active'
+                      ? `${roverRemainingLabel} 귀환합니다. 게임을 닫아도 항해는 계속돼요.`
+                      : `세 항로 중 하나를 골라 ${hasRoverBay ? '6시간' : '8시간'} 장거리 원정을 시작할 수 있어요.`}
+                />
                 <BriefingCard Icon={Compass} overline={todayObjective.eyebrow} title={todayObjective.title} detail={todayObjective.detail} accent />
               </div>
 
               <footer className="frontier-arrival-actions">
                 <button type="button" className="galaxy-secondary-btn" onClick={() => openGameMenu('logs')}><Radio size={17} aria-hidden="true" /> 신호 기록 보기</button>
+                <button type="button" className={roverStatus === 'ready' ? 'galaxy-primary-btn' : 'galaxy-secondary-btn'} onClick={() => openGameMenu('rover')}><Satellite size={17} aria-hidden="true" /> {roverStatus === 'ready' ? '귀환 상자 열기' : '로버 관제 열기'}</button>
                 <button type="button" className="galaxy-primary-btn" onClick={() => setArrivalOpen(false)}>행성으로 들어가기 <DoorOpen size={17} aria-hidden="true" /></button>
               </footer>
             </Motion.section>
@@ -889,6 +1034,30 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                 </div>
                 <button ref={menuCloseRef} type="button" onClick={() => setMenu('')} aria-label="메뉴 닫기"><X size={20} aria-hidden="true" /></button>
               </header>
+
+              {menu === 'rover' && (
+                isOwner ? (
+                  <GalaxyRoverPanel
+                    expedition={roverExpedition}
+                    nowMs={galaxyNowMs}
+                    materials={ownPlanet.materials || {}}
+                    discoveries={ownPlanet.roverDiscoveries || []}
+                    hasRoverBay={hasRoverBay}
+                    hasExpeditionBeacon={hasExpeditionBeacon}
+                    abilityValues={ownPlanet.abilitySnapshot?.values || {}}
+                    busy={busy.startsWith('rover:') ? busy.split(':')[1] : false}
+                    onDispatch={dispatchRover}
+                    onClaim={claimRover}
+                  />
+                ) : (
+                  <div className="galaxy-empty-state frontier-log-empty">
+                    <span className="frontier-empty-icon"><Satellite size={30} aria-hidden="true" /></span>
+                    <h3>로버 관제는 내 행성에서 연결할 수 있어요</h3>
+                    <p>친구의 행성을 둘러본 뒤 내 착륙장으로 돌아가 장거리 원정을 설정해 주세요.</p>
+                    <button type="button" className="galaxy-primary-btn" onClick={() => visitNeighbor(user.uid)}>내 행성으로 귀환</button>
+                  </div>
+                )
+              )}
 
               {menu === 'build' && (
                 <div className="frontier-build-menu">
@@ -958,13 +1127,13 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                 <div className="frontier-social-menu">
                   <div className="frontier-relay-setting">
                     <label>
-                      <span><Satellite size={17} aria-hidden="true" /> 비동기 탐사 릴레이 파트너</span>
+                      <span><Satellite size={17} aria-hidden="true" /> 현장 탐사 릴레이 파트너</span>
                       <select value={missionPartnerUid} onChange={(event) => setMissionPartnerUid(event.target.value)}>
                         <option value="">혼자 출항</option>
                         {neighbors.map((neighbor) => <option key={neighbor.uid} value={neighbor.uid}>{neighbor.displayName}</option>)}
                       </select>
                     </label>
-                    <small>탐사 관문을 완주하면 선택한 친구의 귀환 타임라인에도 공동 기록이 남습니다.</small>
+                    <small>45초 현장 탐사 관문을 완주하면 선택한 친구의 귀환 타임라인에도 공동 기록이 남습니다.</small>
                   </div>
                   {!isOwner && (
                     <label className="galaxy-preset-message">

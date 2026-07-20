@@ -22,7 +22,7 @@ const GALAXY_ITEM_CATALOG = {
   rover_bay: {
     name: "탐사 로버 정비소", icon: "⌂", iconId: "wrench", cost: 160, material: "alloy", materialCost: 3, kind: "facility",
     description: "귀환한 로버를 정비하고 다음 원정을 준비하는 전초 시설입니다.",
-    effect: "탐사 구역을 알아보기 쉬운 정비 거점으로 바꿉니다.",
+    effect: "장거리 로버 원정 시간을 8시간에서 6시간으로 단축합니다.",
     setName: "개척 전초기지", previewTone: "#ffad70",
   },
   observatory: {
@@ -64,7 +64,7 @@ const GALAXY_ITEM_CATALOG = {
   expedition_beacon: {
     name: "원정대 비콘", icon: "△", iconId: "satellite-dish", cost: 210, material: "alloy", materialCost: 4, kind: "facility",
     description: "미지의 섹터로 향하는 탐사 신호를 증폭하는 전초 비콘입니다.",
-    effect: "탐사 관문 근처에 장거리 통신 표식과 회전 신호를 더합니다.",
+    effect: "장거리 로버 원정의 회수 재료를 매번 1개 늘립니다.",
     setName: "개척 전초기지", previewTone: "#ff8c68",
   },
   route_gateway: {
@@ -102,6 +102,48 @@ const GALAXY_WORLD_NODE_ACTIONS = {
   ancient_scrap: "salvage",
   broken_beacon: "beacon",
   wild_soil: "plant",
+};
+
+const GALAXY_ROVER_OPERATION_TYPE = "galaxy_rover_expedition";
+const GALAXY_ROVER_DEFAULT_DURATION_MS = 8 * 60 * 60 * 1000;
+const GALAXY_ROVER_BAY_DURATION_MS = 6 * 60 * 60 * 1000;
+const GALAXY_ROVER_ROUTES = {
+  nebula: {
+    title: "성운 생태 장거리 탐사",
+    material: "biofiber",
+    rewardTitle: "바이오 섬유",
+    baseAmount: 4,
+    ability: "detection",
+    discoveries: [
+      { id: "nebula_lumen_spore", name: "루멘 포자낭", rarity: "common", description: "성운 바람을 머금고 은은하게 빛나는 생태 표본입니다." },
+      { id: "nebula_aether_seed", name: "에테르 씨앗", rarity: "rare", description: "중력이 약한 곳에서만 싹을 틔우는 부유 종자입니다." },
+      { id: "nebula_whale_echo", name: "성운고래의 메아리", rarity: "legendary", description: "아주 오래된 거대 생명체가 남긴 공명 기록입니다." },
+    ],
+  },
+  comet: {
+    title: "혜성 구조 장거리 탐사",
+    material: "alloy",
+    rewardTitle: "혜성 합금",
+    baseAmount: 2,
+    ability: "piloting",
+    discoveries: [
+      { id: "comet_iron_scale", name: "혜성 철편", rarity: "common", description: "수많은 항해를 견딘 단단한 외피 조각입니다." },
+      { id: "comet_tail_crystal", name: "꼬리빛 결정", rarity: "rare", description: "혜성 꼬리의 빛이 결정처럼 굳어진 희귀 표본입니다." },
+      { id: "comet_rescue_capsule", name: "개척자 구조 캡슐", rarity: "legendary", description: "첫 아스트라 개척대의 항해 기록이 잠든 캡슐입니다." },
+    ],
+  },
+  ruins: {
+    title: "고대 정거장 장거리 탐사",
+    material: "crystalGlass",
+    rewardTitle: "수정 유리",
+    baseAmount: 2,
+    ability: "precision",
+    discoveries: [
+      { id: "ruins_station_seal", name: "정거장 인장", rarity: "common", description: "옛 항로 관리자가 사용하던 수정 표식입니다." },
+      { id: "ruins_prism_memory", name: "프리즘 기억핵", rarity: "rare", description: "빛의 결을 따라 장면을 보존하는 고대 저장 장치입니다." },
+      { id: "ruins_astra_chart", name: "잃어버린 아스트라 성도", rarity: "legendary", description: "폭풍 이전의 모든 항로가 새겨진 별자리 지도입니다." },
+    ],
+  },
 };
 
 const GALAXY_BUILD_RADIUS = 14.2;
@@ -179,6 +221,160 @@ function containsUnsafePublicText(value) {
 
 function uniqueIds(values = []) {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function stableGalaxyHash(value) {
+  let hash = 2166136261;
+  const text = String(value || "");
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function getGalaxyRoverExpeditionView(expedition, nowMs = Date.now()) {
+  if (!expedition || typeof expedition !== "object" || !expedition.operationId) return null;
+  const status = expedition.status === "claimed"
+    ? "claimed"
+    : Math.max(0, Number(expedition.readyAtMs || 0)) <= Math.max(0, Number(nowMs || 0))
+      ? "ready"
+      : "exploring";
+  return { ...expedition, status };
+}
+
+function buildGalaxyRoverDeparture({ operationId, route, planet = {}, nowMs = Date.now() }) {
+  const routeConfig = GALAXY_ROVER_ROUTES[route];
+  if (!routeConfig) return null;
+  const layout = Array.isArray(planet.layout) ? planet.layout : [];
+  const hasRoverBay = layout.some((item) => item?.itemId === "rover_bay");
+  const hasExpeditionBeacon = layout.some((item) => item?.itemId === "expedition_beacon");
+  const abilityLevel = Math.max(1, Math.floor(Number(planet.abilitySnapshot?.values?.[routeConfig.ability] || 1)));
+  const abilityBonus = abilityLevel >= 4 ? 1 : 0;
+  const beaconBonus = hasExpeditionBeacon ? 1 : 0;
+  const durationMs = hasRoverBay ? GALAXY_ROVER_BAY_DURATION_MS : GALAXY_ROVER_DEFAULT_DURATION_MS;
+  const startedAtMs = Math.max(0, Math.floor(Number(nowMs || 0)));
+  const discoveryTemplate = routeConfig.discoveries[
+    stableGalaxyHash(`${route}:${operationId}`) % routeConfig.discoveries.length
+  ];
+  return {
+    operationId,
+    route,
+    routeTitle: routeConfig.title,
+    status: "exploring",
+    startedAtMs,
+    readyAtMs: startedAtMs + durationMs,
+    returnsAtMs: startedAtMs + durationMs,
+    durationMs,
+    reward: {
+      material: routeConfig.material,
+      amount: routeConfig.baseAmount + beaconBonus + abilityBonus,
+      baseAmount: routeConfig.baseAmount,
+      beaconBonus,
+      abilityBonus,
+      title: routeConfig.rewardTitle,
+    },
+    discovery: { route, ...discoveryTemplate },
+    bonuses: {
+      roverBay: hasRoverBay,
+      expeditionBeacon: hasExpeditionBeacon,
+      abilityId: routeConfig.ability,
+      abilityLevel,
+      ability: abilityBonus > 0,
+    },
+  };
+}
+
+function planGalaxyRoverStart({ operationId, route, existingOperation = null, planet = {}, nowMs = Date.now() }) {
+  if (!GALAXY_ROVER_ROUTES[route]) return { kind: "invalid_route" };
+  if (existingOperation) {
+    if (
+      existingOperation.type !== GALAXY_ROVER_OPERATION_TYPE
+      || existingOperation.operationId !== operationId
+      || existingOperation.route !== route
+    ) {
+      return { kind: "operation_conflict" };
+    }
+    return {
+      kind: "deduplicated",
+      expedition: getGalaxyRoverExpeditionView(existingOperation, nowMs),
+    };
+  }
+  const activeExpedition = getGalaxyRoverExpeditionView(planet.roverExpedition, nowMs);
+  if (activeExpedition && ["exploring", "ready"].includes(activeExpedition.status)) {
+    return { kind: "active", expedition: activeExpedition };
+  }
+  return {
+    kind: "startable",
+    expedition: buildGalaxyRoverDeparture({ operationId, route, planet, nowMs }),
+  };
+}
+
+function planGalaxyRoverClaim({ operationId, operation = null, planet = {}, nowMs = Date.now() }) {
+  if (!operation) return { kind: "not_found" };
+  if (operation.type !== GALAXY_ROVER_OPERATION_TYPE || operation.operationId !== operationId) {
+    return { kind: "operation_conflict" };
+  }
+  if (operation.status === "claimed") {
+    return {
+      kind: "deduplicated",
+      claimResult: operation.claimResult || null,
+      expedition: getGalaxyRoverExpeditionView(operation, nowMs),
+    };
+  }
+  const expedition = planet.roverExpedition;
+  if (!expedition || expedition.operationId !== operationId || !["exploring", "ready"].includes(expedition.status)) {
+    return { kind: "inactive" };
+  }
+  const readyAtMs = Math.max(0, Number(operation.readyAtMs || expedition.readyAtMs || 0));
+  if (Math.max(0, Number(nowMs || 0)) < readyAtMs) {
+    return { kind: "not_ready", readyAtMs };
+  }
+  const routeConfig = GALAXY_ROVER_ROUTES[operation.route];
+  const reward = operation.reward || {};
+  const rewardAmount = Math.max(0, Math.floor(Number(reward.amount || 0)));
+  if (
+    !routeConfig
+    || reward.material !== routeConfig.material
+    || rewardAmount < routeConfig.baseAmount
+    || rewardAmount > routeConfig.baseAmount + 2
+  ) {
+    return { kind: "invalid_reward" };
+  }
+  const materials = { ...(planet.materials || {}) };
+  materials[reward.material] = Math.max(0, Number(materials[reward.material] || 0)) + rewardAmount;
+  const existingDiscoveries = Array.isArray(planet.roverDiscoveries) ? planet.roverDiscoveries : [];
+  const discovery = operation.discovery || expedition.discovery;
+  if (!discovery?.id) return { kind: "invalid_discovery" };
+  const isNewDiscovery = !existingDiscoveries.some((item) => item?.id === discovery.id);
+  const discoveryRecord = isNewDiscovery ? {
+    ...discovery,
+    firstOperationId: operationId,
+    discoveredAtMs: Math.max(0, Math.floor(Number(nowMs || 0))),
+  } : existingDiscoveries.find((item) => item?.id === discovery.id);
+  const roverDiscoveries = isNewDiscovery ? [...existingDiscoveries, discoveryRecord] : existingDiscoveries;
+  const claimedAtMs = Math.max(0, Math.floor(Number(nowMs || 0)));
+  const claimedExpedition = {
+    ...expedition,
+    status: "claimed",
+    claimedAtMs,
+  };
+  const claimResult = {
+    operationId,
+    route: operation.route,
+    reward: { ...reward, amount: rewardAmount },
+    discovery,
+    isNewDiscovery,
+    claimedAtMs,
+    materials,
+  };
+  return {
+    kind: "claimable",
+    claimResult,
+    expedition: claimedExpedition,
+    materials,
+    roverDiscoveries,
+  };
 }
 
 function getGalaxyRelationshipId(firstUid, secondUid) {
@@ -1246,6 +1442,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const { userRef, user } = await requireMember(uid);
     const learningState = await syncLearningState(userRef, user);
     const ownPlanet = await ensurePlanet(uid, user, learningState);
+    const serverNowMs = Date.now();
     const targetUid = cleanId(data?.targetUid) || uid;
     let targetPlanet = ownPlanet;
 
@@ -1264,15 +1461,19 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       listCrewNeighbors(uid, user),
       ownPlanet.ref.collection("visitEvents").orderBy("createdAt", "desc").limit(30).get(),
     ]);
+    const buildPlanetView = (planetData) => planetData?.roverExpedition
+      ? { ...planetData, roverExpedition: getGalaxyRoverExpeditionView(planetData.roverExpedition, serverNowMs) }
+      : planetData;
 
     return serializeValue({
-      ownPlanet: ownPlanet.data,
-      planet: targetPlanet.data,
+      ownPlanet: buildPlanetView(ownPlanet.data),
+      planet: buildPlanetView(targetPlanet.data),
       neighbors,
       events: eventSnap.docs.map((snap) => ({ id: snap.id, ...(snap.data() || {}) })),
       wallet: Math.max(0, Number(user.crystals || 0)),
       learningState,
       catalog: GALAXY_ITEM_CATALOG,
+      serverNowMs,
     });
   });
 
@@ -1521,6 +1722,175 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     return { success: true, ...result };
   });
 
+  const startGalaxyRoverExpedition = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    const route = cleanId(data?.route, 40);
+    if (!GALAXY_ROVER_ROUTES[route]) {
+      throw new functions.https.HttpsError("invalid-argument", "탐사 로버 항로가 올바르지 않습니다.");
+    }
+    const { userRef, user } = await requireMember(uid);
+    const rawOperationId = data?.operationId;
+    const requestedOperationId = cleanId(rawOperationId, 120);
+    if (rawOperationId != null && rawOperationId !== "" && (
+      typeof rawOperationId !== "string"
+      || rawOperationId.trim().length > 120
+      || !/^[A-Za-z0-9_-]{8,120}$/.test(requestedOperationId)
+    )) {
+      throw new functions.https.HttpsError("invalid-argument", "탐사 로버 요청 식별자가 올바르지 않습니다.");
+    }
+    const operationId = requestedOperationId || userRef.collection("galaxyOperations").doc().id;
+    const operationRef = userRef.collection("galaxyOperations").doc(operationId);
+    const planet = await ensurePlanet(uid, user);
+    const serverNowMs = Date.now();
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, freshUserSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(userRef),
+        transaction.get(planet.ref),
+      ]);
+      const freshUser = freshUserSnap.data() || {};
+      if (
+        !freshUserSnap.exists
+        || freshUser.isGuest === true
+        || freshUser.isDeleted === true
+        || freshUser.accountStatus === "deleted"
+      ) {
+        throw new functions.https.HttpsError("failed-precondition", "정식 학생 계정에서만 탐사 로버를 보낼 수 있습니다.");
+      }
+      if (!planetSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "탐사 로버를 출발시킬 행성을 찾을 수 없습니다.");
+      }
+      const plan = planGalaxyRoverStart({
+        operationId,
+        route,
+        existingOperation: operationSnap.exists ? operationSnap.data() || {} : null,
+        planet: planetSnap.data() || {},
+        nowMs: serverNowMs,
+      });
+      if (plan.kind === "operation_conflict") {
+        throw new functions.https.HttpsError("already-exists", "이미 다른 탐사에 사용된 요청 식별자입니다.");
+      }
+      if (plan.kind === "active") {
+        throw new functions.https.HttpsError("failed-precondition", "현재 탐사 중이거나 귀환 대기 중인 로버가 있습니다.", {
+          expedition: serializeValue(plan.expedition),
+          serverNowMs,
+        });
+      }
+      if (plan.kind === "deduplicated") {
+        return { expedition: plan.expedition, deduplicated: true };
+      }
+      if (plan.kind !== "startable" || !plan.expedition) {
+        throw new functions.https.HttpsError("internal", "탐사 로버 출발 상태를 만들지 못했습니다.");
+      }
+      const expedition = plan.expedition;
+      transaction.set(planet.ref, {
+        roverExpedition: expedition,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      transaction.set(operationRef, {
+        ...expedition,
+        uid,
+        type: GALAXY_ROVER_OPERATION_TYPE,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return { expedition, deduplicated: false };
+    });
+    return serializeValue({ success: true, operationId, serverNowMs, ...result });
+  });
+
+  const claimGalaxyRoverExpedition = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    const { userRef, user } = await requireMember(uid);
+    const rawOperationId = data?.operationId;
+    const operationId = cleanId(rawOperationId, 120);
+    if (
+      typeof rawOperationId !== "string"
+      || rawOperationId.trim().length > 120
+      || !/^[A-Za-z0-9_-]{8,120}$/.test(operationId)
+    ) {
+      throw new functions.https.HttpsError("invalid-argument", "수령할 탐사 로버 요청 식별자가 올바르지 않습니다.");
+    }
+    const operationRef = userRef.collection("galaxyOperations").doc(operationId);
+    const planet = await ensurePlanet(uid, user);
+    const serverNowMs = Date.now();
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, freshUserSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(userRef),
+        transaction.get(planet.ref),
+      ]);
+      const freshUser = freshUserSnap.data() || {};
+      if (
+        !freshUserSnap.exists
+        || freshUser.isGuest === true
+        || freshUser.isDeleted === true
+        || freshUser.accountStatus === "deleted"
+      ) {
+        throw new functions.https.HttpsError("failed-precondition", "정식 학생 계정에서만 탐사 로버 보상을 받을 수 있습니다.");
+      }
+      if (!planetSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "탐사 로버가 귀환할 행성을 찾을 수 없습니다.");
+      }
+      const plan = planGalaxyRoverClaim({
+        operationId,
+        operation: operationSnap.exists ? operationSnap.data() || {} : null,
+        planet: planetSnap.data() || {},
+        nowMs: serverNowMs,
+      });
+      if (plan.kind === "not_found") {
+        throw new functions.https.HttpsError("not-found", "탐사 로버 기록을 찾을 수 없습니다.");
+      }
+      if (plan.kind === "operation_conflict") {
+        throw new functions.https.HttpsError("already-exists", "이 요청 식별자는 탐사 로버 기록이 아닙니다.");
+      }
+      if (plan.kind === "not_ready") {
+        throw new functions.https.HttpsError("failed-precondition", "탐사 로버가 아직 귀환하지 않았습니다.", {
+          readyAtMs: plan.readyAtMs,
+          serverNowMs,
+        });
+      }
+      if (plan.kind === "inactive") {
+        throw new functions.https.HttpsError("failed-precondition", "현재 행성의 활성 탐사 로버와 요청이 일치하지 않습니다.");
+      }
+      if (["invalid_reward", "invalid_discovery"].includes(plan.kind)) {
+        throw new functions.https.HttpsError("data-loss", "탐사 로버 보상 기록을 확인할 수 없습니다.");
+      }
+      if (plan.kind === "deduplicated") {
+        if (!plan.claimResult) {
+          throw new functions.https.HttpsError("data-loss", "완료된 탐사 로버의 수령 결과가 없습니다.");
+        }
+        return {
+          expedition: plan.expedition,
+          claimResult: plan.claimResult,
+          deduplicated: true,
+        };
+      }
+      if (plan.kind !== "claimable") {
+        throw new functions.https.HttpsError("internal", "탐사 로버 수령 상태를 계산하지 못했습니다.");
+      }
+      transaction.set(planet.ref, {
+        materials: plan.materials,
+        roverDiscoveries: plan.roverDiscoveries,
+        roverExpedition: plan.expedition,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      transaction.set(operationRef, {
+        status: "claimed",
+        claimedAtMs: plan.claimResult.claimedAtMs,
+        claimedAt: FieldValue.serverTimestamp(),
+        claimResult: plan.claimResult,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return {
+        expedition: plan.expedition,
+        claimResult: plan.claimResult,
+        deduplicated: false,
+      };
+    });
+    return serializeValue({ success: true, operationId, serverNowMs, ...result });
+  });
+
   const runGalaxyMission = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
     const route = ["nebula", "comet", "ruins"].includes(data?.route) ? data.route : "nebula";
@@ -1696,6 +2066,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     buildGalaxyItem,
     moveGalaxyItem,
     performGalaxyVisitAction,
+    startGalaxyRoverExpedition,
+    claimGalaxyRoverExpedition,
     runGalaxyMission,
     performGalaxyWorldAction,
     markGalaxyEventsSeen,
@@ -1704,6 +2076,11 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
 module.exports.__test = {
   calculateLifetimeLearningOre,
+  buildGalaxyRoverDeparture,
+  getGalaxyRoverExpeditionView,
   getGalaxyLearningLedgerStatus,
   isEligibleLearningOreTransaction,
+  planGalaxyRoverClaim,
+  planGalaxyRoverStart,
+  stableGalaxyHash,
 };

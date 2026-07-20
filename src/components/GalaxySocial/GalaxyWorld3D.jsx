@@ -63,6 +63,15 @@ const RESOURCE_NODES = [
 
 const GUIDE_NODE = { id: 'lumi_guide', kind: 'guide', actionId: 'guide', label: '루미의 귀환 브리핑 듣기', position: [1.5, 1.1, 4.4] }
 
+const ROVER_NODE = { id: 'landing_rover', kind: 'rover', actionId: 'rover', label: '탐사 로버 제어 열기', position: [-1.45, .46, 4.85] }
+
+const ROVER_STATUS_LABELS = {
+  idle: '다음 원정 설정하기',
+  active: '진행 중인 원정 확인하기',
+  ready: '귀환 결과 수신하기',
+  claimed: '새 원정 준비하기',
+}
+
 const MISSION_PORTALS = [
   { id: 'portal_nebula', kind: 'portal', route: 'nebula', label: '성운 생태 항로 시작', position: [-12.2, .85, 1.5] },
   { id: 'portal_comet', kind: 'portal', route: 'comet', label: '혜성 구조 항로 시작', position: [1.2, .85, -12.4] },
@@ -318,11 +327,67 @@ function LandingPad({ palette }) {
       <mesh receiveShadow><cylinderGeometry args={[2.45, 2.65, .18, 36]} /><meshStandardMaterial color="#33495b" metalness={.45} roughness={.55} /></mesh>
       <mesh position={[0, .11, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.45, 2.04, 40]} /><meshBasicMaterial color={palette.glow} transparent opacity={.55} /></mesh>
       {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((rotation) => <mesh key={rotation} position={[Math.sin(rotation) * 2.15, .2, Math.cos(rotation) * 2.15]}><boxGeometry args={[.16, .12, .48]} /><meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={1.2} /></mesh>)}
-      <group position={[-.65, .38, -.15]} rotation={[0, -.35, 0]}>
-        <mesh><boxGeometry args={[1.25, .48, .85]} /><meshStandardMaterial color="#dcecf2" metalness={.45} roughness={.35} /></mesh>
-        <mesh position={[.12, .45, 0]}><boxGeometry args={[.72, .42, .62]} /><meshStandardMaterial color="#6bdcf8" emissive="#185e78" emissiveIntensity={.45} metalness={.4} /></mesh>
-        {[-.42, .42].flatMap((x) => [-.36, .36].map((z) => <mesh key={`${x}_${z}`} position={[x, -.25, z]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.18, .07, 8, 16]} /><meshStandardMaterial color="#172230" metalness={.7} /></mesh>))}
+    </group>
+  )
+}
+
+function RoverControl({ palette, status = 'idle' }) {
+  const antenna = useRef()
+  const activeSignal = useRef()
+  const readyRing = useRef()
+  const normalizedStatus = ROVER_STATUS_LABELS[status] ? status : 'idle'
+  const isActive = normalizedStatus === 'active'
+  const isReady = normalizedStatus === 'ready'
+  const statusColor = isReady ? '#ffe08a' : isActive ? '#75eaff' : normalizedStatus === 'claimed' ? '#8af0bf' : palette.glow
+
+  useFrame((state, delta) => {
+    const elapsed = state.clock.elapsedTime
+    if (antenna.current) antenna.current.rotation.y += delta * (isActive ? 2.2 : .35)
+    if (activeSignal.current) {
+      const pulse = (elapsed * 1.15) % 1
+      activeSignal.current.position.y = 1.34 + pulse * .42
+      activeSignal.current.scale.setScalar(.72 + pulse * .72)
+      activeSignal.current.children.forEach((child) => {
+        if (child.material) child.material.opacity = Math.max(0, .58 * (1 - pulse))
+      })
+    }
+    if (readyRing.current) {
+      const pulse = 1 + Math.sin(elapsed * 3.2) * .12
+      readyRing.current.scale.setScalar(pulse)
+      readyRing.current.material.opacity = .55 + Math.sin(elapsed * 3.2) * .2
+    }
+  })
+
+  return (
+    <group position={ROVER_NODE.position} rotation={[0, -.35, 0]}>
+      <mesh position={[0, .25, 0]} castShadow><boxGeometry args={[1.35, .46, .92]} /><meshStandardMaterial color="#dcecf2" metalness={.48} roughness={.32} /></mesh>
+      <mesh position={[.12, .67, -.03]} castShadow><boxGeometry args={[.74, .42, .64]} /><meshStandardMaterial color="#5fbfda" emissive="#185e78" emissiveIntensity={isActive ? 1.15 : .45} metalness={.42} roughness={.25} /></mesh>
+      <mesh position={[0, .27, .5]}><boxGeometry args={[.88, .14, .08]} /><meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={isReady ? 2.7 : 1.35} toneMapped={false} /></mesh>
+      {[-.48, .48].flatMap((x) => [-.43, .43].map((z) => (
+        <mesh key={`${x}_${z}`} position={[x, .05, z]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <torusGeometry args={[.2, .075, 8, 18]} />
+          <meshStandardMaterial color="#172230" metalness={.72} roughness={.42} />
+        </mesh>
+      )))}
+      <group ref={antenna} position={[.32, .98, -.16]}>
+        <mesh position={[0, .16, 0]}><cylinderGeometry args={[.025, .035, .42, 7]} /><meshStandardMaterial color="#9fb4c1" metalness={.82} roughness={.22} /></mesh>
+        <mesh position={[0, .39, 0]} rotation={[0, 0, -.5]}><coneGeometry args={[.2, .12, 18, 1, true]} /><meshStandardMaterial color="#d7eaf0" emissive={statusColor} emissiveIntensity={isActive ? .8 : .15} metalness={.6} roughness={.24} side={THREE.DoubleSide} /></mesh>
+        <mesh position={[0, .48, 0]}><sphereGeometry args={[.075, 10, 8]} /><meshStandardMaterial color={statusColor} emissive={statusColor} emissiveIntensity={isActive || isReady ? 3 : 1.4} toneMapped={false} /></mesh>
       </group>
+      <group ref={activeSignal} position={[.32, 1.34, -.16]} visible={isActive}>
+        {[.22, .36, .5].map((radius) => (
+          <mesh key={radius} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[radius, radius + .035, 28]} />
+            <meshBasicMaterial color={statusColor} transparent opacity={.42} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+        ))}
+      </group>
+      <mesh ref={readyRing} position={[0, -.16, 0]} rotation={[-Math.PI / 2, 0, 0]} visible={isReady}>
+        <ringGeometry args={[.88, 1.08, 36]} />
+        <meshBasicMaterial color={statusColor} transparent opacity={.72} depthWrite={false} />
+      </mesh>
+      {isReady && <Sparkles count={12} scale={[2.1, 1.7, 2.1]} position={[0, .7, 0]} color={statusColor} size={1.5} speed={.32} />}
+      <pointLight position={[0, .75, .55]} color={statusColor} intensity={isReady ? 1.25 : isActive ? .8 : .25} distance={4} />
     </group>
   )
 }
@@ -475,7 +540,7 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, onNearb
   const group = useRef()
   const body = useRef()
   const keys = useRef(new Set())
-  const nearbyId = useRef('')
+  const nearbySignature = useRef('')
   const collectLock = useRef(new Set())
   const lastPublishAt = useRef(0)
   const { camera, size } = useThree()
@@ -540,9 +605,9 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, onNearb
         const distance = Math.hypot(player.x - item.position[0], player.z - item.position[2])
         if (distance < nearestDistance) { nearest = item; nearestDistance = distance }
       })
-      const nextNearbyId = nearest?.id || ''
-      if (nearbyId.current !== nextNearbyId) {
-        nearbyId.current = nextNearbyId
+      const nextNearbySignature = nearest ? `${nearest.id}:${nearest.status || ''}:${nearest.label || ''}` : ''
+      if (nearbySignature.current !== nextNearbySignature) {
+        nearbySignature.current = nextNearbySignature
         onNearbyChange(nearest)
       }
 
@@ -553,8 +618,8 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, onNearb
           onCollect(pickup.id)
         }
       })
-    } else if (nearbyId.current) {
-      nearbyId.current = ''
+    } else if (nearbySignature.current) {
+      nearbySignature.current = ''
       onNearbyChange(null)
     }
 
@@ -587,11 +652,17 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, onNearb
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild }) {
+function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
-  const interactables = useMemo(() => [...RESOURCE_NODES, ...MISSION_PORTALS, GUIDE_NODE], [])
+  const roverNode = useMemo(() => ({
+    ...ROVER_NODE,
+    status: ROVER_STATUS_LABELS[roverStatus] ? roverStatus : 'idle',
+    label: roverStatusLabel || ROVER_STATUS_LABELS[roverStatus] || ROVER_STATUS_LABELS.idle,
+  }), [roverStatus, roverStatusLabel])
+  const interactables = useMemo(() => [...RESOURCE_NODES, ...MISSION_PORTALS, GUIDE_NODE, roverNode], [roverNode])
   const blockers = useMemo(() => layout.filter((item) => item.itemId !== 'wild_sprout').map(worldPositionFromLayout), [layout])
+  const playerBlockers = useMemo(() => [...blockers, ROVER_NODE.position], [blockers])
   const pickups = useMemo(() => {
     if (!activeMission) return []
     return (MISSION_PICKUPS[activeMission.route] || [])
@@ -604,7 +675,7 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
     const [x, , z] = point
     if (Math.hypot(x, z) > BUILD_RADIUS) return false
     if (blockers.some((position) => Math.hypot(x - position[0], z - position[2]) < 2.1)) return false
-    if ([...RESOURCE_NODES, ...MISSION_PORTALS].some((item) => Math.hypot(x - item.position[0], z - item.position[2]) < 2)) return false
+    if ([...RESOURCE_NODES, ...MISSION_PORTALS, ROVER_NODE].some((item) => Math.hypot(x - item.position[0], z - item.position[2]) < 2)) return false
     return true
   }, [blockers])
   const hoverValid = useMemo(() => isBuildPointValid(hoverPoint), [hoverPoint, isBuildPointValid])
@@ -625,6 +696,7 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
       <LumiGuide palette={palette} />
+      <RoverControl palette={palette} status={roverNode.status} />
       <Creature position={[5.8, .3, -5.3]} color={planet?.theme === 'ocean' ? '#7ccde8' : '#a9e68b'} />
       <Creature position={[8.2, .45, -6.9]} color={planet?.theme === 'crystal' ? '#c3a0ef' : '#f2bd8b'} index={2} />
 
@@ -659,7 +731,7 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
         </group>
       )}
 
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={blockers} pickups={pickups} paused={paused} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} pickups={pickups} paused={paused} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} />
     </>
   )
 }
@@ -731,6 +803,7 @@ const INTERACTION_ICONS = {
   plant: Flower2,
   guide: Bot,
   portal: Compass,
+  rover: Wrench,
 }
 
 function InteractionPrompt({ nearby }) {
@@ -738,7 +811,7 @@ function InteractionPrompt({ nearby }) {
   return (
     <div className="frontier-interaction-prompt">
       <span>{createElement(Graphic, { size: 19, 'aria-hidden': true })}</span>
-      <div><small>{nearby.kind === 'guide' ? 'LUMI GUIDE' : nearby.kind === 'portal' ? 'EXPEDITION GATE' : 'WORLD INTERACTION'}</small><strong>{nearby.label}</strong></div>
+      <div><small>{nearby.kind === 'guide' ? 'LUMI GUIDE' : nearby.kind === 'portal' ? 'EXPEDITION GATE' : nearby.kind === 'rover' ? 'ROVER CONTROL' : 'WORLD INTERACTION'}</small><strong>{nearby.label}</strong></div>
       <kbd>E</kbd>
     </div>
   )
@@ -758,6 +831,9 @@ export default function GalaxyWorld3D({
   onMessage,
   paused = false,
   onOpenBriefing,
+  onOpenRover,
+  roverStatus = 'idle',
+  roverStatusLabel = '',
 }) {
   const inputRef = useRef({ x: 0, z: 0 })
   const [nearby, setNearby] = useState(null)
@@ -785,8 +861,9 @@ export default function GalaxyWorld3D({
     if (!nearby || paused) return
     if (nearby.kind === 'portal') startMission(nearby.route)
     else if (nearby.kind === 'guide') onOpenBriefing?.()
+    else if (nearby.kind === 'rover') onOpenRover?.()
     else onWorldAction?.(nearby)
-  }, [nearby, onOpenBriefing, onWorldAction, paused, startMission])
+  }, [nearby, onOpenBriefing, onOpenRover, onWorldAction, paused, startMission])
 
   useEffect(() => {
     const keydown = (event) => {
@@ -885,6 +962,8 @@ export default function GalaxyWorld3D({
           buildItem={selectedBuildItem}
           onBuildAt={onBuildAt}
           onInvalidBuild={() => onMessage?.('시설과 항로에서 조금 떨어진 평평한 자리를 골라주세요.')}
+          roverStatus={roverStatus}
+          roverStatusLabel={roverStatusLabel}
         />
       </Canvas>
 
@@ -924,7 +1003,7 @@ export default function GalaxyWorld3D({
       <TouchJoystick inputRef={inputRef} disabled={paused} />
       {nearby && !selectedBuildItem && !paused && (
         <button type="button" className="frontier-action-button" onClick={interact}>
-          <span>{nearby.kind === 'guide' ? <Bot size={23} aria-hidden="true" /> : nearby.kind === 'portal' ? <Compass size={23} aria-hidden="true" /> : <SparklesIcon size={23} aria-hidden="true" />}</span>
+          <span>{nearby.kind === 'guide' ? <Bot size={23} aria-hidden="true" /> : nearby.kind === 'portal' ? <Compass size={23} aria-hidden="true" /> : nearby.kind === 'rover' ? <Wrench size={23} aria-hidden="true" /> : <SparklesIcon size={23} aria-hidden="true" />}</span>
           <strong>상호작용</strong>
         </button>
       )}

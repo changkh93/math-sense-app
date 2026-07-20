@@ -516,6 +516,7 @@
   scrollbar-color: rgba(142, 184, 196, .25) transparent;
 }
 .frontier-menu-panel.menu-build { width: min(1120px, 100%); }
+.frontier-menu-panel.menu-rover { width: min(1040px, 100%); }
 .frontier-menu-panel.menu-passport { width: min(1050px, 100%); }
 .frontier-menu-panel > header {
   position: sticky;
@@ -982,6 +983,7 @@
   .frontier-menu-backdrop { padding: 0; }
   .frontier-menu-panel,
   .frontier-menu-panel.menu-build,
+  .frontier-menu-panel.menu-rover,
   .frontier-menu-panel.menu-passport {
     width: 100%;
     border: 0;
