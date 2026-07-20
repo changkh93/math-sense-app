@@ -157,6 +157,29 @@ const MATERIAL_ICONS = {
   alloy: Package,
 }
 
+const MATERIAL_DETAILS = {
+  stardust: {
+    purpose: '빛과 장식에 쓰는 기본 재료',
+    source: '생명체를 돌보거나 일일 사건을 해결해 모아요.',
+    use: '별빛 램프 · 프리즘 길잡이',
+  },
+  biofiber: {
+    purpose: '나무와 정원을 키우는 생태 재료',
+    source: '식물에 물을 주거나 45초 탐사·성운 로버 원정에서 모아요.',
+    use: '루멘 나무 · 온실 · 별꽃 정원',
+  },
+  crystalGlass: {
+    purpose: '관측과 신호 시설에 쓰는 투명 재료',
+    source: '시설에 감탄을 남기거나 수정비 일일 사건에서 모아요.',
+    use: '수정 연못 · 성운 관측소 · 신호 광장',
+  },
+  alloy: {
+    purpose: '기계 시설을 고치는 단단한 재료',
+    source: '시설을 수리하거나 혜성 로버 원정에서 모아요.',
+    use: '로버 정비소 · 원정대 비콘 · 항로문',
+  },
+}
+
 const DAILY_EVENT_ICONS = {
   lumen_bloom: Leaf,
   crystal_rain: Gem,
@@ -310,14 +333,42 @@ function MaterialStrip({ materials = {}, compact = false }) {
       {Object.entries(MATERIAL_LABELS).map(([id, label]) => {
         const Icon = MATERIAL_ICONS[id] || Package
         return (
-          <span key={id} title={label}>
-            {compact ? <Icon size={14} aria-hidden="true" /> : <i className={`material-dot ${id}`} />}
+          <span key={id} className={`material-${id}`} title={`${label}: ${MATERIAL_DETAILS[id]?.purpose || '건설 재료'}`}>
+            <Icon size={compact ? 14 : 15} aria-hidden="true" />
             {!compact && label}
             <strong>{Number(materials[id] || 0)}</strong>
           </span>
         )
       })}
     </div>
+  )
+}
+
+function MaterialGuide({ materials = {} }) {
+  return (
+    <section className="frontier-material-guide" aria-labelledby="frontier-material-guide-title">
+      <div className="frontier-material-guide-heading">
+        <div><small>재료 도감 · 어디서 얻고 어디에 쓰나요?</small><h4 id="frontier-material-guide-title">건설 재료 4종</h4></div>
+        <span>시설 가까이에서 <kbd>E</kbd> 키로 재료를 모을 수 있어요.</span>
+      </div>
+      <div className="frontier-material-guide-grid">
+        {Object.entries(MATERIAL_LABELS).map(([id, label]) => {
+          const Icon = MATERIAL_ICONS[id] || Package
+          const detail = MATERIAL_DETAILS[id]
+          return (
+            <article key={id} className={`frontier-material-card material-${id}`}>
+              <span><Icon size={19} aria-hidden="true" /></span>
+              <div>
+                <strong>{label} <b>보유 {Number(materials[id] || 0)}</b></strong>
+                <p>{detail?.purpose}</p>
+                <small><em>얻기</em> {detail?.source}</small>
+                <small><em>사용</em> {detail?.use}</small>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -1472,7 +1523,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                           </dl>
                           <div className="frontier-build-costs">
                             <span className={focusedCanAfford ? 'ready' : 'short'}><Gem size={15} aria-hidden="true" /> 학습 광석 {focusedBuildItem.cost}</span>
-                            <span className={focusedHasMaterial ? 'ready' : 'short'}><Package size={15} aria-hidden="true" /> {MATERIAL_LABELS[focusedBuildItem.material]} {focusedBuildItem.materialCost}</span>
+                            <span className={focusedHasMaterial ? 'ready' : 'short'}><Package size={15} aria-hidden="true" /> {MATERIAL_LABELS[focusedBuildItem.material]} {focusedBuildItem.materialCost}개 필요 · 보유 {Number(ownPlanet.materials?.[focusedBuildItem.material] || 0)}개</span>
                           </div>
                           <button type="button" className="galaxy-primary-btn frontier-build-cta" disabled={Boolean(busy) || !focusedHasMaterial || !focusedCanAfford} onClick={() => beginBuild(effectiveFocusedBuildItemId)}>
                             {focusedHasMaterial && focusedCanAfford ? <><MapPin size={17} aria-hidden="true" /> 월드에서 자리 선택</> : <><LockKeyhole size={17} aria-hidden="true" /> 부족한 재료 확인</>}
@@ -1485,6 +1536,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                           <div><small>BLUEPRINT COLLECTION</small><h3>다음에 만들 풍경을 고르세요</h3></div>
                           <MaterialStrip materials={ownPlanet.materials} />
                         </div>
+                        <MaterialGuide materials={ownPlanet.materials} />
                         <div className="frontier-build-catalog">
                           {catalogEntries.map(([itemId, item]) => {
                             const ItemIcon = ITEM_ICONS[itemId] || Building2
@@ -1497,7 +1549,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                               <button type="button" key={itemId} className={`frontier-build-option${effectiveFocusedBuildItemId === itemId ? ' selected' : ''}${available ? '' : ' unavailable'}`} onClick={() => setFocusedBuildItemId(itemId)}>
                                 <span className="frontier-build-option-icon"><ItemIcon size={21} aria-hidden="true" /></span>
                                 <div><small>{story.overline}</small><strong>{item.name}</strong><p>{story.set}</p></div>
-                                <span className="frontier-build-option-state">{available ? '설계 가능' : '재료 필요'}</span>
+                                <span className={`frontier-build-option-state material-${item.material}`}>{MATERIAL_LABELS[item.material]} {item.materialCost}개 필요 · 보유 {Number(ownPlanet.materials?.[item.material] || 0)}개 {available ? '· 설계 가능' : ''}</span>
                               </button>
                             )
                           })}

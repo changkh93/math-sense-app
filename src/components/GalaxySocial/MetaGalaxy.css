@@ -225,6 +225,10 @@
   font-size: .66rem;
 }
 .galaxy-material-strip > span strong { color: white; font-size: .69rem; }
+.galaxy-material-strip .material-stardust { color: #ffe28a; }
+.galaxy-material-strip .material-biofiber { color: #7cf2bd; }
+.galaxy-material-strip .material-crystalGlass { color: #8eeaff; }
+.galaxy-material-strip .material-alloy { color: #b8abff; }
 .galaxy-material-strip.compact { gap: .22rem; }
 .galaxy-material-strip.compact > span { min-width: 45px; justify-content: center; padding: .36rem .45rem; color: #aee8ef; }
 .material-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 9px currentColor; }
@@ -742,6 +746,32 @@
 .frontier-build-catalog-shell { min-width: 0; padding: .9rem; }
 .frontier-catalog-heading { display: flex; justify-content: space-between; align-items: end; gap: .75rem; padding: .15rem .1rem .8rem; }
 .frontier-catalog-heading h3 { margin: .22rem 0 0; font-size: 1.02rem; }
+.frontier-material-guide {
+  margin: 0 0 .75rem;
+  padding: .72rem;
+  border: 1px solid rgba(124, 242, 189, .13);
+  border-radius: 17px;
+  background: linear-gradient(135deg, rgba(124, 242, 189, .055), rgba(108, 231, 255, .025));
+}
+.frontier-material-guide-heading { display: flex; align-items: end; justify-content: space-between; gap: .8rem; margin: 0 0 .6rem; }
+.frontier-material-guide-heading small { color: #80dcb9; font-size: .55rem; font-weight: 850; letter-spacing: .075em; }
+.frontier-material-guide-heading h4 { margin: .16rem 0 0; color: #eefaff; font-size: .8rem; }
+.frontier-material-guide-heading > span { color: #8ba1b4; font-size: .58rem; text-align: right; }
+.frontier-material-guide-heading kbd { padding: .08rem .23rem; border: 1px solid rgba(255,255,255,.16); border-radius: 4px; color: #eaf9ff; font: 800 .57rem ui-monospace, monospace; }
+.frontier-material-guide-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .42rem; }
+.frontier-material-card { display: grid; grid-template-columns: 33px minmax(0, 1fr); gap: .45rem; min-width: 0; padding: .5rem; border-radius: 12px; background: rgba(4, 17, 28, .45); }
+.frontier-material-card > span { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 10px; }
+.frontier-material-card.material-stardust > span { color: #ffe28a; background: rgba(255, 226, 138, .12); }
+.frontier-material-card.material-biofiber > span { color: #7cf2bd; background: rgba(124, 242, 189, .12); }
+.frontier-material-card.material-crystalGlass > span { color: #8eeaff; background: rgba(142, 234, 255, .12); }
+.frontier-material-card.material-alloy > span { color: #b8abff; background: rgba(184, 171, 255, .12); }
+.frontier-material-card div { min-width: 0; }
+.frontier-material-card strong { display: flex; align-items: center; justify-content: space-between; gap: .35rem; color: #eef7ff; font-size: .66rem; }
+.frontier-material-card strong b { flex: 0 0 auto; color: #d5e8f4; font-size: .55rem; font-weight: 800; }
+.frontier-material-card p { margin: .14rem 0 .25rem; color: #96aabd; font-size: .57rem; line-height: 1.35; }
+.frontier-material-card small { display: block; color: #71879c; font-size: .52rem; line-height: 1.38; }
+.frontier-material-card small + small { margin-top: .1rem; }
+.frontier-material-card em { color: #a8c8dd; font-style: normal; font-weight: 850; }
 .frontier-build-catalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
 .frontier-build-option {
   display: grid;
@@ -777,6 +807,10 @@
 .frontier-build-option strong { margin-top: .18rem; font-size: .76rem; }
 .frontier-build-option p { margin: .18rem 0 0; color: #8496a9; font-size: .6rem; }
 .frontier-build-option-state { grid-column: 2; color: #75dfb3; font-size: .58rem; font-weight: 850; }
+.frontier-build-option-state.material-stardust { color: #f3d67d; }
+.frontier-build-option-state.material-biofiber { color: #75dfb3; }
+.frontier-build-option-state.material-crystalGlass { color: #8eeaff; }
+.frontier-build-option-state.material-alloy { color: #c4bbff; }
 .frontier-build-option.unavailable .frontier-build-option-state { color: #a0838d; }
 
 /* Neighbor routes */
@@ -1267,6 +1301,9 @@
   .frontier-build-preview { height: 260px; }
   .frontier-build-catalog { grid-template-columns: 1fr; }
   .frontier-catalog-heading { display: grid; }
+  .frontier-material-guide-heading { display: grid; align-items: start; }
+  .frontier-material-guide-heading > span { margin-top: .35rem; text-align: left; }
+  .frontier-material-guide-grid { grid-template-columns: 1fr; }
   .frontier-relay-setting label { display: grid; }
   .frontier-passport-ability-list { grid-template-columns: 1fr; }
   .frontier-passport-identity { grid-template-columns: 70px 1fr; }
