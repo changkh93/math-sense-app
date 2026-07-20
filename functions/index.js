@@ -4,10 +4,12 @@ const crypto = require("crypto");
 const { FieldPath, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const PROJECT_ID = "math-sense-1f6a8";
 const STORAGE_BUCKET = "math-sense-1f6a8.firebasestorage.app";
+const DATABASE_URL = "https://math-sense-1f6a8-default-rtdb.asia-southeast1.firebasedatabase.app";
 try {
   admin.initializeApp({
     projectId: PROJECT_ID,
     storageBucket: STORAGE_BUCKET,
+    databaseURL: DATABASE_URL,
   });
 } catch (e) {}
 const cors = require("cors")({ origin: true });

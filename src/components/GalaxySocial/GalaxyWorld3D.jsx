@@ -1,6 +1,6 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Float, OrbitControls, Sparkles, Stars } from '@react-three/drei'
+import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
 import { Bot, Compass, Flower2, Gem, Radio, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
 import { GALAXY_MISSION_ROUTES } from '../../utils/galaxyGame'
@@ -34,6 +34,7 @@ const MOUSE_LOOK_PITCH_SENSITIVITY = .0021
 const MOUSE_LOOK_MAX_FRAME_DELTA = 420
 const MOUSE_LOOK_REENTRY_GAP_MS = 180
 const MOUSE_LOOK_REENTRY_DISTANCE = 160
+const PROXIMITY_CHAT_DISTANCE = 4.2
 
 function createMovementIntent() {
   return {
@@ -79,6 +80,38 @@ const RESOURCE_NODES = [
   { id: 'broken_beacon', kind: 'resource', actionId: 'beacon', label: '끊어진 신호기 수리', position: [-10.5, .55, 7.4] },
   { id: 'wild_soil', kind: 'resource', actionId: 'plant', label: '루멘 새싹 심기', position: [4.8, .45, -8.7] },
 ]
+
+const DAILY_EVENT_VISUALS = {
+  lumen_bloom: { color: '#7cf2bd', glow: '#c8ffe2' },
+  crystal_rain: { color: '#67e8f9', glow: '#dcfbff' },
+  signal_blackout: { color: '#c59aff', glow: '#f0deff' },
+  meteor_debris: { color: '#ff9f67', glow: '#ffe0b5' },
+  default: { color: '#ffe28a', glow: '#fff3c4' },
+}
+
+function resolveDailyEventVisual(dailyEvent = {}) {
+  const eventType = String(dailyEvent.type || dailyEvent.eventType || '').toLowerCase()
+  if (DAILY_EVENT_VISUALS[eventType]) return DAILY_EVENT_VISUALS[eventType]
+  if (eventType.includes('crystal')) return DAILY_EVENT_VISUALS.crystal_rain
+  if (eventType.includes('lumen') || eventType.includes('bloom') || eventType.includes('fiber')) return DAILY_EVENT_VISUALS.lumen_bloom
+  if (eventType.includes('signal') || eventType.includes('beacon') || eventType.includes('blackout')) return DAILY_EVENT_VISUALS.signal_blackout
+  if (eventType.includes('meteor') || eventType.includes('debris') || eventType.includes('salvage')) return DAILY_EVENT_VISUALS.meteor_debris
+  return DAILY_EVENT_VISUALS.default
+}
+
+function resolvePendingDailyEventNode(dailyEvent) {
+  if (String(dailyEvent?.status || '').toLowerCase() !== 'pending') return null
+  const nodeId = dailyEvent.nodeId || dailyEvent.worldNodeId
+  const resourceNode = RESOURCE_NODES.find((node) => node.id === nodeId)
+  if (!resourceNode) return null
+  return {
+    ...resourceNode,
+    kind: 'daily',
+    status: 'pending',
+    label: dailyEvent.worldLabel || dailyEvent.title || resourceNode.label,
+    dailyEvent,
+  }
+}
 
 const GUIDE_NODE = { id: 'lumi_guide', kind: 'guide', actionId: 'guide', label: '루미의 귀환 브리핑 듣기', position: [1.5, 1.1, 4.4] }
 
@@ -539,6 +572,54 @@ function ResourceNode({ node, palette }) {
   return <group position={[x, y, z]}><mesh position={[0, .04, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow><circleGeometry args={[1.12, 24]} /><meshStandardMaterial color="#76583d" roughness={1} /></mesh><group position={[0, .2, 0]}><RoundedLumenTree scale={.28} color="#82e99c" /></group><ResourceHalo color="#8df2a7" /></group>
 }
 
+function DailyEventMarker({ node }) {
+  const marker = useRef()
+  const beam = useRef()
+  const visual = useMemo(() => resolveDailyEventVisual(node.dailyEvent), [node.dailyEvent])
+  const [x, , z] = node.position
+  const y = terrainHeight(x, z)
+
+  useFrame((state) => {
+    const elapsed = state.clock.elapsedTime
+    if (marker.current) {
+      marker.current.rotation.y = elapsed * .38
+      marker.current.position.y = y + Math.sin(elapsed * 1.45) * .035
+    }
+    if (beam.current) beam.current.material.opacity = .075 + Math.sin(elapsed * 1.9) * .025
+  })
+
+  return (
+    <group ref={marker} position={[x, y, z]}>
+      <mesh ref={beam} position={[0, 2.05, 0]}>
+        <cylinderGeometry args={[.08, .52, 4.1, 24, 1, true]} />
+        <meshBasicMaterial color={visual.color} transparent opacity={.09} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      <mesh position={[0, .08, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.12, .055, 8, 48]} />
+        <meshBasicMaterial color={visual.color} transparent opacity={.82} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh position={[0, .13, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.42, .018, 6, 48]} />
+        <meshBasicMaterial color={visual.glow} transparent opacity={.42} depthWrite={false} toneMapped={false} />
+      </mesh>
+      {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle) => (
+        <mesh key={angle} position={[Math.cos(angle) * 1.25, .18, Math.sin(angle) * 1.25]} rotation={[0, -angle, Math.PI / 4]}>
+          <octahedronGeometry args={[.09, 0]} />
+          <meshBasicMaterial color={visual.glow} toneMapped={false} />
+        </mesh>
+      ))}
+      <Float speed={1.65} floatIntensity={.2} rotationIntensity={.18}>
+        <mesh position={[0, 2.05, 0]} rotation={[0, Math.PI / 4, 0]}>
+          <octahedronGeometry args={[.28, 0]} />
+          <meshStandardMaterial color={visual.glow} emissive={visual.color} emissiveIntensity={2.4} metalness={.25} roughness={.18} toneMapped={false} />
+        </mesh>
+      </Float>
+      <Sparkles count={18} scale={[2.35, 3.8, 2.35]} position={[0, 1.8, 0]} color={visual.glow} size={1.8} speed={.38} noise={.8} />
+      <pointLight position={[0, 1.65, 0]} color={visual.color} intensity={.55} distance={4.2} />
+    </group>
+  )
+}
+
 function MissionPortal({ portal, active }) {
   const color = portal.route === 'nebula' ? '#b08cff' : portal.route === 'comet' ? '#ff9a5c' : '#68e9ff'
   const portalY = terrainHeight(portal.position[0], portal.position[2]) + .72
@@ -567,7 +648,53 @@ function DistantWorlds({ palette }) {
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange }) {
+function PlayerNameTag({ displayName, speech }) {
+  return (
+    <Html position={[0, 3.08, 0]} center distanceFactor={8.5} zIndexRange={[80, 0]} style={{ pointerEvents: 'none' }}>
+      <div className="frontier-player-label">
+        {speech?.text && <p>{speech.text}</p>}
+        <span>{displayName || '탐사원'}</span>
+      </div>
+    </Html>
+  )
+}
+
+function RemoteAstronaut({ player, showName }) {
+  const group = useRef()
+  useFrame((_, delta) => {
+    if (!group.current) return
+    const smoothing = 1 - Math.exp(-Math.min(delta, .05) * 11)
+    group.current.position.x = THREE.MathUtils.lerp(group.current.position.x, Number(player.x || 0), smoothing)
+    group.current.position.z = THREE.MathUtils.lerp(group.current.position.z, Number(player.z || 0), smoothing)
+    group.current.position.y = THREE.MathUtils.lerp(
+      group.current.position.y,
+      walkSurfaceHeight(Number(player.x || 0), Number(player.z || 0)),
+      smoothing,
+    )
+    const yawDelta = Math.atan2(
+      Math.sin(Number(player.yaw || 0) - group.current.rotation.y),
+      Math.cos(Number(player.yaw || 0) - group.current.rotation.y),
+    )
+    group.current.rotation.y += yawDelta * smoothing
+  })
+
+  return (
+    <group ref={group} position={[Number(player.x || 0), walkSurfaceHeight(Number(player.x || 0), Number(player.z || 0)), Number(player.z || 0)]} rotation={[0, Number(player.yaw || 0), 0]} scale={CHARACTER_SCALE}>
+      <mesh position={[0, 1.2, 0]} scale={[.92, 1, .8]} castShadow><capsuleGeometry args={[.39, .72, 8, 14]} /><meshStandardMaterial color="#dcecf4" roughness={.36} metalness={.1} /></mesh>
+      <mesh position={[0, 1.18, .35]}><boxGeometry args={[.5, .42, .08]} /><meshStandardMaterial color="#30445f" metalness={.5} roughness={.25} /></mesh>
+      <mesh position={[0, 1.18, .405]}><boxGeometry args={[.28, .08, .035]} /><meshStandardMaterial color="#c59aff" emissive="#6946a3" emissiveIntensity={1.7} toneMapped={false} /></mesh>
+      <mesh position={[0, 2, 0]} castShadow><sphereGeometry args={[.53, 24, 18]} /><meshStandardMaterial color="#edf6fa" metalness={.14} roughness={.24} /></mesh>
+      <mesh position={[0, 1.98, .43]} scale={[1, .78, .4]}><sphereGeometry args={[.4, 22, 14]} /><meshPhysicalMaterial color="#9bdfff" transparent opacity={.7} metalness={.5} roughness={.05} clearcoat={.7} /></mesh>
+      <mesh position={[0, 1.22, -.4]} castShadow><boxGeometry args={[.7, .86, .34]} /><meshStandardMaterial color="#574d78" metalness={.58} roughness={.28} /></mesh>
+      {[-.5, .5].map((x) => <mesh key={`arm-${x}`} position={[x, 1.18, 0]} rotation={[0, 0, x < 0 ? -.14 : .14]} castShadow><capsuleGeometry args={[.12, .48, 6, 10]} /><meshStandardMaterial color="#d6e7ed" roughness={.4} /></mesh>)}
+      {[-.25, .25].map((x) => <mesh key={`leg-${x}`} position={[x, .32, 0]} castShadow><capsuleGeometry args={[.14, .42, 6, 10]} /><meshStandardMaterial color="#cedfe6" roughness={.42} /></mesh>)}
+      <mesh position={[0, .025, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[.56, 24]} /><meshBasicMaterial color="#000" transparent opacity={.2} depthWrite={false} /></mesh>
+      {showName && <PlayerNameTag displayName={player.displayName} speech={player.speech} />}
+    </group>
+  )
+}
+
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange, onStructureCollision, displayName, showName, speech }) {
   const { gl } = useThree()
   const group = useRef()
   const body = useRef()
@@ -580,6 +707,7 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, freeLoo
   const keys = useRef(new Set())
   const nearbySignature = useRef('')
   const collectLock = useRef(new Set())
+  const collisionLatch = useRef('')
   const lastPublishAt = useRef(0)
   const hoverLook = useRef({ pendingX: 0, pendingY: 0, lastX: null, lastY: null, lastTime: null, orbiting: false })
   const movementIntent = useRef(createMovementIntent())
@@ -799,12 +927,16 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, freeLoo
       const nextX = group.current.position.x + moveDirection.x * PLAYER_SPEED * delta * movementAmount
       const nextZ = group.current.position.z + moveDirection.z * PLAYER_SPEED * delta * movementAmount
       const inWorld = Math.hypot(nextX, nextZ) < WORLD_RADIUS - .8
-      const blockedByObject = blockers.some((position) => Math.hypot(nextX - position[0], nextZ - position[2]) < 1.12)
+      const structureCollision = structureColliders.find((collider) => Math.hypot(nextX - collider.position[0], nextZ - collider.position[2]) < collider.collisionRadius)
+      const blockedByObject = Boolean(structureCollision) || blockers.some((position) => Math.hypot(nextX - position[0], nextZ - position[2]) < 1.12)
       const blockedByRiver = isRiverWater(nextX, nextZ) && !isBridgeDeck(nextX, nextZ)
       const blockedBySlope = !isBridgeDeck(nextX, nextZ) && terrainSlope(nextX, nextZ) > 1.08
       if (inWorld && !blockedByObject && !blockedByRiver && !blockedBySlope) {
         group.current.position.x = nextX
         group.current.position.z = nextZ
+      } else if (structureCollision && collisionLatch.current !== structureCollision.id) {
+        collisionLatch.current = structureCollision.id
+        onStructureCollision?.(structureCollision.item)
       }
     } else {
       movementIntent.current.active = false
@@ -825,6 +957,13 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, freeLoo
 
     group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkSurfaceHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
     const player = group.current.position
+
+    if (collisionLatch.current) {
+      const latchedCollider = structureColliders.find((collider) => collider.id === collisionLatch.current)
+      if (!latchedCollider || Math.hypot(player.x - latchedCollider.position[0], player.z - latchedCollider.position[2]) > latchedCollider.collisionRadius + .75) {
+        collisionLatch.current = ''
+      }
+    }
 
     if (controls.current && orbitCamera) {
       desiredTarget.set(player.x, player.y + CAMERA_TARGET_HEIGHT, player.z)
@@ -850,7 +989,9 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, freeLoo
         const distance = Math.hypot(player.x - item.position[0], player.z - item.position[2])
         if (distance < nearestDistance) { nearest = item; nearestDistance = distance }
       })
-      const nextNearbySignature = nearest ? `${nearest.id}:${nearest.status || ''}:${nearest.label || ''}` : ''
+      const nextNearbySignature = nearest
+        ? `${nearest.id}:${nearest.kind || ''}:${nearest.actionId || ''}:${nearest.dailyEvent?.eventId || ''}:${nearest.status || ''}:${nearest.label || ''}`
+        : ''
       if (nearbySignature.current !== nextNearbySignature) {
         nearbySignature.current = nextNearbySignature
         onNearbyChange(nearest)
@@ -872,7 +1013,7 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, freeLoo
     collectLock.current.forEach((id) => { if (!liveIds.has(id)) collectLock.current.delete(id) })
     if (state.clock.elapsedTime - lastPublishAt.current > .22) {
       lastPublishAt.current = state.clock.elapsedTime
-      onPositionChange?.({ x: player.x, z: player.z })
+      onPositionChange?.({ x: player.x, z: player.z, yaw: group.current.rotation.y })
     }
   }, -2)
 
@@ -939,12 +1080,13 @@ function Astronaut({ inputRef, interactables, blockers, pickups, paused, freeLoo
           <mesh position={[0, 0, .16]}><sphereGeometry args={[.055, 8, 6]} /><meshStandardMaterial color="#7cf2bd" emissive="#4ee1a5" emissiveIntensity={2} /></mesh>
         </group>
         <mesh position={[0, .025, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[.56, 24]} /><meshBasicMaterial color="#000" transparent opacity={.2} depthWrite={false} /></mesh>
+        {showName && <PlayerNameTag displayName={displayName} speech={speech} />}
       </group>
     </>
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel }) {
+function FrontierScene({ planet, selectedStructureId, onSelectStructure, onStructureCollision, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
   const roverNode = useMemo(() => ({
@@ -952,7 +1094,23 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
     status: ROVER_STATUS_LABELS[roverStatus] ? roverStatus : 'idle',
     label: roverStatusLabel || ROVER_STATUS_LABELS[roverStatus] || ROVER_STATUS_LABELS.idle,
   }), [roverStatus, roverStatusLabel])
-  const interactables = useMemo(() => [...RESOURCE_NODES, ...MISSION_PORTALS, GUIDE_NODE, roverNode], [roverNode])
+  const resourceInteractables = useMemo(() => dailyEventNode
+    ? RESOURCE_NODES.map((node) => node.id === dailyEventNode.id ? dailyEventNode : node)
+    : RESOURCE_NODES, [dailyEventNode])
+  const structureColliders = useMemo(() => layout.map((item) => {
+    const position = worldPositionFromLayout(item)
+    position[1] = terrainHeight(position[0], position[2])
+    return {
+      id: item.instanceId,
+      kind: 'structure',
+      actionId: 'structure',
+      label: item.name || '행성 객체 살펴보기',
+      position,
+      collisionRadius: Math.max(.9, structureFootprint(item.itemId) + .42),
+      item,
+    }
+  }), [layout])
+  const interactables = useMemo(() => [...resourceInteractables, ...structureColliders, ...MISSION_PORTALS, GUIDE_NODE, roverNode], [resourceInteractables, roverNode, structureColliders])
   const blockers = useMemo(() => layout.filter((item) => item.itemId !== 'wild_sprout').map(worldPositionFromLayout), [layout])
   const villageSlots = useMemo(() => getAvailableVillageSlots(blockers), [blockers])
   const showVillageBeacon = useMemo(() => isVillageBeaconAvailable(blockers), [blockers])
@@ -1029,6 +1187,7 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
       {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} onSelect={onSelectStructure} />)}
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
+      {dailyEventNode && <DailyEventMarker node={dailyEventNode} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
       <LumiGuide palette={palette} />
       <RoverControl palette={palette} status={roverNode.status} />
@@ -1049,7 +1208,8 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, inputRe
         </group>
       )}
 
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} />
+      {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} />)}
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} onStructureCollision={onStructureCollision} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} />
     </>
   )
 }
@@ -1093,12 +1253,15 @@ function TouchJoystick({ inputRef, disabled }) {
   )
 }
 
-function MiniMap({ playerPosition, nearby }) {
+function MiniMap({ playerPosition, nearby, dailyEventNode }) {
   const playerLeft = 50 + THREE.MathUtils.clamp(playerPosition.x / WORLD_RADIUS, -1, 1) * 44
   const playerTop = 50 + THREE.MathUtils.clamp(playerPosition.z / WORLD_RADIUS, -1, 1) * 44
+  const dailyVisual = dailyEventNode ? resolveDailyEventVisual(dailyEventNode.dailyEvent) : null
+  const dailyLeft = dailyEventNode ? 50 + dailyEventNode.position[0] / WORLD_RADIUS * 43 : 0
+  const dailyTop = dailyEventNode ? 50 + dailyEventNode.position[2] / WORLD_RADIUS * 43 : 0
   return (
     <div className="frontier-minimap" aria-label="행성 구역 미니맵">
-      <header><span>PLANET MAP</span><strong>{nearby ? '신호 감지' : '구역 탐색'}</strong></header>
+      <header><span>PLANET MAP</span><strong>{nearby?.kind === 'daily' ? '사건 현장' : dailyEventNode ? '오늘 사건' : nearby ? '신호 감지' : '구역 탐색'}</strong></header>
       <div className="frontier-minimap-field">
         <i className="frontier-minimap-orbit" />
         {ZONES.map((zone) => (
@@ -1107,6 +1270,17 @@ function MiniMap({ playerPosition, nearby }) {
             <small>{zone.shortLabel}</small>
           </span>
         ))}
+        {dailyEventNode && (
+          <span
+            className="frontier-map-zone frontier-map-daily-event"
+            style={{ left: `${dailyLeft}%`, top: `${dailyTop}%`, '--zone-color': dailyVisual.color, zIndex: 2 }}
+            title={dailyEventNode.label}
+            aria-label={`오늘의 행성 사건: ${dailyEventNode.label}`}
+          >
+            <i style={{ width: 10, height: 10, borderWidth: 2, boxShadow: `0 0 12px ${dailyVisual.color}` }} />
+            <small>오늘</small>
+          </span>
+        )}
         <b className="frontier-map-player" style={{ left: `${playerLeft}%`, top: `${playerTop}%` }} />
       </div>
     </div>
@@ -1125,26 +1299,66 @@ const INTERACTION_ICONS = {
 }
 
 function InteractionPrompt({ nearby }) {
-  const Graphic = nearby.kind === 'portal' ? Compass : INTERACTION_ICONS[nearby.actionId] || SparklesIcon
+  const Graphic = nearby.kind === 'daily' ? SparklesIcon : nearby.kind === 'portal' ? Compass : INTERACTION_ICONS[nearby.actionId] || SparklesIcon
   return (
     <div className="frontier-interaction-prompt">
       <span>{createElement(Graphic, { size: 19, 'aria-hidden': true })}</span>
-      <div><small>{nearby.kind === 'guide' ? 'LUMI GUIDE' : nearby.kind === 'portal' ? 'EXPEDITION GATE' : nearby.kind === 'rover' ? 'ROVER CONTROL' : 'WORLD INTERACTION'}</small><strong>{nearby.label}</strong></div>
+      <div><small>{nearby.kind === 'daily' ? 'TODAY PLANET EVENT' : nearby.kind === 'structure' ? 'WORLD OBJECT' : nearby.kind === 'guide' ? 'LUMI GUIDE' : nearby.kind === 'portal' ? 'EXPEDITION GATE' : nearby.kind === 'rover' ? 'ROVER CONTROL' : 'WORLD INTERACTION'}</small><strong>{nearby.label}</strong></div>
       <kbd>E</kbd>
     </div>
   )
 }
 
+function ProximityChat({ peer, onSend, errorMessage }) {
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [localError, setLocalError] = useState('')
+
+  const submit = async (event) => {
+    event.preventDefault()
+    const text = draft.replace(/\s+/g, ' ').trim().slice(0, 80)
+    if (!text || sending) return
+    setSending(true)
+    setLocalError('')
+    try {
+      const sent = await onSend?.(peer.uid, text)
+      if (!sent) {
+        setLocalError(errorMessage || '친구가 멀어졌거나 오프라인 상태입니다.')
+        return
+      }
+      setDraft('')
+    } catch (error) {
+      setLocalError(error?.message || '대화를 전송하지 못했습니다.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <form className="frontier-proximity-chat" onSubmit={submit}>
+      <div><i /><span><small>LIVE PROXIMITY</small><strong>{peer.displayName || '탐사원'}님과 실시간 대화</strong></span></div>
+      <label>
+        <input value={draft} maxLength={80} placeholder="8초 뒤 사라지는 말을 입력하세요" aria-label={`${peer.displayName || '친구'}에게 휘발성 메시지 보내기`} onChange={(event) => { setDraft(event.target.value); setLocalError('') }} />
+        <button type="submit" disabled={!draft.trim() || sending}>{sending ? '전송 중' : '말하기'}</button>
+      </label>
+      {(localError || errorMessage) && <p role="status">{localError || errorMessage}</p>}
+    </form>
+  )
+}
+
 export default function GalaxyWorld3D({
   planet,
+  dailyEvent,
   missionReady,
   missionCooldownLabel,
   selectedBuildItem,
   onCancelBuild,
   onBuildAt,
   onWorldAction,
+  onDailyEventComplete,
   onMissionComplete,
   onSelectStructure,
+  onStructureCollision,
   selectedStructureId,
   onMessage,
   paused = false,
@@ -1152,16 +1366,36 @@ export default function GalaxyWorld3D({
   onOpenRover,
   roverStatus = 'idle',
   roverStatusLabel = '',
+  remotePlayers = [],
+  localPlayerName = '탐사원',
+  localSpeech = null,
+  liveConnected = false,
+  presenceError = '',
+  onPlayerTransform,
+  onSendSpeech,
 }) {
   const inputRef = useRef({ x: 0, z: 0 })
   const [nearby, setNearby] = useState(null)
-  const [playerPosition, setPlayerPosition] = useState({ x: 0, z: 5 })
+  const [playerPosition, setPlayerPosition] = useState({ x: 0, z: 5, yaw: 0 })
   const [activeMission, setActiveMission] = useState(null)
   const [collectedIds, setCollectedIds] = useState(new Set())
   const [missionRemainingMs, setMissionRemainingMs] = useState(0)
   const [completionStatus, setCompletionStatus] = useState('idle')
   const missionRemainingRef = useRef(0)
   const completingRef = useRef(false)
+  const dailyEventNode = useMemo(() => resolvePendingDailyEventNode(dailyEvent), [dailyEvent])
+  const nearbyRemotePlayers = useMemo(() => remotePlayers
+    .filter((player) => Math.hypot(playerPosition.x - Number(player.x || 0), playerPosition.z - Number(player.z || 0)) <= PROXIMITY_CHAT_DISTANCE)
+    .sort((first, second) => (
+      Math.hypot(playerPosition.x - Number(first.x || 0), playerPosition.z - Number(first.z || 0))
+      - Math.hypot(playerPosition.x - Number(second.x || 0), playerPosition.z - Number(second.z || 0))
+    )), [playerPosition.x, playerPosition.z, remotePlayers])
+  const nearbyRemoteUids = useMemo(() => new Set(nearbyRemotePlayers.map((player) => player.uid)), [nearbyRemotePlayers])
+  const closestRemotePlayer = nearbyRemotePlayers[0] || null
+  const publishPlayerTransform = useCallback((position) => {
+    setPlayerPosition(position)
+    onPlayerTransform?.(position)
+  }, [onPlayerTransform])
 
   const startMission = useCallback((route) => {
     if (!missionReady) { onMessage?.(`탐사선 정비 중 · ${missionCooldownLabel}`); return }
@@ -1178,14 +1412,22 @@ export default function GalaxyWorld3D({
   const interact = useCallback(() => {
     if (!nearby || paused) return
     if (nearby.kind === 'portal') startMission(nearby.route)
+    else if (nearby.kind === 'structure') onSelectStructure?.(nearby.item)
     else if (nearby.kind === 'guide') onOpenBriefing?.()
     else if (nearby.kind === 'rover') onOpenRover?.()
+    else if (nearby.kind === 'daily') {
+      const currentDailyEvent = dailyEvent?.status === 'pending'
+        && dailyEvent.eventId === nearby.dailyEvent?.eventId
+        ? dailyEvent
+        : null
+      if (currentDailyEvent) onDailyEventComplete?.(currentDailyEvent)
+    }
     else onWorldAction?.(nearby)
-  }, [nearby, onOpenBriefing, onOpenRover, onWorldAction, paused, startMission])
+  }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenRover, onSelectStructure, onWorldAction, paused, startMission])
 
   useEffect(() => {
     const keydown = (event) => {
-      if (event.code !== 'KeyE' || paused || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
+      if (event.repeat || event.code !== 'KeyE' || paused || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
       event.preventDefault()
       interact()
     }
@@ -1274,22 +1516,35 @@ export default function GalaxyWorld3D({
           planet={planet}
           selectedStructureId={selectedStructureId}
           onSelectStructure={onSelectStructure}
+          onStructureCollision={onStructureCollision}
           inputRef={inputRef}
           paused={paused}
           onNearbyChange={setNearby}
           activeMission={activeMission}
           collectedIds={collectedIds}
           onCollect={collect}
-          onPlayerPositionChange={setPlayerPosition}
+          onPlayerPositionChange={publishPlayerTransform}
           buildItem={selectedBuildItem}
           onBuildAt={onBuildAt}
           onInvalidBuild={() => onMessage?.('시설과 항로에서 조금 떨어진 평평한 자리를 골라주세요.')}
           roverStatus={roverStatus}
           roverStatusLabel={roverStatusLabel}
+          dailyEventNode={dailyEventNode}
+          remotePlayers={remotePlayers}
+          nearbyRemoteUids={nearbyRemoteUids}
+          localPlayerName={localPlayerName}
+          localSpeech={localSpeech}
         />
       </Canvas>
 
-      <MiniMap playerPosition={playerPosition} nearby={nearby} />
+      <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} />
+      <div className={`frontier-live-status${liveConnected ? ' online' : ' offline'}`} title={presenceError || (liveConnected ? '같은 행성 접속자와 실시간 연결됨' : '실시간 대화 연결 없음')}>
+        <i />
+        <span>{liveConnected ? `온라인 ${remotePlayers.length}명` : '실시간 오프라인'}</span>
+      </div>
+      {closestRemotePlayer && liveConnected && (
+        <ProximityChat key={closestRemotePlayer.uid} peer={closestRemotePlayer} onSend={onSendSpeech} errorMessage={presenceError} />
+      )}
       {activeMission && (
         <div className="frontier-mission-hud">
           <span><Compass size={20} aria-hidden="true" /></span>
@@ -1326,7 +1581,7 @@ export default function GalaxyWorld3D({
       {nearby && !selectedBuildItem && !paused && (
         <button type="button" className="frontier-action-button" onClick={interact}>
           <span>{nearby.kind === 'guide' ? <Bot size={23} aria-hidden="true" /> : nearby.kind === 'portal' ? <Compass size={23} aria-hidden="true" /> : nearby.kind === 'rover' ? <Wrench size={23} aria-hidden="true" /> : <SparklesIcon size={23} aria-hidden="true" />}</span>
-          <strong>상호작용</strong>
+          <strong>{nearby.kind === 'daily' ? '사건 해결' : nearby.kind === 'structure' ? '객체 보기' : '상호작용'}</strong>
         </button>
       )}
     </div>

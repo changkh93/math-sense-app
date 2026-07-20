@@ -1,6 +1,7 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
+import { deleteObject, getDownloadURL, ref as createStorageRef, uploadBytes } from 'firebase/storage'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -56,7 +57,8 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { db, functions } from '../../firebase'
+import { db, functions, storage } from '../../firebase'
+import { useGalaxyWorldPresence } from '../../hooks/useGalaxyWorldPresence'
 import {
   GALAXY_ABILITIES,
   GALAXY_PLAY_STYLES,
@@ -67,7 +69,10 @@ import {
   getGalaxyRoverStatus,
   getMissionCooldown,
 } from '../../utils/galaxyGame'
+import { compressImage } from '../../utils/storageUtils'
+import GalaxyObjectDialog from './GalaxyObjectDialog'
 import GalaxyRoverPanel from './GalaxyRoverPanel'
+import { BUILD_RADIUS, isBridgeDeck, isRiverWater, terrainSlope } from './GalaxyTerrainModel'
 import GalaxyWorld3D, { StructurePreview3D } from './GalaxyWorld3D'
 import './MetaGalaxy.css'
 
@@ -150,6 +155,43 @@ const MATERIAL_ICONS = {
   biofiber: Leaf,
   crystalGlass: Gem,
   alloy: Package,
+}
+
+const DAILY_EVENT_ICONS = {
+  lumen_bloom: Leaf,
+  crystal_rain: Gem,
+  signal_blackout: RadioTower,
+  meteor_debris: Package,
+}
+
+const STRUCTURE_VISIT_ACTIONS = {
+  starter_dome: { actionId: 'repair', label: '개척자 돔 점검 미션' },
+  lumen_tree: { actionId: 'water', label: '이 객체에 물주기 미션' },
+  crystal_pond: { actionId: 'water', label: '물가 생태 돌보기 미션' },
+  friend_greenhouse: { actionId: 'water', label: '공동 온실 물주기 미션' },
+  starflower_garden: { actionId: 'water', label: '별꽃 정원 물주기 미션' },
+  wild_sprout: { actionId: 'water', label: '루멘 새싹 물주기 미션' },
+  rover_bay: { actionId: 'repair', label: '로버 정비소 수리 미션' },
+  observatory: { actionId: 'repair', label: '관측 장치 수리 미션' },
+  expedition_beacon: { actionId: 'repair', label: '원정 비콘 수리 미션' },
+  prism_pathlight: { actionId: 'repair', label: '프리즘 길잡이 점검 미션' },
+  creature_habitat: { actionId: 'feed', label: '루미 생명체 돌보기 미션' },
+}
+
+const getStructureVisitAction = (itemId) => STRUCTURE_VISIT_ACTIONS[itemId]
+  || { actionId: 'admire', label: '이 객체에 감탄 신호 남기기' }
+
+const OBJECT_FALLBACK_CATALOG = {
+  starter_dome: {
+    name: '개척자 돔',
+    description: '아스트라 프론티어에 처음 도착한 탐험가의 귀환 거점입니다.',
+    effect: '행성의 중심과 안전한 귀환 지점을 표시합니다.',
+  },
+  wild_sprout: {
+    name: '루멘 새싹',
+    description: '직접 심어 행성의 흙에서 자라기 시작한 작은 발광 식물입니다.',
+    effect: '행성의 생태 기억과 정원 활력을 보여줍니다.',
+  },
 }
 
 const BUILD_ITEM_STORIES = {
@@ -382,6 +424,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [selectedStructureId, setSelectedStructureId] = useState('')
+  const [objectDialogOpen, setObjectDialogOpen] = useState(false)
   const [selectedBuildItem, setSelectedBuildItem] = useState('')
   const [focusedBuildItemId, setFocusedBuildItemId] = useState('')
   const [visitMessage, setVisitMessage] = useState(VISIT_MESSAGES[0])
@@ -391,10 +434,32 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   const actionLockRef = useRef('')
   const arrivalCloseRef = useRef(null)
   const menuCloseRef = useRef(null)
+  const objectDialogCloseRef = useRef(null)
   const restoreFocusRef = useRef(null)
   const activeOverlayRef = useRef('')
   const isOwner = targetUid === user?.uid
   const overlayReady = !loading && Boolean(home)
+  const sendSpeechRequest = useCallback((payload) => callGalaxy('sendGalaxyWorldSpeech', payload), [])
+  const liveSessionEnabled = Boolean(
+    overlayReady
+    && home?.liveSession?.granted
+    && home.liveSession.roomOwnerUid === targetUid
+    && Number(home.liveSession.expiresAtMs || 0) > nowMs + Number(home.serverClockOffsetMs || 0),
+  )
+  const {
+    remotePlayers,
+    ownSpeech,
+    isConnected: liveConnected,
+    presenceError,
+    updatePosition: updateLivePosition,
+    sendSpeech,
+  } = useGalaxyWorldPresence({
+    enabled: liveSessionEnabled,
+    roomOwnerUid: targetUid,
+    uid: user?.uid || '',
+    displayName: home?.liveSession?.displayName || home?.ownPlanet?.ownerName || userData?.publicDisplayName || userData?.name || '탐사원',
+    sendSpeechRequest,
+  })
 
   const loadHome = useCallback(async (nextTargetUid = user?.uid, { quiet = false } = {}) => {
     if (!user?.uid) {
@@ -470,10 +535,37 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     return () => window.clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    if (!home?.liveSession?.granted || home.liveSession.roomOwnerUid !== targetUid || !user?.uid) return undefined
+    let cancelled = false
+    const renew = async () => {
+      try {
+        const result = await callGalaxy('renewGalaxyWorldSession', { roomOwnerUid: targetUid })
+        if (cancelled || !result?.liveSession) return
+        setHome((current) => current && current.liveSession?.roomOwnerUid === targetUid
+          ? { ...current, liveSession: result.liveSession }
+          : current)
+      } catch (renewError) {
+        console.warn('Failed to renew galaxy live session', renewError)
+      }
+    }
+    const timer = window.setInterval(renew, 2 * 60 * 1000)
+    const handleFocus = () => {
+      const estimatedServerNowMs = Date.now() + Number(home.serverClockOffsetMs || 0)
+      if (Number(home.liveSession.expiresAtMs || 0) - estimatedServerNowMs < 90 * 1000) renew()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [home?.liveSession?.expiresAtMs, home?.liveSession?.granted, home?.liveSession?.roomOwnerUid, home?.serverClockOffsetMs, targetUid, user?.uid])
+
   useEffect(() => () => window.clearTimeout(noticeTimerRef.current), [])
 
   useEffect(() => {
-    const nextOverlay = overlayReady ? (arrivalOpen ? 'arrival' : menu ? 'menu' : '') : ''
+    const nextOverlay = overlayReady ? (objectDialogOpen ? 'object' : arrivalOpen ? 'arrival' : menu ? 'menu' : '') : ''
     const previousOverlay = activeOverlayRef.current
     let frameId = 0
 
@@ -485,7 +577,11 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     activeOverlayRef.current = nextOverlay
     if (nextOverlay) {
       frameId = window.requestAnimationFrame(() => {
-        const closeButton = nextOverlay === 'arrival' ? arrivalCloseRef.current : menuCloseRef.current
+        const closeButton = nextOverlay === 'object'
+          ? objectDialogCloseRef.current
+          : nextOverlay === 'arrival'
+            ? arrivalCloseRef.current
+            : menuCloseRef.current
         closeButton?.focus()
       })
     } else if (previousOverlay) {
@@ -497,26 +593,55 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     }
 
     return () => window.cancelAnimationFrame(frameId)
-  }, [arrivalOpen, menu, overlayReady])
+  }, [arrivalOpen, menu, objectDialogOpen, overlayReady])
 
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key !== 'Escape') return
-      if (arrivalOpen) setArrivalOpen(false)
+      if (objectDialogOpen) {
+        setObjectDialogOpen(false)
+        setSelectedStructureId('')
+      }
+      else if (arrivalOpen) setArrivalOpen(false)
       else if (menu) setMenu('')
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [arrivalOpen, menu])
+  }, [arrivalOpen, menu, objectDialogOpen])
 
   const planet = home?.planet || {}
   const ownPlanet = home?.ownPlanet || {}
   const events = useMemo(() => home?.events || [], [home?.events])
   const neighbors = home?.neighbors || []
   const catalog = home?.catalog || {}
+  const planetLayout = Array.isArray(planet.layout) ? planet.layout : []
+  const selectedObject = selectedStructureId
+    ? planetLayout.find((item) => item?.instanceId === selectedStructureId) || null
+    : null
+  const selectedObjectCatalog = selectedObject
+    ? catalog[selectedObject.itemId] || OBJECT_FALLBACK_CATALOG[selectedObject.itemId] || {}
+    : {}
+  const selectedObjectMission = selectedObject ? getStructureVisitAction(selectedObject.itemId) : null
+  const dailyEvent = isOwner ? home?.dailyEvent || null : null
+  const dailyEventPending = dailyEvent?.status === 'pending'
   const unreadCount = events.filter((event) => !event.seen).length
   const wallet = Math.max(0, Number(home?.wallet ?? userData?.crystals ?? 0))
   const galaxyNowMs = nowMs + Number(home?.serverClockOffsetMs || 0)
+
+  useEffect(() => {
+    if (!objectDialogOpen || selectedObject) return
+    setObjectDialogOpen(false)
+    setSelectedStructureId('')
+  }, [objectDialogOpen, selectedObject])
+
+  useEffect(() => {
+    if (!isOwner || !dailyEvent?.expiresAtMs || !user?.uid) return undefined
+    const serverAdjustedNowMs = Date.now() + Number(home?.serverClockOffsetMs || 0)
+    const refreshDelayMs = Math.max(1000, Number(dailyEvent.expiresAtMs) - serverAdjustedNowMs + 1200)
+    const timer = window.setTimeout(() => loadHome(user.uid, { quiet: true }), refreshDelayMs)
+    return () => window.clearTimeout(timer)
+  }, [dailyEvent?.dayKey, dailyEvent?.expiresAtMs, home?.serverClockOffsetMs, isOwner, loadHome, user?.uid])
+
   const missionCooldown = getMissionCooldown(ownPlanet.lastMissionAtMs, galaxyNowMs)
   const currentTheme = GALAXY_THEMES[planet.theme] || GALAXY_THEMES.forest
   const ownTheme = GALAXY_THEMES[ownPlanet.theme] || GALAXY_THEMES.forest
@@ -565,6 +690,15 @@ export default function MetaGalaxy({ user, userData, onBack }) {
       total: unreadCount,
       action: 'logs',
     }
+    if (dailyEventPending) return {
+      id: 'daily-event',
+      eyebrow: '밤사이 발생한 행성 사건',
+      title: dailyEvent.title || '행성 현장에 새로운 변화가 감지됐어요',
+      detail: dailyEvent.detail || '미니맵의 빛나는 사건 표식을 따라가 현장을 안정시켜 주세요.',
+      progress: 0,
+      total: 1,
+      action: 'daily-event',
+    }
     if (builtCount === 0 && wallet >= 25) return {
       id: 'first-build',
       eyebrow: '오늘의 개척 임무',
@@ -610,16 +744,18 @@ export default function MetaGalaxy({ user, userData, onBack }) {
       total: 1,
       action: isOwner ? 'build' : 'world',
     }
-  }, [builtCount, hasRoverBay, isOwner, missionCooldown.label, missionCooldown.ready, roverRemainingLabel, roverStatus, unreadCount, wallet])
+  }, [builtCount, dailyEvent?.detail, dailyEvent?.title, dailyEventPending, hasRoverBay, isOwner, missionCooldown.label, missionCooldown.ready, roverRemainingLabel, roverStatus, unreadCount, wallet])
 
   const overnightSummary = useMemo(() => {
+    if (dailyEventPending) return `${dailyEvent.title} ${dailyEvent.detail || '현장의 신호를 따라가 오늘의 변화를 해결해 주세요.'}`
+    if (dailyEvent?.status === 'completed') return `${dailyEvent.title || '오늘의 행성 사건'}을 해결해 행성의 흐름이 다시 안정됐습니다.`
     const latestEvent = events[0]
     if (latestEvent) return `${latestEvent.actorName || '이웃 탐사원'}이 ${latestEvent.actionLabel || '새 신호'} 기록을 남겼습니다.`
     const visitCount = Math.max(0, Number(ownPlanet.stats?.visits || 0))
     return visitCount > 0
       ? `지금까지 ${visitCount}명의 탐사원이 이 행성의 기억을 지나갔습니다.`
       : '첫 방문 신호를 기다리며 귀환등이 조용히 항로를 밝히고 있습니다.'
-  }, [events, ownPlanet.stats?.visits])
+  }, [dailyEvent?.detail, dailyEvent?.status, dailyEvent?.title, dailyEventPending, events, ownPlanet.stats?.visits])
 
   const flash = useCallback((message) => {
     setNotice(message)
@@ -645,11 +781,124 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     }
   }, [flash])
 
+  const openObjectDialog = useCallback((item) => {
+    if (!item?.instanceId) return
+    setSelectedStructureId(item.instanceId)
+    setSelectedBuildItem('')
+    setMenu('')
+    setArrivalOpen(false)
+    setObjectDialogOpen(true)
+  }, [])
+
+  const closeObjectDialog = useCallback(() => {
+    setObjectDialogOpen(false)
+    setSelectedStructureId('')
+  }, [])
+
   const visitNeighbor = async (neighborUid) => {
     setSelectedStructureId('')
+    setObjectDialogOpen(false)
     setSelectedBuildItem('')
     setMenu('')
     await loadHome(neighborUid)
+  }
+
+  const saveGalaxyObject = async ({ name, description, worldX, worldZ, rotation, imageFile, removeImage }) => {
+    if (!isOwner || !selectedObject?.instanceId) return null
+    const numericWorldX = Number(worldX)
+    const numericWorldZ = Number(worldZ)
+    const currentWorldX = (Number(selectedObject.x || 50) - 50) / 3
+    const currentWorldZ = (Number(selectedObject.y || 50) - 50) / 3
+    const positionChanged = Math.hypot(numericWorldX - currentWorldX, numericWorldZ - currentWorldZ) > .01
+    if (
+      !Number.isFinite(numericWorldX) || !Number.isFinite(numericWorldZ)
+      || (positionChanged && (
+        Math.hypot(numericWorldX, numericWorldZ) > BUILD_RADIUS
+        || isRiverWater(numericWorldX, numericWorldZ)
+        || isBridgeDeck(numericWorldX, numericWorldZ)
+        || terrainSlope(numericWorldX, numericWorldZ) > .42
+      ))
+    ) {
+      flash('객체는 강·다리·급경사를 피해 행성의 평평한 건설 구역 안에 배치해 주세요.')
+      return null
+    }
+    const instanceId = selectedObject.instanceId
+    let uploadedImageRef = null
+    let nextImageUrl = removeImage ? '' : selectedObject.imageUrl || ''
+    let nextImagePath = removeImage ? '' : selectedObject.imagePath || ''
+
+    const result = await runAction(
+      `object:update:${instanceId}`,
+      async () => {
+        if (imageFile) {
+          let compressed = await compressImage(imageFile, { maxWidth: 1200, quality: .82 })
+          if (compressed.size > 2 * 1024 * 1024) compressed = await compressImage(imageFile, { maxWidth: 900, quality: .68 })
+          if (compressed.size > 2 * 1024 * 1024) throw new Error('이미지를 2MB 이하로 줄인 뒤 다시 첨부해 주세요.')
+          nextImagePath = `galaxy-objects/${user.uid}/${instanceId}/${createOperationId()}.jpg`
+          uploadedImageRef = createStorageRef(storage, nextImagePath)
+          await uploadBytes(uploadedImageRef, compressed, { contentType: 'image/jpeg' })
+          nextImageUrl = await getDownloadURL(uploadedImageRef)
+        }
+        return callGalaxy('updateGalaxyItem', {
+          instanceId,
+          name,
+          description,
+          ...(positionChanged ? { x: 50 + numericWorldX * 3, y: 50 + numericWorldZ * 3 } : {}),
+          rotation: Number(rotation),
+          imageUrl: nextImageUrl,
+          imagePath: nextImagePath,
+        })
+      },
+      '객체 정보와 위치를 저장했습니다.',
+    )
+
+    if (!result) {
+      if (uploadedImageRef) deleteObject(uploadedImageRef).catch(() => {})
+      return null
+    }
+
+    const updatedItem = result.item || {
+      ...selectedObject,
+      name,
+      description,
+      x: 50 + numericWorldX * 3,
+      y: 50 + numericWorldZ * 3,
+      rotation: Number(rotation),
+      imageUrl: nextImageUrl,
+      imagePath: nextImagePath,
+    }
+    setHome((current) => {
+      if (!current) return current
+      const updateLayout = (targetPlanet = {}) => ({
+        ...targetPlanet,
+        layout: (Array.isArray(targetPlanet.layout) ? targetPlanet.layout : []).map((entry) => entry.instanceId === instanceId ? updatedItem : entry),
+      })
+      const nextOwnPlanet = updateLayout(current.ownPlanet)
+      return { ...current, ownPlanet: nextOwnPlanet, planet: targetUid === user.uid ? nextOwnPlanet : current.planet }
+    })
+    return result
+  }
+
+  const deleteGalaxyObject = async (item = selectedObject) => {
+    if (!isOwner || !item?.instanceId) return null
+    const instanceId = item.instanceId
+    const result = await runAction(
+      `object:delete:${instanceId}`,
+      () => callGalaxy('deleteGalaxyItem', { instanceId }),
+      `${item.name || '객체'}를 행성에서 삭제했습니다.`,
+    )
+    if (!result) return null
+    setHome((current) => {
+      if (!current) return current
+      const removeFromLayout = (targetPlanet = {}) => ({
+        ...targetPlanet,
+        layout: (Array.isArray(targetPlanet.layout) ? targetPlanet.layout : []).filter((entry) => entry.instanceId !== instanceId),
+      })
+      const nextOwnPlanet = removeFromLayout(current.ownPlanet)
+      return { ...current, ownPlanet: nextOwnPlanet, planet: targetUid === user.uid ? nextOwnPlanet : current.planet }
+    })
+    closeObjectDialog()
+    return result
   }
 
   const buildItemAt = async (worldX, worldZ) => {
@@ -710,6 +959,35 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     return result
   }
 
+  const performObjectMission = async (item = selectedObject) => {
+    if (isOwner || !item?.instanceId) return null
+    const mission = getStructureVisitAction(item.itemId)
+    const result = await runAction(
+      `object:mission:${item.instanceId}`,
+      () => callGalaxy('performGalaxyVisitAction', {
+        targetUid,
+        actionId: mission.actionId,
+        instanceId: item.instanceId,
+        message: visitMessage,
+      }),
+      (missionResult) => missionResult?.rewarded
+        ? '객체 도움 미션을 기록하고 별가루 1개를 발견했습니다.'
+        : '객체 도움 미션을 친구의 귀환 기록에 남겼습니다.',
+    )
+    if (!result) return null
+    setHome((current) => current ? {
+      ...current,
+      neighbors: (current.neighbors || []).map((neighbor) => neighbor.uid === targetUid ? {
+        ...neighbor,
+        routeLevel: result.routeLevel ?? neighbor.routeLevel,
+        connectionXp: result.connectionXp ?? neighbor.connectionXp,
+        nextLevelXp: result.nextLevelXp ?? neighbor.nextLevelXp,
+        interactionCount: Math.max(0, Number(neighbor.interactionCount || 0)) + 1,
+      } : neighbor),
+    } : current)
+    return result
+  }
+
   const performWorldAction = async (node) => {
     if (!node) return
     if (!isOwner) {
@@ -726,6 +1004,41 @@ export default function MetaGalaxy({ user, userData, onBack }) {
       x: node.position?.[0] || 0,
       z: node.position?.[2] || 0,
     }), (result) => result?.label || '월드 활동을 완료했습니다.')
+  }
+
+  const completeDailyEvent = async (event = dailyEvent) => {
+    if (!isOwner || event?.status !== 'pending') return null
+    const result = await runAction(
+      `daily:${event.eventId || event.type || 'event'}`,
+      () => callGalaxy('completeGalaxyDailyEvent', { dayKey: event.dayKey, eventId: event.eventId }),
+      (completion) => {
+        const reward = completion?.reward || event.reward || {}
+        return `${event.title || '오늘의 행성 사건'} 해결 · ${reward.title || MATERIAL_LABELS[reward.material] || '행성 재료'} ${reward.amount ?? 1}개를 회수했습니다.`
+      },
+    )
+    if (!result?.dailyEvent) return null
+
+    const receivedAtMs = Date.now()
+    setHome((current) => {
+      if (!current) return current
+      const nextOwnPlanet = {
+        ...current.ownPlanet,
+        materials: { ...(current.ownPlanet?.materials || {}), ...(result.materials || {}) },
+        stats: { ...(current.ownPlanet?.stats || {}), ...(result.stats || {}) },
+      }
+      return {
+        ...current,
+        dailyEvent: result.dailyEvent,
+        serverNowMs: result.serverNowMs || current.serverNowMs,
+        serverClockOffsetMs: Number.isFinite(Number(result.serverNowMs))
+          ? Number(result.serverNowMs) - receivedAtMs
+          : current.serverClockOffsetMs,
+        ownPlanet: nextOwnPlanet,
+        ...(targetUid === user?.uid ? { planet: nextOwnPlanet } : {}),
+      }
+    })
+    setNowMs(receivedAtMs)
+    return result
   }
 
   const runMission = useCallback(async (route, operationId = createOperationId()) => {
@@ -860,6 +1173,12 @@ export default function MetaGalaxy({ user, userData, onBack }) {
       openGameMenu('build')
       return
     }
+    if (todayObjective.action === 'daily-event') {
+      setArrivalOpen(false)
+      setMenu('')
+      flash('미니맵의 금빛 사건 표식을 따라 현장으로 이동한 뒤 E키로 안정시켜 주세요.')
+      return
+    }
     setArrivalOpen(false)
     setMenu('')
     flash(isOwner ? '월드의 빛나는 탐사 관문으로 이동해 항로를 시작하세요.' : '가까운 생태 지점에서 도움 행동을 남겨보세요.')
@@ -881,6 +1200,10 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     : false
   const focusedCanAfford = focusedBuildItem ? wallet >= Number(focusedBuildItem.cost || 0) : false
   const FocusedItemIcon = ITEM_ICONS[effectiveFocusedBuildItemId] || Building2
+  const DailyEventIcon = DAILY_EVENT_ICONS[dailyEvent?.type] || Sparkles
+  const dailyRewardLabel = dailyEvent?.reward
+    ? `${dailyEvent.reward.title || MATERIAL_LABELS[dailyEvent.reward.material] || '행성 재료'} ${dailyEvent.reward.amount ?? 1}개`
+    : '행성 재료 1개'
 
   return (
     <div className="meta-galaxy frontier-immersive">
@@ -891,6 +1214,15 @@ export default function MetaGalaxy({ user, userData, onBack }) {
         missionCooldownLabel={isOwner ? missionCooldown.label : '현장 탐사는 내 행성에서 출발할 수 있어요'}
         roverStatus={isOwner ? roverStatus : 'idle'}
         roverStatusLabel={isOwner ? roverStatusLabel : '내 행성에서 원정 가능'}
+        remotePlayers={remotePlayers}
+        localPlayerName={home?.liveSession?.displayName || ownPlanet.ownerName || userData?.publicDisplayName || userData?.name || '탐사원'}
+        localSpeech={ownSpeech}
+        liveConnected={liveConnected}
+        presenceError={presenceError}
+        onPlayerTransform={updateLivePosition}
+        onSendSpeech={sendSpeech}
+        dailyEvent={isOwner ? dailyEvent : null}
+        onDailyEventComplete={completeDailyEvent}
         onOpenRover={() => openGameMenu('rover')}
         selectedBuildItem={selectedBuildItem}
         onCancelBuild={() => setSelectedBuildItem('')}
@@ -898,11 +1230,12 @@ export default function MetaGalaxy({ user, userData, onBack }) {
         onWorldAction={performWorldAction}
         onMissionComplete={runMission}
         selectedStructureId={selectedStructureId}
-        onSelectStructure={(item) => { setSelectedStructureId(item.instanceId); flash(`${item.name} 시설을 확인했습니다.`) }}
+        onSelectStructure={openObjectDialog}
+        onStructureCollision={openObjectDialog}
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}
-        paused={Boolean(menu || arrivalOpen)}
+        paused={Boolean(menu || arrivalOpen || objectDialogOpen)}
         onOpenBriefing={() => setArrivalOpen(true)}
       />
 
@@ -924,8 +1257,8 @@ export default function MetaGalaxy({ user, userData, onBack }) {
         </section>
       </div>
 
-      <button type="button" className="frontier-objective-card" onClick={handleObjectiveAction}>
-        <span className="frontier-objective-icon"><Compass size={19} aria-hidden="true" /></span>
+      <button type="button" className={`frontier-objective-card${dailyEventPending && todayObjective.id === 'daily-event' ? ' daily-event' : ''}`} onClick={handleObjectiveAction}>
+        <span className="frontier-objective-icon">{createElement(todayObjective.id === 'daily-event' ? DailyEventIcon : Compass, { size: 19, 'aria-hidden': true })}</span>
         <span className="frontier-objective-copy">
           <small>{todayObjective.eyebrow}</small>
           <strong>{todayObjective.title}</strong>
@@ -967,6 +1300,28 @@ export default function MetaGalaxy({ user, userData, onBack }) {
       {busy && <div className="frontier-network-busy"><i /> 은하 네트워크 동기화</div>}
 
       <AnimatePresence>
+        {objectDialogOpen && selectedObject && (
+          <Motion.div className="frontier-object-dialog-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeObjectDialog} onKeyDown={trapDialogFocus}>
+            <Motion.div className="frontier-object-dialog-motion" initial={{ opacity: 0, y: 22, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: .98 }} onClick={(event) => event.stopPropagation()}>
+              <GalaxyObjectDialog
+                key={`${selectedObject.instanceId}:${selectedObject.name || ''}:${selectedObject.description || ''}:${selectedObject.x}:${selectedObject.y}:${selectedObject.imageUrl || ''}`}
+                item={selectedObject}
+                catalogItem={selectedObjectCatalog}
+                isOwner={isOwner}
+                busy={busy}
+                missionLabel={selectedObjectMission?.label}
+                closeButtonRef={objectDialogCloseRef}
+                onClose={closeObjectDialog}
+                onSave={saveGalaxyObject}
+                onDelete={deleteGalaxyObject}
+                onMission={performObjectMission}
+              />
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {(error || notice) && (
           <Motion.div
             className={`frontier-game-toast ${error ? 'error' : 'success'}`}
@@ -998,7 +1353,13 @@ export default function MetaGalaxy({ user, userData, onBack }) {
               </header>
 
               <div className="frontier-arrival-grid">
-                <BriefingCard Icon={Sparkles} overline="귀환 후 행성 변화" title={events.length ? '새로운 기억이 도착했어요' : '귀환등이 항로를 지켰어요'} detail={overnightSummary} />
+                <BriefingCard
+                  Icon={DailyEventIcon}
+                  overline={dailyEvent ? '밤사이 발생한 행성 변화' : '귀환 후 행성 변화'}
+                  title={dailyEvent?.title || (events.length ? '새로운 기억이 도착했어요' : '귀환등이 항로를 지켰어요')}
+                  detail={overnightSummary}
+                  accent={dailyEventPending}
+                />
                 <BriefingCard Icon={Radio} overline="수신 신호" title={unreadCount ? `읽지 않은 신호 ${unreadCount}개` : '새 신호를 기다리는 중'} detail={unreadCount ? '타임라인에서 친구의 도움과 메시지를 확인할 수 있어요.' : '이웃 행성을 방문해 첫 도움 신호를 보내면 새로운 왕복 항로가 시작됩니다.'} />
                 <BriefingCard
                   Icon={Satellite}
@@ -1010,13 +1371,21 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                       ? `${roverRemainingLabel} 귀환합니다. 게임을 닫아도 항해는 계속돼요.`
                       : `세 항로 중 하나를 골라 ${hasRoverBay ? '6시간' : '8시간'} 장거리 원정을 시작할 수 있어요.`}
                 />
-                <BriefingCard Icon={Compass} overline={todayObjective.eyebrow} title={todayObjective.title} detail={todayObjective.detail} accent />
+                <BriefingCard
+                  Icon={dailyEventPending ? Package : Compass}
+                  overline={dailyEventPending ? '현장 안정화 보상' : todayObjective.eyebrow}
+                  title={dailyEventPending ? dailyRewardLabel : todayObjective.title}
+                  detail={dailyEventPending ? '표시된 현장까지 직접 이동해 E키로 해결하면 서버가 오늘 보상을 한 번만 지급합니다.' : todayObjective.detail}
+                  accent
+                />
               </div>
 
               <footer className="frontier-arrival-actions">
                 <button type="button" className="galaxy-secondary-btn" onClick={() => openGameMenu('logs')}><Radio size={17} aria-hidden="true" /> 신호 기록 보기</button>
                 <button type="button" className={roverStatus === 'ready' ? 'galaxy-primary-btn' : 'galaxy-secondary-btn'} onClick={() => openGameMenu('rover')}><Satellite size={17} aria-hidden="true" /> {roverStatus === 'ready' ? '귀환 상자 열기' : '로버 관제 열기'}</button>
-                <button type="button" className="galaxy-primary-btn" onClick={() => setArrivalOpen(false)}>행성으로 들어가기 <DoorOpen size={17} aria-hidden="true" /></button>
+                <button type="button" className="galaxy-primary-btn" onClick={() => setArrivalOpen(false)}>
+                  {dailyEventPending ? <><MapPin size={17} aria-hidden="true" /> 사건 현장으로 출발</> : <>행성으로 들어가기 <DoorOpen size={17} aria-hidden="true" /></>}
+                </button>
               </footer>
             </Motion.section>
           </Motion.div>
