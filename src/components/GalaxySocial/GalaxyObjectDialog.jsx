@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   ImagePlus,
@@ -37,6 +37,22 @@ function getInitialForm(item, catalogItem) {
   }
 }
 
+function getDraftKey(instanceId) {
+  return `metasense_galaxy_object_draft_${String(instanceId || '')}`
+}
+
+function readObjectDraft(item, catalogItem) {
+  const fallback = getInitialForm(item, catalogItem)
+  if (!item?.instanceId) return fallback
+  try {
+    const draft = JSON.parse(sessionStorage.getItem(getDraftKey(item.instanceId)) || 'null')
+    if (!draft?.form) return fallback
+    return { ...fallback, ...draft.form }
+  } catch {
+    return fallback
+  }
+}
+
 export default function GalaxyObjectDialog({
   item,
   catalogItem,
@@ -50,6 +66,7 @@ export default function GalaxyObjectDialog({
   onSave,
   onDelete,
   onMission,
+  playRemainingSeconds = 0,
 }) {
   const [form, setForm] = useState(() => getInitialForm(item, catalogItem))
   const [imageFile, setImageFile] = useState(null)
@@ -59,21 +76,20 @@ export default function GalaxyObjectDialog({
   const [isEditing, setIsEditing] = useState(false)
   const [saveComplete, setSaveComplete] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const autoSaveAttemptedRef = useRef(false)
 
   const localPreviewUrl = useMemo(() => imageFile ? URL.createObjectURL(imageFile) : '', [imageFile])
   useEffect(() => () => {
     if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl)
   }, [localPreviewUrl])
 
-  if (!item) return null
-
-  const storedImageUrl = removeImage ? '' : item.imageUrl || ''
+  const storedImageUrl = removeImage ? '' : item?.imageUrl || ''
   const previewUrl = localPreviewUrl || storedImageUrl
   const description = item.description || catalogItem?.description || '아직 이 시설에 대한 설명이 등록되지 않았습니다.'
   const objectName = item.name || catalogItem?.name || '이름 없는 시설'
-  const saving = busy === `object:update:${item.instanceId}`
-  const deleting = busy === `object:delete:${item.instanceId}`
-  const missionBusy = busy === `object:mission:${item.instanceId}`
+  const saving = busy === `object:update:${item?.instanceId || ''}`
+  const deleting = busy === `object:delete:${item?.instanceId || ''}`
+  const missionBusy = busy === `object:mission:${item?.instanceId || ''}`
   const saveInProgress = saving
   const displayedSaveError = saveError || (isEditing ? errorMessage : '')
   const reward = ACTION_REWARDS[missionAction] || ACTION_REWARDS.admire
@@ -102,6 +118,7 @@ export default function GalaxyObjectDialog({
     setSaveError('')
     const result = await onSave?.({ ...form, imageFile, removeImage })
     if (result) {
+      sessionStorage.removeItem(getDraftKey(item.instanceId))
       setIsEditing(false)
       setSaveComplete(true)
       return
@@ -110,13 +127,14 @@ export default function GalaxyObjectDialog({
   }
 
   const startEditing = () => {
-    setForm(getInitialForm(item, catalogItem))
+    setForm(readObjectDraft(item, catalogItem))
     setImageFile(null)
     setRemoveImage(false)
     setFileError('')
     setSaveError('')
     setSaveComplete(false)
     setConfirmDelete(false)
+    autoSaveAttemptedRef.current = false
     setIsEditing(true)
   }
 
@@ -128,8 +146,42 @@ export default function GalaxyObjectDialog({
     setFileError('')
     setSaveError('')
     setConfirmDelete(false)
+    sessionStorage.removeItem(getDraftKey(item.instanceId))
     setIsEditing(false)
   }
+
+  useEffect(() => {
+    if (!isEditing || !item?.instanceId) return
+    sessionStorage.setItem(getDraftKey(item.instanceId), JSON.stringify({
+      form,
+      removeImage,
+      updatedAtMs: Date.now(),
+    }))
+  }, [form, isEditing, item?.instanceId, removeImage])
+
+  useEffect(() => {
+    if (
+      !isEditing
+      || !isOwner
+      || saving
+      || deleting
+      || playRemainingSeconds <= 0
+      || playRemainingSeconds > 120
+      || autoSaveAttemptedRef.current
+    ) return
+    autoSaveAttemptedRef.current = true
+    Promise.resolve(onSave?.({ ...form, imageFile, removeImage })).then((result) => {
+      if (!result) {
+        setSaveError('자동 저장을 완료하지 못했습니다. 입력 내용은 다음 접속에서 복구할 수 있도록 보관했습니다.')
+        return
+      }
+      sessionStorage.removeItem(getDraftKey(item.instanceId))
+      setIsEditing(false)
+      setSaveComplete(true)
+    })
+  }, [deleting, form, imageFile, isEditing, isOwner, item?.instanceId, onSave, playRemainingSeconds, removeImage, saving])
+
+  if (!item) return null
 
   return (
     <section className={`frontier-object-dialog${isEditing ? ' is-editing' : ' is-viewing'}`} role="dialog" aria-modal="true" aria-labelledby="frontier-object-dialog-title">

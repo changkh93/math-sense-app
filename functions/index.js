@@ -32,10 +32,18 @@ const costOptimizedDataFunctions = regionalFunctions.runWith({
   timeoutSeconds: 60,
 });
 
+const galaxyPlayTime = require("./galaxyPlayTime")({
+  functions,
+  admin,
+  regionalFunctions,
+});
+Object.assign(exports, galaxyPlayTime.functions);
+
 Object.assign(exports, require("./galaxyGame")({
   functions,
   admin,
   regionalFunctions,
+  galaxyPlayTime: galaxyPlayTime.internal,
 }));
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 50;
@@ -6353,6 +6361,24 @@ async function deleteUserOwnedData(uid, options = {}) {
     await deleteQueryDocs(db.collection("referrals").where("referrerStudentUid", "==", uid), stats, "referralsDeleted");
     await deleteQueryDocs(db.collection("referrals").where("referredStudentUid", "==", uid), stats, "referralsDeleted");
     await deleteQueryDocs(db.collection("referralInvites").where("referrerStudentUid", "==", uid), stats, "referralInvitesDeleted");
+    await deleteQueryDocs(db.collection("galaxyPlaySessions").where("uid", "==", uid), stats, "galaxyPlaySessionsDeleted");
+    await deleteQueryDocs(db.collection("galaxyReports").where("reporterUid", "==", uid), stats, "galaxyReportsDeleted");
+    await deleteQueryDocs(db.collection("galaxyReports").where("targetUid", "==", uid), stats, "galaxyReportsDeleted");
+    await deleteQueryDocs(db.collectionGroup("blocked").where("targetUid", "==", uid), stats, "galaxyBlockLinksDeleted");
+    const galaxyPlayPolicyRef = db.collection("galaxyPlayPolicies").doc(uid);
+    const galaxyPlayRuntimeRef = db.collection("galaxyPlayRuntime").doc(uid);
+    const galaxyPlayDailyRef = db.collection("galaxyPlayDaily").doc(uid);
+    const galaxyBlocksRef = db.collection("galaxyBlocks").doc(uid);
+    await Promise.all([
+      galaxyPlayPolicyRef.delete().catch((error) => { if (error.code !== 5) throw error; }),
+      galaxyPlayRuntimeRef.delete().catch((error) => { if (error.code !== 5) throw error; }),
+      db.recursiveDelete(galaxyPlayDailyRef),
+      db.recursiveDelete(galaxyBlocksRef),
+    ]);
+    stats.galaxyPlayPolicyDeleted = 1;
+    stats.galaxyPlayRuntimeDeleted = 1;
+    stats.galaxyPlayDailyDeleted = 1;
+    stats.galaxyBlocksDeleted = 1;
     const enrollmentRef = db.collection("studentEnrollments").doc(uid);
     const enrollmentSnap = await enrollmentRef.get();
     if (enrollmentSnap.exists) {

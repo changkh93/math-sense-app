@@ -7,8 +7,9 @@
     "test:galaxy-daily-event": "node galaxyGame.dailyEvent.test.cjs",
     "test:galaxy-world-object": "node galaxyGame.worldObject.test.cjs",
     "test:galaxy-live": "node galaxyGame.live.test.cjs",
+    "test:galaxy-play-time": "node galaxyPlayTime.test.cjs",
     "test:galaxy-rover": "node galaxyGame.rover.test.cjs",
-    "test:galaxy": "npm run test:galaxy-backfill && npm run test:galaxy-rover && npm run test:galaxy-daily-event && npm run test:galaxy-world-object && npm run test:galaxy-live",
+    "test:galaxy": "npm run test:galaxy-backfill && npm run test:galaxy-rover && npm run test:galaxy-daily-event && npm run test:galaxy-world-object && npm run test:galaxy-live && npm run test:galaxy-play-time",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

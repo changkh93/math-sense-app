@@ -6,6 +6,7 @@ import { AnimatePresence, motion as Motion } from 'framer-motion'
 import {
   ArrowLeft,
   Backpack,
+  Ban,
   Bot,
   Building2,
   Camera,
@@ -19,6 +20,7 @@ import {
   Egg,
   Eye,
   Flower2,
+  Flag,
   Gem,
   Gift,
   Globe2,
@@ -76,7 +78,7 @@ import { BUILD_RADIUS, isBridgeDeck, isRiverWater, terrainSlope } from './Galaxy
 import GalaxyWorld3D, { StructurePreview3D } from './GalaxyWorld3D'
 import './MetaGalaxy.css'
 
-const callGalaxy = (name, payload = {}) => httpsCallable(functions, name)(payload).then((result) => result.data)
+const invokeGalaxy = (name, payload = {}) => httpsCallable(functions, name)(payload).then((result) => result.data)
 
 const createOperationId = () => globalThis.crypto?.randomUUID?.()
   || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
@@ -465,7 +467,7 @@ function getConnectionSummary(neighbor, events) {
   return { signalCount, level, percent }
 }
 
-export default function MetaGalaxy({ user, userData, onBack }) {
+export default function MetaGalaxy({ user, userData, playSession, playRemainingSeconds = 0, onBack }) {
   const [home, setHome] = useState(null)
   const [targetUid, setTargetUid] = useState(user?.uid || '')
   const [menu, setMenu] = useState('')
@@ -490,7 +492,13 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   const activeOverlayRef = useRef('')
   const isOwner = targetUid === user?.uid
   const overlayReady = !loading && Boolean(home)
-  const sendSpeechRequest = useCallback((payload) => callGalaxy('sendGalaxyWorldSpeech', payload), [])
+  const callGalaxy = useCallback((name, payload = {}) => invokeGalaxy(name, {
+    ...payload,
+    playSessionId: playSession?.sessionId || '',
+    playClientInstanceId: playSession?.clientInstanceId || '',
+    playResumeToken: playSession?.resumeToken || '',
+  }), [playSession?.clientInstanceId, playSession?.resumeToken, playSession?.sessionId])
+  const sendSpeechRequest = useCallback((payload) => callGalaxy('sendGalaxyWorldSpeech', payload), [callGalaxy])
   const liveSessionEnabled = Boolean(
     overlayReady
     && home?.liveSession?.granted
@@ -533,7 +541,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [user?.uid])
+  }, [callGalaxy, user?.uid])
 
   useEffect(() => { loadHome(user?.uid) }, [loadHome, user?.uid])
 
@@ -611,7 +619,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
       window.clearInterval(timer)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [home?.liveSession?.expiresAtMs, home?.liveSession?.granted, home?.liveSession?.roomOwnerUid, home?.serverClockOffsetMs, targetUid, user?.uid])
+  }, [callGalaxy, home?.liveSession?.expiresAtMs, home?.liveSession?.granted, home?.liveSession?.roomOwnerUid, home?.serverClockOffsetMs, targetUid, user?.uid])
 
   useEffect(() => () => window.clearTimeout(noticeTimerRef.current), [])
 
@@ -852,6 +860,50 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     setSelectedBuildItem('')
     setMenu('')
     await loadHome(neighborUid)
+  }
+
+  const setNeighborBlocked = async (neighbor, blocked) => {
+    if (!neighbor?.uid) return
+    const result = await runAction(
+      `safety:block:${neighbor.uid}`,
+      () => callGalaxy('setGalaxyUserBlocked', { targetUid: neighbor.uid, blocked }),
+      blocked
+        ? `${neighbor.displayName} 탐사원과의 방문·대화를 차단했습니다.`
+        : `${neighbor.displayName} 탐사원의 차단을 해제했습니다.`,
+    )
+    if (!result) return
+    setHome((current) => current ? {
+      ...current,
+      neighbors: (current.neighbors || []).map((entry) => entry.uid === neighbor.uid ? {
+        ...entry,
+        blocked,
+        visitMode: blocked ? 'private' : entry.visitMode,
+        planetName: blocked ? '차단한 탐사원' : entry.planetName,
+        tagline: blocked ? '차단을 해제하기 전에는 서로 방문하거나 대화할 수 없습니다.' : entry.tagline,
+      } : entry),
+    } : current)
+    await loadHome(blocked && targetUid === neighbor.uid ? user.uid : targetUid, { quiet: true })
+  }
+
+  const reportNeighbor = async (neighbor) => {
+    if (!neighbor?.uid) return
+    const confirmed = window.confirm(`${neighbor.displayName} 탐사원의 부적절한 행동을 운영자에게 신고할까요?`)
+    if (!confirmed) return
+    // 신고 증거로 해당 탐사원의 가장 최근 공개 발언 한 줄만 서버에 전달한다.
+    // 신고자가 직접 쓴 문장이 아니라 실제 노출되었던 휘발성 대화 텍스트다.
+    const recentSpeech = remotePlayers
+      .find((player) => player?.uid === neighbor.uid)?.speech?.text || ''
+    const evidence = typeof recentSpeech === 'string' ? recentSpeech.slice(0, 200) : ''
+    await runAction(
+      `safety:report:${neighbor.uid}`,
+      () => callGalaxy('reportGalaxyUser', {
+        targetUid: neighbor.uid,
+        category: 'harassment',
+        reportId: createOperationId(),
+        evidence,
+      }),
+      '신고를 접수했습니다. 불편하면 함께 차단해 주세요.',
+    )
   }
 
   const saveGalaxyObject = async ({ name, description, worldX, worldZ, rotation, imageFile, removeImage }) => {
@@ -1108,6 +1160,10 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   }
 
   const runMission = useCallback(async (route, operationId = createOperationId()) => {
+    if (playRemainingSeconds < 60) {
+      flash('안전 귀환까지 1분이 남아 새로운 현장 탐사는 시작할 수 없어요.')
+      return null
+    }
     const result = await runAction(
       `mission:${route}`,
       () => callGalaxy('runGalaxyMission', { route, partnerUid: missionPartnerUid, operationId }),
@@ -1122,7 +1178,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     } : current)
     setNowMs(Date.now())
     return result
-  }, [missionPartnerUid, runAction, targetUid, user?.uid])
+  }, [callGalaxy, flash, missionPartnerUid, playRemainingSeconds, runAction, targetUid, user?.uid])
 
   const dispatchRover = async (route) => {
     if (!isOwner) return null
@@ -1386,6 +1442,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                 onSave={saveGalaxyObject}
                 onDelete={deleteGalaxyObject}
                 onMission={performObjectMission}
+                playRemainingSeconds={playRemainingSeconds}
               />
             </Motion.div>
           </Motion.div>
@@ -1571,7 +1628,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                       <span><Satellite size={17} aria-hidden="true" /> 현장 탐사 릴레이 파트너</span>
                       <select value={missionPartnerUid} onChange={(event) => setMissionPartnerUid(event.target.value)}>
                         <option value="">혼자 출항</option>
-                        {neighbors.map((neighbor) => <option key={neighbor.uid} value={neighbor.uid}>{neighbor.displayName}</option>)}
+                        {neighbors.filter((neighbor) => !neighbor.blocked).map((neighbor) => <option key={neighbor.uid} value={neighbor.uid}>{neighbor.displayName}</option>)}
                       </select>
                     </label>
                     <small>45초 현장 탐사 관문을 완주하면 선택한 친구의 귀환 타임라인에도 공동 기록이 남습니다.</small>
@@ -1591,7 +1648,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                       <i className="frontier-galaxy-orbit orbit-two" />
                       {neighbors.map((neighbor, index) => {
                         const connection = getConnectionSummary(neighbor, events)
-                        const isPrivate = neighbor.visitMode === 'private'
+                        const isPrivate = neighbor.visitMode === 'private' || neighbor.blocked
                         return (
                           <article key={neighbor.uid} className={`frontier-neighbor-card theme-${neighbor.theme}${targetUid === neighbor.uid ? ' active' : ''}${isPrivate ? ' private' : ''}`} style={{ '--route-index': index }}>
                             <span className="frontier-neighbor-card__planet"><ThemeGlyph themeId={neighbor.theme} size={27} /><i /></span>
@@ -1605,9 +1662,19 @@ export default function MetaGalaxy({ user, userData, onBack }) {
                                 <small>최근 도움 신호 {connection.signalCount}회</small>
                               </div>
                             </div>
-                            <button type="button" className="frontier-neighbor-card__cta" disabled={isPrivate} onClick={() => visitNeighbor(neighbor.uid)}>
-                              {isPrivate ? <><LockKeyhole size={16} aria-hidden="true" /> 휴식 중</> : targetUid === neighbor.uid ? <><Eye size={16} aria-hidden="true" /> 방문 중</> : <><Rocket size={16} aria-hidden="true" /> 워프</>}
-                            </button>
+                            <div className="frontier-neighbor-card__actions">
+                              <button type="button" className="frontier-neighbor-card__cta" disabled={isPrivate} onClick={() => visitNeighbor(neighbor.uid)}>
+                                {neighbor.blocked ? <><Ban size={16} aria-hidden="true" /> 차단됨</> : isPrivate ? <><LockKeyhole size={16} aria-hidden="true" /> 휴식 중</> : targetUid === neighbor.uid ? <><Eye size={16} aria-hidden="true" /> 방문 중</> : <><Rocket size={16} aria-hidden="true" /> 워프</>}
+                              </button>
+                              <button type="button" className="frontier-neighbor-card__safety" disabled={busy === `safety:block:${neighbor.uid}`} onClick={() => setNeighborBlocked(neighbor, !neighbor.blocked)}>
+                                <Ban size={14} aria-hidden="true" /> {neighbor.blocked ? '차단 해제' : '차단'}
+                              </button>
+                              {!neighbor.blocked && (
+                                <button type="button" className="frontier-neighbor-card__safety report" disabled={busy === `safety:report:${neighbor.uid}`} onClick={() => reportNeighbor(neighbor)}>
+                                  <Flag size={14} aria-hidden="true" /> 신고
+                                </button>
+                              )}
+                            </div>
                           </article>
                         )
                       })}

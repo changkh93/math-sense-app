@@ -469,6 +469,43 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Astra Frontier play limits are server-authoritative. Students and linked
+    // parents use callable functions so raw sessions, leases, and audit fields
+    // can never be forged or enumerated from the client.
+    match /galaxyPlayPolicies/{userId} {
+      allow read, write: if false;
+    }
+
+    match /galaxyPlayRuntime/{userId} {
+      allow read, write: if false;
+    }
+
+    match /galaxyPlayDaily/{userId} {
+      allow read, write: if false;
+
+      match /days/{dayKey} {
+        allow read, write: if false;
+      }
+    }
+
+    match /galaxyPlaySessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    // Social safety choices and reports are callable-only so students cannot
+    // enumerate reports, forge moderation state, or remove another user's block.
+    match /galaxyBlocks/{userId} {
+      allow read, write: if false;
+
+      match /blocked/{targetUid} {
+        allow read, write: if false;
+      }
+    }
+
+    match /galaxyReports/{reportId} {
+      allow read, write: if false;
+    }
+
     // Server-maintained compact rollup used instead of loading every history document.
     match /learningSummaries/{userId} {
       allow read: if isAuth() && (

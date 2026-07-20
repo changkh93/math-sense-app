@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
@@ -8,7 +8,7 @@ import { useLearningHistory } from '../../hooks/useLearningHistory';
 import { useUserPresence } from '../../hooks/useRealtimePresence';
 import { useAdminUserAllAssignments, useAdminUserAllAttendance, useStudentAssignmentWarnings } from '../../hooks/useAssignments';
 import { getTodayKST } from '../../utils/streakUtils';
-import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight, KeyRound, Eye, EyeOff, X } from 'lucide-react';
+import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight, KeyRound, Eye, EyeOff, X, Gamepad2, Settings2, Save, ShieldCheck } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import StudentReport from '../../components/Report/StudentReport';
 import DailyLearningTimeline from '../../components/Space/DailyLearningTimeline';
@@ -25,6 +25,13 @@ const formatTimeElapsed = (ms) => {
   if (minutes < 60) return `${minutes}분 전`;
   const hours = Math.floor(minutes / 60);
   return `${hours}시간 전`;
+};
+
+const formatGameDuration = (seconds) => {
+  const safe = Math.max(0, Number(seconds || 0));
+  if (safe <= 0) return '0분';
+  if (safe < 60) return '1분 미만';
+  return `${Math.ceil(safe / 60)}분`;
 };
 
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
@@ -238,11 +245,69 @@ const ChildCard = ({ childUid }) => {
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState('');
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [gameDay, setGameDay] = useState(null);
+  const [gameLoading, setGameLoading] = useState(true);
+  const [gameLoadError, setGameLoadError] = useState('');
+  const [showGameSettings, setShowGameSettings] = useState(false);
+  const [gamePolicyForm, setGamePolicyForm] = useState({ dailyLimitMinutes: 30, sessionLimitMinutes: 15 });
+  const [gamePolicyDirty, setGamePolicyDirty] = useState(false);
+  const [gamePolicySaving, setGamePolicySaving] = useState(false);
+  const [gamePolicyMessage, setGamePolicyMessage] = useState('');
   const childPresence = useUserPresence(childUid);
   
   const isToday = selectedDate === getTodayKST();
 
   const { activities, groupedActivities, dailyStats, loading: historyLoading } = useLearningHistory(childUid, selectedDate);
+
+  const loadGameDay = useCallback(async ({ quiet = false } = {}) => {
+    if (!childUid || !selectedDate) return;
+    if (!quiet) setGameLoading(true);
+    if (!quiet) setGameLoadError('');
+    try {
+      const getGameDay = httpsCallable(functions, 'parentGetGalaxyPlayDay');
+      const result = await getGameDay({ childUid, dayKey: selectedDate });
+      const data = result.data || null;
+      setGameDay(data);
+      setGameLoadError('');
+      if (!gamePolicyDirty && data?.policy) {
+        setGamePolicyForm({
+          dailyLimitMinutes: Number(data.policy.dailyLimitMinutes || 30),
+          sessionLimitMinutes: Number(data.policy.sessionLimitMinutes || 15),
+        });
+      }
+    } catch (gameError) {
+      console.error('parentGetGalaxyPlayDay failed:', gameError);
+      if (!quiet) setGameLoadError(gameError?.message || '게임 이용기록을 불러오지 못했습니다.');
+    } finally {
+      if (!quiet) setGameLoading(false);
+    }
+  }, [childUid, gamePolicyDirty, selectedDate]);
+
+  useEffect(() => {
+    loadGameDay();
+    if (!isToday) return undefined;
+    const timer = window.setInterval(() => loadGameDay({ quiet: true }), 30000);
+    return () => window.clearInterval(timer);
+  }, [isToday, loadGameDay]);
+
+  const saveGamePolicy = async () => {
+    if (gamePolicySaving) return;
+    setGamePolicySaving(true);
+    setGamePolicyMessage('');
+    try {
+      const setPolicy = httpsCallable(functions, 'parentSetGalaxyPlayPolicy');
+      const result = await setPolicy({ childUid, ...gamePolicyForm });
+      setGamePolicyDirty(false);
+      setGameDay((current) => current ? { ...current, policy: result.data?.policy || current.policy } : current);
+      setGamePolicyMessage('설정이 저장되었습니다. 다음 탐험부터 적용됩니다.');
+      await loadGameDay({ quiet: true });
+    } catch (gameError) {
+      console.error('parentSetGalaxyPlayPolicy failed:', gameError);
+      setGamePolicyMessage(gameError?.message || '게임 이용시간 설정을 저장하지 못했습니다.');
+    } finally {
+      setGamePolicySaving(false);
+    }
+  };
 
   // Listen to child's user document in real-time
   useEffect(() => {
@@ -404,6 +469,110 @@ const ChildCard = ({ childUid }) => {
           </div>
         )}
       </div>
+
+        {/* Minimal Astra Frontier usage summary */}
+        <section style={{ padding: '18px 20px 0' }} aria-label="아스트라 프론티어 게임 이용">
+          <div style={{
+            padding: 16,
+            borderRadius: 16,
+            background: 'linear-gradient(145deg, rgba(16, 54, 55, 0.62), rgba(10, 23, 42, 0.72))',
+            border: '1px solid rgba(109, 245, 176, 0.18)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <span style={{ width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: 11, color: '#75f3ba', background: 'rgba(109,245,176,.1)' }}>
+                  <Gamepad2 size={18} />
+                </span>
+                <div>
+                  <strong style={{ display: 'block', color: 'white', fontSize: '.92rem' }}>게임 이용</strong>
+                  <small style={{ color: 'rgba(255,255,255,.42)' }}>{selectedDate} · 아스트라 프론티어</small>
+                </div>
+              </div>
+            </div>
+
+            {gameLoading ? (
+              <div style={{ padding: 18, textAlign: 'center', color: 'rgba(255,255,255,.38)', fontSize: '.82rem' }}>게임 기록 조회 중…</div>
+            ) : gameLoadError ? (
+              <div role="alert" style={{ padding: 14, textAlign: 'center', color: '#ff9ba9', background: 'rgba(255,90,110,.06)', borderRadius: 11, fontSize: '.78rem', lineHeight: 1.5 }}>
+                {gameLoadError}
+                <button type="button" onClick={() => loadGameDay()} style={{ display: 'block', margin: '9px auto 0', minHeight: 34, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.12)', color: 'white', background: 'rgba(255,255,255,.06)', cursor: 'pointer' }}>다시 불러오기</button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                <div style={{ padding: '12px 8px', textAlign: 'center', borderRadius: 12, background: 'rgba(109,245,176,.06)', border: '1px solid rgba(109,245,176,.1)' }}>
+                  <strong style={{ display: 'block', color: '#75f3ba', fontSize: '1.05rem' }}>
+                    {formatGameDuration(gameDay?.summary?.totalSeconds)}{isToday ? ` / ${gameDay?.policy?.dailyLimitMinutes || 30}분` : ''}
+                  </strong>
+                  <small style={{ display: 'block', marginTop: 4, color: 'rgba(255,255,255,.46)', fontSize: '.68rem' }}>게임시간</small>
+                </div>
+                <div style={{ padding: '12px 8px', textAlign: 'center', borderRadius: 12, background: 'rgba(99,216,241,.05)', border: '1px solid rgba(99,216,241,.09)' }}>
+                  <strong style={{ display: 'block', color: '#77dff5', fontSize: '1.05rem' }}>{Number(gameDay?.summary?.sessionCount || 0)}회</strong>
+                  <small style={{ display: 'block', marginTop: 4, color: 'rgba(255,255,255,.46)', fontSize: '.68rem' }}>접속 횟수</small>
+                </div>
+                <div style={{ padding: '12px 8px', textAlign: 'center', borderRadius: 12, background: 'rgba(167,139,250,.05)', border: '1px solid rgba(167,139,250,.09)' }}>
+                  <strong style={{ display: 'block', color: '#b8a3ff', fontSize: '1.05rem' }}>{formatGameDuration(gameDay?.summary?.longestSessionSeconds)}</strong>
+                  <small style={{ display: 'block', marginTop: 4, color: 'rgba(255,255,255,.46)', fontSize: '.68rem' }}>가장 긴 세션</small>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => { setShowGameSettings((current) => !current); setGamePolicyMessage(''); }}
+              style={{
+                width: '100%', marginTop: 11, minHeight: 38, borderRadius: 10,
+                border: '1px solid rgba(255,255,255,.09)', color: 'rgba(255,255,255,.7)',
+                background: 'rgba(255,255,255,.035)', cursor: 'pointer', font: 'inherit', fontSize: '.78rem', fontWeight: 750,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7
+              }}
+            >
+              <Settings2 size={14} /> {showGameSettings ? '이용시간 설정 닫기' : '이용시간 설정'}
+            </button>
+
+            {showGameSettings && (
+              <div style={{ marginTop: 11, padding: 13, borderRadius: 12, background: 'rgba(0,0,0,.16)', display: 'grid', gap: 11 }}>
+                <label style={{ display: 'grid', gridTemplateColumns: '1fr minmax(110px, .7fr)', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,.72)', fontSize: '.78rem' }}>
+                  <span><strong style={{ display: 'block', color: 'white' }}>하루 허용시간</strong><small style={{ color: 'rgba(255,255,255,.38)' }}>최대 60분</small></span>
+                  <select
+                    value={gamePolicyForm.dailyLimitMinutes}
+                    disabled={gamePolicySaving}
+                    onChange={(event) => { setGamePolicyForm((current) => ({ ...current, dailyLimitMinutes: Number(event.target.value) })); setGamePolicyDirty(true); setGamePolicyMessage(''); }}
+                    style={{ minHeight: 38, borderRadius: 9, border: '1px solid rgba(255,255,255,.12)', color: 'white', background: '#132333', padding: '0 10px' }}
+                  >
+                    {[20, 30, 40, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes}분</option>)}
+                  </select>
+                </label>
+                <label style={{ display: 'grid', gridTemplateColumns: '1fr minmax(110px, .7fr)', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,.72)', fontSize: '.78rem' }}>
+                  <span><strong style={{ display: 'block', color: 'white' }}>한 번에 이용시간</strong><small style={{ color: 'rgba(255,255,255,.38)' }}>최대 20분</small></span>
+                  <select
+                    value={gamePolicyForm.sessionLimitMinutes}
+                    disabled={gamePolicySaving}
+                    onChange={(event) => { setGamePolicyForm((current) => ({ ...current, sessionLimitMinutes: Number(event.target.value) })); setGamePolicyDirty(true); setGamePolicyMessage(''); }}
+                    style={{ minHeight: 38, borderRadius: 9, border: '1px solid rgba(255,255,255,.12)', color: 'white', background: '#132333', padding: '0 10px' }}
+                  >
+                    {[10, 15, 20].map((minutes) => <option key={minutes} value={minutes}>{minutes}분</option>)}
+                  </select>
+                </label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'rgba(255,255,255,.46)', fontSize: '.72rem', lineHeight: 1.45 }}>
+                  <ShieldCheck size={15} color="#75f3ba" style={{ flex: '0 0 auto' }} /> 탐험 종료 후 재입장 대기는 20분으로 고정됩니다. 1회 연장 기능은 제공하지 않습니다.
+                </div>
+                {gamePolicyMessage && (
+                  <div role="status" style={{ padding: '9px 10px', borderRadius: 9, color: gamePolicyMessage.includes('저장되었습니다') ? '#75f3ba' : '#ff9ba9', background: gamePolicyMessage.includes('저장되었습니다') ? 'rgba(109,245,176,.07)' : 'rgba(255,90,110,.07)', fontSize: '.72rem', lineHeight: 1.45 }}>
+                    {gamePolicyMessage}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  disabled={!gamePolicyDirty || gamePolicySaving}
+                  onClick={saveGamePolicy}
+                  style={{ minHeight: 42, border: 0, borderRadius: 11, color: '#071713', background: 'linear-gradient(135deg,#7ff4bd,#63dcff)', cursor: !gamePolicyDirty || gamePolicySaving ? 'not-allowed' : 'pointer', opacity: !gamePolicyDirty || gamePolicySaving ? .55 : 1, font: 'inherit', fontSize: '.8rem', fontWeight: 850, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+                >
+                  <Save size={15} /> {gamePolicySaving ? '저장 중…' : '설정 저장'}
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* Today's Summary */}
         <div style={{ padding: '18px 20px' }}>

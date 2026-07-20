@@ -908,8 +908,6 @@
 .frontier-route-meter b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--frontier-mint), var(--frontier-cyan), var(--frontier-violet)); }
 .frontier-neighbor-card__route small { color: #63798f; font-size: .55rem; }
 .frontier-neighbor-card__cta {
-  grid-column: 2;
-  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: .34rem;
@@ -923,6 +921,28 @@
   cursor: pointer;
 }
 .frontier-neighbor-card__cta:disabled { color: #7f91a3; border-color: rgba(255, 255, 255, .08); background: rgba(255, 255, 255, .035); cursor: not-allowed; }
+.frontier-neighbor-card__actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .36rem;
+}
+.frontier-neighbor-card__safety {
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .4rem .5rem;
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 10px;
+  color: #93a7bb;
+  background: rgba(255, 255, 255, .035);
+  font-size: .58rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.frontier-neighbor-card__safety.report { color: #caa5aa; border-color: rgba(255, 128, 142, .12); }
+.frontier-neighbor-card__safety:disabled { opacity: .55; cursor: wait; }
 
 /* Timeline and empty states */
 .galaxy-empty-state {

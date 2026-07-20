@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 
 const {
+  containsUnsafePublicText,
   getActiveGalaxyLiveConnection,
   isGalaxyLiveSpeechRateLimited,
   planGalaxyLiveSpeech,
@@ -21,6 +22,29 @@ function testSpeechSafetyValidation() {
   assert.equal(validateGalaxyLiveSpeechText('내 번호는 010-1234-5678').valid, false);
   assert.equal(validateGalaxyLiveSpeechText('@outside_account').valid, false);
   assert.equal(validateGalaxyLiveSpeechText('<script>안녕</script>').valid, false);
+  // 외부 메신저 계정·학교명·주소 패턴 차단
+  assert.equal(validateGalaxyLiveSpeechText('카톡 아이디 @friend12').valid, false);
+  assert.equal(validateGalaxyLiveSpeechText('인스타: my_handle').valid, false);
+  assert.equal(validateGalaxyLiveSpeechText('디스코드 my_tag#1234').valid, false);
+  assert.equal(validateGalaxyLiveSpeechText('우리 학교 부산초등학교').valid, false);
+  assert.equal(validateGalaxyLiveSpeechText('경기도 성남시 정자로 1').valid, false);
+}
+
+function testPublicTextPiiPatterns() {
+  // 차단되어야 할 패턴
+  assert.equal(containsUnsafePublicText('친구 카톡 ID: friend9'), true);
+  assert.equal(containsUnsafePublicText('인스타그램 @school_mate'), true);
+  assert.equal(containsUnsafePublicText('디스코드: my_tag'), true);
+  assert.equal(containsUnsafePublicText('전화 010 1234 5678'), true);
+  assert.equal(containsUnsafePublicText('메일은 a@b.com'), true);
+  assert.equal(containsUnsafePublicText('사이트 www.fun.com'), true);
+  assert.equal(containsUnsafePublicText('나 서울노원초등학교 다녀'), true);
+  assert.equal(containsUnsafePublicText('경기도 수원시 권선로 1'), true);
+  // 안전한 일반 표현은 통과
+  assert.equal(containsUnsafePublicText('오늘 날씨가 정말 좋다'), false);
+  assert.equal(containsUnsafePublicText('같이 별 보러 갈래?'), false);
+  assert.equal(containsUnsafePublicText('정원에 꽃이 피었어요'), false);
+  assert.equal(containsUnsafePublicText(''), false);
 }
 
 function testNewestNonStaleConnectionSelection() {
@@ -68,6 +92,7 @@ function testServerSpeechRateLimit() {
 
 function run() {
   testSpeechSafetyValidation();
+  testPublicTextPiiPatterns();
   testNewestNonStaleConnectionSelection();
   testOnlineAndProximityEnforcement();
   testServerSpeechRateLimit();

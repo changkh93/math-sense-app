@@ -31,6 +31,16 @@ import ProfileEditView from './ProfileEditView' // Profile Management
 import StudyCrewView from './StudyCrewView'
 import QuizBattleHub from './QuizBattleHub'
 import MetaGalaxy from '../GalaxySocial/MetaGalaxy'
+import {
+  GalaxyEntryDialog,
+  GalaxyIdlePrompt,
+  GalaxyPlayHud,
+  GalaxyPlayTimeStyles,
+  GalaxyReconnectNotice,
+  GalaxyReturnScreen,
+  GalaxyTimeWarning,
+} from '../GalaxySocial/GalaxyPlayTimeUI'
+import { useGalaxyPlaySession } from '../../hooks/useGalaxyPlaySession'
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import DarkMatterView from './DarkMatterView' // Dark Matter Integration
@@ -598,6 +608,7 @@ function SpaceHome() {
     const savedView = sessionStorage.getItem('metasense_current_view')
     return requestedView || (ROOT_VIEWS.has(savedView) ? savedView : 'planet')
   }) // 'planet', 'dashboard', 'collection', 'assignment_hub'
+  const [galaxyEntryOpen, setGalaxyEntryOpen] = useState(false)
   const [transactions, setTransactions] = useState([])
   const [loadingTransactions, setLoadingTransactions] = useState(true)
   const [shouldScrollStore, setShouldScrollStore] = useState(false)
@@ -616,6 +627,7 @@ function SpaceHome() {
   const [signupPrompt, setSignupPrompt] = useState(null)
   const [acceptedQuizBattle, setAcceptedQuizBattle] = useState(null)
   const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
+  const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy' })
 
   const handleGuestInviteLogin = useCallback(() => {
     const rawLink = guestInviteLink.trim()
@@ -841,6 +853,43 @@ function SpaceHome() {
     if (isDarkMatterMode) stopDarkMatterMode();
     resetViewportForRootView();
   }, [clearMissionSelection, isDarkMatterMode, resetViewportForRootView, stopDarkMatterMode, updateSelectedChapterDocId, updateSelectedRegionId, userData?.isGuest]);
+
+  const requestGalaxyEntry = useCallback(async () => {
+    if (!user?.uid || userData?.isGuest === true) return
+    if (galaxyPlay.session) {
+      switchRootView('galaxy')
+      return
+    }
+    setGalaxyEntryOpen(true)
+    await galaxyPlay.loadAccess()
+  }, [galaxyPlay, switchRootView, user?.uid, userData?.isGuest])
+
+  const startGalaxyEntry = useCallback(async () => {
+    const playSession = await galaxyPlay.startSession()
+    if (!playSession) return
+    setGalaxyEntryOpen(false)
+    switchRootView('galaxy')
+    soundManager.playWarp()
+  }, [galaxyPlay, switchRootView])
+
+  const closeGalaxyEntry = useCallback(() => {
+    if (galaxyPlay.busy) return
+    setGalaxyEntryOpen(false)
+    if (currentView === 'galaxy' && !galaxyPlay.session) switchRootView('planet')
+  }, [currentView, galaxyPlay.busy, galaxyPlay.session, switchRootView])
+
+  const finishGalaxyReturn = useCallback(() => {
+    galaxyPlay.clearEndedSummary()
+    setGalaxyEntryOpen(false)
+    switchRootView('planet')
+    soundManager.playWarp()
+  }, [galaxyPlay, switchRootView])
+
+  useEffect(() => {
+    if (currentView !== 'galaxy' || galaxyPlay.session || galaxyPlay.endedSummary || galaxyEntryOpen) return
+    setGalaxyEntryOpen(true)
+    galaxyPlay.loadAccess()
+  }, [currentView, galaxyEntryOpen, galaxyPlay])
 
   const isRecheckDue = useCallback((mark) => {
     if (mark?.status !== 'recheck_pending') return false
@@ -1225,6 +1274,7 @@ function SpaceHome() {
     if (currentView === 'collection') return '도감 방문 중';
     if (currentView === 'crew') return '스터디 크루 방문 중';
     if (currentView === 'battle') return '퀴즈 배틀 아레나 도전 중';
+    if (currentView === 'galaxy') return '아스트라 프론티어 이용 중';
     if (currentView === 'assignment_hub') return '항행 일지(과제) 작성 중';
     if (currentView === 'mistake_notebook') return '오답노트 행성 복습 중';
     return '우주 공간(메인) 대기 중';
@@ -3401,13 +3451,52 @@ function SpaceHome() {
   }
 
   if (currentView === 'galaxy') {
+    if (galaxyPlay.endedSummary) {
+      return (
+        <>
+          <GalaxyPlayTimeStyles />
+          <GalaxyReturnScreen summary={galaxyPlay.endedSummary} onConfirm={finishGalaxyReturn} />
+        </>
+      )
+    }
     return (
       <div style={{ minHeight: '100dvh', overflow: 'hidden', background: '#03050c' }}>
-        <MetaGalaxy
-          user={user}
-          userData={userData}
-          onBack={() => { switchRootView('planet'); soundManager.playWarp(); }}
-        />
+        <GalaxyPlayTimeStyles />
+        {galaxyPlay.session ? (
+          <>
+            <MetaGalaxy
+              user={user}
+              userData={userData}
+              playSession={galaxyPlay.session}
+              playRemainingSeconds={galaxyPlay.remainingSeconds}
+              onBack={() => galaxyPlay.endSession('manual_exit')}
+            />
+            <GalaxyPlayHud
+              remainingSeconds={galaxyPlay.remainingSeconds}
+              dailyUsedSeconds={galaxyPlay.dailyUsedSeconds}
+              dailyLimitSeconds={galaxyPlay.session.dailyLimitSeconds}
+              warningStage={galaxyPlay.warningStage}
+              onExit={() => galaxyPlay.endSession('manual_exit')}
+            />
+            <GalaxyTimeWarning stage={galaxyPlay.warningStage} />
+            {galaxyPlay.connectionState === 'reconnecting' && <GalaxyReconnectNotice />}
+            {galaxyPlay.idleWarning && (
+              <GalaxyIdlePrompt
+                onContinue={galaxyPlay.acknowledgeIdle}
+                onExit={() => galaxyPlay.endSession('idle_timeout')}
+              />
+            )}
+          </>
+        ) : (
+          <GalaxyEntryDialog
+            access={galaxyPlay.access}
+            busy={galaxyPlay.busy}
+            error={galaxyPlay.error}
+            onStart={startGalaxyEntry}
+            onRetry={galaxyPlay.loadAccess}
+            onClose={closeGalaxyEntry}
+          />
+        )}
       </div>
     )
   }
@@ -3543,6 +3632,17 @@ function SpaceHome() {
     <div className={`space-bg ${isMobile ? 'mobile-space-home' : ''}`} style={{ 
       overflowX: 'hidden'
     }}>
+      <GalaxyPlayTimeStyles />
+      {galaxyEntryOpen && (
+        <GalaxyEntryDialog
+          access={galaxyPlay.access}
+          busy={galaxyPlay.busy}
+          error={galaxyPlay.error}
+          onStart={startGalaxyEntry}
+          onRetry={galaxyPlay.loadAccess}
+          onClose={closeGalaxyEntry}
+        />
+      )}
       {/* 3D Background Scene - Always Visible but controlled by state */}
       <AnimatePresence>
         {currentView === 'planet' && selectedClusterId && !is2DMode && !isMobile && (
@@ -3753,10 +3853,7 @@ function SpaceHome() {
           <div style={{ pointerEvents: 'auto', width: '100%' }}>
             <ClusterSelector 
               clusters={activeClusters}
-              onEnterFrontier={() => {
-                switchRootView('galaxy');
-                soundManager.playWarp();
-              }}
+              onEnterFrontier={requestGalaxyEntry}
               onSelect={(id) => {
                 selectCluster(id);
                 soundManager.playWarp();
@@ -3898,10 +3995,7 @@ function SpaceHome() {
                           animate={{ opacity: 1, scale: 1, transition: { delay: 0.06 } }}
                           whileHover={isMobile ? undefined : { scale: 1.05, filter: 'brightness(1.16)' }}
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            switchRootView('galaxy')
-                            if (soundManager?.playWarp) soundManager.playWarp()
-                          }}
+                          onClick={requestGalaxyEntry}
                           style={{
                             width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
                             minHeight: isMobile ? '148px' : '250px',

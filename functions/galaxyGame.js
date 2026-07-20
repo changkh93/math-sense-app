@@ -89,6 +89,12 @@ const GALAXY_SAFE_VISIT_MESSAGES = new Set([
   "정원을 조금 돌보고 갔어.",
   "이 행성의 색 조합이 좋아!",
 ]);
+const GALAXY_REPORT_CATEGORIES = new Set([
+  "unsafe_message",
+  "personal_info",
+  "harassment",
+  "other",
+]);
 const GALAXY_WORLD_ACTIONS = {
   crystal: { material: "crystalGlass", amount: 1, label: "수정 파편을 채집했습니다." },
   fiber: { material: "biofiber", amount: 1, label: "루멘 섬유를 채집했습니다." },
@@ -357,9 +363,28 @@ function getExactDocumentId(value) {
   return typeof value === "string" ? value : "";
 }
 
+// External contact patterns and school-name hints are blocked server-side so a
+// student cannot route a friend off-platform or reveal identifying context in
+// public galaxy text (planet names, item names, live speech, descriptions).
+// 정확한 단어 일치보다 오탐을 줄이는 것이 우선이므로, 띄어쓰기/구분자로
+// 묶인 키워드만 매칭한다. 전화번호/이메일/URL은 기존 정규식으로 잡는다.
+// \b는 ASCII 단어 경계라 한글과 함께 쓰지 못하므로 한글 패턴에는 쓰지 않는다.
+const GALAXY_PUBLIC_TEXT_UNSAFE_PATTERNS = [
+  /https?:\/\/|www\./i,
+  /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i,
+  /@[a-z0-9_.-]{2,}/i,
+  /\b\d{2,4}[- .)]?\d{3,4}[- .]?\d{4}\b/,
+  // External messenger accounts and off-platform handles.
+  /(?:카톡|카카오톡|kakaotalk|kakao\.?talk|insta|인스타(그램)?|instagram|디엠|dm|틱톡|tiktok|트위터|twitter|x\.com|스냅챗|snapchat|텔레그램|telegram|라인|line|디스코드|discord|왓챠|watcha|유튜브|youtube|넥슨|배그|발로란트|오버워치)\s*[:.\-=]?\s*[@a-z0-9_][a-z0-9_.@-]{1,30}/i,
+  // Korean residential/road addresses and school/academy identifiers.
+  /(?:경기|서울|부산|대구|인천|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)\s?(?:특별자치도|특별자치시|특별시|광역시|도)?\s?[가-힣]{1,4}(?:시|군|구)\s?[가-힣0-9]+\s?(?:로|길)\s?\d/,
+  /[가-힣]{1,8}(?:초등학교|중학교|고등학교|학원|교회)/,
+  /(?:학번|반|번)[\s:.]?\d{1,4}/,
+];
+
 function containsUnsafePublicText(value) {
   const text = String(value || "");
-  return /https?:\/\/|www\.|@[a-z0-9_.-]+|\b\d{2,4}[- .)]?\d{3,4}[- .]?\d{4}\b/i.test(text);
+  return GALAXY_PUBLIC_TEXT_UNSAFE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function getGalaxyItemDefaultDescription(itemId) {
@@ -1117,7 +1142,7 @@ function serializeValue(value) {
   return value;
 }
 
-module.exports = function registerGalaxyGame({ functions, admin, regionalFunctions }) {
+module.exports = function registerGalaxyGame({ functions, admin, regionalFunctions, galaxyPlayTime = null }) {
   const db = admin.firestore();
   const FieldValue = admin.firestore.FieldValue;
   const galaxyLearningAdminFunctions = regionalFunctions.runWith({
@@ -1127,6 +1152,17 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
   });
   const galaxyLearningAdminJobRef = db.collection("adminGalaxyLearningBackfillJobs")
     .doc(GALAXY_LEARNING_ADMIN_JOB_ID);
+
+  async function requireActiveGalaxyPlay(uid, data, options = {}) {
+    if (!galaxyPlayTime?.assertActiveGalaxySession) {
+      throw new functions.https.HttpsError("failed-precondition", "게임 이용시간 확인 서비스를 사용할 수 없습니다.");
+    }
+    return galaxyPlayTime.assertActiveGalaxySession({
+      uid,
+      data,
+      minRemainingSeconds: options.minRemainingSeconds || 0,
+    });
+  }
 
   function requireValidGalaxyItemPlacement(plan) {
     if (plan?.kind === "valid") return plan;
@@ -1776,7 +1812,11 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     };
   });
 
-  async function getSharedCrew(actorUid, targetUid, actorUser) {
+  function getGalaxyBlockRef(ownerUid, targetUid) {
+    return db.collection("galaxyBlocks").doc(ownerUid).collection("blocked").doc(targetUid);
+  }
+
+  async function getApprovedSharedCrew(actorUid, targetUid, actorUser) {
     const crewId = cleanId(actorUser.crewId);
     if (!crewId) return null;
     const crewSnap = await db.collection("crews").doc(crewId).get();
@@ -1785,6 +1825,17 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const memberIds = getCrewMemberIds(crew);
     if (crew.status !== "approved" || !memberIds.includes(actorUid) || !memberIds.includes(targetUid)) return null;
     return { id: crewSnap.id, ...crew, memberIds };
+  }
+
+  async function getSharedCrew(actorUid, targetUid, actorUser) {
+    const sharedCrew = await getApprovedSharedCrew(actorUid, targetUid, actorUser);
+    if (!sharedCrew) return null;
+    const [actorBlockSnap, targetBlockSnap] = await Promise.all([
+      getGalaxyBlockRef(actorUid, targetUid).get(),
+      getGalaxyBlockRef(targetUid, actorUid).get(),
+    ]);
+    if (actorBlockSnap.exists || targetBlockSnap.exists) return null;
+    return sharedCrew;
   }
 
   async function syncLearningState(userRef, user) {
@@ -1868,9 +1919,13 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     if (!memberIds.length) return [];
     const refs = memberIds.flatMap((memberId) => [db.collection("users").doc(memberId), db.collection("galaxyPlanets").doc(memberId)]);
     const relationshipRefs = memberIds.map((memberId) => db.collection("galaxyRelationships").doc(getGalaxyRelationshipId(uid, memberId)));
-    const [snaps, relationshipSnaps] = await Promise.all([
+    const ownBlockRefs = memberIds.map((memberId) => getGalaxyBlockRef(uid, memberId));
+    const reverseBlockRefs = memberIds.map((memberId) => getGalaxyBlockRef(memberId, uid));
+    const [snaps, relationshipSnaps, ownBlockSnaps, reverseBlockSnaps] = await Promise.all([
       db.getAll(...refs),
       db.getAll(...relationshipRefs),
+      db.getAll(...ownBlockRefs),
+      db.getAll(...reverseBlockRefs),
     ]);
     const rows = [];
     for (let index = 0; index < memberIds.length; index += 1) {
@@ -1878,18 +1933,21 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const userSnap = snaps[index * 2];
       const planetSnap = snaps[index * 2 + 1];
       if (!userSnap?.exists || userSnap.data()?.isDeleted === true) continue;
+      if (reverseBlockSnaps[index]?.exists) continue;
       const member = userSnap.data() || {};
       const planet = planetSnap?.exists ? planetSnap.data() || {} : {};
       const relationship = relationshipSnaps[index]?.exists ? relationshipSnaps[index].data() || {} : {};
       const route = getGalaxyRelationshipProgress(relationship.connectionXp);
+      const blocked = ownBlockSnaps[index]?.exists === true;
       rows.push({
         uid: memberId,
         displayName: getPublicName(member),
-        planetName: cleanText(planet.planetName || `${getPublicName(member)}의 미개척 별`, 40),
+        planetName: blocked ? "차단한 탐사원" : cleanText(planet.planetName || `${getPublicName(member)}의 미개척 별`, 40),
         theme: GALAXY_THEMES.has(planet.theme) ? planet.theme : "forest",
-        visitMode: planet.visitMode === "private" ? "private" : "crew",
+        visitMode: blocked || planet.visitMode === "private" ? "private" : "crew",
         shipHullTier: Math.max(1, Number(planet.shipHullTier || member.galaxyShipHullTier || 1)),
-        tagline: cleanText(planet.tagline || "아직 첫 신호를 기다리고 있어요.", 80),
+        tagline: blocked ? "차단을 해제하기 전에는 서로 방문하거나 대화할 수 없습니다." : cleanText(planet.tagline || "아직 첫 신호를 기다리고 있어요.", 80),
+        blocked,
         routeLevel: route.routeLevel,
         connectionXp: route.connectionXp,
         nextLevelXp: route.nextLevelXp,
@@ -1899,14 +1957,17 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     return rows;
   }
 
-  async function grantGalaxyLiveRoomAccess({ roomOwnerUid, actorUid, actorName, nowMs = Date.now() }) {
+  async function grantGalaxyLiveRoomAccess({ roomOwnerUid, actorUid, actorName, nowMs = Date.now(), maxExpiresAtMs = 0 }) {
     const safeRoomOwnerUid = cleanId(roomOwnerUid, 180);
     const safeActorUid = cleanId(actorUid, 180);
     const safeActorName = cleanText(actorName, 40) || "탐사원";
     if (!isSafeRealtimePathSegment(safeRoomOwnerUid) || !isSafeRealtimePathSegment(safeActorUid)) {
       return { granted: false, roomOwnerUid: safeRoomOwnerUid, displayName: "", expiresAtMs: 0 };
     }
-    const expiresAtMs = Math.max(0, Number(nowMs || Date.now())) + GALAXY_LIVE_ACCESS_DURATION_MS;
+    const defaultExpiresAtMs = Math.max(0, Number(nowMs || Date.now())) + GALAXY_LIVE_ACCESS_DURATION_MS;
+    const expiresAtMs = maxExpiresAtMs > nowMs
+      ? Math.min(defaultExpiresAtMs, Number(maxExpiresAtMs))
+      : defaultExpiresAtMs;
     try {
       await admin.database().ref(`galaxyWorldAccess/${safeRoomOwnerUid}/${safeActorUid}`).set({
         uid: safeActorUid,
@@ -1947,6 +2008,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const openGalaxyHome = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    const playSession = await requireActiveGalaxyPlay(uid, data);
     const { userRef, user } = await requireMember(uid);
     const learningState = await syncLearningState(userRef, user);
     const ownPlanet = await ensurePlanet(uid, user, learningState);
@@ -1977,6 +2039,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         actorUid: uid,
         actorName: getPublicName(user),
         nowMs: serverNowMs,
+        maxExpiresAtMs: playSession.hardEndsAtMs,
       }),
     ]);
     const buildPlanetView = (planetData) => planetData?.roverExpedition
@@ -2003,6 +2066,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const renewGalaxyWorldSession = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    const playSession = await requireActiveGalaxyPlay(uid, data);
     const rawRoomOwnerUid = data?.roomOwnerUid;
     const { user } = await requireMember(uid);
     await requireGalaxyLiveRoomAuthorization(uid, user, rawRoomOwnerUid);
@@ -2011,6 +2075,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       actorUid: uid,
       actorName: getPublicName(user),
       nowMs: Date.now(),
+      maxExpiresAtMs: playSession.hardEndsAtMs,
     });
     if (!liveSession.granted) {
       throw new functions.https.HttpsError("unavailable", "실시간 행성 방 접근권을 갱신하지 못했습니다.");
@@ -2020,6 +2085,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const sendGalaxyWorldSpeech = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const rawRoomOwnerUid = data?.roomOwnerUid;
     const rawTargetUid = data?.targetUid;
     const rawConnectionId = data?.connectionId;
@@ -2101,6 +2167,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const completeGalaxyDailyEvent = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const rawDayKey = data?.dayKey;
     const rawEventId = data?.eventId;
     const dayKey = typeof rawDayKey === "string" ? rawDayKey.trim() : "";
@@ -2193,6 +2260,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const saveGalaxyPassport = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const { user } = await requireMember(uid);
     const planet = await ensurePlanet(uid, user);
     const planetName = cleanText(data?.planetName, 30);
@@ -2212,6 +2280,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const buildGalaxyItem = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const itemId = cleanId(data?.itemId, 80);
     const item = GALAXY_ITEM_CATALOG[itemId];
     if (!item) throw new functions.https.HttpsError("invalid-argument", "건설할 수 없는 시설입니다.");
@@ -2299,6 +2368,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const updateGalaxyItem = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const rawInstanceId = data?.instanceId;
     const instanceId = cleanId(rawInstanceId, 120);
     if (
@@ -2390,6 +2460,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const moveGalaxyItem = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const rawInstanceId = data?.instanceId;
     const instanceId = cleanId(rawInstanceId, 120);
     if (
@@ -2425,6 +2496,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const deleteGalaxyItem = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const rawInstanceId = data?.instanceId;
     const instanceId = cleanId(rawInstanceId, 120);
     if (
@@ -2451,6 +2523,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const performGalaxyVisitAction = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const targetUid = cleanId(data?.targetUid);
     const actionId = cleanId(data?.actionId, 40);
     const action = GALAXY_VISIT_ACTIONS[actionId];
@@ -2617,6 +2690,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const startGalaxyRoverExpedition = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const route = cleanId(data?.route, 40);
     if (!GALAXY_ROVER_ROUTES[route]) {
       throw new functions.https.HttpsError("invalid-argument", "탐사 로버 항로가 올바르지 않습니다.");
@@ -2694,6 +2768,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const claimGalaxyRoverExpedition = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const { userRef, user } = await requireMember(uid);
     const rawOperationId = data?.operationId;
     const operationId = cleanId(rawOperationId, 120);
@@ -2786,6 +2861,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const runGalaxyMission = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data, { minRemainingSeconds: 60 });
     const route = ["nebula", "comet", "ruins"].includes(data?.route) ? data.route : "nebula";
     const partnerUid = cleanId(data?.partnerUid);
     const { userRef, user } = await requireMember(uid);
@@ -2872,6 +2948,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const performGalaxyWorldAction = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const actionId = cleanId(data?.actionId, 40);
     const nodeId = cleanId(data?.nodeId, 80);
     const worldX = clamp(data?.x, -16, 16);
@@ -2939,6 +3016,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const performGalaxyStructureAction = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     const rawInstanceId = data?.instanceId;
     const instanceId = cleanId(rawInstanceId, 120);
     if (
@@ -2989,6 +3067,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   const markGalaxyEventsSeen = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
     await requireMember(uid);
     const eventIds = uniqueIds(Array.isArray(data?.eventIds) ? data.eventIds.map((id) => cleanId(id, 180)) : []).slice(0, 30);
     if (!eventIds.length) return { success: true, updated: 0 };
@@ -2999,6 +3078,103 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     }, { merge: true }));
     await batch.commit();
     return { success: true, updated: eventIds.length };
+  });
+
+  const setGalaxyUserBlocked = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
+    const { user } = await requireMember(uid);
+    const targetUid = cleanId(data?.targetUid, 180);
+    const blocked = data?.blocked === true;
+    if (!isSafeRealtimePathSegment(targetUid) || targetUid === uid) {
+      throw new functions.https.HttpsError("invalid-argument", "차단할 탐사원을 확인해 주세요.");
+    }
+    const sharedCrew = await getApprovedSharedCrew(uid, targetUid, user);
+    if (!sharedCrew) {
+      throw new functions.https.HttpsError("permission-denied", "같은 승인 크루의 탐사원만 차단 설정을 변경할 수 있습니다.");
+    }
+
+    const blockRef = getGalaxyBlockRef(uid, targetUid);
+    if (blocked) {
+      await blockRef.set({
+        ownerUid: uid,
+        targetUid,
+        crewId: sharedCrew.id,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } else {
+      await blockRef.delete().catch((error) => {
+        if (error?.code !== 5) throw error;
+      });
+    }
+
+    if (blocked) {
+      const realtimeUpdates = {
+        [`galaxyWorldAccess/${uid}/${targetUid}`]: null,
+        [`galaxyWorldAccess/${targetUid}/${uid}`]: null,
+        [`galaxyWorldRooms/${uid}/players/${targetUid}`]: null,
+        [`galaxyWorldRooms/${targetUid}/players/${uid}`]: null,
+        [`galaxyWorldSpeechRateLimits/${uid}/${targetUid}`]: null,
+        [`galaxyWorldSpeechRateLimits/${targetUid}/${uid}`]: null,
+      };
+      await admin.database().ref().update(realtimeUpdates).catch((error) => {
+        console.warn("[galaxySafety] live access revoke failed", {
+          uid,
+          targetUid,
+          message: cleanText(error?.message || error, 200),
+        });
+      });
+    }
+
+    return { success: true, targetUid, blocked };
+  });
+
+  const reportGalaxyUser = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
+    const { user } = await requireMember(uid);
+    const targetUid = cleanId(data?.targetUid, 180);
+    const category = cleanId(data?.category, 40);
+    const reportId = cleanId(data?.reportId, 180);
+    if (!isSafeRealtimePathSegment(targetUid) || targetUid === uid) {
+      throw new functions.https.HttpsError("invalid-argument", "신고할 탐사원을 확인해 주세요.");
+    }
+    if (!GALAXY_REPORT_CATEGORIES.has(category)) {
+      throw new functions.https.HttpsError("invalid-argument", "신고 사유를 확인해 주세요.");
+    }
+    if (!isSafeRealtimePathSegment(reportId)) {
+      throw new functions.https.HttpsError("invalid-argument", "신고 요청 식별자가 올바르지 않습니다.");
+    }
+    const sharedCrew = await getApprovedSharedCrew(uid, targetUid, user);
+    if (!sharedCrew) {
+      throw new functions.https.HttpsError("permission-denied", "같은 승인 크루에서 발생한 문제만 신고할 수 있습니다.");
+    }
+
+    // 신고 증거는 선택적이며, 신고자가 직접 쓴 글이 아니라 갈럭시 공개 텍스트
+    // 한 조각만 최소 문맥으로 보존한다. 길이·제어문자·HTML 태그를 서버에서 정리한다.
+    const rawEvidence = typeof data?.evidence === "string" ? data.evidence : "";
+    const sanitizedEvidence = rawEvidence.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+    const evidence = sanitizedEvidence && sanitizedEvidence.length <= 200 ? sanitizedEvidence : "";
+
+    const reportRef = db.collection("galaxyReports").doc(`${uid}_${reportId}`);
+    const reportPayload = {
+      reporterUid: uid,
+      targetUid,
+      crewId: sharedCrew.id,
+      category,
+      status: "pending",
+      source: "astra_frontier",
+      createdAt: FieldValue.serverTimestamp(),
+      expireAt: admin.firestore.Timestamp.fromMillis(Date.now() + 90 * 24 * 60 * 60 * 1000),
+    };
+    if (evidence) reportPayload.evidence = evidence;
+    await db.runTransaction(async (transaction) => {
+      const reportSnap = await transaction.get(reportRef);
+      if (reportSnap.exists) return;
+      transaction.create(reportRef, reportPayload);
+    });
+    return { success: true, reportId: reportRef.id, evidencePreserved: Boolean(evidence) };
   });
 
   return {
@@ -3023,6 +3199,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     performGalaxyWorldAction,
     performGalaxyStructureAction,
     markGalaxyEventsSeen,
+    setGalaxyUserBlocked,
+    reportGalaxyUser,
   };
 };
 
@@ -3052,4 +3230,5 @@ module.exports.__test = {
   stableGalaxyHash,
   validateGalaxyObjectImage,
   validateGalaxyLiveSpeechText,
+  containsUnsafePublicText,
 };
