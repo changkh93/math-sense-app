@@ -3891,6 +3891,40 @@ function SpaceHome() {
                     <>
                     {is2DMode && (
                       <>
+                        {/* Mobile-safe route into the 3D Astra Frontier world. */}
+                        <Motion.button
+                          type="button"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1, transition: { delay: 0.06 } }}
+                          whileHover={isMobile ? undefined : { scale: 1.05, filter: 'brightness(1.16)' }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            switchRootView('galaxy')
+                            if (soundManager?.playWarp) soundManager.playWarp()
+                          }}
+                          style={{
+                            width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
+                            minHeight: isMobile ? '148px' : '250px',
+                            padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                            border: '1px solid rgba(109, 245, 176, 0.52)',
+                            borderRadius: isMobile ? '14px' : '20px',
+                            color: 'white',
+                            cursor: 'pointer',
+                            background: 'radial-gradient(circle at 78% 20%, rgba(109,245,176,.27), transparent 34%), linear-gradient(145deg, rgba(14,54,55,.94), rgba(7,21,36,.96))',
+                            boxShadow: '0 8px 32px rgba(63, 218, 166, .18)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: isMobile ? '.45rem' : '.8rem',
+                            font: 'inherit',
+                          }}
+                        >
+                          <span aria-hidden="true" style={{ fontSize: isMobile ? '2.2rem' : '4rem' }}>🌌</span>
+                          <strong className="font-tech" style={{ fontSize: isMobile ? '.92rem' : '1.3rem' }}>아스트라 프론티어</strong>
+                          <small style={{ color: '#9ee8cc', fontSize: isMobile ? '.68rem' : '.8rem', lineHeight: 1.35 }}>3D 게임 세계로 진입</small>
+                        </Motion.button>
+
                         {/* Special Card: Assignment Hub */}
                         <Motion.div
                           initial={{ opacity: 0, scale: 0.8 }}
