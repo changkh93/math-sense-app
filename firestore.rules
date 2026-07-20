@@ -65,6 +65,56 @@ service cloud.firestore {
              request.resource.data.streakWriteAudit.writtenAt == request.time;
     }
 
+    // Identity/authority and Galaxy ledger rollups are server-managed. A user
+    // must never be able to promote their own role or forge a completed ore ledger.
+    function protectedUserKeys() {
+      return [
+        'role',
+        'isGuest',
+        'isDeleted',
+        'accountStatus',
+        'galaxyLearningLedgerVersion',
+        'galaxyLearningLedgerComplete',
+        'galaxyLearningBackfillCursor',
+        'galaxyLearningOreV2Total',
+        'lifetimeLearningCrystalsEarned',
+        'galaxyLearningLedgerSyncedAt',
+        'galaxyShipHullTier',
+        'gameAbilitySnapshot',
+        'galaxyLearningSyncedAt'
+      ];
+    }
+
+    function touchesProtectedUserFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedUserKeys());
+    }
+
+    function hasSafeSelfCreatedIdentity() {
+      return (!('role' in request.resource.data) || request.resource.data.role == 'student') &&
+             (!('isGuest' in request.resource.data) || request.resource.data.isGuest == false) &&
+             (!('isDeleted' in request.resource.data) || request.resource.data.isDeleted == false) &&
+             (!('accountStatus' in request.resource.data) || request.resource.data.accountStatus == 'active') &&
+             !request.resource.data.keys().hasAny([
+               'galaxyLearningLedgerVersion',
+               'galaxyLearningLedgerComplete',
+               'galaxyLearningBackfillCursor',
+               'galaxyLearningOreV2Total',
+               'lifetimeLearningCrystalsEarned',
+               'galaxyLearningLedgerSyncedAt',
+               'galaxyShipHullTier',
+               'gameAbilitySnapshot',
+               'galaxyLearningSyncedAt'
+             ]);
+    }
+
+    // Exact-once Galaxy markers and callable operation records are maintained
+    // only by Cloud Functions. Blocking client writes prevents marker deletion
+    // or pre-creation from changing a backfill result.
+    function isServerManagedUserSubcollection(collectionId) {
+      return collectionId == 'galaxyLearningOreEvents' ||
+             collectionId == 'galaxyOperations';
+    }
+
     function assignmentStudentWritableKeys() {
       return [
         'userId',
@@ -367,21 +417,25 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuth();
-      allow create: if isAuth() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuth() && (
+        isAdmin() ||
+        (request.auth.uid == userId && hasSafeSelfCreatedIdentity())
+      );
       allow update: if isAuth() && (
         isAdmin() ||
         (
           request.auth.uid == userId &&
+          !touchesProtectedUserFields() &&
           (!touchesManagedStreakFields() || hasValidStreakWriteAudit())
         )
       );
       allow delete: if isAdmin();
       
       // Allow subcollections (like 'history', 'crystal_transactions', 'learning_progress', 'activityLogs')
-      match /{document=**} {
+      match /{collectionId}/{document=**} {
         allow create: if isAuth() && (
-          request.auth.uid == userId ||
-          isAdmin()
+          !isServerManagedUserSubcollection(collectionId) &&
+          (request.auth.uid == userId || isAdmin())
         );
         allow read: if isAuth() && (
           request.auth.uid == userId || 
@@ -389,8 +443,8 @@ service cloud.firestore {
           isLinkedParentOf(userId)
         );
         allow update, delete: if isAuth() && (
-          request.auth.uid == userId ||
-          isAdmin()
+          !isServerManagedUserSubcollection(collectionId) &&
+          (request.auth.uid == userId || isAdmin())
         );
       }
     }

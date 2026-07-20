@@ -3,6 +3,7 @@
   "description": "Firebase Cloud Functions for Math Sense App",
   "scripts": {
     "lint": "eslint .",
+    "test:galaxy-backfill": "node galaxyGame.backfill.test.cjs",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },

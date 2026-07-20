@@ -22,6 +22,7 @@ import AITaggingEditor from './pages/Admin/AITaggingEditor'
 import QuizEditor from './pages/Admin/QuizEditor'
 import GhostCleaner from './pages/Admin/GhostCleaner'
 import StreakFixer from './pages/Admin/StreakFixer'
+import GalaxyLearningLedgerBackfill from './pages/Admin/GalaxyLearningLedgerBackfill'
 import TeacherQA from './pages/Admin/TeacherQA'
 import PythonCourseBuilder from './pages/Admin/PythonCourseBuilder'
 import MiddleSchoolMathBuilder from './pages/Admin/MiddleSchoolMathBuilder'
@@ -92,6 +93,7 @@ function App() {
         <Route path="quizzes/:unitId" element={<QuizEditor />} />
         <Route path="ghost-cleaner" element={<GhostCleaner />} />
         <Route path="streak-fixer" element={<StreakFixer />} />
+        <Route path="galaxy-ledger" element={<GalaxyLearningLedgerBackfill />} />
         <Route path="qa" element={<TeacherQA />} />
         <Route path="python-builder" element={<PythonCourseBuilder />} />
         <Route path="middle-math-builder" element={<MiddleSchoolMathBuilder />} />

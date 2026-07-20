@@ -139,6 +139,22 @@ const LEARNING_ORE_EXCLUDED_TYPES = new Set([
 ]);
 const GALAXY_LEARNING_LEDGER_VERSION = 2;
 const GALAXY_LEARNING_BACKFILL_LIMIT = 200;
+const GALAXY_LEARNING_MAX_ORE_PER_TRANSACTION = 10000;
+const GALAXY_LEARNING_ADMIN_SCAN_LIMIT = 1000;
+const GALAXY_LEARNING_ADMIN_MAX_USERS_PER_RUN = 20;
+const GALAXY_LEARNING_ADMIN_MAX_PAGES_PER_USER = 5;
+const GALAXY_LEARNING_ADMIN_MAX_PAGES_PER_RUN = 25;
+const GALAXY_LEARNING_ADMIN_LOCK_MS = 10 * 60 * 1000;
+const GALAXY_LEARNING_ADMIN_JOB_ID = "learningOreLedgerV2";
+const GALAXY_LEARNING_ADMIN_CONFIRMATION = "BACKFILL-ASTRA-LEARNING-ORE";
+const GALAXY_LEARNING_ADMIN_BLOCKED_ROLES = new Set([
+  "admin",
+  "developer",
+  "teacher",
+  "operator",
+  "parent",
+  "guest",
+]);
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number(value) || 0));
@@ -150,6 +166,10 @@ function cleanText(value, maxLength = 120) {
 
 function cleanId(value, maxLength = 180) {
   return String(value || "").trim().slice(0, maxLength);
+}
+
+function getExactDocumentId(value) {
+  return typeof value === "string" ? value : "";
 }
 
 function containsUnsafePublicText(value) {
@@ -305,28 +325,82 @@ function buildStarterPlanet(uid, user, learningState, now) {
 function isEligibleLearningOreTransaction(data = {}) {
   const amount = Number(data.amount || 0);
   const type = cleanId(data.type, 80);
-  if (amount <= 0 || LEARNING_ORE_EXCLUDED_TYPES.has(type)) return false;
+  if (
+    !Number.isSafeInteger(amount)
+    || amount <= 0
+    || amount > GALAXY_LEARNING_MAX_ORE_PER_TRANSACTION
+    || LEARNING_ORE_EXCLUDED_TYPES.has(type)
+  ) return false;
   if (type.includes("gift") || type.includes("refund") || type.includes("crew_")) return false;
   return true;
+}
+
+function isGalaxyLearningBackfillTarget(user = {}) {
+  const role = cleanId(user.role, 40).toLowerCase();
+  return !GALAXY_LEARNING_ADMIN_BLOCKED_ROLES.has(role)
+    && user.isGuest !== true
+    && user.isDeleted !== true
+    && user.accountStatus !== "deleted";
+}
+
+function getGalaxyLearningLedgerStatus(user = {}) {
+  const complete = Number(user.galaxyLearningLedgerVersion || 0) >= GALAXY_LEARNING_LEDGER_VERSION
+    && user.galaxyLearningLedgerComplete === true;
+  if (complete) return "complete";
+  if (
+    cleanId(user.galaxyLearningBackfillCursor, 180)
+    || Number(user.galaxyLearningLedgerVersion || 0) > 0
+    || user.galaxyLearningLedgerSyncedAt
+  ) return "in_progress";
+  return "not_started";
+}
+
+function normalizeGalaxyLearningBackfillCounters(counters = {}) {
+  return {
+    usersVisited: Math.max(0, Number(counters.usersVisited || 0)),
+    usersCompleted: Math.max(0, Number(counters.usersCompleted || 0)),
+    usersAlreadyComplete: Math.max(0, Number(counters.usersAlreadyComplete || 0)),
+    usersSkipped: Math.max(0, Number(counters.usersSkipped || 0)),
+    pagesProcessed: Math.max(0, Number(counters.pagesProcessed || 0)),
+    ledgerDocsScanned: Math.max(0, Number(counters.ledgerDocsScanned || 0)),
+    eligibleEventsScanned: Math.max(0, Number(counters.eligibleEventsScanned || 0)),
+    eventsCredited: Math.max(0, Number(counters.eventsCredited || 0)),
+    oreCredited: Math.max(0, Number(counters.oreCredited || 0)),
+    errors: Math.max(0, Number(counters.errors || 0)),
+  };
 }
 
 async function calculateLifetimeLearningOre(db, admin, userRef, user = {}) {
   const currentTotal = Math.max(0, Number(user.galaxyLearningOreV2Total || 0));
   const isComplete = Number(user.galaxyLearningLedgerVersion || 0) >= GALAXY_LEARNING_LEDGER_VERSION
     && user.galaxyLearningLedgerComplete === true;
-  if (isComplete) return { total: currentTotal, complete: true };
+  if (isComplete) {
+    return { total: currentTotal, complete: true, scanned: 0, eligible: 0, creditedEvents: 0, credited: 0 };
+  }
 
   let ledgerQuery = userRef.collection("crystal_transactions")
     .orderBy(admin.firestore.FieldPath.documentId())
     .limit(GALAXY_LEARNING_BACKFILL_LIMIT);
-  const cursor = cleanId(user.galaxyLearningBackfillCursor, 180);
+  const cursor = getExactDocumentId(user.galaxyLearningBackfillCursor);
   if (cursor) ledgerQuery = ledgerQuery.startAfter(cursor);
   const ledgerSnap = await ledgerQuery.get();
 
   if (ledgerSnap.empty) {
     return db.runTransaction(async (transaction) => {
       const freshUserSnap = await transaction.get(userRef);
-      const freshTotal = Math.max(0, Number(freshUserSnap.data()?.galaxyLearningOreV2Total || currentTotal));
+      const freshUser = freshUserSnap.data() || {};
+      if (!freshUserSnap.exists || freshUser.isDeleted === true || freshUser.accountStatus === "deleted") {
+        return { total: 0, complete: false, missing: true, scanned: 0, eligible: 0, creditedEvents: 0, credited: 0 };
+      }
+      const freshTotal = Math.max(0, Number(freshUser.galaxyLearningOreV2Total || currentTotal));
+      const freshComplete = Number(freshUser.galaxyLearningLedgerVersion || 0) >= GALAXY_LEARNING_LEDGER_VERSION
+        && freshUser.galaxyLearningLedgerComplete === true;
+      if (freshComplete) {
+        return { total: freshTotal, complete: true, scanned: 0, eligible: 0, creditedEvents: 0, credited: 0 };
+      }
+      if (getExactDocumentId(freshUser.galaxyLearningBackfillCursor) !== cursor) {
+        return { total: freshTotal, complete: false, stale: true, scanned: 0, eligible: 0, creditedEvents: 0, credited: 0 };
+      }
       transaction.set(userRef, {
         galaxyLearningLedgerVersion: GALAXY_LEARNING_LEDGER_VERSION,
         galaxyLearningLedgerComplete: true,
@@ -334,7 +408,7 @@ async function calculateLifetimeLearningOre(db, admin, userRef, user = {}) {
         lifetimeLearningCrystalsEarned: freshTotal,
         galaxyLearningLedgerSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
-      return { total: freshTotal, complete: true };
+      return { total: freshTotal, complete: true, scanned: 0, eligible: 0, creditedEvents: 0, credited: 0 };
     });
   }
 
@@ -346,18 +420,37 @@ async function calculateLifetimeLearningOre(db, admin, userRef, user = {}) {
   const pageComplete = ledgerSnap.size < GALAXY_LEARNING_BACKFILL_LIMIT;
 
   return db.runTransaction(async (transaction) => {
-    const [freshUserSnap, ...markerSnaps] = await Promise.all([
-      transaction.get(userRef),
-      ...markerRefs.map((ref) => transaction.get(ref)),
-    ]);
+    const freshUserSnap = await transaction.get(userRef);
     const freshUser = freshUserSnap.data() || {};
+    if (!freshUserSnap.exists || freshUser.isDeleted === true || freshUser.accountStatus === "deleted") {
+      return { total: 0, complete: false, missing: true, scanned: 0, eligible: 0, creditedEvents: 0, credited: 0 };
+    }
     const baseTotal = Math.max(0, Number(freshUser.galaxyLearningOreV2Total || 0));
+    const freshComplete = Number(freshUser.galaxyLearningLedgerVersion || 0) >= GALAXY_LEARNING_LEDGER_VERSION
+      && freshUser.galaxyLearningLedgerComplete === true;
+    if (freshComplete) {
+      return { total: baseTotal, complete: true, scanned: 0, eligible: 0, creditedEvents: 0, credited: 0 };
+    }
+    if (getExactDocumentId(freshUser.galaxyLearningBackfillCursor) !== cursor) {
+      return {
+        total: baseTotal,
+        complete: false,
+        stale: true,
+        scanned: ledgerSnap.size,
+        eligible: eligibleRows.length,
+        creditedEvents: 0,
+        credited: 0,
+      };
+    }
+    const markerSnaps = await Promise.all(markerRefs.map((ref) => transaction.get(ref)));
     let delta = 0;
+    let creditedEvents = 0;
     eligibleRows.forEach(({ id, row }, index) => {
       if (markerSnaps[index]?.exists) return;
       const amount = Math.max(0, Math.floor(Number(row.amount || 0)));
       if (!amount) return;
       delta += amount;
+      creditedEvents += 1;
       transaction.set(markerRefs[index], {
         transactionId: id,
         amount,
@@ -375,7 +468,14 @@ async function calculateLifetimeLearningOre(db, admin, userRef, user = {}) {
       lifetimeLearningCrystalsEarned: total,
       galaxyLearningLedgerSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
-    return { total, complete: pageComplete };
+    return {
+      total,
+      complete: pageComplete,
+      scanned: ledgerSnap.size,
+      eligible: eligibleRows.length,
+      creditedEvents,
+      credited: delta,
+    };
   });
 }
 
@@ -392,14 +492,21 @@ function serializeValue(value) {
 module.exports = function registerGalaxyGame({ functions, admin, regionalFunctions }) {
   const db = admin.firestore();
   const FieldValue = admin.firestore.FieldValue;
+  const galaxyLearningAdminFunctions = regionalFunctions.runWith({
+    timeoutSeconds: 300,
+    memory: "512MB",
+    maxInstances: 1,
+  });
+  const galaxyLearningAdminJobRef = db.collection("adminGalaxyLearningBackfillJobs")
+    .doc(GALAXY_LEARNING_ADMIN_JOB_ID);
 
   const rollupGalaxyLearningOre = regionalFunctions.firestore
     .document("users/{uid}/crystal_transactions/{transactionId}")
     .onCreate(async (snapshot, context) => {
       const row = snapshot.data() || {};
       if (!isEligibleLearningOreTransaction(row)) return null;
-      const uid = cleanId(context.params.uid, 180);
-      const transactionId = cleanId(context.params.transactionId, 180);
+      const uid = getExactDocumentId(context.params.uid);
+      const transactionId = getExactDocumentId(context.params.transactionId);
       const amount = Math.max(0, Math.floor(Number(row.amount || 0)));
       if (!uid || !transactionId || !amount) return null;
       const userRef = db.collection("users").doc(uid);
@@ -409,7 +516,12 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
           transaction.get(markerRef),
           transaction.get(userRef),
         ]);
-        if (markerSnap.exists || !userSnap.exists) return;
+        if (
+          markerSnap.exists
+          || !userSnap.exists
+          || userSnap.data()?.isDeleted === true
+          || userSnap.data()?.accountStatus === "deleted"
+        ) return;
         const user = userSnap.data() || {};
         const total = Math.max(0, Number(user.galaxyLearningOreV2Total || 0)) + amount;
         transaction.set(userRef, {
@@ -433,6 +545,15 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     return context.auth.uid;
   }
 
+  async function requireAdminUid(context) {
+    const uid = requireUid(context);
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists || userSnap.data()?.role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "관리자 권한이 없습니다.");
+    }
+    return uid;
+  }
+
   async function requireMember(uid) {
     const userRef = db.collection("users").doc(uid);
     const userSnap = await userRef.get();
@@ -441,6 +562,561 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     }
     return { userRef, user: userSnap.data() || {} };
   }
+
+  async function writeGalaxyLearningAdminAudit(adminUid, action, details = {}) {
+    const safeDetails = Object.fromEntries(
+      Object.entries(details).filter(([, value]) => value !== undefined),
+    );
+    try {
+      await db.collection("adminAuditLogs").add({
+        action,
+        adminUid,
+        operation: "galaxy_learning_ore_ledger_v2_backfill",
+        ...safeDetails,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("[galaxyLearningBackfill] audit log failed", action, error);
+    }
+  }
+
+  function buildGalaxyLearningAdminJobView(job = {}, id = GALAXY_LEARNING_ADMIN_JOB_ID) {
+    const { targetUids = [], ...visibleJob } = job;
+    return serializeValue({
+      id,
+      ...visibleJob,
+      targetCount: Math.max(0, Number(job.targetCount || targetUids.length || 0)),
+      leaseActive: Number(job.leaseUntilMs || 0) > Date.now(),
+    });
+  }
+
+  async function readGalaxyLearningAdminStatus() {
+    const [usersSnap, jobSnap] = await Promise.all([
+      db.collection("users")
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(GALAXY_LEARNING_ADMIN_SCAN_LIMIT + 1)
+        .get(),
+      galaxyLearningAdminJobRef.get(),
+    ]);
+    const truncated = usersSnap.size > GALAXY_LEARNING_ADMIN_SCAN_LIMIT;
+    const scannedDocs = usersSnap.docs.slice(0, GALAXY_LEARNING_ADMIN_SCAN_LIMIT);
+    const users = scannedDocs
+      .filter((snapshot) => isGalaxyLearningBackfillTarget(snapshot.data() || {}))
+      .map((snapshot) => {
+        const user = snapshot.data() || {};
+        return {
+          uid: snapshot.id,
+          displayName: getPublicName(user),
+          status: getGalaxyLearningLedgerStatus(user),
+          ledgerVersion: Math.max(0, Number(user.galaxyLearningLedgerVersion || 0)),
+          cursor: getExactDocumentId(user.galaxyLearningBackfillCursor),
+          oreTotal: Math.max(0, Number(user.galaxyLearningOreV2Total || 0)),
+          syncedAt: serializeValue(user.galaxyLearningLedgerSyncedAt) || null,
+        };
+      });
+    const completeUsers = users.filter((user) => user.status === "complete").length;
+    const inProgressUsers = users.filter((user) => user.status === "in_progress").length;
+    const notStartedUsers = users.filter((user) => user.status === "not_started").length;
+    const rawJob = jobSnap.exists ? jobSnap.data() || {} : null;
+    const job = rawJob ? buildGalaxyLearningAdminJobView(rawJob, jobSnap.id) : null;
+
+    return {
+      ledgerVersion: GALAXY_LEARNING_LEDGER_VERSION,
+      confirmationPhrase: GALAXY_LEARNING_ADMIN_CONFIRMATION,
+      summary: {
+        partial: truncated,
+        totalUsers: users.length,
+        completeUsers,
+        pendingUsers: users.length - completeUsers,
+        inProgressUsers,
+        notStartedUsers,
+        totalRecordedOre: users.reduce((sum, user) => sum + user.oreTotal, 0),
+        scannedDocuments: scannedDocs.length,
+        excludedDocuments: scannedDocs.length - users.length,
+      },
+      users,
+      truncated,
+      scanLimit: GALAXY_LEARNING_ADMIN_SCAN_LIMIT,
+      job,
+    };
+  }
+
+  const adminGetGalaxyLearningBackfillStatus = regionalFunctions.https.onCall(async (_data, context) => {
+    await requireAdminUid(context);
+    return {
+      success: true,
+      ...await readGalaxyLearningAdminStatus(),
+    };
+  });
+
+  const adminStartGalaxyLearningBackfill = regionalFunctions.https.onCall(async (data, context) => {
+    const adminUid = await requireAdminUid(context);
+    const confirmation = String(data?.confirmation || "").trim();
+    if (confirmation !== GALAXY_LEARNING_ADMIN_CONFIRMATION) {
+      throw new functions.https.HttpsError("failed-precondition", "화면의 확인 문구를 정확히 입력해 주세요.");
+    }
+    const scope = String(data?.scope || "").trim();
+    if (!["all", "user"].includes(scope)) {
+      throw new functions.https.HttpsError("invalid-argument", "백필 범위는 전체 또는 개별 사용자여야 합니다.");
+    }
+    const targetUid = scope === "user" ? cleanId(data?.targetUid, 180) : "";
+    let targetUids = [];
+    if (scope === "user") {
+      if (!targetUid) {
+        throw new functions.https.HttpsError("invalid-argument", "개별 백필 대상 UID가 필요합니다.");
+      }
+      const targetSnap = await db.collection("users").doc(targetUid).get();
+      if (!targetSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "대상 사용자 문서를 찾을 수 없습니다.");
+      }
+      if (!isGalaxyLearningBackfillTarget(targetSnap.data() || {})) {
+        throw new functions.https.HttpsError("failed-precondition", "학생 계정만 학습 광석 백필 대상으로 지정할 수 있습니다.");
+      }
+      targetUids = [targetSnap.id];
+    } else {
+      const targetSnapshot = await db.collection("users")
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(GALAXY_LEARNING_ADMIN_SCAN_LIMIT + 1)
+        .get();
+      if (targetSnapshot.size > GALAXY_LEARNING_ADMIN_SCAN_LIMIT) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          `안전 한도 ${GALAXY_LEARNING_ADMIN_SCAN_LIMIT}명을 초과했습니다. 도구의 대상 스냅샷 한도를 먼저 확장해 주세요.`,
+        );
+      }
+      targetUids = targetSnapshot.docs
+        .filter((snapshot) => {
+          const user = snapshot.data() || {};
+          return isGalaxyLearningBackfillTarget(user)
+            && getGalaxyLearningLedgerStatus(user) !== "complete";
+        })
+        .map((snapshot) => snapshot.id);
+    }
+
+    const jobRunId = `${Date.now()}_${adminUid.slice(0, 12)}_${Math.random().toString(36).slice(2, 10)}`;
+    await db.runTransaction(async (transaction) => {
+      const currentSnap = await transaction.get(galaxyLearningAdminJobRef);
+      const current = currentSnap.data() || {};
+      if (currentSnap.exists && !["completed", "cancelled"].includes(current.status)) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "재개 가능한 기존 백필 작업이 있습니다. 새 작업을 만들지 말고 기존 작업을 계속 실행해 주세요.",
+          { jobRunId: current.jobRunId || "", status: current.status || "unknown" },
+        );
+      }
+      transaction.set(galaxyLearningAdminJobRef, {
+        version: GALAXY_LEARNING_LEDGER_VERSION,
+        jobRunId,
+        scope,
+        targetUid,
+        status: "queued",
+        targetUids,
+        targetCount: targetUids.length,
+        targetIndex: 0,
+        userCursor: "",
+        currentUid: targetUids[0] || "",
+        counters: normalizeGalaxyLearningBackfillCounters(),
+        createdBy: adminUid,
+        createdAt: FieldValue.serverTimestamp(),
+        startedAt: null,
+        updatedAt: FieldValue.serverTimestamp(),
+        completedAt: null,
+        leaseId: "",
+        leaseOwnerUid: "",
+        leaseUntilMs: 0,
+        lastError: null,
+        lastStep: null,
+      });
+    });
+
+    await writeGalaxyLearningAdminAudit(adminUid, "galaxy_learning_backfill_started", {
+      jobRunId,
+      scope,
+      targetUid,
+      targetCount: targetUids.length,
+    });
+    const jobSnap = await galaxyLearningAdminJobRef.get();
+    return { success: true, job: buildGalaxyLearningAdminJobView(jobSnap.data() || {}, jobSnap.id) };
+  });
+
+  const adminRunGalaxyLearningBackfillStep = galaxyLearningAdminFunctions.https.onCall(async (data, context) => {
+    const adminUid = await requireAdminUid(context);
+    const expectedJobRunId = cleanId(data?.jobRunId, 180);
+    if (!expectedJobRunId) {
+      throw new functions.https.HttpsError("invalid-argument", "실행할 백필 작업 ID가 필요합니다.");
+    }
+    const pageBudget = Math.floor(clamp(
+      Number(data?.pageBudget) || 15,
+      1,
+      GALAXY_LEARNING_ADMIN_MAX_PAGES_PER_RUN,
+    ));
+    const userBudget = Math.floor(clamp(
+      Number(data?.userBudget) || GALAXY_LEARNING_ADMIN_MAX_USERS_PER_RUN,
+      1,
+      GALAXY_LEARNING_ADMIN_MAX_USERS_PER_RUN,
+    ));
+    const leaseId = `${Date.now()}_${adminUid.slice(0, 12)}_${Math.random().toString(36).slice(2, 10)}`;
+    let leaseAcquired = false;
+    let userCursor = "";
+    let currentUid = "";
+    let targetIndex = 0;
+    let counters = normalizeGalaxyLearningBackfillCounters();
+    const step = {
+      usersHandled: 0,
+      userDocumentsScanned: 0,
+      pagesProcessed: 0,
+      ledgerDocsScanned: 0,
+      eligibleEventsScanned: 0,
+      eventsCredited: 0,
+      oreCredited: 0,
+      results: [],
+      stopReason: "queued",
+    };
+
+    try {
+      const acquisition = await db.runTransaction(async (transaction) => {
+        const jobSnap = await transaction.get(galaxyLearningAdminJobRef);
+        if (!jobSnap.exists) {
+          throw new functions.https.HttpsError("failed-precondition", "먼저 백필 작업을 시작해 주세요.");
+        }
+        const job = jobSnap.data() || {};
+        if (job.jobRunId !== expectedJobRunId) {
+          throw new functions.https.HttpsError("failed-precondition", "화면의 작업 정보가 오래되었습니다. 현황을 새로 고쳐 주세요.");
+        }
+        if (job.status === "completed") return { alreadyCompleted: true, job };
+        if (!["queued", "running", "failed", "paused"].includes(job.status)) {
+          throw new functions.https.HttpsError("failed-precondition", "현재 상태에서는 백필 작업을 실행할 수 없습니다.");
+        }
+        if (cleanId(job.leaseId, 180) && Number(job.leaseUntilMs || 0) > Date.now()) {
+          throw new functions.https.HttpsError("aborted", "다른 관리자 배치가 이미 실행 중입니다. 잠시 후 현황을 새로 고쳐 주세요.");
+        }
+        const updates = {
+          status: "running",
+          leaseId,
+          leaseOwnerUid: adminUid,
+          leaseUntilMs: Date.now() + GALAXY_LEARNING_ADMIN_LOCK_MS,
+          updatedAt: FieldValue.serverTimestamp(),
+          lastError: null,
+        };
+        if (!job.startedAt) updates.startedAt = FieldValue.serverTimestamp();
+        transaction.set(galaxyLearningAdminJobRef, updates, { merge: true });
+        return { alreadyCompleted: false, job };
+      });
+
+      if (acquisition.alreadyCompleted) {
+        return {
+          success: true,
+          alreadyCompleted: true,
+          job: buildGalaxyLearningAdminJobView(acquisition.job),
+          step,
+        };
+      }
+      leaseAcquired = true;
+      const job = acquisition.job || {};
+      const scope = job.scope === "user" ? "user" : "all";
+      const targetUid = cleanId(job.targetUid, 180);
+      const targetUids = Array.isArray(job.targetUids)
+        ? job.targetUids.filter((uid) => typeof uid === "string" && uid)
+        : [];
+      targetIndex = Math.min(
+        targetUids.length,
+        Math.max(0, Math.floor(Number(job.targetIndex || 0))),
+      );
+      userCursor = getExactDocumentId(job.userCursor);
+      currentUid = getExactDocumentId(job.currentUid) || targetUids[targetIndex] || "";
+      if (currentUid && currentUid !== targetUids[targetIndex]) {
+        throw new functions.https.HttpsError("failed-precondition", "백필 대상 큐가 일치하지 않습니다. 작업을 종료하고 새로 시작해 주세요.");
+      }
+      counters = normalizeGalaxyLearningBackfillCounters(job.counters);
+
+      const checkpointProgress = async () => {
+        await db.runTransaction(async (transaction) => {
+          const checkpointSnap = await transaction.get(galaxyLearningAdminJobRef);
+          const checkpointJob = checkpointSnap.data() || {};
+          if (checkpointJob.jobRunId !== expectedJobRunId || checkpointJob.leaseId !== leaseId) {
+            throw new functions.https.HttpsError("aborted", "백필 작업 잠금이 변경되었습니다. 현황을 새로 고쳐 주세요.");
+          }
+          transaction.set(galaxyLearningAdminJobRef, {
+            targetIndex,
+            userCursor,
+            currentUid,
+            counters,
+            updatedAt: FieldValue.serverTimestamp(),
+            lastCheckpointAtMs: Date.now(),
+          }, { merge: true });
+        });
+      };
+
+      const finishUser = async (uid, outcome) => {
+        if (uid !== targetUids[targetIndex]) {
+          throw new Error(`Backfill target index mismatch: ${uid}`);
+        }
+        targetIndex += 1;
+        currentUid = "";
+        userCursor = uid;
+        step.usersHandled += 1;
+        counters.usersVisited += 1;
+        if (outcome === "completed") counters.usersCompleted += 1;
+        if (outcome === "already_complete") counters.usersAlreadyComplete += 1;
+        if (outcome === "skipped") counters.usersSkipped += 1;
+        await checkpointProgress();
+      };
+
+      while (step.usersHandled < userBudget && step.pagesProcessed < pageBudget) {
+        if (!currentUid) {
+          currentUid = targetUids[targetIndex] || "";
+          if (!currentUid) break;
+        }
+
+        const processingUid = currentUid;
+        const userRef = db.collection("users").doc(processingUid);
+        const userSnap = await userRef.get();
+        step.userDocumentsScanned += 1;
+        const user = userSnap.data() || {};
+        if (!userSnap.exists || !isGalaxyLearningBackfillTarget(user)) {
+          await finishUser(processingUid, "skipped");
+          step.results.push({ uid: processingUid, displayName: getPublicName(user), outcome: "skipped" });
+          continue;
+        }
+
+        const displayName = getPublicName(user);
+        if (getGalaxyLearningLedgerStatus(user) === "complete") {
+          await finishUser(processingUid, "already_complete");
+          step.results.push({
+            uid: processingUid,
+            displayName,
+            outcome: "already_complete",
+            total: Math.max(0, Number(user.galaxyLearningOreV2Total || 0)),
+          });
+          continue;
+        }
+
+        let freshUser = user;
+        let pagesForUser = 0;
+        let scannedForUser = 0;
+        let eligibleForUser = 0;
+        let eventsCreditedForUser = 0;
+        let oreCreditedForUser = 0;
+        let latestTotal = Math.max(0, Number(user.galaxyLearningOreV2Total || 0));
+        let userComplete = false;
+        let userMissing = false;
+
+        while (
+          pagesForUser < GALAXY_LEARNING_ADMIN_MAX_PAGES_PER_USER
+          && step.pagesProcessed < pageBudget
+        ) {
+          const result = await calculateLifetimeLearningOre(db, admin, userRef, freshUser);
+          pagesForUser += 1;
+          step.pagesProcessed += 1;
+          scannedForUser += Number(result.scanned || 0);
+          eligibleForUser += Number(result.eligible || 0);
+          eventsCreditedForUser += Number(result.creditedEvents || 0);
+          oreCreditedForUser += Number(result.credited || 0);
+          step.ledgerDocsScanned += Number(result.scanned || 0);
+          step.eligibleEventsScanned += Number(result.eligible || 0);
+          step.eventsCredited += Number(result.creditedEvents || 0);
+          step.oreCredited += Number(result.credited || 0);
+          counters.pagesProcessed += 1;
+          counters.ledgerDocsScanned += Number(result.scanned || 0);
+          counters.eligibleEventsScanned += Number(result.eligible || 0);
+          counters.eventsCredited += Number(result.creditedEvents || 0);
+          counters.oreCredited += Number(result.credited || 0);
+          latestTotal = Math.max(0, Number(result.total || 0));
+          userMissing = result.missing === true;
+          if (userMissing) break;
+          userComplete = result.complete === true;
+          if (userComplete) break;
+          await checkpointProgress();
+          const refreshedUserSnap = await userRef.get();
+          if (
+            !refreshedUserSnap.exists
+            || refreshedUserSnap.data()?.isDeleted === true
+            || refreshedUserSnap.data()?.accountStatus === "deleted"
+          ) {
+            userMissing = true;
+            break;
+          }
+          freshUser = refreshedUserSnap.data() || {};
+        }
+
+        if (userMissing) {
+          await finishUser(processingUid, "skipped");
+          step.results.push({
+            uid: processingUid,
+            displayName,
+            outcome: "skipped_deleted",
+            pages: pagesForUser,
+          });
+          continue;
+        }
+
+        step.results.push({
+          uid: processingUid,
+          displayName,
+          outcome: userComplete ? "completed" : "partial",
+          pages: pagesForUser,
+          scanned: scannedForUser,
+          eligible: eligibleForUser,
+          eventsCredited: eventsCreditedForUser,
+          oreCredited: oreCreditedForUser,
+          total: latestTotal,
+        });
+        if (userComplete) {
+          await finishUser(processingUid, "completed");
+          continue;
+        }
+        step.stopReason = step.pagesProcessed >= pageBudget ? "page_budget" : "per_user_page_budget";
+        break;
+      }
+
+      const completed = !currentUid && targetIndex >= targetUids.length;
+      if (completed) step.stopReason = "completed";
+      else if (step.stopReason === "queued" && step.usersHandled >= userBudget) step.stopReason = "user_budget";
+      else if (step.stopReason === "queued" && step.pagesProcessed >= pageBudget) step.stopReason = "page_budget";
+
+      const finishedAtMs = Date.now();
+      await db.runTransaction(async (transaction) => {
+        const freshJobSnap = await transaction.get(galaxyLearningAdminJobRef);
+        const freshJob = freshJobSnap.data() || {};
+        if (freshJob.jobRunId !== expectedJobRunId || freshJob.leaseId !== leaseId) {
+          throw new functions.https.HttpsError("aborted", "백필 작업 잠금이 변경되었습니다. 현황을 새로 고쳐 주세요.");
+        }
+        const updates = {
+          status: completed ? "completed" : "queued",
+          targetIndex,
+          userCursor,
+          currentUid,
+          counters,
+          updatedAt: FieldValue.serverTimestamp(),
+          completedAt: completed ? FieldValue.serverTimestamp() : null,
+          leaseId: "",
+          leaseOwnerUid: "",
+          leaseUntilMs: 0,
+          lastError: null,
+          lastStep: {
+            ...step,
+            pageBudget,
+            userBudget,
+            finishedAtMs,
+            results: step.results.slice(-GALAXY_LEARNING_ADMIN_MAX_USERS_PER_RUN),
+          },
+        };
+        transaction.set(galaxyLearningAdminJobRef, updates, { merge: true });
+      });
+      leaseAcquired = false;
+
+      await writeGalaxyLearningAdminAudit(adminUid, "galaxy_learning_backfill_step_completed", {
+        jobRunId: expectedJobRunId,
+        scope,
+        targetUid,
+        status: completed ? "completed" : "queued",
+        usersHandled: step.usersHandled,
+        pagesProcessed: step.pagesProcessed,
+        ledgerDocsScanned: step.ledgerDocsScanned,
+        eventsCredited: step.eventsCredited,
+        oreCredited: step.oreCredited,
+        stopReason: step.stopReason,
+      });
+      const finalJobSnap = await galaxyLearningAdminJobRef.get();
+      return {
+        success: true,
+        step,
+        job: buildGalaxyLearningAdminJobView(finalJobSnap.data() || {}, finalJobSnap.id),
+      };
+    } catch (error) {
+      const message = cleanText(error?.message || "알 수 없는 백필 오류", 500);
+      if (leaseAcquired) {
+        counters.errors += 1;
+        try {
+          await db.runTransaction(async (transaction) => {
+            const jobSnap = await transaction.get(galaxyLearningAdminJobRef);
+            const job = jobSnap.data() || {};
+            if (job.jobRunId !== expectedJobRunId || job.leaseId !== leaseId) return;
+            transaction.set(galaxyLearningAdminJobRef, {
+              status: "failed",
+              targetIndex,
+              userCursor,
+              currentUid,
+              counters,
+              updatedAt: FieldValue.serverTimestamp(),
+              leaseId: "",
+              leaseOwnerUid: "",
+              leaseUntilMs: 0,
+              lastError: {
+                code: cleanId(error?.code || "internal", 80),
+                message,
+                failedAtMs: Date.now(),
+                currentUid,
+              },
+              lastStep: {
+                ...step,
+                pageBudget,
+                userBudget,
+                failed: true,
+                finishedAtMs: Date.now(),
+                results: step.results.slice(-GALAXY_LEARNING_ADMIN_MAX_USERS_PER_RUN),
+              },
+            }, { merge: true });
+          });
+        } catch (stateError) {
+          console.error("[galaxyLearningBackfill] failed to persist error state", stateError);
+        }
+        await writeGalaxyLearningAdminAudit(adminUid, "galaxy_learning_backfill_step_failed", {
+          jobRunId: expectedJobRunId,
+          currentUid,
+          message,
+        });
+      }
+      if (error instanceof functions.https.HttpsError) throw error;
+      console.error("[galaxyLearningBackfill] step failed", error);
+      throw new functions.https.HttpsError("internal", `백필 배치 실행에 실패했습니다: ${message}`);
+    }
+  });
+
+  const adminCancelGalaxyLearningBackfill = regionalFunctions.https.onCall(async (data, context) => {
+    const adminUid = await requireAdminUid(context);
+    const expectedJobRunId = cleanId(data?.jobRunId, 180);
+    const confirmation = String(data?.confirmation || "").trim();
+    if (!expectedJobRunId || confirmation !== GALAXY_LEARNING_ADMIN_CONFIRMATION) {
+      throw new functions.https.HttpsError("failed-precondition", "작업 ID와 안전 확인 문구를 확인해 주세요.");
+    }
+
+    const cancellation = await db.runTransaction(async (transaction) => {
+      const jobSnap = await transaction.get(galaxyLearningAdminJobRef);
+      if (!jobSnap.exists || jobSnap.data()?.jobRunId !== expectedJobRunId) {
+        throw new functions.https.HttpsError("failed-precondition", "종료할 백필 작업이 현재 작업과 일치하지 않습니다.");
+      }
+      const job = jobSnap.data() || {};
+      if (["completed", "cancelled"].includes(job.status)) {
+        return { changed: false, status: job.status };
+      }
+      if (cleanId(job.leaseId, 180) && Number(job.leaseUntilMs || 0) > Date.now()) {
+        throw new functions.https.HttpsError("failed-precondition", "실행 중인 서버 배치가 끝난 뒤 작업을 종료해 주세요.");
+      }
+      transaction.set(galaxyLearningAdminJobRef, {
+        status: "cancelled",
+        cancelledBy: adminUid,
+        cancelledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        leaseId: "",
+        leaseOwnerUid: "",
+        leaseUntilMs: 0,
+      }, { merge: true });
+      return { changed: true, status: "cancelled" };
+    });
+
+    if (cancellation.changed) {
+      await writeGalaxyLearningAdminAudit(adminUid, "galaxy_learning_backfill_cancelled", {
+        jobRunId: expectedJobRunId,
+      });
+    }
+    const jobSnap = await galaxyLearningAdminJobRef.get();
+    return {
+      success: true,
+      cancelled: cancellation.changed,
+      job: buildGalaxyLearningAdminJobView(jobSnap.data() || {}, jobSnap.id),
+    };
+  });
 
   async function getSharedCrew(actorUid, targetUid, actorUser) {
     const crewId = cleanId(actorUser.crewId);
@@ -454,11 +1130,24 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
   }
 
   async function syncLearningState(userRef, user) {
-    const learningLedger = await calculateLifetimeLearningOre(db, admin, userRef, user);
+    let learningUser = user;
+    let learningLedger = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      learningLedger = await calculateLifetimeLearningOre(db, admin, userRef, learningUser);
+      if (learningLedger.missing) {
+        throw new functions.https.HttpsError("not-found", "학습 광석을 동기화할 사용자 문서가 없습니다.");
+      }
+      if (!learningLedger.stale) break;
+      const refreshedUserSnap = await userRef.get();
+      if (!refreshedUserSnap.exists || refreshedUserSnap.data()?.isDeleted === true) {
+        throw new functions.https.HttpsError("not-found", "학습 광석을 동기화할 사용자 문서가 없습니다.");
+      }
+      learningUser = refreshedUserSnap.data() || {};
+    }
     const lifetimeLearningOre = learningLedger.total;
     const shipHullTier = getShipHullTier(lifetimeLearningOre);
-    const currentResonance = buildAbilitySnapshot(user, lifetimeLearningOre);
-    const previousValues = user.gameAbilitySnapshot?.values || {};
+    const currentResonance = buildAbilitySnapshot(learningUser, lifetimeLearningOre);
+    const previousValues = learningUser.gameAbilitySnapshot?.values || {};
     const values = Object.fromEntries(Object.entries(currentResonance.values).map(([abilityId, level]) => [
       abilityId,
       abilityId === "construction"
@@ -470,11 +1159,21 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       values,
       resonance: currentResonance.values,
     };
-    await userRef.set({
-      galaxyShipHullTier: shipHullTier,
-      gameAbilitySnapshot: abilitySnapshot,
-      galaxyLearningSyncedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
+    await db.runTransaction(async (transaction) => {
+      const freshUserSnap = await transaction.get(userRef);
+      if (
+        !freshUserSnap.exists
+        || freshUserSnap.data()?.isDeleted === true
+        || freshUserSnap.data()?.accountStatus === "deleted"
+      ) {
+        throw new functions.https.HttpsError("not-found", "학습 광석을 동기화할 사용자 문서가 없습니다.");
+      }
+      transaction.set(userRef, {
+        galaxyShipHullTier: shipHullTier,
+        gameAbilitySnapshot: abilitySnapshot,
+        galaxyLearningSyncedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
     return { lifetimeLearningOre, shipHullTier, abilitySnapshot, learningLedgerComplete: learningLedger.complete };
   }
 
@@ -988,6 +1687,10 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
   return {
     rollupGalaxyLearningOre,
+    adminGetGalaxyLearningBackfillStatus,
+    adminStartGalaxyLearningBackfill,
+    adminRunGalaxyLearningBackfillStep,
+    adminCancelGalaxyLearningBackfill,
     openGalaxyHome,
     saveGalaxyPassport,
     buildGalaxyItem,
@@ -997,4 +1700,10 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     performGalaxyWorldAction,
     markGalaxyEventsSeen,
   };
+};
+
+module.exports.__test = {
+  calculateLifetimeLearningOre,
+  getGalaxyLearningLedgerStatus,
+  isEligibleLearningOreTransaction,
 };

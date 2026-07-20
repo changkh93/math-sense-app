@@ -85,6 +85,10 @@ const AdminLayout = () => {
             <ShieldAlert size={20} />
             <span>Streak Fixer</span>
           </Link>
+          <Link to="/admin/galaxy-ledger" className="nav-link">
+            <Database size={20} />
+            <span>아스라 광석 백필</span>
+          </Link>
           <Link to="/admin/qa" className="nav-link">
             <MessageSquare size={20} />
             <span>Q&A Manager</span>

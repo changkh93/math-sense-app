@@ -7,6 +7,13 @@
 
 .admin-sidebar, .admin-content {
   background: transparent;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.content-wrapper {
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .content-wrapper.glass {
@@ -1306,5 +1313,82 @@
 
   .monthly-awards-preview {
     position: static;
+  }
+}
+
+@media (max-width: 820px) {
+  .admin-container {
+    flex-direction: column;
+  }
+
+  .admin-sidebar {
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px;
+    width: 100%;
+  }
+
+  .admin-header {
+    margin: 0;
+  }
+
+  .admin-nav {
+    flex: 1 0 100%;
+    flex-direction: row;
+    gap: 6px;
+    order: 3;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .admin-nav .nav-link {
+    flex: 0 0 auto;
+    padding: 9px 11px;
+    white-space: nowrap;
+  }
+
+  .admin-nav > div {
+    display: contents !important;
+  }
+
+  .admin-nav > div > div {
+    display: none;
+  }
+
+  .admin-footer {
+    border: 0;
+    margin-left: auto;
+    padding: 0;
+  }
+
+  .logout-btn {
+    padding: 8px 10px;
+    width: auto;
+  }
+
+  .admin-content {
+    padding: 12px;
+  }
+
+  .content-wrapper {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-header h2 {
+    font-size: 1.15rem;
+  }
+
+  .admin-nav .nav-link {
+    font-size: 0.78rem;
+  }
+
+  .content-wrapper {
+    padding: 10px;
   }
 }
