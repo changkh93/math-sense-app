@@ -79,18 +79,18 @@ export const GALAXY_VISIT_ACTIONS = {
 export const GALAXY_MISSION_ROUTES = {
   nebula: {
     label: '성운 생태 항로', icon: '✣', iconId: 'cloud', ability: 'detection', reward: '바이오 섬유', rewardMaterial: 'biofiber', baseReward: 2,
-    copy: '빛나는 포자를 따라 미지의 생태 표본을 회수합니다.',
-    effect: '45초 안에 신호 조각 5개를 모으면 바이오 섬유 2개를 얻고, 탐지 공명 Lv.4부터 1개가 추가됩니다.',
+    copy: '45초 안에 빛나는 조각 5개를 모아 바이오 섬유를 가져옵니다.',
+    effect: '45초 안에 빛나는 조각 5개를 모으면 바이오 섬유 2개를 얻고, 탐지 공명 Lv.4부터 1개가 추가됩니다.',
   },
   comet: {
     label: '혜성 구조 항로', icon: '◒', iconId: 'comet', ability: 'piloting', reward: '혜성 합금', rewardMaterial: 'alloy', baseReward: 1,
-    copy: '흔들리는 혜성 꼬리 사이로 구조 신호를 추적합니다.',
-    effect: '45초 안에 신호 조각 5개를 모으면 혜성 합금 1개를 얻고, 조종 감각 Lv.4부터 1개가 추가됩니다.',
+    copy: '45초 안에 빛나는 조각 5개를 모아 혜성 합금을 가져옵니다.',
+    effect: '45초 안에 빛나는 조각 5개를 모으면 혜성 합금 1개를 얻고, 조종 감각 Lv.4부터 1개가 추가됩니다.',
   },
   ruins: {
     label: '고대 정거장', icon: '⌬', iconId: 'satellite', ability: 'precision', reward: '수정 유리', rewardMaterial: 'crystalGlass', baseReward: 1,
-    copy: '버려진 정거장의 장치를 정밀하게 복원합니다.',
-    effect: '45초 안에 신호 조각 5개를 모으면 수정 유리 1개를 얻고, 정밀 제어 Lv.4부터 1개가 추가됩니다.',
+    copy: '45초 안에 빛나는 조각 5개를 모아 수정 유리를 가져옵니다.',
+    effect: '45초 안에 빛나는 조각 5개를 모으면 수정 유리 1개를 얻고, 정밀 제어 Lv.4부터 1개가 추가됩니다.',
   },
 }
 

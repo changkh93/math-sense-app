@@ -114,14 +114,14 @@ function RouteSelector({ selectedRoute, onSelect, materials, hasRoverBay, disabl
           >
             <span className="galaxy-rover-route__icon"><Icon size={23} aria-hidden="true" /></span>
             <span className="galaxy-rover-route__copy">
-              <small>{route.shortLabel} ROUTE</small>
+              <small>{route.shortLabel} 장거리 항로</small>
               <strong>{route.label}</strong>
               <span>{route.copy}</span>
             </span>
             <span className="galaxy-rover-route__facts">
               <i><Clock3 size={13} aria-hidden="true" /> {durationHours}시간</i>
-              <i><PackageOpen size={13} aria-hidden="true" /> {route.reward} {route.baseReward}</i>
-              <i><Archive size={13} aria-hidden="true" /> 발견물 3종</i>
+              <i><PackageOpen size={13} aria-hidden="true" /> 재료 {route.baseReward}개 이상</i>
+              <i><Archive size={13} aria-hidden="true" /> 발견 기록 1개</i>
             </span>
             <span className="galaxy-rover-route__inventory">
               현재 {MATERIAL_LABELS[route.rewardMaterial] || route.reward} {Math.max(0, Number(materials?.[route.rewardMaterial] || 0))}
@@ -304,7 +304,7 @@ export default function GalaxyRoverPanel({
       <header className="galaxy-rover-header">
         <div className="galaxy-rover-header__identity">
           <span><Rocket size={23} aria-hidden="true" /></span>
-          <div><small>ASTRA ROVER COMMAND</small><h2>밤사이 로버 원정</h2><p>지금 항로를 정하면, 다음 귀환에 열어볼 새로운 행성 기억이 생깁니다.</p></div>
+          <div><small>건설 재료를 모으는 장거리 탐사</small><h2>밤사이 로버 원정</h2><p>항로 하나를 고르고 로버를 보내세요. 게임을 꺼도 계속 움직이며, 귀환하면 재료와 발견 기록을 가져옵니다.</p></div>
         </div>
         <div className={`galaxy-rover-status status-${status}`} role="status" aria-live="polite">
           <i />
@@ -336,14 +336,14 @@ export default function GalaxyRoverPanel({
       {canChooseRoute && (
         <section className="galaxy-rover-dispatch" aria-labelledby="galaxy-rover-dispatch-title">
           <header>
-            <div><small>{status === 'claimed' ? 'NEXT EXPEDITION' : 'SELECT EXPEDITION'}</small><h3 id="galaxy-rover-dispatch-title">다음 귀환 항로를 선택하세요</h3></div>
+            <div><small>{status === 'claimed' ? '다음 원정' : '1단계 · 항로 고르기'}</small><h3 id="galaxy-rover-dispatch-title">아래에서 가고 싶은 항로 하나를 선택하세요</h3></div>
             <span><Clock3 size={15} aria-hidden="true" /> {hasRoverBay ? '정비소 가속 · 6시간' : '기본 항해 · 8시간'}</span>
           </header>
           <RouteSelector selectedRoute={selectedRoute} onSelect={setSelectedRoute} materials={materials} hasRoverBay={hasRoverBay} disabled={Boolean(busy)} />
           <div className="galaxy-rover-dispatch__footer">
             <div>
               <strong><Rocket size={16} aria-hidden="true" /> {selectedConfig.label}</strong>
-              <span>{selectedConfig.reward} {selectedConfig.baseReward}개 + 발견 기록 1개를 회수합니다.</span>
+              <span>{selectedConfig.reward} {selectedConfig.baseReward}개 이상과 발견 기록 1개를 가져옵니다.</span>
             </div>
             <button
               type="button"
@@ -351,7 +351,7 @@ export default function GalaxyRoverPanel({
               disabled={Boolean(busy) || !onDispatch}
               onClick={() => onDispatch?.(selectedRoute)}
             >
-              {busy ? '출항 신호 전송 중…' : status === 'claimed' ? '다음 원정 출발' : '로버 출항'}
+              {busy ? '로버 보내는 중…' : status === 'claimed' ? '선택한 항로로 다시 보내기' : '선택한 항로로 로버 보내기'}
               {!busy && <ChevronRight size={17} aria-hidden="true" />}
             </button>
           </div>

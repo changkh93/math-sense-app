@@ -125,9 +125,8 @@ const ROVER_STATUS_LABELS = {
 }
 
 const MISSION_PORTALS = [
-  { id: 'portal_nebula', kind: 'portal', route: 'nebula', label: '성운 생태 항로 시작', position: [-12.2, .85, 1.5] },
-  { id: 'portal_comet', kind: 'portal', route: 'comet', label: '혜성 구조 항로 시작', position: [1.2, .85, -12.4] },
-  { id: 'portal_ruins', kind: 'portal', route: 'ruins', label: '고대 정거장 항로 시작', position: [12.4, .85, .2] },
+  // A single, visible starting point avoids making students hunt for a route by coordinates.
+  { id: 'portal_expedition', kind: 'portal', route: 'nebula', label: '탐사 출발대 · E키로 탐사 시작', position: [0, .85, 1.7] },
 ]
 
 const MISSION_PICKUPS = {
@@ -386,18 +385,18 @@ function structureFootprint(itemId) {
   return 1.14
 }
 
-function StructureProximityLabel({ item, footprint }) {
+function StructureProximityLabel({ item, footprint, isPlanetOwner }) {
   return (
     <Html position={[0, Math.max(1.7, footprint + .9), 0]} center distanceFactor={8.8} style={{ pointerEvents: 'none' }}>
       <div className="frontier-structure-proximity-label">
         <strong>{item.name || '행성 객체'}</strong>
-        <span><kbd>E</kbd> 미션 <i /> <kbd>F</kbd> 정보</span>
+        <span><kbd>E</kbd> {isPlanetOwner ? '재료 얻기' : '도와주기'} <i /> <kbd>F</kbd> 정보</span>
       </div>
     </Html>
   )
 }
 
-function PlacedStructure({ item, selected, nearby, onSelect }) {
+function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId)
@@ -412,7 +411,7 @@ function PlacedStructure({ item, selected, nearby, onSelect }) {
           </button>
         </Html>
       )}
-      {nearby && <StructureProximityLabel item={item} footprint={footprint} />}
+      {nearby && <StructureProximityLabel item={item} footprint={footprint} isPlanetOwner={isPlanetOwner} />}
       {selected && (
         <mesh position={[0, .07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[footprint + .24, footprint + .42, 36]} />
@@ -658,8 +657,8 @@ function MissionPortal({ portal, active }) {
       <ResourceHalo color={color} />
       <Html position={[0, 3.1, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
         <div className="frontier-mission-portal-label">
-          <small>탐사 관문</small>
-          <strong><kbd>E</kbd> 탐사 시작</strong>
+          <small>화면 앞 탐사 출발대</small>
+          <strong><kbd>E</kbd> 45초 탐사 시작</strong>
         </div>
       </Html>
     </group>
@@ -1098,7 +1097,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
   const roverNode = useMemo(() => ({
@@ -1197,7 +1196,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       />
 
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
-      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} />)}
+      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} />)}
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
       {dailyEventNode && <DailyEventMarker node={dailyEventNode} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
@@ -1293,6 +1292,18 @@ function MiniMap({ playerPosition, nearby, dailyEventNode }) {
             <small>오늘</small>
           </span>
         )}
+        {MISSION_PORTALS.map((portal) => (
+          <span
+            key={portal.id}
+            className="frontier-map-zone frontier-map-expedition"
+            style={{ left: `${50 + portal.position[0] / WORLD_RADIUS * 43}%`, top: `${50 + portal.position[2] / WORLD_RADIUS * 43}%`, '--zone-color': '#b08cff', zIndex: 3 }}
+            title="탐사 출발대"
+            aria-label="탐사 출발대"
+          >
+            <i style={{ width: 10, height: 10, borderWidth: 2, boxShadow: '0 0 12px #b08cff' }} />
+            <small>출발</small>
+          </span>
+        ))}
         <b className="frontier-map-player" style={{ left: `${playerLeft}%`, top: `${playerTop}%` }} />
       </div>
     </div>
@@ -1316,10 +1327,10 @@ function InteractionPrompt({ nearby }) {
   return (
     <div className="frontier-interaction-prompt">
       <span>{createElement(Graphic, { size: 19, 'aria-hidden': true })}</span>
-      <div><small>{nearby.kind === 'daily' ? 'TODAY PLANET EVENT' : nearby.kind === 'structure' ? 'WORLD OBJECT' : nearby.kind === 'guide' ? 'LUMI GUIDE' : nearby.kind === 'portal' ? 'EXPEDITION GATE' : nearby.kind === 'rover' ? 'ROVER CONTROL' : 'WORLD INTERACTION'}</small><strong>{nearby.label}</strong></div>
+      <div><small>{nearby.kind === 'daily' ? '오늘의 현장 사건' : nearby.kind === 'structure' ? '행성 시설' : nearby.kind === 'guide' ? '루미 안내소' : nearby.kind === 'portal' ? '45초 탐사 출발대' : nearby.kind === 'rover' ? '로버 원정 관리' : '행성 상호작용'}</small><strong>{nearby.label}</strong></div>
       {isStructure ? (
         <div className="frontier-interaction-keys" aria-label="객체 조작 키">
-          <span><kbd>E</kbd><em>미션</em></span>
+          <span><kbd>E</kbd><em>행동</em></span>
           <span><kbd>F</kbd><em>정보</em></span>
         </div>
       ) : <kbd>E</kbd>}
@@ -1391,6 +1402,7 @@ export default function GalaxyWorld3D({
   presenceError = '',
   onPlayerTransform,
   onSendSpeech,
+  isPlanetOwner = false,
 }) {
   const inputRef = useRef({ x: 0, z: 0 })
   const [nearby, setNearby] = useState(null)
@@ -1416,7 +1428,7 @@ export default function GalaxyWorld3D({
   }, [onPlayerTransform])
 
   const startMission = useCallback((route) => {
-    if (!missionReady) { onMessage?.(`탐사선 정비 중 · ${missionCooldownLabel}`); return }
+    if (!missionReady) { onMessage?.(`45초 탐사는 ${missionCooldownLabel} 뒤 다시 할 수 있어요. 그동안 시설에서 재료를 모아보세요.`); return }
     if (activeMission) { onMessage?.('진행 중인 탐사를 먼저 완료하세요.'); return }
     const startedAtMs = Date.now()
     setCollectedIds(new Set())
@@ -1424,7 +1436,7 @@ export default function GalaxyWorld3D({
     setMissionRemainingMs(45000)
     setCompletionStatus('idle')
     setActiveMission({ route, startedAtMs, operationId: createMissionOperationId() })
-    onMessage?.(`${GALAXY_MISSION_ROUTES[route]?.label} 시작 · 신호 조각 5개를 모으세요.`)
+    onMessage?.('탐사가 시작됐어요. 주변에 나타난 빛나는 조각 5개를 몸으로 지나가 모으세요.')
   }, [activeMission, missionCooldownLabel, missionReady, onMessage])
 
   const interact = useCallback(() => {
@@ -1474,7 +1486,7 @@ export default function GalaxyWorld3D({
       setActiveMission(null)
       setCollectedIds(new Set())
       setCompletionStatus('idle')
-      onMessage?.('탐사 신호가 사라졌습니다. 관문에서 다시 도전할 수 있어요.')
+      onMessage?.('시간이 끝났어요. 화면 앞 보라색 출발대에서 E키를 눌러 다시 도전할 수 있어요.')
     }
 
     const timer = window.setInterval(() => {
@@ -1559,6 +1571,7 @@ export default function GalaxyWorld3D({
           nearbyRemoteUids={nearbyRemoteUids}
           localPlayerName={localPlayerName}
           localSpeech={localSpeech}
+          isPlanetOwner={isPlanetOwner}
         />
       </Canvas>
 
@@ -1574,8 +1587,8 @@ export default function GalaxyWorld3D({
         <div className="frontier-mission-hud">
           <span><Compass size={20} aria-hidden="true" /></span>
           <div>
-            <small>{completionStatus === 'submitting' ? 'REWARD UPLINK' : completionStatus === 'failed' ? 'UPLINK INTERRUPTED' : 'ACTIVE EXPEDITION'}</small>
-            <strong>{GALAXY_MISSION_ROUTES[activeMission.route]?.label} · {completionStatus === 'failed' ? '수집 기록 보존 · 재시도 필요' : `신호 조각 ${collectedIds.size}/5`}</strong>
+            <small>{completionStatus === 'submitting' ? '보상 받는 중' : completionStatus === 'failed' ? '보상 연결이 끊겼어요' : '45초 안에 빛나는 조각을 지나가 모으세요'}</small>
+            <strong>{completionStatus === 'failed' ? '수집 기록 보존 · 보상 다시 요청' : `빛나는 조각 ${collectedIds.size}/5`}</strong>
             <i><b style={{ width: `${Math.min(100, collectedIds.size / 5 * 100)}%` }} /></i>
           </div>
           <em>
@@ -1607,7 +1620,7 @@ export default function GalaxyWorld3D({
         nearby.kind === 'structure' ? (
           <div className="frontier-structure-actions">
             <button type="button" className="frontier-action-button" onClick={interact}>
-              <span><SparklesIcon size={23} aria-hidden="true" /></span><strong>미션 수행</strong>
+              <span><SparklesIcon size={23} aria-hidden="true" /></span><strong>{isPlanetOwner ? '재료 얻기' : '도와주기'}</strong>
             </button>
             <button type="button" className="frontier-action-button" onClick={inspectStructure}>
               <span><SparklesIcon size={23} aria-hidden="true" /></span><strong>객체 정보</strong>

@@ -165,21 +165,21 @@ const DAILY_EVENT_ICONS = {
 }
 
 const STRUCTURE_VISIT_ACTIONS = {
-  starter_dome: { actionId: 'repair', label: '개척자 돔 점검 미션' },
-  lumen_tree: { actionId: 'water', label: '이 객체에 물주기 미션' },
-  crystal_pond: { actionId: 'water', label: '물가 생태 돌보기 미션' },
-  friend_greenhouse: { actionId: 'water', label: '공동 온실 물주기 미션' },
-  starflower_garden: { actionId: 'water', label: '별꽃 정원 물주기 미션' },
-  wild_sprout: { actionId: 'water', label: '루멘 새싹 물주기 미션' },
-  rover_bay: { actionId: 'repair', label: '로버 정비소 수리 미션' },
-  observatory: { actionId: 'repair', label: '관측 장치 수리 미션' },
-  expedition_beacon: { actionId: 'repair', label: '원정 비콘 수리 미션' },
-  prism_pathlight: { actionId: 'repair', label: '프리즘 길잡이 점검 미션' },
-  creature_habitat: { actionId: 'feed', label: '루미 생명체 돌보기 미션' },
+  starter_dome: { actionId: 'repair', label: '개척자 돔을 점검하기' },
+  lumen_tree: { actionId: 'water', label: '루멘 나무에 물 주기' },
+  crystal_pond: { actionId: 'water', label: '수정 연못 돌보기' },
+  friend_greenhouse: { actionId: 'water', label: '공동 온실에 물 주기' },
+  starflower_garden: { actionId: 'water', label: '별꽃 정원에 물 주기' },
+  wild_sprout: { actionId: 'water', label: '루멘 새싹에 물 주기' },
+  rover_bay: { actionId: 'repair', label: '로버 정비소 점검하기' },
+  observatory: { actionId: 'repair', label: '관측 장치 수리하기' },
+  expedition_beacon: { actionId: 'repair', label: '원정 비콘 수리하기' },
+  prism_pathlight: { actionId: 'repair', label: '프리즘 길잡이 점검하기' },
+  creature_habitat: { actionId: 'feed', label: '루미 생명체 돌보기' },
 }
 
 const getStructureVisitAction = (itemId) => STRUCTURE_VISIT_ACTIONS[itemId]
-  || { actionId: 'admire', label: '이 객체에 감탄 신호 남기기' }
+  || { actionId: 'admire', label: '이 시설에 감탄 신호 남기기' }
 
 const OBJECT_FALLBACK_CATALOG = {
   starter_dome: {
@@ -674,77 +674,77 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   const todayObjective = useMemo(() => {
     if (isOwner && roverStatus === 'ready') return {
       id: 'rover-return',
-      eyebrow: '오늘의 최우선 귀환 임무',
-      title: '로버 귀환 상자를 열어 발견물을 확인하세요',
-      detail: '서버에 보존된 원정 재료와 새로운 발견 기록을 한 번만 안전하게 수령합니다.',
+      eyebrow: '지금 할 일 · 로버 보상 받기',
+      title: '아래 로버 메뉴를 열고 ‘보상 받기’를 누르세요',
+      detail: '원정이 가져온 건설 재료와 발견 기록을 한 번에 받습니다.',
       progress: 1,
       total: 1,
       action: 'rover',
     }
     if (unreadCount > 0) return {
       id: 'signals',
-      eyebrow: '오늘의 귀환 임무',
-      title: `새 신호 ${unreadCount}개를 확인하세요`,
-      detail: '친구가 남긴 도움과 메시지를 확인하면 새로운 항로의 다음 행동이 열립니다.',
+      eyebrow: '지금 할 일 · 새 소식 확인',
+      title: `아래 신호 메뉴에서 새 메시지 ${unreadCount}개를 읽으세요`,
+      detail: '친구의 도움 기록과 메시지를 확인할 수 있습니다.',
       progress: 0,
       total: unreadCount,
       action: 'logs',
     }
     if (dailyEventPending) return {
       id: 'daily-event',
-      eyebrow: '밤사이 발생한 행성 사건',
-      title: dailyEvent.title || '행성 현장에 새로운 변화가 감지됐어요',
-      detail: dailyEvent.detail || '미니맵의 빛나는 사건 표식을 따라가 현장을 안정시켜 주세요.',
+      eyebrow: '오늘 한 번 · 현장 사건 해결',
+      title: `미니맵의 금빛 표식으로 가서 E키를 누르세요 · ${dailyEvent.title || '행성 사건'}`,
+      detail: `${dailyEvent.detail || '현장에 가서 사건을 해결하세요.'} 해결하면 ${dailyEvent.reward?.title || '건설 재료'} ${dailyEvent.reward?.amount ?? 1}개를 받습니다.`,
       progress: 0,
       total: 1,
       action: 'daily-event',
     }
     if (builtCount === 0 && wallet >= 25) return {
       id: 'first-build',
-      eyebrow: '오늘의 개척 임무',
-      title: '행성의 첫 랜드마크를 건설하세요',
-      detail: '시설 하나가 생기면 친구가 기억할 장소와 다음 꾸미기 동선이 시작됩니다.',
+      eyebrow: '처음 시작하기 · 첫 시설 건설',
+      title: '아래 건설 메뉴에서 시설 하나를 골라 땅에 배치하세요',
+      detail: '‘건설’ → 시설 선택 → 초록색 원이 보이는 평평한 땅을 누르면 완성됩니다.',
       progress: 0,
       total: 1,
       action: 'build',
     }
     if (isOwner && ['idle', 'claimed'].includes(roverStatus)) return {
       id: 'rover-dispatch',
-      eyebrow: '오늘의 장거리 원정',
-      title: '밤사이 탐사할 로버 항로를 선택하세요',
-      detail: `지금 출항하면 ${hasRoverBay ? '6시간' : '8시간'} 뒤 재료와 발견 기록이 귀환합니다. 게임을 닫아도 원정은 계속됩니다.`,
+      eyebrow: '지금 할 일 · 로버 보내기',
+      title: '아래 로버 메뉴에서 항로 하나를 고르고 출발시키세요',
+      detail: `출발하면 ${hasRoverBay ? '6시간' : '8시간'} 뒤 건설 재료와 발견 기록을 가져옵니다. 게임을 닫아도 계속됩니다.`,
       progress: 0,
       total: 1,
       action: 'rover',
     }
     if (missionCooldown.ready) return {
       id: 'field-expedition',
-      eyebrow: '45초 탐사 · 건설 재료 보상',
-      title: '빛나는 고리 관문에 가서 E키를 누르세요',
-      detail: '보라·주황·하늘색 고리 중 하나에서 시작한 뒤 신호 조각 5개를 모으면 건설 재료를 얻습니다.',
+      eyebrow: '45초 미니게임 · 건설 재료',
+      title: '화면 앞 보라색 출발대에서 E키를 눌러 탐사를 시작하세요',
+      detail: '시작 뒤 나타나는 빛나는 조각 5개를 몸으로 지나가 모으세요. 45초 안에 모두 모으면 재료를 받습니다.',
       progress: 0,
       total: 5,
       action: 'world',
     }
     if (isOwner && roverStatus === 'active') return {
       id: 'rover-active',
-      eyebrow: '장거리 원정 진행 중',
+      eyebrow: '로버가 재료를 모으는 중',
       title: `로버가 ${roverRemainingLabel} 돌아옵니다`,
-      detail: '원정이 진행되는 동안 행성을 건설하거나 이웃 항로에 도움 신호를 남겨보세요.',
+      detail: '기다리는 동안 시설 가까이에서 E키로 재료를 모으거나, 아래 건설 메뉴에서 행성을 꾸며보세요.',
       progress: 0,
       total: 1,
       action: 'rover',
     }
     return {
       id: 'route-care',
-      eyebrow: '오늘의 항로 임무',
-      title: isOwner ? '행성을 돌보고 다음 귀환을 준비하세요' : '친구의 행성에 도움 신호를 남기세요',
-      detail: isOwner ? `현장 탐사 관문 재충전까지 ${missionCooldown.label}` : '가까운 생태·시설 지점에서 안전한 도움 행동을 남길 수 있습니다.',
+      eyebrow: isOwner ? '지금 할 일 · 내 시설 돌보기' : '지금 할 일 · 친구 시설 도와주기',
+      title: isOwner ? '가까운 시설에서 E키를 눌러 건설 재료를 모으세요' : '친구 시설 가까이에서 E키를 눌러 도움을 남기세요',
+      detail: isOwner ? `시설마다 5분에 한 번 재료를 얻을 수 있습니다. 탐사 출발대는 ${missionCooldown.label} 뒤 다시 이용할 수 있습니다.` : '친구 행성에서는 시설을 수정하거나 건설할 수 없지만, 돌보기로 도움 기록을 남길 수 있습니다.',
       progress: 0,
       total: 1,
       action: isOwner ? 'build' : 'world',
     }
-  }, [builtCount, dailyEvent?.detail, dailyEvent?.title, dailyEventPending, hasRoverBay, isOwner, missionCooldown.label, missionCooldown.ready, roverRemainingLabel, roverStatus, unreadCount, wallet])
+  }, [builtCount, dailyEvent?.detail, dailyEvent?.reward?.amount, dailyEvent?.reward?.title, dailyEvent?.title, dailyEventPending, hasRoverBay, isOwner, missionCooldown.label, missionCooldown.ready, roverRemainingLabel, roverStatus, unreadCount, wallet])
 
   const overnightSummary = useMemo(() => {
     if (dailyEventPending) return `${dailyEvent.title} ${dailyEvent.detail || '현장의 신호를 따라가 오늘의 변화를 해결해 주세요.'}`
@@ -1191,14 +1191,14 @@ export default function MetaGalaxy({ user, userData, onBack }) {
     if (todayObjective.action === 'daily-event') {
       setArrivalOpen(false)
       setMenu('')
-      flash('미니맵의 금빛 사건 표식을 따라 현장으로 이동한 뒤 E키로 안정시켜 주세요.')
+      flash('왼쪽 아래 미니맵의 금빛 점까지 걸어가세요. 현장 이름이 보이면 E키를 눌러 해결하고 재료를 받습니다.')
       return
     }
     setArrivalOpen(false)
     setMenu('')
     flash(isOwner
-      ? '지도 가장자리의 보라·주황·하늘색 빛 고리로 가세요. 가까이에서 E키를 누르면 45초 탐사가 시작됩니다.'
-      : '가까운 생태 지점에서 도움 행동을 남겨보세요.')
+      ? '화면 앞 보라색 출발대까지 걸어가 E키를 누르세요. 시작 후 빛나는 조각 5개를 몸으로 지나가 모으면 됩니다.'
+      : '친구 시설 가까이에서 E키를 누르면 돌보기 도움을 남길 수 있습니다.')
   }
 
   const beginBuild = (itemId) => {
@@ -1249,6 +1249,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
         selectedStructureId={selectedStructureId}
         onSelectStructure={openObjectDialog}
         onStructureMission={performObjectMission}
+        isPlanetOwner={isOwner}
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}
