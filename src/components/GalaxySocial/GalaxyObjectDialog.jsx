@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Eye,
   ImagePlus,
   MapPin,
   Pencil,
@@ -44,6 +43,7 @@ export default function GalaxyObjectDialog({
   const [removeImage, setRemoveImage] = useState(false)
   const [fileError, setFileError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   const localPreviewUrl = useMemo(() => imageFile ? URL.createObjectURL(imageFile) : '', [imageFile])
   useEffect(() => () => {
@@ -80,37 +80,54 @@ export default function GalaxyObjectDialog({
   const submit = async (event) => {
     event.preventDefault()
     if (!isOwner || saving || deleting) return
-    await onSave?.({ ...form, imageFile, removeImage })
+    const result = await onSave?.({ ...form, imageFile, removeImage })
+    if (result) setIsEditing(false)
+  }
+
+  const startEditing = () => {
+    setForm(getInitialForm(item, catalogItem))
+    setImageFile(null)
+    setRemoveImage(false)
+    setFileError('')
+    setConfirmDelete(false)
+    setIsEditing(true)
+  }
+
+  const stopEditing = () => {
+    if (saving || deleting) return
+    setForm(getInitialForm(item, catalogItem))
+    setImageFile(null)
+    setRemoveImage(false)
+    setFileError('')
+    setConfirmDelete(false)
+    setIsEditing(false)
   }
 
   return (
-    <section className="frontier-object-dialog" role="dialog" aria-modal="true" aria-labelledby="frontier-object-dialog-title">
+    <section className={`frontier-object-dialog${isEditing ? ' is-editing' : ' is-viewing'}`} role="dialog" aria-modal="true" aria-labelledby="frontier-object-dialog-title">
       <header className="frontier-object-dialog__header">
-        <div>
-          <span>{isOwner ? <Pencil size={15} aria-hidden="true" /> : <Eye size={15} aria-hidden="true" />} {isOwner ? 'OBJECT CONTROL' : 'OBJECT ARCHIVE'}</span>
-          <h2 id="frontier-object-dialog-title">{objectName}</h2>
-        </div>
+        {isEditing ? <div><span><Pencil size={15} aria-hidden="true" /> OBJECT EDITOR</span><h2 id="frontier-object-dialog-title">{objectName}</h2></div> : <h2 id="frontier-object-dialog-title" className="frontier-sr-only">{objectName}</h2>}
         <button ref={closeButtonRef} type="button" onClick={onClose} aria-label="객체 정보 닫기"><X size={20} aria-hidden="true" /></button>
       </header>
 
-      <div className="frontier-object-dialog__grid">
-        <section className="frontier-object-visual">
-          {previewUrl ? (
-            <img src={previewUrl} alt={`${objectName} 첨부 이미지`} />
-          ) : (
-            <div className="frontier-object-visual__model">
-              <StructurePreview3D itemId={item.itemId} />
-              <span><Sparkles size={15} aria-hidden="true" /> 등록 이미지가 없어 3D 모형을 표시합니다</span>
+      {isEditing ? (
+        <div className="frontier-object-dialog__grid">
+          <section className="frontier-object-visual">
+            {previewUrl ? (
+              <img src={previewUrl} alt={`${objectName} 첨부 이미지`} />
+            ) : (
+              <div className="frontier-object-visual__model">
+                <StructurePreview3D itemId={item.itemId} />
+                <span><Sparkles size={15} aria-hidden="true" /> 등록 이미지가 없어 3D 모형을 표시합니다</span>
+              </div>
+            )}
+            <div className="frontier-object-coordinate">
+              <MapPin size={16} aria-hidden="true" />
+              <span>행성 좌표</span>
+              <strong>X {toWorldCoordinate(item.x)} · Z {toWorldCoordinate(item.y)}</strong>
             </div>
-          )}
-          <div className="frontier-object-coordinate">
-            <MapPin size={16} aria-hidden="true" />
-            <span>행성 좌표</span>
-            <strong>X {toWorldCoordinate(item.x)} · Z {toWorldCoordinate(item.y)}</strong>
-          </div>
-        </section>
+          </section>
 
-        {isOwner ? (
           <form className="frontier-object-editor" onSubmit={submit}>
             <div className="frontier-object-owner-badge"><ShieldCheck size={16} aria-hidden="true" /><span><strong>내 월드 객체</strong><small>이름·설명·이미지·좌표를 변경할 수 있습니다.</small></span></div>
 
@@ -143,6 +160,7 @@ export default function GalaxyObjectDialog({
 
             <div className="frontier-object-dialog__actions">
               <button type="submit" className="galaxy-primary-btn" disabled={Boolean(busy)}><Save size={16} aria-hidden="true" /> {saving ? '저장 중' : '변경사항 저장'}</button>
+              <button type="button" className="galaxy-secondary-btn" disabled={Boolean(busy)} onClick={stopEditing}>보기로 돌아가기</button>
               {!confirmDelete ? (
                 <button type="button" className="frontier-object-delete" disabled={Boolean(busy)} onClick={() => setConfirmDelete(true)}><Trash2 size={16} aria-hidden="true" /> 객체 삭제</button>
               ) : (
@@ -150,17 +168,25 @@ export default function GalaxyObjectDialog({
               )}
             </div>
           </form>
-        ) : (
-          <section className="frontier-object-readonly">
-            <span className="frontier-object-visitor-badge"><Eye size={16} aria-hidden="true" /> 친구 월드 · 읽기 전용</span>
+        </div>
+      ) : (
+        <section className="frontier-object-hero">
+          <div className="frontier-object-hero__media">
+            {previewUrl ? <img src={previewUrl} alt={`${objectName} 첨부 이미지`} /> : <StructurePreview3D itemId={item.itemId} />}
+          </div>
+          <div className="frontier-object-hero__content">
             <h3>{objectName}</h3>
             <p>{description}</p>
-            {catalogItem?.effect && <div><small>시설 효과</small><strong>{catalogItem.effect}</strong></div>}
-            <button type="button" className="galaxy-primary-btn" disabled={Boolean(busy)} onClick={() => onMission?.(item)}><Sparkles size={16} aria-hidden="true" /> {missionBusy ? '도움 신호 전송 중' : missionLabel || '이 객체의 도움 미션 수행'}</button>
-            <small>이름·설명·이미지·좌표는 행성 주인만 수정하거나 삭제할 수 있습니다.</small>
-          </section>
-        )}
-      </div>
+            <div className="frontier-object-hero__actions">
+              {isOwner ? (
+                <button type="button" className="galaxy-primary-btn" onClick={startEditing}><Pencil size={16} aria-hidden="true" /> 수정</button>
+              ) : (
+                <button type="button" className="galaxy-primary-btn" disabled={Boolean(busy)} onClick={() => onMission?.(item)}><Sparkles size={16} aria-hidden="true" /> {missionBusy ? '미션 시작 중' : missionLabel || '미션 수행'}</button>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
     </section>
   )
 }

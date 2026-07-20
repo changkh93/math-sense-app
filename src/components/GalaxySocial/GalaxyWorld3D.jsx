@@ -1,7 +1,7 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
-import { Bot, Compass, Flower2, Gem, Radio, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
+import { Bot, Compass, Flower2, Gem, Image as ImageIcon, Radio, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
 import { GALAXY_MISSION_ROUTES } from '../../utils/galaxyGame'
 import WorldTerrain from './GalaxyTerrain3D'
@@ -386,14 +386,33 @@ function structureFootprint(itemId) {
   return 1.14
 }
 
-function PlacedStructure({ item, selected, onSelect }) {
+function StructureProximityLabel({ item, footprint }) {
+  return (
+    <Html position={[0, Math.max(1.7, footprint + .9), 0]} center distanceFactor={8.8} style={{ pointerEvents: 'none' }}>
+      <div className="frontier-structure-proximity-label">
+        <strong>{item.name || '행성 객체'}</strong>
+        <span><kbd>E</kbd> 미션 <i /> <kbd>F</kbd> 정보</span>
+      </div>
+    </Html>
+  )
+}
+
+function PlacedStructure({ item, selected, nearby, onSelect }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId)
   return (
-    <group position={position} rotation={[0, THREE.MathUtils.degToRad(Number(item.rotation || 0)), 0]} onClick={(event) => { if (event.delta > 4) return; event.stopPropagation(); onSelect?.(item) }}>
+    <group position={position} rotation={[0, THREE.MathUtils.degToRad(Number(item.rotation || 0)), 0]}>
       <mesh position={[0, .045, 0]} receiveShadow><cylinderGeometry args={[footprint, footprint + .12, .09, 24]} /><meshStandardMaterial color="#293d48" roughness={.94} /></mesh>
       <StructureModel itemId={item.itemId} />
+      {item.imageUrl && (
+        <Html position={[0, Math.max(.76, footprint * .58), footprint * .82]} center distanceFactor={11}>
+          <button type="button" className="frontier-structure-image-marker" onClick={(event) => { event.stopPropagation(); onSelect?.(item) }} aria-label={`${item.name || '객체'} 이미지와 설명 보기`}>
+            <ImageIcon size={14} aria-hidden="true" />
+          </button>
+        </Html>
+      )}
+      {nearby && <StructureProximityLabel item={item} footprint={footprint} />}
       {selected && (
         <mesh position={[0, .07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[footprint + .24, footprint + .42, 36]} />
@@ -694,7 +713,7 @@ function RemoteAstronaut({ player, showName }) {
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange, onStructureCollision, displayName, showName, speech }) {
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech }) {
   const { gl } = useThree()
   const group = useRef()
   const body = useRef()
@@ -707,7 +726,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   const keys = useRef(new Set())
   const nearbySignature = useRef('')
   const collectLock = useRef(new Set())
-  const collisionLatch = useRef('')
   const lastPublishAt = useRef(0)
   const hoverLook = useRef({ pendingX: 0, pendingY: 0, lastX: null, lastY: null, lastTime: null, orbiting: false })
   const movementIntent = useRef(createMovementIntent())
@@ -892,25 +910,18 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       moveDirection.normalize()
       intent.targetYaw = Math.atan2(moveDirection.x, moveDirection.z)
 
-      const currentViewYaw = Math.atan2(forward.x, forward.z)
+      const currentFacingYaw = group.current.rotation.y
       let yawDelta = Math.atan2(
-        Math.sin(intent.targetYaw - currentViewYaw),
-        Math.cos(intent.targetYaw - currentViewYaw),
+        Math.sin(intent.targetYaw - currentFacingYaw),
+        Math.cos(intent.targetYaw - currentFacingYaw),
       )
       if (Math.abs(Math.abs(yawDelta) - Math.PI) < .0001) yawDelta = intent.lastTurnSign * Math.PI
       else if (Math.abs(yawDelta) > .001) intent.lastTurnSign = Math.sign(yawDelta)
       const turnStep = THREE.MathUtils.clamp(yawDelta, -PLAYER_TURN_SPEED * delta, PLAYER_TURN_SPEED * delta)
 
-      if (turnStep) {
-        cameraOffset.subVectors(orbitCamera.position, controls.current.target)
-        cameraSpherical.setFromVector3(cameraOffset)
-        cameraSpherical.theta += turnStep
-        cameraSpherical.makeSafe()
-        orbitCamera.position.copy(controls.current.target).add(cameraOffset.setFromSpherical(cameraSpherical))
-        orbitCamera.lookAt(controls.current.target)
-      }
-
-      const nextFacingYaw = currentViewYaw + turnStep
+      // Movement only turns the character. Camera yaw/pitch is reserved for mouse look,
+      // so arrow keys never drag the view or the background along with the astronaut.
+      const nextFacingYaw = currentFacingYaw + turnStep
       group.current.rotation.y = nextFacingYaw
       const remainingTurn = Math.atan2(
         Math.sin(intent.targetYaw - nextFacingYaw),
@@ -934,9 +945,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       if (inWorld && !blockedByObject && !blockedByRiver && !blockedBySlope) {
         group.current.position.x = nextX
         group.current.position.z = nextZ
-      } else if (structureCollision && collisionLatch.current !== structureCollision.id) {
-        collisionLatch.current = structureCollision.id
-        onStructureCollision?.(structureCollision.item)
       }
     } else {
       movementIntent.current.active = false
@@ -957,13 +965,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkSurfaceHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
     const player = group.current.position
-
-    if (collisionLatch.current) {
-      const latchedCollider = structureColliders.find((collider) => collider.id === collisionLatch.current)
-      if (!latchedCollider || Math.hypot(player.x - latchedCollider.position[0], player.z - latchedCollider.position[2]) > latchedCollider.collisionRadius + .75) {
-        collisionLatch.current = ''
-      }
-    }
 
     if (controls.current && orbitCamera) {
       desiredTarget.set(player.x, player.y + CAMERA_TARGET_HEIGHT, player.z)
@@ -1025,6 +1026,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         enabled={!paused}
         target={[0, CAMERA_TARGET_HEIGHT, 5]}
         enablePan={false}
+        enableKeys={false}
         enableDamping
         dampingFactor={.08}
         rotateSpeed={.56}
@@ -1086,7 +1088,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, onSelectStructure, onStructureCollision, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
   const roverNode = useMemo(() => ({
@@ -1185,7 +1187,7 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, onStruc
       />
 
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
-      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} onSelect={onSelectStructure} />)}
+      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} />)}
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
       {dailyEventNode && <DailyEventMarker node={dailyEventNode} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
@@ -1209,7 +1211,7 @@ function FrontierScene({ planet, selectedStructureId, onSelectStructure, onStruc
       )}
 
       {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} />)}
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} onStructureCollision={onStructureCollision} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} />
     </>
   )
 }
@@ -1300,11 +1302,17 @@ const INTERACTION_ICONS = {
 
 function InteractionPrompt({ nearby }) {
   const Graphic = nearby.kind === 'daily' ? SparklesIcon : nearby.kind === 'portal' ? Compass : INTERACTION_ICONS[nearby.actionId] || SparklesIcon
+  const isStructure = nearby.kind === 'structure'
   return (
     <div className="frontier-interaction-prompt">
       <span>{createElement(Graphic, { size: 19, 'aria-hidden': true })}</span>
       <div><small>{nearby.kind === 'daily' ? 'TODAY PLANET EVENT' : nearby.kind === 'structure' ? 'WORLD OBJECT' : nearby.kind === 'guide' ? 'LUMI GUIDE' : nearby.kind === 'portal' ? 'EXPEDITION GATE' : nearby.kind === 'rover' ? 'ROVER CONTROL' : 'WORLD INTERACTION'}</small><strong>{nearby.label}</strong></div>
-      <kbd>E</kbd>
+      {isStructure ? (
+        <div className="frontier-interaction-keys" aria-label="객체 조작 키">
+          <span><kbd>E</kbd><em>미션</em></span>
+          <span><kbd>F</kbd><em>정보</em></span>
+        </div>
+      ) : <kbd>E</kbd>}
     </div>
   )
 }
@@ -1358,7 +1366,7 @@ export default function GalaxyWorld3D({
   onDailyEventComplete,
   onMissionComplete,
   onSelectStructure,
-  onStructureCollision,
+  onStructureMission,
   selectedStructureId,
   onMessage,
   paused = false,
@@ -1412,7 +1420,7 @@ export default function GalaxyWorld3D({
   const interact = useCallback(() => {
     if (!nearby || paused) return
     if (nearby.kind === 'portal') startMission(nearby.route)
-    else if (nearby.kind === 'structure') onSelectStructure?.(nearby.item)
+    else if (nearby.kind === 'structure') onStructureMission?.(nearby.item)
     else if (nearby.kind === 'guide') onOpenBriefing?.()
     else if (nearby.kind === 'rover') onOpenRover?.()
     else if (nearby.kind === 'daily') {
@@ -1423,17 +1431,24 @@ export default function GalaxyWorld3D({
       if (currentDailyEvent) onDailyEventComplete?.(currentDailyEvent)
     }
     else onWorldAction?.(nearby)
-  }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenRover, onSelectStructure, onWorldAction, paused, startMission])
+  }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenRover, onStructureMission, onWorldAction, paused, startMission])
+
+  const inspectStructure = useCallback(() => {
+    if (paused || nearby?.kind !== 'structure') return
+    onSelectStructure?.(nearby.item)
+  }, [nearby, onSelectStructure, paused])
 
   useEffect(() => {
     const keydown = (event) => {
-      if (event.repeat || event.code !== 'KeyE' || paused || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
+      if (event.repeat || paused || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
+      if (event.code !== 'KeyE' && event.code !== 'KeyF') return
       event.preventDefault()
-      interact()
+      if (event.code === 'KeyE') interact()
+      else inspectStructure()
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [interact, paused])
+  }, [inspectStructure, interact, paused])
 
   useEffect(() => {
     if (!activeMission || paused || collectedIds.size >= 5) return undefined
@@ -1515,8 +1530,8 @@ export default function GalaxyWorld3D({
         <FrontierScene
           planet={planet}
           selectedStructureId={selectedStructureId}
+          nearbyStructureId={nearby?.kind === 'structure' ? nearby.id : ''}
           onSelectStructure={onSelectStructure}
-          onStructureCollision={onStructureCollision}
           inputRef={inputRef}
           paused={paused}
           onNearbyChange={setNearby}
@@ -1575,13 +1590,22 @@ export default function GalaxyWorld3D({
           <button type="button" onClick={onCancelBuild}>취소</button>
         </div>
       )}
-      {!selectedBuildItem && nearby && !paused && <InteractionPrompt nearby={nearby} />}
-      <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>방향 전환 후 전진</span><kbd>마우스 이동량</kbd><span>시점·캐릭터 방향</span><kbd>휠</kbd><span>줌</span><kbd>E</kbd><span>상호작용</span></div>
+      {!selectedBuildItem && nearby && nearby.kind !== 'structure' && !paused && <InteractionPrompt nearby={nearby} />}
+      <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>방향 전환 후 전진</span><kbd>마우스 이동량</kbd><span>시점·캐릭터 방향</span><kbd>휠</kbd><span>줌</span><kbd>E</kbd><span>미션·상호작용</span><kbd>F</kbd><span>객체 정보</span></div>
       <TouchJoystick inputRef={inputRef} disabled={paused} />
       {nearby && !selectedBuildItem && !paused && (
-        <button type="button" className="frontier-action-button" onClick={interact}>
+        nearby.kind === 'structure' ? (
+          <div className="frontier-structure-actions">
+            <button type="button" className="frontier-action-button" onClick={interact}>
+              <span><SparklesIcon size={23} aria-hidden="true" /></span><strong>미션 수행</strong>
+            </button>
+            <button type="button" className="frontier-action-button" onClick={inspectStructure}>
+              <span><SparklesIcon size={23} aria-hidden="true" /></span><strong>객체 정보</strong>
+            </button>
+          </div>
+        ) : <button type="button" className="frontier-action-button" onClick={interact}>
           <span>{nearby.kind === 'guide' ? <Bot size={23} aria-hidden="true" /> : nearby.kind === 'portal' ? <Compass size={23} aria-hidden="true" /> : nearby.kind === 'rover' ? <Wrench size={23} aria-hidden="true" /> : <SparklesIcon size={23} aria-hidden="true" />}</span>
-          <strong>{nearby.kind === 'daily' ? '사건 해결' : nearby.kind === 'structure' ? '객체 보기' : '상호작용'}</strong>
+          <strong>{nearby.kind === 'daily' ? '사건 해결' : '상호작용'}</strong>
         </button>
       )}
     </div>

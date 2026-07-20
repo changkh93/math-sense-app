@@ -960,7 +960,11 @@ export default function MetaGalaxy({ user, userData, onBack }) {
   }
 
   const performObjectMission = async (item = selectedObject) => {
-    if (isOwner || !item?.instanceId) return null
+    if (!item?.instanceId) return null
+    if (isOwner) {
+      flash('내 행성의 객체 정보는 가까이에서 F 키를 눌러 확인할 수 있어요.')
+      return null
+    }
     const mission = getStructureVisitAction(item.itemId)
     const result = await runAction(
       `object:mission:${item.instanceId}`,
@@ -1231,7 +1235,7 @@ export default function MetaGalaxy({ user, userData, onBack }) {
         onMissionComplete={runMission}
         selectedStructureId={selectedStructureId}
         onSelectStructure={openObjectDialog}
-        onStructureCollision={openObjectDialog}
+        onStructureMission={performObjectMission}
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}
