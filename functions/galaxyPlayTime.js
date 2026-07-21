@@ -166,10 +166,7 @@ module.exports = function registerGalaxyPlayTime({ functions, admin, regionalFun
     const userSnap = await userRef.get();
     const user = userSnap.data() || {};
     if (!userSnap.exists || user.isDeleted === true || user.accountStatus === "deleted") {
-      throw new functions.https.HttpsError("not-found", "학생 계정을 찾을 수 없습니다.");
-    }
-    if (user.role === "admin" || user.role === "parent" || user.isGuest === true) {
-      throw new functions.https.HttpsError("permission-denied", "학생 계정에서만 아스트라 프론티어를 이용할 수 있습니다.");
+      throw new functions.https.HttpsError("not-found", "계정을 찾을 수 없습니다.");
     }
     return { userRef, user };
   }

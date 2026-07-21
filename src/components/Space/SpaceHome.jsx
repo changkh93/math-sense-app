@@ -841,7 +841,7 @@ function SpaceHome() {
     setIsBoosting(false);
     // Crew guests can explore NAV, STUDY CREW and the public QUIZ BATTLE arena.
     const guest = userData?.isGuest === true;
-    const guestAvailableViews = new Set(['planet', 'crew', 'battle']);
+    const guestAvailableViews = new Set(['planet', 'crew', 'battle', 'galaxy']);
     const allowedView = guest && !guestAvailableViews.has(view) ? 'planet' : view;
     // Persist synchronously so a route remount cannot briefly restore NAV.
     sessionStorage.setItem('metasense_current_view', allowedView);
@@ -855,14 +855,14 @@ function SpaceHome() {
   }, [clearMissionSelection, isDarkMatterMode, resetViewportForRootView, stopDarkMatterMode, updateSelectedChapterDocId, updateSelectedRegionId, userData?.isGuest]);
 
   const requestGalaxyEntry = useCallback(async () => {
-    if (!user?.uid || userData?.isGuest === true) return
+    if (!user?.uid) return
     if (galaxyPlay.session) {
       switchRootView('galaxy')
       return
     }
     setGalaxyEntryOpen(true)
     await galaxyPlay.loadAccess()
-  }, [galaxyPlay, switchRootView, user?.uid, userData?.isGuest])
+  }, [galaxyPlay, switchRootView, user?.uid])
 
   const startGalaxyEntry = useCallback(async () => {
     const playSession = await galaxyPlay.startSession()
