@@ -8513,6 +8513,36 @@ exports.listStudyCrews = regionalFunctions.https.onCall(async (_data, context) =
   };
 });
 
+exports.adminDeleteStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
+  await requireAdminUid(context);
+  const crewId = String(data?.crewId || "").trim();
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const crewSnap = await crewRef.get();
+  if (!crewSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  }
+
+  const crewData = crewSnap.data() || {};
+  const memberIds = getCrewMemberIds(crewData);
+  const nameCanonical = crewData.nameCanonical || canonicalizeCrewName(crewData.name || "");
+  const nameRegistryRef = nameCanonical ? crewNameRegistryRef(db, nameCanonical) : null;
+
+  const batch = db.batch();
+  memberIds.forEach((mId) => {
+    batch.set(db.collection("users").doc(mId), buildClearedCrewUserFields(), { merge: true });
+  });
+  if (nameRegistryRef) {
+    batch.delete(nameRegistryRef);
+  }
+  await batch.commit();
+
+  await db.recursiveDelete(crewRef);
+  return { success: true };
+});
+
 exports.listOpenStudyPoolsAdmin = regionalFunctions.https.onCall(async (_data, context) => {
   await requireAdminUid(context);
   const db = admin.firestore();
@@ -11905,14 +11935,18 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
     const userData = userSnap.data() || {};
     const memberIds = Array.isArray(crewData.memberIds) ? crewData.memberIds.filter(Boolean) : [];
 
-    if (userData.crewId !== crewId || !memberIds.includes(uid)) {
-      throw new functions.https.HttpsError("permission-denied", "현재 소속된 크루만 탈퇴할 수 있습니다.");
+    const isLeader = crewData.leaderId === uid;
+    const isMember = memberIds.includes(uid);
+    const isRejectedLeader = isLeader && (userData.rejectedCrewId === crewId || crewData.status === "rejected");
+
+    if (!isLeader && !isMember && userData.crewId !== crewId && !isRejectedLeader) {
+      throw new functions.https.HttpsError("permission-denied", "현재 소속되었거나 관리 중인 크루만 탈퇴/삭제할 수 있습니다.");
     }
 
-    const isLeader = crewData.leaderId === uid;
     const nameCanonical = crewData.nameCanonical || canonicalizeCrewName(crewData.name || "");
     const nameRegistryRef = isLeader && nameCanonical ? crewNameRegistryRef(db, nameCanonical) : null;
     const nameRegistrySnap = nameRegistryRef ? await tx.get(nameRegistryRef) : null;
+
     if (isLeader && memberIds.length > 1) {
       throw new functions.https.HttpsError("failed-precondition", "리더는 혼자 남았을 때만 탈퇴할 수 있습니다.");
     }
@@ -11926,20 +11960,27 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
       }
     }
 
-    tx.set(userRef, buildClearedCrewUserFields(), { merge: true });
-
     if (isLeader) {
       cleanup.deleteCrew = true;
       const roomQuery = await db.collection("studyRooms").where("crewId", "==", crewId).get();
       roomQuery.docs.forEach((roomDoc) => {
         if (!cleanup.deleteRoomIds.includes(roomDoc.id)) cleanup.deleteRoomIds.push(roomDoc.id);
       });
+
+      // Clear crew user fields for all crew members when leader dissolves the crew
+      memberIds.forEach((mId) => {
+        const mUserRef = db.collection("users").doc(mId);
+        tx.set(mUserRef, buildClearedCrewUserFields(), { merge: true });
+      });
+
       tx.delete(crewRef);
       if (nameRegistrySnap?.exists && nameRegistrySnap.data()?.crewId === crewId) {
         tx.delete(nameRegistryRef);
       }
       return;
     }
+
+    tx.set(userRef, buildClearedCrewUserFields(), { merge: true });
 
     const nextMemberIds = memberIds.filter((memberId) => memberId !== uid);
     const nextCrewData = {

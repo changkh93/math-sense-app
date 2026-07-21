@@ -570,6 +570,21 @@ export default function CrewApproval() {
     }
   };
 
+  const deleteCrewAdmin = async (crew) => {
+    if (!window.confirm(`"${crew.name}" 크루를 영구 삭제할까요?\n소속된 멤버의 크루 소속 정보가 함께 해제됩니다.`)) return;
+    setBusyId(`delete:${crew.id}`);
+    try {
+      await httpsCallable(functions, 'adminDeleteStudyCrew')({ crewId: crew.id });
+      setMessage('크루를 삭제했습니다.');
+      await refreshData();
+    } catch (err) {
+      console.error('Failed to delete crew:', err);
+      alert('크루 삭제 처리에 실패했습니다: ' + (err?.message || ''));
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const saveCrewDetails = async (crew) => {
     const draft = editDrafts[crew.id] || buildCrewEditDraft(crew);
     setBusyId(`details:${crew.id}`);
@@ -827,8 +842,11 @@ export default function CrewApproval() {
                     <button type="button" className="admin-btn secondary" onClick={() => approveCrew(crew)} disabled={!!busyId || status === 'approved'} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                       <CheckCircle2 size={15} /> 승인
                     </button>
-                    <button type="button" className="admin-btn danger" onClick={() => setRejectTarget(crew)} disabled={!!busyId} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <button type="button" className="admin-btn danger" onClick={() => setRejectTarget(crew)} disabled={!!busyId || status === 'rejected'} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                       <XCircle size={15} /> 반려
+                    </button>
+                    <button type="button" className="admin-btn danger" onClick={() => deleteCrewAdmin(crew)} disabled={!!busyId} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(220, 38, 38, 0.25)', borderColor: '#ef4444', color: '#fca5a5' }}>
+                      <Trash2 size={15} /> 크루 삭제
                     </button>
                   </div>
 

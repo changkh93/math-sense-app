@@ -298,7 +298,7 @@ export default function CrewDetailView({ onBack }) {
   }, [notes, pendingNotes]);
   const status = crew?.status || userData?.crewStatus || 'pending';
   const todayKey = getTodayKey();
-  const isLeader = userData?.crewRole === 'leader';
+  const isLeader = userData?.crewRole === 'leader' || (Boolean(user?.uid) && crew?.leaderId === user?.uid);
   const isGuest = userData?.isGuest === true;
   const guestAccessEnabled = crew?.guestAccessEnabled === true;
   const liveGuestAccessEnabled = crewDocData?.guestAccessEnabled;

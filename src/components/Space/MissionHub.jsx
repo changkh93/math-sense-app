@@ -274,11 +274,23 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     onTrackingStatusRef.current = onTrackingStatus
   }, [onTrackingStatus])
 
+  const onErrorRef = useRef(onError)
+  useEffect(() => {
+    onErrorRef.current = onError
+  }, [onError])
+
+  useEffect(() => {
+    if (hasError || apiTimedOut) {
+      onErrorRef.current?.(hasError ? 'PLAYER_ERROR' : 'API_TIMEOUT')
+    }
+  }, [hasError, apiTimedOut])
+
   useEffect(() => {
     setHasError(false)
     setApiTimedOut(false)
     if (!normalizedVideoId) {
       setHasError(true)
+      onErrorRef.current?.('INVALID_VIDEO_ID')
       return undefined
     }
 
@@ -468,31 +480,44 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%', maxWidth: '320px', marginTop: '0.5rem' }}>
-          <a
-            href={directWatchUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '0.6rem', width: '100%', maxWidth: '320px', marginTop: '0.5rem', justifyContent: 'center' }}>
+          <button
+            onClick={() => {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(directWatchUrl)
+                alert('📋 유튜브 영상 링크가 복사되었습니다!\n\n브라우저 시크릿 창(Ctrl+Shift+N 또는 모바일 시크릿 탭)을 열고 주소창에 붙여넣어 시청해 주세요.')
+              }
+            }}
             className="hud-btn primary glass"
             style={{
-              padding: '0.8rem 1.5rem',
+              padding: '0.8rem 1.8rem',
               background: 'rgba(0, 243, 255, 0.2)',
               border: '2px solid var(--crystal-cyan)',
               color: 'var(--text-bright)',
               borderRadius: '10px',
-              textDecoration: 'none',
               fontWeight: 700,
               fontSize: '1rem',
-              display: 'inline-block',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 4px 15px rgba(0, 243, 255, 0.2)'
             }}
           >
-            📺 YouTube에서 직접 보기
-          </a>
+            📋 영상 링크 복사
+          </button>
         </div>
         
-        <p className="font-tech" style={{ marginTop: '1.2rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          ※ YouTube에서 영상을 보신 후, 플레이어 하단의 <b>[수동 완료 처리]</b>를 누르시면 다음 단계로 진행하실 수 있습니다.
+        <div style={{ marginTop: '1.2rem', maxWidth: '480px', padding: '0.8rem 1rem', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', textAlign: 'left' }}>
+          <p className="font-tech" style={{ margin: 0, fontSize: '0.83rem', color: '#e2e8f0', lineHeight: '1.6' }}>
+            💡 <b>시크릿 창 시청 안내</b><br />
+            상단의 <b>[영상 링크 복사]</b>를 클릭한 후, 브라우저 <b>시크릿 창</b> (PC: <code>Ctrl+Shift+N</code> / Mac: <code>Cmd+Shift+N</code> / 모바일: 시크릿 탭) 주소창에 붙여넣어 접속하시면 구글 계정 제약 없이 시청하실 수 있습니다.
+          </p>
+        </div>
+
+        <p className="font-tech" style={{ marginTop: '0.8rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+          ※ 시청을 마치신 후, 플레이어 하단의 <b>[수동 완료 처리]</b> 버튼을 누르시면 다음 단계로 진행하실 수 있습니다.
         </p>
       </div>
     )
