@@ -515,18 +515,42 @@ const adminUpdateFamilyBilling = regionalFunctions.https.onCall(async (data, con
   const monthKey = cleanText(data?.effectiveMonth, 7) || currentMonthKey();
   const baseFee = Math.max(0, Math.round(Number(data?.baseFee) || 0));
   const reason = cleanText(data?.reason, 500);
-  if (!parentUid || !isMonthKey(monthKey)) throw new functions.https.HttpsError("invalid-argument", "학부모와 적용 월을 확인해 주세요.");
-  if (!reason) throw new functions.https.HttpsError("invalid-argument", "변경 사유를 입력해 주세요.");
+  if (!parentUid || !isMonthKey(monthKey)) throw new functions.https.HttpsError("invalid-argument", "학부모와 적용 월을 확인해 주세요.");
+  if (!reason) throw new functions.https.HttpsError("invalid-argument", "변경 사유를 입력해 주세요.");
   const ref = admin.firestore().collection("familyBillingAccounts").doc(parentUid);
   const beforeSnap = await ref.get();
   const before = beforeSnap.exists ? beforeSnap.data() : null;
-  const feeSchedule = { ...(before?.feeSchedule || {}), [monthKey]: baseFee };
+  const previousSchedule = before?.feeSchedule || {};
+  const previousFee = Object.prototype.hasOwnProperty.call(previousSchedule, monthKey)
+    ? Number(previousSchedule[monthKey]) || 0
+    : (before ? scheduledFee(before, monthKey) : 0);
+  const feeSchedule = { ...previousSchedule, [monthKey]: baseFee };
   const baselineFee = beforeSnap.exists
     ? Math.max(0, Math.round(Number(before?.baseMonthlyFee) || 0))
     : (monthKey <= currentMonthKey() ? baseFee : 0);
-  const after = { parentUid, baseMonthlyFee: baselineFee, feeSchedule, updatedBy: adminUid, updatedAt: FieldValue.serverTimestamp() };
+  const changeHistory = Array.isArray(before?.changeHistory) ? before.changeHistory.slice(-19) : [];
+  changeHistory.push({
+    reason,
+    monthKey,
+    baseFeeFrom: previousFee,
+    baseFeeTo: baseFee,
+    adminUid,
+    changedAt: new Date().toISOString(),
+  });
+  const after = {
+    parentUid,
+    baseMonthlyFee: baselineFee,
+    feeSchedule,
+    lastChangeReason: reason,
+    lastChangeMonthKey: monthKey,
+    lastChangedAt: FieldValue.serverTimestamp(),
+    lastChangedBy: adminUid,
+    changeHistory,
+    updatedBy: adminUid,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
   await ref.set(after, { merge: true });
-  await addAudit(adminUid, "update_family_billing", "familyBillingAccount", parentUid, before, { ...after, updatedAt: null }, reason);
+  await addAudit(adminUid, "update_family_billing", "familyBillingAccount", parentUid, before, { ...after, updatedAt: null, lastChangedAt: null }, reason);
   return { success: true, monthKey, baseFee };
 });
 
@@ -546,6 +570,18 @@ const adminUpdateStudentEnrollment = regionalFunctions.https.onCall(async (data,
   const ref = admin.firestore().collection("studentEnrollments").doc(studentUid);
   const beforeSnap = await ref.get();
   const before = beforeSnap.exists ? beforeSnap.data() : null;
+  const changeHistory = Array.isArray(before?.changeHistory) ? before.changeHistory.slice(-19) : [];
+  changeHistory.push({
+    reason,
+    statusFrom: before?.status || null,
+    statusTo: status,
+    activeFromFrom: before?.activeFrom || null,
+    activeFromTo: activeFrom || null,
+    activeThroughFrom: before?.activeThrough || null,
+    activeThroughTo: activeThrough || null,
+    adminUid,
+    changedAt: new Date().toISOString(),
+  });
   const after = {
     studentUid,
     parentUid: parentUid || null,
@@ -553,12 +589,16 @@ const adminUpdateStudentEnrollment = regionalFunctions.https.onCall(async (data,
     status,
     activeFrom: activeFrom || null,
     activeThrough: activeThrough || null,
+    lastChangeReason: reason,
+    lastChangedAt: FieldValue.serverTimestamp(),
+    lastChangedBy: adminUid,
+    changeHistory,
     updatedBy: adminUid,
     updatedAt: FieldValue.serverTimestamp(),
   };
   await ref.set(after, { merge: true });
-  await addAudit(adminUid, "update_student_enrollment", "studentEnrollment", studentUid, before, { ...after, updatedAt: null }, reason);
-  return { success: true, parentUid, enrollment: { ...after, updatedAt: null } };
+  await addAudit(adminUid, "update_student_enrollment", "studentEnrollment", studentUid, before, { ...after, updatedAt: null, lastChangedAt: null }, reason);
+  return { success: true, parentUid, enrollment: { ...after, updatedAt: null, lastChangedAt: null } };
 });
 
 const adminConfigureReferralApplication = regionalFunctions.https.onCall(async (data, context) => {
