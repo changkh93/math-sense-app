@@ -6145,6 +6145,25 @@ async function deleteQueryDocs(queryRef, stats, key) {
   return deleted;
 }
 
+// galaxyBlocks/{ownerUid}/blocked/{targetUid} 서브컬렉션에서 targetUid가 uid인 차단
+// 기록을 모두 지운다. collectionGroup 쿼리는 전용 인덱스가 없으면 FAILED_PRECONDITION
+// 에러를 내기 때문에, 각 소유자 문서를 순회하는 방식으로 인덱스 의존성을 없앤다.
+async function deleteGalaxyBlockLinksByTarget(db, targetUid, stats) {
+  let deleted = 0;
+  const ownersSnap = await db.collection("galaxyBlocks").get();
+  for (const ownerDoc of ownersSnap.docs) {
+    const subStats = { galaxyBlockLinksDeleted: 0 };
+    await deleteQueryDocs(
+      ownerDoc.ref.collection("blocked").where("targetUid", "==", targetUid),
+      subStats,
+      "galaxyBlockLinksDeleted"
+    );
+    deleted += subStats.galaxyBlockLinksDeleted || 0;
+  }
+  stats.galaxyBlockLinksDeleted = deleted;
+  return deleted;
+}
+
 async function deleteStoragePrefix(bucket, prefix, stats) {
   let files = [];
   try {
@@ -6364,7 +6383,7 @@ async function deleteUserOwnedData(uid, options = {}) {
     await deleteQueryDocs(db.collection("galaxyPlaySessions").where("uid", "==", uid), stats, "galaxyPlaySessionsDeleted");
     await deleteQueryDocs(db.collection("galaxyReports").where("reporterUid", "==", uid), stats, "galaxyReportsDeleted");
     await deleteQueryDocs(db.collection("galaxyReports").where("targetUid", "==", uid), stats, "galaxyReportsDeleted");
-    await deleteQueryDocs(db.collectionGroup("blocked").where("targetUid", "==", uid), stats, "galaxyBlockLinksDeleted");
+    await deleteGalaxyBlockLinksByTarget(db, uid, stats);
     const galaxyPlayPolicyRef = db.collection("galaxyPlayPolicies").doc(uid);
     const galaxyPlayRuntimeRef = db.collection("galaxyPlayRuntime").doc(uid);
     const galaxyPlayDailyRef = db.collection("galaxyPlayDaily").doc(uid);
