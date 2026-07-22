@@ -760,11 +760,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const isInteractiveTarget = (target) => target?.closest?.('input, textarea, select, button, a, [contenteditable="true"], [role="dialog"]')
     const down = (event) => {
       if (paused || isInteractiveTarget(event.target)) return
-      if (event.code === 'KeyV') {
-        event.preventDefault()
-        setIsFirstPerson?.((prev) => !prev)
-        return
-      }
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].includes(event.code)) {
         event.preventDefault()
         keys.current.add(event.code)
@@ -1132,16 +1127,16 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     const px = nearby.position[0] || 0
     const pz = nearby.position[2] || 0
     const py = terrainHeight(px, pz)
-    let h = 1.45
+    let h = 2.0
     if (nearby.kind === 'structure') {
       const footprint = structureFootprint(nearby.item?.itemId || '')
-      h = Math.min(2.4, Math.max(1.3, footprint * 0.75 + 0.5))
+      h = Math.max(2.6, footprint * 1.2 + 1.2)
     } else if (nearby.kind === 'portal') {
-      h = 2.2
+      h = 2.8
     } else if (nearby.kind === 'rover') {
-      h = 1.25
+      h = 2.0
     } else if (nearby.kind === 'guide') {
-      h = 1.35
+      h = 2.2
     }
     return [px, py + h, pz]
   }, [nearby])
@@ -1393,29 +1388,19 @@ function InteractionPrompt({ nearby, onInteract, onInspect }) {
       onClick={() => onInteract?.()}
       role="button"
       tabIndex={0}
-      title="터치 또는 클릭하여 상호작용 실행"
+      title="터치 또는 클릭하여 상호작용"
     >
-      <span>{createElement(Graphic, { size: 19, 'aria-hidden': true })}</span>
-      <div>
-        <small>{nearby.kind === 'daily' ? '오늘의 현장 사건' : nearby.kind === 'structure' ? '행성 시설' : nearby.kind === 'guide' ? '루미 안내소' : nearby.kind === 'portal' ? '45초 탐사 출발대' : nearby.kind === 'rover' ? '로버 원정 관리' : '행성 상호작용'}</small>
-        <strong>{nearby.label} 👆</strong>
+      <span className="prompt-icon">{createElement(Graphic, { size: 14, 'aria-hidden': true })}</span>
+      <div className="prompt-text">
+        <small>{nearby.kind === 'daily' ? '행성 사건' : nearby.kind === 'structure' ? '행성 시설' : nearby.kind === 'guide' ? '안내소' : nearby.kind === 'portal' ? '탐사 출발대' : nearby.kind === 'rover' ? '로버 원정대' : '상호작용'}</small>
+        <strong>{nearby.label}</strong>
       </div>
-      {isStructure ? (
-        <div className="frontier-interaction-keys" aria-label="객체 조작 키">
-          <button type="button" className="touch-key-btn" onClick={(e) => { e.stopPropagation(); onInteract?.(); }}>
-            <kbd>E</kbd><em>행동</em>
-          </button>
-          <button type="button" className="touch-key-btn" onClick={(e) => { e.stopPropagation(); onInspect?.(); }}>
-            <kbd>F</kbd><em>정보</em>
-          </button>
-        </div>
-      ) : (
-        <div className="frontier-interaction-keys">
-          <button type="button" className="touch-key-btn" onClick={(e) => { e.stopPropagation(); onInteract?.(); }}>
-            <kbd>E</kbd><em>실행</em>
-          </button>
-        </div>
-      )}
+      <div className="prompt-badges">
+        <span className="prompt-key-badge" onClick={(e) => { e.stopPropagation(); onInteract?.(); }} title="E 키 또는 터치로 실행">E</span>
+        {isStructure && (
+          <span className="prompt-key-badge inspect" onClick={(e) => { e.stopPropagation(); onInspect?.(); }} title="F 키 또는 터치로 정보">F</span>
+        )}
+      </div>
     </div>
   )
 }

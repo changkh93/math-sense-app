@@ -1135,49 +1135,58 @@
 .frontier-interaction-prompt {
   display: flex;
   align-items: center;
-  gap: .42rem;
+  gap: .38rem;
   width: max-content;
-  max-width: 210px;
-  padding: .35rem .6rem;
-  border: 1px solid rgba(124, 242, 189, .38);
-  border-radius: 12px;
+  max-width: 195px;
+  padding: .28rem .52rem;
+  border: 1px solid rgba(124, 242, 189, .42);
+  border-radius: 9px;
   color: white;
-  background: rgba(8, 22, 34, .92);
-  backdrop-filter: blur(8px);
+  background: rgba(6, 18, 28, .93);
+  backdrop-filter: blur(10px);
   pointer-events: auto;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .45);
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 .frontier-interaction-prompt:active,
 .frontier-interaction-prompt:hover {
-  transform: scale(1.04);
+  transform: scale(1.03);
   border-color: rgba(124, 242, 189, 0.85);
-  background: rgba(12, 38, 52, 0.96);
+  background: rgba(10, 32, 46, 0.97);
 }
-.touch-key-trigger {
-  all: unset;
+.frontier-interaction-prompt .prompt-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: #6ef4c5;
+  background: rgba(124, 242, 189, .15);
+}
+.frontier-interaction-prompt .prompt-text small,
+.frontier-interaction-prompt .prompt-text strong { display: block; white-space: nowrap; }
+.frontier-interaction-prompt .prompt-text small { color: #85aa9c; font-size: .45rem; letter-spacing: .03em; line-height: 1; }
+.frontier-interaction-prompt .prompt-text strong { margin-top: 1px; font-size: .62rem; line-height: 1.15; }
+.frontier-interaction-prompt .prompt-badges { display: flex; align-items: center; gap: .2rem; margin-left: .15rem; }
+.frontier-interaction-prompt .prompt-key-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.4rem;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  cursor: pointer;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  background: rgba(124, 242, 189, .22);
+  border: 1px solid rgba(124, 242, 189, .48);
+  color: #6ef4c5;
+  font: 800 .54rem ui-monospace, monospace;
 }
-.touch-key-trigger:hover,
-.touch-key-trigger:active {
-  background: rgba(124, 242, 189, 0.3);
+.frontier-interaction-prompt .prompt-key-badge.inspect {
+  background: rgba(110, 200, 255, .22);
+  border-color: rgba(110, 200, 255, .48);
+  color: #6ec8ff;
 }
-.frontier-interaction-prompt > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--frontier-mint); background: rgba(124, 242, 189, .12); }
-.frontier-interaction-prompt small,
-.frontier-interaction-prompt strong { display: block; white-space: nowrap; }
-.frontier-interaction-prompt small { color: #8dafa4; font-size: .48rem; letter-spacing: .04em; }
-.frontier-interaction-prompt strong { margin-top: 1px; font-size: .66rem; }
-.frontier-interaction-keys { display: flex; align-items: center; gap: .35rem; }
-.frontier-interaction-keys > span { display: grid; justify-items: center; gap: .1rem; }
-.frontier-interaction-keys em { color: #8fb4a8; font: 700 .42rem ui-monospace, monospace; font-style: normal; letter-spacing: .02em; }
 .frontier-mission-hud {
   position: absolute;
   z-index: 25;
@@ -1368,7 +1377,6 @@
     gap: .45rem;
   }
   .frontier-structure-actions .frontier-action-button { position: static; }
-  .frontier-interaction-prompt { bottom: calc(11rem + env(safe-area-inset-bottom)); min-width: min(270px, calc(100vw - 7rem)); }
   .frontier-mission-hud,
   .frontier-build-mode { top: 8.8rem; }
   .frontier-game-toast { top: 8.15rem; width: min(360px, calc(100vw - 5.8rem)); padding: .5rem .58rem; border-radius: 12px; font-size: .6rem; line-height: 1.4; }
