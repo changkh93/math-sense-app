@@ -757,15 +757,32 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       inputRef.current.z = 0
       movementIntent.current.active = false
     }
-    const isInteractiveTarget = (target) => target?.closest?.('input, textarea, select, button, a, [contenteditable="true"], [role="dialog"]')
+    const isTextInput = (target) => {
+      const tag = target?.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable
+    }
+    const mapKey = (e) => {
+      const code = e.code || ''
+      const key = (e.key || '').toLowerCase()
+      if (code === 'KeyW' || code === 'ArrowUp' || key === 'arrowup' || key === 'w' || key === 'ㅈ') return 'UP'
+      if (code === 'KeyS' || code === 'ArrowDown' || key === 'arrowdown' || key === 's' || key === 'ㄴ') return 'DOWN'
+      if (code === 'KeyA' || code === 'ArrowLeft' || key === 'arrowleft' || key === 'a' || key === 'ㅁ') return 'LEFT'
+      if (code === 'KeyD' || code === 'ArrowRight' || key === 'arrowright' || key === 'd' || key === 'ㅇ') return 'RIGHT'
+      return null
+    }
+
     const down = (event) => {
-      if (paused || isInteractiveTarget(event.target)) return
-      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].includes(event.code)) {
+      if (paused || isTextInput(event.target)) return
+      const dir = mapKey(event)
+      if (dir) {
         event.preventDefault()
-        keys.current.add(event.code)
+        keys.current.add(dir)
       }
     }
-    const up = (event) => keys.current.delete(event.code)
+    const up = (event) => {
+      const dir = mapKey(event)
+      if (dir) keys.current.delete(dir)
+    }
     const visibility = () => { if (document.hidden) resetInput() }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -777,7 +794,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       window.removeEventListener('blur', resetInput)
       document.removeEventListener('visibilitychange', visibility)
     }
-  }, [inputRef, paused, setIsFirstPerson])
+  }, [inputRef, paused])
 
   useEffect(() => {
     if (!paused) return
@@ -790,9 +807,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   useEffect(() => {
     const canvas = gl.domElement
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const updateReducedMotion = () => {
-      if (reducedMotion.matches) resetFreeLook()
-    }
     const updateHoverLook = (event) => {
       const look = hoverLook.current
       if (
@@ -800,7 +814,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         || !freeLookEnabled
         || reducedMotion.matches
         || look.orbiting
-        || (event.pointerType === 'mouse' && event.buttons !== 0)
         || (event.target !== canvas && !event.target?.classList?.contains('webgl-canvas'))
       ) {
         resetFreeLook()
@@ -828,20 +841,14 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     canvas.addEventListener('pointerleave', resetFreeLook)
     canvas.addEventListener('pointerdown', resetFreeLook)
     document.addEventListener('visibilitychange', resetWhenHidden)
-    reducedMotion.addEventListener?.('change', updateReducedMotion)
     return () => {
       window.removeEventListener('pointermove', updateHoverLook)
       window.removeEventListener('blur', resetFreeLook)
       canvas.removeEventListener('pointerleave', resetFreeLook)
       canvas.removeEventListener('pointerdown', resetFreeLook)
       document.removeEventListener('visibilitychange', resetWhenHidden)
-      reducedMotion.removeEventListener?.('change', updateReducedMotion)
     }
   }, [freeLookEnabled, gl, paused, resetFreeLook])
-
-  useEffect(() => {
-    resetFreeLook()
-  }, [freeLookEnabled, paused, resetFreeLook])
 
   useFrame((state, frameDelta) => {
     if (!group.current) return
@@ -887,8 +894,8 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       }
     }
 
-    const keyboardX = paused ? 0 : (keys.current.has('KeyD') || keys.current.has('ArrowRight') ? 1 : 0) - (keys.current.has('KeyA') || keys.current.has('ArrowLeft') ? 1 : 0)
-    const keyboardZ = paused ? 0 : (keys.current.has('KeyS') || keys.current.has('ArrowDown') ? 1 : 0) - (keys.current.has('KeyW') || keys.current.has('ArrowUp') ? 1 : 0)
+    const keyboardX = paused ? 0 : (keys.current.has('RIGHT') ? 1 : 0) - (keys.current.has('LEFT') ? 1 : 0)
+    const keyboardZ = paused ? 0 : (keys.current.has('DOWN') ? 1 : 0) - (keys.current.has('UP') ? 1 : 0)
     const moveX = paused ? 0 : THREE.MathUtils.clamp(keyboardX + Number(inputRef.current.x || 0), -1, 1)
     const moveZ = paused ? 0 : THREE.MathUtils.clamp(keyboardZ + Number(inputRef.current.z || 0), -1, 1)
     const inputLength = Math.hypot(moveX, moveZ)
