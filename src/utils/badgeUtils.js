@@ -17,6 +17,14 @@ import stellarWindSurferBadge from '../assets/badge/stellar_wind_surfer.png';
 import supernovaBurstBadge from '../assets/badge/supernova_burst.png';
 import eternalVoyagerBadge from '../assets/badge/eternal_voyager.png';
 
+import masterRegAdditionBadge from '../assets/badge/master_reg_addition.png';
+import masterRegMultiplicationBadge from '../assets/badge/master_reg_multiplication.png';
+import masterRegDivisionBadge from '../assets/badge/master_reg_division.png';
+import masterRegFractionsBadge from '../assets/badge/master_reg_fractions.png';
+import masterRegDecimalsBadge from '../assets/badge/master_reg_decimals.png';
+import masterRegRatiosBadge from '../assets/badge/master_reg_ratios.png';
+import masterRegElemMonthlyBadge from '../assets/badge/master_reg_elem_monthly.png';
+
 // 배지 외형 업그레이드 1종(프리미엄)의 광석 가격.
 export const BADGE_UPGRADE_COST = 100;
 
@@ -47,13 +55,13 @@ const BADGE_PREMIUM_IMAGES = {
   master_cluster_python: null,
   master_cluster_classic: null,
 
-  master_reg_addition: null,
-  master_reg_multiplication: null,
-  master_reg_division: null,
-  master_reg_fractions: null,
-  master_reg_decimals: null,
-  master_reg_ratios: null,
-  master_reg_elem_monthly: null,
+  master_reg_addition: masterRegAdditionBadge,
+  master_reg_multiplication: masterRegMultiplicationBadge,
+  master_reg_division: masterRegDivisionBadge,
+  master_reg_fractions: masterRegFractionsBadge,
+  master_reg_decimals: masterRegDecimalsBadge,
+  master_reg_ratios: masterRegRatiosBadge,
+  master_reg_elem_monthly: masterRegElemMonthlyBadge,
 
   master_reg_mid_basic: null,
   master_reg_mid_eval: null,
