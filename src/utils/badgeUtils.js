@@ -41,6 +41,11 @@ import masterRegClassicNeverlandBadge from '../assets/badge/master_reg_classic_n
 import masterRegClassicWesternBadge from '../assets/badge/master_reg_classic_western.png';
 import masterRegClassicNobelBadge from '../assets/badge/master_reg_classic_nobel.png';
 
+import masterClusterElementaryBadge from '../assets/badge/master_cluster_elementary.png';
+import masterClusterMiddleBadge from '../assets/badge/master_cluster_middle.png';
+import masterClusterPythonBadge from '../assets/badge/master_cluster_python.png';
+import masterClusterClassicBadge from '../assets/badge/master_cluster_classic.png';
+
 // 배지 외형 업그레이드 1종(프리미엄)의 광석 가격.
 export const BADGE_UPGRADE_COST = 100;
 
@@ -66,10 +71,10 @@ const BADGE_PREMIUM_IMAGES = {
   eternal_voyager: eternalVoyagerBadge,
 
   // --- 코스 및 성역(Region) 마스터 각성 이미지 슬롯 ---
-  master_cluster_elementary: masterRegElemMonthlyBadge,
-  master_cluster_middle: masterRegMidExamBadge,
-  master_cluster_python: masterRegPyAdvancedBadge,
-  master_cluster_classic: masterRegClassicNobelBadge,
+  master_cluster_elementary: masterClusterElementaryBadge,
+  master_cluster_middle: masterClusterMiddleBadge,
+  master_cluster_python: masterClusterPythonBadge,
+  master_cluster_classic: masterClusterClassicBadge,
 
   master_reg_addition: masterRegAdditionBadge,
   master_reg_multiplication: masterRegMultiplicationBadge,
