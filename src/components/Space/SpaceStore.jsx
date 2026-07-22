@@ -1821,77 +1821,7 @@ function BadgeShowcaseSection({ userData, history, purchasing, badgeUpgradeTarge
       )}
 
       {challengeBadges.length > 0 && (
-        <section style={{ marginBottom: '4rem' }}>
-          <h4 style={{ color: 'var(--text-bright)', margin: '0 0 1rem', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <span>🎖 도전할 배지 & 성역 마스터 목록</span>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 400 }}>(클릭 시 성역별 접기/펼치기)</span>
-          </h4>
-
-          {/* Group challenge badges by region/cluster */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {[
-              { key: 'cluster_elementary', title: '🏫 초등수학 성역 배지' },
-              { key: 'middle-math', title: '📐 중등수학 성역 배지' },
-              { key: 'python', title: '🐍 파이썬 코딩 성역 배지' },
-              { key: 'western-classic', title: '🏛️ 서양 고전 성역 배지' },
-              { key: 'general', title: '🏅 일반 & 활동 성취 배지' }
-            ].map(({ key, title }) => {
-              const regionBadges = challengeBadges.filter(b => key === 'general' ? (!b.clusterId && b.category !== 'region_master') : b.clusterId === key);
-              if (regionBadges.length === 0) return null;
-              return (
-                <details key={key} open className="glass-card" style={{ padding: 0, borderRadius: 12, overflow: 'hidden' }}>
-                  <summary style={{
-                    padding: '0.9rem 1.2rem',
-                    background: 'rgba(15, 23, 42, 0.82)',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    color: 'var(--text-bright)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    userSelect: 'none'
-                  }}>
-                    <span>{title}</span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>({regionBadges.length}개 도전 중)</span>
-                  </summary>
-                  <div style={{ padding: '1rem', background: 'rgba(5, 10, 25, 0.4)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                    {regionBadges.map((badge) => (
-                      <div
-                        key={badge.id}
-                        className="glass-card"
-                        style={{
-                          padding: '1rem',
-                          textAlign: 'center',
-                          opacity: 0.6,
-                          filter: 'grayscale(70%)',
-                          minHeight: 206,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          border: '1px solid var(--glass-border)',
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontSize: '2.75rem', lineHeight: 1, marginBottom: '0.75rem' }}>{badge.icon}</div>
-                          <div style={{ fontWeight: 900, color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-                            {badge.title}
-                          </div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.5, marginTop: '0.45rem', minHeight: '2.5em' }}>
-                            {badge.desc}
-                          </div>
-                        </div>
-                        <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                          🔒 조건 미달성
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              );
-            })}
-          </div>
-        </section>
+        <StoreChallengeAccordionSection challengeBadges={challengeBadges} />
       )}
 
       {/* 업그레이드 확인 모달 */}
@@ -1951,3 +1881,109 @@ function BadgeShowcaseSection({ userData, history, purchasing, badgeUpgradeTarge
     </>
   )
 }
+
+function StoreChallengeAccordionSection({ challengeBadges = [] }) {
+  // Course section initial state: CLOSED (false)
+  // General section initial state: OPEN (true)
+  const [openSections, setOpenSections] = React.useState({
+    'cluster_elementary': false,
+    'middle-math': false,
+    'python': false,
+    'western-classic': false,
+    'general': true,
+  });
+
+  const toggleSection = (key) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const sections = [
+    { key: 'cluster_elementary', title: '🏫 초등수학 성역 배지' },
+    { key: 'middle-math', title: '📐 중등수학 성역 배지' },
+    { key: 'python', title: '🐍 파이썬 코딩 성역 배지' },
+    { key: 'western-classic', title: '🏛️ 서양 고전 성역 배지' },
+    { key: 'general', title: '🏅 일반 & 활동 성취 배지' }
+  ];
+
+  return (
+    <section style={{ marginBottom: '4rem' }}>
+      <h4 style={{ color: 'var(--text-bright)', margin: '0 0 1rem', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+        <span>🎖 도전할 배지 목록</span>
+      </h4>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {sections.map(({ key, title }) => {
+          const regionBadges = challengeBadges.filter(b => key === 'general' ? (!b.clusterId && b.category !== 'region_master') : b.clusterId === key);
+          if (regionBadges.length === 0) return null;
+          const isOpen = openSections[key] ?? false;
+
+          return (
+            <div key={key} className="glass-card" style={{ padding: 0, borderRadius: 12, overflow: 'hidden' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection(key)}
+                style={{
+                  width: '100%',
+                  padding: '0.95rem 1.2rem',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  border: 'none',
+                  color: 'var(--text-bright)',
+                  fontWeight: 700,
+                  fontSize: '1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  outline: 'none',
+                }}
+              >
+                <span>{title}</span>
+                <span style={{ fontSize: '0.85rem', color: isOpen ? 'var(--crystal-cyan)' : 'var(--text-muted)', fontWeight: 700 }}>
+                  {isOpen ? '열림 ▲' : '닫힘 ▼'}
+                </span>
+              </button>
+
+              {isOpen && (
+                <div style={{ padding: '1rem', background: 'rgba(5, 10, 25, 0.4)', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  {regionBadges.map((badge) => (
+                    <div
+                      key={badge.id}
+                      className="glass-card"
+                      style={{
+                        padding: '1rem',
+                        textAlign: 'center',
+                        opacity: 0.6,
+                        filter: 'grayscale(70%)',
+                        minHeight: 206,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        border: '1px solid var(--glass-border)',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '2.75rem', lineHeight: 1, marginBottom: '0.75rem' }}>{badge.icon}</div>
+                        <div style={{ fontWeight: 900, color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                          {badge.title}
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.5, marginTop: '0.45rem', minHeight: '2.5em' }}>
+                          {badge.desc}
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        🔒 조건 미달성
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+

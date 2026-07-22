@@ -10,12 +10,12 @@ export default function SpaceCollection({ userData, history }) {
     [userData, history]
   );
 
-  // Group state for Region Accordions: default open all or toggleable
+  // Group state for Region Accordions: default closed for courses
   const [openRegions, setOpenRegions] = useState({
-    'cluster_elementary': true,
-    'middle-math': true,
-    'python': true,
-    'western-classic': true,
+    'cluster_elementary': false,
+    'middle-math': false,
+    'python': false,
+    'western-classic': false,
   });
 
   const toggleRegion = (key) => {
@@ -145,7 +145,7 @@ export default function SpaceCollection({ userData, history }) {
           <p style={{ color: 'var(--text-bright)', marginBottom: '0.3rem', fontWeight: 700 }}>💡 마스터 배지 도감 안내</p>
           <ul style={{ color: 'var(--text-muted)', lineHeight: 1.55, paddingLeft: '1.2rem', margin: 0 }}>
             <li><strong>코스 & 성역(Region) 마스터</strong>: 각 과정 및 행성 영역을 완주하면 수여되는 <strong>최고의 명예 배지</strong>입니다.</li>
-            <li>성역 카드를 클릭하면 하위 챕터 및 성역 배지 목록을 <strong>접기/펼치기(아코디언)</strong>할 수 있습니다.</li>
+            <li>성역 카드를 클릭하면 하위 챕터 및 성역 배지 목록을 <strong>열림/닫힘(아코디언)</strong>할 수 있습니다.</li>
           </ul>
         </div>
       </div>
@@ -165,13 +165,12 @@ export default function SpaceCollection({ userData, history }) {
       <div style={{ marginBottom: '3rem' }}>
         <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span>🛸 성역(Region)별 마스터 배지 그룹</span>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>(클릭 시 펼치기/접기)</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>(클릭 시 열림/닫힘)</span>
         </h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
           {Object.entries(clusterGroups).map(([clusterKey, group]) => {
-            const isOpen = openRegions[clusterKey] ?? true;
-            const unlockedInGroup = group.badges.filter((b) => b.unlocked).length;
+            const isOpen = openRegions[clusterKey] ?? false;
             return (
               <div key={clusterKey} className="glass-card" style={{ borderRadius: 14, overflow: 'hidden', padding: 0 }}>
                 {/* Accordion Header */}
@@ -194,14 +193,11 @@ export default function SpaceCollection({ userData, history }) {
                     outline: 'none',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div>
                     <span>{group.title}</span>
-                    <span style={{ fontSize: '0.82rem', padding: '0.2rem 0.6rem', borderRadius: 12, background: unlockedInGroup > 0 ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 255, 255, 0.08)', color: unlockedInGroup > 0 ? 'var(--planet-green)' : 'var(--text-muted)' }}>
-                      {unlockedInGroup} / {group.badges.length} 달성
-                    </span>
                   </div>
-                  <span style={{ fontSize: '0.9rem', color: 'var(--crystal-cyan)', transition: 'transform 0.2s' }}>
-                    {isOpen ? '▲ 접기' : '▼ 펼치기'}
+                  <span style={{ fontSize: '0.85rem', color: isOpen ? 'var(--crystal-cyan)' : 'var(--text-muted)', fontWeight: 700 }}>
+                    {isOpen ? '열림 ▲' : '닫힘 ▼'}
                   </span>
                 </button>
 

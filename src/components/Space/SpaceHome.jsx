@@ -1815,6 +1815,21 @@ function SpaceHome() {
     return progress
   }, [chapters, unitProgressMap, chapterUnitResults, loadingHistory, loadingQuizAvailability, quizAvailabilityMap])
 
+  // Auto-promote region access to 'completed' when student finishes all chapters in selectedRegionId
+  useEffect(() => {
+    if (!user?.uid || !selectedRegionId || !chapters || chapters.length === 0) return;
+    if (userData?.regionAccess?.[selectedRegionId] === 'completed') return;
+
+    const allFinished = chapters.every((ch) => chapterProgress[ch.docId]?.isFinished);
+    if (allFinished) {
+      console.log(`[Auto-Promote] All chapters completed in region ${selectedRegionId}. Updating regionAccess to completed...`);
+      const userRef = doc(db, 'users', user.uid);
+      updateDoc(userRef, {
+        [`regionAccess.${selectedRegionId}`]: 'completed'
+      }).catch((err) => console.error("Failed to auto-promote region access:", err));
+    }
+  }, [user?.uid, selectedRegionId, chapters, chapterProgress, userData?.regionAccess]);
+
 
   const isProcessingSave = useRef(false)
 
