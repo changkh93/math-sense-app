@@ -138,6 +138,7 @@ function testReadyBoundary() {
   assert.equal(getGalaxyRoverExpeditionView(expedition, expedition.readyAtMs - 1).status, 'exploring');
   assert.equal(getGalaxyRoverExpeditionView(expedition, expedition.readyAtMs).status, 'ready');
   assert.equal(getGalaxyRoverExpeditionView({ ...expedition, status: 'claimed' }, expedition.readyAtMs - 1).status, 'claimed');
+  assert.equal(getGalaxyRoverExpeditionView({ ...expedition, claimedAtMs: NOW_MS + 8 * HOUR_MS }, expedition.readyAtMs - 1).status, 'claimed');
 }
 
 function testClaimStateAndExactOnceRetry() {

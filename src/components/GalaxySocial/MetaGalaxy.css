@@ -101,6 +101,13 @@
 }
 
 /* Shared glass */
+.galaxy-play-hud,
+.frontier-shell .galaxy-play-hud,
+body:has(.frontier-top-hud) .galaxy-play-hud,
+.frontier-live-status {
+  display: none !important;
+}
+
 .frontier-planet-hud,
 .frontier-economy-hud,
 .frontier-objective-card,

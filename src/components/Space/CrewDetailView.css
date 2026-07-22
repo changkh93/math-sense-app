@@ -117,6 +117,100 @@
 .crew-mothership-hero {
   position: relative;
   min-width: 0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.crew-hero-switcher-bar {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 10;
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 243, 255, 0.25);
+  background: rgba(4, 12, 28, 0.75);
+  backdrop-filter: blur(8px);
+}
+
+.crew-hero-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.crew-hero-switcher-btn.is-active {
+  background: rgba(0, 243, 255, 0.2);
+  color: #ffffff;
+  border: 1px solid rgba(0, 243, 255, 0.4);
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.25);
+}
+
+.crew-hero-mode-wrap {
+  position: relative;
+  cursor: pointer;
+}
+
+.crew-hero-switch-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(2, 6, 18, 0.65);
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  color: rgba(0, 243, 255, 0.85);
+  font-size: 0.68rem;
+  pointer-events: none;
+}
+
+.crew-hero-notes-frame {
+  padding: 1.25rem 1.4rem;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 243, 255, 0.25);
+  background: linear-gradient(165deg, rgba(6, 16, 36, 0.95) 0%, rgba(3, 8, 20, 0.98) 100%);
+  box-shadow: inset 0 0 30px rgba(0, 243, 255, 0.05);
+  cursor: default;
+}
+
+.crew-hero-notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.crew-hero-notes-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e0f2fe;
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.crew-hero-notes-back-btn:hover {
+  border-color: rgba(0, 243, 255, 0.4);
+  color: #ffffff;
+  background: rgba(0, 243, 255, 0.12);
 }
 
 .crew-mothership-hero__copy {
@@ -327,9 +421,31 @@
 
 .crew-flight-stats span,
 .crew-detail-drawer span {
+  display: inline-flex;
+  align-items: center;
   color: rgba(255, 255, 255, 0.38);
   font-size: 0.64rem;
   letter-spacing: 0.08em;
+}
+
+.crew-stat-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.3rem;
+  padding: 0.1rem;
+  border: 0;
+  background: transparent;
+  color: var(--neon-cyan, #00f3ff);
+  cursor: pointer;
+  vertical-align: middle;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.crew-stat-help-btn:hover {
+  opacity: 1;
+  transform: scale(1.22);
 }
 
 .crew-flight-stats strong {
@@ -763,6 +879,28 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 0.65rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 243, 255, 0.4) rgba(2, 8, 22, 0.6);
+  padding-right: 4px;
+}
+
+.crew-comms-log::-webkit-scrollbar {
+  width: 6px;
+}
+
+.crew-comms-log::-webkit-scrollbar-track {
+  background: rgba(2, 8, 22, 0.6);
+  border-radius: 999px;
+}
+
+.crew-comms-log::-webkit-scrollbar-thumb {
+  background: rgba(0, 243, 255, 0.35);
+  border-radius: 999px;
+  border: 1px solid rgba(0, 243, 255, 0.15);
+}
+
+.crew-comms-log::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 243, 255, 0.6);
 }
 
 .crew-comms-message {

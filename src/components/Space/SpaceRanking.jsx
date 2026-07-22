@@ -20,10 +20,14 @@ function CrewLeaderboardVessel({ summary, crew, rank }) {
     name: summary.crewName,
     color: summary.crewColor,
     memberCount: summary.memberCount,
+    mothershipXP: summary.mothershipXP,
   }
   const level = getCrewMothershipLevel(resolvedCrew)
   const moduleCount = getEquippedCrewModules(resolvedCrew).length
   const memberCount = Math.max(Number(resolvedCrew.memberCount || 0), Number(summary.memberCount || 0), 1)
+  const mothershipXP = Math.max(0, Number(resolvedCrew.mothershipXP || resolvedCrew.mothershipStats?.xp || summary.mothershipXP || 0))
+  const xpBonus = mothershipXP * 10
+  const weeklyScore = summary.totalWeeklyGain + xpBonus
 
   return (
     <div className={`ranking-crew-vessel ranking-crew-vessel--${Math.min(rank, 3)}`} style={{ '--ranking-crew-accent': resolvedCrew.color || summary.crewColor || '#00f3ff' }}>
@@ -33,9 +37,9 @@ function CrewLeaderboardVessel({ summary, crew, rank }) {
       <div className="ranking-crew-vessel__copy">
         <div><span>#{rank}</span><strong>{resolvedCrew.name || summary.crewName}</strong></div>
         <small className="font-tech">LV.{level.level} {level.name} · 멤버 {memberCount}명 · 시설 {moduleCount}</small>
-        <small className="font-tech">총 SEI {summary.totalSEI.toLocaleString()}</small>
+        <small className="font-tech">총 SEI {summary.totalSEI.toLocaleString()}{mothershipXP > 0 ? ` · MISSION ${mothershipXP.toLocaleString()} XP` : ''}</small>
       </div>
-      <div className="ranking-crew-vessel__growth font-tech"><span>WEEKLY</span><strong>+{summary.totalWeeklyGain.toLocaleString()}</strong></div>
+      <div className="ranking-crew-vessel__growth font-tech"><span>WEEKLY SCORE</span><strong>+{weeklyScore.toLocaleString()}</strong></div>
     </div>
   )
 }
@@ -161,13 +165,16 @@ export default function SpaceRanking({ user, userData }) {
       const crewMap = new Map()
       users.forEach(u => {
         if (!u.crewId) return
+        const rankingCrew = rankingCrewsById[u.crewId]
+        const mothershipXP = Math.max(0, Number(rankingCrew?.mothershipXP || rankingCrew?.mothershipStats?.xp || 0))
         const existing = crewMap.get(u.crewId) || {
           crewId: u.crewId,
-          crewName: u.crewName || '이름 없는 크루',
-          crewColor: u.crewColor || '#00f3ff',
+          crewName: u.crewName || rankingCrew?.name || '이름 없는 크루',
+          crewColor: u.crewColor || rankingCrew?.color || '#00f3ff',
           totalSEI: 0,
           totalWeeklyGain: 0,
           memberCount: 0,
+          mothershipXP,
         }
 
         existing.totalSEI += u.seiData?.total || 0
@@ -178,7 +185,9 @@ export default function SpaceRanking({ user, userData }) {
 
       const crewLeaders = Array.from(crewMap.values())
         .sort((a, b) => {
-          if (b.totalWeeklyGain !== a.totalWeeklyGain) return b.totalWeeklyGain - a.totalWeeklyGain
+          const scoreA = a.totalWeeklyGain + (a.mothershipXP * 10)
+          const scoreB = b.totalWeeklyGain + (b.mothershipXP * 10)
+          if (scoreB !== scoreA) return scoreB - scoreA
           return b.totalSEI - a.totalSEI
         })
         .slice(0, 3)

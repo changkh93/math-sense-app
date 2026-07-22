@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion as Motion } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { signOut } from 'firebase/auth';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, Copy, Crown, Loader2, LogOut, Radio, Rocket, Send, Share2, ShieldCheck, StickyNote, Trash2, Users, Wifi } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleHelp, Copy, Crown, Loader2, LogOut, Radio, Rocket, Send, Share2, ShieldCheck, StickyNote, Trash2, Users, Wifi } from 'lucide-react';
 import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
@@ -12,6 +12,7 @@ import { useAllUserPresence } from '../../hooks/useRealtimePresence';
 import soundManager from '../../utils/SoundManager';
 import { copyMeetText, getGoogleMeetCode, openGoogleMeet } from '../../utils/googleMeetNavigation';
 import CrewSettingsModal from './CrewSettingsModal';
+import CrewGuideModal from './CrewGuideModal';
 import CrewCrystalChest from './CrewCrystalChest';
 import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
@@ -290,11 +291,18 @@ export default function CrewDetailView({ onBack }) {
     });
     return Array.from(byId.values());
   }, [crew?.leaderId, crewMemberIds, members]);
+  const NOTE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000; // 7일 후 자동 만료
   const notes = useMemo(() => liveNotes, [liveNotes]);
   const displayNotes = useMemo(() => {
-    const serverKeys = new Set(notes.map((note) => `${note?.userId || ''}::${note?.text || ''}`));
+    const nowMs = Date.now();
+    const validNotes = notes.filter((note) => {
+      const createdMs = getTimestampMs(note.createdAt) || getTimestampMs(note.createdAtMs);
+      if (!createdMs) return true;
+      return nowMs - createdMs < NOTE_EXPIRATION_MS;
+    });
+    const serverKeys = new Set(validNotes.map((note) => `${note?.userId || ''}::${note?.text || ''}`));
     const filteredPending = pendingNotes.filter((note) => !serverKeys.has(`${note?.userId || ''}::${note?.text || ''}`));
-    return [...filteredPending, ...notes].slice(0, 6);
+    return [...filteredPending, ...validNotes].slice(0, 6);
   }, [notes, pendingNotes]);
   const status = crew?.status || userData?.crewStatus || 'pending';
   const todayKey = getTodayKey();
@@ -318,6 +326,16 @@ export default function CrewDetailView({ onBack }) {
   const mothershipDockedProfiles = useMemo(() => Object.entries(effectiveMemberProfiles)
     .filter(([, profile]) => profile)
     .map(([uid, profile]) => ({ uid, ...profile })), [effectiveMemberProfiles]);
+  const [guideModalState, setGuideModalState] = useState({ isOpen: false, tab: 'all' });
+  const [heroMode, setHeroMode] = useState('ship');
+  const [showGrowthRules, setShowGrowthRules] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHeroMode('notes');
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!crewId || !user?.uid) {
@@ -726,12 +744,169 @@ export default function CrewDetailView({ onBack }) {
 
         <div className="crew-cockpit-main">
           <div className="crew-mothership-hero">
-            <div className="crew-mothership-hero__copy">
-              <div className="crew-eyebrow font-tech">ORBITAL STUDY VESSEL</div>
-              <h1 className="font-title">{crew.name || userData?.crewName || '스터디 크루'}</h1>
-              <p className="font-tech">{crew.motto || '함께 항해할 준비가 되었습니다.'}</p>
+            <div className="crew-hero-switcher-bar font-tech">
+              <button
+                type="button"
+                className={`crew-hero-switcher-btn ${heroMode === 'ship' ? 'is-active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  soundManager.playClick();
+                  setHeroMode('ship');
+                }}
+              >
+                <Rocket size={13} /> 탐사정 뷰
+              </button>
+              <button
+                type="button"
+                className={`crew-hero-switcher-btn ${heroMode === 'notes' ? 'is-active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  soundManager.playClick();
+                  setHeroMode('notes');
+                }}
+              >
+                <StickyNote size={13} /> 크루 메모 ({displayNotes.length})
+              </button>
             </div>
-            <CrewMothership crew={crew} memberProfiles={mothershipDockedProfiles} variant="hero" />
+
+            <AnimatePresence mode="wait">
+              {heroMode === 'ship' ? (
+                <Motion.div
+                  key="hero-ship"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.35 }}
+                  className="crew-hero-mode-wrap"
+                  onClick={() => setHeroMode('notes')}
+                  title="클릭하여 크루 메모 보드로 전환"
+                >
+                  <div className="crew-mothership-hero__copy">
+                    <div className="crew-eyebrow font-tech">ORBITAL STUDY VESSEL</div>
+                    <h1 className="font-title">{crew.name || userData?.crewName || '스터디 크루'}</h1>
+                    <p className="font-tech">{crew.motto || '함께 항해할 준비가 되었습니다.'}</p>
+                  </div>
+                  <CrewMothership
+                    crew={crew}
+                    memberProfiles={mothershipDockedProfiles}
+                    variant="hero"
+                  />
+                  <div className="crew-hero-switch-hint font-tech">
+                    <span>💬 클릭하여 크루 메모 보기</span>
+                  </div>
+                </Motion.div>
+              ) : (
+                <Motion.div
+                  key="hero-notes"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.35 }}
+                  className="crew-hero-mode-wrap crew-hero-notes-frame"
+                >
+                  <div className="crew-hero-notes-header">
+                    <div>
+                      <div className="font-tech" style={{ color: 'var(--neon-cyan, #00f3ff)', fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <StickyNote size={14} /> CREW POST-IT BOARD
+                      </div>
+                      <h2 className="font-title" style={{ margin: '0.15rem 0 0', fontSize: '1.25rem', color: '#ffffff' }}>크루 공유 메모장</h2>
+                    </div>
+                  </div>
+
+                  <div className="crew-comms-composer" style={{ marginTop: '0.75rem' }}>
+                    <textarea
+                      style={{ ...inputStyle, minHeight: 64, resize: 'vertical', lineHeight: 1.45, fontSize: '0.85rem' }}
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      onKeyDown={handleNoteKeyDown}
+                      placeholder="나누고 싶은 글, 오늘의 약속, 먼저 들어온 사람이 남기는 말을 적어주세요."
+                      maxLength={NOTE_MAX_LENGTH}
+                      disabled={activeNoteAction === 'posting'}
+                    />
+                    <button
+                      className="space-btn cosmic-btn font-tech"
+                      type="button"
+                      disabled={activeNoteAction === 'posting' || !noteText.trim()}
+                      onClick={() => handlePostNote()}
+                      style={{ borderRadius: 8, minWidth: 54, minHeight: 46, padding: '0 0.9rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {activeNoteAction === 'posting' ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
+                    </button>
+                  </div>
+
+                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.72rem', marginTop: '-0.3rem', marginBottom: '0.6rem', textAlign: 'right' }}>
+                    {noteText.length}/{NOTE_MAX_LENGTH} · 작성 메모는 7일간 유지됩니다
+                  </div>
+
+                  {displayNotes.length ? (
+                    <div className="crew-comms-log" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                      {displayNotes.map((note, index) => {
+                        const { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead } = getGreetingReadMeta(note, activeParticipantIds, user?.uid);
+                        const canDeleteNote = note.userId === user?.uid || isLeader || userData?.role === 'admin';
+                        const isPendingPost = !!note.localPending;
+                        const noteColor = ['rgba(250, 204, 21, 0.18)', 'rgba(45, 212, 191, 0.16)', 'rgba(96, 165, 250, 0.16)', 'rgba(251, 191, 36, 0.14)'][index % 4];
+                        return (
+                          <div
+                            key={note.id || `${note.userId}-${index}`}
+                            className="crew-comms-message"
+                            style={{ '--note-tint': noteColor, padding: '0.75rem 0.85rem' }}
+                          >
+                            <div className="font-tech" style={{ color: 'rgba(255,255,255,0.66)', fontSize: '0.74rem', marginBottom: '0.35rem', display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <strong>{memberNameById.get(note.userId) || note.userName || '크루 멤버'}</strong>
+                                {note.userId === user?.uid && (
+                                  <span style={{ padding: '0.1rem 0.4rem', borderRadius: 999, background: 'rgba(96,165,250,0.16)', color: 'var(--crystal-cyan)', fontSize: '0.68rem' }}>내 메모</span>
+                                )}
+                              </span>
+                              <span style={{ color: isFullyRead ? 'var(--planet-green)' : 'rgba(255,255,255,0.64)', fontSize: '0.7rem' }}>
+                                읽음 {readCount}/{totalCount}명
+                              </span>
+                            </div>
+                            <div className="font-tech" style={{ color: 'var(--text-bright)', fontSize: '0.84rem', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '0.5rem' }}>{note.text}</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                              <div className="font-tech" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem' }}>
+                                {normalizedReadBy.length > 0 ? `읽은 사람 ${readCount}명` : '아직 읽은 사람이 없습니다'}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                {note.userId !== user?.uid && (
+                                  <button
+                                    type="button"
+                                    className="space-nav-link font-tech"
+                                    onClick={() => handleReadNote(note.id)}
+                                    disabled={activeNoteAction === `read:${note.id}` || activeNoteAction === 'posting' || hasCurrentUserRead}
+                                    style={{ borderRadius: 6, padding: '0.25rem 0.5rem', fontSize: '0.74rem' }}
+                                  >
+                                    {hasCurrentUserRead ? '읽음' : '읽었어요'}
+                                  </button>
+                                )}
+                                {canDeleteNote && (
+                                  <button
+                                    type="button"
+                                    className="space-nav-link font-tech"
+                                    onClick={() => handleDeleteNote(note.id)}
+                                    disabled={activeNoteAction === `delete:${note.id}` || activeNoteAction === 'posting'}
+                                    style={{ borderRadius: 6, padding: '0.25rem 0.5rem', fontSize: '0.74rem', color: '#fca5a5' }}
+                                  >
+                                    <Trash2 size={12} /> 삭제
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ borderRadius: 10, minHeight: 90, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.45)' }}>
+                      <div className="font-tech" style={{ textAlign: 'center', fontSize: '0.8rem' }}>
+                        <StickyNote size={18} style={{ marginBottom: '0.3rem', opacity: 0.5 }} />
+                        <div>아직 남겨진 포스트잇이 없습니다. (7일간 유지 후 자동 정리)</div>
+                      </div>
+                    </div>
+                  )}
+                </Motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <aside className="crew-launch-console">
@@ -771,12 +946,28 @@ export default function CrewDetailView({ onBack }) {
           {[
             { label: 'CREW', value: `${Math.max(crew.memberCount || rosterMembers.length || 1, rosterMembers.length) + activeGuestCount}명` },
             { label: 'ONLINE', value: `${onlineFlightCrewCount}명` },
-            { label: 'MOTHERSHIP', value: `Lv.${mothershipLevel.level} ${mothershipLevel.name}` },
-            { label: 'MISSION XP', value: `${mothershipStats.xp.toLocaleString()} XP` },
+            { label: 'MOTHERSHIP', value: `Lv.${mothershipLevel.level} ${mothershipLevel.name}`, helpTab: 'level' },
+            { label: 'MISSION XP', value: `${mothershipStats.xp.toLocaleString()} XP`, helpTab: 'xp' },
             { label: 'SCHEDULE', value: formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes) },
           ].map((item) => (
-            <div key={item.label}>
-              <span className="font-tech">{item.label}</span>
+            <div key={item.label} className={item.helpTab ? 'has-help-stat' : ''}>
+              <span className="font-tech">
+                {item.label}
+                {item.helpTab && (
+                  <button
+                    type="button"
+                    className="crew-stat-help-btn"
+                    aria-label={`${item.label} 설명 보기`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      soundManager.playClick();
+                      setGuideModalState({ isOpen: true, tab: item.helpTab });
+                    }}
+                  >
+                    <CircleHelp size={13} />
+                  </button>
+                )}
+              </span>
               <strong className="font-tech">{item.value}</strong>
             </div>
           ))}
@@ -885,13 +1076,39 @@ export default function CrewDetailView({ onBack }) {
             isGuest={isGuest}
           />
           <div className="crew-growth-status__rules font-tech">
-            <strong>부정 방지·집계 규정</strong>
-            <span>첫 입장 24시간 + 퀴즈 배틀 2회 + 실제 답변 10문제를 완료하면 자동 집계됩니다.</span>
-            <span>탐사원 대전과 NOVA-7 AI 대결을 모두 인정합니다. 동일 기기 중복은 자동 제외되며, 동일 IP의 단시간 다량 생성과 비정상 활동은 운영툴에서 사후 검토하여 로그인 정지·삭제할 수 있습니다.</span>
-            <span>20명 도달 순간의 명단이 48시간 고정됩니다. 중간에 새로 가입한 회원은 이탈자를 대신할 수 없으며, 인원이 부족해지면 검증이 다시 시작됩니다.</span>
-            <span>한 계정은 이벤트 전체에서 한 번만 달성 인원과 1,000광석 대상이 될 수 있습니다. 보상 후 다른 크루 가입은 가능하지만 이벤트에는 재집계되지 않습니다.</span>
-            {growthEvent?.currentUserEventCompleted && <span style={{ color: '#f0abfc' }}>내 계정은 이벤트 참여를 이미 완료해 현재 크루의 달성 인원에서 제외됩니다.</span>}
-            <span>멤버별 고유 링크는 1회용이 아닙니다. 같은 링크 하나로 여러 친구를 제한 없이 초대할 수 있으며, 친구마다 별도의 게스트 UID가 발급됩니다.</span>
+            <button
+              type="button"
+              className="crew-growth-rules-toggle font-tech"
+              onClick={() => {
+                soundManager.playClick();
+                setShowGrowthRules((prev) => !prev);
+              }}
+              style={{
+                background: 'transparent',
+                border: 0,
+                padding: 0,
+                color: 'rgba(255, 255, 255, 0.75)',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              <span>부정 방지·집계 규정 자세히 보기</span>
+              <ChevronDown size={14} style={{ transform: showGrowthRules ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+            </button>
+            {showGrowthRules && (
+              <div className="crew-growth-rules-body" style={{ marginTop: '0.65rem', display: 'grid', gap: '0.35rem' }}>
+                <span>첫 입장 24시간 + 퀴즈 배틀 2회 + 실제 답변 10문제를 완료하면 자동 집계됩니다.</span>
+                <span>탐사원 대전과 NOVA-7 AI 대결을 모두 인정합니다. 동일 기기 중복은 자동 제외되며, 동일 IP의 단시간 다량 생성과 비정상 활동은 운영툴에서 사후 검토하여 로그인 정지·삭제할 수 있습니다.</span>
+                <span>20명 도달 순간의 명단이 48시간 고정됩니다. 중간에 새로 가입한 회원은 이탈자를 대신할 수 없으며, 인원이 부족해지면 검증이 다시 시작됩니다.</span>
+                <span>한 계정은 이벤트 전체에서 한 번만 달성 인원과 1,000광석 대상이 될 수 있습니다. 보상 후 다른 크루 가입은 가능하지만 이벤트에는 재집계되지 않습니다.</span>
+                {growthEvent?.currentUserEventCompleted && <span style={{ color: '#f0abfc' }}>내 계정은 이벤트 참여를 이미 완료해 현재 크루의 달성 인원에서 제외됩니다.</span>}
+                <span>멤버별 고유 링크는 1회용이 아닙니다. 같은 링크 하나로 여러 친구를 제한 없이 초대할 수 있으며, 친구마다 별도의 게스트 UID가 발급됩니다.</span>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -944,131 +1161,6 @@ export default function CrewDetailView({ onBack }) {
           ))}
         </div>
       </section>
-
-      {/* Post-it Board */}
-      <Motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="crew-workspace-comms">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
-          <div>
-            <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <StickyNote size={15} /> CREW POST-IT
-            </div>
-            <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1.15rem', marginTop: '0.15rem' }}>함께 남기는 메모</div>
-          </div>
-        </div>
-        <div className="crew-comms-composer">
-          <textarea
-            style={{ ...inputStyle, minHeight: 72, resize: 'vertical', lineHeight: 1.45 }}
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            onKeyDown={handleNoteKeyDown}
-            placeholder="나누고 싶은 글, 오늘의 약속, 먼저 들어온 사람이 남기는 말을 적어주세요."
-            maxLength={NOTE_MAX_LENGTH}
-            disabled={activeNoteAction === 'posting'}
-          />
-          <button
-            className="space-btn cosmic-btn font-tech"
-            type="button"
-            disabled={activeNoteAction === 'posting' || !noteText.trim()}
-            onClick={() => handlePostNote()}
-            style={{ borderRadius: 8, minWidth: 54, minHeight: 46, padding: '0 0.9rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            {activeNoteAction === 'posting' ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
-          </button>
-        </div>
-        <div className="font-tech" style={{ color: 'rgba(255,255,255,0.48)', fontSize: '0.74rem', marginTop: '-0.4rem', marginBottom: '0.9rem', textAlign: 'right' }}>
-          {noteText.length}/{NOTE_MAX_LENGTH}
-        </div>
-        {displayNotes.length ? (
-          <div className="crew-comms-log">
-            {displayNotes.map((note, index) => {
-              const { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead } = getGreetingReadMeta(note, activeParticipantIds, user?.uid);
-              const canDeleteNote = note.userId === user?.uid || userData?.role === 'admin';
-              const isPendingPost = !!note.localPending;
-              const noteColor = ['rgba(250, 204, 21, 0.18)', 'rgba(45, 212, 191, 0.16)', 'rgba(96, 165, 250, 0.16)', 'rgba(251, 191, 36, 0.14)'][index % 4];
-              return (
-                <div
-                  key={note.id || `${note.userId}-${index}`}
-                  className="crew-comms-message"
-                  style={{ '--note-tint': noteColor }}
-                >
-                  <div style={{
-                    position: 'absolute',
-                    top: 10,
-                    right: 12,
-                    width: 34,
-                    height: 10,
-                    borderRadius: 999,
-                    background: 'rgba(255,255,255,0.16)',
-                  }} />
-                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.66)', fontSize: '0.76rem', marginBottom: '0.45rem', display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      {memberNameById.get(note.userId) || note.userName || '크루 멤버'}
-                      {note.userId === user?.uid && (
-                        <span style={{ padding: '0.12rem 0.45rem', borderRadius: 999, background: 'rgba(96,165,250,0.16)', color: 'var(--crystal-cyan)' }}>내 메모</span>
-                      )}
-                      {isPendingPost && (
-                        <span style={{ padding: '0.12rem 0.45rem', borderRadius: 999, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.72)' }}>저장 중</span>
-                      )}
-                    </span>
-                    <span style={{ color: isFullyRead ? 'var(--planet-green)' : 'rgba(255,255,255,0.64)' }}>
-                      읽음 {readCount}/{totalCount}명
-                    </span>
-                  </div>
-                  <div className="font-tech" style={{ color: 'var(--text-bright)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: '0.7rem' }}>{note.text}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                    <div className="font-tech" style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.74rem' }}>
-                      {normalizedReadBy.length > 0 ? `읽은 사람 ${readCount}명` : '아직 읽은 사람이 없습니다'}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      {note.userId !== user?.uid && (
-                        <button
-                          type="button"
-                          className="space-nav-link font-tech"
-                          onClick={() => handleReadNote(note.id)}
-                          disabled={activeNoteAction === `read:${note.id}` || activeNoteAction === 'posting' || hasCurrentUserRead}
-                          style={{ borderRadius: 8, padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}
-                        >
-                          {activeNoteAction === `read:${note.id}` ? '처리 중...' : hasCurrentUserRead ? '읽음' : '읽었어요'}
-                        </button>
-                      )}
-                      {canDeleteNote && (
-                        <button
-                          type="button"
-                          className="space-nav-link font-tech"
-                          onClick={() => handleDeleteNote(note.id)}
-                          disabled={activeNoteAction === `delete:${note.id}` || activeNoteAction === 'posting'}
-                          style={{ borderRadius: 8, padding: '0.35rem 0.6rem', fontSize: '0.78rem', color: '#fca5a5' }}
-                        >
-                          {activeNoteAction === `delete:${note.id}` ? '삭제 중...' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><Trash2 size={13} />삭제</span>}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '0.75rem' }}>
-            <div
-              style={{
-                borderRadius: 12,
-                minHeight: 132,
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px dashed rgba(255,255,255,0.14)',
-                display: 'grid',
-                placeItems: 'center',
-                color: 'rgba(255,255,255,0.5)',
-              }}
-            >
-              <div className="font-tech" style={{ textAlign: 'center', lineHeight: 1.55 }}>
-                <StickyNote size={20} style={{ marginBottom: '0.45rem', opacity: 0.6 }} />
-                <div>아직 남겨진 포스트잇이 없습니다.</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Motion.section>
       </div>
 
       {userData?.crewRole === 'leader' && (
@@ -1122,6 +1214,11 @@ export default function CrewDetailView({ onBack }) {
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
         crew={crew}
+      />
+      <CrewGuideModal
+        isOpen={guideModalState.isOpen}
+        onClose={() => setGuideModalState({ isOpen: false, tab: 'all' })}
+        initialTab={guideModalState.tab}
       />
     </div>
   );

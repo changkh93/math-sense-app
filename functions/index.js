@@ -9089,6 +9089,20 @@ exports.contributeCrewMothershipOre = crewMothershipFunctions.https.onCall(async
       currentMothershipProject: nextProject,
       ownedMothershipModules: ownedModules,
       equippedMothershipModules: equippedModules,
+      ...(completed ? {
+        completedMothershipProjectsHistory: {
+          ...(crew.completedMothershipProjectsHistory && typeof crew.completedMothershipProjectsHistory === "object" ? crew.completedMothershipProjectsHistory : {}),
+          [project.itemId]: {
+            itemId: project.itemId,
+            name: module.name,
+            requiredOre: Number(project.requiredOre || module.cost),
+            contributedOre: nextContributedOre,
+            contributionsByUser,
+            contributorNamesById,
+            completedAt: now,
+          },
+        },
+      } : {}),
       mothershipXP: nextXP,
       mothershipStats: {
         ...stats,

@@ -550,7 +550,8 @@ function stableGalaxyHash(value) {
 
 function getGalaxyRoverExpeditionView(expedition, nowMs = Date.now()) {
   if (!expedition || typeof expedition !== "object" || !expedition.operationId) return null;
-  const status = expedition.status === "claimed"
+  const isClaimed = expedition.status === "claimed" || Boolean(expedition.claimedAtMs) || Boolean(expedition.claimedAt);
+  const status = isClaimed
     ? "claimed"
     : Math.max(0, Number(expedition.readyAtMs || 0)) <= Math.max(0, Number(nowMs || 0))
       ? "ready"
@@ -2727,11 +2728,29 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       if (!planetSnap.exists) {
         throw new functions.https.HttpsError("not-found", "탐사 로버를 출발시킬 행성을 찾을 수 없습니다.");
       }
+      const planetData = planetSnap.data() || {};
+      const prevOpId = cleanId(planetData.roverExpedition?.operationId, 120);
+      let previousOperationSnap = null;
+      if (prevOpId && prevOpId !== operationId) {
+        const prevOpRef = userRef.collection("galaxyOperations").doc(prevOpId);
+        previousOperationSnap = await transaction.get(prevOpRef);
+      }
+      const isPrevOpClaimed = previousOperationSnap?.exists && previousOperationSnap.data()?.status === "claimed";
+      const effectivePlanet = {
+        ...planetData,
+        ...(isPrevOpClaimed ? {
+          roverExpedition: {
+            ...(planetData.roverExpedition || {}),
+            status: "claimed",
+            claimedAtMs: previousOperationSnap.data()?.claimedAtMs || Date.now(),
+          },
+        } : {}),
+      };
       const plan = planGalaxyRoverStart({
         operationId,
         route,
         existingOperation: operationSnap.exists ? operationSnap.data() || {} : null,
-        planet: planetSnap.data() || {},
+        planet: effectivePlanet,
         nowMs: serverNowMs,
       });
       if (plan.kind === "operation_conflict") {
@@ -2828,6 +2847,10 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         if (!plan.claimResult) {
           throw new functions.https.HttpsError("data-loss", "완료된 탐사 로버의 수령 결과가 없습니다.");
         }
+        transaction.set(planet.ref, {
+          roverExpedition: plan.expedition,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
         return {
           expedition: plan.expedition,
           claimResult: plan.claimResult,

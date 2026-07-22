@@ -1,9 +1,9 @@
 export const CREW_MOTHERSHIP_LEVELS = [
-  { level: 1, minMembers: 1, name: '크루 탐사정', code: 'CREW SCOUT', description: '소형 코어와 기본 도킹 포트를 갖춘 첫 공동 함선' },
-  { level: 2, minMembers: 10, name: '궤도 탐사선', code: 'ORBITAL EXPLORER', description: '10명의 승무원이 모여 양측 모듈 베이를 확장한 함선' },
-  { level: 3, minMembers: 20, name: '성간 연구모함', code: 'STELLAR CARRIER', description: '20명의 항로와 다중 격납고를 운용하는 연구모함' },
-  { level: 4, minMembers: 40, name: '궤도 연구기지', code: 'ORBITAL STATION', description: '40명의 항로를 연결하는 거대 궤도 연구기지' },
-  { level: 5, minMembers: 80, name: '은하 수도함', code: 'GALACTIC CITADEL', description: '80명의 완전체 함대와 워프 항로를 통제하는 전설 기함' },
+  { level: 1, minMembers: 1, minXP: 0, name: '크루 탐사정', code: 'CREW SCOUT', description: '소형 코어와 기본 도킹 포트를 갖춘 첫 공동 함선' },
+  { level: 2, minMembers: 10, minXP: 100, name: '궤도 탐사선', code: 'ORBITAL EXPLORER', description: '10명의 승무원 또는 100 XP 달성으로 양측 모듈 베이를 확장한 함선' },
+  { level: 3, minMembers: 20, minXP: 300, name: '성간 연구모함', code: 'STELLAR CARRIER', description: '20명의 항로 또는 300 XP 달성으로 다중 격납고를 운용하는 연구모함' },
+  { level: 4, minMembers: 40, minXP: 800, name: '궤도 연구기지', code: 'ORBITAL STATION', description: '40명의 항로 또는 800 XP 달성으로 거대 궤도 연구기지로 확장' },
+  { level: 5, minMembers: 80, minXP: 2000, name: '은하 수도함', code: 'GALACTIC CITADEL', description: '80명의 함대 또는 2,000 XP 달성으로 워프 항로를 통제하는 전설 기함' },
 ]
 
 export const CREW_MOTHERSHIP_DEFAULT_MODULES = ['core-cadet', 'hangar-basic']
@@ -57,7 +57,11 @@ export function getCrewMemberCount(crew = {}) {
 
 export function getCrewMothershipLevel(crew = {}) {
   const memberCount = getCrewMemberCount(crew)
-  return [...CREW_MOTHERSHIP_LEVELS].reverse().find((item) => memberCount >= item.minMembers) || CREW_MOTHERSHIP_LEVELS[0]
+  const stats = getCrewMothershipStats(crew)
+  const xp = stats.xp
+  return [...CREW_MOTHERSHIP_LEVELS].reverse().find(
+    (item) => memberCount >= item.minMembers || (item.minXP > 0 && xp >= item.minXP)
+  ) || CREW_MOTHERSHIP_LEVELS[0]
 }
 
 export function getCrewMothershipStats(crew = {}) {

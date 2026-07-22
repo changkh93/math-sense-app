@@ -2845,7 +2845,7 @@ function SpaceHome() {
                   lineHeight: 1.7,
                   fontSize: isMobile ? '0.98rem' : '1.05rem'
                 }}>
-                  이 계정은 아직 메타센스 회원으로 등록되어 있지 않습니다. 학부모 회원가입을 먼저 완료한 뒤 같은 화면에서 로그인해 주세요.
+                  이 계정은 아직 메타센스 회원으로 등록되어 있지 않습니다. 회원가입을 먼저 완료한 뒤 같은 화면에서 로그인해 주세요.
                 </p>
                 {signupPrompt.email && (
                   <div className="font-tech" style={{

@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion as Motion } from 'framer-motion'
-import { Check, ChevronRight, CircleDollarSign, CircleHelp, Gem, Hammer, LockKeyhole, RadioTower, Sparkles, UsersRound } from 'lucide-react'
+import { Check, ChevronRight, CircleDollarSign, Gem, Hammer, LockKeyhole, RadioTower, Sparkles, Trophy, UsersRound } from 'lucide-react'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '../../firebase'
 import soundManager from '../../utils/SoundManager'
@@ -16,6 +16,23 @@ import './CrewConstructionDock.css'
 
 const TIER_LABELS = { COMMON: '일반', UNCOMMON: '고급', RARE: '희귀', EPIC: '영웅', LEGEND: '전설' }
 
+const getItemContributors = (itemId, crew) => {
+  const history = crew?.completedMothershipProjectsHistory?.[itemId]
+  const current = crew?.currentMothershipProject?.itemId === itemId ? crew.currentMothershipProject : null
+  const source = history || current
+  if (!source) return []
+  const amounts = source.contributionsByUser && typeof source.contributionsByUser === 'object' ? source.contributionsByUser : {}
+  const names = source.contributorNamesById && typeof source.contributorNamesById === 'object' ? source.contributorNamesById : {}
+  return Object.entries(amounts)
+    .map(([uid, amount]) => ({
+      uid,
+      name: names[uid] || '크루원',
+      amount: Number(amount || 0),
+    }))
+    .filter((c) => c.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+}
+
 export default function CrewConstructionDock({ crew, crewId, userData, isLeader, isGuest }) {
   const [selectedItemId, setSelectedItemId] = React.useState('')
   const [selectedAmount, setSelectedAmount] = React.useState(10)
@@ -23,7 +40,6 @@ export default function CrewConstructionDock({ crew, crewId, userData, isLeader,
   const [message, setMessage] = React.useState('')
   const [contributionSummary, setContributionSummary] = React.useState({ projectId: '', contributors: [] })
   const [contributionSummaryLoading, setContributionSummaryLoading] = React.useState(false)
-  const [xpHelpOpen, setXpHelpOpen] = React.useState(false)
   const owned = React.useMemo(() => new Set(getOwnedCrewModules(crew)), [crew])
   const stats = React.useMemo(() => getCrewMothershipStats(crew), [crew])
   const project = crew?.currentMothershipProject?.status === 'funding' ? crew.currentMothershipProject : null
@@ -124,18 +140,10 @@ export default function CrewConstructionDock({ crew, crewId, userData, isLeader,
         <div>
           <span className="font-tech"><Hammer size={15} /> MOTHERSHIP CONSTRUCTION DOCK</span>
           <h2 className="font-title">공동 건설소</h2>
-          <p>리더가 시설을 선택하면 모든 멤버가 원하는 만큼 광석을 지원합니다. 지원 내역은 함께 확인하되 순위는 만들지 않습니다.</p>
+          <p>리더가 시설을 선택하면 모든 멤버가 원하는 만큼 광석을 지원합니다.</p>
         </div>
         <div className="crew-construction-dock__stats font-tech">
-          <div className={`crew-construction-stat crew-construction-stat--help ${xpHelpOpen ? 'is-open' : ''}`}>
-            <span>MISSION XP <button type="button" aria-label="MISSION XP 설명" aria-expanded={xpHelpOpen} onClick={() => setXpHelpOpen((open) => !open)}><CircleHelp size={13} /></button></span>
-            <strong>{stats.xp.toLocaleString()}</strong>
-            <div className="crew-construction-stat__tooltip" role="tooltip">
-              <b>MISSION XP란?</b>
-              <p>크루가 함께 달성한 활동의 누적 점수입니다. 팀 미션과 광석 상자 완료 시 +20, 시설 완성 시 +50 XP를 받습니다.</p>
-              <small>모함 외형 레벨은 XP가 아니라 정식 멤버 수 1·10·20·40·80명으로 결정됩니다.</small>
-            </div>
-          </div>
+          <div><span>MISSION XP</span><strong>{stats.xp.toLocaleString()}</strong></div>
           <div><span>BUILT</span><strong>{stats.completedProjects}</strong></div>
           <div><span>SUPPORTED</span><strong>{stats.totalContributedOre.toLocaleString()}</strong></div>
         </div>
@@ -199,6 +207,7 @@ export default function CrewConstructionDock({ crew, crewId, userData, isLeader,
           const isOwned = owned.has(item.id)
           const isCurrent = project?.itemId === item.id
           const selected = selectedItemId === item.id
+          const itemContributors = isOwned ? getItemContributors(item.id, crew) : []
           return (
             <article key={item.id} className={`crew-facility-card crew-facility-card--${item.tier.toLowerCase()} ${selected ? 'is-selected' : ''} ${isOwned ? 'is-owned' : ''}`}>
               <button type="button" className="crew-facility-card__select" onClick={() => setSelectedItemId(selected ? '' : item.id)}>
@@ -208,7 +217,29 @@ export default function CrewConstructionDock({ crew, crewId, userData, isLeader,
               </button>
               {selected && <Motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="crew-facility-card__detail">
                 <p>{item.description}</p>
-                <div><span><Gem size={13} /> 건설비 {item.cost.toLocaleString()}</span>{item.achievement && <span>{item.achievement.label} · {Math.min(unlock.achievementCurrent, item.achievement.value)}/{item.achievement.value}</span>}</div>
+                {isOwned ? (
+                  <div className="crew-facility-honor font-tech" style={{ marginTop: '0.5rem', padding: '0.6rem 0.75rem', borderRadius: 10, background: 'rgba(255, 214, 108, 0.08)', border: '1px solid rgba(255, 214, 108, 0.25)', display: 'block' }}>
+                    <div style={{ color: '#ffd66a', fontWeight: 900, fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem' }}>
+                      <Trophy size={14} style={{ color: '#ffd66a' }} /> 건설 명예 기부 승무원 명단
+                    </div>
+                    {itemContributors.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.72rem' }}>
+                        {itemContributors.map((c) => (
+                          <span key={c.uid || c.name} style={{ padding: '0.2rem 0.5rem', borderRadius: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <strong style={{ color: '#ffffff' }}>{c.name}</strong>
+                            <span style={{ color: '#ffe193', fontWeight: 800 }}><Gem size={11} style={{ verticalAlign: 'middle', marginRight: 2 }} />{c.amount.toLocaleString()}광석</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Gem size={12} style={{ color: '#ffd66a' }} /> 건설비 {item.cost.toLocaleString()}광석 · 크루원 공동 기부 완성
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div><span><Gem size={13} /> 건설비 {item.cost.toLocaleString()}</span>{item.achievement && <span>{item.achievement.label} · {Math.min(unlock.achievementCurrent, item.achievement.value)}/{item.achievement.value}</span>}</div>
+                )}
                 {isLeader && !project && !isOwned && <button type="button" disabled={!unlock.unlocked || !!action} onClick={() => startProject(item)}>{action === `start:${item.id}` ? '프로젝트 생성 중…' : unlock.unlocked ? '공동 건설 시작' : unlock.reason}</button>}
               </Motion.div>}
             </article>

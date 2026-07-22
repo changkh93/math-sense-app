@@ -1,4 +1,5 @@
 import React from 'react'
+import { CircleHelp } from 'lucide-react'
 import ModularShip from './ModularShip'
 import {
   CREW_MOTHERSHIP_MODULE_MAP,
@@ -6,6 +7,7 @@ import {
   getCrewMothershipStats,
   getEquippedCrewModules,
 } from '../../utils/crewMothershipCatalog'
+import soundManager from '../../utils/SoundManager'
 import './CrewMothership.css'
 
 function MothershipSvg({ crew, compact = false }) {
@@ -127,19 +129,23 @@ function MothershipSvg({ crew, compact = false }) {
 
       {hasStorage && <g className="crew-mothership__storage">
         <path d="M522 405 Q600 450 678 405 L651 472 Q600 505 549 472 Z" fill="#3f2a0a" stroke="#ffd866" strokeWidth="7" />
-        {[570, 600, 630].map((x, i) => <polygon key={x} points={`${x},429 ${x + 12},448 ${x},467 ${x - 12},448`} fill={i === 1 ? '#fff4a3' : '#ffc53d'} filter={`url(#${id}-glow)`} />)}
-      </g>}
-
-      {hasResearch && <g className="crew-mothership__research" filter={`url(#${id}-glow)`}>
-        <circle cx="805" cy="270" r="54" fill="#251052" stroke="#ba7cff" strokeWidth="7" />
-        <circle cx="805" cy="270" r="25" fill={`url(#${id}-purple)`} />
-        <path d="M758 245 Q805 199 852 245 M758 295 Q805 341 852 295" fill="none" stroke="#d9b7ff" strokeWidth="5" />
+        <rect x="520" y="390" width="160" height="28" rx="6" fill={`url(#${id}-gold)`} stroke="#ffe680" strokeWidth="2" filter={`url(#${id}-glow)`} />
       </g>}
 
       {hasArchive && <g className="crew-mothership__archive">
-        <path d="M285 244 L371 220 L409 278 L320 301 Z" fill="#4b3107" stroke="#ffd66e" strokeWidth="6" />
-        <path d="M320 250 H371 M329 266 H380" stroke="#fff0a5" strokeWidth="5" />
-        <circle cx="303" cy="265" r="9" fill="#fff" filter={`url(#${id}-glow)`} />
+        <polygon points="600,195 625,235 575,235" fill={`url(#${id}-gold)`} stroke="#ffffff" strokeWidth="2" />
+      </g>}
+
+      <ellipse cx="600" cy="305" rx="110" ry="75" fill={`url(#${id}-core)`} filter={`url(#${id}-glow)`} />
+      <circle cx="600" cy="305" r="42" fill="#ffffff" opacity="0.9" filter={`url(#${id}-glow)`} />
+
+      <g className="crew-mothership__engines">
+        <rect x="140" y="285" width="40" height="40" rx="6" fill="#0284c7" />
+        <rect x="1020" y="285" width="40" height="40" rx="6" fill="#0284c7" />
+      </g>
+
+      {hasLights && <g className="crew-mothership__dock-lights">
+        <path d="M400 390 L300 520 M800 390 L900 520" stroke="#22d3ee" strokeWidth="4" strokeDasharray="12 8" className="crew-mothership__dock-lane-flow" />
       </g>}
 
       {!compact && <g className="crew-mothership__beacons">
@@ -149,7 +155,7 @@ function MothershipSvg({ crew, compact = false }) {
   )
 }
 
-export default function CrewMothership({ crew = {}, memberProfiles = [], variant = 'hero' }) {
+export default function CrewMothership({ crew = {}, memberProfiles = [], variant = 'hero', onOpenGuide }) {
   const level = getCrewMothershipLevel(crew)
   const stats = getCrewMothershipStats(crew)
   const equippedModuleIds = getEquippedCrewModules(crew)
