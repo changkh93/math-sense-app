@@ -13,6 +13,7 @@ import {
   Check,
   ChevronRight,
   CircleUserRound,
+  Clock3,
   Compass,
   Cpu,
   DoorOpen,
@@ -29,6 +30,7 @@ import {
   Home,
   Leaf,
   LockKeyhole,
+  LogOut,
   Map,
   MapPin,
   MessageCircle,
@@ -467,7 +469,20 @@ function getConnectionSummary(neighbor, events) {
   return { signalCount, level, percent }
 }
 
-export default function MetaGalaxy({ user, userData, playSession, playRemainingSeconds = 0, onBack }) {
+function formatMinutes(seconds) {
+  const safe = Math.max(0, Number(seconds || 0))
+  if (safe === 0) return '0분'
+  if (safe < 60) return '1분 미만'
+  return `${Math.ceil(safe / 60)}분`
+}
+
+function formatCountdown(seconds) {
+  const safe = Math.max(0, Math.ceil(Number(seconds || 0)))
+  if (safe > 120) return `${Math.ceil(safe / 60)}분`
+  return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`
+}
+
+export default function MetaGalaxy({ user, userData, playSession, playRemainingSeconds, dailyUsedSeconds, dailyLimitSeconds, warningStage = 0, onBack }) {
   const [home, setHome] = useState(null)
   const [targetUid, setTargetUid] = useState(user?.uid || '')
   const [menu, setMenu] = useState('')
@@ -1364,7 +1379,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onOpenBriefing={() => setArrivalOpen(true)}
       />
 
-      <div className="frontier-top-hud" aria-label="행성 상태와 보유 자원">
+      <div className="frontier-top-hud" aria-label="행성 상태와 보유 자원 및 탐험 시간">
         <section className="frontier-planet-hud">
           <span className={`frontier-hud-icon theme-${planet.theme || 'forest'}`}><ThemeGlyph themeId={planet.theme} size={21} /></span>
           <div>
@@ -1373,12 +1388,36 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
             <span>{currentTheme.label}{!isOwner && <b className="frontier-visitor-chip">방문 중</b>}</span>
           </div>
         </section>
-        <section className="frontier-economy-hud">
+        <section className="frontier-economy-hud frontier-unified-hud">
           <div className="frontier-ore-readout" title="학습을 통해서만 얻는 메타 광석">
-            <Gem size={18} aria-hidden="true" />
+            <Gem size={17} aria-hidden="true" />
             <span><small>LEARNING ORE</small><strong>{wallet.toLocaleString()}</strong></span>
           </div>
           <MaterialStrip materials={(isOwner ? planet : ownPlanet).materials || {}} compact />
+
+          {playRemainingSeconds !== undefined && playRemainingSeconds !== null && (
+            <div className={`frontier-time-readout${warningStage > 0 ? ' is-warning' : ''}`} title="오늘 게임 이용 시간 및 이번 탐험 남은 시간">
+              <Clock3 size={15} aria-hidden="true" />
+              <div>
+                <small>{warningStage === 1 ? '안전 귀환' : '이번 탐험'}</small>
+                <strong>{formatCountdown(playRemainingSeconds)}</strong>
+                {dailyUsedSeconds !== undefined && dailyLimitSeconds !== undefined && (
+                  <span className="frontier-time-sub">오늘 {formatMinutes(dailyUsedSeconds)} / {formatMinutes(dailyLimitSeconds)}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="frontier-hud-exit-btn"
+            onClick={onBack}
+            title="메타센스로 귀환"
+            aria-label="메타센스로 귀환"
+          >
+            <LogOut size={15} aria-hidden="true" />
+            <span>귀환</span>
+          </button>
         </section>
       </div>
 
@@ -1389,16 +1428,6 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           <strong>{todayObjective.title}</strong>
         </span>
         <ChevronRight size={18} aria-hidden="true" />
-      </button>
-
-      <button
-        type="button"
-        className="frontier-learning-route"
-        onClick={onBack}
-        aria-label="메타센스로 귀환"
-      >
-        <ArrowLeft size={18} aria-hidden="true" />
-        <div><small>EXIT ROUTE</small><strong>메타센스로 귀환</strong></div>
       </button>
 
       <nav className="frontier-command-dock" aria-label="프론티어 명령 독">

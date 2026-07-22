@@ -3484,14 +3484,10 @@ function SpaceHome() {
               userData={userData}
               playSession={galaxyPlay.session}
               playRemainingSeconds={galaxyPlay.remainingSeconds}
-              onBack={() => galaxyPlay.endSession('manual_exit')}
-            />
-            <GalaxyPlayHud
-              remainingSeconds={galaxyPlay.remainingSeconds}
               dailyUsedSeconds={galaxyPlay.dailyUsedSeconds}
               dailyLimitSeconds={galaxyPlay.session.dailyLimitSeconds}
               warningStage={galaxyPlay.warningStage}
-              onExit={() => galaxyPlay.endSession('manual_exit')}
+              onBack={() => galaxyPlay.endSession('manual_exit')}
             />
             <GalaxyTimeWarning stage={galaxyPlay.warningStage} />
             {galaxyPlay.connectionState === 'reconnecting' && <GalaxyReconnectNotice />}
