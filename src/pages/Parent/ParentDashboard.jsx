@@ -9,7 +9,7 @@ import { useUserPresence } from '../../hooks/useRealtimePresence';
 import { useAdminUserAllAssignments, useAdminUserAllAttendance, useStudentAssignmentWarnings } from '../../hooks/useAssignments';
 import { getTodayKST } from '../../utils/streakUtils';
 import { Rocket, LogOut, Trash2, Clock, AlertTriangle, ChevronDown, ChevronUp, Calendar as CalendarIcon, ChevronLeft, ChevronRight, KeyRound, Eye, EyeOff, X, Gamepad2, Settings2, Save, ShieldCheck } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import StudentReport from '../../components/Report/StudentReport';
 import DailyLearningTimeline from '../../components/Space/DailyLearningTimeline';
 import ChildAccountCreator from '../../components/Parent/ChildAccountCreator';
