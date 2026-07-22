@@ -1133,27 +1133,48 @@
 }
 .frontier-control-hint span { margin: 0 .25rem 0 .05rem; }
 .frontier-interaction-prompt {
-  position: absolute;
-  z-index: 24;
-  left: 50%;
-  bottom: 8.7rem;
-  display: grid;
-  grid-template-columns: 38px 1fr auto;
+  display: flex;
   align-items: center;
-  gap: .65rem;
-  min-width: 260px;
-  padding: .58rem .7rem;
-  transform: translateX(-50%);
-  border-color: rgba(124, 242, 189, .27);
-  border-radius: 15px;
+  gap: .42rem;
+  width: max-content;
+  max-width: 210px;
+  padding: .35rem .6rem;
+  border: 1px solid rgba(124, 242, 189, .38);
+  border-radius: 12px;
   color: white;
-  pointer-events: none;
+  background: rgba(8, 22, 34, .92);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .4);
+  transition: transform 0.15s ease, border-color 0.15s ease;
 }
-.frontier-interaction-prompt > span { display: grid; place-items: center; width: 37px; height: 37px; border-radius: 12px; color: var(--frontier-mint); background: rgba(124, 242, 189, .09); }
+.frontier-interaction-prompt:active,
+.frontier-interaction-prompt:hover {
+  transform: scale(1.04);
+  border-color: rgba(124, 242, 189, 0.85);
+  background: rgba(12, 38, 52, 0.96);
+}
+.touch-key-trigger {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+.touch-key-trigger:hover,
+.touch-key-trigger:active {
+  background: rgba(124, 242, 189, 0.3);
+}
+.frontier-interaction-prompt > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--frontier-mint); background: rgba(124, 242, 189, .12); }
 .frontier-interaction-prompt small,
-.frontier-interaction-prompt strong { display: block; }
-.frontier-interaction-prompt small { color: #6d9185; font-size: .5rem; letter-spacing: .1em; }
-.frontier-interaction-prompt strong { margin-top: 2px; font-size: .7rem; }
+.frontier-interaction-prompt strong { display: block; white-space: nowrap; }
+.frontier-interaction-prompt small { color: #8dafa4; font-size: .48rem; letter-spacing: .04em; }
+.frontier-interaction-prompt strong { margin-top: 1px; font-size: .66rem; }
 .frontier-interaction-keys { display: flex; align-items: center; gap: .35rem; }
 .frontier-interaction-keys > span { display: grid; justify-items: center; gap: .1rem; }
 .frontier-interaction-keys em { color: #8fb4a8; font: 700 .42rem ui-monospace, monospace; font-style: normal; letter-spacing: .02em; }
@@ -1214,6 +1235,33 @@
   .frontier-build-layout { grid-template-columns: minmax(290px, .8fr) minmax(370px, 1.2fr); }
 }
 
+.frontier-camera-mode-toggle {
+  position: absolute;
+  top: max(.65rem, env(safe-area-inset-top));
+  right: 5.5rem;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .4rem .7rem;
+  border: 1px solid rgba(124, 242, 189, .35);
+  border-radius: 12px;
+  color: white;
+  background: rgba(4, 16, 28, .82);
+  backdrop-filter: blur(8px);
+  font-size: .68rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .25);
+  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+.frontier-camera-mode-toggle:active,
+.frontier-camera-mode-toggle:hover {
+  transform: scale(1.05);
+  border-color: rgba(124, 242, 189, .8);
+  background: rgba(12, 38, 56, .94);
+}
+
 @media (max-width: 900px) {
   .frontier-object-dialog-backdrop { padding: 0; }
   .frontier-object-dialog-motion,
@@ -1244,7 +1292,7 @@
   .frontier-neighbor-card { min-height: 165px; }
 }
 
-@media (max-width: 780px), (hover: none) and (pointer: coarse) and (max-width: 1180px) {
+@media (max-width: 1200px), (hover: none), (pointer: coarse) {
   .frontier-live-status { top: 8.25rem; right: .65rem; min-height: 26px; padding: .28rem .46rem; font-size: .51rem; }
   .frontier-proximity-chat { left: .65rem; right: .65rem; bottom: calc(4.95rem + env(safe-area-inset-bottom)); width: auto; }
   .frontier-object-dialog__grid { padding: .7rem; }

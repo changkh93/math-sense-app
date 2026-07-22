@@ -411,7 +411,6 @@ function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner }) {
           </button>
         </Html>
       )}
-      {nearby && <StructureProximityLabel item={item} footprint={footprint} isPlanetOwner={isPlanetOwner} />}
       {selected && (
         <mesh position={[0, .07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[footprint + .24, footprint + .42, 36]} />
@@ -655,12 +654,6 @@ function MissionPortal({ portal, active }) {
       </Float>
       <Sparkles count={12} scale={[2.4, 2.4, .8]} color={color} size={1.6} speed={.28} />
       <ResourceHalo color={color} />
-      <Html position={[0, 3.1, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
-        <div className="frontier-mission-portal-label">
-          <small>화면 앞 탐사 출발대</small>
-          <strong><kbd>E</kbd> 45초 탐사 시작</strong>
-        </div>
-      </Html>
     </group>
   )
 }
@@ -722,7 +715,7 @@ function RemoteAstronaut({ player, showName }) {
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech }) {
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, setIsFirstPerson }) {
   const { gl } = useThree()
   const group = useRef()
   const body = useRef()
@@ -737,6 +730,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   const collectLock = useRef(new Set())
   const lastPublishAt = useRef(0)
   const hoverLook = useRef({ pendingX: 0, pendingY: 0, lastX: null, lastY: null, lastTime: null, orbiting: false })
+  const firstPersonPitch = useRef(0)
   const movementIntent = useRef(createMovementIntent())
   const movementVectors = useRef({
     forward: new THREE.Vector3(),
@@ -766,6 +760,11 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const isInteractiveTarget = (target) => target?.closest?.('input, textarea, select, button, a, [contenteditable="true"], [role="dialog"]')
     const down = (event) => {
       if (paused || isInteractiveTarget(event.target)) return
+      if (event.code === 'KeyV') {
+        event.preventDefault()
+        setIsFirstPerson?.((prev) => !prev)
+        return
+      }
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].includes(event.code)) {
         event.preventDefault()
         keys.current.add(event.code)
@@ -783,7 +782,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       window.removeEventListener('blur', resetInput)
       document.removeEventListener('visibilitychange', visibility)
     }
-  }, [inputRef, paused])
+  }, [inputRef, paused, setIsFirstPerson])
 
   useEffect(() => {
     if (!paused) return
@@ -806,9 +805,8 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         || !freeLookEnabled
         || reducedMotion.matches
         || look.orbiting
-        || event.pointerType !== 'mouse'
-        || event.buttons !== 0
-        || event.target !== canvas
+        || (event.pointerType === 'mouse' && event.buttons !== 0)
+        || (event.target !== canvas && !event.target?.classList?.contains('webgl-canvas'))
       ) {
         resetFreeLook()
         return
@@ -852,9 +850,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
   useFrame((state, frameDelta) => {
     if (!group.current) return
-    if (!movementIntent.current?.basisForward || !movementIntent.current?.basisRight) {
-      movementIntent.current = createMovementIntent()
-    }
     const delta = Math.min(frameDelta, .05)
     const orbitCamera = controls.current?.object
     const {
@@ -875,17 +870,26 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     look.pendingY -= mouseDeltaY
 
     if (canFreeLook && (mouseDeltaX || mouseDeltaY)) {
-      cameraOffset.subVectors(orbitCamera.position, controls.current.target)
-      cameraSpherical.setFromVector3(cameraOffset)
-      cameraSpherical.theta += manualLookYaw
-      cameraSpherical.phi = THREE.MathUtils.clamp(
-        cameraSpherical.phi - mouseDeltaY * MOUSE_LOOK_PITCH_SENSITIVITY,
-        CAMERA_MIN_POLAR,
-        CAMERA_MAX_POLAR,
-      )
-      cameraSpherical.makeSafe()
-      orbitCamera.position.copy(controls.current.target).add(cameraOffset.setFromSpherical(cameraSpherical))
-      orbitCamera.lookAt(controls.current.target)
+      if (isFirstPerson) {
+        group.current.rotation.y += manualLookYaw
+        firstPersonPitch.current = THREE.MathUtils.clamp(
+          firstPersonPitch.current - mouseDeltaY * MOUSE_LOOK_PITCH_SENSITIVITY,
+          -1.2,
+          1.2,
+        )
+      } else {
+        cameraOffset.subVectors(orbitCamera.position, controls.current.target)
+        cameraSpherical.setFromVector3(cameraOffset)
+        cameraSpherical.theta += manualLookYaw
+        cameraSpherical.phi = THREE.MathUtils.clamp(
+          cameraSpherical.phi - mouseDeltaY * MOUSE_LOOK_PITCH_SENSITIVITY,
+          CAMERA_MIN_POLAR,
+          CAMERA_MAX_POLAR,
+        )
+        cameraSpherical.makeSafe()
+        orbitCamera.position.copy(controls.current.target).add(cameraOffset.setFromSpherical(cameraSpherical))
+        orbitCamera.lookAt(controls.current.target)
+      }
     }
 
     const keyboardX = paused ? 0 : (keys.current.has('KeyD') || keys.current.has('ArrowRight') ? 1 : 0) - (keys.current.has('KeyA') || keys.current.has('ArrowLeft') ? 1 : 0)
@@ -895,6 +899,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const inputLength = Math.hypot(moveX, moveZ)
     const moving = inputLength > .05 && !look.orbiting
     let movementAmount = 0
+
     if (orbitCamera) {
       orbitCamera.getWorldDirection(forward)
       forward.setY(0)
@@ -904,48 +909,23 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     }
 
     if (moving && orbitCamera) {
-      const intent = movementIntent.current
-      if (!intent.active) {
-        intent.active = true
-        intent.basisForward.copy(forward)
-        intent.basisRight.copy(right)
-      } else if (manualLookYaw) {
-        intent.basisForward.applyAxisAngle(orbitCamera.up, manualLookYaw)
-        intent.basisRight.applyAxisAngle(orbitCamera.up, manualLookYaw)
-      }
-
-      moveDirection.copy(intent.basisRight).multiplyScalar(moveX).addScaledVector(intent.basisForward, -moveZ)
+      moveDirection.copy(right).multiplyScalar(moveX).addScaledVector(forward, -moveZ)
       const inputStrength = Math.min(1, moveDirection.length())
       moveDirection.normalize()
-      intent.targetYaw = Math.atan2(moveDirection.x, moveDirection.z)
 
-      const currentFacingYaw = group.current.rotation.y
-      let yawDelta = Math.atan2(
-        Math.sin(intent.targetYaw - currentFacingYaw),
-        Math.cos(intent.targetYaw - currentFacingYaw),
-      )
-      if (Math.abs(Math.abs(yawDelta) - Math.PI) < .0001) yawDelta = intent.lastTurnSign * Math.PI
-      else if (Math.abs(yawDelta) > .001) intent.lastTurnSign = Math.sign(yawDelta)
-      const turnStep = THREE.MathUtils.clamp(yawDelta, -PLAYER_TURN_SPEED * delta, PLAYER_TURN_SPEED * delta)
+      if (isFirstPerson) {
+        group.current.rotation.y = Math.atan2(forward.x, forward.z)
+      } else {
+        const targetFacingYaw = Math.atan2(forward.x, forward.z)
+        const yawDelta = Math.atan2(Math.sin(targetFacingYaw - group.current.rotation.y), Math.cos(targetFacingYaw - group.current.rotation.y))
+        group.current.rotation.y += yawDelta * Math.min(1, delta * 14)
+      }
 
-      // Movement only turns the character. Camera yaw/pitch is reserved for mouse look,
-      // so arrow keys never drag the view or the background along with the astronaut.
-      const nextFacingYaw = currentFacingYaw + turnStep
-      group.current.rotation.y = nextFacingYaw
-      const remainingTurn = Math.atan2(
-        Math.sin(intent.targetYaw - nextFacingYaw),
-        Math.cos(intent.targetYaw - nextFacingYaw),
-      )
-      const facingStrength = THREE.MathUtils.smoothstep(
-        Math.cos(Math.abs(remainingTurn)),
-        Math.cos(PLAYER_MOVE_START_ANGLE),
-        Math.cos(PLAYER_MOVE_FULL_ANGLE),
-      )
-      movementAmount = inputStrength * facingStrength
-      moveDirection.set(Math.sin(nextFacingYaw), 0, Math.cos(nextFacingYaw))
+      movementAmount = inputStrength
+      const moveWorldVec = moveDirection.clone().multiplyScalar(PLAYER_SPEED * delta * movementAmount)
 
-      const nextX = group.current.position.x + moveDirection.x * PLAYER_SPEED * delta * movementAmount
-      const nextZ = group.current.position.z + moveDirection.z * PLAYER_SPEED * delta * movementAmount
+      const nextX = group.current.position.x + moveWorldVec.x
+      const nextZ = group.current.position.z + moveWorldVec.z
       const inWorld = Math.hypot(nextX, nextZ) < WORLD_RADIUS - .8
       const structureCollision = structureColliders.find((collider) => Math.hypot(nextX - collider.position[0], nextZ - collider.position[2]) < collider.collisionRadius)
       const blockedByObject = Boolean(structureCollision) || blockers.some((position) => Math.hypot(nextX - position[0], nextZ - position[2]) < 1.12)
@@ -955,40 +935,81 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         group.current.position.x = nextX
         group.current.position.z = nextZ
       }
-    } else {
-      movementIntent.current.active = false
-      if (orbitCamera) {
-        const targetYaw = Math.atan2(forward.x, forward.z)
-        const yawDelta = Math.atan2(Math.sin(targetYaw - group.current.rotation.y), Math.cos(targetYaw - group.current.rotation.y))
-        group.current.rotation.y += yawDelta * (1 - Math.exp(-delta * 14))
-      }
+    } else if (orbitCamera && !isFirstPerson) {
+      const targetYaw = Math.atan2(forward.x, forward.z)
+      const yawDelta = Math.atan2(Math.sin(targetYaw - group.current.rotation.y), Math.cos(targetYaw - group.current.rotation.y))
+      group.current.rotation.y += yawDelta * (1 - Math.exp(-delta * 14))
     }
 
-    const locomoting = moving && movementAmount > .03
-    const stride = locomoting ? Math.sin(state.clock.elapsedTime * 13.5) * .52 : 0
-    if (body.current) body.current.position.y = THREE.MathUtils.lerp(body.current.position.y, locomoting ? Math.abs(Math.sin(state.clock.elapsedTime * 13.5)) * .035 : 0, delta * 10)
-    if (leftArm.current) leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, -stride, delta * 11)
-    if (rightArm.current) rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, stride, delta * 11)
-    if (leftLeg.current) leftLeg.current.rotation.x = THREE.MathUtils.lerp(leftLeg.current.rotation.x, stride * .72, delta * 11)
-    if (rightLeg.current) rightLeg.current.rotation.x = THREE.MathUtils.lerp(rightLeg.current.rotation.x, -stride * .72, delta * 11)
+    const locomoting = moving && movementAmount > .01
+    const strideSign = moveZ > 0 ? -1 : 1
+    const stride = locomoting ? Math.sin(state.clock.elapsedTime * 14) * .52 * strideSign : 0
+    const strafeStep = locomoting ? Math.sin(state.clock.elapsedTime * 14) * 0.32 * moveX : 0
+    const bodySway = locomoting ? Math.sin(state.clock.elapsedTime * 14) * 0.08 * moveX : 0
+
+    if (body.current) {
+      body.current.position.y = THREE.MathUtils.lerp(body.current.position.y, locomoting ? Math.abs(Math.sin(state.clock.elapsedTime * 14)) * .035 : 0, delta * 10)
+      body.current.rotation.z = THREE.MathUtils.lerp(body.current.rotation.z, bodySway, delta * 10)
+    }
+    if (leftArm.current) {
+      leftArm.current.rotation.x = THREE.MathUtils.lerp(leftArm.current.rotation.x, -stride, delta * 11)
+      leftArm.current.rotation.z = THREE.MathUtils.lerp(leftArm.current.rotation.z, -.14 + strafeStep * 0.5, delta * 11)
+    }
+    if (rightArm.current) {
+      rightArm.current.rotation.x = THREE.MathUtils.lerp(rightArm.current.rotation.x, stride, delta * 11)
+      rightArm.current.rotation.z = THREE.MathUtils.lerp(rightArm.current.rotation.z, .14 + strafeStep * 0.5, delta * 11)
+    }
+    if (leftLeg.current) {
+      leftLeg.current.rotation.x = THREE.MathUtils.lerp(leftLeg.current.rotation.x, stride * .72, delta * 11)
+      leftLeg.current.rotation.z = THREE.MathUtils.lerp(leftLeg.current.rotation.z, strafeStep, delta * 11)
+    }
+    if (rightLeg.current) {
+      rightLeg.current.rotation.x = THREE.MathUtils.lerp(rightLeg.current.rotation.x, -stride * .72, delta * 11)
+      rightLeg.current.rotation.z = THREE.MathUtils.lerp(rightLeg.current.rotation.z, -strafeStep, delta * 11)
+    }
 
     group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkSurfaceHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
     const player = group.current.position
 
-    if (controls.current && orbitCamera) {
-      desiredTarget.set(player.x, player.y + CAMERA_TARGET_HEIGHT, player.z)
-      if (!controlsReady.current) {
-        controls.current.target.copy(desiredTarget)
-        controlsReady.current = true
-      } else {
-        const followStrength = 1 - Math.exp(-delta * 10)
-        followDelta.subVectors(desiredTarget, controls.current.target).multiplyScalar(followStrength)
-        controls.current.target.add(followDelta)
-        orbitCamera.position.add(followDelta)
+    const activeCamera = state.camera
+    if (isFirstPerson) {
+      if (controls.current) controls.current.enabled = false
+      const eyeY = player.y + 1.58
+      const yaw = group.current.rotation.y
+      const pitch = firstPersonPitch.current
+      const lookDist = 10.0
+
+      if (activeCamera.fov !== 65) {
+        activeCamera.fov = 65
+        activeCamera.updateProjectionMatrix()
       }
-      const minimumCameraY = terrainHeight(orbitCamera.position.x, orbitCamera.position.z) + .6
-      if (orbitCamera.position.y < minimumCameraY) {
-        orbitCamera.position.setY(THREE.MathUtils.lerp(orbitCamera.position.y, minimumCameraY, Math.min(1, delta * 12)))
+      activeCamera.position.set(player.x, eyeY, player.z)
+      activeCamera.lookAt(
+        player.x + Math.sin(yaw) * Math.cos(pitch) * lookDist,
+        eyeY + Math.sin(pitch) * lookDist,
+        player.z + Math.cos(yaw) * Math.cos(pitch) * lookDist
+      )
+    } else {
+      if (controls.current) controls.current.enabled = !paused
+      if (activeCamera.fov !== 48) {
+        activeCamera.fov = 48
+        activeCamera.updateProjectionMatrix()
+      }
+      if (controls.current && orbitCamera) {
+        desiredTarget.set(player.x, player.y + CAMERA_TARGET_HEIGHT, player.z)
+        if (!controlsReady.current) {
+          controls.current.target.copy(desiredTarget)
+          controlsReady.current = true
+        } else {
+          const followStrength = 1 - Math.exp(-delta * 10)
+          followDelta.subVectors(desiredTarget, controls.current.target).multiplyScalar(followStrength)
+          controls.current.target.add(followDelta)
+          orbitCamera.position.add(followDelta)
+        }
+        const minimumCameraY = terrainHeight(orbitCamera.position.x, orbitCamera.position.z) + .6
+        if (orbitCamera.position.y < minimumCameraY) {
+          orbitCamera.position.setY(THREE.MathUtils.lerp(orbitCamera.position.y, minimumCameraY, Math.min(1, delta * 12)))
+        }
       }
     }
 
@@ -1032,7 +1053,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       <OrbitControls
         ref={controls}
         makeDefault
-        enabled={!paused}
+        enabled={!paused && !isFirstPerson}
         target={[0, CAMERA_TARGET_HEIGHT, 5]}
         enablePan={false}
         enableKeys={false}
@@ -1040,10 +1061,10 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         dampingFactor={.08}
         rotateSpeed={.56}
         zoomSpeed={.78}
-        minDistance={4.8}
-        maxDistance={13.5}
-        minPolarAngle={CAMERA_MIN_POLAR}
-        maxPolarAngle={CAMERA_MAX_POLAR}
+        minDistance={isFirstPerson ? 0.05 : 4.8}
+        maxDistance={isFirstPerson ? 0.2 : 13.5}
+        minPolarAngle={isFirstPerson ? 0.1 : CAMERA_MIN_POLAR}
+        maxPolarAngle={isFirstPerson ? Math.PI - 0.1 : CAMERA_MAX_POLAR}
         mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
         touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE }}
         onStart={() => {
@@ -1058,7 +1079,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         }}
       />
       <group ref={group} position={[0, terrainHeight(0, 5), 5]} scale={CHARACTER_SCALE}>
-        <group ref={body}>
+        <group ref={body} visible={!isFirstPerson}>
           <mesh position={[0, 1.2, 0]} scale={[.92, 1, .8]} castShadow><capsuleGeometry args={[.39, .72, 8, 14]} /><meshStandardMaterial color="#e8f2f3" roughness={.34} metalness={.08} /></mesh>
           <mesh position={[0, 1.18, .35]}><boxGeometry args={[.5, .42, .08]} /><meshStandardMaterial color="#253e54" metalness={.5} roughness={.25} /></mesh>
           <mesh position={[0, 1.18, .405]}><boxGeometry args={[.28, .08, .035]} /><meshStandardMaterial color="#7cf2bd" emissive="#2a9b71" emissiveIntensity={1.5} toneMapped={false} /></mesh>
@@ -1097,7 +1118,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, setIsFirstPerson, nearby, onInteract, onInspectStructure }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
   const roverNode = useMemo(() => ({
@@ -1105,6 +1126,25 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     status: ROVER_STATUS_LABELS[roverStatus] ? roverStatus : 'idle',
     label: roverStatusLabel || ROVER_STATUS_LABELS[roverStatus] || ROVER_STATUS_LABELS.idle,
   }), [roverStatus, roverStatusLabel])
+
+  const nearbyPromptPos = useMemo(() => {
+    if (!nearby || !nearby.position) return null
+    const px = nearby.position[0] || 0
+    const pz = nearby.position[2] || 0
+    const py = terrainHeight(px, pz)
+    let h = 1.45
+    if (nearby.kind === 'structure') {
+      const footprint = structureFootprint(nearby.item?.itemId || '')
+      h = Math.min(2.4, Math.max(1.3, footprint * 0.75 + 0.5))
+    } else if (nearby.kind === 'portal') {
+      h = 2.2
+    } else if (nearby.kind === 'rover') {
+      h = 1.25
+    } else if (nearby.kind === 'guide') {
+      h = 1.35
+    }
+    return [px, py + h, pz]
+  }, [nearby])
   const resourceInteractables = useMemo(() => dailyEventNode
     ? RESOURCE_NODES.map((node) => node.id === dailyEventNode.id ? dailyEventNode : node)
     : RESOURCE_NODES, [dailyEventNode])
@@ -1219,8 +1259,14 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
         </group>
       )}
 
+      {nearbyPromptPos && !buildItem && !paused && (
+        <Html position={nearbyPromptPos} center zIndexRange={[100, 0]}>
+          <InteractionPrompt nearby={nearby} onInteract={onInteract} onInspect={onInspectStructure} />
+        </Html>
+      )}
+
       {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} />)}
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={isFirstPerson} setIsFirstPerson={setIsFirstPerson} />
     </>
   )
 }
@@ -1228,36 +1274,53 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
 function TouchJoystick({ inputRef, disabled }) {
   const [vector, setVector] = useState({ x: 0, z: 0 })
   const baseRef = useRef()
-  const update = (event) => {
+
+  const updatePos = (clientX, clientY) => {
     if (disabled) return
     const rect = baseRef.current?.getBoundingClientRect()
     if (!rect) return
-    const x = event.clientX - (rect.left + rect.width / 2)
-    const y = event.clientY - (rect.top + rect.height / 2)
+    const x = clientX - (rect.left + rect.width / 2)
+    const y = clientY - (rect.top + rect.height / 2)
     const radius = rect.width * .34
     const length = Math.max(1, Math.hypot(x, y))
     const scale = Math.min(radius, length) / length
-    const next = { x: x * scale / radius, z: y * scale / radius }
+    const next = { x: (x * scale) / radius, z: (y * scale) / radius }
     inputRef.current.x = next.x
     inputRef.current.z = next.z
     setVector(next)
   }
+
+  const updatePointer = (event) => {
+    updatePos(event.clientX, event.clientY)
+  }
+
+  const updateTouch = (event) => {
+    if (event.touches && event.touches[0]) {
+      updatePos(event.touches[0].clientX, event.touches[0].clientY)
+    }
+  }
+
   const stop = (event) => {
-    try { event.currentTarget.releasePointerCapture(event.pointerId) } catch { /* already released */ }
+    try { event?.currentTarget?.releasePointerCapture?.(event.pointerId) } catch { /* released */ }
     inputRef.current.x = 0
     inputRef.current.z = 0
     setVector({ x: 0, z: 0 })
   }
+
   return (
     <div
       ref={baseRef}
       className={`frontier-joystick${disabled ? ' disabled' : ''}`}
       role="application"
       aria-label="탐사자 이동 조이스틱"
-      onPointerDown={(event) => { if (disabled) return; event.currentTarget.setPointerCapture(event.pointerId); update(event) }}
-      onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) update(event) }}
+      onPointerDown={(event) => { if (disabled) return; event.currentTarget.setPointerCapture(event.pointerId); updatePointer(event) }}
+      onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) updatePointer(event) }}
       onPointerUp={stop}
       onPointerCancel={stop}
+      onTouchStart={(e) => { if (disabled) return; updateTouch(e) }}
+      onTouchMove={(e) => { if (disabled) return; updateTouch(e) }}
+      onTouchEnd={stop}
+      onTouchCancel={stop}
     >
       <i style={{ transform: `translate(${vector.x * 28}px,${vector.z * 28}px)` }} />
     </div>
@@ -1321,19 +1384,38 @@ const INTERACTION_ICONS = {
   rover: Wrench,
 }
 
-function InteractionPrompt({ nearby }) {
+function InteractionPrompt({ nearby, onInteract, onInspect }) {
   const Graphic = nearby.kind === 'daily' ? SparklesIcon : nearby.kind === 'portal' ? Compass : INTERACTION_ICONS[nearby.actionId] || SparklesIcon
   const isStructure = nearby.kind === 'structure'
   return (
-    <div className="frontier-interaction-prompt">
+    <div
+      className="frontier-interaction-prompt touch-clickable-prompt"
+      onClick={() => onInteract?.()}
+      role="button"
+      tabIndex={0}
+      title="터치 또는 클릭하여 상호작용 실행"
+    >
       <span>{createElement(Graphic, { size: 19, 'aria-hidden': true })}</span>
-      <div><small>{nearby.kind === 'daily' ? '오늘의 현장 사건' : nearby.kind === 'structure' ? '행성 시설' : nearby.kind === 'guide' ? '루미 안내소' : nearby.kind === 'portal' ? '45초 탐사 출발대' : nearby.kind === 'rover' ? '로버 원정 관리' : '행성 상호작용'}</small><strong>{nearby.label}</strong></div>
+      <div>
+        <small>{nearby.kind === 'daily' ? '오늘의 현장 사건' : nearby.kind === 'structure' ? '행성 시설' : nearby.kind === 'guide' ? '루미 안내소' : nearby.kind === 'portal' ? '45초 탐사 출발대' : nearby.kind === 'rover' ? '로버 원정 관리' : '행성 상호작용'}</small>
+        <strong>{nearby.label} 👆</strong>
+      </div>
       {isStructure ? (
         <div className="frontier-interaction-keys" aria-label="객체 조작 키">
-          <span><kbd>E</kbd><em>행동</em></span>
-          <span><kbd>F</kbd><em>정보</em></span>
+          <button type="button" className="touch-key-btn" onClick={(e) => { e.stopPropagation(); onInteract?.(); }}>
+            <kbd>E</kbd><em>행동</em>
+          </button>
+          <button type="button" className="touch-key-btn" onClick={(e) => { e.stopPropagation(); onInspect?.(); }}>
+            <kbd>F</kbd><em>정보</em>
+          </button>
         </div>
-      ) : <kbd>E</kbd>}
+      ) : (
+        <div className="frontier-interaction-keys">
+          <button type="button" className="touch-key-btn" onClick={(e) => { e.stopPropagation(); onInteract?.(); }}>
+            <kbd>E</kbd><em>실행</em>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -1406,6 +1488,7 @@ export default function GalaxyWorld3D({
 }) {
   const inputRef = useRef({ x: 0, z: 0 })
   const [nearby, setNearby] = useState(null)
+  const [isFirstPerson, setIsFirstPerson] = useState(false)
   const [playerPosition, setPlayerPosition] = useState({ x: 0, z: 5, yaw: 0 })
   const [activeMission, setActiveMission] = useState(null)
   const [collectedIds, setCollectedIds] = useState(new Set())
@@ -1463,10 +1546,11 @@ export default function GalaxyWorld3D({
   useEffect(() => {
     const keydown = (event) => {
       if (event.repeat || paused || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
-      if (event.code !== 'KeyE' && event.code !== 'KeyF') return
+      if (event.code !== 'KeyE' && event.code !== 'KeyF' && event.code !== 'KeyV') return
       event.preventDefault()
       if (event.code === 'KeyE') interact()
-      else inspectStructure()
+      else if (event.code === 'KeyF') inspectStructure()
+      else if (event.code === 'KeyV') setIsFirstPerson((prev) => !prev)
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
@@ -1572,10 +1656,23 @@ export default function GalaxyWorld3D({
           localPlayerName={localPlayerName}
           localSpeech={localSpeech}
           isPlanetOwner={isPlanetOwner}
+          isFirstPerson={isFirstPerson}
+          setIsFirstPerson={setIsFirstPerson}
+          nearby={nearby}
+          onInteract={interact}
+          onInspectStructure={inspectStructure}
         />
       </Canvas>
 
       <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} />
+      <button
+        type="button"
+        className="frontier-camera-mode-toggle"
+        onClick={() => setIsFirstPerson((prev) => !prev)}
+        title="1인칭/3인칭 시점 전환 (단축키: V)"
+      >
+        {isFirstPerson ? '🛸 3인칭 시점 (V)' : '👁️ 1인칭 시점 (V)'}
+      </button>
       <div className={`frontier-live-status${liveConnected ? ' online' : ' offline'}`} title={presenceError || (liveConnected ? '같은 행성 접속자와 실시간 연결됨' : '실시간 대화 연결 없음')}>
         <i />
         <span>{liveConnected ? `온라인 ${remotePlayers.length}명` : '실시간 오프라인'}</span>
@@ -1613,24 +1710,8 @@ export default function GalaxyWorld3D({
           <button type="button" onClick={onCancelBuild}>취소</button>
         </div>
       )}
-      {!selectedBuildItem && nearby && nearby.kind !== 'structure' && !paused && <InteractionPrompt nearby={nearby} />}
-      <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>방향 전환 후 전진</span><kbd>마우스 이동량</kbd><span>시점·캐릭터 방향</span><kbd>휠</kbd><span>줌</span><kbd>E</kbd><span>미션·상호작용</span><kbd>F</kbd><span>객체 정보</span></div>
+      <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>방향 전환 후 전진</span><kbd>V</kbd><span>1인칭/3인칭 시점</span><kbd>E</kbd><span>미션·상호작용</span><kbd>F</kbd><span>객체 정보</span></div>
       <TouchJoystick inputRef={inputRef} disabled={paused} />
-      {nearby && !selectedBuildItem && !paused && (
-        nearby.kind === 'structure' ? (
-          <div className="frontier-structure-actions">
-            <button type="button" className="frontier-action-button" onClick={interact}>
-              <span><SparklesIcon size={23} aria-hidden="true" /></span><strong>{isPlanetOwner ? '재료 얻기' : '도와주기'}</strong>
-            </button>
-            <button type="button" className="frontier-action-button" onClick={inspectStructure}>
-              <span><SparklesIcon size={23} aria-hidden="true" /></span><strong>객체 정보</strong>
-            </button>
-          </div>
-        ) : <button type="button" className="frontier-action-button" onClick={interact}>
-          <span>{nearby.kind === 'guide' ? <Bot size={23} aria-hidden="true" /> : nearby.kind === 'portal' ? <Compass size={23} aria-hidden="true" /> : nearby.kind === 'rover' ? <Wrench size={23} aria-hidden="true" /> : <SparklesIcon size={23} aria-hidden="true" />}</span>
-          <strong>{nearby.kind === 'daily' ? '사건 해결' : '상호작용'}</strong>
-        </button>
-      )}
     </div>
   )
 }
