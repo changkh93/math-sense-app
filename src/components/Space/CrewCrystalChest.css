@@ -16,6 +16,9 @@
 .crew-crystal-chest__feed,.crew-crystal-chest__rules { border:1px solid rgba(255,255,255,.08); border-radius:12px; background:rgba(1,7,20,.52); }
 .crew-crystal-chest__section-title { padding:.72rem .8rem .48rem; color:#67e8f9; font-size:.68rem; letter-spacing:.1em; }
 .crew-crystal-chest__event { display:grid; grid-template-columns:30px minmax(0,1fr) auto; align-items:center; gap:.65rem; padding:.65rem .8rem; border-top:1px solid rgba(255,255,255,.06); }
+.crew-crystal-chest__event.grouped { grid-template-columns:30px minmax(0,1fr); }
+.crew-crystal-chest__event.grouped p { color:rgba(255,255,255,.88); font-size:.81rem; line-height:1.5; }
+.crew-crystal-chest__event.grouped p strong { color:#fde68a; font-weight:800; }
 .crew-crystal-chest__event>div { display:grid; place-items:center; width:30px; height:30px; color:#fde047; border-radius:9px; background:rgba(250,204,21,.1); }
 .crew-crystal-chest__event p { margin:0; color:rgba(255,255,255,.72); font-size:.78rem; line-height:1.4; }
 .crew-crystal-chest__event p strong { color:#fff; }

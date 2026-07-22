@@ -133,6 +133,38 @@ export default function CrewCrystalChest({ crewId, isGuest = false }) {
     }
   };
 
+  const groupedEvents = useMemo(() => {
+    const rawEvents = chest?.events || [];
+    if (!rawEvents.length) return [];
+
+    const map = new Map();
+    rawEvents.forEach((evt) => {
+      let dateLabel = '';
+      if (evt.createdAtMs) {
+        const d = new Date(evt.createdAtMs);
+        dateLabel = `${d.getMonth() + 1}월 ${d.getDate()}일`;
+      } else if (evt.dateKey) {
+        const parts = evt.dateKey.split('-');
+        if (parts.length === 3) dateLabel = `${Number(parts[1])}월 ${Number(parts[2])}일`;
+        else dateLabel = evt.dateKey;
+      } else {
+        dateLabel = '오늘';
+      }
+
+      if (!map.has(dateLabel)) {
+        map.set(dateLabel, { dateLabel, names: [], totalContribution: 0 });
+      }
+      const group = map.get(dateLabel);
+      const name = evt.contributorName || '크루 대원';
+      if (!group.names.includes(name)) {
+        group.names.push(name);
+      }
+      group.totalContribution += Number(evt.acceptedAmount || 0);
+    });
+
+    return Array.from(map.values());
+  }, [chest?.events]);
+
   if (!crewId) return null;
 
   return (
@@ -162,11 +194,12 @@ export default function CrewCrystalChest({ crewId, isGuest = false }) {
         <div className="crew-crystal-chest__body">
           <div className="crew-crystal-chest__feed">
             <div className="crew-crystal-chest__section-title font-tech">TODAY'S CREW LIGHT</div>
-            {chest?.events?.length ? chest.events.slice(0, 4).map((event) => (
-              <div className="crew-crystal-chest__event" key={event.id}>
-                <div><BookOpenCheck size={16} /></div>
-                <p><strong>{event.contributorName} 대원</strong>이 과제 피드백 40광석을 달성했습니다.<span>크루 상자 +{event.acceptedAmount}</span></p>
-                <time className="font-tech">{formatEventTime(event.createdAtMs)}</time>
+            {groupedEvents.length ? groupedEvents.slice(0, 4).map((group) => (
+              <div className="crew-crystal-chest__event grouped" key={group.dateLabel}>
+                <div><Sparkles size={16} /></div>
+                <p>
+                  <strong>{group.names.join(', ')} 대원</strong>, {group.dateLabel} 과제 만점 축하🎉!!
+                </p>
               </div>
             )) : (
               <div className="crew-crystal-chest__empty font-tech">첫 번째 빛나는 성취가 여기에 기록됩니다.</div>

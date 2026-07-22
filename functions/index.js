@@ -10585,7 +10585,7 @@ exports.notifyAssignmentWarningCreated = regionalFunctions.firestore
 
 async function contributePerfectAssignmentToCrewChest(assignmentId, assignment = {}) {
   const userId = cleanId(assignment.userId, 160);
-  if (!userId || Number(assignment.bonusCrystals || 0) !== 40 || assignment.status !== "reviewed") {
+  if (!userId || Number(assignment.bonusCrystals || 0) < 40 || assignment.status !== "reviewed") {
     return { contributed: false, reason: "not_qualified" };
   }
 
@@ -10767,27 +10767,33 @@ exports.notifyAssignmentHighBonus = regionalFunctions.firestore
     const afterBonus = Number(after.bonusCrystals || 0);
     const afterQualified = after.status === "reviewed" && afterBonus >= 40;
 
-    if (!after.userId || !afterQualified || beforeQualified) return null;
+    if (!after.userId || !afterQualified) return null;
 
-    const clusterLabel = getAssignmentNotificationClusterLabel(after.clusterId);
-    await Promise.all([
-      admin.firestore().collection("notifications").doc(`assignment_bonus_${context.params.assignmentId}`).set({
-        recipientId: after.userId,
-        type: "assignment_bonus",
-        message: `${clusterLabel} 과제에서 보너스 광석 ${Math.floor(afterBonus)}점을 받았습니다.`,
-        link: buildAssignmentHubLink(after.clusterId, after.date),
-        isRead: false,
-        createdAt: FieldValue.serverTimestamp(),
-        metadata: {
-          assignmentId: context.params.assignmentId,
-          clusterId: after.clusterId || "",
-          date: after.date || "",
-          bonusCrystals: afterBonus,
-        },
-      }, { merge: true }),
+    const tasks = [
       contributePerfectAssignmentToCrewChest(context.params.assignmentId, after),
-    ]);
+    ];
 
+    if (!beforeQualified) {
+      const clusterLabel = getAssignmentNotificationClusterLabel(after.clusterId);
+      tasks.push(
+        admin.firestore().collection("notifications").doc(`assignment_bonus_${context.params.assignmentId}`).set({
+          recipientId: after.userId,
+          type: "assignment_bonus",
+          message: `${clusterLabel} 과제에서 보너스 광석 ${Math.floor(afterBonus)}점을 받았습니다.`,
+          link: buildAssignmentHubLink(after.clusterId, after.date),
+          isRead: false,
+          createdAt: FieldValue.serverTimestamp(),
+          metadata: {
+            assignmentId: context.params.assignmentId,
+            clusterId: after.clusterId || "",
+            date: after.date || "",
+            bonusCrystals: afterBonus,
+          },
+        }, { merge: true })
+      );
+    }
+
+    await Promise.all(tasks);
     return null;
   });
 
