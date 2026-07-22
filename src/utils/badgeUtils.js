@@ -25,6 +25,13 @@ import masterRegDecimalsBadge from '../assets/badge/master_reg_decimals.png';
 import masterRegRatiosBadge from '../assets/badge/master_reg_ratios.png';
 import masterRegElemMonthlyBadge from '../assets/badge/master_reg_elem_monthly.png';
 
+import masterRegMidBasicBadge from '../assets/badge/master_reg_mid_basic.png';
+import masterRegMidEvalBadge from '../assets/badge/master_reg_mid_eval.png';
+import masterRegMidNumExpBadge from '../assets/badge/master_reg_mid_num_exp.png';
+import masterRegMidFuncStatBadge from '../assets/badge/master_reg_mid_func_stat.png';
+import masterRegMidGeometryBadge from '../assets/badge/master_reg_mid_geometry.png';
+import masterRegMidExamBadge from '../assets/badge/master_reg_mid_exam.png';
+
 // 배지 외형 업그레이드 1종(프리미엄)의 광석 가격.
 export const BADGE_UPGRADE_COST = 100;
 
@@ -63,12 +70,14 @@ const BADGE_PREMIUM_IMAGES = {
   master_reg_ratios: masterRegRatiosBadge,
   master_reg_elem_monthly: masterRegElemMonthlyBadge,
 
-  master_reg_mid_basic: null,
-  master_reg_mid_eval: null,
-  master_reg_mid_num_exp: null,
-  master_reg_mid_func_stat: null,
-  master_reg_mid_geometry: null,
-  master_reg_mid_exam: null,
+  master_reg_mid_basic: masterRegMidBasicBadge,
+  master_reg_mid_eval: masterRegMidEvalBadge,
+  master_reg_mid_num_exp: masterRegMidNumExpBadge,
+  master_reg_mid_number_expression: masterRegMidNumExpBadge,
+  master_reg_mid_func_stat: masterRegMidFuncStatBadge,
+  master_reg_mid_function_stats: masterRegMidFuncStatBadge,
+  master_reg_mid_geometry: masterRegMidGeometryBadge,
+  master_reg_mid_exam: masterRegMidExamBadge,
 
   master_reg_py_basic: null,
   master_reg_py_game: null,
