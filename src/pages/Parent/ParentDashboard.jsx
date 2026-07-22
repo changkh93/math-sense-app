@@ -554,7 +554,7 @@ const ChildCard = ({ childUid }) => {
                   </select>
                 </label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'rgba(255,255,255,.46)', fontSize: '.72rem', lineHeight: 1.45 }}>
-                  <ShieldCheck size={15} color="#75f3ba" style={{ flex: '0 0 auto' }} /> 탐험 종료 후 재입장 대기는 20분으로 고정됩니다. 1회 연장 기능은 제공하지 않습니다.
+                  <ShieldCheck size={15} color="#75f3ba" style={{ flex: '0 0 auto' }} /> 탐험 종료 후 재입장 대기는 20분으로 고정됩니다.
                 </div>
                 {gamePolicyMessage && (
                   <div role="status" style={{ padding: '9px 10px', borderRadius: 9, color: gamePolicyMessage.includes('저장되었습니다') ? '#75f3ba' : '#ff9ba9', background: gamePolicyMessage.includes('저장되었습니다') ? 'rgba(109,245,176,.07)' : 'rgba(255,90,110,.07)', fontSize: '.72rem', lineHeight: 1.45 }}>

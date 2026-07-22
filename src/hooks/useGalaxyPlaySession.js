@@ -88,19 +88,26 @@ export function useGalaxyPlaySession({ uid, active }) {
     sequenceRef.current = Number(restored?.sequenceNumber || 0)
   }, [uid])
 
+  const lastAccessFetchedAtRef = useRef(0)
+
   const syncServerClock = useCallback((serverNowMs, sentAtMs = Date.now(), receivedAtMs = Date.now()) => {
     if (!Number.isFinite(Number(serverNowMs))) return
     setServerOffsetMs(Number(serverNowMs) - Math.round((sentAtMs + receivedAtMs) / 2))
   }, [])
 
-  const loadAccess = useCallback(async () => {
+  const loadAccess = useCallback(async ({ force = false } = {}) => {
     if (!uid) return null
+    const now = Date.now()
+    if (!force && lastAccessFetchedAtRef.current && (now - lastAccessFetchedAtRef.current < 10_000) && access) {
+      return access
+    }
     setBusy('access')
     setError('')
     const sentAtMs = Date.now()
     try {
       const result = await callPlay('getGalaxyPlayAccess')
       syncServerClock(result?.serverNowMs, sentAtMs, Date.now())
+      lastAccessFetchedAtRef.current = Date.now()
       setAccess(result)
       return result
     } catch (loadError) {
@@ -109,7 +116,7 @@ export function useGalaxyPlaySession({ uid, active }) {
     } finally {
       setBusy('')
     }
-  }, [syncServerClock, uid])
+  }, [access, syncServerClock, uid])
 
   const startSession = useCallback(async () => {
     if (!uid || busy) return null

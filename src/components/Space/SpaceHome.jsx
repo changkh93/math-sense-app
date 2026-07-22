@@ -3504,7 +3504,7 @@ function SpaceHome() {
             busy={galaxyPlay.busy}
             error={galaxyPlay.error}
             onStart={startGalaxyEntry}
-            onRetry={galaxyPlay.loadAccess}
+            onRetry={() => galaxyPlay.loadAccess({ force: true })}
             onClose={closeGalaxyEntry}
           />
         )}
