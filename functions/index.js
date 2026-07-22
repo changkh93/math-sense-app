@@ -46,7 +46,7 @@ Object.assign(exports, require("./galaxyGame")({
   galaxyPlayTime: galaxyPlayTime.internal,
 }));
 const DIRECT_MEMO_MAX_LENGTH = 2000;
-const CRYSTAL_GIFT_DAILY_LIMIT = 50;
+const CRYSTAL_GIFT_DAILY_LIMIT = 100;
 const STORE_RADAR_DURATION_DAYS = 7;
 const QUIZ_BATTLE_TIE_TOLERANCE_MS = 3000;
 const STORE_PHOTON_SHIELD_CHARGES_PER_GIFT = 10;
@@ -10241,6 +10241,7 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
   const senderId = await requireAuthUid(context);
   const recipientId = String(data?.recipientId || "").trim();
   const amount = Number(data?.amount);
+  const message = cleanText(data?.message || data?.note || "", 100);
 
   if (!recipientId) {
     throw new functions.https.HttpsError("invalid-argument", "받는 사람을 선택해주세요.");
@@ -10309,6 +10310,7 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
       recipientId,
       recipientName,
       amount,
+      message: message || "",
       dayKey,
       createdAt: nowTimestamp,
     };
@@ -10337,6 +10339,7 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
         recipientId,
         recipientName,
         dayKey,
+        ...(message ? { message } : {}),
       },
       timestamp: nowTimestamp,
     });
@@ -10349,6 +10352,7 @@ exports.transferCrystals = regionalFunctions.https.onCall(async (data, context) 
         senderId,
         senderName,
         dayKey,
+        ...(message ? { message } : {}),
       },
       timestamp: nowTimestamp,
     });

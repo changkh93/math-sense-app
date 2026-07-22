@@ -7,7 +7,7 @@ import { db, auth, functions } from '../../firebase'
 import './CrystalLedger.css'
 import { getTodayKST, getYesterdayKST, getKSTComponents } from '../../utils/streakUtils'
 
-const CRYSTAL_GIFT_DAILY_LIMIT = 50
+const CRYSTAL_GIFT_DAILY_LIMIT = 100
 const OPERATOR_GIFT_EMAIL = 'paul@dulcine.net'
 
 // Transaction type configs
@@ -113,6 +113,7 @@ export default function CrystalLedger({ userData }) {
   const [recipientSearch, setRecipientSearch] = useState('')
   const [selectedRecipientId, setSelectedRecipientId] = useState('')
   const [transferAmount, setTransferAmount] = useState('')
+  const [transferNote, setTransferNote] = useState('')
   const [transferBusy, setTransferBusy] = useState(false)
   const [transferMessage, setTransferMessage] = useState(null)
   const [questionMetaById, setQuestionMetaById] = useState({})
@@ -354,9 +355,14 @@ export default function CrystalLedger({ userData }) {
 
     try {
       const transferCrystals = httpsCallable(functions, 'transferCrystals')
-      const result = await transferCrystals({ recipientId: selectedRecipient.uid, amount })
+      const result = await transferCrystals({
+        recipientId: selectedRecipient.uid,
+        amount,
+        message: transferNote.trim(),
+      })
       const data = result?.data || {}
       setTransferAmount('')
+      setTransferNote('')
       setSelectedRecipientId('')
       setRecipientSearch('')
       setTransferMessage({
@@ -513,7 +519,7 @@ export default function CrystalLedger({ userData }) {
           </div>
 
           <div className="crystal-quick-amounts">
-            {[10, 30, 50].map(amount => (
+            {[10, 30, 50, 100].map(amount => (
               <button
                 key={amount}
                 type="button"
@@ -526,6 +532,20 @@ export default function CrystalLedger({ userData }) {
                 {amount}
               </button>
             ))}
+          </div>
+
+          <div className="crystal-note-field">
+            <input
+              type="text"
+              value={transferNote}
+              onChange={(e) => {
+                setTransferNote(e.target.value)
+                setTransferMessage(null)
+              }}
+              maxLength={60}
+              placeholder="메시지 (선택, 최대 60자)"
+              disabled={transferBusy}
+            />
           </div>
 
           <button
@@ -666,6 +686,11 @@ export default function CrystalLedger({ userData }) {
                             <div className="ledger-tx-type">{config.label}</div>
                             {tx.description && (
                               <div className="ledger-tx-desc">{tx.description}</div>
+                            )}
+                            {(tx.metadata?.message || tx.message) && (
+                              <div className="ledger-tx-note">
+                                💬 "{tx.metadata?.message || tx.message}"
+                              </div>
                             )}
                             {agoraContext && (
                               <div className="ledger-agora-context">
