@@ -796,6 +796,17 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     }
   }, [inputRef, paused])
 
+  const firstPersonFov = useRef(65)
+
+  useEffect(() => {
+    const handleWheel = (event) => {
+      if (paused || !isFirstPerson) return
+      firstPersonFov.current = THREE.MathUtils.clamp(firstPersonFov.current + event.deltaY * 0.05, 20, 85)
+    }
+    window.addEventListener('wheel', handleWheel, { passive: true })
+    return () => window.removeEventListener('wheel', handleWheel)
+  }, [isFirstPerson, paused])
+
   useEffect(() => {
     if (!paused) return
     keys.current.clear()
@@ -902,7 +913,10 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const moving = inputLength > .05 && !look.orbiting
     let movementAmount = 0
 
-    if (orbitCamera) {
+    if (isFirstPerson) {
+      forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y)).normalize()
+      right.set(Math.cos(group.current.rotation.y), 0, -Math.sin(group.current.rotation.y)).normalize()
+    } else if (orbitCamera) {
       orbitCamera.getWorldDirection(forward)
       forward.setY(0)
       if (forward.lengthSq() < .0001) forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y))
@@ -910,14 +924,12 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       right.crossVectors(forward, orbitCamera.up).normalize()
     }
 
-    if (moving && orbitCamera) {
+    if (moving) {
       moveDirection.copy(right).multiplyScalar(moveX).addScaledVector(forward, -moveZ)
       const inputStrength = Math.min(1, moveDirection.length())
       moveDirection.normalize()
 
-      if (isFirstPerson) {
-        group.current.rotation.y = Math.atan2(forward.x, forward.z)
-      } else {
+      if (!isFirstPerson) {
         const targetFacingYaw = Math.atan2(forward.x, forward.z)
         const yawDelta = Math.atan2(Math.sin(targetFacingYaw - group.current.rotation.y), Math.cos(targetFacingYaw - group.current.rotation.y))
         group.current.rotation.y += yawDelta * Math.min(1, delta * 14)
@@ -981,10 +993,8 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       const pitch = firstPersonPitch.current
       const lookDist = 10.0
 
-      if (activeCamera.fov !== 65) {
-        activeCamera.fov = 65
-        activeCamera.updateProjectionMatrix()
-      }
+      activeCamera.fov = THREE.MathUtils.lerp(activeCamera.fov, firstPersonFov.current, delta * 12)
+      activeCamera.updateProjectionMatrix()
       activeCamera.position.set(player.x, eyeY, player.z)
       activeCamera.lookAt(
         player.x + Math.sin(yaw) * Math.cos(pitch) * lookDist,
@@ -1134,19 +1144,19 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     const px = nearby.position[0] || 0
     const pz = nearby.position[2] || 0
     const py = terrainHeight(px, pz)
-    let h = 2.0
+    let h = isFirstPerson ? 1.0 : 2.0
     if (nearby.kind === 'structure') {
       const footprint = structureFootprint(nearby.item?.itemId || '')
-      h = Math.max(2.6, footprint * 1.2 + 1.2)
+      h = isFirstPerson ? Math.min(1.6, footprint * 0.8 + 0.6) : Math.max(2.6, footprint * 1.2 + 1.2)
     } else if (nearby.kind === 'portal') {
-      h = 2.8
+      h = isFirstPerson ? 1.6 : 2.8
     } else if (nearby.kind === 'rover') {
-      h = 2.0
+      h = isFirstPerson ? 0.9 : 2.0
     } else if (nearby.kind === 'guide') {
-      h = 2.2
+      h = isFirstPerson ? 1.0 : 2.2
     }
     return [px, py + h, pz]
-  }, [nearby])
+  }, [nearby, isFirstPerson])
   const resourceInteractables = useMemo(() => dailyEventNode
     ? RESOURCE_NODES.map((node) => node.id === dailyEventNode.id ? dailyEventNode : node)
     : RESOURCE_NODES, [dailyEventNode])
