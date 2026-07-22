@@ -32,6 +32,15 @@ import masterRegMidFuncStatBadge from '../assets/badge/master_reg_mid_func_stat.
 import masterRegMidGeometryBadge from '../assets/badge/master_reg_mid_geometry.png';
 import masterRegMidExamBadge from '../assets/badge/master_reg_mid_exam.png';
 
+import masterRegPyBasicBadge from '../assets/badge/master_reg_py_basic.png';
+import masterRegPyGameBadge from '../assets/badge/master_reg_py_game.png';
+import masterRegPyAdvancedBadge from '../assets/badge/master_reg_py_advanced.png';
+import masterRegPyMathBadge from '../assets/badge/master_reg_py_math.png';
+
+import masterRegClassicNeverlandBadge from '../assets/badge/master_reg_classic_neverland.png';
+import masterRegClassicWesternBadge from '../assets/badge/master_reg_classic_western.png';
+import masterRegClassicNobelBadge from '../assets/badge/master_reg_classic_nobel.png';
+
 // 배지 외형 업그레이드 1종(프리미엄)의 광석 가격.
 export const BADGE_UPGRADE_COST = 100;
 
@@ -57,10 +66,10 @@ const BADGE_PREMIUM_IMAGES = {
   eternal_voyager: eternalVoyagerBadge,
 
   // --- 코스 및 성역(Region) 마스터 각성 이미지 슬롯 ---
-  master_cluster_elementary: null,
-  master_cluster_middle: null,
-  master_cluster_python: null,
-  master_cluster_classic: null,
+  master_cluster_elementary: masterRegElemMonthlyBadge,
+  master_cluster_middle: masterRegMidExamBadge,
+  master_cluster_python: masterRegPyAdvancedBadge,
+  master_cluster_classic: masterRegClassicNobelBadge,
 
   master_reg_addition: masterRegAdditionBadge,
   master_reg_multiplication: masterRegMultiplicationBadge,
@@ -79,14 +88,14 @@ const BADGE_PREMIUM_IMAGES = {
   master_reg_mid_geometry: masterRegMidGeometryBadge,
   master_reg_mid_exam: masterRegMidExamBadge,
 
-  master_reg_py_basic: null,
-  master_reg_py_game: null,
-  master_reg_py_advanced: null,
-  master_reg_py_math: null,
+  master_reg_py_basic: masterRegPyBasicBadge,
+  master_reg_py_game: masterRegPyGameBadge,
+  master_reg_py_advanced: masterRegPyAdvancedBadge,
+  master_reg_py_math: masterRegPyMathBadge,
 
-  master_reg_classic_neverland: null,
-  master_reg_classic_western: null,
-  master_reg_classic_nobel: null,
+  master_reg_classic_neverland: masterRegClassicNeverlandBadge,
+  master_reg_classic_western: masterRegClassicWesternBadge,
+  master_reg_classic_nobel: masterRegClassicNobelBadge,
 };
 
 // 업그레이드 가능한 배지 id 목록
