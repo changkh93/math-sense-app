@@ -8809,11 +8809,11 @@ const CREW_CRYSTAL_CHEST_MEMBER_DAILY_CLAIM_LIMIT = 10;
 const CREW_MOTHERSHIP_DAILY_CONTRIBUTION_LIMIT = 100;
 const CREW_MOTHERSHIP_CONTRIBUTION_AMOUNTS = new Set([5, 10, 20, 50]);
 const CREW_MOTHERSHIP_LEVELS = [
-  { level: 1, minMembers: 1 },
-  { level: 2, minMembers: 10 },
-  { level: 3, minMembers: 20 },
-  { level: 4, minMembers: 40 },
-  { level: 5, minMembers: 80 },
+  { level: 1, minMembers: 1, minXP: 0 },
+  { level: 2, minMembers: 10, minXP: 100 },
+  { level: 3, minMembers: 20, minXP: 300 },
+  { level: 4, minMembers: 40, minXP: 800 },
+  { level: 5, minMembers: 80, minXP: 2000 },
 ];
 const CREW_MOTHERSHIP_MODULES = {
   "dock-lights": { slot: "lights", name: "시안 도킹 라이트", cost: 150, minLevel: 1 },
@@ -8832,7 +8832,10 @@ const crewMothershipFunctions = regionalFunctions.runWith({
 
 function getCrewMothershipLevelValue(crew = {}) {
   const memberCount = Math.max(1, Number(crew.memberCount || 0), getCrewMemberIds(crew).length);
-  return [...CREW_MOTHERSHIP_LEVELS].reverse().find((entry) => memberCount >= entry.minMembers)?.level || 1;
+  const xp = getCrewMothershipServerStats(crew).xp;
+  return [...CREW_MOTHERSHIP_LEVELS].reverse().find(
+    (entry) => memberCount >= entry.minMembers || (entry.minXP > 0 && xp >= entry.minXP)
+  )?.level || 1;
 }
 
 function getCrewMothershipServerStats(crew = {}) {
