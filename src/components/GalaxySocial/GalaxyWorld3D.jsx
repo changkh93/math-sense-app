@@ -34,6 +34,7 @@ const PLAYER_SPEED = 6
 const PLAYER_TURN_SPEED = Math.PI * 2.4
 const PLAYER_MOVE_START_ANGLE = THREE.MathUtils.degToRad(25)
 const PLAYER_MOVE_FULL_ANGLE = THREE.MathUtils.degToRad(6)
+const WORLD_UP = new THREE.Vector3(0, 1, 0)
 const CHARACTER_SCALE = .56
 const CAMERA_TARGET_HEIGHT = .84
 const CAMERA_MIN_POLAR = .24
@@ -951,20 +952,21 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     let movementAmount = 0
     let movedDistance = 0
 
+    // Compute `forward` and `right` as the direction the player should move.
+    // In both modes `forward` is the horizontal direction the character FACES. The right-hand
+    // vector is `forward × WORLD_UP` (NOT `up × forward` — the order matters: a×b = −(b×a)).
+    // At yaw=0, forward=(0,0,1), so forward×up = (-1,0,0) which is screen-right (the camera
+    // looks toward +Z, so its local +X/screen-right maps to world -X). This makes a positive
+    // `moveX` (D / ▶ key) always move the character to screen-right in BOTH view modes.
     if (isFirstPerson) {
       forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y)).normalize()
-      right.set(-Math.cos(group.current.rotation.y), 0, Math.sin(group.current.rotation.y)).normalize()
     } else if (orbitCamera) {
       orbitCamera.getWorldDirection(forward)
       forward.setY(0)
       if (forward.lengthSq() < .0001) forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y))
       forward.normalize()
-      // orbitCamera is the active camera in third-person mode (controls.current?.object).
-      // Must NOT use activeCamera here — it is declared further below (line ~1091) and would
-      // throw a TDZ ReferenceError every frame, silently killing the entire useFrame loop
-      // (which freezes movement AND the V-key camera switch).
-      right.crossVectors(orbitCamera.up, forward).normalize()
     }
+    right.crossVectors(forward, WORLD_UP).normalize()
 
     if (moving) {
       moveDirection.copy(right).multiplyScalar(moveX).addScaledVector(forward, -moveZ)
@@ -1975,9 +1977,10 @@ export default function GalaxyWorld3D({
         type="button"
         className="frontier-camera-mode-toggle"
         onClick={() => onToggleFirstPerson?.()}
-        title="1인칭/3인칭 시점 전환 (단축키: V)"
+        aria-label={isFirstPerson ? '3인칭 시점으로 전환' : '1인칭 시점으로 전환'}
+        title={`시점 전환 (V) · 현재 ${isFirstPerson ? '1인칭' : '3인칭'}`}
       >
-        {isFirstPerson ? '🛸 3인칭 시점 (V)' : '👁️ 1인칭 시점 (V)'}
+        {isFirstPerson ? '👁️' : '🛸'}
       </button>
       <div className={`frontier-live-status${liveConnected ? ' online' : ' offline'}`} title={presenceError || (liveConnected ? '같은 행성 접속자와 실시간 연결됨' : '실시간 대화 연결 없음')}>
         <i />

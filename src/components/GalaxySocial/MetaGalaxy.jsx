@@ -498,11 +498,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [notice, setNotice] = useState('')
 
   const toggleViewMode = useCallback(() => {
-    setIsFirstPerson((prev) => {
-      const next = !prev
-      setNotice(next ? '1인칭 탐험 시점으로 전환했습니다. (V 키로 3인칭 전환)' : '3인칭 탐험 시점으로 전환했습니다. (V 키로 1인칭 전환)')
-      return next
-    })
+    // No toast/notice: the view change is immediately visible (camera switches), so a textual
+    // confirmation is redundant. The on-screen icon button reflects current mode via its glyph.
+    setIsFirstPerson((prev) => !prev)
   }, [])
 
   // V-key view toggle is handled exclusively by GalaxyWorld3D's keydown listener, which calls
