@@ -54,7 +54,9 @@ import {
   Telescope,
   TimerReset,
   Trees,
+  User,
   Users,
+  Volume2,
   Waves,
   Warehouse,
   Wrench,
@@ -77,6 +79,7 @@ import { compressImage } from '../../utils/storageUtils'
 import soundManager from '../../utils/SoundManager'
 import GalaxyObjectDialog from './GalaxyObjectDialog'
 import GalaxyRoverPanel from './GalaxyRoverPanel'
+import FrontierAudioSettingsModal from './FrontierAudioSettingsModal'
 import { BUILD_RADIUS, isBridgeDeck, isRiverWater, terrainSlope } from './GalaxyTerrainModel'
 import GalaxyWorld3D, { StructurePreview3D } from './GalaxyWorld3D'
 import './MetaGalaxy.css'
@@ -487,7 +490,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [home, setHome] = useState(null)
   const [targetUid, setTargetUid] = useState(user?.uid || '')
   const [menu, setMenu] = useState('')
-  const [arrivalOpen, setArrivalOpen] = useState(true)
+  const [arrivalOpen, setArrivalOpen] = useState(false)
+  const [audioSettingsOpen, setAudioSettingsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -1169,6 +1173,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       },
     )
     if (!result?.dailyEvent) return null
+    soundManager.play('frontier.daily.complete')
 
     const receivedAtMs = Date.now()
     setHome((current) => {
@@ -1226,6 +1231,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       },
     )
     if (!result?.expedition) return null
+    soundManager.play('frontier.rover.complete')
     const receivedAtMs = Date.now()
     setHome((current) => {
       if (!current) return current
@@ -1428,6 +1434,15 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
             </div>
           )}
 
+          <button
+            type="button"
+            className="frontier-hud-exit-btn audio-settings-btn"
+            onClick={() => setAudioSettingsOpen(true)}
+            title="오디오 및 소리 설정"
+            aria-label="오디오 및 소리 설정"
+          >
+            <Volume2 size={15} aria-hidden="true" />
+          </button>
           <button
             type="button"
             className="frontier-hud-exit-btn"
@@ -1823,6 +1838,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           </Motion.div>
         )}
       </AnimatePresence>
+      <FrontierAudioSettingsModal key={audioSettingsOpen ? 'open' : 'closed'} open={audioSettingsOpen} onClose={() => setAudioSettingsOpen(false)} />
     </div>
   )
 }

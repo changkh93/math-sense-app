@@ -394,6 +394,13 @@ function structureFootprint(itemId) {
   return 1.14
 }
 
+function getStructureAcousticMaterial(itemId) {
+  if (itemId === 'lumen_tree' || itemId === 'wild_sprout' || itemId === 'starflower_garden' || itemId === 'friend_greenhouse') return 'wood'
+  if (itemId === 'crystal_pond' || itemId === 'observatory') return 'stone'
+  if (itemId === 'starter_dome' || itemId === 'rover_bay' || itemId === 'star_lamp' || itemId === 'prism_pathlight' || itemId === 'route_gateway' || itemId === 'signal_plaza') return 'metal'
+  return 'soft'
+}
+
 function StructureProximityLabel({ item, footprint, isPlanetOwner }) {
   return (
     <Html position={[0, Math.max(1.7, footprint + .9), 0]} center distanceFactor={8.8} style={{ pointerEvents: 'none' }}>
@@ -977,8 +984,9 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
             collisionClearDuration.current = 0
           }
         }
-      } else if (FRONTIER_AUDIO_ASSETS_READY && !collisionLatched.current) {
-        soundManager.play(structureCollision ? 'frontier.collision.metal' : 'frontier.collision.soft')
+      } else if (!collisionLatched.current) {
+        const acousticMat = structureCollision?.acousticMaterial || 'soft'
+        soundManager.play(`frontier.collision.${acousticMat}`)
         collisionLatched.current = true
         collisionClearDuration.current = 0
       } else if (collisionLatched.current) {
@@ -1025,7 +1033,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkSurfaceHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
     const player = group.current.position
 
-    if (FRONTIER_AUDIO_ASSETS_READY && movedDistance > 0) {
+    if (movedDistance > 0) {
       stepDistance.current += movedDistance
       if (stepDistance.current >= 1.05) {
         stepDistance.current %= 1.05
@@ -1234,6 +1242,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       label: item.name || '행성 객체 살펴보기',
       position,
       collisionRadius: Math.max(.9, structureFootprint(item.itemId) + .42),
+      acousticMaterial: getStructureAcousticMaterial(item.itemId),
       item,
     }
   }), [layout])
@@ -1666,7 +1675,12 @@ export default function GalaxyWorld3D({
         : null
       if (currentDailyEvent) onDailyEventComplete?.(currentDailyEvent)
     }
-    else onWorldAction?.(nearby)
+    else {
+      if (nearby.actionId === 'plant') soundManager.play('frontier.interaction.water')
+      else if (nearby.actionId === 'beacon') soundManager.play('frontier.interaction.repair')
+      else soundManager.play('frontier.pickup.collect')
+      onWorldAction?.(nearby)
+    }
   }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenRover, onStructureMission, onWorldAction, paused, startMission])
 
   const inspectStructure = useCallback(() => {
@@ -1765,7 +1779,11 @@ export default function GalaxyWorld3D({
     setCompletionStatus('idle')
   }, [activeMission, collectedIds.size])
 
-  const collect = useCallback((id) => setCollectedIds((current) => current.has(id) ? current : new Set([...current, id])), [])
+  const collect = useCallback((id) => setCollectedIds((current) => {
+    if (current.has(id)) return current
+    soundManager.play('frontier.pickup.collect')
+    return new Set([...current, id])
+  }), [])
 
   return (
     <div
@@ -1798,7 +1816,10 @@ export default function GalaxyWorld3D({
           onPlayerPositionChange={publishPlayerTransform}
           buildItem={selectedBuildItem}
           onBuildAt={onBuildAt}
-          onInvalidBuild={() => onMessage?.('시설과 항로에서 조금 떨어진 평평한 자리를 골라주세요.')}
+          onInvalidBuild={() => {
+            soundManager.play('frontier.build.invalid')
+            onMessage?.('시설과 항로에서 조금 떨어진 평평한 자리를 골라주세요.')
+          }}
           roverStatus={roverStatus}
           roverStatusLabel={roverStatusLabel}
           dailyEventNode={dailyEventNode}

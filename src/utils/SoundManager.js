@@ -231,6 +231,13 @@ export class SoundManager {
   }
 
   /**
+   * 사용자 선호 설정 조회
+   */
+  getPreferences() {
+    return { ...this.preferences }
+  }
+
+  /**
    * 선호 설정 업데이트
    * @param {Partial<typeof this.preferences>} newPrefs
    */

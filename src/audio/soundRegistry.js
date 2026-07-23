@@ -217,6 +217,7 @@ export const FRONTIER_SOUNDS = {
     cooldownMs: 500,
     maxInstances: 1,
     priority: 80,
+    fallbackId: 'click',
   },
   'frontier.collision.metal': {
     sources: [
@@ -231,6 +232,52 @@ export const FRONTIER_SOUNDS = {
     cooldownMs: 500,
     maxInstances: 1,
     priority: 80,
+    fallbackId: 'click',
+  },
+  'frontier.collision.wood': {
+    sources: [
+      '/sounds/frontier/v1/collisions/wood-01.webm',
+      '/sounds/frontier/v1/collisions/wood-01.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'frontierSfx',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.35,
+    cooldownMs: 500,
+    maxInstances: 1,
+    priority: 80,
+    fallbackId: 'click',
+  },
+  'frontier.collision.stone': {
+    sources: [
+      '/sounds/frontier/v1/collisions/stone-01.webm',
+      '/sounds/frontier/v1/collisions/stone-01.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'frontierSfx',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.35,
+    cooldownMs: 500,
+    maxInstances: 1,
+    priority: 80,
+    fallbackId: 'click',
+  },
+  'frontier.build.invalid': {
+    sources: [
+      '/sounds/frontier/v1/ui/build-invalid.webm',
+      '/sounds/frontier/v1/ui/build-invalid.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'ui',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.35,
+    cooldownMs: 500,
+    maxInstances: 1,
+    priority: 85,
+    fallbackId: 'wrong',
   },
 
   // --- 상호작용 및 피드백 (Interactions & Events) ---

@@ -650,6 +650,154 @@ test('Walk surfaces and river emitters use the rendered world model', () => {
   assert.equal(z, riverCenterZ(1.2))
 })
 
+test('Phase 2: Footsteps only trigger when actual displacement (movedDistance) occurs', () => {
+  let stepDistance = 0
+  let playCount = 0
+  const triggerStep = (movedDistance) => {
+    if (movedDistance > 0) {
+      stepDistance += movedDistance
+      if (stepDistance >= 1.05) {
+        stepDistance %= 1.05
+        playCount += 1
+      }
+    }
+  }
+
+  // 1. 벽에 막혀 movedDistance가 0인 상태에서 키를 계속 밀 때 -> 발소리 0회
+  for (let i = 0; i < 60; i += 1) {
+    triggerStep(0)
+  }
+  assert.equal(playCount, 0, 'No footsteps when blocked by wall')
+
+  // 2. 정상 이동으로 2.2 unit 이동 시 -> 2회 발소리 발생
+  triggerStep(0.5)
+  triggerStep(0.6) // 1.1 -> step 1
+  triggerStep(0.6)
+  triggerStep(0.6) // 2.3 -> step 2
+  assert.equal(playCount, 2, 'Footsteps trigger exactly on 1.05 unit displacement threshold')
+})
+
+test('Phase 2: Surface switching immediately changes footstep sound within 1.05 units', () => {
+  const surfacesHit = []
+  const simulateMove = (x, z, theme) => {
+    const surface = getWalkSurface(x, z, theme)
+    surfacesHit.push(surface)
+    return getFrontierFootstepSoundId(surface)
+  }
+
+  // 1) Landing Pad (x:0, z:5)
+  const sound1 = simulateMove(0, 5, 'forest')
+  assert.equal(sound1, 'frontier.footstep.landingMetal')
+
+  // 2) Bridge (x:1.2, z:-15)
+  const sound2 = simulateMove(1.2, -15, 'forest')
+  assert.equal(sound2, 'frontier.footstep.bridgeWood')
+
+  // 3) Road (-4.8, 4.8)
+  const sound3 = simulateMove(-4.8, 4.8, 'forest')
+  assert.equal(sound3, 'frontier.footstep.path')
+
+  assert.deepEqual(surfacesHit, ['landingMetal', 'bridgeWood', 'path'])
+})
+
+test('Phase 2: Collision latches on initial impact and prevents spam during wall scraping', () => {
+  let collisionLatched = false
+  let clearDuration = 0
+  const playedCollisions = []
+
+  const updateCollisionState = (inWorld, blocked, acousticMat, delta) => {
+    if (inWorld && !blocked) {
+      if (collisionLatched) {
+        clearDuration += delta
+        if (clearDuration >= 0.35) {
+          collisionLatched = false
+          clearDuration = 0
+        }
+      }
+    } else if (!collisionLatched) {
+      playedCollisions.push(acousticMat)
+      collisionLatched = true
+      clearDuration = 0
+    } else if (collisionLatched) {
+      clearDuration = 0
+    }
+  }
+
+  // 1. 최초 충돌 -> 소리 1회 발생
+  updateCollisionState(true, true, 'metal', 0.016)
+  assert.equal(playedCollisions.length, 1)
+  assert.equal(playedCollisions[0], 'metal')
+
+  // 2. 계속 벽을 밀면서 60프레임 동안 스크랩 -> 추가 충돌음 0회
+  for (let i = 0; i < 60; i += 1) {
+    updateCollisionState(true, true, 'metal', 0.016)
+  }
+  assert.equal(playedCollisions.length, 1, 'Collision sound latched; no spam on continuous push')
+
+  // 3. 벽에서 떨어져 0.35초 이상 자유 이동 후 다시 충돌 -> 2번째 충돌음 발생
+  for (let i = 0; i < 25; i += 1) {
+    updateCollisionState(true, false, 'wood', 0.016)
+  }
+  assert.equal(collisionLatched, false, 'Rearmed after clearing distance')
+
+  updateCollisionState(true, true, 'wood', 0.016)
+  assert.equal(playedCollisions.length, 2)
+  assert.equal(playedCollisions[1], 'wood')
+})
+
+test('Phase 3: Big completion sounds only trigger on confirmed server success', async () => {
+  const playedSounds = []
+  const mockSoundManager = {
+    play(soundId) { playedSounds.push(soundId) },
+  }
+
+  const simulateServerOperation = async (shouldSucceed) => {
+    try {
+      if (!shouldSucceed) throw new Error('server failure')
+      mockSoundManager.play('frontier.mission.complete')
+      return true
+    } catch {
+      mockSoundManager.play('frontier.connection.softError')
+      return false
+    }
+  }
+
+  // 1. 서버 실패 시 -> 성공음이 나지 않고 softError 발생
+  await simulateServerOperation(false)
+  assert.deepEqual(playedSounds, ['frontier.connection.softError'])
+
+  // 2. 서버 성공 시 -> 성공음 발생
+  await simulateServerOperation(true)
+  assert.deepEqual(playedSounds, ['frontier.connection.softError', 'frontier.mission.complete'])
+})
+
+test('Phase 3 & 4: Scope exit fades out ambient loops and cleans active voices', () => {
+  const { manager } = createManager()
+  manager.enterScope('frontier')
+  manager.loopAt('frontier.ambience.forest', [0, 0, 0], { key: 'frontier:ambience:theme' })
+  assert.ok(manager.activeLoops.has('frontier:ambience:theme'))
+
+  manager.exitScope('frontier', { unload: true, fadeOutMs: 300 })
+  assert.equal(manager.activeLoops.has('frontier:ambience:theme'), false)
+  assert.equal(manager.activeScopes.has('frontier'), false)
+})
+
+test('Phase 4: Quiet mode applies a 50% volume cap and sanitized bus levels', () => {
+  const { manager } = createManager()
+  manager.updatePreferences({ quietMode: true, ambience: 0.8, action: 1.0 })
+  const prefs = manager.getPreferences()
+
+  assert.equal(prefs.quietMode, true)
+  const calculatedVol = calculateInstanceVolume(
+    1.0,
+    1.0,
+    1.0,
+    true, // quietMode = true
+    'frontierSfx',
+  )
+  assert.equal(calculatedVol, 0.4, 'Quiet mode caps volume at 50% of base * bus (0.4)')
+})
+
 await asyncTest('Interrupted AudioContext is only unlocked after it reaches running', async () => {
   const { manager } = createManager()
   let resumeCount = 0
