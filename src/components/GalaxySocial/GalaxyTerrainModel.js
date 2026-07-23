@@ -52,6 +52,9 @@ export const PATH_NETWORK = [
 
 export const BRIDGE_X = 1.2
 export const BRIDGE_DECK_HEIGHT = .38
+export const LANDING_PAD_RADIUS = 2.72
+export const ROAD_EDGE_HALF_WIDTH = .7
+export const ROAD_CENTER_HALF_WIDTH = .5
 
 function clamp01(value) {
   return Math.min(1, Math.max(0, value))
@@ -74,6 +77,60 @@ export function riverCenterZ(x) {
 
 export function riverWidth(x) {
   return 1.02 + Math.sin(x * .37 + 1.3) * .14
+}
+
+export function isLandingPad(x, z) {
+  return Math.hypot(x - 0, z - 5) <= LANDING_PAD_RADIUS
+}
+
+export function distanceToSegment(x, z, start, end) {
+  const dx = end[0] - start[0]
+  const dz = end[1] - start[1]
+  const lengthSquared = dx * dx + dz * dz
+  const amount = lengthSquared > 0 ? Math.min(1, Math.max(0, ((x - start[0]) * dx + (z - start[1]) * dz) / lengthSquared)) : 0
+  return Math.hypot(x - (start[0] + dx * amount), z - (start[1] + dz * amount))
+}
+
+const ROAD_CENTERLINES = PATH_NETWORK.map((path) => {
+  const points = path.map(([pathX, pathZ]) => new THREE.Vector3(pathX, 0, pathZ))
+  const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', .35)
+  const sampleCount = Math.max(12, (points.length - 1) * 14)
+  return Array.from({ length: sampleCount + 1 }, (_, index) => {
+    const point = curve.getPoint(index / sampleCount)
+    return [point.x, point.z]
+  })
+})
+
+export function isNearRoad(x, z) {
+  return ROAD_CENTERLINES.some((path) => {
+    for (let index = 1; index < path.length; index += 1) {
+      if (
+        distanceToSegment(
+          x,
+          z,
+          path[index - 1],
+          path[index],
+        ) <= ROAD_EDGE_HALF_WIDTH
+      ) {
+        return true
+      }
+    }
+    return false
+  })
+}
+
+export function getWalkSurface(x, z, theme = 'forest') {
+  if (isLandingPad(x, z)) return 'landingMetal'
+  if (isBridgeDeck(x, z)) return 'bridgeWood'
+  if (isNearRoad(x, z)) return 'path'
+  const validThemes = ['forest', 'ocean', 'crystal', 'desert', 'mechanical', 'ice']
+  const normalizedTheme = validThemes.includes(theme) ? theme : 'forest'
+  return `terrain.${normalizedTheme}`
+}
+
+export function getRiverAudioPoint(playerX) {
+  const clampX = Math.max(-19.5, Math.min(19.5, playerX))
+  return [clampX, 0.05, riverCenterZ(clampX)]
 }
 
 export function isBridgeDeck(x, z) {

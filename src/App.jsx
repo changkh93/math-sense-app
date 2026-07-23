@@ -44,13 +44,14 @@ import CrewGuestManager from './pages/Admin/CrewGuestManager'
 import QuizBattleChallengeReceiver from './components/Space/QuizBattleChallengeReceiver'
 
 import PrivateRoute from './components/PrivateRoute'
+import { cleanExpiredAudioPreferences } from './audio/audioPreferences'
+import { cleanExpiredLocalStorage } from './utils/storageUtils'
 
 function App() {
-  // 앱 로드 시 만료된 localStorage 캐시(7일 이상) 일괄 정리
+  // 앱 로드 시 일반 캐시와 UID별 오디오 선호 만료분을 함께 정리
   useEffect(() => {
-    import('./utils/storageUtils').then(({ cleanExpiredLocalStorage }) => {
-      cleanExpiredLocalStorage();
-    });
+    cleanExpiredLocalStorage();
+    cleanExpiredAudioPreferences();
   }, []);
 
   return (

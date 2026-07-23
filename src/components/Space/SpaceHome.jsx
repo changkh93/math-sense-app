@@ -629,6 +629,13 @@ function SpaceHome() {
   const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
   const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy' })
 
+  useEffect(() => {
+    soundManager.setUserBinding(
+      user?.uid || null,
+      Boolean(user?.isAnonymous || userData?.isGuest),
+    )
+  }, [user, userData?.isGuest])
+
   const handleGuestInviteLogin = useCallback(() => {
     const rawLink = guestInviteLink.trim()
     if (!rawLink) {
@@ -865,6 +872,8 @@ function SpaceHome() {
   }, [galaxyPlay, switchRootView, user?.uid])
 
   const startGalaxyEntry = useCallback(async () => {
+    // 사용자 제스처가 유지되는 동안 Web Audio를 먼저 해제해야 Safari/iPad에서 재생된다.
+    soundManager.unlock()
     const playSession = await galaxyPlay.startSession()
     if (!playSession) return
     setGalaxyEntryOpen(false)

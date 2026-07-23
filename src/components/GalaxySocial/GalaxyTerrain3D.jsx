@@ -6,6 +6,9 @@ import {
   BRIDGE_X,
   MOUNTAINS,
   PATH_NETWORK,
+  LANDING_PAD_RADIUS,
+  ROAD_CENTER_HALF_WIDTH,
+  ROAD_EDGE_HALF_WIDTH,
   VILLAGE_BEACON_POSITION,
   WORLD_RADIUS,
   WORLD_ZONES,
@@ -18,6 +21,7 @@ import {
   terrainHeight,
   terrainSlope,
   walkSurfaceHeight,
+  isNearRoad,
 } from './GalaxyTerrainModel.js'
 
 const GROUND_TEXTURE_SIZE = 512
@@ -161,20 +165,6 @@ function createGroundDetailTextures(palette) {
   bump.needsUpdate = true
 
   return { albedo, bump }
-}
-
-function distanceToSegment(x, z, start, end) {
-  const dx = end[0] - start[0]
-  const dz = end[1] - start[1]
-  const lengthSquared = dx * dx + dz * dz
-  const amount = lengthSquared > 0 ? THREE.MathUtils.clamp(((x - start[0]) * dx + (z - start[1]) * dz) / lengthSquared, 0, 1) : 0
-  return Math.hypot(x - (start[0] + dx * amount), z - (start[1] + dz * amount))
-}
-
-function isNearRoad(x, z) {
-  return PATH_NETWORK.some((path) => path.some((point, index) => (
-    index > 0 && distanceToSegment(x, z, path[index - 1], point) < .82
-  )))
 }
 
 function seededRandom(seed) {
@@ -383,8 +373,8 @@ function GroundCover({ palette, clearings = [] }) {
 }
 
 function TerrainRoads({ palette }) {
-  const edgeGeometry = useMemo(() => createRibbonGeometry(PATH_NETWORK, .7, walkSurfaceHeight), [])
-  const centerGeometry = useMemo(() => createRibbonGeometry(PATH_NETWORK, .5, walkSurfaceHeight), [])
+  const edgeGeometry = useMemo(() => createRibbonGeometry(PATH_NETWORK, ROAD_EDGE_HALF_WIDTH, walkSurfaceHeight), [])
+  const centerGeometry = useMemo(() => createRibbonGeometry(PATH_NETWORK, ROAD_CENTER_HALF_WIDTH, walkSurfaceHeight), [])
   const tones = ROAD_TONES[palette.prop] || ROAD_TONES.forest
   useEffect(() => () => {
     edgeGeometry.dispose()
@@ -515,7 +505,7 @@ function LandingPad({ palette }) {
   const ground = terrainHeight(0, 5)
   return (
     <group position={[0, ground + .08, 5]}>
-      <mesh receiveShadow castShadow><cylinderGeometry args={[2.48, 2.72, .2, 48]} /><meshStandardMaterial color="#2e4354" metalness={.5} roughness={.48} /></mesh>
+      <mesh receiveShadow castShadow><cylinderGeometry args={[2.48, LANDING_PAD_RADIUS, .2, 48]} /><meshStandardMaterial color="#2e4354" metalness={.5} roughness={.48} /></mesh>
       <mesh position={[0, .12, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.38, 2.05, 48]} /><meshStandardMaterial color="#435c68" emissive={palette.glow} emissiveIntensity={.18} metalness={.58} roughness={.28} /></mesh>
       <mesh position={[0, .135, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.72, 1.8, 48]} /><meshBasicMaterial color={palette.accent} transparent opacity={.8} toneMapped={false} /></mesh>
       {Array.from({ length: 8 }, (_, index) => {

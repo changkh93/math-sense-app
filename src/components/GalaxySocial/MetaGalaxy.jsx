@@ -74,6 +74,7 @@ import {
   getMissionCooldown,
 } from '../../utils/galaxyGame'
 import { compressImage } from '../../utils/storageUtils'
+import soundManager from '../../utils/SoundManager'
 import GalaxyObjectDialog from './GalaxyObjectDialog'
 import GalaxyRoverPanel from './GalaxyRoverPanel'
 import { BUILD_RADIUS, isBridgeDeck, isRiverWater, terrainSlope } from './GalaxyTerrainModel'
@@ -505,8 +506,20 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const objectDialogCloseRef = useRef(null)
   const restoreFocusRef = useRef(null)
   const activeOverlayRef = useRef('')
+  const audioSessionKey = `${user?.uid || 'guest'}:${targetUid || 'home'}:${playSession?.sessionId || 'no-session'}`
+  const audioMountedRef = useRef(false)
+  const audioSessionKeyRef = useRef(audioSessionKey)
+  audioSessionKeyRef.current = audioSessionKey
   const isOwner = targetUid === user?.uid
   const overlayReady = !loading && Boolean(home)
+
+  useEffect(() => {
+    audioMountedRef.current = true
+    return () => {
+      audioMountedRef.current = false
+    }
+  }, [])
+
   const callGalaxy = useCallback((name, payload = {}) => invokeGalaxy(name, {
     ...payload,
     playSessionId: playSession?.sessionId || '',
@@ -1023,13 +1036,18 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     if (!selectedBuildItem || !isOwner) return
     const itemId = selectedBuildItem
     const operationId = createOperationId()
+    const requestAudioSessionKey = audioSessionKey
     const result = await runAction(`build:${itemId}`, () => callGalaxy('buildGalaxyItem', {
       itemId,
       operationId,
       x: 50 + Number(worldX || 0) * 3,
       y: 50 + Number(worldZ || 0) * 3,
     }), (buildResult) => `${buildResult?.placed?.name || '새 시설'}을 이곳에 건설했습니다.`)
-    if (!result) return
+    if (
+      !result
+      || !audioMountedRef.current
+      || audioSessionKeyRef.current !== requestAudioSessionKey
+    ) return
     setHome((current) => {
       if (!current) return current
       const currentOwnPlanet = current.ownPlanet || {}
@@ -1050,6 +1068,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       }
     })
     setSelectedBuildItem('')
+    soundManager.play('frontier.build.complete')
   }
 
   const performVisitAction = async (actionId, node = null) => {
@@ -1348,6 +1367,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     <div className="meta-galaxy frontier-immersive">
       <GalaxyWorld3D
         planet={planet}
+        audioSessionKey={audioSessionKey}
         materials={(isOwner ? planet : ownPlanet).materials || {}}
         missionReady={isOwner && missionCooldown.ready}
         missionCooldownLabel={isOwner ? missionCooldown.label : '현장 탐사는 내 행성에서 출발할 수 있어요'}

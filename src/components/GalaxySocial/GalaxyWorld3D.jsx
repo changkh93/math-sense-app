@@ -3,7 +3,13 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
 import { Bot, Compass, Flower2, Gem, Image as ImageIcon, Radio, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
+import {
+  FRONTIER_AUDIO_ASSETS_READY,
+  getFrontierAmbienceSoundId,
+  getFrontierFootstepSoundId,
+} from '../../audio/soundRegistry'
 import { GALAXY_MISSION_ROUTES } from '../../utils/galaxyGame'
+import soundManager from '../../utils/SoundManager'
 import WorldTerrain from './GalaxyTerrain3D'
 import {
   BUILD_RADIUS,
@@ -11,6 +17,8 @@ import {
   WORLD_RADIUS,
   WORLD_ZONES as ZONES,
   getAvailableVillageSlots,
+  getRiverAudioPoint,
+  getWalkSurface,
   isVillageBeaconAvailable,
   isBridgeDeck,
   isRiverWater,
@@ -35,6 +43,7 @@ const MOUSE_LOOK_MAX_FRAME_DELTA = 420
 const MOUSE_LOOK_REENTRY_GAP_MS = 180
 const MOUSE_LOOK_REENTRY_DISTANCE = 160
 const PROXIMITY_CHAT_DISTANCE = 4.2
+const COLLISION_REARM_CLEAR_SECONDS = .35
 
 function createMovementIntent() {
   return {
@@ -396,7 +405,7 @@ function StructureProximityLabel({ item, footprint, isPlanetOwner }) {
   )
 }
 
-function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner }) {
+function PlacedStructure({ item, selected, onSelect }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId)
@@ -715,7 +724,7 @@ function RemoteAstronaut({ player, showName }) {
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, setIsFirstPerson }) {
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest' }) {
   const { gl } = useThree()
   const group = useRef()
   const body = useRef()
@@ -729,6 +738,10 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   const nearbySignature = useRef('')
   const collectLock = useRef(new Set())
   const lastPublishAt = useRef(0)
+  const lastListenerUpdateAt = useRef(0)
+  const stepDistance = useRef(0)
+  const collisionLatched = useRef(false)
+  const collisionClearDuration = useRef(0)
   const hoverLook = useRef({ pendingX: 0, pendingY: 0, lastX: null, lastY: null, lastTime: null, orbiting: false })
   const firstPersonPitch = useRef(0)
   const movementIntent = useRef(createMovementIntent())
@@ -740,6 +753,8 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     followDelta: new THREE.Vector3(),
     cameraOffset: new THREE.Vector3(),
     cameraSpherical: new THREE.Spherical(),
+    listenerForward: new THREE.Vector3(),
+    listenerUp: new THREE.Vector3(),
   })
 
   const resetFreeLook = useCallback(() => {
@@ -873,6 +888,8 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       followDelta,
       cameraOffset,
       cameraSpherical,
+      listenerForward,
+      listenerUp,
     } = movementVectors.current
     const look = hoverLook.current
     const canFreeLook = Boolean(orbitCamera && controls.current && freeLookEnabled && !paused && !look.orbiting)
@@ -912,6 +929,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const inputLength = Math.hypot(moveX, moveZ)
     const moving = inputLength > .05 && !look.orbiting
     let movementAmount = 0
+    let movedDistance = 0
 
     if (isFirstPerson) {
       forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y)).normalize()
@@ -946,13 +964,35 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       const blockedByRiver = isRiverWater(nextX, nextZ) && !isBridgeDeck(nextX, nextZ)
       const blockedBySlope = !isBridgeDeck(nextX, nextZ) && terrainSlope(nextX, nextZ) > 1.08
       if (inWorld && !blockedByObject && !blockedByRiver && !blockedBySlope) {
+        movedDistance = Math.hypot(
+          nextX - group.current.position.x,
+          nextZ - group.current.position.z,
+        )
         group.current.position.x = nextX
         group.current.position.z = nextZ
+        if (collisionLatched.current) {
+          collisionClearDuration.current += delta
+          if (collisionClearDuration.current >= COLLISION_REARM_CLEAR_SECONDS) {
+            collisionLatched.current = false
+            collisionClearDuration.current = 0
+          }
+        }
+      } else if (FRONTIER_AUDIO_ASSETS_READY && !collisionLatched.current) {
+        soundManager.play(structureCollision ? 'frontier.collision.metal' : 'frontier.collision.soft')
+        collisionLatched.current = true
+        collisionClearDuration.current = 0
+      } else if (collisionLatched.current) {
+        // 벽을 비스듬히 긁을 때 성공/실패 프레임이 교차해도 재무장하지 않는다.
+        collisionClearDuration.current = 0
       }
     } else if (orbitCamera && !isFirstPerson) {
       const targetYaw = Math.atan2(forward.x, forward.z)
       const yawDelta = Math.atan2(Math.sin(targetYaw - group.current.rotation.y), Math.cos(targetYaw - group.current.rotation.y))
       group.current.rotation.y += yawDelta * (1 - Math.exp(-delta * 14))
+    }
+    if (!moving) {
+      collisionLatched.current = false
+      collisionClearDuration.current = 0
     }
 
     const locomoting = moving && movementAmount > .01
@@ -984,6 +1024,15 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkSurfaceHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
     const player = group.current.position
+
+    if (FRONTIER_AUDIO_ASSETS_READY && movedDistance > 0) {
+      stepDistance.current += movedDistance
+      if (stepDistance.current >= 1.05) {
+        stepDistance.current %= 1.05
+        const surface = getWalkSurface(player.x, player.z, theme)
+        soundManager.play(getFrontierFootstepSoundId(surface))
+      }
+    }
 
     const activeCamera = state.camera
     if (isFirstPerson) {
@@ -1025,6 +1074,20 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       }
     }
 
+    if (
+      FRONTIER_AUDIO_ASSETS_READY
+      && state.clock.elapsedTime - lastListenerUpdateAt.current >= .05
+    ) {
+      lastListenerUpdateAt.current = state.clock.elapsedTime
+      activeCamera.getWorldDirection(listenerForward).normalize()
+      listenerUp.set(0, 1, 0).applyQuaternion(activeCamera.quaternion).normalize()
+      soundManager.setListenerTransform({
+        position: [player.x, player.y + .9, player.z],
+        forward: [listenerForward.x, listenerForward.y, listenerForward.z],
+        up: [listenerUp.x, listenerUp.y, listenerUp.z],
+      })
+    }
+
     if (!paused) {
       let nearest = null
       let nearestDistance = 2.5
@@ -1044,6 +1107,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         if (collectLock.current.has(pickup.id)) return
         if (Math.hypot(player.x - pickup.position[0], player.z - pickup.position[2]) < .9) {
           collectLock.current.add(pickup.id)
+          soundManager.play('frontier.pickup.collect')
           onCollect(pickup.id)
         }
       })
@@ -1130,7 +1194,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, setIsFirstPerson, nearby, onInteract, onInspectStructure }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
   const roverNode = useMemo(() => ({
@@ -1278,7 +1342,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       )}
 
       {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} />)}
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={isFirstPerson} setIsFirstPerson={setIsFirstPerson} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={isFirstPerson} theme={planet?.theme || 'forest'} />
     </>
   )
 }
@@ -1461,6 +1525,7 @@ function ProximityChat({ peer, onSend, errorMessage }) {
 
 export default function GalaxyWorld3D({
   planet,
+  audioSessionKey = 'frontier',
   dailyEvent,
   missionReady,
   missionCooldownLabel,
@@ -1498,7 +1563,71 @@ export default function GalaxyWorld3D({
   const [completionStatus, setCompletionStatus] = useState('idle')
   const missionRemainingRef = useRef(0)
   const completingRef = useRef(false)
+  const completionRequestTokenRef = useRef(null)
+  const mountedRef = useRef(false)
+  const audioSessionKeyRef = useRef(audioSessionKey)
+  audioSessionKeyRef.current = audioSessionKey
   const dailyEventNode = useMemo(() => resolvePendingDailyEventNode(dailyEvent), [dailyEvent])
+  const themeAmbienceSoundId = useMemo(
+    () => getFrontierAmbienceSoundId(planet?.theme || 'forest'),
+    [planet?.theme],
+  )
+
+  useEffect(() => {
+    // 행성/플레이 세션이 바뀌면 이전 세션의 비동기 완료 상태를 새 화면에 남기지 않는다.
+    soundManager.invalidateScopeVoices('frontier')
+    completingRef.current = false
+    completionRequestTokenRef.current = null
+    missionRemainingRef.current = 0
+    setActiveMission(null)
+    setCollectedIds(new Set())
+    setMissionRemainingMs(0)
+    setCompletionStatus('idle')
+  }, [audioSessionKey])
+
+  useEffect(() => {
+    mountedRef.current = true
+    soundManager.enterScope('frontier')
+    if (FRONTIER_AUDIO_ASSETS_READY) {
+      soundManager.loopAt('frontier.ambience.landing', [0, terrainHeight(0, 5) + .15, 5], {
+        key: 'frontier:ambience:landing',
+      })
+    }
+    return () => {
+      mountedRef.current = false
+      soundManager.unduck('frontier:overlay')
+      soundManager.exitScope('frontier', { unload: true, fadeOutMs: 700 })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!FRONTIER_AUDIO_ASSETS_READY) return undefined
+    const key = 'frontier:ambience:theme'
+    soundManager.loopAt(themeAmbienceSoundId, [0, 0, 0], { key })
+    return () => soundManager.stopLoop(key, 350)
+  }, [themeAmbienceSoundId])
+
+  useEffect(() => {
+    if (!FRONTIER_AUDIO_ASSETS_READY) return
+    soundManager.loopAt(
+      'frontier.ambience.river',
+      getRiverAudioPoint(playerPosition.x),
+      { key: 'frontier:ambience:river' },
+    )
+  }, [playerPosition.x])
+
+  useEffect(() => {
+    if (paused) {
+      soundManager.duck('frontier:overlay', {
+        frontierAmbience: .35,
+        frontierSfx: .6,
+      })
+    } else {
+      soundManager.unduck('frontier:overlay')
+    }
+    return () => soundManager.unduck('frontier:overlay')
+  }, [paused])
+
   const nearbyRemotePlayers = useMemo(() => remotePlayers
     .filter((player) => Math.hypot(playerPosition.x - Number(player.x || 0), playerPosition.z - Number(player.z || 0)) <= PROXIMITY_CHAT_DISTANCE)
     .sort((first, second) => (
@@ -1591,24 +1720,40 @@ export default function GalaxyWorld3D({
 
   const requestMissionCompletion = useCallback(async () => {
     if (!activeMission || collectedIds.size < 5 || completingRef.current) return
+    const requestAudioSessionKey = audioSessionKey
+    const requestToken = {}
     completingRef.current = true
+    completionRequestTokenRef.current = requestToken
     setCompletionStatus('submitting')
 
     try {
       const result = await onMissionComplete?.(activeMission.route, activeMission.operationId)
       if (result === null || result === false) throw new Error('mission completion rejected')
+      if (
+        !mountedRef.current
+        || audioSessionKeyRef.current !== requestAudioSessionKey
+      ) return
+      soundManager.play('frontier.mission.complete')
       setActiveMission(null)
       setCollectedIds(new Set())
       missionRemainingRef.current = 0
       setMissionRemainingMs(0)
       setCompletionStatus('idle')
     } catch {
+      if (
+        !mountedRef.current
+        || audioSessionKeyRef.current !== requestAudioSessionKey
+      ) return
       setCompletionStatus('failed')
+      soundManager.play('frontier.connection.softError')
       onMessage?.('보상 통신이 끊겼습니다. 수집 기록은 보존했어요. 다시 요청해 주세요.')
     } finally {
-      completingRef.current = false
+      if (completionRequestTokenRef.current === requestToken) {
+        completionRequestTokenRef.current = null
+        completingRef.current = false
+      }
     }
-  }, [activeMission, collectedIds.size, onMessage, onMissionComplete])
+  }, [activeMission, audioSessionKey, collectedIds.size, onMessage, onMissionComplete])
 
   useEffect(() => {
     if (!activeMission || collectedIds.size < 5 || completionStatus !== 'idle') return
@@ -1623,7 +1768,11 @@ export default function GalaxyWorld3D({
   const collect = useCallback((id) => setCollectedIds((current) => current.has(id) ? current : new Set([...current, id])), [])
 
   return (
-    <div className={`frontier-game-stage${paused ? ' paused' : ''}`} onContextMenu={(event) => event.preventDefault()}>
+    <div
+      className={`frontier-game-stage${paused ? ' paused' : ''}`}
+      onContextMenu={(event) => event.preventDefault()}
+      onPointerDownCapture={() => soundManager.unlock()}
+    >
       <Canvas
         shadows
         frameloop={paused ? 'demand' : 'always'}
@@ -1659,7 +1808,6 @@ export default function GalaxyWorld3D({
           localSpeech={localSpeech}
           isPlanetOwner={isPlanetOwner}
           isFirstPerson={isFirstPerson}
-          setIsFirstPerson={setIsFirstPerson}
           nearby={nearby}
           onInteract={interact}
           onInspectStructure={inspectStructure}
