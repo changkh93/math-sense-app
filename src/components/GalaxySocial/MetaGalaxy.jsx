@@ -1462,6 +1462,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onStructureMission={performObjectMission}
         isPlanetOwner={isOwner}
         isFirstPerson={isFirstPerson}
+        onToggleFirstPerson={toggleViewMode}
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}

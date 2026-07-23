@@ -1607,10 +1607,11 @@ export default function GalaxyWorld3D({
   onPlayerTransform,
   onSendSpeech,
   isPlanetOwner = false,
+  isFirstPerson = false,
+  onToggleFirstPerson,
 }) {
   const inputRef = useRef({ x: 0, z: 0 })
   const [nearby, setNearby] = useState(null)
-  const [isFirstPerson, setIsFirstPerson] = useState(false)
   const [playerPosition, setPlayerPosition] = useState({ x: 0, z: 5, yaw: 0 })
   const [activeMission, setActiveMission] = useState(null)
   const [collectedIds, setCollectedIds] = useState(new Set())
@@ -1817,11 +1818,11 @@ export default function GalaxyWorld3D({
       event.preventDefault()
       if (event.code === 'KeyE') interact()
       else if (event.code === 'KeyF') inspectStructure()
-      else if (event.code === 'KeyV') setIsFirstPerson((prev) => !prev)
+      else if (event.code === 'KeyV') onToggleFirstPerson?.()
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [inspectStructure, interact, paused])
+  }, [inspectStructure, interact, onToggleFirstPerson, paused])
 
   useEffect(() => {
     if (!activeMission || paused || collectedIds.size >= 5) return undefined
@@ -1969,7 +1970,7 @@ export default function GalaxyWorld3D({
       <button
         type="button"
         className="frontier-camera-mode-toggle"
-        onClick={() => setIsFirstPerson((prev) => !prev)}
+        onClick={() => onToggleFirstPerson?.()}
         title="1인칭/3인칭 시점 전환 (단축키: V)"
       >
         {isFirstPerson ? '🛸 3인칭 시점 (V)' : '👁️ 1인칭 시점 (V)'}
