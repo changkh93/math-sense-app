@@ -1604,6 +1604,7 @@ export default function GalaxyWorld3D({
   useEffect(() => {
     // 행성/플레이 세션이 바뀌면 이전 세션의 비동기 완료 상태를 새 화면에 남기지 않는다.
     soundManager.invalidateScopeVoices('frontier')
+    soundManager.stopLoop('frontier:music:background', 0)
     soundManager.stopLoop('frontier:ambience:theme', 350)
     soundManager.stopLoop('frontier:ambience:landing', 350)
     soundManager.stopLoop('frontier:ambience:river', 350)
@@ -1628,17 +1629,9 @@ export default function GalaxyWorld3D({
   useEffect(() => {
     mountedRef.current = true
     soundManager.enterScope('frontier')
-    let musicTimer
-    if (FRONTIER_AUDIO_ASSETS_READY) {
-      musicTimer = window.setTimeout(() => {
-        soundManager.loopAt('frontier.music.background', [0, 0, 0], {
-          key: 'frontier:music:background',
-          fadeInMs: 900,
-        })
-      }, MUSIC_ENTRY_DELAY_MS)
-    }
+    // 배경음악(BGM) 재생 안함 (사용자 요청으로 완전 제거)
+    soundManager.stopLoop('frontier:music:background', 0)
     return () => {
-      if (musicTimer) window.clearTimeout(musicTimer)
       mountedRef.current = false
       soundManager.unduck('frontier:overlay')
       soundManager.unduck('frontier:river-proximity')
