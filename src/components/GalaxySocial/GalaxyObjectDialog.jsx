@@ -10,6 +10,7 @@ import {
   Save,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   Trash2,
   X,
 } from 'lucide-react'
@@ -58,12 +59,14 @@ export default function GalaxyObjectDialog({
   catalogItem,
   isOwner,
   busy,
+  wallet = 0,
   errorMessage,
   missionLabel,
   missionAction,
   closeButtonRef,
   onClose,
   onSave,
+  onUpgrade,
   onDelete,
   onMission,
   playRemainingSeconds = 0,
@@ -90,6 +93,15 @@ export default function GalaxyObjectDialog({
   const saving = busy === `object:update:${item?.instanceId || ''}`
   const deleting = busy === `object:delete:${item?.instanceId || ''}`
   const missionBusy = busy === `object:mission:${item?.instanceId || ''}`
+  const upgradeBusy = busy === `object:upgrade:${item?.instanceId || ''}`
+  const currentLevel = Math.max(1, Number(item?.level || 1))
+  const maxLevel = Math.max(1, Number(catalogItem?.maxLevel || 1))
+  const stage2Available = Boolean(catalogItem?.stage2Available)
+  const nextUpgradeCost = currentLevel < 2 ? Number(catalogItem?.stage2Cost || 0) : 0
+  const canUpgrade = isOwner
+    && currentLevel < maxLevel
+    && stage2Available
+    && Number(wallet || 0) >= nextUpgradeCost
   const saveInProgress = saving
   const displayedSaveError = saveError || (isEditing ? errorMessage : '')
   const reward = ACTION_REWARDS[missionAction] || ACTION_REWARDS.admire
@@ -197,7 +209,7 @@ export default function GalaxyObjectDialog({
               <img src={previewUrl} alt={`${objectName} 첨부 이미지`} />
             ) : (
               <div className="frontier-object-visual__model">
-                <StructurePreview3D itemId={item.itemId} />
+                <StructurePreview3D itemId={item.itemId} level={currentLevel} />
                 <span><Sparkles size={15} aria-hidden="true" /> 등록 이미지가 없어 3D 모형을 표시합니다</span>
               </div>
             )}
@@ -210,6 +222,34 @@ export default function GalaxyObjectDialog({
 
           <form className="frontier-object-editor" onSubmit={submit}>
             <div className="frontier-object-owner-badge"><ShieldCheck size={16} aria-hidden="true" /><span><strong>내 월드 객체</strong><small>이름·설명·이미지·좌표를 변경할 수 있습니다.</small></span></div>
+
+            <section className="frontier-object-upgrade" aria-label="객체 그래픽 등급">
+              <div>
+                <span><TrendingUp size={16} aria-hidden="true" /> GRAPHIC STAGE</span>
+                <strong>Stage {currentLevel} · {currentLevel >= 2 ? catalogItem?.stage2Label || '고급 설계' : '기본 설계'}</strong>
+                <p>{currentLevel >= maxLevel
+                  ? '현재 준비된 최고 등급입니다.'
+                  : stage2Available
+                    ? '더 자연스러운 형태와 세부 조명으로 성장시킬 수 있습니다.'
+                    : '등급 시스템은 연결됐으며 고급 그래픽 자산을 준비하고 있습니다.'}</p>
+              </div>
+              {currentLevel < maxLevel && (
+                <button
+                  type="button"
+                  disabled={Boolean(busy) || !canUpgrade}
+                  onClick={() => onUpgrade?.(item)}
+                >
+                  <Sparkles size={16} aria-hidden="true" />
+                  {upgradeBusy
+                    ? '성장 중'
+                    : stage2Available
+                      ? Number(wallet || 0) >= nextUpgradeCost
+                        ? `Stage 2 성장 · 광석 ${nextUpgradeCost}`
+                        : `광석 ${nextUpgradeCost - Number(wallet || 0)} 부족`
+                      : 'Stage 2 준비 중'}
+                </button>
+              )}
+            </section>
 
             {displayedSaveError && <p className="frontier-object-save-error" role="alert">{displayedSaveError}</p>}
 
@@ -254,9 +294,10 @@ export default function GalaxyObjectDialog({
       ) : (
         <section className="frontier-object-hero">
           <div className="frontier-object-hero__media">
-            {previewUrl ? <img src={previewUrl} alt={`${objectName} 첨부 이미지`} /> : <StructurePreview3D itemId={item.itemId} />}
+            {previewUrl ? <img src={previewUrl} alt={`${objectName} 첨부 이미지`} /> : <StructurePreview3D itemId={item.itemId} level={currentLevel} />}
           </div>
           <div className="frontier-object-hero__content">
+            <span className="frontier-object-stage-badge">STAGE {currentLevel}</span>
             <h3>{objectName}</h3>
             <p>{description}</p>
             <section className={`frontier-object-reward material-${reward.className}`} aria-label="이 시설에서 얻는 재료">

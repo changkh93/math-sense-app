@@ -28,9 +28,10 @@ function testValidState() {
   const grid = Buffer.alloc(BYTE_LENGTH);
   grid.writeUInt16LE(1 | (3 << 8), 0);
   grid.writeUInt16LE(6, 2);
-  const result = validateAstraBuilderStatePayload(payloadFromBuffer(grid, { blockCount: 2 }));
+  grid.writeUInt16LE(7 | (1 << 8), 4);
+  const result = validateAstraBuilderStatePayload(payloadFromBuffer(grid, { blockCount: 3 }));
   assert.equal(result.kind, 'valid');
-  assert.equal(result.blockCount, 2);
+  assert.equal(result.blockCount, 3);
   assert.equal(result.gridBuffer.equals(grid), true);
   assert.deepEqual(result.modules, []);
 }
@@ -57,7 +58,7 @@ function testMalformedPayloads() {
 
 function testCellValidation() {
   const invalidType = Buffer.alloc(BYTE_LENGTH);
-  invalidType.writeUInt16LE(7, 0);
+  invalidType.writeUInt16LE(8, 0);
   assert.equal(validateAstraBuilderStatePayload(payloadFromBuffer(invalidType)).kind, 'invalid_block_type');
 
   const invalidBits = Buffer.alloc(BYTE_LENGTH);

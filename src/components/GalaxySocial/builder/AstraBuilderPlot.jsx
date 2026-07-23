@@ -9,6 +9,7 @@ import {
   getAstraBuilderCellFromIndex,
   getAstraBuilderCellFromWorldPoint,
   getAstraBuilderCellIndex,
+  getAstraBuilderDoorwayColumnKeys,
   getAstraBuilderInstances,
   getAstraBuilderTopFaceTarget,
   getAstraBuilderWorldPosition,
@@ -47,6 +48,96 @@ function getBlockTransform(blockType, cell) {
     scale.z = 0.42
   }
   return { position, scale }
+}
+
+function WoodDoorVisual({ color, preview = false }) {
+  const cellSize = ASTRA_BUILDER_POC_PLOT.cellSize
+  const doorWidth = cellSize * 2
+  const doorHeight = cellSize * 2.55
+  const frameThickness = cellSize * .12
+  const frameDepth = cellSize * .28
+  const baseY = -cellSize * .5
+  const openingWidth = doorWidth - frameThickness * 2
+  const leafWidth = openingWidth * .2
+  const leafHeight = doorHeight - frameThickness * 1.8
+  const DoorMaterial = ({ leaf = false }) => preview ? (
+    <meshBasicMaterial color={color} transparent opacity={.42} wireframe depthWrite={false} />
+  ) : (
+    <meshStandardMaterial
+      color={leaf ? '#87522f' : color}
+      roughness={leaf ? .82 : .72}
+      metalness={leaf ? .02 : .04}
+    />
+  )
+
+  return (
+    <group>
+      {[-1, 1].map((side) => (
+        <mesh
+          key={side}
+          position={[side * (doorWidth * .5 - frameThickness * .5), baseY + doorHeight * .5, 0]}
+          castShadow={!preview}
+          receiveShadow={!preview}
+        >
+          <boxGeometry args={[frameThickness, doorHeight, frameDepth]} />
+          <DoorMaterial />
+        </mesh>
+      ))}
+      <mesh
+        position={[0, baseY + doorHeight - frameThickness * .5, 0]}
+        castShadow={!preview}
+        receiveShadow={!preview}
+      >
+        <boxGeometry args={[doorWidth, frameThickness, frameDepth]} />
+        <DoorMaterial />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <group
+          key={`leaf-${side}`}
+          position={[
+            side * (openingWidth * .5 - leafWidth * .5),
+            baseY + frameThickness * .35,
+            frameDepth * .18,
+          ]}
+        >
+          <mesh
+            position={[0, leafHeight * .5, 0]}
+            castShadow={!preview}
+          >
+            <boxGeometry args={[leafWidth, leafHeight, cellSize * .065]} />
+            <DoorMaterial leaf />
+          </mesh>
+          {!preview && (
+            <mesh position={[side * -leafWidth * .28, leafHeight * .52, cellSize * .04]}>
+              <sphereGeometry args={[cellSize * .035, 8, 6]} />
+              <meshStandardMaterial color="#e7c46e" metalness={.7} roughness={.24} />
+            </mesh>
+          )}
+        </group>
+      ))}
+    </group>
+  )
+}
+
+function BuilderWoodDoors({ block, instances, onBlockPointerDown, onBlockPointerMove }) {
+  const cellSize = ASTRA_BUILDER_POC_PLOT.cellSize
+
+  return instances.map((cell) => {
+    const position = getAstraBuilderWorldPosition(cell)
+    return (
+      <group
+        key={cell.index}
+        position={position}
+        rotation={[0, cell.rotation * Math.PI * 0.5, 0]}
+        onPointerDown={(event) => onBlockPointerDown?.(event, cell)}
+        onPointerMove={(event) => onBlockPointerMove?.(event, cell)}
+      >
+        <group position={[cellSize * .5, 0, 0]}>
+          <WoodDoorVisual color={block.color} />
+        </group>
+      </group>
+    )
+  })
 }
 
 function BuilderBlockInstances({ block, instances, onBlockPointerDown, onBlockPointerMove }) {
@@ -122,11 +213,17 @@ function buildBlockEdgesGeometry(cells) {
   const cellSize = ASTRA_BUILDER_POC_PLOT.cellSize
   const segments = []
   const object = new THREE.Object3D()
+  const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells)
   for (let index = 0; index < cells.length; index += 1) {
     const decoded = decodeAstraBuilderCell(cells[index])
-    if (!decoded.occupied) continue
+    if (!decoded.occupied || decoded.blockType === 7) continue
     const cell = getAstraBuilderCellFromIndex(index)
     if (!cell) continue
+    if (
+      decoded.blockType !== 2
+      && cell.y <= 2
+      && doorwayColumns.has(`${cell.x}:${cell.z}`)
+    ) continue
     const { position, scale } = getBlockTransform(decoded.blockType, cell)
     object.position.set(position[0], position[1], position[2])
     object.rotation.set(0, (decoded.rotation || 0) * Math.PI * 0.5, 0)
@@ -324,7 +421,15 @@ export default function AstraBuilderPlot({
         <meshStandardMaterial color="#526d76" roughness={0.78} metalness={0.18} />
       </mesh>
 
-      {ASTRA_BUILDER_BLOCKS.map((block) => (
+      {ASTRA_BUILDER_BLOCKS.map((block) => block.id === 7 ? (
+        <BuilderWoodDoors
+          key={block.id}
+          block={block}
+          instances={instancesByType.get(block.id) || []}
+          onBlockPointerDown={handleBlockPointerDown}
+          onBlockPointerMove={updateHoveredBlock}
+        />
+      ) : (
         <BuilderBlockInstances
           key={block.id}
           block={block}
@@ -377,6 +482,10 @@ export default function AstraBuilderPlot({
                     depthWrite={false}
                   />
                 </mesh>
+              ) : selectedBlockType === 7 ? (
+                <group position={[ASTRA_BUILDER_POC_PLOT.cellSize * .5, 0, 0]}>
+                  <WoodDoorVisual color={hoverValid ? '#6ff0b8' : '#ff7182'} preview />
+                </group>
               ) : (
                 <mesh>
                   <boxGeometry args={[

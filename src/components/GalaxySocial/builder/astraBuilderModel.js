@@ -17,6 +17,7 @@ export const ASTRA_BUILDER_BLOCKS = Object.freeze([
   Object.freeze({ id: 4, key: 'star_light', label: '별빛 조명', color: '#ffe58a' }),
   Object.freeze({ id: 5, key: 'step_block', label: '기본 계단', color: '#9bb6b7' }),
   Object.freeze({ id: 6, key: 'support_pillar', label: '지지 기둥', color: '#476171' }),
+  Object.freeze({ id: 7, key: 'lumen_wood_door', label: '나무 문', color: '#a86f42' }),
 ])
 
 export const ASTRA_BUILDER_BLOCK_BY_ID = new Map(
@@ -77,6 +78,59 @@ export function decodeAstraBuilderCell(value) {
   }
 }
 
+export function isAstraBuilderWalkBlockingCell(value, cell) {
+  const decoded = decodeAstraBuilderCell(value)
+  if (!decoded.occupied || !cell || cell.y > 1) return false
+  // 바닥·계단은 걸을 수 있고, 문은 해당 열 전체를 출입 통로로 사용한다.
+  return decoded.blockType !== 2
+    && decoded.blockType !== 5
+    && decoded.blockType !== 7
+}
+
+export function getAstraBuilderDoorwayColumns(cell, rotation, plot = ASTRA_BUILDER_POC_PLOT) {
+  if (!isAstraBuilderCellInBounds(cell, plot)) return []
+  const direction = [
+    { x: 1, z: 0 },
+    { x: 0, z: -1 },
+    { x: -1, z: 0 },
+    { x: 0, z: 1 },
+  ][((Number(rotation) % 4) + 4) % 4]
+  const neighbour = { x: cell.x + direction.x, y: cell.y, z: cell.z + direction.z }
+  return isAstraBuilderCellInBounds(neighbour, plot) ? [cell, neighbour] : [cell]
+}
+
+export function getAstraBuilderDoorwayColumnKeys(cells, plot = ASTRA_BUILDER_POC_PLOT) {
+  if (!(cells instanceof Uint16Array)) return new Set()
+  const doorwayColumns = new Set()
+  for (let index = 0; index < cells.length; index += 1) {
+    const decoded = decodeAstraBuilderCell(cells[index])
+    if (!decoded.occupied || decoded.blockType !== 7) continue
+    const cell = getAstraBuilderCellFromIndex(index, plot)
+    if (cell?.y !== 0) continue
+    getAstraBuilderDoorwayColumns(cell, decoded.rotation, plot).forEach((column) => {
+      doorwayColumns.add(`${column.x}:${column.z}`)
+    })
+  }
+  return doorwayColumns
+}
+
+export function getAstraBuilderWalkBlockingCells(cells, plot = ASTRA_BUILDER_POC_PLOT) {
+  if (!(cells instanceof Uint16Array)) return []
+  const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells, plot)
+  const blockers = []
+  for (let index = 0; index < cells.length; index += 1) {
+    const cell = getAstraBuilderCellFromIndex(index, plot)
+    if (!cell || doorwayColumns.has(`${cell.x}:${cell.z}`)) continue
+    if (!isAstraBuilderWalkBlockingCell(cells[index], cell)) continue
+    blockers.push({
+      ...cell,
+      index,
+      blockType: decodeAstraBuilderCell(cells[index]).blockType,
+    })
+  }
+  return blockers
+}
+
 export function countAstraBuilderBlocks(cells) {
   let count = 0
   for (let index = 0; index < cells.length; index += 1) {
@@ -124,11 +178,20 @@ export function applyAstraBuilderPatch(cells, patch, direction = 'redo') {
 
 export function getAstraBuilderInstances(cells, plot = ASTRA_BUILDER_POC_PLOT) {
   const instancesByType = new Map(ASTRA_BUILDER_BLOCKS.map((block) => [block.id, []]))
+  const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells, plot)
   for (let index = 0; index < cells.length; index += 1) {
     const decoded = decodeAstraBuilderCell(cells[index])
     if (!decoded.occupied || !instancesByType.has(decoded.blockType)) continue
+    const cell = getAstraBuilderCellFromIndex(index, plot)
+    if (!cell) continue
+    const hiddenByDoorway = decoded.blockType !== 2
+      && decoded.blockType !== 7
+      && cell.y <= 2
+      && doorwayColumns.has(`${cell.x}:${cell.z}`)
+    if (hiddenByDoorway) continue
     instancesByType.get(decoded.blockType).push({
-      ...getAstraBuilderCellFromIndex(index, plot),
+      ...cell,
+      type: decoded.blockType,
       rotation: decoded.rotation,
       index,
     })
@@ -178,6 +241,10 @@ export function getAstraBuilderTopFaceTarget(
   placingBlockType = null,
 ) {
   if (!isAstraBuilderCellInBounds(cell, plot) || Number(faceNormal?.y || 0) < 0.6) return null
+  if (cell.type === 7) {
+    const doorTopTarget = { x: cell.x, y: cell.y + 3, z: cell.z }
+    return isAstraBuilderCellInBounds(doorTopTarget, plot) ? doorTopTarget : null
+  }
   if (cell.type === 5 && (placingBlockType === 5 || placingBlockType === null)) {
     const { dirX, dirZ } = getAstraBuilderStairAscentVector(cell.rotation || 0)
     const stairTarget = { x: cell.x + dirX, y: cell.y + 1, z: cell.z + dirZ }

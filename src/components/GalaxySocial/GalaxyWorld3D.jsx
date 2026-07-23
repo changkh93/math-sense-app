@@ -14,6 +14,8 @@ import AstraBuilderHud from './builder/AstraBuilderHud'
 import AstraBuilderPlot from './builder/AstraBuilderPlot'
 import {
   ASTRA_BUILDER_POC_PLOT,
+  getAstraBuilderWalkBlockingCells,
+  getAstraBuilderWorldPosition,
 } from './builder/astraBuilderModel'
 import useAstraBuilderPoc from './builder/useAstraBuilderPoc'
 import WorldTerrain from './GalaxyTerrain3D'
@@ -41,8 +43,14 @@ const PLAYER_TURN_SPEED = Math.PI * 2.4
 const PLAYER_MOVE_START_ANGLE = THREE.MathUtils.degToRad(25)
 const PLAYER_MOVE_FULL_ANGLE = THREE.MathUtils.degToRad(6)
 const WORLD_UP = new THREE.Vector3(0, 1, 0)
-const CHARACTER_SCALE = .56
-const CAMERA_TARGET_HEIGHT = .84
+const CHARACTER_SCALE = .28
+const PLAYER_COLLISION_RADIUS = .14
+const STATIC_BLOCKER_COLLISION_RADIUS = .78
+const CAMERA_TARGET_HEIGHT = .44
+const FIRST_PERSON_EYE_HEIGHT = 1.96 * CHARACTER_SCALE
+const FIRST_PERSON_DEFAULT_FOV = 58
+const FIRST_PERSON_CAMERA_NEAR = .025
+const DEFAULT_CAMERA_NEAR = .1
 const CAMERA_MIN_POLAR = .24
 const CAMERA_MAX_POLAR = Math.PI * .58
 const MOUSE_LOOK_YAW_SENSITIVITY = .0026
@@ -232,6 +240,73 @@ function RoundedLumenTree({ scale = 1, color = '#58c985', ghost = false }) {
   )
 }
 
+function MatureLumenTree({ scale = 1, ghost = false }) {
+  const canopy = [
+    [-.82, 2.05, .08, .76, '#3eaa68'],
+    [-.28, 2.38, -.18, .82, '#55c77b'],
+    [.42, 2.32, .02, .84, '#64d98a'],
+    [.88, 1.98, -.16, .7, '#43b970'],
+    [0, 2.72, .06, .7, '#79e79a'],
+    [-.48, 1.82, .52, .62, '#4fc179'],
+    [.46, 1.78, .48, .66, '#5ed487'],
+  ]
+  const buds = [
+    [-.92, 2.16, .58], [-.48, 2.65, .42], [.08, 2.92, .28],
+    [.55, 2.58, .5], [1.02, 2.1, .36], [.18, 2.14, .82],
+  ]
+  return (
+    <group scale={scale}>
+      {[
+        [-.34, .34, .08, -.52], [.32, .32, -.06, .5],
+        [-.12, .27, .34, -.2], [.08, .26, -.34, .2],
+      ].map(([x, y, z, tilt], index) => (
+        <mesh key={`mature-root-${index}`} position={[x, y, z]} rotation={[index > 1 ? tilt : 0, 0, index > 1 ? 0 : tilt]} castShadow={!ghost}>
+          <cylinderGeometry args={[.07, .18, .85, 9]} />
+          <ModelMaterial color="#66432f" roughness={.98} ghost={ghost} />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.02, 0]} castShadow={!ghost}>
+        <cylinderGeometry args={[.22, .38, 2.04, 14]} />
+        <ModelMaterial color="#704b34" roughness={.97} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, 1.02, .205]} scale={[.36, 1.55, .12]}>
+        <sphereGeometry args={[.35, 10, 12]} />
+        <ModelMaterial color="#a87952" roughness={1} ghost={ghost} />
+      </mesh>
+      {[
+        [-.49, 1.56, .02, -.72, 0], [.5, 1.7, -.06, .72, 0],
+        [-.12, 1.85, .38, -.18, .55], [.18, 2.02, -.34, .2, -.55],
+      ].map(([x, y, z, rz, rx], index) => (
+        <mesh key={`mature-branch-${index}`} position={[x, y, z]} rotation={[rx, 0, rz]} castShadow={!ghost}>
+          <cylinderGeometry args={[.075, .14, index < 2 ? 1.35 : 1.05, 10]} />
+          <ModelMaterial color="#755039" roughness={.96} ghost={ghost} />
+        </mesh>
+      ))}
+      {canopy.map(([x, y, z, size, color], index) => (
+        <mesh key={`mature-canopy-${index}`} position={[x, y, z]} scale={[1.08, .82, 1]} rotation={[0, index * .63, 0]} castShadow={!ghost}>
+          <icosahedronGeometry args={[size, 2]} />
+          <ModelMaterial color={color} emissive="#123f27" emissiveIntensity={.18} roughness={.86} ghost={ghost} />
+        </mesh>
+      ))}
+      {buds.map(([x, y, z], index) => (
+        <group key={`mature-bud-${index}`} position={[x, y, z]}>
+          <mesh>
+            <sphereGeometry args={[.085, 12, 9]} />
+            <ModelMaterial color="#d9fff0" emissive="#5ff0ae" emissiveIntensity={2.1} roughness={.18} ghost={ghost} />
+          </mesh>
+          {!ghost && <pointLight color="#75efb7" intensity={.18} distance={1.35} />}
+        </group>
+      ))}
+      {[[-.68, 1.55, .48], [.72, 1.48, .4]].map(([x, y, z], index) => (
+        <mesh key={`mature-vine-${index}`} position={[x, y, z]} rotation={[Math.PI / 2, 0, index ? -.22 : .22]}>
+          <torusGeometry args={[.34, .025, 6, 18, Math.PI * 1.25]} />
+          <ModelMaterial color="#70d992" emissive="#1d633d" emissiveIntensity={.2} roughness={.8} ghost={ghost} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 function CrystalCluster({ color = '#77e9ff', ghost = false, scale = 1 }) {
   return (
     <group scale={scale}>
@@ -245,7 +320,7 @@ function CrystalCluster({ color = '#77e9ff', ghost = false, scale = 1 }) {
   )
 }
 
-export function StructureModel({ itemId, ghost = false }) {
+export function StructureModel({ itemId, level = 1, ghost = false }) {
   if (itemId === 'starter_dome') {
     return (
       <group>
@@ -256,7 +331,10 @@ export function StructureModel({ itemId, ghost = false }) {
       </group>
     )
   }
-  if (itemId === 'lumen_tree' || itemId === 'wild_sprout') return <RoundedLumenTree scale={itemId === 'wild_sprout' ? .45 : .9} ghost={ghost} />
+  if (itemId === 'lumen_tree') return Number(level || 1) >= 2
+    ? <MatureLumenTree scale={.82} ghost={ghost} />
+    : <RoundedLumenTree scale={.9} ghost={ghost} />
+  if (itemId === 'wild_sprout') return <RoundedLumenTree scale={.45} ghost={ghost} />
   if (itemId === 'star_lamp' || itemId === 'prism_pathlight') {
     const small = itemId === 'prism_pathlight'
     return (
@@ -382,24 +460,24 @@ export function StructureModel({ itemId, ghost = false }) {
   )
 }
 
-function PreviewTurntable({ itemId }) {
+function PreviewTurntable({ itemId, level = 1 }) {
   const group = useRef()
   useFrame((state, delta) => {
     if (!group.current) return
     group.current.rotation.y += delta * .35
     group.current.position.y = -.65 + Math.sin(state.clock.elapsedTime * 1.4) * .04
   })
-  return <group ref={group} position={[0, -.65, 0]}><StructureModel itemId={itemId} /></group>
+  return <group ref={group} position={[0, -.65, 0]}><StructureModel itemId={itemId} level={level} /></group>
 }
 
-export function StructurePreview3D({ itemId }) {
+export function StructurePreview3D({ itemId, level = 1 }) {
   return (
     <Canvas dpr={[1, 1.35]} camera={{ position: [4.5, 3.4, 5.5], fov: 38, near: .1, far: 50 }} gl={{ antialias: true, alpha: true }}>
       <ambientLight intensity={1.05} />
       <hemisphereLight args={['#d9f8ff', '#172435', 1.4]} />
       <directionalLight position={[4, 7, 5]} intensity={2.2} color="#fff3d6" />
       <pointLight position={[-3, 2, 2]} intensity={1.2} color="#68e9ff" distance={10} />
-      <PreviewTurntable itemId={itemId} />
+      <PreviewTurntable itemId={itemId} level={level} />
       <mesh position={[0, -.72, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[2.2, 40]} /><meshBasicMaterial color="#6ce7ff" transparent opacity={.06} /></mesh>
       <Sparkles count={18} scale={[4, 3, 4]} size={1.6} color="#a8efff" speed={.2} />
     </Canvas>
@@ -440,7 +518,7 @@ function PlacedStructure({ item, selected, onSelect }) {
   return (
     <group position={position} rotation={[0, THREE.MathUtils.degToRad(Number(item.rotation || 0)), 0]}>
       <mesh position={[0, .045, 0]} receiveShadow><cylinderGeometry args={[footprint, footprint + .12, .09, 24]} /><meshStandardMaterial color="#293d48" roughness={.94} /></mesh>
-      <StructureModel itemId={item.itemId} />
+      <StructureModel itemId={item.itemId} level={item.level || 1} />
       {item.imageUrl && (
         <Html position={[0, Math.max(.76, footprint * .58), footprint * .82]} center distanceFactor={11}>
           <button type="button" className="frontier-structure-image-marker" onClick={(event) => { event.stopPropagation(); onSelect?.(item) }} aria-label={`${item.name || '객체'} 이미지와 설명 보기`}>
@@ -717,7 +795,7 @@ function PlayerNameTag({ displayName, speech }) {
   )
 }
 
-function RemoteAstronaut({ player, showName }) {
+function RemoteAstronaut({ player, showName, walkHeightAt = walkSurfaceHeight }) {
   const group = useRef()
   useFrame((_, delta) => {
     if (!group.current) return
@@ -726,7 +804,7 @@ function RemoteAstronaut({ player, showName }) {
     group.current.position.z = THREE.MathUtils.lerp(group.current.position.z, Number(player.z || 0), smoothing)
     group.current.position.y = THREE.MathUtils.lerp(
       group.current.position.y,
-      walkSurfaceHeight(Number(player.x || 0), Number(player.z || 0)),
+      walkHeightAt(Number(player.x || 0), Number(player.z || 0)),
       smoothing,
     )
     const yawDelta = Math.atan2(
@@ -737,7 +815,7 @@ function RemoteAstronaut({ player, showName }) {
   })
 
   return (
-    <group ref={group} position={[Number(player.x || 0), walkSurfaceHeight(Number(player.x || 0), Number(player.z || 0)), Number(player.z || 0)]} rotation={[0, Number(player.yaw || 0), 0]} scale={CHARACTER_SCALE}>
+    <group ref={group} position={[Number(player.x || 0), walkHeightAt(Number(player.x || 0), Number(player.z || 0)), Number(player.z || 0)]} rotation={[0, Number(player.yaw || 0), 0]} scale={CHARACTER_SCALE}>
       <mesh position={[0, 1.2, 0]} scale={[.92, 1, .8]} castShadow><capsuleGeometry args={[.39, .72, 8, 14]} /><meshStandardMaterial color="#dcecf4" roughness={.36} metalness={.1} /></mesh>
       <mesh position={[0, 1.18, .35]}><boxGeometry args={[.5, .42, .08]} /><meshStandardMaterial color="#30445f" metalness={.5} roughness={.25} /></mesh>
       <mesh position={[0, 1.18, .405]}><boxGeometry args={[.28, .08, .035]} /><meshStandardMaterial color="#c59aff" emissive="#6946a3" emissiveIntensity={1.7} toneMapped={false} /></mesh>
@@ -752,7 +830,7 @@ function RemoteAstronaut({ player, showName }) {
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderMode = false, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest' }) {
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderMode = false, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest', walkHeightAt = walkSurfaceHeight }) {
   const { gl } = useThree()
   const group = useRef()
   const body = useRef()
@@ -839,12 +917,12 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     }
   }, [inputRef, paused])
 
-  const firstPersonFov = useRef(65)
+  const firstPersonFov = useRef(FIRST_PERSON_DEFAULT_FOV)
 
   useEffect(() => {
     const handleWheel = (event) => {
       if (paused || !isFirstPerson) return
-      firstPersonFov.current = THREE.MathUtils.clamp(firstPersonFov.current + event.deltaY * 0.05, 20, 85)
+      firstPersonFov.current = THREE.MathUtils.clamp(firstPersonFov.current + event.deltaY * 0.05, 35, 75)
     }
     window.addEventListener('wheel', handleWheel, { passive: true })
     return () => window.removeEventListener('wheel', handleWheel)
@@ -998,7 +1076,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         if (Math.hypot(testX, testZ) >= WORLD_RADIUS - .8) return true
         const hitStructure = structureColliders.find((collider) => Math.hypot(testX - collider.position[0], testZ - collider.position[2]) < collider.collisionRadius)
         if (hitStructure) return hitStructure
-        if (blockers.some((position) => Math.hypot(testX - position[0], testZ - position[2]) < 1.05)) return true
+        if (blockers.some((position) => Math.hypot(testX - position[0], testZ - position[2]) < STATIC_BLOCKER_COLLISION_RADIUS)) return true
         if (isRiverWater(testX, testZ) && !isBridgeDeck(testX, testZ)) return true
         if (!isBridgeDeck(testX, testZ) && terrainSlope(testX, testZ) > 1.08) return true
         return false
@@ -1089,7 +1167,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       rightLeg.current.rotation.z = THREE.MathUtils.lerp(rightLeg.current.rotation.z, -strafeStep, delta * 11)
     }
 
-    group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkSurfaceHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
+    group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkHeightAt(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
     const player = group.current.position
 
     if (FRONTIER_AUDIO_ASSETS_READY && movedDistance > 0) {
@@ -1104,11 +1182,12 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const activeCamera = state.camera
     if (isFirstPerson) {
       if (controls.current) controls.current.enabled = false
-      const eyeY = player.y + 1.58
+      const eyeY = player.y + FIRST_PERSON_EYE_HEIGHT
       const yaw = group.current.rotation.y
       const pitch = firstPersonPitch.current
       const lookDist = 10.0
 
+      activeCamera.near = FIRST_PERSON_CAMERA_NEAR
       activeCamera.fov = THREE.MathUtils.lerp(activeCamera.fov, firstPersonFov.current, delta * 12)
       activeCamera.updateProjectionMatrix()
       activeCamera.position.set(player.x, eyeY, player.z)
@@ -1119,7 +1198,8 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       )
     } else {
       if (controls.current) controls.current.enabled = !paused
-      if (activeCamera.fov !== 48) {
+      if (activeCamera.fov !== 48 || activeCamera.near !== DEFAULT_CAMERA_NEAR) {
+        activeCamera.near = DEFAULT_CAMERA_NEAR
         activeCamera.fov = 48
         activeCamera.updateProjectionMatrix()
       }
@@ -1157,10 +1237,15 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     if (!paused) {
       let nearest = null
-      let nearestDistance = 2.5
+      let nearestScore = Number.POSITIVE_INFINITY
       interactables.forEach((item) => {
         const distance = Math.hypot(player.x - item.position[0], player.z - item.position[2])
-        if (distance < nearestDistance) { nearest = item; nearestDistance = distance }
+        const interactionRadius = Math.max(2.5, Number(item.interactionRadius || 0))
+        const edgeDistance = Math.max(0, distance - Number(item.collisionRadius || 0))
+        if (distance < interactionRadius && edgeDistance < nearestScore) {
+          nearest = item
+          nearestScore = edgeDistance
+        }
       })
       const nextNearbySignature = nearest
         ? `${nearest.id}:${nearest.kind || ''}:${nearest.actionId || ''}:${nearest.dailyEvent?.eventId || ''}:${nearest.status || ''}:${nearest.label || ''}`
@@ -1261,7 +1346,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
   const roverNode = useMemo(() => ({
@@ -1279,6 +1364,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       terrainHeight(...ASTRA_BUILDER_POC_PLOT.center),
       ASTRA_BUILDER_POC_PLOT.center[1],
     ],
+    interactionRadius: 4.35,
   }) : null, [builderEnabled])
 
   const nearbyPromptPos = useMemo(() => {
@@ -1307,17 +1393,55 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
   const structureColliders = useMemo(() => layout.map((item) => {
     const position = worldPositionFromLayout(item)
     position[1] = terrainHeight(position[0], position[2])
+    const collisionRadius = Math.max(.64, structureFootprint(item.itemId) + PLAYER_COLLISION_RADIUS)
     return {
       id: item.instanceId,
       kind: 'structure',
       actionId: 'structure',
       label: item.name || '행성 객체 살펴보기',
       position,
-      collisionRadius: Math.max(.9, structureFootprint(item.itemId) + .42),
+      collisionRadius,
+      interactionRadius: collisionRadius + 1.65,
       acousticMaterial: getStructureAcousticMaterial(item.itemId),
       item,
     }
   }), [layout])
+  const biomeColliders = useMemo(() => BIOME_PROP_POSITIONS.map(([x, z, scale], index) => ({
+    id: `biome-prop-${index}`,
+    position: [x, terrainHeight(x, z), z],
+    collisionRadius: Math.max(.34, Number(scale || 1) * .48) + PLAYER_COLLISION_RADIUS,
+    acousticMaterial: palette.prop === 'forest' ? 'wood' : palette.prop === 'mechanical' ? 'metal' : 'stone',
+  })), [palette.prop])
+  const builderBlockColliders = useMemo(() => {
+    if (!builderEnabled || !builderCells?.length) return []
+    return getAstraBuilderWalkBlockingCells(builderCells).map((cell) => {
+      const localPosition = getAstraBuilderWorldPosition(cell)
+      return {
+        id: `astra-builder-block-${cell.index}`,
+        position: [
+          ASTRA_BUILDER_POC_PLOT.center[0] + localPosition[0],
+          terrainHeight(...ASTRA_BUILDER_POC_PLOT.center) + localPosition[1],
+          ASTRA_BUILDER_POC_PLOT.center[1] + localPosition[2],
+        ],
+        collisionRadius: ASTRA_BUILDER_POC_PLOT.cellSize * .5 + PLAYER_COLLISION_RADIUS,
+        acousticMaterial: cell.blockType === 3 ? 'glass' : 'stone',
+      }
+    })
+  }, [builderCells, builderEnabled])
+  const movementColliders = useMemo(
+    () => [...structureColliders, ...biomeColliders, ...builderBlockColliders],
+    [biomeColliders, builderBlockColliders, structureColliders],
+  )
+  const walkHeightAt = useCallback((x, z) => {
+    const terrainY = walkSurfaceHeight(x, z)
+    if (!builderEnabled) return terrainY
+    const halfWidth = ASTRA_BUILDER_POC_PLOT.width * ASTRA_BUILDER_POC_PLOT.cellSize * .5
+    const halfDepth = ASTRA_BUILDER_POC_PLOT.depth * ASTRA_BUILDER_POC_PLOT.cellSize * .5
+    const insidePlot = Math.abs(x - ASTRA_BUILDER_POC_PLOT.center[0]) <= halfWidth
+      && Math.abs(z - ASTRA_BUILDER_POC_PLOT.center[1]) <= halfDepth
+    if (!insidePlot) return terrainY
+    return Math.max(terrainY, terrainHeight(...ASTRA_BUILDER_POC_PLOT.center) + .088)
+  }, [builderEnabled])
   const interactables = useMemo(() => [
     ...resourceInteractables,
     ...structureColliders,
@@ -1446,7 +1570,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       {buildItem && hoverPoint && (
         <group position={hoverPoint}>
           <mesh position={[0, .06, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.15, 1.38, 32]} /><meshBasicMaterial color={hoverValid ? '#63f5b0' : '#ff7182'} transparent opacity={.9} depthWrite={false} /></mesh>
-          <group position={[0, .08, 0]}><StructureModel itemId={buildItem} ghost /></group>
+          <group position={[0, .08, 0]}><StructureModel itemId={buildItem} level={buildLevel} ghost /></group>
         </group>
       )}
 
@@ -1456,8 +1580,8 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
         </Html>
       )}
 
-      {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} />)}
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused || builderActive} freeLookEnabled={!buildItem && !builderActive} builderMode={builderActive} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={builderActive ? false : isFirstPerson} theme={planet?.theme || 'forest'} />
+      {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} walkHeightAt={walkHeightAt} />)}
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={movementColliders} pickups={pickups} paused={paused || builderActive} freeLookEnabled={!buildItem && !builderActive} builderMode={builderActive} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={builderActive ? false : isFirstPerson} theme={planet?.theme || 'forest'} walkHeightAt={walkHeightAt} />
     </>
   )
 }
@@ -1674,6 +1798,7 @@ export default function GalaxyWorld3D({
   missionReady,
   missionCooldownLabel,
   selectedBuildItem,
+  selectedBuildLevel = 1,
   onCancelBuild,
   onBuildAt,
   onWorldAction,
@@ -2125,7 +2250,7 @@ export default function GalaxyWorld3D({
       <Canvas
         shadows
         dpr={[1, 1.5]}
-        camera={{ position: [6, 5.4, 12], fov: 48, near: .1, far: 120 }}
+        camera={{ position: [6, 5.4, 12], fov: 48, near: DEFAULT_CAMERA_NEAR, far: 120 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping
@@ -2145,6 +2270,7 @@ export default function GalaxyWorld3D({
           onCollect={collect}
           onPlayerPositionChange={publishPlayerTransform}
           buildItem={selectedBuildItem}
+          buildLevel={selectedBuildLevel}
           onBuildAt={onBuildAt}
           onInvalidBuild={() => {
             soundManager.play('frontier.build.invalid')

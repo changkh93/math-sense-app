@@ -75,6 +75,31 @@ const GALAXY_ITEM_CATALOG = {
   },
 };
 
+// 모든 행성 객체가 같은 등급 계약을 사용한다. 이번 릴리스에서는 루멘
+// 나무의 Stage 2 자산만 준비됐으며, 나머지는 자산이 완성되는 순서대로
+// `stage2Available`만 켜면 동일한 결제·저장·UI 경로를 사용한다.
+const GALAXY_ITEM_STAGE2_COSTS = Object.freeze({
+  star_lamp: 20,
+  lumen_tree: 45,
+  crystal_pond: 70,
+  rover_bay: 100,
+  observatory: 140,
+  friend_greenhouse: 110,
+  prism_pathlight: 30,
+  starflower_garden: 55,
+  creature_habitat: 85,
+  signal_plaza: 80,
+  expedition_beacon: 120,
+  route_gateway: 180,
+});
+
+Object.entries(GALAXY_ITEM_CATALOG).forEach(([itemId, item]) => {
+  item.maxLevel = 2;
+  item.stage2Cost = GALAXY_ITEM_STAGE2_COSTS[itemId] || 0;
+  item.stage2Available = itemId === "lumen_tree";
+  item.stage2Label = itemId === "lumen_tree" ? "성목 루멘" : "Stage 2 준비 중";
+});
+
 const GALAXY_THEMES = new Set(["forest", "ocean", "crystal", "desert", "mechanical", "ice"]);
 const GALAXY_PLAY_STYLES = new Set(["decorate", "explore", "collect", "cooperate", "photo"]);
 const GALAXY_VISIT_ACTIONS = {
@@ -213,7 +238,7 @@ const ASTRA_BUILDER_STATE_ENCODING = "u16le-v1";
 const ASTRA_BUILDER_SAVE_GRACE_MS = 30 * 1000;
 const ASTRA_BUILDER_MAX_STATE_BYTES = 64 * 1024;
 const ASTRA_BUILDER_ALLOWED_CELL_MASK = 0x03ff;
-const ASTRA_BUILDER_ALLOWED_BLOCK_TYPES = new Set([1, 2, 3, 4, 5, 6]);
+const ASTRA_BUILDER_ALLOWED_BLOCK_TYPES = new Set([1, 2, 3, 4, 5, 6, 7]);
 const ASTRA_BUILDER_PLOTS = {
   "habitat-b01": {
     schemaVersion: 1,
@@ -2619,6 +2644,15 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const itemId = cleanId(data?.itemId, 80);
     const item = GALAXY_ITEM_CATALOG[itemId];
     if (!item) throw new functions.https.HttpsError("invalid-argument", "건설할 수 없는 시설입니다.");
+    const requestedLevel = Number(data?.level ?? 1);
+    if (!Number.isInteger(requestedLevel) || requestedLevel < 1 || requestedLevel > Number(item.maxLevel || 1)) {
+      throw new functions.https.HttpsError("invalid-argument", "시설 등급이 올바르지 않습니다.");
+    }
+    if (requestedLevel > 1 && !item.stage2Available) {
+      throw new functions.https.HttpsError("failed-precondition", "이 시설의 Stage 2 설계는 아직 준비 중입니다.");
+    }
+    const upgradeCost = requestedLevel >= 2 ? Number(item.stage2Cost || 0) : 0;
+    const totalCost = Number(item.cost || 0) + upgradeCost;
     const { userRef, user } = await requireMember(uid);
     const planet = await ensurePlanet(uid, user);
     const requestedOperationId = cleanId(data?.operationId, 120);
@@ -2636,7 +2670,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       ]);
       if (operationSnap.exists) {
         const previous = operationSnap.data() || {};
-        if (previous.itemId !== itemId) {
+        if (previous.itemId !== itemId || Number(previous.level || 1) !== requestedLevel) {
           throw new functions.https.HttpsError("already-exists", "이미 다른 시설에 사용된 건설 요청입니다.");
         }
         return {
@@ -2652,7 +2686,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const materials = { ...(currentPlanet.materials || {}) };
       const materialCount = Math.max(0, Number(materials[item.material] || 0));
       const layout = Array.isArray(currentPlanet.layout) ? currentPlanet.layout : [];
-      if (wallet < item.cost) throw new functions.https.HttpsError("failed-precondition", "학습 광석이 부족합니다.");
+      if (wallet < totalCost) throw new functions.https.HttpsError("failed-precondition", "학습 광석이 부족합니다.");
       if (materialCount < item.materialCost) throw new functions.https.HttpsError("failed-precondition", `${item.name} 건설에 필요한 게임 재료가 부족합니다.`);
       if (layout.length >= 36) throw new functions.https.HttpsError("failed-precondition", "현재 구역에 더 이상 시설을 놓을 수 없습니다.");
       const instanceId = `${itemId}_${operationId.slice(0, 10)}`;
@@ -2674,29 +2708,116 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         x: placement.x,
         y: placement.y,
         rotation: placement.rotation,
+        level: requestedLevel,
         locked: false,
       };
       materials[item.material] = materialCount - item.materialCost;
-      transaction.set(userRef, { crystals: wallet - item.cost }, { merge: true });
+      transaction.set(userRef, { crystals: wallet - totalCost }, { merge: true });
       transaction.set(planet.ref, { layout: [...layout, placed], materials, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       transaction.set(txRef, {
-        amount: -item.cost,
+        amount: -totalCost,
         type: "galaxy_build",
-        description: `${item.name} 행성 건설`,
-        metadata: { itemId, instanceId: placed.instanceId, source: "buildGalaxyItem" },
+        description: `${item.name} Stage ${requestedLevel} 행성 건설`,
+        metadata: { itemId, instanceId: placed.instanceId, level: requestedLevel, source: "buildGalaxyItem" },
         timestamp: FieldValue.serverTimestamp(),
       });
       transaction.set(operationRef, {
         uid,
         type: "build",
         itemId,
-        amount: item.cost,
+        level: requestedLevel,
+        amount: totalCost,
         placed,
-        wallet: wallet - item.cost,
+        wallet: wallet - totalCost,
         materials,
         createdAt: FieldValue.serverTimestamp(),
       });
-      return { placed, wallet: wallet - item.cost, materials };
+      return { placed, wallet: wallet - totalCost, materials };
+    });
+    return serializeValue({ success: true, ...result });
+  });
+
+  const upgradeGalaxyItem = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
+    const instanceId = cleanId(data?.instanceId, 120);
+    const targetLevel = Number(data?.targetLevel);
+    const operationId = cleanId(data?.operationId, 120);
+    if (
+      typeof data?.instanceId !== "string"
+      || !/^[A-Za-z0-9_-]{1,120}$/.test(instanceId)
+      || !/^[A-Za-z0-9_-]{8,120}$/.test(operationId)
+      || !Number.isInteger(targetLevel)
+    ) {
+      throw new functions.https.HttpsError("invalid-argument", "시설 업그레이드 요청이 올바르지 않습니다.");
+    }
+
+    const { userRef, user } = await requireMember(uid);
+    const planet = await ensurePlanet(uid, user);
+    const operationRef = userRef.collection("galaxyOperations").doc(operationId);
+    const transactionRef = userRef.collection("crystal_transactions").doc(`galaxy-upgrade-${operationId}`);
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, userSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(userRef),
+        transaction.get(planet.ref),
+      ]);
+      if (operationSnap.exists) {
+        const previous = operationSnap.data() || {};
+        if (
+          previous.type !== "upgrade"
+          || previous.instanceId !== instanceId
+          || Number(previous.targetLevel || 0) !== targetLevel
+        ) {
+          throw new functions.https.HttpsError("already-exists", "이미 다른 작업에 사용된 업그레이드 요청입니다.");
+        }
+        return {
+          item: previous.item,
+          wallet: Math.max(0, Number(previous.wallet || 0)),
+          deduplicated: true,
+        };
+      }
+
+      const layout = Array.isArray(planetSnap.data()?.layout) ? planetSnap.data().layout : [];
+      const index = layout.findIndex((entry) => entry?.instanceId === instanceId);
+      if (index < 0) throw new functions.https.HttpsError("not-found", "배치된 시설을 찾을 수 없습니다.");
+      const current = layout[index] || {};
+      const catalogItem = GALAXY_ITEM_CATALOG[current.itemId];
+      if (!catalogItem) throw new functions.https.HttpsError("failed-precondition", "업그레이드할 수 없는 시설입니다.");
+      if (!catalogItem.stage2Available) {
+        throw new functions.https.HttpsError("failed-precondition", "이 시설의 Stage 2 설계는 아직 준비 중입니다.");
+      }
+      const currentLevel = Math.max(1, Number(current.level || 1));
+      if (targetLevel !== currentLevel + 1 || targetLevel > Number(catalogItem.maxLevel || 1)) {
+        throw new functions.https.HttpsError("failed-precondition", "현재 등급에서 진행할 수 없는 업그레이드입니다.");
+      }
+      const cost = targetLevel === 2 ? Number(catalogItem.stage2Cost || 0) : 0;
+      const wallet = Math.max(0, Number(userSnap.data()?.crystals || 0));
+      if (wallet < cost) throw new functions.https.HttpsError("failed-precondition", "업그레이드에 필요한 학습 광석이 부족합니다.");
+
+      const upgraded = { ...current, level: targetLevel };
+      const nextLayout = layout.map((entry, entryIndex) => entryIndex === index ? upgraded : entry);
+      transaction.set(userRef, { crystals: wallet - cost }, { merge: true });
+      transaction.set(planet.ref, { layout: nextLayout, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(transactionRef, {
+        amount: -cost,
+        type: "galaxy_object_upgrade",
+        description: `${catalogItem.name} Stage ${targetLevel} 업그레이드`,
+        metadata: { itemId: current.itemId, instanceId, targetLevel, source: "upgradeGalaxyItem" },
+        timestamp: FieldValue.serverTimestamp(),
+      });
+      transaction.set(operationRef, {
+        uid,
+        type: "upgrade",
+        instanceId,
+        itemId: current.itemId,
+        targetLevel,
+        amount: cost,
+        item: upgraded,
+        wallet: wallet - cost,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return { item: upgraded, wallet: wallet - cost, deduplicated: false };
     });
     return serializeValue({ success: true, ...result });
   });
@@ -3548,6 +3669,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     completeGalaxyDailyEvent,
     saveGalaxyPassport,
     buildGalaxyItem,
+    upgradeGalaxyItem,
     updateGalaxyItem,
     moveGalaxyItem,
     deleteGalaxyItem,
@@ -3564,6 +3686,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 };
 
 module.exports.__test = {
+  GALAXY_ITEM_CATALOG,
   calculateLifetimeLearningOre,
   buildGalaxyDailyEvent,
   buildGalaxyRoverDeparture,

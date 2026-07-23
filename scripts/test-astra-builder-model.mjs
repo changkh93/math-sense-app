@@ -10,7 +10,10 @@ import {
   getAstraBuilderCellFromIndex,
   getAstraBuilderCellIndex,
   getAstraBuilderInstances,
+  getAstraBuilderDoorwayColumns,
   getAstraBuilderTopFaceTarget,
+  getAstraBuilderWalkBlockingCells,
+  isAstraBuilderWalkBlockingCell,
 } from '../src/components/GalaxySocial/builder/astraBuilderModel.js'
 import {
   decodeAstraBuilderGridBase64,
@@ -29,6 +32,41 @@ const targetIndex = getAstraBuilderCellIndex(target)
 assert.deepEqual(getAstraBuilderCellFromIndex(targetIndex), target)
 assert.equal(getAstraBuilderCellIndex({ x: -1, y: 0, z: 0 }), -1)
 assert.equal(getAstraBuilderCellIndex({ x: 0, y: ASTRA_BUILDER_POC_PLOT.height, z: 0 }), -1)
+assert.equal(isAstraBuilderWalkBlockingCell(1, { x: 0, y: 0, z: 0 }), true)
+assert.equal(isAstraBuilderWalkBlockingCell(2, { x: 0, y: 0, z: 0 }), false)
+assert.equal(isAstraBuilderWalkBlockingCell(5, { x: 0, y: 0, z: 0 }), false)
+assert.equal(isAstraBuilderWalkBlockingCell(7, { x: 0, y: 0, z: 0 }), false)
+assert.equal(isAstraBuilderWalkBlockingCell(1, { x: 0, y: 2, z: 0 }), false)
+assert.deepEqual(
+  getAstraBuilderDoorwayColumns({ x: 2, y: 0, z: 2 }, 0),
+  [{ x: 2, y: 0, z: 2 }, { x: 3, y: 0, z: 2 }],
+)
+assert.deepEqual(
+  getAstraBuilderDoorwayColumns({ x: 2, y: 0, z: 2 }, 1),
+  [{ x: 2, y: 0, z: 2 }, { x: 2, y: 0, z: 1 }],
+)
+assert.deepEqual(
+  getAstraBuilderTopFaceTarget(
+    { x: 2, y: 0, z: 2, type: 7 },
+    { x: 0, y: 1, z: 0 },
+  ),
+  { x: 2, y: 3, z: 2 },
+)
+
+const doorwayGrid = createEmptyAstraBuilderGrid()
+doorwayGrid[getAstraBuilderCellIndex({ x: 2, y: 0, z: 2 })] = 7
+doorwayGrid[getAstraBuilderCellIndex({ x: 2, y: 1, z: 2 })] = 1
+doorwayGrid[getAstraBuilderCellIndex({ x: 3, y: 0, z: 2 })] = 1
+doorwayGrid[getAstraBuilderCellIndex({ x: 1, y: 0, z: 2 })] = 1
+assert.deepEqual(
+  getAstraBuilderWalkBlockingCells(doorwayGrid).map(({ x, y, z }) => ({ x, y, z })),
+  [{ x: 1, y: 0, z: 2 }],
+)
+const doorwayInstances = getAstraBuilderInstances(doorwayGrid)
+assert.deepEqual(
+  doorwayInstances.get(1).map(({ x, y, z }) => ({ x, y, z })),
+  [{ x: 1, y: 0, z: 2 }],
+)
 assert.deepEqual(
   getAstraBuilderTopFaceTarget(target, { x: 0, y: 1, z: 0 }),
   { x: 3, y: 5, z: 5 },
@@ -85,6 +123,20 @@ const removed = applyAstraBuilderEdit(redone, {
   cell: target,
 })
 assert.equal(countAstraBuilderBlocks(removed.cells), 0)
+
+const woodenDoor = applyAstraBuilderEdit(removed.cells, {
+  tool: 'place',
+  cell: { x: 1, y: 0, z: 1 },
+  blockType: 7,
+  rotation: 3,
+})
+assert.deepEqual(decodeAstraBuilderCell(
+  woodenDoor.cells[getAstraBuilderCellIndex({ x: 1, y: 0, z: 1 })],
+), {
+  blockType: 7,
+  rotation: 3,
+  occupied: true,
+})
 
 const encodedGrid = encodeAstraBuilderGridBase64(redone)
 const decodedGrid = decodeAstraBuilderGridBase64(encodedGrid, redone.length)

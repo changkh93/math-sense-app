@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 
 const {
+  GALAXY_ITEM_CATALOG,
   getGalaxyItemDefaultDescription,
   getGalaxyLayoutWorldPosition,
   getGalaxyStructureVisitAction,
@@ -129,6 +130,23 @@ function testDescriptionFallbacks() {
   assert.ok(getGalaxyItemDefaultDescription('unknown_object').length > 0);
 }
 
+function testObjectUpgradeCatalogContract() {
+  Object.entries(GALAXY_ITEM_CATALOG).forEach(([itemId, item]) => {
+    assert.equal(item.maxLevel, 2, `${itemId} should use the shared two-stage contract`);
+    assert.ok(Number(item.stage2Cost) > 0, `${itemId} should define a Stage 2 ore cost`);
+    assert.equal(typeof item.stage2Available, 'boolean');
+  });
+  assert.equal(GALAXY_ITEM_CATALOG.lumen_tree.stage2Available, true);
+  assert.equal(GALAXY_ITEM_CATALOG.lumen_tree.stage2Cost, 45);
+  assert.equal(
+    Object.entries(GALAXY_ITEM_CATALOG)
+      .filter(([, item]) => item.stage2Available)
+      .map(([itemId]) => itemId)
+      .join(','),
+    'lumen_tree',
+  );
+}
+
 function testFirebaseStorageImageValidation() {
   assert.equal(isGalaxyObjectImagePath(UID, INSTANCE_ID, IMAGE_PATH), true);
   assert.equal(isGalaxyObjectImagePath(UID, INSTANCE_ID, `galaxy-objects/${UID}/${INSTANCE_ID}/../escape.webp`), false);
@@ -182,6 +200,7 @@ function run() {
   testStructureVisitActionsAreExplicit();
   testStructureVisitUsesServerLayoutAndAction();
   testDescriptionFallbacks();
+  testObjectUpgradeCatalogContract();
   testFirebaseStorageImageValidation();
   console.log('Galaxy world object tests passed.');
 }

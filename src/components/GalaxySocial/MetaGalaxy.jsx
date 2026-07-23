@@ -511,7 +511,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [selectedStructureId, setSelectedStructureId] = useState('')
   const [objectDialogOpen, setObjectDialogOpen] = useState(false)
   const [selectedBuildItem, setSelectedBuildItem] = useState('')
+  const [selectedBuildLevel, setSelectedBuildLevel] = useState(1)
   const [focusedBuildItemId, setFocusedBuildItemId] = useState('')
+  const [focusedBuildLevel, setFocusedBuildLevel] = useState(1)
   const [visitMessage, setVisitMessage] = useState(VISIT_MESSAGES[0])
   const [missionPartnerUid, setMissionPartnerUid] = useState('')
   const [nowMs, setNowMs] = useState(Date.now())
@@ -551,6 +553,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     (payload) => callGalaxy('saveGalaxyBuildState', payload),
     [callGalaxy],
   )
+
   const liveSessionEnabled = Boolean(
     overlayReady
     && home?.liveSession?.granted
@@ -1050,6 +1053,38 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     return result
   }
 
+  const upgradeGalaxyObject = async (item = selectedObject) => {
+    if (!isOwner || !item?.instanceId) return null
+    const targetLevel = Math.max(1, Number(item.level || 1)) + 1
+    const result = await runAction(
+      `object:upgrade:${item.instanceId}`,
+      () => callGalaxy('upgradeGalaxyItem', {
+        instanceId: item.instanceId,
+        targetLevel,
+        operationId: createOperationId(),
+      }),
+      (upgradeResult) => `${upgradeResult?.item?.name || item.name || '객체'}가 Stage ${targetLevel}로 성장했습니다.`,
+    )
+    if (!result?.item) return null
+    setHome((current) => {
+      if (!current) return current
+      const updateLayout = (targetPlanet = {}) => ({
+        ...targetPlanet,
+        layout: (Array.isArray(targetPlanet.layout) ? targetPlanet.layout : [])
+          .map((entry) => entry.instanceId === item.instanceId ? result.item : entry),
+      })
+      const nextOwnPlanet = updateLayout(current.ownPlanet)
+      return {
+        ...current,
+        wallet: Number.isFinite(Number(result.wallet)) ? Number(result.wallet) : current.wallet,
+        ownPlanet: nextOwnPlanet,
+        planet: targetUid === user.uid ? nextOwnPlanet : current.planet,
+      }
+    })
+    soundManager.play('frontier.build.complete')
+    return result
+  }
+
   const deleteGalaxyObject = async (item = selectedObject) => {
     if (!isOwner || !item?.instanceId) return null
     const instanceId = item.instanceId
@@ -1079,6 +1114,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     const requestAudioSessionKey = audioSessionKey
     const result = await runAction(`build:${itemId}`, () => callGalaxy('buildGalaxyItem', {
       itemId,
+      level: selectedBuildLevel,
       operationId,
       x: 50 + Number(worldX || 0) * 3,
       y: 50 + Number(worldZ || 0) * 3,
@@ -1111,6 +1147,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       }
     })
     setSelectedBuildItem('')
+    setSelectedBuildLevel(1)
     soundManager.play('frontier.build.complete')
   }
 
@@ -1411,8 +1448,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       : '친구 시설 가까이에서 E키를 누르면 돌보기 도움을 남길 수 있습니다.')
   }
 
-  const beginBuild = (itemId) => {
+  const beginBuild = (itemId, level = 1) => {
     setSelectedBuildItem(itemId)
+    setSelectedBuildLevel(level)
     setMenu('')
     setArrivalOpen(false)
   }
@@ -1425,7 +1463,10 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const focusedHasMaterial = focusedBuildItem
     ? Number(ownPlanet.materials?.[focusedBuildItem.material] || 0) >= Number(focusedBuildItem.materialCost || 0)
     : false
-  const focusedCanAfford = focusedBuildItem ? wallet >= Number(focusedBuildItem.cost || 0) : false
+  const focusedStage2Ready = Boolean(focusedBuildItem?.stage2Available)
+  const focusedUpgradeCost = focusedBuildLevel >= 2 ? Number(focusedBuildItem?.stage2Cost || 0) : 0
+  const focusedTotalCost = Number(focusedBuildItem?.cost || 0) + focusedUpgradeCost
+  const focusedCanAfford = focusedBuildItem ? wallet >= focusedTotalCost : false
   const FocusedItemIcon = ITEM_ICONS[effectiveFocusedBuildItemId] || Building2
   const DailyEventIcon = DAILY_EVENT_ICONS[dailyEvent?.type] || Sparkles
   const dailyRewardLabel = dailyEvent?.reward
@@ -1453,7 +1494,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onDailyEventComplete={completeDailyEvent}
         onOpenRover={() => openGameMenu('rover')}
         selectedBuildItem={selectedBuildItem}
-        onCancelBuild={() => setSelectedBuildItem('')}
+        selectedBuildLevel={selectedBuildLevel}
+        onCancelBuild={() => { setSelectedBuildItem(''); setSelectedBuildLevel(1) }}
         onBuildAt={buildItemAt}
         onWorldAction={performWorldAction}
         onMissionComplete={runMission}
@@ -1574,17 +1616,19 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           <Motion.div className="frontier-object-dialog-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeObjectDialog} onKeyDown={trapDialogFocus}>
             <Motion.div className="frontier-object-dialog-motion" initial={{ opacity: 0, y: 22, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: .98 }} onClick={(event) => event.stopPropagation()}>
               <GalaxyObjectDialog
-                key={`${selectedObject.instanceId}:${selectedObject.name || ''}:${selectedObject.description || ''}:${selectedObject.x}:${selectedObject.y}:${selectedObject.imageUrl || ''}`}
+                key={`${selectedObject.instanceId}:${selectedObject.level || 1}:${selectedObject.name || ''}:${selectedObject.description || ''}:${selectedObject.x}:${selectedObject.y}:${selectedObject.imageUrl || ''}`}
                 item={selectedObject}
                 catalogItem={selectedObjectCatalog}
                 isOwner={isOwner}
                 busy={busy}
+                wallet={wallet}
                 errorMessage={error}
                 missionLabel={selectedObjectMission?.label}
                 missionAction={selectedObjectMission?.actionId}
                 closeButtonRef={objectDialogCloseRef}
                 onClose={closeObjectDialog}
                 onSave={saveGalaxyObject}
+                onUpgrade={upgradeGalaxyObject}
                 onDelete={deleteGalaxyObject}
                 onMission={performObjectMission}
                 playRemainingSeconds={playRemainingSeconds}
@@ -1714,8 +1758,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                     <div className="frontier-build-layout">
                       <section className="frontier-build-showcase">
                         <div className="frontier-build-preview">
-                          <StructurePreview3D itemId={effectiveFocusedBuildItemId} />
-                          <span><FocusedItemIcon size={18} aria-hidden="true" /> 3D 설계 미리보기</span>
+                          <StructurePreview3D itemId={effectiveFocusedBuildItemId} level={focusedBuildLevel} />
+                          <span><FocusedItemIcon size={18} aria-hidden="true" /> Stage {focusedBuildLevel} 실시간 미리보기</span>
                         </div>
                         <div className="frontier-build-story">
                           <small>{focusedBuildStory.overline}</small>
@@ -1725,11 +1769,19 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                             <div><dt><Zap size={15} aria-hidden="true" /> 설치 변화</dt><dd>{focusedBuildStory.effect}</dd></div>
                             <div><dt><Orbit size={15} aria-hidden="true" /> 컬렉션</dt><dd>{focusedBuildStory.set}</dd></div>
                           </dl>
+                          <div className="frontier-build-stage-picker" role="group" aria-label="객체 그래픽 등급">
+                            <button type="button" className={focusedBuildLevel === 1 ? 'active' : ''} onClick={() => setFocusedBuildLevel(1)}>
+                              <small>STAGE 1</small><strong>기본 설계</strong><span>추가 비용 없음</span>
+                            </button>
+                            <button type="button" className={focusedBuildLevel === 2 ? 'active' : ''} disabled={!focusedStage2Ready} onClick={() => setFocusedBuildLevel(2)}>
+                              <small>STAGE 2</small><strong>{focusedBuildItem.stage2Label || '고급 설계'}</strong><span>{focusedStage2Ready ? `광석 +${Number(focusedBuildItem.stage2Cost || 0)}` : '그래픽 준비 중'}</span>
+                            </button>
+                          </div>
                           <div className="frontier-build-costs">
-                            <span className={focusedCanAfford ? 'ready' : 'short'}><Gem size={15} aria-hidden="true" /> 학습 광석 {focusedBuildItem.cost}</span>
+                            <span className={focusedCanAfford ? 'ready' : 'short'}><Gem size={15} aria-hidden="true" /> 학습 광석 {focusedTotalCost}{focusedBuildLevel >= 2 ? ` (기본 ${focusedBuildItem.cost} + 성장 ${focusedUpgradeCost})` : ''}</span>
                             <span className={focusedHasMaterial ? 'ready' : 'short'}><Package size={15} aria-hidden="true" /> {MATERIAL_LABELS[focusedBuildItem.material]} {focusedBuildItem.materialCost}개 필요 · 보유 {Number(ownPlanet.materials?.[focusedBuildItem.material] || 0)}개</span>
                           </div>
-                          <button type="button" className="galaxy-primary-btn frontier-build-cta" disabled={Boolean(busy) || !focusedHasMaterial || !focusedCanAfford} onClick={() => beginBuild(effectiveFocusedBuildItemId)}>
+                          <button type="button" className="galaxy-primary-btn frontier-build-cta" disabled={Boolean(busy) || !focusedHasMaterial || !focusedCanAfford} onClick={() => beginBuild(effectiveFocusedBuildItemId, focusedBuildLevel)}>
                             {focusedHasMaterial && focusedCanAfford ? <><MapPin size={17} aria-hidden="true" /> 월드에서 자리 선택</> : <><LockKeyhole size={17} aria-hidden="true" /> 부족한 재료 확인</>}
                           </button>
                         </div>
@@ -1750,7 +1802,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                             const canAfford = wallet >= Number(item.cost || 0)
                             const available = hasMaterial && canAfford
                             return (
-                              <button type="button" key={itemId} className={`frontier-build-option${effectiveFocusedBuildItemId === itemId ? ' selected' : ''}${available ? '' : ' unavailable'}`} onClick={() => setFocusedBuildItemId(itemId)}>
+                              <button type="button" key={itemId} className={`frontier-build-option${effectiveFocusedBuildItemId === itemId ? ' selected' : ''}${available ? '' : ' unavailable'}`} onClick={() => { setFocusedBuildItemId(itemId); setFocusedBuildLevel(1) }}>
                                 <span className="frontier-build-option-icon"><ItemIcon size={21} aria-hidden="true" /></span>
                                 <div><small>{story.overline}</small><strong>{item.name}</strong><p>{story.set}</p></div>
                                 <span className={`frontier-build-option-state material-${item.material}`}>{MATERIAL_LABELS[item.material]} {item.materialCost}개 필요 · 보유 {Number(ownPlanet.materials?.[item.material] || 0)}개 {available ? '· 설계 가능' : ''}</span>
