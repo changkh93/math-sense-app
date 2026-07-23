@@ -1648,6 +1648,18 @@ export default function GalaxyWorld3D({
 
   useEffect(() => {
     if (!FRONTIER_AUDIO_ASSETS_READY || !ambienceReady) return undefined
+    if (themeAmbienceSoundId === 'frontier.ambience.forest') {
+      const keys = [
+        ['frontier:ambience:forest:1', 7.8, -7.3],
+        ['frontier:ambience:forest:2', -11.5, -13.0],
+        ['frontier:ambience:forest:3', 12.0, -11.5],
+      ]
+      keys.forEach(([key, x, z]) => {
+        const y = terrainHeight(x, z) + 1.2
+        soundManager.loopAt('frontier.ambience.forest', [x, y, z], { key, fadeInMs: 1200 })
+      })
+      return () => keys.forEach(([key]) => soundManager.stopLoop(key, 700))
+    }
     const key = 'frontier:ambience:theme'
     soundManager.loopAt(themeAmbienceSoundId, [0, 0, 0], { key, fadeInMs: 1200 })
     return () => soundManager.stopLoop(key, 700)

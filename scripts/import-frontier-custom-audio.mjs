@@ -27,9 +27,7 @@ const imports = [
     outputs: [
       {
         base: 'ambience/music/background-loop',
-        start: 24,
-        duration: 23.5,
-        filter: 'loudnorm=I=-17:TP=-2:LRA=6,afade=t=in:st=0:d=0.15,afade=t=out:st=23.35:d=0.15,alimiter=limit=0.89',
+        filter: 'loudnorm=I=-16:TP=-1.5:LRA=7,afade=t=in:st=0:d=0.2,alimiter=limit=0.89',
         channels: 2,
       },
     ],
@@ -49,9 +47,8 @@ const imports = [
     outputs: [
       {
         base: 'ambience/themes/forest-bed',
-        start: 120,
-        duration: 24,
-        filter: 'highpass=f=70,lowpass=f=2600,acompressor=threshold=0.055:ratio=4:attack=20:release=300:makeup=2.2,loudnorm=I=-19:TP=-3:LRA=5,afade=t=in:st=0:d=0.2,afade=t=out:st=23.8:d=0.2,alimiter=limit=0.89',
+        duration: 30,
+        filter: 'loudnorm=I=-16:TP=-1.5:LRA=6,afade=t=in:st=0:d=0.3,afade=t=out:st=29.6:d=0.4,alimiter=limit=0.89',
         channels: 2,
       },
     ],
