@@ -64,6 +64,7 @@ export class SoundManager {
     this.busVolumes = {
       feedback: 1.0,
       ui: 1.0,
+      frontierMusic: 1.0,
       frontierAmbience: 1.0,
       frontierSfx: 1.0,
     }
@@ -82,7 +83,7 @@ export class SoundManager {
     this.nextVoiceId = 1
 
     // 활성 루프 및 보이스 트래킹
-    this.activeLoops = new Map() // key -> { handle, soundId, howl, howlerId, baseVolume, busName, spatial, callVolume }
+    this.activeLoops = new Map() // key -> { handle, soundId, howl, howlerId, baseVolume, busName, spatial, callVolume, currentVolume }
     this.activeVoices = new Map() // instanceId -> { id, soundId, priority, startTime, howl, howlerId }
     this.loopRequests = new Map()
 
@@ -94,6 +95,7 @@ export class SoundManager {
     this.scopeUnloadTimers = new Map()
     this.scopeGenerations = new Map()
     this.lifecycleCleanups = []
+    this.transientMusicDuckTimer = null
 
     // 라이프사이클 및 unlock 상태
     this.isPageHidden = Boolean(documentRef?.hidden)
@@ -226,6 +228,7 @@ export class SoundManager {
       this.loopAt(request.soundId, request.position, {
         key: request.key,
         volumeMultiplier: request.callVolume,
+        fadeInMs: request.fadeInMs,
       })
     })
   }
@@ -254,12 +257,14 @@ export class SoundManager {
     saveAudioPreferences(this.currentUid, this.preferences, this.isGuest)
     this.applyPreferences()
     if (reducedSpatialChanged) this.restartSpatialLoops()
+    return this.getPreferences()
   }
 
   /**
    * 선호 설정을 실제 엔진 및 볼륨에 적용
    */
   applyPreferences() {
+    this.busVolumes.frontierMusic = this.clampVolume(this.preferences.ambience, 0.55)
     this.busVolumes.frontierAmbience = this.clampVolume(this.preferences.ambience, 0.55)
     this.busVolumes.frontierSfx = this.clampVolume(this.preferences.action, 0.65)
     this.busVolumes.ui = this.clampVolume(this.preferences.ui, 0.45)
@@ -343,6 +348,22 @@ export class SoundManager {
     }
   }
 
+  duckMusicForOneShot(definition) {
+    if (!['frontierSfx', 'ui', 'feedback'].includes(definition?.bus)) return
+    const isImportant = Number(definition.priority || 0) >= 95
+    this.duck('frontier:transient-feedback', {
+      frontierMusic: isImportant ? 0.28 : 0.42,
+      frontierAmbience: isImportant ? 0.62 : 0.75,
+    })
+    if (this.transientMusicDuckTimer !== null) {
+      this.clearTimeoutFn(this.transientMusicDuckTimer)
+    }
+    this.transientMusicDuckTimer = this.setTimeoutFn(() => {
+      this.transientMusicDuckTimer = null
+      this.unduck('frontier:transient-feedback')
+    }, isImportant ? 1100 : 650)
+  }
+
   /**
    * 버스별 Ducking 배율 구하기
    */
@@ -392,6 +413,10 @@ export class SoundManager {
     }
 
     this.activeDucks.clear()
+    if (scopeName === 'frontier' && this.transientMusicDuckTimer !== null) {
+      this.clearTimeoutFn(this.transientMusicDuckTimer)
+      this.transientMusicDuckTimer = null
+    }
     if (this.currentScope === scopeName) {
       this.currentScope = Array.from(this.activeScopes).at(-1) || 'global'
     }
@@ -605,8 +630,16 @@ export class SoundManager {
 
     const fallbackId = definition?.fallbackId
     if (!fallbackId || visited.has(fallbackId)) return null
+    const requestedVolume = Number(options.volumeMultiplier ?? 1)
+    const fallbackGain = Number(definition.fallbackVolumeMultiplier ?? 1)
+    const volumeMultiplier = (
+      Number.isFinite(requestedVolume) ? requestedVolume : 1
+    ) * (
+      Number.isFinite(fallbackGain) && fallbackGain > 0 ? fallbackGain : 1
+    )
     return this.play(fallbackId, {
       ...options,
+      volumeMultiplier,
       __fallbackVisited: Array.from(visited),
     })
   }
@@ -717,6 +750,7 @@ export class SoundManager {
         scopeGeneration: this.scopeGenerations.get(def.scope) || 0,
         userBindingGeneration: this.userBindingGeneration,
       })
+      this.duckMusicForOneShot(def)
 
       cleanup = () => {
         this.activeVoices.delete(voiceInstanceId)
@@ -753,6 +787,7 @@ export class SoundManager {
    * @param {Object} options
    * @param {string} options.key - 루프 고유 키
    * @param {number} [options.volumeMultiplier=1.0]
+   * @param {number} [options.fadeInMs=0]
    * @returns {string} handle Key
    */
   loopAt(soundId, position, options = {}) {
@@ -782,12 +817,17 @@ export class SoundManager {
     const nextPosition = Array.isArray(position)
       ? [...position]
       : previousRequest?.position
+    const hasExplicitFadeIn = Object.prototype.hasOwnProperty.call(options, 'fadeInMs')
+    const fadeInMs = hasExplicitFadeIn
+      ? Math.max(0, Number(options.fadeInMs) || 0)
+      : previousRequest?.fadeInMs ?? 0
 
     const request = {
       key,
       soundId,
       position: nextPosition,
       callVolume: callVol,
+      fadeInMs,
     }
     this.loopRequests.set(key, request)
 
@@ -856,7 +896,12 @@ export class SoundManager {
         def.bus
       )
 
-      howl.volume(finalVol, howlerId)
+      if (request.fadeInMs > 0) {
+        howl.volume(0, howlerId)
+        howl.fade(0, finalVol, request.fadeInMs, howlerId)
+      } else {
+        howl.volume(finalVol, howlerId)
+      }
 
       // Call Volume(원본 gain)을 보존
       this.activeLoops.set(key, {
@@ -868,6 +913,7 @@ export class SoundManager {
         busName: def.bus,
         spatial,
         callVolume: request.callVolume,
+        currentVolume: finalVol,
         pausedByManager: false,
       })
 
@@ -917,6 +963,7 @@ export class SoundManager {
     )
 
     howl.volume(finalVol, howlerId)
+    loopInfo.currentVolume = finalVol
   }
 
   /**
@@ -927,11 +974,11 @@ export class SoundManager {
     if (!keepRequest) this.loopRequests.delete(key)
     if (!loopInfo) return
 
-    const { howl, howlerId } = loopInfo
+    const { howl, howlerId, currentVolume = 0 } = loopInfo
     this.activeLoops.delete(key)
 
     if (fadeMs > 0) {
-      howl.fade(howl.volume(howlerId), 0, fadeMs, howlerId)
+      howl.fade(currentVolume, 0, fadeMs, howlerId)
       this.setTimeoutFn(() => {
         try { howl.stop(howlerId) } catch (err) { void err }
       }, fadeMs + 50)
@@ -1002,6 +1049,7 @@ export class SoundManager {
         busName
       )
       howl.volume(finalVol, howlerId)
+      loopInfo.currentVolume = finalVol
     }
   }
 
@@ -1060,6 +1108,10 @@ export class SoundManager {
     for (const voiceId of Array.from(this.activeVoices.keys())) this.stopVoice(voiceId)
     for (const timer of this.scopeUnloadTimers.values()) this.clearTimeoutFn(timer)
     this.scopeUnloadTimers.clear()
+    if (this.transientMusicDuckTimer !== null) {
+      this.clearTimeoutFn(this.transientMusicDuckTimer)
+      this.transientMusicDuckTimer = null
+    }
     this.lifecycleCleanups.splice(0).forEach((cleanup) => cleanup())
     for (const meta of this.howlMeta.values()) {
       try { meta.howl.unload() } catch (err) { void err }
@@ -1071,12 +1123,22 @@ export class SoundManager {
   getDebugStatus() {
     return {
       unlocked: this.unlocked,
+      audioContextState: this.howler.ctx?.state || 'unavailable',
       currentScope: this.currentScope,
       activeScopes: Array.from(this.activeScopes),
       disabledSounds: Array.from(this.disabledSounds),
       activeLoopsCount: this.activeLoops.size,
       activeVoicesCount: this.activeVoices.size,
       pendingLoopsCount: this.loopRequests.size,
+      activeLoops: Array.from(this.activeLoops.entries()).map(([key, loop]) => ({
+        key,
+        soundId: loop.soundId,
+        currentVolume: loop.currentVolume,
+        callVolume: loop.callVolume,
+        pausedByManager: loop.pausedByManager,
+        engineState: loop.howl?.state?.() || 'unknown',
+        playing: Boolean(loop.howl?.playing?.(loop.howlerId)),
+      })),
       howlCacheSize: this.howlCache.size,
       frontierAssetsReady: this.frontierAssetsReady,
       failedSources: Array.from(this.failedSources),

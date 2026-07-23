@@ -77,8 +77,35 @@ export const LEGACY_SOUND_DEFS = {
  */
 export const FRONTIER_AUDIO_ASSETS_READY = import.meta.env?.VITE_FRONTIER_AUDIO_ASSETS_READY === 'true'
 
+const createThemeAmbienceDefinition = (theme) => ({
+  sources: [
+    `/sounds/frontier/v1/ambience/themes/${theme}-bed.webm`,
+    `/sounds/frontier/v1/ambience/themes/${theme}-bed.mp3`,
+  ],
+  scope: 'frontier',
+  bus: 'frontierAmbience',
+  kind: 'loop',
+  spatial: false,
+  baseVolume: 0.62,
+  priority: 30,
+  maxInstances: 1,
+})
+
 export const FRONTIER_SOUNDS = {
   // --- 테마 및 구역 루프 (Ambience Loops) ---
+  'frontier.music.background': {
+    sources: [
+      '/sounds/frontier/v1/ambience/music/background-loop.webm',
+      '/sounds/frontier/v1/ambience/music/background-loop.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'frontierMusic',
+    kind: 'loop',
+    spatial: false,
+    baseVolume: 0.62,
+    priority: 20,
+    maxInstances: 1,
+  },
   'frontier.ambience.river': {
     sources: [
       '/sounds/frontier/v1/ambience/river/river-loop.webm',
@@ -88,30 +115,23 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierAmbience',
     kind: 'loop',
     spatial: true,
-    baseVolume: 0.32,
+    baseVolume: 0.44,
     priority: 40,
     maxInstances: 1,
     panner: {
       distanceModel: 'linear',
-      refDistance: 1.5,
-      maxDistance: 11,
+      refDistance: 2.5,
+      maxDistance: 18,
       rolloffFactor: 1,
       panningModel: 'HRTF',
     },
   },
-  'frontier.ambience.forest': {
-    sources: [
-      '/sounds/frontier/v1/ambience/themes/forest-bed.webm',
-      '/sounds/frontier/v1/ambience/themes/forest-bed.mp3',
-    ],
-    scope: 'frontier',
-    bus: 'frontierAmbience',
-    kind: 'loop',
-    spatial: false,
-    baseVolume: 0.28,
-    priority: 30,
-    maxInstances: 1,
-  },
+  'frontier.ambience.forest': createThemeAmbienceDefinition('forest'),
+  'frontier.ambience.ocean': createThemeAmbienceDefinition('ocean'),
+  'frontier.ambience.crystal': createThemeAmbienceDefinition('crystal'),
+  'frontier.ambience.desert': createThemeAmbienceDefinition('desert'),
+  'frontier.ambience.mechanical': createThemeAmbienceDefinition('mechanical'),
+  'frontier.ambience.ice': createThemeAmbienceDefinition('ice'),
   'frontier.ambience.landing': {
     sources: [
       '/sounds/frontier/v1/ambience/landing/landing-hum.webm',
@@ -121,7 +141,7 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierAmbience',
     kind: 'loop',
     spatial: true,
-    baseVolume: 0.25,
+    baseVolume: 0.13,
     priority: 35,
     maxInstances: 1,
     panner: {
@@ -144,7 +164,7 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierSfx',
     kind: 'oneshot',
     spatial: false,
-    baseVolume: 0.38,
+    baseVolume: 0.23,
     cooldownMs: 90,
     maxInstances: 2,
     priority: 90,
@@ -161,7 +181,7 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierSfx',
     kind: 'oneshot',
     spatial: false,
-    baseVolume: 0.4,
+    baseVolume: 0.24,
     cooldownMs: 90,
     maxInstances: 2,
     priority: 90,
@@ -178,7 +198,7 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierSfx',
     kind: 'oneshot',
     spatial: false,
-    baseVolume: 0.35,
+    baseVolume: 0.22,
     cooldownMs: 90,
     maxInstances: 2,
     priority: 90,
@@ -195,7 +215,7 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierSfx',
     kind: 'oneshot',
     spatial: false,
-    baseVolume: 0.36,
+    baseVolume: 0.23,
     cooldownMs: 90,
     maxInstances: 2,
     priority: 90,
@@ -213,11 +233,10 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierSfx',
     kind: 'oneshot',
     spatial: false,
-    baseVolume: 0.3,
+    baseVolume: 0.2,
     cooldownMs: 500,
     maxInstances: 1,
     priority: 80,
-    fallbackId: 'click',
   },
   'frontier.collision.metal': {
     sources: [
@@ -228,11 +247,10 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierSfx',
     kind: 'oneshot',
     spatial: false,
-    baseVolume: 0.35,
+    baseVolume: 0.22,
     cooldownMs: 500,
     maxInstances: 1,
     priority: 80,
-    fallbackId: 'click',
   },
   'frontier.collision.wood': {
     sources: [
@@ -243,11 +261,10 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierSfx',
     kind: 'oneshot',
     spatial: false,
-    baseVolume: 0.35,
+    baseVolume: 0.22,
     cooldownMs: 500,
     maxInstances: 1,
     priority: 80,
-    fallbackId: 'click',
   },
   'frontier.collision.stone': {
     sources: [
@@ -258,11 +275,10 @@ export const FRONTIER_SOUNDS = {
     bus: 'frontierSfx',
     kind: 'oneshot',
     spatial: false,
-    baseVolume: 0.35,
+    baseVolume: 0.22,
     cooldownMs: 500,
     maxInstances: 1,
     priority: 80,
-    fallbackId: 'click',
   },
   'frontier.build.invalid': {
     sources: [
@@ -278,6 +294,119 @@ export const FRONTIER_SOUNDS = {
     maxInstances: 1,
     priority: 85,
     fallbackId: 'wrong',
+    fallbackVolumeMultiplier: 2,
+  },
+  'frontier.interaction.water': {
+    sources: [
+      '/sounds/frontier/v1/interactions/water.webm',
+      '/sounds/frontier/v1/interactions/water.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'frontierSfx',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.34,
+    cooldownMs: 350,
+    maxInstances: 1,
+    priority: 75,
+    fallbackId: 'click',
+    fallbackVolumeMultiplier: 2.5,
+  },
+  'frontier.interaction.repair': {
+    sources: [
+      '/sounds/frontier/v1/interactions/repair.webm',
+      '/sounds/frontier/v1/interactions/repair.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'frontierSfx',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.38,
+    cooldownMs: 350,
+    maxInstances: 1,
+    priority: 80,
+    fallbackId: 'click',
+    fallbackVolumeMultiplier: 2.5,
+  },
+  'frontier.ui.interact': {
+    sources: [
+      '/sounds/frontier/v1/ui/interact.webm',
+      '/sounds/frontier/v1/ui/interact.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'ui',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.38,
+    cooldownMs: 90,
+    maxInstances: 1,
+    priority: 65,
+    fallbackId: 'click',
+    fallbackVolumeMultiplier: 2.5,
+  },
+  'frontier.ui.inspect': {
+    sources: [
+      '/sounds/frontier/v1/ui/inspect.webm',
+      '/sounds/frontier/v1/ui/inspect.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'ui',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.36,
+    cooldownMs: 90,
+    maxInstances: 1,
+    priority: 65,
+    fallbackId: 'click',
+    fallbackVolumeMultiplier: 2.5,
+  },
+  'frontier.daily.complete': {
+    sources: [
+      '/sounds/frontier/v1/interactions/daily-complete.webm',
+      '/sounds/frontier/v1/interactions/daily-complete.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'frontierSfx',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.46,
+    cooldownMs: 1200,
+    maxInstances: 1,
+    priority: 95,
+    fallbackId: 'correct',
+    fallbackVolumeMultiplier: 2,
+  },
+  'frontier.rover.complete': {
+    sources: [
+      '/sounds/frontier/v1/interactions/rover-complete.webm',
+      '/sounds/frontier/v1/interactions/rover-complete.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'frontierSfx',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.5,
+    cooldownMs: 1500,
+    maxInstances: 1,
+    priority: 100,
+    fallbackId: 'levelUp',
+    fallbackVolumeMultiplier: 2.2,
+  },
+  'frontier.mission.warning': {
+    sources: [
+      '/sounds/frontier/v1/ui/mission-warning.webm',
+      '/sounds/frontier/v1/ui/mission-warning.mp3',
+    ],
+    scope: 'frontier',
+    bus: 'ui',
+    kind: 'oneshot',
+    spatial: false,
+    baseVolume: 0.24,
+    cooldownMs: 5000,
+    maxInstances: 1,
+    priority: 90,
+    fallbackId: 'click',
+    fallbackVolumeMultiplier: 2.5,
   },
 
   // --- 상호작용 및 피드백 (Interactions & Events) ---
@@ -295,6 +424,7 @@ export const FRONTIER_SOUNDS = {
     maxInstances: 4,
     priority: 95,
     fallbackId: 'crystal',
+    fallbackVolumeMultiplier: 3,
   },
   'frontier.mission.complete': {
     sources: [
@@ -310,6 +440,7 @@ export const FRONTIER_SOUNDS = {
     maxInstances: 1,
     priority: 100,
     fallbackId: 'levelUp',
+    fallbackVolumeMultiplier: 2.2,
   },
   'frontier.build.complete': {
     sources: [
@@ -325,6 +456,7 @@ export const FRONTIER_SOUNDS = {
     maxInstances: 1,
     priority: 95,
     fallbackId: 'correct',
+    fallbackVolumeMultiplier: 2,
   },
   'frontier.connection.softError': {
     sources: [
@@ -340,6 +472,7 @@ export const FRONTIER_SOUNDS = {
     maxInstances: 1,
     priority: 85,
     fallbackId: 'wrong',
+    fallbackVolumeMultiplier: 2,
   },
 }
 

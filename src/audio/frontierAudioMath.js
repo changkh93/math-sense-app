@@ -92,6 +92,8 @@ export function calculateInstanceVolume(baseVolume, busVolume, callVolume = 1.0,
       quietFactor = 0.4
     } else if (busName === 'frontierAmbience') {
       quietFactor = 0.8
+    } else if (busName === 'frontierMusic') {
+      quietFactor = 0.65
     }
   }
 
@@ -128,6 +130,10 @@ export function calculateCameraOrientation(quat) {
   }
 }
 
-import { getWalkSurface, getRiverAudioPoint } from '../components/GalaxySocial/GalaxyTerrainModel.js'
+import {
+  getWalkSurface,
+  getRiverAudioPoint,
+  getRiverAudioProximity,
+} from '../components/GalaxySocial/GalaxyTerrainModel.js'
 
-export { getWalkSurface, getRiverAudioPoint }
+export { getWalkSurface, getRiverAudioPoint, getRiverAudioProximity }

@@ -17,7 +17,7 @@ import {
   WORLD_RADIUS,
   WORLD_ZONES as ZONES,
   getAvailableVillageSlots,
-  getRiverAudioPoint,
+  getRiverAudioProximity,
   getWalkSurface,
   isVillageBeaconAvailable,
   isBridgeDeck,
@@ -44,6 +44,10 @@ const MOUSE_LOOK_REENTRY_GAP_MS = 180
 const MOUSE_LOOK_REENTRY_DISTANCE = 160
 const PROXIMITY_CHAT_DISTANCE = 4.2
 const COLLISION_REARM_CLEAR_SECONDS = .35
+const FOOTSTEP_STRIDE_DISTANCE = 1.7
+const MUSIC_ENTRY_DELAY_MS = 900
+const AMBIENCE_ENTRY_DELAY_MS = 2800
+const LANDING_AUDIO_STOP_DISTANCE = 7.5
 
 function createMovementIntent() {
   return {
@@ -131,6 +135,14 @@ const ROVER_STATUS_LABELS = {
   active: '진행 중인 원정 확인하기',
   ready: '귀환 결과 수신하기',
   claimed: '새 원정 준비하기',
+}
+
+const INTERACTION_SOUND_IDS = {
+  crystal: 'frontier.pickup.collect',
+  fiber: 'frontier.pickup.collect',
+  salvage: 'frontier.interaction.repair',
+  beacon: 'frontier.interaction.repair',
+  plant: 'frontier.interaction.water',
 }
 
 const MISSION_PORTALS = [
@@ -1033,10 +1045,10 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, walkSurfaceHeight(group.current.position.x, group.current.position.z), Math.min(1, delta * 9))
     const player = group.current.position
 
-    if (movedDistance > 0) {
+    if (FRONTIER_AUDIO_ASSETS_READY && movedDistance > 0) {
       stepDistance.current += movedDistance
-      if (stepDistance.current >= 1.05) {
-        stepDistance.current %= 1.05
+      if (stepDistance.current >= FOOTSTEP_STRIDE_DISTANCE) {
+        stepDistance.current %= FOOTSTEP_STRIDE_DISTANCE
         const surface = getWalkSurface(player.x, player.z, theme)
         soundManager.play(getFrontierFootstepSoundId(surface))
       }
@@ -1570,10 +1582,13 @@ export default function GalaxyWorld3D({
   const [collectedIds, setCollectedIds] = useState(new Set())
   const [missionRemainingMs, setMissionRemainingMs] = useState(0)
   const [completionStatus, setCompletionStatus] = useState('idle')
+  const [ambienceReady, setAmbienceReady] = useState(false)
   const missionRemainingRef = useRef(0)
   const completingRef = useRef(false)
   const completionRequestTokenRef = useRef(null)
+  const missionWarningPlayedRef = useRef(false)
   const mountedRef = useRef(false)
+  const hasLeftLandingAudioZoneRef = useRef(false)
   const audioSessionKeyRef = useRef(audioSessionKey)
   audioSessionKeyRef.current = audioSessionKey
   const dailyEventNode = useMemo(() => resolvePendingDailyEventNode(dailyEvent), [dailyEvent])
@@ -1581,55 +1596,119 @@ export default function GalaxyWorld3D({
     () => getFrontierAmbienceSoundId(planet?.theme || 'forest'),
     [planet?.theme],
   )
+  const riverAudio = useMemo(
+    () => getRiverAudioProximity(playerPosition.x, playerPosition.z),
+    [playerPosition.x, playerPosition.z],
+  )
 
   useEffect(() => {
     // 행성/플레이 세션이 바뀌면 이전 세션의 비동기 완료 상태를 새 화면에 남기지 않는다.
     soundManager.invalidateScopeVoices('frontier')
+    soundManager.stopLoop('frontier:ambience:theme', 350)
+    soundManager.stopLoop('frontier:ambience:landing', 350)
+    soundManager.stopLoop('frontier:ambience:river', 350)
+    soundManager.unduck('frontier:river-proximity')
+    setAmbienceReady(false)
+    hasLeftLandingAudioZoneRef.current = false
     completingRef.current = false
     completionRequestTokenRef.current = null
+    missionWarningPlayedRef.current = false
     missionRemainingRef.current = 0
     setActiveMission(null)
     setCollectedIds(new Set())
     setMissionRemainingMs(0)
     setCompletionStatus('idle')
+    const ambienceTimer = window.setTimeout(
+      () => setAmbienceReady(true),
+      AMBIENCE_ENTRY_DELAY_MS,
+    )
+    return () => window.clearTimeout(ambienceTimer)
   }, [audioSessionKey])
 
   useEffect(() => {
     mountedRef.current = true
     soundManager.enterScope('frontier')
+    let musicTimer
     if (FRONTIER_AUDIO_ASSETS_READY) {
-      soundManager.loopAt('frontier.ambience.landing', [0, terrainHeight(0, 5) + .15, 5], {
-        key: 'frontier:ambience:landing',
-      })
+      musicTimer = window.setTimeout(() => {
+        soundManager.loopAt('frontier.music.background', [0, 0, 0], {
+          key: 'frontier:music:background',
+          fadeInMs: 900,
+        })
+      }, MUSIC_ENTRY_DELAY_MS)
     }
     return () => {
+      if (musicTimer) window.clearTimeout(musicTimer)
       mountedRef.current = false
       soundManager.unduck('frontier:overlay')
+      soundManager.unduck('frontier:river-proximity')
       soundManager.exitScope('frontier', { unload: true, fadeOutMs: 700 })
     }
   }, [])
 
   useEffect(() => {
-    if (!FRONTIER_AUDIO_ASSETS_READY) return undefined
+    if (!FRONTIER_AUDIO_ASSETS_READY || !ambienceReady) return undefined
     const key = 'frontier:ambience:theme'
-    soundManager.loopAt(themeAmbienceSoundId, [0, 0, 0], { key })
-    return () => soundManager.stopLoop(key, 350)
-  }, [themeAmbienceSoundId])
+    soundManager.loopAt(themeAmbienceSoundId, [0, 0, 0], { key, fadeInMs: 1200 })
+    return () => soundManager.stopLoop(key, 700)
+  }, [ambienceReady, themeAmbienceSoundId])
 
   useEffect(() => {
-    if (!FRONTIER_AUDIO_ASSETS_READY) return
+    const key = 'frontier:ambience:landing'
+    const landingDistance = Math.hypot(playerPosition.x, playerPosition.z - 5)
+    if (landingDistance > LANDING_AUDIO_STOP_DISTANCE) {
+      hasLeftLandingAudioZoneRef.current = true
+    }
+    if (
+      !FRONTIER_AUDIO_ASSETS_READY
+      || !ambienceReady
+      || !hasLeftLandingAudioZoneRef.current
+      || landingDistance > LANDING_AUDIO_STOP_DISTANCE
+    ) {
+      soundManager.stopLoop(key, 500)
+      return
+    }
+    soundManager.loopAt('frontier.ambience.landing', [0, terrainHeight(0, 5) + .15, 5], {
+      key,
+      fadeInMs: 900,
+    })
+  }, [ambienceReady, playerPosition.x, playerPosition.z])
+
+  useEffect(() => {
+    const key = 'frontier:ambience:river'
+    if (
+      !FRONTIER_AUDIO_ASSETS_READY
+      || !ambienceReady
+      || riverAudio.volumeMultiplier <= 0
+    ) {
+      soundManager.stopLoop(key, 600)
+      soundManager.unduck('frontier:river-proximity')
+      return
+    }
     soundManager.loopAt(
       'frontier.ambience.river',
-      getRiverAudioPoint(playerPosition.x),
-      { key: 'frontier:ambience:river' },
+      riverAudio.point,
+      {
+        key,
+        fadeInMs: 900,
+        volumeMultiplier: riverAudio.volumeMultiplier,
+      },
     )
-  }, [playerPosition.x])
+    if (riverAudio.musicDuck < 1) {
+      soundManager.duck('frontier:river-proximity', {
+        frontierMusic: riverAudio.musicDuck,
+      })
+    } else {
+      soundManager.unduck('frontier:river-proximity')
+    }
+  }, [ambienceReady, riverAudio])
 
   useEffect(() => {
     if (paused) {
       soundManager.duck('frontier:overlay', {
-        frontierAmbience: .35,
-        frontierSfx: .6,
+        frontierMusic: .55,
+        frontierAmbience: .45,
+        frontierSfx: .65,
       })
     } else {
       soundManager.unduck('frontier:overlay')
@@ -1655,6 +1734,7 @@ export default function GalaxyWorld3D({
     if (activeMission) { onMessage?.('진행 중인 탐사를 먼저 완료하세요.'); return }
     const startedAtMs = Date.now()
     setCollectedIds(new Set())
+    missionWarningPlayedRef.current = false
     missionRemainingRef.current = 45000
     setMissionRemainingMs(45000)
     setCompletionStatus('idle')
@@ -1664,6 +1744,9 @@ export default function GalaxyWorld3D({
 
   const interact = useCallback(() => {
     if (!nearby || paused) return
+    const interactionSoundId = INTERACTION_SOUND_IDS[nearby.actionId]
+      || 'frontier.ui.interact'
+    soundManager.play(interactionSoundId)
     if (nearby.kind === 'portal') startMission(nearby.route)
     else if (nearby.kind === 'structure') onStructureMission?.(nearby.item)
     else if (nearby.kind === 'guide') onOpenBriefing?.()
@@ -1676,15 +1759,13 @@ export default function GalaxyWorld3D({
       if (currentDailyEvent) onDailyEventComplete?.(currentDailyEvent)
     }
     else {
-      if (nearby.actionId === 'plant') soundManager.play('frontier.interaction.water')
-      else if (nearby.actionId === 'beacon') soundManager.play('frontier.interaction.repair')
-      else soundManager.play('frontier.pickup.collect')
       onWorldAction?.(nearby)
     }
   }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenRover, onStructureMission, onWorldAction, paused, startMission])
 
   const inspectStructure = useCallback(() => {
     if (paused || nearby?.kind !== 'structure') return
+    soundManager.play('frontier.ui.inspect')
     onSelectStructure?.(nearby.item)
   }, [nearby, onSelectStructure, paused])
 
@@ -1709,9 +1790,18 @@ export default function GalaxyWorld3D({
       const remainingMs = Math.max(0, endsAtMs - Date.now())
       missionRemainingRef.current = remainingMs
       setMissionRemainingMs(remainingMs)
+      if (
+        remainingMs > 0
+        && remainingMs <= 5000
+        && !missionWarningPlayedRef.current
+      ) {
+        missionWarningPlayedRef.current = true
+        soundManager.play('frontier.mission.warning')
+      }
       if (remainingMs > 0) return
 
       window.clearInterval(timer)
+      missionWarningPlayedRef.current = false
       setActiveMission(null)
       setCollectedIds(new Set())
       setCompletionStatus('idle')
@@ -1742,12 +1832,13 @@ export default function GalaxyWorld3D({
 
     try {
       const result = await onMissionComplete?.(activeMission.route, activeMission.operationId)
-      if (result === null || result === false) throw new Error('mission completion rejected')
+      if (!result) throw new Error('mission completion rejected')
       if (
         !mountedRef.current
         || audioSessionKeyRef.current !== requestAudioSessionKey
       ) return
       soundManager.play('frontier.mission.complete')
+      missionWarningPlayedRef.current = false
       setActiveMission(null)
       setCollectedIds(new Set())
       missionRemainingRef.current = 0
@@ -1779,11 +1870,9 @@ export default function GalaxyWorld3D({
     setCompletionStatus('idle')
   }, [activeMission, collectedIds.size])
 
-  const collect = useCallback((id) => setCollectedIds((current) => {
-    if (current.has(id)) return current
-    soundManager.play('frontier.pickup.collect')
-    return new Set([...current, id])
-  }), [])
+  const collect = useCallback((id) => setCollectedIds((current) => (
+    current.has(id) ? current : new Set([...current, id])
+  )), [])
 
   return (
     <div

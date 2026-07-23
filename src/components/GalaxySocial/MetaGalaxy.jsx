@@ -54,7 +54,6 @@ import {
   Telescope,
   TimerReset,
   Trees,
-  User,
   Users,
   Volume2,
   Waves,
@@ -490,7 +489,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [home, setHome] = useState(null)
   const [targetUid, setTargetUid] = useState(user?.uid || '')
   const [menu, setMenu] = useState('')
-  const [arrivalOpen, setArrivalOpen] = useState(false)
+  const [arrivalOpen, setArrivalOpen] = useState(true)
   const [audioSettingsOpen, setAudioSettingsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
@@ -1048,10 +1047,13 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       y: 50 + Number(worldZ || 0) * 3,
     }), (buildResult) => `${buildResult?.placed?.name || '새 시설'}을 이곳에 건설했습니다.`)
     if (
-      !result
-      || !audioMountedRef.current
+      !audioMountedRef.current
       || audioSessionKeyRef.current !== requestAudioSessionKey
     ) return
+    if (!result) {
+      soundManager.play('frontier.connection.softError')
+      return
+    }
     setHome((current) => {
       if (!current) return current
       const currentOwnPlanet = current.ownPlanet || {}
@@ -1164,6 +1166,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   const completeDailyEvent = async (event = dailyEvent) => {
     if (!isOwner || event?.status !== 'pending') return null
+    const requestAudioSessionKey = audioSessionKey
     const result = await runAction(
       `daily:${event.eventId || event.type || 'event'}`,
       () => callGalaxy('completeGalaxyDailyEvent', { dayKey: event.dayKey, eventId: event.eventId }),
@@ -1172,7 +1175,14 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         return `${event.title || '오늘의 행성 사건'} 해결 · ${reward.title || MATERIAL_LABELS[reward.material] || '행성 재료'} ${reward.amount ?? 1}개를 회수했습니다.`
       },
     )
-    if (!result?.dailyEvent) return null
+    if (
+      !audioMountedRef.current
+      || audioSessionKeyRef.current !== requestAudioSessionKey
+    ) return result
+    if (!result?.dailyEvent) {
+      soundManager.play('frontier.connection.softError')
+      return null
+    }
     soundManager.play('frontier.daily.complete')
 
     const receivedAtMs = Date.now()
@@ -1221,6 +1231,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   const dispatchRover = async (route) => {
     if (!isOwner) return null
+    const requestAudioSessionKey = audioSessionKey
     const result = await runAction(
       'rover:dispatch',
       () => callGalaxy('startGalaxyRoverExpedition', { route, operationId: createOperationId() }),
@@ -1230,8 +1241,14 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         return `${title}을 시작했습니다.${readyAt ? ` ${readyAt} 귀환 예정입니다.` : ''}`
       },
     )
-    if (!result?.expedition) return null
-    soundManager.play('frontier.rover.complete')
+    if (
+      !audioMountedRef.current
+      || audioSessionKeyRef.current !== requestAudioSessionKey
+    ) return result
+    if (!result?.expedition) {
+      soundManager.play('frontier.connection.softError')
+      return null
+    }
     const receivedAtMs = Date.now()
     setHome((current) => {
       if (!current) return current
@@ -1255,6 +1272,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       flash('수령할 로버 원정 기록을 찾지 못했습니다. 관제 화면을 다시 열어 주세요.')
       return null
     }
+    const requestAudioSessionKey = audioSessionKey
     const result = await runAction(
       'rover:claim',
       () => callGalaxy('claimGalaxyRoverExpedition', { operationId: roverExpedition.operationId }),
@@ -1264,7 +1282,15 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         return `${reward.title || '원정 재료'} ${reward.amount || 0}개와 ${discovery.name || '새 발견 기록'}을 수령했습니다.`
       },
     )
-    if (!result?.expedition || !result?.claimResult) return null
+    if (
+      !audioMountedRef.current
+      || audioSessionKeyRef.current !== requestAudioSessionKey
+    ) return result
+    if (!result?.expedition || !result?.claimResult) {
+      soundManager.play('frontier.connection.softError')
+      return null
+    }
+    soundManager.play('frontier.rover.complete')
     const receivedAtMs = Date.now()
     setHome((current) => {
       if (!current) return current
@@ -1401,7 +1427,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}
-        paused={Boolean(menu || arrivalOpen || objectDialogOpen)}
+        paused={Boolean(menu || arrivalOpen || objectDialogOpen || audioSettingsOpen)}
         onOpenBriefing={() => setArrivalOpen(true)}
       />
 
@@ -1838,7 +1864,11 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           </Motion.div>
         )}
       </AnimatePresence>
-      <FrontierAudioSettingsModal key={audioSettingsOpen ? 'open' : 'closed'} open={audioSettingsOpen} onClose={() => setAudioSettingsOpen(false)} />
+      <FrontierAudioSettingsModal
+        key={`${audioSessionKey}:${audioSettingsOpen ? 'open' : 'closed'}`}
+        open={audioSettingsOpen}
+        onClose={() => setAudioSettingsOpen(false)}
+      />
     </div>
   )
 }

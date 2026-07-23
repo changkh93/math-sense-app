@@ -255,6 +255,217 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   border-color: rgba(255, 121, 139, .55);
   transform: translateY(-1px);
 }
+.frontier-hud-exit-btn.audio-settings-btn {
+  width: 34px;
+  justify-content: center;
+  padding-inline: 0;
+  border-color: rgba(108, 231, 255, .24);
+  color: #b9f5ff;
+  background: rgba(46, 171, 202, .13);
+}
+.frontier-hud-exit-btn.audio-settings-btn:hover {
+  border-color: rgba(108, 231, 255, .55);
+  background: rgba(46, 171, 202, .28);
+}
+
+.frontier-audio-settings-overlay {
+  position: absolute;
+  z-index: 3160;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(1, 7, 15, .76);
+  backdrop-filter: blur(14px);
+}
+.frontier-audio-settings-card {
+  width: min(620px, 100%);
+  max-height: min(760px, calc(100dvh - 2rem));
+  overflow: auto;
+  border: 1px solid rgba(124, 242, 189, .2);
+  border-radius: 24px;
+  color: var(--frontier-text);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(108, 231, 255, .1), transparent 42%),
+    linear-gradient(155deg, rgba(11, 26, 43, .99), rgba(6, 14, 27, .99));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .55);
+}
+.frontier-audio-settings-card:focus { outline: none; }
+.frontier-audio-settings-header {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--frontier-line);
+  background: rgba(7, 16, 30, .94);
+  backdrop-filter: blur(12px);
+}
+.frontier-audio-settings-header .title-group {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+}
+.frontier-audio-settings-header h3 { margin: 0; font-size: 1rem; }
+.frontier-audio-settings-header .icon-sparkle { color: var(--frontier-mint); }
+.frontier-audio-settings-header .btn-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--frontier-line);
+  border-radius: 11px;
+  color: #b8c8d8;
+  background: rgba(255, 255, 255, .04);
+  cursor: pointer;
+}
+.frontier-audio-settings-header .btn-close:hover,
+.frontier-audio-settings-header .btn-close:focus-visible {
+  border-color: rgba(108, 231, 255, .45);
+  color: white;
+}
+.frontier-audio-settings-body {
+  display: grid;
+  gap: .7rem;
+  padding: 1rem;
+}
+.frontier-audio-asset-notice {
+  display: grid;
+  gap: .24rem;
+  padding: .72rem .82rem;
+  border: 1px solid rgba(255, 190, 92, .3);
+  border-radius: 14px;
+  color: #ffe5b5;
+  background: rgba(255, 151, 46, .09);
+}
+.frontier-audio-asset-notice strong { font-size: .7rem; }
+.frontier-audio-asset-notice span {
+  color: #d9c5a5;
+  font-size: .61rem;
+  line-height: 1.5;
+}
+.frontier-audio-settings-body .setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .85rem;
+  border: 1px solid var(--frontier-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .025);
+}
+.frontier-audio-settings-body .highlight-row {
+  border-color: rgba(124, 242, 189, .18);
+  background: rgba(124, 242, 189, .045);
+}
+.frontier-audio-settings-body .label-group { min-width: 0; }
+.frontier-audio-settings-body .label-group strong,
+.frontier-audio-settings-body .label-group > span { display: block; }
+.frontier-audio-settings-body .label-group strong { font-size: .8rem; }
+.frontier-audio-settings-body .label-group > span {
+  margin-top: .25rem;
+  color: var(--frontier-muted);
+  font-size: .65rem;
+  line-height: 1.5;
+}
+.frontier-audio-settings-body .title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.frontier-audio-settings-body .badge {
+  padding: .14rem .34rem;
+  border-radius: 999px;
+  color: #0a2b22;
+  background: var(--frontier-mint);
+  font-size: .5rem;
+  font-weight: 900;
+}
+.frontier-audio-settings-body .toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  flex: 0 0 auto;
+  min-width: 92px;
+  min-height: 36px;
+  padding: .42rem .65rem;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 11px;
+  color: #9aabbd;
+  background: rgba(255, 255, 255, .045);
+  font-size: .64rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+.frontier-audio-settings-body .toggle-btn.active {
+  border-color: rgba(124, 242, 189, .38);
+  color: #d9ffec;
+  background: rgba(62, 188, 132, .16);
+}
+.frontier-audio-settings-body button:focus-visible,
+.frontier-audio-settings-body input:focus-visible {
+  outline: 2px solid var(--frontier-cyan);
+  outline-offset: 2px;
+}
+.frontier-audio-settings-body .sliders-section {
+  display: grid;
+  gap: .8rem;
+  padding: .95rem;
+  border: 1px solid var(--frontier-line);
+  border-radius: 16px;
+  background: rgba(3, 10, 20, .34);
+}
+.frontier-audio-settings-body .slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .7rem;
+  margin-bottom: .4rem;
+  color: #cbd8e6;
+  font-size: .68rem;
+  font-weight: 750;
+}
+.frontier-audio-settings-body .slider-header span { color: var(--frontier-cyan); }
+.frontier-audio-settings-body input[type='range'] {
+  width: 100%;
+  accent-color: var(--frontier-mint);
+  cursor: pointer;
+}
+.frontier-audio-preset-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .55rem;
+}
+.frontier-audio-reset-btn,
+.frontier-audio-test-volume-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-height: 38px;
+  border: 1px solid var(--frontier-line);
+  border-radius: 12px;
+  color: #b8c8d8;
+  background: rgba(255, 255, 255, .035);
+  font-size: .67rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.frontier-audio-test-volume-btn {
+  border-color: rgba(108, 231, 255, .26);
+  color: #c8f8ff;
+  background: rgba(46, 171, 202, .12);
+}
+.frontier-audio-reset-btn:hover,
+.frontier-audio-test-volume-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, .08);
+}
 
 .galaxy-material-strip { display: flex; align-items: center; gap: .42rem; overflow-x: auto; scrollbar-width: none; }
 .galaxy-material-strip::-webkit-scrollbar { display: none; }
@@ -1452,6 +1663,11 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
 }
 
 @media (max-width: 520px) {
+  .frontier-audio-settings-overlay { padding: .55rem; }
+  .frontier-audio-settings-card { max-height: calc(100dvh - 1.1rem); border-radius: 18px; }
+  .frontier-audio-settings-body .setting-row { align-items: stretch; flex-direction: column; }
+  .frontier-audio-settings-body .toggle-btn { width: 100%; }
+  .frontier-audio-preset-actions { grid-template-columns: 1fr; }
   .frontier-planet-hud { max-width: 48vw; }
   .frontier-planet-hud div > span { display: none; }
   .frontier-economy-hud .galaxy-material-strip { display: none; }

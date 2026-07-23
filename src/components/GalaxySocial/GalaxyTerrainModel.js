@@ -133,6 +133,21 @@ export function getRiverAudioPoint(playerX) {
   return [clampX, 0.05, riverCenterZ(clampX)]
 }
 
+export function getRiverAudioProximity(playerX, playerZ) {
+  const point = getRiverAudioPoint(playerX)
+  const distance = Math.hypot(
+    Number(playerX || 0) - point[0],
+    Number(playerZ || 0) - point[2],
+  )
+  const normalized = Math.max(0, Math.min(1, 1 - distance / 15))
+  return {
+    point,
+    distance,
+    volumeMultiplier: normalized <= 0 ? 0 : 0.15 + normalized * 1.25,
+    musicDuck: distance <= 7 ? 0.52 : distance <= 11 ? 0.72 : 1,
+  }
+}
+
 export function isBridgeDeck(x, z) {
   return Math.abs(x - BRIDGE_X) < 1.15 && Math.abs(z - riverCenterZ(BRIDGE_X)) < 2.65
 }

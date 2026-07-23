@@ -2719,7 +2719,9 @@ function SpaceHome() {
   }
 
   // Loading State with Timeout & Error handling
-  const isLoading = (authLoading || loadingClusters || (canLoadLearningMap && loadingRegions)) && !errorRegions
+  const hasAccountDataIssue = Boolean(userData?.dataLoadError || userData?.recoveryRequired)
+  const isUserDataPending = Boolean(user && !userData && !hasAccountDataIssue)
+  const isLoading = (authLoading || isUserDataPending || loadingClusters || (canLoadLearningMap && loadingRegions)) && !errorRegions
 
   if (isLoading) {
     return (
@@ -3312,9 +3314,7 @@ function SpaceHome() {
     )
   }
 
-  const hasAccountDataIssue = userData?.dataLoadError || userData?.recoveryRequired
-
-  if (!userData || hasAccountDataIssue) {
+  if (hasAccountDataIssue) {
     const issueTitle = userData?.recoveryRequired
       ? '계정 데이터 복구가 필요합니다'
       : '계정 데이터를 불러오지 못했습니다'

@@ -24,6 +24,7 @@ import {
 } from '../src/audio/frontierAudioMath.js'
 import {
   getRiverAudioPoint,
+  getRiverAudioProximity,
   getWalkSurface,
   isNearRoad,
   riverCenterZ,
@@ -241,7 +242,7 @@ test('Legacy wrappers invoke Howl.play and preserve the public API', () => {
   assert.equal(manager.activeVoices.size, 6)
 })
 
-test('Registry definitions are normalized and footstep themes have a safe fallback', () => {
+test('Registry definitions are normalized and theme/footstep lookups have safe fallbacks', () => {
   assert.equal(typeof LEGACY_SOUND_DEFS, 'object')
   assert.equal(typeof FRONTIER_SOUNDS, 'object')
   assert.ok(isValidSoundId('correct'))
@@ -252,8 +253,53 @@ test('Registry definitions are normalized and footstep themes have a safe fallba
     getFrontierFootstepSoundId('terrain.ocean'),
     'frontier.footstep.terrain.forest',
   )
-  assert.equal(getFrontierAmbienceSoundId('ocean'), 'frontier.ambience.forest')
+  assert.equal(getFrontierAmbienceSoundId('ocean'), 'frontier.ambience.ocean')
   assert.equal(getFrontierAmbienceSoundId('forest'), 'frontier.ambience.forest')
+  assert.equal(getFrontierAmbienceSoundId('unknown'), 'frontier.ambience.forest')
+})
+
+test('Every Phase 2-4 runtime semantic ID resolves to a complete definition', () => {
+  const runtimeSoundIds = [
+    'frontier.music.background',
+    'frontier.ambience.forest',
+    'frontier.ambience.ocean',
+    'frontier.ambience.crystal',
+    'frontier.ambience.desert',
+    'frontier.ambience.mechanical',
+    'frontier.ambience.ice',
+    'frontier.ambience.river',
+    'frontier.ambience.landing',
+    'frontier.collision.soft',
+    'frontier.collision.metal',
+    'frontier.collision.wood',
+    'frontier.collision.stone',
+    'frontier.build.invalid',
+    'frontier.interaction.water',
+    'frontier.interaction.repair',
+    'frontier.ui.interact',
+    'frontier.ui.inspect',
+    'frontier.pickup.collect',
+    'frontier.mission.warning',
+    'frontier.mission.complete',
+    'frontier.build.complete',
+    'frontier.daily.complete',
+    'frontier.rover.complete',
+    'frontier.connection.softError',
+  ]
+
+  runtimeSoundIds.forEach((soundId) => {
+    const definition = getSoundDefinition(soundId)
+    assert.ok(definition, `${soundId} is missing`)
+    assert.ok(definition.sources?.length || definition.variants?.length, `${soundId} has no sources`)
+    assert.equal(definition.scope, 'frontier')
+    if (definition.fallbackId) {
+      assert.ok(isValidSoundId(definition.fallbackId), `${soundId} has an invalid fallback`)
+      assert.ok(
+        Number(definition.fallbackVolumeMultiplier) > 0,
+        `${soundId} has no audible fallback gain`,
+      )
+    }
+  })
 })
 
 test('Variant playback creates one cache entry per selected source group', () => {
@@ -428,6 +474,10 @@ test('Pending asset gate avoids 404 loops and uses legacy feedback fallback', ()
   const pickupId = manager.play('frontier.pickup.collect')
   assert.ok(Number.isInteger(pickupId))
   assert.ok([...manager.howlCache.keys()].some((key) => key.startsWith('crystal:oneshot:')))
+  const fallbackVoice = [...manager.activeVoices.values()]
+    .find((voice) => voice.soundId === 'crystal')
+  assert.ok(fallbackVoice)
+  assert.ok(Math.abs(fallbackVoice.howl.volume() - 0.108) < 1e-9)
 })
 
 test('Loop volume survives position-only and idempotent loopAt updates', () => {
@@ -443,6 +493,36 @@ test('Loop volume survives position-only and idempotent loopAt updates', () => {
   manager.recalculateLoopVolumes()
   assert.equal(manager.activeLoops.get(key).callVolume, 0.5)
   assert.equal(manager.loopRequests.get(key).callVolume, 0.5)
+})
+
+test('Loop fade-in and fade-out use tracked gain instead of a Howler instance ID', () => {
+  const { manager } = createManager()
+  manager.enterScope('frontier')
+  const key = manager.loopAt(
+    'frontier.ambience.forest',
+    [0, 0, 0],
+    { key: 'theme', fadeInMs: 350 },
+  )
+  const loop = manager.activeLoops.get(key)
+  const expectedVolume = (
+    getSoundDefinition('frontier.ambience.forest').baseVolume
+    * manager.getPreferences().ambience
+  )
+
+  assert.deepEqual(loop.howl.lastFade, {
+    from: 0,
+    to: expectedVolume,
+    duration: 350,
+    id: loop.howlerId,
+  })
+
+  manager.stopLoop(key, 350)
+  assert.deepEqual(loop.howl.lastFade, {
+    from: expectedVolume,
+    to: 0,
+    duration: 350,
+    id: loop.howlerId,
+  })
 })
 
 test('Rapid scope exit and re-entry cancels stale unload work', () => {
@@ -615,6 +695,16 @@ test('Preferences sanitize malformed values without coercion surprises', () => {
   assert.ok(Number.isFinite(sanitized.updatedAt))
 })
 
+test('Preference updates return a safe snapshot for settings UI state', () => {
+  const { manager } = createManager()
+  const updated = manager.updatePreferences({ action: 0.25, quietMode: true })
+  assert.equal(updated.action, 0.25)
+  assert.equal(updated.quietMode, true)
+
+  updated.action = 1
+  assert.equal(manager.getPreferences().action, 0.25)
+})
+
 test('Cooldown handles first timestamp zero and clock rollback', () => {
   const cooldowns = new Map()
   assert.equal(checkCooldown(cooldowns, 'step', 100, 0), true)
@@ -648,16 +738,42 @@ test('Walk surfaces and river emitters use the rendered world model', () => {
   const [x, y, z] = getRiverAudioPoint(1.2)
   assert.deepEqual([x, y], [1.2, 0.05])
   assert.equal(z, riverCenterZ(1.2))
+  const nearRiver = getRiverAudioProximity(1.2, riverCenterZ(1.2) + 1.2)
+  const farRiver = getRiverAudioProximity(1.2, 5)
+  assert.ok(nearRiver.volumeMultiplier > 1)
+  assert.ok(nearRiver.musicDuck < 1)
+  assert.equal(farRiver.volumeMultiplier, 0)
+  assert.equal(farRiver.musicDuck, 1)
+})
+
+test('Action feedback temporarily ducks background music and then restores it', () => {
+  const scheduler = createScheduler()
+  const { manager } = createManager({ scheduler })
+  manager.enterScope('frontier')
+  const key = manager.loopAt(
+    'frontier.music.background',
+    [0, 0, 0],
+    { key: 'music' },
+  )
+  const before = manager.activeLoops.get(key).currentVolume
+  manager.play('frontier.ui.interact', { bypassCooldown: true })
+  const during = manager.activeLoops.get(key).currentVolume
+  assert.ok(during < before)
+  assert.equal(manager.getBusDuckFactor('frontierMusic'), 0.42)
+  scheduler.runAll()
+  assert.equal(manager.activeLoops.get(key).currentVolume, before)
+  assert.equal(manager.getBusDuckFactor('frontierMusic'), 1)
 })
 
 test('Phase 2: Footsteps only trigger when actual displacement (movedDistance) occurs', () => {
+  const strideDistance = 1.7
   let stepDistance = 0
   let playCount = 0
   const triggerStep = (movedDistance) => {
     if (movedDistance > 0) {
       stepDistance += movedDistance
-      if (stepDistance >= 1.05) {
-        stepDistance %= 1.05
+      if (stepDistance >= strideDistance) {
+        stepDistance %= strideDistance
         playCount += 1
       }
     }
@@ -669,15 +785,15 @@ test('Phase 2: Footsteps only trigger when actual displacement (movedDistance) o
   }
   assert.equal(playCount, 0, 'No footsteps when blocked by wall')
 
-  // 2. 정상 이동으로 2.2 unit 이동 시 -> 2회 발소리 발생
-  triggerStep(0.5)
-  triggerStep(0.6) // 1.1 -> step 1
-  triggerStep(0.6)
-  triggerStep(0.6) // 2.3 -> step 2
-  assert.equal(playCount, 2, 'Footsteps trigger exactly on 1.05 unit displacement threshold')
+  // 2. 정상 이동으로 3.5 unit 이동 시 -> 느리고 분명한 2회 발소리 발생
+  triggerStep(0.8)
+  triggerStep(0.9) // 1.7 -> step 1
+  triggerStep(0.8)
+  triggerStep(1) // 3.5 -> step 2
+  assert.equal(playCount, 2, 'Footsteps trigger exactly on 1.7 unit displacement threshold')
 })
 
-test('Phase 2: Surface switching immediately changes footstep sound within 1.05 units', () => {
+test('Phase 2: Surface switching immediately changes footstep sound on the next stride', () => {
   const surfacesHit = []
   const simulateMove = (x, z, theme) => {
     const surface = getWalkSurface(x, z, theme)
@@ -745,7 +861,7 @@ test('Phase 2: Collision latches on initial impact and prevents spam during wall
   assert.equal(playedCollisions[1], 'wood')
 })
 
-test('Phase 3: Big completion sounds only trigger on confirmed server success', async () => {
+test('Phase 3 policy fixture: completion feedback follows the resolved server result', async () => {
   const playedSounds = []
   const mockSoundManager = {
     play(soundId) { playedSounds.push(soundId) },
@@ -782,20 +898,28 @@ test('Phase 3 & 4: Scope exit fades out ambient loops and cleans active voices',
   assert.equal(manager.activeScopes.has('frontier'), false)
 })
 
-test('Phase 4: Quiet mode applies a 50% volume cap and sanitized bus levels', () => {
+test('Phase 4: Quiet mode preserves ambience while reducing action feedback more strongly', () => {
   const { manager } = createManager()
   manager.updatePreferences({ quietMode: true, ambience: 0.8, action: 1.0 })
   const prefs = manager.getPreferences()
 
   assert.equal(prefs.quietMode, true)
-  const calculatedVol = calculateInstanceVolume(
+  const actionVolume = calculateInstanceVolume(
     1.0,
     1.0,
     1.0,
     true, // quietMode = true
     'frontierSfx',
   )
-  assert.equal(calculatedVol, 0.4, 'Quiet mode caps volume at 50% of base * bus (0.4)')
+  const ambienceVolume = calculateInstanceVolume(
+    1.0,
+    1.0,
+    1.0,
+    true,
+    'frontierAmbience',
+  )
+  assert.equal(actionVolume, 0.4)
+  assert.equal(ambienceVolume, 0.8)
 })
 
 await asyncTest('Interrupted AudioContext is only unlocked after it reaches running', async () => {

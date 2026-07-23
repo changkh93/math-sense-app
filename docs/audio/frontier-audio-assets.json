@@ -1,0 +1,1180 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-23T07:52:47.607Z",
+  "provisional": true,
+  "generatedBy": "scripts/generate-frontier-qa-audio.mjs",
+  "assets": [
+    {
+      "path": "/sounds/frontier/v1/ambience/landing/landing-hum.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/base-hum.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "17dd1fbbd672888c7090e36f49a5107a02f32db184c5503a34bf3903412dea67",
+      "provisional": true,
+      "origin": "base-hum.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "volume=-3dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/landing/landing-hum.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/base-hum.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "4a413106a0a256080bf1f847b83a12ff30559f7f207e08921564d77ab04f5be7",
+      "provisional": true,
+      "origin": "base-hum.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "volume=-3dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/music/background-loop.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/background-loop.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "c3ad5886608326c0a3ac4abef2100a9341d13f3cde70383ac730a04503c49332",
+      "provisional": true,
+      "origin": "background-loop.mp3",
+      "processing": {
+        "start": 24,
+        "duration": 23.5,
+        "filter": "loudnorm=I=-17:TP=-2:LRA=6,afade=t=in:st=0:d=0.15,afade=t=out:st=23.35:d=0.15,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 2
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/music/background-loop.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/background-loop.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "f03a1b1106555917c7a493a03661da2cd27156bd66b3ff39599cd589ff3feefb",
+      "provisional": true,
+      "origin": "background-loop.mp3",
+      "processing": {
+        "start": 24,
+        "duration": 23.5,
+        "filter": "loudnorm=I=-17:TP=-2:LRA=6,afade=t=in:st=0:d=0.15,afade=t=out:st=23.35:d=0.15,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 2
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/river/river-loop.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/water-stream.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "b9714c6c5c10a0155a230e9fa64a101dc93e27cd3b95632f2ae4a9ff0f2284e3",
+      "provisional": true,
+      "origin": "water-stream.mp3",
+      "processing": {
+        "start": 10,
+        "duration": 24,
+        "filter": "volume=8dB,afade=t=in:st=0:d=0.2,afade=t=out:st=23.8:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/river/river-loop.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/water-stream.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "4ad5f32731d77efa312f58f7619c46c749e13afb11376e0380a0c0f49f153d58",
+      "provisional": true,
+      "origin": "water-stream.mp3",
+      "processing": {
+        "start": 10,
+        "duration": 24,
+        "filter": "volume=8dB,afade=t=in:st=0:d=0.2,afade=t=out:st=23.8:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/crystal-bed.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#crystal",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "cd551372ffab1bf25c9efea81d13f596a24cba61b6aafa4bd964e60a995dcd0c",
+      "provisional": true,
+      "profile": "crystal"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/crystal-bed.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#crystal",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "ad8b2f3bf854c87ac4d65f9a47fb355b3e63cf826d58a561d33008b60e00948a",
+      "provisional": true,
+      "profile": "crystal"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/desert-bed.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#desert",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "3a3646ccb4fe2034832f02edde2c8c4875b7a3d54d635dd2efbda15cf5f05526",
+      "provisional": true,
+      "profile": "desert"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/desert-bed.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#desert",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "125f5bb2a2a577d5a048d0e6f78b529c9fc7ab9b2872cc21ade6887d543260e8",
+      "provisional": true,
+      "profile": "desert"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/forest-bed.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/forest.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "5b0b874772819d5e7c661bff427cab546fa1f72dc214b24269c42dfef365b0ab",
+      "provisional": true,
+      "origin": "forest.mp3",
+      "processing": {
+        "start": 120,
+        "duration": 24,
+        "filter": "highpass=f=70,lowpass=f=2600,acompressor=threshold=0.055:ratio=4:attack=20:release=300:makeup=2.2,loudnorm=I=-19:TP=-3:LRA=5,afade=t=in:st=0:d=0.2,afade=t=out:st=23.8:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 2
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/forest-bed.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/forest.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "d5d6002f3fcfb99501fe7f4526b0beb25097476bb79e642095c31b06d2bbedaa",
+      "provisional": true,
+      "origin": "forest.mp3",
+      "processing": {
+        "start": 120,
+        "duration": 24,
+        "filter": "highpass=f=70,lowpass=f=2600,acompressor=threshold=0.055:ratio=4:attack=20:release=300:makeup=2.2,loudnorm=I=-19:TP=-3:LRA=5,afade=t=in:st=0:d=0.2,afade=t=out:st=23.8:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 2
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/ice-bed.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#ice",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "2372c2a5b89bc3885c4f27f910ca91d2799a92a107efdc91411fa49f0e9a2e30",
+      "provisional": true,
+      "profile": "ice"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/ice-bed.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#ice",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "5b306df281027325764e8258d914f0cdebcf7c6deb7f6ef7eca07dd19ee2b3be",
+      "provisional": true,
+      "profile": "ice"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/mechanical-bed.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#mechanical",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "a4a98e71a5c77083e7ddc1b0bad6d9bf5e55395dbf3fdaac840907325b6fd82b",
+      "provisional": true,
+      "profile": "mechanical"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/mechanical-bed.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#mechanical",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "bacafdb0b7313af1462f516e78d1dca2b6c511795d3ad7f812b8037e195df75e",
+      "provisional": true,
+      "profile": "mechanical"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/ocean-bed.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#ocean",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "cf4fffae53139e85cdbd31865b62f7239b04f9a6f1a3122a8ae2e8493a0e72e0",
+      "provisional": true,
+      "profile": "ocean"
+    },
+    {
+      "path": "/sounds/frontier/v1/ambience/themes/ocean-bed.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#ocean",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "b4e39e071fb392deb77a8ab6dc43e345325ea6c7019ffa412342e26b397201a3",
+      "provisional": true,
+      "profile": "ocean"
+    },
+    {
+      "path": "/sounds/frontier/v1/collisions/metal-01.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "efa2f2d290c058c908dd3524d9d7ea6e86a7a857a00d267a42d1d06ea08557a4",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=36000,aresample=48000,highpass=f=45,lowpass=f=1400,volume=-2dB,afade=t=out:st=0.34:d=0.18,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/collisions/metal-01.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "53b3772b570da5a1fedda3161a13f2b65c3c939461781d514a4b72424f4d154b",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=36000,aresample=48000,highpass=f=45,lowpass=f=1400,volume=-2dB,afade=t=out:st=0.34:d=0.18,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/collisions/soft-01.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "cfc37a34a73984ae703bfe685486627f39189c9b1ad23daee5b5ce866e8f4692",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=30000,aresample=48000,highpass=f=35,lowpass=f=650,volume=-1dB,afade=t=out:st=0.42:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/collisions/soft-01.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "cba1cdbb6e1bf7736580f4736dc69e3502efa53dc01f81e5988370ba31387b89",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=30000,aresample=48000,highpass=f=35,lowpass=f=650,volume=-1dB,afade=t=out:st=0.42:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/collisions/stone-01.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "aac9ff21fb92b398b3064fe27bff88d9c421ed197853e3830310f399874d098f",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=32000,aresample=48000,highpass=f=40,lowpass=f=1150,volume=-2dB,afade=t=out:st=0.38:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/collisions/stone-01.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "fd921e3d141c105abb54b2d2807f250f662cb51c030f03afa915e3a80cb80ea2",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=32000,aresample=48000,highpass=f=40,lowpass=f=1150,volume=-2dB,afade=t=out:st=0.38:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/collisions/wood-01.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "1b915f2fd21c4c41ebf54bb305cb441d4084cc679e875007af32948e4ec6de3d",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=33000,aresample=48000,highpass=f=40,lowpass=f=900,volume=-1dB,afade=t=out:st=0.38:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/collisions/wood-01.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "63734e918e6c4f67d266c5dbff35521241da45e9db4b2d9c504ea050f6794473",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=33000,aresample=48000,highpass=f=40,lowpass=f=900,volume=-1dB,afade=t=out:st=0.38:d=0.2,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/bridge-wood-01.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footsteps-on-wood.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "f91a099a4be24a895684a7eef0ca58fea1d8e002f201e32730bfb042e830a451",
+      "provisional": true,
+      "origin": "footsteps-on-wood.mp3",
+      "processing": {
+        "start": 0.56,
+        "duration": 0.25,
+        "filter": "afade=t=in:st=0:d=0.008,afade=t=out:st=0.21:d=0.04,volume=-2dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/bridge-wood-01.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footsteps-on-wood.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "80914d60b1769babb63fea5f5de70252741c50ae451ea690259fe1762bd283bf",
+      "provisional": true,
+      "origin": "footsteps-on-wood.mp3",
+      "processing": {
+        "start": 0.56,
+        "duration": 0.25,
+        "filter": "afade=t=in:st=0:d=0.008,afade=t=out:st=0.21:d=0.04,volume=-2dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/bridge-wood-02.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footsteps-on-wood.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "2c4694632b0519fb27f0b5316816890e3f1051ee653d05a1d6685dcaf11f1534",
+      "provisional": true,
+      "origin": "footsteps-on-wood.mp3",
+      "processing": {
+        "start": 1.09,
+        "duration": 0.2,
+        "filter": "afade=t=in:st=0:d=0.008,afade=t=out:st=0.16:d=0.04,volume=-2dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/bridge-wood-02.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footsteps-on-wood.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "5156777749aaa7b7406ffc030284154ac3ce44c193e5244f4919eb7ae549bdf6",
+      "provisional": true,
+      "origin": "footsteps-on-wood.mp3",
+      "processing": {
+        "start": 1.09,
+        "duration": 0.2,
+        "filter": "afade=t=in:st=0:d=0.008,afade=t=out:st=0.16:d=0.04,volume=-2dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/bridge-wood-03.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footsteps-on-wood.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "67483d3e6b937dd33b611e60657e602a2c3584e082aa5522470c6938579abaaa",
+      "provisional": true,
+      "origin": "footsteps-on-wood.mp3",
+      "processing": {
+        "start": 1.68,
+        "duration": 0.26,
+        "filter": "afade=t=in:st=0:d=0.008,afade=t=out:st=0.22:d=0.04,volume=-2dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/bridge-wood-03.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footsteps-on-wood.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "10c4e6ed3ac65632ed95fdb96265fe18346af265a6ef24806c321247a4ca3283",
+      "provisional": true,
+      "origin": "footsteps-on-wood.mp3",
+      "processing": {
+        "start": 1.68,
+        "duration": 0.26,
+        "filter": "afade=t=in:st=0:d=0.008,afade=t=out:st=0.22:d=0.04,volume=-2dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/forest-01.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "64130d9f5277fc7f14ec348f12edf162112db4c476a760f54ed638ea99313000",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=42116,aresample=48000,highpass=f=55,lowpass=f=5200,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/forest-01.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "3b835b9842a450a1b7063f176c848cd2c5684e7cb1510ec5c344333bb187e4bc",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=42116,aresample=48000,highpass=f=55,lowpass=f=5200,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/forest-02.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "8e0d279767b925635a00ac797ea9cf506074537cbb58741099b5dba21b90d247",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=43439,aresample=48000,highpass=f=55,lowpass=f=5200,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/forest-02.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "3217b50aa459e79d91b32fabf186458a9574a80cdd8baf357861c5288f0b0459",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=43439,aresample=48000,highpass=f=55,lowpass=f=5200,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/forest-03.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "740c50ff9707de7cc78001c345a811c202feafcfb270d55ceef5c567b5318595",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=44982,aresample=48000,highpass=f=55,lowpass=f=5200,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/forest-03.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "9efcbf817d5a30d13032fece0eb0cee6e2c3e2c1594500a7f27874e4c7f6fa35",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=44982,aresample=48000,highpass=f=55,lowpass=f=5200,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/metal-01.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "9421e608723f207f3bcb3220027f331dd7ea15334a26c49944b65f40d3cd5333",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=38808,aresample=48000,highpass=f=45,lowpass=f=1800,volume=1dB,afade=t=out:st=0.3:d=0.12,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/metal-01.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "9da8ff5ebd924dd7fc82cff5e6b1c74e32ba184672e0a213c249070a27a65810",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=38808,aresample=48000,highpass=f=45,lowpass=f=1800,volume=1dB,afade=t=out:st=0.3:d=0.12,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/metal-02.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "e8a1193feda8cb6d19dac2100fe51db82b2b8c808a7e782e6edde903ac9ff65e",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=40572,aresample=48000,highpass=f=45,lowpass=f=1800,volume=1dB,afade=t=out:st=0.3:d=0.12,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/metal-02.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "c1687293db4a73bd5d0ca02097da8b71a8e8812f73104db80435638aa6b7ed40",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=40572,aresample=48000,highpass=f=45,lowpass=f=1800,volume=1dB,afade=t=out:st=0.3:d=0.12,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/metal-03.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "1fbacbbee1e6fd5760478781ea2ea47842b2e957a204fc0792df2d545c411493",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=42336,aresample=48000,highpass=f=45,lowpass=f=1800,volume=1dB,afade=t=out:st=0.3:d=0.12,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/metal-03.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "30226795ad573ff49794d0a25ba98d45fd7b5a51b194a3923a19711ea3e01e42",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=42336,aresample=48000,highpass=f=45,lowpass=f=1800,volume=1dB,afade=t=out:st=0.3:d=0.12,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/path-01.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "6c9f820a318af913af96db477458e454e82330a22b067db58eaec2d645df1b84",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=42777,aresample=48000,highpass=f=65,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/path-01.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "53bad19644762577631ebc3543fbbacd85a026dbe2ad7739ac0094287239ac11",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=42777,aresample=48000,highpass=f=65,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/path-02.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "61396813f211a519fba4e67c87baf4637d7a2eabe00d3f565eec78a524a413ef",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=44100,aresample=48000,highpass=f=65,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/path-02.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "5618990212dadf6cadccd01fd77d7ebaccf39850738bdc1145c07000e89d4211",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=44100,aresample=48000,highpass=f=65,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/path-03.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "42bd6f9271a9dfc8d17e62400aa23c489623950451fa4ffe0c08cb4e134afe24",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=45644,aresample=48000,highpass=f=65,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/footsteps/path-03.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/footstep.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "e730761dbba1b72218c0f0b1033d53c72316f82b212d027b9f09da314ba90d5d",
+      "provisional": true,
+      "origin": "footstep.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "asetrate=45644,aresample=48000,highpass=f=65,volume=4dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/build-complete.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/build-complete.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "b6185d64ea2847ceda389331d687b3956298cbf93b78f3e64b917f8dec388d75",
+      "provisional": true,
+      "origin": "build-complete.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "highpass=f=45,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/build-complete.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/build-complete.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "3ed80cdb7a39be9db84f3aad30187cbef82941c341f06c5d4e38fff83ca44b5a",
+      "provisional": true,
+      "origin": "build-complete.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "highpass=f=45,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/daily-complete.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#daily-complete",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "f70dbd89488533fa98dab2f51fed4514edabce361e7a86aede5b9a039d315727",
+      "provisional": true,
+      "profile": "daily-complete"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/daily-complete.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#daily-complete",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "e07feb15194b660158f98fd1e3724cd74e006f2872b2cc75292fe9a0092e146e",
+      "provisional": true,
+      "profile": "daily-complete"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/pickup.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#pickup",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "c97e33cbad4be8b532ed54653e46aa0b4097b449ddd10d54a792b15e19ea4d8b",
+      "provisional": true,
+      "profile": "pickup"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/pickup.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#pickup",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "6139bcafc7c196bd62e59609591b8a99086cd6b90f72bb20111a190c7ceac591",
+      "provisional": true,
+      "profile": "pickup"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/repair.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#repair",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "9086b09b9b788b6996bdf03e52a6c3e700ad5af047f2285918c435c3a9415cc7",
+      "provisional": true,
+      "profile": "repair"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/repair.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#repair",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "45e025d633bbb0da35e8336f28fd409e423236393e02cc30bbef4b2cdb7b1360",
+      "provisional": true,
+      "profile": "repair"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/rover-complete.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#rover-complete",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "6e8b21ac0b307293df3f1013792d18abe5fd723755067e2b8bc05dcb759062f9",
+      "provisional": true,
+      "profile": "rover-complete"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/rover-complete.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#rover-complete",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "05697b34a0f16c848bba91444f0ee4ed4c9cc8746759c922ecb86b16fe65d848",
+      "provisional": true,
+      "profile": "rover-complete"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/water.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#water",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "f93f6929be18ea38a260d7c3a2d2e165bc17f81763d5164bec164952730adea3",
+      "provisional": true,
+      "profile": "water"
+    },
+    {
+      "path": "/sounds/frontier/v1/interactions/water.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#water",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "a9dc4c362aa5ef17863ab639aff53113c53b3691e388d1ab9a2078623fd972e3",
+      "provisional": true,
+      "profile": "water"
+    },
+    {
+      "path": "/sounds/frontier/v1/missions/mission-complete.mp3",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/mission-complete.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "6106ad5af2b411e4618bc6f3e5490e26b6e1850ae018d743d1e49f9f8089a059",
+      "provisional": true,
+      "origin": "mission-complete.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "highpass=f=45,volume=6dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/missions/mission-complete.webm",
+      "sourceUrl": "user-provided://public/sounds/frontier/v1/sound/mission-complete.mp3",
+      "creator": "User-provided source; creator not recorded",
+      "license": "User-provided; verification pending",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "32239e29d36a1bb97e85341a923c09d5d067d1ea19f5fa0028c7d3c824ace022",
+      "provisional": true,
+      "origin": "mission-complete.mp3",
+      "processing": {
+        "start": 0,
+        "duration": null,
+        "filter": "highpass=f=45,volume=6dB,alimiter=limit=0.89",
+        "sampleRate": 48000,
+        "channels": 1
+      }
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/build-invalid.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#invalid",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "f8f48a16c5dac20fc5b6291ca0a25ca4bf9b7cf49142dc04900858be8060e104",
+      "provisional": true,
+      "profile": "invalid"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/build-invalid.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#invalid",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "e8bb09dd67efac3c9a2406310482cbc2979b90fa7bfcefc93ac961c3d3f93db2",
+      "provisional": true,
+      "profile": "invalid"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/inspect.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#ui-inspect",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "7b0d06a9041a2a0621784deedf28501e848db5fa2b557a08a06466063f752f72",
+      "provisional": true,
+      "profile": "ui-inspect"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/inspect.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#ui-inspect",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "0509d080ef1af4591d47329ce96c6e2dfe22d4445675dd248e18be0ad5a5afde",
+      "provisional": true,
+      "profile": "ui-inspect"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/interact.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#ui-interact",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "01baf40b0c9129ce4bfcbc43157d625c07ef2d7eacad5ad086eb9a46f2953874",
+      "provisional": true,
+      "profile": "ui-interact"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/interact.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#ui-interact",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "9f3344ab9c3e6e486066bf0dfd83a98c824a6547608d89508c800dadc1222e63",
+      "provisional": true,
+      "profile": "ui-interact"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/mission-warning.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#warning",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "ec8d5c7bbe6ccffe20c8586f5352b6fbf0b3b7c2b777141fb3712fcca9b6e260",
+      "provisional": true,
+      "profile": "warning"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/mission-warning.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#warning",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "7170075d025c5e3f2fb0ab464e2ea49c332993d416fafcefd795a29a1b0d3a4b",
+      "provisional": true,
+      "profile": "warning"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/soft-error.mp3",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#soft-error",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "f1a43a5fc09bf4c54f55e8096d63e641852626c478e08911a2f9e140c68834f0",
+      "provisional": true,
+      "profile": "soft-error"
+    },
+    {
+      "path": "/sounds/frontier/v1/ui/soft-error.webm",
+      "sourceUrl": "internal://scripts/generate-frontier-qa-audio.mjs#soft-error",
+      "creator": "MetaSense Frontier QA Synthesizer",
+      "license": "Project-generated provisional QA asset",
+      "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
+      "downloadedAt": "2026-07-23",
+      "sha256": "07684ed2341fbc0e60a32d83f20a88b199bb025d3a1f4ce6a7fa838a755af53d",
+      "provisional": true,
+      "profile": "soft-error"
+    }
+  ],
+  "customImport": {
+    "importedAt": "2026-07-23T07:52:47.607Z",
+    "importedPaths": [
+      "/sounds/frontier/v1/ambience/music/background-loop.webm",
+      "/sounds/frontier/v1/ambience/music/background-loop.mp3",
+      "/sounds/frontier/v1/ambience/landing/landing-hum.webm",
+      "/sounds/frontier/v1/ambience/landing/landing-hum.mp3",
+      "/sounds/frontier/v1/ambience/themes/forest-bed.webm",
+      "/sounds/frontier/v1/ambience/themes/forest-bed.mp3",
+      "/sounds/frontier/v1/ambience/river/river-loop.webm",
+      "/sounds/frontier/v1/ambience/river/river-loop.mp3",
+      "/sounds/frontier/v1/footsteps/path-01.webm",
+      "/sounds/frontier/v1/footsteps/path-01.mp3",
+      "/sounds/frontier/v1/footsteps/path-02.webm",
+      "/sounds/frontier/v1/footsteps/path-02.mp3",
+      "/sounds/frontier/v1/footsteps/path-03.webm",
+      "/sounds/frontier/v1/footsteps/path-03.mp3",
+      "/sounds/frontier/v1/footsteps/forest-01.webm",
+      "/sounds/frontier/v1/footsteps/forest-01.mp3",
+      "/sounds/frontier/v1/footsteps/forest-02.webm",
+      "/sounds/frontier/v1/footsteps/forest-02.mp3",
+      "/sounds/frontier/v1/footsteps/forest-03.webm",
+      "/sounds/frontier/v1/footsteps/forest-03.mp3",
+      "/sounds/frontier/v1/footsteps/metal-01.webm",
+      "/sounds/frontier/v1/footsteps/metal-01.mp3",
+      "/sounds/frontier/v1/footsteps/metal-02.webm",
+      "/sounds/frontier/v1/footsteps/metal-02.mp3",
+      "/sounds/frontier/v1/footsteps/metal-03.webm",
+      "/sounds/frontier/v1/footsteps/metal-03.mp3",
+      "/sounds/frontier/v1/collisions/soft-01.webm",
+      "/sounds/frontier/v1/collisions/soft-01.mp3",
+      "/sounds/frontier/v1/collisions/metal-01.webm",
+      "/sounds/frontier/v1/collisions/metal-01.mp3",
+      "/sounds/frontier/v1/collisions/wood-01.webm",
+      "/sounds/frontier/v1/collisions/wood-01.mp3",
+      "/sounds/frontier/v1/collisions/stone-01.webm",
+      "/sounds/frontier/v1/collisions/stone-01.mp3",
+      "/sounds/frontier/v1/footsteps/bridge-wood-01.webm",
+      "/sounds/frontier/v1/footsteps/bridge-wood-01.mp3",
+      "/sounds/frontier/v1/footsteps/bridge-wood-02.webm",
+      "/sounds/frontier/v1/footsteps/bridge-wood-02.mp3",
+      "/sounds/frontier/v1/footsteps/bridge-wood-03.webm",
+      "/sounds/frontier/v1/footsteps/bridge-wood-03.mp3",
+      "/sounds/frontier/v1/interactions/build-complete.webm",
+      "/sounds/frontier/v1/interactions/build-complete.mp3",
+      "/sounds/frontier/v1/missions/mission-complete.webm",
+      "/sounds/frontier/v1/missions/mission-complete.mp3"
+    ],
+    "sourceDirectory": "public/sounds/frontier/v1/sound"
+  }
+}
