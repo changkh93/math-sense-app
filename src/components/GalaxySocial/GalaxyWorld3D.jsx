@@ -953,13 +953,13 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     if (isFirstPerson) {
       forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y)).normalize()
-      right.set(Math.cos(group.current.rotation.y), 0, -Math.sin(group.current.rotation.y)).normalize()
+      right.set(-Math.cos(group.current.rotation.y), 0, Math.sin(group.current.rotation.y)).normalize()
     } else if (orbitCamera) {
       orbitCamera.getWorldDirection(forward)
       forward.setY(0)
       if (forward.lengthSq() < .0001) forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y))
       forward.normalize()
-      right.crossVectors(forward, orbitCamera.up).normalize()
+      right.crossVectors(activeCamera.up, forward).normalize()
     }
 
     if (moving) {
