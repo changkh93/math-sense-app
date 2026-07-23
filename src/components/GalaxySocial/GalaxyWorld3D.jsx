@@ -976,20 +976,41 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       movementAmount = inputStrength
       const moveWorldVec = moveDirection.clone().multiplyScalar(PLAYER_SPEED * delta * movementAmount)
 
-      const nextX = group.current.position.x + moveWorldVec.x
-      const nextZ = group.current.position.z + moveWorldVec.z
-      const inWorld = Math.hypot(nextX, nextZ) < WORLD_RADIUS - .8
-      const structureCollision = structureColliders.find((collider) => Math.hypot(nextX - collider.position[0], nextZ - collider.position[2]) < collider.collisionRadius)
-      const blockedByObject = Boolean(structureCollision) || blockers.some((position) => Math.hypot(nextX - position[0], nextZ - position[2]) < 1.12)
-      const blockedByRiver = isRiverWater(nextX, nextZ) && !isBridgeDeck(nextX, nextZ)
-      const blockedBySlope = !isBridgeDeck(nextX, nextZ) && terrainSlope(nextX, nextZ) > 1.08
-      if (inWorld && !blockedByObject && !blockedByRiver && !blockedBySlope) {
-        movedDistance = Math.hypot(
-          nextX - group.current.position.x,
-          nextZ - group.current.position.z,
-        )
-        group.current.position.x = nextX
-        group.current.position.z = nextZ
+      const currX = group.current.position.x
+      const currZ = group.current.position.z
+      const nextX = currX + moveWorldVec.x
+      const nextZ = currZ + moveWorldVec.z
+
+      const checkObstacle = (testX, testZ) => {
+        if (Math.hypot(testX, testZ) >= WORLD_RADIUS - .8) return true
+        const hitStructure = structureColliders.find((collider) => Math.hypot(testX - collider.position[0], testZ - collider.position[2]) < collider.collisionRadius)
+        if (hitStructure) return hitStructure
+        if (blockers.some((position) => Math.hypot(testX - position[0], testZ - position[2]) < 1.05)) return true
+        if (isRiverWater(testX, testZ) && !isBridgeDeck(testX, testZ)) return true
+        if (!isBridgeDeck(testX, testZ) && terrainSlope(testX, testZ) > 1.08) return true
+        return false
+      }
+
+      let obstacleHit = checkObstacle(nextX, nextZ)
+      let targetX = nextX
+      let targetZ = nextZ
+
+      if (obstacleHit) {
+        if (!checkObstacle(nextX, currZ)) {
+          targetX = nextX
+          targetZ = currZ
+          obstacleHit = false
+        } else if (!checkObstacle(currX, nextZ)) {
+          targetX = currX
+          targetZ = nextZ
+          obstacleHit = false
+        }
+      }
+
+      if (!obstacleHit) {
+        movedDistance = Math.hypot(targetX - currX, targetZ - currZ)
+        group.current.position.x = targetX
+        group.current.position.z = targetZ
         if (collisionLatched.current) {
           collisionClearDuration.current += delta
           if (collisionClearDuration.current >= COLLISION_REARM_CLEAR_SECONDS) {
@@ -997,14 +1018,26 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
             collisionClearDuration.current = 0
           }
         }
-      } else if (!collisionLatched.current) {
-        const acousticMat = structureCollision?.acousticMaterial || 'soft'
-        soundManager.play(`frontier.collision.${acousticMat}`)
-        collisionLatched.current = true
-        collisionClearDuration.current = 0
-      } else if (collisionLatched.current) {
-        // 벽을 비스듬히 긁을 때 성공/실패 프레임이 교차해도 재무장하지 않는다.
-        collisionClearDuration.current = 0
+      } else {
+        const hitObj = typeof obstacleHit === 'object' ? obstacleHit : null
+        if (hitObj) {
+          const pushAngle = Math.atan2(currZ - hitObj.position[2], currX - hitObj.position[0])
+          const pushDist = delta * 1.5
+          const escapeX = currX + Math.cos(pushAngle) * pushDist
+          const escapeZ = currZ + Math.sin(pushAngle) * pushDist
+          if (!checkObstacle(escapeX, escapeZ)) {
+            group.current.position.x = escapeX
+            group.current.position.z = escapeZ
+          }
+        }
+        if (!collisionLatched.current) {
+          const acousticMat = hitObj?.acousticMaterial || 'soft'
+          soundManager.play(`frontier.collision.${acousticMat}`)
+          collisionLatched.current = true
+          collisionClearDuration.current = 0
+        } else if (collisionLatched.current) {
+          collisionClearDuration.current = 0
+        }
       }
     } else if (orbitCamera && !isFirstPerson) {
       const targetYaw = Math.atan2(forward.x, forward.z)
