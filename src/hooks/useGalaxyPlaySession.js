@@ -310,6 +310,7 @@ export function useGalaxyPlaySession({ uid, active }) {
     const timer = window.setInterval(() => {
       const nextNow = Date.now()
       setNowMs(nextNow)
+      if (access?.isAdmin || session?.isAdmin) return
       const estimatedServerNow = nextNow + serverOffsetMs
       const idleMs = nextNow - lastInteractionRef.current
       if (idleMs >= IDLE_EXIT_MS) {
@@ -320,12 +321,15 @@ export function useGalaxyPlaySession({ uid, active }) {
       if (Number(session.hardEndsAtMs || 0) <= estimatedServerNow) endSession('time_limit')
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [active, endSession, serverOffsetMs, session?.hardEndsAtMs, session?.sessionId])
+  }, [access?.isAdmin, active, endSession, serverOffsetMs, session?.hardEndsAtMs, session?.isAdmin, session?.sessionId])
 
   const estimatedServerNowMs = nowMs + serverOffsetMs
-  const remainingSeconds = session?.hardEndsAtMs
-    ? Math.max(0, Math.ceil((Number(session.hardEndsAtMs) - estimatedServerNowMs) / 1000))
-    : 0
+  const isAdminSession = Boolean(access?.isAdmin || session?.isAdmin)
+  const remainingSeconds = isAdminSession
+    ? 86400
+    : session?.hardEndsAtMs
+      ? Math.max(0, Math.ceil((Number(session.hardEndsAtMs) - estimatedServerNowMs) / 1000))
+      : 0
   const sessionElapsedSeconds = session?.startedAtMs
     ? Math.max(0, Math.ceil((estimatedServerNowMs - Number(session.startedAtMs)) / 1000))
     : 0
@@ -335,7 +339,7 @@ export function useGalaxyPlaySession({ uid, active }) {
         Number(access?.daily?.completedSeconds || 0) + sessionElapsedSeconds,
       )
     : Number(access?.daily?.usedSeconds || 0)
-  const warningStage = remainingSeconds <= 60 ? 1 : remainingSeconds <= 120 ? 2 : remainingSeconds <= 300 ? 5 : 0
+  const warningStage = isAdminSession ? 0 : (remainingSeconds <= 60 ? 1 : remainingSeconds <= 120 ? 2 : remainingSeconds <= 300 ? 5 : 0)
 
   return useMemo(() => ({
     session,

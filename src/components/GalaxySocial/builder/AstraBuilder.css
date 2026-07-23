@@ -1,0 +1,408 @@
+.astra-builder-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 32;
+  color: #effff9;
+  pointer-events: none;
+}
+
+.astra-builder-hud button {
+  border: 1px solid rgba(255, 255, 255, .12);
+  color: #dcece9;
+  background: rgba(7, 20, 31, .86);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .2);
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+}
+
+.astra-builder-hud button:hover,
+.astra-builder-hud button.active {
+  border-color: rgba(124, 242, 189, .58);
+  color: #effff9;
+  background: rgba(45, 111, 91, .88);
+}
+
+.astra-builder-hud button:disabled {
+  opacity: .38;
+  cursor: default;
+}
+
+.astra-builder-hud__top {
+  position: absolute;
+  top: max(.75rem, env(safe-area-inset-top));
+  left: .85rem;
+  right: .85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  min-height: 54px;
+  padding: .55rem .65rem .55rem .85rem;
+  border: 1px solid rgba(124, 242, 189, .18);
+  border-radius: 16px;
+  background: rgba(5, 15, 25, .82);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, .22);
+  backdrop-filter: blur(16px);
+}
+
+.astra-builder-hud__top small,
+.astra-builder-hud__top strong {
+  display: block;
+}
+
+.astra-builder-hud__top small {
+  color: #7cf2bd;
+  font-size: .56rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.astra-builder-hud__top strong {
+  margin-top: .1rem;
+  font-size: .86rem;
+}
+
+.astra-builder-hud__status {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .62rem;
+}
+
+.astra-builder-hud__status span {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  color: #9ab4ad;
+}
+
+.astra-builder-hud__status b,
+.astra-builder-hud__status em {
+  padding: .3rem .45rem;
+  border-radius: 999px;
+  color: #dff9ee;
+  background: rgba(124, 242, 189, .1);
+  font-style: normal;
+}
+
+.astra-builder-hud__status button {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  min-height: 36px;
+  padding: 0 .62rem;
+  border-radius: 10px;
+}
+
+.astra-builder-hud__modes {
+  position: absolute;
+  top: 5.2rem;
+  left: 50%;
+  display: flex;
+  gap: .35rem;
+  transform: translateX(-50%);
+}
+
+.astra-builder-hud__conflict,
+.astra-builder-hud__sync-notice {
+  position: absolute;
+  top: 8.2rem;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.astra-builder-hud__conflict {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  width: min(620px, calc(100% - 8rem));
+  padding: .65rem .75rem;
+  border: 1px solid rgba(255, 199, 100, .45);
+  border-radius: 14px;
+  background: rgba(40, 27, 16, .94);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, .3);
+}
+
+.astra-builder-hud__conflict > svg {
+  flex: 0 0 auto;
+  color: #ffd17b;
+}
+
+.astra-builder-hud__conflict div {
+  flex: 1;
+  min-width: 0;
+}
+
+.astra-builder-hud__conflict strong,
+.astra-builder-hud__conflict span {
+  display: block;
+}
+
+.astra-builder-hud__conflict strong {
+  font-size: .73rem;
+}
+
+.astra-builder-hud__conflict span {
+  margin-top: .12rem;
+  color: #c8bda8;
+  font-size: .58rem;
+}
+
+.astra-builder-hud__conflict button {
+  min-height: 34px;
+  padding: 0 .65rem;
+  border-radius: 9px;
+  white-space: nowrap;
+  font-size: .62rem;
+  font-weight: 800;
+}
+
+.astra-builder-hud__conflict button.primary {
+  border-color: rgba(124, 242, 189, .58);
+  background: rgba(45, 111, 91, .94);
+}
+
+.astra-builder-hud__sync-notice {
+  max-width: min(520px, calc(100% - 8rem));
+  padding: .5rem .7rem;
+  border: 1px solid rgba(124, 242, 189, .2);
+  border-radius: 999px;
+  color: #c8d8d3;
+  background: rgba(7, 20, 31, .9);
+  font-size: .61rem;
+  text-align: center;
+}
+
+.astra-builder-hud__modes button {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  min-height: 38px;
+  padding: 0 .7rem;
+  border-radius: 12px;
+}
+
+.astra-builder-hud__tools,
+.astra-builder-hud__history {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  gap: .4rem;
+  transform: translateY(-50%);
+}
+
+.astra-builder-hud__tools { left: .85rem; }
+.astra-builder-hud__history { right: .85rem; }
+
+.astra-builder-hud__tools button,
+.astra-builder-hud__history button {
+  display: grid;
+  place-items: center;
+  gap: .15rem;
+  width: 58px;
+  min-height: 54px;
+  border-radius: 13px;
+  font-size: .56rem;
+  font-weight: 800;
+}
+
+.astra-builder-hud__layer {
+  position: absolute;
+  right: .85rem;
+  bottom: 7.1rem;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .3rem;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 13px;
+  background: rgba(5, 15, 25, .82);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.astra-builder-hud__layer button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.astra-builder-hud__layer span {
+  min-width: 56px;
+  text-align: center;
+}
+
+.astra-builder-hud__layer small,
+.astra-builder-hud__layer strong {
+  display: block;
+}
+
+.astra-builder-hud__layer small {
+  color: #88a69e;
+  font-size: .5rem;
+}
+
+.astra-builder-hud__layer strong {
+  margin-top: .1rem;
+  font-size: .66rem;
+}
+
+.astra-builder-hud__palette {
+  position: absolute;
+  right: .85rem;
+  bottom: max(.75rem, env(safe-area-inset-bottom));
+  left: .85rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: .75rem;
+  min-height: 78px;
+  padding: .55rem .65rem;
+  border: 1px solid rgba(124, 242, 189, .16);
+  border-radius: 16px;
+  background: rgba(5, 15, 25, .86);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
+
+.astra-builder-hud__palette > div:first-child small,
+.astra-builder-hud__palette > div:first-child span {
+  display: block;
+  white-space: nowrap;
+}
+
+.astra-builder-hud__palette > div:first-child small {
+  color: #7cf2bd;
+  font-size: .54rem;
+  font-weight: 900;
+}
+
+.astra-builder-hud__palette > div:first-child span {
+  margin-top: .15rem;
+  color: #91aaa4;
+  font-size: .54rem;
+}
+
+.astra-builder-hud__materials {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(58px, 1fr));
+  gap: .35rem;
+}
+
+.astra-builder-hud__materials button {
+  display: grid;
+  place-items: center;
+  gap: .18rem;
+  min-height: 58px;
+  padding: .3rem;
+  border-radius: 11px;
+  font-size: .5rem;
+  font-weight: 800;
+}
+
+.astra-builder-hud__materials i {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 5px;
+  background: var(--builder-block-color);
+  box-shadow: inset -5px -5px 8px rgba(0, 0, 0, .16);
+}
+
+@media (max-width: 760px) {
+  .astra-builder-hud__top {
+    align-items: flex-start;
+    padding-left: .65rem;
+  }
+
+  .astra-builder-hud__status span,
+  .astra-builder-hud__status em {
+    display: none;
+  }
+
+  .astra-builder-hud__modes {
+    top: 4.8rem;
+  }
+
+  .astra-builder-hud__conflict {
+    top: 7.8rem;
+    width: calc(100% - 1.3rem);
+    flex-wrap: wrap;
+  }
+
+  .astra-builder-hud__conflict div {
+    flex-basis: calc(100% - 2rem);
+  }
+
+  .astra-builder-hud__conflict button {
+    flex: 1;
+  }
+
+  .astra-builder-hud__sync-notice {
+    top: 7.8rem;
+    max-width: calc(100% - 1.3rem);
+  }
+
+  .astra-builder-hud__tools,
+  .astra-builder-hud__history {
+    top: auto;
+    bottom: 7.6rem;
+    display: flex;
+    transform: none;
+  }
+
+  .astra-builder-hud__tools { left: .65rem; }
+  .astra-builder-hud__history { right: .65rem; }
+
+  .astra-builder-hud__tools button,
+  .astra-builder-hud__history button {
+    width: 46px;
+    min-height: 44px;
+  }
+
+  .astra-builder-hud__tools button span,
+  .astra-builder-hud__history button span {
+    display: none;
+  }
+
+  .astra-builder-hud__layer {
+    right: .65rem;
+    bottom: 10.6rem;
+  }
+
+  .astra-builder-hud__palette {
+    right: .65rem;
+    left: .65rem;
+    display: block;
+    min-height: 68px;
+    padding: .4rem;
+  }
+
+  .astra-builder-hud__palette > div:first-child {
+    display: none;
+  }
+
+  .astra-builder-hud__materials {
+    display: flex;
+    gap: .3rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .astra-builder-hud__materials button {
+    flex: 0 0 56px;
+    min-height: 54px;
+  }
+
+  .astra-builder-hud__materials button:nth-child(5),
+  .astra-builder-hud__materials button:nth-child(6),
+  .astra-builder-hud__materials .rotate-selection {
+    display: none;
+  }
+}

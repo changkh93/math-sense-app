@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Routes, Route } from 'react-router-dom'
 import './App.css'
 import './styles/space-theme.css' /* Global Space Theme */
@@ -47,6 +47,10 @@ import PrivateRoute from './components/PrivateRoute'
 import { cleanExpiredAudioPreferences } from './audio/audioPreferences'
 import { cleanExpiredLocalStorage } from './utils/storageUtils'
 
+const AstraBuilderQa = import.meta.env.DEV
+  ? lazy(() => import('./components/GalaxySocial/builder/AstraBuilderQa'))
+  : null
+
 function App() {
   // 앱 로드 시 일반 캐시와 UID별 오디오 선호 만료분을 함께 정리
   useEffect(() => {
@@ -69,6 +73,12 @@ function App() {
       <Route path="/vacation" element={<VacationCamp />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/terms" element={<Terms />} />
+      {AstraBuilderQa && (
+        <Route
+          path="/dev/astra-builder"
+          element={<Suspense fallback={null}><AstraBuilderQa /></Suspense>}
+        />
+      )}
       
       <Route path="/admin" element={
         <AdminRoute>

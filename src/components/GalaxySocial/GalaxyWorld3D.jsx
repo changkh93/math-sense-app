@@ -1,7 +1,7 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
-import { Bot, Compass, Flower2, Gem, Image as ImageIcon, Radio, Search, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
+import { Bot, Compass, Flower2, Gem, Hammer, Image as ImageIcon, Radio, Search, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
 import {
   FRONTIER_AUDIO_ASSETS_READY,
@@ -10,6 +10,12 @@ import {
 } from '../../audio/soundRegistry'
 import { GALAXY_MISSION_ROUTES } from '../../utils/galaxyGame'
 import soundManager from '../../utils/SoundManager'
+import AstraBuilderHud from './builder/AstraBuilderHud'
+import AstraBuilderPlot from './builder/AstraBuilderPlot'
+import {
+  ASTRA_BUILDER_POC_PLOT,
+} from './builder/astraBuilderModel'
+import useAstraBuilderPoc from './builder/useAstraBuilderPoc'
 import WorldTerrain from './GalaxyTerrain3D'
 import {
   BUILD_RADIUS,
@@ -50,6 +56,7 @@ const FOOTSTEP_STRIDE_DISTANCE = 1.7
 const MUSIC_ENTRY_DELAY_MS = 900
 const AMBIENCE_ENTRY_DELAY_MS = 2800
 const LANDING_AUDIO_STOP_DISTANCE = 7.5
+const ASTRA_BUILDER_POC_ENABLED = import.meta.env.VITE_ASTRA_BUILDER_POC !== 'false'
 
 function createMovementIntent() {
   return {
@@ -745,7 +752,7 @@ function RemoteAstronaut({ player, showName }) {
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest' }) {
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderMode = false, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest' }) {
   const { gl } = useThree()
   const group = useRef()
   const body = useRef()
@@ -1186,7 +1193,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
   return (
     <>
-      <OrbitControls
+      {!builderMode && <OrbitControls
         ref={controls}
         makeDefault
         enabled={!paused && !isFirstPerson}
@@ -1213,7 +1220,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
           movementIntent.current.active = false
           resetFreeLook()
         }}
-      />
+      />}
       <group ref={group} position={[0, terrainHeight(0, 5), 5]} scale={CHARACTER_SCALE}>
         <group ref={body} visible={!isFirstPerson}>
           <mesh position={[0, 1.2, 0]} scale={[.92, 1, .8]} castShadow><capsuleGeometry args={[.39, .72, 8, 14]} /><meshStandardMaterial color="#e8f2f3" roughness={.34} metalness={.08} /></mesh>
@@ -1254,7 +1261,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
   const roverNode = useMemo(() => ({
@@ -1262,6 +1269,17 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     status: ROVER_STATUS_LABELS[roverStatus] ? roverStatus : 'idle',
     label: roverStatusLabel || ROVER_STATUS_LABELS[roverStatus] || ROVER_STATUS_LABELS.idle,
   }), [roverStatus, roverStatusLabel])
+  const builderNode = useMemo(() => builderEnabled ? ({
+    id: ASTRA_BUILDER_POC_PLOT.id,
+    kind: 'builder',
+    actionId: 'builder',
+    label: '아스트라 빌더 시작',
+    position: [
+      ASTRA_BUILDER_POC_PLOT.center[0],
+      terrainHeight(...ASTRA_BUILDER_POC_PLOT.center),
+      ASTRA_BUILDER_POC_PLOT.center[1],
+    ],
+  }) : null, [builderEnabled])
 
   const nearbyPromptPos = useMemo(() => {
     if (!nearby || !nearby.position) return null
@@ -1278,6 +1296,8 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       h = isFirstPerson ? 0.9 : 2.0
     } else if (nearby.kind === 'guide') {
       h = isFirstPerson ? 1.0 : 2.2
+    } else if (nearby.kind === 'builder') {
+      h = isFirstPerson ? 1.2 : 2.3
     }
     return [px, py + h, pz]
   }, [nearby, isFirstPerson])
@@ -1298,19 +1318,31 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       item,
     }
   }), [layout])
-  const interactables = useMemo(() => [...resourceInteractables, ...structureColliders, ...MISSION_PORTALS, GUIDE_NODE, roverNode], [resourceInteractables, roverNode, structureColliders])
+  const interactables = useMemo(() => [
+    ...resourceInteractables,
+    ...structureColliders,
+    ...MISSION_PORTALS,
+    GUIDE_NODE,
+    roverNode,
+    ...(builderNode ? [builderNode] : []),
+  ], [builderNode, resourceInteractables, roverNode, structureColliders])
   const blockers = useMemo(() => layout.filter((item) => item.itemId !== 'wild_sprout').map(worldPositionFromLayout), [layout])
-  const villageSlots = useMemo(() => getAvailableVillageSlots(blockers), [blockers])
-  const showVillageBeacon = useMemo(() => isVillageBeaconAvailable(blockers), [blockers])
+  const villageSlots = useMemo(() => builderEnabled ? [] : getAvailableVillageSlots(blockers), [blockers, builderEnabled])
+  const showVillageBeacon = useMemo(() => !builderEnabled && isVillageBeaconAvailable(blockers), [blockers, builderEnabled])
   const groundDetailClearings = useMemo(() => [
     ...blockers.map((position) => ({ x: position[0], z: position[2], radius: 1.55 })),
     ...villageSlots.map((slot) => ({ x: slot.position[0], z: slot.position[1], radius: 1.48 })),
     ...(showVillageBeacon ? [{ x: VILLAGE_BEACON_POSITION[0], z: VILLAGE_BEACON_POSITION[1], radius: 1.4 }] : []),
+    ...(builderEnabled ? [{
+      x: ASTRA_BUILDER_POC_PLOT.center[0],
+      z: ASTRA_BUILDER_POC_PLOT.center[1],
+      radius: 3.15,
+    }] : []),
     ...RESOURCE_NODES.map((item) => ({ x: item.position[0], z: item.position[2], radius: .9 })),
     ...MISSION_PORTALS.map((item) => ({ x: item.position[0], z: item.position[2], radius: 1.35 })),
     { x: GUIDE_NODE.position[0], z: GUIDE_NODE.position[2], radius: .8 },
     { x: ROVER_NODE.position[0], z: ROVER_NODE.position[2], radius: 1.05 },
-  ], [blockers, showVillageBeacon, villageSlots])
+  ], [blockers, builderEnabled, showVillageBeacon, villageSlots])
   const playerBlockers = useMemo(() => [
     ...blockers,
     ROVER_NODE.position,
@@ -1340,10 +1372,15 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     if ([...RESOURCE_NODES, ...MISSION_PORTALS, ROVER_NODE].some((item) => Math.hypot(x - item.position[0], z - item.position[2]) < 2)) return false
     if (villageSlots.some((slot) => Math.hypot(x - slot.position[0], z - slot.position[1]) < 1.9)) return false
     if (showVillageBeacon && Math.hypot(x - VILLAGE_BEACON_POSITION[0], z - VILLAGE_BEACON_POSITION[1]) < 1.9) return false
+    if (
+      builderEnabled
+      && Math.abs(x - ASTRA_BUILDER_POC_PLOT.center[0]) < ASTRA_BUILDER_POC_PLOT.width * ASTRA_BUILDER_POC_PLOT.cellSize * 0.5 + 0.55
+      && Math.abs(z - ASTRA_BUILDER_POC_PLOT.center[1]) < ASTRA_BUILDER_POC_PLOT.depth * ASTRA_BUILDER_POC_PLOT.cellSize * 0.5 + 0.55
+    ) return false
     if (MISSION_PICKUP_RESERVED_POINTS.some(([pickupX, pickupZ]) => Math.hypot(x - pickupX, z - pickupZ) < 2)) return false
     if (isRiverWater(x, z) || isBridgeDeck(x, z) || terrainSlope(x, z) > .42) return false
     return true
-  }, [blockers, showVillageBeacon, villageSlots])
+  }, [blockers, builderEnabled, showVillageBeacon, villageSlots])
   const hoverValid = useMemo(() => isBuildPointValid(hoverPoint), [hoverPoint, isBuildPointValid])
 
   return (
@@ -1360,6 +1397,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       <WorldTerrain
         palette={palette}
         villageSlots={villageSlots}
+        showVillage={!builderEnabled}
         showVillageBeacon={showVillageBeacon}
         detailClearings={groundDetailClearings}
         buildItem={buildItem}
@@ -1371,6 +1409,22 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
           else onInvalidBuild?.()
         }}
       />
+      {builderEnabled && (
+        <AstraBuilderPlot
+          baseY={terrainHeight(...ASTRA_BUILDER_POC_PLOT.center) + 0.08}
+          cells={builderCells}
+          blockCount={builderBlockCount}
+          active={builderActive}
+          paused={paused}
+          inputMode={builderInputMode}
+          tool={builderTool}
+          activeLayer={builderLayer}
+          selectedBlockType={builderBlockType}
+          selectedRotation={builderRotation}
+          onLayerChange={onBuilderLayerChange}
+          onEdit={onBuilderEdit}
+        />
+      )}
 
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
       {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} />)}
@@ -1396,14 +1450,14 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
         </group>
       )}
 
-      {nearbyPromptPos && !buildItem && !paused && (
+      {nearbyPromptPos && !buildItem && !builderActive && !paused && (
         <Html position={nearbyPromptPos} center zIndexRange={[100, 0]}>
           <InteractionPrompt nearby={nearby} onInteract={onInteract} onInspect={onInspectStructure} />
         </Html>
       )}
 
       {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} />)}
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused} freeLookEnabled={!buildItem} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={isFirstPerson} theme={planet?.theme || 'forest'} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={structureColliders} pickups={pickups} paused={paused || builderActive} freeLookEnabled={!buildItem && !builderActive} builderMode={builderActive} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={builderActive ? false : isFirstPerson} theme={planet?.theme || 'forest'} />
     </>
   )
 }
@@ -1519,6 +1573,7 @@ const INTERACTION_ICONS = {
   guide: Bot,
   portal: Compass,
   rover: Wrench,
+  builder: Hammer,
 }
 
 function InteractionPrompt({ nearby, onInteract, onInspect }) {
@@ -1534,7 +1589,7 @@ function InteractionPrompt({ nearby, onInteract, onInspect }) {
     >
       <span className="prompt-icon">{createElement(Graphic, { size: 14, 'aria-hidden': true })}</span>
       <div className="prompt-text">
-        <small>{nearby.kind === 'daily' ? '행성 사건' : nearby.kind === 'structure' ? '행성 시설' : nearby.kind === 'guide' ? '안내소' : nearby.kind === 'portal' ? '탐사 출발대' : nearby.kind === 'rover' ? '로버 원정대' : '상호작용'}</small>
+        <small>{nearby.kind === 'daily' ? '행성 사건' : nearby.kind === 'structure' ? '행성 시설' : nearby.kind === 'guide' ? '안내소' : nearby.kind === 'portal' ? '탐사 출발대' : nearby.kind === 'rover' ? '로버 원정대' : nearby.kind === 'builder' ? '자유 건축 부지' : '상호작용'}</small>
         <strong>{nearby.label}</strong>
       </div>
       <div className="prompt-badges">
@@ -1555,7 +1610,7 @@ function InteractionPrompt({ nearby, onInteract, onInspect }) {
 function TouchActionButtons({ nearby, onInteract, onInspect, disabled }) {
   if (disabled || !nearby) return null
   const Graphic = nearby.kind === 'daily' ? SparklesIcon : nearby.kind === 'portal' ? Compass : INTERACTION_ICONS[nearby.actionId] || SparklesIcon
-  const label = nearby.kind === 'structure' ? '시설' : nearby.kind === 'portal' ? '탐사' : nearby.kind === 'guide' ? '안내' : nearby.kind === 'rover' ? '로버' : nearby.kind === 'daily' ? '사건' : '실행'
+  const label = nearby.kind === 'structure' ? '시설' : nearby.kind === 'portal' ? '탐사' : nearby.kind === 'guide' ? '안내' : nearby.kind === 'rover' ? '로버' : nearby.kind === 'builder' ? '건축' : nearby.kind === 'daily' ? '사건' : '실행'
   const isStructure = nearby.kind === 'structure'
   const interactBtn = (
     <button type="button" className="frontier-action-button" onPointerDown={(e) => { e.preventDefault(); onInteract?.() }} title="상호작용 (E)">
@@ -1643,6 +1698,12 @@ export default function GalaxyWorld3D({
   isPlanetOwner = false,
   isFirstPerson = false,
   onToggleFirstPerson,
+  builderOwnerId = 'local',
+  builderRemainingSeconds,
+  builderServerSessionKey = '',
+  onOpenBuilderPlot,
+  onSaveBuilderState,
+  onBuilderModeChange,
 }) {
   const inputRef = useRef({ x: 0, z: 0 })
   const [nearby, setNearby] = useState(null)
@@ -1652,6 +1713,12 @@ export default function GalaxyWorld3D({
   const [missionRemainingMs, setMissionRemainingMs] = useState(0)
   const [completionStatus, setCompletionStatus] = useState('idle')
   const [ambienceReady, setAmbienceReady] = useState(false)
+  const [builderActive, setBuilderActive] = useState(false)
+  const [builderInputMode, setBuilderInputMode] = useState('build')
+  const [builderTool, setBuilderTool] = useState('place')
+  const [builderLayer, setBuilderLayer] = useState(0)
+  const [builderBlockType, setBuilderBlockType] = useState(1)
+  const [builderRotation, setBuilderRotation] = useState(0)
   const missionRemainingRef = useRef(0)
   const completingRef = useRef(false)
   const completionRequestTokenRef = useRef(null)
@@ -1669,6 +1736,72 @@ export default function GalaxyWorld3D({
     () => getRiverAudioProximity(playerPosition.x, playerPosition.z),
     [playerPosition.x, playerPosition.z],
   )
+  const builderEnabled = ASTRA_BUILDER_POC_ENABLED && isPlanetOwner
+  const builder = useAstraBuilderPoc(
+    `${builderOwnerId || 'local'}:${ASTRA_BUILDER_POC_PLOT.id}`,
+    builderEnabled,
+    {
+      serverActive: builderActive,
+      serverSessionKey: builderServerSessionKey,
+      openServerPlot: onOpenBuilderPlot,
+      saveServerState: onSaveBuilderState,
+      onSyncMessage: onMessage,
+    },
+  )
+
+  const openAstraBuilder = useCallback(() => {
+    if (!builderEnabled) return
+    onCancelBuild?.()
+    setNearby(null)
+    setBuilderInputMode('build')
+    setBuilderActive(true)
+    onBuilderModeChange?.(true)
+    soundManager.play('frontier.ui.interact')
+  }, [builderEnabled, onBuilderModeChange, onCancelBuild])
+
+  const closeAstraBuilder = useCallback(async () => {
+    await builder.flush()
+    await builder.syncNow()
+    setBuilderActive(false)
+    setBuilderInputMode('build')
+    setNearby(null)
+    onBuilderModeChange?.(false)
+  }, [builder, onBuilderModeChange])
+
+  const applyAstraBuilderEditWithFeedback = useCallback((edit) => {
+    const changed = builder.edit(edit)
+    if (!changed) {
+      soundManager.play('frontier.build.invalid')
+      if (
+        edit?.tool === 'place'
+        && builder.blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks
+      ) {
+        onMessage?.(`POC에서는 ${ASTRA_BUILDER_POC_PLOT.maxBlocks}블록까지 사용할 수 있어요.`)
+      }
+      return false
+    }
+    const soundId = edit.tool === 'delete'
+      ? 'frontier.build.remove'
+      : edit.tool === 'rotate'
+        ? 'frontier.build.rotate'
+        : 'frontier.build.place'
+    soundManager.play(soundId)
+    return true
+  }, [builder, onMessage])
+
+  useEffect(() => {
+    if (builderEnabled || !builderActive) return
+    void closeAstraBuilder()
+  }, [builderActive, builderEnabled, closeAstraBuilder])
+
+  useEffect(() => () => {
+    onBuilderModeChange?.(false)
+  }, [onBuilderModeChange])
+
+  useEffect(() => {
+    if (!builderActive || !Number.isFinite(builderRemainingSeconds) || builderRemainingSeconds > 0) return
+    void closeAstraBuilder()
+  }, [builderActive, builderRemainingSeconds, closeAstraBuilder])
 
   useEffect(() => {
     // 행성/플레이 세션이 바뀌면 이전 세션의 비동기 완료 상태를 새 화면에 남기지 않는다.
@@ -1823,7 +1956,8 @@ export default function GalaxyWorld3D({
     const interactionSoundId = INTERACTION_SOUND_IDS[nearby.actionId]
       || 'frontier.ui.interact'
     soundManager.play(interactionSoundId)
-    if (nearby.kind === 'portal') startMission(nearby.route)
+    if (nearby.kind === 'builder') openAstraBuilder()
+    else if (nearby.kind === 'portal') startMission(nearby.route)
     else if (nearby.kind === 'structure') onStructureMission?.(nearby.item)
     else if (nearby.kind === 'guide') onOpenBriefing?.()
     else if (nearby.kind === 'rover') onOpenRover?.()
@@ -1837,7 +1971,7 @@ export default function GalaxyWorld3D({
     else {
       onWorldAction?.(nearby)
     }
-  }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenRover, onStructureMission, onWorldAction, paused, startMission])
+  }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenRover, onStructureMission, onWorldAction, openAstraBuilder, paused, startMission])
 
   const inspectStructure = useCallback(() => {
     if (paused || nearby?.kind !== 'structure') return
@@ -1846,8 +1980,40 @@ export default function GalaxyWorld3D({
   }, [nearby, onSelectStructure, paused])
 
   useEffect(() => {
+    if (!builderActive) return undefined
     const keydown = (event) => {
-      if (event.repeat || paused || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
+      const modifier = event.ctrlKey || event.metaKey
+      if (event.code === 'Escape') {
+        event.preventDefault()
+        void closeAstraBuilder()
+      } else if (modifier && event.code === 'KeyZ') {
+        event.preventDefault()
+        if (event.shiftKey) builder.redo()
+        else builder.undo()
+      } else if (modifier && event.code === 'KeyY') {
+        event.preventDefault()
+        builder.redo()
+      } else if (event.code === 'KeyB') {
+        event.preventDefault()
+        setBuilderInputMode('build')
+      } else if (event.code === 'KeyC') {
+        event.preventDefault()
+        setBuilderInputMode('camera')
+      } else if (event.code === 'KeyQ' || event.code === 'KeyE') {
+        event.preventDefault()
+        setBuilderRotation((current) => (
+          event.code === 'KeyQ' ? (current + 3) % 4 : (current + 1) % 4
+        ))
+      }
+    }
+    window.addEventListener('keydown', keydown)
+    return () => window.removeEventListener('keydown', keydown)
+  }, [builder, builderActive, closeAstraBuilder])
+
+  useEffect(() => {
+    const keydown = (event) => {
+      if (event.repeat || paused || builderActive || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
       if (event.code !== 'KeyE' && event.code !== 'KeyF' && event.code !== 'KeyV') return
       event.preventDefault()
       if (event.code === 'KeyE') interact()
@@ -1856,7 +2022,7 @@ export default function GalaxyWorld3D({
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [inspectStructure, interact, onToggleFirstPerson, paused])
+  }, [builderActive, inspectStructure, interact, onToggleFirstPerson, paused])
 
   useEffect(() => {
     if (!activeMission || paused || collectedIds.size >= 5) return undefined
@@ -1952,7 +2118,7 @@ export default function GalaxyWorld3D({
 
   return (
     <div
-      className={`frontier-game-stage${paused ? ' paused' : ''}`}
+      className={`frontier-game-stage${paused ? ' paused' : ''}${builderActive ? ' builder-active' : ''}`}
       onContextMenu={(event) => event.preventDefault()}
       onPointerDownCapture={() => soundManager.unlock()}
     >
@@ -1996,11 +2162,22 @@ export default function GalaxyWorld3D({
           nearby={nearby}
           onInteract={interact}
           onInspectStructure={inspectStructure}
+          builderEnabled={builderEnabled}
+          builderActive={builderActive}
+          builderCells={builder.cells}
+          builderBlockCount={builder.blockCount}
+          builderInputMode={builderInputMode}
+          builderTool={builderTool}
+          builderLayer={builderLayer}
+          builderBlockType={builderBlockType}
+          builderRotation={builderRotation}
+          onBuilderLayerChange={setBuilderLayer}
+          onBuilderEdit={applyAstraBuilderEditWithFeedback}
         />
       </Canvas>
 
-      <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} />
-      <button
+      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} />}
+      {!builderActive && <button
         type="button"
         className="frontier-camera-mode-toggle"
         onClick={() => onToggleFirstPerson?.()}
@@ -2008,15 +2185,15 @@ export default function GalaxyWorld3D({
         title={`시점 전환 (V) · 현재 ${isFirstPerson ? '1인칭' : '3인칭'}`}
       >
         {isFirstPerson ? '👁️' : '🛸'}
-      </button>
-      <div className={`frontier-live-status${liveConnected ? ' online' : ' offline'}`} title={presenceError || (liveConnected ? '같은 행성 접속자와 실시간 연결됨' : '실시간 대화 연결 없음')}>
+      </button>}
+      {!builderActive && <div className={`frontier-live-status${liveConnected ? ' online' : ' offline'}`} title={presenceError || (liveConnected ? '같은 행성 접속자와 실시간 연결됨' : '실시간 대화 연결 없음')}>
         <i />
         <span>{liveConnected ? `온라인 ${remotePlayers.length}명` : '실시간 오프라인'}</span>
-      </div>
-      {closestRemotePlayer && liveConnected && (
+      </div>}
+      {!builderActive && closestRemotePlayer && liveConnected && (
         <ProximityChat key={closestRemotePlayer.uid} peer={closestRemotePlayer} onSend={onSendSpeech} errorMessage={presenceError} />
       )}
-      {activeMission && (
+      {!builderActive && activeMission && (
         <div className="frontier-mission-hud">
           <span><Compass size={20} aria-hidden="true" /></span>
           <div>
@@ -2039,16 +2216,49 @@ export default function GalaxyWorld3D({
           </em>
         </div>
       )}
-      {selectedBuildItem && (
+      {!builderActive && selectedBuildItem && (
         <div className="frontier-build-mode">
           <strong>실제 시설 모형으로 자리를 확인하세요</strong>
           <span>초록색은 건설 가능 · 붉은색은 다른 자리 필요</span>
           <button type="button" onClick={onCancelBuild}>취소</button>
         </div>
       )}
-      <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>방향 전환 후 전진</span><kbd>V</kbd><span>1인칭/3인칭 시점</span><kbd>E</kbd><span>미션·상호작용</span><kbd>F</kbd><span>객체 정보</span></div>
-      <TouchJoystick inputRef={inputRef} disabled={paused} />
-      <TouchActionButtons nearby={nearby} onInteract={interact} onInspect={inspectStructure} disabled={paused} />
+      {!builderActive && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>방향 전환 후 전진</span><kbd>V</kbd><span>1인칭/3인칭 시점</span><kbd>E</kbd><span>미션·상호작용</span><kbd>F</kbd><span>객체 정보</span></div>}
+      {!builderActive && <TouchJoystick inputRef={inputRef} disabled={paused} />}
+      {!builderActive && <TouchActionButtons nearby={nearby} onInteract={interact} onInspect={inspectStructure} disabled={paused} />}
+      {builderActive && (
+        <AstraBuilderHud
+          hydrated={builder.hydrated}
+          saveState={builder.saveState}
+          blockCount={builder.blockCount}
+          inputMode={builderInputMode}
+          onInputModeChange={setBuilderInputMode}
+          tool={builderTool}
+          onToolChange={setBuilderTool}
+          activeLayer={builderLayer}
+          onLayerChange={(layer) => setBuilderLayer(THREE.MathUtils.clamp(
+            layer,
+            0,
+            ASTRA_BUILDER_POC_PLOT.height - 1,
+          ))}
+          selectedBlockType={builderBlockType}
+          onSelectBlockType={(blockType) => {
+            setBuilderBlockType(blockType)
+            setBuilderTool('place')
+          }}
+          selectedRotation={builderRotation}
+          onRotateSelection={() => setBuilderRotation((current) => (current + 1) % 4)}
+          canUndo={builder.canUndo}
+          canRedo={builder.canRedo}
+          onUndo={builder.undo}
+          onRedo={builder.redo}
+          onClose={() => { void closeAstraBuilder() }}
+          remainingSeconds={builderRemainingSeconds}
+          conflict={builder.conflict}
+          serverError={builder.serverError}
+          onResolveConflict={builder.resolveConflict}
+        />
+      )}
     </div>
   )
 }

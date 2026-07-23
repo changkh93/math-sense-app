@@ -142,6 +142,14 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   pointer-events: none;
 }
 .frontier-top-hud > * { pointer-events: auto; }
+
+.frontier-immersive.builder-active .frontier-top-hud,
+.frontier-immersive.builder-active .frontier-objective-card,
+.frontier-immersive.builder-active .frontier-command-dock {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 .frontier-planet-hud {
   display: flex;
   align-items: center;

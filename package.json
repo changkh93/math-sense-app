@@ -13,6 +13,7 @@
     "test:referral": "node scripts/test-referral-billing-core.cjs",
     "test:learning-summary": "node scripts/test-learning-summary-utils.mjs",
     "test:frontier-audio": "node scripts/test-frontier-audio-utils.mjs",
+    "test:astra-builder": "node scripts/test-astra-builder-model.mjs",
     "test:frontier-audio-assets": "node scripts/validate-frontier-audio-assets.mjs",
     "test:frontier-audio-assets:qa": "node scripts/validate-frontier-audio-assets.mjs --strict --allow-provisional",
     "generate:frontier-audio-qa": "node scripts/generate-frontier-qa-audio.mjs",

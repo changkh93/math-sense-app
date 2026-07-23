@@ -492,6 +492,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [arrivalOpen, setArrivalOpen] = useState(true)
   const [audioSettingsOpen, setAudioSettingsOpen] = useState(false)
   const [isFirstPerson, setIsFirstPerson] = useState(false)
+  const [builderActive, setBuilderActive] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -542,6 +543,14 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     playResumeToken: playSession?.resumeToken || '',
   }), [playSession?.clientInstanceId, playSession?.resumeToken, playSession?.sessionId])
   const sendSpeechRequest = useCallback((payload) => callGalaxy('sendGalaxyWorldSpeech', payload), [callGalaxy])
+  const openBuilderPlot = useCallback(
+    (payload) => callGalaxy('openGalaxyBuildPlot', payload),
+    [callGalaxy],
+  )
+  const saveBuilderState = useCallback(
+    (payload) => callGalaxy('saveGalaxyBuildState', payload),
+    [callGalaxy],
+  )
   const liveSessionEnabled = Boolean(
     overlayReady
     && home?.liveSession?.granted
@@ -1424,7 +1433,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     : '행성 재료 1개'
 
   return (
-    <div className="meta-galaxy frontier-immersive">
+    <div className={`meta-galaxy frontier-immersive${builderActive ? ' builder-active' : ''}`}>
       <GalaxyWorld3D
         planet={planet}
         audioSessionKey={audioSessionKey}
@@ -1454,6 +1463,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         isPlanetOwner={isOwner}
         isFirstPerson={isFirstPerson}
         onToggleFirstPerson={toggleViewMode}
+        builderOwnerId={user?.uid || 'local'}
+        builderRemainingSeconds={playRemainingSeconds}
+        builderServerSessionKey={playSession?.sessionId || ''}
+        onOpenBuilderPlot={openBuilderPlot}
+        onSaveBuilderState={saveBuilderState}
+        onBuilderModeChange={setBuilderActive}
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}

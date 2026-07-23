@@ -516,7 +516,7 @@ function LandingPad({ palette }) {
   )
 }
 
-export default function WorldTerrain({ palette, villageSlots = [], showVillageBeacon = true, detailClearings = [], buildItem = '', onBuildHover, onBuildCommit }) {
+export default function WorldTerrain({ palette, villageSlots = [], showVillage = true, showVillageBeacon = true, detailClearings = [], buildItem = '', onBuildHover, onBuildCommit }) {
   const terrainGeometry = useMemo(() => createTerrainGeometry(palette), [palette])
   const groundTextures = useMemo(() => createGroundDetailTextures(palette), [palette])
   useEffect(() => () => terrainGeometry.dispose(), [terrainGeometry])
@@ -545,7 +545,7 @@ export default function WorldTerrain({ palette, villageSlots = [], showVillageBe
       <GroundCover palette={palette} clearings={detailClearings} />
       <River palette={palette} />
       <Bridge palette={palette} />
-      <SettlementVillage slots={villageSlots} palette={palette} showBeacon={showVillageBeacon} />
+      {showVillage && <SettlementVillage slots={villageSlots} palette={palette} showBeacon={showVillageBeacon} />}
       <MountainDetails />
       {WORLD_ZONES.filter((zone) => zone.id !== 'landing').map((zone) => (
         <mesh key={zone.id} position={[zone.position[0], terrainHeight(zone.position[0], zone.position[1]) + .065, zone.position[1]]} rotation={[-Math.PI / 2, 0, 0]}>

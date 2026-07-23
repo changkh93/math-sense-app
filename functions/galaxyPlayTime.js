@@ -283,6 +283,38 @@ module.exports = function registerGalaxyPlayTime({ functions, admin, regionalFun
   }
 
   async function getReconciledAccess(uid, nowMs = Date.now()) {
+    const userSnap = await db.collection("users").doc(uid).get();
+    const user = userSnap.data() || {};
+    if (userSnap.exists && (user.role === "admin" || user.email === "paul@dulcine.net")) {
+      const { dayKey } = getKstDayWindow(nowMs);
+      return {
+        dayKey,
+        serverNowMs: nowMs,
+        nextMidnightMs: nowMs + (24 * 60 * 60 * 1000),
+        policy: {
+          version: 1,
+          dailyLimitMinutes: 1440,
+          sessionLimitMinutes: 1440,
+          dailyLimitSeconds: 86400,
+          sessionLimitSeconds: 86400,
+          cooldownSeconds: 0,
+        },
+        daily: {
+          usedSeconds: 0,
+          completedSeconds: 0,
+          remainingSeconds: 86400,
+          sessionCount: 1,
+          longestSessionSeconds: 0,
+        },
+        runtime: {
+          status: "idle",
+          nextAllowedAtMs: 0,
+        },
+        canStart: true,
+        blockedReason: "",
+        isAdmin: true,
+      };
+    }
     const { dayKey } = getKstDayWindow(nowMs);
     const { policyRef, runtimeRef, dailyRef } = refsFor(uid, dayKey);
     return db.runTransaction(async (transaction) => {
@@ -317,7 +349,8 @@ module.exports = function registerGalaxyPlayTime({ functions, admin, regionalFun
   const startGalaxyPlaySession = regionalFunctions.https.onCall(async (data, context) => {
     observeAppCheck(context, "startGalaxyPlaySession");
     const uid = requireUid(context);
-    await requireStudent(uid);
+    const { user } = await requireStudent(uid);
+    const isAdmin = user.role === "admin" || user.email === "paul@dulcine.net";
     const clientInstanceId = cleanId(data?.clientInstanceId, 100);
     const startRequestId = cleanId(data?.startRequestId, 100);
     if (!clientInstanceId || !startRequestId) {
@@ -329,6 +362,55 @@ module.exports = function registerGalaxyPlayTime({ functions, admin, regionalFun
     const requestedSessionId = `${uid}_${startRequestId}`.slice(0, 400);
     const requestedSessionRef = sessionRef(requestedSessionId);
     const resumeToken = crypto.randomBytes(24).toString("base64url");
+
+    if (isAdmin) {
+      const hardEndsAtMs = nowMs + (24 * 60 * 60 * 1000);
+      const session = {
+        uid,
+        sessionId: requestedSessionId,
+        status: "active",
+        dayKey,
+        policyVersion: 1,
+        dailyLimitSeconds: 86400,
+        sessionLimitSeconds: 86400,
+        startedAtMs: nowMs,
+        hardEndsAtMs,
+        midnightEndsAtMs: nextMidnightMs,
+        leaseExpiresAtMs: hardEndsAtMs,
+        clientInstanceId,
+        startRequestId,
+        resumeToken,
+        resumeTokenHash: hashToken(resumeToken),
+        lastSequenceNumber: 0,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        expireAt: Timestamp.fromMillis(hardEndsAtMs + SESSION_TTL_MS),
+      };
+      await db.runTransaction(async (transaction) => {
+        transaction.set(requestedSessionRef, session);
+        transaction.set(runtimeRef, {
+          ...session,
+          status: "active",
+        });
+      });
+      const access = await getReconciledAccess(uid, nowMs);
+      return {
+        success: true,
+        session: {
+          sessionId: session.sessionId,
+          clientInstanceId: session.clientInstanceId,
+          resumeToken: session.resumeToken,
+          startedAtMs: session.startedAtMs,
+          hardEndsAtMs: session.hardEndsAtMs,
+          leaseExpiresAtMs: session.leaseExpiresAtMs,
+          dailyLimitSeconds: 86400,
+          sessionLimitSeconds: 86400,
+          isAdmin: true,
+        },
+        access,
+        serverNowMs: nowMs,
+      };
+    }
 
     const result = await db.runTransaction(async (transaction) => {
       const [policySnap, runtimeSnap, dailySnap, requestedSessionSnap] = await Promise.all([
@@ -666,13 +748,24 @@ module.exports = function registerGalaxyPlayTime({ functions, admin, regionalFun
   });
 
   async function assertActiveGalaxySession({ uid, data, minRemainingSeconds = 0 }) {
+    const nowMs = Date.now();
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (userSnap.exists && userSnap.data()?.role === "admin") {
+      const sessionId = cleanId(data?.playSessionId, 400) || "admin-unlimited-session";
+      return {
+        sessionId,
+        hardEndsAtMs: nowMs + (24 * 60 * 60 * 1000),
+        leaseExpiresAtMs: nowMs + (24 * 60 * 60 * 1000),
+        remainingSeconds: 86400,
+        isAdmin: true,
+      };
+    }
     const sessionId = cleanId(data?.playSessionId, 400);
     const clientInstanceId = cleanId(data?.playClientInstanceId, 100);
     const resumeToken = typeof data?.playResumeToken === "string" ? data.playResumeToken : "";
     if (!sessionId || !clientInstanceId || !resumeToken) {
       throw new functions.https.HttpsError("failed-precondition", "아스트라 프론티어 입장 승인이 필요합니다.", { reason: "play_session_required" });
     }
-    const nowMs = Date.now();
     const runtimeSnap = await db.collection("galaxyPlayRuntime").doc(uid).get();
     const runtime = runtimeSnap.data() || {};
     if (

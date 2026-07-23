@@ -9,7 +9,8 @@
     "test:galaxy-live": "node galaxyGame.live.test.cjs",
     "test:galaxy-play-time": "node galaxyPlayTime.test.cjs",
     "test:galaxy-rover": "node galaxyGame.rover.test.cjs",
-    "test:galaxy": "npm run test:galaxy-backfill && npm run test:galaxy-rover && npm run test:galaxy-daily-event && npm run test:galaxy-world-object && npm run test:galaxy-live && npm run test:galaxy-play-time",
+    "test:galaxy-builder": "node galaxyGame.builder.test.cjs",
+    "test:galaxy": "npm run test:galaxy-backfill && npm run test:galaxy-rover && npm run test:galaxy-daily-event && npm run test:galaxy-world-object && npm run test:galaxy-live && npm run test:galaxy-play-time && npm run test:galaxy-builder",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },
