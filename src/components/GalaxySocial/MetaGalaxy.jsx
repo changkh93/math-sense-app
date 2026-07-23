@@ -577,11 +577,11 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   useEffect(() => { loadHome(user?.uid) }, [loadHome, user?.uid])
 
   const hasActiveOverlay = Boolean(
-    menuOpen
+    menu
+    || arrivalOpen
     || audioSettingsOpen
-    || activeBuildMenu
-    || activeObjectModal
-    || activeArrivalNotice
+    || objectDialogOpen
+    || selectedBuildItem
   )
 
   useEffect(() => {
