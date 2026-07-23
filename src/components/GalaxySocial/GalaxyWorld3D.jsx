@@ -959,7 +959,11 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       forward.setY(0)
       if (forward.lengthSq() < .0001) forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y))
       forward.normalize()
-      right.crossVectors(activeCamera.up, forward).normalize()
+      // orbitCamera is the active camera in third-person mode (controls.current?.object).
+      // Must NOT use activeCamera here — it is declared further below (line ~1091) and would
+      // throw a TDZ ReferenceError every frame, silently killing the entire useFrame loop
+      // (which freezes movement AND the V-key camera switch).
+      right.crossVectors(orbitCamera.up, forward).normalize()
     }
 
     if (moving) {

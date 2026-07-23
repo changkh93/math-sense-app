@@ -505,17 +505,10 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     })
   }, [])
 
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === 'v' || event.key === 'V' || event.code === 'KeyV') {
-        const activeTag = document.activeElement?.tagName?.toLowerCase()
-        if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return
-        toggleViewMode()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleViewMode])
+  // V-key view toggle is handled exclusively by GalaxyWorld3D's keydown listener, which calls
+  // onToggleFirstPerson (wired to toggleViewMode via the prop). We intentionally do NOT register
+  // a second V listener here — that would call toggleViewMode twice per keypress and the
+  // double-toggle cancels out, making the view appear stuck.
   const [selectedStructureId, setSelectedStructureId] = useState('')
   const [objectDialogOpen, setObjectDialogOpen] = useState(false)
   const [selectedBuildItem, setSelectedBuildItem] = useState('')
