@@ -6,6 +6,7 @@ import {
   ASTRA_BUILDER_BLOCKS,
   ASTRA_BUILDER_POC_PLOT,
   decodeAstraBuilderCell,
+  getAstraBuilderCellFromIndex,
   getAstraBuilderCellFromWorldPoint,
   getAstraBuilderCellIndex,
   getAstraBuilderInstances,
@@ -15,7 +16,6 @@ import {
 
 const PLATFORM_SIZE = ASTRA_BUILDER_POC_PLOT.width * ASTRA_BUILDER_POC_PLOT.cellSize
 const BUILDER_CAMERA_OFFSET = new THREE.Vector3(4.8, 6.2, 5.4)
-const BUILDER_TAP_TOLERANCE_PX = 9
 
 const STAIR_GEOMETRY = (() => {
   const cellSize = ASTRA_BUILDER_POC_PLOT.cellSize
@@ -28,7 +28,7 @@ const STAIR_GEOMETRY = (() => {
   shape.lineTo(0, half)
   shape.lineTo(-half, half)
   shape.closePath()
-  const geom = new THREE.ExtrudeGeometry(shape, { depth: cellSize * 0.96, bevelEnabled: false })
+  const geom = new THREE.ExtrudeGeometry(shape, { depth: cellSize, bevelEnabled: false })
   geom.center()
   geom.rotateY(Math.PI / 2)
   return geom
@@ -36,7 +36,9 @@ const STAIR_GEOMETRY = (() => {
 
 function getBlockTransform(blockType, cell) {
   const position = getAstraBuilderWorldPosition(cell)
-  const scale = new THREE.Vector3(0.96, 0.96, 0.96)
+  // 벽(1)·유리(3)·조명(4)·계단(5)은 셀에 딱 맞춰 밀착(틈/단차 제거).
+  // 바닥(2)은 납작하게, 기둥(6)은 가늘게 두어 각 재료 특성 유지.
+  const scale = new THREE.Vector3(1, 1, 1)
   if (blockType === 2) {
     scale.y = 0.22
     position[1] -= ASTRA_BUILDER_POC_PLOT.cellSize * 0.37
@@ -47,7 +49,7 @@ function getBlockTransform(blockType, cell) {
   return { position, scale }
 }
 
-function BuilderBlockInstances({ block, instances, onBlockPointerMove, onBlockClick }) {
+function BuilderBlockInstances({ block, instances, onBlockPointerDown, onBlockPointerMove }) {
   const meshRef = useRef()
   const transform = useMemo(() => new THREE.Object3D(), [])
 
@@ -80,13 +82,13 @@ function BuilderBlockInstances({ block, instances, onBlockPointerMove, onBlockCl
       castShadow
       receiveShadow
       frustumCulled={false}
+      onPointerDown={(event) => {
+        const cell = instances[event.instanceId]
+        if (cell) onBlockPointerDown?.(event, cell)
+      }}
       onPointerMove={(event) => {
         const cell = instances[event.instanceId]
         if (cell) onBlockPointerMove?.(event, cell)
-      }}
-      onClick={(event) => {
-        const cell = instances[event.instanceId]
-        if (cell) onBlockClick?.(event, cell)
       }}
     >
       {block.id !== 5 && (
@@ -99,6 +101,46 @@ function BuilderBlockInstances({ block, instances, onBlockPointerMove, onBlockCl
       <meshStandardMaterial color={block.color} {...materialProps} />
     </instancedMesh>
   )
+}
+
+const BOX_EDGE_PAIRS = (() => {
+  // cellSize 정육면체(중심 원점)의 12개 모서리를 정점 인덱스 쌍으로 표현
+  const c = [
+    [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [-0.5, 0.5, -0.5],
+    [-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5],
+  ]
+  return [
+    [0, 1], [1, 2], [2, 3], [3, 0], // 아랫면
+    [4, 5], [5, 6], [6, 7], [7, 4], // 윗면
+    [0, 4], [1, 5], [2, 6], [3, 7], // 세로 기둥
+  ].map(([a, b]) => [c[a], c[b]])
+})()
+
+// 모든 occupied 셀의 블록 외곽선(어두운 얇은 선)을 하나의 geometry로 병합.
+// 각 블록은 getBlockTransform(기둥 얇음/바닥 납작함 등)을 그대로 반영해 실제 형태의 테두리가 됨.
+function buildBlockEdgesGeometry(cells) {
+  const cellSize = ASTRA_BUILDER_POC_PLOT.cellSize
+  const segments = []
+  const object = new THREE.Object3D()
+  for (let index = 0; index < cells.length; index += 1) {
+    const decoded = decodeAstraBuilderCell(cells[index])
+    if (!decoded.occupied) continue
+    const cell = getAstraBuilderCellFromIndex(index)
+    if (!cell) continue
+    const { position, scale } = getBlockTransform(decoded.blockType, cell)
+    object.position.set(position[0], position[1], position[2])
+    object.rotation.set(0, (decoded.rotation || 0) * Math.PI * 0.5, 0)
+    object.scale.set(scale.x * cellSize, scale.y * cellSize, scale.z * cellSize)
+    object.updateMatrix()
+    BOX_EDGE_PAIRS.forEach(([a, b]) => {
+      const va = new THREE.Vector3(a[0], a[1], a[2]).applyMatrix4(object.matrix)
+      const vb = new THREE.Vector3(b[0], b[1], b[2]).applyMatrix4(object.matrix)
+      segments.push(va.x, va.y, va.z, vb.x, vb.y, vb.z)
+    })
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(segments, 3))
+  return geometry
 }
 
 function AstraBuilderCamera({ active, inputMode, paused, baseY }) {
@@ -180,6 +222,10 @@ export default function AstraBuilderPlot({
 }) {
   const [hoveredCell, setHoveredCell] = useState(null)
   const instancesByType = useMemo(() => getAstraBuilderInstances(cells), [cells])
+  const edgesGeometry = useMemo(() => buildBlockEdgesGeometry(cells), [cells])
+  const edgesVisible = active && inputMode === 'build'
+  const isPlacingRef = useRef(false)
+  const lastPlacedKeyRef = useRef(null)
   const hoverIndex = hoveredCell ? getAstraBuilderCellIndex(hoveredCell) : -1
   const hoveredValue = hoverIndex >= 0 ? cells[hoverIndex] : 0
   const hoverOccupied = decodeAstraBuilderCell(hoveredValue).occupied
@@ -191,17 +237,31 @@ export default function AstraBuilderPlot({
   const hoverPosition = hoveredCell ? getAstraBuilderWorldPosition(hoveredCell) : null
   const editPlaneY = activeLayer * ASTRA_BUILDER_POC_PLOT.cellSize + 0.012
 
-  const updateHoveredCell = (event) => {
-    if (!active || paused || inputMode !== 'build') return
-    const cell = getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
-    setHoveredCell(cell)
-  }
+  // 버튼을 놓치거나 씬 밖으로 나간 경우를 대비한 안전망: 포인터가 올라오면 연속 배치 종료.
+  useEffect(() => {
+    const stop = () => {
+      isPlacingRef.current = false
+      lastPlacedKeyRef.current = null
+    }
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+    return () => {
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+    }
+  }, [])
 
-  const applyHoveredCell = (event) => {
-    if (!active || paused || inputMode !== 'build' || event.delta > BUILDER_TAP_TOLERANCE_PX) return
-    event.stopPropagation()
-    const cell = getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
-    if (!cell || (tool === 'place' && blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks)) return
+  const cellKey = (cell) => cell ? `${cell.x}:${cell.y}:${cell.z}` : null
+
+  // 하나의 셀에 대해 배치/삭제를 수행. 직전에 처리한 셀과 같으면 스킵(드래그 중 중복 방지).
+  const placeAtCell = (cell, { raiseLayer = false } = {}) => {
+    if (!active || paused || inputMode !== 'build') return
+    if (!cell) return
+    const key = cellKey(cell)
+    if (key && lastPlacedKeyRef.current === key) return
+    if (tool === 'place' && blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks) return
+    lastPlacedKeyRef.current = key
+    if (raiseLayer) onLayerChange?.(cell.y)
     onEdit?.({
       tool,
       cell,
@@ -210,9 +270,38 @@ export default function AstraBuilderPlot({
     })
   }
 
+  // 빈 땅(plane) 위에서의 다운/무브. 마우스를 누른 채 움직이면 그려가며 연속 배치.
+  const handlePlanePointerDown = (event) => {
+    if (!active || paused || inputMode !== 'build') return
+    event.stopPropagation()
+    isPlacingRef.current = true
+    const cell = getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
+    placeAtCell(cell)
+  }
+
+  const handlePlanePointerMove = (event) => {
+    if (!active || paused || inputMode !== 'build') return
+    const cell = getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
+    setHoveredCell(cell)
+    if (isPlacingRef.current && cell) {
+      event.stopPropagation()
+      placeAtCell(cell)
+    }
+  }
+
   const getBlockPointerTarget = (event, cell) => {
     if (tool === 'place') return getAstraBuilderTopFaceTarget(cell, event.face?.normal, ASTRA_BUILDER_POC_PLOT, selectedBlockType)
     return cell
+  }
+
+  const handleBlockPointerDown = (event, cell) => {
+    if (!active || paused || inputMode !== 'build') return
+    event.stopPropagation()
+    const target = getBlockPointerTarget(event, cell)
+    if (!target) return
+    isPlacingRef.current = true
+    setHoveredCell(target)
+    placeAtCell(target, { raiseLayer: tool === 'place' })
   }
 
   const updateHoveredBlock = (event, cell) => {
@@ -221,21 +310,7 @@ export default function AstraBuilderPlot({
     if (!target) return
     event.stopPropagation()
     setHoveredCell(target)
-  }
-
-  const applyBlockTarget = (event, cell) => {
-    if (!active || paused || inputMode !== 'build' || event.delta > BUILDER_TAP_TOLERANCE_PX) return
-    const target = getBlockPointerTarget(event, cell)
-    if (!target) return
-    event.stopPropagation()
-    if (tool === 'place' && blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks) return
-    onLayerChange?.(target.y)
-    onEdit?.({
-      tool,
-      cell: target,
-      blockType: selectedBlockType,
-      rotation: selectedRotation,
-    })
+    if (isPlacingRef.current) placeAtCell(target, { raiseLayer: tool === 'place' })
   }
 
   return (
@@ -254,10 +329,17 @@ export default function AstraBuilderPlot({
           key={block.id}
           block={block}
           instances={instancesByType.get(block.id) || []}
+          onBlockPointerDown={handleBlockPointerDown}
           onBlockPointerMove={updateHoveredBlock}
-          onBlockClick={applyBlockTarget}
         />
       ))}
+
+      {/* 건축 모드에서만 블록 외곽선 표시. 카메라 모드에서는 숨겨 깔끔한 감상 화면 제공. */}
+      {edgesVisible && (
+        <lineSegments geometry={edgesGeometry} renderOrder={2}>
+          <lineBasicMaterial color="#1c2b35" transparent opacity={0.55} depthWrite={false} />
+        </lineSegments>
+      )}
 
       {active && (
         <>
@@ -268,12 +350,9 @@ export default function AstraBuilderPlot({
           <mesh
             position={[0, editPlaneY, 0]}
             rotation={[-Math.PI / 2, 0, 0]}
-            onPointerMove={(event) => {
-              event.stopPropagation()
-              updateHoveredCell(event)
-            }}
+            onPointerDown={handlePlanePointerDown}
+            onPointerMove={handlePlanePointerMove}
             onPointerOut={() => setHoveredCell(null)}
-            onClick={applyHoveredCell}
           >
             <planeGeometry args={[PLATFORM_SIZE, PLATFORM_SIZE]} />
             <meshBasicMaterial
@@ -301,9 +380,9 @@ export default function AstraBuilderPlot({
               ) : (
                 <mesh>
                   <boxGeometry args={[
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.94,
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.94,
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.94,
+                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.98,
+                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.98,
+                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.98,
                   ]} />
                   <meshBasicMaterial
                     color={hoverValid ? '#6ff0b8' : '#ff7182'}
