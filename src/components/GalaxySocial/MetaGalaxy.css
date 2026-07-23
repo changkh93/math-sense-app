@@ -1625,9 +1625,21 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
     background: rgba(21, 91, 69, .72);
     backdrop-filter: blur(10px);
     box-shadow: 0 12px 30px rgba(0, 0, 0, .3);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .12s ease, background .12s ease;
+    animation: frontier-action-enter .18s ease-out;
   }
-  .frontier-action-button span { font-size: 1.05rem; }
-  .frontier-action-button strong { font-size: .48rem; }
+  .frontier-action-button:active { transform: scale(.92); background: rgba(31, 121, 92, .9); }
+  .frontier-action-button.inspect { border-color: rgba(110, 200, 255, .42); background: rgba(28, 76, 110, .72); }
+  .frontier-action-button.inspect:active { background: rgba(38, 100, 140, .9); }
+  .frontier-action-button span { font-size: 1.05rem; display: flex; align-items: center; justify-content: center; }
+  .frontier-action-button strong { font-size: .48rem; letter-spacing: .02em; opacity: .85; }
+  @keyframes frontier-action-enter { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+  /* Hide the small world-anchored 3D prompt on touch devices: the fixed action buttons
+     above are thumb-reachable and reliable, so the floating prompt is redundant there.
+     Desktop keeps the 3D prompt (it has a physical E/F key and no fixed buttons shown). */
+  .frontier-interaction-prompt { display: none !important; }
   .frontier-structure-actions {
     position: absolute;
     z-index: 29;

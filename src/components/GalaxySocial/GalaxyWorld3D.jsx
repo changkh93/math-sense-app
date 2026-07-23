@@ -1,7 +1,7 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
-import { Bot, Compass, Flower2, Gem, Image as ImageIcon, Radio, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
+import { Bot, Compass, Flower2, Gem, Image as ImageIcon, Radio, Search, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
 import {
   FRONTIER_AUDIO_ASSETS_READY,
@@ -1547,6 +1547,34 @@ function InteractionPrompt({ nearby, onInteract, onInspect }) {
   )
 }
 
+// Fixed thumb-reachable action buttons for touch devices (tablets/phones without a keyboard).
+// Rendered only when `nearby` is truthy (player within 2.5 units of something interactable) and
+// the game isn't paused. Mirrors the E/F keyboard keys: E = interact, F = inspect (structures only).
+// Uses the pre-existing .frontier-action-button / .frontier-structure-actions CSS; visibility is
+// also gated by a touch media query so these never appear on desktop.
+function TouchActionButtons({ nearby, onInteract, onInspect, disabled }) {
+  if (disabled || !nearby) return null
+  const Graphic = nearby.kind === 'daily' ? SparklesIcon : nearby.kind === 'portal' ? Compass : INTERACTION_ICONS[nearby.actionId] || SparklesIcon
+  const label = nearby.kind === 'structure' ? '시설' : nearby.kind === 'portal' ? '탐사' : nearby.kind === 'guide' ? '안내' : nearby.kind === 'rover' ? '로버' : nearby.kind === 'daily' ? '사건' : '실행'
+  const isStructure = nearby.kind === 'structure'
+  const interactBtn = (
+    <button type="button" className="frontier-action-button" onPointerDown={(e) => { e.preventDefault(); onInteract?.() }} title="상호작용 (E)">
+      <span>{createElement(Graphic, { size: 22, 'aria-hidden': true })}</span>
+      <strong>{label}</strong>
+    </button>
+  )
+  if (!isStructure) return interactBtn
+  return (
+    <div className="frontier-structure-actions">
+      {interactBtn}
+      <button type="button" className="frontier-action-button inspect" onPointerDown={(e) => { e.preventDefault(); onInspect?.() }} title="정보 (F)">
+        <span>{createElement(Search, { size: 22, 'aria-hidden': true })}</span>
+        <strong>정보</strong>
+      </button>
+    </div>
+  )
+}
+
 function ProximityChat({ peer, onSend, errorMessage }) {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -2021,6 +2049,7 @@ export default function GalaxyWorld3D({
       )}
       <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>방향 전환 후 전진</span><kbd>V</kbd><span>1인칭/3인칭 시점</span><kbd>E</kbd><span>미션·상호작용</span><kbd>F</kbd><span>객체 정보</span></div>
       <TouchJoystick inputRef={inputRef} disabled={paused} />
+      <TouchActionButtons nearby={nearby} onInteract={interact} onInspect={inspectStructure} disabled={paused} />
     </div>
   )
 }
