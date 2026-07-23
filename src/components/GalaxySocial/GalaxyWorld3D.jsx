@@ -13,6 +13,7 @@ import soundManager from '../../utils/SoundManager'
 import WorldTerrain from './GalaxyTerrain3D'
 import {
   BUILD_RADIUS,
+  MOUNTAINS,
   VILLAGE_BEACON_POSITION,
   WORLD_RADIUS,
   WORLD_ZONES as ZONES,
@@ -1642,21 +1643,23 @@ export default function GalaxyWorld3D({
   useEffect(() => {
     if (!FRONTIER_AUDIO_ASSETS_READY || !ambienceReady) return undefined
     if (themeAmbienceSoundId === 'frontier.ambience.forest') {
-      const keys = [
-        ['frontier:ambience:forest:1', 7.8, -7.3],
-        ['frontier:ambience:forest:2', -11.5, -13.0],
-        ['frontier:ambience:forest:3', 12.0, -11.5],
-      ]
-      keys.forEach(([key, x, z]) => {
-        const y = terrainHeight(x, z) + 1.2
-        soundManager.loopAt('frontier.ambience.forest', [x, y, z], { key, fadeInMs: 1200 })
-      })
-      return () => keys.forEach(([key]) => soundManager.stopLoop(key, 700))
+      const pHeight = terrainHeight(playerPosition.x, playerPosition.z, planet?.theme || 'forest')
+      const nearMountain = pHeight >= 1.45 || MOUNTAINS.some(m => Math.hypot(playerPosition.x - m.x, playerPosition.z - m.z) <= (m.sigma + 1.8))
+      const keys = MOUNTAINS.map((m, idx) => [`frontier:ambience:forest:${idx + 1}`, m.x, m.z, m.height])
+
+      if (nearMountain) {
+        keys.forEach(([key, x, z, h]) => {
+          soundManager.loopAt('frontier.ambience.forest', [x, h, z], { key, fadeInMs: 1000 })
+        })
+      } else {
+        keys.forEach(([key]) => soundManager.stopLoop(key, 500))
+      }
+      return () => keys.forEach(([key]) => soundManager.stopLoop(key, 500))
     }
     const key = 'frontier:ambience:theme'
     soundManager.loopAt(themeAmbienceSoundId, [0, 0, 0], { key, fadeInMs: 1200 })
     return () => soundManager.stopLoop(key, 700)
-  }, [ambienceReady, themeAmbienceSoundId])
+  }, [ambienceReady, themeAmbienceSoundId, playerPosition.x, playerPosition.z, planet?.theme])
 
   useEffect(() => {
     const key = 'frontier:ambience:landing'

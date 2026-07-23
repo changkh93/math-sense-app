@@ -576,6 +576,22 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   useEffect(() => { loadHome(user?.uid) }, [loadHome, user?.uid])
 
+  const hasActiveOverlay = Boolean(
+    menuOpen
+    || audioSettingsOpen
+    || activeBuildMenu
+    || activeObjectModal
+    || activeArrivalNotice
+  )
+
+  useEffect(() => {
+    if (hasActiveOverlay) {
+      soundManager.duck('frontier:overlay', 0.2)
+    } else {
+      soundManager.unduck('frontier:overlay')
+    }
+  }, [hasActiveOverlay])
+
   useEffect(() => {
     if (!user?.uid) return undefined
     return onSnapshot(doc(db, 'galaxyPlanets', user.uid), (snapshot) => {
