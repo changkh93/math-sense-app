@@ -30,8 +30,8 @@ export class SoundManager {
     documentRef = typeof document === 'undefined' ? null : document,
     frontierAssetsReady = FRONTIER_AUDIO_ASSETS_READY,
     random = Math.random,
-    setTimeoutFn = setTimeout,
-    clearTimeoutFn = clearTimeout,
+    setTimeoutFn = (fn, delay) => (windowRef ? windowRef.setTimeout(fn, delay) : setTimeout(fn, delay)),
+    clearTimeoutFn = (id) => (windowRef ? windowRef.clearTimeout(id) : clearTimeout(id)),
     eagerLegacy = Boolean(windowRef),
   } = {}) {
     this.HowlClass = HowlClass
