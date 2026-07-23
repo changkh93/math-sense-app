@@ -95,7 +95,7 @@ export const FRONTIER_SOUNDS = {
   // --- 테마 및 구역 루프 (Ambience Loops) ---
   'frontier.music.background': {
     sources: [
-      '/sounds/frontier/v1/ambience/music/background-loop.webm',
+      '/sounds/frontier/v1/sound/background-loop.mp3',
       '/sounds/frontier/v1/ambience/music/background-loop.mp3',
     ],
     scope: 'frontier',
@@ -108,7 +108,7 @@ export const FRONTIER_SOUNDS = {
   },
   'frontier.ambience.river': {
     sources: [
-      '/sounds/frontier/v1/ambience/river/river-loop.webm',
+      '/sounds/frontier/v1/sound/water-stream.mp3',
       '/sounds/frontier/v1/ambience/river/river-loop.mp3',
     ],
     scope: 'frontier',
@@ -128,20 +128,20 @@ export const FRONTIER_SOUNDS = {
   },
   'frontier.ambience.forest': {
     sources: [
-      '/sounds/frontier/v1/ambience/themes/forest-bed.webm',
+      '/sounds/frontier/v1/sound/forest.mp3',
       '/sounds/frontier/v1/ambience/themes/forest-bed.mp3',
     ],
     scope: 'frontier',
     bus: 'frontierAmbience',
     kind: 'loop',
     spatial: true,
-    baseVolume: 0.65,
+    baseVolume: 0.7,
     priority: 35,
     maxInstances: 3,
     panner: {
       distanceModel: 'linear',
-      refDistance: 3.5,
-      maxDistance: 16.0,
+      refDistance: 4.0,
+      maxDistance: 18.0,
       rolloffFactor: 1,
       panningModel: 'HRTF',
     },
@@ -153,7 +153,7 @@ export const FRONTIER_SOUNDS = {
   'frontier.ambience.ice': createThemeAmbienceDefinition('ice'),
   'frontier.ambience.landing': {
     sources: [
-      '/sounds/frontier/v1/ambience/landing/landing-hum.webm',
+      '/sounds/frontier/v1/sound/base-hum.mp3',
       '/sounds/frontier/v1/ambience/landing/landing-hum.mp3',
     ],
     scope: 'frontier',

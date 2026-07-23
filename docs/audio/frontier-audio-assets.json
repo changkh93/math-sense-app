@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-23T08:22:17.000Z",
+  "updatedAt": "2026-07-23T08:30:38.375Z",
   "provisional": true,
   "generatedBy": "scripts/generate-frontier-qa-audio.mjs",
   "assets": [
@@ -29,7 +29,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "396dc4e975d371ec6bc44d841e04d300cbd5b1bc66911f33fc134f4f05f0a398",
+      "sha256": "42682a71a3986fc7acc64b6bd4d5c4cc81e63fa8b75987731972bfec4ab7b0ec",
       "provisional": true,
       "origin": "base-hum.mp3",
       "processing": {
@@ -65,7 +65,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "b2430a6935eb69bfc5f89ca63e5b718dbeeb5dff2b78babebf596bc0a5ab227c",
+      "sha256": "32a0c4e262280322fc761daa2d21effd583d29aeb1a78b2fedb94f342ce3d3d7",
       "provisional": true,
       "origin": "background-loop.mp3",
       "processing": {
@@ -101,7 +101,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "95c69e45ad728743fa4db08d729fbd99d31d3f9ff73be230f9bf85e260193b1d",
+      "sha256": "908c7df10d135320bcd21cea912687dd020a47b954fcbad3bd697de8f4f0c026",
       "provisional": true,
       "origin": "water-stream.mp3",
       "processing": {
@@ -181,7 +181,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "71ef18177a89d4fe5c6a0c8623e901e88b258cc1bedaa264c2cdcc058e28e938",
+      "sha256": "2a1a07e3c1fcfc42364713840936b61efa969461a2f04f997398d74cd377f075",
       "provisional": true,
       "origin": "forest.mp3",
       "processing": {
@@ -283,7 +283,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "ee0a260ef11f6fe4c0071007dce665a5d57dc9308a2b71a88907dbcef4f2f7bb",
+      "sha256": "1a7c187304a792c25aba7f95b6c9eb0a9aa23dfb71be8c068785a0dd6e4dd689",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -319,7 +319,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "b1b90d3e59f3729e62af78bafd058ea4f1602b14136e05cb0716a53f21cc58df",
+      "sha256": "a307042c9ac93bb94b25c0f437ce588dc7eab84d612d3d755559763a0ef9f177",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -355,7 +355,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "23a1117aef5fcb12455eef65b4aba52a5af7211a90eed15de7334b311110d61c",
+      "sha256": "af0a2d42291092db2b83594c6ff6d2e284cb20dc3405bb7d2c3c640eb147f22d",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -391,7 +391,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "5aa58b98e79dc13584e50783a76574d9d86fc02bcd4c7e3db62bcdca223dcb33",
+      "sha256": "6061408a0ac7e0093bf683b6d06d4bdb756427cb197e58672af910f7e6b2f6f2",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -427,7 +427,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "9a38fb70d924833fcd59f2272553be6d734c26f7b1aeac64cccf5ce767ec6bb3",
+      "sha256": "89f3ac3a33c9b49004fa253971374dc7d196b083e8a1e0764d8ec74d30fdf304",
       "provisional": true,
       "origin": "footsteps-on-wood.mp3",
       "processing": {
@@ -463,7 +463,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "a26906f3869a65a666e326831597fc46268cf7464fbe2a52c6d5d62a86c8fb27",
+      "sha256": "45f054e6b95b86e00c9580d7d684eab8ad625eebb5b6cb994e7759b81f7e2a41",
       "provisional": true,
       "origin": "footsteps-on-wood.mp3",
       "processing": {
@@ -499,7 +499,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "64d0d3409fb5036b69b2252128d9ce387d9c28b396d95ecb533ca0be46495253",
+      "sha256": "5c555988d24e0e1bf4f407318a12e42dbabccf4ccf6375fbfc19f01e31f549a0",
       "provisional": true,
       "origin": "footsteps-on-wood.mp3",
       "processing": {
@@ -535,7 +535,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "9e5fa04b5142eaefe684d8e84ef1dccf908f4db4827a2d27ad1a1994438084b2",
+      "sha256": "c281930f1d383c1dc3f0b65ecc51da3089336b531c9313a042bfa7f806ef9240",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -571,7 +571,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "54f4427a48ae60b8028601c0a9405d329ebdaab174a1adffd40629138cb1f9e0",
+      "sha256": "4bf968772d91d00204f5ef0b7a2ec51175c5917a94500f7482f025ad75137b30",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -607,7 +607,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "2962d6beceecf90edcc2693da48a4bc99d52914f8b5e29593c6eabca007d0df1",
+      "sha256": "3068e79c565d911610a49cc759a2db3df2d39851518b2c710491df365c1cb449",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -643,7 +643,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "975d8447bacaa9454e60d53144dac23ae60468e6cd5bfa35d705048cf506b238",
+      "sha256": "c01872be45f24bc3501f6bdfceaf383fe9161092b21f7bd9de4f9052b2d2b956",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -679,7 +679,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "5f44cfc63c234012e30f655caf2553fdff45148a80a7c543dd41c1993d898963",
+      "sha256": "38a99c59f561d8cf81a2d89462216d211bf431c4236d82b894a0710440891831",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -715,7 +715,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "08ac1ee4ac23e783466072b5ac3d1645a6f346e61b36e59d2dd0069625f7f912",
+      "sha256": "9eef926782e24bc006272197a96199c3432ff337ebd9bf10b08c752f46d9089b",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -751,7 +751,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "54f982b35d0555505bd437e9b9d4bdf70a77dad42bfae2c6cbd3ba4ac3c5daba",
+      "sha256": "8c044a06187526a370e36bd6bfc0dd72a85ee69d25d7fd61e797a2013989976c",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -787,7 +787,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "f929eb60df3b9c51f99ac5407a603d0735714d5ea0d8b56997f1003215d7e7ad",
+      "sha256": "9aaebd2442941a1d3841596b11247a1f15cd2b7b26d4864cb59f2d121de41068",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -823,7 +823,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "a570fb8701a659ae7a2e90d9fafa05cbfe9d71c1e7ce475731e18c24fdff0ad4",
+      "sha256": "ea70b612dc6c6b4c6761033e96b2e37528a4827f60af87c666b932bdb5681959",
       "provisional": true,
       "origin": "footstep.mp3",
       "processing": {
@@ -859,7 +859,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "edc97cf04077d6ef64e385f422a5f28dd329781a6484592f316d8f28e19c40f7",
+      "sha256": "954275593b232ab0d4de8ec670d93567a83c152a2ca810c2399b71b0f11f7717",
       "provisional": true,
       "origin": "build-complete.mp3",
       "processing": {
@@ -1005,7 +1005,7 @@
       "license": "User-provided; verification pending",
       "licenseUrl": "internal://docs/audio/FRONTIER_AUDIO_FILE_CHECKLIST.md",
       "downloadedAt": "2026-07-23",
-      "sha256": "b5865add028be5332841d1f20d351380aa60a83bbf1e939bcda1a8f8b34b3fee",
+      "sha256": "eab28537bdfdf4df2c2482d8eefd35d3552c392102bce5d2899d09b8c217f7a9",
       "provisional": true,
       "origin": "mission-complete.mp3",
       "processing": {
@@ -1128,7 +1128,7 @@
     }
   ],
   "customImport": {
-    "importedAt": "2026-07-23T08:22:17.000Z",
+    "importedAt": "2026-07-23T08:30:38.375Z",
     "importedPaths": [
       "/sounds/frontier/v1/ambience/music/background-loop.webm",
       "/sounds/frontier/v1/ambience/music/background-loop.mp3",
