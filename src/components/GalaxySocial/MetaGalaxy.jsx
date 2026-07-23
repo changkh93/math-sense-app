@@ -491,10 +491,31 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [menu, setMenu] = useState('')
   const [arrivalOpen, setArrivalOpen] = useState(true)
   const [audioSettingsOpen, setAudioSettingsOpen] = useState(false)
+  const [isFirstPerson, setIsFirstPerson] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  const toggleViewMode = useCallback(() => {
+    setIsFirstPerson((prev) => {
+      const next = !prev
+      setNotice(next ? '1인칭 탐험 시점으로 전환했습니다. (V 키로 3인칭 전환)' : '3인칭 탐험 시점으로 전환했습니다. (V 키로 1인칭 전환)')
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'v' || event.key === 'V' || event.code === 'KeyV') {
+        const activeTag = document.activeElement?.tagName?.toLowerCase()
+        if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return
+        toggleViewMode()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleViewMode])
   const [selectedStructureId, setSelectedStructureId] = useState('')
   const [objectDialogOpen, setObjectDialogOpen] = useState(false)
   const [selectedBuildItem, setSelectedBuildItem] = useState('')
@@ -1440,6 +1461,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onSelectStructure={openObjectDialog}
         onStructureMission={performObjectMission}
         isPlanetOwner={isOwner}
+        isFirstPerson={isFirstPerson}
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}
@@ -1476,6 +1498,16 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
             </div>
           )}
 
+          <button
+            type="button"
+            className={`frontier-hud-exit-btn camera-view-btn${isFirstPerson ? ' active' : ''}`}
+            onClick={toggleViewMode}
+            title={isFirstPerson ? '3인칭 시점으로 전환 (단축키: V)' : '1인칭 시점으로 전환 (단축키: V)'}
+            aria-label={isFirstPerson ? '3인칭 시점으로 전환' : '1인칭 시점으로 전환'}
+          >
+            <Eye size={15} aria-hidden="true" />
+            <span>{isFirstPerson ? '1인칭 [V]' : '3인칭 [V]'}</span>
+          </button>
           <button
             type="button"
             className="frontier-hud-exit-btn audio-settings-btn"
