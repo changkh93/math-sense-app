@@ -1958,7 +1958,6 @@ export default function GalaxyWorld3D({
     >
       <Canvas
         shadows
-        frameloop={paused ? 'demand' : 'always'}
         dpr={[1, 1.5]}
         camera={{ position: [6, 5.4, 12], fov: 48, near: .1, far: 120 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
