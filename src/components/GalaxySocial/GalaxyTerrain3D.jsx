@@ -1,26 +1,28 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import {
   BRIDGE_DECK_HEIGHT,
   BRIDGE_X,
   MOUNTAINS,
-  PATH_NETWORK,
   LANDING_PAD_RADIUS,
+  LANDING_PAD_SURFACE_LIFT,
   ROAD_CENTER_HALF_WIDTH,
   ROAD_EDGE_HALF_WIDTH,
+  ROAD_SURFACE_LIFT,
   VILLAGE_BEACON_POSITION,
   WORLD_RADIUS,
   WORLD_ZONES,
   createRiverGeometry,
   createRibbonGeometry,
   createTerrainGeometry,
+  generatePathNetwork,
   isRiverWater,
   riverCenterZ,
   riverWidth,
+  setActivePathNetwork,
   terrainHeight,
   terrainSlope,
-  walkSurfaceHeight,
   isNearRoad,
 } from './GalaxyTerrainModel.js'
 
@@ -372,22 +374,122 @@ function GroundCover({ palette, clearings = [] }) {
   )
 }
 
-function TerrainRoads({ palette }) {
-  const edgeGeometry = useMemo(() => createRibbonGeometry(PATH_NETWORK, ROAD_EDGE_HALF_WIDTH, walkSurfaceHeight), [])
-  const centerGeometry = useMemo(() => createRibbonGeometry(PATH_NETWORK, ROAD_CENTER_HALF_WIDTH, walkSurfaceHeight), [])
+// 길 중심선을 따라 돌 테두리/장식 인스턴스를 배치하기 위한 샘플링.
+// 각 폴리선을 CatmullRom으로 샘플링해 일정 간격의 위치/법선(좌우 방향)을 반환.
+function sampleRoadDecorationPoints(paths, spacing) {
+  const result = []
+  paths.forEach((path) => {
+    const points = path.map(([x, z]) => new THREE.Vector3(x, 0, z))
+    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal')
+    const totalLen = Math.max(.001, curve.getLength())
+    const count = Math.max(2, Math.round(totalLen / spacing))
+    for (let i = 0; i <= count; i += 1) {
+      const t = i / count
+      const point = curve.getPoint(t)
+      const before = curve.getPoint(Math.max(0, t - .01))
+      const after = curve.getPoint(Math.min(1, t + .01))
+      const tx = after.x - before.x
+      const tz = after.z - before.z
+      const tLen = Math.max(.001, Math.hypot(tx, tz))
+      result.push({
+        x: point.x,
+        z: point.z,
+        // 접선에 수직(좌우) 방향 단위벡터
+        sideX: -tz / tLen,
+        sideZ: tx / tLen,
+      })
+    }
+  })
+  return result
+}
+
+function TerrainRoads({ palette, structurePositions }) {
+  // 노드 기반 길 네트워크 자동 생성. 노드가 바뀌면 재계산.
+  const pathNetwork = useMemo(() => generatePathNetwork(structurePositions), [structurePositions])
+  // 발소리/분산 판정용 글로벌 활성 네트워크를 최신으로 유지.
+  useEffect(() => { setActivePathNetwork(pathNetwork) }, [pathNetwork])
+
+  const edgeGeometry = useMemo(() => createRibbonGeometry(pathNetwork, ROAD_EDGE_HALF_WIDTH, terrainHeight, ROAD_SURFACE_LIFT - 0.01), [pathNetwork])
+  const centerGeometry = useMemo(() => createRibbonGeometry(pathNetwork, ROAD_CENTER_HALF_WIDTH, terrainHeight, ROAD_SURFACE_LIFT), [pathNetwork])
   const tones = ROAD_TONES[palette.prop] || ROAD_TONES.forest
+
+  // 돌 테두리 인스턴스: 길 양쪽 가장자리에 작은 돌을 일정 간격으로 배치
+  const stoneInstances = useMemo(() => {
+    const samples = sampleRoadDecorationPoints(pathNetwork, 0.62)
+    const pebblePalette = PEBBLE_COLORS[palette.prop] || PEBBLE_COLORS.forest
+    const stones = []
+    samples.forEach((s, idx) => {
+      // 양쪽 가장자리(엣지 폭 근처)에 하나씩, 짝수/홀수로 좌/우 분산
+      const side = idx % 2 === 0 ? 1 : -1
+      const offset = ROAD_EDGE_HALF_WIDTH + 0.06 + ((idx * 37) % 10) * 0.01
+      const x = s.x + s.sideX * side * offset
+      const z = s.z + s.sideZ * side * offset
+      // 돌은 길 가장자리 위에 놓이므로 길 표면 높이(terrainHeight + lift) 기준.
+      const y = terrainHeight(x, z) + ROAD_SURFACE_LIFT
+      const scaleN = 0.7 + ((idx * 53) % 10) * 0.06
+      const rot = ((idx * 91) % 360) * (Math.PI / 180)
+      const color = pebblePalette[idx % pebblePalette.length]
+      stones.push({ position: [x, y + 0.04, z], scale: scaleN, rotationY: rot, color })
+    })
+    return stones
+  }, [pathNetwork, palette.prop])
+
+  const stoneGeometry = useMemo(() => new THREE.DodecahedronGeometry(0.085, 0), [])
+  const stoneMaterial = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.96, flatShading: true }), [])
+  const stoneRef = useRef()
+  const stoneColorArray = useMemo(() => {
+    const arr = new Float32Array(stoneInstances.length * 3)
+    stoneInstances.forEach((s, i) => {
+      const c = new THREE.Color(s.color)
+      arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b
+    })
+    return arr
+  }, [stoneInstances])
+
+  useLayoutEffect(() => {
+    const mesh = stoneRef.current
+    if (!mesh) return
+    const obj = new THREE.Object3D()
+    stoneInstances.forEach((s, i) => {
+      obj.position.set(s.position[0], s.position[1], s.position[2])
+      obj.rotation.set(0, s.rotationY, 0)
+      obj.scale.setScalar(s.scale)
+      obj.updateMatrix()
+      mesh.setMatrixAt(i, obj.matrix)
+    })
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  }, [stoneInstances])
+
   useEffect(() => () => {
     edgeGeometry.dispose()
     centerGeometry.dispose()
-  }, [centerGeometry, edgeGeometry])
+    stoneGeometry.dispose()
+    stoneMaterial.dispose()
+  }, [centerGeometry, edgeGeometry, stoneGeometry, stoneMaterial])
+
   return (
     <group>
+      {/* 넓은 가장자리 띠 (어두운 흙). center보다 살짝 아래. */}
       <mesh geometry={edgeGeometry} receiveShadow>
-        <meshStandardMaterial color={tones.edge} roughness={.98} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+        <meshStandardMaterial color={tones.edge} roughness={.98} />
       </mesh>
+      {/* 중앙 띠 (밝은 흙, edge보다 살짝 위). z-fighting은 geometry 높이차로 해결. */}
       <mesh geometry={centerGeometry} receiveShadow>
-        <meshStandardMaterial color={tones.center} roughness={.96} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+        <meshStandardMaterial color={tones.center} roughness={.94} />
       </mesh>
+      {/* 돌 테두리: 길 양쪽에 늘어선 작은 돌 */}
+      {stoneInstances.length > 0 && (
+        <instancedMesh
+          ref={stoneRef}
+          args={[stoneGeometry, stoneMaterial, stoneInstances.length]}
+          castShadow
+          receiveShadow
+          frustumCulled={false}
+        >
+          <instancedBufferAttribute attach="instanceColor" args={[stoneColorArray, 3]} />
+        </instancedMesh>
+      )}
     </group>
   )
 }
@@ -504,7 +606,7 @@ function MountainDetails() {
 function LandingPad({ palette }) {
   const ground = terrainHeight(0, 5)
   return (
-    <group position={[0, ground + .08, 5]}>
+    <group position={[0, ground + LANDING_PAD_SURFACE_LIFT - .1, 5]}>
       <mesh receiveShadow castShadow><cylinderGeometry args={[2.48, LANDING_PAD_RADIUS, .2, 48]} /><meshStandardMaterial color="#2e4354" metalness={.5} roughness={.48} /></mesh>
       <mesh position={[0, .12, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.38, 2.05, 48]} /><meshStandardMaterial color="#435c68" emissive={palette.glow} emissiveIntensity={.18} metalness={.58} roughness={.28} /></mesh>
       <mesh position={[0, .135, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.72, 1.8, 48]} /><meshBasicMaterial color={palette.accent} transparent opacity={.8} toneMapped={false} /></mesh>
@@ -516,7 +618,7 @@ function LandingPad({ palette }) {
   )
 }
 
-export default function WorldTerrain({ palette, villageSlots = [], showVillage = true, showVillageBeacon = true, detailClearings = [], buildItem = '', onBuildHover, onBuildCommit }) {
+export default function WorldTerrain({ palette, villageSlots = [], showVillage = true, showVillageBeacon = true, detailClearings = [], buildItem = '', structurePositions = [], onBuildHover, onBuildCommit }) {
   const terrainGeometry = useMemo(() => createTerrainGeometry(palette), [palette])
   const groundTextures = useMemo(() => createGroundDetailTextures(palette), [palette])
   useEffect(() => () => terrainGeometry.dispose(), [terrainGeometry])
@@ -541,7 +643,7 @@ export default function WorldTerrain({ palette, villageSlots = [], showVillage =
       </mesh>
       <mesh position={[0, -1.28, 0]} receiveShadow><cylinderGeometry args={[WORLD_RADIUS, WORLD_RADIUS - 2.4, 2.62, 96]} /><meshStandardMaterial color={palette.edge} roughness={.96} /></mesh>
       <mesh position={[0, -1.05, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[39, 96]} /><meshPhysicalMaterial color={palette.water} transparent opacity={.72} roughness={.17} metalness={.04} clearcoat={.38} /></mesh>
-      <TerrainRoads palette={palette} />
+      <TerrainRoads palette={palette} structurePositions={structurePositions} />
       <GroundCover palette={palette} clearings={detailClearings} />
       <River palette={palette} />
       <Bridge palette={palette} />

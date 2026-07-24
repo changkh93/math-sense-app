@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
   ASTRA_BUILDER_POC_PLOT,
   applyAstraBuilderEdit,
   applyAstraBuilderPatch,
@@ -12,6 +13,7 @@ import {
   getAstraBuilderInstances,
   getAstraBuilderDoorwayColumns,
   getAstraBuilderTopFaceTarget,
+  getAstraBuilderWalkSurfaceOffset,
   getAstraBuilderWalkBlockingCells,
   isAstraBuilderWalkBlockingCell,
 } from '../src/components/GalaxySocial/builder/astraBuilderModel.js'
@@ -26,6 +28,31 @@ assert.equal(getAstraBuilderCellCount(), 12 * 12 * 10)
 const cells = createEmptyAstraBuilderGrid()
 assert.equal(cells.length, 1440)
 assert.equal(countAstraBuilderBlocks(cells), 0)
+assert.equal(
+  getAstraBuilderWalkSurfaceOffset(
+    ASTRA_BUILDER_POC_PLOT.center[0],
+    ASTRA_BUILDER_POC_PLOT.center[1],
+    cells,
+  ),
+  ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
+)
+assert.equal(getAstraBuilderWalkSurfaceOffset(100, 100, cells), null)
+
+const foundationCell = {
+  x: Math.floor(ASTRA_BUILDER_POC_PLOT.width / 2),
+  y: 0,
+  z: Math.floor(ASTRA_BUILDER_POC_PLOT.depth / 2),
+}
+cells[getAstraBuilderCellIndex(foundationCell)] = 2
+assert.equal(
+  getAstraBuilderWalkSurfaceOffset(
+    ASTRA_BUILDER_POC_PLOT.center[0],
+    ASTRA_BUILDER_POC_PLOT.center[1],
+    cells,
+  ),
+  ASTRA_BUILDER_POC_PLOT.cellSize * .24,
+)
+cells[getAstraBuilderCellIndex(foundationCell)] = 0
 
 const target = { x: 3, y: 4, z: 5 }
 const targetIndex = getAstraBuilderCellIndex(target)

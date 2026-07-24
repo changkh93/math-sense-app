@@ -42,19 +42,120 @@ export const VILLAGE_SLOTS = [
 ]
 export const VILLAGE_BEACON_POSITION = [-7.45, -4.25]
 
-export const PATH_NETWORK = [
-  [[0, 5], [0, 2.9], [-3.8, -.2], [-7.5, -4.5]],
-  [[0, 2.9], [-4.8, 4.8], [-8.8, 7]],
-  [[0, 2.9], [4.6, 4.2], [8.7, 5.4], [11.7, 3.2], [12.4, .2]],
-  [[-7.5, -4.5], [-2.4, -5.5], [2.6, -6.1], [6.8, -6.2], [4.8, -8.7], [1.2, -12.4]],
-  [[-8.8, 7], [-10.7, 4.3], [-12.2, 1.5]],
-]
+// 길 네트워크는 더 이상 정적이지 않다. 구조물 위치를 받아 연결망(MST + 루프)을 자동 생성한다.
+// 렌더/발소리는 항상 한 개의 현재 네트워크를 사용하므로, 기본값으로 zones를 잇는 폴백을 둔다.
+function buildFallbackPathNetwork() {
+  // zones만으로도 연결되도록 최소 폴백 (노드가 비어 있을 때 안전망)
+  const zonePositions = WORLD_ZONES.map((zone) => zone.position)
+  return generatePathNetwork(zonePositions)
+}
 
 export const BRIDGE_X = 1.2
 export const BRIDGE_DECK_HEIGHT = .38
 export const LANDING_PAD_RADIUS = 2.72
+export const LANDING_PAD_SURFACE_LIFT = .18
 export const ROAD_EDGE_HALF_WIDTH = .7
 export const ROAD_CENTER_HALF_WIDTH = .5
+// 길 표면이 지형 위로 떠 있는 높이. 캐릭터 보행 높이와 리본 yOffset가 이 값을 공유해
+// 길 위에서 발이 묻히거나 뜨지 않게 한다.
+export const ROAD_SURFACE_LIFT = .066
+
+// 결정론적 의사난수(길 경유점 지터용). 입력에 대해 안정적.
+function pathHash(seed) {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453
+  return x - Math.floor(x)
+}
+
+// 구조물 위치들([x,z])을 받아 모두를 잇는 길 네트워크 폴리선 배열을 반환.
+// MST(Prim)로 어떤 노드도 고립되지 않게 하고, 여유 엣지로 마을 한 바퀴 루프를 만든다.
+export function generatePathNetwork(structurePositions) {
+  const nodes = (Array.isArray(structurePositions) ? structurePositions : [])
+    .map((pos) => (Array.isArray(pos) ? [Number(pos[0]) || 0, Number(pos[1]) || 0] : null))
+    .filter((pos) => pos !== null)
+    // 중복/근접 노드 제거 (같은 자리에 여러 구조물이 있을 수 있음)
+    .filter((pos, idx, arr) => arr.findIndex((other) => Math.hypot(other[0] - pos[0], other[1] - pos[1]) < 1.2) === idx)
+
+  if (nodes.length < 2) {
+    return nodes.length === 1 ? [[nodes[0], [nodes[0][0] + 0.01, nodes[0][1]]]] : []
+  }
+
+  // 1. MST (Prim)
+  const inTree = new Array(nodes.length).fill(false)
+  const edges = []
+  inTree[0] = true
+  for (let step = 1; step < nodes.length; step += 1) {
+    let best = null
+    for (let i = 0; i < nodes.length; i += 1) {
+      if (!inTree[i]) continue
+      for (let j = 0; j < nodes.length; j += 1) {
+        if (inTree[j]) continue
+        const d = Math.hypot(nodes[i][0] - nodes[j][0], nodes[i][1] - nodes[j][1])
+        if (!best || d < best.dist) best = { from: i, to: j, dist: d }
+      }
+    }
+    if (!best) break
+    inTree[best.to] = true
+    edges.push([best.from, best.to])
+  }
+
+  // 2. 루프용 여유 엣지 (MST에 없는 가장 가까운 인접쌍 몇 개 추가 → 폐루프)
+  const edgeKey = (a, b) => (a < b ? `${a}-${b}` : `${b}-${a}`)
+  const usedEdges = new Set(edges.map((e) => edgeKey(e[0], e[1])))
+  const extraCandidates = []
+  for (let i = 0; i < nodes.length; i += 1) {
+    // 각 노드의 가장 가까운 비-MST 이웃 1개
+    let nearest = null
+    for (let j = 0; j < nodes.length; j += 1) {
+      if (i === j || usedEdges.has(edgeKey(i, j))) continue
+      const d = Math.hypot(nodes[i][0] - nodes[j][0], nodes[i][1] - nodes[j][1])
+      if (!nearest || d < nearest.dist) nearest = { from: i, to: j, dist: d }
+    }
+    if (nearest) extraCandidates.push(nearest)
+  }
+  // 짧은 순으로 최대 3개 추가 (루프 형성). 전체 엣지 대비 너무 긴 것은 제외.
+  extraCandidates.sort((a, b) => a.dist - b.dist)
+  const loopBudget = Math.min(3, Math.max(1, Math.floor(nodes.length / 3)))
+  const maxEdgeLen = edges.reduce((max, e) => Math.max(max, Math.hypot(nodes[e[0]][0] - nodes[e[1]][0], nodes[e[0]][1] - nodes[e[1]][1])), 0) * 1.6
+  let added = 0
+  for (const cand of extraCandidates) {
+    if (added >= loopBudget) break
+    if (usedEdges.has(edgeKey(cand.from, cand.to))) continue
+    if (cand.dist > maxEdgeLen) continue
+    usedEdges.add(edgeKey(cand.from, cand.to))
+    edges.push([cand.from, cand.to])
+    added += 1
+  }
+
+  // 3. 각 엣지 → 곡선 제어점. 모든 제어점은 시작→끝 축에서 단조 증가하게 두어
+  //    교차로 주변에서 곡선이 되감기거나 리본의 좌우 면이 뒤집히지 않게 한다.
+  return edges.map(([a, b], edgeIdx) => {
+    const start = nodes[a]
+    const end = nodes[b]
+    const dx = end[0] - start[0]
+    const dz = end[1] - start[1]
+    const segLen = Math.hypot(dx, dz)
+    const dirX = dx / Math.max(.001, segLen)
+    const dirZ = dz / Math.max(.001, segLen)
+    const perpX = -dirZ
+    const perpZ = dirX
+    // 곡률 강도: 거리에 비례하되 너무 급하지 않게. 짧은 엣지는 거의 직선.
+    const curveAmp = Math.min(1.1, segLen * 0.16)
+    // 곡선 방향(좌/우)은 엣지마다 일관되게: 해시로 결정.
+    const curveSign = pathHash(edgeIdx * 23.7) > 0.5 ? 1 : -1
+
+    const controlCount = Math.min(4, Math.max(2, Math.ceil(segLen / 3.5)))
+    const pts = [start]
+    for (let m = 1; m <= controlCount; m += 1) {
+      const t = m / (controlCount + 1)
+      const baseX = start[0] + dx * t
+      const baseZ = start[1] + dz * t
+      const curvature = Math.sin(t * Math.PI) * curveAmp * curveSign
+      pts.push([baseX + perpX * curvature, baseZ + perpZ * curvature])
+    }
+    pts.push(end)
+    return pts
+  })
+}
 
 function clamp01(value) {
   return Math.min(1, Math.max(0, value))
@@ -91,18 +192,37 @@ export function distanceToSegment(x, z, start, end) {
   return Math.hypot(x - (start[0] + dx * amount), z - (start[1] + dz * amount))
 }
 
-const ROAD_CENTERLINES = PATH_NETWORK.map((path) => {
-  const points = path.map(([pathX, pathZ]) => new THREE.Vector3(pathX, 0, pathZ))
-  const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', .35)
-  const sampleCount = Math.max(12, (points.length - 1) * 14)
-  return Array.from({ length: sampleCount + 1 }, (_, index) => {
-    const point = curve.getPoint(index / sampleCount)
-    return [point.x, point.z]
+// 현재 활성 길 네트워크(폴리선 배열). 기본값은 zones 폴백.
+// WorldTerrain이 generatePathNetwork 결과로 교체한다.
+let activePathNetwork = buildFallbackPathNetwork()
+
+// 폴리선 배열을 받아 샘플링된 중심선 세그먼트 배열로 변환 (isNearRoad용).
+function sampleCenterlines(paths) {
+  return paths.map((path) => {
+    const points = path.map(([pathX, pathZ]) => new THREE.Vector3(pathX, 0, pathZ))
+    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal')
+    const sampleCount = Math.max(16, (points.length - 1) * 18)
+    return Array.from({ length: sampleCount + 1 }, (_, index) => {
+      const point = curve.getPoint(index / sampleCount)
+      return [point.x, point.z]
+    })
   })
-})
+}
+
+let activeRoadCenterlines = sampleCenterlines(activePathNetwork)
+
+// 외부(WorldTerrain)에서 생성된 길 네트워크를 등록. 발소리/분산 판정이 새 길을 따른다.
+export function setActivePathNetwork(paths) {
+  activePathNetwork = paths && paths.length ? paths : buildFallbackPathNetwork()
+  activeRoadCenterlines = sampleCenterlines(activePathNetwork)
+}
+
+export function getActivePathNetwork() {
+  return activePathNetwork
+}
 
 export function isNearRoad(x, z) {
-  return ROAD_CENTERLINES.some((path) => {
+  return activeRoadCenterlines.some((path) => {
     for (let index = 1; index < path.length; index += 1) {
       if (
         distanceToSegment(
@@ -190,7 +310,10 @@ export function terrainHeight(x, z) {
 }
 
 export function walkSurfaceHeight(x, z) {
-  return isBridgeDeck(x, z) ? BRIDGE_DECK_HEIGHT : terrainHeight(x, z)
+  if (isBridgeDeck(x, z)) return BRIDGE_DECK_HEIGHT
+  if (isLandingPad(x, z)) return terrainHeight(0, 5) + LANDING_PAD_SURFACE_LIFT
+  if (isNearRoad(x, z)) return terrainHeight(x, z) + ROAD_SURFACE_LIFT
+  return terrainHeight(x, z)
 }
 
 export function terrainSlope(x, z) {
@@ -275,17 +398,19 @@ export function createTerrainGeometry(palette) {
   return geometry
 }
 
-export function createRibbonGeometry(paths, width, heightSampler = terrainHeight) {
+export function createRibbonGeometry(paths, width, heightSampler = terrainHeight, yOffset = .055) {
   const positions = []
   const uvs = []
   const indices = []
   paths.forEach((path) => {
     const points = path.map(([x, z]) => new THREE.Vector3(x, 0, z))
-    const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', .35)
-    const sampleCount = Math.max(12, (points.length - 1) * 14)
+    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal')
+    const sampleCount = Math.max(16, (points.length - 1) * 18)
     const lengths = curve.getLengths(sampleCount)
     const totalLength = Math.max(.001, lengths[lengths.length - 1])
     const startIndex = positions.length / 3
+    let previousSideX = null
+    let previousSideZ = null
     for (let index = 0; index <= sampleCount; index += 1) {
       const t = index / sampleCount
       const point = curve.getPoint(t)
@@ -294,14 +419,20 @@ export function createRibbonGeometry(paths, width, heightSampler = terrainHeight
       const tangentX = after.x - before.x
       const tangentZ = after.z - before.z
       const tangentLength = Math.max(.001, Math.hypot(tangentX, tangentZ))
-      const sideX = -tangentZ / tangentLength * width
-      const sideZ = tangentX / tangentLength * width
+      let sideX = -tangentZ / tangentLength * width
+      let sideZ = tangentX / tangentLength * width
+      if (previousSideX !== null && previousSideX * sideX + previousSideZ * sideZ < 0) {
+        sideX *= -1
+        sideZ *= -1
+      }
+      previousSideX = sideX
+      previousSideZ = sideZ
       const leftX = point.x + sideX
       const leftZ = point.z + sideZ
       const rightX = point.x - sideX
       const rightZ = point.z - sideZ
-      positions.push(leftX, heightSampler(leftX, leftZ) + .055, leftZ)
-      positions.push(rightX, heightSampler(rightX, rightZ) + .055, rightZ)
+      positions.push(leftX, heightSampler(leftX, leftZ) + yOffset, leftZ)
+      positions.push(rightX, heightSampler(rightX, rightZ) + yOffset, rightZ)
       const along = lengths[index] / totalLength
       uvs.push(along, 0, along, 1)
       if (index < sampleCount) {

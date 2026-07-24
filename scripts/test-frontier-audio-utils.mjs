@@ -28,7 +28,10 @@ import {
   getWalkSurface,
   isNearRoad,
   riverCenterZ,
+  setActivePathNetwork,
 } from '../src/components/GalaxySocial/GalaxyTerrainModel.js'
+
+setActivePathNetwork([[[-5, 2.4], [5, 2.4]]])
 import { SoundManager } from '../src/utils/SoundManager.js'
 
 class FakeHowl {
@@ -732,9 +735,9 @@ test('Shuffle, voice priority, volume, and camera math remain deterministic', ()
 test('Walk surfaces and river emitters use the rendered world model', () => {
   assert.equal(getWalkSurface(0, 5, 'forest'), 'landingMetal')
   assert.equal(getWalkSurface(1.2, -15, 'forest'), 'bridgeWood')
-  assert.equal(getWalkSurface(-4.8, 4.8, 'forest'), 'path')
+  assert.equal(getWalkSurface(-4.8, 2.4, 'forest'), 'path')
   assert.equal(getWalkSurface(10, 10, 'ocean'), 'terrain.ocean')
-  assert.equal(isNearRoad(-4.8, 4.8), true)
+  assert.equal(isNearRoad(-4.8, 2.4), true)
   const [x, y, z] = getRiverAudioPoint(1.2)
   assert.deepEqual([x, y], [1.2, 0.05])
   assert.equal(z, riverCenterZ(1.2))
@@ -809,8 +812,8 @@ test('Phase 2: Surface switching immediately changes footstep sound on the next 
   const sound2 = simulateMove(1.2, -15, 'forest')
   assert.equal(sound2, 'frontier.footstep.bridgeWood')
 
-  // 3) Road (-4.8, 4.8)
-  const sound3 = simulateMove(-4.8, 4.8, 'forest')
+  // 3) Road (-4.8, 2.4)
+  const sound3 = simulateMove(-4.8, 2.4, 'forest')
   assert.equal(sound3, 'frontier.footstep.path')
 
   assert.deepEqual(surfacesHit, ['landingMetal', 'bridgeWood', 'path'])

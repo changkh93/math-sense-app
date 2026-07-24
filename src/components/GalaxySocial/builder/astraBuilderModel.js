@@ -9,6 +9,8 @@ export const ASTRA_BUILDER_POC_PLOT = Object.freeze({
 })
 
 export const ASTRA_BUILDER_HISTORY_LIMIT = 30
+export const ASTRA_BUILDER_BASE_LIFT = .08
+export const ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET = .008
 
 export const ASTRA_BUILDER_BLOCKS = Object.freeze([
   Object.freeze({ id: 1, key: 'lumen_wall', label: '루멘 벽', color: '#dbe9e8' }),
@@ -221,6 +223,21 @@ export function getAstraBuilderCellFromWorldPoint(
   const z = Math.floor((point.z - plot.center[1] + halfDepth) / plot.cellSize)
   const cell = { x, y: Number(layer), z }
   return isAstraBuilderCellInBounds(cell, plot) ? cell : null
+}
+
+export function getAstraBuilderWalkSurfaceOffset(
+  x,
+  z,
+  cells,
+  plot = ASTRA_BUILDER_POC_PLOT,
+) {
+  const cell = getAstraBuilderCellFromWorldPoint({ x, z }, 0, plot)
+  if (!cell) return null
+  const index = getAstraBuilderCellIndex(cell, plot)
+  const decoded = decodeAstraBuilderCell(cells?.[index] || 0)
+  return decoded.blockType === 2
+    ? plot.cellSize * .24
+    : ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET
 }
 
 export function getAstraBuilderStairAscentVector(rotation) {
