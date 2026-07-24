@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
 import { Bot, Compass, Flower2, Gem, Hammer, Image as ImageIcon, Radio, Search, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
@@ -221,6 +221,7 @@ function ModelMaterial({ color, emissive = '#000000', emissiveIntensity = 0, met
 }
 
 function RoundedLumenTree({ scale = 1, color = '#58c985', ghost = false }) {
+  console.log('[LUMEN] rendering RoundedLumenTree (Stage 1)', { scale, ghost })
   return (
     <group scale={scale}>
       {[[-.2, .42, .08, -.48], [.22, .52, -.06, .48]].map(([x, y, z, tilt], index) => (
@@ -240,69 +241,556 @@ function RoundedLumenTree({ scale = 1, color = '#58c985', ghost = false }) {
   )
 }
 
-function MatureLumenTree({ scale = 1, ghost = false }) {
-  const canopy = [
-    [-.82, 2.05, .08, .76, '#3eaa68'],
-    [-.28, 2.38, -.18, .82, '#55c77b'],
-    [.42, 2.32, .02, .84, '#64d98a'],
-    [.88, 1.98, -.16, .7, '#43b970'],
-    [0, 2.72, .06, .7, '#79e79a'],
-    [-.48, 1.82, .52, .62, '#4fc179'],
-    [.46, 1.78, .48, .66, '#5ed487'],
+function seededRandom(seed) {
+  const x = Math.sin(seed * 999.91 + 12.34) * 43758.5453
+  return x - Math.floor(x)
+}
+
+function createLumenLeafGeometry(length = 0.26, width = 0.11, fold = 0.035) {
+  const positions = new Float32Array([
+    // Base (0)
+    0, 0, 0,
+    // Mid left (1), spine mid (2), mid right (3)
+    -width * 0.5, length * 0.35, fold,
+    0, length * 0.42, 0,
+    width * 0.5, length * 0.35, fold,
+    // Upper left (4), spine upper (5), upper right (6)
+    -width * 0.35, length * 0.75, fold * 0.6,
+    0, length * 0.78, 0,
+    width * 0.35, length * 0.75, fold * 0.6,
+    // Tip (7)
+    0, length, 0,
+  ])
+
+  const indices = [
+    0, 1, 2,  0, 2, 3,
+    1, 4, 5,  1, 5, 2,
+    2, 5, 6,  2, 6, 3,
+    4, 7, 5,  5, 7, 6,
   ]
-  const buds = [
-    [-.92, 2.16, .58], [-.48, 2.65, .42], [.08, 2.92, .28],
-    [.55, 2.58, .5], [1.02, 2.1, .36], [.18, 2.14, .82],
-  ]
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
+}
+
+function createTaperedTubeGeometry(points, radii, radialSegments = 8) {
+  const numPoints = points.length
+  if (numPoints < 2) return new THREE.BufferGeometry()
+
+  const tangents = []
+  const normals = []
+  const binormals = []
+
+  for (let i = 0; i < numPoints; i++) {
+    let t = new THREE.Vector3()
+    if (i === 0) {
+      t.subVectors(points[1], points[0]).normalize()
+    } else if (i === numPoints - 1) {
+      t.subVectors(points[numPoints - 1], points[numPoints - 2]).normalize()
+    } else {
+      t.subVectors(points[i + 1], points[i - 1]).normalize()
+    }
+    tangents.push(t)
+  }
+
+  let n = new THREE.Vector3()
+  let initialT = tangents[0]
+  if (Math.abs(initialT.y) < 0.99) {
+    n.set(0, 1, 0).cross(initialT).normalize()
+  } else {
+    n.set(1, 0, 0).cross(initialT).normalize()
+  }
+  normals.push(n)
+  binormals.push(new THREE.Vector3().crossVectors(initialT, n).normalize())
+
+  for (let i = 1; i < numPoints; i++) {
+    let prevN = normals[i - 1]
+    let t = tangents[i]
+    let b = new THREE.Vector3().crossVectors(t, prevN)
+    if (b.lengthSq() < 0.0001) {
+      normals.push(prevN.clone())
+      binormals.push(binormals[i - 1].clone())
+    } else {
+      b.normalize()
+      let curN = new THREE.Vector3().crossVectors(b, t).normalize()
+      normals.push(curN)
+      binormals.push(b)
+    }
+  }
+
+  const vertices = []
+  const indices = []
+
+  for (let i = 0; i < numPoints; i++) {
+    const p = points[i]
+    const r = radii[i]
+    const N = normals[i]
+    const B = binormals[i]
+
+    for (let j = 0; j < radialSegments; j++) {
+      const angle = (j / radialSegments) * Math.PI * 2
+      const cos = Math.cos(angle)
+      const sin = Math.sin(angle)
+
+      const vx = p.x + r * (cos * N.x + sin * B.x)
+      const vy = p.y + r * (cos * N.y + sin * B.y)
+      const vz = p.z + r * (cos * N.z + sin * B.z)
+
+      vertices.push(vx, vy, vz)
+    }
+  }
+
+  for (let i = 0; i < numPoints - 1; i++) {
+    for (let j = 0; j < radialSegments; j++) {
+      const nextJ = (j + 1) % radialSegments
+      const current = i * radialSegments + j
+      const next = i * radialSegments + nextJ
+      const currentAbove = (i + 1) * radialSegments + j
+      const nextAbove = (i + 1) * radialSegments + nextJ
+
+      indices.push(current, currentAbove, next)
+      indices.push(next, currentAbove, nextAbove)
+    }
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
+}
+
+function mergeBufferGeometries(geometries) {
+  let totalVertices = 0
+  let totalIndices = 0
+
+  geometries.forEach(g => {
+    if (!g || !g.attributes || !g.attributes.position) return
+    totalVertices += g.attributes.position.array.length
+    if (g.index) totalIndices += g.index.array.length
+  })
+
+  if (totalVertices === 0) return new THREE.BufferGeometry()
+
+  const mergedPos = new Float32Array(totalVertices)
+  // Three.js는 부호 없는(unsigned) 16/32비트 인덱스만 허용. 정점 수가 65536을 넘으면 Uint32.
+  const needsUint32 = totalVertices / 3 > 65535
+  const mergedIndex = totalIndices > 0
+    ? (needsUint32 ? new Uint32Array(totalIndices) : new Uint16Array(totalIndices))
+    : null
+
+  let posOffset = 0
+  let indexOffset = 0
+  let vertIndexOffset = 0
+
+  geometries.forEach(g => {
+    if (!g || !g.attributes || !g.attributes.position) return
+    const pos = g.attributes.position.array
+    mergedPos.set(pos, posOffset)
+
+    if (g.index && mergedIndex) {
+      const idx = g.index.array
+      for (let i = 0; i < idx.length; i++) {
+        mergedIndex[indexOffset + i] = idx[i] + vertIndexOffset
+      }
+      indexOffset += idx.length
+    }
+
+    vertIndexOffset += pos.length / 3
+    posOffset += pos.length
+  })
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(mergedPos, 3))
+  if (mergedIndex) geo.setIndex(new THREE.BufferAttribute(mergedIndex, 1))
+  geo.computeVertexNormals()
+  return geo
+}
+
+function LeafMaterial({ ghost = false }) {
+  return (
+    <meshStandardMaterial
+      side={THREE.DoubleSide}
+      flatShading
+      metalness={0}
+      roughness={0.9}
+      transparent={ghost}
+      opacity={ghost ? 0.46 : 1}
+      wireframe={ghost}
+      depthWrite={!ghost}
+      emissive={ghost ? '#1f765a' : '#000000'}
+      emissiveIntensity={ghost ? 0.8 : 0}
+    />
+  )
+}
+
+// 수관 부피 덩어리용 저면폴리곤 머티리얼 (flatShading으로 세계관 톤 유지, 루멘 발광)
+function CanopyMaterial({ color, emissive, emissiveIntensity = 0.2, ghost = false }) {
+  return (
+    <meshStandardMaterial
+      color={ghost ? '#71f3bf' : color}
+      emissive={ghost ? '#1f765a' : emissive}
+      emissiveIntensity={ghost ? 0.8 : emissiveIntensity}
+      metalness={0}
+      roughness={0.88}
+      flatShading
+      transparent={ghost}
+      opacity={ghost ? 0.46 : 1}
+      wireframe={ghost}
+      depthWrite={!ghost}
+    />
+  )
+}
+
+// 잔가지 끝(twig tip) 주변에 저면폴리곤 덩어리를 군집시켜 울창한 수관 부피를 만든다.
+// 기둥(둥치)·뿌리는 노출해야 하므로 덩어리는 가지 끝 영역(상부)에만 작게 형성한다.
+function buildCanopyClusters(twigTips) {
+  const lower = []
+  const middle = []
+  const upper = []
+  twigTips.forEach((tip, idx) => {
+    // 낮은 가지 끝(tip.y < 2.6)에는 덩어리를 아예 두지 않아 둥치가 가려지지 않게 한다.
+    if (tip.point.y < 2.6) return
+    const clusterCount = 1 + Math.floor(seededRandom(idx * 13 + 1) * 2) // 1~2개 덩어리/tip
+    for (let c = 0; c < clusterCount; c++) {
+      const cSeed = idx * 31 + c
+      const baseRadius = 0.22 + seededRandom(cSeed + 1) * 0.12 // 작게 유지
+      const blob = new THREE.IcosahedronGeometry(baseRadius, 1)
+      const offset = new THREE.Vector3(
+        (seededRandom(cSeed + 2) - 0.5) * 0.26,
+        (seededRandom(cSeed + 3) - 0.5) * 0.18 + 0.06,
+        (seededRandom(cSeed + 4) - 0.5) * 0.26,
+      )
+      const pos = tip.point.clone().add(offset)
+      const sx = 0.68 + seededRandom(cSeed + 5) * 0.34
+      const sy = sx * (0.8 + seededRandom(cSeed + 6) * 0.3)
+      const sz = 0.68 + seededRandom(cSeed + 7) * 0.34
+      const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        seededRandom(cSeed + 8) * Math.PI,
+        seededRandom(cSeed + 9) * Math.PI,
+        seededRandom(cSeed + 10) * Math.PI,
+      ))
+      const m = new THREE.Matrix4().compose(pos, quat, new THREE.Vector3(sx, sy, sz))
+      blob.applyMatrix4(m)
+      if (pos.y < 3.2) lower.push(blob)
+      else if (pos.y < 3.7) middle.push(blob)
+      else upper.push(blob)
+    }
+  })
+  return {
+    lower: mergeBufferGeometries(lower),
+    middle: mergeBufferGeometries(middle),
+    upper: mergeBufferGeometries(upper),
+  }
+}
+
+function MatureLumenTree({ scale = 1, ghost = false, seed = 0 }) {
+  // 1. 단 하나의 유기적으로 연결된 굽은 줄기 + 뿌리 + 가지(1차, 2차, 잔가지) Merged Wood Geometry
+  const { woodGeometry, twigTips } = useMemo(() => {
+    const geometries = []
+    const tips = []
+
+    // 메인 줄기 S자 곡선 (총 높이 ~3.7, 밑동 0.42 → 상단 0.07). 굵고 또렷한 기둥.
+    const trunkPoints = [
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(-0.06, 0.7, 0.03),
+      new THREE.Vector3(0.05, 1.45, -0.03),
+      new THREE.Vector3(-0.03, 2.2, 0.04),
+      new THREE.Vector3(0.05, 2.9, -0.02),
+      new THREE.Vector3(-0.02, 3.5, 0.02),
+      new THREE.Vector3(0, 3.7, 0),
+    ]
+    const trunkRadii = [0.42, 0.36, 0.28, 0.2, 0.13, 0.085, 0.07]
+    geometries.push(createTaperedTubeGeometry(trunkPoints, trunkRadii, 10))
+
+    // 넓게 퍼지는 굵은 Buttress Roots (버팀목 가시성 강화)
+    const rootDefs = [
+      { pts: [new THREE.Vector3(-0.05, 0.3, 0.03), new THREE.Vector3(-0.55, 0.1, 0.28), new THREE.Vector3(-0.92, -0.04, 0.44)], r: [0.27, 0.13, 0.04] },
+      { pts: [new THREE.Vector3(0.05, 0.28, -0.02), new THREE.Vector3(0.52, 0.09, -0.32), new THREE.Vector3(0.86, -0.04, -0.52)], r: [0.25, 0.11, 0.035] },
+      { pts: [new THREE.Vector3(0, 0.26, -0.04), new THREE.Vector3(-0.18, 0.08, -0.55), new THREE.Vector3(-0.3, -0.04, -0.88)], r: [0.23, 0.1, 0.032] },
+      { pts: [new THREE.Vector3(0.03, 0.3, 0.04), new THREE.Vector3(0.4, 0.1, 0.46), new THREE.Vector3(0.64, -0.04, 0.7)], r: [0.22, 0.095, 0.03] },
+      { pts: [new THREE.Vector3(-0.04, 0.27, -0.03), new THREE.Vector3(-0.46, 0.09, -0.4), new THREE.Vector3(-0.76, -0.04, -0.64)], r: [0.21, 0.09, 0.028] },
+    ]
+    rootDefs.forEach(root => {
+      geometries.push(createTaperedTubeGeometry(root.pts, root.r, 8))
+    })
+
+    // 1차 가지 (6개) - 분기 높이 대폭 상향(y≥2.45): 기둥(둥치)을 완전히 노출.
+    const primaryBranchDefs = [
+      { tOffset: new THREE.Vector3(0.04, 2.45, -0.03), end: new THREE.Vector3(-1.0, 2.8, 0.28), radii: [0.18, 0.12, 0.07] },
+      { tOffset: new THREE.Vector3(0.04, 2.6, -0.03), end: new THREE.Vector3(0.92, 2.95, -0.26), radii: [0.17, 0.115, 0.065] },
+      { tOffset: new THREE.Vector3(-0.03, 2.9, 0.04), end: new THREE.Vector3(-0.34, 3.25, 0.8), radii: [0.14, 0.09, 0.055] },
+      { tOffset: new THREE.Vector3(-0.03, 3.05, 0.04), end: new THREE.Vector3(0.5, 3.4, -0.72), radii: [0.13, 0.085, 0.05] },
+      { tOffset: new THREE.Vector3(0.05, 3.3, -0.02), end: new THREE.Vector3(-0.7, 3.6, -0.38), radii: [0.1, 0.065, 0.04] },
+      { tOffset: new THREE.Vector3(0.05, 3.45, -0.02), end: new THREE.Vector3(0.66, 3.7, 0.36), radii: [0.095, 0.06, 0.038] },
+    ]
+
+    primaryBranchDefs.forEach((pb, pIdx) => {
+      const mid = pb.tOffset.clone().add(pb.end).multiplyScalar(0.5).add(new THREE.Vector3(
+        (seededRandom(pIdx * 3) - 0.5) * 0.18,
+        0.1,
+        (seededRandom(pIdx * 3 + 1) - 0.5) * 0.18
+      ))
+      const pts = [pb.tOffset, mid, pb.end]
+      geometries.push(createTaperedTubeGeometry(pts, pb.radii, 8))
+
+      // 각 1차 가지당 2차 가지 2개씩 분기
+      for (let s = 0; s < 2; s++) {
+        const sSeed = pIdx * 10 + s
+        const sStart = mid.clone().lerp(pb.end, s === 0 ? 0.35 : 0.75)
+        const sDir = pb.end.clone().sub(pb.tOffset).normalize()
+        const sSpread = new THREE.Vector3(
+          (seededRandom(sSeed + 1) - 0.5) * 0.5,
+          0.15 + seededRandom(sSeed + 2) * 0.3,
+          (seededRandom(sSeed + 3) - 0.5) * 0.5
+        ).add(sDir).normalize()
+
+        const sLen = 0.4 + seededRandom(sSeed + 4) * 0.28
+        const sEnd = sStart.clone().add(sSpread.clone().multiplyScalar(sLen))
+        const sMid = sStart.clone().add(sEnd).multiplyScalar(0.5)
+
+        geometries.push(createTaperedTubeGeometry([sStart, sMid, sEnd], [pb.radii[1] * 0.72, pb.radii[2], 0.03], 6))
+
+        // 잔가지 (Twigs) 2개씩 분기 -> 잔가지 끝이 LeafSpray 중심. 최소 반경 확보(가시성).
+        for (let t = 0; t < 2; t++) {
+          const tSeed = sSeed * 5 + t
+          const tStart = sEnd.clone()
+          const tDir = sSpread.clone().add(new THREE.Vector3(
+            (seededRandom(tSeed + 1) - 0.5) * 0.55,
+            0.12 + seededRandom(tSeed + 2) * 0.25,
+            (seededRandom(tSeed + 3) - 0.5) * 0.55
+          )).normalize()
+
+          const tLen = 0.24 + seededRandom(tSeed + 4) * 0.16
+          const tEnd = tStart.clone().add(tDir.clone().multiplyScalar(tLen))
+          geometries.push(createTaperedTubeGeometry([tStart, tEnd], [0.035, 0.028], 5))
+
+          tips.push({ point: tEnd, dir: tDir })
+        }
+      }
+    })
+
+    // 상단 크라운 추가 잔가지
+    const topCenterPoint = trunkPoints[trunkPoints.length - 1]
+    for (let t = 0; t < 4; t++) {
+      const tSeed = 99 + t
+      const tStart = topCenterPoint.clone()
+      const tDir = new THREE.Vector3(
+        (seededRandom(tSeed + 1) - 0.5) * 0.7,
+        0.5 + seededRandom(tSeed + 2) * 0.5,
+        (seededRandom(tSeed + 3) - 0.5) * 0.7
+      ).normalize()
+      const tEnd = tStart.clone().add(tDir.clone().multiplyScalar(0.44))
+      geometries.push(createTaperedTubeGeometry([tStart, tEnd], [0.03, 0.022], 5))
+      tips.push({ point: tEnd, dir: tDir })
+    }
+
+    const merged = mergeBufferGeometries(geometries)
+    return { woodGeometry: merged, twigTips: tips }
+  }, [seed])
+
+  // 2. 부피 수관(clusters) + LeafSpray 잎 카드 겉면 디테일 (이중 레이어)
+  //    clusters: 저면폴리곤 덩어리로 울창한 수관 부피 형성 (lower/middle/upper 각 단일 머지 메시)
+  //    leafInstances: 덩어리 겉면에 붙는 잎 카드로 표면 질감. 기존 로직 유지하되 높이 기준 상향.
+  const canopyClusters = useMemo(() => buildCanopyClusters(twigTips), [twigTips])
+
+  const leafInstances = useMemo(() => {
+    const leafGeo = createLumenLeafGeometry(0.26, 0.11, 0.035)
+
+    const lowerData = []  // 2.6 <= Y < 3.2
+    const middleData = [] // 3.2 <= Y < 3.7
+    const upperData = []  // Y >= 3.7
+
+    const palette = [
+      new THREE.Color('#1f633b'), // 어두운 내부
+      new THREE.Color('#2d824b'), // 기본 잎
+      new THREE.Color('#39995a'), // 바깥 잎
+      new THREE.Color('#4aaa68'), // 위쪽 잎
+      new THREE.Color('#65bd78'), // 어린 잎
+    ]
+
+    twigTips.forEach((tip, tipIdx) => {
+      // 낮은 가지 끝은 잎도 두지 않아 둥치·기둥이 가려지지 않게 한다.
+      if (tip.point.y < 2.6) return
+      const leafCount = 3 + Math.floor(seededRandom(tipIdx * 7) * 2)
+
+      for (let l = 0; l < leafCount; l++) {
+        const lSeed = tipIdx * 20 + l
+        const leafPos = tip.point.clone().add(new THREE.Vector3(
+          (seededRandom(lSeed + 1) - 0.5) * 0.1,
+          (seededRandom(lSeed + 2) - 0.5) * 0.08,
+          (seededRandom(lSeed + 3) - 0.5) * 0.1
+        ))
+
+        const outDir = tip.dir.clone().add(new THREE.Vector3(
+          (seededRandom(lSeed + 4) - 0.5) * 0.85,
+          (seededRandom(lSeed + 5) - 0.5) * 0.65,
+          (seededRandom(lSeed + 6) - 0.5) * 0.85
+        )).normalize()
+
+        const quat = new THREE.Quaternion()
+        quat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), outDir)
+
+        const roll = (seededRandom(lSeed + 7) - 0.5) * 1.3
+        const rollQuat = new THREE.Quaternion().setFromAxisAngle(outDir, roll)
+        quat.premultiply(rollQuat)
+
+        const scaleVal = 0.82 + seededRandom(lSeed + 8) * 0.42
+        const matrix = new THREE.Matrix4().compose(
+          leafPos,
+          quat,
+          new THREE.Vector3(scaleVal, scaleVal, scaleVal)
+        )
+
+        let colorIdx = 1
+        if (leafPos.y < 3.2) colorIdx = seededRandom(lSeed + 9) > 0.4 ? 0 : 1
+        else if (leafPos.y < 3.7) colorIdx = seededRandom(lSeed + 9) > 0.5 ? 2 : 1
+        else colorIdx = seededRandom(lSeed + 9) > 0.4 ? 3 : 4
+
+        const color = palette[colorIdx]
+        const item = { matrix, color }
+
+        if (leafPos.y < 3.2) lowerData.push(item)
+        else if (leafPos.y < 3.7) middleData.push(item)
+        else upperData.push(item)
+      }
+    })
+
+    return { leafGeo, lowerData, middleData, upperData }
+  }, [twigTips])
+
+  const lowerRef = useRef()
+  const middleRef = useRef()
+  const upperRef = useRef()
+
+  useLayoutEffect(() => {
+    const applyData = (ref, data) => {
+      if (!ref.current) return
+      data.forEach((item, i) => {
+        ref.current.setMatrixAt(i, item.matrix)
+        ref.current.setColorAt(i, item.color)
+      })
+      ref.current.instanceMatrix.needsUpdate = true
+      if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true
+    }
+
+    applyData(lowerRef, leafInstances.lowerData)
+    applyData(middleRef, leafInstances.middleData)
+    applyData(upperRef, leafInstances.upperData)
+  }, [leafInstances])
+
+  // 3. 바람 애니메이션 (ghost 모드 시 정지)
+  const lowerGroupRef = useRef()
+  const middleGroupRef = useRef()
+  const upperGroupRef = useRef()
+
+  useFrame((state) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+    if (lowerGroupRef.current) {
+      lowerGroupRef.current.rotation.z = Math.sin(time * 0.45 + seed) * 0.004
+      lowerGroupRef.current.rotation.x = Math.sin(time * 0.35 + seed * 1.2) * 0.002
+    }
+    if (middleGroupRef.current) {
+      middleGroupRef.current.rotation.z = Math.sin(time * 0.55 + seed * 1.5) * 0.008
+      middleGroupRef.current.rotation.x = Math.sin(time * 0.42 + seed * 0.8) * 0.005
+    }
+    if (upperGroupRef.current) {
+      upperGroupRef.current.rotation.z = Math.sin(time * 0.65 + seed * 2.1) * 0.013
+      upperGroupRef.current.rotation.x = Math.sin(time * 0.50 + seed * 1.7) * 0.008
+    }
+  })
+
+  // 4. 발광 루멘 봉오리/열매 (5개)
+  const fruits = useMemo(() => {
+    const res = []
+    twigTips.forEach((tip, idx) => {
+      if (idx % 5 === 0) {
+        res.push(tip.point.clone().add(tip.dir.clone().multiplyScalar(0.06)))
+      }
+    })
+    return res
+  }, [twigTips])
+
   return (
     <group scale={scale}>
-      {[
-        [-.34, .34, .08, -.52], [.32, .32, -.06, .5],
-        [-.12, .27, .34, -.2], [.08, .26, -.34, .2],
-      ].map(([x, y, z, tilt], index) => (
-        <mesh key={`mature-root-${index}`} position={[x, y, z]} rotation={[index > 1 ? tilt : 0, 0, index > 1 ? 0 : tilt]} castShadow={!ghost}>
-          <cylinderGeometry args={[.07, .18, .85, 9]} />
-          <ModelMaterial color="#66432f" roughness={.98} ghost={ghost} />
-        </mesh>
-      ))}
-      <mesh position={[0, 1.02, 0]} castShadow={!ghost}>
-        <cylinderGeometry args={[.22, .38, 2.04, 14]} />
-        <ModelMaterial color="#704b34" roughness={.97} ghost={ghost} />
+      {/* 1. 줄기 + 뿌리 + 모든 가지 병합 Wood Mesh (Draw Call = 1) */}
+      <mesh geometry={woodGeometry} castShadow={!ghost}>
+        <ModelMaterial color="#513525" roughness={0.96} metalness={0} ghost={ghost} />
       </mesh>
-      <mesh position={[0, 1.02, .205]} scale={[.36, 1.55, .12]}>
-        <sphereGeometry args={[.35, 10, 12]} />
-        <ModelMaterial color="#a87952" roughness={1} ghost={ghost} />
-      </mesh>
-      {[
-        [-.49, 1.56, .02, -.72, 0], [.5, 1.7, -.06, .72, 0],
-        [-.12, 1.85, .38, -.18, .55], [.18, 2.02, -.34, .2, -.55],
-      ].map(([x, y, z, rz, rx], index) => (
-        <mesh key={`mature-branch-${index}`} position={[x, y, z]} rotation={[rx, 0, rz]} castShadow={!ghost}>
-          <cylinderGeometry args={[.075, .14, index < 2 ? 1.35 : 1.05, 10]} />
-          <ModelMaterial color="#755039" roughness={.96} ghost={ghost} />
+
+      {/* 2. 수관 부피 덩어리 (저면폴리곤). 울창한 수관 실루엣 형성. 3개 그룹 각 단일 메시. */}
+      <group ref={lowerGroupRef}>
+        <mesh geometry={canopyClusters.lower} castShadow={!ghost}>
+          <CanopyMaterial color="#24633c" emissive="#16452c" emissiveIntensity={0.18} ghost={ghost} />
+        </mesh>
+        {leafInstances.lowerData.length > 0 && (
+          <instancedMesh
+            ref={lowerRef}
+            args={[leafInstances.leafGeo, undefined, leafInstances.lowerData.length]}
+            castShadow={!ghost}
+          >
+            <LeafMaterial ghost={ghost} />
+          </instancedMesh>
+        )}
+      </group>
+
+      <group ref={middleGroupRef}>
+        <mesh geometry={canopyClusters.middle} castShadow={!ghost}>
+          <CanopyMaterial color="#358a52" emissive="#1c5c38" emissiveIntensity={0.2} ghost={ghost} />
+        </mesh>
+        {leafInstances.middleData.length > 0 && (
+          <instancedMesh
+            ref={middleRef}
+            args={[leafInstances.leafGeo, undefined, leafInstances.middleData.length]}
+            castShadow={!ghost}
+          >
+            <LeafMaterial ghost={ghost} />
+          </instancedMesh>
+        )}
+      </group>
+
+      <group ref={upperGroupRef}>
+        <mesh geometry={canopyClusters.upper} castShadow={!ghost}>
+          <CanopyMaterial color="#4baa68" emissive="#246638" emissiveIntensity={0.24} ghost={ghost} />
+        </mesh>
+        {leafInstances.upperData.length > 0 && (
+          <instancedMesh
+            ref={upperRef}
+            args={[leafInstances.leafGeo, undefined, leafInstances.upperData.length]}
+            castShadow={!ghost}
+          >
+            <LeafMaterial ghost={ghost} />
+          </instancedMesh>
+        )}
+      </group>
+
+      {/* 3. 루멘 발광 열매 */}
+      {fruits.map((pos, idx) => (
+        <mesh key={`fruit_${idx}`} position={pos}>
+          <sphereGeometry args={[0.075, 8, 8]} />
+          <ModelMaterial
+            color="#e2fff3"
+            emissive="#5af0af"
+            emissiveIntensity={2}
+            roughness={0.2}
+            ghost={ghost}
+          />
         </mesh>
       ))}
-      {canopy.map(([x, y, z, size, color], index) => (
-        <mesh key={`mature-canopy-${index}`} position={[x, y, z]} scale={[1.08, .82, 1]} rotation={[0, index * .63, 0]} castShadow={!ghost}>
-          <icosahedronGeometry args={[size, 2]} />
-          <ModelMaterial color={color} emissive="#123f27" emissiveIntensity={.18} roughness={.86} ghost={ghost} />
-        </mesh>
-      ))}
-      {buds.map(([x, y, z], index) => (
-        <group key={`mature-bud-${index}`} position={[x, y, z]}>
-          <mesh>
-            <sphereGeometry args={[.085, 12, 9]} />
-            <ModelMaterial color="#d9fff0" emissive="#5ff0ae" emissiveIntensity={2.1} roughness={.18} ghost={ghost} />
-          </mesh>
-          {!ghost && <pointLight color="#75efb7" intensity={.18} distance={1.35} />}
-        </group>
-      ))}
-      {[[-.68, 1.55, .48], [.72, 1.48, .4]].map(([x, y, z], index) => (
-        <mesh key={`mature-vine-${index}`} position={[x, y, z]} rotation={[Math.PI / 2, 0, index ? -.22 : .22]}>
-          <torusGeometry args={[.34, .025, 6, 18, Math.PI * 1.25]} />
-          <ModelMaterial color="#70d992" emissive="#1d633d" emissiveIntensity={.2} roughness={.8} ghost={ghost} />
-        </mesh>
-      ))}
+
+      {/* 4. 은은한 대표 포인트 라이트 단 1개 */}
+      {!ghost && (
+        <pointLight
+          position={[0, 3, 0.2]}
+          color="#6bf5ba"
+          intensity={0.4}
+          distance={2.8}
+        />
+      )}
     </group>
   )
 }
@@ -332,7 +820,7 @@ export function StructureModel({ itemId, level = 1, ghost = false }) {
     )
   }
   if (itemId === 'lumen_tree') return Number(level || 1) >= 2
-    ? <MatureLumenTree scale={.82} ghost={ghost} />
+    ? <MatureLumenTree scale={1} ghost={ghost} />
     : <RoundedLumenTree scale={.9} ghost={ghost} />
   if (itemId === 'wild_sprout') return <RoundedLumenTree scale={.45} ghost={ghost} />
   if (itemId === 'star_lamp' || itemId === 'prism_pathlight') {
@@ -511,13 +999,22 @@ function StructureProximityLabel({ item, footprint, isPlanetOwner }) {
   )
 }
 
+const ORGANIC_STRUCTURE_IDS = new Set([
+  'lumen_tree',
+  'wild_sprout',
+  'starflower_garden',
+])
+
 function PlacedStructure({ item, selected, onSelect }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId)
+  const isOrganic = ORGANIC_STRUCTURE_IDS.has(item.itemId)
   return (
     <group position={position} rotation={[0, THREE.MathUtils.degToRad(Number(item.rotation || 0)), 0]}>
-      <mesh position={[0, .045, 0]} receiveShadow><cylinderGeometry args={[footprint, footprint + .12, .09, 24]} /><meshStandardMaterial color="#293d48" roughness={.94} /></mesh>
+      {!isOrganic && (
+        <mesh position={[0, .045, 0]} receiveShadow><cylinderGeometry args={[footprint, footprint + .12, .09, 24]} /><meshStandardMaterial color="#293d48" roughness={.94} /></mesh>
+      )}
       <StructureModel itemId={item.itemId} level={item.level || 1} />
       {item.imageUrl && (
         <Html position={[0, Math.max(.76, footprint * .58), footprint * .82]} center distanceFactor={11}>
