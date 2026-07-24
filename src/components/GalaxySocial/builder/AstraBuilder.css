@@ -95,13 +95,19 @@
   border-radius: 10px;
 }
 
-.astra-builder-hud__modes {
+.astra-builder-hud__commandbar {
   position: absolute;
   top: 5.2rem;
   left: 50%;
   display: flex;
+  align-items: center;
   gap: .35rem;
   transform: translateX(-50%);
+}
+
+.astra-builder-hud__modes {
+  display: flex;
+  gap: .35rem;
 }
 
 .astra-builder-hud__conflict,
@@ -210,9 +216,6 @@
 }
 
 .astra-builder-hud__layer {
-  position: absolute;
-  right: .85rem;
-  bottom: 7.1rem;
   display: flex;
   align-items: center;
   gap: .3rem;
@@ -233,7 +236,7 @@
 }
 
 .astra-builder-hud__layer span {
-  min-width: 56px;
+  min-width: 64px;
   text-align: center;
 }
 
@@ -249,7 +252,8 @@
 
 .astra-builder-hud__layer strong {
   margin-top: .1rem;
-  font-size: .66rem;
+  color: #effff9;
+  font-size: .7rem;
 }
 
 .astra-builder-hud__palette {
@@ -326,7 +330,7 @@
     display: none;
   }
 
-  .astra-builder-hud__modes {
+  .astra-builder-hud__commandbar {
     top: 4.8rem;
   }
 
@@ -369,11 +373,6 @@
   .astra-builder-hud__tools button span,
   .astra-builder-hud__history button span {
     display: none;
-  }
-
-  .astra-builder-hud__layer {
-    right: .65rem;
-    bottom: 10.6rem;
   }
 
   .astra-builder-hud__palette {

@@ -88,23 +88,50 @@ export default function AstraBuilderHud({
         </div>
       )}
 
-      <div className="astra-builder-hud__modes" role="group" aria-label="입력 모드">
-        <button
-          type="button"
-          className={inputMode === 'build' ? 'active' : ''}
-          aria-pressed={inputMode === 'build'}
-          onClick={() => onInputModeChange('build')}
-        >
-          <Hammer size={17} aria-hidden="true" /> 건축
-        </button>
-        <button
-          type="button"
-          className={inputMode === 'camera' ? 'active' : ''}
-          aria-pressed={inputMode === 'camera'}
-          onClick={() => onInputModeChange('camera')}
-        >
-          <Camera size={17} aria-hidden="true" /> 카메라
-        </button>
+      <div className="astra-builder-hud__commandbar">
+        <div className="astra-builder-hud__modes" role="group" aria-label="입력 모드">
+          <button
+            type="button"
+            className={inputMode === 'build' ? 'active' : ''}
+            aria-pressed={inputMode === 'build'}
+            onClick={() => onInputModeChange('build')}
+          >
+            <Hammer size={17} aria-hidden="true" /> 건축
+          </button>
+          <button
+            type="button"
+            className={inputMode === 'camera' ? 'active' : ''}
+            aria-pressed={inputMode === 'camera'}
+            onClick={() => onInputModeChange('camera')}
+          >
+            <Camera size={17} aria-hidden="true" /> 카메라
+          </button>
+        </div>
+
+        <div className="astra-builder-hud__layer" aria-label="층 엘리베이터">
+          <button
+            type="button"
+            disabled={activeLayer <= 0}
+            onClick={() => onLayerChange(activeLayer - 1)}
+            aria-label="한 층 아래로"
+            title="한 층 아래로 (Page Down)"
+          >
+            <ChevronDown size={17} aria-hidden="true" />
+          </button>
+          <span>
+            <small>층 엘리베이터</small>
+            <strong>{activeLayer + 1}층</strong>
+          </span>
+          <button
+            type="button"
+            disabled={activeLayer >= ASTRA_BUILDER_POC_PLOT.height - 1}
+            onClick={() => onLayerChange(activeLayer + 1)}
+            aria-label="한 층 위로"
+            title="한 층 위로 (Page Up)"
+          >
+            <ChevronUp size={17} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <aside className="astra-builder-hud__tools" aria-label="건축 도구">
@@ -138,26 +165,6 @@ export default function AstraBuilderHud({
         <button type="button" disabled={!canUndo} onClick={onUndo}><Undo2 size={18} aria-hidden="true" /><span>되돌리기</span></button>
         <button type="button" disabled={!canRedo} onClick={onRedo}><Redo2 size={18} aria-hidden="true" /><span>다시 실행</span></button>
       </aside>
-
-      <div className="astra-builder-hud__layer" aria-label="현재 편집 높이">
-        <button
-          type="button"
-          disabled={activeLayer >= ASTRA_BUILDER_POC_PLOT.height - 1}
-          onClick={() => onLayerChange(activeLayer + 1)}
-          aria-label="한 층 위로"
-        >
-          <ChevronUp size={17} aria-hidden="true" />
-        </button>
-        <span><small>편집 높이</small><strong>{activeLayer + 1} / {ASTRA_BUILDER_POC_PLOT.height}</strong></span>
-        <button
-          type="button"
-          disabled={activeLayer <= 0}
-          onClick={() => onLayerChange(activeLayer - 1)}
-          aria-label="한 층 아래로"
-        >
-          <ChevronDown size={17} aria-hidden="true" />
-        </button>
-      </div>
 
       <footer className="astra-builder-hud__palette">
         <div>

@@ -2701,6 +2701,13 @@ export default function GalaxyWorld3D({
       } else if (event.code === 'KeyC') {
         event.preventDefault()
         setBuilderInputMode('camera')
+      } else if (event.code === 'PageUp' || event.code === 'PageDown') {
+        event.preventDefault()
+        setBuilderLayer((current) => THREE.MathUtils.clamp(
+          current + (event.code === 'PageUp' ? 1 : -1),
+          0,
+          ASTRA_BUILDER_POC_PLOT.height - 1,
+        ))
       } else if (event.code === 'KeyQ' || event.code === 'KeyE') {
         event.preventDefault()
         setBuilderRotation((current) => (
