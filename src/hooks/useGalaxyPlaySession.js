@@ -63,7 +63,7 @@ function formatEndReason(reason) {
   return '이번 탐험 시간이 끝났어요.'
 }
 
-export function useGalaxyPlaySession({ uid, active }) {
+export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
   const [session, setSession] = useState(() => readStoredSession(uid))
   const [access, setAccess] = useState(null)
   const [busy, setBusy] = useState('')
@@ -96,6 +96,18 @@ export function useGalaxyPlaySession({ uid, active }) {
   }, [])
 
   const loadAccess = useCallback(async ({ force = false } = {}) => {
+    if (isGuest) {
+      const mockAccess = {
+        granted: true,
+        reason: 'ok',
+        dailyLimitSeconds: 15 * 60,
+        dailyUsedSeconds: 0,
+        dailyRemainingSeconds: 15 * 60,
+        serverNowMs: Date.now()
+      }
+      setAccess(mockAccess)
+      return mockAccess
+    }
     if (!uid) return null
     const now = Date.now()
     if (!force && lastAccessFetchedAtRef.current && (now - lastAccessFetchedAtRef.current < 10_000) && access) {
@@ -116,9 +128,32 @@ export function useGalaxyPlaySession({ uid, active }) {
     } finally {
       setBusy('')
     }
-  }, [access, syncServerClock, uid])
+  }, [access, isGuest, syncServerClock, uid])
 
   const startSession = useCallback(async () => {
+    if (isGuest) {
+      const guestUid = uid || 'guest'
+      const clientInstanceId = getClientInstanceId(guestUid)
+      const nextSession = {
+        sessionId: `guest_session_${Date.now()}`,
+        clientInstanceId,
+        resumeToken: 'guest_resume_token',
+        dailyLimitSeconds: 15 * 60,
+        remainingSeconds: 15 * 60,
+        sequenceNumber: 0,
+        expiresAtMs: Date.now() + 15 * 60 * 1000,
+        hardEndsAtMs: Date.now() + 15 * 60 * 1000,
+        startedAtMs: Date.now()
+      }
+      setSession(nextSession)
+      setAccess({ granted: true, reason: 'ok', dailyLimitSeconds: 15 * 60, dailyUsedSeconds: 0, dailyRemainingSeconds: 15 * 60 })
+      setEndedSummary(null)
+      setIdleWarning(false)
+      sequenceRef.current = 0
+      lastInteractionRef.current = Date.now()
+      writeStoredSession(guestUid, nextSession)
+      return nextSession
+    }
     if (!uid || busy) return null
     setBusy('start')
     setError('')
@@ -153,7 +188,7 @@ export function useGalaxyPlaySession({ uid, active }) {
     } finally {
       setBusy('')
     }
-  }, [busy, syncServerClock, uid])
+  }, [busy, isGuest, syncServerClock, uid])
 
   const finishLocally = useCallback((summary = {}) => {
     const currentSession = readStoredSession(uid) || session

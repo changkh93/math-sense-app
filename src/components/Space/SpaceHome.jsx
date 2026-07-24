@@ -627,7 +627,7 @@ function SpaceHome() {
   const [signupPrompt, setSignupPrompt] = useState(null)
   const [acceptedQuizBattle, setAcceptedQuizBattle] = useState(null)
   const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
-  const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy' })
+  const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy', isGuest: userData?.isGuest === true })
 
   useEffect(() => {
     soundManager.setUserBinding(

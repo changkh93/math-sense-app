@@ -69,6 +69,127 @@ export const GALAXY_ABILITIES = {
   construction: { label: '건조 기술', icon: '⬡', iconId: 'hammer', description: '누적 학습 광석으로 성장하는 건설 능력입니다.', effect: '현재 패스포트와 선체 성장 기록에 표시됩니다.' },
 }
 
+// 백엔드 functions/galaxyGame.js 의 GALAXY_ITEM_CATALOG 와 동기화한 프론트엔드 사본.
+// 게스트 모드는 서버에서 catalog 를 내려받을 수 없으므로 이 사본으로 UI/비용을 구성한다.
+// 백엔드 카탈로그가 바뀌면 이쪽도 함께 갱신해야 한다.
+const GALAXY_ITEM_STAGE2_COSTS = Object.freeze({
+  star_lamp: 20,
+  lumen_tree: 45,
+  crystal_pond: 70,
+  rover_bay: 100,
+  observatory: 140,
+  friend_greenhouse: 110,
+  prism_pathlight: 30,
+  starflower_garden: 55,
+  creature_habitat: 85,
+  signal_plaza: 80,
+  expedition_beacon: 120,
+  route_gateway: 180,
+})
+
+export const GALAXY_ITEM_CATALOG = {
+  star_lamp: {
+    name: '별빛 램프', icon: '✦', iconId: 'sparkles', cost: 25, material: 'stardust', materialCost: 0, kind: 'decor',
+    description: '귀환 지점을 은은하게 밝히는 첫 번째 개척 조명입니다.',
+    effect: '주변에 따뜻한 별빛과 귀환 포인트를 만듭니다.',
+    setName: '귀환의 빛', previewTone: '#ffe28a',
+  },
+  lumen_tree: {
+    name: '루멘 나무', icon: '♧', iconId: 'tree-pine', cost: 60, material: 'biofiber', materialCost: 2, kind: 'nature',
+    description: '행성의 밤에도 빛을 머금는 대표 생태 식물입니다.',
+    effect: '행성에 발광 수관과 생태 구역의 중심을 만듭니다.',
+    setName: '루멘 생태계', previewTone: '#72efad',
+  },
+  crystal_pond: {
+    name: '수정 연못', icon: '◈', iconId: 'waves', cost: 110, material: 'crystalGlass', materialCost: 2, kind: 'nature',
+    description: '수정 입자가 수면을 따라 흐르는 작은 휴식 공간입니다.',
+    effect: '반사 수면과 부유 입자로 행성에 물가 풍경을 더합니다.',
+    setName: '루멘 생태계', previewTone: '#62ddff',
+  },
+  rover_bay: {
+    name: '탐사 로버 정비소', icon: '⌂', iconId: 'wrench', cost: 160, material: 'alloy', materialCost: 3, kind: 'facility',
+    description: '귀환한 로버를 정비하고 다음 원정을 준비하는 전초 시설입니다.',
+    effect: '장거리 로버 원정 시간을 8시간에서 6시간으로 단축합니다.',
+    setName: '개척 전초기지', previewTone: '#ffad70',
+  },
+  observatory: {
+    name: '성운 관측소', icon: '◎', iconId: 'telescope', cost: 240, material: 'crystalGlass', materialCost: 4, kind: 'facility',
+    description: '멀리 끊어진 아스트라 항로의 신호를 관측하는 시설입니다.',
+    effect: '행성 스카이라인에 회전 관측 장치와 푸른 신호광을 더합니다.',
+    setName: '개척 전초기지', previewTone: '#91b9ff',
+  },
+  friend_greenhouse: {
+    name: '별빛 공동 온실', icon: '◇', iconId: 'warehouse', cost: 180, material: 'biofiber', materialCost: 4, kind: 'social',
+    description: '친구가 찾아와 물을 주고 생태 흔적을 남길 수 있는 공동 공간입니다.',
+    effect: '방문 도움 행동의 목적지가 되는 투명 온실을 만듭니다.',
+    setName: '연결의 정원', previewTone: '#8fffd1',
+  },
+  prism_pathlight: {
+    name: '프리즘 길잡이', icon: '⌁', iconId: 'route', cost: 45, material: 'stardust', materialCost: 1, kind: 'decor',
+    description: '착륙장과 주요 시설 사이의 길을 표시하는 낮은 유도등입니다.',
+    effect: '걸어갈 방향을 보여주는 연속 빛 표식을 만듭니다.',
+    setName: '귀환의 빛', previewTone: '#79eaff',
+  },
+  starflower_garden: {
+    name: '별꽃 정원', icon: '❋', iconId: 'flower-2', cost: 90, material: 'biofiber', materialCost: 3, kind: 'nature',
+    description: '친구의 물주기 신호에 어울리는 작은 발광 꽃밭입니다.',
+    effect: '정원 구역에 색 변화가 있는 꽃 군락을 더합니다.',
+    setName: '연결의 정원', previewTone: '#ff9fcb',
+  },
+  creature_habitat: {
+    name: '루미 생명체 쉼터', icon: '◌', iconId: 'egg', cost: 145, material: 'biofiber', materialCost: 4, kind: 'ecology',
+    description: '작은 행성 생명체가 머물 수 있도록 만든 안전한 보금자리입니다.',
+    effect: '생명체 돌보기 행동을 위한 생태 랜드마크를 만듭니다.',
+    setName: '루멘 생태계', previewTone: '#c6f58a',
+  },
+  signal_plaza: {
+    name: '귀환 신호 광장', icon: '⌾', iconId: 'radio-tower', cost: 135, material: 'crystalGlass', materialCost: 3, kind: 'social',
+    description: '방문자의 인사와 감탄 신호가 모이는 작은 행성 광장입니다.',
+    effect: '친구 방문 흔적을 보여줄 중심 광장과 신호 비콘을 만듭니다.',
+    setName: '항로 연결망', previewTone: '#a995ff',
+  },
+  expedition_beacon: {
+    name: '원정대 비콘', icon: '△', iconId: 'satellite-dish', cost: 210, material: 'alloy', materialCost: 4, kind: 'facility',
+    description: '미지의 섹터로 향하는 탐사 신호를 증폭하는 전초 비콘입니다.',
+    effect: '장거리 로버 원정의 회수 재료를 매번 1개 늘립니다.',
+    setName: '개척 전초기지', previewTone: '#ff8c68',
+  },
+  route_gateway: {
+    name: '아스트라 항로문', icon: '⬡', iconId: 'orbit', cost: 320, material: 'alloy', materialCost: 6, kind: 'social',
+    description: '오래 연결된 친구의 행성을 향해 빛나는 대형 항로 구조물입니다.',
+    effect: '행성에 전시 가치가 높은 워프 랜드마크를 세웁니다.',
+    setName: '항로 연결망', previewTone: '#68f0d0',
+  },
+}
+
+// 백엔드와 동일하게 Stage 2/최대 레벨 메타를 파생시킨다.
+Object.entries(GALAXY_ITEM_CATALOG).forEach(([itemId, item]) => {
+  item.maxLevel = 2
+  item.stage2Cost = GALAXY_ITEM_STAGE2_COSTS[itemId] || 0
+  item.stage2Available = itemId === 'lumen_tree'
+  item.stage2Label = itemId === 'lumen_tree' ? '성목 루멘' : 'Stage 2 준비 중'
+})
+
+// 게스트가 기본 보유한 개척자 돔. 카탈로그엔 없는 특수 객체라 별도 정의.
+export const GUEST_STARTER_OBJECTS = {
+  starter_dome: {
+    name: '개척자 돔', icon: '⬡', iconId: 'house', kind: 'facility',
+    description: '아스트라 프론티어에 처음 도착한 탐험가의 귀환 거점입니다.',
+    effect: '행성의 중심과 안전한 귀환 지점을 표시합니다.',
+  },
+}
+
+// 게스트 모드에서는 별도 재료 소모 없이 광석(학습 크리스탈)만 차감한다.
+export function getGuestBuildCost(itemId) {
+  return Number(GALAXY_ITEM_CATALOG[itemId]?.cost || 0)
+}
+
+export function getGuestItemName(itemId) {
+  return GALAXY_ITEM_CATALOG[itemId]?.name
+    || GUEST_STARTER_OBJECTS[itemId]?.name
+    || itemId
+}
+
 export const GALAXY_VISIT_ACTIONS = {
   water: { label: '별꽃에 물주기', icon: '▽', iconId: 'droplets', description: '친구 정원의 생명력을 회복합니다.', effect: '정원 활력 +4 · 항로 연결도 +6', stat: 'gardenVitality', connectionXp: 6 },
   repair: { label: '시설 수리하기', icon: '⌁', iconId: 'wrench', description: '폭풍에 지친 친구 시설을 손봅니다.', effect: '시설 상태 +4 · 항로 연결도 +7', stat: 'facilityHealth', connectionXp: 7 },

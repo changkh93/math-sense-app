@@ -5008,6 +5008,72 @@ exports.createChildAccountForParent = regionalFunctions.https.onCall(async (data
   };
 });
 
+exports.migrateGuestGalaxyData = regionalFunctions.https.onCall(async (data, context) => {
+  const callerUid = await requireAuthUid(context);
+  const targetStudentUid = cleanText(data?.studentUid, 120) || callerUid;
+  const guestPlanet = data?.guestData?.planet || {};
+  
+  if (!targetStudentUid) {
+    throw new functions.https.HttpsError("invalid-argument", "승계 대상 학생 계정 ID가 필요합니다.");
+  }
+
+  if (callerUid !== targetStudentUid) {
+    const parentSnap = await admin.firestore().collection("parents").doc(callerUid).get();
+    const childrenUids = parentSnap.exists ? (parentSnap.data()?.childrenUids || []) : [];
+    if (!childrenUids.includes(targetStudentUid)) {
+      throw new functions.https.HttpsError("permission-denied", "해당 자녀 계정에 대한 마이그레이션 권한이 없습니다.");
+    }
+  }
+
+  const planetRef = admin.firestore().collection("galaxyPlanets").doc(targetStudentUid);
+  const existingPlanetSnap = await planetRef.get();
+  const guestLayout = Array.isArray(guestPlanet.layout) ? guestPlanet.layout : [];
+
+  const nextLayout = guestLayout.map((item) => {
+    const instanceId = String(
+      item.instanceId || item.id || `migrated_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    );
+    // 게스트 로컬 스키마는 정규 필드(y/rotation)를 쓰지만, 옛날 형식(z/yaw)도
+    // 아직 브라우저에 남아 있을 수 있어 양쪽 모두 안전하게 읽는다.
+    const y = Number(item.y ?? item.z ?? 50);
+    const rotation = Number(item.rotation ?? item.yaw ?? 0);
+    return {
+      instanceId,
+      itemId: cleanText(item.itemId, 80) || "starter_dome",
+      level: Number(item.level || 1),
+      x: Number(item.x || 50),
+      y,
+      rotation,
+      createdAtMs: Number(item.createdAtMs || item.createdAt || Date.now()),
+    };
+  });
+
+  const planetPayload = {
+    ownerUid: targetStudentUid,
+    theme: guestPlanet.theme || "forest",
+    layout: nextLayout,
+    gardenVitality: 100,
+    facilityHealth: 100,
+    creatureHappiness: 100,
+    migratedFromGuestAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
+  };
+
+  if (!existingPlanetSnap.exists) {
+    planetPayload.createdAt = FieldValue.serverTimestamp();
+  }
+
+  await planetRef.set(planetPayload, { merge: true });
+
+  const userRef = admin.firestore().collection("users").doc(targetStudentUid);
+  await userRef.set({
+    crystals: FieldValue.increment(200),
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { success: true, migratedCount: nextLayout.length };
+});
+
 /**
  * fetchNotebook
  * 

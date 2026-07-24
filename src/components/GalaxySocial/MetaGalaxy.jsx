@@ -64,6 +64,7 @@ import {
 } from 'lucide-react'
 import { db, functions, storage } from '../../firebase'
 import { useGalaxyWorldPresence } from '../../hooks/useGalaxyWorldPresence'
+import { useGuestGalaxyData } from '../../hooks/useGuestGalaxyData'
 import {
   GALAXY_ABILITIES,
   GALAXY_PLAY_STYLES,
@@ -528,7 +529,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const audioMountedRef = useRef(false)
   const audioSessionKeyRef = useRef(audioSessionKey)
   audioSessionKeyRef.current = audioSessionKey
-  const isOwner = targetUid === user?.uid
+  const isGuest = userData?.isGuest === true
+  const guestGalaxy = useGuestGalaxyData()
+  const isOwner = isGuest || targetUid === user?.uid
   const overlayReady = !loading && Boolean(home)
 
   useEffect(() => {
@@ -575,7 +578,17 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     sendSpeechRequest,
   })
 
+  // 게스트는 서버가 없으므로 로컬 mockHomeData(메모이제이션)로 home 을 채운다.
+  // guestData 가 바뀌면 mockHomeData 도 갱신되어 이 effect 가 home 을 다시 동기화한다.
+  const guestMockHomeData = guestGalaxy.mockHomeData
+
   const loadHome = useCallback(async (nextTargetUid = user?.uid, { quiet = false } = {}) => {
+    if (isGuest) {
+      setHome(guestMockHomeData)
+      setTargetUid('guest')
+      setLoading(false)
+      return
+    }
     if (!user?.uid) {
       setLoading(false)
       return
@@ -596,7 +609,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [callGalaxy, user?.uid])
+  }, [callGalaxy, guestMockHomeData, isGuest, user?.uid])
 
   useEffect(() => { loadHome(user?.uid) }, [loadHome, user?.uid])
 
@@ -1088,6 +1101,23 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const deleteGalaxyObject = async (item = selectedObject) => {
     if (!isOwner || !item?.instanceId) return null
     const instanceId = item.instanceId
+    if (isGuest) {
+      // 게스트는 로컬 저장소에서만 삭제한다. (서버 호출 없음)
+      guestGalaxy.removeBuildItem(instanceId)
+      setHome((current) => {
+        if (!current) return current
+        const removeFromLayout = (targetPlanet = {}) => ({
+          ...targetPlanet,
+          layout: (Array.isArray(targetPlanet.layout) ? targetPlanet.layout : []).filter((entry) => entry.instanceId !== instanceId),
+        })
+        const nextOwnPlanet = removeFromLayout(current.ownPlanet)
+        return { ...current, ownPlanet: nextOwnPlanet, planet: nextOwnPlanet }
+      })
+      setNotice(`${item.name || '객체'}를 행성에서 삭제했습니다.`)
+      soundManager.play('frontier.buildingPlaced')
+      closeObjectDialog()
+      return { success: true }
+    }
     const result = await runAction(
       `object:delete:${instanceId}`,
       () => callGalaxy('deleteGalaxyItem', { instanceId }),
@@ -1110,6 +1140,34 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const buildItemAt = async (worldX, worldZ) => {
     if (!selectedBuildItem || !isOwner) return
     const itemId = selectedBuildItem
+    if (isGuest) {
+      // 정규 서버 스키마와 동일한 좌표(0~100)를 사용한다. 비용은 카탈로그에서 읽는다.
+      const placementX = 50 + Number(worldX || 0) * 3
+      const placementY = 50 + Number(worldZ || 0) * 3
+      try {
+        const newItem = guestGalaxy.buildItem(itemId, placementX, placementY)
+        setHome((current) => {
+          if (!current) return current
+          const currentOwnPlanet = current.ownPlanet || {}
+          const currentLayout = Array.isArray(currentOwnPlanet.layout) ? currentOwnPlanet.layout : []
+          const nextLayout = [...currentLayout, newItem]
+          const nextOwnPlanet = { ...currentOwnPlanet, layout: nextLayout }
+          return {
+            ...current,
+            ownPlanet: nextOwnPlanet,
+            planet: nextOwnPlanet,
+            userCrystals: guestGalaxy.guestData.crystals,
+            wallet: guestGalaxy.guestData.crystals,
+          }
+        })
+        setNotice(`${newItem.name || itemId}을(를) 로컬 행성에 건설했습니다.`)
+        soundManager.play('frontier.buildingPlaced')
+      } catch (err) {
+        setError(err?.message || '광석이 부족하거나 건설할 수 없습니다.')
+        soundManager.play('frontier.connection.softError')
+      }
+      return
+    }
     const operationId = createOperationId()
     const requestAudioSessionKey = audioSessionKey
     const result = await runAction(`build:${itemId}`, () => callGalaxy('buildGalaxyItem', {
@@ -1475,6 +1533,30 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   return (
     <div className={`meta-galaxy frontier-immersive${builderActive ? ' builder-active' : ''}`}>
+      {isGuest && (
+        <div style={{
+          position: 'absolute',
+          top: '16px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          background: 'rgba(15, 23, 42, 0.88)',
+          border: '1px solid rgba(0, 243, 255, 0.4)',
+          borderRadius: '12px',
+          padding: '8px 16px',
+          color: '#e2e8f0',
+          fontSize: '0.82rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(8px)',
+          pointerEvents: 'none'
+        }}>
+          <span style={{ color: '#00f3ff' }}>💡</span>
+          <span><strong>게스트 체험 모드</strong>: 하루 500 광석이 기본 제공되며, 현재 브라우저에 건설 내역이 저장됩니다. 회원가입 시 작성한 행성이 정식 계정으로 안전하게 연결됩니다.</span>
+        </div>
+      )}
       <GalaxyWorld3D
         planet={planet}
         audioSessionKey={audioSessionKey}

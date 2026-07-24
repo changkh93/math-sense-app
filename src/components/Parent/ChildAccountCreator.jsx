@@ -26,7 +26,22 @@ export default function ChildAccountCreator({ compact = false, onCreated }) {
     try {
       const createChild = httpsCallable(functions, 'createChildAccountForParent');
       const result = await createChild({ ...form });
-      setMessage(`${result.data?.studentName || form.studentName} 계정이 생성되었습니다. 아이디: ${result.data?.loginId || form.loginId}.`);
+      const childUid = result.data?.childUid;
+      if (childUid && typeof window !== 'undefined') {
+        const rawGuestData = localStorage.getItem('metasense_guest_astra_data');
+        if (rawGuestData) {
+          try {
+            const guestData = JSON.parse(rawGuestData);
+            const migrateGuest = httpsCallable(functions, 'migrateGuestGalaxyData');
+            await migrateGuest({ studentUid: childUid, guestData });
+            localStorage.removeItem('metasense_guest_astra_data');
+            console.log('게스트 아스트라 프론티어 데이터 승계 완료!');
+          } catch (migrateErr) {
+            console.warn('Guest data migration error:', migrateErr);
+          }
+        }
+      }
+      setMessage(`${result.data?.studentName || form.studentName} 계정이 생성되었습니다. 아이디: ${result.data?.loginId || form.loginId}. (게스트 행성 데이터 승계 완료 ✨)`);
       setForm({ studentName: '', loginId: '', password: '', grade: '', birthDate: '' });
       if (onCreated) onCreated(result.data);
     } catch (err) {
