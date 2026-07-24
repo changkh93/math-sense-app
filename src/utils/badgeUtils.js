@@ -321,11 +321,26 @@ export function buildCollectionBadges(userData = {}, history = []) {
     { id: 'eternal_voyager', title: '영원한 항해사', icon: '🌌', category: 'general', unlocked: (userData?.longestStreak || 0) >= 365, desc: '365일 연속! 은하핵에 도달한 전설의 항해사.' },
   ];
 
-  // 프리미엄 이미지가 등록된 배지에만 premiumImage 필드를 붙인다.
-  return badges.map(badge => ({
-    ...badge,
-    premiumImage: BADGE_PREMIUM_IMAGES[badge.id] || null,
-  }));
+  // 프리미엄 각성(100광석 영구 해금)을 보유한 배지는 조건을 일시적으로 벗어나도
+  // 획득 상태를 유지한다. 한 번 광석으로 결제한 성취를 조건 변동(예: 광석 잔액
+  // 감소로 crystal_collector 배지가 풀리는 현상) 때문에 회수하면 이용자에게 부당하다.
+  // earnedByBadgeUpgrade 플래그를 함께 남겨 UI에서 "조건은 벗어났지만 각성으로
+  // 보존된 배지"임을 구분할 수 있게 한다.
+  return badges.map(badge => {
+    const premiumImage = BADGE_PREMIUM_IMAGES[badge.id] || null
+    const ownsPremium = isBadgeUpgradeOwned(userData, badge.id)
+    const conditionUnlocked = badge.unlocked
+    // 각성한 배지는 unlocked 를 강제 유지한다.
+    const unlocked = ownsPremium ? true : conditionUnlocked
+    return {
+      ...badge,
+      premiumImage,
+      unlocked,
+      // 조건 자체가 충족된 상태인지(각성과 무관). UI에서 실적 진척도를 표시할 때 쓸 수 있다.
+      conditionUnlocked,
+      earnedByBadgeUpgrade: ownsPremium && !conditionUnlocked,
+    }
+  });
 }
 
 // id로 배지를 찾는다.
