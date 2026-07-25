@@ -138,12 +138,15 @@ function testObjectUpgradeCatalogContract() {
   });
   assert.equal(GALAXY_ITEM_CATALOG.lumen_tree.stage2Available, true);
   assert.equal(GALAXY_ITEM_CATALOG.lumen_tree.stage2Cost, 45);
+  assert.equal(GALAXY_ITEM_CATALOG.star_lamp.stage2Available, true);
+  assert.equal(GALAXY_ITEM_CATALOG.star_lamp.stage2Cost, 20);
   assert.equal(
     Object.entries(GALAXY_ITEM_CATALOG)
       .filter(([, item]) => item.stage2Available)
       .map(([itemId]) => itemId)
+      .sort()
       .join(','),
-    'lumen_tree',
+    'lumen_tree,star_lamp',
   );
 }
 
