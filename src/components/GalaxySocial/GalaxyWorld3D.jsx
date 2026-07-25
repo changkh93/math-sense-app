@@ -994,6 +994,233 @@ function MatureStarLamp({ scale = 1, ghost = false, seed = 0, dynamicLightActive
   )
 }
 
+// 탐사 로버 정비소 Stage 2: 외행성 로버 서비스 도크(Autonomous Rover Service Dock).
+// 진입/정렬/세척/진단/충전/부품교체를 수행하는 반개방형 자율 도크.
+// 가장 가까운 1개만 spotLight를 damp 보간으로 부드럽게 켜고, 나머지는 emissive로만 발광.
+// 8초 주기 자체 루프(idle→scanning→repairing→charging)로 천천히 전환(상시 과동작 방지).
+function MatureRoverBay({ scale = 1, ghost = false, dynamicLightActive = false }) {
+  const gantryRef = useRef()
+  const leftShoulderRef = useRef()
+  const leftElbowRef = useRef()
+  const rightShoulderRef = useRef()
+  const rightElbowRef = useRef()
+  const couplerRef = useRef()
+  const couplerMatRef = useRef()
+  const lightRef = useRef()
+  // spotLight target: 도크 중앙 바닥 방향. useMemo로 한 번만 생성.
+  const lightTarget = useMemo(() => {
+    const obj = new THREE.Object3D()
+    obj.position.set(0, 0, 0)
+    return obj
+  }, [])
+
+  useLayoutEffect(() => {
+    if (lightRef.current) lightRef.current.target = lightTarget
+  }, [lightTarget])
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+    // 8초 주기 자체 루프. 0~0.25 idle / 0.25~0.5 scanning / 0.5~0.75 repairing / 0.75~1 charging
+    const cycle = (time % 8) / 8
+    const isScanning = cycle >= 0.25 && cycle < 0.5
+    const isRepairing = cycle >= 0.5 && cycle < 0.75
+    const isCharging = cycle >= 0.75
+
+    // 갠트리 스캐너 캐리지: scanning 구간에서만 좌우 왕복, 그 외엔 중앙으로 복귀(damp).
+    if (gantryRef.current) {
+      const targetX = isScanning ? Math.sin(time * 0.7) * 0.75 : 0
+      gantryRef.current.position.x = THREE.MathUtils.damp(gantryRef.current.position.x, targetX, 4, delta)
+    }
+    // 충전 커플러: charging 구간에서 상승, 그 외엔 수납(damp).
+    if (couplerRef.current) {
+      const targetY = isCharging ? 0.26 : 0.17
+      couplerRef.current.position.y = THREE.MathUtils.damp(couplerRef.current.position.y, targetY, 6, delta)
+    }
+    if (couplerMatRef.current) {
+      couplerMatRef.current.emissiveIntensity = isCharging ? 1.8 + Math.sin(time * 6) * 0.4 : 0.9
+    }
+    // 좌측 기계 정비 팔: repairing 구간에서 접근 자세, 그 외엔 접힌 자세(damp).
+    if (leftShoulderRef.current) {
+      const target = isRepairing ? -0.45 : -1.1
+      leftShoulderRef.current.rotation.z = THREE.MathUtils.damp(leftShoulderRef.current.rotation.z, target, 5, delta)
+    }
+    if (leftElbowRef.current) {
+      const target = isRepairing ? 0.75 : 0.25
+      leftElbowRef.current.rotation.z = THREE.MathUtils.damp(leftElbowRef.current.rotation.z, target, 5, delta)
+    }
+    // 우측 진단 팔: scanning/repairing 구간에서 약간 내려오며 스캔 자세.
+    if (rightShoulderRef.current) {
+      const target = (isScanning || isRepairing) ? -0.35 : -1.1
+      rightShoulderRef.current.rotation.z = THREE.MathUtils.damp(rightShoulderRef.current.rotation.z, target, 5, delta)
+    }
+    if (rightElbowRef.current) {
+      const target = isScanning ? 0.6 : 0.25
+      rightElbowRef.current.rotation.z = THREE.MathUtils.damp(rightElbowRef.current.rotation.z, target, 5, delta)
+    }
+    // 동적 조명 intensity damp 보간.
+    if (lightRef.current) {
+      const target = dynamicLightActive ? 0.45 : 0
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, target, 6, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      {/* === 5.1 강화 서비스 패드 (3층) === */}
+      {/* 하부 기초층 (모서리 잘린 효과: 중앙 박스 + 좌우 얇은 패드) */}
+      <mesh position={[0, .06, 0]} receiveShadow><boxGeometry args={[3.6, .12, 3.1]} /><ModelMaterial color="#1C2B35" metalness={.45} roughness={.55} ghost={ghost} /></mesh>
+      {/* 중앙 서비스 데크 */}
+      <mesh position={[0, .14, 0]} receiveShadow><boxGeometry args={[3.2, .06, 2.7]} /><ModelMaterial color="#283B49" metalness={.5} roughness={.5} ghost={ghost} /></mesh>
+      {/* 코너 황색 안전 마킹 4개 */}
+      {[[-1.6, 1.25], [1.6, 1.25], [-1.6, -1.25], [1.6, -1.25]].map(([x, z], i) => (
+        <mesh key={`safety_${i}`} position={[x, .15, z]}><boxGeometry args={[.3, .02, .3]} /><ModelMaterial color="#FFB05C" emissive="#7a4a1a" emissiveIntensity={.4} ghost={ghost} /></mesh>
+      ))}
+      {/* 지면 앵커 4개 (떠 보이지 않게) */}
+      {[[-1.7, 1.4], [1.7, 1.4], [-1.7, -1.4], [1.7, -1.4]].map(([x, z], i) => (
+        <mesh key={`anchor_${i}`} position={[x, .04, z]}><cylinderGeometry args={[.08, .1, .08, 8]} /><ModelMaterial color="#526A78" metalness={.55} roughness={.42} ghost={ghost} /></mesh>
+      ))}
+
+      {/* === 5.2 로버 진입 유도 시스템 === */}
+      {/* 휠 가이드 레일 2개 (전면 넓게, 안쪽으로 좁아짐은 회전으로 표현) */}
+      {[[-.9, .9], [.9, .9]].map(([x, rot], i) => (
+        <mesh key={`guide_${i}`} position={[x * (i === 0 ? 1 : 1), .17, .4]} rotation={[0, rot * (i === 0 ? -.12 : .12), 0]}><boxGeometry args={[.12, .06, 1.8]} /><ModelMaterial color="#A9B8BE" metalness={.75} roughness={.25} ghost={ghost} /></mesh>
+      ))}
+      {/* 바닥 유도등 emissive 스트립 5개 (진입 방향) */}
+      {[-.4, -.2, 0, .2, .4].map((z, i) => (
+        <mesh key={`guidelight_${i}`} position={[0, .155, 1.1 + z]}><boxGeometry args={[1.4, .005, .04]} /><ModelMaterial color="#71D7FF" emissive="#2a7fa8" emissiveIntensity={.9} ghost={ghost} /></mesh>
+      ))}
+      {/* 휠 스토퍼 4개 (도크 후면) */}
+      {[[-.7, -.9], [-.3, -.9], [.3, -.9], [.7, -.9]].map(([x, z], i) => (
+        <mesh key={`stopper_${i}`} position={[x, .16, z]}><boxGeometry args={[.18, .05, .12]} /><ModelMaterial color="#526A78" metalness={.55} roughness={.42} ghost={ghost} /></mesh>
+      ))}
+
+      {/* === 5.10 바닥 로버 정렬 윤곽선 (안 B, 성능 최소) === */}
+      <mesh position={[0, .158, -.1]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[.7, .74, 6]} /><meshBasicMaterial color="#63E6D2" transparent opacity={.35} depthWrite={false} /></mesh>
+
+      {/* === 5.3 중앙 충전 커플러 (승강식) === */}
+      <group ref={couplerRef} position={[0, .17, -.1]}>
+        <mesh><cylinderGeometry args={[.26, .3, .08, 6]} /><ModelMaterial color="#283B49" metalness={.65} roughness={.4} ghost={ghost} /></mesh>
+        <mesh position={[0, .05, 0]}><torusGeometry args={[.18, .025, 8, 6]} /><ModelMaterial ref={couplerMatRef} color="#63E6D2" emissive="#2a9a8a" emissiveIntensity={.9} ghost={ghost} /></mesh>
+        <mesh position={[0, .07, 0]}><torusGeometry args={[.1, .02, 8, 6]} /><ModelMaterial color="#63E6D2" emissive="#2a9a8a" emissiveIntensity={1.1} ghost={ghost} /></mesh>
+      </group>
+
+      {/* === 5.4 좌우 서비스 타워 (분절형) === */}
+      {[-1, 1].map((dir) => (
+        <group key={`tower_${dir}`} position={[dir * 1.6, 0, 0]}>
+          {/* 하부 베이스 */}
+          <mesh position={[0, .35, 0]} castShadow={!ghost}><boxGeometry args={[.42, .7, .5]} /><ModelMaterial color="#283B49" metalness={.65} roughness={.44} ghost={ghost} /></mesh>
+          {/* 중앙 프레임 */}
+          <mesh position={[0, 1.2, 0]} castShadow={!ghost}><boxGeometry args={[.24, .9, .28]} /><ModelMaterial color="#526A78" metalness={.55} roughness={.42} ghost={ghost} /></mesh>
+          {/* 밝은 세라믹 커버 */}
+          <mesh position={[dir * -.12, 1.2, 0]}><boxGeometry args={[.06, .7, .22]} /><ModelMaterial color="#C5D0CB" metalness={.08} roughness={.62} ghost={ghost} /></mesh>
+          {/* 케이블 덕트 */}
+          <mesh position={[dir * .16, 1.2, 0]} castShadow={!ghost}><boxGeometry args={[.06, .8, .08]} /><ModelMaterial color="#1C2B35" metalness={.4} roughness={.6} ghost={ghost} /></mesh>
+          {/* 상태 표시등 */}
+          <mesh position={[0, 1.75, .12]}><boxGeometry args={[.12, .06, .03]} /><ModelMaterial color="#71D7FF" emissive="#2a7fa8" emissiveIntensity={1.3} ghost={ghost} /></mesh>
+          {/* 상단 갠트리 연결부 */}
+          <mesh position={[0, 2.1, 0]} castShadow={!ghost}><boxGeometry args={[.3, .14, .3]} /><ModelMaterial color="#283B49" metalness={.65} roughness={.44} ghost={ghost} /></mesh>
+        </group>
+      ))}
+
+      {/* === 5.5 상단 갠트리 레일 + 스캐너 캐리지 === */}
+      <mesh position={[0, 2.35, 0]} castShadow={!ghost}><boxGeometry args={[3.4, .14, .22]} /><ModelMaterial color="#526A78" metalness={.55} roughness={.42} ghost={ghost} /></mesh>
+      {/* 이동 레일 (빔 아래) */}
+      <mesh position={[0, 2.24, 0]}><boxGeometry args={[3.2, .04, .06]} /><ModelMaterial color="#A9B8BE" metalness={.75} roughness={.25} ghost={ghost} /></mesh>
+      {/* 스캐너 캐리지 (gantryRef로 좌우 이동) */}
+      <group ref={gantryRef} position={[0, 2.12, 0]}>
+        <mesh><boxGeometry args={[.28, .18, .2]} /><ModelMaterial color="#283B49" metalness={.65} roughness={.4} ghost={ghost} /></mesh>
+        {/* 스캐너 헤드 (아래로) */}
+        <mesh position={[0, -.16, 0]}><boxGeometry args={[.16, .14, .16]} /><ModelMaterial color="#C5D0CB" metalness={.08} roughness={.62} ghost={ghost} /></mesh>
+        <mesh position={[0, -.26, 0]}><boxGeometry args={[.22, .02, .22]} /><meshBasicMaterial color="#71D7FF" transparent opacity={.4} depthWrite={false} /></mesh>
+      </group>
+      {/* 양끝 충돌 방지 스토퍼 + 경고등 */}
+      {[-1.6, 1.6].map((x, i) => (
+        <mesh key={`gantryStop_${i}`} position={[x, 2.35, 0]}><boxGeometry args={[.08, .22, .26]} /><ModelMaterial color="#FFB05C" emissive="#7a4a1a" emissiveIntensity={.5} ghost={ghost} /></mesh>
+      ))}
+
+      {/* === 5.6 다축 로봇 정비 팔 (좌: 기계 / 우: 진단) === */}
+      {[
+        { dir: -1, shoulderRef: leftShoulderRef, elbowRef: leftElbowRef, tool: 'mechanical' },
+        { dir: 1, shoulderRef: rightShoulderRef, elbowRef: rightElbowRef, tool: 'scanner' },
+      ].map((arm) => (
+        <group key={`arm_${arm.dir}`} position={[arm.dir * 1.35, .55, 0]}>
+          {/* 회전 베이스 */}
+          <mesh position={[0, .18, 0]} castShadow={!ghost}><cylinderGeometry args={[.2, .25, .36, 10]} /><ModelMaterial color="#283B49" metalness={.7} roughness={.4} ghost={ghost} /></mesh>
+          {/* 어깨(shoulder) 그룹 - rotation.z로 회전 */}
+          <group ref={arm.shoulderRef} position={[0, .38, 0]} rotation={[0, 0, -1.1]}>
+            {/* 상완 */}
+            <mesh position={[0, .35, 0]} castShadow={!ghost}><boxGeometry args={[.18, .7, .22]} /><ModelMaterial color="#C5D0CB" metalness={.25} roughness={.55} ghost={ghost} /></mesh>
+            {/* 어깨 관절 실린더 */}
+            <mesh position={[0, 0, 0]}><cylinderGeometry args={[.16, .16, .22, 10]} /><ModelMaterial color="#526A78" metalness={.65} roughness={.35} ghost={ghost} /></mesh>
+            {/* 팔꿈치(elbow) 그룹 - rotation.z로 회전 */}
+            <group ref={arm.elbowRef} position={[0, .7, 0]} rotation={[0, 0, .25]}>
+              <mesh position={[0, .28, 0]} castShadow={!ghost}><boxGeometry args={[.15, .56, .18]} /><ModelMaterial color="#C5D0CB" metalness={.22} roughness={.58} ghost={ghost} /></mesh>
+              {/* 손목 */}
+              <mesh position={[0, .6, 0]}><cylinderGeometry args={[.1, .1, .14, 8]} /><ModelMaterial color="#526A78" metalness={.65} roughness={.35} ghost={ghost} /></mesh>
+              {/* 공구 헤드: 기계팔=클램프(주황), 진단팔=센서(청록) */}
+              {arm.tool === 'mechanical' ? (
+                <>
+                  <mesh position={[0, .72, 0]}><boxGeometry args={[.18, .06, .16]} /><ModelMaterial color="#526A78" metalness={.65} roughness={.35} ghost={ghost} /></mesh>
+                  <mesh position={[-.06, .78, 0]}><boxGeometry args={[.03, .08, .12]} /><ModelMaterial color="#FFB05C" emissive="#7a4a1a" emissiveIntensity={1} ghost={ghost} /></mesh>
+                  <mesh position={[.06, .78, 0]}><boxGeometry args={[.03, .08, .12]} /><ModelMaterial color="#FFB05C" emissive="#7a4a1a" emissiveIntensity={1} ghost={ghost} /></mesh>
+                </>
+              ) : (
+                <>
+                  <mesh position={[0, .72, 0]}><sphereGeometry args={[.09, 10, 8]} /><ModelMaterial color="#71D7FF" emissive="#2a7fa8" emissiveIntensity={1.2} ghost={ghost} /></mesh>
+                  <mesh position={[0, .82, 0]}><cylinderGeometry args={[.04, .06, .08, 8]} /><ModelMaterial color="#526A78" metalness={.65} roughness={.35} ghost={ghost} /></mesh>
+                </>
+              )}
+            </group>
+          </group>
+        </group>
+      ))}
+
+      {/* === 5.9 후면 통제 콘솔 (역할별 분리) === */}
+      <group position={[0, .14, -1.35]}>
+        {/* 중앙 서비스 콘솔 */}
+        <mesh position={[0, .55, 0]} castShadow={!ghost}><boxGeometry args={[1.2, 1.1, .18]} /><ModelMaterial color="#283B49" metalness={.65} roughness={.4} ghost={ghost} /></mesh>
+        {/* 좌측 전력·배터리 모듈 */}
+        <mesh position={[-.85, .45, 0]} castShadow={!ghost}><boxGeometry args={[.4, .9, .18]} /><ModelMaterial color="#526A78" metalness={.55} roughness={.42} ghost={ghost} /></mesh>
+        {/* 우측 진단 서버 모듈 */}
+        <mesh position={[.85, .45, 0]} castShadow={!ghost}><boxGeometry args={[.4, .9, .18]} /><ModelMaterial color="#526A78" metalness={.55} roughness={.42} ghost={ghost} /></mesh>
+        {/* 상단 상태 바 */}
+        <mesh position={[0, 1.2, 0]}><boxGeometry args={[1.8, .08, .04]} /><ModelMaterial color="#63E6D2" emissive="#2a9a8a" emissiveIntensity={1.1} ghost={ghost} /></mesh>
+        {/* 게이지 메쉬 (막대그래프 표현) */}
+        {[-.4, -.2, 0, .2, .4].map((x, i) => (
+          <mesh key={`gauge_${i}`} position={[x, .6, .1]}><boxGeometry args={[.06, .2 + (i % 3) * .12, .02]} /><ModelMaterial color={i % 2 ? '#71D7FF' : '#63E6D2'} emissive={i % 2 ? '#2a7fa8' : '#2a9a8a'} emissiveIntensity={1} ghost={ghost} /></mesh>
+        ))}
+      </group>
+
+      {/* === 5.8 진입부 에어 노즐 (먼지 제거, 파티클 없이 메쉬만) === */}
+      {[-1.4, 1.4].map((x, i) => (
+        <group key={`nozzle_${i}`} position={[x, .3, 1.2]}>
+          <mesh><cylinderGeometry args={[.05, .07, .25, 8]} /><ModelMaterial color="#526A78" metalness={.55} roughness={.42} ghost={ghost} /></mesh>
+          <mesh position={[0, -.14, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[.04, .06, .08, 8]} /><ModelMaterial color="#283B49" metalness={.65} roughness={.4} ghost={ghost} /></mesh>
+        </group>
+      ))}
+
+      {/* === 8. 실제 동적 조명 (spotLight, 가장 가까운 1개만, castShadow=false) === */}
+      {!ghost && (
+        <>
+          <spotLight
+            ref={lightRef}
+            position={[0, 2.35, -.1]}
+            color="#e5f8ff"
+            intensity={0}
+            distance={4.6}
+            angle={0.82}
+            penumbra={0.9}
+            decay={2}
+            castShadow={false}
+          />
+          <primitive object={lightTarget} position={[0, 0, 0]} />
+        </>
+      )}
+    </group>
+  )
+}
+
 export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightActive = false }) {
   if (itemId === 'starter_dome') {
     return (
@@ -1055,6 +1282,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'rover_bay') {
+    if (Number(level || 1) >= 2) {
+      return <MatureRoverBay scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group>
         <mesh position={[0, .08, 0]} receiveShadow><boxGeometry args={[2.7, .16, 2.35]} /><ModelMaterial color="#26394c" metalness={.6} roughness={.42} ghost={ghost} /></mesh>
@@ -1204,15 +1435,22 @@ const ORGANIC_STRUCTURE_IDS = new Set([
   'starflower_garden',
 ])
 
-function PlacedStructure({ item, selected, onSelect, activeLampId }) {
+// Stage 2에서 동적 조명(spotLight)을 내장하는 발광 시설. 가장 가까운 1개만 실제 조명을 켠다.
+// 새 발광 Stage 2 시설이 추가되면 여기에 itemId를 추가하면 자동으로 조명 매니저가 지원한다.
+const LIGHTING_STRUCTURE_IDS = new Set([
+  'star_lamp',
+  'rover_bay',
+])
+
+function PlacedStructure({ item, selected, onSelect, activeLightId }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId)
   const isOrganic = ORGANIC_STRUCTURE_IDS.has(item.itemId)
-  // 가장 가까운 Stage 2 별빛 램프만 동적 조명을 켠다.
-  const dynamicLightActive = item.itemId === 'star_lamp'
+  // 가장 가까운 Stage 2 발광 시설 1개만 동적 조명을 켠다.
+  const dynamicLightActive = LIGHTING_STRUCTURE_IDS.has(item.itemId)
     && Number(item.level || 1) >= 2
-    && activeLampId === item.instanceId
+    && activeLightId === item.instanceId
   return (
     <group position={position} rotation={[0, THREE.MathUtils.degToRad(Number(item.rotation || 0)), 0]}>
       {!isOrganic && (
@@ -2116,14 +2354,15 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
 
-  // === 별빛 램프 동적 조명 매니저 ===
-  // 상위 월드에서 매 프레임 1회 가장 가까운 Stage 2 램프를 계산하고,
+  // === 발광 시설 동적 조명 매니저 ===
+  // 상위 월드에서 매 프레임 1회 가장 가까운 Stage 2 발광 시설을 계산하고,
   // id가 바뀔 때만 React state를 갱신한다(매 프레임 리렌더 방지).
+  // 대상: LIGHTING_STRUCTURE_IDS(star_lamp, rover_bay 등). 새 시설은 집합에 추가만 하면 자동 지원.
   const playerGroupRef = useRef()
-  const activeLampIdRef = useRef(null)
-  const [activeLampId, setActiveLampId] = useState(null)
-  const lampPositions = useMemo(() => layout
-    .filter((item) => item.itemId === 'star_lamp' && Number(item.level || 1) >= 2)
+  const activeLightIdRef = useRef(null)
+  const [activeLightId, setActiveLightId] = useState(null)
+  const lightingPositions = useMemo(() => layout
+    .filter((item) => LIGHTING_STRUCTURE_IDS.has(item.itemId) && Number(item.level || 1) >= 2)
     .map((item) => {
       const pos = worldPositionFromLayout(item)
       pos[1] = terrainHeight(pos[0], pos[2])
@@ -2131,22 +2370,22 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     }), [layout])
   useFrame(() => {
     const player = playerGroupRef.current
-    if (!player || lampPositions.length === 0) {
-      if (activeLampIdRef.current !== null) {
-        activeLampIdRef.current = null
-        setActiveLampId(null)
+    if (!player || lightingPositions.length === 0) {
+      if (activeLightIdRef.current !== null) {
+        activeLightIdRef.current = null
+        setActiveLightId(null)
       }
       return
     }
     const px = player.position.x
     const pz = player.position.z
     const CUTOFF_SQ = 36 // 6 World Unit
-    const HYST_MARGIN_SQ = 0.36 // 약 0.6 WU 히스테리시스 마진(인접 램프 교체 방지)
-    // 가장 가까운 램프 탐색(6 WU 이내만)
+    const HYST_MARGIN_SQ = 0.36 // 약 0.6 WU 히스테리시스 마진(인접 시설 교체 방지)
+    // 가장 가까운 발광 시설 탐색(6 WU 이내만)
     let nearestId = null
     let nearestDistSq = CUTOFF_SQ
-    for (let i = 0; i < lampPositions.length; i++) {
-      const lamp = lampPositions[i]
+    for (let i = 0; i < lightingPositions.length; i++) {
+      const lamp = lightingPositions[i]
       const dx = lamp.position[0] - px
       const dz = lamp.position[2] - pz
       const d = dx * dx + dz * dz
@@ -2155,19 +2394,19 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
         nearestId = lamp.id
       }
     }
-    // 히스테리시스: 새 후보가 현재 활성 램프보다 충분히 더 가까울 때만 교체.
-    const currentId = activeLampIdRef.current
+    // 히스테리시스: 새 후보가 현재 활성 시설보다 충분히 더 가까울 때만 교체.
+    const currentId = activeLightIdRef.current
     let nextId = currentId
     if (nearestId !== currentId) {
       if (currentId === null) {
         nextId = nearestId
       } else {
-        const cur = lampPositions.find((l) => l.id === currentId)
+        const cur = lightingPositions.find((l) => l.id === currentId)
         const cdx = cur.position[0] - px
         const cdz = cur.position[2] - pz
         const cDistSq = cdx * cdx + cdz * cdz
         if (cDistSq >= CUTOFF_SQ) {
-          nextId = nearestId // 현재 램프가 범위 밖으로 나가면 교체
+          nextId = nearestId // 현재 시설이 범위 밖으로 나가면 교체
         } else if (nearestId !== null && nearestDistSq + HYST_MARGIN_SQ < cDistSq) {
           nextId = nearestId // 새 후보가 충분히 더 가까우면 교체
         } else if (nearestId === null) {
@@ -2176,8 +2415,8 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       }
     }
     if (nextId !== currentId) {
-      activeLampIdRef.current = nextId
-      setActiveLampId(nextId)
+      activeLightIdRef.current = nextId
+      setActiveLightId(nextId)
     }
   })
   const roverNode = useMemo(() => ({
@@ -2391,7 +2630,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       )}
 
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
-      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLampId={activeLampId} />)}
+      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLightId={activeLightId} />)}
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
       {dailyEventNode && <DailyEventMarker node={dailyEventNode} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
