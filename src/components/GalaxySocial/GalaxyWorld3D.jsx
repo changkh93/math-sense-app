@@ -816,7 +816,185 @@ function CrystalCluster({ color = '#77e9ff', ghost = false, scale = 1 }) {
   )
 }
 
-export function StructureModel({ itemId, level = 1, ghost = false }) {
+// 별빛 램프 Stage 2: 외행성 개척 비콘(Frontier Photon Beacon).
+// 항로 표시 / 환경 감지 / 비상 통신 / 야간 조명을 동시에 수행하는 자율 비콘.
+// 가장 가까운 1개만 spotLight를 damp 보간으로 부드럽게 켜고, 나머지는 emissive로만 발광.
+function MatureStarLamp({ scale = 1, ghost = false, seed = 0, dynamicLightActive = false }) {
+  const outerGimbalRef = useRef()
+  const innerGimbalRef = useRef()
+  const coreRef = useRef()
+  const coreMatRef = useRef()
+  const lightRef = useRef()
+  // spotLight target: 램프 바로 아래 지면을 향함. useMemo로 한 번만 생성(매 렌더 재생성 방지).
+  const lightTarget = useMemo(() => {
+    const obj = new THREE.Object3D()
+    obj.position.set(0, 0, 0)
+    return obj
+  }, [])
+  // 램프 인스턴스 간 펄스 위상 분리. seed 가 0~1로 들어오므로 정수화.
+  const phase = (((seed || 0) % 97) / 97) * Math.PI * 2
+
+  // spotLight target을 램프 기준 지면 방향(아래)으로 고정.
+  useLayoutEffect(() => {
+    if (lightRef.current) {
+      lightRef.current.target = lightTarget
+    }
+  }, [lightTarget])
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime + phase
+
+    // 외부 짐벌: 매우 느린 수평 회전(기계식 항로 스캔)
+    if (outerGimbalRef.current) outerGimbalRef.current.rotation.y = time * 0.09
+    // 내부 짐벌: 미세한 피칭(레이더/카메라 짐벌처럼)
+    if (innerGimbalRef.current) innerGimbalRef.current.rotation.z = Math.sin(time * 0.28) * 0.08
+
+    // 짧은 펄스 신호(약 3.2초 주기). pow(sin, 10)로 날카롭게.
+    const pulse = Math.pow(Math.max(0, Math.sin(time * 1.9)), 10)
+    if (coreRef.current) {
+      const coreScale = 1 + pulse * 0.035
+      coreRef.current.scale.setScalar(coreScale)
+    }
+    if (coreMatRef.current) {
+      coreMatRef.current.emissiveIntensity = 1.4 + pulse * 1.5
+    }
+
+    // 동적 조명 intensity damp 보간. 갑작스러운 on/off 방지.
+    if (lightRef.current) {
+      const target = dynamicLightActive ? 0.55 : 0
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, target, 6, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      {/* === 4.1 삼점식 지면 앵커 (120도 간격) === */}
+      {[0, 1, 2].map((i) => {
+        const angle = (i / 3) * Math.PI * 2
+        const reach = 0.42
+        const x = Math.sin(angle) * reach
+        const z = Math.cos(angle) * reach
+        return (
+          <group key={`anchor_${i}`} position={[x, 0, z]} rotation={[0, angle, 0]}>
+            {/* 지면 압력 패드 */}
+            <mesh position={[0, .03, 0]} castShadow={!ghost}><cylinderGeometry args={[.12, .15, .06, 8]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+            {/* 충격 흡수 실린더 */}
+            <mesh position={[0, .12, 0]} castShadow={!ghost}><cylinderGeometry args={[.045, .055, .16, 8]} /><ModelMaterial color="#486174" metalness={.55} roughness={.48} ghost={ghost} /></mesh>
+            {/* 베이스로 향하는 지지 암 */}
+            <mesh position={[-0.13, .14, 0]} castShadow={!ghost}><boxGeometry args={[.26, .05, .07]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+            {/* 압력 패드 위 청록 위치등 */}
+            <mesh position={[0, .075, 0]}><sphereGeometry args={[.022, 8, 6]} /><ModelMaterial color="#67E8F9" emissive="#22a8c0" emissiveIntensity={1.2} ghost={ghost} /></mesh>
+          </group>
+        )
+      })}
+
+      {/* === 4.2 육각형 전력 베이스 (상하 반경 다르게) === */}
+      <mesh position={[0, .13, 0]} castShadow={!ghost} receiveShadow><cylinderGeometry args={[.55, .64, .22, 6]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+      {/* 열 차폐 세라믹 중단 */}
+      <mesh position={[0, .26, 0]} castShadow={!ghost}><cylinderGeometry args={[.5, .54, .06, 6]} /><ModelMaterial color="#C9C9B9" metalness={.05} roughness={.7} ghost={ghost} /></mesh>
+      {/* 내부 에너지 코어 슬롯 발광 (3개 방사형) */}
+      {[0, 1, 2].map((i) => {
+        const angle = (i / 3) * Math.PI * 2 + Math.PI / 6
+        return <mesh key={`core_${i}`} position={[Math.cos(angle) * .38, .17, Math.sin(angle) * .38]}><boxGeometry args={[.04, .04, .12]} /><ModelMaterial color="#67E8F9" emissive="#22a8c0" emissiveIntensity={1.1} ghost={ghost} /></mesh>
+      })}
+
+      {/* === 4.3 분절형 중앙 마스트 (3분할 + 두꺼운 칼라) === */}
+      {/* 하단 동력부 (약간 굵게) */}
+      <mesh position={[0, .68, 0]} castShadow={!ghost}><cylinderGeometry args={[.13, .17, .58, 12]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+      {/* 하단-중앙 연결 칼라 */}
+      <mesh position={[0, .97, 0]} castShadow={!ghost}><cylinderGeometry args={[.16, .16, .06, 12]} /><ModelMaterial color="#486174" metalness={.55} roughness={.48} ghost={ghost} /></mesh>
+      {/* 중앙 구조부 */}
+      <mesh position={[0, 1.26, 0]} castShadow={!ghost}><cylinderGeometry args={[.12, .13, .52, 12]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+      {/* 마스트 세로 발광선 (전력 진단등, 3개) */}
+      {[0, 1, 2].map((i) => {
+        const angle = (i / 3) * Math.PI * 2
+        return <mesh key={`diag_${i}`} position={[Math.cos(angle) * .135, 1.26, Math.sin(angle) * .135]}><boxGeometry args={[.018, .42, .018]} /><ModelMaterial color="#67E8F9" emissive="#22a8c0" emissiveIntensity={.9} ghost={ghost} /></mesh>
+      })}
+      {/* 중앙-상단 연결 칼라 */}
+      <mesh position={[0, 1.55, 0]} castShadow={!ghost}><cylinderGeometry args={[.15, .15, .06, 12]} /><ModelMaterial color="#486174" metalness={.55} roughness={.48} ghost={ghost} /></mesh>
+      {/* 상단 회전부 (가늘게) */}
+      <mesh position={[0, 1.8, 0]} castShadow={!ghost}><cylinderGeometry args={[.1, .12, .44, 12]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+
+      {/* === 4.4 열 방출 핀 (방사형 4개) === */}
+      {[0, 1, 2, 3].map((i) => {
+        const angle = (i / 4) * Math.PI * 2 + Math.PI / 8
+        return (
+          <mesh key={`fin_${i}`} position={[Math.cos(angle) * .15, 1.72, Math.sin(angle) * .15]} castShadow={!ghost}>
+            <boxGeometry args={[.04, .22, .18]} />
+            <ModelMaterial color="#3a4a5e" metalness={.4} roughness={.6} ghost={ghost} />
+          </mesh>
+        )
+      })}
+
+      {/* === 4.5 기계식 광학 짐벌 (2축) + 4.6 수정 유리 광학 코어 === */}
+      <group ref={outerGimbalRef} position={[0, 2.1, 0]}>
+        {/* 외부 링 (수평 회전 장치) + 모터 하우징 */}
+        <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.28, .035, 8, 20]} /><ModelMaterial color="#486174" metalness={.55} roughness={.48} ghost={ghost} /></mesh>
+        <mesh position={[.28, 0, 0]}><boxGeometry args={[.08, .08, .08]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+        <mesh position={[-.28, 0, 0]}><boxGeometry args={[.08, .08, .08]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+        {/* 내부 링 (피칭 축) */}
+        <group ref={innerGimbalRef}>
+          <mesh><torusGeometry args={[.2, .028, 8, 18]} /><ModelMaterial color="#486174" metalness={.55} roughness={.48} ghost={ghost} /></mesh>
+          {/* 외부 금속 보호 프레임 (코어 감싸기) */}
+          <mesh position={[0, .14, 0]}><boxGeometry args={[.34, .04, .34]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+          <mesh position={[0, -.14, 0]}><boxGeometry args={[.34, .04, .34]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+          {/* 반투명 보호 셸 */}
+          <mesh><sphereGeometry args={[.16, 16, 12]} /><meshPhysicalMaterial color={ghost ? '#71f3bf' : '#fff3b0'} transparent opacity={ghost ? .42 : .32} roughness={.12} metalness={.05} depthWrite={!ghost} emissive={ghost ? '#1f765a' : '#ffd98a'} emissiveIntensity={ghost ? .8 : .5} /></mesh>
+          {/* 내부 발광 결정 (수정 유리 광학 코어) */}
+          <mesh ref={coreRef} rotation={[0, Math.PI / 4, 0]}>
+            <octahedronGeometry args={[.11, 0]} />
+            <meshStandardMaterial ref={coreMatRef} color={ghost ? '#71f3bf' : '#FFF3B0'} emissive={ghost ? '#1f765a' : '#FFBF5B'} emissiveIntensity={1.4} metalness={.2} roughness={.18} toneMapped={false} />
+          </mesh>
+        </group>
+      </group>
+
+      {/* === 4.7 환경 센서 크라운 (작은 안테나 3개, 전체 높이 10% 이내) === */}
+      <group position={[0, 2.42, 0]}>
+        {[0, 1, 2].map((i) => {
+          const angle = (i / 3) * Math.PI * 2
+          const r = .06
+          return (
+            <group key={`sensor_${i}`} position={[Math.cos(angle) * r, 0, Math.sin(angle) * r]}>
+              <mesh castShadow={!ghost}><cylinderGeometry args={[.008, .012, .14, 6]} /><ModelMaterial color="#486174" metalness={.55} roughness={.48} ghost={ghost} /></mesh>
+              <mesh position={[0, .08, 0]}><sphereGeometry args={[.012, 6, 5]} /><ModelMaterial color="#67E8F9" emissive="#22a8c0" emissiveIntensity={1} ghost={ghost} /></mesh>
+            </group>
+          )
+        })}
+        {/* 중앙 통신 안테나 */}
+        <mesh castShadow={!ghost}><cylinderGeometry args={[.01, .015, .16, 6]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+      </group>
+
+      {/* === 4.8 수정 유리 카트리지 배출구 (베이스 전면) === */}
+      <group position={[0, .17, .5]}>
+        <mesh><boxGeometry args={[.18, .08, .04]} /><ModelMaterial color="#293B4A" metalness={.65} roughness={.42} ghost={ghost} /></mesh>
+        {/* 서비스 상태등 */}
+        <mesh position={[.12, 0, 0]}><sphereGeometry args={[.018, 8, 6]} /><ModelMaterial color="#67E8F9" emissive="#22a8c0" emissiveIntensity={1.1} ghost={ghost} /></mesh>
+      </group>
+
+      {/* === 6. 실제 동적 조명 (spotLight, 가장 가까운 1개만, castShadow=false) === */}
+      {!ghost && (
+        <>
+          <spotLight
+            ref={lightRef}
+            position={[0, 1.9, 0]}
+            color="#ffe6a1"
+            intensity={0}
+            distance={4.8}
+            angle={0.72}
+            penumbra={0.85}
+            decay={2}
+            castShadow={false}
+          />
+          {/* 지면 조준 target (램프 바로 아래). primitive로 씬 그래프에 추가해 transform 반영. */}
+          <primitive object={lightTarget} position={[0, 0, 0]} />
+        </>
+      )}
+    </group>
+  )
+}
+
+export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightActive = false }) {
   if (itemId === 'starter_dome') {
     return (
       <group>
@@ -831,10 +1009,23 @@ export function StructureModel({ itemId, level = 1, ghost = false }) {
     ? <MatureLumenTree scale={1} ghost={ghost} />
     : <RoundedLumenTree scale={.9} ghost={ghost} />
   if (itemId === 'wild_sprout') return <RoundedLumenTree scale={.45} ghost={ghost} />
-  if (itemId === 'star_lamp' || itemId === 'prism_pathlight') {
-    const small = itemId === 'prism_pathlight'
+  if (itemId === 'star_lamp') {
+    if (Number(level || 1) >= 2) {
+      return <MatureStarLamp scale={1} ghost={ghost} seed={0} dynamicLightActive={dynamicLightActive} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
-      <group scale={small ? .68 : 1}>
+      <group>
+        <mesh position={[0, .7, 0]} castShadow={!ghost}><cylinderGeometry args={[.08, .17, 1.4, 10]} /><ModelMaterial color="#7589a5" metalness={.78} roughness={.25} ghost={ghost} /></mesh>
+        <mesh position={[0, 1.54, 0]} rotation={[0, .35, 0]}><octahedronGeometry args={[.34, 0]} /><ModelMaterial color="#fff2a9" emissive="#ffd347" emissiveIntensity={2.5} metalness={.2} roughness={.18} ghost={ghost} /></mesh>
+        <mesh position={[0, .09, 0]}><cylinderGeometry args={[.36, .46, .18, 12]} /><ModelMaterial color="#32465d" metalness={.7} ghost={ghost} /></mesh>
+      </group>
+    )
+  }
+  if (itemId === 'prism_pathlight') {
+    // Stage 1만 (prism_pathlight는 Stage 2 없음, 별도 분기)
+    return (
+      <group scale={.68}>
         <mesh position={[0, .7, 0]} castShadow={!ghost}><cylinderGeometry args={[.08, .17, 1.4, 10]} /><ModelMaterial color="#7589a5" metalness={.78} roughness={.25} ghost={ghost} /></mesh>
         <mesh position={[0, 1.54, 0]} rotation={[0, .35, 0]}><octahedronGeometry args={[.34, 0]} /><ModelMaterial color="#fff2a9" emissive="#ffd347" emissiveIntensity={2.5} metalness={.2} roughness={.18} ghost={ghost} /></mesh>
         <mesh position={[0, .09, 0]}><cylinderGeometry args={[.36, .46, .18, 12]} /><ModelMaterial color="#32465d" metalness={.7} ghost={ghost} /></mesh>
@@ -1013,17 +1204,21 @@ const ORGANIC_STRUCTURE_IDS = new Set([
   'starflower_garden',
 ])
 
-function PlacedStructure({ item, selected, onSelect }) {
+function PlacedStructure({ item, selected, onSelect, activeLampId }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId)
   const isOrganic = ORGANIC_STRUCTURE_IDS.has(item.itemId)
+  // 가장 가까운 Stage 2 별빛 램프만 동적 조명을 켠다.
+  const dynamicLightActive = item.itemId === 'star_lamp'
+    && Number(item.level || 1) >= 2
+    && activeLampId === item.instanceId
   return (
     <group position={position} rotation={[0, THREE.MathUtils.degToRad(Number(item.rotation || 0)), 0]}>
       {!isOrganic && (
         <mesh position={[0, .045, 0]} receiveShadow><cylinderGeometry args={[footprint, footprint + .12, .09, 24]} /><meshStandardMaterial color="#293d48" roughness={.94} /></mesh>
       )}
-      <StructureModel itemId={item.itemId} level={item.level || 1} />
+      <StructureModel itemId={item.itemId} level={item.level || 1} dynamicLightActive={dynamicLightActive} />
       {item.imageUrl && (
         <Html position={[0, Math.max(.76, footprint * .58), footprint * .82]} center distanceFactor={11}>
           <button type="button" className="frontier-structure-image-marker" onClick={(event) => { event.stopPropagation(); onSelect?.(item) }} aria-label={`${item.name || '객체'} 이미지와 설명 보기`}>
@@ -1335,9 +1530,13 @@ function RemoteAstronaut({ player, showName, walkHeightAt = walkSurfaceHeight })
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderMode = false, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest', walkHeightAt = walkSurfaceHeight }) {
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderMode = false, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest', walkHeightAt = walkSurfaceHeight, playerGroupRef }) {
   const { gl } = useThree()
   const group = useRef()
+  // 외부(상위 월드)에서 플레이어 위치를 ref로 읽을 수 있도록 노출. 매 프레임 갱신.
+  useLayoutEffect(() => {
+    if (playerGroupRef) playerGroupRef.current = group.current
+  })
   const body = useRef()
   const leftArm = useRef()
   const rightArm = useRef()
@@ -1916,6 +2115,71 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
+
+  // === 별빛 램프 동적 조명 매니저 ===
+  // 상위 월드에서 매 프레임 1회 가장 가까운 Stage 2 램프를 계산하고,
+  // id가 바뀔 때만 React state를 갱신한다(매 프레임 리렌더 방지).
+  const playerGroupRef = useRef()
+  const activeLampIdRef = useRef(null)
+  const [activeLampId, setActiveLampId] = useState(null)
+  const lampPositions = useMemo(() => layout
+    .filter((item) => item.itemId === 'star_lamp' && Number(item.level || 1) >= 2)
+    .map((item) => {
+      const pos = worldPositionFromLayout(item)
+      pos[1] = terrainHeight(pos[0], pos[2])
+      return { id: item.instanceId, position: pos }
+    }), [layout])
+  useFrame(() => {
+    const player = playerGroupRef.current
+    if (!player || lampPositions.length === 0) {
+      if (activeLampIdRef.current !== null) {
+        activeLampIdRef.current = null
+        setActiveLampId(null)
+      }
+      return
+    }
+    const px = player.position.x
+    const pz = player.position.z
+    const CUTOFF_SQ = 36 // 6 World Unit
+    const HYST_MARGIN_SQ = 0.36 // 약 0.6 WU 히스테리시스 마진(인접 램프 교체 방지)
+    // 가장 가까운 램프 탐색(6 WU 이내만)
+    let nearestId = null
+    let nearestDistSq = CUTOFF_SQ
+    for (let i = 0; i < lampPositions.length; i++) {
+      const lamp = lampPositions[i]
+      const dx = lamp.position[0] - px
+      const dz = lamp.position[2] - pz
+      const d = dx * dx + dz * dz
+      if (d < nearestDistSq) {
+        nearestDistSq = d
+        nearestId = lamp.id
+      }
+    }
+    // 히스테리시스: 새 후보가 현재 활성 램프보다 충분히 더 가까울 때만 교체.
+    const currentId = activeLampIdRef.current
+    let nextId = currentId
+    if (nearestId !== currentId) {
+      if (currentId === null) {
+        nextId = nearestId
+      } else {
+        const cur = lampPositions.find((l) => l.id === currentId)
+        const cdx = cur.position[0] - px
+        const cdz = cur.position[2] - pz
+        const cDistSq = cdx * cdx + cdz * cdz
+        if (cDistSq >= CUTOFF_SQ) {
+          nextId = nearestId // 현재 램프가 범위 밖으로 나가면 교체
+        } else if (nearestId !== null && nearestDistSq + HYST_MARGIN_SQ < cDistSq) {
+          nextId = nearestId // 새 후보가 충분히 더 가까우면 교체
+        } else if (nearestId === null) {
+          nextId = null // 모두 범위 밖
+        }
+      }
+    }
+    if (nextId !== currentId) {
+      activeLampIdRef.current = nextId
+      setActiveLampId(nextId)
+    }
+  })
   const roverNode = useMemo(() => ({
     ...ROVER_NODE,
     status: ROVER_STATUS_LABELS[roverStatus] ? roverStatus : 'idle',
@@ -2127,7 +2391,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       )}
 
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
-      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} />)}
+      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLampId={activeLampId} />)}
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
       {dailyEventNode && <DailyEventMarker node={dailyEventNode} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
@@ -2157,7 +2421,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       )}
 
       {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} walkHeightAt={walkHeightAt} />)}
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={movementColliders} pickups={pickups} paused={paused || builderActive} freeLookEnabled={!buildItem && !builderActive} builderMode={builderActive} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={builderActive ? false : isFirstPerson} theme={planet?.theme || 'forest'} walkHeightAt={walkHeightAt} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={movementColliders} pickups={pickups} paused={paused || builderActive} freeLookEnabled={!buildItem && !builderActive} builderMode={builderActive} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={builderActive ? false : isFirstPerson} theme={planet?.theme || 'forest'} walkHeightAt={walkHeightAt} playerGroupRef={playerGroupRef} />
     </>
   )
 }

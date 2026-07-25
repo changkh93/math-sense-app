@@ -166,8 +166,10 @@ export const GALAXY_ITEM_CATALOG = {
 Object.entries(GALAXY_ITEM_CATALOG).forEach(([itemId, item]) => {
   item.maxLevel = 2
   item.stage2Cost = GALAXY_ITEM_STAGE2_COSTS[itemId] || 0
-  item.stage2Available = itemId === 'lumen_tree'
-  item.stage2Label = itemId === 'lumen_tree' ? '성목 루멘' : 'Stage 2 준비 중'
+  item.stage2Available = itemId === 'lumen_tree' || itemId === 'star_lamp'
+  item.stage2Label = itemId === 'lumen_tree' ? '성목 루멘'
+    : itemId === 'star_lamp' ? '외행성 개척 비콘'
+    : 'Stage 2 준비 중'
 })
 
 // 게스트가 기본 보유한 개척자 돔. 카탈로그엔 없는 특수 객체라 별도 정의.
