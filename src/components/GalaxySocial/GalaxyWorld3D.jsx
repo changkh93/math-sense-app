@@ -1000,7 +1000,7 @@ function MatureStarLamp({ scale = 1, ghost = false, seed = 0, dynamicLightActive
 // 진입/정렬/세척/진단/충전/부품교체를 수행하는 반개방형 자율 도크.
 // 가장 가까운 1개만 spotLight를 damp 보간으로 부드럽게 켜고, 나머지는 emissive로만 발광.
 // 8초 주기 자체 루프(idle→scanning→repairing→charging)로 천천히 전환(상시 과동작 방지).
-function MatureRoverBay({ scale = 1, ghost = false, dynamicLightActive = false }) {
+function MatureRoverBay({ scale = 1, ghost = false, dynamicLightActive = false, roverStatus = 'idle' }) {
   const gantryRef = useRef()
   const leftShoulderRef = useRef()
   const leftElbowRef = useRef()
@@ -1009,6 +1009,9 @@ function MatureRoverBay({ scale = 1, ghost = false, dynamicLightActive = false }
   const couplerRef = useRef()
   const couplerMatRef = useRef()
   const lightRef = useRef()
+  const normalizedStatus = ['active', 'ready', 'claimed'].includes(roverStatus) ? roverStatus : 'idle'
+  const statusColor = normalizedStatus === 'ready' ? '#ffe18a' : normalizedStatus === 'active' ? '#71d7ff' : normalizedStatus === 'claimed' ? '#83f1bd' : '#63e6d2'
+  const statusEmissive = normalizedStatus === 'ready' ? '#a86812' : normalizedStatus === 'active' ? '#2a7fa8' : normalizedStatus === 'claimed' ? '#25795b' : '#2a9a8a'
   // spotLight target: 도크 중앙 바닥 방향. useMemo로 한 번만 생성.
   const lightTarget = useMemo(() => {
     const obj = new THREE.Object3D()
@@ -1119,7 +1122,7 @@ function MatureRoverBay({ scale = 1, ghost = false, dynamicLightActive = false }
           {/* 케이블 덕트 */}
           <mesh position={[dir * .16, 1.2, 0]} castShadow={!ghost}><boxGeometry args={[.06, .8, .08]} /><ModelMaterial color="#1C2B35" metalness={.4} roughness={.6} ghost={ghost} /></mesh>
           {/* 상태 표시등 */}
-          <mesh position={[0, 1.75, .12]}><boxGeometry args={[.12, .06, .03]} /><ModelMaterial color="#71D7FF" emissive="#2a7fa8" emissiveIntensity={1.3} ghost={ghost} /></mesh>
+        <mesh position={[0, 1.75, .12]}><boxGeometry args={[.12, .06, .03]} /><ModelMaterial color={statusColor} emissive={statusEmissive} emissiveIntensity={1.3} ghost={ghost} /></mesh>
           {/* 상단 갠트리 연결부 */}
           <mesh position={[0, 2.1, 0]} castShadow={!ghost}><boxGeometry args={[.3, .14, .3]} /><ModelMaterial color="#283B49" metalness={.65} roughness={.44} ghost={ghost} /></mesh>
         </group>
@@ -1187,7 +1190,7 @@ function MatureRoverBay({ scale = 1, ghost = false, dynamicLightActive = false }
         {/* 우측 진단 서버 모듈 */}
         <mesh position={[.85, .45, 0]} castShadow={!ghost}><boxGeometry args={[.4, .9, .18]} /><ModelMaterial color="#526A78" metalness={.55} roughness={.42} ghost={ghost} /></mesh>
         {/* 상단 상태 바 */}
-        <mesh position={[0, 1.2, 0]}><boxGeometry args={[1.8, .08, .04]} /><ModelMaterial color="#63E6D2" emissive="#2a9a8a" emissiveIntensity={1.1} ghost={ghost} /></mesh>
+        <mesh position={[0, 1.2, 0]}><boxGeometry args={[1.8, .08, .04]} /><ModelMaterial color={statusColor} emissive={statusEmissive} emissiveIntensity={1.1} ghost={ghost} /></mesh>
         {/* 게이지 메쉬 (막대그래프 표현) */}
         {[-.4, -.2, 0, .2, .4].map((x, i) => (
           <mesh key={`gauge_${i}`} position={[x, .6, .1]}><boxGeometry args={[.06, .2 + (i % 3) * .12, .02]} /><ModelMaterial color={i % 2 ? '#71D7FF' : '#63E6D2'} emissive={i % 2 ? '#2a7fa8' : '#2a9a8a'} emissiveIntensity={1} ghost={ghost} /></mesh>
@@ -1439,7 +1442,7 @@ function GreenhouseGlassMaterial({ ghost = false, opacity = .2 }) {
 // 별빛 공동 온실 Stage 2: 별빛 공생 생태관(Starlight Symbiosis Conservatory).
 // 세 개의 공동 재배 베드, 자동 관수 저장조, 개폐형 환기창과 교류 신호등을 갖춘 성숙 시설.
 // 파티클과 실제 광원은 플레이어에게 가장 가까운 Stage 2 발광 시설 하나에서만 활성화한다.
-function MatureFriendGreenhouse({ scale = 1, ghost = false, dynamicLightActive = false }) {
+function MatureFriendGreenhouse({ scale = 1, ghost = false, dynamicLightActive = false, vitality = 60 }) {
   const leftVentRef = useRef()
   const rightVentRef = useRef()
   const floraRef = useRef()
@@ -1468,7 +1471,8 @@ function MatureFriendGreenhouse({ scale = 1, ghost = false, dynamicLightActive =
 
   const frameColor = '#315b58'
   const frameLight = '#527f78'
-  const growLight = '#76f4c4'
+  const safeVitality = Math.min(100, Math.max(0, Number(vitality || 0)))
+  const growLight = safeVitality >= 80 ? '#9dffd1' : safeVitality >= 50 ? '#76f4c4' : '#ffd080'
 
   return (
     <group scale={scale}>
@@ -1569,7 +1573,7 @@ function MatureFriendGreenhouse({ scale = 1, ghost = false, dynamicLightActive =
 
       {!ghost && (
         <>
-          {dynamicLightActive && <Sparkles count={9} scale={[3, 2.2, 2.4]} position={[0, 1.55, 0]} color={growLight} size={1.25} speed={.22} />}
+          {dynamicLightActive && <Sparkles count={safeVitality >= 80 ? 14 : 9} scale={[3, 2.2, 2.4]} position={[0, 1.55, 0]} color={growLight} size={1.25} speed={.22} />}
           <pointLight ref={lightRef} position={[0, 1.75, .2]} color={growLight} intensity={0} distance={4.4} decay={2} castShadow={false} />
         </>
       )}
@@ -1662,12 +1666,16 @@ function StarflowerBloom({
 
 // 별꽃 정원 Stage 2: 별무리 치유정원(Starlit Sanctuary Garden).
 // 평면 화단을 다층 산책 정원으로 확장하고, 중심 별꽃과 서로 다른 꽃 군락이 느린 바람에 호흡하듯 흔들린다.
-function MatureStarflowerGarden({ scale = 1, ghost = false, dynamicLightActive = false }) {
+function MatureStarflowerGarden({ scale = 1, ghost = false, dynamicLightActive = false, vitality = 60, recentWaterCount = 0 }) {
   const bloomRefs = useRef([])
   const centerpieceRef = useRef()
   const centerpieceMatRef = useRef()
   const haloRef = useRef()
+  const waterSignalRef = useRef()
   const lightRef = useRef()
+  const safeVitality = Math.min(100, Math.max(0, Number(vitality || 0)))
+  const bloomScale = .86 + safeVitality * .002
+  const visibleWaterSignals = Math.min(3, Math.max(0, Number(recentWaterCount || 0)))
 
   useFrame((state, delta) => {
     if (ghost) return
@@ -1689,8 +1697,12 @@ function MatureStarflowerGarden({ scale = 1, ghost = false, dynamicLightActive =
       haloRef.current.rotation.z = time * .08
       haloRef.current.material.opacity = .12 + Math.sin(time * .7) * .025
     }
+    if (waterSignalRef.current) {
+      waterSignalRef.current.rotation.y = time * .32
+      waterSignalRef.current.position.y = .42 + Math.sin(time * .9) * .035
+    }
     if (lightRef.current) {
-      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, .28, 5, delta)
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, .2 + safeVitality * .0012, 5, delta)
     }
   })
 
@@ -1728,6 +1740,7 @@ function MatureStarflowerGarden({ scale = 1, ghost = false, dynamicLightActive =
         <StarflowerBloom
           key={`mature_starflower_${index}`}
           {...flower}
+          scale={flower.scale * bloomScale}
           ghost={ghost}
           bloomRef={(element) => { bloomRefs.current[index] = element }}
         />
@@ -1736,7 +1749,7 @@ function MatureStarflowerGarden({ scale = 1, ghost = false, dynamicLightActive =
       {/* 정원의 시선을 모으는 대형 칠엽 별꽃 */}
       <StarflowerBloom
         position={[0, .24, -.04]}
-        scale={1.18}
+        scale={1.18 * bloomScale}
         color="#f6c2ff"
         emissive="#9256b2"
         phase={0}
@@ -1764,10 +1777,31 @@ function MatureStarflowerGarden({ scale = 1, ghost = false, dynamicLightActive =
         </mesh>
       )}
 
+      {/* 최근 친구 물주기 기록을 나타내는 푸른 물방울 신호. 최대 3개만 표시해 과밀을 막는다. */}
+      {!ghost && visibleWaterSignals > 0 && (
+        <group ref={waterSignalRef}>
+          {Array.from({ length: visibleWaterSignals }, (_, index) => {
+            const angle = index / visibleWaterSignals * Math.PI * 2
+            return (
+              <group key={`garden_water_signal_${index}`} position={[Math.sin(angle) * 1.58, .42, Math.cos(angle) * 1.58]}>
+                <mesh scale={[.08, .13, .08]} rotation={[0, 0, Math.PI / 4]}>
+                  <octahedronGeometry args={[1, 0]} />
+                  <meshBasicMaterial color="#8deeff" transparent opacity={.9} toneMapped={false} />
+                </mesh>
+                <mesh position={[0, -.16, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <ringGeometry args={[.08, .12, 12]} />
+                  <meshBasicMaterial color="#8deeff" transparent opacity={.32} depthWrite={false} toneMapped={false} />
+                </mesh>
+              </group>
+            )
+          })}
+        </group>
+      )}
+
       {!ghost && dynamicLightActive && (
         <>
           <pointLight ref={lightRef} position={[0, 1.2, 0]} color="#ffc6e8" intensity={0} distance={3.6} decay={2} castShadow={false} />
-          <Sparkles count={11} scale={[2.9, 1.35, 2.9]} position={[0, .88, 0]} size={1.3} color="#ffd4ed" speed={.18} opacity={.58} />
+          <Sparkles count={safeVitality >= 80 ? 16 : 11} scale={[2.9, 1.35, 2.9]} position={[0, .88, 0]} size={1.3} color={safeVitality < 45 ? '#ffd59e' : '#ffd4ed'} speed={.18} opacity={.58} />
         </>
       )}
     </group>
@@ -2398,30 +2432,34 @@ function MaturePrismPathlight({ scale = 1, ghost = false, dynamicLightActive = f
 // 성운 관측소 Stage 2: 오로라 성운 천문대(Aurora Nebula Observatory).
 // Stage 1보다 넓고 높은 이중 타워, 회전식 돔, 프리즘 망원경으로 실루엣을 명확히 구분한다.
 // 광원·파티클은 플레이어에게 가장 가까운 Stage 2 발광 시설 하나에서만 활성화한다.
-function MatureObservatory({ scale = 1, ghost = false, dynamicLightActive = false }) {
+function MatureObservatory({ scale = 1, ghost = false, dynamicLightActive = false, observatoryMode = 'stable' }) {
   const scanAssemblyRef = useRef()
   const starChartRef = useRef()
   const beamRef = useRef()
   const lensRef = useRef()
   const lightRef = useRef()
+  const isAlert = observatoryMode === 'alert'
+  const isSignal = observatoryMode === 'signal'
+  const scanColor = isAlert ? '#ffd56f' : isSignal ? '#b79aff' : '#7dd3fc'
+  const scanEmissive = isAlert ? '#b86b10' : isSignal ? '#6945b8' : '#168fb2'
 
   useFrame((state, delta) => {
     if (ghost) return
     const time = state.clock.elapsedTime
-    if (scanAssemblyRef.current) scanAssemblyRef.current.rotation.y = time * .11
+    if (scanAssemblyRef.current) scanAssemblyRef.current.rotation.y = time * (isAlert ? .24 : isSignal ? .16 : .11)
     if (starChartRef.current) {
       starChartRef.current.rotation.y = time * .27
       starChartRef.current.rotation.z = Math.sin(time * .32) * .14
     }
     if (beamRef.current) {
-      const baseOpacity = dynamicLightActive ? .13 : .045
+      const baseOpacity = dynamicLightActive ? isAlert ? .2 : .13 : isAlert ? .085 : .045
       beamRef.current.material.opacity = baseOpacity + Math.sin(time * 1.35) * (dynamicLightActive ? .035 : .012)
     }
     if (lensRef.current) {
-      lensRef.current.emissiveIntensity = 1.7 + Math.sin(time * 1.8) * .25
+      lensRef.current.emissiveIntensity = (isAlert ? 2.25 : 1.7) + Math.sin(time * (isAlert ? 3.2 : 1.8)) * .25
     }
     if (lightRef.current) {
-      const target = dynamicLightActive ? .38 : 0
+      const target = dynamicLightActive ? isAlert ? .58 : .38 : 0
       lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, target, 5, delta)
     }
   })
@@ -2497,8 +2535,8 @@ function MatureObservatory({ scale = 1, ghost = false, dynamicLightActive = fals
             <cylinderGeometry args={[.54, .54, .13, 20]} />
             <meshStandardMaterial
               ref={lensRef}
-              color={ghost ? '#71f3bf' : '#8ce6ff'}
-              emissive={ghost ? '#1f765a' : '#0284c7'}
+              color={ghost ? '#71f3bf' : scanColor}
+              emissive={ghost ? '#1f765a' : scanEmissive}
               emissiveIntensity={ghost ? .8 : 1.7}
               metalness={.25}
               roughness={.12}
@@ -2518,7 +2556,7 @@ function MatureObservatory({ scale = 1, ghost = false, dynamicLightActive = fals
           {!ghost && (
             <mesh ref={beamRef} position={[0, 2.05, 0]}>
               <cylinderGeometry args={[.12, .45, 2.2, 12, 1, true]} />
-              <meshBasicMaterial color="#38bdf8" transparent opacity={.045} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+              <meshBasicMaterial color={scanColor} transparent opacity={.045} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
             </mesh>
           )}
         </group>
@@ -2538,8 +2576,8 @@ function MatureObservatory({ scale = 1, ghost = false, dynamicLightActive = fals
 
       {!ghost && (
         <>
-          {dynamicLightActive && <Sparkles count={10} scale={[2.6, 2.4, 2.6]} position={[0, 3.2, 0]} color="#7dd3fc" size={1.45} speed={.28} />}
-          <pointLight ref={lightRef} position={[0, 2.75, .35]} color="#38bdf8" intensity={0} distance={4.8} decay={2} castShadow={false} />
+          {dynamicLightActive && <Sparkles count={isAlert ? 16 : 10} scale={[2.6, 2.4, 2.6]} position={[0, 3.2, 0]} color={scanColor} size={1.45} speed={isAlert ? .46 : .28} />}
+          <pointLight ref={lightRef} position={[0, 2.75, .35]} color={scanColor} intensity={0} distance={4.8} decay={2} castShadow={false} />
         </>
       )}
     </group>
@@ -2659,7 +2697,7 @@ function MatureExpeditionBeacon({ scale = 1, ghost = false, dynamicLightActive =
   )
 }
 
-export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightActive = false, signalSummary, roverStatus = 'idle' }) {
+export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightActive = false, signalSummary, observatoryMode = 'stable', roverStatus = 'idle', greenhouseSummary, gardenSummary }) {
   if (itemId === 'starter_dome') {
     return (
       <group>
@@ -2715,7 +2753,7 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
   }
   if (itemId === 'friend_greenhouse') {
     if (Number(level || 1) >= 2) {
-      return <MatureFriendGreenhouse scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+      return <MatureFriendGreenhouse scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} vitality={greenhouseSummary?.vitality} />
     }
     // Stage 1: 기존 코드 유지
     return (
@@ -2732,7 +2770,7 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
   }
   if (itemId === 'rover_bay') {
     if (Number(level || 1) >= 2) {
-      return <MatureRoverBay scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+      return <MatureRoverBay scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} roverStatus={roverStatus} />
     }
     // Stage 1: 기존 코드 유지
     return (
@@ -2751,7 +2789,7 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
   }
   if (itemId === 'observatory') {
     if (Number(level || 1) >= 2) {
-      return <MatureObservatory scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+      return <MatureObservatory scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} observatoryMode={observatoryMode} />
     }
     // Stage 1: 기존 코드 유지
     return (
@@ -2767,7 +2805,7 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
   }
   if (itemId === 'starflower_garden') {
     if (Number(level || 1) >= 2) {
-      return <MatureStarflowerGarden scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+      return <MatureStarflowerGarden scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} vitality={gardenSummary?.vitality} recentWaterCount={gardenSummary?.recentWaterCount} />
     }
     // Stage 1: 기존 코드 유지
     return (
@@ -2847,7 +2885,7 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
   )
 }
 
-function PreviewTurntable({ itemId, level = 1, signalSummary, roverStatus = 'idle' }) {
+function PreviewTurntable({ itemId, level = 1, signalSummary, observatoryMode = 'stable', roverStatus = 'idle', greenhouseSummary, gardenSummary }) {
   const group = useRef()
   const baseY = itemId === 'observatory' && Number(level || 1) >= 2 ? -.98 : -.65
   useFrame((state, delta) => {
@@ -2855,10 +2893,10 @@ function PreviewTurntable({ itemId, level = 1, signalSummary, roverStatus = 'idl
     group.current.rotation.y += delta * .35
     group.current.position.y = baseY + Math.sin(state.clock.elapsedTime * 1.4) * .04
   })
-  return <group ref={group} position={[0, baseY, 0]}><StructureModel itemId={itemId} level={level} signalSummary={signalSummary} roverStatus={roverStatus} /></group>
+  return <group ref={group} position={[0, baseY, 0]}><StructureModel itemId={itemId} level={level} signalSummary={signalSummary} observatoryMode={observatoryMode} roverStatus={roverStatus} greenhouseSummary={greenhouseSummary} gardenSummary={gardenSummary} /></group>
 }
 
-export function StructurePreview3D({ itemId, level = 1, signalSummary, roverStatus = 'idle' }) {
+export function StructurePreview3D({ itemId, level = 1, signalSummary, observatoryMode = 'stable', roverStatus = 'idle', greenhouseSummary, gardenSummary }) {
   const isTallStructure = (itemId === 'observatory' || itemId === 'expedition_beacon') && Number(level || 1) >= 2
   return (
     <Canvas
@@ -2875,7 +2913,7 @@ export function StructurePreview3D({ itemId, level = 1, signalSummary, roverStat
       <hemisphereLight args={['#d9f8ff', '#172435', 1.4]} />
       <directionalLight position={[4, 7, 5]} intensity={2.2} color="#fff3d6" />
       <pointLight position={[-3, 2, 2]} intensity={1.2} color="#68e9ff" distance={10} />
-      <PreviewTurntable itemId={itemId} level={level} signalSummary={signalSummary} roverStatus={roverStatus} />
+      <PreviewTurntable itemId={itemId} level={level} signalSummary={signalSummary} observatoryMode={observatoryMode} roverStatus={roverStatus} greenhouseSummary={greenhouseSummary} gardenSummary={gardenSummary} />
       <mesh position={[0, -.72, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[2.2, 40]} /><meshBasicMaterial color="#6ce7ff" transparent opacity={.06} /></mesh>
       <Sparkles count={18} scale={[4, 3, 4]} size={1.6} color="#a8efff" speed={.2} />
     </Canvas>
@@ -2905,9 +2943,13 @@ function getStructureAcousticMaterial(itemId) {
   return 'soft'
 }
 
-function StructureProximityLabel({ item, footprint, isPlanetOwner, signalSummary, roverStatus = 'idle', roverStatusLabel = '' }) {
+function StructureProximityLabel({ item, footprint, isPlanetOwner, signalSummary, observatorySummary, greenhouseSummary, gardenSummary, roverStatus = 'idle', roverStatusLabel = '', roverBayApplied = false }) {
   const isSignalPlaza = item.itemId === 'signal_plaza'
   const isExpeditionBeacon = item.itemId === 'expedition_beacon'
+  const isRoverBay = item.itemId === 'rover_bay'
+  const isObservatory = item.itemId === 'observatory'
+  const isFriendGreenhouse = item.itemId === 'friend_greenhouse'
+  const isStarflowerGarden = item.itemId === 'starflower_garden'
   const unreadCount = Math.max(0, Number(signalSummary?.unreadCount || 0))
   const signalActionLabel = isPlanetOwner
     ? unreadCount > 0 ? `새 귀환 신호 ${unreadCount}개 확인` : '귀환 신호 기록 열기'
@@ -2915,11 +2957,21 @@ function StructureProximityLabel({ item, footprint, isPlanetOwner, signalSummary
   const beaconActionLabel = isPlanetOwner
     ? roverStatus === 'ready' ? '귀환 보상 받기' : roverStatus === 'active' ? roverStatusLabel || '원정 신호 추적' : '로버 관제 열기'
     : '원정 비콘 수리하기'
+  const roverBayActionLabel = isPlanetOwner
+    ? roverStatus === 'ready'
+      ? '귀환 보상 받기'
+      : roverStatus === 'active'
+        ? roverBayApplied ? `${roverStatusLabel} · 6시간 적용` : '다음 원정부터 6시간'
+        : '로버 관제 열기 · 다음 원정 6시간'
+    : '로버 정비소 수리하기'
+  const observatoryActionLabel = isPlanetOwner
+    ? observatorySummary?.statusLabel || '오늘의 관측 브리핑 열기'
+    : '관측 장비 수리하기'
   return (
     <Html position={[0, Math.max(1.7, footprint + .9), 0]} center distanceFactor={8.8} style={{ pointerEvents: 'none' }}>
       <div className="frontier-structure-proximity-label">
         <strong>{item.name || '행성 객체'}</strong>
-        <span><kbd>E</kbd> {isSignalPlaza ? signalActionLabel : isExpeditionBeacon ? beaconActionLabel : isPlanetOwner ? '재료 얻기' : '도와주기'} <i /> <kbd>F</kbd> {isSignalPlaza ? '광장 안내' : isExpeditionBeacon ? '비콘 안내' : '정보'}</span>
+        <span><kbd>E</kbd> {isSignalPlaza ? signalActionLabel : isObservatory ? observatoryActionLabel : isFriendGreenhouse ? isPlanetOwner ? '온실 돌보기 · 바이오 섬유' : `물주기 · 활력 ${greenhouseSummary?.vitality ?? 0}/100` : isStarflowerGarden ? isPlanetOwner ? `정원 돌보기 · 친구 물주기 ${gardenSummary?.recentWaterCount ?? 0}회` : `별꽃 물주기 · 활력 ${gardenSummary?.vitality ?? 0}/100` : isExpeditionBeacon ? beaconActionLabel : isRoverBay ? roverBayActionLabel : isPlanetOwner ? '재료 얻기' : '도와주기'} <i /> <kbd>F</kbd> {isSignalPlaza ? '광장 안내' : isObservatory ? '관측소 안내' : isFriendGreenhouse ? '협업 안내' : isStarflowerGarden ? '물주기 안내' : isExpeditionBeacon ? '비콘 안내' : isRoverBay ? '정비소 안내' : '정보'}</span>
       </div>
     </Html>
   )
@@ -2947,7 +2999,7 @@ const LIGHTING_STRUCTURE_IDS = new Set([
   'expedition_beacon',
 ])
 
-function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner, activeLightId, signalSummary, roverStatus, roverStatusLabel }) {
+function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner, activeLightId, signalSummary, observatorySummary, greenhouseSummary, gardenSummary, roverStatus, roverStatusLabel, roverBayApplied }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId, item.level)
@@ -2966,7 +3018,10 @@ function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner, acti
         level={item.level || 1}
         dynamicLightActive={dynamicLightActive}
         signalSummary={item.itemId === 'signal_plaza' ? signalSummary : undefined}
-        roverStatus={item.itemId === 'expedition_beacon' ? roverStatus : undefined}
+        observatoryMode={item.itemId === 'observatory' ? observatorySummary?.mode : undefined}
+        roverStatus={item.itemId === 'expedition_beacon' || item.itemId === 'rover_bay' ? roverStatus : undefined}
+        greenhouseSummary={item.itemId === 'friend_greenhouse' ? greenhouseSummary : undefined}
+        gardenSummary={item.itemId === 'starflower_garden' ? gardenSummary : undefined}
       />
       {item.imageUrl && (
         <Html position={[0, Math.max(.76, footprint * .58), footprint * .82]} center distanceFactor={11}>
@@ -2981,14 +3036,18 @@ function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner, acti
           <meshBasicMaterial color="#6ce7ff" transparent opacity={.9} depthWrite={false} />
         </mesh>
       )}
-      {nearby && (item.itemId === 'signal_plaza' || item.itemId === 'expedition_beacon') && (
+      {nearby && (item.itemId === 'signal_plaza' || item.itemId === 'observatory' || item.itemId === 'friend_greenhouse' || item.itemId === 'starflower_garden' || item.itemId === 'expedition_beacon' || item.itemId === 'rover_bay') && (
         <StructureProximityLabel
           item={item}
           footprint={footprint}
           isPlanetOwner={isPlanetOwner}
           signalSummary={signalSummary}
+          observatorySummary={observatorySummary}
+          greenhouseSummary={greenhouseSummary}
+          gardenSummary={gardenSummary}
           roverStatus={roverStatus}
           roverStatusLabel={roverStatusLabel}
+          roverBayApplied={roverBayApplied}
         />
       )}
     </group>
@@ -3888,7 +3947,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
 
@@ -4004,6 +4063,10 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     const collisionRadius = Math.max(.64, structureFootprint(item.itemId, item.level) + PLAYER_COLLISION_RADIUS)
     const isSignalPlaza = item.itemId === 'signal_plaza'
     const isExpeditionBeacon = item.itemId === 'expedition_beacon'
+    const isRoverBay = item.itemId === 'rover_bay'
+    const isObservatory = item.itemId === 'observatory'
+    const isFriendGreenhouse = item.itemId === 'friend_greenhouse'
+    const isStarflowerGarden = item.itemId === 'starflower_garden'
     const unreadSignals = Math.max(0, Number(signalPlazaSummary?.unreadCount || 0))
     return {
       id: item.instanceId,
@@ -4012,6 +4075,14 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
         ? isPlanetOwner ? 'signal' : 'admire'
         : isExpeditionBeacon
           ? isPlanetOwner ? 'rover' : 'repair'
+          : isObservatory
+            ? isPlanetOwner ? 'observatory' : 'repair'
+          : isRoverBay
+            ? isPlanetOwner ? 'rover' : 'repair'
+          : isFriendGreenhouse
+            ? isPlanetOwner ? 'structure' : 'water'
+          : isStarflowerGarden
+            ? isPlanetOwner ? 'structure' : 'water'
           : 'structure',
       label: isSignalPlaza
         ? isPlanetOwner
@@ -4021,6 +4092,26 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
           ? isPlanetOwner
             ? roverStatus === 'ready' ? '귀환 보상 받기 · 비콘 +1 적용' : roverStatus === 'active' ? `${roverStatusLabel} · 비콘 +1 적용` : '로버 원정 관제 열기 · 회수 재료 +1'
             : '원정 비콘 수리하기'
+        : isObservatory
+          ? isPlanetOwner
+            ? observatorySummary?.statusLabel || '오늘의 관측 브리핑 열기'
+            : '관측 장비 수리하기 · 도움 기록'
+        : isRoverBay
+          ? isPlanetOwner
+            ? roverStatus === 'ready'
+              ? '귀환 보상 받기 · 정비소 관제'
+              : roverStatus === 'active'
+                ? roverBayApplied ? `${roverStatusLabel} · 6시간 가속 적용` : '다음 원정부터 6시간 · 관제 열기'
+                : '로버 원정 관제 열기 · 다음 원정 6시간'
+            : '로버 정비소 수리하기'
+        : isFriendGreenhouse
+          ? isPlanetOwner
+            ? '온실 돌보기 · 바이오 섬유 1개'
+            : `공동 온실에 물주기 · 활력 ${greenhouseSummary?.vitality ?? 0}/100`
+        : isStarflowerGarden
+          ? isPlanetOwner
+            ? `별꽃 돌보기 · 친구 물주기 ${gardenSummary?.recentWaterCount ?? 0}회`
+            : `별꽃에 물주기 · 활력 ${gardenSummary?.vitality ?? 0}/100`
         : item.name || '행성 객체 살펴보기',
       position,
       collisionRadius,
@@ -4028,7 +4119,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       acousticMaterial: getStructureAcousticMaterial(item.itemId),
       item,
     }
-  }), [isPlanetOwner, layout, roverStatus, roverStatusLabel, signalPlazaSummary?.unreadCount])
+  }), [gardenSummary?.recentWaterCount, gardenSummary?.vitality, greenhouseSummary?.vitality, isPlanetOwner, layout, observatorySummary?.statusLabel, roverBayApplied, roverStatus, roverStatusLabel, signalPlazaSummary?.unreadCount])
   const biomeColliders = useMemo(() => BIOME_PROP_POSITIONS.map(([x, z, scale], index) => ({
     id: `biome-prop-${index}`,
     position: [x, terrainHeight(x, z), z],
@@ -4183,7 +4274,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       )}
 
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
-      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLightId={activeLightId} signalSummary={signalPlazaSummary} roverStatus={roverStatus} roverStatusLabel={roverStatusLabel} />)}
+      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLightId={activeLightId} signalSummary={signalPlazaSummary} observatorySummary={observatorySummary} greenhouseSummary={greenhouseSummary} gardenSummary={gardenSummary} roverStatus={roverStatus} roverStatusLabel={roverStatusLabel} roverBayApplied={roverBayApplied} />)}
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
       {dailyEventNode && <DailyEventMarker node={dailyEventNode} playerPosition={playerPosition} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
@@ -4368,6 +4459,7 @@ const INTERACTION_ICONS = {
   rover: Wrench,
   builder: Hammer,
   signal: Radio,
+  observatory: Search,
 }
 
 function InteractionPrompt({ nearby, onInteract, onInspect }) {
@@ -4482,6 +4574,9 @@ export default function GalaxyWorld3D({
   onSelectStructure,
   onStructureMission,
   signalPlazaSummary,
+  observatorySummary,
+  greenhouseSummary,
+  gardenSummary,
   selectedStructureId,
   onMessage,
   paused = false,
@@ -4489,6 +4584,7 @@ export default function GalaxyWorld3D({
   onOpenRover,
   roverStatus = 'idle',
   roverStatusLabel = '',
+  roverBayApplied = false,
   remotePlayers = [],
   localPlayerName = '탐사원',
   localSpeech = null,
@@ -4962,6 +5058,7 @@ export default function GalaxyWorld3D({
           }}
           roverStatus={roverStatus}
           roverStatusLabel={roverStatusLabel}
+          roverBayApplied={roverBayApplied}
           dailyEventNode={dailyEventNode}
           remotePlayers={remotePlayers}
           nearbyRemoteUids={nearbyRemoteUids}
@@ -4973,6 +5070,9 @@ export default function GalaxyWorld3D({
           onInteract={interact}
           onInspectStructure={inspectStructure}
           signalPlazaSummary={signalPlazaSummary}
+          observatorySummary={observatorySummary}
+          greenhouseSummary={greenhouseSummary}
+          gardenSummary={gardenSummary}
           builderEnabled={builderEnabled}
           builderActive={builderActive}
           builderCells={builder.cells}

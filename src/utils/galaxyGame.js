@@ -109,19 +109,19 @@ export const GALAXY_ITEM_CATALOG = {
   rover_bay: {
     name: '탐사 로버 정비소', icon: '⌂', iconId: 'wrench', cost: 160, material: 'alloy', materialCost: 3, kind: 'facility',
     description: '귀환한 로버를 정비하고 다음 원정을 준비하는 전초 시설입니다.',
-    effect: '장거리 로버 원정 시간을 8시간에서 6시간으로 단축합니다.',
+    effect: '설치 후 출발하는 장거리 로버 원정 시간을 8시간에서 6시간으로 단축합니다.',
     setName: '개척 전초기지', previewTone: '#ffad70',
   },
   observatory: {
     name: '성운 관측소', icon: '◎', iconId: 'telescope', cost: 240, material: 'crystalGlass', materialCost: 4, kind: 'facility',
-    description: '멀리 끊어진 아스트라 항로의 신호를 관측하는 시설입니다.',
-    effect: '행성 스카이라인에 회전 관측 장치와 푸른 신호광을 더합니다.',
+    description: '행성 사건·귀환 신호·로버 원정 상태를 한곳에서 관측하는 브리핑 시설입니다.',
+    effect: '가까이에서 E 키를 누르면 오늘의 관측 브리핑을 열고, 행성 스카이라인에 푸른 신호광을 더합니다.',
     setName: '개척 전초기지', previewTone: '#91b9ff',
   },
   friend_greenhouse: {
     name: '별빛 공동 온실', icon: '◇', iconId: 'warehouse', cost: 180, material: 'biofiber', materialCost: 4, kind: 'social',
-    description: '친구가 찾아와 물을 주고 생태 흔적을 남길 수 있는 공동 공간입니다.',
-    effect: '방문 도움 행동의 목적지가 되는 투명 온실을 만듭니다.',
+    description: '친구가 찾아와 물을 주면 정원 활력과 서로의 항로 연결도가 자라는 협업 시설입니다.',
+    effect: '친구는 가까이에서 E 키로 물을 주고, 주인은 방문자의 이름과 메시지를 귀환 기록에서 확인합니다.',
     setName: '연결의 정원', previewTone: '#8fffd1',
   },
   prism_pathlight: {
@@ -132,8 +132,8 @@ export const GALAXY_ITEM_CATALOG = {
   },
   starflower_garden: {
     name: '별꽃 정원', icon: '❋', iconId: 'flower-2', cost: 90, material: 'biofiber', materialCost: 3, kind: 'nature',
-    description: '친구의 물주기 신호에 어울리는 작은 발광 꽃밭입니다.',
-    effect: '정원 구역에 색 변화가 있는 꽃 군락을 더합니다.',
+    description: '친구가 찾아와 물을 주면 꽃빛이 살아나고 정원 활력과 항로 연결도가 자라는 협업 꽃밭입니다.',
+    effect: '친구는 가까이에서 E 키로 별꽃에 물을 주고, 주인은 방문자의 이름과 메시지를 귀환 기록에서 확인합니다.',
     setName: '연결의 정원', previewTone: '#ff9fcb',
   },
   creature_habitat: {

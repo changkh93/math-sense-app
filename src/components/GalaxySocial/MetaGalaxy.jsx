@@ -247,13 +247,13 @@ const BUILD_ITEM_STORIES = {
   rover_bay: {
     overline: '새로운 놀이의 출발점',
     promise: '탐사 로버가 돌아와 정비를 받는 기지를 세워 원정의 목적지를 만듭니다.',
-    effect: '장거리 로버 원정 시간을 8시간에서 6시간으로 단축합니다.',
+    effect: '정비소를 설치한 뒤 출발하는 장거리 로버 원정 시간을 8시간에서 6시간으로 단축합니다.',
     set: '개척 탐사 세트',
   },
   observatory: {
-    overline: '행성의 대표 실루엣',
-    promise: '먼 성운을 바라보는 높은 관측소로 친구에게 보여줄 랜드마크를 세웁니다.',
-    effect: '고대 정거장과 성운 항로를 상징하는 탐사 거점을 만듭니다.',
+    overline: '오늘의 신호를 읽는 높은 눈',
+    promise: '행성 사건과 귀환 신호, 로버 원정 상태를 한눈에 확인하는 관측 거점을 세웁니다.',
+    effect: '관측소 가까이에서 E 키를 눌러 오늘의 행성 브리핑을 바로 열 수 있습니다.',
     set: '심우주 관측 세트',
   },
   friend_greenhouse: {
@@ -813,6 +813,33 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       }))
       : [],
   }), [events, isOwner, planet.stats?.admirationCount, planet.stats?.visits])
+  const greenhouseSummary = useMemo(() => {
+    const waterEvents = isOwner
+      ? events.filter((event) => event?.itemId === 'friend_greenhouse' && event?.actionId === 'water')
+      : []
+    const recentHelpers = [...new Set(waterEvents.map((event) => event?.actorName).filter(Boolean))].slice(0, 3)
+    const route = (home?.neighbors || []).find((neighbor) => neighbor?.uid === targetUid)
+    return {
+      vitality: Math.min(100, Math.max(0, Number(planet.stats?.gardenVitality || 0))),
+      recentWaterCount: waterEvents.length,
+      recentHelpers,
+      visitMessage,
+      routeLevel: Math.max(1, Number(route?.routeLevel || 1)),
+      connectionXp: Math.max(0, Number(route?.connectionXp || 0)),
+      nextLevelXp: Math.max(0, Number(route?.nextLevelXp || 0)),
+    }
+  }, [events, home?.neighbors, isOwner, planet.stats?.gardenVitality, targetUid, visitMessage])
+  const gardenSummary = useMemo(() => {
+    const waterEvents = isOwner
+      ? events.filter((event) => event?.itemId === 'starflower_garden' && event?.actionId === 'water')
+      : []
+    return {
+      vitality: Math.min(100, Math.max(0, Number(planet.stats?.gardenVitality || 0))),
+      recentWaterCount: waterEvents.length,
+      recentHelpers: [...new Set(waterEvents.map((event) => event?.actorName).filter(Boolean))].slice(0, 3),
+      visitMessage,
+    }
+  }, [events, isOwner, planet.stats?.gardenVitality, visitMessage])
   const wallet = Math.max(0, Number(home?.wallet ?? userData?.crystals ?? 0))
   const galaxyNowMs = nowMs + Number(home?.serverClockOffsetMs || 0)
 
@@ -840,6 +867,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const roverRemainingLabel = formatGalaxyRoverRemainingTime(Math.max(0, roverReadyAtMs - galaxyNowMs))
   const hasRoverBay = ownLayout.some((item) => item?.itemId === 'rover_bay' && item?.locked !== true)
   const hasExpeditionBeacon = ownLayout.some((item) => item?.itemId === 'expedition_beacon' && item?.locked !== true)
+  const roverBayAppliedToCurrent = Boolean(roverExpedition?.bonuses?.roverBay)
   const roverStatusLabel = roverStatus === 'ready'
     ? '귀환 상자 수신하기'
     : roverStatus === 'active'
@@ -847,6 +875,25 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       : roverStatus === 'claimed'
         ? '다음 원정 준비'
         : '장거리 원정 준비'
+  const observatorySummary = {
+    mode: dailyEventPending ? 'alert' : unreadCount > 0 || roverStatus === 'ready' ? 'signal' : 'stable',
+    statusLabel: dailyEventPending
+      ? `행성 사건 관측 · ${dailyEvent?.title || '미확인 현장 신호'}`
+      : unreadCount > 0
+        ? `새 귀환 신호 ${unreadCount}개 관측`
+        : roverStatus === 'ready'
+          ? '로버 귀환 신호 관측'
+          : roverStatus === 'active'
+            ? `로버 원정 관측 · ${roverRemainingLabel}`
+            : '오늘의 행성 신호 안정',
+    detail: dailyEventPending
+      ? '브리핑에서 사건 위치와 해결 보상을 확인한 뒤 현장으로 이동할 수 있습니다.'
+      : unreadCount > 0
+        ? '브리핑에서 새 방문 기록과 행성 상태를 함께 확인할 수 있습니다.'
+        : roverStatus === 'ready'
+          ? '브리핑에서 귀환 상태를 확인하고 로버 관제로 이동할 수 있습니다.'
+          : '사건·방문·원정 신호를 한 화면에서 확인할 수 있습니다.',
+  }
   const builtCount = ownLayout.filter((item) => !item.locked && item.itemId !== 'wild_sprout').length
   const catalogEntries = Object.entries(catalog)
   const effectiveFocusedBuildItemId = focusedBuildItemId && catalog[focusedBuildItemId] ? focusedBuildItemId : catalogEntries[0]?.[0] || ''
@@ -1290,6 +1337,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         : '귀환 신호 타임라인을 열었습니다.')
       return { openedSignalTimeline: true }
     }
+    if (isOwner && item.itemId === 'observatory') {
+      closeObjectDialog()
+      setArrivalOpen(true)
+      flash(`${observatorySummary.statusLabel}. 관측 브리핑을 열었습니다.`)
+      return { openedObservatoryBriefing: true }
+    }
     if (isOwner && item.itemId === 'expedition_beacon') {
       closeObjectDialog()
       openGameMenu('rover')
@@ -1300,11 +1353,25 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           : '원정 관제를 열었습니다. 비콘 보너스가 적용된 항로를 선택해 주세요.')
       return { openedRoverControl: true }
     }
+    if (isOwner && item.itemId === 'rover_bay') {
+      closeObjectDialog()
+      openGameMenu('rover')
+      flash(roverStatus === 'ready'
+        ? '정비소에 로버가 귀환했습니다. 상자를 열어 보상을 회수해 주세요.'
+        : roverStatus === 'active'
+          ? roverBayAppliedToCurrent
+            ? `정비소 가속이 적용된 원정입니다. ${roverRemainingLabel} 귀환합니다.`
+            : `이번 원정은 기존 8시간 일정입니다. 정비소 가속은 다음 원정부터 적용됩니다.`
+          : '로버 관제를 열었습니다. 정비소 가속으로 다음 원정은 6시간이 걸립니다.')
+      return { openedRoverControl: true }
+    }
     if (isOwner) {
       const result = await runAction(
         `object:mission:${item.instanceId}`,
         () => callGalaxy('performGalaxyStructureAction', { instanceId: item.instanceId }),
-        (missionResult) => missionResult?.label || `${mission.label}을 완료했습니다.`,
+        (missionResult) => item.itemId === 'friend_greenhouse' || item.itemId === 'starflower_garden'
+          ? `${missionResult?.label || '정원 돌봄을 마쳤습니다.'} 다음 돌봄은 5분 뒤 가능합니다.`
+          : missionResult?.label || `${mission.label}을 완료했습니다.`,
       )
       if (!result) return null
       setHome((current) => {
@@ -1323,21 +1390,34 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         instanceId: item.instanceId,
         message: visitMessage,
       }),
-      (missionResult) => missionResult?.rewarded
-        ? '객체 도움 미션을 기록하고 별가루 1개를 발견했습니다.'
-        : '객체 도움 미션을 친구의 귀환 기록에 남겼습니다.',
+      (missionResult) => item.itemId === 'friend_greenhouse' || item.itemId === 'starflower_garden'
+        ? missionResult?.rewarded
+          ? `${item.itemId === 'starflower_garden' ? '별꽃 물주기' : '물주기'} 완료 · 정원 활력 +${missionResult?.statAmount || 4} · 연결도 +${missionResult?.connectionXpGained || 6} · 별가루 +1`
+          : `${item.itemId === 'starflower_garden' ? '별꽃 물주기' : '물주기'} 완료 · 정원 활력 +${missionResult?.statAmount || 4} · 연결도 +${missionResult?.connectionXpGained || 6} · 방문 기록 전달`
+        : missionResult?.rewarded
+          ? '객체 도움 미션을 기록하고 별가루 1개를 발견했습니다.'
+          : '객체 도움 미션을 친구의 귀환 기록에 남겼습니다.',
     )
     if (!result) return null
-    setHome((current) => current ? {
-      ...current,
-      neighbors: (current.neighbors || []).map((neighbor) => neighbor.uid === targetUid ? {
+    setHome((current) => {
+      if (!current) return current
+      const currentOwnPlanet = current.ownPlanet || {}
+      const currentPlanet = current.planet || {}
+      return {
+        ...current,
+        ownPlanet: result.materials ? { ...currentOwnPlanet, materials: result.materials } : currentOwnPlanet,
+        planet: result.stat
+          ? { ...currentPlanet, stats: { ...(currentPlanet.stats || {}), [result.stat]: result.statValue } }
+          : currentPlanet,
+        neighbors: (current.neighbors || []).map((neighbor) => neighbor.uid === targetUid ? {
         ...neighbor,
         routeLevel: result.routeLevel ?? neighbor.routeLevel,
         connectionXp: result.connectionXp ?? neighbor.connectionXp,
         nextLevelXp: result.nextLevelXp ?? neighbor.nextLevelXp,
         interactionCount: Math.max(0, Number(neighbor.interactionCount || 0)) + 1,
       } : neighbor),
-    } : current)
+      }
+    })
     return result
   }
 
@@ -1628,6 +1708,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         missionCooldownLabel={isOwner ? missionCooldown.label : '현장 탐사는 내 행성에서 출발할 수 있어요'}
         roverStatus={isOwner ? roverStatus : 'idle'}
         roverStatusLabel={isOwner ? roverStatusLabel : '내 행성에서 원정 가능'}
+        roverBayApplied={isOwner && roverBayAppliedToCurrent}
         remotePlayers={remotePlayers}
         localPlayerName={home?.liveSession?.displayName || ownPlanet.ownerName || userData?.publicDisplayName || userData?.name || '탐사원'}
         localSpeech={ownSpeech}
@@ -1648,6 +1729,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onSelectStructure={openObjectDialog}
         onStructureMission={performObjectMission}
         signalPlazaSummary={signalPlazaSummary}
+        observatorySummary={isOwner ? observatorySummary : null}
+        greenhouseSummary={greenhouseSummary}
+        gardenSummary={gardenSummary}
         isPlanetOwner={isOwner}
         isFirstPerson={isFirstPerson}
         onToggleFirstPerson={toggleViewMode}
@@ -1778,11 +1862,19 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                 onDelete={deleteGalaxyObject}
                 onMission={performObjectMission}
                 signalSummary={signalPlazaSummary}
+                observatorySummary={isOwner ? observatorySummary : null}
+                greenhouseSummary={greenhouseSummary}
+                gardenSummary={gardenSummary}
                 roverStatus={isOwner ? roverStatus : 'idle'}
                 roverStatusLabel={isOwner ? roverStatusLabel : '내 행성에서 원정 가능'}
+                roverExpedition={isOwner ? roverExpedition : null}
                 onOpenSignals={() => {
                   closeObjectDialog()
                   openLogs()
+                }}
+                onOpenBriefing={() => {
+                  closeObjectDialog()
+                  setArrivalOpen(true)
                 }}
                 onOpenRover={() => {
                   closeObjectDialog()

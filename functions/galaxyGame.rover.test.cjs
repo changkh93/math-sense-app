@@ -118,6 +118,21 @@ function testStartStateAndIdempotency() {
     nowMs: NOW_MS,
   });
   assert.equal(secondStart.kind, 'active');
+  assert.equal(secondStart.expedition.durationMs, 8 * HOUR_MS);
+  assert.equal(secondStart.expedition.bonuses.roverBay, false);
+
+  const installedAfterLaunch = planGalaxyRoverStart({
+    operationId: 'rover-operation-after-bay-install',
+    route: 'ruins',
+    planet: {
+      layout: [{ itemId: 'rover_bay' }],
+      roverExpedition: expedition,
+    },
+    nowMs: NOW_MS + HOUR_MS,
+  });
+  assert.equal(installedAfterLaunch.kind, 'active');
+  assert.equal(installedAfterLaunch.expedition.durationMs, 8 * HOUR_MS);
+  assert.equal(installedAfterLaunch.expedition.bonuses.roverBay, false);
 
   const afterClaim = planGalaxyRoverStart({
     operationId: 'rover-operation-after-claim',

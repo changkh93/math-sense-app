@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
+  Droplets,
   ImagePlus,
   Gem,
   Leaf,
@@ -12,8 +13,10 @@ import {
   Save,
   ShieldCheck,
   Sparkles,
+  Telescope,
   TrendingUp,
   Trash2,
+  Wrench,
   X,
 } from 'lucide-react'
 import { StructurePreview3D } from './GalaxyWorld3D'
@@ -73,8 +76,13 @@ export default function GalaxyObjectDialog({
   onMission,
   signalSummary,
   onOpenSignals,
+  observatorySummary,
+  onOpenBriefing,
+  greenhouseSummary,
+  gardenSummary,
   roverStatus = 'idle',
   roverStatusLabel = '',
+  roverExpedition = null,
   onOpenRover,
   playRemainingSeconds = 0,
 }) {
@@ -115,6 +123,11 @@ export default function GalaxyObjectDialog({
   const RewardIcon = reward.Icon
   const isSignalPlaza = item?.itemId === 'signal_plaza'
   const isExpeditionBeacon = item?.itemId === 'expedition_beacon'
+  const isRoverBay = item?.itemId === 'rover_bay'
+  const isRoverFacility = isExpeditionBeacon || isRoverBay
+  const isObservatory = item?.itemId === 'observatory'
+  const isFriendGreenhouse = item?.itemId === 'friend_greenhouse'
+  const isStarflowerGarden = item?.itemId === 'starflower_garden'
   const signalUnreadCount = Math.max(0, Number(signalSummary?.unreadCount || 0))
   const signalRecentCount = Math.max(0, Number(signalSummary?.recentCount || 0))
   const beaconStatusTitle = roverStatus === 'ready'
@@ -122,6 +135,12 @@ export default function GalaxyObjectDialog({
     : roverStatus === 'active'
       ? '심우주 원정 신호 추적 중'
       : '새 장거리 원정을 준비할 수 있어요'
+  const roverBayAppliedToCurrent = Boolean(roverExpedition?.bonuses?.roverBay)
+  const roverBayStatusTitle = roverStatus === 'ready'
+    ? '귀환한 로버의 보상을 받을 수 있어요'
+    : roverStatus === 'active'
+      ? roverBayAppliedToCurrent ? '이번 원정은 6시간 가속 적용 중' : '가속은 다음 원정부터 적용'
+      : '다음 원정이 8시간에서 6시간으로 단축돼요'
 
   const chooseImage = (event) => {
     const file = event.target.files?.[0] || null
@@ -225,7 +244,7 @@ export default function GalaxyObjectDialog({
               <img src={previewUrl} alt={`${objectName} 첨부 이미지`} />
             ) : (
               <div className="frontier-object-visual__model">
-                <StructurePreview3D itemId={item.itemId} level={currentLevel} signalSummary={signalSummary} roverStatus={roverStatus} />
+                <StructurePreview3D itemId={item.itemId} level={currentLevel} signalSummary={signalSummary} observatoryMode={observatorySummary?.mode} roverStatus={roverStatus} greenhouseSummary={greenhouseSummary} gardenSummary={gardenSummary} />
                 <span><Sparkles size={15} aria-hidden="true" /> 등록 이미지가 없어 3D 모형을 표시합니다</span>
               </div>
             )}
@@ -310,7 +329,7 @@ export default function GalaxyObjectDialog({
       ) : (
         <section className="frontier-object-hero">
           <div className="frontier-object-hero__media">
-            {previewUrl ? <img src={previewUrl} alt={`${objectName} 첨부 이미지`} /> : <StructurePreview3D itemId={item.itemId} level={currentLevel} signalSummary={signalSummary} roverStatus={roverStatus} />}
+            {previewUrl ? <img src={previewUrl} alt={`${objectName} 첨부 이미지`} /> : <StructurePreview3D itemId={item.itemId} level={currentLevel} signalSummary={signalSummary} observatoryMode={observatorySummary?.mode} roverStatus={roverStatus} greenhouseSummary={greenhouseSummary} gardenSummary={gardenSummary} />}
           </div>
           <div className="frontier-object-hero__content">
             <span className="frontier-object-stage-badge">STAGE {currentLevel}</span>
@@ -329,6 +348,72 @@ export default function GalaxyObjectDialog({
                   <p>{isOwner
                     ? '친구의 인사·감탄·도움 기록을 시간순으로 확인하고 바로 답방할 수 있습니다.'
                     : '가까이에서 E 키를 누르면 행성 주인에게 방문자의 이름과 메시지가 안전하게 전달됩니다.'}</p>
+                </div>
+              </section>
+            ) : isObservatory ? (
+              <section className="frontier-object-reward material-crystalGlass" aria-label="성운 관측소 기능">
+                <span><Telescope size={20} aria-hidden="true" /></span>
+                <div>
+                  <small>{isOwner ? observatorySummary?.statusLabel || '오늘의 행성 신호 안정' : '친구 행성의 관측 장비 돕기'}</small>
+                  <strong>{isOwner ? 'E 키로 오늘의 관측 브리핑을 열어요' : '관측 장비를 수리해 도움 기록을 남겨요'}</strong>
+                  <p>{isOwner
+                    ? observatorySummary?.detail || '행성 사건, 방문자의 귀환 신호와 로버 원정 상태를 한 화면에서 확인할 수 있습니다.'
+                    : '가까이에서 E 키를 누르면 행성 주인에게 관측 장비 수리 기록과 안전 메시지가 전달됩니다.'}</p>
+                </div>
+              </section>
+            ) : isStarflowerGarden ? (
+              <section className="frontier-object-reward material-biofiber frontier-garden-collaboration" aria-label="별꽃 정원 물주기 협업 기능">
+                <span><Droplets size={20} aria-hidden="true" /></span>
+                <div>
+                  <small>{isOwner
+                    ? `정원 활력 ${gardenSummary?.vitality ?? 0}/100 · 최근 친구 물주기 ${gardenSummary?.recentWaterCount ?? 0}회`
+                    : `현재 정원 활력 ${gardenSummary?.vitality ?? 0}/100 · 물주기 효과 +4`}</small>
+                  <strong>{isOwner
+                    ? '친구의 물주기 신호는 이름과 메시지가 담긴 방문 기록이에요'
+                    : '가까이에서 E 키를 눌러 별꽃에 물을 주세요'}</strong>
+                  <p>{isOwner
+                    ? gardenSummary?.recentHelpers?.length
+                      ? `${gardenSummary.recentHelpers.join(' · ')} 탐사원이 최근 이 정원에 물을 주었습니다. 아래 기록 버튼에서 시간과 메시지를 확인할 수 있습니다. 주인은 E 키로 바이오 섬유 1개를 얻으며 재사용 대기는 5분입니다.`
+                      : '아직 이 정원에 도착한 친구 물주기 기록이 없습니다. 친구가 E 키로 물을 주면 이름·메시지·시간이 귀환 기록에 남습니다. 주인은 E 키로 바이오 섬유 1개를 얻습니다.'
+                    : `물주기 한 번으로 정원 활력 +4와 항로 연결도 +6이 적용되고 '${gardenSummary?.visitMessage || '선택한 안전 메시지'}'가 주인에게 전달됩니다. 이 친구에게 하루 8회까지 도울 수 있고 첫 3회까지 별가루 1개를 받습니다.`}</p>
+                  <div className="frontier-greenhouse-vitality is-starflower" aria-label={`정원 활력 ${gardenSummary?.vitality ?? 0} 퍼센트`}>
+                    <i><b style={{ width: `${Math.min(100, Math.max(0, Number(gardenSummary?.vitality || 0)))}%` }} /></i>
+                    <span>{Number(gardenSummary?.vitality || 0) >= 80 ? '별꽃 만개' : Number(gardenSummary?.vitality || 0) >= 50 ? '꽃빛 성장 중' : '친구의 물주기가 필요해요'}</span>
+                  </div>
+                </div>
+              </section>
+            ) : isFriendGreenhouse ? (
+              <section className="frontier-object-reward material-biofiber frontier-greenhouse-collaboration" aria-label="별빛 공동 온실 협업 기능">
+                <span><Leaf size={20} aria-hidden="true" /></span>
+                <div>
+                  <small>{isOwner
+                    ? `정원 활력 ${greenhouseSummary?.vitality ?? 0}/100 · 최근 물주기 ${greenhouseSummary?.recentWaterCount ?? 0}회`
+                    : `정원 활력 ${greenhouseSummary?.vitality ?? 0}/100 · 항로 연결도 +6`}</small>
+                  <strong>{isOwner
+                    ? '친구의 물주기는 활력과 귀환 기록으로 남아요'
+                    : '가까이에서 E 키를 눌러 공동 온실에 물을 주세요'}</strong>
+                  <p>{isOwner
+                    ? greenhouseSummary?.recentHelpers?.length
+                      ? `${greenhouseSummary.recentHelpers.join(' · ')} 탐사원이 최근 온실을 돌봤습니다. 주인은 E 키로 바이오 섬유 1개를 수확할 수 있으며, 다시 돌보기까지 5분이 걸립니다.`
+                      : '친구가 물을 주면 방문자의 이름과 안전 메시지가 귀환 기록에 남습니다. 주인은 E 키로 바이오 섬유 1개를 수확할 수 있으며, 다시 돌보기까지 5분이 걸립니다.'
+                    : `물주기 한 번으로 정원 활력 +4, 항로 연결도 +6이 적용되고 '${greenhouseSummary?.visitMessage || '선택한 안전 메시지'}'가 주인에게 전달됩니다. 이 친구에게 하루 8회까지 도울 수 있고 첫 3회까지 별가루 1개를 받습니다.`}</p>
+                  <div className="frontier-greenhouse-vitality" aria-label={`정원 활력 ${greenhouseSummary?.vitality ?? 0} 퍼센트`}>
+                    <i><b style={{ width: `${Math.min(100, Math.max(0, Number(greenhouseSummary?.vitality || 0)))}%` }} /></i>
+                    <span>{Number(greenhouseSummary?.vitality || 0) >= 80 ? '공생 생태 안정' : Number(greenhouseSummary?.vitality || 0) >= 50 ? '함께 돌보는 중' : '친구의 물주기가 필요해요'}</span>
+                  </div>
+                </div>
+              </section>
+            ) : isRoverBay ? (
+              <section className="frontier-object-reward material-alloy" aria-label="탐사 로버 정비소 기능">
+                <span><Wrench size={20} aria-hidden="true" /></span>
+                <div>
+                  <small>{roverStatusLabel || '장거리 원정 준비'}</small>
+                  <strong>{roverBayStatusTitle}</strong>
+                  <p>{isOwner
+                    ? roverStatus === 'active' && !roverBayAppliedToCurrent
+                      ? '현재 원정은 정비소 설치 전에 출발해 기존 8시간 일정입니다. 가까이에서 E 키를 누르면 관제를 열 수 있으며, 다음 원정부터 6시간이 적용됩니다.'
+                      : '정비소가 설치된 상태에서 출발하면 원정 시간이 8시간에서 6시간으로 줄어듭니다. 가까이에서 E 키를 누르면 로버 관제가 열립니다.'
+                    : '이 정비소는 행성 주인의 다음 장거리 원정을 빠르게 준비합니다. 가까이에서 E 키를 눌러 수리 도움을 남길 수 있습니다.'}</p>
                 </div>
               </section>
             ) : isExpeditionBeacon ? (
@@ -360,15 +445,25 @@ export default function GalaxyObjectDialog({
                       <Radio size={16} aria-hidden="true" /> {signalUnreadCount > 0 ? `새 신호 ${signalUnreadCount}개 보기` : '신호 기록 보기'}
                     </button>
                   )}
-                  {isExpeditionBeacon && (
+                  {isObservatory && (
+                    <button type="button" className="galaxy-primary-btn" onClick={() => onOpenBriefing?.()}>
+                      <Telescope size={16} aria-hidden="true" /> 관측 브리핑 열기
+                    </button>
+                  )}
+                  {isStarflowerGarden && (
+                    <button type="button" className="galaxy-primary-btn" onClick={() => onOpenSignals?.()}>
+                      <Droplets size={16} aria-hidden="true" /> 물주기 기록 보기
+                    </button>
+                  )}
+                  {isRoverFacility && (
                     <button type="button" className="galaxy-primary-btn" onClick={() => onOpenRover?.()}>
                       <Satellite size={16} aria-hidden="true" /> {roverStatus === 'ready' ? '귀환 보상 받기' : '로버 관제 열기'}
                     </button>
                   )}
-                  <button type="button" className={isSignalPlaza || isExpeditionBeacon ? 'galaxy-secondary-btn' : 'galaxy-primary-btn'} onClick={startEditing}><Pencil size={16} aria-hidden="true" /> 수정</button>
+                  <button type="button" className={isSignalPlaza || isObservatory || isRoverFacility || isStarflowerGarden ? 'galaxy-secondary-btn' : 'galaxy-primary-btn'} onClick={startEditing}><Pencil size={16} aria-hidden="true" /> 수정</button>
                 </>
               ) : (
-                <button type="button" className="galaxy-primary-btn" disabled={Boolean(busy)} onClick={() => onMission?.(item)}><Sparkles size={16} aria-hidden="true" /> {missionBusy ? '미션 시작 중' : missionLabel || '미션 수행'}</button>
+                <button type="button" className="galaxy-primary-btn" disabled={Boolean(busy)} onClick={() => onMission?.(item)}><Sparkles size={16} aria-hidden="true" /> {missionBusy ? '미션 시작 중' : isFriendGreenhouse ? '공동 온실에 물주기' : isStarflowerGarden ? '별꽃에 물주기' : missionLabel || '미션 수행'}</button>
               )}
             </div>
           </div>

@@ -140,6 +140,11 @@ function testObjectUpgradeCatalogContract() {
   assert.equal(GALAXY_ITEM_CATALOG.lumen_tree.stage2Cost, 45);
   assert.equal(GALAXY_ITEM_CATALOG.star_lamp.stage2Available, true);
   assert.equal(GALAXY_ITEM_CATALOG.star_lamp.stage2Cost, 20);
+  assert.match(GALAXY_ITEM_CATALOG.friend_greenhouse.description, /항로 연결도/);
+  assert.match(GALAXY_ITEM_CATALOG.friend_greenhouse.effect, /E 키/);
+  assert.match(GALAXY_ITEM_CATALOG.friend_greenhouse.effect, /귀환 기록/);
+  assert.match(GALAXY_ITEM_CATALOG.starflower_garden.description, /정원 활력.*항로 연결도/);
+  assert.match(GALAXY_ITEM_CATALOG.starflower_garden.effect, /E 키.*귀환 기록/);
   assert.equal(GALAXY_ITEM_CATALOG.rover_bay.stage2Available, true);
   assert.equal(GALAXY_ITEM_CATALOG.rover_bay.stage2Cost, 100);
   assert.equal(GALAXY_ITEM_CATALOG.crystal_pond.stage2Available, true);
@@ -147,6 +152,8 @@ function testObjectUpgradeCatalogContract() {
   assert.equal(GALAXY_ITEM_CATALOG.expedition_beacon.stage2Available, true);
   assert.equal(GALAXY_ITEM_CATALOG.expedition_beacon.stage2Cost, 120);
   assert.equal(GALAXY_ITEM_CATALOG.expedition_beacon.stage2Label, '심우주 원정 중계기');
+  assert.match(GALAXY_ITEM_CATALOG.observatory.description, /행성 사건.*귀환 신호.*로버 원정/);
+  assert.match(GALAXY_ITEM_CATALOG.observatory.effect, /E 키.*관측 브리핑/);
   assert.equal(
     Object.entries(GALAXY_ITEM_CATALOG)
       .filter(([, item]) => item.stage2Available)

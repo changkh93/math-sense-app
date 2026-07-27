@@ -862,6 +862,13 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
 .frontier-object-reward kbd { padding: .08rem .22rem; border: 1px solid rgba(255,255,255,.2); border-radius: 4px; color: #f3fbff; font: 800 .55rem ui-monospace, monospace; }
 .frontier-object-reward strong { display: block; margin-top: .12rem; color: white; font-size: .76rem; }
 .frontier-object-reward p { margin: .13rem 0 0; color: #91a9b9; font-size: .58rem; line-height: 1.42; }
+.frontier-greenhouse-vitality { display: flex; align-items: center; gap: .45rem; margin-top: .42rem; }
+.frontier-greenhouse-vitality > i { flex: 1; height: 5px; overflow: hidden; border-radius: 999px; background: rgba(124, 242, 189, .13); }
+.frontier-greenhouse-vitality > i > b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #46c99b, #a4ffd2); box-shadow: 0 0 12px rgba(124, 242, 189, .5); transition: width .35s ease; }
+.frontier-greenhouse-vitality > span { color: #b9f3d7; font-size: .52rem; font-weight: 800; white-space: nowrap; }
+.frontier-greenhouse-vitality.is-starflower > i { background: rgba(255, 158, 207, .13); }
+.frontier-greenhouse-vitality.is-starflower > i > b { background: linear-gradient(90deg, #b889ff, #ff9ecf, #ffe0a8); box-shadow: 0 0 12px rgba(255, 158, 207, .48); }
+.frontier-greenhouse-vitality.is-starflower > span { color: #ffd2e8; }
 .frontier-object-hero__actions { display: flex; gap: .55rem; margin-top: .55rem; }
 .frontier-object-hero__actions .galaxy-primary-btn { min-width: 118px; justify-content: center; box-shadow: 0 12px 30px rgba(86, 226, 226, .2); }
 .frontier-object-dialog__grid { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(350px, 1.1fr); gap: 1rem; padding: 1rem; }

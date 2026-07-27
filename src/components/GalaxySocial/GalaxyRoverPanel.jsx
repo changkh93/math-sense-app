@@ -94,13 +94,15 @@ function ExpeditionPerk({ active, icon, title, children }) {
   )
 }
 
-function RouteSelector({ selectedRoute, onSelect, materials, hasRoverBay, disabled }) {
+function RouteSelector({ selectedRoute, onSelect, materials, hasRoverBay, hasExpeditionBeacon, abilityValues, disabled }) {
   return (
     <div className="galaxy-rover-routes" role="radiogroup" aria-label="로버 원정 항로">
       {Object.entries(GALAXY_ROVER_ROUTES).map(([routeId, route]) => {
         const Icon = ROUTE_ICONS[routeId] || Radar
         const selected = selectedRoute === routeId
         const durationHours = (hasRoverBay ? route.roverBayDurationMs : route.durationMs) / (60 * 60 * 1000)
+        const abilityBonus = Math.max(1, Number(abilityValues?.[route.ability] || 1)) >= 4 ? 1 : 0
+        const expectedReward = route.baseReward + (hasExpeditionBeacon ? 1 : 0) + abilityBonus
         return (
           <button
             type="button"
@@ -120,7 +122,7 @@ function RouteSelector({ selectedRoute, onSelect, materials, hasRoverBay, disabl
             </span>
             <span className="galaxy-rover-route__facts">
               <i><Clock3 size={13} aria-hidden="true" /> {durationHours}시간</i>
-              <i><PackageOpen size={13} aria-hidden="true" /> 재료 {route.baseReward}개 이상</i>
+              <i><PackageOpen size={13} aria-hidden="true" /> 예상 재료 {expectedReward}개</i>
               <i><Archive size={13} aria-hidden="true" /> 발견 기록 1개</i>
             </span>
             <span className="galaxy-rover-route__inventory">
@@ -144,6 +146,7 @@ function ExpeditionTrack({ routeId, route, expedition, nowMs }) {
     ? Math.min(100, Math.max(0, ((totalMs - remainingMs) / totalMs) * 100))
     : 0
   const Icon = ROUTE_ICONS[routeId] || Radar
+  const accelerated = Boolean(expedition?.bonuses?.roverBay)
 
   return (
     <section className={`galaxy-rover-track route-${routeId}`} style={{ '--rover-route-accent': route?.accent }} aria-live="polite">
@@ -172,12 +175,17 @@ function ExpeditionTrack({ routeId, route, expedition, nowMs }) {
       <dl className="galaxy-rover-track__times">
         <div><dt>출발 기록</dt><dd>{formatGalaxyTime(startedAtMs) || '항로 동기화 중'}</dd></div>
         <div><dt>예상 귀환</dt><dd>{formatGalaxyTime(returnsAtMs) || '귀환 시각 계산 중'}</dd></div>
+        <div><dt>정비소 가속</dt><dd>{accelerated ? '적용 · 총 6시간' : '미적용 · 총 8시간'}</dd></div>
       </dl>
     </section>
   )
 }
 
-function ReturnCrate({ route, busy, onClaim }) {
+function ReturnCrate({ route, expedition, busy, onClaim }) {
+  const reward = expedition?.reward || {}
+  const rewardAmount = Math.max(0, Number(reward.amount || route?.baseReward || 1))
+  const beaconBonus = Math.max(0, Number(reward.beaconBonus || 0))
+  const abilityBonus = Math.max(0, Number(reward.abilityBonus || 0))
   return (
     <section className="galaxy-rover-return" aria-live="polite">
       <div className="galaxy-rover-return__signal" aria-hidden="true">
@@ -189,9 +197,12 @@ function ReturnCrate({ route, busy, onClaim }) {
         <h3>귀환 상자가 도착했습니다</h3>
         <p>{route?.label || '심우주 원정'}에서 가져온 재료와 발견 기록을 직접 확인하세요. 수령 전에는 다음 원정을 보낼 수 없습니다.</p>
         <div className="galaxy-rover-return__preview">
-          <span><PackageOpen size={16} aria-hidden="true" /> {route?.reward || '원정 재료'} 최소 {route?.baseReward || 1}</span>
+          <span><PackageOpen size={16} aria-hidden="true" /> {reward.title || route?.reward || '원정 재료'} {rewardAmount}개 확정</span>
           <span><Sparkles size={16} aria-hidden="true" /> 미확인 발견 신호 1개</span>
         </div>
+        {(beaconBonus > 0 || abilityBonus > 0) && (
+          <p>기본 {reward.baseAmount || route?.baseReward || 1}개{beaconBonus > 0 ? ' + 비콘 1개' : ''}{abilityBonus > 0 ? ' + 학습 공명 1개' : ''}</p>
+        )}
         <button type="button" className="galaxy-rover-primary" disabled={Boolean(busy) || !onClaim} onClick={onClaim}>
           {busy ? '귀환 상자 동기화 중…' : '귀환 상자 열기'}
           {!busy && <ChevronRight size={17} aria-hidden="true" />}
@@ -292,9 +303,17 @@ export default function GalaxyRoverPanel({
   const effectiveRouteId = canChooseRoute ? selectedRoute : expeditionRouteId || selectedRoute
   const selectedConfig = GALAXY_ROVER_ROUTES[effectiveRouteId] || GALAXY_ROVER_ROUTES.nebula
   const selectedAbilityLevel = Math.max(1, Number(
-    expedition?.bonuses?.abilityLevel ?? abilityValues?.[selectedConfig.ability] ?? 1,
+    canChooseRoute
+      ? abilityValues?.[selectedConfig.ability] ?? 1
+      : expedition?.bonuses?.abilityLevel ?? abilityValues?.[selectedConfig.ability] ?? 1,
   ) || 1)
   const hasAbilityBonus = selectedAbilityLevel >= 4
+  const activeExpeditionLocked = status === 'active' || status === 'ready'
+  const roverBayApplied = activeExpeditionLocked ? Boolean(expedition?.bonuses?.roverBay) : hasRoverBay
+  const expeditionBeaconApplied = activeExpeditionLocked ? Boolean(expedition?.bonuses?.expeditionBeacon) : hasExpeditionBeacon
+  const roverBayInstalledAfterLaunch = activeExpeditionLocked && hasRoverBay && !roverBayApplied
+  const roverBayRemovedAfterLaunch = activeExpeditionLocked && !hasRoverBay && roverBayApplied
+  const expectedReward = selectedConfig.baseReward + (hasExpeditionBeacon ? 1 : 0) + (hasAbilityBonus ? 1 : 0)
   const currentDiscovery = expedition?.discovery || expedition?.result?.discovery
   const busyLabel = String(busy || '').toLowerCase()
   const isClaimBusy = Boolean(busy) && (busyLabel.includes('claim') || busyLabel.includes('return') || busy === true)
@@ -316,11 +335,21 @@ export default function GalaxyRoverPanel({
       </header>
 
       <div className="galaxy-rover-perks" aria-label="로버 원정 보너스">
-        <ExpeditionPerk active={hasRoverBay} icon={Wrench} title={hasRoverBay ? '로버 정비소 가속 적용' : '로버 정비소 미설치'}>
-          {hasRoverBay ? '기본 8시간 원정이 6시간으로 단축됩니다.' : '정비소를 건설하면 원정 시간이 8시간에서 6시간으로 줄어듭니다.'}
+        <ExpeditionPerk active={roverBayApplied} icon={Wrench} title={roverBayApplied ? '로버 정비소 가속 적용' : roverBayInstalledAfterLaunch ? '다음 원정부터 정비소 적용' : '로버 정비소 미적용'}>
+          {roverBayInstalledAfterLaunch
+            ? '이번 원정은 출발 당시 정비소가 없어 8시간이며, 다음 원정부터 6시간으로 줄어듭니다.'
+            : roverBayRemovedAfterLaunch
+              ? '출발할 때 적용되어 이번 원정은 6시간입니다. 다음 원정에는 정비소를 다시 설치해야 합니다.'
+              : roverBayApplied
+                ? activeExpeditionLocked ? '출발할 때 가속이 확정되어 이번 원정은 총 6시간입니다.' : '다음 원정 시간이 8시간에서 6시간으로 줄어듭니다.'
+                : '정비소를 건설하면 다음 원정 시간이 8시간에서 6시간으로 줄어듭니다.'}
         </ExpeditionPerk>
-        <ExpeditionPerk active={hasExpeditionBeacon} icon={SatelliteDish} title={hasExpeditionBeacon ? '원정대 비콘 보정 적용' : '원정대 비콘 미설치'}>
-          {hasExpeditionBeacon ? '항로 신호가 강화되어 회수 재료가 1개 늘어납니다.' : '비콘을 건설하면 원정마다 회수 재료를 1개 더 가져옵니다.'}
+        <ExpeditionPerk active={expeditionBeaconApplied} icon={SatelliteDish} title={expeditionBeaconApplied ? '원정대 비콘 보정 적용' : activeExpeditionLocked && hasExpeditionBeacon ? '다음 원정부터 비콘 적용' : '원정대 비콘 미적용'}>
+          {activeExpeditionLocked && hasExpeditionBeacon && !expeditionBeaconApplied
+            ? '이번 원정은 출발 뒤 비콘이 설치되어 보너스가 없고, 다음 원정부터 재료가 1개 늘어납니다.'
+            : expeditionBeaconApplied
+              ? activeExpeditionLocked ? '출발할 때 보정이 확정되어 이번 원정의 회수 재료가 1개 늘어납니다.' : '다음 원정의 회수 재료가 1개 늘어납니다.'
+              : '비콘을 건설하면 다음 원정마다 회수 재료를 1개 더 가져옵니다.'}
         </ExpeditionPerk>
         <ExpeditionPerk active={hasAbilityBonus} icon={Radar} title={`${selectedConfig.abilityLabel} Lv.${selectedAbilityLevel}`}>
           {hasAbilityBonus
@@ -330,7 +359,7 @@ export default function GalaxyRoverPanel({
       </div>
 
       {status === 'active' && <ExpeditionTrack routeId={expeditionRouteId} route={route} expedition={expedition} nowMs={nowMs} />}
-      {status === 'ready' && <ReturnCrate route={route} busy={isClaimBusy} onClaim={onClaim} />}
+      {status === 'ready' && <ReturnCrate route={route} expedition={expedition} busy={isClaimBusy} onClaim={onClaim} />}
       {status === 'claimed' && <ClaimedResult expedition={expedition} fallbackRoute={route} />}
 
       {canChooseRoute && (
@@ -339,11 +368,11 @@ export default function GalaxyRoverPanel({
             <div><small>{status === 'claimed' ? '다음 원정' : '1단계 · 항로 고르기'}</small><h3 id="galaxy-rover-dispatch-title">아래에서 가고 싶은 항로 하나를 선택하세요</h3></div>
             <span><Clock3 size={15} aria-hidden="true" /> {hasRoverBay ? '정비소 가속 · 6시간' : '기본 항해 · 8시간'}</span>
           </header>
-          <RouteSelector selectedRoute={selectedRoute} onSelect={setSelectedRoute} materials={materials} hasRoverBay={hasRoverBay} disabled={Boolean(busy)} />
+          <RouteSelector selectedRoute={selectedRoute} onSelect={setSelectedRoute} materials={materials} hasRoverBay={hasRoverBay} hasExpeditionBeacon={hasExpeditionBeacon} abilityValues={abilityValues} disabled={Boolean(busy)} />
           <div className="galaxy-rover-dispatch__footer">
             <div>
               <strong><Rocket size={16} aria-hidden="true" /> {selectedConfig.label}</strong>
-              <span>{selectedConfig.reward} {selectedConfig.baseReward}개 이상과 발견 기록 1개를 가져옵니다.</span>
+              <span>{selectedConfig.reward} {expectedReward}개와 발견 기록 1개를 가져옵니다. 기본 {selectedConfig.baseReward}{hasExpeditionBeacon ? ' + 비콘 1' : ''}{hasAbilityBonus ? ' + 학습 공명 1' : ''}</span>
             </div>
             <button
               type="button"
