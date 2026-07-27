@@ -1417,6 +1417,157 @@ function MatureCrystalPond({ scale = 1, ghost = false, dynamicLightActive = fals
   )
 }
 
+// 성운 관측소 Stage 2: 오로라 성운 천문대(Aurora Nebula Observatory).
+// Stage 1보다 넓고 높은 이중 타워, 회전식 돔, 프리즘 망원경으로 실루엣을 명확히 구분한다.
+// 광원·파티클은 플레이어에게 가장 가까운 Stage 2 발광 시설 하나에서만 활성화한다.
+function MatureObservatory({ scale = 1, ghost = false, dynamicLightActive = false }) {
+  const scanAssemblyRef = useRef()
+  const starChartRef = useRef()
+  const beamRef = useRef()
+  const lensRef = useRef()
+  const lightRef = useRef()
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+    if (scanAssemblyRef.current) scanAssemblyRef.current.rotation.y = time * .11
+    if (starChartRef.current) {
+      starChartRef.current.rotation.y = time * .27
+      starChartRef.current.rotation.z = Math.sin(time * .32) * .14
+    }
+    if (beamRef.current) {
+      const baseOpacity = dynamicLightActive ? .13 : .045
+      beamRef.current.material.opacity = baseOpacity + Math.sin(time * 1.35) * (dynamicLightActive ? .035 : .012)
+    }
+    if (lensRef.current) {
+      lensRef.current.emissiveIntensity = 1.7 + Math.sin(time * 1.8) * .25
+    }
+    if (lightRef.current) {
+      const target = dynamicLightActive ? .38 : 0
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, target, 5, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      {/* 1층: 낮고 넓은 12각 강화 기초와 관측원 진입부 */}
+      <mesh position={[0, .12, 0]} receiveShadow castShadow={!ghost}>
+        <cylinderGeometry args={[1.52, 1.68, .24, 12]} />
+        <ModelMaterial color="#22354b" metalness={.58} roughness={.44} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .62, 0]} castShadow={!ghost}>
+        <cylinderGeometry args={[1.28, 1.48, .92, 12]} />
+        <ModelMaterial color="#344966" metalness={.62} roughness={.34} ghost={ghost} />
+      </mesh>
+      {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle) => (
+        <group key={`buttress_${angle}`} position={[Math.sin(angle) * 1.32, .52, Math.cos(angle) * 1.32]} rotation={[0, angle, 0]}>
+          <mesh castShadow={!ghost}><boxGeometry args={[.34, .76, .22]} /><ModelMaterial color="#4a6282" metalness={.68} roughness={.3} ghost={ghost} /></mesh>
+          <mesh position={[0, .02, .125]}><boxGeometry args={[.1, .52, .025]} /><ModelMaterial color="#62d8f7" emissive="#157f9c" emissiveIntensity={.65} ghost={ghost} /></mesh>
+        </group>
+      ))}
+      <group position={[0, .46, 1.46]}>
+        <mesh><boxGeometry args={[.6, .76, .08]} /><ModelMaterial color="#17283a" metalness={.72} roughness={.3} ghost={ghost} /></mesh>
+        <mesh position={[0, .38, .05]}><torusGeometry args={[.3, .055, 7, 16, Math.PI]} /><ModelMaterial color="#8ba6be" metalness={.82} roughness={.2} ghost={ghost} /></mesh>
+        <mesh position={[0, .03, .052]}><boxGeometry args={[.38, .42, .035]} /><ModelMaterial color="#63dcf5" emissive="#147d99" emissiveIntensity={.85} ghost={ghost} /></mesh>
+      </group>
+
+      {/* 2층: 테라스와 방위각 레일 */}
+      <mesh position={[0, 1.16, 0]} castShadow={!ghost}>
+        <cylinderGeometry args={[1.13, 1.28, .34, 16]} />
+        <ModelMaterial color="#4a6282" metalness={.7} roughness={.26} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, 1.35, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.24, .045, 8, 28]} />
+        <ModelMaterial color="#93abc1" metalness={.82} roughness={.18} ghost={ghost} />
+      </mesh>
+      {[0, Math.PI / 3, Math.PI * 2 / 3, Math.PI, Math.PI * 4 / 3, Math.PI * 5 / 3].map((angle) => (
+        <mesh key={`rail_${angle}`} position={[Math.sin(angle) * 1.24, 1.49, Math.cos(angle) * 1.24]}>
+          <cylinderGeometry args={[.025, .032, .28, 6]} />
+          <ModelMaterial color="#7892aa" metalness={.76} roughness={.24} ghost={ghost} />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.61, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.24, .025, 6, 28]} />
+        <ModelMaterial color="#7892aa" metalness={.76} roughness={.24} ghost={ghost} />
+      </mesh>
+
+      {/* 회전식 천구 돔과 대형 프리즘 망원경 */}
+      <group ref={scanAssemblyRef} position={[0, 1.42, 0]}>
+        <mesh position={[0, .4, 0]} castShadow={!ghost}>
+          <sphereGeometry args={[1.02, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <ModelMaterial color="#9bb9ce" metalness={.46} roughness={.22} ghost={ghost} />
+        </mesh>
+        <mesh position={[0, .65, .86]} rotation={[-.28, 0, 0]} scale={[.34, .95, .08]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <ModelMaterial color="#1b3045" metalness={.72} roughness={.24} ghost={ghost} />
+        </mesh>
+        {[-.23, .23].map((x) => (
+          <mesh key={`slit_rail_${x}`} position={[x, .67, .84]} rotation={[-.28, 0, 0]}>
+            <boxGeometry args={[.045, .96, .05]} />
+            <ModelMaterial color="#d2e6ee" metalness={.66} roughness={.2} ghost={ghost} />
+          </mesh>
+        ))}
+
+        <group position={[0, .88, .05]} rotation={[0, 0, -.5]}>
+          <mesh castShadow={!ghost}>
+            <cylinderGeometry args={[.3, .46, 1.72, 14]} />
+            <ModelMaterial color="#526f91" metalness={.8} roughness={.2} ghost={ghost} />
+          </mesh>
+          <mesh position={[0, -.63, 0]}><torusGeometry args={[.38, .055, 8, 16]} /><ModelMaterial color="#263d58" metalness={.82} roughness={.18} ghost={ghost} /></mesh>
+          <mesh position={[0, .42, 0]}><torusGeometry args={[.34, .045, 8, 16]} /><ModelMaterial color="#8ca8c0" metalness={.8} roughness={.18} ghost={ghost} /></mesh>
+          <mesh position={[0, .91, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[.54, .54, .13, 20]} />
+            <meshStandardMaterial
+              ref={lensRef}
+              color={ghost ? '#71f3bf' : '#8ce6ff'}
+              emissive={ghost ? '#1f765a' : '#0284c7'}
+              emissiveIntensity={ghost ? .8 : 1.7}
+              metalness={.25}
+              roughness={.12}
+              transparent={ghost}
+              opacity={ghost ? .46 : 1}
+              wireframe={ghost}
+              depthWrite={!ghost}
+              toneMapped={false}
+            />
+          </mesh>
+          <mesh position={[0, .99, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[.24, .48, 20]} />
+            <meshBasicMaterial color={ghost ? '#71f3bf' : '#b9f3ff'} transparent opacity={ghost ? .45 : .52} depthWrite={false} />
+          </mesh>
+
+          {/* 짧은 관측 빔은 항상 방향을 표시하고, 가까이 접근했을 때만 선명해진다. */}
+          {!ghost && (
+            <mesh ref={beamRef} position={[0, 2.05, 0]}>
+              <cylinderGeometry args={[.12, .45, 2.2, 12, 1, true]} />
+              <meshBasicMaterial color="#38bdf8" transparent opacity={.045} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+            </mesh>
+          )}
+        </group>
+
+        {/* 망원경 위 독립 회전 홀로그램 성도 */}
+        <group ref={starChartRef} position={[-.72, 2.13, .05]} rotation={[Math.PI / 3, 0, 0]}>
+          <mesh><torusGeometry args={[.62, .018, 6, 24]} /><ModelMaterial color="#77ddff" emissive="#168fb2" emissiveIntensity={1.5} ghost={ghost} /></mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.4, .012, 6, 20]} /><ModelMaterial color="#a7ecff" emissive="#1b91b1" emissiveIntensity={1.15} ghost={ghost} /></mesh>
+          {[0, Math.PI * .5, Math.PI, Math.PI * 1.5].map((angle) => (
+            <mesh key={`chart_star_${angle}`} position={[Math.cos(angle) * .62, Math.sin(angle) * .62, 0]}>
+              <octahedronGeometry args={[.045, 0]} />
+              <ModelMaterial color="#e2f8ff" emissive="#38bdf8" emissiveIntensity={1.8} ghost={ghost} />
+            </mesh>
+          ))}
+        </group>
+      </group>
+
+      {!ghost && (
+        <>
+          {dynamicLightActive && <Sparkles count={10} scale={[2.6, 2.4, 2.6]} position={[0, 3.2, 0]} color="#7dd3fc" size={1.45} speed={.28} />}
+          <pointLight ref={lightRef} position={[0, 2.75, .35]} color="#38bdf8" intensity={0} distance={4.8} decay={2} castShadow={false} />
+        </>
+      )}
+    </group>
+  )
+}
+
 export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightActive = false }) {
   if (itemId === 'starter_dome') {
     return (
@@ -1501,6 +1652,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'observatory') {
+    if (Number(level || 1) >= 2) {
+      return <MatureObservatory scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group>
         <mesh position={[0, .55, 0]} castShadow={!ghost}><cylinderGeometry args={[1.05, 1.25, 1.1, 18]} /><ModelMaterial color="#526a91" metalness={.65} roughness={.3} ghost={ghost} /></mesh>
@@ -1580,17 +1735,28 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
 
 function PreviewTurntable({ itemId, level = 1 }) {
   const group = useRef()
+  const baseY = itemId === 'observatory' && Number(level || 1) >= 2 ? -.98 : -.65
   useFrame((state, delta) => {
     if (!group.current) return
     group.current.rotation.y += delta * .35
-    group.current.position.y = -.65 + Math.sin(state.clock.elapsedTime * 1.4) * .04
+    group.current.position.y = baseY + Math.sin(state.clock.elapsedTime * 1.4) * .04
   })
-  return <group ref={group} position={[0, -.65, 0]}><StructureModel itemId={itemId} level={level} /></group>
+  return <group ref={group} position={[0, baseY, 0]}><StructureModel itemId={itemId} level={level} /></group>
 }
 
 export function StructurePreview3D({ itemId, level = 1 }) {
+  const isTallObservatory = itemId === 'observatory' && Number(level || 1) >= 2
   return (
-    <Canvas dpr={[1, 1.35]} camera={{ position: [4.5, 3.4, 5.5], fov: 38, near: .1, far: 50 }} gl={{ antialias: true, alpha: true }}>
+    <Canvas
+      dpr={[1, 1.35]}
+      camera={{
+        position: isTallObservatory ? [5.4, 4.1, 6.7] : [4.5, 3.4, 5.5],
+        fov: isTallObservatory ? 40 : 38,
+        near: .1,
+        far: 50,
+      }}
+      gl={{ antialias: true, alpha: true }}
+    >
       <ambientLight intensity={1.05} />
       <hemisphereLight args={['#d9f8ff', '#172435', 1.4]} />
       <directionalLight position={[4, 7, 5]} intensity={2.2} color="#fff3d6" />
@@ -1602,12 +1768,13 @@ export function StructurePreview3D({ itemId, level = 1 }) {
   )
 }
 
-function structureFootprint(itemId) {
+function structureFootprint(itemId, level = 1) {
   if (itemId === 'star_lamp' || itemId === 'prism_pathlight') return .46
   if (itemId === 'wild_sprout') return .42
   if (itemId === 'lumen_tree') return .78
   if (itemId === 'crystal_pond' || itemId === 'starflower_garden') return 1.28
   if (itemId === 'signal_plaza' || itemId === 'route_gateway') return 1.52
+  if (itemId === 'observatory' && Number(level || 1) >= 2) return 1.68
   return 1.14
 }
 
@@ -1641,12 +1808,13 @@ const LIGHTING_STRUCTURE_IDS = new Set([
   'star_lamp',
   'rover_bay',
   'crystal_pond',
+  'observatory',
 ])
 
 function PlacedStructure({ item, selected, onSelect, activeLightId }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
-  const footprint = structureFootprint(item.itemId)
+  const footprint = structureFootprint(item.itemId, item.level)
   const isOrganic = ORGANIC_STRUCTURE_IDS.has(item.itemId)
   // 가장 가까운 Stage 2 발광 시설 1개만 동적 조명을 켠다.
   const dynamicLightActive = LIGHTING_STRUCTURE_IDS.has(item.itemId)
@@ -2662,7 +2830,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     const py = terrainHeight(px, pz)
     let h = isFirstPerson ? 1.0 : 2.0
     if (nearby.kind === 'structure') {
-      const footprint = structureFootprint(nearby.item?.itemId || '')
+      const footprint = structureFootprint(nearby.item?.itemId || '', nearby.item?.level)
       h = isFirstPerson ? Math.min(1.6, footprint * 0.8 + 0.6) : Math.max(2.6, footprint * 1.2 + 1.2)
     } else if (nearby.kind === 'portal') {
       h = isFirstPerson ? 1.6 : 2.8
@@ -2681,7 +2849,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
   const structureColliders = useMemo(() => layout.map((item) => {
     const position = worldPositionFromLayout(item)
     position[1] = terrainHeight(position[0], position[2])
-    const collisionRadius = Math.max(.64, structureFootprint(item.itemId) + PLAYER_COLLISION_RADIUS)
+    const collisionRadius = Math.max(.64, structureFootprint(item.itemId, item.level) + PLAYER_COLLISION_RADIUS)
     return {
       id: item.instanceId,
       kind: 'structure',

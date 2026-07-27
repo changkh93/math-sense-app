@@ -166,11 +166,12 @@ export const GALAXY_ITEM_CATALOG = {
 Object.entries(GALAXY_ITEM_CATALOG).forEach(([itemId, item]) => {
   item.maxLevel = 2
   item.stage2Cost = GALAXY_ITEM_STAGE2_COSTS[itemId] || 0
-  item.stage2Available = itemId === 'lumen_tree' || itemId === 'star_lamp' || itemId === 'rover_bay' || itemId === 'crystal_pond'
+  item.stage2Available = itemId === 'lumen_tree' || itemId === 'star_lamp' || itemId === 'rover_bay' || itemId === 'crystal_pond' || itemId === 'observatory'
   item.stage2Label = itemId === 'lumen_tree' ? '성목 루멘'
     : itemId === 'star_lamp' ? '외행성 개척 비콘'
     : itemId === 'rover_bay' ? '외행성 로버 서비스 도크'
     : itemId === 'crystal_pond' ? '외행성 수정 생태 샘'
+    : itemId === 'observatory' ? '오로라 성운 천문대'
     : 'Stage 2 준비 중'
 })
 
