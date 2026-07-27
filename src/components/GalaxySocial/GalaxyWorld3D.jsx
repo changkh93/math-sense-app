@@ -3408,6 +3408,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   const collisionClearDuration = useRef(0)
   const hoverLook = useRef({ pendingX: 0, pendingY: 0, lastX: null, lastY: null, lastTime: null, orbiting: false })
   const firstPersonPitch = useRef(0)
+  const firstPersonYawOffset = useRef(0)
   const movementIntent = useRef(createMovementIntent())
   const movementVectors = useRef({
     forward: new THREE.Vector3(),
@@ -3504,6 +3505,10 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   const firstPersonFov = useRef(FIRST_PERSON_DEFAULT_FOV)
 
   useEffect(() => {
+    firstPersonYawOffset.current = 0
+  }, [isFirstPerson])
+
+  useEffect(() => {
     const handleWheel = (event) => {
       if (paused || !isFirstPerson) return
       firstPersonFov.current = THREE.MathUtils.clamp(firstPersonFov.current + event.deltaY * 0.06, 22, 100)
@@ -3592,13 +3597,19 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     if (canFreeLook && (mouseDeltaX || mouseDeltaY)) {
       if (isFirstPerson) {
-        group.current.rotation.y += manualLookYaw
+        // [1인칭 시점] 정면 기준 좌우 180도(±90도 = ±π/2) 회전 범위 제한 및 상하 pitch 제한
+        firstPersonYawOffset.current = THREE.MathUtils.clamp(
+          firstPersonYawOffset.current + manualLookYaw,
+          -Math.PI / 2,
+          Math.PI / 2,
+        )
         firstPersonPitch.current = THREE.MathUtils.clamp(
           firstPersonPitch.current - mouseDeltaY * MOUSE_LOOK_PITCH_SENSITIVITY,
           -1.2,
           1.2,
         )
       } else {
+        // [3인칭 시점] 제한 없이 360도 전방위 완전 자유 회전 지원
         cameraOffset.subVectors(orbitCamera.position, controls.current.target)
         cameraSpherical.setFromVector3(cameraOffset)
         cameraSpherical.theta += manualLookYaw
@@ -3648,6 +3659,10 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         const targetFacingYaw = Math.atan2(forward.x, forward.z)
         const yawDelta = Math.atan2(Math.sin(targetFacingYaw - group.current.rotation.y), Math.cos(targetFacingYaw - group.current.rotation.y))
         group.current.rotation.y += yawDelta * Math.min(1, delta * 14)
+      } else {
+        // 1인칭 탐험 시 고개 회전을 몸체 방향으로 부드럽게 감쇠/흡수
+        group.current.rotation.y += firstPersonYawOffset.current * Math.min(1, delta * 6)
+        firstPersonYawOffset.current *= (1 - Math.min(1, delta * 6))
       }
 
       movementAmount = inputStrength
@@ -3791,7 +3806,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     if (isFirstPerson) {
       if (controls.current) controls.current.enabled = false
       const eyeY = player.y + 1.96 * characterScale.current
-      const yaw = group.current.rotation.y
+      const yaw = group.current.rotation.y + firstPersonYawOffset.current
       const pitch = firstPersonPitch.current
       const lookDist = 10.0
 
