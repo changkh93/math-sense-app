@@ -596,6 +596,7 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   background: var(--frontier-gold);
   font-size: .55rem;
 }
+.frontier-command-dock button b.is-active-expedition { color: #052017; background: var(--frontier-mint); box-shadow: 0 0 10px rgba(124, 242, 189, .55); font-size: .42rem; }
 .frontier-command-dock .frontier-command-home { margin-left: .15rem; border-left-color: rgba(255, 255, 255, .08); }
 .frontier-learning-route {
   position: fixed;

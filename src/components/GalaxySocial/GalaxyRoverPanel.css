@@ -401,6 +401,19 @@
 }
 .galaxy-rover-track h3 { font-size: .92rem; }
 .galaxy-rover-track__heading > strong { color: var(--rover-route-accent); font-size: .84rem; }
+.galaxy-rover-persistence {
+  display: flex;
+  align-items: center;
+  gap: .38rem;
+  margin: .62rem 0 0;
+  padding: .48rem .58rem;
+  border: 1px solid rgba(108, 231, 255, .1);
+  border-radius: 10px;
+  color: #a7ddec;
+  background: rgba(108, 231, 255, .045);
+  font-size: .64rem;
+  line-height: 1.45;
+}
 .galaxy-rover-progress {
   position: relative;
   display: grid;
@@ -427,7 +440,7 @@
 .galaxy-rover-progress > span { color: #a9b8c7; font-size: .66rem; font-weight: 800; }
 .galaxy-rover-track__times {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: .5rem;
   margin: .75rem 0 0;
 }
@@ -513,17 +526,44 @@
 
 .galaxy-rover-archive { padding: 1rem; }
 .galaxy-rover-archive > header { margin-bottom: .55rem; }
+.galaxy-rover-archive > header > div { min-width: 0; }
+.galaxy-rover-archive > header p { max-width: 660px; margin: .3rem 0 0; color: #879caf; font-size: .65rem; line-height: 1.5; }
 .galaxy-rover-archive > header > strong { color: var(--rover-cyan); }
 .galaxy-rover-archive__meter { height: 3px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .055); }
 .galaxy-rover-archive__meter > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--rover-cyan), var(--rover-violet)); transition: width .5s ease; }
-.galaxy-rover-discoveries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-top: .72rem; }
+.galaxy-rover-archive__filters { display: flex; gap: .38rem; margin-top: .72rem; }
+.galaxy-rover-archive__filters button {
+  padding: .38rem .58rem;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 999px;
+  color: #8296aa;
+  background: rgba(255, 255, 255, .025);
+  font-size: .62rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.galaxy-rover-archive__filters button.is-active { color: #dffaff; border-color: rgba(108, 231, 255, .24); background: rgba(108, 231, 255, .08); }
+.galaxy-rover-archive__routes { display: grid; gap: .72rem; margin-top: .72rem; }
+.galaxy-rover-archive-route {
+  padding: .72rem;
+  border: 1px solid color-mix(in srgb, var(--rover-route-accent) 16%, transparent);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--rover-route-accent) 3%, transparent);
+}
+.galaxy-rover-archive-route > header { display: flex; align-items: center; gap: .55rem; }
+.galaxy-rover-archive-route > header > span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: var(--rover-route-accent); background: color-mix(in srgb, var(--rover-route-accent) 10%, transparent); }
+.galaxy-rover-archive-route > header strong,
+.galaxy-rover-archive-route > header small { display: block; }
+.galaxy-rover-archive-route > header strong { color: #eaf5ff; font-size: .72rem; }
+.galaxy-rover-archive-route > header small { margin-top: .12rem; color: #7f93a7; font-size: .57rem; }
+.galaxy-rover-discoveries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-top: .58rem; }
 .galaxy-rover-discovery {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: .52rem;
   min-width: 0;
-  min-height: 59px;
+  min-height: 104px;
   padding: .55rem .62rem;
   border: 1px solid rgba(255, 255, 255, .06);
   border-radius: 12px;
@@ -532,10 +572,10 @@
 .galaxy-rover-discovery__icon { display: grid; place-items: center; flex: 0 0 31px; width: 31px; height: 31px; border-radius: 10px; color: #66798d; background: rgba(255, 255, 255, .035); }
 .galaxy-rover-discovery > div { min-width: 0; }
 .galaxy-rover-discovery small,
-.galaxy-rover-discovery strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.galaxy-rover-discovery strong { display: block; }
 .galaxy-rover-discovery small { color: #667b91; font-size: .54rem; }
 .galaxy-rover-discovery strong { margin-top: .15rem; color: #788a9e; font-size: .65rem; }
-.galaxy-rover-discovery > b { position: absolute; top: 5px; right: 6px; min-width: 18px; padding: .12rem .28rem; border-radius: 999px; color: #07151f; background: var(--rover-cyan); font-size: .52rem; text-align: center; }
+.galaxy-rover-discovery p { margin: .28rem 0 0; color: #667b8f; font-size: .56rem; line-height: 1.45; }
 .galaxy-rover-discovery.is-locked { filter: saturate(.35); }
 .galaxy-rover-discovery.is-owned { border-color: rgba(108, 231, 255, .12); background: rgba(108, 231, 255, .03); }
 .galaxy-rover-discovery.is-owned .galaxy-rover-discovery__icon { color: var(--rover-cyan); background: rgba(108, 231, 255, .075); }
@@ -544,6 +584,8 @@
 .galaxy-rover-discovery.is-owned.rarity-rare .galaxy-rover-discovery__icon { color: var(--rover-violet); background: rgba(169, 151, 255, .08); }
 .galaxy-rover-discovery.is-owned.rarity-legendary { border-color: rgba(255, 215, 124, .18); background: rgba(255, 215, 124, .03); }
 .galaxy-rover-discovery.is-owned.rarity-legendary .galaxy-rover-discovery__icon { color: var(--rover-gold); background: rgba(255, 215, 124, .08); }
+.galaxy-rover-archive__empty { margin: 0; padding: 1rem; border: 1px dashed rgba(255, 255, 255, .1); border-radius: 14px; color: #8ca0b4; text-align: center; font-size: .68rem; }
+.galaxy-rover-dispatch__footer em { display: block; margin-top: .3rem; color: #ffdda0; font-size: .6rem; font-style: normal; }
 
 @keyframes galaxy-rover-signal {
   0%, 100% { opacity: .58; transform: scale(.88); }

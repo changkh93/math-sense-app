@@ -89,6 +89,8 @@ const invokeGalaxy = (name, payload = {}) => httpsCallable(functions, name)(payl
 const createOperationId = () => globalThis.crypto?.randomUUID?.()
   || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 
+const getRoverDispatchStorageKey = (uid) => `metasense_rover_dispatch_${String(uid || 'anonymous')}`
+
 const VISIT_MESSAGES = [
   '새로운 풍경이 정말 멋져!',
   '다음 탐사도 같이 가자!',
@@ -1507,13 +1509,40 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const dispatchRover = async (route) => {
     if (!isOwner) return null
     const requestAudioSessionKey = audioSessionKey
+    const dispatchStorageKey = getRoverDispatchStorageKey(user?.uid)
+    let operationId = ''
+    let dispatchRoute = route
+    try {
+      const pendingDispatch = JSON.parse(sessionStorage.getItem(dispatchStorageKey) || 'null')
+      operationId = pendingDispatch?.operationId || ''
+      dispatchRoute = pendingDispatch?.route || route
+      if (!operationId) {
+        operationId = createOperationId()
+        dispatchRoute = route
+        sessionStorage.setItem(dispatchStorageKey, JSON.stringify({ operationId, route: dispatchRoute }))
+      }
+    } catch {
+      operationId = createOperationId()
+      dispatchRoute = route
+    }
     const result = await runAction(
       'rover:dispatch',
-      () => callGalaxy('startGalaxyRoverExpedition', { route, operationId: createOperationId() }),
+      () => callGalaxy('startGalaxyRoverExpedition', { route: dispatchRoute, operationId }).catch((dispatchError) => {
+        const activeExpedition = dispatchError?.details?.expedition
+        if (!activeExpedition?.operationId) throw dispatchError
+        return {
+          success: true,
+          recovered: true,
+          expedition: activeExpedition,
+          serverNowMs: dispatchError?.details?.serverNowMs,
+        }
+      }),
       (dispatchResult) => {
         const title = dispatchResult?.expedition?.routeTitle || '장거리 로버 원정'
         const readyAt = formatGalaxyTime(dispatchResult?.expedition?.readyAtMs)
-        return `${title}을 시작했습니다.${readyAt ? ` ${readyAt} 귀환 예정입니다.` : ''}`
+        return dispatchResult?.recovered
+          ? `이미 진행 중인 ${title} 기록을 복원했습니다.${readyAt ? ` ${readyAt} 귀환 예정입니다.` : ''}`
+          : `${title}을 시작했습니다.${readyAt ? ` ${readyAt} 귀환 예정입니다.` : ''}`
       },
     )
     if (
@@ -1523,6 +1552,11 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     if (!result?.expedition) {
       soundManager.play('frontier.connection.softError')
       return null
+    }
+    try {
+      sessionStorage.removeItem(dispatchStorageKey)
+    } catch {
+      // 세션 저장소를 사용할 수 없는 환경에서도 서버 원정 상태는 정상 유지된다.
     }
     const receivedAtMs = Date.now()
     setHome((current) => {
@@ -1595,6 +1629,15 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     setNowMs(receivedAtMs)
     return result
   }
+
+  useEffect(() => {
+    if (!user?.uid || !roverExpedition?.operationId) return
+    try {
+      sessionStorage.removeItem(getRoverDispatchStorageKey(user.uid))
+    } catch {
+      // 실시간 서버 원정 기록이 확인되었으므로 별도 복구 키가 없어도 안전하다.
+    }
+  }, [roverExpedition?.operationId, user?.uid])
 
   const savePassport = async (form) => {
     const result = await runAction('passport', () => callGalaxy('saveGalaxyPassport', form), '탐험가 패스포트가 갱신되었습니다.')
@@ -1819,8 +1862,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       </button>
 
       <nav className="frontier-command-dock" aria-label="프론티어 명령 독">
-        <button type="button" className={menu === 'rover' ? 'active' : ''} onClick={() => openGameMenu('rover')} aria-label={roverStatus === 'ready' ? '로버 귀환 상자 열기' : '로버 원정 관제 열기'}>
-          <Satellite size={21} aria-hidden="true" /><small>로버</small>{isOwner && roverStatus === 'ready' && <b>!</b>}
+        <button type="button" className={menu === 'rover' ? 'active' : ''} onClick={() => openGameMenu('rover')} aria-label={roverStatus === 'ready' ? '로버 귀환 상자 열기' : roverStatus === 'active' ? `진행 중인 로버 원정 확인 · ${roverRemainingLabel}` : '로버 원정 관제 열기'}>
+          <Satellite size={21} aria-hidden="true" /><small>로버</small>{isOwner && (roverStatus === 'ready' || roverStatus === 'active') && <b className={roverStatus === 'active' ? 'is-active-expedition' : ''}>{roverStatus === 'ready' ? '!' : '●'}</b>}
         </button>
         <button type="button" className={menu === 'build' ? 'active' : ''} onClick={() => openGameMenu('build')}>
           <Backpack size={21} aria-hidden="true" /><small>건설</small>
