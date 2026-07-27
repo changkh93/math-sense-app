@@ -12,6 +12,28 @@ const MEMO_MAX_LENGTH = 2000;
 const RECIPIENT_CACHE_TTL_MS = 10 * 60 * 1000;
 let recipientDirectoryCache = { loadedAt: 0, rows: [] };
 
+// 운영자(선생님) 계정은 이메일로 식별한다. 표시명이 아니라 이메일이 화이트리스트 기준이다.
+const OPERATOR_EMAIL = 'paul@dulcine.net';
+// 편지함에서 선생님께 편지를 쓸 수 있도록, users 목록 조회(limit 200)에서
+// 운영자가 잘려나가더라도 반드시 수신자 디렉토리에 포함되도록 보장한다.
+const ensureOperatorRecipient = async (rows) => {
+  if (rows.some((row) => row.email === OPERATOR_EMAIL)) return rows;
+  try {
+    const snap = await getDocs(query(collection(db, 'users'), where('email', '==', OPERATOR_EMAIL), limitDocs(1)));
+    if (!snap.empty) {
+      const docSnap = snap.docs[0];
+      recipientDirectoryCache = {
+        loadedAt: recipientDirectoryCache.loadedAt,
+        rows: [...recipientDirectoryCache.rows, { uid: docSnap.id, ...docSnap.data() }],
+      };
+      return [...rows, { uid: docSnap.id, ...docSnap.data() }];
+    }
+  } catch (err) {
+    console.error('Failed to ensure operator recipient:', err);
+  }
+  return rows;
+};
+
 function getProfileName(profile = {}, fallback = '탐사원') {
   return profile.publicDisplayName || profile.studentName || profile.name || profile.displayName || fallback;
 }
@@ -181,9 +203,12 @@ export default function DirectMemoMenu() {
           rows = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
           recipientDirectoryCache = { loadedAt: Date.now(), rows };
         }
+        // users 목록이 limit(200)으로 잘릴 때 운영자(선생님)가 빠지면
+        // 선생님께 편지를 쓸 수 없게 되므로 별도 조회로 보장 포함시킨다.
+        rows = await ensureOperatorRecipient(rows);
         if (cancelled) return;
         const list = rows
-          .filter((profile) => profile.uid !== user.uid && profile.role !== 'parent' && (profile.role !== 'admin' || profile.email === 'paul@dulcine.net'))
+          .filter((profile) => profile.uid !== user.uid && profile.role !== 'parent' && (profile.role !== 'admin' || profile.email === OPERATOR_EMAIL))
           .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'));
         setRecipients(list);
         setRecipientId((prev) => (prev && list.some((item) => item.uid === prev) ? prev : ''));
@@ -269,7 +294,12 @@ export default function DirectMemoMenu() {
   const unreadCount = useMemo(() => visibleInbox.filter((memo) => !memo.isRead).length, [visibleInbox]);
   const filteredRecipients = useMemo(() => {
     const keyword = recipientSearch.trim().toLowerCase();
-    if (!keyword) return [];
+    // 검색어가 없을 때는 선생님(운영자)을 기본 추천으로 먼저 보여준다.
+    // 학생이 가장 많이 찾는 수신자이므로, 검색을 강제하지 않고 바로 선택할 수 있게 한다.
+    if (!keyword) {
+      const operator = recipients.find((r) => r.email === OPERATOR_EMAIL);
+      return operator ? [operator] : [];
+    }
     return recipients.filter((recipient) => {
       const haystack = [
         recipient.publicDisplayName || '',
@@ -593,35 +623,36 @@ export default function DirectMemoMenu() {
                         placeholder="프로필명으로 msense 사용자 검색"
                         disabled={action === 'sending'}
                       />
-                      {recipientFocused && recipientSearch.trim() && (
+                      {recipientFocused && filteredRecipients.length > 0 && (
                         <div className="direct-memo-suggestions">
-                          {filteredRecipients.length ? (
-                            filteredRecipients.map((recipient) => {
-                              const hint = getProfileHint(recipient);
-                              return (
-                                <button
-                                  type="button"
-                                  key={recipient.uid}
-                                  className="direct-memo-suggestion"
-                                  onMouseDown={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    protectMemoInteraction();
-                                  }}
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    handleSelectRecipient(recipient);
-                                  }}
-                                >
-                                  <span className="direct-memo-suggestion-name">{getProfileName(recipient)}</span>
-                                  {hint && <span className="direct-memo-suggestion-hint">{hint}</span>}
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <div className="direct-memo-suggestion-empty">일치하는 사용자가 없습니다.</div>
-                          )}
+                          {filteredRecipients.map((recipient) => {
+                            const hint = getProfileHint(recipient);
+                            return (
+                              <button
+                                type="button"
+                                key={recipient.uid}
+                                className="direct-memo-suggestion"
+                                onMouseDown={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  protectMemoInteraction();
+                                }}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  handleSelectRecipient(recipient);
+                                }}
+                              >
+                                <span className="direct-memo-suggestion-name">{getProfileName(recipient)}</span>
+                                {hint && <span className="direct-memo-suggestion-hint">{hint}</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {recipientFocused && recipientSearch.trim() && filteredRecipients.length === 0 && (
+                        <div className="direct-memo-suggestions">
+                          <div className="direct-memo-suggestion-empty">일치하는 사용자가 없습니다.</div>
                         </div>
                       )}
                     </>
