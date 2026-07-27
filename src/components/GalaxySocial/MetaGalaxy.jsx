@@ -569,6 +569,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const latestFrontierStoryRef = useRef(null)
   const lastExitTelemetryAtRef = useRef(0)
   const lastChapterTelemetryRef = useRef('')
+  const homeLoadInFlightRef = useRef(new Set())
+  const dailyStorySyncAttemptRef = useRef('')
   const audioSessionKey = `${user?.uid || 'guest'}:${targetUid || 'home'}:${playSession?.sessionId || 'no-session'}`
   const audioMountedRef = useRef(false)
   const audioSessionKeyRef = useRef(audioSessionKey)
@@ -627,14 +629,22 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const guestMockHomeData = guestGalaxy.mockHomeData
 
   const loadHome = useCallback(async (nextTargetUid = user?.uid, { quiet = false } = {}) => {
+    const requestKey = String(nextTargetUid || user?.uid || (isGuest ? 'guest' : 'anonymous'))
+    if (homeLoadInFlightRef.current.has(requestKey)) return null
+    homeLoadInFlightRef.current.add(requestKey)
     if (isGuest) {
-      setHome(guestMockHomeData)
-      setTargetUid('guest')
-      setLoading(false)
-      return
+      try {
+        setHome(guestMockHomeData)
+        setTargetUid('guest')
+        setLoading(false)
+        return guestMockHomeData
+      } finally {
+        homeLoadInFlightRef.current.delete(requestKey)
+      }
     }
     if (!user?.uid) {
       setLoading(false)
+      homeLoadInFlightRef.current.delete(requestKey)
       return
     }
     if (!quiet) setLoading(true)
@@ -651,6 +661,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     } catch (err) {
       setError(err?.message || '행성 신호를 불러오지 못했습니다.')
     } finally {
+      homeLoadInFlightRef.current.delete(requestKey)
       if (!quiet) setLoading(false)
     }
   }, [callGalaxy, guestMockHomeData, isGuest, user?.uid])
@@ -894,17 +905,27 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   }, [dailyEvent?.status, frontierStory, isOwner])
   useEffect(() => {
     if (
-      !isOwner
+      !isGuest
+      || !isOwner
+      || frontierStory.stepId !== 'stabilize_daily_event'
+      || dailyEvent?.status !== 'completed'
+    ) return
+    guestGalaxy.syncCompletedDailyEventStory()
+  }, [dailyEvent?.status, frontierStory.stepId, guestGalaxy.syncCompletedDailyEventStory, isGuest, isOwner])
+
+  useEffect(() => {
+    if (
+      isGuest
+      || !isOwner
       || !user?.uid
       || frontierStory.stepId !== 'stabilize_daily_event'
       || dailyEvent?.status !== 'completed'
     ) return
-    if (isGuest) {
-      guestGalaxy.syncCompletedDailyEventStory()
-      return
-    }
+    const attemptKey = `${user.uid}:${dailyEvent.eventId || dailyEvent.dayKey || 'completed'}`
+    if (dailyStorySyncAttemptRef.current === attemptKey) return
+    dailyStorySyncAttemptRef.current = attemptKey
     void loadHome(user.uid, { quiet: true })
-  }, [dailyEvent?.status, frontierStory.stepId, guestGalaxy, isGuest, isOwner, loadHome, user?.uid])
+  }, [dailyEvent?.dayKey, dailyEvent?.eventId, dailyEvent?.status, frontierStory.stepId, isGuest, isOwner, loadHome, user?.uid])
   useEffect(() => {
     if (frontierStory.status !== 'completed' || finaleShownRef.current) return
     finaleShownRef.current = true

@@ -285,7 +285,6 @@ function ModelMaterial({ color, emissive = '#000000', emissiveIntensity = 0, met
 }
 
 function RoundedLumenTree({ scale = 1, color = '#58c985', ghost = false }) {
-  console.log('[LUMEN] rendering RoundedLumenTree (Stage 1)', { scale, ghost })
   return (
     <group scale={scale}>
       {[[-.2, .42, .08, -.48], [.22, .52, -.06, .48]].map(([x, y, z, tilt], index) => (
