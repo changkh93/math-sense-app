@@ -4824,9 +4824,13 @@ export default function GalaxyWorld3D({
       }
       return () => keys.forEach(([key]) => soundManager.stopLoop(key, 500))
     }
-    const key = 'frontier:ambience:theme'
-    soundManager.loopAt(themeAmbienceSoundId, [0, 0, 0], { key, fadeInMs: 1200 })
-    return () => soundManager.stopLoop(key, 700)
+    // [BGM/테마 배경음 주석 처리]
+    // 패스포트 기후(심해, 수정, 사막, 기계, 빙하, 숲 등) 테마 배경음 비활성화.
+    // 향후 원본 음원 교체 시 아래 3줄 주석 해제로 즉시 복원 가능.
+    // const key = 'frontier:ambience:theme'
+    // soundManager.loopAt(themeAmbienceSoundId, [0, 0, 0], { key, fadeInMs: 1200 })
+    // return () => soundManager.stopLoop(key, 700)
+    return undefined
   }, [ambienceReady, themeAmbienceSoundId, playerPosition.x, playerPosition.z, planet?.theme])
 
   useEffect(() => {
@@ -4844,10 +4848,12 @@ export default function GalaxyWorld3D({
       soundManager.stopLoop(key, 500)
       return
     }
-    soundManager.loopAt('frontier.ambience.landing', [0, terrainHeight(0, 5) + .15, 5], {
-      key,
-      fadeInMs: 900,
-    })
+    // [BGM/착륙지 베이스 배경음 주석 처리]
+    // 착륙지 베이스 웅웅거림 배경음 비활성화. 향후 음원 교체 시 주석 해제하여 복원 가능.
+    // soundManager.loopAt('frontier.ambience.landing', [0, terrainHeight(0, 5) + .15, 5], {
+    //   key,
+    //   fadeInMs: 900,
+    // })
   }, [ambienceReady, playerPosition.x, playerPosition.z])
 
   useEffect(() => {
