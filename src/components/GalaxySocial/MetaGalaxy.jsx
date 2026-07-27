@@ -836,7 +836,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     if (dailyEventPending) return {
       id: 'daily-event',
       eyebrow: '오늘 한 번 · 현장 사건 해결',
-      title: `미니맵의 금빛 표식으로 가서 E키를 누르세요 · ${dailyEvent.title || '행성 사건'}`,
+      title: `왼쪽 아래 행성 지도의 점선 방향으로 [✦ 사건 현장]까지 이동하세요 · ${dailyEvent.title || '행성 사건'}`,
       detail: `${dailyEvent.detail || '현장에 가서 사건을 해결하세요.'} 해결하면 ${dailyEvent.reward?.title || '건설 재료'} ${dailyEvent.reward?.amount ?? 1}개를 받습니다.`,
       progress: 0,
       total: 1,
@@ -1496,7 +1496,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     if (todayObjective.action === 'daily-event') {
       setArrivalOpen(false)
       setMenu('')
-      flash('왼쪽 아래 미니맵의 금빛 점까지 걸어가세요. 현장 이름이 보이면 E키를 눌러 해결하고 재료를 받습니다.')
+      flash('왼쪽 아래 행성 지도에서 ‘나’와 [✦ 사건 현장]을 잇는 점선 방향으로 이동하세요. 도착하면 E키(모바일: 사건 버튼)를 눌러 해결합니다.')
       return
     }
     setArrivalOpen(false)

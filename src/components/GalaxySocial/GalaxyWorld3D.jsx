@@ -72,6 +72,7 @@ const FOOTSTEP_STRIDE_DISTANCE = 1.7
 const MUSIC_ENTRY_DELAY_MS = 900
 const AMBIENCE_ENTRY_DELAY_MS = 2800
 const LANDING_AUDIO_STOP_DISTANCE = 7.5
+const DAILY_EVENT_INTERACTION_RADIUS = 2.8
 const ASTRA_BUILDER_POC_ENABLED = import.meta.env.VITE_ASTRA_BUILDER_POC !== 'false'
 
 function createMovementIntent() {
@@ -147,6 +148,7 @@ function resolvePendingDailyEventNode(dailyEvent) {
     kind: 'daily',
     status: 'pending',
     label: dailyEvent.worldLabel || dailyEvent.title || resourceNode.label,
+    interactionRadius: DAILY_EVENT_INTERACTION_RADIUS,
     dailyEvent,
   }
 }
@@ -1841,50 +1843,67 @@ function ResourceNode({ node, palette }) {
   return <group position={[x, y, z]}><mesh position={[0, .04, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow><circleGeometry args={[1.12, 24]} /><meshStandardMaterial color="#76583d" roughness={1} /></mesh><group position={[0, .2, 0]}><RoundedLumenTree scale={.28} color="#82e99c" /></group><ResourceHalo color="#8df2a7" /></group>
 }
 
-function DailyEventMarker({ node }) {
+function DailyEventMarker({ node, playerPosition }) {
   const marker = useRef()
   const beam = useRef()
   const visual = useMemo(() => resolveDailyEventVisual(node.dailyEvent), [node.dailyEvent])
   const [x, , z] = node.position
   const y = terrainHeight(x, z)
 
+  const distance = playerPosition
+    ? Math.round(Math.hypot(playerPosition.x - x, playerPosition.z - z))
+    : 0
+  const isInRange = distance <= DAILY_EVENT_INTERACTION_RADIUS
+
   useFrame((state) => {
     const elapsed = state.clock.elapsedTime
     if (marker.current) {
       marker.current.rotation.y = elapsed * .38
-      marker.current.position.y = y + Math.sin(elapsed * 1.45) * .035
+      marker.current.position.y = Math.sin(elapsed * 1.45) * .035
     }
-    if (beam.current) beam.current.material.opacity = .075 + Math.sin(elapsed * 1.9) * .025
+    if (beam.current) beam.current.material.opacity = .18 + Math.sin(elapsed * 2.2) * .07
   })
 
   return (
-    <group ref={marker} position={[x, y, z]}>
-      <mesh ref={beam} position={[0, 2.05, 0]}>
-        <cylinderGeometry args={[.08, .52, 4.1, 24, 1, true]} />
-        <meshBasicMaterial color={visual.color} transparent opacity={.09} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, .08, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.12, .055, 8, 48]} />
-        <meshBasicMaterial color={visual.color} transparent opacity={.82} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, .13, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.42, .018, 6, 48]} />
-        <meshBasicMaterial color={visual.glow} transparent opacity={.42} depthWrite={false} toneMapped={false} />
-      </mesh>
-      {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle) => (
-        <mesh key={angle} position={[Math.cos(angle) * 1.25, .18, Math.sin(angle) * 1.25]} rotation={[0, -angle, Math.PI / 4]}>
-          <octahedronGeometry args={[.09, 0]} />
-          <meshBasicMaterial color={visual.glow} toneMapped={false} />
+    <group position={[x, y, z]}>
+      {/* 3D 상공 사건 현장 핀 태그 오버레이 */}
+      <Html position={[0, 4.35, 0]} center zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
+        <div className={`frontier-event-pin-tag${isInRange ? ' in-range' : ''}`}>
+          <i className="frontier-event-pin-icon">✦</i>
+          <span className="frontier-event-pin-title">{node.label || '사건 현장'}</span>
+          <span className="frontier-event-pin-dist">{isInRange ? '도착 · E키' : `${distance}m`}</span>
+        </div>
+      </Html>
+
+      <group ref={marker}>
+        {/* 수직 높은 황금 빛 기둥 */}
+        <mesh ref={beam} position={[0, 4.2, 0]}>
+          <cylinderGeometry args={[.18, .98, 8.4, 24, 1, true]} />
+          <meshBasicMaterial color={visual.color} transparent opacity={.22} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
         </mesh>
-      ))}
-      <Float speed={1.65} floatIntensity={.2} rotationIntensity={.18}>
-        <mesh position={[0, 2.05, 0]} rotation={[0, Math.PI / 4, 0]}>
-          <octahedronGeometry args={[.28, 0]} />
-          <meshStandardMaterial color={visual.glow} emissive={visual.color} emissiveIntensity={2.4} metalness={.25} roughness={.18} toneMapped={false} />
+        <mesh position={[0, .08, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.25, .065, 8, 48]} />
+          <meshBasicMaterial color={visual.color} transparent opacity={.9} depthWrite={false} toneMapped={false} />
         </mesh>
-      </Float>
-      <Sparkles count={18} scale={[2.35, 3.8, 2.35]} position={[0, 1.8, 0]} color={visual.glow} size={1.8} speed={.38} noise={.8} />
-      <pointLight position={[0, 1.65, 0]} color={visual.color} intensity={.55} distance={4.2} />
+        <mesh position={[0, .13, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.6, .022, 6, 48]} />
+          <meshBasicMaterial color={visual.glow} transparent opacity={.55} depthWrite={false} toneMapped={false} />
+        </mesh>
+        {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle) => (
+          <mesh key={angle} position={[Math.cos(angle) * 1.35, .2, Math.sin(angle) * 1.35]} rotation={[0, -angle, Math.PI / 4]}>
+            <octahedronGeometry args={[.11, 0]} />
+            <meshBasicMaterial color={visual.glow} toneMapped={false} />
+          </mesh>
+        ))}
+        <Float speed={1.8} floatIntensity={.25} rotationIntensity={.22}>
+          <mesh position={[0, 2.2, 0]} rotation={[0, Math.PI / 4, 0]}>
+            <octahedronGeometry args={[.34, 0]} />
+            <meshStandardMaterial color={visual.glow} emissive={visual.color} emissiveIntensity={2.8} metalness={.25} roughness={.18} toneMapped={false} />
+          </mesh>
+        </Float>
+        <Sparkles count={22} scale={[2.8, 5.2, 2.8]} position={[0, 2.2, 0]} color={visual.glow} size={2.2} speed={.45} noise={.8} />
+        <pointLight position={[0, 2.2, 0]} color={visual.color} intensity={.8} distance={5.5} />
+      </group>
     </group>
   )
 }
@@ -2549,7 +2568,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
 
@@ -2831,7 +2850,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
       {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLightId={activeLightId} />)}
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
-      {dailyEventNode && <DailyEventMarker node={dailyEventNode} />}
+      {dailyEventNode && <DailyEventMarker node={dailyEventNode} playerPosition={playerPosition} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
       <LumiGuide palette={palette} />
       <RoverControl palette={palette} status={roverNode.status} />
@@ -2924,13 +2943,36 @@ function MiniMap({ playerPosition, nearby, dailyEventNode }) {
   const playerLeft = 50 + THREE.MathUtils.clamp(playerPosition.x / WORLD_RADIUS, -1, 1) * 44
   const playerTop = 50 + THREE.MathUtils.clamp(playerPosition.z / WORLD_RADIUS, -1, 1) * 44
   const dailyVisual = dailyEventNode ? resolveDailyEventVisual(dailyEventNode.dailyEvent) : null
-  const dailyLeft = dailyEventNode ? 50 + dailyEventNode.position[0] / WORLD_RADIUS * 43 : 0
-  const dailyTop = dailyEventNode ? 50 + dailyEventNode.position[2] / WORLD_RADIUS * 43 : 0
+  const dailyLeft = dailyEventNode ? 50 + THREE.MathUtils.clamp(dailyEventNode.position[0] / WORLD_RADIUS, -1, 1) * 43 : 0
+  const dailyTop = dailyEventNode ? 50 + THREE.MathUtils.clamp(dailyEventNode.position[2] / WORLD_RADIUS, -1, 1) * 43 : 0
+  const eventDistance = dailyEventNode
+    ? Math.round(Math.hypot(playerPosition.x - dailyEventNode.position[0], playerPosition.z - dailyEventNode.position[2]))
+    : null
+  const eventInRange = nearby?.kind === 'daily'
+  const statusLabel = eventInRange
+    ? '도착 · E키로 해결'
+    : dailyEventNode
+      ? `✦ 사건까지 ${eventDistance}m`
+      : nearby
+        ? '주변 신호 감지'
+        : '구역 탐색 중'
   return (
-    <div className="frontier-minimap" aria-label="행성 구역 미니맵">
-      <header><span>PLANET MAP</span><strong>{nearby?.kind === 'daily' ? '사건 현장' : dailyEventNode ? '오늘 사건' : nearby ? '신호 감지' : '구역 탐색'}</strong></header>
+    <div
+      className={`frontier-minimap${dailyEventNode ? ' has-event' : ''}${eventInRange ? ' event-in-range' : ''}`}
+      role="group"
+      aria-label={dailyEventNode ? `행성 지도. 황금색 사건 현장까지 ${eventDistance}미터` : '행성 구역 지도'}
+    >
+      <header>
+        <span>행성 지도 <small>PLANET MAP</small></span>
+        <strong>{statusLabel}</strong>
+      </header>
       <div className="frontier-minimap-field">
         <i className="frontier-minimap-orbit" />
+        {dailyEventNode && (
+          <svg className="frontier-map-event-route" viewBox="0 0 100 100" aria-hidden="true">
+            <line x1={playerLeft} y1={playerTop} x2={dailyLeft} y2={dailyTop} />
+          </svg>
+        )}
         {ZONES.map((zone) => (
           <span key={zone.id} className={`frontier-map-zone zone-${zone.id}`} style={{ left: `${50 + zone.position[0] / WORLD_RADIUS * 43}%`, top: `${50 + zone.position[1] / WORLD_RADIUS * 43}%`, '--zone-color': zone.color }} title={zone.label}>
             <i />
@@ -2940,12 +2982,12 @@ function MiniMap({ playerPosition, nearby, dailyEventNode }) {
         {dailyEventNode && (
           <span
             className="frontier-map-zone frontier-map-daily-event"
-            style={{ left: `${dailyLeft}%`, top: `${dailyTop}%`, '--zone-color': dailyVisual.color, zIndex: 2 }}
-            title={dailyEventNode.label}
+            style={{ left: `${dailyLeft}%`, top: `${dailyTop}%`, '--zone-color': dailyVisual.color }}
+            title={`✦ 사건 현장: ${dailyEventNode.label}`}
             aria-label={`오늘의 행성 사건: ${dailyEventNode.label}`}
           >
-            <i style={{ width: 10, height: 10, borderWidth: 2, boxShadow: `0 0 12px ${dailyVisual.color}` }} />
-            <small>오늘</small>
+            <i className="frontier-map-daily-pulse" />
+            <small>✦ 사건 현장</small>
           </span>
         )}
         {MISSION_PORTALS.map((portal) => (
@@ -2960,8 +3002,22 @@ function MiniMap({ playerPosition, nearby, dailyEventNode }) {
             <small>출발</small>
           </span>
         ))}
-        <b className="frontier-map-player" style={{ left: `${playerLeft}%`, top: `${playerTop}%` }} />
+        <span
+          className="frontier-map-player-marker"
+          style={{ left: `${playerLeft}%`, top: `${playerTop}%` }}
+          aria-label="내 위치"
+        >
+          <b className="frontier-map-player" style={{ transform: `rotate(${THREE.MathUtils.radToDeg(playerPosition.yaw || 0) + 45}deg)` }} />
+          <small>나</small>
+        </span>
       </div>
+      {dailyEventNode && (
+        <div className="frontier-minimap-guide" aria-hidden="true">
+          <span><i className="me" /> 나</span>
+          <b>점선 방향으로 이동</b>
+          <span><i className="event">✦</i> 사건</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -2985,6 +3041,11 @@ function InteractionPrompt({ nearby, onInteract, onInspect }) {
     <div
       className="frontier-interaction-prompt touch-clickable-prompt"
       onClick={() => onInteract?.()}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onInteract?.()
+      }}
       role="button"
       tabIndex={0}
       title="터치 또는 클릭하여 상호작용"
@@ -3550,6 +3611,7 @@ export default function GalaxyWorld3D({
           inputRef={inputRef}
           paused={paused}
           onNearbyChange={setNearby}
+          playerPosition={playerPosition}
           activeMission={activeMission}
           collectedIds={collectedIds}
           onCollect={collect}

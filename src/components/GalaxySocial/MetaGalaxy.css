@@ -1341,8 +1341,11 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   pointer-events: none;
 }
 .frontier-minimap header { display: flex; justify-content: space-between; align-items: center; gap: .4rem; margin-bottom: .4rem; }
-.frontier-minimap header span { color: #6d8298; font-size: .46rem; font-weight: 900; letter-spacing: .1em; }
-.frontier-minimap header strong { color: #a9c4ce; font-size: .5rem; }
+.frontier-minimap header span { color: #d6e5ed; font-size: .52rem; font-weight: 900; letter-spacing: -.01em; white-space: nowrap; }
+.frontier-minimap header span small { margin-left: .15rem; color: #6d8298; font-size: .38rem; letter-spacing: .06em; }
+.frontier-minimap header strong { color: #a9c4ce; font-size: .5rem; text-align: right; }
+.frontier-minimap.has-event header strong { color: #ffe082; }
+.frontier-minimap.event-in-range header strong { color: #9dffd0; }
 .frontier-minimap-field {
   position: relative;
   width: 100%;
@@ -1356,6 +1359,26 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   box-shadow: inset 0 0 22px rgba(0, 0, 0, .35);
 }
 .frontier-minimap-orbit { position: absolute; inset: 16%; border: 1px dashed rgba(108, 231, 255, .13); border-radius: 50%; }
+.frontier-map-event-route {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.frontier-map-event-route line {
+  stroke: rgba(255, 213, 79, .8);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px rgba(255, 196, 38, .8));
+  animation: frontierMapRouteFlow 1.2s linear infinite;
+}
+@keyframes frontierMapRouteFlow {
+  to { stroke-dashoffset: -6; }
+}
 .frontier-map-zone {
   position: absolute;
   display: grid;
@@ -1366,15 +1389,120 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
 }
 .frontier-map-zone > i { width: 6px; height: 6px; border: 1px solid color-mix(in srgb, var(--zone-color), white 18%); border-radius: 50%; background: var(--zone-color); box-shadow: 0 0 7px var(--zone-color); }
 .frontier-map-zone small { padding: 1px 3px; border-radius: 4px; background: rgba(3, 9, 18, .68); font-size: .38rem; white-space: nowrap; }
-.frontier-map-player {
+.frontier-map-player-marker {
   position: absolute;
+  z-index: 12;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  transform: translate(-50%, -50%);
+  color: #e9fbff;
+}
+.frontier-map-player-marker small {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(3, 9, 18, .82);
+  font-size: .38rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.frontier-map-player {
+  display: block;
   width: 9px;
   height: 9px;
-  transform: translate(-50%, -50%) rotate(45deg);
   border: 2px solid #fff;
   border-radius: 3px 50% 50% 50%;
   background: var(--frontier-cyan);
   box-shadow: 0 0 9px rgba(108, 231, 255, .8);
+}
+.frontier-minimap-guide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .25rem;
+  margin-top: .38rem;
+  color: #9caeba;
+  font-size: .42rem;
+  font-weight: 800;
+}
+.frontier-minimap-guide span { display: inline-flex; align-items: center; gap: .16rem; white-space: nowrap; }
+.frontier-minimap-guide b { color: #ffe082; font-size: .4rem; white-space: nowrap; }
+.frontier-minimap-guide i { display: inline-grid; place-items: center; width: 8px; height: 8px; font-style: normal; }
+.frontier-minimap-guide i.me { border: 1px solid #fff; border-radius: 2px 50% 50% 50%; background: var(--frontier-cyan); transform: rotate(45deg); }
+.frontier-minimap-guide i.event { color: #ffd54f; text-shadow: 0 0 5px #ffd54f; }
+.frontier-event-pin-tag {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .28rem .55rem;
+  border: 1px solid rgba(255, 213, 79, .8);
+  border-radius: 999px;
+  background: rgba(14, 25, 22, 0.88);
+  backdrop-filter: blur(8px);
+  color: #fff3c4;
+  box-shadow: 0 0 16px rgba(255, 200, 60, .45), inset 0 0 8px rgba(255, 220, 100, .2);
+  white-space: nowrap;
+  animation: frontierEventPinBounce 2s ease-in-out infinite alternate;
+}
+.frontier-event-pin-icon {
+  color: #ffe082;
+  font-size: .82rem;
+  font-style: normal;
+  text-shadow: 0 0 8px #ffd54f;
+}
+.frontier-event-pin-title {
+  font-size: .7rem;
+  font-weight: 800;
+  color: #ffecb3;
+}
+.frontier-event-pin-dist {
+  padding: .05rem .3rem;
+  border-radius: 6px;
+  background: rgba(255, 179, 0, .28);
+  color: #ffe082;
+  font-size: .62rem;
+  font-weight: 900;
+}
+.frontier-event-pin-tag.in-range {
+  border-color: rgba(124, 242, 189, .9);
+  box-shadow: 0 0 18px rgba(124, 242, 189, .5), inset 0 0 8px rgba(124, 242, 189, .2);
+}
+.frontier-event-pin-tag.in-range .frontier-event-pin-dist {
+  background: rgba(49, 176, 121, .3);
+  color: #bfffe0;
+}
+@keyframes frontierEventPinBounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+.frontier-map-daily-event {
+  z-index: 10 !important;
+}
+.frontier-map-daily-event small {
+  color: #ffe082 !important;
+  background: rgba(30, 20, 5, .88) !important;
+  border: 1px solid rgba(255, 213, 79, .5);
+  font-weight: 900;
+}
+.frontier-map-daily-pulse {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffd54f !important;
+  box-shadow: 0 0 12px #ffd54f !important;
+}
+.frontier-map-daily-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 1px solid #ffe082;
+  border-radius: 50%;
+  animation: frontierMinimapPulse 1.5s ease-out infinite;
+}
+@keyframes frontierMinimapPulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
 }
 .frontier-game-stage.paused .frontier-minimap,
 .frontier-game-stage.paused .frontier-control-hint { opacity: .45; }
@@ -1614,9 +1742,18 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   .frontier-command-dock button small { font-size: .52rem; }
   .frontier-command-dock button b { right: calc(50% - 22px); }
   .frontier-control-hint { display: none; }
-  .frontier-minimap { left: .65rem; bottom: calc(11.25rem + env(safe-area-inset-bottom)); width: 94px; padding: .34rem; border-radius: 14px; }
+  .frontier-minimap { left: .65rem; bottom: calc(11.25rem + env(safe-area-inset-bottom)); width: 106px; padding: .34rem; border-radius: 14px; }
   .frontier-minimap header { display: none; }
+  .frontier-minimap.has-event header { display: flex; margin-bottom: .28rem; }
+  .frontier-minimap.has-event header > span { display: none; }
+  .frontier-minimap.has-event header strong { width: 100%; font-size: .46rem; text-align: center; }
   .frontier-map-zone small { display: none; }
+  .frontier-map-daily-event small,
+  .frontier-map-player-marker small { display: block; }
+  .frontier-map-daily-event small { font-size: .34rem; }
+  .frontier-minimap-guide { justify-content: center; }
+  .frontier-minimap-guide > span { display: none; }
+  .frontier-minimap-guide b { font-size: .38rem; }
   .frontier-joystick {
     position: absolute;
     z-index: 28;
@@ -1729,6 +1866,7 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
 
 @media (max-width: 780px) and (max-height: 700px) {
   .frontier-minimap { display: none; }
+  .frontier-minimap.has-event { display: block; bottom: calc(10.35rem + env(safe-area-inset-bottom)); width: 92px; }
   .frontier-learning-route { top: 7.8rem; }
 }
 
