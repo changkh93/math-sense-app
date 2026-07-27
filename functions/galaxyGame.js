@@ -1203,6 +1203,23 @@ function planGalaxyDailyEventCompletion({
   };
 }
 
+function syncFrontierStoryWithCompletedDailyEvent({
+  rawStory,
+  uid,
+  event,
+  operation,
+  nowMs = Date.now(),
+} = {}) {
+  const story = normalizeFrontierStory(rawStory, nowMs);
+  if (!isGalaxyDailyEventOperation(operation, uid, event)) {
+    return { story, advanced: false, advancedStepIds: [] };
+  }
+  return advanceFrontierStory(story, {
+    type: "daily_event_completed",
+    nodeId: event.nodeId,
+  }, nowMs);
+}
+
 function calculateWilsonLowerBound(successes, total, z = 1) {
   const n = Math.max(0, Math.floor(Number(total) || 0));
   if (!n) return 0;
@@ -2495,6 +2512,22 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         maxExpiresAtMs: playSession.hardEndsAtMs,
       }),
     ]);
+    const dailyOperation = dailyOperationSnap.exists ? dailyOperationSnap.data() || {} : null;
+    const dailyStoryProgress = syncFrontierStoryWithCompletedDailyEvent({
+      rawStory: ownPlanetData.frontierStory,
+      uid,
+      event: pendingDailyEvent,
+      operation: dailyOperation,
+      nowMs: serverNowMs,
+    });
+    if (dailyStoryProgress.advanced) {
+      ownPlanetData = { ...ownPlanetData, frontierStory: dailyStoryProgress.story };
+      await ownPlanet.ref.set({
+        frontierStory: dailyStoryProgress.story,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      if (targetUid === uid) targetPlanet = { ...targetPlanet, data: ownPlanetData };
+    }
     const buildPlanetView = (planetData) => planetData?.roverExpedition
       ? { ...planetData, roverExpedition: getGalaxyRoverExpeditionView(planetData.roverExpedition, serverNowMs) }
       : planetData;
@@ -2505,7 +2538,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       dailyEvent: getGalaxyDailyEventView({
         uid,
         event: pendingDailyEvent,
-        operation: dailyOperationSnap.exists ? dailyOperationSnap.data() || {} : null,
+        operation: dailyOperation,
       }),
       neighbors,
       events: eventSnap.docs.map((snap) => ({ id: snap.id, ...(snap.data() || {}) })),
@@ -4230,6 +4263,7 @@ module.exports.__test = {
   planGalaxyItemPlacement,
   planGalaxyStructureVisit,
   planGalaxyDailyEventCompletion,
+  syncFrontierStoryWithCompletedDailyEvent,
   planGalaxyLiveSpeech,
   planGalaxyRoverClaim,
   planGalaxyRoverStart,

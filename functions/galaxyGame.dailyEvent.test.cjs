@@ -6,6 +6,8 @@ const {
   getKstDayKey,
   getKstDayWindow,
   planGalaxyDailyEventCompletion,
+  syncFrontierStoryWithCompletedDailyEvent,
+  normalizeFrontierStory,
 } = require('./galaxyGame').__test;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -193,12 +195,56 @@ function testRetryUsesLatestPlanetBalances() {
   assert.equal(tampered.kind, 'operation_conflict');
 }
 
+function testCompletedEventAdvancesWaitingStory() {
+  const event = buildGalaxyDailyEvent({ uid: UID, nowMs: NOW_MS });
+  const completion = planGalaxyDailyEventCompletion({
+    uid: UID,
+    dayKey: event.dayKey,
+    eventId: event.eventId,
+    planet: {},
+    nowMs: NOW_MS,
+  });
+  const waitingStory = normalizeFrontierStory({
+    completedStepIds: [
+      'restore_beacon',
+      'build_first_light',
+      'field_expedition',
+      'launch_rover',
+      'build_lumen_tree',
+      'restore_garden',
+    ],
+  }, NOW_MS);
+  assert.equal(waitingStory.stepId, 'stabilize_daily_event');
+
+  const synced = syncFrontierStoryWithCompletedDailyEvent({
+    rawStory: waitingStory,
+    uid: UID,
+    event,
+    operation: completion.operation,
+    nowMs: NOW_MS + 1,
+  });
+  assert.equal(synced.advanced, true);
+  assert.equal(synced.story.stepId, 'trace_lost_route');
+  assert.equal(synced.story.completedChapterIds.includes('reborn_star'), true);
+
+  const pending = syncFrontierStoryWithCompletedDailyEvent({
+    rawStory: waitingStory,
+    uid: UID,
+    event,
+    operation: null,
+    nowMs: NOW_MS + 1,
+  });
+  assert.equal(pending.advanced, false);
+  assert.equal(pending.story.stepId, 'stabilize_daily_event');
+}
+
 function run() {
   testKstMidnightBoundary();
   testCatalogAndDeterministicDailyRotation();
   testStaleAndForgedRequestsAreRejected();
   testCompletionIncreasesServerOwnedBalances();
   testRetryUsesLatestPlanetBalances();
+  testCompletedEventAdvancesWaitingStory();
   console.log('Galaxy daily event tests passed.');
 }
 

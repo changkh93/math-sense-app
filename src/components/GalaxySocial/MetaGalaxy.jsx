@@ -881,8 +881,30 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   latestFrontierStoryRef.current = frontierStory
   const storyObjective = useMemo(() => {
     const objective = getFrontierStoryObjective(frontierStory)
+    if (isOwner && frontierStory.stepId === 'stabilize_daily_event' && dailyEvent?.status !== 'pending') return {
+      ...objective,
+      eyebrow: '제1장 완료 기록 확인 중',
+      title: dailyEvent?.status === 'completed'
+        ? '오늘의 행성 사건은 해결되었습니다. 다음 항로를 여는 중입니다'
+        : '오늘의 행성 사건 신호를 다시 확인하고 있습니다',
+      detail: '완료 기록이 확인되면 제2장 ‘잃어버린 항로’로 자동 전환됩니다.',
+      action: 'story-sync',
+    }
     return isOwner || objective?.action === 'neighbors' ? objective : null
-  }, [frontierStory, isOwner])
+  }, [dailyEvent?.status, frontierStory, isOwner])
+  useEffect(() => {
+    if (
+      !isOwner
+      || !user?.uid
+      || frontierStory.stepId !== 'stabilize_daily_event'
+      || dailyEvent?.status !== 'completed'
+    ) return
+    if (isGuest) {
+      guestGalaxy.syncCompletedDailyEventStory()
+      return
+    }
+    void loadHome(user.uid, { quiet: true })
+  }, [dailyEvent?.status, frontierStory.stepId, guestGalaxy, isGuest, isOwner, loadHome, user?.uid])
   useEffect(() => {
     if (frontierStory.status !== 'completed' || finaleShownRef.current) return
     finaleShownRef.current = true
@@ -1277,6 +1299,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       }
     })
     soundManager.play('frontier.build.complete')
+    if (result.frontierStory?.stepId === 'stabilize_daily_event' && dailyEvent?.status === 'completed') {
+      void loadHome(user.uid, { quiet: true })
+    }
     return result
   }
 
@@ -1828,6 +1853,11 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   }
 
   const handleObjectiveAction = () => {
+    if (todayObjective.action === 'story-sync') {
+      if (!isGuest && user?.uid) void loadHome(user.uid, { quiet: true })
+      flash('완료된 행성 사건 기록을 확인해 다음 항로를 열고 있습니다.')
+      return
+    }
     if (todayObjective.action === 'rover') {
       openGameMenu('rover')
       return

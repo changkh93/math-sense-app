@@ -159,13 +159,22 @@ export function useGuestGalaxyData() {
       createdAtMs: Date.now(),
     });
     const nextLayout = [...(guestData.planet?.layout || []), newItem];
-    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
+    let frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
       type: 'item_built',
       itemId,
       level,
       builtItemIds: nextLayout.map((entry) => entry?.itemId).filter(Boolean),
       discoveryCount: Array.isArray(guestData.planet?.roverDiscoveries) ? guestData.planet.roverDiscoveries.length : 0,
     });
+    if (
+      frontierStory.stepId === 'stabilize_daily_event'
+      && guestData.planet?.lastDailyEventDayKey === guestData.lastGrantedAt
+    ) {
+      frontierStory = advanceFrontierStory(frontierStory, {
+        type: 'daily_event_completed',
+        nodeId: 'broken_beacon',
+      });
+    }
     const nextData = {
       ...guestData,
       crystals: Math.max(0, guestData.crystals - cost),
@@ -247,8 +256,11 @@ export function useGuestGalaxyData() {
     const dayKey = guestData.lastGrantedAt || getTodayDateStringKey();
     const materials = { ...(guestData.planet?.materials || {}) };
     const stats = { ...(guestData.planet?.stats || {}) };
-    materials.stardust = Math.max(0, Number(materials.stardust || 0)) + 1;
-    stats.facilityHealth = Math.min(100, Number(stats.facilityHealth || 0) + 6);
+    const alreadyCompleted = guestData.planet?.lastDailyEventDayKey === dayKey;
+    if (!alreadyCompleted) {
+      materials.stardust = Math.max(0, Number(materials.stardust || 0)) + 1;
+      stats.facilityHealth = Math.min(100, Number(stats.facilityHealth || 0) + 6);
+    }
     const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
       type: 'daily_event_completed',
       nodeId: 'broken_beacon',
@@ -265,12 +277,25 @@ export function useGuestGalaxyData() {
         status: 'completed',
         reward: { material: 'stardust', amount: 1, title: '별가루' },
       },
-      reward: { material: 'stardust', amount: 1, title: '별가루' },
+      reward: { material: 'stardust', amount: alreadyCompleted ? 0 : 1, title: '별가루' },
       materials,
       stats,
       frontierStory,
       planet,
     };
+  }, [guestData, persist]);
+
+  const syncCompletedDailyEventStory = useCallback(() => {
+    const dayKey = guestData.lastGrantedAt || getTodayDateStringKey();
+    if (guestData.planet?.lastDailyEventDayKey !== dayKey) return null;
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
+      type: 'daily_event_completed',
+      nodeId: 'broken_beacon',
+    });
+    if (frontierStory.stepId === normalizeFrontierStory(guestData.planet?.frontierStory).stepId) return null;
+    const planet = { ...guestData.planet, frontierStory };
+    persist({ ...guestData, planet });
+    return { frontierStory, planet };
   }, [guestData, persist]);
 
   const careForStructure = useCallback((item) => {
@@ -413,6 +438,7 @@ export function useGuestGalaxyData() {
     helpTrainingNeighbor,
     removeBuildItem,
     saveGuestData: persist,
+    syncCompletedDailyEventStory,
     visitTrainingNeighbor,
   };
 }

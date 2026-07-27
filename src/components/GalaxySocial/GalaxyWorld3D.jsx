@@ -4399,7 +4399,7 @@ function TouchJoystick({ inputRef, disabled }) {
   )
 }
 
-function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, expanded, onToggleExpanded }) {
+function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, objective, expanded, onToggleExpanded }) {
   const playerLeft = 50 + THREE.MathUtils.clamp(playerPosition.x / WORLD_RADIUS, -1, 1) * 44
   const playerTop = 50 + THREE.MathUtils.clamp(playerPosition.z / WORLD_RADIUS, -1, 1) * 44
   const targetNode = dailyEventNode || objectiveTarget
@@ -4414,7 +4414,9 @@ function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, expa
     ? '목표 지점 도착'
     : targetNode
       ? '목표 안내 중'
-      : '구역 탐색 중'
+      : objective?.action === 'story-sync'
+        ? '완료 기록 확인 중'
+        : '구역 탐색 중'
   return (
     <div
       className={`frontier-minimap${targetNode ? ' has-event has-target' : ''}${targetInRange ? ' event-in-range' : ''}${expanded ? ' is-expanded' : ''}`}
@@ -5142,7 +5144,7 @@ export default function GalaxyWorld3D({
         />
       </Canvas>
 
-      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} objectiveTarget={objectiveTarget} expanded={mapExpanded} onToggleExpanded={() => setMapExpanded((current) => !current)} />}
+      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} objectiveTarget={objectiveTarget} objective={objective} expanded={mapExpanded} onToggleExpanded={() => setMapExpanded((current) => !current)} />}
       {!builderActive && <button
         type="button"
         className="frontier-camera-mode-toggle"
