@@ -7,6 +7,8 @@ import {
   MapPin,
   Package,
   Pencil,
+  Radio,
+  Satellite,
   Save,
   ShieldCheck,
   Sparkles,
@@ -69,6 +71,11 @@ export default function GalaxyObjectDialog({
   onUpgrade,
   onDelete,
   onMission,
+  signalSummary,
+  onOpenSignals,
+  roverStatus = 'idle',
+  roverStatusLabel = '',
+  onOpenRover,
   playRemainingSeconds = 0,
 }) {
   const [form, setForm] = useState(() => getInitialForm(item, catalogItem))
@@ -106,6 +113,15 @@ export default function GalaxyObjectDialog({
   const displayedSaveError = saveError || (isEditing ? errorMessage : '')
   const reward = ACTION_REWARDS[missionAction] || ACTION_REWARDS.admire
   const RewardIcon = reward.Icon
+  const isSignalPlaza = item?.itemId === 'signal_plaza'
+  const isExpeditionBeacon = item?.itemId === 'expedition_beacon'
+  const signalUnreadCount = Math.max(0, Number(signalSummary?.unreadCount || 0))
+  const signalRecentCount = Math.max(0, Number(signalSummary?.recentCount || 0))
+  const beaconStatusTitle = roverStatus === 'ready'
+    ? '귀환 상자를 수신했어요'
+    : roverStatus === 'active'
+      ? '심우주 원정 신호 추적 중'
+      : '새 장거리 원정을 준비할 수 있어요'
 
   const chooseImage = (event) => {
     const file = event.target.files?.[0] || null
@@ -209,7 +225,7 @@ export default function GalaxyObjectDialog({
               <img src={previewUrl} alt={`${objectName} 첨부 이미지`} />
             ) : (
               <div className="frontier-object-visual__model">
-                <StructurePreview3D itemId={item.itemId} level={currentLevel} />
+                <StructurePreview3D itemId={item.itemId} level={currentLevel} signalSummary={signalSummary} roverStatus={roverStatus} />
                 <span><Sparkles size={15} aria-hidden="true" /> 등록 이미지가 없어 3D 모형을 표시합니다</span>
               </div>
             )}
@@ -294,23 +310,63 @@ export default function GalaxyObjectDialog({
       ) : (
         <section className="frontier-object-hero">
           <div className="frontier-object-hero__media">
-            {previewUrl ? <img src={previewUrl} alt={`${objectName} 첨부 이미지`} /> : <StructurePreview3D itemId={item.itemId} level={currentLevel} />}
+            {previewUrl ? <img src={previewUrl} alt={`${objectName} 첨부 이미지`} /> : <StructurePreview3D itemId={item.itemId} level={currentLevel} signalSummary={signalSummary} roverStatus={roverStatus} />}
           </div>
           <div className="frontier-object-hero__content">
             <span className="frontier-object-stage-badge">STAGE {currentLevel}</span>
             <h3>{objectName}</h3>
             <p>{description}</p>
-            <section className={`frontier-object-reward material-${reward.className}`} aria-label="이 시설에서 얻는 재료">
-              <span><RewardIcon size={20} aria-hidden="true" /></span>
-              <div>
-                <small>이 시설 가까이에서 <kbd>E</kbd> 키를 누르면</small>
-                <strong>{reward.label} {reward.amount}개를 얻어요</strong>
-                <p>{reward.purpose}</p>
-              </div>
-            </section>
+            {isSignalPlaza ? (
+              <section className="frontier-object-reward material-crystalGlass" aria-label="귀환 신호 광장 기능">
+                <span><Radio size={20} aria-hidden="true" /></span>
+                <div>
+                  <small>{isOwner
+                    ? signalUnreadCount > 0
+                      ? `새 귀환 신호 ${signalUnreadCount}개 도착`
+                      : `최근 보존된 신호 ${signalRecentCount}개`
+                    : '친구 행성에 방문 흔적 남기기'}</small>
+                  <strong>{isOwner ? 'E 키로 귀환 신호 기록을 열어요' : '감탄 신호가 이 광장과 타임라인에 기록돼요'}</strong>
+                  <p>{isOwner
+                    ? '친구의 인사·감탄·도움 기록을 시간순으로 확인하고 바로 답방할 수 있습니다.'
+                    : '가까이에서 E 키를 누르면 행성 주인에게 방문자의 이름과 메시지가 안전하게 전달됩니다.'}</p>
+                </div>
+              </section>
+            ) : isExpeditionBeacon ? (
+              <section className="frontier-object-reward material-alloy" aria-label="원정대 비콘 기능">
+                <span><Satellite size={20} aria-hidden="true" /></span>
+                <div>
+                  <small>{roverStatusLabel || '장거리 원정 준비'}</small>
+                  <strong>{beaconStatusTitle}</strong>
+                  <p>{isOwner
+                    ? '설치 뒤 출발하는 모든 장거리 로버 원정의 회수 재료가 1개 늘어납니다. 가까이에서 E 키를 누르면 원정 관제가 열립니다.'
+                    : '이 비콘은 행성 주인의 장거리 원정 신호를 중계합니다. 가까이에서 E 키를 눌러 수리 도움을 남길 수 있습니다.'}</p>
+                </div>
+              </section>
+            ) : (
+              <section className={`frontier-object-reward material-${reward.className}`} aria-label="이 시설에서 얻는 재료">
+                <span><RewardIcon size={20} aria-hidden="true" /></span>
+                <div>
+                  <small>이 시설 가까이에서 <kbd>E</kbd> 키를 누르면</small>
+                  <strong>{reward.label} {reward.amount}개를 얻어요</strong>
+                  <p>{reward.purpose}</p>
+                </div>
+              </section>
+            )}
             <div className="frontier-object-hero__actions">
               {isOwner ? (
-                <button type="button" className="galaxy-primary-btn" onClick={startEditing}><Pencil size={16} aria-hidden="true" /> 수정</button>
+                <>
+                  {isSignalPlaza && (
+                    <button type="button" className="galaxy-primary-btn" onClick={() => onOpenSignals?.()}>
+                      <Radio size={16} aria-hidden="true" /> {signalUnreadCount > 0 ? `새 신호 ${signalUnreadCount}개 보기` : '신호 기록 보기'}
+                    </button>
+                  )}
+                  {isExpeditionBeacon && (
+                    <button type="button" className="galaxy-primary-btn" onClick={() => onOpenRover?.()}>
+                      <Satellite size={16} aria-hidden="true" /> {roverStatus === 'ready' ? '귀환 보상 받기' : '로버 관제 열기'}
+                    </button>
+                  )}
+                  <button type="button" className={isSignalPlaza || isExpeditionBeacon ? 'galaxy-secondary-btn' : 'galaxy-primary-btn'} onClick={startEditing}><Pencil size={16} aria-hidden="true" /> 수정</button>
+                </>
               ) : (
                 <button type="button" className="galaxy-primary-btn" disabled={Boolean(busy)} onClick={() => onMission?.(item)}><Sparkles size={16} aria-hidden="true" /> {missionBusy ? '미션 시작 중' : missionLabel || '미션 수행'}</button>
               )}

@@ -262,6 +262,36 @@ const BUILD_ITEM_STORIES = {
     effect: '물주기와 귀환 신호가 자연스럽게 이어지는 소셜 거점을 만듭니다.',
     set: '항로 우정 세트',
   },
+  prism_pathlight: {
+    overline: '빛이 이어지는 길',
+    promise: '회전 방향을 따라 프리즘 패널의 빛이 흐르며 다음 길잡이를 가리킵니다.',
+    effect: '여러 개를 연속 배치하면 착륙장과 주요 시설 사이에 하나의 빛길이 만들어집니다.',
+    set: '귀환의 빛',
+  },
+  starflower_garden: {
+    overline: '잠시 머물고 싶은 풍경',
+    promise: '크기와 색이 다른 별꽃이 바람에 천천히 흔들리는 작은 치유 정원을 만듭니다.',
+    effect: '친구의 물주기 신호와 어울리는 산책 화단과 은은한 별빛 풍경을 더합니다.',
+    set: '별무리 치유정원',
+  },
+  creature_habitat: {
+    overline: '작은 생명과 나누는 온기',
+    promise: '포근한 둥지와 물가에서 루미 가족이 쉬고 뛰노는 교감 생태원을 만듭니다.',
+    effect: '먹이 주기와 생명체 돌보기 행동이 눈앞의 루미와 이어지는 생태 랜드마크가 됩니다.',
+    set: '루미 교감 생태원',
+  },
+  signal_plaza: {
+    overline: '친구의 방문이 빛으로 남는 곳',
+    promise: '도착한 인사·감탄·도움 신호가 기억 캡슐과 중앙 비콘의 빛으로 보존됩니다.',
+    effect: '광장에서 E 키를 눌러 새 신호를 확인하고 기록을 따라 친구 행성으로 답방할 수 있습니다.',
+    set: '항로 기억 신호원',
+  },
+  expedition_beacon: {
+    overline: '원정의 출발과 귀환을 잇는 신호',
+    promise: '심우주 항로를 향한 로버 신호를 중계하고 현재 원정 상태를 빛으로 알려줍니다.',
+    effect: '설치 뒤 출발하는 모든 장거리 로버 원정의 회수 재료가 1개 늘어나며, 현장에서 E 키로 관제를 엽니다.',
+    set: '심우주 원정 중계기',
+  },
 }
 
 const FALLBACK_BUILD_STORY = {
@@ -768,6 +798,21 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const dailyEvent = isOwner ? home?.dailyEvent || null : null
   const dailyEventPending = dailyEvent?.status === 'pending'
   const unreadCount = events.filter((event) => !event.seen).length
+  const signalPlazaSummary = useMemo(() => ({
+    unreadCount: isOwner ? events.filter((event) => !event.seen).length : 0,
+    recentCount: isOwner
+      ? events.length
+      : Math.max(0, Number(planet.stats?.admirationCount || 0)),
+    totalVisits: Math.max(0, Number(planet.stats?.visits || 0)),
+    recentSignals: isOwner
+      ? events.slice(0, 6).map((event) => ({
+        id: event.id,
+        actionId: event.actionId || 'admire',
+        actorName: event.actorName || '이웃 탐사원',
+        seen: Boolean(event.seen),
+      }))
+      : [],
+  }), [events, isOwner, planet.stats?.admirationCount, planet.stats?.visits])
   const wallet = Math.max(0, Number(home?.wallet ?? userData?.crystals ?? 0))
   const galaxyNowMs = nowMs + Number(home?.serverClockOffsetMs || 0)
 
@@ -1237,6 +1282,24 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const performObjectMission = async (item = selectedObject) => {
     if (!item?.instanceId) return null
     const mission = getStructureVisitAction(item.itemId)
+    if (isOwner && item.itemId === 'signal_plaza') {
+      closeObjectDialog()
+      await openLogs()
+      flash(unreadCount > 0
+        ? `광장에 도착한 새 귀환 신호 ${unreadCount}개를 열었습니다.`
+        : '귀환 신호 타임라인을 열었습니다.')
+      return { openedSignalTimeline: true }
+    }
+    if (isOwner && item.itemId === 'expedition_beacon') {
+      closeObjectDialog()
+      openGameMenu('rover')
+      flash(roverStatus === 'ready'
+        ? '원정대 비콘이 귀환 상자를 수신했습니다. 보상을 회수해 주세요.'
+        : roverStatus === 'active'
+          ? `원정 신호를 추적 중입니다. ${roverRemainingLabel} 귀환합니다.`
+          : '원정 관제를 열었습니다. 비콘 보너스가 적용된 항로를 선택해 주세요.')
+      return { openedRoverControl: true }
+    }
     if (isOwner) {
       const result = await runAction(
         `object:mission:${item.instanceId}`,
@@ -1584,6 +1647,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         selectedStructureId={selectedStructureId}
         onSelectStructure={openObjectDialog}
         onStructureMission={performObjectMission}
+        signalPlazaSummary={signalPlazaSummary}
         isPlanetOwner={isOwner}
         isFirstPerson={isFirstPerson}
         onToggleFirstPerson={toggleViewMode}
@@ -1713,6 +1777,17 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                 onUpgrade={upgradeGalaxyObject}
                 onDelete={deleteGalaxyObject}
                 onMission={performObjectMission}
+                signalSummary={signalPlazaSummary}
+                roverStatus={isOwner ? roverStatus : 'idle'}
+                roverStatusLabel={isOwner ? roverStatusLabel : '내 행성에서 원정 가능'}
+                onOpenSignals={() => {
+                  closeObjectDialog()
+                  openLogs()
+                }}
+                onOpenRover={() => {
+                  closeObjectDialog()
+                  openGameMenu('rover')
+                }}
                 playRemainingSeconds={playRemainingSeconds}
               />
             </Motion.div>

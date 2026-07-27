@@ -1417,6 +1417,984 @@ function MatureCrystalPond({ scale = 1, ghost = false, dynamicLightActive = fals
   )
 }
 
+function GreenhouseGlassMaterial({ ghost = false, opacity = .2 }) {
+  return (
+    <meshPhysicalMaterial
+      color={ghost ? '#71f3bf' : '#b9fff0'}
+      emissive={ghost ? '#1f765a' : '#205f58'}
+      emissiveIntensity={ghost ? .8 : .12}
+      transparent
+      opacity={ghost ? .34 : opacity}
+      roughness={.08}
+      metalness={.08}
+      clearcoat={.72}
+      clearcoatRoughness={.16}
+      wireframe={ghost}
+      depthWrite={false}
+      side={THREE.DoubleSide}
+    />
+  )
+}
+
+// 별빛 공동 온실 Stage 2: 별빛 공생 생태관(Starlight Symbiosis Conservatory).
+// 세 개의 공동 재배 베드, 자동 관수 저장조, 개폐형 환기창과 교류 신호등을 갖춘 성숙 시설.
+// 파티클과 실제 광원은 플레이어에게 가장 가까운 Stage 2 발광 시설 하나에서만 활성화한다.
+function MatureFriendGreenhouse({ scale = 1, ghost = false, dynamicLightActive = false }) {
+  const leftVentRef = useRef()
+  const rightVentRef = useRef()
+  const floraRef = useRef()
+  const waterRef = useRef()
+  const signalRef = useRef()
+  const lightRef = useRef()
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+    const ventOpen = .12 + (Math.sin(time * .24) * .5 + .5) * .12
+    if (leftVentRef.current) leftVentRef.current.rotation.z = -.39 - ventOpen
+    if (rightVentRef.current) rightVentRef.current.rotation.z = .39 + ventOpen
+    if (floraRef.current) floraRef.current.rotation.z = Math.sin(time * .58) * .012
+    if (waterRef.current) waterRef.current.material.opacity = .48 + Math.sin(time * .85) * .045
+    if (signalRef.current) {
+      signalRef.current.rotation.y = time * .38
+      const pulse = 1 + Math.sin(time * 1.7) * .06
+      signalRef.current.scale.setScalar(pulse)
+    }
+    if (lightRef.current) {
+      const target = dynamicLightActive ? .3 : 0
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, target, 5, delta)
+    }
+  })
+
+  const frameColor = '#315b58'
+  const frameLight = '#527f78'
+  const growLight = '#76f4c4'
+
+  return (
+    <group scale={scale}>
+      {/* 강화 기초 데크와 전면 진입 램프 */}
+      <mesh position={[0, .07, 0]} receiveShadow castShadow={!ghost}>
+        <boxGeometry args={[3.55, .14, 2.85]} />
+        <ModelMaterial color="#193b3b" metalness={.48} roughness={.5} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .16, 0]} receiveShadow>
+        <boxGeometry args={[3.3, .06, 2.58]} />
+        <ModelMaterial color="#2b5550" metalness={.4} roughness={.56} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .12, 1.62]} rotation={[-.1, 0, 0]}>
+        <boxGeometry args={[1.05, .1, .7]} />
+        <ModelMaterial color="#466d67" metalness={.36} roughness={.58} ghost={ghost} />
+      </mesh>
+
+      {/* 개별 투명 패널: 내부 식생 가독성을 위해 하나의 투명 박스 대신 면 단위로 구성 */}
+      <mesh position={[0, 1.25, -1.25]}><boxGeometry args={[3.12, 2.04, .035]} /><GreenhouseGlassMaterial ghost={ghost} opacity={.18} /></mesh>
+      <mesh position={[-1.56, 1.25, 0]}><boxGeometry args={[.035, 2.04, 2.46]} /><GreenhouseGlassMaterial ghost={ghost} opacity={.16} /></mesh>
+      <mesh position={[1.56, 1.25, 0]}><boxGeometry args={[.035, 2.04, 2.46]} /><GreenhouseGlassMaterial ghost={ghost} opacity={.16} /></mesh>
+      {[-1.08, 1.08].map((x) => (
+        <mesh key={`front_glass_${x}`} position={[x, 1.25, 1.25]}>
+          <boxGeometry args={[.95, 2.04, .035]} />
+          <GreenhouseGlassMaterial ghost={ghost} opacity={.18} />
+        </mesh>
+      ))}
+
+      {/* 구조 프레임과 2층 높이의 박공지붕 */}
+      {[-1.56, 1.56].flatMap((x) => [-1.25, 1.25].map((z) => (
+        <mesh key={`greenhouse_post_${x}_${z}`} position={[x, 1.28, z]} castShadow={!ghost}>
+          <boxGeometry args={[.1, 2.3, .1]} />
+          <ModelMaterial color={frameColor} metalness={.58} roughness={.38} ghost={ghost} />
+        </mesh>
+      )))}
+      {[-.78, 0, .78].map((z) => (
+        <group key={`roof_rib_${z}`} position={[0, 0, z]}>
+          <mesh position={[-.78, 2.42, 0]} rotation={[0, 0, -.39]}><boxGeometry args={[1.78, .08, .09]} /><ModelMaterial color={frameLight} metalness={.64} roughness={.32} ghost={ghost} /></mesh>
+          <mesh position={[.78, 2.42, 0]} rotation={[0, 0, .39]}><boxGeometry args={[1.78, .08, .09]} /><ModelMaterial color={frameLight} metalness={.64} roughness={.32} ghost={ghost} /></mesh>
+        </group>
+      ))}
+      <mesh position={[0, 2.75, 0]}><boxGeometry args={[.1, .1, 2.62]} /><ModelMaterial color={frameColor} metalness={.62} roughness={.34} ghost={ghost} /></mesh>
+      <mesh position={[-.78, 2.43, 0]} rotation={[0, 0, -.39]}><boxGeometry args={[1.72, .035, 2.46]} /><GreenhouseGlassMaterial ghost={ghost} opacity={.22} /></mesh>
+      <mesh position={[.78, 2.43, 0]} rotation={[0, 0, .39]}><boxGeometry args={[1.72, .035, 2.46]} /><GreenhouseGlassMaterial ghost={ghost} opacity={.22} /></mesh>
+
+      {/* 자동 개폐형 상부 환기창 */}
+      <group ref={leftVentRef} position={[-.3, 2.72, -.25]} rotation={[0, 0, -.51]}>
+        <mesh position={[-.34, 0, 0]}><boxGeometry args={[.72, .045, .82]} /><GreenhouseGlassMaterial ghost={ghost} opacity={.28} /></mesh>
+        <mesh position={[-.34, 0, 0]}><boxGeometry args={[.78, .065, .055]} /><ModelMaterial color="#78a198" metalness={.64} roughness={.3} ghost={ghost} /></mesh>
+      </group>
+      <group ref={rightVentRef} position={[.3, 2.72, .35]} rotation={[0, 0, .51]}>
+        <mesh position={[.34, 0, 0]}><boxGeometry args={[.72, .045, .82]} /><GreenhouseGlassMaterial ghost={ghost} opacity={.28} /></mesh>
+        <mesh position={[.34, 0, 0]}><boxGeometry args={[.78, .065, .055]} /><ModelMaterial color="#78a198" metalness={.64} roughness={.3} ghost={ghost} /></mesh>
+      </group>
+
+      {/* 세 개의 공동 재배 베드와 서로 다른 생장 단계의 식생 */}
+      <group ref={floraRef}>
+        {[
+          { x: -.92, z: -.35, color: '#73d995', bloom: '#b8ffd0' },
+          { x: .92, z: -.35, color: '#65cbb0', bloom: '#a5f5de' },
+          { x: 0, z: .65, color: '#8ed37b', bloom: '#d4ffad' },
+        ].map((bed, bedIndex) => (
+          <group key={`community_bed_${bedIndex}`} position={[bed.x, .25, bed.z]}>
+            <mesh position={[0, .16, 0]} castShadow={!ghost}><boxGeometry args={[1.05, .32, .72]} /><ModelMaterial color="#84644a" roughness={.88} ghost={ghost} /></mesh>
+            <mesh position={[0, .34, 0]}><boxGeometry args={[.92, .08, .6]} /><ModelMaterial color="#594638" roughness={.96} ghost={ghost} /></mesh>
+            {[-.3, 0, .3].map((x, plantIndex) => {
+              const height = .34 + ((bedIndex + plantIndex) % 3) * .12
+              return (
+                <group key={`plant_${x}`} position={[x, .4, plantIndex % 2 ? .12 : -.1]}>
+                  <mesh position={[0, height * .5, 0]}><cylinderGeometry args={[.025, .035, height, 6]} /><ModelMaterial color="#3f9e6b" roughness={.78} ghost={ghost} /></mesh>
+                  <mesh position={[-.08, height * .55, 0]} rotation={[0, 0, -.55]} scale={[1.4, .55, .8]}><sphereGeometry args={[.09, 8, 6]} /><ModelMaterial color={bed.color} emissive="#245c3d" emissiveIntensity={.24} ghost={ghost} /></mesh>
+                  <mesh position={[.08, height * .72, 0]} rotation={[0, 0, .55]} scale={[1.4, .55, .8]}><sphereGeometry args={[.09, 8, 6]} /><ModelMaterial color={bed.color} emissive="#245c3d" emissiveIntensity={.24} ghost={ghost} /></mesh>
+                  <mesh position={[0, height + .04, 0]}><octahedronGeometry args={[.1 + plantIndex * .012, 0]} /><ModelMaterial color={bed.bloom} emissive={bed.color} emissiveIntensity={.75} ghost={ghost} /></mesh>
+                </group>
+              )
+            })}
+          </group>
+        ))}
+      </group>
+
+      {/* 측면 자동 관수 저장조와 내부 분배 파이프 */}
+      <group position={[1.78, .55, -.55]}>
+        <mesh castShadow={!ghost}><cylinderGeometry args={[.38, .46, .86, 12]} /><ModelMaterial color="#3d6767" metalness={.5} roughness={.38} ghost={ghost} /></mesh>
+        <mesh ref={waterRef} position={[0, .08, 0]}><cylinderGeometry args={[.31, .31, .54, 12]} /><meshPhysicalMaterial color={ghost ? '#71f3bf' : '#58d9e5'} transparent opacity={ghost ? .34 : .48} roughness={.08} depthWrite={false} /></mesh>
+        <mesh position={[0, .48, 0]}><torusGeometry args={[.34, .035, 7, 16]} /><ModelMaterial color="#8aaca7" metalness={.7} roughness={.28} ghost={ghost} /></mesh>
+      </group>
+      <mesh position={[.9, 1.5, -.92]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[.035, .035, 1.75, 7]} /><ModelMaterial color="#6fbeb3" emissive="#246f65" emissiveIntensity={.45} ghost={ghost} /></mesh>
+      {[-.92, 0, .92].map((x) => (
+        <mesh key={`mist_nozzle_${x}`} position={[x, 1.42, -.92]}><sphereGeometry args={[.065, 8, 6]} /><ModelMaterial color="#a8fff0" emissive="#48caa9" emissiveIntensity={1.15} ghost={ghost} /></mesh>
+      ))}
+
+      {/* 친구 두 명의 기여를 상징하는 연결 신호 */}
+      <group ref={signalRef} position={[0, 1.62, 1.35]}>
+        {[-.24, .24].map((x) => <mesh key={`friend_signal_${x}`} position={[x, 0, 0]}><sphereGeometry args={[.09, 10, 8]} /><ModelMaterial color={x < 0 ? '#7ce8ff' : '#8effc7'} emissive={x < 0 ? '#2688a1' : '#2c9b6c'} emissiveIntensity={1.5} ghost={ghost} /></mesh>)}
+        <mesh rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[.018, .018, .4, 6]} /><ModelMaterial color="#d6fff3" emissive="#53d8bb" emissiveIntensity={1.2} ghost={ghost} /></mesh>
+      </group>
+      <mesh position={[0, 1.05, 1.29]}><boxGeometry args={[.8, 1.65, .08]} /><ModelMaterial color="#6ee8cb" emissive="#238a73" emissiveIntensity={.8} ghost={ghost} /></mesh>
+
+      {!ghost && (
+        <>
+          {dynamicLightActive && <Sparkles count={9} scale={[3, 2.2, 2.4]} position={[0, 1.55, 0]} color={growLight} size={1.25} speed={.22} />}
+          <pointLight ref={lightRef} position={[0, 1.75, .2]} color={growLight} intensity={0} distance={4.4} decay={2} castShadow={false} />
+        </>
+      )}
+    </group>
+  )
+}
+
+const MATURE_STARFLOWERS = [
+  { position: [-1.15, .24, -.48], scale: .82, color: '#ff9ecf', emissive: '#a83c72', phase: .1 },
+  { position: [-.62, .24, -.92], scale: .68, color: '#ffd4a8', emissive: '#a86535', phase: .8 },
+  { position: [.08, .24, -1.02], scale: .76, color: '#c7adff', emissive: '#6744aa', phase: 1.5 },
+  { position: [.86, .24, -.78], scale: .88, color: '#92eaff', emissive: '#258ca8', phase: 2.2 },
+  { position: [1.24, .24, -.2], scale: .7, color: '#ffc0dd', emissive: '#a44473', phase: 2.9 },
+  { position: [1.06, .24, .55], scale: .8, color: '#d5b8ff', emissive: '#7652b2', phase: 3.6 },
+  { position: [.47, .24, .98], scale: .66, color: '#ffe2a8', emissive: '#ac7437', phase: 4.3 },
+  { position: [-.28, .24, 1.08], scale: .83, color: '#ff9fcf', emissive: '#a83c72', phase: 5 },
+  { position: [-1.02, .24, .76], scale: .72, color: '#9eead8', emissive: '#267e70', phase: 5.7 },
+  { position: [-.62, .24, .18], scale: .62, color: '#c4a0ff', emissive: '#6740a0', phase: 6.4 },
+  { position: [.63, .24, .18], scale: .7, color: '#ffaecb', emissive: '#a44769', phase: 7.1 },
+]
+
+function StarflowerBloom({
+  position,
+  scale = 1,
+  color,
+  emissive,
+  phase = 0,
+  ghost = false,
+  bloomRef,
+  centerpiece = false,
+}) {
+  const stemHeight = centerpiece ? .92 : .54 + (phase % 1) * .18
+  const headY = stemHeight
+  const petalCount = centerpiece ? 7 : 5
+
+  return (
+    <group ref={bloomRef} position={position} scale={scale}>
+      <mesh position={[0, stemHeight * .5, 0]} castShadow={!ghost}>
+        <cylinderGeometry args={[centerpiece ? .045 : .027, centerpiece ? .065 : .04, stemHeight, 7]} />
+        <ModelMaterial color={centerpiece ? '#70d49a' : '#62bb82'} roughness={.82} ghost={ghost} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <mesh
+          key={`leaf_${side}`}
+          position={[side * .12, stemHeight * .48, .015]}
+          rotation={[0, side * .32, side * -.72]}
+          scale={[.18, .055, .1]}
+        >
+          <sphereGeometry args={[1, 8, 6]} />
+          <ModelMaterial color="#5bc68c" emissive="#174d34" emissiveIntensity={.18} roughness={.85} ghost={ghost} />
+        </mesh>
+      ))}
+      <group position={[0, headY, 0]}>
+        {Array.from({ length: petalCount }, (_, index) => {
+          const angle = (index / petalCount) * Math.PI * 2
+          const radius = centerpiece ? .28 : .185
+          return (
+            <mesh
+              key={`petal_${index}`}
+              position={[Math.sin(angle) * radius, 0, Math.cos(angle) * radius]}
+              rotation={[0, angle, 0]}
+              scale={centerpiece ? [.16, .07, .32] : [.11, .05, .22]}
+              castShadow={!ghost}
+            >
+              <sphereGeometry args={[1, 10, 7]} />
+              <ModelMaterial
+                color={color}
+                emissive={emissive}
+                emissiveIntensity={centerpiece ? 1.18 : .72}
+                roughness={.42}
+                ghost={ghost}
+              />
+            </mesh>
+          )
+        })}
+        <mesh position={[0, .035, 0]}>
+          <sphereGeometry args={[centerpiece ? .14 : .095, 12, 8]} />
+          <ModelMaterial
+            color={centerpiece ? '#fff3b5' : '#ffe5a2'}
+            emissive={centerpiece ? '#ffc85c' : '#a96f31'}
+            emissiveIntensity={centerpiece ? 1.9 : .8}
+            roughness={.3}
+            ghost={ghost}
+          />
+        </mesh>
+      </group>
+    </group>
+  )
+}
+
+// 별꽃 정원 Stage 2: 별무리 치유정원(Starlit Sanctuary Garden).
+// 평면 화단을 다층 산책 정원으로 확장하고, 중심 별꽃과 서로 다른 꽃 군락이 느린 바람에 호흡하듯 흔들린다.
+function MatureStarflowerGarden({ scale = 1, ghost = false, dynamicLightActive = false }) {
+  const bloomRefs = useRef([])
+  const centerpieceRef = useRef()
+  const centerpieceMatRef = useRef()
+  const haloRef = useRef()
+  const lightRef = useRef()
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+    bloomRefs.current.forEach((bloom, index) => {
+      if (!bloom) return
+      const phase = MATURE_STARFLOWERS[index]?.phase || 0
+      bloom.rotation.z = Math.sin(time * .72 + phase) * .045
+      bloom.rotation.x = Math.cos(time * .56 + phase) * .026
+    })
+    if (centerpieceRef.current) {
+      centerpieceRef.current.rotation.z = Math.sin(time * .48) * .035
+      centerpieceRef.current.rotation.x = Math.cos(time * .42) * .02
+    }
+    if (centerpieceMatRef.current) {
+      centerpieceMatRef.current.opacity = .7 + Math.sin(time * .9) * .1
+    }
+    if (haloRef.current) {
+      haloRef.current.rotation.z = time * .08
+      haloRef.current.material.opacity = .12 + Math.sin(time * .7) * .025
+    }
+    if (lightRef.current) {
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, .28, 5, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      {/* 별빛 석재 테두리와 두 겹으로 올라온 부드러운 화단 */}
+      <mesh position={[0, .08, 0]} receiveShadow castShadow={!ghost}>
+        <cylinderGeometry args={[1.82, 1.96, .16, 32]} />
+        <ModelMaterial color="#776b88" metalness={.18} roughness={.72} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .17, 0]} receiveShadow>
+        <cylinderGeometry args={[1.67, 1.75, .12, 32]} />
+        <ModelMaterial color="#294f43" roughness={.96} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .24, 0]} receiveShadow>
+        <cylinderGeometry args={[1.24, 1.38, .13, 28]} />
+        <ModelMaterial color="#386b52" emissive="#13372a" emissiveIntensity={.2} roughness={.94} ghost={ghost} />
+      </mesh>
+
+      {/* 정원 앞으로 이어지는 달빛 디딤돌 */}
+      {[1.72, 1.42, 1.12, .84].map((z, index) => (
+        <mesh
+          key={`garden_step_${z}`}
+          position={[Math.sin(index * .9) * .16, .22, z]}
+          rotation={[0, index % 2 ? .18 : -.12, 0]}
+          receiveShadow
+        >
+          <cylinderGeometry args={[.22 - index * .012, .24, .055, 7]} />
+          <ModelMaterial color="#b7a9c8" emissive="#57466e" emissiveIntensity={.22} roughness={.7} ghost={ghost} />
+        </mesh>
+      ))}
+
+      {/* 주변 꽃 군락 */}
+      {MATURE_STARFLOWERS.map((flower, index) => (
+        <StarflowerBloom
+          key={`mature_starflower_${index}`}
+          {...flower}
+          ghost={ghost}
+          bloomRef={(element) => { bloomRefs.current[index] = element }}
+        />
+      ))}
+
+      {/* 정원의 시선을 모으는 대형 칠엽 별꽃 */}
+      <StarflowerBloom
+        position={[0, .24, -.04]}
+        scale={1.18}
+        color="#f6c2ff"
+        emissive="#9256b2"
+        phase={0}
+        ghost={ghost}
+        centerpiece
+        bloomRef={centerpieceRef}
+      />
+      <mesh position={[0, 1.34, -.04]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[.38, .44, 7]} />
+        <meshBasicMaterial
+          ref={centerpieceMatRef}
+          color={ghost ? '#71f3bf' : '#ffd6ff'}
+          transparent
+          opacity={ghost ? .3 : .76}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* 화단 전체를 감싸는 느린 별자리 후광 */}
+      {!ghost && (
+        <mesh ref={haloRef} position={[0, .29, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[1.38, 1.44, 12]} />
+          <meshBasicMaterial color="#efb7ff" transparent opacity={.12} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+
+      {!ghost && dynamicLightActive && (
+        <>
+          <pointLight ref={lightRef} position={[0, 1.2, 0]} color="#ffc6e8" intensity={0} distance={3.6} decay={2} castShadow={false} />
+          <Sparkles count={11} scale={[2.9, 1.35, 2.9]} position={[0, .88, 0]} size={1.3} color="#ffd4ed" speed={.18} opacity={.58} />
+        </>
+      )}
+    </group>
+  )
+}
+
+const LUMI_SANCTUARY_CREATURES = [
+  {
+    position: [-.52, .28, .14],
+    scale: 1,
+    rotationY: 1.05,
+    color: '#baf2cc',
+    emissive: '#397b5c',
+    accent: '#8ee7ff',
+    phase: 0,
+  },
+  {
+    position: [.36, .27, .48],
+    scale: .7,
+    rotationY: -1.95,
+    color: '#d9c9ff',
+    emissive: '#68529a',
+    accent: '#ffd0e7',
+    phase: 2.1,
+  },
+]
+
+function LumiSanctuaryCreature({
+  position,
+  scale = 1,
+  rotationY = 0,
+  color,
+  emissive,
+  accent,
+  ghost = false,
+  creatureRef,
+}) {
+  return (
+    <group ref={creatureRef} position={position} rotation={[0, rotationY, 0]} scale={scale}>
+      {/* 포근한 물방울형 몸통 */}
+      <mesh position={[0, .3, 0]} scale={[.38, .31, .42]} castShadow={!ghost}>
+        <sphereGeometry args={[1, 16, 12]} />
+        <ModelMaterial color={color} emissive={emissive} emissiveIntensity={.28} roughness={.66} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .62, .09]} castShadow={!ghost}>
+        <sphereGeometry args={[.3, 16, 12]} />
+        <ModelMaterial color={color} emissive={emissive} emissiveIntensity={.34} roughness={.62} ghost={ghost} />
+      </mesh>
+
+      {/* 부드러운 귀와 별빛 촉수 */}
+      {[-1, 1].map((side) => (
+        <group key={`lumi_ear_${side}`}>
+          <mesh position={[side * .2, .86, .04]} rotation={[0, 0, side * -.24]} scale={[.12, .24, .1]}>
+            <sphereGeometry args={[1, 10, 7]} />
+            <ModelMaterial color={accent} emissive={emissive} emissiveIntensity={.42} roughness={.52} ghost={ghost} />
+          </mesh>
+          <mesh position={[side * .11, .91, .08]} rotation={[0, 0, side * -.18]}>
+            <cylinderGeometry args={[.015, .022, .25, 6]} />
+            <ModelMaterial color="#78cfa7" roughness={.72} ghost={ghost} />
+          </mesh>
+          <mesh position={[side * .135, 1.045, .08]}>
+            <sphereGeometry args={[.045, 9, 7]} />
+            <ModelMaterial color="#fff1a8" emissive="#d79c3f" emissiveIntensity={1.45} roughness={.3} ghost={ghost} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* 표정: 큰 눈, 작은 코, 볼빛 */}
+      {[-1, 1].map((side) => (
+        <group key={`lumi_face_${side}`}>
+          <mesh position={[side * .1, .67, .35]} scale={[.06, .075, .035]}>
+            <sphereGeometry args={[1, 10, 7]} />
+            <ModelMaterial color="#173444" emissive="#071620" emissiveIntensity={.1} roughness={.28} ghost={ghost} />
+          </mesh>
+          <mesh position={[side * .17, .59, .34]} scale={[.045, .025, .02]}>
+            <sphereGeometry args={[1, 8, 6]} />
+            <ModelMaterial color="#ffb8ce" emissive="#8e3d5c" emissiveIntensity={.26} roughness={.5} ghost={ghost} />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[0, .59, .385]} scale={[.035, .025, .02]}>
+        <sphereGeometry args={[1, 8, 6]} />
+        <ModelMaterial color="#6d506c" roughness={.38} ghost={ghost} />
+      </mesh>
+
+      {/* 동글동글한 발과 꼬리 */}
+      {[-1, 1].map((side) => (
+        <mesh key={`lumi_foot_${side}`} position={[side * .19, .08, .15]} scale={[.15, .08, .2]}>
+          <sphereGeometry args={[1, 10, 7]} />
+          <ModelMaterial color={accent} emissive={emissive} emissiveIntensity={.18} roughness={.7} ghost={ghost} />
+        </mesh>
+      ))}
+      <mesh position={[-.34, .34, -.19]}>
+        <sphereGeometry args={[.13, 10, 8]} />
+        <ModelMaterial color={accent} emissive={emissive} emissiveIntensity={.52} roughness={.52} ghost={ghost} />
+      </mesh>
+    </group>
+  )
+}
+
+// 루미 생명체 쉼터 Stage 2: 루미 교감 생태원(Lumi Bonding Sanctuary).
+// 닫힌 반구 대신 생명체·둥지·먹이·물가가 모두 보이는 열린 돌봄 공간으로 확장한다.
+function MatureCreatureHabitat({ scale = 1, ghost = false, dynamicLightActive = false }) {
+  const creatureRefs = useRef([])
+  const waterGlowRef = useRef()
+  const mobileRef = useRef()
+  const lightRef = useRef()
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+    creatureRefs.current.forEach((creature, index) => {
+      if (!creature) return
+      const config = LUMI_SANCTUARY_CREATURES[index]
+      const hopWave = Math.max(0, Math.sin(time * .86 + config.phase) - .84) * (index ? .32 : .14)
+      creature.position.y = config.position[1] + Math.sin(time * 1.18 + config.phase) * .014 + hopWave
+      creature.rotation.z = Math.sin(time * .72 + config.phase) * .025
+      creature.rotation.y = config.rotationY + Math.sin(time * .34 + config.phase) * .09
+    })
+    if (waterGlowRef.current) {
+      waterGlowRef.current.rotation.z = time * .12
+      waterGlowRef.current.material.opacity = .23 + Math.sin(time * .72) * .045
+    }
+    if (mobileRef.current) {
+      mobileRef.current.rotation.y = time * .26
+      mobileRef.current.position.y = 1.48 + Math.sin(time * .85) * .035
+    }
+    if (lightRef.current) {
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, .26, 5, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      {/* 포근한 초지와 열린 돌봄 마당 */}
+      <mesh position={[0, .08, 0]} receiveShadow castShadow={!ghost}>
+        <cylinderGeometry args={[1.86, 2, .16, 32]} />
+        <ModelMaterial color="#536b5e" roughness={.94} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .18, 0]} receiveShadow>
+        <cylinderGeometry args={[1.7, 1.82, .13, 30]} />
+        <ModelMaterial color="#3e7258" emissive="#163929" emissiveIntensity={.16} roughness={.96} ghost={ghost} />
+      </mesh>
+
+      {/* 뒤쪽의 열린 나뭇가지 캐노피 */}
+      <mesh position={[0, .34, -.72]} castShadow={!ghost}>
+        <torusGeometry args={[1.25, .13, 9, 34, Math.PI]} />
+        <ModelMaterial color="#987654" roughness={.88} ghost={ghost} />
+      </mesh>
+      {[[-1.02, .95], [-.56, 1.42], [0, 1.62], [.58, 1.42], [1.04, .95]].map(([x, y], index) => (
+        <mesh
+          key={`sanctuary_leaf_${index}`}
+          position={[x, y, -.7]}
+          scale={[.42 - Math.abs(x) * .08, .24, .3]}
+          rotation={[0, index * .55, index % 2 ? .18 : -.16]}
+          castShadow={!ghost}
+        >
+          <sphereGeometry args={[1, 11, 8]} />
+          <ModelMaterial
+            color={index % 2 ? '#7fbe75' : '#6ba96d'}
+            emissive={index === 2 ? '#2f6842' : '#214d35'}
+            emissiveIntensity={index === 2 ? .38 : .2}
+            roughness={.86}
+            ghost={ghost}
+          />
+        </mesh>
+      ))}
+
+      {/* 푹신한 둥지 */}
+      <group position={[-.58, .28, -.02]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[.55, .15, 10, 28]} />
+          <ModelMaterial color="#b89568" roughness={.96} ghost={ghost} />
+        </mesh>
+        <mesh position={[0, -.035, 0]}>
+          <cylinderGeometry args={[.46, .5, .1, 20]} />
+          <ModelMaterial color="#d8bb87" emissive="#654c2d" emissiveIntensity={.12} roughness={.95} ghost={ghost} />
+        </mesh>
+      </group>
+
+      {/* 얕은 물가와 잔잔한 별빛 물결 */}
+      <group position={[1.03, .25, .65]}>
+        <mesh>
+          <cylinderGeometry args={[.48, .54, .1, 20]} />
+          <ModelMaterial color="#627e7a" roughness={.74} ghost={ghost} />
+        </mesh>
+        <mesh ref={waterGlowRef} position={[0, .06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[.17, .4, 20]} />
+          <meshBasicMaterial color={ghost ? '#71f3bf' : '#8deeff'} transparent opacity={ghost ? .25 : .23} depthWrite={false} toneMapped={false} />
+        </mesh>
+      </group>
+
+      {/* 먹이 그릇과 빛나는 열매 */}
+      <group position={[.92, .3, -.38]}>
+        <mesh>
+          <cylinderGeometry args={[.34, .42, .18, 16]} />
+          <ModelMaterial color="#8193a0" metalness={.18} roughness={.62} ghost={ghost} />
+        </mesh>
+        {[[-.12, .13], [.08, .08], [.16, -.09], [-.08, -.12]].map(([x, z], index) => (
+          <mesh key={`lumi_food_${index}`} position={[x, .16, z]}>
+            <sphereGeometry args={[.075, 9, 7]} />
+            <ModelMaterial
+              color={index % 2 ? '#ffd096' : '#a8f1c6'}
+              emissive={index % 2 ? '#a6602c' : '#37815a'}
+              emissiveIntensity={.72}
+              roughness={.46}
+              ghost={ghost}
+            />
+          </mesh>
+        ))}
+      </group>
+
+      {/* 생명체에게 이어지는 발자국 돌 */}
+      {[1.68, 1.38, 1.1].map((z, index) => (
+        <group key={`lumi_step_${z}`} position={[index % 2 ? .16 : -.1, .24, z]}>
+          <mesh scale={[.17, .045, .21]}>
+            <sphereGeometry args={[1, 10, 7]} />
+            <ModelMaterial color="#aeb8a2" emissive="#495746" emissiveIntensity={.12} roughness={.82} ghost={ghost} />
+          </mesh>
+          {[-1, 0, 1].map((toe) => (
+            <mesh key={`toe_${toe}`} position={[toe * .09, .035, -.18]} scale={[.055, .028, .07]}>
+              <sphereGeometry args={[1, 8, 6]} />
+              <ModelMaterial color="#aeb8a2" roughness={.82} ghost={ghost} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* 실제로 보이고 반응하는 루미 가족 */}
+      {LUMI_SANCTUARY_CREATURES.map((creature, index) => (
+        <LumiSanctuaryCreature
+          key={`sanctuary_lumi_${index}`}
+          {...creature}
+          ghost={ghost}
+          creatureRef={(element) => { creatureRefs.current[index] = element }}
+        />
+      ))}
+
+      {/* 캐노피 아래 천천히 도는 교감 모빌 */}
+      <group ref={mobileRef} position={[0, 1.48, -.7]}>
+        <mesh rotation={[0, 0, Math.PI / 4]}>
+          <octahedronGeometry args={[.11, 0]} />
+          <ModelMaterial color="#fff0a8" emissive="#c88735" emissiveIntensity={1.45} roughness={.28} ghost={ghost} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[.18, .21, 12]} />
+          <ModelMaterial color="#b7f1dd" emissive="#3c8b6d" emissiveIntensity={.58} ghost={ghost} />
+        </mesh>
+      </group>
+
+      {!ghost && dynamicLightActive && (
+        <>
+          <pointLight ref={lightRef} position={[0, 1.25, .15]} color="#bdf4d3" intensity={0} distance={3.8} decay={2} castShadow={false} />
+          <Sparkles count={10} scale={[3, 1.45, 2.8]} position={[0, .9, 0]} size={1.15} color="#d8ffd9" speed={.16} opacity={.5} />
+        </>
+      )}
+    </group>
+  )
+}
+
+const SIGNAL_PLAZA_COLORS = {
+  water: { color: '#88f2cf', emissive: '#23886a' },
+  repair: { color: '#ffbd87', emissive: '#a95227' },
+  feed: { color: '#c7f39d', emissive: '#588f35' },
+  admire: { color: '#d9b7ff', emissive: '#7851b4' },
+}
+
+function getSignalPlazaNodes(signalSummary) {
+  if (Array.isArray(signalSummary?.recentSignals) && signalSummary.recentSignals.length) {
+    return signalSummary.recentSignals.slice(0, 6)
+  }
+  const count = signalSummary
+    ? Math.min(6, Math.max(0, Number(signalSummary.recentCount || 0)))
+    : 5
+  return Array.from({ length: count }, (_, index) => ({
+    id: `preview_signal_${index}`,
+    actionId: ['admire', 'water', 'repair', 'feed'][index % 4],
+    seen: index > 1,
+  }))
+}
+
+// 귀환 신호 광장 Stage 2: 항로 기억 신호원(Route Memory Signal Court).
+// 방문 기록을 여섯 개 기억 캡슐과 중앙 비콘의 빛으로 직접 보여주는 데이터 반응형 소셜 광장이다.
+function MatureSignalPlaza({ scale = 1, ghost = false, dynamicLightActive = false, signalSummary }) {
+  const beaconRef = useRef()
+  const orbitRef = useRef()
+  const beamRef = useRef()
+  const rippleRefs = useRef([])
+  const lightRef = useRef()
+  const signalNodes = getSignalPlazaNodes(signalSummary)
+  const unreadCount = Math.max(0, Number(signalSummary?.unreadCount || 0))
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+    if (beaconRef.current) {
+      beaconRef.current.rotation.y = time * (unreadCount > 0 ? .42 : .24)
+      beaconRef.current.position.y = 2.15 + Math.sin(time * .85) * .045
+    }
+    if (orbitRef.current) orbitRef.current.rotation.y = time * .1
+    if (beamRef.current) {
+      const activeOpacity = dynamicLightActive ? .16 : .06
+      beamRef.current.material.opacity = activeOpacity + Math.sin(time * 1.1) * .018
+    }
+    rippleRefs.current.forEach((ripple, index) => {
+      if (!ripple) return
+      const cycle = (time * .26 + index / 3) % 1
+      const rippleScale = .72 + cycle * .76
+      ripple.scale.set(rippleScale, rippleScale, 1)
+      ripple.material.opacity = (1 - cycle) * (dynamicLightActive ? .16 : .07)
+    })
+    if (lightRef.current) {
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, unreadCount > 0 ? .42 : .28, 5, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      {/* 여러 방향에서 진입 가능한 넓은 중심 광장 */}
+      <mesh position={[0, .08, 0]} receiveShadow castShadow={!ghost}>
+        <cylinderGeometry args={[2.18, 2.32, .16, 36]} />
+        <ModelMaterial color="#31475d" metalness={.5} roughness={.48} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .2, 0]} receiveShadow>
+        <cylinderGeometry args={[1.87, 2.04, .15, 36]} />
+        <ModelMaterial color="#566c84" metalness={.54} roughness={.38} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .285, 0]} receiveShadow>
+        <cylinderGeometry args={[1.18, 1.34, .12, 30]} />
+        <ModelMaterial color="#31445d" metalness={.62} roughness={.3} ghost={ghost} />
+      </mesh>
+
+      {/* 전면 귀환 동선과 광장 진입 표식 */}
+      {[1.98, 1.67, 1.36].map((z, index) => (
+        <mesh key={`signal_entry_${z}`} position={[0, .25 + index * .018, z]} receiveShadow>
+          <boxGeometry args={[.86 + index * .13, .07, .27]} />
+          <ModelMaterial color="#8398ad" emissive="#354d69" emissiveIntensity={.22} metalness={.5} roughness={.42} ghost={ghost} />
+        </mesh>
+      ))}
+      {[-.32, .32].map((x) => (
+        <mesh key={`signal_entry_line_${x}`} position={[x, .31, 1.43]}>
+          <boxGeometry args={[.035, .018, 1.08]} />
+          <ModelMaterial color="#bfa5ff" emissive="#7052bd" emissiveIntensity={1.15} ghost={ghost} />
+        </mesh>
+      ))}
+
+      {/* 방문 기록을 담는 여섯 개 기억 캡슐 */}
+      <group ref={orbitRef}>
+        {Array.from({ length: 6 }, (_, index) => {
+          const angle = (index / 6) * Math.PI * 2
+          const signal = signalNodes[index]
+          const palette = SIGNAL_PLAZA_COLORS[signal?.actionId] || SIGNAL_PLAZA_COLORS.admire
+          const active = Boolean(signal)
+          return (
+            <group
+              key={`signal_memory_${signal?.id || index}`}
+              position={[Math.sin(angle) * 1.63, .32, Math.cos(angle) * 1.63]}
+              rotation={[0, angle, 0]}
+            >
+              <mesh position={[0, .19, 0]} castShadow={!ghost}>
+                <cylinderGeometry args={[.13, .2, .38, 10]} />
+                <ModelMaterial color="#60748a" metalness={.7} roughness={.28} ghost={ghost} />
+              </mesh>
+              <mesh position={[0, .51, 0]} rotation={[0, index * .48, Math.PI / 4]}>
+                <octahedronGeometry args={[active ? .19 : .13, 0]} />
+                <ModelMaterial
+                  color={active ? palette.color : '#627183'}
+                  emissive={active ? palette.emissive : '#1f2e42'}
+                  emissiveIntensity={active ? signal?.seen === false ? 1.9 : 1.05 : .12}
+                  metalness={.28}
+                  roughness={.24}
+                  ghost={ghost}
+                />
+              </mesh>
+              {active && (
+                <mesh position={[0, .51, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <ringGeometry args={[.24, .28, 12]} />
+                  <meshBasicMaterial color={palette.color} transparent opacity={signal?.seen === false ? .72 : .35} depthWrite={false} toneMapped={false} />
+                </mesh>
+              )}
+            </group>
+          )
+        })}
+      </group>
+
+      {/* 중앙 비콘: 두 개의 열린 수신 날개가 신호를 한 점으로 모은다 */}
+      <group position={[0, .3, 0]}>
+        {[-1, 1].map((side) => (
+          <group key={`beacon_wing_${side}`}>
+            <mesh position={[side * .42, .82, 0]} rotation={[0, 0, side * -.24]} castShadow={!ghost}>
+              <boxGeometry args={[.16, 1.58, .34]} />
+              <ModelMaterial color={side < 0 ? '#647f9c' : '#725f96'} metalness={.72} roughness={.24} ghost={ghost} />
+            </mesh>
+            <mesh position={[side * .53, 1.05, .02]} rotation={[0, 0, side * -.24]}>
+              <boxGeometry args={[.045, 1.04, .38]} />
+              <ModelMaterial
+                color={side < 0 ? '#79e9ff' : '#d3b5ff'}
+                emissive={side < 0 ? '#188da8' : '#7952b7'}
+                emissiveIntensity={1.2}
+                ghost={ghost}
+              />
+            </mesh>
+          </group>
+        ))}
+        <mesh position={[0, .25, 0]}>
+          <cylinderGeometry args={[.4, .55, .42, 16]} />
+          <ModelMaterial color="#273b54" metalness={.72} roughness={.26} ghost={ghost} />
+        </mesh>
+        <mesh position={[0, 1.13, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[.64, .045, 8, 30]} />
+          <ModelMaterial color="#c9afff" emissive="#7250bd" emissiveIntensity={1.35} ghost={ghost} />
+        </mesh>
+        <mesh position={[0, 1.13, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <torusGeometry args={[.64, .03, 7, 28]} />
+          <ModelMaterial color="#86e8ff" emissive="#258ca8" emissiveIntensity={1.1} ghost={ghost} />
+        </mesh>
+      </group>
+
+      {/* 새 신호가 모이는 부유 코어 */}
+      <group ref={beaconRef} position={[0, 2.15, 0]}>
+        <mesh rotation={[0, Math.PI / 4, Math.PI / 4]}>
+          <octahedronGeometry args={[.31, 0]} />
+          <ModelMaterial
+            color={unreadCount > 0 ? '#fff0b5' : '#eadcff'}
+            emissive={unreadCount > 0 ? '#e2a43f' : '#8a64d0'}
+            emissiveIntensity={unreadCount > 0 ? 2.25 : 1.55}
+            metalness={.2}
+            roughness={.16}
+            ghost={ghost}
+          />
+        </mesh>
+        {[0, Math.PI / 2].map((rotationX) => (
+          <mesh key={`beacon_core_ring_${rotationX}`} rotation={[rotationX, 0, 0]}>
+            <torusGeometry args={[.45, .022, 7, 24]} />
+            <ModelMaterial color="#d7c3ff" emissive="#7a58c6" emissiveIntensity={1.25} ghost={ghost} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* 귀환 비콘과 지면으로 번지는 수신 파동 */}
+      {!ghost && (
+        <>
+          <mesh ref={beamRef} position={[0, 2.92, 0]}>
+            <cylinderGeometry args={[.1, .34, 1.35, 12, 1, true]} />
+            <meshBasicMaterial color="#bfa5ff" transparent opacity={.06} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+          </mesh>
+          {[0, 1, 2].map((index) => (
+            <mesh
+              key={`signal_ripple_${index}`}
+              ref={(element) => { rippleRefs.current[index] = element }}
+              position={[0, .36 + index * .01, 0]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <ringGeometry args={[.72, .78, 30]} />
+              <meshBasicMaterial color="#cbb5ff" transparent opacity={.08} depthWrite={false} toneMapped={false} />
+            </mesh>
+          ))}
+        </>
+      )}
+
+      {/* 대화를 나누는 네 방향 벤치 */}
+      {[Math.PI / 4, Math.PI * .75, Math.PI * 1.25, Math.PI * 1.75].map((angle) => (
+        <group
+          key={`signal_bench_${angle}`}
+          position={[Math.sin(angle) * 1.95, .42, Math.cos(angle) * 1.95]}
+          rotation={[0, angle, 0]}
+        >
+          <mesh><boxGeometry args={[.68, .11, .26]} /><ModelMaterial color="#8ca0af" metalness={.52} roughness={.4} ghost={ghost} /></mesh>
+          <mesh position={[0, -.18, .08]}><boxGeometry args={[.52, .28, .08]} /><ModelMaterial color="#52677a" metalness={.56} roughness={.38} ghost={ghost} /></mesh>
+        </group>
+      ))}
+
+      {!ghost && dynamicLightActive && (
+        <>
+          <pointLight ref={lightRef} position={[0, 2.35, .15]} color={unreadCount > 0 ? '#ffe1a3' : '#c7adff'} intensity={0} distance={4.8} decay={2} castShadow={false} />
+          <Sparkles count={12} scale={[3.2, 2.6, 3.2]} position={[0, 1.7, 0]} size={1.25} color="#d9c7ff" speed={.22} opacity={.52} />
+        </>
+      )}
+    </group>
+  )
+}
+
+// 프리즘 길잡이 Stage 2: 프리즘 항로 리본(Prismatic Route Ribbon).
+// 수직 램프 실루엣을 버리고 회전 방향을 따라 지면 위로 빛이 흐르는 저상형 항로 장치로 차별화한다.
+// 여러 개를 연속 배치하면 맥동 순서와 전방 광선이 하나의 이동 경로처럼 이어진다.
+function MaturePrismPathlight({ scale = 1, ghost = false, dynamicLightActive = false }) {
+  const coreRef = useRef()
+  const routeRefs = useRef([])
+  const beamRef = useRef()
+  const lightRef = useRef()
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+    if (coreRef.current) {
+      coreRef.current.rotation.y = time * .55
+      coreRef.current.position.y = 1.12 + Math.sin(time * 1.35) * .045
+    }
+    routeRefs.current.forEach((marker, index) => {
+      if (!marker) return
+      const wave = Math.sin(time * 3.2 - index * .92) * .5 + .5
+      marker.material.emissiveIntensity = .7 + wave * 1.55
+      const markerScale = .92 + wave * .1
+      marker.scale.set(markerScale, markerScale, .55)
+    })
+    if (beamRef.current) {
+      const baseOpacity = dynamicLightActive ? .19 : .075
+      beamRef.current.material.opacity = baseOpacity + Math.sin(time * 1.7) * .025
+    }
+    if (lightRef.current) {
+      const target = dynamicLightActive ? .24 : 0
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, target, 6, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      {/* 길 방향(+Z)이 한눈에 드러나는 길쭉한 저상형 기초 */}
+      <mesh position={[0, .06, .12]} receiveShadow castShadow={!ghost}>
+        <boxGeometry args={[1.45, .12, 2.55]} />
+        <ModelMaterial color="#172d41" metalness={.64} roughness={.38} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .13, .15]} receiveShadow>
+        <boxGeometry args={[1.17, .035, 2.28]} />
+        <ModelMaterial color="#29465b" metalness={.62} roughness={.32} ghost={ghost} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <mesh key={`route_edge_${side}`} position={[side * .68, .13, .12]}>
+          <boxGeometry args={[.055, .05, 2.42]} />
+          <ModelMaterial
+            color={side < 0 ? '#64dfff' : '#b79aff'}
+            emissive={side < 0 ? '#167d9a' : '#6243aa'}
+            emissiveIntensity={.8}
+            ghost={ghost}
+          />
+        </mesh>
+      ))}
+
+      {/* 중앙이 열린 비대칭 쌍날개 게이트: 램프 기둥과 다른 낮고 넓은 실루엣 */}
+      <group position={[0, .18, -.48]}>
+        <mesh position={[-.48, .48, 0]} rotation={[0, 0, -.38]} castShadow={!ghost}>
+          <boxGeometry args={[.13, 1.05, .18]} />
+          <ModelMaterial color="#486b82" metalness={.74} roughness={.24} ghost={ghost} />
+        </mesh>
+        <mesh position={[.48, .48, 0]} rotation={[0, 0, .38]} castShadow={!ghost}>
+          <boxGeometry args={[.13, 1.05, .18]} />
+          <ModelMaterial color="#675f8e" metalness={.72} roughness={.25} ghost={ghost} />
+        </mesh>
+        <mesh position={[-.61, .55, 0]} rotation={[0, 0, -.38]}>
+          <boxGeometry args={[.045, .78, .2]} />
+          <ModelMaterial color="#70e7ff" emissive="#188eac" emissiveIntensity={1.25} ghost={ghost} />
+        </mesh>
+        <mesh position={[.61, .55, 0]} rotation={[0, 0, .38]}>
+          <boxGeometry args={[.045, .78, .2]} />
+          <ModelMaterial color="#c0a8ff" emissive="#7655c8" emissiveIntensity={1.15} ghost={ghost} />
+        </mesh>
+      </group>
+
+      {/* 부유 프리즘 코어와 삼각 방향 프레임 */}
+      <group ref={coreRef} position={[0, 1.12, -.48]}>
+        <mesh scale={[.38, .52, .26]} rotation={[0, Math.PI / 4, 0]}>
+          <octahedronGeometry args={[.42, 0]} />
+          <meshStandardMaterial
+            color={ghost ? '#71f3bf' : '#dffbff'}
+            emissive={ghost ? '#1f765a' : '#55ccef'}
+            emissiveIntensity={ghost ? .8 : 1.8}
+            metalness={.2}
+            roughness={.12}
+            transparent={ghost}
+            opacity={ghost ? .46 : 1}
+            wireframe={ghost}
+            depthWrite={!ghost}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh position={[0, 0, -.04]}>
+          <ringGeometry args={[.43, .49, 3]} />
+          <ModelMaterial color="#bda8ff" emissive="#6b52c4" emissiveIntensity={1.2} ghost={ghost} />
+        </mesh>
+      </group>
+
+      {/* 전방으로 펼쳐지는 프리즘 광선: 조명이 아니라 진행 방향을 표시 */}
+      {!ghost && (
+        <mesh ref={beamRef} position={[0, .72, .48]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[.38, .08, 1.9, 6, 1, true]} />
+          <meshBasicMaterial color="#76e7ff" transparent opacity={.075} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+        </mesh>
+      )}
+
+      {/* 뒤에서 앞으로 순차 맥동하는 항로 패널 */}
+      {[-.42, .05, .52, .98].map((z, index) => (
+        <mesh
+          key={`route_marker_${z}`}
+          ref={(element) => { routeRefs.current[index] = element }}
+          position={[0, .185, z]}
+          rotation={[-Math.PI / 2, 0, Math.PI / 4]}
+          scale={[1, 1, .55]}
+        >
+          <boxGeometry args={[.29, .29, .025]} />
+          <meshStandardMaterial
+            color={ghost ? '#71f3bf' : index % 2 ? '#bda8ff' : '#76e7ff'}
+            emissive={ghost ? '#1f765a' : index % 2 ? '#6d4fc0' : '#1c9fbd'}
+            emissiveIntensity={ghost ? .8 : .9}
+            metalness={.18}
+            roughness={.18}
+            transparent={ghost}
+            opacity={ghost ? .46 : 1}
+            wireframe={ghost}
+            depthWrite={!ghost}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+
+      {/* 끝점의 V형 진행 화살표 */}
+      <group position={[0, .2, 1.22]}>
+        <mesh position={[-.16, 0, -.04]} rotation={[0, -.68, 0]}><boxGeometry args={[.08, .035, .5]} /><ModelMaterial color="#d9fbff" emissive="#36bad5" emissiveIntensity={1.35} ghost={ghost} /></mesh>
+        <mesh position={[.16, 0, -.04]} rotation={[0, .68, 0]}><boxGeometry args={[.08, .035, .5]} /><ModelMaterial color="#d9fbff" emissive="#785bd0" emissiveIntensity={1.35} ghost={ghost} /></mesh>
+      </group>
+
+      {!ghost && dynamicLightActive && (
+        <pointLight ref={lightRef} position={[0, .72, .35]} color="#7deaff" intensity={0} distance={3.2} decay={2} castShadow={false} />
+      )}
+    </group>
+  )
+}
+
 // 성운 관측소 Stage 2: 오로라 성운 천문대(Aurora Nebula Observatory).
 // Stage 1보다 넓고 높은 이중 타워, 회전식 돔, 프리즘 망원경으로 실루엣을 명확히 구분한다.
 // 광원·파티클은 플레이어에게 가장 가까운 Stage 2 발광 시설 하나에서만 활성화한다.
@@ -1568,7 +2546,120 @@ function MatureObservatory({ scale = 1, ghost = false, dynamicLightActive = fals
   )
 }
 
-export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightActive = false }) {
+function MatureExpeditionBeacon({ scale = 1, ghost = false, dynamicLightActive = false, roverStatus = 'idle' }) {
+  const relayRef = useRef()
+  const dishRef = useRef()
+  const pulseRef = useRef()
+  const routeRef = useRef()
+  const lightRef = useRef()
+  const normalizedStatus = ['active', 'ready', 'claimed'].includes(roverStatus) ? roverStatus : 'idle'
+  const isActive = normalizedStatus === 'active'
+  const isReady = normalizedStatus === 'ready'
+  const signalColor = isReady ? '#ffe18a' : isActive ? '#6de8ff' : normalizedStatus === 'claimed' ? '#83f1bd' : '#ff9b67'
+  const signalEmissive = isReady ? '#d98e16' : isActive ? '#1687aa' : normalizedStatus === 'claimed' ? '#237a58' : '#a94320'
+
+  useFrame((state, delta) => {
+    const elapsed = state.clock.elapsedTime
+    if (relayRef.current) relayRef.current.rotation.y += delta * (isActive ? 1.45 : isReady ? .72 : .28)
+    if (dishRef.current) dishRef.current.rotation.y = Math.sin(elapsed * (isActive ? .9 : .35)) * .26
+    if (pulseRef.current) {
+      const pulse = 1 + Math.sin(elapsed * (isReady ? 3.6 : 1.8)) * (isReady ? .16 : .06)
+      pulseRef.current.scale.setScalar(pulse)
+    }
+    if (routeRef.current) {
+      routeRef.current.children.forEach((child, index) => {
+        if (!child.material) return
+        child.material.opacity = ghost ? .18 : .2 + Math.max(0, Math.sin(elapsed * 2.2 - index * .8)) * (isActive ? .42 : .18)
+      })
+    }
+    if (lightRef.current) {
+      const target = dynamicLightActive ? isReady ? .72 : isActive ? .48 : .24 : 0
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, target, 6, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      <mesh position={[0, .1, 0]} receiveShadow castShadow={!ghost}>
+        <cylinderGeometry args={[1.72, 1.92, .2, 6]} />
+        <ModelMaterial color="#24384b" metalness={.76} roughness={.32} ghost={ghost} />
+      </mesh>
+      <mesh position={[0, .23, 0]} receiveShadow>
+        <cylinderGeometry args={[1.44, 1.58, .11, 6]} />
+        <ModelMaterial color="#435b70" metalness={.68} roughness={.3} ghost={ghost} />
+      </mesh>
+      {[0, Math.PI * 2 / 3, Math.PI * 4 / 3].map((angle, index) => (
+        <group key={`relay_pad_${index}`} position={[Math.sin(angle) * 1.48, .28, Math.cos(angle) * 1.48]} rotation={[0, angle, 0]}>
+          <mesh castShadow={!ghost}><boxGeometry args={[.62, .1, .54]} /><ModelMaterial color="#526b7d" metalness={.72} roughness={.28} ghost={ghost} /></mesh>
+          <mesh position={[0, .07, .08]}><boxGeometry args={[.38, .025, .3]} /><ModelMaterial color={signalColor} emissive={signalEmissive} emissiveIntensity={1.25} ghost={ghost} /></mesh>
+        </group>
+      ))}
+
+      <mesh position={[0, .76, 0]} castShadow={!ghost}>
+        <cylinderGeometry args={[.35, .56, 1.06, 10]} />
+        <ModelMaterial color="#60778c" metalness={.84} roughness={.2} ghost={ghost} />
+      </mesh>
+      <group ref={pulseRef} position={[0, 1.26, 0]}>
+        <mesh><icosahedronGeometry args={[.28, 1]} /><ModelMaterial color="#fff4d8" emissive={signalEmissive} emissiveIntensity={2.35} metalness={.25} roughness={.16} ghost={ghost} /></mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.46, .035, 8, 30]} /><ModelMaterial color={signalColor} emissive={signalEmissive} emissiveIntensity={1.8} ghost={ghost} /></mesh>
+      </group>
+
+      <group ref={dishRef} position={[0, 1.52, 0]}>
+        {[-1, 1].map((side) => (
+          <group key={`deep_dish_${side}`} position={[side * .68, .48, 0]} rotation={[-.34, side * .42, side * -.18]}>
+            <mesh castShadow={!ghost}>
+              <coneGeometry args={[.62, .2, 28, 1, true]} />
+              <meshStandardMaterial
+                color={ghost ? '#71f3bf' : side < 0 ? '#d8edf5' : '#ffb083'}
+                emissive={side < 0 ? '#1a6d86' : '#8e3d22'}
+                emissiveIntensity={ghost ? .55 : .46}
+                metalness={.72}
+                roughness={.22}
+                transparent={ghost}
+                opacity={ghost ? .42 : 1}
+                wireframe={ghost}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+            <mesh position={[0, -.12, 0]}><cylinderGeometry args={[.045, .07, .55, 8]} /><ModelMaterial color="#8ea4b5" metalness={.82} roughness={.2} ghost={ghost} /></mesh>
+            <mesh position={[0, -.42, 0]}><sphereGeometry args={[.09, 10, 8]} /><ModelMaterial color={signalColor} emissive={signalEmissive} emissiveIntensity={1.7} ghost={ghost} /></mesh>
+          </group>
+        ))}
+      </group>
+
+      <group ref={relayRef} position={[0, 2.58, 0]}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.66, .045, 8, 36]} /><ModelMaterial color={signalColor} emissive={signalEmissive} emissiveIntensity={2} ghost={ghost} /></mesh>
+        {[0, Math.PI * 2 / 3, Math.PI * 4 / 3].map((angle) => (
+          <mesh key={`relay_fin_${angle}`} position={[Math.sin(angle) * .64, 0, Math.cos(angle) * .64]} rotation={[0, angle, 0]}>
+            <octahedronGeometry args={[.13, 0]} />
+            <ModelMaterial color="#fff7dc" emissive={signalEmissive} emissiveIntensity={2.1} ghost={ghost} />
+          </mesh>
+        ))}
+      </group>
+      <group ref={routeRef} position={[0, 2.62, 0]}>
+        {[0, Math.PI * 2 / 3, Math.PI * 4 / 3].map((angle, index) => (
+          <mesh key={`route_beam_${angle}`} position={[Math.sin(angle) * 1.15, .08 + index * .08, Math.cos(angle) * 1.15]} rotation={[Math.PI / 2, 0, -angle]}>
+            <cylinderGeometry args={[.022, .055, 1.62, 8]} />
+            <meshBasicMaterial color={signalColor} transparent opacity={ghost ? .18 : .34} depthWrite={false} toneMapped={false} />
+          </mesh>
+        ))}
+      </group>
+      <mesh position={[0, 3.02, 0]} rotation={[0, Math.PI / 4, 0]}>
+        <octahedronGeometry args={[.22, 0]} />
+        <ModelMaterial color="#fff5cf" emissive={signalEmissive} emissiveIntensity={2.7} metalness={.18} roughness={.14} ghost={ghost} />
+      </mesh>
+
+      {!ghost && (
+        <>
+          {dynamicLightActive && <Sparkles count={isReady ? 18 : 10} scale={[3.4, 3.2, 3.4]} position={[0, 2.25, 0]} color={signalColor} size={1.45} speed={isActive ? .48 : .24} />}
+          <pointLight ref={lightRef} position={[0, 2.5, 0]} color={signalColor} intensity={0} distance={5.2} decay={2} castShadow={false} />
+        </>
+      )}
+    </group>
+  )
+}
+
+export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightActive = false, signalSummary, roverStatus = 'idle' }) {
   if (itemId === 'starter_dome') {
     return (
       <group>
@@ -1597,7 +2688,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'prism_pathlight') {
-    // Stage 1만 (prism_pathlight는 Stage 2 없음, 별도 분기)
+    if (Number(level || 1) >= 2) {
+      return <MaturePrismPathlight scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group scale={.68}>
         <mesh position={[0, .7, 0]} castShadow={!ghost}><cylinderGeometry args={[.08, .17, 1.4, 10]} /><ModelMaterial color="#7589a5" metalness={.78} roughness={.25} ghost={ghost} /></mesh>
@@ -1620,6 +2714,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'friend_greenhouse') {
+    if (Number(level || 1) >= 2) {
+      return <MatureFriendGreenhouse scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group>
         <mesh position={[0, .08, 0]} receiveShadow><boxGeometry args={[2.5, .16, 2.05]} /><ModelMaterial color="#304b50" metalness={.48} roughness={.55} ghost={ghost} /></mesh>
@@ -1668,6 +2766,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'starflower_garden') {
+    if (Number(level || 1) >= 2) {
+      return <MatureStarflowerGarden scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group>
         <mesh position={[0, .06, 0]} receiveShadow><cylinderGeometry args={[1.2, 1.3, .12, 24]} /><ModelMaterial color="#315b48" roughness={.95} ghost={ghost} /></mesh>
@@ -1681,6 +2783,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'creature_habitat') {
+    if (Number(level || 1) >= 2) {
+      return <MatureCreatureHabitat scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group>
         <mesh position={[0, .07, 0]} receiveShadow><cylinderGeometry args={[1.55, 1.68, .14, 24]} /><ModelMaterial color="#354c43" roughness={.94} ghost={ghost} /></mesh>
@@ -1694,6 +2800,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'signal_plaza') {
+    if (Number(level || 1) >= 2) {
+      return <MatureSignalPlaza scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} signalSummary={signalSummary} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group>
         <mesh position={[0, .08, 0]} receiveShadow><cylinderGeometry args={[1.82, 1.96, .16, 32]} /><ModelMaterial color="#34485e" metalness={.48} roughness={.48} ghost={ghost} /></mesh>
@@ -1706,6 +2816,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'expedition_beacon') {
+    if (Number(level || 1) >= 2) {
+      return <MatureExpeditionBeacon scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} roverStatus={roverStatus} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group>
         <mesh position={[0, .16, 0]} castShadow={!ghost}><cylinderGeometry args={[.7, .92, .32, 16]} /><ModelMaterial color="#36495e" metalness={.7} ghost={ghost} /></mesh>
@@ -1733,7 +2847,7 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
   )
 }
 
-function PreviewTurntable({ itemId, level = 1 }) {
+function PreviewTurntable({ itemId, level = 1, signalSummary, roverStatus = 'idle' }) {
   const group = useRef()
   const baseY = itemId === 'observatory' && Number(level || 1) >= 2 ? -.98 : -.65
   useFrame((state, delta) => {
@@ -1741,17 +2855,17 @@ function PreviewTurntable({ itemId, level = 1 }) {
     group.current.rotation.y += delta * .35
     group.current.position.y = baseY + Math.sin(state.clock.elapsedTime * 1.4) * .04
   })
-  return <group ref={group} position={[0, baseY, 0]}><StructureModel itemId={itemId} level={level} /></group>
+  return <group ref={group} position={[0, baseY, 0]}><StructureModel itemId={itemId} level={level} signalSummary={signalSummary} roverStatus={roverStatus} /></group>
 }
 
-export function StructurePreview3D({ itemId, level = 1 }) {
-  const isTallObservatory = itemId === 'observatory' && Number(level || 1) >= 2
+export function StructurePreview3D({ itemId, level = 1, signalSummary, roverStatus = 'idle' }) {
+  const isTallStructure = (itemId === 'observatory' || itemId === 'expedition_beacon') && Number(level || 1) >= 2
   return (
     <Canvas
       dpr={[1, 1.35]}
       camera={{
-        position: isTallObservatory ? [5.4, 4.1, 6.7] : [4.5, 3.4, 5.5],
-        fov: isTallObservatory ? 40 : 38,
+        position: isTallStructure ? [5.4, 4.1, 6.7] : [4.5, 3.4, 5.5],
+        fov: isTallStructure ? 40 : 38,
         near: .1,
         far: 50,
       }}
@@ -1761,7 +2875,7 @@ export function StructurePreview3D({ itemId, level = 1 }) {
       <hemisphereLight args={['#d9f8ff', '#172435', 1.4]} />
       <directionalLight position={[4, 7, 5]} intensity={2.2} color="#fff3d6" />
       <pointLight position={[-3, 2, 2]} intensity={1.2} color="#68e9ff" distance={10} />
-      <PreviewTurntable itemId={itemId} level={level} />
+      <PreviewTurntable itemId={itemId} level={level} signalSummary={signalSummary} roverStatus={roverStatus} />
       <mesh position={[0, -.72, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[2.2, 40]} /><meshBasicMaterial color="#6ce7ff" transparent opacity={.06} /></mesh>
       <Sparkles count={18} scale={[4, 3, 4]} size={1.6} color="#a8efff" speed={.2} />
     </Canvas>
@@ -1769,12 +2883,18 @@ export function StructurePreview3D({ itemId, level = 1 }) {
 }
 
 function structureFootprint(itemId, level = 1) {
-  if (itemId === 'star_lamp' || itemId === 'prism_pathlight') return .46
+  if (itemId === 'star_lamp' || (itemId === 'prism_pathlight' && Number(level || 1) < 2)) return .46
+  if (itemId === 'prism_pathlight') return 1.2
   if (itemId === 'wild_sprout') return .42
   if (itemId === 'lumen_tree') return .78
+  if (itemId === 'starflower_garden' && Number(level || 1) >= 2) return 1.76
+  if (itemId === 'creature_habitat' && Number(level || 1) >= 2) return 1.88
   if (itemId === 'crystal_pond' || itemId === 'starflower_garden') return 1.28
+  if (itemId === 'signal_plaza' && Number(level || 1) >= 2) return 2.34
+  if (itemId === 'expedition_beacon' && Number(level || 1) >= 2) return 1.92
   if (itemId === 'signal_plaza' || itemId === 'route_gateway') return 1.52
   if (itemId === 'observatory' && Number(level || 1) >= 2) return 1.68
+  if (itemId === 'friend_greenhouse' && Number(level || 1) >= 2) return 1.78
   return 1.14
 }
 
@@ -1785,12 +2905,21 @@ function getStructureAcousticMaterial(itemId) {
   return 'soft'
 }
 
-function StructureProximityLabel({ item, footprint, isPlanetOwner }) {
+function StructureProximityLabel({ item, footprint, isPlanetOwner, signalSummary, roverStatus = 'idle', roverStatusLabel = '' }) {
+  const isSignalPlaza = item.itemId === 'signal_plaza'
+  const isExpeditionBeacon = item.itemId === 'expedition_beacon'
+  const unreadCount = Math.max(0, Number(signalSummary?.unreadCount || 0))
+  const signalActionLabel = isPlanetOwner
+    ? unreadCount > 0 ? `새 귀환 신호 ${unreadCount}개 확인` : '귀환 신호 기록 열기'
+    : '감탄 신호 남기기'
+  const beaconActionLabel = isPlanetOwner
+    ? roverStatus === 'ready' ? '귀환 보상 받기' : roverStatus === 'active' ? roverStatusLabel || '원정 신호 추적' : '로버 관제 열기'
+    : '원정 비콘 수리하기'
   return (
     <Html position={[0, Math.max(1.7, footprint + .9), 0]} center distanceFactor={8.8} style={{ pointerEvents: 'none' }}>
       <div className="frontier-structure-proximity-label">
         <strong>{item.name || '행성 객체'}</strong>
-        <span><kbd>E</kbd> {isPlanetOwner ? '재료 얻기' : '도와주기'} <i /> <kbd>F</kbd> 정보</span>
+        <span><kbd>E</kbd> {isSignalPlaza ? signalActionLabel : isExpeditionBeacon ? beaconActionLabel : isPlanetOwner ? '재료 얻기' : '도와주기'} <i /> <kbd>F</kbd> {isSignalPlaza ? '광장 안내' : isExpeditionBeacon ? '비콘 안내' : '정보'}</span>
       </div>
     </Html>
   )
@@ -1800,18 +2929,25 @@ const ORGANIC_STRUCTURE_IDS = new Set([
   'lumen_tree',
   'wild_sprout',
   'starflower_garden',
+  'creature_habitat',
 ])
 
 // Stage 2에서 동적 조명(spotLight)을 내장하는 발광 시설. 가장 가까운 1개만 실제 조명을 켠다.
 // 새 발광 Stage 2 시설이 추가되면 여기에 itemId를 추가하면 자동으로 조명 매니저가 지원한다.
 const LIGHTING_STRUCTURE_IDS = new Set([
   'star_lamp',
+  'prism_pathlight',
   'rover_bay',
   'crystal_pond',
   'observatory',
+  'friend_greenhouse',
+  'starflower_garden',
+  'creature_habitat',
+  'signal_plaza',
+  'expedition_beacon',
 ])
 
-function PlacedStructure({ item, selected, onSelect, activeLightId }) {
+function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner, activeLightId, signalSummary, roverStatus, roverStatusLabel }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId, item.level)
@@ -1825,7 +2961,13 @@ function PlacedStructure({ item, selected, onSelect, activeLightId }) {
       {!isOrganic && (
         <mesh position={[0, .045, 0]} receiveShadow><cylinderGeometry args={[footprint, footprint + .12, .09, 24]} /><meshStandardMaterial color="#293d48" roughness={.94} /></mesh>
       )}
-      <StructureModel itemId={item.itemId} level={item.level || 1} dynamicLightActive={dynamicLightActive} />
+      <StructureModel
+        itemId={item.itemId}
+        level={item.level || 1}
+        dynamicLightActive={dynamicLightActive}
+        signalSummary={item.itemId === 'signal_plaza' ? signalSummary : undefined}
+        roverStatus={item.itemId === 'expedition_beacon' ? roverStatus : undefined}
+      />
       {item.imageUrl && (
         <Html position={[0, Math.max(.76, footprint * .58), footprint * .82]} center distanceFactor={11}>
           <button type="button" className="frontier-structure-image-marker" onClick={(event) => { event.stopPropagation(); onSelect?.(item) }} aria-label={`${item.name || '객체'} 이미지와 설명 보기`}>
@@ -1838,6 +2980,16 @@ function PlacedStructure({ item, selected, onSelect, activeLightId }) {
           <ringGeometry args={[footprint + .24, footprint + .42, 36]} />
           <meshBasicMaterial color="#6ce7ff" transparent opacity={.9} depthWrite={false} />
         </mesh>
+      )}
+      {nearby && (item.itemId === 'signal_plaza' || item.itemId === 'expedition_beacon') && (
+        <StructureProximityLabel
+          item={item}
+          footprint={footprint}
+          isPlanetOwner={isPlanetOwner}
+          signalSummary={signalSummary}
+          roverStatus={roverStatus}
+          roverStatusLabel={roverStatusLabel}
+        />
       )}
     </group>
   )
@@ -2736,7 +3888,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
+function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const palette = BIOMES[planet?.theme] || BIOMES.forest
 
@@ -2850,18 +4002,33 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     const position = worldPositionFromLayout(item)
     position[1] = terrainHeight(position[0], position[2])
     const collisionRadius = Math.max(.64, structureFootprint(item.itemId, item.level) + PLAYER_COLLISION_RADIUS)
+    const isSignalPlaza = item.itemId === 'signal_plaza'
+    const isExpeditionBeacon = item.itemId === 'expedition_beacon'
+    const unreadSignals = Math.max(0, Number(signalPlazaSummary?.unreadCount || 0))
     return {
       id: item.instanceId,
       kind: 'structure',
-      actionId: 'structure',
-      label: item.name || '행성 객체 살펴보기',
+      actionId: isSignalPlaza
+        ? isPlanetOwner ? 'signal' : 'admire'
+        : isExpeditionBeacon
+          ? isPlanetOwner ? 'rover' : 'repair'
+          : 'structure',
+      label: isSignalPlaza
+        ? isPlanetOwner
+          ? unreadSignals > 0 ? `새 귀환 신호 ${unreadSignals}개 확인` : '귀환 신호 기록 열기'
+          : '감탄 신호 남기기 · 방문 흔적 기록'
+        : isExpeditionBeacon
+          ? isPlanetOwner
+            ? roverStatus === 'ready' ? '귀환 보상 받기 · 비콘 +1 적용' : roverStatus === 'active' ? `${roverStatusLabel} · 비콘 +1 적용` : '로버 원정 관제 열기 · 회수 재료 +1'
+            : '원정 비콘 수리하기'
+        : item.name || '행성 객체 살펴보기',
       position,
       collisionRadius,
       interactionRadius: collisionRadius + 1.65,
       acousticMaterial: getStructureAcousticMaterial(item.itemId),
       item,
     }
-  }), [layout])
+  }), [isPlanetOwner, layout, roverStatus, roverStatusLabel, signalPlazaSummary?.unreadCount])
   const biomeColliders = useMemo(() => BIOME_PROP_POSITIONS.map(([x, z, scale], index) => ({
     id: `biome-prop-${index}`,
     position: [x, terrainHeight(x, z), z],
@@ -3016,7 +4183,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       )}
 
       {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
-      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLightId={activeLightId} />)}
+      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLightId={activeLightId} signalSummary={signalPlazaSummary} roverStatus={roverStatus} roverStatusLabel={roverStatusLabel} />)}
       {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
       {dailyEventNode && <DailyEventMarker node={dailyEventNode} playerPosition={playerPosition} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
@@ -3200,6 +4367,7 @@ const INTERACTION_ICONS = {
   portal: Compass,
   rover: Wrench,
   builder: Hammer,
+  signal: Radio,
 }
 
 function InteractionPrompt({ nearby, onInteract, onInspect }) {
@@ -3313,6 +4481,7 @@ export default function GalaxyWorld3D({
   onMissionComplete,
   onSelectStructure,
   onStructureMission,
+  signalPlazaSummary,
   selectedStructureId,
   onMessage,
   paused = false,
@@ -3803,6 +4972,7 @@ export default function GalaxyWorld3D({
           nearby={nearby}
           onInteract={interact}
           onInspectStructure={inspectStructure}
+          signalPlazaSummary={signalPlazaSummary}
           builderEnabled={builderEnabled}
           builderActive={builderActive}
           builderCells={builder.cells}
