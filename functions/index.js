@@ -1451,7 +1451,10 @@ async function markQuizBattleResolving(runtimeRef, finalizeReason) {
     const participants = battleData.participants || {};
     const totalQuestions = Number(battleData.questionCount || 0);
     const allDone = participantUids.length === 2
-      && participantUids.every((uid) => Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions);
+      && (
+        participantUids.every((uid) => Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions)
+        || (battleData.isAI === true && participantUids.some((uid) => uid !== battleData.aiParticipantUid && Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions))
+      );
     const timedOut = Number(battleData.endsAtMs || 0) > 0 && nowMs >= Number(battleData.endsAtMs || 0);
     const hasForfeit = participantUids.some((uid) => participants?.[uid]?.forfeited === true);
     if (!allDone && !timedOut && !hasForfeit && finalizeReason !== "force") {
@@ -1531,7 +1534,8 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
     const participants = battleData.participants || {};
     const totalQuestions = Number(battleData.questionCount || battleData.questionSet?.length || 0);
     const nowMs = Date.now();
-    const allDone = participantUids.every((uid) => Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions);
+    const allDone = participantUids.every((uid) => Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions)
+      || (battleData.isAI === true && participantUids.some((uid) => uid !== battleData.aiParticipantUid && Number(participants?.[uid]?.answeredCount || 0) >= totalQuestions));
     const timedOut = Number(battleData.endsAtMs || 0) > 0 && nowMs >= Number(battleData.endsAtMs || 0);
     const hasForfeit = participantUids.some((uid) => participants?.[uid]?.forfeited === true);
     // 한쪽이 중도 포기했거나, 강제 정산 요청이면 즉시 정산한다.
@@ -4026,7 +4030,7 @@ exports.advanceAIQuizBattle = regionalFunctions.https.onCall(async (data, contex
     const totalQuestions = Number(battleData.questionCount || battleData.questionSet?.length || 0);
     const myAnswered = Math.min(totalQuestions, Number(myParticipant.answeredCount || 0));
     const currentAIAnswered = Math.min(totalQuestions, Number(aiParticipant.answeredCount || 0));
-    const canAdvance = currentAIAnswered < totalQuestions && currentAIAnswered < myAnswered;
+    const canAdvance = currentAIAnswered < totalQuestions && currentAIAnswered < myAnswered && myAnswered < totalQuestions;
     const nextAIAnswered = canAdvance ? currentAIAnswered + 1 : currentAIAnswered;
     let nextAICorrect = Math.min(nextAIAnswered, Number(aiParticipant.correctCount || 0));
 
@@ -4046,7 +4050,7 @@ exports.advanceAIQuizBattle = regionalFunctions.https.onCall(async (data, contex
         updatedAt: FieldValue.serverTimestamp(),
       });
     }
-    shouldFinalize = myAnswered >= totalQuestions && nextAIAnswered >= totalQuestions;
+    shouldFinalize = myAnswered >= totalQuestions || (currentAIAnswered >= totalQuestions);
     aiProgress = { answeredCount: nextAIAnswered, correctCount: nextAICorrect, score: nextAICorrect * 100 };
   });
 
@@ -4155,6 +4159,9 @@ exports.submitBattleAnswer = quizBattleFunctions.https.onCall(async (data, conte
       correctCount: nextCorrectCount,
       score: nextScore,
       shouldFinalize: (battleData.participantUids || []).every((participantUid) => {
+        if (battleData.isAI === true && participantUid !== uid) {
+          return true;
+        }
         const count = participantUid === uid
           ? nextAnsweredCount
           : Number(battleData.participants?.[participantUid]?.answeredCount || 0);

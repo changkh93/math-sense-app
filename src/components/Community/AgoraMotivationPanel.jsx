@@ -145,7 +145,7 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
           </h3>
           <div className="mini-stats-grid">
             <div className="mini-stat">
-              <span className="label">해결한 문제</span>
+              <span className="label">완료한 퀴즈 세트</span>
               <span className="value">{userData.totalQuizzes}개</span>
             </div>
             <div className="mini-stat">

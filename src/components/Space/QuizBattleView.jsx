@@ -628,7 +628,23 @@ export default function QuizBattleView({
   const isBattleCompleteForMe = questionSet.length > 0 && answeredCount >= questionSet.length
   const isOpponentComplete = questionSet.length > 0 && Number(opponentParticipant.answeredCount || 0) >= questionSet.length
   const timeExpired = Number(battle?.endsAtMs || 0) > 0 && timeNow >= Number(battle.endsAtMs)
+  const timeLeftSec = Number(battle?.endsAtMs || 0) > 0 ? Math.max(0, Math.ceil((Number(battle.endsAtMs) - timeNow) / 1000)) : 999
+  const isUrgentTime = Number(battle?.endsAtMs || 0) > 0 && battle?.status === 'active' && !isBattleFinished && timeLeftSec <= 30
   const aiAnsweredCount = Number(opponentParticipant.answeredCount || 0)
+
+  const urgentAudioTriggeredRef = useRef(false)
+  useEffect(() => {
+    if (isUrgentTime && !urgentAudioTriggeredRef.current) {
+      urgentAudioTriggeredRef.current = true
+      try {
+        soundManager.playWarning()
+      } catch (err) {
+        // ignore
+      }
+    } else if (!isUrgentTime) {
+      urgentAudioTriggeredRef.current = false
+    }
+  }, [isUrgentTime])
 
   useEffect(() => {
     if (
@@ -637,6 +653,8 @@ export default function QuizBattleView({
       || battle?.status !== 'active'
       || questionSet.length === 0
       || aiAnsweredCount >= answeredCount
+      || isBattleCompleteForMe
+      || timeExpired
     ) return undefined
 
     // 이용자가 빠르게 다음 문제로 넘어가도 기존 AI 진행을 버리지 않는다.
@@ -660,7 +678,7 @@ export default function QuizBattleView({
       if (aiAdvanceTimerRef.current) window.clearTimeout(aiAdvanceTimerRef.current)
       aiAdvanceTimerRef.current = null
     }
-  }, [aiAnsweredCount, answeredCount, battle?.isAI, battle?.schemaVersion, battle?.status, battleId, questionSet.length])
+  }, [aiAnsweredCount, answeredCount, battle?.isAI, battle?.schemaVersion, battle?.status, battleId, isBattleCompleteForMe, questionSet.length, timeExpired])
 
   useEffect(() => {
     if (!isBattleSettled) {
@@ -1645,7 +1663,14 @@ export default function QuizBattleView({
           </div>
           <div style={{ textAlign: 'center' }}>
             <div className="font-title" style={{ color: 'var(--star-gold)', fontSize: '1.15rem' }}>QUIZ BATTLE</div>
-            <div className="font-tech" style={{ color: timeExpired ? '#f87171' : 'var(--text-muted)' }}>{formatTimeLeft(battle.endsAtMs)}</div>
+            <div className={`font-tech ${isUrgentTime ? 'battle-timer-urgent' : ''}`} style={{ color: timeExpired ? '#f87171' : isUrgentTime ? '#ef4444' : 'var(--text-muted)' }}>
+              {formatTimeLeft(battle.endsAtMs)}
+            </div>
+            {isUrgentTime && (
+              <div className="battle-urgent-badge font-tech">
+                ⚠️ 제한시간 마감 임박 ({timeLeftSec}초)
+              </div>
+            )}
           </div>
           <div className="glass-card" style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
             <div className="font-tech" style={{ color: 'var(--text-muted)' }}>{opponentParticipant.displayName || '상대'}</div>

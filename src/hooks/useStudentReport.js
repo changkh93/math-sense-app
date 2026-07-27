@@ -346,13 +346,13 @@ async function fetchPeerComparison(activeRegions, startTs, endTs, myUserId) {
 
         const hType = data.type || 'quiz_pass';
         const isVideo = hType.includes('video') || hType === 'recovery_mastery';
-        const isQuiz = hType.includes('quiz') || (!isVideo && hType !== 'text' && hType !== 'data_log_read');
+        const isQuiz = (hType.includes('quiz') || (!isVideo && hType !== 'text' && hType !== 'data_log_read')) && hType !== 'quiz_battle' && hType !== 'code_trace';
 
         if (isVideo && data.videoTime) {
           userStats[uid].videoSeconds += data.videoTime;
-        } else if (isQuiz && data.score != null) {
+        } else if (isQuiz && data.score != null && Number(data.score) <= 100) {
           userStats[uid].quizCount++;
-          userStats[uid].quizScoreSum += data.score;
+          userStats[uid].quizScoreSum += Number(data.score);
           userStats[uid].quizScoreCount++;
         }
       });
@@ -469,7 +469,7 @@ function analyzeLearning(history, days) {
 
     const hType = h.type || 'quiz_pass';
     const isVideo = hType.includes('video') || hType === 'recovery_mastery';
-    const isQuiz = hType.includes('quiz') || (!isVideo && hType !== 'text' && hType !== 'data_log_read');
+    const isQuiz = (hType.includes('quiz') || (!isVideo && hType !== 'text' && hType !== 'data_log_read')) && hType !== 'quiz_battle' && hType !== 'code_trace';
 
     if (isVideo) {
       const vTime = h.videoTime || 0;
@@ -489,10 +489,10 @@ function analyzeLearning(history, days) {
       // Cluster specific weekly
       weeklyMap[weekKey][`quiz_${clusterId}`] = (weeklyMap[weekKey][`quiz_${clusterId}`] || 0) + 1;
       
-      if (h.score != null) {
-        quizScoreSum += h.score;
+      if (h.score != null && Number(h.score) <= 100) {
+        quizScoreSum += Number(h.score);
         quizScoreCount++;
-        byCluster[clusterId].quizScoreSum += h.score;
+        byCluster[clusterId].quizScoreSum += Number(h.score);
         byCluster[clusterId].quizScoreCount++;
       }
     }
