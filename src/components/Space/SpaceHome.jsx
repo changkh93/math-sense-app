@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react'
+import { lazy, useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db, functions } from '../../firebase'
@@ -14,23 +14,8 @@ import { httpsCallable } from 'firebase/functions'
 // Space Components
 import StarField from './StarField'
 import ClusterSelector from './ClusterSelector'
-import Planet3D from './Planet3D' // Keep for Login Screen
-import SpaceScene, { checkWebGLSupport } from './SpaceScene' // New 3D Scene
-import SpaceQuizView from './SpaceQuizView'
-import MissionHub from './MissionHub' // New Integration
-import SpaceDashboard from './SpaceDashboard'
-import SpaceCollection from './SpaceCollection'
-import SpaceStore from './SpaceStore'
-import SpaceRanking from './SpaceRanking'
-import SpaceJourney from './SpaceJourney'
 import RegionAccessModal from './RegionAccessModal' // New Integration
-import AssignmentHub from './AssignmentHub' // New Integration
-import MistakeNotebookPlanet from './MistakeNotebookPlanet'
 import WarpGateDocking from './WarpGateDocking'
-import ProfileEditView from './ProfileEditView' // Profile Management
-import StudyCrewView from './StudyCrewView'
-import QuizBattleHub from './QuizBattleHub'
-import MetaGalaxy from '../GalaxySocial/MetaGalaxy'
 import {
   GalaxyEntryDialog,
   GalaxyIdlePrompt,
@@ -43,12 +28,8 @@ import {
 import { useGalaxyPlaySession } from '../../hooks/useGalaxyPlaySession'
 import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
-import DarkMatterView from './DarkMatterView' // Dark Matter Integration
-import DarkMatterRefineryView from './DarkMatterRefineryView'
-import StudyStreamRoomView from './StudyStreamRoomView'
 import CrewMothershipFlyby from './CrewMothershipFlyby'
 import { useGlobalActiveRoomId } from '../../utils/roomState'
-import CrystalLedger from './CrystalLedger'
 import { useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments'
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
@@ -59,6 +40,7 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
 import { mergeSummaryWithRecentHistory } from '../../utils/learningSummaryUtils'
+import { checkWebGLSupport } from '../../utils/webglSupport'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
@@ -67,6 +49,74 @@ import { BellRing, Mail, Sparkles, X } from 'lucide-react'
 
 // Styles
 import '../../styles/space-theme.css'
+
+const SpaceQuizView = lazy(() => import('./SpaceQuizView'))
+const Planet3D = lazy(() => import('./Planet3D'))
+const SpaceScene = lazy(() => import('./SpaceScene'))
+const MissionHub = lazy(() => import('./MissionHub'))
+const SpaceDashboard = lazy(() => import('./SpaceDashboard'))
+const SpaceCollection = lazy(() => import('./SpaceCollection'))
+const SpaceStore = lazy(() => import('./SpaceStore'))
+const SpaceRanking = lazy(() => import('./SpaceRanking'))
+const SpaceJourney = lazy(() => import('./SpaceJourney'))
+const AssignmentHub = lazy(() => import('./AssignmentHub'))
+const MistakeNotebookPlanet = lazy(() => import('./MistakeNotebookPlanet'))
+const ProfileEditView = lazy(() => import('./ProfileEditView'))
+const StudyCrewView = lazy(() => import('./StudyCrewView'))
+const QuizBattleHub = lazy(() => import('./QuizBattleHub'))
+const DarkMatterView = lazy(() => import('./DarkMatterView'))
+const DarkMatterRefineryView = lazy(() => import('./DarkMatterRefineryView'))
+const StudyStreamRoomView = lazy(() => import('./StudyStreamRoomView'))
+const CrystalLedger = lazy(() => import('./CrystalLedger'))
+const loadMetaGalaxy = () => import('../GalaxySocial/MetaGalaxy')
+const MetaGalaxy = lazy(loadMetaGalaxy)
+
+function SpaceViewFallback() {
+  return (
+    <div
+      role="status"
+      className="space-bg space-hud"
+      style={{
+        minHeight: '100dvh',
+        display: 'grid',
+        placeContent: 'center',
+        gap: 12,
+        padding: 24,
+        color: '#e0f2fe',
+        textAlign: 'center',
+      }}
+    >
+      <div className="journey-loader" style={{ margin: '0 auto 4px' }} />
+      <strong className="font-title">화면 좌표 동기화 중</strong>
+      <small className="font-tech" style={{ color: 'rgba(224, 242, 254, 0.68)' }}>
+        선택한 탐사 모듈을 불러오고 있습니다.
+      </small>
+    </div>
+  )
+}
+
+function GalaxyModuleFallback() {
+  return (
+    <div
+      role="status"
+      style={{
+        minHeight: '100dvh',
+        display: 'grid',
+        placeContent: 'center',
+        gap: 10,
+        padding: 24,
+        background: '#03050c',
+        color: '#e0f2fe',
+        textAlign: 'center',
+      }}
+    >
+      <strong className="font-title">아스트라 프론티어로 워프 중</strong>
+      <small className="font-tech" style={{ color: 'rgba(224, 242, 254, 0.68)' }}>
+        행성 지형 모듈을 불러오고 있습니다.
+      </small>
+    </div>
+  )
+}
 
 function getRewardMultiplierSuffix(multiplierMeta) {
   if (!multiplierMeta || multiplierMeta.multiplier <= 1 || multiplierMeta.bonusAmount <= 0) return ''
@@ -628,6 +678,13 @@ function SpaceHome() {
   const [acceptedQuizBattle, setAcceptedQuizBattle] = useState(null)
   const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
   const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy', isGuest: userData?.isGuest === true })
+
+  useEffect(() => {
+    if (currentView !== 'galaxy') return
+    loadMetaGalaxy().catch((error) => {
+      console.warn('Failed to preload Astra Frontier:', error)
+    })
+  }, [currentView])
 
   useEffect(() => {
     soundManager.setUserBinding(
@@ -3488,16 +3545,18 @@ function SpaceHome() {
         <GalaxyPlayTimeStyles />
         {galaxyPlay.session ? (
           <>
-            <MetaGalaxy
-              user={user}
-              userData={userData}
-              playSession={galaxyPlay.session}
-              playRemainingSeconds={galaxyPlay.remainingSeconds}
-              dailyUsedSeconds={galaxyPlay.dailyUsedSeconds}
-              dailyLimitSeconds={galaxyPlay.session.dailyLimitSeconds}
-              warningStage={galaxyPlay.warningStage}
-              onBack={() => galaxyPlay.endSession('manual_exit')}
-            />
+            <Suspense fallback={<GalaxyModuleFallback />}>
+              <MetaGalaxy
+                user={user}
+                userData={userData}
+                playSession={galaxyPlay.session}
+                playRemainingSeconds={galaxyPlay.remainingSeconds}
+                dailyUsedSeconds={galaxyPlay.dailyUsedSeconds}
+                dailyLimitSeconds={galaxyPlay.session.dailyLimitSeconds}
+                warningStage={galaxyPlay.warningStage}
+                onBack={() => galaxyPlay.endSession('manual_exit')}
+              />
+            </Suspense>
             <GalaxyTimeWarning stage={galaxyPlay.warningStage} />
             {galaxyPlay.connectionState === 'reconnecting' && <GalaxyReconnectNotice />}
             {galaxyPlay.idleWarning && (
@@ -3673,33 +3732,34 @@ function SpaceHome() {
               transition={{ duration: 1 }}
               style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}
             >
-            <SpaceScene 
-              regions={regions} 
-              selectedRegionId={selectedRegionId}
-              recentRegionId={recentRegionId}
-              explorationStatus={explorationStatus}
-              onSelectRegion={(id) => {
-                const region = regions?.find(r => r.id === id);
-                if (region?.isPrivate) {
-                   const accessStatus = userData?.regionAccess?.[id];
-                   if (accessStatus === 'suspended') {
-                      alert('이 행성에 대한 접근이 일시정지되었습니다. 선생님께 문의하세요.');
-                      return;
-                   } else if (accessStatus !== 'active' && accessStatus !== 'completed') {
-                      setPendingRegion(region);
-                      soundManager.playClick();
-                      return;
-                   }
-                }
-                selectRegion(id)
-                soundManager.playWarp()
-              }}
-              onSelectArchive={() => {
-                setAssignmentHubInitialDate(null);
-                switchRootView('assignment_hub');
-                soundManager.playWarp();
-              }}
-              onSelectDarkMatter={() => {
+            <Suspense fallback={null}>
+              <SpaceScene
+                regions={regions}
+                selectedRegionId={selectedRegionId}
+                recentRegionId={recentRegionId}
+                explorationStatus={explorationStatus}
+                onSelectRegion={(id) => {
+                  const region = regions?.find(r => r.id === id);
+                  if (region?.isPrivate) {
+                     const accessStatus = userData?.regionAccess?.[id];
+                     if (accessStatus === 'suspended') {
+                        alert('이 행성에 대한 접근이 일시정지되었습니다. 선생님께 문의하세요.');
+                        return;
+                     } else if (accessStatus !== 'active' && accessStatus !== 'completed') {
+                        setPendingRegion(region);
+                        soundManager.playClick();
+                        return;
+                     }
+                  }
+                  selectRegion(id)
+                  soundManager.playWarp()
+                }}
+                onSelectArchive={() => {
+                  setAssignmentHubInitialDate(null);
+                  switchRootView('assignment_hub');
+                  soundManager.playWarp();
+                }}
+                onSelectDarkMatter={() => {
                 startDarkMatterMode('learning');
               }}
               onSelectDarkMatterRefinery={() => {
@@ -3715,6 +3775,7 @@ function SpaceHome() {
               shipCustomization={userData?.shipCustomization || {}}
               isBoosting={isBoosting}
             />
+            </Suspense>
           </Motion.div>
         )}
       </AnimatePresence>
@@ -4798,7 +4859,9 @@ function SpaceHome() {
   return (
     <>
       <RealtimeTopAlerts userId={user?.uid} />
-      {renderMainContent()}
+      <Suspense fallback={<SpaceViewFallback />}>
+        {renderMainContent()}
+      </Suspense>
       {persistentStudyRoom}
     </>
   );

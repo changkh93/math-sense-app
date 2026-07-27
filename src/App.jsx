@@ -3,53 +3,64 @@ import { Navigate, Routes, Route } from 'react-router-dom'
 import './App.css'
 import './styles/space-theme.css' /* Global Space Theme */
 import SpaceHome from './components/Space/SpaceHome'
-import AdminLayout from './pages/Admin/AdminLayout'
-import AdminDashboard from './pages/Admin/Dashboard'
 import AdminRoute from './components/AdminRoute'
-import LiveStatus from './pages/Admin/LiveStatus'
-import ParentManager from './pages/Admin/ParentManager'
-import CrewApproval from './pages/Admin/CrewApproval'
-import Applications from './pages/Admin/Applications'
-import VacationCampAdmin from './pages/Admin/VacationCampAdmin'
-
-import ParentDashboard from './pages/Parent/ParentDashboard'
-
-import ClusterManager from './pages/Admin/ClusterManager'
-import UserAccessManager from './pages/Admin/UserAccessManager'
-import ContentManager from './pages/Admin/ContentManager'
-import MissionContentEditor from './pages/Admin/MissionContentEditor'
-import AITaggingEditor from './pages/Admin/AITaggingEditor'
-import QuizEditor from './pages/Admin/QuizEditor'
-import GhostCleaner from './pages/Admin/GhostCleaner'
-import StreakFixer from './pages/Admin/StreakFixer'
-import GalaxyLearningLedgerBackfill from './pages/Admin/GalaxyLearningLedgerBackfill'
-import TeacherQA from './pages/Admin/TeacherQA'
-import PythonCourseBuilder from './pages/Admin/PythonCourseBuilder'
-import MiddleSchoolMathBuilder from './pages/Admin/MiddleSchoolMathBuilder'
-import AdminAssignments from './pages/Admin/AdminAssignments'
-import MistakeNotebookAdmin from './pages/Admin/MistakeNotebookAdmin'
-import AdminStudentReport from './pages/Admin/AdminStudentReport'
-import MonthlyEvaluationAwards from './pages/Admin/MonthlyEvaluationAwards'
-import Agora from './pages/Community/Agora'
-import QuestionDetail from './pages/Community/QuestionDetail'
-import PublicProfile from './pages/Community/PublicProfile'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import InviteHandler from './pages/InviteHandler'
-import PublicApplication from './pages/PublicApplication'
-import VacationCamp from './pages/VacationCamp'
-import Signup from './pages/Signup'
-import Terms from './pages/Terms'
-import CrewGuestInvite from './pages/CrewGuestInvite'
-import CrewGuestManager from './pages/Admin/CrewGuestManager'
 import QuizBattleChallengeReceiver from './components/Space/QuizBattleChallengeReceiver'
 
 import PrivateRoute from './components/PrivateRoute'
 import { cleanExpiredAudioPreferences } from './audio/audioPreferences'
 import { cleanExpiredLocalStorage } from './utils/storageUtils'
 
+const AdminLayout = lazy(() => import('./pages/Admin/AdminLayout'))
+const AdminDashboard = lazy(() => import('./pages/Admin/Dashboard'))
+const LiveStatus = lazy(() => import('./pages/Admin/LiveStatus'))
+const ParentManager = lazy(() => import('./pages/Admin/ParentManager'))
+const CrewApproval = lazy(() => import('./pages/Admin/CrewApproval'))
+const Applications = lazy(() => import('./pages/Admin/Applications'))
+const VacationCampAdmin = lazy(() => import('./pages/Admin/VacationCampAdmin'))
+const ClusterManager = lazy(() => import('./pages/Admin/ClusterManager'))
+const UserAccessManager = lazy(() => import('./pages/Admin/UserAccessManager'))
+const ContentManager = lazy(() => import('./pages/Admin/ContentManager'))
+const MissionContentEditor = lazy(() => import('./pages/Admin/MissionContentEditor'))
+const AITaggingEditor = lazy(() => import('./pages/Admin/AITaggingEditor'))
+const QuizEditor = lazy(() => import('./pages/Admin/QuizEditor'))
+const GhostCleaner = lazy(() => import('./pages/Admin/GhostCleaner'))
+const StreakFixer = lazy(() => import('./pages/Admin/StreakFixer'))
+const GalaxyLearningLedgerBackfill = lazy(() => import('./pages/Admin/GalaxyLearningLedgerBackfill'))
+const TeacherQA = lazy(() => import('./pages/Admin/TeacherQA'))
+const PythonCourseBuilder = lazy(() => import('./pages/Admin/PythonCourseBuilder'))
+const MiddleSchoolMathBuilder = lazy(() => import('./pages/Admin/MiddleSchoolMathBuilder'))
+const AdminAssignments = lazy(() => import('./pages/Admin/AdminAssignments'))
+const MistakeNotebookAdmin = lazy(() => import('./pages/Admin/MistakeNotebookAdmin'))
+const AdminStudentReport = lazy(() => import('./pages/Admin/AdminStudentReport'))
+const MonthlyEvaluationAwards = lazy(() => import('./pages/Admin/MonthlyEvaluationAwards'))
+const CrewGuestManager = lazy(() => import('./pages/Admin/CrewGuestManager'))
+const ParentDashboard = lazy(() => import('./pages/Parent/ParentDashboard'))
+const Agora = lazy(() => import('./pages/Community/Agora'))
+const QuestionDetail = lazy(() => import('./pages/Community/QuestionDetail'))
+const PublicProfile = lazy(() => import('./pages/Community/PublicProfile'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const InviteHandler = lazy(() => import('./pages/InviteHandler'))
+const PublicApplication = lazy(() => import('./pages/PublicApplication'))
+const VacationCamp = lazy(() => import('./pages/VacationCamp'))
+const Signup = lazy(() => import('./pages/Signup'))
+const Terms = lazy(() => import('./pages/Terms'))
+const CrewGuestInvite = lazy(() => import('./pages/CrewGuestInvite'))
+
 const AstraBuilderQa = import.meta.env.DEV
   ? lazy(() => import('./components/GalaxySocial/builder/AstraBuilderQa'))
   : null
+
+function RouteFallback() {
+  return (
+    <div
+      role="status"
+      className="space-bg space-hud"
+      style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', color: 'var(--crystal-cyan)' }}
+    >
+      <div className="font-tech">항로 모듈을 불러오고 있습니다...</div>
+    </div>
+  )
+}
 
 function App() {
   // 앱 로드 시 일반 캐시와 UID별 오디오 선호 만료분을 함께 정리
@@ -61,6 +72,7 @@ function App() {
   return (
     <>
       <QuizBattleChallengeReceiver />
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
       <Route path="/" element={<SpaceHome />} />
       <Route path="/journey" element={<Navigate to="/?view=journey" replace />} />
@@ -76,7 +88,7 @@ function App() {
       {AstraBuilderQa && (
         <Route
           path="/dev/astra-builder"
-          element={<Suspense fallback={null}><AstraBuilderQa /></Suspense>}
+          element={<AstraBuilderQa />}
         />
       )}
       
@@ -132,6 +144,7 @@ function App() {
       <Route path="/parent/dashboard" element={<ParentDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </>
   )
 }

@@ -144,6 +144,216 @@ const GALAXY_WORLD_NODE_ACTIONS = {
   broken_beacon: "beacon",
   wild_soil: "plant",
 };
+
+const FRONTIER_STORY_VERSION = 3;
+const FRONTIER_PROLOGUE_STEPS = Object.freeze([
+  "restore_beacon",
+  "build_first_light",
+  "field_expedition",
+  "launch_rover",
+]);
+const FRONTIER_REBORN_STAR_STEPS = Object.freeze([
+  "build_lumen_tree",
+  "restore_garden",
+  "stabilize_daily_event",
+]);
+const FRONTIER_LOST_ROUTE_STEPS = Object.freeze([
+  "trace_lost_route",
+  "dispatch_route_rover",
+  "recover_pre_storm_discovery",
+]);
+const FRONTIER_FRIEND_SIGNAL_STEPS = Object.freeze([
+  "visit_friend_planet",
+  "help_friend_planet",
+  "unlock_shared_route",
+]);
+const FRONTIER_ASTRA_MEMORY_STEPS = Object.freeze([
+  "complete_discovery_codex",
+  "complete_core_facilities",
+  "build_astra_gateway",
+  "restore_astra_memory",
+]);
+const FRONTIER_FIRST_SIGNAL_STEPS = FRONTIER_REBORN_STAR_STEPS;
+const FRONTIER_CORE_FACILITY_IDS = Object.freeze(["lumen_tree", "starflower_garden", "observatory"]);
+const FRONTIER_STORY_CHAPTERS = Object.freeze([
+  { id: "prologue", steps: FRONTIER_PROLOGUE_STEPS },
+  { id: "reborn_star", steps: FRONTIER_REBORN_STAR_STEPS },
+  { id: "lost_route", steps: FRONTIER_LOST_ROUTE_STEPS },
+  { id: "friend_signal", steps: FRONTIER_FRIEND_SIGNAL_STEPS },
+  { id: "astra_memory", steps: FRONTIER_ASTRA_MEMORY_STEPS },
+]);
+const FRONTIER_STORY_STEPS = Object.freeze(FRONTIER_STORY_CHAPTERS.flatMap((chapter) => chapter.steps));
+const FRONTIER_LEGACY_STEP_MAP = Object.freeze({
+  restore_connection: "help_friend_planet",
+  recover_first_discovery: "recover_pre_storm_discovery",
+});
+
+function getFrontierChapterForStep(stepId) {
+  return FRONTIER_STORY_CHAPTERS.find((chapter) => chapter.steps.includes(stepId)) || FRONTIER_STORY_CHAPTERS[0];
+}
+
+function getFrontierCompletedChapterIds(completedStepIds) {
+  return FRONTIER_STORY_CHAPTERS
+    .filter((chapter) => chapter.steps.every((stepId) => completedStepIds.includes(stepId)))
+    .map((chapter) => chapter.id);
+}
+
+function getFrontierRestorationStage(restorationPercent) {
+  if (restorationPercent >= 100) return 5;
+  if (restorationPercent >= 80) return 4;
+  if (restorationPercent >= 60) return 3;
+  if (restorationPercent >= 40) return 2;
+  if (restorationPercent >= 20) return 1;
+  return 0;
+}
+
+function normalizeFrontierCompletedStepIds(raw = {}) {
+  const source = Array.isArray(raw.completedStepIds) ? raw.completedStepIds : [];
+  const migrated = source.map((stepId) => FRONTIER_LEGACY_STEP_MAP[stepId] || stepId);
+  if (raw.stepId === "prologue_complete") migrated.push(...FRONTIER_PROLOGUE_STEPS);
+  return FRONTIER_STORY_STEPS.filter((stepId) => migrated.includes(stepId));
+}
+
+function createInitialFrontierStory(nowMs = Date.now()) {
+  return {
+    version: FRONTIER_STORY_VERSION,
+    chapterId: "prologue",
+    stepId: FRONTIER_PROLOGUE_STEPS[0],
+    completedStepIds: [],
+    completedChapterIds: [],
+    memoryShards: 0,
+    signalFragments: 0,
+    restorationPercent: 0,
+    restorationStage: 0,
+    status: "active",
+    startedAtMs: nowMs,
+    updatedAtMs: nowMs,
+  };
+}
+
+function normalizeFrontierStory(raw, nowMs = Date.now()) {
+  const initial = createInitialFrontierStory(nowMs);
+  if (!raw || typeof raw !== "object") return initial;
+  const completedStepIds = normalizeFrontierCompletedStepIds(raw);
+  const completed = completedStepIds.length === FRONTIER_STORY_STEPS.length;
+  const nextStepId = completed
+    ? "astra_memory_complete"
+    : FRONTIER_STORY_STEPS.find((stepId) => !completedStepIds.includes(stepId)) || FRONTIER_STORY_STEPS[0];
+  const completedChapterIds = getFrontierCompletedChapterIds(completedStepIds);
+  const restorationPercent = Math.round((completedStepIds.length / FRONTIER_STORY_STEPS.length) * 100);
+  const chapter = completed ? FRONTIER_STORY_CHAPTERS[FRONTIER_STORY_CHAPTERS.length - 1] : getFrontierChapterForStep(nextStepId);
+  return {
+    ...initial,
+    ...raw,
+    version: FRONTIER_STORY_VERSION,
+    chapterId: chapter.id,
+    stepId: nextStepId,
+    completedStepIds,
+    completedChapterIds,
+    memoryShards: FRONTIER_PROLOGUE_STEPS.filter((stepId) => completedStepIds.includes(stepId)).length,
+    signalFragments: FRONTIER_REBORN_STAR_STEPS.filter((stepId) => completedStepIds.includes(stepId)).length,
+    restorationPercent,
+    restorationStage: getFrontierRestorationStage(restorationPercent),
+    status: completed ? "completed" : "active",
+  };
+}
+
+function frontierEventMatchesStep(stepId, event = {}) {
+  const builtItemIds = Array.isArray(event.builtItemIds) ? event.builtItemIds : [];
+  if (stepId === "restore_beacon") return (event.type === "world_action" && event.nodeId === "broken_beacon")
+    || (event.type === "daily_event_completed" && event.nodeId === "broken_beacon");
+  if (stepId === "build_first_light") return event.type === "item_built" && event.itemId === "star_lamp" && Number(event.level || 1) === 1;
+  if (stepId === "field_expedition") return event.type === "mission_completed";
+  if (stepId === "launch_rover") return event.type === "rover_dispatched";
+  if (stepId === "build_lumen_tree") return event.type === "item_built" && event.itemId === "lumen_tree";
+  if (stepId === "restore_garden") return event.type === "item_built" && ["starflower_garden", "friend_greenhouse"].includes(event.itemId);
+  if (stepId === "stabilize_daily_event") return event.type === "daily_event_completed";
+  if (stepId === "trace_lost_route") return event.type === "mission_completed";
+  if (stepId === "dispatch_route_rover") return event.type === "rover_dispatched";
+  if (stepId === "recover_pre_storm_discovery") return event.type === "rover_claimed";
+  if (stepId === "visit_friend_planet") return event.type === "friend_visited";
+  if (stepId === "help_friend_planet") return event.type === "social_help_completed";
+  if (stepId === "unlock_shared_route") return event.type === "social_help_completed" && Number(event.routeLevel || 0) >= 2;
+  if (stepId === "complete_discovery_codex") return Number(event.discoveryCount || 0) >= 3;
+  if (stepId === "complete_core_facilities") return FRONTIER_CORE_FACILITY_IDS.every((itemId) => builtItemIds.includes(itemId));
+  if (stepId === "build_astra_gateway") return event.type === "item_built" && event.itemId === "route_gateway";
+  if (stepId === "restore_astra_memory") return event.type === "astra_memory_activated"
+    || (event.type === "structure_cared" && event.itemId === "route_gateway");
+  return false;
+}
+
+function advanceFrontierStory(raw, event = {}, nowMs = Date.now()) {
+  const initialStory = normalizeFrontierStory(raw, nowMs);
+  if (initialStory.status === "completed") return { story: initialStory, advanced: false, advancedStepIds: [] };
+  let story = initialStory;
+  let guard = 0;
+  while (story.status !== "completed" && frontierEventMatchesStep(story.stepId, event) && guard < FRONTIER_STORY_STEPS.length) {
+    const completedStepIds = [...story.completedStepIds, story.stepId];
+    story = normalizeFrontierStory({
+      ...story,
+      completedStepIds,
+      updatedAtMs: nowMs,
+      ...(completedStepIds.length === FRONTIER_STORY_STEPS.length ? { completedAtMs: nowMs } : {}),
+    }, nowMs);
+    guard += 1;
+  }
+  const advancedStepIds = story.completedStepIds.filter((stepId) => !initialStory.completedStepIds.includes(stepId));
+  const completedChapterIds = story.completedChapterIds.filter((chapterId) => !initialStory.completedChapterIds.includes(chapterId));
+  return {
+    story,
+    advanced: advancedStepIds.length > 0,
+    advancedStepIds,
+    ...(advancedStepIds.length ? { completedStepId: advancedStepIds[advancedStepIds.length - 1] } : {}),
+    ...(completedChapterIds.length ? { completedChapterId: completedChapterIds[completedChapterIds.length - 1] } : {}),
+  };
+}
+
+function isPendingFrontierBeaconRepair(rawStory, nodeId) {
+  if (nodeId !== "broken_beacon") return false;
+  const story = normalizeFrontierStory(rawStory);
+  return story.status === "active"
+    && story.stepId === "restore_beacon"
+    && !story.completedStepIds.includes("restore_beacon");
+}
+
+function deriveFrontierStoryFromPlanet(planet = {}, nowMs = Date.now()) {
+  if (planet.frontierStory) return normalizeFrontierStory(planet.frontierStory, nowMs);
+  let story = createInitialFrontierStory(nowMs);
+  const advance = (event) => {
+    story = advanceFrontierStory(story, event, nowMs).story;
+  };
+  const unlockedLayout = Array.isArray(planet.layout) ? planet.layout.filter((item) => item?.locked !== true) : [];
+  if (unlockedLayout.some((item) => item?.itemId === "star_lamp")) {
+    advance({ type: "world_action", nodeId: "broken_beacon" });
+    advance({ type: "item_built", itemId: "star_lamp", level: 1 });
+  }
+  if (Number(planet.lastMissionAtMs || 0) > 0 || planet.lastMission) {
+    if (story.stepId === "restore_beacon") advance({ type: "world_action", nodeId: "broken_beacon" });
+    if (story.stepId === "build_first_light") advance({ type: "item_built", itemId: "star_lamp", level: 1 });
+    advance({ type: "mission_completed" });
+  }
+  if (planet.roverExpedition || (Array.isArray(planet.roverDiscoveries) && planet.roverDiscoveries.length)) {
+    if (story.stepId === "restore_beacon") advance({ type: "world_action", nodeId: "broken_beacon" });
+    if (story.stepId === "build_first_light") advance({ type: "item_built", itemId: "star_lamp", level: 1 });
+    if (story.stepId === "field_expedition") advance({ type: "mission_completed" });
+    advance({ type: "rover_dispatched" });
+  }
+  if (Array.isArray(planet.roverDiscoveries) && planet.roverDiscoveries.length) {
+    advance({ type: "rover_claimed", discoveryCount: planet.roverDiscoveries.length });
+  }
+  return story;
+}
+
+function getFrontierBuildPricing(story, itemId, level, item = {}) {
+  const storyGrantApplied = normalizeFrontierStory(story).stepId === "build_first_light"
+    && itemId === "star_lamp"
+    && Number(level) === 1;
+  return {
+    storyGrantApplied,
+    totalCost: storyGrantApplied ? 0 : Number(item.cost || 0) + (Number(level) >= 2 ? Number(item.stage2Cost || 0) : 0),
+    materialCost: storyGrantApplied ? 0 : Number(item.materialCost || 0),
+  };
+}
 const GALAXY_STRUCTURE_ACTION_REWARDS = {
   water: { material: "biofiber", amount: 1, label: "돌봄을 마치고 바이오 섬유 1개를 얻었습니다." },
   repair: { material: "alloy", amount: 1, label: "정비를 마치고 고대 합금 1개를 회수했습니다." },
@@ -824,6 +1034,49 @@ function getKstDateOrdinal(dayKey) {
   return Math.floor(Date.UTC(year, month - 1, day) / (24 * 60 * 60 * 1000));
 }
 
+function updateFrontierAnalyticsOnOpen(raw = {}, nowMs = Date.now()) {
+  const current = raw && typeof raw === "object" ? raw : {};
+  const dayKey = getKstDayKey(new Date(nowMs));
+  const firstDayKey = /^\d{4}-\d{2}-\d{2}$/.test(current.firstDayKey || "") ? current.firstDayKey : dayKey;
+  const dayOffset = Math.max(0, getKstDateOrdinal(dayKey) - getKstDateOrdinal(firstDayKey));
+  const distinctDayKeys = uniqueIds([...(Array.isArray(current.distinctDayKeys) ? current.distinctDayKeys : []), dayKey]).slice(-32);
+  return {
+    ...current,
+    firstEnteredAtMs: Math.max(0, Number(current.firstEnteredAtMs || nowMs)),
+    firstDayKey,
+    lastEnteredAtMs: nowMs,
+    lastDayKey: dayKey,
+    entryCount: Math.max(0, Math.floor(Number(current.entryCount || 0))) + 1,
+    distinctDayKeys,
+    ...(dayOffset >= 1 && !current.d1ReturnedAtMs ? { d1ReturnedAtMs: nowMs } : {}),
+    ...(dayOffset >= 7 && !current.d7ReturnedAtMs ? { d7ReturnedAtMs: nowMs } : {}),
+  };
+}
+
+function updateFrontierAnalyticsFirstBuild(raw = {}, nowMs = Date.now()) {
+  const current = raw && typeof raw === "object" ? raw : {};
+  if (Number(current.firstBuildAtMs || 0) > 0) return current;
+  const firstEnteredAtMs = Math.max(0, Number(current.firstEnteredAtMs || nowMs));
+  return {
+    ...current,
+    firstEnteredAtMs,
+    firstBuildAtMs: nowMs,
+    firstBuildElapsedMs: Math.max(0, nowMs - firstEnteredAtMs),
+  };
+}
+
+function updateFrontierAnalyticsPrologue(raw = {}, story = {}, nowMs = Date.now()) {
+  const current = raw && typeof raw === "object" ? raw : {};
+  if (!story?.completedChapterIds?.includes("prologue") || Number(current.prologueCompletedAtMs || 0) > 0) return current;
+  const firstEnteredAtMs = Math.max(0, Number(current.firstEnteredAtMs || nowMs));
+  return {
+    ...current,
+    firstEnteredAtMs,
+    prologueCompletedAtMs: nowMs,
+    prologueElapsedMs: Math.max(0, nowMs - firstEnteredAtMs),
+  };
+}
+
 function buildGalaxyDailyEvent({ uid, nowMs = Date.now() } = {}) {
   const { dayKey, expiresAtMs } = getKstDayWindow(nowMs);
   const event = GALAXY_DAILY_EVENT_CATALOG[
@@ -1006,6 +1259,7 @@ function getShipHullTier(lifetimeLearningOre = 0) {
 }
 
 function buildStarterPlanet(uid, user, learningState, now) {
+  const nowMs = Date.now();
   return {
     ownerId: uid,
     ownerName: getPublicName(user),
@@ -1025,6 +1279,7 @@ function buildStarterPlanet(uid, user, learningState, now) {
     lifetimeLearningOre: learningState.lifetimeLearningOre,
     shipHullTier: learningState.shipHullTier,
     abilitySnapshot: learningState.abilitySnapshot,
+    frontierStory: createInitialFrontierStory(nowMs),
     lastMissionAtMs: 0,
     createdAt: now,
     updatedAt: now,
@@ -2073,15 +2328,23 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       };
       await planetRef.create(buildStarterPlanet(uid, user, state, FieldValue.serverTimestamp()));
       planetSnap = await planetRef.get();
-    } else if (learningState) {
-      await planetRef.set({
+    } else {
+      const currentPlanet = planetSnap.data() || {};
+      const updates = {};
+      if (!currentPlanet.frontierStory || Number(currentPlanet.frontierStory.version || 0) < FRONTIER_STORY_VERSION) {
+        updates.frontierStory = deriveFrontierStoryFromPlanet(currentPlanet);
+      }
+      if (learningState) Object.assign(updates, {
         ownerName: getPublicName(user),
         lifetimeLearningOre: learningState.lifetimeLearningOre,
         shipHullTier: learningState.shipHullTier,
         abilitySnapshot: learningState.abilitySnapshot,
         updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
-      planetSnap = await planetRef.get();
+      });
+      if (Object.keys(updates).length) {
+        await planetRef.set(updates, { merge: true });
+        planetSnap = await planetRef.get();
+      }
     }
     return { ref: planetRef, data: { id: planetSnap.id, ...(planetSnap.data() || {}) } };
   }
@@ -2188,7 +2451,11 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const { userRef, user } = await requireMember(uid);
     const learningState = await syncLearningState(userRef, user);
     const ownPlanet = await ensurePlanet(uid, user, learningState);
+    let ownPlanetData = ownPlanet.data;
     const serverNowMs = Date.now();
+    const frontierAnalytics = updateFrontierAnalyticsOnOpen(ownPlanetData.frontierAnalytics, serverNowMs);
+    ownPlanetData = { ...ownPlanetData, frontierAnalytics };
+    await ownPlanet.ref.set({ frontierAnalytics, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     const targetUid = cleanId(data?.targetUid) || uid;
     let targetPlanet = ownPlanet;
 
@@ -2200,6 +2467,16 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       targetPlanet = await ensurePlanet(targetUid, targetUserSnap.data() || {});
       if (targetPlanet.data.visitMode === "private") {
         throw new functions.https.HttpsError("permission-denied", "현재 방문을 받지 않는 행성입니다.");
+      }
+      const visitStoryProgress = advanceFrontierStory(ownPlanetData.frontierStory, {
+        type: "friend_visited",
+      }, serverNowMs);
+      if (visitStoryProgress.advanced) {
+        ownPlanetData = { ...ownPlanetData, frontierStory: visitStoryProgress.story };
+        await ownPlanet.ref.set({
+          frontierStory: visitStoryProgress.story,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
       }
     }
 
@@ -2223,7 +2500,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       : planetData;
 
     return serializeValue({
-      ownPlanet: buildPlanetView(ownPlanet.data),
+      ownPlanet: buildPlanetView(ownPlanetData),
       planet: buildPlanetView(targetPlanet.data),
       dailyEvent: getGalaxyDailyEventView({
         uid,
@@ -2593,11 +2870,20 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         throw new functions.https.HttpsError("already-exists", "오늘의 행성 사건 완료 기록을 확인할 수 없습니다.");
       }
       if (plan.kind === "deduplicated") {
+        const storyProgress = advanceFrontierStory(planetSnap.data()?.frontierStory, {
+          type: "daily_event_completed",
+          nodeId: plan.dailyEvent.nodeId,
+        }, serverNowMs);
+        transaction.set(planet.ref, {
+          frontierStory: storyProgress.story,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
         return {
           dailyEvent: plan.dailyEvent,
           reward: plan.dailyEvent.reward,
           materials: plan.materials,
           stats: plan.stats,
+          frontierStory: storyProgress.story,
           deduplicated: true,
           serverNowMs,
         };
@@ -2606,13 +2892,20 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         throw new functions.https.HttpsError("internal", "오늘의 행성 사건 완료 상태를 계산하지 못했습니다.");
       }
 
+      const storyProgress = advanceFrontierStory(planetSnap.data()?.frontierStory, {
+        type: "daily_event_completed",
+        nodeId: plan.dailyEvent.nodeId,
+      }, serverNowMs);
+
       transaction.set(planet.ref, {
         materials: plan.materials,
         stats: plan.stats,
+        frontierStory: storyProgress.story,
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       transaction.set(operationRef, {
         ...plan.operation,
+        frontierStory: storyProgress.story,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -2621,6 +2914,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         reward: plan.dailyEvent.reward,
         materials: plan.materials,
         stats: plan.stats,
+        frontierStory: storyProgress.story,
         deduplicated: false,
         serverNowMs,
       };
@@ -2661,8 +2955,6 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     if (requestedLevel > 1 && !item.stage2Available) {
       throw new functions.https.HttpsError("failed-precondition", "이 시설의 Stage 2 설계는 아직 준비 중입니다.");
     }
-    const upgradeCost = requestedLevel >= 2 ? Number(item.stage2Cost || 0) : 0;
-    const totalCost = Number(item.cost || 0) + upgradeCost;
     const { userRef, user } = await requireMember(uid);
     const planet = await ensurePlanet(uid, user);
     const requestedOperationId = cleanId(data?.operationId, 120);
@@ -2687,6 +2979,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
           placed: previous.placed,
           wallet: Math.max(0, Number(previous.wallet || 0)),
           materials: previous.materials || {},
+          frontierStory: previous.frontierStory || null,
+          storyGrantApplied: previous.storyGrantApplied === true,
           deduplicated: true,
         };
       }
@@ -2696,8 +2990,10 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const materials = { ...(currentPlanet.materials || {}) };
       const materialCount = Math.max(0, Number(materials[item.material] || 0));
       const layout = Array.isArray(currentPlanet.layout) ? currentPlanet.layout : [];
+      const pricing = getFrontierBuildPricing(currentPlanet.frontierStory, itemId, requestedLevel, item);
+      const { totalCost, materialCost, storyGrantApplied } = pricing;
       if (wallet < totalCost) throw new functions.https.HttpsError("failed-precondition", "학습 광석이 부족합니다.");
-      if (materialCount < item.materialCost) throw new functions.https.HttpsError("failed-precondition", `${item.name} 건설에 필요한 게임 재료가 부족합니다.`);
+      if (materialCount < materialCost) throw new functions.https.HttpsError("failed-precondition", `${item.name} 건설에 필요한 게임 재료가 부족합니다.`);
       if (layout.length >= 36) throw new functions.https.HttpsError("failed-precondition", "현재 구역에 더 이상 시설을 놓을 수 없습니다.");
       const instanceId = `${itemId}_${operationId.slice(0, 10)}`;
       const slot = layout.length;
@@ -2721,9 +3017,28 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         level: requestedLevel,
         locked: false,
       };
-      materials[item.material] = materialCount - item.materialCost;
+      materials[item.material] = materialCount - materialCost;
+      const nextLayout = [...layout, placed];
+      const builtItemIds = uniqueIds(nextLayout
+        .filter((entry) => entry?.locked !== true)
+        .map((entry) => cleanId(entry?.itemId, 80)));
+      const buildCompletedAtMs = Date.now();
+      const storyProgress = advanceFrontierStory(currentPlanet.frontierStory, {
+        type: "item_built",
+        itemId,
+        level: requestedLevel,
+        builtItemIds,
+        discoveryCount: Array.isArray(currentPlanet.roverDiscoveries) ? currentPlanet.roverDiscoveries.length : 0,
+      }, buildCompletedAtMs);
+      const frontierAnalytics = updateFrontierAnalyticsFirstBuild(currentPlanet.frontierAnalytics, buildCompletedAtMs);
       transaction.set(userRef, { crystals: wallet - totalCost }, { merge: true });
-      transaction.set(planet.ref, { layout: [...layout, placed], materials, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(planet.ref, {
+        layout: nextLayout,
+        materials,
+        frontierStory: storyProgress.story,
+        frontierAnalytics,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
       transaction.set(txRef, {
         amount: -totalCost,
         type: "galaxy_build",
@@ -2740,9 +3055,12 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         placed,
         wallet: wallet - totalCost,
         materials,
+        frontierStory: storyProgress.story,
+        frontierAnalytics,
+        storyGrantApplied,
         createdAt: FieldValue.serverTimestamp(),
       });
-      return { placed, wallet: wallet - totalCost, materials };
+      return { placed, wallet: wallet - totalCost, materials, frontierStory: storyProgress.story, storyGrantApplied };
     });
     return serializeValue({ success: true, ...result });
   });
@@ -3136,8 +3454,20 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         } : {}),
         ...(visitPosition ? { position: visitPosition } : {}),
       };
+      const storyProgress = advanceFrontierStory(actorData.frontierStory, {
+        type: "social_help_completed",
+        routeLevel: relationshipProgress.routeLevel,
+        discoveryCount: Array.isArray(actorData.roverDiscoveries) ? actorData.roverDiscoveries.length : 0,
+        builtItemIds: uniqueIds((Array.isArray(actorData.layout) ? actorData.layout : [])
+          .filter((entry) => entry?.locked !== true)
+          .map((entry) => cleanId(entry?.itemId, 80))),
+      });
       transaction.set(targetPlanet.ref, { stats, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      transaction.set(actorPlanet.ref, { materials, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(actorPlanet.ref, {
+        materials,
+        frontierStory: storyProgress.story,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
       transaction.set(dailyRef, { actorId: uid, targetId: targetUid, dayKey, count: count + 1, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       transaction.set(relationshipRef, relationshipUpdate, { merge: true });
       transaction.set(eventRef, eventData);
@@ -3156,6 +3486,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         routeLevel: relationshipProgress.routeLevel,
         connectionXp: relationshipProgress.connectionXp,
         nextLevelXp: relationshipProgress.nextLevelXp,
+        frontierStory: storyProgress.story,
         ...(instanceId ? { instanceId, position: visitPosition } : {}),
       };
     });
@@ -3183,11 +3514,14 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const operationRef = userRef.collection("galaxyOperations").doc(operationId);
     const planet = await ensurePlanet(uid, user);
     const serverNowMs = Date.now();
+    const currentDailyEvent = buildGalaxyDailyEvent({ uid, nowMs: serverNowMs });
+    const currentDailyOperationRef = db.collection("galaxyOperations").doc(`daily_${uid}_${currentDailyEvent.dayKey}`);
     const result = await db.runTransaction(async (transaction) => {
-      const [operationSnap, freshUserSnap, planetSnap] = await Promise.all([
+      const [operationSnap, freshUserSnap, planetSnap, currentDailyOperationSnap] = await Promise.all([
         transaction.get(operationRef),
         transaction.get(userRef),
         transaction.get(planet.ref),
+        transaction.get(currentDailyOperationRef),
       ]);
       const freshUser = freshUserSnap.data() || {};
       if (
@@ -3226,6 +3560,14 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         planet: effectivePlanet,
         nowMs: serverNowMs,
       });
+      const applyCompletedDailyEvent = (story) => currentDailyOperationSnap.exists
+        && currentDailyOperationSnap.data()?.type === GALAXY_DAILY_EVENT_OPERATION_TYPE
+        && currentDailyOperationSnap.data()?.status === "completed"
+        ? advanceFrontierStory(story, {
+          type: "daily_event_completed",
+          nodeId: currentDailyEvent.nodeId,
+        }, serverNowMs).story
+        : story;
       if (plan.kind === "operation_conflict") {
         throw new functions.https.HttpsError("already-exists", "이미 다른 탐사에 사용된 요청 식별자입니다.");
       }
@@ -3236,24 +3578,38 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         });
       }
       if (plan.kind === "deduplicated") {
-        return { expedition: plan.expedition, deduplicated: true };
+        const dispatchedStory = advanceFrontierStory(planetData.frontierStory, { type: "rover_dispatched" }, serverNowMs).story;
+        const frontierStory = applyCompletedDailyEvent(dispatchedStory);
+        const frontierAnalytics = updateFrontierAnalyticsPrologue(planetData.frontierAnalytics, frontierStory, serverNowMs);
+        transaction.set(planet.ref, { frontierStory, frontierAnalytics, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        return {
+          expedition: plan.expedition,
+          frontierStory,
+          deduplicated: true,
+        };
       }
       if (plan.kind !== "startable" || !plan.expedition) {
         throw new functions.https.HttpsError("internal", "탐사 로버 출발 상태를 만들지 못했습니다.");
       }
       const expedition = plan.expedition;
+      const dispatchedStory = advanceFrontierStory(planetData.frontierStory, { type: "rover_dispatched" }, serverNowMs).story;
+      const frontierStory = applyCompletedDailyEvent(dispatchedStory);
+      const frontierAnalytics = updateFrontierAnalyticsPrologue(planetData.frontierAnalytics, frontierStory, serverNowMs);
       transaction.set(planet.ref, {
         roverExpedition: expedition,
+        frontierStory,
+        frontierAnalytics,
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       transaction.set(operationRef, {
         ...expedition,
         uid,
         type: GALAXY_ROVER_OPERATION_TYPE,
+        frontierStory,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return { expedition, deduplicated: false };
+      return { expedition, frontierStory, deduplicated: false };
     });
     return serializeValue({ success: true, operationId, serverNowMs, ...result });
   });
@@ -3320,23 +3676,42 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         if (!plan.claimResult) {
           throw new functions.https.HttpsError("data-loss", "완료된 탐사 로버의 수령 결과가 없습니다.");
         }
+        const planetData = planetSnap.data() || {};
+        const storyProgress = advanceFrontierStory(planetData.frontierStory, {
+          type: "rover_claimed",
+          discoveryCount: Array.isArray(planetData.roverDiscoveries) ? planetData.roverDiscoveries.length : 0,
+          builtItemIds: uniqueIds((Array.isArray(planetData.layout) ? planetData.layout : [])
+            .filter((entry) => entry?.locked !== true)
+            .map((entry) => cleanId(entry?.itemId, 80))),
+        }, serverNowMs);
         transaction.set(planet.ref, {
           roverExpedition: plan.expedition,
+          frontierStory: storyProgress.story,
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
         return {
           expedition: plan.expedition,
           claimResult: plan.claimResult,
+          frontierStory: storyProgress.story,
           deduplicated: true,
         };
       }
       if (plan.kind !== "claimable") {
         throw new functions.https.HttpsError("internal", "탐사 로버 수령 상태를 계산하지 못했습니다.");
       }
+      const planetData = planetSnap.data() || {};
+      const storyProgress = advanceFrontierStory(planetData.frontierStory, {
+        type: "rover_claimed",
+        discoveryCount: Array.isArray(plan.roverDiscoveries) ? plan.roverDiscoveries.length : 0,
+        builtItemIds: uniqueIds((Array.isArray(planetData.layout) ? planetData.layout : [])
+          .filter((entry) => entry?.locked !== true)
+          .map((entry) => cleanId(entry?.itemId, 80))),
+      }, serverNowMs);
       transaction.set(planet.ref, {
         materials: plan.materials,
         roverDiscoveries: plan.roverDiscoveries,
         roverExpedition: plan.expedition,
+        frontierStory: storyProgress.story,
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       transaction.set(operationRef, {
@@ -3344,11 +3719,13 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         claimedAtMs: plan.claimResult.claimedAtMs,
         claimedAt: FieldValue.serverTimestamp(),
         claimResult: plan.claimResult,
+        frontierStory: storyProgress.story,
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       return {
         expedition: plan.expedition,
         claimResult: plan.claimResult,
+        frontierStory: storyProgress.story,
         deduplicated: false,
       };
     });
@@ -3385,6 +3762,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
           reward: previous.reward,
           bonus: Math.max(0, Number(previous.bonus || 0)),
           nextMissionAtMs: Math.max(0, Number(previous.nextMissionAtMs || 0)),
+          frontierStory: previous.frontierStory || null,
           deduplicated: true,
         };
       }
@@ -3406,10 +3784,12 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const reward = rewardMap[route];
       const materials = { ...(current.materials || {}) };
       materials[reward.material] = Math.max(0, Number(materials[reward.material] || 0)) + reward.amount;
+      const storyProgress = advanceFrontierStory(current.frontierStory, { type: "mission_completed" }, nowMs);
       transaction.set(planet.ref, {
         materials,
         lastMissionAtMs: nowMs,
         lastMission: { route, title: reward.title, partnerUid: partnerUid || "", completedAtMs: nowMs },
+        frontierStory: storyProgress.story,
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       transaction.set(missionRef, {
@@ -3420,9 +3800,10 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         bonus,
         partnerUid: partnerUid || "",
         nextMissionAtMs: nowMs + cooldownMs,
+        frontierStory: storyProgress.story,
         createdAt: FieldValue.serverTimestamp(),
       });
-      return { reward, bonus, nextMissionAtMs: nowMs + cooldownMs, deduplicated: false };
+      return { reward, bonus, nextMissionAtMs: nowMs + cooldownMs, frontierStory: storyProgress.story, deduplicated: false };
     });
     if (partnerUid && partnerUid !== uid && !result.deduplicated) {
       const partnerEventRef = db.collection("galaxyPlanets").doc(partnerUid).collection("visitEvents").doc(operationId);
@@ -3462,20 +3843,31 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         transaction.get(planet.ref),
       ]);
       const nowMs = Date.now();
+      const current = planetSnap.data() || {};
       const availableAtMs = Math.max(0, Number(operationSnap.data()?.availableAtMs || 0));
-      if (availableAtMs > nowMs) {
+      const recoveringBeaconStory = availableAtMs > nowMs
+        && isPendingFrontierBeaconRepair(current.frontierStory, nodeId);
+      if (availableAtMs > nowMs && !recoveringBeaconStory) {
         throw new functions.https.HttpsError("resource-exhausted", "이 자원은 아직 다시 생성되지 않았습니다.");
       }
-      const current = planetSnap.data() || {};
       const materials = { ...(current.materials || {}) };
       const layout = Array.isArray(current.layout) ? current.layout : [];
       const stats = { ...(current.stats || {}) };
-      if (action.amount > 0) {
+      if (!recoveringBeaconStory && action.amount > 0) {
         materials[action.material] = Math.max(0, Number(materials[action.material] || 0)) + action.amount;
       }
-      if (action.stat) stats[action.stat] = clamp(Number(stats[action.stat] || 0) + 6, 0, 100);
+      if (!recoveringBeaconStory && action.stat) stats[action.stat] = clamp(Number(stats[action.stat] || 0) + 6, 0, 100);
 
-      const updates = { materials, stats, updatedAt: FieldValue.serverTimestamp() };
+      const storyProgress = advanceFrontierStory(current.frontierStory, {
+        type: "world_action",
+        nodeId,
+      }, nowMs);
+      const updates = {
+        materials,
+        stats,
+        frontierStory: storyProgress.story,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
       if (action.plants) {
         if (layout.length >= 36) throw new functions.https.HttpsError("failed-precondition", "행성에 더 이상 새싹을 심을 공간이 없습니다.");
         const x = clamp(50 + worldX * 3, 8, 92);
@@ -3497,15 +3889,24 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       }
 
       transaction.set(planet.ref, updates, { merge: true });
-      transaction.set(operationRef, {
-        uid,
-        type: "galaxy_world_action",
-        actionId,
-        nodeId,
-        availableAtMs: nowMs + (action.plants ? 60 * 60 * 1000 : 5 * 60 * 1000),
-        lastCompletedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
-      return { material: action.material, amount: action.amount, label: action.label };
+      if (!recoveringBeaconStory) {
+        transaction.set(operationRef, {
+          uid,
+          type: "galaxy_world_action",
+          actionId,
+          nodeId,
+          availableAtMs: nowMs + (action.plants ? 60 * 60 * 1000 : 5 * 60 * 1000),
+          lastCompletedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      return {
+        material: action.material,
+        amount: recoveringBeaconStory ? 0 : action.amount,
+        label: recoveringBeaconStory ? "비콘 수리 상태를 복구했습니다." : action.label,
+        materials,
+        stats,
+        frontierStory: storyProgress.story,
+      };
     });
     return { success: true, ...result };
   });
@@ -3546,7 +3947,15 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
       const materials = { ...(planetData.materials || {}) };
       materials[reward.material] = Math.max(0, Number(materials[reward.material] || 0)) + reward.amount;
-      transaction.set(planet.ref, { materials, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      const storyProgress = advanceFrontierStory(planetData.frontierStory, {
+        type: "structure_cared",
+        itemId: structure.itemId || "",
+      }, nowMs);
+      transaction.set(planet.ref, {
+        materials,
+        frontierStory: storyProgress.story,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
       transaction.set(operationRef, {
         uid,
         type: "galaxy_structure_action",
@@ -3556,9 +3965,79 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         availableAtMs: nowMs + 5 * 60 * 1000,
         lastCompletedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
-      return { materials, label: reward.label, material: reward.material, amount: reward.amount, availableAtMs: nowMs + 5 * 60 * 1000 };
+      return {
+        materials,
+        label: reward.label,
+        material: reward.material,
+        amount: reward.amount,
+        availableAtMs: nowMs + 5 * 60 * 1000,
+        frontierStory: storyProgress.story,
+      };
     });
     return serializeValue({ success: true, ...result });
+  });
+
+  const recordGalaxyStoryTelemetry = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    const { user } = await requireMember(uid);
+    const eventType = cleanId(data?.eventType, 40);
+    if (!["chapter_view", "exit", "finale_view"].includes(eventType)) {
+      throw new functions.https.HttpsError("invalid-argument", "기록할 스토리 지표 유형이 올바르지 않습니다.");
+    }
+    const rawEventId = data?.eventId;
+    const eventId = cleanId(rawEventId, 120);
+    if (typeof rawEventId !== "string" || !/^[A-Za-z0-9_-]{8,120}$/.test(eventId)) {
+      throw new functions.https.HttpsError("invalid-argument", "스토리 지표 식별자가 올바르지 않습니다.");
+    }
+    const stepId = cleanId(data?.stepId, 80);
+    const chapterId = cleanId(data?.chapterId, 60);
+    const elapsedMs = clamp(Math.floor(Number(data?.elapsedMs || 0)), 0, 24 * 60 * 60 * 1000);
+    const restorationPercent = clamp(Math.round(Number(data?.restorationPercent || 0)), 0, 100);
+    const planet = await ensurePlanet(uid, user);
+    const eventRef = planet.ref.collection("storyTelemetry").doc(eventId);
+    const nowMs = Date.now();
+    const result = await db.runTransaction(async (transaction) => {
+      const [eventSnap, planetSnap] = await Promise.all([
+        transaction.get(eventRef),
+        transaction.get(planet.ref),
+      ]);
+      if (eventSnap.exists) return { deduplicated: true };
+      const planetData = planetSnap.data() || {};
+      const story = normalizeFrontierStory(planetData.frontierStory, nowMs);
+      const current = planetData.frontierAnalytics && typeof planetData.frontierAnalytics === "object"
+        ? planetData.frontierAnalytics
+        : {};
+      const frontierAnalytics = {
+        ...current,
+        lastTelemetryAtMs: nowMs,
+        ...(eventType === "chapter_view" ? {
+          lastViewedChapterId: chapterId || story.chapterId,
+          lastViewedStepId: stepId || story.stepId,
+        } : {}),
+        ...(eventType === "exit" ? {
+          lastExitAtMs: nowMs,
+          lastExitChapterId: chapterId || story.chapterId,
+          lastExitStepId: stepId || story.stepId,
+          lastExitElapsedMs: elapsedMs,
+          lastExitRestorationPercent: restorationPercent,
+        } : {}),
+        ...(eventType === "finale_view" && !current.finaleViewedAtMs ? { finaleViewedAtMs: nowMs } : {}),
+      };
+      transaction.create(eventRef, {
+        uid,
+        eventType,
+        chapterId: chapterId || story.chapterId,
+        stepId: stepId || story.stepId,
+        elapsedMs,
+        restorationPercent,
+        storyVersion: story.version,
+        createdAtMs: nowMs,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      transaction.set(planet.ref, { frontierAnalytics, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      return { deduplicated: false };
+    });
+    return { success: true, ...result };
   });
 
   const markGalaxyEventsSeen = regionalFunctions.https.onCall(async (data, context) => {
@@ -3650,7 +4129,16 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     // 신고 증거는 선택적이며, 신고자가 직접 쓴 글이 아니라 갈럭시 공개 텍스트
     // 한 조각만 최소 문맥으로 보존한다. 길이·제어문자·HTML 태그를 서버에서 정리한다.
     const rawEvidence = typeof data?.evidence === "string" ? data.evidence : "";
-    const sanitizedEvidence = rawEvidence.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+    const sanitizedEvidence = [...rawEvidence]
+      .map((character) => {
+        const code = character.charCodeAt(0);
+        return code <= 31 || code === 127 ? " " : character;
+      })
+      .join("")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 200);
     const evidence = sanitizedEvidence && sanitizedEvidence.length <= 200 ? sanitizedEvidence : "";
 
     const reportRef = db.collection("galaxyReports").doc(`${uid}_${reportId}`);
@@ -3697,6 +4185,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     runGalaxyMission,
     performGalaxyWorldAction,
     performGalaxyStructureAction,
+    recordGalaxyStoryTelemetry,
     markGalaxyEventsSeen,
     setGalaxyUserBlocked,
     reportGalaxyUser,
@@ -3705,7 +4194,19 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
 
 module.exports.__test = {
   GALAXY_ITEM_CATALOG,
+  FRONTIER_ASTRA_MEMORY_STEPS,
+  FRONTIER_CORE_FACILITY_IDS,
+  FRONTIER_FRIEND_SIGNAL_STEPS,
+  FRONTIER_FIRST_SIGNAL_STEPS,
+  FRONTIER_LOST_ROUTE_STEPS,
+  FRONTIER_PROLOGUE_STEPS,
+  FRONTIER_REBORN_STAR_STEPS,
+  FRONTIER_STORY_CHAPTERS,
+  FRONTIER_STORY_STEPS,
+  advanceFrontierStory,
   calculateLifetimeLearningOre,
+  createInitialFrontierStory,
+  deriveFrontierStoryFromPlanet,
   buildGalaxyDailyEvent,
   buildGalaxyRoverDeparture,
   GALAXY_DAILY_EVENT_CATALOG,
@@ -3715,7 +4216,12 @@ module.exports.__test = {
   getGalaxyLayoutWorldPosition,
   getKstDayKey,
   getKstDayWindow,
+  updateFrontierAnalyticsFirstBuild,
+  updateFrontierAnalyticsOnOpen,
+  updateFrontierAnalyticsPrologue,
   getGalaxyRoverExpeditionView,
+  getFrontierBuildPricing,
+  isPendingFrontierBeaconRepair,
   getGalaxyLearningLedgerStatus,
   getGalaxyStructureVisitAction,
   isEligibleLearningOreTransaction,
@@ -3734,5 +4240,6 @@ module.exports.__test = {
   getAstraBuilderGridByteLength,
   getAstraBuilderStoredGridBuffer,
   normalizeAstraBuilderBase64,
+  normalizeFrontierStory,
   validateAstraBuilderStatePayload,
 };

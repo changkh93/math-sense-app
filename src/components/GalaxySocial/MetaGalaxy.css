@@ -708,6 +708,26 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
     linear-gradient(150deg, rgba(13, 28, 43, .98), rgba(6, 13, 27, .98));
   box-shadow: 0 35px 100px rgba(0, 0, 0, .5), inset 0 1px rgba(255, 255, 255, .06);
 }
+.frontier-finale-backdrop {
+  background: radial-gradient(circle at 50% 42%, rgba(255, 232, 144, .2), transparent 34%), rgba(1, 5, 14, .78);
+}
+.frontier-finale-panel {
+  width: min(660px, 100%);
+  padding: clamp(2rem, 6vw, 4.5rem);
+  overflow: hidden;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 238, 160, .2), transparent 22rem),
+    radial-gradient(circle at 10% 100%, rgba(92, 239, 210, .16), transparent 24rem),
+    linear-gradient(150deg, rgba(17, 35, 50, .99), rgba(6, 12, 27, .99));
+}
+.frontier-finale-panel > svg { color: #ffe9a0; filter: drop-shadow(0 0 22px rgba(255, 226, 125, .55)); }
+.frontier-finale-panel > small { display: block; margin-top: 1rem; color: #ffe9a0; font-size: .66rem; font-weight: 900; letter-spacing: .18em; }
+.frontier-finale-panel h2 { margin: .6rem 0 .75rem; font-size: clamp(2rem, 6vw, 3.5rem); letter-spacing: -.055em; }
+.frontier-finale-panel p { max-width: 520px; margin: 0 auto; color: #aebfd0; line-height: 1.7; }
+.frontier-finale-panel > button { margin: 1.4rem auto 0; }
+.frontier-finale-progress { height: 8px; margin: 1.5rem auto 0; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .08); }
+.frontier-finale-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #67e7ca, #ffe793); box-shadow: 0 0 22px rgba(255, 230, 145, .48); }
 .frontier-arrival-header {
   display: grid;
   grid-template-columns: 58px 1fr 40px;
@@ -936,11 +956,6 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
 /* Object affordances in the 3D world */
 .frontier-structure-image-marker { display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 1px solid rgba(213, 251, 255, .62); border-radius: 9px; color: #e6feff; background: rgba(7, 35, 43, .86); box-shadow: 0 5px 14px rgba(0, 0, 0, .3), 0 0 0 3px rgba(103, 233, 255, .1); cursor: pointer; transition: transform .16s ease, background .16s ease; }
 .frontier-structure-image-marker:hover { transform: translateY(-2px) scale(1.06); background: rgba(30, 109, 119, .95); }
-.frontier-structure-proximity-label { display: grid; justify-items: center; gap: .18rem; min-width: max-content; padding: .42rem .62rem; border: 1px solid rgba(186, 240, 227, .26); border-radius: 12px; color: white; background: rgba(4, 28, 31, .82); box-shadow: 0 9px 26px rgba(0, 0, 0, .3); backdrop-filter: blur(9px); text-align: center; }
-.frontier-structure-proximity-label strong { max-width: 180px; overflow: hidden; font-size: .68rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.frontier-structure-proximity-label span { display: flex; align-items: center; gap: .26rem; color: #a9cdbf; font-size: .51rem; white-space: nowrap; }
-.frontier-structure-proximity-label kbd { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 .18rem; border: 1px solid rgba(255, 255, 255, .22); border-radius: 4px; color: #effffc; background: rgba(255, 255, 255, .11); font: 800 .54rem ui-monospace, SFMono-Regular, Menlo, monospace; }
-.frontier-structure-proximity-label i { width: 3px; height: 3px; border-radius: 50%; background: rgba(173, 231, 210, .6); }
 .frontier-mission-portal-label { display: grid; justify-items: center; gap: .14rem; min-width: max-content; padding: .34rem .5rem; border: 1px solid rgba(205, 240, 255, .24); border-radius: 10px; color: white; background: rgba(6, 19, 34, .68); box-shadow: 0 8px 22px rgba(0, 0, 0, .26); backdrop-filter: blur(8px); text-align: center; }
 .frontier-mission-portal-label small { color: #a9cfe0; font-size: .48rem; font-weight: 850; letter-spacing: .08em; }
 .frontier-mission-portal-label strong { display: flex; align-items: center; gap: .28rem; font-size: .57rem; }
@@ -1343,15 +1358,37 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   z-index: 22;
   left: 1rem;
   bottom: 5.4rem;
-  width: 154px;
-  padding: .55rem;
-  border-radius: 17px;
-  pointer-events: none;
+  width: 220px;
+  padding: .7rem;
+  border-radius: 19px;
+  pointer-events: auto;
+  transition: width .22s ease, padding .22s ease, background .22s ease, box-shadow .22s ease;
 }
-.frontier-minimap header { display: flex; justify-content: space-between; align-items: center; gap: .4rem; margin-bottom: .4rem; }
-.frontier-minimap header span { color: #d6e5ed; font-size: .52rem; font-weight: 900; letter-spacing: -.01em; white-space: nowrap; }
-.frontier-minimap header span small { margin-left: .15rem; color: #6d8298; font-size: .38rem; letter-spacing: .06em; }
-.frontier-minimap header strong { color: #a9c4ce; font-size: .5rem; text-align: right; }
+.frontier-minimap.is-expanded {
+  z-index: 46;
+  width: min(380px, calc(100vw - 2rem));
+  padding: .9rem;
+  background: rgba(5, 13, 26, .94);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, .55), inset 0 1px rgba(255, 255, 255, .06);
+}
+.frontier-minimap header { display: grid; grid-template-columns: auto minmax(0, 1fr) 28px; align-items: center; gap: .45rem; margin-bottom: .55rem; }
+.frontier-minimap header span { color: #e7f2f7; font-size: .68rem; font-weight: 900; letter-spacing: -.01em; white-space: nowrap; }
+.frontier-minimap header span small { margin-left: .18rem; color: #7890a7; font-size: .46rem; letter-spacing: .06em; }
+.frontier-minimap header strong { overflow: hidden; color: #b9d0da; font-size: .62rem; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.frontier-minimap header button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 9px;
+  color: #d9edf2;
+  background: rgba(255, 255, 255, .07);
+  cursor: pointer;
+}
+.frontier-minimap header button:hover,
+.frontier-minimap header button:focus-visible { color: #fff5bd; border-color: rgba(255, 224, 130, .55); background: rgba(255, 224, 130, .1); outline: none; }
 .frontier-minimap.has-event header strong { color: #ffe082; }
 .frontier-minimap.event-in-range header strong { color: #9dffd0; }
 .frontier-minimap-field {
@@ -1395,8 +1432,8 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   transform: translate(-50%, -50%);
   color: #8da3b7;
 }
-.frontier-map-zone > i { width: 6px; height: 6px; border: 1px solid color-mix(in srgb, var(--zone-color), white 18%); border-radius: 50%; background: var(--zone-color); box-shadow: 0 0 7px var(--zone-color); }
-.frontier-map-zone small { padding: 1px 3px; border-radius: 4px; background: rgba(3, 9, 18, .68); font-size: .38rem; white-space: nowrap; }
+.frontier-map-zone > i { width: 8px; height: 8px; border: 1px solid color-mix(in srgb, var(--zone-color), white 18%); border-radius: 50%; background: var(--zone-color); box-shadow: 0 0 9px var(--zone-color); }
+.frontier-map-zone small { padding: 2px 4px; border-radius: 5px; background: rgba(3, 9, 18, .8); font-size: .5rem; font-weight: 750; white-space: nowrap; }
 .frontier-map-player-marker {
   position: absolute;
   z-index: 12;
@@ -1410,14 +1447,14 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   padding: 0 3px;
   border-radius: 4px;
   background: rgba(3, 9, 18, .82);
-  font-size: .38rem;
+  font-size: .5rem;
   font-weight: 900;
   line-height: 1.2;
 }
 .frontier-map-player {
   display: block;
-  width: 9px;
-  height: 9px;
+  width: 12px;
+  height: 12px;
   border: 2px solid #fff;
   border-radius: 3px 50% 50% 50%;
   background: var(--frontier-cyan);
@@ -1430,14 +1467,17 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   gap: .25rem;
   margin-top: .38rem;
   color: #9caeba;
-  font-size: .42rem;
+  font-size: .54rem;
   font-weight: 800;
 }
 .frontier-minimap-guide span { display: inline-flex; align-items: center; gap: .16rem; white-space: nowrap; }
-.frontier-minimap-guide b { color: #ffe082; font-size: .4rem; white-space: nowrap; }
+.frontier-minimap-guide b { color: #ffe082; font-size: .54rem; white-space: nowrap; }
 .frontier-minimap-guide i { display: inline-grid; place-items: center; width: 8px; height: 8px; font-style: normal; }
 .frontier-minimap-guide i.me { border: 1px solid #fff; border-radius: 2px 50% 50% 50%; background: var(--frontier-cyan); transform: rotate(45deg); }
 .frontier-minimap-guide i.event { color: #ffd54f; text-shadow: 0 0 5px #ffd54f; }
+.frontier-minimap.is-expanded .frontier-map-zone small,
+.frontier-minimap.is-expanded .frontier-map-player-marker small { font-size: .64rem; }
+.frontier-minimap.is-expanded .frontier-minimap-guide b { font-size: .66rem; }
 .frontier-event-pin-tag {
   display: flex;
   align-items: center;
@@ -1497,14 +1537,14 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #ffd54f !important;
-  box-shadow: 0 0 12px #ffd54f !important;
+  background: var(--zone-color, #ffd54f) !important;
+  box-shadow: 0 0 15px var(--zone-color, #ffd54f) !important;
 }
 .frontier-map-daily-pulse::after {
   content: '';
   position: absolute;
   inset: -4px;
-  border: 1px solid #ffe082;
+  border: 2px solid var(--zone-color, #ffe082);
   border-radius: 50%;
   animation: frontierMinimapPulse 1.5s ease-out infinite;
 }
@@ -1573,6 +1613,15 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   border-color: rgba(124, 242, 189, 0.85);
   background: rgba(10, 32, 46, 0.97);
 }
+.frontier-interaction-prompt.is-completed {
+  border-color: rgba(124, 242, 189, .72);
+  color: #dffff3;
+  background: rgba(7, 34, 31, .94);
+  box-shadow: 0 0 18px rgba(73, 231, 177, .22), 0 6px 20px rgba(0, 0, 0, .4);
+  pointer-events: none;
+  cursor: default;
+}
+.frontier-interaction-prompt.is-completed:hover { transform: none; background: rgba(7, 34, 31, .94); }
 .frontier-interaction-prompt .prompt-icon {
   display: grid;
   place-items: center;
@@ -1752,10 +1801,12 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   .frontier-control-hint { display: none; }
   .frontier-minimap { left: .65rem; bottom: calc(11.25rem + env(safe-area-inset-bottom)); width: 106px; padding: .34rem; border-radius: 14px; }
   .frontier-minimap header { display: none; }
-  .frontier-minimap.has-event header { display: flex; margin-bottom: .28rem; }
+  .frontier-minimap.has-event header,
+  .frontier-minimap.is-expanded header { display: grid; margin-bottom: .28rem; }
   .frontier-minimap.has-event header > span { display: none; }
   .frontier-minimap.has-event header strong { width: 100%; font-size: .46rem; text-align: center; }
   .frontier-map-zone small { display: none; }
+  .frontier-minimap.is-expanded .frontier-map-zone small { display: block; }
   .frontier-map-daily-event small,
   .frontier-map-player-marker small { display: block; }
   .frontier-map-daily-event small { font-size: .34rem; }

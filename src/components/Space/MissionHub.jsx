@@ -1,18 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react'
+import React, { lazy, Suspense, useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Volume2, VolumeX, X } from 'lucide-react'
 
-import SpaceQuizView from './SpaceQuizView'
-import QuizBattleView from './QuizBattleView'
-import WorkbookPlayer from './WorkbookPlayer'
-import CodeTracePlayer from './CodeTracePlayer'
-import QuestionModal from '../QuestionModal'
 import soundManager from '../../utils/SoundManager'
-import { InlineMath } from 'react-katex'
-import 'katex/dist/katex.min.css'
-import MissionMarkdownViewer from './MissionMarkdownViewer'
 import UnitLeaderboard from './UnitLeaderboard'
-import TimeAttackOverlay from './TimeAttackOverlay'
 import { db, getFunctionUrl } from '../../firebase'
 import { doc, setDoc, getDoc, onSnapshot, serverTimestamp, increment } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
@@ -20,6 +11,36 @@ import { useCodeExercises } from '../../hooks/useContent'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { isRadarActive } from '../../utils/streakUtils'
 import { getEmbeddablePdfUrl, normalizePdfUrl } from '../../utils/pdfUrlUtils'
+
+const SpaceQuizView = lazy(() => import('./SpaceQuizView'))
+const QuizBattleView = lazy(() => import('./QuizBattleView'))
+const WorkbookPlayer = lazy(() => import('./WorkbookPlayer'))
+const CodeTracePlayer = lazy(() => import('./CodeTracePlayer'))
+const QuestionModal = lazy(() => import('../QuestionModal'))
+const MissionMarkdownViewer = lazy(() => import('./MissionMarkdownViewer'))
+const TimeAttackOverlay = lazy(() => import('./TimeAttackOverlay'))
+
+function MissionModeFallback({ label = '학습 모듈을 불러오고 있습니다...' }) {
+  return (
+    <div
+      role="status"
+      className="space-bg"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2000,
+        display: 'grid',
+        placeItems: 'center',
+        color: 'var(--crystal-cyan)'
+      }}
+    >
+      <div className="font-tech" style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '0.8rem' }}>🛰️</div>
+        {label}
+      </div>
+    </div>
+  )
+}
 
 // Mock Data for demonstration - In production this would come from Firestore
 // (Mock data removed — use only real Firestore data)
@@ -2504,7 +2525,9 @@ export default function MissionHub({
               </div>
             )}
             <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
-              <MissionMarkdownViewer text={missionData?.learningContents?.text} imageMode="reading" />
+              <Suspense fallback={<div className="font-tech">데이터 로그 해석 중...</div>}>
+                <MissionMarkdownViewer text={missionData?.learningContents?.text} imageMode="reading" />
+              </Suspense>
             </div>
           </div>
         )}
@@ -3103,13 +3126,15 @@ export default function MissionHub({
 
              {/* Time Attack Overlay */}
              {showTimeAttack && (
-               <TimeAttackOverlay 
-                 onHit={handleTimeAttackHit} 
-                 onMiss={handleTimeAttackMiss} 
-                 currentCombo={timeAttackCombo} 
-                 userName={userData?.studentName || user?.displayName}
-                 isVideoPaused={!isVideoPlaying}
-               />
+               <Suspense fallback={null}>
+                 <TimeAttackOverlay
+                   onHit={handleTimeAttackHit}
+                   onMiss={handleTimeAttackMiss}
+                   currentCombo={timeAttackCombo}
+                   userName={userData?.studentName || user?.displayName}
+                   isVideoPaused={!isVideoPlaying}
+                 />
+               </Suspense>
               )}
           </div>
       )
@@ -3207,13 +3232,15 @@ export default function MissionHub({
   if (currentMode === 'workbook') {
     return (
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000, background: '#050a19' }}>
-        <WorkbookPlayer 
-          pages={activeUnit?.workbookPages || []} 
-          unitId={unitId}
-          unitTitle={activeUnit?.title}
-          onComplete={onComplete}
-          onClose={returnFromContent}
-        />
+        <Suspense fallback={<MissionModeFallback label="워크북을 불러오고 있습니다..." />}>
+          <WorkbookPlayer
+            pages={activeUnit?.workbookPages || []}
+            unitId={unitId}
+            unitTitle={activeUnit?.title}
+            onComplete={onComplete}
+            onClose={returnFromContent}
+          />
+        </Suspense>
       </div>
     )
   }
@@ -3231,29 +3258,33 @@ export default function MissionHub({
     }
 
     return (
-      <CodeTracePlayer
-        exercises={codeExercises}
-        unitId={unitId}
-        unitTitle={activeUnit?.title}
-        activeUnit={activeUnit}
-        clusterId={clusterId}
-        learningProgress={learningProgress}
-        onClose={returnFromContent}
-      />
+      <Suspense fallback={<MissionModeFallback label="코드 훈련기를 불러오고 있습니다..." />}>
+        <CodeTracePlayer
+          exercises={codeExercises}
+          unitId={unitId}
+          unitTitle={activeUnit?.title}
+          activeUnit={activeUnit}
+          clusterId={clusterId}
+          learningProgress={learningProgress}
+          onClose={returnFromContent}
+        />
+      </Suspense>
     )
   }
 
   if (currentMode === 'battle') {
     return (
-      <QuizBattleView
-        key={`${unitId}_${battleSessionKey}`}
-        clusterId={clusterId}
-        regionId={regionId}
-        entryUnitId={unitId}
-        entryUnitTitle={activeUnit?.title}
-        onExit={returnFromContent}
-        onSoloQuiz={() => updateCurrentMode('quiz')}
-      />
+      <Suspense fallback={<MissionModeFallback label="배틀 전장을 연결하고 있습니다..." />}>
+        <QuizBattleView
+          key={`${unitId}_${battleSessionKey}`}
+          clusterId={clusterId}
+          regionId={regionId}
+          entryUnitId={unitId}
+          entryUnitTitle={activeUnit?.title}
+          onExit={returnFromContent}
+          onSoloQuiz={() => updateCurrentMode('quiz')}
+        />
+      </Suspense>
     )
   }
 
@@ -3288,7 +3319,7 @@ export default function MissionHub({
     }
 
     return (
-      <>
+      <Suspense fallback={<MissionModeFallback label="퀴즈 탐사 장비를 불러오고 있습니다..." />}>
         <SpaceQuizView
           region={null}
           quizData={{
@@ -3402,7 +3433,9 @@ export default function MissionHub({
                                 </div>
                               )}
                               <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.8' }}>
-                                <MissionMarkdownViewer text={missionData?.learningContents?.text} imageMode="reading" />
+                                <Suspense fallback={<div className="font-tech">데이터 로그 해석 중...</div>}>
+                                  <MissionMarkdownViewer text={missionData?.learningContents?.text} imageMode="reading" />
+                                </Suspense>
                               </div>
                             </div>
                           )}
@@ -3471,7 +3504,7 @@ export default function MissionHub({
             </motion.div>
           )}
         </AnimatePresence>
-      </>
+      </Suspense>
     )
   }
 
@@ -3611,11 +3644,15 @@ export default function MissionHub({
        )}
 
        {/* Question Modal */}
-       <QuestionModal
-         isOpen={isQuestionModalOpen}
-         onClose={() => setIsQuestionModalOpen(false)}
-         contextData={questionContext}
-       />
+       {isQuestionModalOpen && (
+         <Suspense fallback={<MissionModeFallback label="질문 도구를 불러오고 있습니다..." />}>
+           <QuestionModal
+             isOpen
+             onClose={() => setIsQuestionModalOpen(false)}
+             contextData={questionContext}
+           />
+         </Suspense>
+       )}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { createElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
-import { Bot, Compass, Flower2, Gem, Hammer, Image as ImageIcon, Radio, Search, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
+import { Bot, CircleCheck, Compass, Flower2, Gem, Hammer, Image as ImageIcon, Maximize2, Minimize2, Radio, Search, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
 import {
   FRONTIER_AUDIO_ASSETS_READY,
@@ -112,6 +112,20 @@ const BIOMES = {
   },
 }
 
+const DORMANT_FRONTIER_PALETTE = Object.freeze({
+  sky: '#05080f', fog: '#121923', ground: '#26302e', groundDeep: '#141b1c', edge: '#11161b', water: '#17252c',
+  path: '#52605d', glow: '#73908b', accent: '#91a6a1', particle: '#9aa9aa', light: '#c4c9c5',
+})
+
+function blendFrontierPalette(target, restorationPercent = 0) {
+  const progress = THREE.MathUtils.clamp(Number(restorationPercent || 0) / 100, 0, 1)
+  const mix = (from, to) => `#${new THREE.Color(from).lerp(new THREE.Color(to), progress).getHexString()}`
+  return {
+    ...target,
+    ...Object.fromEntries(Object.keys(DORMANT_FRONTIER_PALETTE).map((key) => [key, mix(DORMANT_FRONTIER_PALETTE[key], target[key])])),
+  }
+}
+
 const RESOURCE_NODES = [
   { id: 'crystal_north', kind: 'resource', actionId: 'crystal', label: '수정 파편 채집', position: [9.2, .8, 7.8] },
   { id: 'fiber_grove', kind: 'resource', actionId: 'fiber', label: '루멘 섬유 채집', position: [7.8, .7, -7.3] },
@@ -176,6 +190,46 @@ const MISSION_PORTALS = [
   // A single, visible starting point avoids making students hunt for a route by coordinates.
   { id: 'portal_expedition', kind: 'portal', route: 'nebula', label: '탐사 출발대 · E키로 탐사 시작', position: [0, .85, 1.7] },
 ]
+
+const OBJECTIVE_WORLD_TARGETS = Object.freeze({
+  restore_beacon: { type: 'resource', id: 'broken_beacon', label: '고장 난 비콘' },
+  field_expedition: { type: 'mission', id: 'portal_expedition', label: '45초 탐사 출발대' },
+  trace_lost_route: { type: 'mission', id: 'portal_expedition', label: '항로 좌표 탐사 출발대' },
+  launch_rover: { type: 'rover', id: 'landing_rover', label: '로버 관제' },
+  dispatch_route_rover: { type: 'rover', id: 'landing_rover', label: '로버 관제' },
+  recover_pre_storm_discovery: { type: 'rover', id: 'landing_rover', label: '귀환 로버 관제' },
+  complete_discovery_codex: { type: 'rover', id: 'landing_rover', label: '발견 도감·로버 관제' },
+  restore_astra_memory: { type: 'structure', id: 'route_gateway', label: '아스트라 항로문' },
+})
+
+function resolveObjectiveWorldTarget(objective, planet) {
+  const definition = OBJECTIVE_WORLD_TARGETS[objective?.id]
+  if (!definition) return null
+  if (definition.type === 'resource') {
+    const node = RESOURCE_NODES.find((entry) => entry.id === definition.id)
+    return node ? { ...node, mapLabel: definition.label, color: '#ffe082' } : null
+  }
+  if (definition.type === 'mission') {
+    const portal = MISSION_PORTALS.find((entry) => entry.id === definition.id)
+    return portal ? { ...portal, mapLabel: definition.label, color: '#c9a7ff' } : null
+  }
+  if (definition.type === 'rover') {
+    return { ...ROVER_NODE, mapLabel: definition.label, color: '#75e9ff' }
+  }
+  if (definition.type === 'structure') {
+    const item = (Array.isArray(planet?.layout) ? planet.layout : []).find((entry) => entry?.itemId === definition.id && entry?.locked !== true)
+    if (!item) return null
+    return {
+      id: item.instanceId,
+      kind: 'structure',
+      mapLabel: definition.label,
+      position: worldPositionFromLayout(item),
+      interactionRadius: Math.max(2.4, structureFootprint(item.itemId, item.level) + 1.65),
+      color: '#ffe082',
+    }
+  }
+  return null
+}
 
 const MISSION_PICKUPS = {
   nebula: [[-10, -7], [-5, -11], [1, -10], [6, -8], [10, -3], [7, 3], [-1, 7], [-8, 3]],
@@ -2943,40 +2997,6 @@ function getStructureAcousticMaterial(itemId) {
   return 'soft'
 }
 
-function StructureProximityLabel({ item, footprint, isPlanetOwner, signalSummary, observatorySummary, greenhouseSummary, gardenSummary, roverStatus = 'idle', roverStatusLabel = '', roverBayApplied = false }) {
-  const isSignalPlaza = item.itemId === 'signal_plaza'
-  const isExpeditionBeacon = item.itemId === 'expedition_beacon'
-  const isRoverBay = item.itemId === 'rover_bay'
-  const isObservatory = item.itemId === 'observatory'
-  const isFriendGreenhouse = item.itemId === 'friend_greenhouse'
-  const isStarflowerGarden = item.itemId === 'starflower_garden'
-  const unreadCount = Math.max(0, Number(signalSummary?.unreadCount || 0))
-  const signalActionLabel = isPlanetOwner
-    ? unreadCount > 0 ? `새 귀환 신호 ${unreadCount}개 확인` : '귀환 신호 기록 열기'
-    : '감탄 신호 남기기'
-  const beaconActionLabel = isPlanetOwner
-    ? roverStatus === 'ready' ? '귀환 보상 받기' : roverStatus === 'active' ? roverStatusLabel || '원정 신호 추적' : '로버 관제 열기'
-    : '원정 비콘 수리하기'
-  const roverBayActionLabel = isPlanetOwner
-    ? roverStatus === 'ready'
-      ? '귀환 보상 받기'
-      : roverStatus === 'active'
-        ? roverBayApplied ? `${roverStatusLabel} · 6시간 적용` : '다음 원정부터 6시간'
-        : '로버 관제 열기 · 다음 원정 6시간'
-    : '로버 정비소 수리하기'
-  const observatoryActionLabel = isPlanetOwner
-    ? observatorySummary?.statusLabel || '오늘의 관측 브리핑 열기'
-    : '관측 장비 수리하기'
-  return (
-    <Html position={[0, Math.max(1.7, footprint + .9), 0]} center distanceFactor={8.8} style={{ pointerEvents: 'none' }}>
-      <div className="frontier-structure-proximity-label">
-        <strong>{item.name || '행성 객체'}</strong>
-        <span><kbd>E</kbd> {isSignalPlaza ? signalActionLabel : isObservatory ? observatoryActionLabel : isFriendGreenhouse ? isPlanetOwner ? '온실 돌보기 · 바이오 섬유' : `물주기 · 활력 ${greenhouseSummary?.vitality ?? 0}/100` : isStarflowerGarden ? isPlanetOwner ? `정원 돌보기 · 친구 물주기 ${gardenSummary?.recentWaterCount ?? 0}회` : `별꽃 물주기 · 활력 ${gardenSummary?.vitality ?? 0}/100` : isExpeditionBeacon ? beaconActionLabel : isRoverBay ? roverBayActionLabel : isPlanetOwner ? '재료 얻기' : '도와주기'} <i /> <kbd>F</kbd> {isSignalPlaza ? '광장 안내' : isObservatory ? '관측소 안내' : isFriendGreenhouse ? '협업 안내' : isStarflowerGarden ? '물주기 안내' : isExpeditionBeacon ? '비콘 안내' : isRoverBay ? '정비소 안내' : '정보'}</span>
-      </div>
-    </Html>
-  )
-}
-
 const ORGANIC_STRUCTURE_IDS = new Set([
   'lumen_tree',
   'wild_sprout',
@@ -2999,7 +3019,7 @@ const LIGHTING_STRUCTURE_IDS = new Set([
   'expedition_beacon',
 ])
 
-function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner, activeLightId, signalSummary, observatorySummary, greenhouseSummary, gardenSummary, roverStatus, roverStatusLabel, roverBayApplied }) {
+function PlacedStructure({ item, selected, onSelect, activeLightId, signalSummary, observatorySummary, greenhouseSummary, gardenSummary, roverStatus }) {
   const position = worldPositionFromLayout(item)
   position[1] = terrainHeight(position[0], position[2])
   const footprint = structureFootprint(item.itemId, item.level)
@@ -3035,20 +3055,6 @@ function PlacedStructure({ item, selected, nearby, onSelect, isPlanetOwner, acti
           <ringGeometry args={[footprint + .24, footprint + .42, 36]} />
           <meshBasicMaterial color="#6ce7ff" transparent opacity={.9} depthWrite={false} />
         </mesh>
-      )}
-      {nearby && (item.itemId === 'signal_plaza' || item.itemId === 'observatory' || item.itemId === 'friend_greenhouse' || item.itemId === 'starflower_garden' || item.itemId === 'expedition_beacon' || item.itemId === 'rover_bay') && (
-        <StructureProximityLabel
-          item={item}
-          footprint={footprint}
-          isPlanetOwner={isPlanetOwner}
-          signalSummary={signalSummary}
-          observatorySummary={observatorySummary}
-          greenhouseSummary={greenhouseSummary}
-          gardenSummary={gardenSummary}
-          roverStatus={roverStatus}
-          roverStatusLabel={roverStatusLabel}
-          roverBayApplied={roverBayApplied}
-        />
       )}
     </group>
   )
@@ -3218,7 +3224,20 @@ function ResourceNode({ node, palette }) {
   if (node.actionId === 'crystal') return <group position={[x, y, z]}><CrystalCluster color={palette.glow} /><ResourceHalo color={palette.glow} /></group>
   if (node.actionId === 'fiber') return <group position={[x, y, z]}><RoundedLumenTree scale={.72} color={palette.glow} /><Sparkles count={8} scale={[2, 2.5, 2]} color={palette.particle} size={1.5} speed={.25} /><ResourceHalo color="#7cf2bd" /></group>
   if (node.actionId === 'salvage') return <group position={[x, y, z]} rotation={[0, .6, -.12]}><mesh position={[0, .45, 0]} castShadow><dodecahedronGeometry args={[.82, 0]} /><meshStandardMaterial color="#56677a" metalness={.85} roughness={.3} /></mesh><mesh position={[.2, .5, .62]}><boxGeometry args={[.9, .16, .1]} /><meshStandardMaterial color="#ffb167" emissive="#a34819" emissiveIntensity={1.2} /></mesh><ResourceHalo color="#ffb167" /></group>
-  if (node.actionId === 'beacon') return <group position={[x, y, z]}><mesh position={[0, .8, 0]} rotation={[0, 0, .18]} castShadow><cylinderGeometry args={[.14, .3, 1.7, 9]} /><meshStandardMaterial color="#71859a" metalness={.78} /></mesh><Float speed={1.6} floatIntensity={.14}><mesh position={[0, 1.75, 0]}><sphereGeometry args={[.24, 12, 9]} /><meshStandardMaterial color="#ff8279" emissive="#ff312b" emissiveIntensity={2.4} toneMapped={false} /></mesh></Float><ResourceHalo color="#ff8279" /></group>
+  if (node.actionId === 'beacon') {
+    if (node.completed) return (
+      <group position={[x, y, z]}>
+        <mesh position={[0, .85, 0]} castShadow><cylinderGeometry args={[.14, .3, 1.7, 9]} /><meshStandardMaterial color="#7896a2" metalness={.82} roughness={.22} /></mesh>
+        <Float speed={1.25} floatIntensity={.08}>
+          <mesh position={[0, 1.78, 0]}><sphereGeometry args={[.25, 16, 12]} /><meshStandardMaterial color="#c9fff0" emissive="#49e7b1" emissiveIntensity={3.2} toneMapped={false} /></mesh>
+          {[.48, .72].map((radius, index) => <mesh key={radius} position={[0, 1.78, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[radius, .025, 6, 30]} /><meshBasicMaterial color="#7cf2bd" transparent opacity={.72 - index * .2} toneMapped={false} /></mesh>)}
+        </Float>
+        <pointLight position={[0, 1.78, 0]} color="#7cf2bd" intensity={1.4} distance={5} />
+        <ResourceHalo color="#7cf2bd" />
+      </group>
+    )
+    return <group position={[x, y, z]}><mesh position={[0, .8, 0]} rotation={[0, 0, .18]} castShadow><cylinderGeometry args={[.14, .3, 1.7, 9]} /><meshStandardMaterial color="#71859a" metalness={.78} /></mesh><Float speed={1.6} floatIntensity={.14}><mesh position={[0, 1.75, 0]}><sphereGeometry args={[.24, 12, 9]} /><meshStandardMaterial color="#ff8279" emissive="#ff312b" emissiveIntensity={2.4} toneMapped={false} /></mesh></Float><ResourceHalo color="#ff8279" /></group>
+  }
   return <group position={[x, y, z]}><mesh position={[0, .04, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow><circleGeometry args={[1.12, 24]} /><meshStandardMaterial color="#76583d" roughness={1} /></mesh><group position={[0, .2, 0]}><RoundedLumenTree scale={.28} color="#82e99c" /></group><ResourceHalo color="#8df2a7" /></group>
 }
 
@@ -3229,10 +3248,8 @@ function DailyEventMarker({ node, playerPosition }) {
   const [x, , z] = node.position
   const y = terrainHeight(x, z)
 
-  const distance = playerPosition
-    ? Math.round(Math.hypot(playerPosition.x - x, playerPosition.z - z))
-    : 0
-  const isInRange = distance <= DAILY_EVENT_INTERACTION_RADIUS
+  const isInRange = Boolean(playerPosition
+    && Math.hypot(playerPosition.x - x, playerPosition.z - z) <= DAILY_EVENT_INTERACTION_RADIUS)
 
   useFrame((state) => {
     const elapsed = state.clock.elapsedTime
@@ -3250,7 +3267,7 @@ function DailyEventMarker({ node, playerPosition }) {
         <div className={`frontier-event-pin-tag${isInRange ? ' in-range' : ''}`}>
           <i className="frontier-event-pin-icon">✦</i>
           <span className="frontier-event-pin-title">{node.label || '사건 현장'}</span>
-          <span className="frontier-event-pin-dist">{isInRange ? '도착 · E키' : `${distance}m`}</span>
+          <span className="frontier-event-pin-dist">{isInRange ? '도착' : '목표 위치'}</span>
         </div>
       </Html>
 
@@ -3947,9 +3964,18 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
+function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderEdit }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
-  const palette = BIOMES[planet?.theme] || BIOMES.forest
+  const basePalette = BIOMES[planet?.theme] || BIOMES.forest
+  const restorationProgress = THREE.MathUtils.clamp(Number(restorationPercent || 0), 0, 100)
+  const palette = useMemo(
+    () => blendFrontierPalette(basePalette, restorationProgress),
+    [basePalette, restorationProgress],
+  )
+  const restoredPropPositions = useMemo(() => {
+    const visibleRatio = .28 + (.72 * restorationProgress / 100)
+    return BIOME_PROP_POSITIONS.slice(0, Math.max(4, Math.round(BIOME_PROP_POSITIONS.length * visibleRatio)))
+  }, [restorationProgress])
 
   // === 발광 시설 동적 조명 매니저 ===
   // 상위 월드에서 매 프레임 1회 가장 가까운 Stage 2 발광 시설을 계산하고,
@@ -4033,6 +4059,9 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     ],
     interactionRadius: 4.35,
   }) : null, [builderEnabled])
+  const resourceNodes = useMemo(() => RESOURCE_NODES.map((node) => node.id === 'broken_beacon' && beaconRepaired
+    ? { ...node, completed: true, label: '비콘 수리 완료' }
+    : node), [beaconRepaired])
 
   const nearbyPromptPos = useMemo(() => {
     if (!nearby || !nearby.position) return null
@@ -4055,8 +4084,8 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
     return [px, py + h, pz]
   }, [nearby, isFirstPerson])
   const resourceInteractables = useMemo(() => dailyEventNode
-    ? RESOURCE_NODES.map((node) => node.id === dailyEventNode.id ? dailyEventNode : node)
-    : RESOURCE_NODES, [dailyEventNode])
+    ? resourceNodes.map((node) => node.id === dailyEventNode.id ? dailyEventNode : node)
+    : resourceNodes, [dailyEventNode, resourceNodes])
   const structureColliders = useMemo(() => layout.map((item) => {
     const position = worldPositionFromLayout(item)
     position[1] = terrainHeight(position[0], position[2])
@@ -4120,12 +4149,12 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       item,
     }
   }), [gardenSummary?.recentWaterCount, gardenSummary?.vitality, greenhouseSummary?.vitality, isPlanetOwner, layout, observatorySummary?.statusLabel, roverBayApplied, roverStatus, roverStatusLabel, signalPlazaSummary?.unreadCount])
-  const biomeColliders = useMemo(() => BIOME_PROP_POSITIONS.map(([x, z, scale], index) => ({
+  const biomeColliders = useMemo(() => restoredPropPositions.map(([x, z, scale], index) => ({
     id: `biome-prop-${index}`,
     position: [x, terrainHeight(x, z), z],
     collisionRadius: Math.max(.34, Number(scale || 1) * .48) + PLAYER_COLLISION_RADIUS,
     acousticMaterial: palette.prop === 'forest' ? 'wood' : palette.prop === 'mechanical' ? 'metal' : 'stone',
-  })), [palette.prop])
+  })), [palette.prop, restoredPropPositions])
   const builderBlockColliders = useMemo(() => {
     if (!builderEnabled || !builderCells?.length) return []
     return getAstraBuilderWalkBlockingCells(builderCells).map((cell) => {
@@ -4238,7 +4267,7 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
       <directionalLight position={[-12, 7, -9]} intensity={.32} color={palette.accent} />
       <ambientLight intensity={.24} />
       <Stars radius={72} depth={34} count={720} factor={2.2} saturation={.18} fade speed={.08} />
-      <Sparkles count={70} scale={[48, 20, 48]} position={[0, 9, 0]} size={1.25} color={palette.particle} speed={.12} />
+      <Sparkles count={Math.round(24 + restorationProgress * .7)} scale={[48, 20, 48]} position={[0, 9, 0]} size={1.25} color={palette.particle} speed={.12} />
       <DistantWorlds palette={palette} />
       <WorldTerrain
         palette={palette}
@@ -4273,15 +4302,20 @@ function FrontierScene({ planet, selectedStructureId, nearbyStructureId, onSelec
         />
       )}
 
-      {BIOME_PROP_POSITIONS.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
-      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} nearby={nearbyStructureId === item.instanceId} onSelect={onSelectStructure} isPlanetOwner={isPlanetOwner} activeLightId={activeLightId} signalSummary={signalPlazaSummary} observatorySummary={observatorySummary} greenhouseSummary={greenhouseSummary} gardenSummary={gardenSummary} roverStatus={roverStatus} roverStatusLabel={roverStatusLabel} roverBayApplied={roverBayApplied} />)}
-      {RESOURCE_NODES.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
+      {restoredPropPositions.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
+      {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} onSelect={onSelectStructure} activeLightId={activeLightId} signalSummary={signalPlazaSummary} observatorySummary={observatorySummary} greenhouseSummary={greenhouseSummary} gardenSummary={gardenSummary} roverStatus={roverStatus} />)}
+      {restorationProgress >= 80 && layout.filter((item) => item?.locked !== true).map((item) => {
+        const [x, , z] = worldPositionFromLayout(item)
+        return <mesh key={`memory-aura-${item.instanceId}`} position={[x, terrainHeight(x, z) + .035, z]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[.72, .82, 28]} /><meshBasicMaterial color={palette.glow} transparent opacity={.16 + (restorationProgress - 80) / 160} depthWrite={false} /></mesh>
+      })}
+      {resourceNodes.map((node) => <ResourceNode key={node.id} node={node} palette={palette} />)}
       {dailyEventNode && <DailyEventMarker node={dailyEventNode} playerPosition={playerPosition} />}
       {MISSION_PORTALS.map((portal) => <MissionPortal key={portal.id} portal={portal} active={activeMission?.route === portal.route} />)}
       <LumiGuide palette={palette} />
       <RoverControl palette={palette} status={roverNode.status} />
-      <Creature position={[5.8, .3, -5.3]} color={planet?.theme === 'ocean' ? '#7ccde8' : '#a9e68b'} />
-      <Creature position={[8.2, .45, -6.9]} color={planet?.theme === 'crystal' ? '#c3a0ef' : '#f2bd8b'} index={2} />
+      {restorationProgress >= 40 && <Creature position={[5.8, .3, -5.3]} color={planet?.theme === 'ocean' ? '#7ccde8' : '#a9e68b'} />}
+      {restorationProgress >= 65 && <Creature position={[8.2, .45, -6.9]} color={planet?.theme === 'crystal' ? '#c3a0ef' : '#f2bd8b'} index={2} />}
+      {restorationProgress >= 100 && <Sparkles count={48} scale={[22, 7, 22]} position={[0, 3.5, 0]} size={2} color="#fff4b2" speed={.28} />}
 
       {pickups.map((pickup, index) => (
         <Float key={pickup.id} speed={2.2 + index * .06} floatIntensity={.38} position={pickup.position}>
@@ -4365,38 +4399,40 @@ function TouchJoystick({ inputRef, disabled }) {
   )
 }
 
-function MiniMap({ playerPosition, nearby, dailyEventNode }) {
+function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, expanded, onToggleExpanded }) {
   const playerLeft = 50 + THREE.MathUtils.clamp(playerPosition.x / WORLD_RADIUS, -1, 1) * 44
   const playerTop = 50 + THREE.MathUtils.clamp(playerPosition.z / WORLD_RADIUS, -1, 1) * 44
-  const dailyVisual = dailyEventNode ? resolveDailyEventVisual(dailyEventNode.dailyEvent) : null
-  const dailyLeft = dailyEventNode ? 50 + THREE.MathUtils.clamp(dailyEventNode.position[0] / WORLD_RADIUS, -1, 1) * 43 : 0
-  const dailyTop = dailyEventNode ? 50 + THREE.MathUtils.clamp(dailyEventNode.position[2] / WORLD_RADIUS, -1, 1) * 43 : 0
-  const eventDistance = dailyEventNode
-    ? Math.round(Math.hypot(playerPosition.x - dailyEventNode.position[0], playerPosition.z - dailyEventNode.position[2]))
-    : null
-  const eventInRange = nearby?.kind === 'daily'
-  const statusLabel = eventInRange
-    ? '도착 · E키로 해결'
-    : dailyEventNode
-      ? `✦ 사건까지 ${eventDistance}m`
-      : nearby
-        ? '주변 신호 감지'
-        : '구역 탐색 중'
+  const targetNode = dailyEventNode || objectiveTarget
+  const targetVisual = dailyEventNode ? resolveDailyEventVisual(dailyEventNode.dailyEvent) : { color: targetNode?.color || '#ffe082' }
+  const targetLeft = targetNode ? 50 + THREE.MathUtils.clamp(targetNode.position[0] / WORLD_RADIUS, -1, 1) * 43 : 0
+  const targetTop = targetNode ? 50 + THREE.MathUtils.clamp(targetNode.position[2] / WORLD_RADIUS, -1, 1) * 43 : 0
+  const targetInRange = Boolean(targetNode && (
+    nearby?.id === targetNode.id
+    || Math.hypot(playerPosition.x - targetNode.position[0], playerPosition.z - targetNode.position[2]) <= Number(targetNode.interactionRadius || 2.8)
+  ))
+  const statusLabel = targetInRange
+    ? '목표 지점 도착'
+    : targetNode
+      ? '목표 안내 중'
+      : '구역 탐색 중'
   return (
     <div
-      className={`frontier-minimap${dailyEventNode ? ' has-event' : ''}${eventInRange ? ' event-in-range' : ''}`}
+      className={`frontier-minimap${targetNode ? ' has-event has-target' : ''}${targetInRange ? ' event-in-range' : ''}${expanded ? ' is-expanded' : ''}`}
       role="group"
-      aria-label={dailyEventNode ? `행성 지도. 황금색 사건 현장까지 ${eventDistance}미터` : '행성 구역 지도'}
+      aria-label={targetNode ? `행성 지도. 현재 목표는 ${targetNode.mapLabel || targetNode.label || '표시된 목표 지점'}입니다` : '행성 구역 지도'}
     >
       <header>
         <span>행성 지도 <small>PLANET MAP</small></span>
         <strong>{statusLabel}</strong>
+        <button type="button" onClick={onToggleExpanded} aria-label={expanded ? '행성 지도 축소' : '행성 지도 확대'} title={expanded ? '지도 축소' : '지도 확대'}>
+          {expanded ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
+        </button>
       </header>
       <div className="frontier-minimap-field">
         <i className="frontier-minimap-orbit" />
-        {dailyEventNode && (
+        {targetNode && (
           <svg className="frontier-map-event-route" viewBox="0 0 100 100" aria-hidden="true">
-            <line x1={playerLeft} y1={playerTop} x2={dailyLeft} y2={dailyTop} />
+            <line x1={playerLeft} y1={playerTop} x2={targetLeft} y2={targetTop} />
           </svg>
         )}
         {ZONES.map((zone) => (
@@ -4405,15 +4441,15 @@ function MiniMap({ playerPosition, nearby, dailyEventNode }) {
             <small>{zone.shortLabel}</small>
           </span>
         ))}
-        {dailyEventNode && (
+        {targetNode && (
           <span
             className="frontier-map-zone frontier-map-daily-event"
-            style={{ left: `${dailyLeft}%`, top: `${dailyTop}%`, '--zone-color': dailyVisual.color }}
-            title={`✦ 사건 현장: ${dailyEventNode.label}`}
-            aria-label={`오늘의 행성 사건: ${dailyEventNode.label}`}
+            style={{ left: `${targetLeft}%`, top: `${targetTop}%`, '--zone-color': targetVisual.color }}
+            title={`현재 목표: ${targetNode.mapLabel || targetNode.label}`}
+            aria-label={`현재 미션 수행 위치: ${targetNode.mapLabel || targetNode.label}`}
           >
             <i className="frontier-map-daily-pulse" />
-            <small>✦ 사건 현장</small>
+            <small>✦ {targetNode.mapLabel || targetNode.label || '미션 위치'}</small>
           </span>
         )}
         {MISSION_PORTALS.map((portal) => (
@@ -4437,11 +4473,11 @@ function MiniMap({ playerPosition, nearby, dailyEventNode }) {
           <small>나</small>
         </span>
       </div>
-      {dailyEventNode && (
-        <div className="frontier-minimap-guide" aria-hidden="true">
+      {targetNode && (
+        <div className="frontier-minimap-guide">
           <span><i className="me" /> 나</span>
-          <b>점선 방향으로 이동</b>
-          <span><i className="event">✦</i> 사건</span>
+          <b>{targetInRange ? '목표 지점에 도착했습니다' : '점선을 따라 목표로 이동'}</b>
+          <span><i className="event">✦</i> 목표</span>
         </div>
       )}
     </div>
@@ -4463,6 +4499,15 @@ const INTERACTION_ICONS = {
 }
 
 function InteractionPrompt({ nearby, onInteract, onInspect }) {
+  if (nearby.completed) return (
+    <div className="frontier-interaction-prompt is-completed" role="status" aria-label={nearby.label || '상호작용 완료'}>
+      <span className="prompt-icon"><CircleCheck size={14} aria-hidden="true" /></span>
+      <div className="prompt-text">
+        <small>신호 상태</small>
+        <strong>{nearby.label || '완료되었습니다'}</strong>
+      </div>
+    </div>
+  )
   const Graphic = nearby.kind === 'daily' ? SparklesIcon : nearby.kind === 'portal' ? Compass : INTERACTION_ICONS[nearby.actionId] || SparklesIcon
   const isStructure = nearby.kind === 'structure'
   return (
@@ -4499,7 +4544,7 @@ function InteractionPrompt({ nearby, onInteract, onInspect }) {
 // Uses the pre-existing .frontier-action-button / .frontier-structure-actions CSS; visibility is
 // also gated by a touch media query so these never appear on desktop.
 function TouchActionButtons({ nearby, onInteract, onInspect, disabled }) {
-  if (disabled || !nearby) return null
+  if (disabled || !nearby || nearby.completed) return null
   const Graphic = nearby.kind === 'daily' ? SparklesIcon : nearby.kind === 'portal' ? Compass : INTERACTION_ICONS[nearby.actionId] || SparklesIcon
   const label = nearby.kind === 'structure' ? '시설' : nearby.kind === 'portal' ? '탐사' : nearby.kind === 'guide' ? '안내' : nearby.kind === 'rover' ? '로버' : nearby.kind === 'builder' ? '건축' : nearby.kind === 'daily' ? '사건' : '실행'
   const isStructure = nearby.kind === 'structure'
@@ -4560,6 +4605,8 @@ function ProximityChat({ peer, onSend, errorMessage }) {
 
 export default function GalaxyWorld3D({
   planet,
+  frontierStory,
+  restorationPercent = 0,
   audioSessionKey = 'frontier',
   dailyEvent,
   missionReady,
@@ -4601,6 +4648,7 @@ export default function GalaxyWorld3D({
   onOpenBuilderPlot,
   onSaveBuilderState,
   onBuilderModeChange,
+  objective,
 }) {
   const inputRef = useRef({ x: 0, z: 0 })
   const [nearby, setNearby] = useState(null)
@@ -4616,6 +4664,8 @@ export default function GalaxyWorld3D({
   const [builderLayer, setBuilderLayer] = useState(0)
   const [builderBlockType, setBuilderBlockType] = useState(1)
   const [builderRotation, setBuilderRotation] = useState(0)
+  const [mapExpanded, setMapExpanded] = useState(false)
+  const beaconRepaired = Boolean(frontierStory?.completedStepIds?.includes('restore_beacon'))
   const missionRemainingRef = useRef(0)
   const completingRef = useRef(false)
   const completionRequestTokenRef = useRef(null)
@@ -4625,6 +4675,10 @@ export default function GalaxyWorld3D({
   const audioSessionKeyRef = useRef(audioSessionKey)
   audioSessionKeyRef.current = audioSessionKey
   const dailyEventNode = useMemo(() => resolvePendingDailyEventNode(dailyEvent), [dailyEvent])
+  const objectiveTarget = useMemo(
+    () => resolveObjectiveWorldTarget(objective, planet),
+    [objective, planet],
+  )
   const themeAmbienceSoundId = useMemo(
     () => getFrontierAmbienceSoundId(planet?.theme || 'forest'),
     [planet?.theme],
@@ -4849,7 +4903,7 @@ export default function GalaxyWorld3D({
   }, [activeMission, missionCooldownLabel, missionReady, onMessage])
 
   const interact = useCallback(() => {
-    if (!nearby || paused) return
+    if (!nearby || nearby.completed || paused) return
     const interactionSoundId = INTERACTION_SOUND_IDS[nearby.actionId]
       || 'frontier.ui.interact'
     soundManager.play(interactionSoundId)
@@ -5038,8 +5092,9 @@ export default function GalaxyWorld3D({
       >
         <FrontierScene
           planet={planet}
+          restorationPercent={restorationPercent}
+          beaconRepaired={beaconRepaired}
           selectedStructureId={selectedStructureId}
-          nearbyStructureId={nearby?.kind === 'structure' ? nearby.id : ''}
           onSelectStructure={onSelectStructure}
           inputRef={inputRef}
           paused={paused}
@@ -5087,7 +5142,7 @@ export default function GalaxyWorld3D({
         />
       </Canvas>
 
-      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} />}
+      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} objectiveTarget={objectiveTarget} expanded={mapExpanded} onToggleExpanded={() => setMapExpanded((current) => !current)} />}
       {!builderActive && <button
         type="button"
         className="frontier-camera-mode-toggle"

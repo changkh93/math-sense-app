@@ -75,6 +75,12 @@ import {
   getGalaxyRoverStatus,
   getMissionCooldown,
 } from '../../utils/galaxyGame'
+import {
+  FRONTIER_CORE_FACILITY_IDS,
+  getFrontierStoryObjective,
+  isFirstLightStoryGrant,
+  normalizeFrontierStory,
+} from '../../utils/frontierStory'
 import { compressImage } from '../../utils/storageUtils'
 import soundManager from '../../utils/SoundManager'
 import GalaxyObjectDialog from './GalaxyObjectDialog'
@@ -523,6 +529,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [targetUid, setTargetUid] = useState(user?.uid || '')
   const [menu, setMenu] = useState('')
   const [arrivalOpen, setArrivalOpen] = useState(true)
+  const [finaleOpen, setFinaleOpen] = useState(false)
   const [audioSettingsOpen, setAudioSettingsOpen] = useState(false)
   const [isFirstPerson, setIsFirstPerson] = useState(false)
   const [builderActive, setBuilderActive] = useState(false)
@@ -557,6 +564,11 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const objectDialogCloseRef = useRef(null)
   const restoreFocusRef = useRef(null)
   const activeOverlayRef = useRef('')
+  const finaleShownRef = useRef(false)
+  const storySessionStartedAtRef = useRef(Date.now())
+  const latestFrontierStoryRef = useRef(null)
+  const lastExitTelemetryAtRef = useRef(0)
+  const lastChapterTelemetryRef = useRef('')
   const audioSessionKey = `${user?.uid || 'guest'}:${targetUid || 'home'}:${playSession?.sessionId || 'no-session'}`
   const audioMountedRef = useRef(false)
   const audioSessionKeyRef = useRef(audioSessionKey)
@@ -648,6 +660,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const hasActiveOverlay = Boolean(
     menu
     || arrivalOpen
+    || finaleOpen
     || audioSettingsOpen
     || objectDialogOpen
     || selectedBuildItem
@@ -662,7 +675,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   }, [hasActiveOverlay])
 
   useEffect(() => {
-    if (!user?.uid) return undefined
+    if (isGuest || !user?.uid) return undefined
     return onSnapshot(doc(db, 'galaxyPlanets', user.uid), (snapshot) => {
       if (!snapshot.exists()) return
       const nextOwnPlanet = { id: snapshot.id, ...snapshot.data() }
@@ -672,28 +685,28 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         ...(targetUid === user.uid ? { planet: nextOwnPlanet } : {}),
       } : current)
     }, (snapshotError) => setError(snapshotError?.message || '내 행성의 실시간 신호가 끊어졌습니다.'))
-  }, [targetUid, user?.uid])
+  }, [isGuest, targetUid, user?.uid])
 
   useEffect(() => {
-    if (!targetUid || targetUid === user?.uid) return undefined
+    if (isGuest || !targetUid || targetUid === user?.uid) return undefined
     return onSnapshot(doc(db, 'galaxyPlanets', targetUid), (snapshot) => {
       if (!snapshot.exists()) return
       const nextPlanet = { id: snapshot.id, ...snapshot.data() }
       setHome((current) => current ? { ...current, planet: nextPlanet } : current)
     }, (snapshotError) => setError(snapshotError?.message || '이웃 행성의 실시간 신호가 끊어졌습니다.'))
-  }, [targetUid, user?.uid])
+  }, [isGuest, targetUid, user?.uid])
 
   useEffect(() => {
-    if (!user?.uid) return undefined
+    if (isGuest || !user?.uid) return undefined
     return onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
       if (!snapshot.exists()) return
       const nextWallet = Math.max(0, Number(snapshot.data()?.crystals || 0))
       setHome((current) => current ? { ...current, wallet: nextWallet } : current)
     })
-  }, [user?.uid])
+  }, [isGuest, user?.uid])
 
   useEffect(() => {
-    if (!user?.uid) return undefined
+    if (isGuest || !user?.uid) return undefined
     const eventQuery = query(collection(db, 'galaxyPlanets', user.uid, 'visitEvents'), orderBy('createdAt', 'desc'), limit(30))
     return onSnapshot(eventQuery, (snapshot) => {
       const events = snapshot.docs.map((eventDoc) => ({
@@ -703,7 +716,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       }))
       setHome((current) => current ? { ...current, events } : current)
     }, (snapshotError) => setError(snapshotError?.message || '귀환 신호를 실시간으로 불러오지 못했습니다.'))
-  }, [user?.uid])
+  }, [isGuest, user?.uid])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 15000)
@@ -777,12 +790,13 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         setObjectDialogOpen(false)
         setSelectedStructureId('')
       }
+      else if (finaleOpen) setFinaleOpen(false)
       else if (arrivalOpen) setArrivalOpen(false)
       else if (menu) setMenu('')
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [arrivalOpen, menu, objectDialogOpen])
+  }, [arrivalOpen, finaleOpen, menu, objectDialogOpen])
 
   const planet = home?.planet || {}
   const ownPlanet = home?.ownPlanet || {}
@@ -863,6 +877,69 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const currentTheme = GALAXY_THEMES[planet.theme] || GALAXY_THEMES.forest
   const ownTheme = GALAXY_THEMES[ownPlanet.theme] || GALAXY_THEMES.forest
   const ownLayout = Array.isArray(ownPlanet.layout) ? ownPlanet.layout : []
+  const frontierStory = useMemo(() => normalizeFrontierStory(ownPlanet.frontierStory), [ownPlanet.frontierStory])
+  latestFrontierStoryRef.current = frontierStory
+  const storyObjective = useMemo(() => {
+    const objective = getFrontierStoryObjective(frontierStory)
+    return isOwner || objective?.action === 'neighbors' ? objective : null
+  }, [frontierStory, isOwner])
+  useEffect(() => {
+    if (frontierStory.status !== 'completed' || finaleShownRef.current) return
+    finaleShownRef.current = true
+    setArrivalOpen(false)
+    setMenu('')
+    setFinaleOpen(true)
+    if (!isGuest) {
+      void callGalaxy('recordGalaxyStoryTelemetry', {
+        eventId: createOperationId(),
+        eventType: 'finale_view',
+        chapterId: frontierStory.chapterId,
+        stepId: frontierStory.stepId,
+        restorationPercent: frontierStory.restorationPercent,
+        elapsedMs: Date.now() - storySessionStartedAtRef.current,
+      }).catch(() => {})
+    }
+  }, [callGalaxy, frontierStory.chapterId, frontierStory.restorationPercent, frontierStory.status, frontierStory.stepId, isGuest])
+
+  useEffect(() => {
+    if (isGuest || !frontierStory.chapterId || lastChapterTelemetryRef.current === frontierStory.chapterId) return
+    lastChapterTelemetryRef.current = frontierStory.chapterId
+    void callGalaxy('recordGalaxyStoryTelemetry', {
+      eventId: createOperationId(),
+      eventType: 'chapter_view',
+      chapterId: frontierStory.chapterId,
+      stepId: frontierStory.stepId,
+      restorationPercent: frontierStory.restorationPercent,
+      elapsedMs: Date.now() - storySessionStartedAtRef.current,
+    }).catch(() => {})
+  }, [callGalaxy, frontierStory.chapterId, frontierStory.restorationPercent, frontierStory.stepId, isGuest])
+
+  useEffect(() => {
+    if (isGuest) return undefined
+    const recordExit = () => {
+      const now = Date.now()
+      if (now - lastExitTelemetryAtRef.current < 2000) return
+      const story = latestFrontierStoryRef.current
+      if (!story) return
+      lastExitTelemetryAtRef.current = now
+      void callGalaxy('recordGalaxyStoryTelemetry', {
+        eventId: createOperationId(),
+        eventType: 'exit',
+        chapterId: story.chapterId,
+        stepId: story.stepId,
+        restorationPercent: story.restorationPercent,
+        elapsedMs: now - storySessionStartedAtRef.current,
+      }).catch(() => {})
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') recordExit()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      recordExit()
+    }
+  }, [callGalaxy, isGuest])
   const roverExpedition = ownPlanet.roverExpedition || null
   const roverStatus = getGalaxyRoverStatus(roverExpedition, galaxyNowMs)
   const roverReadyAtMs = Number(roverExpedition?.returnsAtMs || roverExpedition?.readyAtMs || 0)
@@ -909,6 +986,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   } : focusedBuildStoryBase
 
   const todayObjective = useMemo(() => {
+    if (storyObjective) return storyObjective
     if (isOwner && roverStatus === 'ready') return {
       id: 'rover-return',
       eyebrow: '지금 할 일 · 로버 보상 받기',
@@ -981,11 +1059,11 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       total: 1,
       action: isOwner ? 'build' : 'world',
     }
-  }, [builtCount, dailyEvent?.detail, dailyEvent?.reward?.amount, dailyEvent?.reward?.title, dailyEvent?.title, dailyEventPending, hasRoverBay, isOwner, missionCooldown.label, missionCooldown.ready, roverRemainingLabel, roverStatus, unreadCount, wallet])
+  }, [builtCount, dailyEvent?.detail, dailyEvent?.reward?.amount, dailyEvent?.reward?.title, dailyEvent?.title, dailyEventPending, hasRoverBay, isOwner, missionCooldown.label, missionCooldown.ready, roverRemainingLabel, roverStatus, storyObjective, unreadCount, wallet])
 
   const overnightSummary = useMemo(() => {
     if (dailyEventPending) return `${dailyEvent.title} ${dailyEvent.detail || '현장의 신호를 따라가 오늘의 변화를 해결해 주세요.'}`
-    if (dailyEvent?.status === 'completed') return `${dailyEvent.title || '오늘의 행성 사건'}을 해결해 행성의 흐름이 다시 안정됐습니다.`
+    if (dailyEvent?.status === 'completed') return `${dailyEvent.title || '오늘의 행성 사건'} 해결로 행성의 흐름이 다시 안정됐습니다.`
     const latestEvent = events[0]
     if (latestEvent) return `${latestEvent.actorName || '이웃 탐사원'}이 ${latestEvent.actionLabel || '새 신호'} 기록을 남겼습니다.`
     const visitCount = Math.max(0, Number(ownPlanet.stats?.visits || 0))
@@ -1037,6 +1115,16 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     setObjectDialogOpen(false)
     setSelectedBuildItem('')
     setMenu('')
+    if (isGuest && neighborUid === 'guest-training-neighbor') {
+      const result = guestGalaxy.visitTrainingNeighbor()
+      setHome((current) => current ? {
+        ...current,
+        ownPlanet: { ...current.ownPlanet, frontierStory: result.frontierStory },
+        planet: { ...current.planet, frontierStory: result.frontierStory },
+      } : current)
+      flash('루미의 훈련용 행성에 왕복 신호를 보냈습니다. 친구 방문 단계가 기록되었습니다.')
+      return
+    }
     await loadHome(neighborUid)
   }
 
@@ -1239,22 +1327,22 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       const placementX = 50 + Number(worldX || 0) * 3
       const placementY = 50 + Number(worldZ || 0) * 3
       try {
-        const newItem = guestGalaxy.buildItem(itemId, placementX, placementY)
+        const guestResult = guestGalaxy.buildItem(itemId, placementX, placementY)
+        const newItem = guestResult.item
         setHome((current) => {
           if (!current) return current
-          const currentOwnPlanet = current.ownPlanet || {}
-          const currentLayout = Array.isArray(currentOwnPlanet.layout) ? currentOwnPlanet.layout : []
-          const nextLayout = [...currentLayout, newItem]
-          const nextOwnPlanet = { ...currentOwnPlanet, layout: nextLayout }
+          const nextOwnPlanet = { ...current.ownPlanet, ...guestResult.planet }
           return {
             ...current,
             ownPlanet: nextOwnPlanet,
             planet: nextOwnPlanet,
-            userCrystals: guestGalaxy.guestData.crystals,
-            wallet: guestGalaxy.guestData.crystals,
+            userCrystals: guestResult.wallet,
+            wallet: guestResult.wallet,
           }
         })
-        setNotice(`${newItem.name || itemId}을(를) 로컬 행성에 건설했습니다.`)
+        setNotice(guestResult.storyGrantApplied
+          ? `${newItem.name || itemId}을(를) 프롤로그 지원으로 건설했습니다. 기억 조각 2/4 복원!`
+          : `${newItem.name || itemId}을(를) 로컬 행성에 건설했습니다.`)
         soundManager.play('frontier.buildingPlaced')
       } catch (err) {
         setError(err?.message || '광석이 부족하거나 건설할 수 없습니다.')
@@ -1270,7 +1358,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       operationId,
       x: 50 + Number(worldX || 0) * 3,
       y: 50 + Number(worldZ || 0) * 3,
-    }), (buildResult) => `${buildResult?.placed?.name || '새 시설'}을 이곳에 건설했습니다.`)
+    }), (buildResult) => buildResult?.frontierStory?.memoryShards > frontierStory.memoryShards
+      ? `${buildResult?.placed?.name || '새 시설'}을 건설했습니다. 기억 조각 ${buildResult.frontierStory.memoryShards}/4 복원!`
+      : `${buildResult?.placed?.name || '새 시설'}을 이곳에 건설했습니다.`)
     if (
       !audioMountedRef.current
       || audioSessionKeyRef.current !== requestAudioSessionKey
@@ -1290,6 +1380,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         ...currentOwnPlanet,
         layout: nextLayout,
         materials: result.materials || currentOwnPlanet.materials || {},
+        frontierStory: result.frontierStory || currentOwnPlanet.frontierStory,
       }
       return {
         ...current,
@@ -1317,6 +1408,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     if (!result) return null
     setHome((current) => current ? {
       ...current,
+      ownPlanet: result.frontierStory
+        ? { ...current.ownPlanet, frontierStory: result.frontierStory, materials: result.materials || current.ownPlanet?.materials }
+        : current.ownPlanet,
       neighbors: (current.neighbors || []).map((neighbor) => neighbor.uid === targetUid ? {
         ...neighbor,
         routeLevel: result.routeLevel ?? neighbor.routeLevel,
@@ -1370,8 +1464,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     if (isOwner) {
       const result = await runAction(
         `object:mission:${item.instanceId}`,
-        () => callGalaxy('performGalaxyStructureAction', { instanceId: item.instanceId }),
-        (missionResult) => item.itemId === 'friend_greenhouse' || item.itemId === 'starflower_garden'
+        () => isGuest
+          ? guestGalaxy.careForStructure(item)
+          : callGalaxy('performGalaxyStructureAction', { instanceId: item.instanceId }),
+        (missionResult) => missionResult?.frontierStory?.signalFragments > frontierStory.signalFragments
+          ? `${missionResult?.label || '시설 돌보기를 마쳤습니다.'} 항로 신호 ${missionResult.frontierStory.signalFragments}/3 복원!`
+          : item.itemId === 'friend_greenhouse' || item.itemId === 'starflower_garden'
           ? `${missionResult?.label || '정원 돌봄을 마쳤습니다.'} 다음 돌봄은 5분 뒤 가능합니다.`
           : missionResult?.label || `${mission.label}을 완료했습니다.`,
       )
@@ -1379,8 +1477,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       setHome((current) => {
         if (!current) return current
         const ownPlanet = current.ownPlanet || {}
-        const nextOwnPlanet = { ...ownPlanet, materials: result.materials || ownPlanet.materials || {} }
-        return { ...current, ownPlanet: nextOwnPlanet, planet: targetUid === user?.uid ? nextOwnPlanet : current.planet }
+        const nextOwnPlanet = {
+          ...ownPlanet,
+          materials: result.materials || ownPlanet.materials || {},
+          frontierStory: result.frontierStory || ownPlanet.frontierStory,
+        }
+        return { ...current, ownPlanet: nextOwnPlanet, planet: (isGuest || targetUid === user?.uid) ? nextOwnPlanet : current.planet }
       })
       return result
     }
@@ -1407,7 +1509,11 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       const currentPlanet = current.planet || {}
       return {
         ...current,
-        ownPlanet: result.materials ? { ...currentOwnPlanet, materials: result.materials } : currentOwnPlanet,
+        ownPlanet: result.materials || result.frontierStory ? {
+          ...currentOwnPlanet,
+          materials: result.materials || currentOwnPlanet.materials,
+          frontierStory: result.frontierStory || currentOwnPlanet.frontierStory,
+        } : currentOwnPlanet,
         planet: result.stat
           ? { ...currentPlanet, stats: { ...(currentPlanet.stats || {}), [result.stat]: result.statValue } }
           : currentPlanet,
@@ -1433,12 +1539,32 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       const visitActionMap = { crystal: 'admire', fiber: 'water', salvage: 'repair', beacon: 'repair', plant: 'feed' }
       return performVisitAction(visitActionMap[node.actionId] || 'admire', node)
     }
-    return runAction(`world:${node.id}`, () => callGalaxy('performGalaxyWorldAction', {
-      actionId: node.actionId,
-      nodeId: node.id,
-      x: node.position?.[0] || 0,
-      z: node.position?.[2] || 0,
-    }), (result) => result?.label || '월드 활동을 완료했습니다.')
+    const result = await runAction(
+      `world:${node.id}`,
+      () => isGuest
+        ? guestGalaxy.performWorldAction(node)
+        : callGalaxy('performGalaxyWorldAction', {
+          actionId: node.actionId,
+          nodeId: node.id,
+          x: node.position?.[0] || 0,
+          z: node.position?.[2] || 0,
+        }),
+      (actionResult) => actionResult?.frontierStory?.memoryShards > frontierStory.memoryShards
+        ? `${actionResult?.label || '월드 활동을 완료했습니다.'} 기억 조각 ${actionResult.frontierStory.memoryShards}/4 복원!`
+        : actionResult?.label || '월드 활동을 완료했습니다.',
+    )
+    if (!result) return null
+    setHome((current) => {
+      if (!current) return current
+      const nextOwnPlanet = {
+        ...current.ownPlanet,
+        materials: result.materials || current.ownPlanet?.materials || {},
+        stats: result.stats || current.ownPlanet?.stats || {},
+        frontierStory: result.frontierStory || current.ownPlanet?.frontierStory,
+      }
+      return { ...current, ownPlanet: nextOwnPlanet, planet: nextOwnPlanet }
+    })
+    return result
   }
 
   const completeDailyEvent = async (event = dailyEvent) => {
@@ -1446,10 +1572,15 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     const requestAudioSessionKey = audioSessionKey
     const result = await runAction(
       `daily:${event.eventId || event.type || 'event'}`,
-      () => callGalaxy('completeGalaxyDailyEvent', { dayKey: event.dayKey, eventId: event.eventId }),
+      () => isGuest
+        ? guestGalaxy.completeDailyEvent()
+        : callGalaxy('completeGalaxyDailyEvent', { dayKey: event.dayKey, eventId: event.eventId }),
       (completion) => {
         const reward = completion?.reward || event.reward || {}
-        return `${event.title || '오늘의 행성 사건'} 해결 · ${reward.title || MATERIAL_LABELS[reward.material] || '행성 재료'} ${reward.amount ?? 1}개를 회수했습니다.`
+        const base = `${event.title || '오늘의 행성 사건'} 해결 · ${reward.title || MATERIAL_LABELS[reward.material] || '행성 재료'} ${reward.amount ?? 1}개를 회수했습니다.`
+        return completion?.frontierStory?.signalFragments > frontierStory.signalFragments
+          ? `${base} 항로 신호 ${completion.frontierStory.signalFragments}/3 복원!`
+          : base
       },
     )
     if (
@@ -1469,6 +1600,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         ...current.ownPlanet,
         materials: { ...(current.ownPlanet?.materials || {}), ...(result.materials || {}) },
         stats: { ...(current.ownPlanet?.stats || {}), ...(result.stats || {}) },
+        frontierStory: result.frontierStory || current.ownPlanet?.frontierStory,
       }
       return {
         ...current,
@@ -1478,7 +1610,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           ? Number(result.serverNowMs) - receivedAtMs
           : current.serverClockOffsetMs,
         ownPlanet: nextOwnPlanet,
-        ...(targetUid === user?.uid ? { planet: nextOwnPlanet } : {}),
+        ...((isGuest || targetUid === user?.uid) ? { planet: nextOwnPlanet } : {}),
       }
     })
     setNowMs(receivedAtMs)
@@ -1492,19 +1624,33 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     }
     const result = await runAction(
       `mission:${route}`,
-      () => callGalaxy('runGalaxyMission', { route, partnerUid: missionPartnerUid, operationId }),
-      (missionResult) => `${missionResult?.reward?.title || '탐사 표본'} ${missionResult?.reward?.amount || 1}개를 회수했습니다.`,
+      () => isGuest
+        ? guestGalaxy.completeMission(route)
+        : callGalaxy('runGalaxyMission', { route, partnerUid: missionPartnerUid, operationId }),
+      (missionResult) => missionResult?.frontierStory?.memoryShards > frontierStory.memoryShards
+        ? `${missionResult?.reward?.title || '탐사 표본'} ${missionResult?.reward?.amount || 1}개를 회수했습니다. 기억 조각 ${missionResult.frontierStory.memoryShards}/4 복원!`
+        : `${missionResult?.reward?.title || '탐사 표본'} ${missionResult?.reward?.amount || 1}개를 회수했습니다.`,
     )
     if (!result) return null
     const completedAtMs = Number(result.nextMissionAtMs || Date.now()) - (2 * 60 * 60 * 1000)
     setHome((current) => current ? {
       ...current,
-      ownPlanet: { ...current.ownPlanet, lastMissionAtMs: completedAtMs },
-      ...(targetUid === user?.uid ? { planet: { ...current.planet, lastMissionAtMs: completedAtMs } } : {}),
+      ownPlanet: {
+        ...current.ownPlanet,
+        lastMissionAtMs: completedAtMs,
+        materials: result.planet?.materials || current.ownPlanet?.materials,
+        frontierStory: result.frontierStory || current.ownPlanet?.frontierStory,
+      },
+      ...((isGuest || targetUid === user?.uid) ? { planet: {
+        ...current.planet,
+        lastMissionAtMs: completedAtMs,
+        materials: result.planet?.materials || current.planet?.materials,
+        frontierStory: result.frontierStory || current.planet?.frontierStory,
+      } } : {}),
     } : current)
     setNowMs(Date.now())
     return result
-  }, [callGalaxy, flash, missionPartnerUid, playRemainingSeconds, runAction, targetUid, user?.uid])
+  }, [callGalaxy, flash, frontierStory, guestGalaxy, isGuest, missionPartnerUid, playRemainingSeconds, runAction, targetUid, user?.uid])
 
   const dispatchRover = async (route) => {
     if (!isOwner) return null
@@ -1527,19 +1673,24 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     }
     const result = await runAction(
       'rover:dispatch',
-      () => callGalaxy('startGalaxyRoverExpedition', { route: dispatchRoute, operationId }).catch((dispatchError) => {
-        const activeExpedition = dispatchError?.details?.expedition
-        if (!activeExpedition?.operationId) throw dispatchError
-        return {
-          success: true,
-          recovered: true,
-          expedition: activeExpedition,
-          serverNowMs: dispatchError?.details?.serverNowMs,
-        }
-      }),
+      () => isGuest
+        ? guestGalaxy.dispatchRover(dispatchRoute, operationId)
+        : callGalaxy('startGalaxyRoverExpedition', { route: dispatchRoute, operationId }).catch((dispatchError) => {
+          const activeExpedition = dispatchError?.details?.expedition
+          if (!activeExpedition?.operationId) throw dispatchError
+          return {
+            success: true,
+            recovered: true,
+            expedition: activeExpedition,
+            serverNowMs: dispatchError?.details?.serverNowMs,
+          }
+        }),
       (dispatchResult) => {
         const title = dispatchResult?.expedition?.routeTitle || '장거리 로버 원정'
         const readyAt = formatGalaxyTime(dispatchResult?.expedition?.readyAtMs)
+        if (dispatchResult?.frontierStory?.completedChapterIds?.includes('prologue') && !frontierStory.completedChapterIds?.includes('prologue')) {
+          return `${title}이 출항했습니다. 기억 조각 4/4 복원 · 아스트라 프론티어 프롤로그 완성!`
+        }
         return dispatchResult?.recovered
           ? `이미 진행 중인 ${title} 기록을 복원했습니다.${readyAt ? ` ${readyAt} 귀환 예정입니다.` : ''}`
           : `${title}을 시작했습니다.${readyAt ? ` ${readyAt} 귀환 예정입니다.` : ''}`
@@ -1561,7 +1712,11 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     const receivedAtMs = Date.now()
     setHome((current) => {
       if (!current) return current
-      const nextOwnPlanet = { ...current.ownPlanet, roverExpedition: result.expedition }
+      const nextOwnPlanet = {
+        ...current.ownPlanet,
+        roverExpedition: result.expedition,
+        frontierStory: result.frontierStory || current.ownPlanet?.frontierStory,
+      }
       return {
         ...current,
         serverNowMs: result.serverNowMs || current.serverNowMs,
@@ -1569,7 +1724,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           ? Number(result.serverNowMs) - receivedAtMs
           : current.serverClockOffsetMs,
         ownPlanet: nextOwnPlanet,
-        ...(targetUid === user?.uid ? { planet: nextOwnPlanet } : {}),
+        ...((isGuest || targetUid === user?.uid) ? { planet: nextOwnPlanet } : {}),
       }
     })
     setNowMs(receivedAtMs)
@@ -1584,11 +1739,16 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     const requestAudioSessionKey = audioSessionKey
     const result = await runAction(
       'rover:claim',
-      () => callGalaxy('claimGalaxyRoverExpedition', { operationId: roverExpedition.operationId }),
+      () => isGuest
+        ? guestGalaxy.claimRover()
+        : callGalaxy('claimGalaxyRoverExpedition', { operationId: roverExpedition.operationId }),
       (claimResult) => {
         const reward = claimResult?.claimResult?.reward || {}
         const discovery = claimResult?.claimResult?.discovery || {}
-        return `${reward.title || '원정 재료'} ${reward.amount || 0}개와 ${discovery.name || '새 발견 기록'}을 수령했습니다.`
+        const base = `${reward.title || '원정 재료'} ${reward.amount || 0}개와 ${discovery.name || '새 발견 기록'}을 수령했습니다.`
+        return claimResult?.frontierStory?.completedChapterIds?.includes('first_signal') && !frontierStory.completedChapterIds?.includes('first_signal')
+          ? `${base} 제1장 ‘깨어난 신호’ 완성!`
+          : base
       },
     )
     if (
@@ -1615,6 +1775,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         roverExpedition: result.expedition,
         roverDiscoveries: nextDiscoveries,
         materials: result.claimResult.materials || current.ownPlanet?.materials || {},
+        frontierStory: result.frontierStory || current.ownPlanet?.frontierStory,
       }
       return {
         ...current,
@@ -1623,7 +1784,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           ? Number(result.serverNowMs) - receivedAtMs
           : current.serverClockOffsetMs,
         ownPlanet: nextOwnPlanet,
-        ...(targetUid === user?.uid ? { planet: nextOwnPlanet } : {}),
+        ...((isGuest || targetUid === user?.uid) ? { planet: nextOwnPlanet } : {}),
       }
     })
     setNowMs(receivedAtMs)
@@ -1676,13 +1837,77 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       return
     }
     if (todayObjective.action === 'build') {
+      const missingCoreFacility = FRONTIER_CORE_FACILITY_IDS.find((itemId) => !ownLayout.some((item) => item?.itemId === itemId && item?.locked !== true))
+      const objectiveItemId = todayObjective.itemId || (frontierStory.stepId === 'complete_core_facilities' ? missingCoreFacility : '')
+      if (objectiveItemId) {
+        setFocusedBuildItemId(objectiveItemId)
+        setFocusedBuildLevel(1)
+      }
       openGameMenu('build')
+      return
+    }
+    if (todayObjective.action === 'neighbors') {
+      if (isGuest) {
+        if (frontierStory.stepId === 'visit_friend_planet') {
+          visitNeighbor('guest-training-neighbor')
+          return
+        }
+        const result = guestGalaxy.helpTrainingNeighbor()
+        setHome((current) => current ? {
+          ...current,
+          ownPlanet: { ...current.ownPlanet, frontierStory: result.frontierStory },
+          planet: { ...current.planet, frontierStory: result.frontierStory },
+          neighbors: (current.neighbors || []).map((neighbor) => neighbor.uid === 'guest-training-neighbor' ? {
+            ...neighbor,
+            connectionXp: result.guestRouteXp,
+            routeLevel: result.routeLevel,
+            nextLevelXp: Math.max(0, 20 - result.guestRouteXp),
+            interactionCount: Math.max(0, Number(neighbor.interactionCount || 0)) + 1,
+          } : neighbor),
+        } : current)
+        flash(result.routeLevel >= 2
+          ? '루미와 안정 항로 레벨 2를 해금했습니다. 친구의 신호가 기억망에 연결되었습니다.'
+          : '훈련 행성에 도움 신호를 남겼습니다. 한 번 더 도우면 안정 항로 레벨 2가 열립니다.')
+        return
+      }
+      if (!isOwner) {
+        setArrivalOpen(false)
+        setMenu('')
+        flash(frontierStory.stepId === 'unlock_shared_route'
+          ? '이 친구의 시설이나 자원 지점 가까이에서 E키로 도움을 반복해 연결 XP 20을 모으세요.'
+          : '친구 시설이나 자원 지점 가까이에서 E키를 눌러 도움 신호를 남기세요.')
+        return
+      }
+      openGameMenu('neighbors')
+      return
+    }
+    if (todayObjective.action === 'story-world') {
+      setArrivalOpen(false)
+      setMenu('')
+      flash('왼쪽 아래 행성 지도에서 고장 난 비콘을 찾아 이동하세요. 가까이에서 E키를 누르면 귀환 신호가 복구됩니다.')
+      return
+    }
+    if (todayObjective.action === 'care') {
+      if (neighbors.some((neighbor) => !neighbor.blocked)) {
+        openGameMenu('neighbors')
+        flash('방문 가능한 크루 이웃을 골라 시설이나 자원 지점 가까이에서 E키로 도움을 남기세요. 내 시설을 돌봐도 진행됩니다.')
+      } else {
+        setArrivalOpen(false)
+        setMenu('')
+        flash('내 개척자 돔이나 별빛 램프 가까이에서 E키를 눌러 시설을 돌보세요.')
+      }
       return
     }
     if (todayObjective.action === 'daily-event') {
       setArrivalOpen(false)
       setMenu('')
       flash('왼쪽 아래 행성 지도에서 ‘나’와 [✦ 사건 현장]을 잇는 점선 방향으로 이동하세요. 도착하면 E키(모바일: 사건 버튼)를 눌러 해결합니다.')
+      return
+    }
+    if (todayObjective.action === 'activate-gateway') {
+      setArrivalOpen(false)
+      setMenu('')
+      flash('아스트라 항로문을 찾아 가까이에서 E키를 누르세요. 항로문이 별의 기억을 다시 연결합니다.')
       return
     }
     setArrivalOpen(false)
@@ -1704,12 +1929,15 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   const menuMeta = MENU_META[menu] || MENU_META.passport
   const MenuIcon = menuMeta.Icon
+  const firstLightStoryGrant = focusedBuildItem
+    ? isFirstLightStoryGrant(frontierStory, effectiveFocusedBuildItemId, focusedBuildLevel)
+    : false
   const focusedHasMaterial = focusedBuildItem
-    ? Number(ownPlanet.materials?.[focusedBuildItem.material] || 0) >= Number(focusedBuildItem.materialCost || 0)
+    ? firstLightStoryGrant || Number(ownPlanet.materials?.[focusedBuildItem.material] || 0) >= Number(focusedBuildItem.materialCost || 0)
     : false
   const focusedStage2Ready = Boolean(focusedBuildItem?.stage2Available)
   const focusedUpgradeCost = focusedBuildLevel >= 2 ? Number(focusedBuildItem?.stage2Cost || 0) : 0
-  const focusedTotalCost = Number(focusedBuildItem?.cost || 0) + focusedUpgradeCost
+  const focusedTotalCost = firstLightStoryGrant ? 0 : Number(focusedBuildItem?.cost || 0) + focusedUpgradeCost
   const focusedCanAfford = focusedBuildItem ? wallet >= focusedTotalCost : false
   const FocusedItemIcon = ITEM_ICONS[effectiveFocusedBuildItemId] || Building2
   const DailyEventIcon = DAILY_EVENT_ICONS[dailyEvent?.type] || Sparkles
@@ -1745,6 +1973,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       )}
       <GalaxyWorld3D
         planet={planet}
+        frontierStory={isOwner ? frontierStory : planet.frontierStory}
+        restorationPercent={frontierStory.restorationPercent}
         audioSessionKey={audioSessionKey}
         materials={(isOwner ? planet : ownPlanet).materials || {}}
         missionReady={isOwner && missionCooldown.ready}
@@ -1956,7 +2186,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                 <div>
                   <small>LUMI RETURN BRIEFING</small>
                   <h2 id="frontier-arrival-title">루미의 귀환 브리핑</h2>
-                  <p>암흑물질 폭풍 뒤에 잠든 작은 별이 다시 당신의 신호를 기다리고 있어요.</p>
+                  <p>{storyObjective
+                    ? `${storyObjective.chapterTitle} · 전체 복원율 ${frontierStory.restorationPercent}% · ${storyObjective.title}`
+                    : '암흑물질 폭풍 뒤에 잠든 작은 별이 다시 당신의 신호를 기다리고 있어요.'}</p>
                 </div>
                 <button ref={arrivalCloseRef} type="button" onClick={() => setArrivalOpen(false)} aria-label="브리핑 닫기"><X size={20} aria-hidden="true" /></button>
               </header>
@@ -1981,10 +2213,10 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                       : `세 항로 중 하나를 골라 ${hasRoverBay ? '6시간' : '8시간'} 장거리 원정을 시작할 수 있어요.`}
                 />
                 <BriefingCard
-                  Icon={dailyEventPending ? Package : Compass}
-                  overline={dailyEventPending ? '현장 안정화 보상' : todayObjective.eyebrow}
-                  title={dailyEventPending ? dailyRewardLabel : todayObjective.title}
-                  detail={dailyEventPending ? '표시된 현장까지 직접 이동해 E키로 해결하면 서버가 오늘 보상을 한 번만 지급합니다.' : todayObjective.detail}
+                  Icon={storyObjective ? Compass : dailyEventPending ? Package : Compass}
+                  overline={storyObjective ? todayObjective.eyebrow : dailyEventPending ? '현장 안정화 보상' : todayObjective.eyebrow}
+                  title={storyObjective ? todayObjective.title : dailyEventPending ? dailyRewardLabel : todayObjective.title}
+                  detail={storyObjective ? todayObjective.detail : dailyEventPending ? '표시된 현장까지 직접 이동해 E키로 해결하면 서버가 오늘 보상을 한 번만 지급합니다.' : todayObjective.detail}
                   accent
                 />
               </div>
@@ -1992,10 +2224,29 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
               <footer className="frontier-arrival-actions">
                 <button type="button" className="galaxy-secondary-btn" onClick={() => openGameMenu('logs')}><Radio size={17} aria-hidden="true" /> 신호 기록 보기</button>
                 <button type="button" className={roverStatus === 'ready' ? 'galaxy-primary-btn' : 'galaxy-secondary-btn'} onClick={() => openGameMenu('rover')}><Satellite size={17} aria-hidden="true" /> {roverStatus === 'ready' ? '귀환 상자 열기' : '로버 관제 열기'}</button>
-                <button type="button" className="galaxy-primary-btn" onClick={() => setArrivalOpen(false)}>
-                  {dailyEventPending ? <><MapPin size={17} aria-hidden="true" /> 사건 현장으로 출발</> : <>행성으로 들어가기 <DoorOpen size={17} aria-hidden="true" /></>}
+                <button type="button" className="galaxy-primary-btn" onClick={handleObjectiveAction}>
+                  {storyObjective
+                    ? <><MapPin size={17} aria-hidden="true" /> {storyObjective.chapterTitle} 계속하기</>
+                    : dailyEventPending
+                      ? <><MapPin size={17} aria-hidden="true" /> 사건 현장으로 출발</>
+                      : <>행성으로 들어가기 <DoorOpen size={17} aria-hidden="true" /></>}
                 </button>
               </footer>
+            </Motion.section>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {finaleOpen && (
+          <Motion.div className="frontier-arrival-backdrop frontier-finale-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Motion.section className="frontier-arrival-panel frontier-finale-panel" role="dialog" aria-modal="true" aria-labelledby="frontier-finale-title" initial={{ opacity: 0, scale: .9, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .96 }}>
+              <Sparkles size={46} aria-hidden="true" />
+              <small>ASTRA MEMORY NETWORK · 100%</small>
+              <h2 id="frontier-finale-title">별의 기억이 돌아왔습니다</h2>
+              <p>꺼진 귀환등에서 시작한 모든 신호가 하나의 항로가 되었습니다. 하늘과 식생, 루미 생명체와 시설의 빛이 완전히 복원되었습니다.</p>
+              <div className="frontier-finale-progress"><i style={{ width: '100%' }} /></div>
+              <button type="button" className="galaxy-primary-btn" onClick={() => setFinaleOpen(false)}><DoorOpen size={17} aria-hidden="true" /> 복원된 아스트라로 돌아가기</button>
             </Motion.section>
           </Motion.div>
         )}
@@ -2070,8 +2321,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                             </button>
                           </div>
                           <div className="frontier-build-costs">
-                            <span className={focusedCanAfford ? 'ready' : 'short'}><Gem size={15} aria-hidden="true" /> 학습 광석 {focusedTotalCost}{focusedBuildLevel >= 2 ? ` (기본 ${focusedBuildItem.cost} + 성장 ${focusedUpgradeCost})` : ''}</span>
-                            <span className={focusedHasMaterial ? 'ready' : 'short'}><Package size={15} aria-hidden="true" /> {MATERIAL_LABELS[focusedBuildItem.material]} {focusedBuildItem.materialCost}개 필요 · 보유 {Number(ownPlanet.materials?.[focusedBuildItem.material] || 0)}개</span>
+                            <span className={focusedCanAfford ? 'ready' : 'short'}><Gem size={15} aria-hidden="true" /> {firstLightStoryGrant ? '프롤로그 지원 · 학습 광석 0' : `학습 광석 ${focusedTotalCost}${focusedBuildLevel >= 2 ? ` (기본 ${focusedBuildItem.cost} + 성장 ${focusedUpgradeCost})` : ''}`}</span>
+                            <span className={focusedHasMaterial ? 'ready' : 'short'}><Package size={15} aria-hidden="true" /> {firstLightStoryGrant ? '첫 빛 건설 재료 지원' : `${MATERIAL_LABELS[focusedBuildItem.material]} ${focusedBuildItem.materialCost}개 필요 · 보유 ${Number(ownPlanet.materials?.[focusedBuildItem.material] || 0)}개`}</span>
                           </div>
                           <button type="button" className="galaxy-primary-btn frontier-build-cta" disabled={Boolean(busy) || !focusedHasMaterial || !focusedCanAfford} onClick={() => beginBuild(effectiveFocusedBuildItemId, focusedBuildLevel)}>
                             {focusedHasMaterial && focusedCanAfford ? <><MapPin size={17} aria-hidden="true" /> 월드에서 자리 선택</> : <><LockKeyhole size={17} aria-hidden="true" /> 부족한 재료 확인</>}
@@ -2090,14 +2341,15 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                             const ItemIcon = ITEM_ICONS[itemId] || Building2
                             const storyBase = BUILD_ITEM_STORIES[itemId] || FALLBACK_BUILD_STORY
                             const story = { ...storyBase, set: item.setName || storyBase.set }
-                            const hasMaterial = Number(ownPlanet.materials?.[item.material] || 0) >= Number(item.materialCost || 0)
-                            const canAfford = wallet >= Number(item.cost || 0)
+                            const storyGrant = isFirstLightStoryGrant(frontierStory, itemId, 1)
+                            const hasMaterial = storyGrant || Number(ownPlanet.materials?.[item.material] || 0) >= Number(item.materialCost || 0)
+                            const canAfford = storyGrant || wallet >= Number(item.cost || 0)
                             const available = hasMaterial && canAfford
                             return (
                               <button type="button" key={itemId} className={`frontier-build-option${effectiveFocusedBuildItemId === itemId ? ' selected' : ''}${available ? '' : ' unavailable'}`} onClick={() => { setFocusedBuildItemId(itemId); setFocusedBuildLevel(1) }}>
                                 <span className="frontier-build-option-icon"><ItemIcon size={21} aria-hidden="true" /></span>
                                 <div><small>{story.overline}</small><strong>{item.name}</strong><p>{story.set}</p></div>
-                                <span className={`frontier-build-option-state material-${item.material}`}>{MATERIAL_LABELS[item.material]} {item.materialCost}개 필요 · 보유 {Number(ownPlanet.materials?.[item.material] || 0)}개 {available ? '· 설계 가능' : ''}</span>
+                                <span className={`frontier-build-option-state material-${item.material}`}>{storyGrant ? '프롤로그 지원 · 무료 설계' : `${MATERIAL_LABELS[item.material]} ${item.materialCost}개 필요 · 보유 ${Number(ownPlanet.materials?.[item.material] || 0)}개 ${available ? '· 설계 가능' : ''}`}</span>
                               </button>
                             )
                           })}
@@ -2155,10 +2407,10 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                               <button type="button" className="frontier-neighbor-card__cta" disabled={isPrivate} onClick={() => visitNeighbor(neighbor.uid)}>
                                 {neighbor.blocked ? <><Ban size={16} aria-hidden="true" /> 차단됨</> : isPrivate ? <><LockKeyhole size={16} aria-hidden="true" /> 휴식 중</> : targetUid === neighbor.uid ? <><Eye size={16} aria-hidden="true" /> 방문 중</> : <><Rocket size={16} aria-hidden="true" /> 워프</>}
                               </button>
-                              <button type="button" className="frontier-neighbor-card__safety" disabled={busy === `safety:block:${neighbor.uid}`} onClick={() => setNeighborBlocked(neighbor, !neighbor.blocked)}>
+                              {!isGuest && <button type="button" className="frontier-neighbor-card__safety" disabled={busy === `safety:block:${neighbor.uid}`} onClick={() => setNeighborBlocked(neighbor, !neighbor.blocked)}>
                                 <Ban size={14} aria-hidden="true" /> {neighbor.blocked ? '차단 해제' : '차단'}
-                              </button>
-                              {!neighbor.blocked && (
+                              </button>}
+                              {!isGuest && !neighbor.blocked && (
                                 <button type="button" className="frontier-neighbor-card__safety report" disabled={busy === `safety:report:${neighbor.uid}`} onClick={() => reportNeighbor(neighbor)}>
                                   <Flag size={14} aria-hidden="true" /> 신고
                                 </button>

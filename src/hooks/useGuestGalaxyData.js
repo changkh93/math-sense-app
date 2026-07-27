@@ -1,10 +1,18 @@
 import { useState, useCallback, useMemo } from 'react';
 import {
   GALAXY_ITEM_CATALOG,
+  GALAXY_MISSION_ROUTES,
+  GALAXY_ROVER_ROUTES,
   GUEST_STARTER_OBJECTS,
   getGuestBuildCost,
   getGuestItemName,
-} from '../utils/galaxyGame';
+} from '../utils/galaxyGame.js';
+import {
+  advanceFrontierStory,
+  createInitialFrontierStory,
+  isFirstLightStoryGrant,
+  normalizeFrontierStory,
+} from '../utils/frontierStory.js';
 
 const STORAGE_KEY = 'metasense_guest_astra_data';
 const DAILY_GUEST_CRYSTALS = 500;
@@ -57,26 +65,28 @@ function createStarterDome() {
 const DEFAULT_GUEST_DATA = {
   crystals: DAILY_GUEST_CRYSTALS,
   lastGrantedAt: getTodayDateStringKey(),
+  guestRouteXp: 0,
   planet: {
     theme: 'forest',
     layout: [createStarterDome()],
+    materials: { stardust: 8, biofiber: 4, crystalGlass: 2, alloy: 1 },
+    stats: { gardenVitality: 60, facilityHealth: 70, creatureHappiness: 55, admirationCount: 0, visits: 0 },
+    frontierStory: createInitialFrontierStory(),
+    lastMissionAtMs: 0,
+    roverExpedition: null,
+    roverDiscoveries: [],
+    lastDailyEventDayKey: '',
   },
 };
 
-function readFromStorage() {
-  if (typeof window === 'undefined') return DEFAULT_GUEST_DATA;
+export function normalizeGuestGalaxyData(parsed = {}, today = getTodayDateStringKey()) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_GUEST_DATA;
-    const parsed = JSON.parse(raw);
-
     // 1) layout 을 항상 정규 스키마로 맞춘다. (옛날 형식 호환)
     const rawLayout = Array.isArray(parsed?.planet?.layout) ? parsed.planet.layout : []
     const normalizedLayout = rawLayout.map(normalizeLayoutItem).filter(Boolean)
     if (normalizedLayout.length === 0) normalizedLayout.push(createStarterDome())
 
     // 2) 일일 기본 광석 리셋 체크
-    const today = getTodayDateStringKey();
     const lastGrantedAt = parsed?.lastGrantedAt || today;
     const crystals = lastGrantedAt !== today
       ? DAILY_GUEST_CRYSTALS
@@ -85,12 +95,30 @@ function readFromStorage() {
     const nextData = {
       crystals,
       lastGrantedAt: today,
+      guestRouteXp: Math.max(0, Number(parsed?.guestRouteXp || 0)),
       planet: {
         theme: parsed?.planet?.theme || 'forest',
         layout: normalizedLayout,
+        materials: { ...DEFAULT_GUEST_DATA.planet.materials, ...(parsed?.planet?.materials || {}) },
+        stats: { ...DEFAULT_GUEST_DATA.planet.stats, ...(parsed?.planet?.stats || {}) },
+        frontierStory: normalizeFrontierStory(parsed?.planet?.frontierStory),
+        lastMissionAtMs: Math.max(0, Number(parsed?.planet?.lastMissionAtMs || 0)),
+        roverExpedition: parsed?.planet?.roverExpedition || null,
+        roverDiscoveries: Array.isArray(parsed?.planet?.roverDiscoveries) ? parsed.planet.roverDiscoveries : [],
+        lastDailyEventDayKey: String(parsed?.planet?.lastDailyEventDayKey || ''),
       },
     };
     return nextData;
+  } catch {
+    return DEFAULT_GUEST_DATA;
+  }
+}
+
+function readFromStorage() {
+  if (typeof window === 'undefined') return DEFAULT_GUEST_DATA;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? normalizeGuestGalaxyData(JSON.parse(raw)) : DEFAULT_GUEST_DATA;
   } catch {
     return DEFAULT_GUEST_DATA;
   }
@@ -111,7 +139,9 @@ export function useGuestGalaxyData() {
   }, []);
 
   const buildItem = useCallback((itemId, x = 48, y = 48) => {
-    const cost = getGuestBuildCost(itemId);
+    const level = 1;
+    const storyGrantApplied = isFirstLightStoryGrant(guestData.planet?.frontierStory, itemId, level);
+    const cost = storyGrantApplied ? 0 : getGuestBuildCost(itemId);
     if (guestData.crystals < cost) {
       throw new Error('광석이 부족합니다.');
     }
@@ -128,16 +158,182 @@ export function useGuestGalaxyData() {
       rotation: 0,
       createdAtMs: Date.now(),
     });
+    const nextLayout = [...(guestData.planet?.layout || []), newItem];
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
+      type: 'item_built',
+      itemId,
+      level,
+      builtItemIds: nextLayout.map((entry) => entry?.itemId).filter(Boolean),
+      discoveryCount: Array.isArray(guestData.planet?.roverDiscoveries) ? guestData.planet.roverDiscoveries.length : 0,
+    });
     const nextData = {
       ...guestData,
       crystals: Math.max(0, guestData.crystals - cost),
       planet: {
         ...guestData.planet,
-        layout: [...(guestData.planet?.layout || []), newItem],
+        layout: nextLayout,
+        frontierStory,
       },
     };
     persist(nextData);
-    return newItem;
+    return { item: newItem, planet: nextData.planet, wallet: nextData.crystals, storyGrantApplied };
+  }, [guestData, persist]);
+
+  const performWorldAction = useCallback((node) => {
+    const rewards = {
+      crystal: { material: 'crystalGlass', amount: 1, label: '수정 파편을 채집했습니다.' },
+      fiber: { material: 'biofiber', amount: 1, label: '루멘 섬유를 채집했습니다.' },
+      salvage: { material: 'alloy', amount: 1, label: '고대 합금을 회수했습니다.' },
+      beacon: { material: 'stardust', amount: 1, label: '신호기를 수리하고 별가루를 찾았습니다.' },
+      plant: { material: 'stardust', amount: 0, label: '황무지에 루멘 새싹을 심었습니다.' },
+    };
+    const reward = rewards[node?.actionId];
+    if (!reward) throw new Error('월드 상호작용 정보가 올바르지 않습니다.');
+    const materials = { ...(guestData.planet?.materials || {}) };
+    materials[reward.material] = Math.max(0, Number(materials[reward.material] || 0)) + reward.amount;
+    const stats = { ...(guestData.planet?.stats || {}) };
+    if (node.actionId === 'beacon') stats.facilityHealth = Math.min(100, Number(stats.facilityHealth || 0) + 6);
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, { type: 'world_action', nodeId: node.id });
+    const planet = { ...guestData.planet, materials, stats, frontierStory };
+    const nextData = { ...guestData, planet };
+    persist(nextData);
+    return { ...reward, materials, stats, frontierStory, planet };
+  }, [guestData, persist]);
+
+  const completeMission = useCallback((route) => {
+    const routeInfo = GALAXY_MISSION_ROUTES[route] || GALAXY_MISSION_ROUTES.nebula;
+    const nowMs = Date.now();
+    const materials = { ...(guestData.planet?.materials || {}) };
+    const amount = Number(routeInfo.baseReward || 1);
+    materials[routeInfo.rewardMaterial] = Math.max(0, Number(materials[routeInfo.rewardMaterial] || 0)) + amount;
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, { type: 'mission_completed' }, nowMs);
+    const planet = { ...guestData.planet, materials, frontierStory, lastMissionAtMs: nowMs };
+    persist({ ...guestData, planet });
+    return {
+      reward: { material: routeInfo.rewardMaterial, amount, title: routeInfo.reward },
+      nextMissionAtMs: nowMs + (2 * 60 * 60 * 1000),
+      frontierStory,
+      planet,
+    };
+  }, [guestData, persist]);
+
+  const dispatchRover = useCallback((route, operationId) => {
+    const routeInfo = GALAXY_ROVER_ROUTES[route] || GALAXY_ROVER_ROUTES.nebula;
+    const nowMs = Date.now();
+    const readyAtMs = nowMs + (8 * 60 * 60 * 1000);
+    const expedition = {
+      operationId,
+      route,
+      routeTitle: routeInfo.label,
+      status: 'exploring',
+      startedAtMs: nowMs,
+      readyAtMs,
+      returnsAtMs: readyAtMs,
+      reward: { material: routeInfo.rewardMaterial, amount: Number(routeInfo.baseReward || 1), title: routeInfo.reward },
+    };
+    let frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, { type: 'rover_dispatched' }, nowMs);
+    if (guestData.planet?.lastDailyEventDayKey === guestData.lastGrantedAt) {
+      frontierStory = advanceFrontierStory(frontierStory, {
+        type: 'daily_event_completed',
+        nodeId: 'broken_beacon',
+      }, nowMs);
+    }
+    const planet = { ...guestData.planet, roverExpedition: expedition, frontierStory };
+    persist({ ...guestData, planet });
+    return { expedition, frontierStory, planet, serverNowMs: nowMs };
+  }, [guestData, persist]);
+
+  const completeDailyEvent = useCallback(() => {
+    const dayKey = guestData.lastGrantedAt || getTodayDateStringKey();
+    const materials = { ...(guestData.planet?.materials || {}) };
+    const stats = { ...(guestData.planet?.stats || {}) };
+    materials.stardust = Math.max(0, Number(materials.stardust || 0)) + 1;
+    stats.facilityHealth = Math.min(100, Number(stats.facilityHealth || 0) + 6);
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
+      type: 'daily_event_completed',
+      nodeId: 'broken_beacon',
+    });
+    const planet = { ...guestData.planet, materials, stats, frontierStory, lastDailyEventDayKey: dayKey };
+    persist({ ...guestData, planet });
+    return {
+      dailyEvent: {
+        eventId: `guest_signal_${dayKey}`,
+        dayKey,
+        type: 'signal_blackout',
+        nodeId: 'broken_beacon',
+        title: '귀환 신호 재점화',
+        status: 'completed',
+        reward: { material: 'stardust', amount: 1, title: '별가루' },
+      },
+      reward: { material: 'stardust', amount: 1, title: '별가루' },
+      materials,
+      stats,
+      frontierStory,
+      planet,
+    };
+  }, [guestData, persist]);
+
+  const careForStructure = useCallback((item) => {
+    const materials = { ...(guestData.planet?.materials || {}) };
+    const material = ['lumen_tree', 'crystal_pond', 'starflower_garden'].includes(item?.itemId) ? 'biofiber' : 'alloy';
+    materials[material] = Math.max(0, Number(materials[material] || 0)) + 1;
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
+      type: 'structure_cared',
+      itemId: item?.itemId || '',
+    });
+    const planet = { ...guestData.planet, materials, frontierStory };
+    persist({ ...guestData, planet });
+    return { materials, frontierStory, planet, material, amount: 1, label: `${item?.name || '행성 시설'} 돌보기를 마쳤습니다.` };
+  }, [guestData, persist]);
+
+  const claimRover = useCallback(() => {
+    const expedition = guestData.planet?.roverExpedition;
+    const nowMs = Date.now();
+    if (!expedition?.operationId) throw new Error('수령할 로버 원정 기록이 없습니다.');
+    if (Number(expedition.readyAtMs || expedition.returnsAtMs || 0) > nowMs) throw new Error('탐사 로버가 아직 귀환하지 않았습니다.');
+    const routeInfo = GALAXY_ROVER_ROUTES[expedition.route] || GALAXY_ROVER_ROUTES.nebula;
+    const reward = expedition.reward || { material: routeInfo.rewardMaterial, amount: routeInfo.baseReward, title: routeInfo.reward };
+    const discovery = routeInfo.discoveries[0];
+    const materials = { ...(guestData.planet?.materials || {}) };
+    materials[reward.material] = Math.max(0, Number(materials[reward.material] || 0)) + Number(reward.amount || 0);
+    const roverDiscoveries = Array.isArray(guestData.planet?.roverDiscoveries) ? [...guestData.planet.roverDiscoveries] : [];
+    if (!roverDiscoveries.some((entry) => entry?.id === discovery.id)) roverDiscoveries.push({ ...discovery, discoveredAtMs: nowMs });
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
+      type: 'rover_claimed',
+      discoveryCount: roverDiscoveries.length,
+      builtItemIds: (guestData.planet?.layout || []).map((entry) => entry?.itemId).filter(Boolean),
+    }, nowMs);
+    const claimedExpedition = { ...expedition, status: 'claimed', claimedAtMs: nowMs };
+    const planet = { ...guestData.planet, materials, roverDiscoveries, roverExpedition: claimedExpedition, frontierStory };
+    persist({ ...guestData, planet });
+    return {
+      expedition: claimedExpedition,
+      claimResult: { reward, discovery, materials, claimedAtMs: nowMs },
+      frontierStory,
+      planet,
+      serverNowMs: nowMs,
+    };
+  }, [guestData, persist]);
+
+  const visitTrainingNeighbor = useCallback(() => {
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, { type: 'friend_visited' });
+    const planet = { ...guestData.planet, frontierStory };
+    persist({ ...guestData, planet });
+    return { frontierStory, planet };
+  }, [guestData, persist]);
+
+  const helpTrainingNeighbor = useCallback(() => {
+    const guestRouteXp = Math.max(0, Number(guestData.guestRouteXp || 0)) + 10;
+    const routeLevel = guestRouteXp >= 20 ? 2 : 1;
+    const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
+      type: 'social_help_completed',
+      routeLevel,
+      discoveryCount: Array.isArray(guestData.planet?.roverDiscoveries) ? guestData.planet.roverDiscoveries.length : 0,
+      builtItemIds: (guestData.planet?.layout || []).map((entry) => entry?.itemId).filter(Boolean),
+    });
+    const planet = { ...guestData.planet, frontierStory };
+    persist({ ...guestData, guestRouteXp, planet });
+    return { frontierStory, planet, guestRouteXp, routeLevel };
   }, [guestData, persist]);
 
   const removeBuildItem = useCallback((instanceId) => {
@@ -153,50 +349,70 @@ export function useGuestGalaxyData() {
 
   const mockHomeData = useMemo(() => {
     const layout = guestData.planet?.layout || [];
+    const planet = {
+      ownerName: '게스트 탐사원',
+      theme: guestData.planet?.theme || 'forest',
+      layout,
+      materials: guestData.planet?.materials || DEFAULT_GUEST_DATA.planet.materials,
+      stats: guestData.planet?.stats || DEFAULT_GUEST_DATA.planet.stats,
+      frontierStory: normalizeFrontierStory(guestData.planet?.frontierStory),
+      lastMissionAtMs: guestData.planet?.lastMissionAtMs || 0,
+      roverExpedition: guestData.planet?.roverExpedition || null,
+      roverDiscoveries: guestData.planet?.roverDiscoveries || [],
+      visitMode: 'private',
+    };
+    const dayKey = guestData.lastGrantedAt;
+    const dailyEvent = {
+      eventId: `guest_signal_${dayKey}`,
+      dayKey,
+      type: 'signal_blackout',
+      nodeId: 'broken_beacon',
+      title: '귀환 신호 재점화',
+      detail: '폭풍 뒤에 흔들리는 귀환 신호를 다시 안정화하세요.',
+      status: guestData.planet?.lastDailyEventDayKey === dayKey ? 'completed' : 'pending',
+      reward: { material: 'stardust', amount: 1, title: '별가루' },
+    };
     return {
       // 서버 카탈로그가 없는 게스트는 프론트엔드 카탈로그 사본으로 채운다.
       catalog: { ...GALAXY_ITEM_CATALOG, ...GUEST_STARTER_OBJECTS },
-      ownPlanet: {
-        ownerName: '게스트 탐사원',
-        theme: guestData.planet?.theme || 'forest',
-        layout,
-        materials: {
-          stardust: 10,
-          biofiber: 10,
-          crystalGlass: 10,
-          alloy: 10,
-        },
-        gardenVitality: 100,
-        facilityHealth: 100,
-        creatureHappiness: 100,
-        admirationCount: 0,
-      },
-      targetPlanet: {
-        ownerName: '게스트 탐사원',
-        theme: guestData.planet?.theme || 'forest',
-        layout,
-        gardenVitality: 100,
-        facilityHealth: 100,
-        creatureHappiness: 100,
-        admirationCount: 0,
-      },
+      ownPlanet: planet,
+      planet,
       userCrystals: guestData.crystals,
       wallet: guestData.crystals,
-      materials: {
-        stardust: 10,
-        biofiber: 10,
-        crystalGlass: 10,
-        alloy: 10,
-      },
-      serverNowMs: Date.now(),
+      materials: planet.materials,
+      neighbors: [{
+        uid: 'guest-training-neighbor',
+        displayName: '루미 안내원',
+        planetName: '훈련용 메아리 행성',
+        theme: 'crystal',
+        visitMode: 'crew',
+        shipHullTier: 1,
+        tagline: '친구 방문과 도움 항로를 안전하게 연습하는 게스트 시뮬레이션입니다.',
+        blocked: false,
+        routeLevel: Math.max(1, Number(guestData.guestRouteXp || 0) >= 20 ? 2 : 1),
+        connectionXp: Math.max(0, Number(guestData.guestRouteXp || 0)),
+        nextLevelXp: Math.max(0, 20 - Number(guestData.guestRouteXp || 0)),
+        interactionCount: Math.floor(Math.max(0, Number(guestData.guestRouteXp || 0)) / 10),
+      }],
+      events: [],
+      dailyEvent,
+      learningState: { shipHullTier: 1, lifetimeLearningOre: 0, abilitySnapshot: { values: {} } },
     };
-  }, [guestData.crystals, guestData.planet?.layout, guestData.planet?.theme]);
+  }, [guestData]);
 
   return {
     guestData,
     mockHomeData,
     buildItem,
+    careForStructure,
+    claimRover,
+    completeDailyEvent,
+    completeMission,
+    dispatchRover,
+    performWorldAction,
+    helpTrainingNeighbor,
     removeBuildItem,
     saveGuestData: persist,
+    visitTrainingNeighbor,
   };
 }

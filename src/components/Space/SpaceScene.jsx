@@ -3,6 +3,7 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { Stars, CameraControls, Environment, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import PlanetMesh from './PlanetMesh'
+import { checkWebGLSupport } from '../../utils/webglSupport'
 
 const MIDDLE_MATH_PLANET_STYLES = [
   { planetType: 'middle_math_core', planetColor: '#59c8ff' },
@@ -515,16 +516,6 @@ class CanvasErrorBoundary extends React.Component {
       );
     }
     return this.props.children;
-  }
-}
-
-export function checkWebGLSupport() {
-  try {
-    const canvas = document.createElement('canvas');
-    return !!(window.WebGLRenderingContext && 
-      (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
-  } catch (e) {
-    return false;
   }
 }
 
