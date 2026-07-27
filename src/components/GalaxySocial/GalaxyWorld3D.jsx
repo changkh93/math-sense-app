@@ -1221,6 +1221,200 @@ function MatureRoverBay({ scale = 1, ghost = false, dynamicLightActive = false }
   )
 }
 
+// 수정 연못 Stage 2: 외행성 수정 생태 샘(Xenobiotic Crystal Spring).
+// 지하 광물수가 용출되어 수정성 암반과 수생 생태계를 형성한 천연 샘.
+// 가장 가까운 1개만 spotLight를 damp 보간으로 부드럽게 켜고, 나머지는 emissive로만 발광.
+// 자연 애니메이션(샘물 흐름, 유입부 물결, 수생 식물 미세 흔들림, 간헐 기포)으로 생태감 표현.
+function MatureCrystalPond({ scale = 1, ghost = false, dynamicLightActive = false }) {
+  const springMatRef = useRef()
+  const floraRef = useRef()
+  const rippleRefs = useRef([])
+  const bubbleRefs = useRef([])
+  const lightRef = useRef()
+  // spotLight target: 연못 중심 수면 방향. useMemo로 한 번만 생성.
+  const lightTarget = useMemo(() => {
+    const obj = new THREE.Object3D()
+    obj.position.set(0, 0.15, 0.2)
+    return obj
+  }, [])
+
+  useLayoutEffect(() => {
+    if (lightRef.current) lightRef.current.target = lightTarget
+  }, [lightTarget])
+
+  useFrame((state, delta) => {
+    if (ghost) return
+    const time = state.clock.elapsedTime
+
+    // 샘물 계류 투명도 미세 변화 (흐르는 느낌)
+    if (springMatRef.current) {
+      springMatRef.current.opacity = 0.48 + Math.sin(time * 0.7) * 0.025
+    }
+    // 수생 식물 미세 흔들림
+    if (floraRef.current) {
+      floraRef.current.rotation.z = Math.sin(time * 0.55) * 0.018
+    }
+    // 유입부 물결 링: scale 확장 + opacity 감소 루프
+    rippleRefs.current.forEach((ripple, index) => {
+      if (!ripple) return
+      const cycle = (time * 0.22 + index * 0.4) % 1
+      const scaleValue = 0.35 + cycle * 0.75
+      ripple.scale.setScalar(scaleValue)
+      ripple.material.opacity = (1 - cycle) * 0.14
+    })
+    // 간헐 기포: y 상승 + opacity 0 (Sparkles 대안, 자연 기포 표현)
+    bubbleRefs.current.forEach((bubble, index) => {
+      if (!bubble) return
+      const cycle = (time * 0.18 + index * 0.31) % 1
+      bubble.position.y = 0.16 + cycle * 0.22
+      bubble.material.opacity = cycle < 0.85 ? (1 - cycle / 0.85) * 0.5 : 0
+    })
+    // 동적 조명 intensity damp 보간
+    if (lightRef.current) {
+      const target = dynamicLightActive ? 0.22 : 0
+      lightRef.current.intensity = THREE.MathUtils.damp(lightRef.current.intensity, target, 5, delta)
+    }
+  })
+
+  return (
+    <group scale={scale}>
+      {/* === 5.1 불규칙 지면 기초 (타원형 + 외곽 바위) === */}
+      {/* 중앙 타원 기반 (scale 비대칭으로 자연형) */}
+      <mesh position={[0, .04, 0]} scale={[1.25, 1, 1.1]} receiveShadow><cylinderGeometry args={[1.55, 1.72, .16, 16]} /><ModelMaterial color="#314B56" roughness={.82} ghost={ghost} /></mesh>
+      {/* 외곽 바위 조각 (dodecahedron/cylinder 혼합, 불규칙 배치) */}
+      {[
+        [-1.5, .12, -.3, .35, .4], [1.55, .1, -.2, .3, .2], [-1.2, .08, .9, .28, .8],
+        [1.3, .12, .8, .32, 1.5], [-.6, .06, 1.3, .24, 2.2], [.7, .08, 1.35, .26, 3.0],
+        [-1.7, .14, -.8, .3, .9], [1.65, .12, -.7, .28, 1.8],
+      ].map(([x, y, z, s, rot], i) => (
+        <mesh key={`rock_${i}`} position={[x, y, z]} rotation={[0, rot, 0]} castShadow={!ghost} receiveShadow>
+          {i % 2 === 0 ? <dodecahedronGeometry args={[s, 0]} /> : <cylinderGeometry args={[s * .8, s, .16, 6]} />}
+          <ModelMaterial color={i % 3 === 0 ? '#263E48' : '#314B56'} roughness={i % 2 ? .55 : .82} ghost={ghost} />
+        </mesh>
+      ))}
+
+      {/* === 5.2 이중 수면 (깊은 수역 + 상부 수면) === */}
+      {/* 깊은 수역 (짙은 청록, scale 비대칭) */}
+      <mesh position={[0.05, .13, 0]} scale={[1.12, 1, .92]}>
+        <cylinderGeometry args={[1.34, 1.42, .12, 20]} />
+        <meshPhysicalMaterial color={ghost ? '#71f3bf' : '#176478'} transparent opacity={ghost ? .36 : .67} roughness={.2} metalness={0} depthWrite={!ghost} />
+      </mesh>
+      {/* 상부 수면 (밝은 청록, clearcoat) */}
+      <mesh position={[0.02, .205, 0]} scale={[1.17, 1, .96]}>
+        <cylinderGeometry args={[1.31, 1.36, .035, 24]} />
+        <meshPhysicalMaterial color={ghost ? '#71f3bf' : '#4ED1DC'} transparent opacity={ghost ? .42 : .56} roughness={.08} metalness={0} clearcoat={.8} clearcoatRoughness={.18} depthWrite={false} />
+      </mesh>
+
+      {/* === 5.3 광물 샘 유입부 (후면 암반 + 균열 + 수정광 + 계류) === */}
+      {/* 후면 저폴리 암반 */}
+      <mesh position={[-.2, .4, -1.1]} castShadow={!ghost}><dodecahedronGeometry args={[.55, 0]} /><ModelMaterial color="#263E48" roughness={.55} ghost={ghost} /></mesh>
+      <mesh position={[.25, .28, -1.15]} castShadow={!ghost}><dodecahedronGeometry args={[.42, 0]} /><ModelMaterial color="#314B56" roughness={.82} ghost={ghost} /></mesh>
+      {/* 암반 균열 내 수정광 (emissive) */}
+      <mesh position={[0, .45, -1.0]} rotation={[.3, 0, .2]}><octahedronGeometry args={[.16, 0]} /><ModelMaterial color="#A9F0F1" emissive="#5EE3D4" emissiveIntensity={.7} metalness={.1} roughness={.22} ghost={ghost} /></mesh>
+      {/* 샘에서 연못으로 이어지는 얕은 계류 (반투명 박스, springMatRef) */}
+      <mesh position={[0, .18, -.65]} rotation={[-.35, 0, 0]}>
+        <boxGeometry args={[.28, .02, .8]} />
+        <meshPhysicalMaterial ref={springMatRef} color={ghost ? '#71f3bf' : '#4ED1DC'} transparent opacity={.48} roughness={.06} metalness={0} depthWrite={false} />
+      </mesh>
+
+      {/* === 5.4 자연형 수정 군락 (암반 틈, 크기/기울기/색상 다양화) === */}
+      {/* 후면 큰 수정 군락 */}
+      <group position={[-.15, .25, -.85]}>
+        <mesh position={[-.18, .35, .02]} rotation={[-.16 * .4, 0, -.16]} castShadow={!ghost}><coneGeometry args={[.18, .72, 6]} /><ModelMaterial color="#A9F0F1" emissive="#5EE3D4" emissiveIntensity={.75} metalness={.1} roughness={.22} ghost={ghost} /></mesh>
+        <mesh position={[-.04, .48, -.02]} rotation={[.05 * .4, 0, .05]} castShadow={!ghost}><coneGeometry args={[.22, .94, 5]} /><ModelMaterial color="#A9A3E8" emissive="#5EE3D4" emissiveIntensity={.55} metalness={.1} roughness={.22} ghost={ghost} /></mesh>
+        <mesh position={[.22, .31, .03]} rotation={[.19 * .4, 0, .19]} castShadow={!ghost}><coneGeometry args={[.16, .62, 6]} /><ModelMaterial color="#7FD7D3" emissive="#5EE3D4" emissiveIntensity={.4} metalness={.1} roughness={.22} ghost={ghost} /></mesh>
+      </group>
+      {/* 수면 가장자리 중형 군락 */}
+      <group position={[.9, .15, -.1]} rotation={[0, .8, 0]}>
+        <mesh position={[0, .2, 0]} rotation={[.3, 0, .3]} castShadow={!ghost}><octahedronGeometry args={[.2, 0]} /><ModelMaterial color="#A9F0F1" emissive="#5EE3D4" emissiveIntensity={.6} metalness={.1} roughness={.22} ghost={ghost} /></mesh>
+        <mesh position={[.15, .12, .1]} rotation={[-.2, 0, -.4]} castShadow={!ghost}><octahedronGeometry args={[.13, 0]} /><ModelMaterial color="#A9A3E8" emissive="#5EE3D4" emissiveIntensity={.4} metalness={.1} roughness={.22} ghost={ghost} /></mesh>
+      </group>
+
+      {/* === 5.5 수중 수정층 (바닥 작은 결정 + 발광 광맥, 낮은 emissive) === */}
+      <mesh position={[-.4, .1, .2]} rotation={[0, .5, .2]}><octahedronGeometry args={[.1, 0]} /><ModelMaterial color="#7FD7D3" emissive="#5EE3D4" emissiveIntensity={.3} metalness={.1} roughness={.22} ghost={ghost} /></mesh>
+      <mesh position={[.3, .09, .35]} rotation={[0, -.3, -.15]}><octahedronGeometry args={[.08, 0]} /><ModelMaterial color="#A9A3E8" emissive="#5EE3D4" emissiveIntensity={.25} metalness={.1} roughness={.22} ghost={ghost} /></mesh>
+      {/* 수중 발광 광맥 (낮은 emissive cylinder) */}
+      <mesh position={[-.2, .08, -.2]} rotation={[Math.PI / 2, 0, .3]}><cylinderGeometry args={[.03, .03, .6, 6]} /><ModelMaterial color="#5EE3D4" emissive="#5EE3D4" emissiveIntensity={.45} ghost={ghost} /></mesh>
+      <mesh position={[.4, .08, 0]} rotation={[Math.PI / 2, 0, -.5]}><cylinderGeometry args={[.025, .025, .5, 6]} /><ModelMaterial color="#5EE3D4" emissive="#5EE3D4" emissiveIntensity={.4} ghost={ghost} /></mesh>
+
+      {/* === 5.6 외행성 수생 식물 (floraRef로 미세 흔들림) === */}
+      <group ref={floraRef}>
+        {/* 루멘 리드 (가느다란 줄기 + 끝 발광 구) - 연못 가장자리 군집 */}
+        {[
+          [-1.1, .12, .3], [-.95, .1, .6], [1.0, .12, .4], [.85, .1, .7],
+        ].map(([x, y, z], i) => (
+          <group key={`reed_${i}`} position={[x, y, z]}>
+            <mesh castShadow={!ghost}><cylinderGeometry args={[.012, .018, .42, 5]} /><ModelMaterial color="#3B886F" roughness={.7} ghost={ghost} /></mesh>
+            <mesh position={[0, .24, 0]}><sphereGeometry args={[.035, 8, 6]} /><ModelMaterial color="#70BFA3" emissive="#3a8a72" emissiveIntensity={.8} ghost={ghost} /></mesh>
+          </group>
+        ))}
+        {/* 프리즘 잎 (납작 수면잎, 잎맥 emissive) */}
+        {[
+          [-.5, .21, .5, .6], [.6, .21, .6, -.4], [-.2, .21, .8, .2],
+        ].map(([x, y, z, rot], i) => (
+          <mesh key={`leaf_${i}`} position={[x, y, z]} rotation={[-Math.PI / 2, 0, rot]}><circleGeometry args={[.16, 6]} /><ModelMaterial color="#3B886F" emissive="#2a5e4a" emissiveIntensity={.25} roughness={.7} ghost={ghost} /></mesh>
+        ))}
+        {/* 수정 이끼 (낮은 박스 덩어리, 바위 표면) */}
+        {[
+          [-1.4, .14, -.2], [1.45, .12, -.1], [-1.1, .1, .85],
+        ].map(([x, y, z], i) => (
+          <mesh key={`moss_${i}`} position={[x, y, z]}><boxGeometry args={[.16, .04, .16]} /><ModelMaterial color="#70BFA3" emissive="#3a8a72" emissiveIntensity={.3} roughness={.8} ghost={ghost} /></mesh>
+        ))}
+      </group>
+
+      {/* === 5.7 디딤돌 3개 (전면→물가, 크기/방향 다양화) === */}
+      {[
+        [-.3, .1, .95, .22, .3], [.15, .09, 1.15, .18, -.2], [.5, .1, 1.3, .2, .4],
+      ].map(([x, y, z, s, rot], i) => (
+        <mesh key={`step_${i}`} position={[x, y, z]} rotation={[0, rot, 0]} castShadow={!ghost} receiveShadow><dodecahedronGeometry args={[s, 0]} /><ModelMaterial color={i === 1 ? '#263E48' : '#314B56'} roughness={i === 1 ? .55 : .82} ghost={ghost} /></mesh>
+      ))}
+
+      {/* === 5.8 유입부 물결 링 (얇은 torus, scale/opacity 애니메이션) === */}
+      {!ghost && [0, 1, 2].map((i) => (
+        <mesh
+          key={`ripple_${i}`}
+          ref={(el) => { rippleRefs.current[i] = el }}
+          position={[0, .21, -.45]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <torusGeometry args={[.18, .008, 6, 18]} />
+          <meshBasicMaterial color="#A9F0F1" transparent opacity={0} depthWrite={false} />
+        </mesh>
+      ))}
+
+      {/* === 5.10 간헐 기포 (작은 sphere, y 상승+opacity 0, Sparkles 대안) === */}
+      {!ghost && [0, 1, 2, 3, 4].map((i) => (
+        <mesh
+          key={`bubble_${i}`}
+          ref={(el) => { bubbleRefs.current[i] = el }}
+          position={[-.3 + i * .15, .16, .1 + (i % 2) * .2]}
+        >
+          <sphereGeometry args={[.022, 8, 6]} />
+          <meshStandardMaterial color="#A9F0F1" transparent opacity={0} depthWrite={false} emissive="#5EE3D4" emissiveIntensity={.3} />
+        </mesh>
+      ))}
+
+      {/* === 조명: spotLight (가장 가까운 1개만, castShadow=false) === */}
+      {!ghost && (
+        <>
+          <spotLight
+            ref={lightRef}
+            position={[0.2, 1.0, -0.3]}
+            color="#74E6EF"
+            intensity={0}
+            distance={3.6}
+            angle={0.9}
+            penumbra={0.95}
+            decay={2}
+            castShadow={false}
+          />
+          <primitive object={lightTarget} position={[0, 0.15, 0.2]} />
+        </>
+      )}
+    </group>
+  )
+}
+
 export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightActive = false }) {
   if (itemId === 'starter_dome') {
     return (
@@ -1260,6 +1454,10 @@ export function StructureModel({ itemId, level = 1, ghost = false, dynamicLightA
     )
   }
   if (itemId === 'crystal_pond') {
+    if (Number(level || 1) >= 2) {
+      return <MatureCrystalPond scale={1} ghost={ghost} dynamicLightActive={dynamicLightActive} />
+    }
+    // Stage 1: 기존 코드 유지
     return (
       <group>
         <mesh position={[0, .08, 0]} receiveShadow><cylinderGeometry args={[1.35, 1.55, .2, 24]} /><ModelMaterial color="#203c57" roughness={.8} ghost={ghost} /></mesh>
@@ -1440,6 +1638,7 @@ const ORGANIC_STRUCTURE_IDS = new Set([
 const LIGHTING_STRUCTURE_IDS = new Set([
   'star_lamp',
   'rover_bay',
+  'crystal_pond',
 ])
 
 function PlacedStructure({ item, selected, onSelect, activeLightId }) {
