@@ -1363,8 +1363,13 @@ export default function CodeTracePlayer({
     return () => clearTimeout(timer);
   }, [rewardBurst]);
 
+  const hasAutoJumpedRef = useRef(false);
+
   useEffect(() => {
+    if (hasAutoJumpedRef.current) return;
     if (!exercises.length || unitAlreadyCompleted || firstIncompleteIndex < 0) return;
+
+    hasAutoJumpedRef.current = true;
     const currentId = getExerciseId(exercises[exerciseIndex]);
     if (!currentId || completedIds.has(currentId)) {
       const targetId = getExerciseId(exercises[firstIncompleteIndex]);

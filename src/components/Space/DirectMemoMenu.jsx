@@ -39,7 +39,7 @@ function getProfileName(profile = {}, fallback = '탐사원') {
 }
 
 function getProfileHint(profile = {}) {
-  return profile.publicTitle || profile.crewName || profile.publicSignature || '';
+  return profile.publicTitle || profile.crewName || profile.email || profile.publicSignature || '';
 }
 
 function getMemoTime(value) {
@@ -195,31 +195,59 @@ export default function DirectMemoMenu() {
     }
 
     let cancelled = false;
-    const loadRecipients = async () => {
-      try {
-        let rows = recipientDirectoryCache.rows;
-        if (!rows.length || Date.now() - recipientDirectoryCache.loadedAt > RECIPIENT_CACHE_TTL_MS) {
-          const snap = await getDocs(query(collection(db, 'users'), limitDocs(200)));
-          rows = snap.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() }));
-          recipientDirectoryCache = { loadedAt: Date.now(), rows };
+    const keyword = recipientSearch.trim();
+
+    if (!keyword) {
+      // 검색어가 없을 때는 선생님(운영자) 1명만 최소 조회하여 기본 추천으로 노출 (읽기 비용 최소화)
+      ensureOperatorRecipient([]).then((rows) => {
+        if (!cancelled) {
+          setRecipients(rows.filter((profile) => profile.uid !== user.uid));
         }
-        // users 목록이 limit(200)으로 잘릴 때 운영자(선생님)가 빠지면
-        // 선생님께 편지를 쓸 수 없게 되므로 별도 조회로 보장 포함시킨다.
-        rows = await ensureOperatorRecipient(rows);
+      });
+      return () => { cancelled = true; };
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const term = keyword;
+        const termLower = keyword.toLowerCase();
+        const usersRef = collection(db, 'users');
+
+        const [snap1, snap2, snap3, snap4] = await Promise.all([
+          getDocs(query(usersRef, where('publicDisplayName', '>=', term), where('publicDisplayName', '<=', term + '\uf8ff'), limitDocs(10))),
+          getDocs(query(usersRef, where('studentName', '>=', term), where('studentName', '<=', term + '\uf8ff'), limitDocs(10))),
+          getDocs(query(usersRef, where('name', '>=', term), where('name', '<=', term + '\uf8ff'), limitDocs(10))),
+          getDocs(query(usersRef, where('email', '>=', termLower), where('email', '<=', termLower + '\uf8ff'), limitDocs(10))),
+        ]);
+
         if (cancelled) return;
-        const list = rows
-          .filter((profile) => profile.uid !== user.uid && profile.role !== 'parent' && (profile.role !== 'admin' || profile.email === OPERATOR_EMAIL))
-          .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'));
+
+        const resultMap = new Map();
+        [snap1, snap2, snap3, snap4].forEach((snap) => {
+          snap.docs.forEach((docSnap) => {
+            if (docSnap.id !== user.uid) {
+              const data = docSnap.data();
+              if (data.role !== 'parent' && (data.role !== 'admin' || data.email === OPERATOR_EMAIL)) {
+                resultMap.set(docSnap.id, { uid: docSnap.id, ...data });
+              }
+            }
+          });
+        });
+
+        const list = Array.from(resultMap.values()).sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'));
         setRecipients(list);
         setRecipientId((prev) => (prev && list.some((item) => item.uid === prev) ? prev : ''));
       } catch (err) {
-        console.error('Failed to load direct memo recipients:', err);
-        setRecipients([]);
+        console.error('Failed to search recipients dynamically:', err);
+        if (!cancelled) setRecipients([]);
       }
-    }
-    loadRecipients();
-    return () => { cancelled = true; };
-  }, [isOpen, user?.uid]);
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, recipientSearch, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return undefined;
@@ -310,6 +338,7 @@ export default function DirectMemoMenu() {
         recipient.crewName || '',
         recipient.publicTitle || '',
         recipient.publicSignature || '',
+        recipient.email || '',
       ].join(' ').toLowerCase();
       return haystack.includes(keyword);
     }).slice(0, 10);

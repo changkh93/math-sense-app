@@ -545,6 +545,20 @@ const LEARNING_TYPES = new Set([
  */
 function formatUnitId(id) {
   if (!id) return '학습 활동';
+
+  // 파이썬 수학 (py_math) 코스의 raw ID를 친숙한 한글 단원명으로 자동 변환
+  if (id.toLowerCase().includes('py_math')) {
+    const rangeMatch = id.match(/py_math_(\d+)_(\d+)/i);
+    if (rangeMatch) {
+      return `파이썬 수학 ${rangeMatch[1]}~${rangeMatch[2]}단원`;
+    }
+    const unitMatch = id.match(/py_math_(\d+)/i);
+    if (unitMatch) {
+      return `파이썬 수학 ${unitMatch[1]}단원`;
+    }
+    return '파이썬 수학 학습';
+  }
+
   return id
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))

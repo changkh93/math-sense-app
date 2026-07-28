@@ -1369,8 +1369,9 @@ export default function MissionHub({
             [`videoProgress.${txId}.todayTimeSpentDate`]: dailyTimeSpentDateRef.current,
             [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
             [`videoProgress.${txId}.stampedSeconds`]: stamps,
-            [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || 'Main Video',
+            [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || activeUnit?.title || 'Main Video',
             [`videoProgress.${txId}.trackingDiagnostics`]: getTrackingDiagnostics(),
+            unitTitle: activeUnit?.title || '',
             updatedAt: serverTimestamp()
           }
           

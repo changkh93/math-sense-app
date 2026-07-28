@@ -217,22 +217,54 @@ export default function CrystalLedger({ userData }) {
       return undefined
     }
 
-    let cancelled = false
-    getDocs(collection(db, 'users')).then((snapshot) => {
-      if (cancelled) return
-      const list = snapshot.docs
-        .map(docSnap => ({ uid: docSnap.id, ...docSnap.data() }))
-        .filter(profile => profile.uid !== user.uid && profile.role !== 'parent' && profile.role !== 'admin')
-        .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'))
+    const keyword = recipientSearch.trim()
+    if (!keyword) {
+      setRecipients([])
+      return undefined
+    }
 
-      setRecipients(list)
-      setSelectedRecipientId(prev => (prev && list.some(item => item.uid === prev) ? prev : ''))
-    }).catch((error) => {
-      console.error('Crystal transfer recipients error:', error)
-      if (!cancelled) setRecipients([])
-    })
-    return () => { cancelled = true }
-  }, [])
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const term = keyword
+        const termLower = keyword.toLowerCase()
+        const usersRef = collection(db, 'users')
+
+        const [snap1, snap2, snap3, snap4] = await Promise.all([
+          getDocs(query(usersRef, where('publicDisplayName', '>=', term), where('publicDisplayName', '<=', term + '\uf8ff'), limit(10))),
+          getDocs(query(usersRef, where('studentName', '>=', term), where('studentName', '<=', term + '\uf8ff'), limit(10))),
+          getDocs(query(usersRef, where('name', '>=', term), where('name', '<=', term + '\uf8ff'), limit(10))),
+          getDocs(query(usersRef, where('email', '>=', termLower), where('email', '<=', termLower + '\uf8ff'), limit(10))),
+        ])
+
+        if (cancelled) return
+
+        const resultMap = new Map()
+        ;[snap1, snap2, snap3, snap4].forEach((snap) => {
+          snap.docs.forEach((docSnap) => {
+            if (docSnap.id !== user.uid) {
+              const data = docSnap.data()
+              if (data.role !== 'parent' && data.role !== 'admin') {
+                resultMap.set(docSnap.id, { uid: docSnap.id, ...data })
+              }
+            }
+          })
+        })
+
+        const list = Array.from(resultMap.values()).sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'))
+        setRecipients(list)
+        setSelectedRecipientId(prev => (prev && list.some(item => item.uid === prev) ? prev : ''))
+      } catch (error) {
+        console.error('Crystal transfer recipients error:', error)
+        if (!cancelled) setRecipients([])
+      }
+    }, 250)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [recipientSearch])
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
