@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, getDocs, limit as limitDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit as limitDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Archive, Check, Clock3, PenLine, Reply, Send, Trash2, UserRound, X } from 'lucide-react';
 import { db, functions } from '../../firebase';
@@ -201,7 +201,14 @@ export default function DirectMemoMenu() {
       // 검색어가 없을 때는 선생님(운영자) 1명만 최소 조회하여 기본 추천으로 노출 (읽기 비용 최소화)
       ensureOperatorRecipient([]).then((rows) => {
         if (!cancelled) {
-          setRecipients(rows.filter((profile) => profile.uid !== user.uid));
+          const defaultList = rows.filter((profile) => profile.uid !== user.uid);
+          setRecipients((prev) => {
+            const selected = prev.find((p) => p.uid === recipientId);
+            if (selected && !defaultList.some((p) => p.uid === selected.uid)) {
+              return [selected, ...defaultList];
+            }
+            return defaultList;
+          });
         }
       });
       return () => { cancelled = true; };
@@ -235,8 +242,13 @@ export default function DirectMemoMenu() {
         });
 
         const list = Array.from(resultMap.values()).sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'));
-        setRecipients(list);
-        setRecipientId((prev) => (prev && list.some((item) => item.uid === prev) ? prev : ''));
+        setRecipients((prev) => {
+          const selected = prev.find((p) => p.uid === recipientId);
+          if (selected && !list.some((p) => p.uid === selected.uid)) {
+            return [selected, ...list];
+          }
+          return list;
+        });
       } catch (err) {
         console.error('Failed to search recipients dynamically:', err);
         if (!cancelled) setRecipients([]);
@@ -414,27 +426,38 @@ export default function DirectMemoMenu() {
     navigate(`/profile/${uid}`);
   };
 
-  const startComposeForUid = (uid) => {
-    if (!uid || uid === user?.uid) return;
-    const recipient = recipients.find((item) => item.uid === uid);
-    if (!recipient) return;
+  const startComposeForUid = async (targetUid) => {
+    if (!targetUid || targetUid === user?.uid) return;
     setIsOpen(true);
     setActiveTab('compose');
-    setRecipientId(recipient.uid);
-    setRecipientSearch('');
-    setRecipientFocused(false);
-    setMessage('');
-    window.requestAnimationFrame(() => {
-      if (recipientInputRef.current) recipientInputRef.current.focus();
-    });
-  };
 
-  useEffect(() => {
-    if (!recipients.length || !pendingComposeRef.current) return;
-    const pending = pendingComposeRef.current;
-    pendingComposeRef.current = null;
-    startComposeForUid(pending);
-  }, [recipients]);
+    let recipient = recipients.find((item) => item.uid === targetUid);
+
+    if (!recipient) {
+      try {
+        const docSnap = await getDoc(doc(db, 'users', targetUid));
+        if (docSnap.exists()) {
+          recipient = { uid: docSnap.id, ...docSnap.data() };
+          setRecipients((prev) => {
+            if (prev.some((item) => item.uid === targetUid)) return prev;
+            return [recipient, ...prev];
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch recipient for memo:', err);
+      }
+    }
+
+    if (recipient) {
+      setRecipientId(recipient.uid);
+      setRecipientSearch(getProfileName(recipient));
+      setRecipientFocused(false);
+      setMessage('');
+      window.requestAnimationFrame(() => {
+        if (recipientInputRef.current) recipientInputRef.current.focus();
+      });
+    }
+  };
 
   useEffect(() => {
     const handleRequest = (event) => {
@@ -446,12 +469,7 @@ export default function DirectMemoMenu() {
         return;
       }
       soundManager.playClick();
-      if (recipients.length) {
-        startComposeForUid(uid);
-      } else {
-        pendingComposeRef.current = uid;
-        setIsOpen(true);
-      }
+      startComposeForUid(uid);
     };
     window.addEventListener('directmemo:compose', handleRequest);
     return () => window.removeEventListener('directmemo:compose', handleRequest);
