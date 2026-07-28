@@ -31,7 +31,7 @@ import { hasActiveCourseAccess } from '../../utils/scholarshipAwards'
 import './Admin.css'
 
 const DEFAULT_YEAR = 2026
-const DEFAULT_MONTH = 5
+const DEFAULT_MONTH = new Date().getMonth() + 1
 
 function getStudentName(user = {}) {
   return user.studentName || user.publicDisplayName || user.name || user.displayName || user.email || '이름 없음'
@@ -54,7 +54,8 @@ function hasActiveCourse(user = {}, courseClusterId) {
 }
 
 function getBestHistory(records = []) {
-  return records.reduce((best, record) => {
+  const quizRecords = records.filter(r => r.type !== 'quiz_battle' && r.type !== 'battle')
+  return quizRecords.reduce((best, record) => {
     const score = Number(record.score)
     if (!Number.isFinite(score)) return best
     if (!best) return { ...record, score }
@@ -135,16 +136,32 @@ export default function MonthlyEvaluationAwards() {
     users.forEach(user => {
       const savedGrade = normalizeGradeValue(user.grade)
       const savedGradeOption = getGradeOption(savedGrade)
-      const inferredGradeEntries = savedGrade ? [] : evaluationEntries.filter(entry => (
-        entry.gradeOption &&
-        hasActiveCourse(user, entry.courseClusterId) &&
-        (historyByStudentUnit[`${user.uid}_${entry.unitId}`] || []).length > 0
-      ))
-      const gradeEntries = savedGrade
-        ? [{ grade: savedGrade, gradeOption: savedGradeOption, inferred: false }]
-        : inferredGradeEntries.length
-          ? inferredGradeEntries.map(entry => ({ ...entry, inferred: true }))
-          : [{ grade: '', gradeOption: null, inferred: false }]
+      const historyGradeEntries = evaluationEntries
+        .filter(entry => {
+          if (!entry.gradeOption) return false
+          const records = historyByStudentUnit[`${user.uid}_${entry.unitId}`] || []
+          const quizRecords = records.filter(r => r.type !== 'quiz_battle' && r.type !== 'battle')
+          return quizRecords.length > 0
+        })
+        .map(entry => ({
+          grade: entry.grade,
+          gradeOption: entry.gradeOption,
+          unitId: entry.unitId,
+          inferred: true,
+        }))
+
+      const gradeEntries = []
+      if (savedGrade) {
+        gradeEntries.push({ grade: savedGrade, gradeOption: savedGradeOption, inferred: false })
+      }
+      historyGradeEntries.forEach(hEntry => {
+        if (!gradeEntries.some(g => g.grade === hEntry.grade)) {
+          gradeEntries.push(hEntry)
+        }
+      })
+      if (gradeEntries.length === 0) {
+        gradeEntries.push({ grade: '', gradeOption: null, inferred: false })
+      }
 
       gradeEntries.forEach(gradeEntry => {
         const normalizedGrade = normalizeGradeValue(gradeEntry.grade)
@@ -160,6 +177,7 @@ export default function MonthlyEvaluationAwards() {
         activeCourses.forEach(course => {
           const unitId = gradeEntry.unitId || getEvaluationUnitIdForGrade(year, month, normalizedGrade)
           const historyRecords = unitId ? historyByStudentUnit[`${user.uid}_${unitId}`] || [] : []
+          const quizRecords = historyRecords.filter(r => r.type !== 'quiz_battle' && r.type !== 'battle')
           const bestHistory = getBestHistory(historyRecords)
           const awardId = buildMonthlyAwardId({
             studentId: user.uid,
@@ -177,14 +195,14 @@ export default function MonthlyEvaluationAwards() {
             studentName,
             email: user.email || '',
             grade: normalizedGrade,
-            gradeLabel: getGradeLabel(normalizedGrade),
+            gradeLabel: getGradeLabel(normalizedGrade, '') + (gradeEntry.inferred ? ' (기록 기준)' : ''),
             gradeOrder: gradeOption?.order || 99,
             courseClusterId: course.id,
             courseName: course.label,
             unitId,
             unitTitle: bestHistory?.unitTitle || '월간평가',
             score: bestHistory?.score ?? null,
-            attemptCount: historyRecords.length,
+            attemptCount: quizRecords.length,
             lastAttemptAt: bestHistory?.timestamp || null,
             award,
             canAward: Number(bestHistory?.score) === 100 && !award && Boolean(unitId),

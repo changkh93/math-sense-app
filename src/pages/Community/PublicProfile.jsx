@@ -9,6 +9,7 @@ import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import StarField from '../../components/Space/StarField';
 import CometBadge from '../../components/Space/CometBadge';
 import ModularShip from '../../components/Space/ModularShip';
+import CertificateAwardsBoard from '../../components/Space/CertificateAwardsBoard';
 import { getEffectiveStreak, getKSTComponents, getTodayKST } from '../../utils/streakUtils';
 import { calculateSEI } from '../../utils/rankingUtils';
 import { getBaseTheme, getFrameSurfaceStyles, getProfileFrame, isHallSpotlightActive } from '../../utils/socialUtils';
@@ -878,6 +879,8 @@ export default function PublicProfile() {
                 <p className="public-profile-muted">아직 공개할 개념 탐사 기록이 없습니다.</p>
               )}
             </section>
+
+            <CertificateAwardsBoard user={{ ...profile, uid: profile?.uid || uid || user?.uid }} />
 
             <section className="public-profile-panel public-profile-badge-panel">
               <h2>

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
-import { Award, Printer, X } from 'lucide-react'
+import { Award, GraduationCap, Printer, Sparkles, Trophy, X } from 'lucide-react'
 import { db } from '../../firebase'
 import CertificatePreview from '../CertificatePreview'
 import { formatKoreanDate, formatKoreanDateFromString, getCourseLabel } from '../../utils/monthlyEvaluationAwards'
@@ -181,30 +181,63 @@ export default function CertificateAwardsBoard({ user }) {
         ) : awards.length === 0 ? (
           <div className="certificate-awards-empty">아직 수여된 상장이 없습니다.</div>
         ) : (
-          <div className="certificate-awards-list">
-            {groupedAwards.map(([monthKey, monthAwards]) => (
-              <div className="certificate-awards-group" key={monthKey}>
-                <div className="certificate-awards-month">{monthKey}</div>
-                <div className="certificate-awards-items">
-                  {monthAwards.map(award => (
-                    <button type="button" key={award.id} onClick={() => setSelectedAward(award)} className="certificate-award-item">
-                      <span className={`certificate-award-ribbon ${award.awardKind === 'scholarship' ? 'scholarship' : ''}`}>
-                        {award.awardKind === 'scholarship' ? '장학증서' : '최우수상'}
-                      </span>
-                      <span>
-                        <strong>{getAwardDisplayLabel(award)}</strong>
-                        <small>
-                          {award.awardKind === 'scholarship' ? getScholarshipCourseLabel(award.courseClusterId) : getCourseLabel(award.courseClusterId)}
-                          {' · '}
-                          {getAwardDateLabel(award)}
-                        </small>
-                      </span>
-                      <b>{award.awardKind === 'scholarship' ? '20%' : `${award.score || 100}점`}</b>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="certificate-awards-scroll-container" aria-label="상장 및 장학증서 목록">
+            {awards.map(award => {
+              const isScholarship = award.awardKind === 'scholarship';
+              const dateStr = getAwardDateLabel(award);
+              const label = getAwardDisplayLabel(award);
+              const courseLabel = isScholarship
+                ? getScholarshipCourseLabel(award.courseClusterId)
+                : getCourseLabel(award.courseClusterId);
+              const { year, month } = getAwardYearMonth(award);
+              const periodText = year && month ? `${year}.${String(month).padStart(2, '0')}` : '';
+
+              return (
+                <button
+                  type="button"
+                  key={award.id}
+                  onClick={() => setSelectedAward(award)}
+                  className={`certificate-award-card ${isScholarship ? 'is-scholarship' : ''}`}
+                  title={`${label} - 클릭 시 상세 보기`}
+                >
+                  <div className="certificate-card-shimmer" />
+
+                  <div className="certificate-card-header">
+                    <span className={`certificate-card-ribbon ${isScholarship ? 'scholarship' : ''}`}>
+                      {isScholarship ? (
+                        <><GraduationCap size={13} /> 장학증서</>
+                      ) : (
+                        <><Trophy size={13} /> 최우수상</>
+                      )}
+                    </span>
+                    {periodText && <span className="certificate-card-period">{periodText}</span>}
+                  </div>
+
+                  <div className="certificate-card-seal-area">
+                    <div className="certificate-card-seal-glow" />
+                    <div className="certificate-card-seal">
+                      {isScholarship ? <Sparkles size={32} /> : <Award size={32} />}
+                    </div>
+                  </div>
+
+                  <div className="certificate-card-body">
+                    <strong className="certificate-card-title">{label}</strong>
+                    <span className="certificate-card-course">{courseLabel}</span>
+                  </div>
+
+                  <div className="certificate-card-footer">
+                    <span className="certificate-card-score">
+                      {isScholarship ? '✨ 장학생' : `💯 ${award.score || 100}점`}
+                    </span>
+                    <span className="certificate-card-date">{dateStr}</span>
+                  </div>
+
+                  <div className="certificate-card-hover-overlay">
+                    <span>크게 보기</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </section>
