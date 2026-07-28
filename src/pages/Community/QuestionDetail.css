@@ -224,7 +224,50 @@ button.answer-identity-card {
 
 .owner-actions {
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.owner-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.owner-action-btn.edit-btn {
+  background: rgba(0, 243, 255, 0.12);
+  border: 1px solid rgba(0, 243, 255, 0.4);
+  color: var(--crystal-cyan, #00f3ff);
+}
+
+.owner-action-btn.edit-btn:hover {
+  background: rgba(0, 243, 255, 0.25);
+  border-color: rgba(0, 243, 255, 0.75);
+  color: #ffffff;
+}
+
+.owner-action-btn.delete-btn {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+
+.owner-action-btn.delete-btn:hover {
+  background: rgba(248, 113, 113, 0.25);
+  border-color: rgba(248, 113, 113, 0.75);
+  color: #ffffff;
+}
+
+.owner-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .icon-btn {
@@ -244,16 +287,6 @@ button.answer-identity-card {
 .icon-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: white;
-}
-
-.edit-btn:hover {
-  border-color: var(--crystal-cyan);
-  color: var(--crystal-cyan);
-}
-
-.delete-btn:hover {
-  border-color: #ff4d4d;
-  color: #ff4d4d;
 }
 
 .edit-question-box {

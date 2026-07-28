@@ -456,11 +456,13 @@ export default function QuestionDetail() {
                   </span>
                   {isOwner && (
                     <div className="owner-actions">
-                      <button className="icon-btn edit-btn" onClick={handleStartEdit} title="수정">
-                        <Edit3 size={16} />
+                      <button className="owner-action-btn edit-btn" onClick={() => { setIsEditingQuestion(true); setEditQuestionTitle(question.title); setEditQuestionContent(question.content); }} title="수정">
+                        <Edit3 size={14} />
+                        <span>수정</span>
                       </button>
-                      <button className="icon-btn delete-btn" onClick={handleDeleteQuestion} title="삭제">
-                        <Trash2 size={16} />
+                      <button className="owner-action-btn delete-btn" onClick={handleDeleteQuestion} title="삭제" disabled={deleteQuestion.isPending}>
+                        <Trash2 size={14} />
+                        <span>삭제</span>
                       </button>
                     </div>
                   )}
@@ -667,11 +669,13 @@ export default function QuestionDetail() {
 
                           {canManageAnswer && !isAnswerEditing && (
                             <div className="owner-actions">
-                              <button className="icon-btn edit-btn" onClick={() => handleStartEditAnswer(ans)} title="수정">
-                                <Edit3 size={16} />
+                              <button className="owner-action-btn edit-btn" onClick={() => handleStartEditAnswer(ans)} title="수정">
+                                <Edit3 size={14} />
+                                <span>수정</span>
                               </button>
-                              <button className="icon-btn delete-btn" onClick={() => handleDeleteAnswer(ans)} title="삭제" disabled={deleteAnswer.isPending}>
-                                <Trash2 size={16} />
+                              <button className="owner-action-btn delete-btn" onClick={() => handleDeleteAnswer(ans)} title="삭제" disabled={deleteAnswer.isPending}>
+                                <Trash2 size={14} />
+                                <span>삭제</span>
                               </button>
                             </div>
                           )}
@@ -762,11 +766,13 @@ export default function QuestionDetail() {
                                 {renderAnswerIdentity(reply, '답글')}
                                 {canManageReply && !isReplyEditing && (
                                   <div className="owner-actions reply-owner-actions">
-                                    <button className="icon-btn edit-btn" onClick={() => handleStartEditAnswer(reply)} title="수정">
-                                      <Edit3 size={15} />
+                                    <button className="owner-action-btn edit-btn" onClick={() => handleStartEditAnswer(reply)} title="수정">
+                                      <Edit3 size={13} />
+                                      <span>수정</span>
                                     </button>
-                                    <button className="icon-btn delete-btn" onClick={() => handleDeleteAnswer(reply)} title="삭제" disabled={deleteAnswer.isPending}>
-                                      <Trash2 size={15} />
+                                    <button className="owner-action-btn delete-btn" onClick={() => handleDeleteAnswer(reply)} title="삭제" disabled={deleteAnswer.isPending}>
+                                      <Trash2 size={13} />
+                                      <span>삭제</span>
                                     </button>
                                   </div>
                                 )}
