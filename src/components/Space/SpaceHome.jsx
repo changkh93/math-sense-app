@@ -653,6 +653,9 @@ function SpaceHome() {
   const [learningSummary, setLearningSummary] = useState(null)
   const [recentCompletionHistory, setRecentCompletionHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
+  // videoCompletedFromProgress: { [unitId]: true } — learning_progress.videoProgress.{txId}.completed === true 인 단원.
+  // history의 type:'video' 문서 누락(보너스 타이머 놓침, 탭 닫기 시 sendBeacon 경로)에도 단원 완료가 표시되도록 보정하는 source of truth.
+  const [videoCompletedFromProgress, setVideoCompletedFromProgress] = useState({})
   const [currentView, setCurrentView] = useState(() => {
     const requestedView = getRequestedRootView(location)
     const savedView = sessionStorage.getItem('metasense_current_view')
@@ -1674,6 +1677,34 @@ function SpaceHome() {
     })
   }, [todayKSTForAttendance, user?.uid])
 
+  // learning_progress 서브컬렉션 전체를 구독하여 videoProgress.{txId}.completed === true 인 단원을 추출.
+  // history의 type:'video' 문서가 누락되는 경로(completion_bonus 타이머 놓침, 탭 닫기 sendBeacon)에서도
+  // 단원 완료 체크가 정확히 표시되도록 unitProgressMap.video 를 OR 보정하기 위한 source of truth.
+  useEffect(() => {
+    if (!user?.uid) {
+      setVideoCompletedFromProgress({})
+      return undefined
+    }
+    const progressQuery = collection(db, 'users', user.uid, 'learning_progress')
+    return onSnapshot(progressQuery, (snapshot) => {
+      const map = {}
+      snapshot.forEach((docSnap) => {
+        const unitId = docSnap.id
+        const videoProgress = docSnap.data()?.videoProgress
+        if (videoProgress && typeof videoProgress === 'object') {
+          const hasCompletedVideo = Object.values(videoProgress).some(
+            (tx) => tx && typeof tx === 'object' && tx.completed === true
+          )
+          if (hasCompletedVideo) map[unitId] = true
+        }
+      })
+      setVideoCompletedFromProgress(map)
+    }, (error) => {
+      console.warn('learning_progress subscription failed:', error)
+      setVideoCompletedFromProgress({})
+    })
+  }, [user?.uid])
+
   const history = useMemo(
     () => mergeSummaryWithRecentHistory(learningSummary, recentCompletionHistory),
     [learningSummary, recentCompletionHistory]
@@ -1776,9 +1807,20 @@ function SpaceHome() {
       }
     })
 
+    // OR-보정: history에 type:'video' 문서가 누락되더라도(보너스 타이머 놓침, 탭 닫기 sendBeacon 경로),
+    // learning_progress.videoProgress.{txId}.completed === true 이면 video 모달리티를 완료로 인정.
+    // videoCompletedFromProgress 는 { [unitId]: true } 형태.
+    Object.entries(videoCompletedFromProgress).forEach(([unitId, completed]) => {
+      if (!completed) return
+      if (!progressMap[unitId]) {
+        progressMap[unitId] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false }
+      }
+      progressMap[unitId].video = true
+    })
+
     if (effectiveHistory.length === 0) {
       regions?.forEach(r => statusMap[r.id] = 'not_started')
-      return { explorationStatus: statusMap, recentRegionId: null, bestScores: scores, unitProgressMap: {} }
+      return { explorationStatus: statusMap, recentRegionId: null, bestScores: scores, unitProgressMap: progressMap }
     }
     
     regions.forEach(region => {
@@ -1807,7 +1849,7 @@ function SpaceHome() {
     }
 
     return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores, unitProgressMap: progressMap }
-  }, [effectiveHistory, regions, selectedClusterId])
+  }, [effectiveHistory, regions, selectedClusterId, videoCompletedFromProgress])
 
   // Calculate chapter progress dynamically from Firestore data
   const chapterProgress = useMemo(() => {
@@ -2676,7 +2718,17 @@ function SpaceHome() {
             rewardBaseAmount: rewardMultiplierMeta?.baseAmount ?? actualReward,
             rewardBonusAmount: rewardMultiplierMeta?.bonusAmount || 0,
             timestamp: serverTimestamp(),
-            type: isLogActivity ? 'text' : ((isAttentionMiss || shouldLogFocusOnly) ? 'attention' : 'video'),
+            // completion_bonus 이벤트는 영상 시청 완료(coverage 임계값 도달)와 함께 발생하므로,
+            // 보너스 타이머를 놓쳐(attentionResult='miss') type:'attention'으로 덮어써 단원 완료가 누락되지 않도록
+            // completion_bonus는 miss 여부와 무관하게 type:'video'로 기록한다.
+            // time_attack miss는 별도 video_attention_... 문서 ID로 분리되어 여기엔 도달하지 않는다.
+            // attentionSource/attentionResult 필드는 그대로 보존되어 어텐션 통계에 영향을 주지 않는다.
+            type: (() => {
+              if (isLogActivity) return 'text'
+              const isCompletionBonus = isVideoActivity && attentionSource === 'completion_bonus'
+              if (isCompletionBonus) return 'video'
+              return (isAttentionMiss || shouldLogFocusOnly) ? 'attention' : 'video'
+            })(),
             activityType,
             // Include video duration and stamp count in metadata for summary calculation
             videoTime: nextVideoTime,

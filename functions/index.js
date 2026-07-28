@@ -5332,6 +5332,7 @@ exports.syncVideoProgress = regionalFunctions.https.onRequest((req, res) => {
       }
 
       // We use server Timestamp for updatedAt but the client might pass their own.
+      const db = admin.firestore();
       const updateData = {};
       
       // Prevent destroying existing fields like 'completed' when sending beacon
@@ -5343,13 +5344,43 @@ exports.syncVideoProgress = regionalFunctions.https.onRequest((req, res) => {
       
       updateData[`videoProgress.${txId}.updatedAt`] = new Date();
 
-      const progressRef = admin.firestore()
+      const progressRef = db
         .collection('users')
         .doc(userId)
         .collection('learning_progress')
         .doc(unitId);
 
-      await progressRef.set(updateData, { merge: true });
+      // learning_progress 와 history 를 원자적으로 갱신하여 단원 완료 체크 누락을 방지한다.
+      // 기존에는 learning_progress 에만 completed:true 를 쓰고 history(type:'video')는 쓰지 않아
+      // 탭 닫기/이탈 시 단원 완료 표시가 영영 켜지지 않는 버그가 있었다.
+      await db.runTransaction(async (transaction) => {
+        transaction.set(progressRef, updateData, { merge: true });
+
+        // 영상 시청이 완료(completed === true)된 경우에만 history(type:'video')를 기록한다.
+        // 보상(crystalsEarned)은 0으로 기록하여 중복 지급을 방지하고,
+        // syncLearningSummary 트리거가 learningSummaries.modalities.video 를 자동 갱신하게 한다.
+        const isCompleted = progressData && progressData.completed === true;
+        if (isCompleted) {
+          const todayKST = getKSTDateString();
+          const stableHistoryId = `video_daily_${todayKST}_${unitId}_${txId}`;
+          const historyRef = db
+            .collection('users')
+            .doc(userId)
+            .collection('history')
+            .doc(stableHistoryId);
+          transaction.set(historyRef, {
+            unitId,
+            transmissionId: txId,
+            type: 'video',
+            activityType: '영상 교신 완료',
+            timestamp: FieldValue.serverTimestamp(),
+            crystalsEarned: 0,
+            completionVia: 'unload_beacon',
+            videoTime: Math.max(0, Math.floor(Number(progressData.lastPosition) || 0)),
+            stampedCount: Array.isArray(progressData.stampedSeconds) ? progressData.stampedSeconds.length : 0,
+          }, { merge: true });
+        }
+      });
 
       return res.status(200).send("OK");
     } catch (error) {
