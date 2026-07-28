@@ -192,6 +192,16 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   }, [initiallyMuted])
 
   useImperativeHandle(ref, () => ({
+    playVideo: () => {
+      if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+        try { playerRef.current.playVideo() } catch (e) {}
+      }
+    },
+    seekTo: (seconds) => {
+      if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
+        try { playerRef.current.seekTo(seconds, true) } catch (e) {}
+      }
+    },
     pauseVideo: () => {
       if (playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
         playerRef.current.pauseVideo()
@@ -828,7 +838,7 @@ export default function MissionHub({
       : VIDEO_VOLUME_DEFAULT
   });
   const [isVideoMuted, setIsVideoMuted] = useState(() => localStorage.getItem('metasense_video_muted') === '1');
-  const [isMediaControlsOpen, setIsMediaControlsOpen] = useState(() => window.innerWidth >= 768);
+  const [isMediaControlsOpen, setIsMediaControlsOpen] = useState(false);
   const [isBottomActionsOpen, setIsBottomActionsOpen] = useState(() => window.innerWidth >= 768);
   
   useEffect(() => {
@@ -853,7 +863,7 @@ export default function MissionHub({
   useEffect(() => {
     if (currentMode !== 'video' || !selectedTx) return
     setIsUiVisible(true)
-    setIsMediaControlsOpen(!isMobile)
+    setIsMediaControlsOpen(false)
     setIsBottomActionsOpen(!isMobile)
     setIsBottomHudInteracting(false)
   }, [currentMode, selectedTx?.id, isMobile])

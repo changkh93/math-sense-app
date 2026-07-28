@@ -284,6 +284,14 @@ button:active {
 }
 
 .theater-hud > * {
+  pointer-events: none;
+}
+
+.theater-hud button,
+.theater-hud input,
+.theater-hud a,
+.theater-hud .hud-btn,
+.theater-hud .interactive-hud {
   pointer-events: auto;
 }
 
