@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { motion as Motion } from 'framer-motion'
-import { collection, doc, getDoc, getDocs, query, orderBy, onSnapshot, limit } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { Gift, Search, Send, UserRound, X } from 'lucide-react'
 import { db, auth, functions } from '../../firebase'
@@ -230,17 +230,18 @@ export default function CrystalLedger({ userData }) {
         const termLower = keyword.toLowerCase()
         const usersRef = collection(db, 'users')
 
-        const [snap1, snap2, snap3, snap4] = await Promise.all([
+        const [snap1, snap2, snap3, snap4, snap5] = await Promise.all([
           getDocs(query(usersRef, where('publicDisplayName', '>=', term), where('publicDisplayName', '<=', term + '\uf8ff'), limit(10))),
           getDocs(query(usersRef, where('studentName', '>=', term), where('studentName', '<=', term + '\uf8ff'), limit(10))),
           getDocs(query(usersRef, where('name', '>=', term), where('name', '<=', term + '\uf8ff'), limit(10))),
+          getDocs(query(usersRef, where('displayName', '>=', term), where('displayName', '<=', term + '\uf8ff'), limit(10))),
           getDocs(query(usersRef, where('email', '>=', termLower), where('email', '<=', termLower + '\uf8ff'), limit(10))),
         ])
 
         if (cancelled) return
 
         const resultMap = new Map()
-        ;[snap1, snap2, snap3, snap4].forEach((snap) => {
+        ;[snap1, snap2, snap3, snap4, snap5].forEach((snap) => {
           snap.docs.forEach((docSnap) => {
             if (docSnap.id !== user.uid) {
               const data = docSnap.data()
