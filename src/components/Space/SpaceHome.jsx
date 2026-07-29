@@ -1180,8 +1180,13 @@ function SpaceHome() {
     if (selectedClusterId && activeClusters.length > 0) {
       const isValid = activeClusters.some(c => c.docId === selectedClusterId || c.id === selectedClusterId);
       if (!isValid) {
-        // If not valid anymore (e.g. access revoked), clear it
-        selectCluster(null);
+        // A late access/cluster refresh may invalidate a persisted learning
+        // coordinate while the user is already opening RANKING/STORE/etc.
+        // Clear only the stale hierarchy; do not overwrite the chosen root view.
+        updateSelectedClusterId(null);
+        updateSelectedRegionId(null);
+        updateSelectedChapterDocId(null);
+        clearMissionSelection();
       }
     }
 
@@ -1189,7 +1194,15 @@ function SpaceHome() {
     if (activeClusters.length === 1 && !selectedClusterId) {
       updateSelectedClusterId(activeClusters[0].docId || activeClusters[0].id);
     }
-  }, [activeClusters, selectedClusterId, loadingClusters, selectCluster, updateSelectedClusterId]);
+  }, [
+    activeClusters,
+    clearMissionSelection,
+    loadingClusters,
+    selectedClusterId,
+    updateSelectedChapterDocId,
+    updateSelectedClusterId,
+    updateSelectedRegionId
+  ]);
 
   const canLoadLearningMap = Boolean(userData && !userData.dataLoadError && !userData.recoveryRequired && selectedClusterId)
   const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions(selectedClusterId, {
@@ -1309,9 +1322,8 @@ function SpaceHome() {
 
   useEffect(() => {
     if (!missionUnitId || activeUnit || loadingSingleUnit || !singleUnitFetched) return;
-    console.warn('[NavigationGuard] Mission unit not found. Returning to planet map:', missionUnitId);
+    console.warn('[NavigationGuard] Clearing stale mission coordinate:', missionUnitId);
     clearMissionSelection();
-    setCurrentView('planet');
   }, [activeUnit, clearMissionSelection, loadingSingleUnit, missionUnitId, singleUnitFetched]);
 
   const handleBackFromMission = useCallback(() => {
