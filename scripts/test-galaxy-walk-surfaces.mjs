@@ -3,12 +3,23 @@ import {
   BRIDGE_DECK_HEIGHT,
   BRIDGE_X,
   LANDING_PAD_SURFACE_LIFT,
+  OCEAN_SURFACE_Y,
+  RIVER_MOUTH_BLEND_END_X,
+  RIVER_MOUTH_END_X,
+  RIVER_MOUTH_START_X,
+  RIVER_SOURCE_X,
   ROAD_SURFACE_LIFT,
   VILLAGE_SLOTS,
+  WORLD_RADIUS,
   WORLD_ZONES,
+  createEstuaryBankGeometry,
+  createIslandSkirtGeometry,
+  createRiverGeometry,
+  createRiverMouthGeometry,
   createRibbonGeometry,
   generatePathNetwork,
   riverCenterZ,
+  riverWidth,
   setActivePathNetwork,
   terrainHeight,
   walkSurfaceHeight,
@@ -72,5 +83,65 @@ for (let index = 0; index < ribbonIndices.length; index += 3) {
   assert.equal(sign, windingSign, 'road ribbon triangles must keep a consistent winding')
 }
 ribbon.dispose()
+
+const bridgeRiverWidth = riverWidth(BRIDGE_X)
+const mouthRiverWidth = riverWidth(RIVER_MOUTH_END_X)
+assert.ok(
+  mouthRiverWidth / bridgeRiverWidth >= 1.8 && mouthRiverWidth / bridgeRiverWidth <= 2.2,
+  'river mouth must widen naturally to 1.8–2.2x the upstream channel',
+)
+
+const river = createRiverGeometry()
+const riverPositions = river.getAttribute('position')
+for (let index = 0; index < riverPositions.count; index += 1) {
+  const x = riverPositions.getX(index)
+  const z = riverPositions.getZ(index)
+  if (x <= RIVER_MOUTH_START_X) {
+    assert.ok(Math.hypot(x, z) <= WORLD_RADIUS + .01, 'inland river must stay inside the island coast')
+  }
+}
+river.computeBoundingBox()
+assert.ok(river.boundingBox.min.x >= RIVER_SOURCE_X - .2, 'river must start at the inland spring')
+assert.ok(
+  river.boundingBox.max.x > RIVER_MOUTH_BLEND_END_X,
+  'one continuous river surface must extend into the ocean before fading out',
+)
+river.dispose()
+
+const mouth = createRiverMouthGeometry()
+mouth.computeBoundingBox()
+assert.ok(mouth.boundingBox.min.x < RIVER_MOUTH_START_X, 'estuary must overlap the river')
+assert.ok(mouth.boundingBox.max.x > RIVER_MOUTH_BLEND_END_X, 'estuary must extend into the ocean before fading out')
+assert.ok(mouth.boundingBox.min.y > OCEAN_SURFACE_Y, 'estuary water must meet the ocean without sinking below it')
+mouth.dispose()
+
+for (const side of [-1, 1]) {
+  const bank = createEstuaryBankGeometry(side)
+  const bankPositions = bank.getAttribute('position')
+  const startWidth = Math.abs(bankPositions.getZ(1) - bankPositions.getZ(0))
+  const last = bankPositions.count - 2
+  const endWidth = Math.abs(bankPositions.getZ(last + 1) - bankPositions.getZ(last))
+  assert.ok(endWidth < startWidth * .15, 'estuary sediment bank must finish as a tapered tongue')
+  bank.dispose()
+}
+
+const coastX = 13.1
+assert.ok(
+  terrainHeight(coastX, riverCenterZ(coastX)) < OCEAN_SURFACE_Y,
+  'terrain at the river mouth must open below sea level',
+)
+
+const islandSkirt = createIslandSkirtGeometry()
+const skirtPositions = islandSkirt.getAttribute('position')
+let mouthTop = Number.POSITIVE_INFINITY
+for (let index = 0; index < skirtPositions.count; index += 2) {
+  const x = skirtPositions.getX(index)
+  const z = skirtPositions.getZ(index)
+  if (x > 11 && Math.abs(z - riverCenterZ(x)) < riverWidth(x)) {
+    mouthTop = Math.min(mouthTop, skirtPositions.getY(index))
+  }
+}
+assert.ok(mouthTop < OCEAN_SURFACE_Y, 'island side wall must be submerged at the river mouth')
+islandSkirt.dispose()
 
 console.log('Galaxy walk-surface tests passed')

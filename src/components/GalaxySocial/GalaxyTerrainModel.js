@@ -52,6 +52,12 @@ function buildFallbackPathNetwork() {
 
 export const BRIDGE_X = 1.2
 export const BRIDGE_DECK_HEIGHT = .38
+export const RIVER_SOURCE_X = -11.6
+export const RIVER_MOUTH_START_X = 9.6
+export const RIVER_MOUTH_END_X = 16.4
+export const RIVER_MOUTH_BLEND_END_X = 19.6
+export const RIVER_SURFACE_Y = -.075
+export const OCEAN_SURFACE_Y = -.24
 export const LANDING_PAD_RADIUS = 2.72
 export const LANDING_PAD_SURFACE_LIFT = .18
 export const ROAD_EDGE_HALF_WIDTH = .7
@@ -173,11 +179,17 @@ function gaussian(x, z, peak) {
 }
 
 export function riverCenterZ(x) {
-  return -14.72 + Math.sin((x + 4) * .22) * .66 + Math.sin(x * .51) * .23
+  const mouthTurn = smoothstep(RIVER_MOUTH_START_X, RIVER_MOUTH_END_X, x)
+  return -14.72
+    + Math.sin((x + 4) * .22) * .66
+    + Math.sin(x * .51) * .23
+    - mouthTurn * mouthTurn * .28
 }
 
 export function riverWidth(x) {
-  return 1.02 + Math.sin(x * .37 + 1.3) * .14
+  const channelWidth = 1.02 + Math.sin(x * .37 + 1.3) * .11
+  const mouthBlend = smoothstep(7.4, RIVER_MOUTH_END_X - 1.1, x)
+  return THREE.MathUtils.lerp(channelWidth, 2.16, mouthBlend)
 }
 
 export function isLandingPad(x, z) {
@@ -249,8 +261,8 @@ export function getWalkSurface(x, z, theme = 'forest') {
 }
 
 export function getRiverAudioPoint(playerX) {
-  const clampX = Math.max(-19.5, Math.min(19.5, playerX))
-  return [clampX, 0.05, riverCenterZ(clampX)]
+  const clampX = Math.max(RIVER_SOURCE_X, Math.min(RIVER_MOUTH_END_X, playerX))
+  return [clampX, RIVER_SURFACE_Y, riverCenterZ(clampX)]
 }
 
 export function getRiverAudioProximity(playerX, playerZ) {
@@ -273,6 +285,7 @@ export function isBridgeDeck(x, z) {
 }
 
 export function isRiverWater(x, z) {
+  if (x < RIVER_SOURCE_X - .35 || x > RIVER_MOUTH_END_X) return false
   if (Math.hypot(x, z) > WORLD_RADIUS - .35) return false
   return Math.abs(z - riverCenterZ(x)) < riverWidth(x) * .9
 }
@@ -294,8 +307,11 @@ export function terrainHeight(x, z) {
 
   const riverDistance = Math.abs(z - riverCenterZ(x))
   const width = riverWidth(x)
-  const bedBlend = 1 - smoothstep(width * .68, width * 1.18, riverDistance)
-  const bank = Math.exp(-Math.pow((riverDistance - width * 1.32) / .34, 2)) * .16
+  const sourceFade = smoothstep(RIVER_SOURCE_X - .5, RIVER_SOURCE_X + .8, x)
+  const mouthFade = 1 - smoothstep(RIVER_MOUTH_END_X - .4, RIVER_MOUTH_END_X + .2, x)
+  const channelFade = sourceFade * mouthFade
+  const bedBlend = (1 - smoothstep(width * .68, width * 1.18, riverDistance)) * channelFade
+  const bank = Math.exp(-Math.pow((riverDistance - width * 1.32) / .38, 2)) * .16 * channelFade
   height = THREE.MathUtils.lerp(height + bank, -.42, bedBlend)
 
   PLATEAUS.forEach((plateau) => {
@@ -305,7 +321,13 @@ export function terrainHeight(x, z) {
   })
 
   const edgeBlend = smoothstep(WORLD_RADIUS - 2.1, WORLD_RADIUS, radius)
-  height = THREE.MathUtils.lerp(height, .03, edgeBlend)
+  // 하구의 해안선은 수면 아래로 낮춰 원형 섬의 벽이 강을 막지 않게 한다.
+  // 채널 밖의 해안은 기존 높이를 유지하므로 작은 만입만 생긴다.
+  const estuaryCore = 1 - smoothstep(width * 1.05, width * 1.62, riverDistance)
+  const estuaryForward = smoothstep(RIVER_MOUTH_START_X - .8, RIVER_MOUTH_END_X - 1.6, x)
+  const estuaryBlend = estuaryCore * estuaryForward
+  const coastHeight = THREE.MathUtils.lerp(.03, OCEAN_SURFACE_Y - .1, estuaryBlend)
+  height = THREE.MathUtils.lerp(height, coastHeight, edgeBlend)
   return THREE.MathUtils.clamp(height, -.44, 5.8)
 }
 
@@ -398,7 +420,40 @@ export function createTerrainGeometry(palette) {
   return geometry
 }
 
-export function createRibbonGeometry(paths, width, heightSampler = terrainHeight, yOffset = .055) {
+export function createIslandSkirtGeometry() {
+  const angularSegments = 112
+  const positions = []
+  const uvs = []
+  const indices = []
+  const bottomRadius = WORLD_RADIUS - 2.4
+  const bottomY = -2.59
+
+  for (let segment = 0; segment <= angularSegments; segment += 1) {
+    const amount = segment / angularSegments
+    const angle = amount * Math.PI * 2
+    const cos = Math.cos(angle)
+    const sin = Math.sin(angle)
+    const x = cos * WORLD_RADIUS
+    const z = sin * WORLD_RADIUS
+    positions.push(x, terrainHeight(x, z) - .018, z)
+    positions.push(cos * bottomRadius, bottomY, sin * bottomRadius)
+    uvs.push(amount, 1, amount, 0)
+    if (segment < angularSegments) {
+      const start = segment * 2
+      indices.push(start, start + 2, start + 3, start, start + 3, start + 1)
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
+export function createVariableRibbonGeometry(paths, widthSampler, heightSampler = terrainHeight, yOffset = .055) {
   const positions = []
   const uvs = []
   const indices = []
@@ -419,6 +474,9 @@ export function createRibbonGeometry(paths, width, heightSampler = terrainHeight
       const tangentX = after.x - before.x
       const tangentZ = after.z - before.z
       const tangentLength = Math.max(.001, Math.hypot(tangentX, tangentZ))
+      const width = typeof widthSampler === 'function'
+        ? Math.max(.001, widthSampler(point.x, point.z, t))
+        : widthSampler
       let sideX = -tangentZ / tangentLength * width
       let sideZ = tangentX / tangentLength * width
       if (previousSideX !== null && previousSideX * sideX + previousSideZ * sideZ < 0) {
@@ -431,8 +489,9 @@ export function createRibbonGeometry(paths, width, heightSampler = terrainHeight
       const leftZ = point.z + sideZ
       const rightX = point.x - sideX
       const rightZ = point.z - sideZ
-      positions.push(leftX, heightSampler(leftX, leftZ) + yOffset, leftZ)
-      positions.push(rightX, heightSampler(rightX, rightZ) + yOffset, rightZ)
+      const lift = typeof yOffset === 'function' ? yOffset(point.x, point.z, t) : yOffset
+      positions.push(leftX, heightSampler(leftX, leftZ, t) + lift, leftZ)
+      positions.push(rightX, heightSampler(rightX, rightZ, t) + lift, rightZ)
       const along = lengths[index] / totalLength
       uvs.push(along, 0, along, 1)
       if (index < sampleCount) {
@@ -449,12 +508,92 @@ export function createRibbonGeometry(paths, width, heightSampler = terrainHeight
   return geometry
 }
 
+export function createRibbonGeometry(paths, width, heightSampler = terrainHeight, yOffset = .055) {
+  return createVariableRibbonGeometry(paths, width, heightSampler, yOffset)
+}
+
+function createRiverPath(startX, endX, steps) {
+  return Array.from({ length: steps + 1 }, (_, index) => {
+    const x = THREE.MathUtils.lerp(startX, endX, index / steps)
+    return [x, riverCenterZ(x)]
+  })
+}
+
 export function createRiverGeometry() {
-  const path = []
-  const steps = 72
+  // 발원지부터 바다 안쪽까지 하나의 리본으로 만든다. 강과 하구를 별도
+  // 투명 메시로 겹치면 카메라 각도에 따라 정렬 순서가 바뀌어 직선 경계가
+  // 나타나므로, 색·높이·투명도 변화는 단일 셰이더 안에서 처리한다.
+  const path = createRiverPath(RIVER_SOURCE_X, RIVER_MOUTH_BLEND_END_X, 18)
+  return createVariableRibbonGeometry(
+    [path],
+    (x) => riverWidth(x),
+    (x) => THREE.MathUtils.lerp(
+      RIVER_SURFACE_Y,
+      OCEAN_SURFACE_Y + .018,
+      smoothstep(RIVER_MOUTH_START_X + 1.4, RIVER_MOUTH_BLEND_END_X - .7, x),
+    ),
+    0,
+  )
+}
+
+export function createRiverMouthGeometry(widthScale = 1) {
+  // 바다 안쪽까지 충분히 겹친 뒤 셰이더에서 투명하게 사라지게 한다.
+  // 실제 마지막 단면은 보이지 않으므로 하구가 사각 판처럼 끊기지 않는다.
+  const path = createRiverPath(RIVER_MOUTH_START_X, RIVER_MOUTH_BLEND_END_X, 9)
+  return createVariableRibbonGeometry(
+    [path],
+    (x) => riverWidth(x) * widthScale,
+    (_x, _z, amount) => THREE.MathUtils.lerp(
+      RIVER_SURFACE_Y - .002,
+      OCEAN_SURFACE_Y + .018,
+      smoothstep(.2, .9, amount),
+    ),
+    0,
+  )
+}
+
+export function createEstuaryBankGeometry(side = 1) {
+  const direction = side < 0 ? -1 : 1
+  const startX = RIVER_MOUTH_START_X - 1.15
+  const endX = direction > 0 ? RIVER_MOUTH_END_X - .65 : RIVER_MOUTH_END_X - 1.25
+  const steps = 18
+  const positions = []
+  const uvs = []
+  const indices = []
+
+  const bankHeight = (x, z) => Math.max(
+    terrainHeight(x, z) + .035,
+    OCEAN_SURFACE_Y + .018,
+  )
+
   for (let index = 0; index <= steps; index += 1) {
-    const x = -19.5 + index / steps * 39
-    path.push([x, riverCenterZ(x)])
+    const amount = index / steps
+    const x = THREE.MathUtils.lerp(startX, endX, amount)
+    const centerZ = riverCenterZ(x)
+    const channelWidth = riverWidth(x)
+    const irregularity = Math.sin(amount * Math.PI * 3.4 + direction * .8) * .11
+    const innerDistance = channelWidth * (1.01 + irregularity * .16)
+    const tongueTaper = 1 - smoothstep(.64, 1, amount)
+    const bankDepth = (.5 + amount * .72 + irregularity) * tongueTaper + .035
+    const outerDistance = innerDistance + bankDepth
+    const innerZ = centerZ + direction * innerDistance
+    const outerZ = centerZ + direction * outerDistance
+
+    positions.push(x, bankHeight(x, innerZ), innerZ)
+    positions.push(x, bankHeight(x, outerZ), outerZ)
+    uvs.push(amount, 0, amount, 1)
+
+    if (index < steps) {
+      const start = index * 2
+      indices.push(start, start + 2, start + 3, start, start + 3, start + 1)
+    }
   }
-  return createRibbonGeometry([path], 1.03, () => .015)
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.computeBoundingSphere()
+  return geometry
 }

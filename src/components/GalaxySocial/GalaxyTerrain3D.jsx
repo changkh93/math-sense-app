@@ -5,14 +5,20 @@ import {
   BRIDGE_DECK_HEIGHT,
   BRIDGE_X,
   MOUNTAINS,
+  OCEAN_SURFACE_Y,
   LANDING_PAD_RADIUS,
   LANDING_PAD_SURFACE_LIFT,
+  RIVER_MOUTH_END_X,
+  RIVER_SOURCE_X,
+  RIVER_SURFACE_Y,
   ROAD_CENTER_HALF_WIDTH,
   ROAD_EDGE_HALF_WIDTH,
   ROAD_SURFACE_LIFT,
   VILLAGE_BEACON_POSITION,
   WORLD_RADIUS,
   WORLD_ZONES,
+  createEstuaryBankGeometry,
+  createIslandSkirtGeometry,
   createRiverGeometry,
   createRibbonGeometry,
   createTerrainGeometry,
@@ -27,6 +33,121 @@ import {
 } from './GalaxyTerrainModel.js'
 
 const GROUND_TEXTURE_SIZE = 512
+const OCEAN_VERTEX_SHADER = `
+  varying vec2 vLocal;
+  varying vec3 vWorldPosition;
+
+  void main() {
+    vLocal = position.xy;
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPosition.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+  }
+`
+
+const OCEAN_FRAGMENT_SHADER = `
+  precision mediump float;
+
+  uniform float uTime;
+  uniform float uIslandRadius;
+  uniform sampler2D uWaveMap;
+  uniform vec3 uShallow;
+  uniform vec3 uDeep;
+  varying vec2 vLocal;
+  varying vec3 vWorldPosition;
+
+  void main() {
+    float coastDistance = max(0.0, length(vLocal) - uIslandRadius);
+    float depth = smoothstep(0.35, 32.0, coastDistance);
+    vec2 waveUvA = vLocal * vec2(0.12, 0.17)
+      + vec2(uTime * 0.012, uTime * 0.018);
+    vec2 rotated = vec2(-vLocal.y, vLocal.x);
+    vec2 waveUvB = rotated * vec2(0.085, 0.135)
+      + vec2(-uTime * 0.008, uTime * 0.011);
+    float waveA = texture2D(uWaveMap, waveUvA).r;
+    float waveB = texture2D(uWaveMap, waveUvB).r;
+    float wave = waveA * 0.72 + waveB * 0.28;
+    float waveX = texture2D(uWaveMap, waveUvA + vec2(0.003, 0.0)).r * 0.72
+      + texture2D(uWaveMap, waveUvB + vec2(0.003, 0.0)).r * 0.28;
+    float waveY = texture2D(uWaveMap, waveUvA + vec2(0.0, 0.003)).r * 0.72
+      + texture2D(uWaveMap, waveUvB + vec2(0.0, 0.003)).r * 0.28;
+    vec3 surfaceNormal = normalize(vec3(
+      (wave - waveX) * 4.2,
+      1.0,
+      (wave - waveY) * 4.2
+    ));
+    vec3 lightDirection = normalize(vec3(-0.38, 0.88, 0.28));
+    vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+    vec3 halfDirection = normalize(lightDirection + viewDirection);
+    float reflection = pow(max(dot(surfaceNormal, halfDirection), 0.0), 54.0);
+    float sparkle = pow(max(dot(surfaceNormal, halfDirection), 0.0), 120.0);
+    float crest = smoothstep(0.7, 0.91, wave);
+    float shoreBand = exp(-pow((coastDistance - 0.72) / 0.68, 2.0));
+    float shoreFoam = smoothstep(0.6, 0.82, waveA) * shoreBand;
+    float swell = sin(vLocal.x * 0.34 + vLocal.y * 0.11 - uTime * 0.24) * 0.5 + 0.5;
+    vec3 water = mix(uShallow, uDeep, depth);
+    water *= 0.985 + wave * 0.025 + swell * 0.008;
+    water += vec3(0.18, 0.42, 0.58) * crest * mix(0.045, 0.025, depth);
+    water += vec3(0.72, 0.91, 1.0) * reflection * 0.28;
+    water += vec3(0.94, 0.99, 1.0) * sparkle * 0.38;
+    water += vec3(0.8, 0.96, 1.0) * shoreFoam * 0.2;
+    gl_FragColor = vec4(water, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`
+
+const ESTUARY_VERTEX_SHADER = `
+  varying vec2 vUv;
+
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+const ESTUARY_FRAGMENT_SHADER = `
+  precision mediump float;
+
+  uniform float uTime;
+  uniform float uOpacity;
+  uniform vec3 uRiver;
+  uniform vec3 uOcean;
+  varying vec2 vUv;
+
+  void main() {
+    float endFade = 1.0 - smoothstep(0.86, 0.995, vUv.x);
+    float sideFade = smoothstep(0.0, 0.075, vUv.y)
+      * smoothstep(0.0, 0.075, 1.0 - vUv.y);
+    float wave = sin(vUv.x * 92.0 - uTime * 0.55 + sin(vUv.y * 19.0) * 0.55);
+    float glint = smoothstep(0.82, 0.99, wave) * 0.035;
+    vec3 water = mix(uRiver, uOcean, smoothstep(0.67, 0.92, vUv.x));
+    water += vec3(0.34, 0.58, 0.62) * glint;
+    gl_FragColor = vec4(water, uOpacity * endFade * sideFade);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`
+
+const ESTUARY_FLOW_FRAGMENT_SHADER = `
+  precision mediump float;
+
+  uniform sampler2D uMap;
+  uniform float uTime;
+  uniform vec3 uColor;
+  varying vec2 vUv;
+
+  void main() {
+    float endFade = 1.0 - smoothstep(0.82, 0.975, vUv.x);
+    float sideFade = smoothstep(0.0, 0.1, vUv.y)
+      * smoothstep(0.0, 0.1, 1.0 - vUv.y);
+    vec4 flow = texture2D(uMap, vec2(vUv.x * 11.0 - uTime * 0.11, vUv.y));
+    gl_FragColor = vec4(uColor, flow.a * endFade * sideFade * 0.24);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`
+
 const GROUND_PATCHES = [
   { x: -4.8, z: .5, rx: 4.6, rz: 2.25, rotation: .28 },
   { x: 5.6, z: -1.7, rx: 4.1, rz: 2.15, rotation: -.62 },
@@ -225,6 +346,47 @@ function createRiverFlowTexture() {
   texture.magFilter = THREE.LinearFilter
   texture.generateMipmaps = true
   texture.anisotropy = 2
+  texture.needsUpdate = true
+  return texture
+}
+
+function createOceanWaveTexture() {
+  const size = 256
+  const data = new Uint8Array(size * size)
+  const tau = Math.PI * 2
+  const waves = [
+    { x: 0, y: 1, amplitude: .22, phase: .15 },
+    { x: 1, y: 2, amplitude: .13, phase: 1.2 },
+    { x: -1, y: 3, amplitude: .09, phase: 2.45 },
+    { x: 2, y: 5, amplitude: .065, phase: .72 },
+    { x: -3, y: 7, amplitude: .045, phase: 1.86 },
+    { x: 5, y: 9, amplitude: .03, phase: 2.8 },
+  ]
+
+  for (let y = 0; y < size; y += 1) {
+    const v = y / size
+    for (let x = 0; x < size; x += 1) {
+      const u = x / size
+      // 수평에 가까운 긴 잔물결을 중심으로 작은 교차파를 합성한다.
+      // 높은 거듭제곱 능선을 사용하지 않아 V자/다각형 무늬가 생기지 않는다.
+      const warp = Math.sin((u * 2 + v) * tau) * .075
+      let height = .5
+      waves.forEach((wave) => {
+        height += Math.sin(
+          (u * wave.x + v * wave.y) * tau + wave.phase + warp,
+        ) * wave.amplitude
+      })
+      data[y * size + x] = THREE.MathUtils.clamp(height * 255, 0, 255)
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RedFormat, THREE.UnsignedByteType)
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.minFilter = THREE.LinearMipmapLinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.generateMipmaps = true
+  texture.anisotropy = 4
   texture.needsUpdate = true
   return texture
 }
@@ -494,11 +656,173 @@ function TerrainRoads({ palette, structurePositions }) {
   )
 }
 
+function OceanSurface({ palette }) {
+  const materialRef = useRef()
+  const waveTexture = useMemo(() => createOceanWaveTexture(), [])
+  const uniforms = useMemo(() => {
+    const shallow = new THREE.Color(palette.water).lerp(new THREE.Color('#2d8fbd'), .8)
+    const deep = new THREE.Color(palette.edge).lerp(new THREE.Color('#06395f'), .78)
+    return {
+      uTime: { value: 0 },
+      uIslandRadius: { value: WORLD_RADIUS },
+      uWaveMap: { value: waveTexture },
+      uShallow: { value: shallow },
+      uDeep: { value: deep },
+    }
+  }, [palette.edge, palette.water, waveTexture])
+
+  useEffect(() => () => {
+    waveTexture.dispose()
+  }, [waveTexture])
+
+  useFrame((state) => {
+    if (materialRef.current) materialRef.current.uniforms.uTime.value = state.clock.elapsedTime
+  })
+
+  return (
+    <group>
+      <mesh position={[0, OCEAN_SURFACE_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-3} raycast={() => null}>
+        <circleGeometry args={[62, 128]} />
+        <shaderMaterial
+          ref={materialRef}
+          uniforms={uniforms}
+          vertexShader={OCEAN_VERTEX_SHADER}
+          fragmentShader={OCEAN_FRAGMENT_SHADER}
+          depthWrite
+        />
+      </mesh>
+      <mesh position={[0, .014, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1} raycast={() => null}>
+        <ringGeometry args={[WORLD_RADIUS - .22, WORLD_RADIUS + .08, 128, 1, 1.2, Math.PI * 2 - .75]} />
+        <meshBasicMaterial color={palette.groundDeep} transparent opacity={.28} depthWrite={false} />
+      </mesh>
+    </group>
+  )
+}
+
+function EstuaryDetails({ palette }) {
+  const rockRef = useRef()
+  const rockGeometry = useMemo(() => new THREE.DodecahedronGeometry(.5, 0), [])
+  const rockMaterial = useMemo(() => new THREE.MeshStandardMaterial({
+    color: palette.groundDeep,
+    roughness: .94,
+    flatShading: true,
+  }), [palette.groundDeep])
+  const rocks = useMemo(() => [
+    { x: 10.65, side: -1.28, scale: [.72, .48, .58], rotation: .2 },
+    { x: 11.25, side: 1.34, scale: [.5, .34, .68], rotation: 1.1 },
+    { x: 12.25, side: -1.23, scale: [.82, .43, .52], rotation: 2.4 },
+    { x: 13.05, side: 1.2, scale: [.56, .38, .48], rotation: .7 },
+    { x: 13.9, side: -1.05, scale: [.48, .3, .62], rotation: 1.8 },
+    { x: 14.65, side: 1.06, scale: [.72, .4, .55], rotation: 2.7 },
+    { x: 15.35, side: -1.02, scale: [.42, .27, .46], rotation: .9 },
+    { x: 15.8, side: .92, scale: [.58, .32, .5], rotation: 2.1 },
+  ].map((rock) => {
+    const z = riverCenterZ(rock.x) + riverWidth(rock.x) * rock.side
+    const radius = Math.hypot(rock.x, z)
+    const surface = radius < WORLD_RADIUS - .2
+      ? terrainHeight(rock.x, z)
+      : OCEAN_SURFACE_Y
+    return { ...rock, z, y: Math.max(surface, OCEAN_SURFACE_Y) + .08 }
+  }), [])
+
+  useLayoutEffect(() => {
+    const mesh = rockRef.current
+    if (!mesh) return
+    const dummy = new THREE.Object3D()
+    rocks.forEach((rock, index) => {
+      dummy.position.set(rock.x, rock.y, rock.z)
+      dummy.rotation.set(.08, rock.rotation, -.06)
+      dummy.scale.set(...rock.scale)
+      dummy.updateMatrix()
+      mesh.setMatrixAt(index, dummy.matrix)
+    })
+    mesh.instanceMatrix.needsUpdate = true
+    mesh.computeBoundingSphere()
+  }, [rocks])
+
+  useEffect(() => () => {
+    rockGeometry.dispose()
+    rockMaterial.dispose()
+  }, [rockGeometry, rockMaterial])
+
+  const mouthZ = riverCenterZ(RIVER_MOUTH_END_X - 1.2)
+  return (
+    <group>
+      <instancedMesh
+        ref={rockRef}
+        args={[rockGeometry, rockMaterial, rocks.length]}
+        castShadow
+        receiveShadow
+      />
+      <mesh
+        position={[14.15, OCEAN_SURFACE_Y + .018, mouthZ + 2.05]}
+        scale={[1.45, .14, .56]}
+        rotation={[0, -.24, 0]}
+        receiveShadow
+      >
+        <sphereGeometry args={[1, 14, 7]} />
+        <meshStandardMaterial color={palette.edge} roughness={.98} />
+      </mesh>
+      <mesh
+        position={[15.45, OCEAN_SURFACE_Y + .1, mouthZ - 2.02]}
+        scale={[.74, .38, .62]}
+        rotation={[0, .52, 0]}
+        castShadow
+      >
+        <dodecahedronGeometry args={[.8, 0]} />
+        <meshStandardMaterial color={palette.groundDeep} roughness={.94} />
+      </mesh>
+    </group>
+  )
+}
+
+function EstuaryBanks({ palette }) {
+  const leftBank = useMemo(() => createEstuaryBankGeometry(1), [])
+  const rightBank = useMemo(() => createEstuaryBankGeometry(-1), [])
+  const bankColor = useMemo(
+    () => new THREE.Color(palette.groundDeep).lerp(new THREE.Color('#8d7b5a'), .34),
+    [palette.groundDeep],
+  )
+
+  useEffect(() => () => {
+    leftBank.dispose()
+    rightBank.dispose()
+  }, [leftBank, rightBank])
+
+  return (
+    <group>
+      {[leftBank, rightBank].map((geometry, index) => (
+        <mesh key={index} geometry={geometry} receiveShadow>
+          <meshStandardMaterial
+            color={bankColor}
+            roughness={.96}
+            metalness={0}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 function River({ palette }) {
   const flowTextureRef = useRef()
+  const waterMaterialRef = useRef()
+  const flowMaterialRef = useRef()
   const geometry = useMemo(() => createRiverGeometry(), [])
   const flowTexture = useMemo(() => createRiverFlowTexture(), [])
   const flowColor = useMemo(() => new THREE.Color(palette.water).lerp(new THREE.Color('#eaffff'), .68), [palette.water])
+  const waterUniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uOpacity: { value: .9 },
+    uRiver: { value: new THREE.Color(palette.water) },
+    uOcean: { value: new THREE.Color(palette.water).lerp(new THREE.Color('#2d8fbd'), .8) },
+  }), [palette.water])
+  const flowUniforms = useMemo(() => ({
+    uMap: { value: flowTexture },
+    uTime: { value: 0 },
+    uColor: { value: flowColor },
+  }), [flowColor, flowTexture])
   useEffect(() => {
     flowTextureRef.current = flowTexture
     return () => {
@@ -510,18 +834,47 @@ function River({ palette }) {
   useFrame((state) => {
     const animatedTexture = flowTextureRef.current
     if (!animatedTexture) return
-    animatedTexture.offset.x = -((state.clock.elapsedTime * .11) % 1)
-    animatedTexture.offset.y = Math.sin(state.clock.elapsedTime * .42) * .003
+    const elapsed = state.clock.elapsedTime
+    animatedTexture.offset.x = -((elapsed * .11) % 1)
+    animatedTexture.offset.y = Math.sin(elapsed * .42) * .003
+    if (waterMaterialRef.current) waterMaterialRef.current.uniforms.uTime.value = elapsed
+    if (flowMaterialRef.current) flowMaterialRef.current.uniforms.uTime.value = elapsed
   })
   return (
     <group>
-      <mesh geometry={geometry} renderOrder={2}>
-        <meshPhysicalMaterial color={palette.water} emissive={palette.water} emissiveIntensity={.13} transparent opacity={.86} roughness={.26} metalness={.03} clearcoat={.42} clearcoatRoughness={.25} depthWrite={false} side={THREE.DoubleSide} />
+      <mesh geometry={geometry} renderOrder={2} raycast={() => null}>
+        <shaderMaterial
+          ref={waterMaterialRef}
+          uniforms={waterUniforms}
+          vertexShader={ESTUARY_VERTEX_SHADER}
+          fragmentShader={ESTUARY_FRAGMENT_SHADER}
+          transparent
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      <mesh geometry={geometry} position={[0, .008, 0]} renderOrder={3} raycast={() => null}>
-        <meshBasicMaterial map={flowTexture} color={flowColor} transparent opacity={.32} depthWrite={false} toneMapped />
+      <mesh geometry={geometry} position={[0, .007, 0]} renderOrder={3} raycast={() => null}>
+        <shaderMaterial
+          ref={flowMaterialRef}
+          uniforms={flowUniforms}
+          vertexShader={ESTUARY_VERTEX_SHADER}
+          fragmentShader={ESTUARY_FLOW_FRAGMENT_SHADER}
+          transparent
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      {[-15, -10.5, -5.5, 6.5, 11, 15.5].map((x, index) => {
+      <mesh
+        position={[RIVER_SOURCE_X + .08, RIVER_SURFACE_Y - .006, riverCenterZ(RIVER_SOURCE_X)]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        scale={[1.18, .78, 1]}
+        renderOrder={2}
+        raycast={() => null}
+      >
+        <circleGeometry args={[1.04, 24]} />
+        <meshPhysicalMaterial color={palette.water} transparent opacity={.84} roughness={.3} depthWrite={false} />
+      </mesh>
+      {[-11.05, -8.65, -5.5, 6.5, 9.2].map((x, index) => {
         const side = index % 2 ? -1 : 1
         const z = riverCenterZ(x) + riverWidth(x) * 1.35 * side
         return (
@@ -531,14 +884,27 @@ function River({ palette }) {
           </group>
         )
       })}
+      <EstuaryBanks palette={palette} />
+      <EstuaryDetails palette={palette} />
     </group>
   )
 }
 
 function Bridge({ palette }) {
   const z = riverCenterZ(BRIDGE_X)
+  const bankOffsets = [-2.55, 2.55]
   return (
     <group position={[BRIDGE_X, 0, z]}>
+      <mesh
+        position={[0, RIVER_SURFACE_Y - .006, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        scale={[1.35, 2.18, 1]}
+        renderOrder={3}
+        raycast={() => null}
+      >
+        <circleGeometry args={[1, 28]} />
+        <meshBasicMaterial color="#061e2b" transparent opacity={.28} depthWrite={false} />
+      </mesh>
       {Array.from({ length: 10 }, (_, index) => {
         const deckZ = -2.25 + index * .5
         return <mesh key={deckZ} position={[0, BRIDGE_DECK_HEIGHT - .09, deckZ]} receiveShadow castShadow><boxGeometry args={[2.45, .18, .43]} /><meshStandardMaterial color={index % 2 ? '#7c684f' : '#8b7758'} roughness={.82} metalness={.08} /></mesh>
@@ -548,6 +914,33 @@ function Bridge({ palette }) {
       )))}
       {[-1.08, 1.08].map((x) => <mesh key={x} position={[x, BRIDGE_DECK_HEIGHT + .65, 0]}><boxGeometry args={[.07, .08, 4.75]} /><meshStandardMaterial color={palette.accent} emissive={palette.glow} emissiveIntensity={.5} metalness={.5} /></mesh>)}
       {[-1.85, 1.85].map((deckZ) => <mesh key={deckZ} position={[0, -.05, deckZ]}><cylinderGeometry args={[.32, .48, 1.05, 10]} /><meshStandardMaterial color="#334252" roughness={.72} metalness={.28} /></mesh>)}
+      {bankOffsets.map((deckZ) => {
+        const bankHeight = terrainHeight(BRIDGE_X, z + deckZ)
+        return (
+          <group key={`abutment_${deckZ}`} position={[0, bankHeight, deckZ]}>
+            <mesh position={[0, .1, 0]} receiveShadow castShadow>
+              <cylinderGeometry args={[.82, 1.02, .32, 8]} />
+              <meshStandardMaterial color={palette.edge} roughness={.92} />
+            </mesh>
+            <mesh position={[0, .2, deckZ < 0 ? .28 : -.28]} receiveShadow>
+              <boxGeometry args={[2.35, .18, .82]} />
+              <meshStandardMaterial color={palette.path} roughness={.88} />
+            </mesh>
+          </group>
+        )
+      })}
+      {[-1.85, 1.85].flatMap((deckZ) => [.56, .82].map((radius, index) => (
+        <mesh
+          key={`ripple_${deckZ}_${radius}`}
+          position={[0, RIVER_SURFACE_Y + .012 + index * .002, deckZ]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          renderOrder={4}
+          raycast={() => null}
+        >
+          <ringGeometry args={[radius, radius + .035, 28]} />
+          <meshBasicMaterial color="#b8eef0" transparent opacity={index ? .16 : .26} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )))}
     </group>
   )
 }
@@ -620,8 +1013,10 @@ function LandingPad({ palette }) {
 
 export default function WorldTerrain({ palette, villageSlots = [], showVillage = true, showVillageBeacon = true, detailClearings = [], buildItem = '', structurePositions = [], onBuildHover, onBuildCommit }) {
   const terrainGeometry = useMemo(() => createTerrainGeometry(palette), [palette])
+  const islandSkirtGeometry = useMemo(() => createIslandSkirtGeometry(), [])
   const groundTextures = useMemo(() => createGroundDetailTextures(palette), [palette])
   useEffect(() => () => terrainGeometry.dispose(), [terrainGeometry])
+  useEffect(() => () => islandSkirtGeometry.dispose(), [islandSkirtGeometry])
   useEffect(() => () => {
     groundTextures.albedo.dispose()
     groundTextures.bump.dispose()
@@ -629,6 +1024,7 @@ export default function WorldTerrain({ palette, villageSlots = [], showVillage =
 
   return (
     <group>
+      <OceanSurface palette={palette} />
       <mesh
         geometry={terrainGeometry}
         receiveShadow
@@ -641,8 +1037,9 @@ export default function WorldTerrain({ palette, villageSlots = [], showVillage =
       >
         <meshStandardMaterial map={groundTextures.albedo} bumpMap={groundTextures.bump} bumpScale={.09} roughness={.95} metalness={.01} />
       </mesh>
-      <mesh position={[0, -1.28, 0]} receiveShadow><cylinderGeometry args={[WORLD_RADIUS, WORLD_RADIUS - 2.4, 2.62, 96]} /><meshStandardMaterial color={palette.edge} roughness={.96} /></mesh>
-      <mesh position={[0, -1.05, 0]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[39, 96]} /><meshPhysicalMaterial color={palette.water} transparent opacity={.72} roughness={.17} metalness={.04} clearcoat={.38} /></mesh>
+      <mesh geometry={islandSkirtGeometry} receiveShadow>
+        <meshStandardMaterial color={palette.edge} roughness={.96} side={THREE.DoubleSide} />
+      </mesh>
       <TerrainRoads palette={palette} structurePositions={structurePositions} />
       <GroundCover palette={palette} clearings={detailClearings} />
       <River palette={palette} />
