@@ -80,13 +80,21 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       setShowExtensionPrompt(false);
       setSelectedBounty(0);
     }
-    return () => { document.body.style.overflow = 'auto'; };
+    return () => {
+      document.body.style.overflow = 'auto';
+      document.body.classList.remove('is-capturing');
+      document.body.classList.remove('is-extension-capturing');
+      document.body.classList.remove('is-live-video-capturing');
+    };
   }, [isOpen]);
 
   useEffect(() => {
     return () => {
       resolvePendingExtensionProbe(false);
       resolvePendingExtensionCapture({ error: 'Question modal unmounted' });
+      document.body.classList.remove('is-capturing');
+      document.body.classList.remove('is-extension-capturing');
+      document.body.classList.remove('is-live-video-capturing');
     };
   }, []);
 
@@ -862,7 +870,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     <>
       <AnimatePresence>
       <motion.div 
-        className="modal-overlay"
+        className="modal-overlay question-modal-overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: isCapturing ? 0 : 1 }}
         exit={{ opacity: 0 }}
@@ -1065,8 +1073,8 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="modal-overlay"
-            style={{ zIndex: 1100, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
+            className="modal-overlay question-modal-overlay question-modal-prompt-overlay"
+            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}

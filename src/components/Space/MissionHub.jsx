@@ -443,6 +443,13 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
             })
             setHasError(true)
             if (onError) onError(event.data)
+          },
+          'onAutoplayBlocked': () => {
+            onTrackingStatusRef.current?.({
+              event: 'autoplay_blocked',
+              autoplayBlocked: true,
+              videoId: normalizedVideoId
+            })
           }
         }
       })
@@ -1337,8 +1344,11 @@ export default function MissionHub({
       lastTimeUpdateAt: status.lastTimeUpdateAt || null,
       lastForwardPlaybackAt: status.lastForwardPlaybackAt || null,
       inferredPlayback: !!status.inferredPlayback,
+      autoplayBlocked: !!status.autoplayBlocked,
       trackingUnavailable: !!videoTrackingUnavailable,
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      viewportWidth: typeof window !== 'undefined' ? window.innerWidth : null,
+      viewportHeight: typeof window !== 'undefined' ? window.innerHeight : null
     }
   }, [videoTrackingUnavailable])
 
@@ -1518,6 +1528,13 @@ export default function MissionHub({
         transmissionTitle: selectedTx?.title || '',
         videoId: event.videoId || selectedTx?.videoId || '',
         errorCode: event.playerError ?? null,
+        ...getTrackingDiagnostics()
+      })
+    } else if (event.event === 'autoplay_blocked') {
+      logActivity('video_tracking_autoplay_blocked', {
+        transmissionId: selectedTx?.id || 'default',
+        transmissionTitle: selectedTx?.title || '',
+        videoId: event.videoId || selectedTx?.videoId || '',
         ...getTrackingDiagnostics()
       })
     }
@@ -2668,6 +2685,7 @@ export default function MissionHub({
       const savedTxProgress = learningProgress?.videoProgress?.[txId]
       const hasUnsavedVideoCompletion = videoCompleted && !savedTxProgress?.completed
       const hasActiveCompletionBonus = hasUnsavedVideoCompletion && completionBonusTimeLeft !== null && completionBonusTimeLeft > 0
+      const shouldShowTopHud = isUiVisible || isMediaControlsOpen
       const shouldShowBottomHud = isBottomActionsOpen && (isUiVisible || isBottomHudInteracting || videoCompleted || isAtEnd || videoTrackingWarning)
 
       return (
@@ -2707,7 +2725,15 @@ export default function MissionHub({
              </div>
 
              {/* Top HUD Overlay */}
-             <div className="theater-hud top-hud" style={{ opacity: (isUiVisible || isMediaControlsOpen) ? 1 : 0 }}>
+             <div
+               className={`theater-hud top-hud ${shouldShowTopHud ? '' : 'is-hidden'}`}
+               style={{
+                 opacity: shouldShowTopHud ? 1 : 0,
+                 visibility: shouldShowTopHud ? 'visible' : 'hidden',
+                 pointerEvents: shouldShowTopHud ? undefined : 'none'
+               }}
+               aria-hidden={!shouldShowTopHud}
+             >
                <div style={{ minWidth: 0, flex: '1 1 560px', maxWidth: isMobile ? '100%' : '980px' }}>
                   {/* Global Back Button Integrated into Top HUD */}
                   <button 

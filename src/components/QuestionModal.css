@@ -12,6 +12,19 @@
   backdrop-filter: blur(5px);
 }
 
+/*
+ * MissionHub is a full-screen layer at z-index 2000 (and some video HUDs sit
+ * even higher). QuestionModal is portalled to <body>, so the generic modal
+ * z-index above would otherwise place it behind the learning screen.
+ */
+.question-modal-overlay {
+  z-index: 20000;
+}
+
+.question-modal-prompt-overlay {
+  z-index: 20010;
+}
+
 .question-modal-content {
   width: 90%;
   max-width: 600px;

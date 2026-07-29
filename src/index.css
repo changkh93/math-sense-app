@@ -295,6 +295,12 @@ button:active {
   pointer-events: auto;
 }
 
+/* A hidden HUD must not leave any nested interactive control over the iframe. */
+.theater-hud.is-hidden,
+.theater-hud.is-hidden * {
+  pointer-events: none !important;
+}
+
 .theater-hud input[type="range"] {
   min-height: 2rem;
   touch-action: pan-y;
