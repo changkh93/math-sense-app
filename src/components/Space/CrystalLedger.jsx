@@ -111,7 +111,7 @@ export default function CrystalLedger({ userData }) {
   const [hasMore, setHasMore] = useState(true)
   const [recipients, setRecipients] = useState([])
   const [recipientSearch, setRecipientSearch] = useState('')
-  const [selectedRecipientId, setSelectedRecipientId] = useState('')
+  const [selectedRecipient, setSelectedRecipient] = useState(null)
   const [transferAmount, setTransferAmount] = useState('')
   const [transferNote, setTransferNote] = useState('')
   const [transferBusy, setTransferBusy] = useState(false)
@@ -254,7 +254,6 @@ export default function CrystalLedger({ userData }) {
 
         const list = Array.from(resultMap.values()).sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'))
         setRecipients(list)
-        setSelectedRecipientId(prev => (prev && list.some(item => item.uid === prev) ? prev : ''))
       } catch (error) {
         console.error('Crystal transfer recipients error:', error)
         if (!cancelled) setRecipients([])
@@ -321,10 +320,7 @@ export default function CrystalLedger({ userData }) {
     return (crystals || 0) - totalEarned + totalSpent
   }, [crystals, totalEarned, totalSpent])
 
-  const selectedRecipient = useMemo(
-    () => recipients.find(recipient => recipient.uid === selectedRecipientId) || null,
-    [recipients, selectedRecipientId]
-  )
+
 
   const filteredRecipients = useMemo(() => {
     const keyword = recipientSearch.trim().toLowerCase()
@@ -345,13 +341,13 @@ export default function CrystalLedger({ userData }) {
   }, [recipientSearch, recipients, selectedRecipient])
 
   const handleSelectRecipient = (recipient) => {
-    setSelectedRecipientId(recipient.uid)
+    setSelectedRecipient(recipient)
     setRecipientSearch('')
     setTransferMessage(null)
   }
 
   const handleClearRecipient = () => {
-    setSelectedRecipientId('')
+    setSelectedRecipient(null)
     setRecipientSearch('')
   }
 
@@ -394,15 +390,16 @@ export default function CrystalLedger({ userData }) {
         message: transferNote.trim(),
       })
       const data = result?.data || {}
+      const targetRecipientName = data.recipientName || getProfileName(selectedRecipient)
       setTransferAmount('')
       setTransferNote('')
-      setSelectedRecipientId('')
+      setSelectedRecipient(null)
       setRecipientSearch('')
       setTransferMessage({
         type: 'success',
         text: data.operatorGiftExempt
-          ? `${data.recipientName || getProfileName(selectedRecipient)}님에게 ${amount}광석을 보냈습니다. 운영자 계정은 제한 없이 전송됩니다.`
-          : `${data.recipientName || getProfileName(selectedRecipient)}님에게 ${amount}광석을 보냈습니다. 오늘 남은 송금 한도는 ${data.remainingToday ?? 0}광석입니다.`
+          ? `${targetRecipientName}님에게 ${amount}광석을 보냈습니다. 운영자 계정은 제한 없이 전송됩니다.`
+          : `${targetRecipientName}님에게 ${amount}광석을 보냈습니다. 오늘 남은 송금 한도는 ${data.remainingToday ?? 0}광석입니다.`
       })
     } catch (err) {
       console.error('Crystal transfer failed:', err)
