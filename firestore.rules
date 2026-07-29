@@ -601,25 +601,17 @@ service cloud.firestore {
       allow create: if false;
     }
 
-    // Monthly evaluation certificate awards. Admins grant awards; students can
-    // read their own award ledger for the dashboard certificate board.
+    // Monthly evaluation certificate awards. Admins grant awards; authenticated
+    // users can read awards to view them on public student profiles.
     match /monthlyEvaluationAwards/{awardId} {
-      allow read: if isAuth() && (
-        isAdmin() ||
-        resource.data.studentId == request.auth.uid ||
-        isLinkedParentOf(resource.data.studentId)
-      );
+      allow read: if isAuth();
       allow create, update, delete: if isAdmin();
     }
 
-    // Monthly scholarship awards. Admins grant awards; students and linked
-    // parents can read awarded scholarship certificates.
+    // Monthly scholarship awards. Admins grant awards; authenticated
+    // users can read scholarship certificates to view them on public student profiles.
     match /scholarshipAwards/{awardId} {
-      allow read: if isAuth() && (
-        isAdmin() ||
-        resource.data.studentId == request.auth.uid ||
-        isLinkedParentOf(resource.data.studentId)
-      );
+      allow read: if isAuth();
       allow create, update, delete: if isAdmin();
     }
 
