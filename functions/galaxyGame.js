@@ -1066,12 +1066,11 @@ function planGalaxyRoverReportAcknowledgement({ operationId, operation = null, p
   if (!operation) return { kind: "not_found" };
   if (operation.type !== GALAXY_ROVER_OPERATION_TYPE || operation.operationId !== operationId) return { kind: "operation_conflict" };
   if (operation.reportAcknowledgedAtMs) return { kind: "deduplicated" };
-  const isOpClaimed = operation.status === "claimed" || Boolean(operation.claimResult) || Boolean(operation.claimedAtMs);
-  if (!isOpClaimed) return { kind: "not_claimed" };
   const expedition = planet.roverExpedition;
-  if (!expedition || expedition.operationId !== operationId) return { kind: "stale_operation" };
-  const isExpeditionClaimed = expedition.status === "claimed" || Boolean(expedition.claimedAtMs) || Boolean(expedition.result?.claimedAtMs);
-  if (!isExpeditionClaimed && !isOpClaimed) return { kind: "not_claimed" };
+  const isOpClaimed = operation.status === "claimed" || Boolean(operation.claimResult) || Boolean(operation.claimedAtMs);
+  const isExpeditionClaimed = Boolean(expedition) && (expedition.status === "claimed" || Boolean(expedition.claimedAtMs) || Boolean(expedition.result?.claimedAtMs) || Boolean(expedition.result));
+  if (!isOpClaimed && !isExpeditionClaimed) return { kind: "not_claimed" };
+  if (expedition && expedition.operationId !== operationId) return { kind: "stale_operation" };
   return { kind: "acknowledgeable" };
 }
 
@@ -4045,6 +4044,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const planetData = planetSnap.data() || {};
       const ackOperation = operationSnap.data() || {};
       transaction.set(operationRef, {
+        status: "claimed",
         reportAcknowledgedAtMs: serverNowMs,
         reportAcknowledgedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
