@@ -88,7 +88,11 @@ export default function MonthlyEvaluationAwards() {
       const unitIds = getConfiguredUnitIdsForMonth(year, month)
       const [usersSnap, awardsSnap, historySnap] = await Promise.all([
         getDocs(collection(db, 'users')),
-        getDocs(collection(db, 'monthlyEvaluationAwards')),
+        getDocs(query(
+          collection(db, 'monthlyEvaluationAwards'),
+          where('year', '==', Number(year)),
+          where('month', '==', Number(month)),
+        )),
         unitIds.length
           ? getDocs(query(collectionGroup(db, 'history'), where('unitId', 'in', unitIds)))
           : Promise.resolve({ docs: [] }),
@@ -125,8 +129,8 @@ export default function MonthlyEvaluationAwards() {
   }, [month, year])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    if (activeTab === 'certificates') loadData()
+  }, [activeTab, loadData])
 
   const rows = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()

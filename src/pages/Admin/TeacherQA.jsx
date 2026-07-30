@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import 'katex/dist/katex.min.css';
 import { db, auth } from '../../firebase';
@@ -17,7 +17,8 @@ import {
   where,
   increment,
   writeBatch,
-  limit
+  limit,
+  startAfter
 } from 'firebase/firestore';
 import { 
   MessageSquare, 
@@ -37,12 +38,18 @@ import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
 import { useQAMutations } from '../../hooks/useQA';
 import './Admin.css';
 
+const QUESTION_PAGE_SIZE = 30;
+
 export default function TeacherQA() {
   const { verifyAnswer } = useQAMutations();
   const [activeTab, setActiveTab] = useState('questions');
   const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers] = useState({}); // questionId -> Array of answers
+  const [answers, setAnswers] = useState({}); // questionId -> Array of answers (loaded on demand)
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMoreQuestions, setHasMoreQuestions] = useState(false);
+  const [questionCursor, setQuestionCursor] = useState(null);
+  const [answerLoading, setAnswerLoading] = useState({});
   const [filter, setFilter] = useState('open'); 
   const [replyText, setReplyText] = useState({}); 
   const [editingAnswerId, setEditingAnswerId] = useState(null);
@@ -64,77 +71,61 @@ export default function TeacherQA() {
   const [bannedUsers, setBannedUsers] = useState([]);
   const [banActionUid, setBanActionUid] = useState('');
 
-  useEffect(() => {
-    setLoading(true);
-    let unsubscribeQuestions = null;
-    let cleanupTimeout = null;
+  const loadQuestions = useCallback(async ({ append = false, cursor = null } = {}) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
 
-    let q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
-    if (filter !== 'all') {
-      q = query(collection(db, 'questions'), where('status', '==', filter), orderBy('createdAt', 'desc'));
+    try {
+      const constraints = [];
+      if (filter !== 'all') constraints.push(where('status', '==', filter));
+      constraints.push(orderBy('createdAt', 'desc'));
+      if (cursor) constraints.push(startAfter(cursor));
+      constraints.push(limit(QUESTION_PAGE_SIZE));
+      const snapshot = await getDocs(query(collection(db, 'questions'), ...constraints));
+      const nextQuestions = snapshot.docs.map(questionDoc => ({ id: questionDoc.id, ...questionDoc.data() }));
+      setQuestions(previous => append ? [...previous, ...nextQuestions] : nextQuestions);
+      setQuestionCursor(snapshot.docs.at(-1) || null);
+      setHasMoreQuestions(snapshot.size === QUESTION_PAGE_SIZE);
+    } catch (error) {
+      console.error('❌ Questions load error:', error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
-
-    unsubscribeQuestions = onSnapshot(q, 
-      (snapshot) => {
-        const qs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setQuestions(qs);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("❌ Questions listener error:", error);
-        setLoading(false);
-      }
-    );
-
-    return () => {
-      if (cleanupTimeout) clearTimeout(cleanupTimeout);
-      if (unsubscribeQuestions) {
-        if (!auth.currentUser) {
-           unsubscribeQuestions();
-        } else {
-           cleanupTimeout = setTimeout(() => {
-             if (unsubscribeQuestions) unsubscribeQuestions();
-           }, 100);
-        }
-      }
-    };
   }, [filter]);
 
-  // 2. Global listener for all answers (sync once)
   useEffect(() => {
-    console.log("📡 Subscribing to all answers...");
-    const unsubscribeAnswers = onSnapshot(collection(db, 'answers'), 
-      (snapshot) => {
-        const ansMap = {};
-        snapshot.docs.forEach(doc => {
-          const data = { id: doc.id, ...doc.data() };
-          if (data.questionId) {
-            if (!ansMap[data.questionId]) ansMap[data.questionId] = [];
-            ansMap[data.questionId].push(data);
-          }
-        });
+    setAnswers({});
+    setExpandedQuestions({});
+    loadQuestions();
+  }, [loadQuestions]);
 
-        // Sort answers within each group
-        Object.keys(ansMap).forEach(key => {
-          ansMap[key].sort((a, b) => {
-            const timeA = a.createdAt?.toMillis() || Date.now();
-            const timeB = b.createdAt?.toMillis() || Date.now();
-            return timeA - timeB;
-          });
-        });
+  const loadAnswers = useCallback(async (questionId) => {
+    if (!questionId || answerLoading[questionId]) return;
+    setAnswerLoading(previous => ({ ...previous, [questionId]: true }));
+    try {
+      const snapshot = await getDocs(query(collection(db, 'answers'), where('questionId', '==', questionId)));
+      const nextAnswers = snapshot.docs
+        .map(answerDoc => ({ id: answerDoc.id, ...answerDoc.data() }))
+        .sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+      setAnswers(previous => ({ ...previous, [questionId]: nextAnswers }));
+    } catch (error) {
+      console.error('❌ Answers load error:', error);
+    } finally {
+      setAnswerLoading(previous => ({ ...previous, [questionId]: false }));
+    }
+  }, [answerLoading]);
 
-        setAnswers(ansMap);
-        console.log(`✅ Answers updated: ${snapshot.size} total.`);
-      },
-      (error) => {
-        console.error("❌ Answers listener error:", error);
-      }
-    );
-
-    return () => unsubscribeAnswers();
-  }, []);
+  const toggleAnswers = (questionId) => {
+    const willExpand = !expandedQuestions[questionId];
+    setExpandedQuestions(previous => ({ ...previous, [questionId]: !previous[questionId] }));
+    if (willExpand && !Object.prototype.hasOwnProperty.call(answers, questionId)) {
+      loadAnswers(questionId);
+    }
+  };
 
   useEffect(() => {
+    if (activeTab !== 'bans') return undefined;
     const q = query(collection(db, 'agoraBannedUsers'), orderBy('bannedAt', 'desc'));
     const unsubscribe = onSnapshot(q,
       (snapshot) => {
@@ -146,12 +137,16 @@ export default function TeacherQA() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [activeTab]);
 
   const handleDeleteAnswer = async (answer, questionId) => {
     if (!confirm('답변을 삭제하시겠습니까?')) return;
     try {
       await deleteDoc(doc(db, 'answers', answer.id));
+      setAnswers(previous => ({
+        ...previous,
+        [questionId]: (previous[questionId] || []).filter(item => item.id !== answer.id),
+      }));
       if (!answer.parentAnswerId) {
         await updateDoc(doc(db, 'questions', questionId), {
           answerCount: increment(-1)
@@ -187,6 +182,13 @@ export default function TeacherQA() {
         refsToDelete.slice(i, i + 450).forEach(ref => batch.delete(ref));
         await batch.commit();
       }
+
+      setQuestions(previous => previous.filter(item => item.id !== question.id));
+      setAnswers(previous => {
+        const next = { ...previous };
+        delete next[question.id];
+        return next;
+      });
 
       alert(`게시물을 삭제했습니다. 연결 답변 ${answersSnap.size}개도 함께 삭제했습니다.`);
     } catch (err) {
@@ -329,6 +331,7 @@ export default function TeacherQA() {
       });
 
       setReplyText(prev => ({ ...prev, [questionId]: '' }));
+      await loadAnswers(questionId);
       
       // 3. Create Notification
       try {
@@ -356,6 +359,11 @@ export default function TeacherQA() {
     } finally {
       setIsReplying(false);
     }
+  };
+
+  const handleLoadMoreQuestions = () => {
+    if (!questionCursor || loadingMore) return;
+    loadQuestions({ append: true, cursor: questionCursor });
   };
 
   return (
@@ -568,9 +576,9 @@ export default function TeacherQA() {
                 </div>
 
                 <div className="answers-section">
-                  <div 
-                    className="answers-header" 
-                    onClick={() => setExpandedQuestions(prev => ({...prev, [q.id]: !prev[q.id]}))}
+                  <div
+                    className="answers-header"
+                    onClick={() => toggleAnswers(q.id)}
                   >
                     <span>답변 내역 ({answers[q.id]?.length || 0})</span>
                     {expandedQuestions[q.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -578,7 +586,9 @@ export default function TeacherQA() {
 
                   {expandedQuestions[q.id] && (
                     <div className="answers-list">
-                      {answers[q.id]?.map(ans => (
+                      {answerLoading[q.id] ? (
+                        <div className="empty-msg">답변을 불러오는 중...</div>
+                      ) : answers[q.id]?.map(ans => (
                         <div key={ans.id} className="answer-bubble">
                           {editingAnswerId === ans.id ? (
                             <div className="edit-box">
@@ -638,6 +648,11 @@ export default function TeacherQA() {
                 </div>
               </div>
             ))
+          )}
+          {!loading && hasMoreQuestions && (
+            <button type="button" className="secondary-btn" onClick={handleLoadMoreQuestions} disabled={loadingMore}>
+              {loadingMore ? '불러오는 중...' : '질문 더 보기'}
+            </button>
           )}
         </div>
       )}

@@ -35,8 +35,9 @@ import {
   timestampToMillis,
 } from '../../utils/scholarshipAwards'
 
-const DEFAULT_YEAR = 2026
-const DEFAULT_MONTH = 6
+const DEFAULT_YEAR = new Date().getFullYear()
+const DEFAULT_MONTH = new Date().getMonth() + 1
+const INITIAL_HISTORY_MONTHS = 3
 
 function isSameMonthKey(dateKey, monthKey) {
   return String(dateKey || '').slice(0, 7) === monthKey
@@ -74,6 +75,13 @@ function getAwardHistoryLabel(row = {}) {
   return `${last?.year || ''}.${String(last?.month || '').padStart(2, '0')} 최근 / 누적 ${row.totalScholarshipAwardCount}회`
 }
 
+function getEvaluationPeriods(year, month, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(Number(year), Number(month) - 1 - index, 1)
+    return { year: date.getFullYear(), month: date.getMonth() + 1 }
+  })
+}
+
 export default function ScholarshipAwards() {
   const [year, setYear] = useState(DEFAULT_YEAR)
   const [month, setMonth] = useState(DEFAULT_MONTH)
@@ -92,23 +100,37 @@ export default function ScholarshipAwards() {
   const [selectedRow, setSelectedRow] = useState(null)
   const [previewAward, setPreviewAward] = useState(null)
   const [error, setError] = useState('')
+  const [periodScope, setPeriodScope] = useState('selected')
+  const [loadedMonthCount, setLoadedMonthCount] = useState(INITIAL_HISTORY_MONTHS)
+  const periodCount = periodScope === 'all' ? loadedMonthCount : 1
+  const periods = useMemo(() => getEvaluationPeriods(year, month, periodCount), [year, month, periodCount])
 
   const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const range = getKstMonthRange(year, month)
-      const [usersSnap, assignmentsSnap, attendanceSnap, warningsSnap, awardsSnap, historySnap] = await Promise.all([
+      const oldestPeriod = periods.at(-1)
+      const startRange = getKstMonthRange(oldestPeriod.year, oldestPeriod.month)
+      const endRange = getKstMonthRange(year, month)
+      const startDateKey = getEvaluationPeriodKey(oldestPeriod.year, oldestPeriod.month) + '-01'
+      const nextMonth = new Date(Number(year), Number(month), 1)
+      const endDateKey = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
+      const [usersSnap, assignmentsSnap, attendanceSnap, warningsSnap, historySnap, ...awardSnaps] = await Promise.all([
         getDocs(collection(db, 'users')),
-        getDocs(collection(db, 'assignments')),
-        getDocs(collection(db, 'attendance')),
-        getDocs(collection(db, 'assignmentWarnings')),
-        getDocs(collection(db, 'scholarshipAwards')),
+        getDocs(query(collection(db, 'assignments'), where('date', '>=', startDateKey), where('date', '<', endDateKey))),
+        getDocs(query(collection(db, 'attendance'), where('date', '>=', startDateKey), where('date', '<', endDateKey))),
+        getDocs(query(collection(db, 'assignmentWarnings'), where('date', '>=', startDateKey), where('date', '<', endDateKey))),
         getDocs(query(
           collectionGroup(db, 'history'),
-          where('timestamp', '>=', Timestamp.fromDate(range.start)),
-          where('timestamp', '<=', Timestamp.fromDate(range.end))
+          where('clusterId', 'in', SCHOLARSHIP_COURSES.map(course => course.id)),
+          where('timestamp', '>=', Timestamp.fromDate(startRange.start)),
+          where('timestamp', '<=', Timestamp.fromDate(endRange.end))
         )),
+        ...periods.map(period => getDocs(query(
+          collection(db, 'scholarshipAwards'),
+          where('year', '==', period.year),
+          where('month', '==', period.month),
+        ))),
       ])
 
       setUsers(usersSnap.docs.map(docSnap => ({ uid: docSnap.id, ...docSnap.data() })))
@@ -117,9 +139,9 @@ export default function ScholarshipAwards() {
       setWarningRows(warningsSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })))
 
       const nextAwards = {}
-      awardsSnap.docs.forEach(docSnap => {
+      awardSnaps.forEach(awardsSnap => awardsSnap.docs.forEach(docSnap => {
         nextAwards[docSnap.id] = { id: docSnap.id, ...docSnap.data() }
-      })
+      }))
       setScholarshipAwards(nextAwards)
 
       setHistoryRows(historySnap.docs.map(docSnap => ({
@@ -133,18 +155,18 @@ export default function ScholarshipAwards() {
     } finally {
       setLoading(false)
     }
-  }, [month, year])
+  }, [month, periods, year])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
   const rows = useMemo(() => {
-    const monthKey = getEvaluationPeriodKey(year, month)
     const awardsList = Object.values(scholarshipAwards)
     const baseRows = []
 
-    users.forEach(user => {
+    periods.forEach(period => users.forEach(user => {
+      const monthKey = getEvaluationPeriodKey(period.year, period.month)
       SCHOLARSHIP_COURSES.forEach(course => {
         if (courseFilter !== 'all' && course.id !== courseFilter) return
         if (!isActiveScholarshipStudent(user, course.id)) return
@@ -185,8 +207,8 @@ export default function ScholarshipAwards() {
 
         const awardId = buildScholarshipAwardId({
           studentId: user.uid,
-          year,
-          month,
+          year: period.year,
+          month: period.month,
           courseClusterId: course.id,
         })
         const award = scholarshipAwards[awardId] || null
@@ -206,7 +228,7 @@ export default function ScholarshipAwards() {
           courseClusterId: course.id,
           courseName: course.label,
           evaluationPeriodKey: monthKey,
-          evaluationPeriodLabel: getEvaluationPeriodLabel(year, month),
+          evaluationPeriodLabel: getEvaluationPeriodLabel(period.year, period.month),
           bonusAverage: bonuses.length ? Math.round(average(bonuses) * 10) / 10 : 0,
           bonusTotal: bonuses.reduce((sum, value) => sum + value, 0),
           reviewedAssignmentCount: reviewedAssignments.length,
@@ -222,7 +244,7 @@ export default function ScholarshipAwards() {
           needsRevisionCount: courseAssignments.filter(item => item.status === 'needs_revision').length,
           warningCount: userWarningRows.length,
           totalScholarshipAwardCount: allStudentAwards.length,
-          recentScholarshipAwardCount: getRecentAwardCount(allStudentAwards, year, month),
+          recentScholarshipAwardCount: getRecentAwardCount(allStudentAwards, period.year, period.month),
           lastScholarshipAward,
           reviewedAssignments,
           submittedAssignments,
@@ -231,31 +253,34 @@ export default function ScholarshipAwards() {
           userWarningRows,
         })
       })
-    })
+    }))
 
     const maximaByCourse = {}
     SCHOLARSHIP_COURSES.forEach(course => {
-      const courseRows = baseRows.filter(row => row.courseClusterId === course.id)
-      maximaByCourse[course.id] = {
+      periods.forEach(period => {
+        const key = `${course.id}_${getEvaluationPeriodKey(period.year, period.month)}`
+        const courseRows = baseRows.filter(row => row.courseClusterId === course.id && row.evaluationPeriodKey === getEvaluationPeriodKey(period.year, period.month))
+        maximaByCourse[key] = {
         bonusAverage: Math.max(...courseRows.map(row => row.bonusAverage), 0),
         bonusTotal: Math.max(...courseRows.map(row => row.bonusTotal), 0),
       }
+      })
     })
 
     const indexedRows = baseRows.map(row => ({
       ...row,
-      scholarshipIndex: calculateScholarshipIndex(row, maximaByCourse[row.courseClusterId] || {}),
+      scholarshipIndex: calculateScholarshipIndex(row, maximaByCourse[`${row.courseClusterId}_${row.evaluationPeriodKey}`] || {}),
     }))
 
     const rankByCourse = {}
-    SCHOLARSHIP_COURSES.forEach(course => {
+    SCHOLARSHIP_COURSES.forEach(course => periods.forEach(period => {
       [...indexedRows]
-        .filter(row => row.courseClusterId === course.id)
+        .filter(row => row.courseClusterId === course.id && row.evaluationPeriodKey === getEvaluationPeriodKey(period.year, period.month))
         .sort((a, b) => b.scholarshipIndex - a.scholarshipIndex || b.bonusTotal - a.bonusTotal)
         .forEach((row, index) => {
           rankByCourse[row.id] = index + 1
         })
-    })
+    }))
 
     const term = searchTerm.trim().toLowerCase()
     return indexedRows
@@ -282,7 +307,7 @@ export default function ScholarshipAwards() {
         if (a.courseClusterId !== b.courseClusterId) return a.courseName.localeCompare(b.courseName, 'ko')
         return a.studentName.localeCompare(b.studentName, 'ko')
       })
-  }, [assignments, attendanceRows, awardFilter, courseFilter, historyRows, month, scholarshipAwards, searchTerm, sortKey, users, warningRows, year])
+  }, [assignments, attendanceRows, awardFilter, courseFilter, historyRows, periods, scholarshipAwards, searchTerm, sortKey, users, warningRows])
 
   const stats = useMemo(() => ({
     total: rows.length,
@@ -413,6 +438,16 @@ export default function ScholarshipAwards() {
           </select>
         </label>
         <label>
+          조회 범위
+          <select value={periodScope} onChange={(e) => {
+            setPeriodScope(e.target.value)
+            if (e.target.value === 'all') setLoadedMonthCount(INITIAL_HISTORY_MONTHS)
+          }}>
+            <option value="selected">선택한 월</option>
+            <option value="all">전체 (최근 3개월)</option>
+          </select>
+        </label>
+        <label>
           과정
           <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
             <option value="all">전체</option>
@@ -459,6 +494,7 @@ export default function ScholarshipAwards() {
             <table className="monthly-awards-table scholarship-table">
               <thead>
                 <tr>
+                  {periodScope === 'all' && <th>평가월</th>}
                   <th>순위</th>
                   <th>과정</th>
                   <th>학생</th>
@@ -473,6 +509,7 @@ export default function ScholarshipAwards() {
               <tbody>
                 {rows.map(row => (
                   <tr key={row.id} className={selectedRow?.id === row.id ? 'selected-row' : ''}>
+                    {periodScope === 'all' && <td>{row.evaluationPeriodLabel}</td>}
                     <td><strong>#{row.courseRank || '-'}</strong></td>
                     <td>{getScholarshipCourseLabel(row.courseClusterId)}</td>
                     <td>
@@ -525,11 +562,16 @@ export default function ScholarshipAwards() {
                 ))}
                 {!loading && rows.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="monthly-awards-empty">조건에 맞는 학생이 없습니다.</td>
+                    <td colSpan={periodScope === 'all' ? 10 : 9} className="monthly-awards-empty">조건에 맞는 학생이 없습니다.</td>
                   </tr>
                 )}
               </tbody>
             </table>
+            {periodScope === 'all' && (
+              <button type="button" className="secondary-btn" onClick={() => setLoadedMonthCount(count => count + INITIAL_HISTORY_MONTHS)} disabled={loading}>
+                이전 3개월 더 보기
+              </button>
+            )}
           </div>
         </section>
 
