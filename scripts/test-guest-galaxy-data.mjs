@@ -27,10 +27,24 @@ assert.equal(migrated.planet.layout[0].rotation, 1.25)
 assert.equal(migrated.planet.frontierStory.version, 3)
 assert.equal(migrated.planet.frontierStory.stepId, 'build_lumen_tree')
 assert.deepEqual(migrated.planet.roverDiscoveries, [])
+assert.equal(migrated.planet.roverHistory.length, 0)
+assert.equal(migrated.planet.roverStats.nextExpeditionNo, 1)
 
 const sameDay = normalizeGuestGalaxyData({ crystals: 123, lastGrantedAt: today, planet: {} }, today)
 assert.equal(sameDay.crystals, 123)
 assert.equal(sameDay.planet.layout.length, 1)
 assert.equal(sameDay.planet.layout[0].itemId, 'starter_dome')
+
+const roverMigrated = normalizeGuestGalaxyData({
+  crystals: 1,
+  lastGrantedAt: today,
+  planet: {
+    roverHistory: Array.from({ length: 80 }, (_, index) => ({ operationId: `guest-${index}` })),
+    roverStats: { totalLaunched: 4, routeLaunchCounts: { comet: 3 } },
+  },
+}, today)
+assert.equal(roverMigrated.planet.roverHistory.length, 60)
+assert.equal(roverMigrated.planet.roverStats.totalLaunched, 4)
+assert.equal(roverMigrated.planet.roverStats.routeLaunchCounts.comet, 3)
 
 console.log('Guest galaxy data contract tests passed.')

@@ -228,10 +228,12 @@ export const GALAXY_MISSION_ROUTES = {
 
 const GALAXY_ROVER_BASE_DURATION_MS = 8 * 60 * 60 * 1000
 const GALAXY_ROVER_BAY_DURATION_MS = 6 * 60 * 60 * 1000
+export const GALAXY_ROVER_CATALOG_VERSION = 2
+export const GALAXY_ROVER_REPORT_FLOW_VERSION = 2
 
 export const GALAXY_ROVER_ROUTES = {
   nebula: {
-    label: '성운 생태 원정',
+    label: '성운 생태 항로',
     shortLabel: '성운',
     iconId: 'cloud',
     ability: 'detection',
@@ -242,7 +244,7 @@ export const GALAXY_ROVER_ROUTES = {
     durationMs: GALAXY_ROVER_BASE_DURATION_MS,
     roverBayDurationMs: GALAXY_ROVER_BAY_DURATION_MS,
     accent: '#9e8cff',
-    copy: '빛나는 포자 지대를 지나 미지의 생태 표본을 추적합니다.',
+    copy: '폭풍 뒤 사라진 생태 신호를 추적해 행성의 생명 기록을 복원합니다.',
     discoveries: [
       { id: 'nebula_lumen_spore', name: '루멘 포자낭', rarity: 'common', description: '성운 바람을 머금고 은은하게 빛나는 생태 표본입니다.' },
       { id: 'nebula_aether_seed', name: '에테르 씨앗', rarity: 'rare', description: '중력이 약한 곳에서만 싹을 틔우는 부유 종자입니다.' },
@@ -250,7 +252,7 @@ export const GALAXY_ROVER_ROUTES = {
     ],
   },
   comet: {
-    label: '혜성 구조 원정',
+    label: '혜성 구조 항로',
     shortLabel: '혜성',
     iconId: 'comet',
     ability: 'piloting',
@@ -261,7 +263,7 @@ export const GALAXY_ROVER_ROUTES = {
     durationMs: GALAXY_ROVER_BASE_DURATION_MS,
     roverBayDurationMs: GALAXY_ROVER_BAY_DURATION_MS,
     accent: '#ff9b65',
-    copy: '불안정한 꼬리 궤도를 따라 오래된 구조 신호를 회수합니다.',
+    copy: '끊긴 구조 신호와 오래된 장비를 회수해 개척 전초기지를 보강합니다.',
     discoveries: [
       { id: 'comet_iron_scale', name: '혜성 철편', rarity: 'common', description: '수많은 항해를 견딘 단단한 외피 조각입니다.' },
       { id: 'comet_tail_crystal', name: '꼬리빛 결정', rarity: 'rare', description: '혜성 꼬리의 빛이 결정처럼 굳어진 희귀 표본입니다.' },
@@ -269,8 +271,8 @@ export const GALAXY_ROVER_ROUTES = {
     ],
   },
   ruins: {
-    label: '고대 정거장 원정',
-    shortLabel: '유적',
+    label: '고대 정거장 항로',
+    shortLabel: '정거장',
     iconId: 'satellite',
     ability: 'precision',
     abilityLabel: '정밀 제어',
@@ -280,7 +282,7 @@ export const GALAXY_ROVER_ROUTES = {
     durationMs: GALAXY_ROVER_BASE_DURATION_MS,
     roverBayDurationMs: GALAXY_ROVER_BAY_DURATION_MS,
     accent: '#65dff5',
-    copy: '멈춘 정거장의 장치를 복원해 사라진 항로의 기억을 읽습니다.',
+    copy: '멈춘 정거장의 기억 장치를 복원해 사라진 항로의 기록을 읽습니다.',
     discoveries: [
       { id: 'ruins_station_seal', name: '정거장 인장', rarity: 'common', description: '옛 항로 관리자가 사용하던 수정 표식입니다.' },
       { id: 'ruins_prism_memory', name: '프리즘 기억핵', rarity: 'rare', description: '빛의 결을 따라 장면을 보존하는 고대 저장 장치입니다.' },
@@ -298,12 +300,27 @@ export function getGalaxyRoverStatus(expedition, nowMs = Date.now()) {
   const status = String(expedition.status || '').trim().toLowerCase()
   const hasIdentity = Boolean(expedition.operationId || expedition.id || expedition.route)
   if (!hasIdentity || status === 'idle' || status === 'none') return 'idle'
-  if (expedition.claimedAtMs || ['claimed', 'collected'].includes(status)) return 'claimed'
+  if (expedition.claimedAtMs || expedition.result?.claimedAtMs || ['claimed', 'collected'].includes(status)) return 'claimed'
   if (['ready', 'returned'].includes(status)) return 'ready'
 
   const returnsAtMs = Number(expedition.returnsAtMs || expedition.readyAtMs || expedition.returnAtMs || 0)
   if (returnsAtMs > 0 && Number(nowMs || 0) >= returnsAtMs) return 'ready'
   return 'active'
+}
+
+// 관제 화면은 이 네 단계만 보여 준다. `claimed`는 새 출항 대기가 아니라
+// 보상을 적용한 뒤 학생이 보고서를 읽고 보관해야 하는 단계다.
+export function getGalaxyRoverPhase(expedition, nowMs = Date.now()) {
+  const status = getGalaxyRoverStatus(expedition, nowMs)
+  if (status === 'idle') return 'prepare'
+  if (status === 'active') return 'expedition'
+  if (status === 'ready') return 'returned'
+  return 'report'
+}
+
+export function getGalaxyRoverRouteDiscoveryCount(discoveries, routeId) {
+  const values = Array.isArray(discoveries) ? discoveries : Object.values(discoveries || {})
+  return values.filter((entry) => entry && typeof entry === 'object' && entry.route === routeId).length
 }
 
 export function formatGalaxyRoverRemainingTime(remainingMs) {

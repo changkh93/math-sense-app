@@ -37,11 +37,11 @@ function testOrderedStoryProgression() {
     { type: 'daily_event_completed' },
     { type: 'mission_completed' },
     { type: 'rover_dispatched' },
-    { type: 'rover_claimed', discoveryCount: 1 },
+    { type: 'rover_claimed', isNewDiscovery: true, discoveryCount: 1, discoveryRoutes: ['nebula'] },
     { type: 'friend_visited' },
     { type: 'social_help_completed', routeLevel: 1 },
     { type: 'social_help_completed', routeLevel: 2 },
-    { type: 'rover_claimed', discoveryCount: 3 },
+    { type: 'rover_claimed', isNewDiscovery: true, discoveryCount: 3, discoveryRoutes: ['nebula', 'comet', 'ruins'] },
     { type: 'story_evidence', builtItemIds: [...FRONTIER_CORE_FACILITY_IDS] },
     { type: 'item_built', itemId: 'route_gateway', builtItemIds: [...FRONTIER_CORE_FACILITY_IDS, 'route_gateway'] },
     { type: 'structure_cared', itemId: 'route_gateway' },
@@ -90,6 +90,7 @@ function testEvidenceCannotSkipOrderedSteps() {
     type: 'social_help_completed',
     routeLevel: 2,
     discoveryCount: 3,
+    discoveryRoutes: ['nebula', 'comet', 'ruins'],
     builtItemIds: [...FRONTIER_CORE_FACILITY_IDS],
   }, NOW_MS + 3);
   assert.deepEqual(existingEvidence.advancedStepIds, [

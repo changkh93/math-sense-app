@@ -1,6 +1,7 @@
-import { createElement, useMemo, useState } from 'react'
+import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive,
+  BookOpen,
   Check,
   ChevronRight,
   Clock3,
@@ -24,8 +25,11 @@ import {
   MATERIAL_LABELS,
   formatGalaxyRoverRemainingTime,
   formatGalaxyTime,
+  getGalaxyRoverRouteDiscoveryCount,
   getGalaxyRoverStatus,
+  getGalaxyRoverPhase,
 } from '../../utils/galaxyGame'
+import soundManager from '../../utils/SoundManager'
 import './GalaxyRoverPanel.css'
 
 const ROUTE_ICONS = {
@@ -63,17 +67,28 @@ function normalizeOwnedDiscoveries(discoveries, currentDiscovery) {
   const register = (value, fallbackId = '') => {
     if (!value && !fallbackId) return
     if (typeof value === 'string') {
-      owned.set(value, Math.max(1, owned.get(value) || 0))
+      const previous = owned.get(value) || {}
+      owned.set(value, { ...previous, count: Math.max(1, Number(previous.count || 0)) })
       return
     }
     if (typeof value === 'number') {
-      if (fallbackId && value > 0) owned.set(fallbackId, Math.max(value, owned.get(fallbackId) || 0))
+      if (fallbackId && value > 0) {
+        const previous = owned.get(fallbackId) || {}
+        owned.set(fallbackId, { ...previous, count: Math.max(value, Number(previous.count || 0)) })
+      }
       return
     }
     if (typeof value !== 'object') return
     const id = String(value.id || value.discoveryId || fallbackId || '')
     const count = Math.max(1, Number(value.count || value.quantity || 1))
-    if (id) owned.set(id, Math.max(count, owned.get(id) || 0))
+    if (id) {
+      const previous = owned.get(id) || {}
+      owned.set(id, {
+        ...previous,
+        ...value,
+        count: Math.max(count, Number(value.observationCount || 0), Number(previous.count || 0)),
+      })
+    }
   }
 
   if (Array.isArray(discoveries)) discoveries.forEach((entry) => register(entry))
@@ -161,6 +176,7 @@ function ExpeditionTrack({ routeId, route, expedition, nowMs }) {
         <div><small>ACTIVE ROVER EXPEDITION</small><h3>{route?.label || '심우주 원정'}</h3></div>
         <strong>{formatGalaxyRoverRemainingTime(remainingMs)}</strong>
       </div>
+      {expedition?.storyContextAtLaunch?.title && <div className="galaxy-rover-mission-context"><small>{expedition.storyContextAtLaunch.eyebrow || '출항 당시 임무'}</small><strong>{expedition.storyContextAtLaunch.title}</strong><p>{expedition.storyContextAtLaunch.detail}</p></div>}
       <p className="galaxy-rover-persistence"><SatelliteDish size={15} aria-hidden="true" /> 서버에 원정이 저장되었습니다. 아스트라 프론티어를 나가거나 앱을 닫아도 이 시간부터 계속 진행됩니다.</p>
       <div
         className="galaxy-rover-progress"
@@ -213,32 +229,79 @@ function ReturnCrate({ route, expedition, busy, onClaim }) {
   )
 }
 
-function ClaimedResult({ expedition, fallbackRoute }) {
-  const reward = expedition?.reward || expedition?.result?.reward || {}
-  const discovery = expedition?.discovery || expedition?.result?.discovery || {}
+function ClaimedResult({ expedition, fallbackRoute, busy, onAcknowledge, onOpenBuildForMaterial, discoveries }) {
+  const result = expedition?.result || {}
+  const reward = result.reward || expedition?.reward || {}
+  const discovery = useMemo(() => result.discovery || expedition?.discovery || {}, [result.discovery, expedition?.discovery])
   const rewardMaterial = reward.material || reward.rewardMaterial || fallbackRoute?.rewardMaterial
   const rewardAmount = Math.max(0, Number(reward.amount || reward.quantity || fallbackRoute?.baseReward || 0))
   const rewardTitle = reward.title || reward.name || MATERIAL_LABELS[rewardMaterial] || fallbackRoute?.reward || '원정 재료'
   const discoveryName = discovery.name || discovery.title || '새로운 항로 흔적'
   const rarity = RARITY_META[discovery.rarity] || RARITY_META.common
+  const baseAmount = Math.max(0, Number(reward.baseAmount || 0))
+  const beaconBonus = Math.max(0, Number(reward.beaconBonus || 0))
+  const abilityBonus = Math.max(0, Number(reward.abilityBonus || 0))
+  const operationId = expedition?.operationId
+  const isNew = result.isNewDiscovery !== false
+
+  // 항로 완성(이번 발견으로 해당 항로 3종 달성)과 전체 도감 완성 여부를 귀환 보고서에 전달된 discoveries로 계산한다.
+  const routeId = expedition?.route || fallbackRoute?.routeId
+  const owned = useMemo(() => normalizeOwnedDiscoveries(discoveries, discovery), [discoveries, discovery])
+  const routeOwnedCount = getGalaxyRoverRouteDiscoveryCount([...owned.values()], routeId)
+  const routeDiscoveryTotal = GALAXY_ROVER_ROUTES[routeId]?.discoveries?.length || 3
+  const routeCompleted = routeOwnedCount >= routeDiscoveryTotal
+  const ownedCount = GALAXY_ROVER_DISCOVERIES.filter((entry) => owned.has(entry.id)).length
+  const codexCompleted = ownedCount >= GALAXY_ROVER_DISCOVERIES.length
+
+  // 보고서가 처음 마운트될 때 한 번만 성취 사운드를 재생한다. claim 시점에 이미 frontier.rover.complete가
+  // 재생되므로 여기서는 신규 전설 발견·항로 완성·도감 완성 같은 더 높은 성취에만 사운드를 더한다.
+  const celebratedRef = useRef('')
+  useEffect(() => {
+    const celebrationKey = operationId || 'unknown'
+    if (celebratedRef.current === celebrationKey) return
+    celebratedRef.current = celebrationKey
+    if (codexCompleted) {
+      soundManager.play('frontier.mission.complete')
+      return
+    }
+    if (routeCompleted && isNew) {
+      soundManager.play('frontier.build.complete')
+      return
+    }
+    if (isNew && rarity.className === 'legendary') {
+      soundManager.play('frontier.mission.complete')
+    }
+  }, [operationId, isNew, rarity.className, routeCompleted, codexCompleted])
 
   return (
     <section className="galaxy-rover-claimed" aria-live="polite">
       <header>
         <span><Check size={20} aria-hidden="true" /></span>
-        <div><small>EXPEDITION ARCHIVED</small><h3>귀환 결과를 기록했습니다</h3></div>
+        <div><small>RETURN REPORT READY</small><h3>루미의 귀환 보고서</h3></div>
       </header>
+      {codexCompleted && <p className="galaxy-rover-claimed__milestone"><Sparkles size={16} aria-hidden="true" /> 발견 도감 9종을 모두 복원했습니다. 아스트라의 잃어버린 기억이 온전히 되돌아왔습니다.</p>}
       <div className="galaxy-rover-claimed__loot">
         <article>
           <span><PackageOpen size={22} aria-hidden="true" /></span>
-          <div><small>회수 재료</small><strong>{rewardTitle} +{rewardAmount}</strong></div>
+          <div><small>회수 재료</small><strong>{rewardTitle} +{rewardAmount}</strong>{Number.isFinite(Number(reward.balanceBefore)) && <em>출항 전 {reward.balanceBefore}개 → 현재 {reward.balanceAfter}개</em>}</div>
         </article>
-        <article className={`rarity-${rarity.className}`}>
+        <article className={`rarity-${rarity.className}${isNew ? ' is-new' : ''}`}>
           <span><Sparkles size={22} aria-hidden="true" /></span>
-          <div><small>{rarity.label} 발견</small><strong>{discoveryName}</strong></div>
+          <div><small>{result.isNewDiscovery === false ? '다시 관측한 발견' : `${rarity.label} 새 발견`}</small><strong>{discoveryName}</strong><em>{result.isNewDiscovery === false ? '도감의 관측 횟수가 늘었습니다.' : '도감에 처음으로 기록되었습니다.'}</em></div>
         </article>
       </div>
-      <p>발견물은 아래 원정 도감에 보존되었습니다. 다음 항로를 선택해 로버의 새 귀환을 예약할 수 있습니다.</p>
+      {routeCompleted && isNew && <p className="galaxy-rover-claimed__route-milestone"><em className="galaxy-rover-route-complete">{GALAXY_ROVER_ROUTES[routeId]?.label || '이 항로'} 기록 완성</em> 세 단계 기록을 모두 복원했습니다.</p>}
+      <div className="galaxy-rover-report-breakdown"><strong>회수 계산</strong><span>기본 {baseAmount}개{beaconBonus ? ` + 원정대 비콘 ${beaconBonus}` : ''}{abilityBonus ? ` + 학습 공명 ${abilityBonus}` : ''}</span></div>
+      {expedition?.storyContextAtLaunch?.title && <div className="galaxy-rover-mission-context"><small>{expedition.storyContextAtLaunch.eyebrow || '출항 당시 임무'}</small><strong>{expedition.storyContextAtLaunch.title}</strong><p>{expedition.storyContextAtLaunch.detail}</p></div>}
+      {result.storyProgressAtClaim?.advancedStepIds?.length > 0 && <p>이 귀환으로 프론티어 이야기의 다음 단서가 열렸습니다.</p>}
+      <p>보고서를 보관하면 이번 원정은 일지에 남고, 그때 다음 원정을 준비할 수 있습니다.</p>
+      <div className="galaxy-rover-report-actions">
+        <button type="button" className="galaxy-rover-primary" disabled={Boolean(busy) || !onAcknowledge} onClick={onAcknowledge}>
+          {busy ? '보고서 보관 중…' : '보고서를 보관하고 다음 원정 준비'}
+          {!busy && <ChevronRight size={17} aria-hidden="true" />}
+        </button>
+        {onOpenBuildForMaterial && <button type="button" className="galaxy-rover-secondary" onClick={() => onOpenBuildForMaterial(rewardMaterial)}>이 재료로 시설 보기</button>}
+      </div>
     </section>
   )
 }
@@ -249,13 +312,14 @@ function DiscoveryArchive({ discoveries, currentDiscovery }) {
     [currentDiscovery, discoveries],
   )
   const ownedCount = GALAXY_ROVER_DISCOVERIES.filter((entry) => owned.has(entry.id)).length
+  const codexCompleted = ownedCount >= GALAXY_ROVER_DISCOVERIES.length
   const [view, setView] = useState('all')
 
   return (
     <section className="galaxy-rover-archive" aria-labelledby="galaxy-rover-archive-title">
       <header>
-        <div><small>ASTRA DISCOVERY ARCHIVE</small><h3 id="galaxy-rover-archive-title">로버 원정 발견 도감</h3><p>원정 보상을 수령할 때 해당 항로의 발견물 1개가 공개됩니다. 잠긴 칸은 오류가 아니라 아직 만나지 못한 발견물입니다.</p></div>
-        <strong><Archive size={16} aria-hidden="true" /> {ownedCount} / {GALAXY_ROVER_DISCOVERIES.length}</strong>
+        <div><small>ASTRA DISCOVERY ARCHIVE</small><h3 id="galaxy-rover-archive-title">루미 발견 도감</h3><p>각 항로에는 일반·희귀·전설 기록이 있습니다. 아직 발견하지 못한 칸은 다음 탐사의 목표이며, 같은 기록을 다시 만나면 관측 횟수로 남습니다.</p></div>
+        <strong className={codexCompleted ? 'is-complete' : ''}><Archive size={16} aria-hidden="true" /> {ownedCount} / {GALAXY_ROVER_DISCOVERIES.length}{codexCompleted ? ' · 기억망 완성!' : ''}</strong>
       </header>
       <div className="galaxy-rover-archive__meter" aria-hidden="true"><i style={{ width: `${ownedCount / GALAXY_ROVER_DISCOVERIES.length * 100}%` }} /></div>
       <div className="galaxy-rover-archive__filters" role="group" aria-label="도감 표시 범위">
@@ -264,7 +328,8 @@ function DiscoveryArchive({ discoveries, currentDiscovery }) {
       </div>
       <div className="galaxy-rover-archive__routes">
         {Object.entries(GALAXY_ROVER_ROUTES).map(([routeId, route]) => {
-          const routeOwnedCount = route.discoveries.filter((discovery) => owned.has(discovery.id)).length
+          const routeOwnedCount = getGalaxyRoverRouteDiscoveryCount([...owned.values()], routeId)
+          const routeCompleted = routeOwnedCount === route.discoveries.length
           const visibleDiscoveries = view === 'owned'
             ? route.discoveries.filter((discovery) => owned.has(discovery.id))
             : route.discoveries
@@ -274,11 +339,12 @@ function DiscoveryArchive({ discoveries, currentDiscovery }) {
             <section className={`galaxy-rover-archive-route route-${routeId}`} key={routeId} style={{ '--rover-route-accent': route.accent }}>
               <header>
                 <span><RouteIcon size={18} aria-hidden="true" /></span>
-                <div><strong>{route.label}</strong><small>{route.reward} 회수 항로 · 발견 {routeOwnedCount}/3</small></div>
+                <div><strong>{route.label}{routeCompleted && <em className="galaxy-rover-route-complete" title="이 항로의 일반·희귀·전설 세 단계 기록을 모두 복원했습니다.">항로 기록 완성</em>}</strong><small>{route.reward} 회수 항로 · 기록 복원 {routeOwnedCount}/3{routeCompleted ? ' · 세 단계 기록을 모두 복원했습니다.' : ''}</small></div>
               </header>
               <div className="galaxy-rover-discoveries">
                 {visibleDiscoveries.map((discovery) => {
                   const isOwned = owned.has(discovery.id)
+                  const discoveryRecord = owned.get(discovery.id) || {}
                   const rarity = RARITY_META[discovery.rarity] || RARITY_META.common
                   const Icon = DISCOVERY_ICONS[routeId] || Sparkles
                   return (
@@ -288,9 +354,11 @@ function DiscoveryArchive({ discoveries, currentDiscovery }) {
                     >
                       <span className="galaxy-rover-discovery__icon">{isOwned ? <Icon size={20} aria-hidden="true" /> : <LockKeyhole size={18} aria-hidden="true" />}</span>
                       <div>
-                        <small>{isOwned ? `${rarity.label} 발견물` : `${rarity.label} · 아직 미발견`}</small>
+                        <small>{isOwned ? `기록 등급 · ${rarity.label}${discoveryRecord.count > 1 ? ` · ${discoveryRecord.count}회 관측` : ''}` : `기록 등급 · ${rarity.label} · 아직 미발견`}</small>
                         <strong>{isOwned ? discovery.name : `${route.shortLabel} 원정에서 발견`}</strong>
-                        <p>{isOwned ? discovery.description : '이 항로의 원정을 완료하고 귀환 상자를 열면 발견할 수 있습니다.'}</p>
+                        <p>{isOwned
+                          ? `${discovery.description}${discoveryRecord.discoveredAtMs ? ` · 최초 기록 ${formatGalaxyTime(discoveryRecord.discoveredAtMs)}` : ''}`
+                          : '이 항로의 원정을 완료하고 귀환 보고서를 열면 발견할 수 있습니다.'}</p>
                       </div>
                     </article>
                   )
@@ -305,6 +373,28 @@ function DiscoveryArchive({ discoveries, currentDiscovery }) {
   )
 }
 
+function RoverJournal({ entries = [], loaded = false, loading = false, hasMore = false, onLoadMore }) {
+  if (!loaded && !loading) return <section className="galaxy-rover-journal"><p>원정 일지를 열어 귀환 기록을 불러오세요.</p><button type="button" className="galaxy-rover-secondary" onClick={() => onLoadMore?.()}>원정 일지 불러오기</button></section>
+  if (loading && !entries.length) return <section className="galaxy-rover-journal"><p>원정 일지를 불러오는 중입니다…</p></section>
+  return (
+    <section className="galaxy-rover-journal" aria-label="루미 원정 일지">
+      <header><div><small>ROVER EXPEDITION JOURNAL</small><h3>완료한 원정 일지</h3><p>보관한 보고서만 여기에 남습니다. 언제 어디로 떠났고 무엇을 행성에 남겼는지 다시 볼 수 있습니다.</p></div><BookOpen size={22} aria-hidden="true" /></header>
+      {!entries.length && <p className="galaxy-rover-archive__empty">아직 보관한 원정이 없습니다. 첫 귀환 보고서를 보관하면 이곳에 기록됩니다.</p>}
+      <div className="galaxy-rover-journal__entries">
+        {entries.map((entry) => {
+          const reward = entry.reward || {}
+          const discovery = entry.discovery || {}
+          return <article key={entry.operationId}>
+            <span>#{entry.expeditionNo || '—'}</span>
+            <div><small>{entry.routeTitle || '루미 로버 원정'} · {formatGalaxyTime(entry.claimedAtMs || entry.reportAcknowledgedAtMs)}</small><strong>{reward.title || MATERIAL_LABELS[reward.material] || '원정 재료'} +{Math.max(0, Number(reward.amount || 0))}</strong><p>{discovery.name ? `${entry.isNewDiscovery === false ? '다시 관측: ' : '새 발견: '}${discovery.name}` : '귀환 기록을 보관했습니다.'}</p></div>
+          </article>
+        })}
+      </div>
+      {hasMore && <button type="button" className="galaxy-rover-secondary" disabled={loading} onClick={() => onLoadMore?.(entries.at(-1)?.operationId)}>{loading ? '더 불러오는 중…' : '이전 원정 더 보기'}</button>}
+    </section>
+  )
+}
+
 export default function GalaxyRoverPanel({
   expedition,
   nowMs = 0,
@@ -314,15 +404,25 @@ export default function GalaxyRoverPanel({
   hasExpeditionBeacon = false,
   abilityValues = {},
   busy = false,
+  storyObjective = null,
+  historyEntries = [],
+  historyLoaded = false,
+  historyLoading = false,
+  historyHasMore = false,
   onDispatch,
   onClaim,
+  onAcknowledgeReport,
+  onLoadHistory,
+  onOpenBuildForMaterial,
 }) {
   const expeditionRouteId = expedition?.route || expedition?.routeId || ''
   const initialRoute = GALAXY_ROVER_ROUTES[expeditionRouteId] ? expeditionRouteId : 'nebula'
   const [selectedRoute, setSelectedRoute] = useState(initialRoute)
+  const [tab, setTab] = useState('codex')
   const status = getGalaxyRoverStatus(expedition, nowMs)
+  const phase = getGalaxyRoverPhase(expedition, nowMs)
   const route = GALAXY_ROVER_ROUTES[expeditionRouteId] || GALAXY_ROVER_ROUTES[selectedRoute]
-  const canChooseRoute = status === 'idle' || status === 'claimed'
+  const canChooseRoute = phase === 'prepare'
   const effectiveRouteId = canChooseRoute ? selectedRoute : expeditionRouteId || selectedRoute
   const selectedConfig = GALAXY_ROVER_ROUTES[effectiveRouteId] || GALAXY_ROVER_ROUTES.nebula
   const selectedAbilityLevel = Math.max(1, Number(
@@ -331,7 +431,7 @@ export default function GalaxyRoverPanel({
       : expedition?.bonuses?.abilityLevel ?? abilityValues?.[selectedConfig.ability] ?? 1,
   ) || 1)
   const hasAbilityBonus = selectedAbilityLevel >= 4
-  const activeExpeditionLocked = status === 'active' || status === 'ready'
+  const activeExpeditionLocked = phase === 'expedition' || phase === 'returned' || phase === 'report'
   const roverBayApplied = activeExpeditionLocked ? Boolean(expedition?.bonuses?.roverBay) : hasRoverBay
   const expeditionBeaconApplied = activeExpeditionLocked ? Boolean(expedition?.bonuses?.expeditionBeacon) : hasExpeditionBeacon
   const roverBayInstalledAfterLaunch = activeExpeditionLocked && hasRoverBay && !roverBayApplied
@@ -340,28 +440,36 @@ export default function GalaxyRoverPanel({
   const currentDiscovery = expedition?.discovery || expedition?.result?.discovery
   const busyLabel = String(busy || '').toLowerCase()
   const isClaimBusy = Boolean(busy) && (busyLabel.includes('claim') || busyLabel.includes('return') || busy === true)
+  const isAcknowledgeBusy = Boolean(busy) && (busyLabel.includes('acknowledge') || busyLabel.includes('archive') || busy === true)
+  const missionContext = phase === 'prepare' ? storyObjective : expedition?.storyContextAtLaunch
+
+  useEffect(() => {
+    if (tab === 'journal' && !historyLoaded && !historyLoading) onLoadHistory?.()
+  }, [historyLoaded, historyLoading, onLoadHistory, tab])
 
   return (
-    <div className={`galaxy-rover-panel status-${status}`}>
+    <div className={`galaxy-rover-panel status-${status} phase-${phase}`}>
       <header className="galaxy-rover-header">
         <div className="galaxy-rover-header__identity">
           <span><Rocket size={23} aria-hidden="true" /></span>
-          <div><small>건설 재료를 모으는 장거리 탐사</small><h2>밤사이 로버 원정</h2><p>{status === 'active'
-            ? '선택한 항로의 원정이 서버에서 진행 중입니다. 나갔다 돌아와도 출발 시각과 진행률이 그대로 이어집니다.'
-            : status === 'ready'
-              ? '로버가 귀환했습니다. 상자를 열어야 재료와 발견물이 저장되고 다음 원정을 시작할 수 있습니다.'
-              : status === 'claimed'
-                ? '이전 원정은 완료·수령되었습니다. 아래 버튼은 이어하기가 아니라 지금부터 시작하는 새 원정입니다.'
-                : '항로 하나를 선택해 새 원정을 시작하세요. 앱을 닫아도 서버에서 계속 진행됩니다.'}</p></div>
+          <div><small>ASTRA LUMI ROVER CONTROL</small><h2>루미 로버 원정 관제</h2><p>{phase === 'expedition'
+            ? '루미가 출항 당시 정한 임무를 수행하고 있습니다. 화면을 닫아도 귀환 시각과 보상 약속은 그대로 유지됩니다.'
+            : phase === 'returned'
+              ? '루미가 귀환했습니다. 귀환 보고서를 열어 재료와 발견 기록을 확인하세요.'
+              : phase === 'report'
+                ? '이번 원정의 보상이 적용되었습니다. 보고서를 보관하면 일지에 남고 다음 출항을 준비할 수 있습니다.'
+                : '지금 필요한 행성의 일을 고르고 루미에게 한 가지 임무를 맡기세요. 한 번에 하나의 원정만 진행됩니다.'}</p></div>
         </div>
         <div className={`galaxy-rover-status status-${status}`} role="status" aria-live="polite">
           <i />
-          {status === 'idle' && '출항 대기'}
-          {status === 'active' && '서버에서 원정 진행 중'}
-          {status === 'ready' && '귀환 상자 도착'}
-          {status === 'claimed' && '이전 원정 수령 완료'}
+          {phase === 'prepare' && '출항 준비'}
+          {phase === 'expedition' && '원정 진행 중'}
+          {phase === 'returned' && '귀환 완료'}
+          {phase === 'report' && '보고서 보관 대기'}
         </div>
       </header>
+
+      {missionContext && <section className="galaxy-rover-story-brief"><small>{phase === 'prepare' ? missionContext.eyebrow || '현재 프론티어 임무' : missionContext.eyebrow || '출항 당시 임무'}</small><strong>{missionContext.title}</strong><p>{missionContext.detail}</p></section>}
 
       <div className="galaxy-rover-perks" aria-label="로버 원정 보너스">
         <ExpeditionPerk active={roverBayApplied} icon={Wrench} title={roverBayApplied ? '로버 정비소 가속 적용' : roverBayInstalledAfterLaunch ? '다음 원정부터 정비소 적용' : '로버 정비소 미적용'}>
@@ -387,22 +495,22 @@ export default function GalaxyRoverPanel({
         </ExpeditionPerk>
       </div>
 
-      {status === 'active' && <ExpeditionTrack routeId={expeditionRouteId} route={route} expedition={expedition} nowMs={nowMs} />}
-      {status === 'ready' && <ReturnCrate route={route} expedition={expedition} busy={isClaimBusy} onClaim={onClaim} />}
-      {status === 'claimed' && <ClaimedResult expedition={expedition} fallbackRoute={route} />}
+      {phase === 'expedition' && <ExpeditionTrack routeId={expeditionRouteId} route={route} expedition={expedition} nowMs={nowMs} />}
+      {phase === 'returned' && <ReturnCrate route={route} expedition={expedition} busy={isClaimBusy} onClaim={onClaim} />}
+      {phase === 'report' && <ClaimedResult expedition={expedition} fallbackRoute={route} busy={isAcknowledgeBusy} onAcknowledge={() => onAcknowledgeReport?.(expedition?.operationId)} onOpenBuildForMaterial={onOpenBuildForMaterial} discoveries={discoveries} />}
 
       {canChooseRoute && (
         <section className="galaxy-rover-dispatch" aria-labelledby="galaxy-rover-dispatch-title">
           <header>
-            <div><small>{status === 'claimed' ? '새 원정 예약' : '1단계 · 항로 고르기'}</small><h3 id="galaxy-rover-dispatch-title">{status === 'claimed' ? '완료된 원정과 별개로 새 항로를 선택하세요' : '아래에서 가고 싶은 항로 하나를 선택하세요'}</h3></div>
+            <div><small>1단계 · 이번 원정의 임무 고르기</small><h3 id="galaxy-rover-dispatch-title">어느 항로의 기억을 되찾을까요?</h3></div>
             <span><Clock3 size={15} aria-hidden="true" /> {hasRoverBay ? '정비소 가속 · 6시간' : '기본 항해 · 8시간'}</span>
           </header>
           <RouteSelector selectedRoute={selectedRoute} onSelect={setSelectedRoute} materials={materials} hasRoverBay={hasRoverBay} hasExpeditionBeacon={hasExpeditionBeacon} abilityValues={abilityValues} disabled={Boolean(busy)} />
           <div className="galaxy-rover-dispatch__footer">
             <div>
               <strong><Rocket size={16} aria-hidden="true" /> {selectedConfig.label}</strong>
-              <span>{selectedConfig.reward} {expectedReward}개와 발견 기록 1개를 가져옵니다. 기본 {selectedConfig.baseReward}{hasExpeditionBeacon ? ' + 비콘 1' : ''}{hasAbilityBonus ? ' + 학습 공명 1' : ''}</span>
-              {status === 'claimed' && <em>새 원정은 버튼을 누른 시점부터 {hasRoverBay ? '6시간' : '8시간'}을 새로 계산합니다.</em>}
+              <span>{selectedConfig.reward} {expectedReward}개와 미확인 발견 신호 1개를 가져옵니다. 기본 {selectedConfig.baseReward}{hasExpeditionBeacon ? ' + 비콘 1' : ''}{hasAbilityBonus ? ' + 학습 공명 1' : ''}</span>
+              <em>출항을 기록하면 {hasRoverBay ? '6시간' : '8시간'} 동안 이 원정만 관제합니다.</em>
             </div>
             <button
               type="button"
@@ -410,14 +518,20 @@ export default function GalaxyRoverPanel({
               disabled={Boolean(busy) || !onDispatch}
               onClick={() => onDispatch?.(selectedRoute)}
             >
-              {busy ? '출발 기록 저장 중…' : status === 'claimed' ? `새 ${hasRoverBay ? '6시간' : '8시간'} 원정 시작` : `선택 항로로 ${hasRoverBay ? '6시간' : '8시간'} 원정 시작`}
+              {busy ? '출발 기록 저장 중…' : `${hasRoverBay ? '6시간' : '8시간'} 원정 출항 기록하기`}
               {!busy && <ChevronRight size={17} aria-hidden="true" />}
             </button>
           </div>
         </section>
       )}
 
-      <DiscoveryArchive discoveries={discoveries} currentDiscovery={status === 'claimed' ? currentDiscovery : null} />
+      <div className="galaxy-rover-tabs" role="tablist" aria-label="루미 원정 기록">
+        <button type="button" role="tab" aria-selected={tab === 'codex'} className={tab === 'codex' ? 'is-active' : ''} onClick={() => setTab('codex')}>발견 도감</button>
+        <button type="button" role="tab" aria-selected={tab === 'journal'} className={tab === 'journal' ? 'is-active' : ''} onClick={() => setTab('journal')}>원정 일지</button>
+      </div>
+      {tab === 'codex'
+        ? <DiscoveryArchive discoveries={discoveries} currentDiscovery={phase === 'report' ? currentDiscovery : null} />
+        : <RoverJournal entries={historyEntries} loaded={historyLoaded} loading={historyLoading} hasMore={historyHasMore} onLoadMore={(cursorOperationId) => onLoadHistory?.(cursorOperationId)} />}
     </div>
   )
 }

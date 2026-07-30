@@ -1,6 +1,22 @@
 {
   "indexes": [
     {
+      "collectionGroup": "galaxyOperations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "startedAtMs", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "galaxyRoverEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "history",
       "queryScope": "COLLECTION_GROUP",
       "fields": [

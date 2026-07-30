@@ -247,11 +247,14 @@ function eventMatchesStep(stepId, event = {}) {
   if (stepId === 'stabilize_daily_event') return event.type === 'daily_event_completed'
   if (stepId === 'trace_lost_route') return event.type === 'mission_completed'
   if (stepId === 'dispatch_route_rover') return event.type === 'rover_dispatched'
-  if (stepId === 'recover_pre_storm_discovery') return event.type === 'rover_claimed'
+  if (stepId === 'recover_pre_storm_discovery') return event.type === 'rover_claimed' && event.isNewDiscovery === true
   if (stepId === 'visit_friend_planet') return event.type === 'friend_visited'
   if (stepId === 'help_friend_planet') return event.type === 'social_help_completed'
   if (stepId === 'unlock_shared_route') return event.type === 'social_help_completed' && Number(event.routeLevel || 0) >= 2
-  if (stepId === 'complete_discovery_codex') return Number(event.discoveryCount || 0) >= 3
+  if (stepId === 'complete_discovery_codex') {
+    const routes = Array.isArray(event.discoveryRoutes) ? new Set(event.discoveryRoutes.filter(Boolean)) : null
+    return routes ? routes.size >= 3 : Number(event.discoveryCount || 0) >= 3
+  }
   if (stepId === 'complete_core_facilities') return FRONTIER_CORE_FACILITY_IDS.every((itemId) => builtItemIds.includes(itemId))
   if (stepId === 'build_astra_gateway') return event.type === 'item_built' && event.itemId === 'route_gateway'
   if (stepId === 'restore_astra_memory') return event.type === 'astra_memory_activated'

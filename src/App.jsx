@@ -2,9 +2,9 @@ import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Routes, Route } from 'react-router-dom'
 import './App.css'
 import './styles/space-theme.css' /* Global Space Theme */
-import SpaceHome from './components/Space/SpaceHome'
+const SpaceHome = lazy(() => import('./components/Space/SpaceHome'))
+const QuizBattleChallengeReceiver = lazy(() => import('./components/Space/QuizBattleChallengeReceiver'))
 import AdminRoute from './components/AdminRoute'
-import QuizBattleChallengeReceiver from './components/Space/QuizBattleChallengeReceiver'
 
 import PrivateRoute from './components/PrivateRoute'
 import { cleanExpiredAudioPreferences } from './audio/audioPreferences'
@@ -71,8 +71,8 @@ function App() {
 
   return (
     <>
-      <QuizBattleChallengeReceiver />
       <Suspense fallback={<RouteFallback />}>
+      <QuizBattleChallengeReceiver />
       <Routes>
       <Route path="/" element={<SpaceHome />} />
       <Route path="/journey" element={<Navigate to="/?view=journey" replace />} />

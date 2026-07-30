@@ -10,12 +10,76 @@ import {
 import {
   advanceFrontierStory,
   createInitialFrontierStory,
+  getFrontierStoryObjective,
   isFirstLightStoryGrant,
   normalizeFrontierStory,
 } from '../utils/frontierStory.js';
 
 const STORAGE_KEY = 'metasense_guest_astra_data';
 const DAILY_GUEST_CRYSTALS = 500;
+const GUEST_ROVER_HISTORY_LIMIT = 60;
+
+function stableGuestHash(value) {
+  let hash = 2166136261
+  const text = String(value || '')
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
+function normalizeGuestRoverStats(raw = {}) {
+  const routeLaunchCounts = raw?.routeLaunchCounts && typeof raw.routeLaunchCounts === 'object' ? raw.routeLaunchCounts : {}
+  return {
+    version: Math.max(1, Number(raw?.version || 1)),
+    totalLaunched: Math.max(0, Math.floor(Number(raw?.totalLaunched || 0))),
+    totalClaimed: Math.max(0, Math.floor(Number(raw?.totalClaimed || 0))),
+    nextExpeditionNo: Math.max(1, Math.floor(Number(raw?.nextExpeditionNo || Number(raw?.totalLaunched || 0) + 1))),
+    routeLaunchCounts: {
+      nebula: Math.max(0, Math.floor(Number(routeLaunchCounts.nebula || 0))),
+      comet: Math.max(0, Math.floor(Number(routeLaunchCounts.comet || 0))),
+      ruins: Math.max(0, Math.floor(Number(routeLaunchCounts.ruins || 0))),
+    },
+    uniqueDiscoveryCount: Math.max(0, Math.floor(Number(raw?.uniqueDiscoveryCount || 0))),
+    lastOperationId: String(raw?.lastOperationId || ''),
+    lastClaimedOperationId: String(raw?.lastClaimedOperationId || ''),
+    lastAcknowledgedOperationId: String(raw?.lastAcknowledgedOperationId || ''),
+  }
+}
+
+function getGuestRoverDiscovery(route, operationId, roverDiscoveries = []) {
+  const routeInfo = GALAXY_ROVER_ROUTES[route] || GALAXY_ROVER_ROUTES.nebula
+  const knownIds = new Set((Array.isArray(roverDiscoveries) ? roverDiscoveries : []).map((entry) => entry?.id).filter(Boolean))
+  const firstUnrestored = routeInfo.discoveries.find((entry) => !knownIds.has(entry.id))
+  const discovery = firstUnrestored || routeInfo.discoveries[stableGuestHash(`${route}:${operationId}`) % routeInfo.discoveries.length]
+  return discovery ? { route, ...discovery } : null
+}
+
+function getGuestRoverStatus(expedition, nowMs = Date.now()) {
+  if (!expedition?.operationId) return 'idle'
+  if (expedition.status === 'claimed' || expedition.claimedAtMs) return 'claimed'
+  return Number(expedition.readyAtMs || expedition.returnsAtMs || 0) <= nowMs ? 'ready' : 'exploring'
+}
+
+function getGuestRoverStoryContext(rawStory) {
+  const objective = getFrontierStoryObjective(rawStory) || {
+    chapterId: 'astra_memory',
+    chapterTitle: '아스트라 기억망',
+    id: 'restored',
+    eyebrow: '아스트라 프론티어 · 기록 보존',
+    title: '루미가 항로의 기억을 지킵니다',
+    detail: '귀환 기록과 발견물을 다음 탐사원에게 남깁니다.',
+  }
+  return {
+    chapterId: objective.chapterId,
+    chapterTitle: objective.chapterTitle,
+    stepId: objective.stepId || objective.id,
+    eyebrow: objective.eyebrow,
+    title: objective.title,
+    detail: objective.detail,
+  }
+}
 
 function getTodayDateStringKey() {
   const now = new Date();
@@ -75,6 +139,8 @@ const DEFAULT_GUEST_DATA = {
     lastMissionAtMs: 0,
     roverExpedition: null,
     roverDiscoveries: [],
+    roverHistory: [],
+    roverStats: normalizeGuestRoverStats(),
     lastDailyEventDayKey: '',
   },
 };
@@ -105,6 +171,8 @@ export function normalizeGuestGalaxyData(parsed = {}, today = getTodayDateString
         lastMissionAtMs: Math.max(0, Number(parsed?.planet?.lastMissionAtMs || 0)),
         roverExpedition: parsed?.planet?.roverExpedition || null,
         roverDiscoveries: Array.isArray(parsed?.planet?.roverDiscoveries) ? parsed.planet.roverDiscoveries : [],
+        roverHistory: Array.isArray(parsed?.planet?.roverHistory) ? parsed.planet.roverHistory.slice(0, GUEST_ROVER_HISTORY_LIMIT) : [],
+        roverStats: normalizeGuestRoverStats(parsed?.planet?.roverStats),
         lastDailyEventDayKey: String(parsed?.planet?.lastDailyEventDayKey || ''),
       },
     };
@@ -227,19 +295,53 @@ export function useGuestGalaxyData() {
   }, [guestData, persist]);
 
   const dispatchRover = useCallback((route, operationId) => {
-    const routeInfo = GALAXY_ROVER_ROUTES[route] || GALAXY_ROVER_ROUTES.nebula;
-    const nowMs = Date.now();
-    const readyAtMs = nowMs + (8 * 60 * 60 * 1000);
+    const routeId = GALAXY_ROVER_ROUTES[route] ? route : 'nebula'
+    const routeInfo = GALAXY_ROVER_ROUTES[routeId]
+    const nowMs = Date.now()
+    const currentExpedition = guestData.planet?.roverExpedition
+    if (getGuestRoverStatus(currentExpedition, nowMs) !== 'idle') {
+      throw new Error('현재 원정을 마무리하고 귀환 보고서를 보관한 뒤 다음 원정을 시작할 수 있습니다.')
+    }
+    const safeOperationId = String(operationId || `guest_rover_${nowMs}_${Math.random().toString(36).slice(2, 8)}`)
+    const layout = Array.isArray(guestData.planet?.layout) ? guestData.planet.layout : []
+    const hasRoverBay = layout.some((item) => item?.itemId === 'rover_bay')
+    const hasExpeditionBeacon = layout.some((item) => item?.itemId === 'expedition_beacon')
+    const abilityLevel = Math.max(1, Number(guestData.planet?.abilitySnapshot?.values?.[routeInfo.ability] || 1))
+    const abilityBonus = abilityLevel >= 4 ? 1 : 0
+    const beaconBonus = hasExpeditionBeacon ? 1 : 0
+    const durationMs = hasRoverBay ? routeInfo.roverBayDurationMs : routeInfo.durationMs
+    const readyAtMs = nowMs + durationMs
+    const roverStats = normalizeGuestRoverStats(guestData.planet?.roverStats)
+    const discovery = getGuestRoverDiscovery(routeId, safeOperationId, guestData.planet?.roverDiscoveries)
     const expedition = {
-      operationId,
-      route,
+      operationId: safeOperationId,
+      expeditionNo: roverStats.nextExpeditionNo,
+      route: routeId,
       routeTitle: routeInfo.label,
+      reportFlowVersion: 2,
       status: 'exploring',
       startedAtMs: nowMs,
       readyAtMs,
       returnsAtMs: readyAtMs,
-      reward: { material: routeInfo.rewardMaterial, amount: Number(routeInfo.baseReward || 1), title: routeInfo.reward },
-    };
+      durationMs,
+      reward: {
+        material: routeInfo.rewardMaterial,
+        amount: Number(routeInfo.baseReward || 1) + beaconBonus + abilityBonus,
+        baseAmount: Number(routeInfo.baseReward || 1),
+        beaconBonus,
+        abilityBonus,
+        title: routeInfo.reward,
+      },
+      discovery,
+      bonuses: {
+        roverBay: hasRoverBay,
+        expeditionBeacon: hasExpeditionBeacon,
+        abilityId: routeInfo.ability,
+        abilityLevel,
+        ability: abilityBonus > 0,
+      },
+      storyContextAtLaunch: getGuestRoverStoryContext(guestData.planet?.frontierStory),
+    }
     let frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, { type: 'rover_dispatched' }, nowMs);
     if (guestData.planet?.lastDailyEventDayKey === guestData.lastGrantedAt) {
       frontierStory = advanceFrontierStory(frontierStory, {
@@ -247,7 +349,19 @@ export function useGuestGalaxyData() {
         nodeId: 'broken_beacon',
       }, nowMs);
     }
-    const planet = { ...guestData.planet, roverExpedition: expedition, frontierStory };
+    const nextRouteLaunchCounts = { ...roverStats.routeLaunchCounts, [routeId]: roverStats.routeLaunchCounts[routeId] + 1 }
+    const planet = {
+      ...guestData.planet,
+      roverExpedition: expedition,
+      roverStats: {
+        ...roverStats,
+        totalLaunched: roverStats.totalLaunched + 1,
+        nextExpeditionNo: roverStats.nextExpeditionNo + 1,
+        routeLaunchCounts: nextRouteLaunchCounts,
+        lastOperationId: safeOperationId,
+      },
+      frontierStory,
+    }
     persist({ ...guestData, planet });
     return { expedition, frontierStory, planet, serverNowMs: nowMs };
   }, [guestData, persist]);
@@ -315,30 +429,126 @@ export function useGuestGalaxyData() {
     const expedition = guestData.planet?.roverExpedition;
     const nowMs = Date.now();
     if (!expedition?.operationId) throw new Error('수령할 로버 원정 기록이 없습니다.');
+    if (expedition.status === 'claimed' || expedition.claimedAtMs) {
+      const claimResult = expedition.result || {
+        operationId: expedition.operationId,
+        reward: expedition.reward,
+        discovery: expedition.discovery,
+        claimedAtMs: expedition.claimedAtMs,
+      }
+      return { expedition, claimResult, frontierStory: guestData.planet?.frontierStory, planet: guestData.planet, serverNowMs: nowMs, deduplicated: true }
+    }
     if (Number(expedition.readyAtMs || expedition.returnsAtMs || 0) > nowMs) throw new Error('탐사 로버가 아직 귀환하지 않았습니다.');
     const routeInfo = GALAXY_ROVER_ROUTES[expedition.route] || GALAXY_ROVER_ROUTES.nebula;
     const reward = expedition.reward || { material: routeInfo.rewardMaterial, amount: routeInfo.baseReward, title: routeInfo.reward };
-    const discovery = routeInfo.discoveries[0];
+    const discovery = expedition.discovery || getGuestRoverDiscovery(expedition.route, expedition.operationId, guestData.planet?.roverDiscoveries)
+    if (!discovery?.id) throw new Error('원정 발견 기록을 복원하지 못했습니다.')
     const materials = { ...(guestData.planet?.materials || {}) };
-    materials[reward.material] = Math.max(0, Number(materials[reward.material] || 0)) + Number(reward.amount || 0);
+    const balanceBefore = Math.max(0, Number(materials[reward.material] || 0))
+    const rewardAmount = Math.max(0, Number(reward.amount || 0))
+    const balanceAfter = balanceBefore + rewardAmount
+    materials[reward.material] = balanceAfter
     const roverDiscoveries = Array.isArray(guestData.planet?.roverDiscoveries) ? [...guestData.planet.roverDiscoveries] : [];
-    if (!roverDiscoveries.some((entry) => entry?.id === discovery.id)) roverDiscoveries.push({ ...discovery, discoveredAtMs: nowMs });
+    const previousDiscovery = roverDiscoveries.find((entry) => entry?.id === discovery.id)
+    const isNewDiscovery = !previousDiscovery
+    const discoveryRecord = isNewDiscovery
+      ? { ...discovery, firstOperationId: expedition.operationId, discoveredAtMs: nowMs, lastObservedAtMs: nowMs, lastOperationId: expedition.operationId, observationCount: 1 }
+      : { ...previousDiscovery, lastObservedAtMs: nowMs, lastOperationId: expedition.operationId, observationCount: Math.max(1, Number(previousDiscovery.observationCount || 1)) + 1 }
+    if (isNewDiscovery) roverDiscoveries.push(discoveryRecord)
+    else roverDiscoveries.splice(roverDiscoveries.findIndex((entry) => entry?.id === discovery.id), 1, discoveryRecord)
     const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, {
       type: 'rover_claimed',
+      isNewDiscovery,
       discoveryCount: roverDiscoveries.length,
+      discoveryRoutes: [...new Set(roverDiscoveries.map((entry) => entry?.route).filter(Boolean))],
       builtItemIds: (guestData.planet?.layout || []).map((entry) => entry?.itemId).filter(Boolean),
     }, nowMs);
-    const claimedExpedition = { ...expedition, status: 'claimed', claimedAtMs: nowMs };
-    const planet = { ...guestData.planet, materials, roverDiscoveries, roverExpedition: claimedExpedition, frontierStory };
+    const beforeStory = normalizeFrontierStory(guestData.planet?.frontierStory)
+    const claimResult = {
+      operationId: expedition.operationId,
+      route: expedition.route,
+      reward: { ...reward, amount: rewardAmount, balanceBefore, balanceAfter },
+      discovery,
+      isNewDiscovery,
+      claimedAtMs: nowMs,
+      materials,
+      routeDiscoveryCount: roverDiscoveries.filter((entry) => entry?.route === expedition.route).length,
+      totalDiscoveryCount: roverDiscoveries.length,
+      storyProgressAtClaim: {
+        beforeChapterId: beforeStory.chapterId,
+        beforeStepId: beforeStory.stepId,
+        afterChapterId: frontierStory.chapterId,
+        afterStepId: frontierStory.stepId,
+        restorationBefore: beforeStory.restorationPercent,
+        restorationAfter: frontierStory.restorationPercent,
+      },
+    }
+    const claimedExpedition = { ...expedition, status: 'claimed', claimedAtMs: nowMs, result: claimResult }
+    const roverStats = normalizeGuestRoverStats(guestData.planet?.roverStats)
+    const planet = {
+      ...guestData.planet,
+      materials,
+      roverDiscoveries,
+      roverExpedition: claimedExpedition,
+      roverStats: {
+        ...roverStats,
+        totalClaimed: roverStats.totalClaimed + 1,
+        uniqueDiscoveryCount: Math.max(roverStats.uniqueDiscoveryCount, roverDiscoveries.length),
+        lastClaimedOperationId: expedition.operationId,
+      },
+      frontierStory,
+    }
     persist({ ...guestData, planet });
     return {
       expedition: claimedExpedition,
-      claimResult: { reward, discovery, materials, claimedAtMs: nowMs },
+      claimResult,
       frontierStory,
       planet,
       serverNowMs: nowMs,
     };
   }, [guestData, persist]);
+
+  const acknowledgeRoverReport = useCallback((operationId) => {
+    const expedition = guestData.planet?.roverExpedition
+    if (!expedition?.operationId || expedition.operationId !== operationId) throw new Error('현재 관제 중인 원정 보고서가 아닙니다.')
+    if (getGuestRoverStatus(expedition) !== 'claimed') throw new Error('귀환 결과를 확인한 뒤 보고서를 보관할 수 있습니다.')
+    const entry = {
+      operationId: expedition.operationId,
+      expeditionNo: expedition.expeditionNo || null,
+      route: expedition.route,
+      routeTitle: expedition.routeTitle,
+      startedAtMs: expedition.startedAtMs,
+      readyAtMs: expedition.readyAtMs,
+      claimedAtMs: expedition.claimedAtMs,
+      reportAcknowledgedAtMs: Date.now(),
+      reward: expedition.result?.reward || expedition.reward,
+      discovery: expedition.result?.discovery || expedition.discovery,
+      isNewDiscovery: expedition.result?.isNewDiscovery,
+      bonuses: expedition.bonuses || {},
+      storyContextAtLaunch: expedition.storyContextAtLaunch || null,
+      storyProgressAtClaim: expedition.result?.storyProgressAtClaim || null,
+      localOnly: true,
+    }
+    const history = [entry, ...(guestData.planet?.roverHistory || []).filter((item) => item?.operationId !== operationId)].slice(0, GUEST_ROVER_HISTORY_LIMIT)
+    const roverStats = normalizeGuestRoverStats(guestData.planet?.roverStats)
+    const planet = {
+      ...guestData.planet,
+      roverExpedition: null,
+      roverHistory: history,
+      roverStats: { ...roverStats, lastAcknowledgedOperationId: operationId },
+    }
+    persist({ ...guestData, planet })
+    return { success: true, operationId, planet, serverNowMs: entry.reportAcknowledgedAtMs }
+  }, [guestData, persist])
+
+  const listRoverHistory = useCallback(({ cursorOperationId = '', limit = 10 } = {}) => {
+    const entries = Array.isArray(guestData.planet?.roverHistory) ? guestData.planet.roverHistory : []
+    const pageSize = Math.min(20, Math.max(1, Number(limit) || 10))
+    const cursorIndex = cursorOperationId ? entries.findIndex((entry) => entry?.operationId === cursorOperationId) + 1 : 0
+    const page = entries.slice(Math.max(0, cursorIndex), Math.max(0, cursorIndex) + pageSize)
+    const hasMore = cursorIndex + page.length < entries.length
+    return { success: true, entries: page, hasMore, nextCursorOperationId: hasMore ? page.at(-1)?.operationId || '' : '' }
+  }, [guestData])
 
   const visitTrainingNeighbor = useCallback(() => {
     const frontierStory = advanceFrontierStory(guestData.planet?.frontierStory, { type: 'friend_visited' });
@@ -384,6 +594,8 @@ export function useGuestGalaxyData() {
       lastMissionAtMs: guestData.planet?.lastMissionAtMs || 0,
       roverExpedition: guestData.planet?.roverExpedition || null,
       roverDiscoveries: guestData.planet?.roverDiscoveries || [],
+      roverHistory: guestData.planet?.roverHistory || [],
+      roverStats: normalizeGuestRoverStats(guestData.planet?.roverStats),
       visitMode: 'private',
     };
     const dayKey = guestData.lastGrantedAt;
@@ -430,10 +642,12 @@ export function useGuestGalaxyData() {
     mockHomeData,
     buildItem,
     careForStructure,
+    acknowledgeRoverReport,
     claimRover,
     completeDailyEvent,
     completeMission,
     dispatchRover,
+    listRoverHistory,
     performWorldAction,
     helpTrainingNeighbor,
     removeBuildItem,

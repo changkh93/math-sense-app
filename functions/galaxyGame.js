@@ -260,6 +260,7 @@ function normalizeFrontierStory(raw, nowMs = Date.now()) {
 
 function frontierEventMatchesStep(stepId, event = {}) {
   const builtItemIds = Array.isArray(event.builtItemIds) ? event.builtItemIds : [];
+  const discoveryRoutes = Array.isArray(event.discoveryRoutes) ? [...new Set(event.discoveryRoutes.filter(Boolean))] : [];
   if (stepId === "restore_beacon") return (event.type === "world_action" && event.nodeId === "broken_beacon")
     || (event.type === "daily_event_completed" && event.nodeId === "broken_beacon");
   if (stepId === "build_first_light") return event.type === "item_built" && event.itemId === "star_lamp" && Number(event.level || 1) === 1;
@@ -270,11 +271,13 @@ function frontierEventMatchesStep(stepId, event = {}) {
   if (stepId === "stabilize_daily_event") return event.type === "daily_event_completed";
   if (stepId === "trace_lost_route") return event.type === "mission_completed";
   if (stepId === "dispatch_route_rover") return event.type === "rover_dispatched";
-  if (stepId === "recover_pre_storm_discovery") return event.type === "rover_claimed";
+  if (stepId === "recover_pre_storm_discovery") return event.type === "rover_claimed" && event.isNewDiscovery === true;
   if (stepId === "visit_friend_planet") return event.type === "friend_visited";
   if (stepId === "help_friend_planet") return event.type === "social_help_completed";
   if (stepId === "unlock_shared_route") return event.type === "social_help_completed" && Number(event.routeLevel || 0) >= 2;
-  if (stepId === "complete_discovery_codex") return Number(event.discoveryCount || 0) >= 3;
+  if (stepId === "complete_discovery_codex") {
+    return discoveryRoutes.length ? discoveryRoutes.length >= 3 : Number(event.discoveryCount || 0) >= 3;
+  }
   if (stepId === "complete_core_facilities") return FRONTIER_CORE_FACILITY_IDS.every((itemId) => builtItemIds.includes(itemId));
   if (stepId === "build_astra_gateway") return event.type === "item_built" && event.itemId === "route_gateway";
   if (stepId === "restore_astra_memory") return event.type === "astra_memory_activated"
@@ -339,7 +342,12 @@ function deriveFrontierStoryFromPlanet(planet = {}, nowMs = Date.now()) {
     advance({ type: "rover_dispatched" });
   }
   if (Array.isArray(planet.roverDiscoveries) && planet.roverDiscoveries.length) {
-    advance({ type: "rover_claimed", discoveryCount: planet.roverDiscoveries.length });
+    advance({
+      type: "rover_claimed",
+      isNewDiscovery: true,
+      discoveryCount: planet.roverDiscoveries.length,
+      discoveryRoutes: planet.roverDiscoveries.map((entry) => entry?.route).filter(Boolean),
+    });
   }
   return story;
 }
@@ -405,9 +413,17 @@ const GALAXY_DAILY_EVENT_CATALOG = [
 const GALAXY_ROVER_OPERATION_TYPE = "galaxy_rover_expedition";
 const GALAXY_ROVER_DEFAULT_DURATION_MS = 8 * 60 * 60 * 1000;
 const GALAXY_ROVER_BAY_DURATION_MS = 6 * 60 * 60 * 1000;
+const GALAXY_ROVER_CATALOG_VERSION = 2;
+const GALAXY_ROVER_REPORT_FLOW_VERSION = 2;
+// Version 2 clients render the report acknowledgement action. Version 1
+// clients retain the legacy flow until they receive the new UI, so a stale tab
+// never sees an enabled departure button that the server suddenly rejects.
+const ENFORCE_ROVER_REPORT_ACKNOWLEDGEMENT = true;
 const GALAXY_ROVER_ROUTES = {
   nebula: {
-    title: "성운 생태 장거리 탐사",
+    title: "성운 생태 항로",
+    shortLabel: "성운",
+    copy: "폭풍 뒤 사라진 생태 신호를 추적해 행성의 생명 기록을 복원합니다.",
     material: "biofiber",
     rewardTitle: "바이오 섬유",
     baseAmount: 4,
@@ -419,7 +435,9 @@ const GALAXY_ROVER_ROUTES = {
     ],
   },
   comet: {
-    title: "혜성 구조 장거리 탐사",
+    title: "혜성 구조 항로",
+    shortLabel: "혜성",
+    copy: "끊긴 구조 신호와 오래된 장비를 회수해 개척 전초기지를 보강합니다.",
     material: "alloy",
     rewardTitle: "혜성 합금",
     baseAmount: 2,
@@ -431,7 +449,9 @@ const GALAXY_ROVER_ROUTES = {
     ],
   },
   ruins: {
-    title: "고대 정거장 장거리 탐사",
+    title: "고대 정거장 항로",
+    shortLabel: "정거장",
+    copy: "멈춘 정거장의 기억 장치를 복원해 사라진 항로의 기록을 읽습니다.",
     material: "crystalGlass",
     rewardTitle: "수정 유리",
     baseAmount: 2,
@@ -815,16 +835,74 @@ function stableGalaxyHash(value) {
 
 function getGalaxyRoverExpeditionView(expedition, nowMs = Date.now()) {
   if (!expedition || typeof expedition !== "object" || !expedition.operationId) return null;
-  const isClaimed = expedition.status === "claimed" || Boolean(expedition.claimedAtMs) || Boolean(expedition.claimedAt);
+  const isClaimed = expedition.status === "claimed" || Boolean(expedition.claimedAtMs) || Boolean(expedition.claimedAt) || Boolean(expedition.result?.claimedAtMs);
   const status = isClaimed
     ? "claimed"
     : Math.max(0, Number(expedition.readyAtMs || 0)) <= Math.max(0, Number(nowMs || 0))
       ? "ready"
       : "exploring";
-  return { ...expedition, status };
+  const view = { ...expedition, status, ...(isClaimed ? { claimedAtMs: expedition.claimedAtMs || expedition.result?.claimedAtMs } : {}) };
+  // The route is public while travelling; the concrete discovery is only
+  // revealed in the return report. The operation keeps the server snapshot.
+  if (!isClaimed) {
+    delete view.discovery;
+    view.discoveryPending = true;
+  }
+  return view;
 }
 
-function buildGalaxyRoverDeparture({ operationId, route, planet = {}, nowMs = Date.now() }) {
+function normalizeGalaxyRoverStats(raw = {}) {
+  const routeLaunchCounts = raw?.routeLaunchCounts && typeof raw.routeLaunchCounts === "object"
+    ? raw.routeLaunchCounts : {};
+  return {
+    version: Math.max(1, Number(raw?.version || 1)),
+    totalLaunched: Math.max(0, Math.floor(Number(raw?.totalLaunched || 0))),
+    totalClaimed: Math.max(0, Math.floor(Number(raw?.totalClaimed || 0))),
+    nextExpeditionNo: Math.max(1, Math.floor(Number(raw?.nextExpeditionNo || Number(raw?.totalLaunched || 0) + 1))),
+    routeLaunchCounts: {
+      nebula: Math.max(0, Math.floor(Number(routeLaunchCounts.nebula || 0))),
+      comet: Math.max(0, Math.floor(Number(routeLaunchCounts.comet || 0))),
+      ruins: Math.max(0, Math.floor(Number(routeLaunchCounts.ruins || 0))),
+    },
+    uniqueDiscoveryCount: Math.max(0, Math.floor(Number(raw?.uniqueDiscoveryCount || 0))),
+    lastOperationId: cleanId(raw?.lastOperationId, 120),
+    lastClaimedOperationId: cleanId(raw?.lastClaimedOperationId, 120),
+    lastAcknowledgedOperationId: cleanId(raw?.lastAcknowledgedOperationId, 120),
+  };
+}
+
+function getGalaxyRoverDiscovery({ route, routeConfig, operationId, roverDiscoveries = [] } = {}) {
+  const discoveries = Array.isArray(routeConfig?.discoveries) ? routeConfig.discoveries : [];
+  const knownIds = new Set((Array.isArray(roverDiscoveries) ? roverDiscoveries : []).map((entry) => entry?.id).filter(Boolean));
+  const firstUnrestored = discoveries.find((discovery) => !knownIds.has(discovery.id));
+  const template = firstUnrestored || discoveries[stableGalaxyHash(`${route}:${operationId}`) % Math.max(1, discoveries.length)];
+  return template ? { route, ...template } : null;
+}
+
+function buildGalaxyRoverStoryContext(rawStory, nowMs = Date.now()) {
+  const story = normalizeFrontierStory(rawStory, nowMs);
+  const chapterTitles = {
+    prologue: "꺼진 귀환등",
+    reborn_star: "다시 숨 쉬는 별",
+    lost_route: "잃어버린 항로",
+    friend_signal: "친구의 신호",
+    astra_memory: "아스트라 기억망",
+  };
+  const copyByStep = {
+    launch_rover: { eyebrow: "프롤로그 4/4 · 첫 항로", title: "루미를 첫 장거리 항로로 출항시키세요", detail: "루미의 첫 귀환 기록이 아스트라 프론티어의 마지막 귀환등을 밝힙니다." },
+    dispatch_route_rover: { eyebrow: "제2장 2/3 · 폭풍 너머로", title: "로버를 장거리 항로로 출항시키세요", detail: "폭풍 이전의 발견 기록을 되찾기 위해 루미를 보냅니다." },
+    recover_pre_storm_discovery: { eyebrow: "제2장 3/3 · 되찾은 발견물", title: "귀환한 루미의 발견 기록을 복원하세요", detail: "새로운 발견이 도감에 기록되면 잃어버린 항로가 한 걸음 복원됩니다." },
+  };
+  const fallback = { eyebrow: "아스트라 프론티어 · 장거리 원정", title: "루미가 항로의 기억을 찾습니다", detail: "루미의 귀환은 행성의 건설 재료와 발견 기록으로 남습니다." };
+  return {
+    chapterId: story.chapterId,
+    chapterTitle: chapterTitles[story.chapterId] || "아스트라 프론티어",
+    stepId: story.stepId,
+    ...(copyByStep[story.stepId] || fallback),
+  };
+}
+
+function buildGalaxyRoverDeparture({ operationId, route, planet = {}, nowMs = Date.now(), reportFlowVersion = 1 }) {
   const routeConfig = GALAXY_ROVER_ROUTES[route];
   if (!routeConfig) return null;
   const layout = Array.isArray(planet.layout) ? planet.layout : [];
@@ -835,13 +913,19 @@ function buildGalaxyRoverDeparture({ operationId, route, planet = {}, nowMs = Da
   const beaconBonus = hasExpeditionBeacon ? 1 : 0;
   const durationMs = hasRoverBay ? GALAXY_ROVER_BAY_DURATION_MS : GALAXY_ROVER_DEFAULT_DURATION_MS;
   const startedAtMs = Math.max(0, Math.floor(Number(nowMs || 0)));
-  const discoveryTemplate = routeConfig.discoveries[
-    stableGalaxyHash(`${route}:${operationId}`) % routeConfig.discoveries.length
-  ];
+  const roverStats = normalizeGalaxyRoverStats(planet.roverStats);
+  const discovery = getGalaxyRoverDiscovery({
+    route,
+    routeConfig,
+    operationId,
+    roverDiscoveries: planet.roverDiscoveries,
+  });
   return {
     operationId,
+    expeditionNo: roverStats.nextExpeditionNo,
     route,
     routeTitle: routeConfig.title,
+    reportFlowVersion: Math.max(1, Math.min(GALAXY_ROVER_REPORT_FLOW_VERSION, Number(reportFlowVersion || 1))),
     status: "exploring",
     startedAtMs,
     readyAtMs: startedAtMs + durationMs,
@@ -855,7 +939,7 @@ function buildGalaxyRoverDeparture({ operationId, route, planet = {}, nowMs = Da
       abilityBonus,
       title: routeConfig.rewardTitle,
     },
-    discovery: { route, ...discoveryTemplate },
+    discovery,
     bonuses: {
       roverBay: hasRoverBay,
       expeditionBeacon: hasExpeditionBeacon,
@@ -863,10 +947,11 @@ function buildGalaxyRoverDeparture({ operationId, route, planet = {}, nowMs = Da
       abilityLevel,
       ability: abilityBonus > 0,
     },
+    storyContextAtLaunch: buildGalaxyRoverStoryContext(planet.frontierStory, startedAtMs),
   };
 }
 
-function planGalaxyRoverStart({ operationId, route, existingOperation = null, planet = {}, nowMs = Date.now() }) {
+function planGalaxyRoverStart({ operationId, route, existingOperation = null, planet = {}, nowMs = Date.now(), reportFlowVersion = 1 }) {
   if (!GALAXY_ROVER_ROUTES[route]) return { kind: "invalid_route" };
   if (existingOperation) {
     if (
@@ -882,12 +967,15 @@ function planGalaxyRoverStart({ operationId, route, existingOperation = null, pl
     };
   }
   const activeExpedition = getGalaxyRoverExpeditionView(planet.roverExpedition, nowMs);
-  if (activeExpedition && ["exploring", "ready"].includes(activeExpedition.status)) {
+  const claimedReportBlocksStart = activeExpedition?.status === "claimed"
+    && ENFORCE_ROVER_REPORT_ACKNOWLEDGEMENT
+    && Number(activeExpedition.reportFlowVersion || 1) >= GALAXY_ROVER_REPORT_FLOW_VERSION;
+  if (activeExpedition && (["exploring", "ready"].includes(activeExpedition.status) || claimedReportBlocksStart)) {
     return { kind: "active", expedition: activeExpedition };
   }
   return {
     kind: "startable",
-    expedition: buildGalaxyRoverDeparture({ operationId, route, planet, nowMs }),
+    expedition: buildGalaxyRoverDeparture({ operationId, route, planet, nowMs, reportFlowVersion }),
   };
 }
 
@@ -923,31 +1011,47 @@ function planGalaxyRoverClaim({ operationId, operation = null, planet = {}, nowM
     return { kind: "invalid_reward" };
   }
   const materials = { ...(planet.materials || {}) };
-  materials[reward.material] = Math.max(0, Number(materials[reward.material] || 0)) + rewardAmount;
+  const balanceBefore = Math.max(0, Number(materials[reward.material] || 0));
+  const balanceAfter = balanceBefore + rewardAmount;
+  materials[reward.material] = balanceAfter;
   const existingDiscoveries = Array.isArray(planet.roverDiscoveries) ? planet.roverDiscoveries : [];
   const discovery = operation.discovery || expedition.discovery;
   if (!discovery?.id) return { kind: "invalid_discovery" };
   const isNewDiscovery = !existingDiscoveries.some((item) => item?.id === discovery.id);
+  const observedAtMs = Math.max(0, Math.floor(Number(nowMs || 0)));
   const discoveryRecord = isNewDiscovery ? {
     ...discovery,
     firstOperationId: operationId,
-    discoveredAtMs: Math.max(0, Math.floor(Number(nowMs || 0))),
-  } : existingDiscoveries.find((item) => item?.id === discovery.id);
-  const roverDiscoveries = isNewDiscovery ? [...existingDiscoveries, discoveryRecord] : existingDiscoveries;
-  const claimedAtMs = Math.max(0, Math.floor(Number(nowMs || 0)));
-  const claimedExpedition = {
-    ...expedition,
-    status: "claimed",
-    claimedAtMs,
+    discoveredAtMs: observedAtMs,
+    lastObservedAtMs: observedAtMs,
+    lastOperationId: operationId,
+    observationCount: 1,
+  } : {
+    ...(existingDiscoveries.find((item) => item?.id === discovery.id) || discovery),
+    lastObservedAtMs: observedAtMs,
+    lastOperationId: operationId,
+    observationCount: Math.max(1, Number(existingDiscoveries.find((item) => item?.id === discovery.id)?.observationCount || 1)) + 1,
   };
+  const roverDiscoveries = isNewDiscovery
+    ? [...existingDiscoveries, discoveryRecord]
+    : existingDiscoveries.map((item) => item?.id === discovery.id ? discoveryRecord : item);
+  const claimedAtMs = observedAtMs;
   const claimResult = {
     operationId,
     route: operation.route,
-    reward: { ...reward, amount: rewardAmount },
+    reward: { ...reward, amount: rewardAmount, balanceBefore, balanceAfter },
     discovery,
     isNewDiscovery,
     claimedAtMs,
     materials,
+    routeDiscoveryCount: roverDiscoveries.filter((item) => item?.route === operation.route).length,
+    totalDiscoveryCount: roverDiscoveries.length,
+  };
+  const claimedExpedition = {
+    ...expedition,
+    status: "claimed",
+    claimedAtMs,
+    result: claimResult,
   };
   return {
     kind: "claimable",
@@ -955,6 +1059,96 @@ function planGalaxyRoverClaim({ operationId, operation = null, planet = {}, nowM
     expedition: claimedExpedition,
     materials,
     roverDiscoveries,
+  };
+}
+
+function planGalaxyRoverReportAcknowledgement({ operationId, operation = null, planet = {} } = {}) {
+  if (!operation) return { kind: "not_found" };
+  if (operation.type !== GALAXY_ROVER_OPERATION_TYPE || operation.operationId !== operationId) return { kind: "operation_conflict" };
+  if (operation.reportAcknowledgedAtMs) return { kind: "deduplicated" };
+  const isOpClaimed = operation.status === "claimed" || Boolean(operation.claimResult) || Boolean(operation.claimedAtMs);
+  if (!isOpClaimed) return { kind: "not_claimed" };
+  const expedition = planet.roverExpedition;
+  if (!expedition || expedition.operationId !== operationId) return { kind: "stale_operation" };
+  const isExpeditionClaimed = expedition.status === "claimed" || Boolean(expedition.claimedAtMs) || Boolean(expedition.result?.claimedAtMs);
+  if (!isExpeditionClaimed && !isOpClaimed) return { kind: "not_claimed" };
+  return { kind: "acknowledgeable" };
+}
+
+function buildGalaxyRoverPublicCatalog() {
+  return Object.fromEntries(Object.entries(GALAXY_ROVER_ROUTES).map(([routeId, route]) => [routeId, {
+    id: routeId,
+    title: route.title,
+    shortLabel: route.shortLabel,
+    copy: route.copy,
+    material: route.material,
+    rewardTitle: route.rewardTitle,
+    baseAmount: route.baseAmount,
+    ability: route.ability,
+  }]));
+}
+
+function buildGalaxyRoverStatsAfterLaunch(rawStats, expedition) {
+  const stats = normalizeGalaxyRoverStats(rawStats);
+  const routeLaunchCounts = { ...stats.routeLaunchCounts };
+  routeLaunchCounts[expedition.route] = Math.max(0, Number(routeLaunchCounts[expedition.route] || 0)) + 1;
+  return {
+    ...stats,
+    totalLaunched: stats.totalLaunched + 1,
+    nextExpeditionNo: Math.max(stats.nextExpeditionNo + 1, Number(expedition.expeditionNo || 0) + 1),
+    routeLaunchCounts,
+    lastOperationId: expedition.operationId,
+  };
+}
+
+function buildGalaxyRoverStatsAfterClaim(rawStats, claimResult) {
+  const stats = normalizeGalaxyRoverStats(rawStats);
+  return {
+    ...stats,
+    totalClaimed: stats.totalClaimed + 1,
+    uniqueDiscoveryCount: Math.max(stats.uniqueDiscoveryCount, Number(claimResult.totalDiscoveryCount || 0)),
+    lastClaimedOperationId: claimResult.operationId,
+  };
+}
+
+function buildGalaxyRoverStatsAfterAcknowledgement(rawStats, operationId) {
+  return { ...normalizeGalaxyRoverStats(rawStats), lastAcknowledgedOperationId: operationId };
+}
+
+/**
+ * 운영 지표 이벤트 페이로드 빌더. 트랜잭션 안에서 같은 문서 id로 set({merge:true})하므로 재시도에도 중복되지 않는다.
+ * 각 빌더는 전환 분석에 필요한 값만 남긴 경량 로그이며, operation/planet 원본과는 별개다.
+ */
+function buildGalaxyRoverEventPayload(type, { operationId, route, expeditionNo, reportFlowVersion, nowMs, isNewDiscovery, rarity, elapsedMs }) {
+  const payload = {
+    type,
+    operationId: operationId || "",
+    route: route || "",
+    expeditionNo: Number(expeditionNo || 0) || null,
+    reportFlowVersion: Number(reportFlowVersion || 1) || 1,
+    serverNowMs: Number(nowMs || Date.now()) || 0,
+  };
+  if (typeof isNewDiscovery === "boolean") payload.isNewDiscovery = isNewDiscovery;
+  if (rarity) payload.rarity = rarity;
+  if (Number.isFinite(Number(elapsedMs)) && Number(elapsedMs) >= 0) payload.elapsedMs = Math.floor(Number(elapsedMs));
+  return payload;
+}
+
+function getGalaxyRoverDiscoveryRoutes(discoveries = []) {
+  return [...new Set((Array.isArray(discoveries) ? discoveries : []).map((entry) => entry?.route).filter(Boolean))];
+}
+
+function buildGalaxyRoverStoryProgressAtClaim(beforeStory, storyProgress) {
+  const before = normalizeFrontierStory(beforeStory);
+  const after = normalizeFrontierStory(storyProgress?.story || before);
+  return {
+    beforeChapterId: before.chapterId,
+    beforeStepId: before.stepId,
+    afterChapterId: after.chapterId,
+    afterStepId: after.stepId,
+    advancedStepIds: Array.isArray(storyProgress?.advancedStepIds) ? storyProgress.advancedStepIds : [],
+    restorationBefore: before.restorationPercent,
+    restorationAfter: after.restorationPercent,
   };
 }
 
@@ -2545,6 +2739,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       wallet: Math.max(0, Number(user.crystals || 0)),
       learningState,
       catalog: GALAXY_ITEM_CATALOG,
+      roverCatalogVersion: GALAXY_ROVER_CATALOG_VERSION,
+      roverCatalog: buildGalaxyRoverPublicCatalog(),
       liveSession,
       serverNowMs,
     });
@@ -3544,6 +3740,9 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       throw new functions.https.HttpsError("invalid-argument", "탐사 로버 요청 식별자가 올바르지 않습니다.");
     }
     const operationId = requestedOperationId || userRef.collection("galaxyOperations").doc().id;
+    const reportFlowVersion = Number(data?.reportFlowVersion) >= GALAXY_ROVER_REPORT_FLOW_VERSION
+      ? GALAXY_ROVER_REPORT_FLOW_VERSION
+      : 1;
     const operationRef = userRef.collection("galaxyOperations").doc(operationId);
     const planet = await ensurePlanet(uid, user);
     const serverNowMs = Date.now();
@@ -3583,6 +3782,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
             ...(planetData.roverExpedition || {}),
             status: "claimed",
             claimedAtMs: previousOperationSnap.data()?.claimedAtMs || Date.now(),
+            result: previousOperationSnap.data()?.claimResult || planetData.roverExpedition?.result || null,
           },
         } : {}),
       };
@@ -3592,6 +3792,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         existingOperation: operationSnap.exists ? operationSnap.data() || {} : null,
         planet: effectivePlanet,
         nowMs: serverNowMs,
+        reportFlowVersion,
       });
       const applyCompletedDailyEvent = (story) => currentDailyOperationSnap.exists
         && currentDailyOperationSnap.data()?.type === GALAXY_DAILY_EVENT_OPERATION_TYPE
@@ -3605,19 +3806,19 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         throw new functions.https.HttpsError("already-exists", "이미 다른 탐사에 사용된 요청 식별자입니다.");
       }
       if (plan.kind === "active") {
-        throw new functions.https.HttpsError("failed-precondition", "현재 탐사 중이거나 귀환 대기 중인 로버가 있습니다.", {
+        const reportPending = plan.expedition?.status === "claimed";
+        throw new functions.https.HttpsError("failed-precondition", reportPending
+          ? "귀환 보고서를 보관한 뒤 다음 원정을 시작할 수 있습니다."
+          : "현재 탐사 중이거나 귀환 대기 중인 로버가 있습니다.", {
+          reason: reportPending ? "report_pending" : "active_expedition",
           expedition: serializeValue(plan.expedition),
           serverNowMs,
         });
       }
       if (plan.kind === "deduplicated") {
-        const dispatchedStory = advanceFrontierStory(planetData.frontierStory, { type: "rover_dispatched" }, serverNowMs).story;
-        const frontierStory = applyCompletedDailyEvent(dispatchedStory);
-        const frontierAnalytics = updateFrontierAnalyticsPrologue(planetData.frontierAnalytics, frontierStory, serverNowMs);
-        transaction.set(planet.ref, { frontierStory, frontierAnalytics, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         return {
-          expedition: plan.expedition,
-          frontierStory,
+          expedition: getGalaxyRoverExpeditionView(plan.expedition, serverNowMs),
+          frontierStory: planetData.frontierStory,
           deduplicated: true,
         };
       }
@@ -3625,11 +3826,13 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         throw new functions.https.HttpsError("internal", "탐사 로버 출발 상태를 만들지 못했습니다.");
       }
       const expedition = plan.expedition;
+      const roverStats = buildGalaxyRoverStatsAfterLaunch(planetData.roverStats, expedition);
       const dispatchedStory = advanceFrontierStory(planetData.frontierStory, { type: "rover_dispatched" }, serverNowMs).story;
       const frontierStory = applyCompletedDailyEvent(dispatchedStory);
       const frontierAnalytics = updateFrontierAnalyticsPrologue(planetData.frontierAnalytics, frontierStory, serverNowMs);
       transaction.set(planet.ref, {
         roverExpedition: expedition,
+        roverStats,
         frontierStory,
         frontierAnalytics,
         updatedAt: FieldValue.serverTimestamp(),
@@ -3642,7 +3845,18 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return { expedition, frontierStory, deduplicated: false };
+      // 운영 지표: 출항 전환 이벤트를 원정 단위로 기록한다. 트랜잭션 안에서 같은 문서 id를 덮어쓰므로 재시도에도 중복되지 않는다.
+      transaction.set(userRef.collection("galaxyRoverEvents").doc(`${operationId}_dispatched`), {
+        ...buildGalaxyRoverEventPayload("dispatched", {
+          operationId,
+          route: expedition.route,
+          expeditionNo: expedition.expeditionNo,
+          reportFlowVersion: expedition.reportFlowVersion,
+          nowMs: serverNowMs,
+        }),
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { expedition: getGalaxyRoverExpeditionView(expedition, serverNowMs), frontierStory, deduplicated: false };
     });
     return serializeValue({ success: true, operationId, serverNowMs, ...result });
   });
@@ -3710,22 +3924,20 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
           throw new functions.https.HttpsError("data-loss", "완료된 탐사 로버의 수령 결과가 없습니다.");
         }
         const planetData = planetSnap.data() || {};
-        const storyProgress = advanceFrontierStory(planetData.frontierStory, {
-          type: "rover_claimed",
-          discoveryCount: Array.isArray(planetData.roverDiscoveries) ? planetData.roverDiscoveries.length : 0,
-          builtItemIds: uniqueIds((Array.isArray(planetData.layout) ? planetData.layout : [])
-            .filter((entry) => entry?.locked !== true)
-            .map((entry) => cleanId(entry?.itemId, 80))),
-        }, serverNowMs);
-        transaction.set(planet.ref, {
-          roverExpedition: plan.expedition,
-          frontierStory: storyProgress.story,
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
+        const storedOperation = operationSnap.data() || {};
+        const frontierStory = storedOperation.frontierStory || planetData.frontierStory;
+        const claimResult = storedOperation.claimResult || plan.claimResult;
+        const expedition = {
+          ...plan.expedition,
+          status: "claimed",
+          claimedAtMs: claimResult?.claimedAtMs || storedOperation.claimedAtMs || serverNowMs,
+          result: claimResult,
+        };
+        transaction.set(planet.ref, { roverExpedition: expedition, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
         return {
-          expedition: plan.expedition,
-          claimResult: plan.claimResult,
-          frontierStory: storyProgress.story,
+          expedition: getGalaxyRoverExpeditionView(expedition, serverNowMs),
+          claimResult,
+          frontierStory,
           deduplicated: true,
         };
       }
@@ -3735,34 +3947,177 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const planetData = planetSnap.data() || {};
       const storyProgress = advanceFrontierStory(planetData.frontierStory, {
         type: "rover_claimed",
+        isNewDiscovery: plan.claimResult.isNewDiscovery,
         discoveryCount: Array.isArray(plan.roverDiscoveries) ? plan.roverDiscoveries.length : 0,
+        discoveryRoutes: getGalaxyRoverDiscoveryRoutes(plan.roverDiscoveries),
         builtItemIds: uniqueIds((Array.isArray(planetData.layout) ? planetData.layout : [])
           .filter((entry) => entry?.locked !== true)
           .map((entry) => cleanId(entry?.itemId, 80))),
       }, serverNowMs);
+      const claimResult = {
+        ...plan.claimResult,
+        storyProgressAtClaim: buildGalaxyRoverStoryProgressAtClaim(planetData.frontierStory, storyProgress),
+      };
+      const expedition = {
+        ...plan.expedition,
+        status: "claimed",
+        claimedAtMs: claimResult.claimedAtMs,
+        result: claimResult,
+      };
+      const roverStats = buildGalaxyRoverStatsAfterClaim(planetData.roverStats, claimResult);
       transaction.set(planet.ref, {
         materials: plan.materials,
         roverDiscoveries: plan.roverDiscoveries,
-        roverExpedition: plan.expedition,
+        roverExpedition: expedition,
+        roverStats,
         frontierStory: storyProgress.story,
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       transaction.set(operationRef, {
         status: "claimed",
-        claimedAtMs: plan.claimResult.claimedAtMs,
+        claimedAtMs: claimResult.claimedAtMs,
         claimedAt: FieldValue.serverTimestamp(),
-        claimResult: plan.claimResult,
+        claimResult,
         frontierStory: storyProgress.story,
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
+      // 운영 지표: 수령 전환 이벤트. 출항 시각 대비 경과 시간과 신규 발견 여부로 이탈/재관측 비율을 관찰한다.
+      const claimOperation = operationSnap.data() || {};
+      transaction.set(userRef.collection("galaxyRoverEvents").doc(`${operationId}_claimed`), {
+        ...buildGalaxyRoverEventPayload("claimed", {
+          operationId,
+          route: claimOperation.route || expedition.route || "",
+          expeditionNo: claimOperation.expeditionNo || expedition.expeditionNo,
+          reportFlowVersion: claimOperation.reportFlowVersion || expedition.reportFlowVersion,
+          nowMs: serverNowMs,
+          isNewDiscovery: Boolean(claimResult.isNewDiscovery),
+          rarity: claimResult.discovery?.rarity || null,
+          elapsedMs: serverNowMs - Number(claimOperation.startedAtMs || 0),
+        }),
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
       return {
-        expedition: plan.expedition,
-        claimResult: plan.claimResult,
+        expedition: getGalaxyRoverExpeditionView(expedition, serverNowMs),
+        claimResult,
         frontierStory: storyProgress.story,
         deduplicated: false,
       };
     });
     return serializeValue({ success: true, operationId, serverNowMs, ...result });
+  });
+
+  const acknowledgeGalaxyRoverReport = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
+    const { userRef, user } = await requireMember(uid);
+    const operationId = cleanId(data?.operationId, 120);
+    if (!/^[A-Za-z0-9_-]{8,120}$/.test(operationId)) {
+      throw new functions.https.HttpsError("invalid-argument", "보관할 루미 원정 보고서 식별자가 올바르지 않습니다.");
+    }
+    const operationRef = userRef.collection("galaxyOperations").doc(operationId);
+    const planet = await ensurePlanet(uid, user);
+    const serverNowMs = Date.now();
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(planet.ref),
+      ]);
+      const plan = planGalaxyRoverReportAcknowledgement({
+        operationId,
+        operation: operationSnap.exists ? operationSnap.data() || {} : null,
+        planet: planetSnap.exists ? planetSnap.data() || {} : {},
+      });
+      if (plan.kind === "not_found") {
+        throw new functions.https.HttpsError("not-found", "보관할 루미 원정 기록을 찾지 못했습니다.");
+      }
+      if (plan.kind === "operation_conflict") {
+        throw new functions.https.HttpsError("already-exists", "이 기록은 루미 로버 원정이 아닙니다.");
+      }
+      if (plan.kind === "not_claimed") {
+        throw new functions.https.HttpsError("failed-precondition", "귀환 결과를 수령한 뒤 보고서를 보관할 수 있습니다.", { reason: "not_claimed" });
+      }
+      if (plan.kind === "stale_operation") {
+        throw new functions.https.HttpsError("failed-precondition", "현재 관제 중인 원정과 다른 보고서입니다.", { reason: "stale_operation" });
+      }
+      if (plan.kind === "deduplicated") {
+        return { status: "deduplicated" };
+      }
+      const planetData = planetSnap.data() || {};
+      const ackOperation = operationSnap.data() || {};
+      transaction.set(operationRef, {
+        reportAcknowledgedAtMs: serverNowMs,
+        reportAcknowledgedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      transaction.set(planet.ref, {
+        roverExpedition: null,
+        roverStats: buildGalaxyRoverStatsAfterAcknowledgement(planetData.roverStats, operationId),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      // 운영 지표: 보관 전환 이벤트. 수령 대비 경과 시간으로 보고서 체류·미보관 이탈을 관찰한다.
+      transaction.set(userRef.collection("galaxyRoverEvents").doc(`${operationId}_acknowledged`), {
+        ...buildGalaxyRoverEventPayload("acknowledged", {
+          operationId,
+          route: ackOperation.route || "",
+          expeditionNo: ackOperation.expeditionNo,
+          reportFlowVersion: ackOperation.reportFlowVersion,
+          nowMs: serverNowMs,
+          elapsedMs: serverNowMs - Number(ackOperation.claimedAtMs || ackOperation.startedAtMs || 0),
+        }),
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { status: "acknowledged" };
+    });
+    return serializeValue({ success: true, operationId, serverNowMs, ...result });
+  });
+
+  const listGalaxyRoverExpeditions = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
+    const { userRef } = await requireMember(uid);
+    const requestedLimit = Math.floor(Number(data?.limit || 10));
+    const pageSize = Math.min(20, Math.max(1, requestedLimit));
+    const cursorOperationId = cleanId(data?.cursorOperationId, 120);
+    let historyQuery = userRef.collection("galaxyOperations")
+      .where("type", "==", GALAXY_ROVER_OPERATION_TYPE)
+      .orderBy("startedAtMs", "desc")
+      .limit(pageSize + 1);
+    if (cursorOperationId) {
+      const cursorSnap = await userRef.collection("galaxyOperations").doc(cursorOperationId).get();
+      if (!cursorSnap.exists || cursorSnap.data()?.type !== GALAXY_ROVER_OPERATION_TYPE) {
+        throw new functions.https.HttpsError("invalid-argument", "원정 일지 다음 페이지 식별자가 올바르지 않습니다.");
+      }
+      historyQuery = historyQuery.startAfter(cursorSnap);
+    }
+    const historySnap = await historyQuery.get();
+    const rows = historySnap.docs.slice(0, pageSize).map((snap) => {
+      const operation = snap.data() || {};
+      const claimResult = operation.claimResult || {};
+      return {
+        operationId: operation.operationId || snap.id,
+        expeditionNo: Number(operation.expeditionNo || 0) || null,
+        route: operation.route || "",
+        routeTitle: operation.routeTitle || "루미 로버 원정",
+        startedAtMs: Number(operation.startedAtMs || 0),
+        readyAtMs: Number(operation.readyAtMs || 0),
+        claimedAtMs: Number(operation.claimedAtMs || 0),
+        reportAcknowledgedAtMs: Number(operation.reportAcknowledgedAtMs || 0),
+        reward: claimResult.reward || operation.reward || null,
+        discovery: claimResult.discovery || null,
+        isNewDiscovery: typeof claimResult.isNewDiscovery === "boolean" ? claimResult.isNewDiscovery : null,
+        bonuses: operation.bonuses || {},
+        storyContextAtLaunch: operation.storyContextAtLaunch || null,
+        storyProgressAtClaim: claimResult.storyProgressAtClaim || null,
+        legacy: Number(operation.reportFlowVersion || 1) < GALAXY_ROVER_REPORT_FLOW_VERSION,
+      };
+    });
+    const hasMore = historySnap.docs.length > pageSize;
+    return serializeValue({
+      success: true,
+      entries: rows,
+      nextCursorOperationId: hasMore ? rows.at(-1)?.operationId || "" : "",
+      hasMore,
+    });
   });
 
   const runGalaxyMission = regionalFunctions.https.onCall(async (data, context) => {
@@ -4215,6 +4570,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     performGalaxyVisitAction,
     startGalaxyRoverExpedition,
     claimGalaxyRoverExpedition,
+    acknowledgeGalaxyRoverReport,
+    listGalaxyRoverExpeditions,
     runGalaxyMission,
     performGalaxyWorldAction,
     performGalaxyStructureAction,
@@ -4242,6 +4599,12 @@ module.exports.__test = {
   deriveFrontierStoryFromPlanet,
   buildGalaxyDailyEvent,
   buildGalaxyRoverDeparture,
+  buildGalaxyRoverPublicCatalog,
+  buildGalaxyRoverStatsAfterAcknowledgement,
+  buildGalaxyRoverEventPayload,
+  GALAXY_ROVER_CATALOG_VERSION,
+  GALAXY_ROVER_REPORT_FLOW_VERSION,
+  GALAXY_ROVER_ROUTES,
   GALAXY_DAILY_EVENT_CATALOG,
   getGalaxyDailyEventView,
   getActiveGalaxyLiveConnection,
@@ -4266,6 +4629,7 @@ module.exports.__test = {
   syncFrontierStoryWithCompletedDailyEvent,
   planGalaxyLiveSpeech,
   planGalaxyRoverClaim,
+  planGalaxyRoverReportAcknowledgement,
   planGalaxyRoverStart,
   stableGalaxyHash,
   validateGalaxyObjectImage,

@@ -72,6 +72,7 @@ import {
   MATERIAL_LABELS,
   formatGalaxyRoverRemainingTime,
   formatGalaxyTime,
+  getGalaxyRoverPhase,
   getGalaxyRoverStatus,
   getMissionCooldown,
 } from '../../utils/galaxyGame'
@@ -535,6 +536,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [builderActive, setBuilderActive] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
+  const [roverHistory, setRoverHistory] = useState({ entries: [], loaded: false, loading: false, hasMore: false, nextCursorOperationId: '' })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -577,6 +579,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   audioSessionKeyRef.current = audioSessionKey
   const isGuest = userData?.isGuest === true
   const guestGalaxy = useGuestGalaxyData()
+  const syncGuestCompletedDailyEventStory = guestGalaxy.syncCompletedDailyEventStory
   const isOwner = isGuest || targetUid === user?.uid
   const overlayReady = !loading && Boolean(home)
 
@@ -910,8 +913,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       || frontierStory.stepId !== 'stabilize_daily_event'
       || dailyEvent?.status !== 'completed'
     ) return
-    guestGalaxy.syncCompletedDailyEventStory()
-  }, [dailyEvent?.status, frontierStory.stepId, guestGalaxy.syncCompletedDailyEventStory, isGuest, isOwner])
+    syncGuestCompletedDailyEventStory()
+  }, [dailyEvent?.status, frontierStory.stepId, isGuest, isOwner, syncGuestCompletedDailyEventStory])
 
   useEffect(() => {
     if (
@@ -985,17 +988,18 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   }, [callGalaxy, isGuest])
   const roverExpedition = ownPlanet.roverExpedition || null
   const roverStatus = getGalaxyRoverStatus(roverExpedition, galaxyNowMs)
+  const roverPhase = getGalaxyRoverPhase(roverExpedition, galaxyNowMs)
   const roverReadyAtMs = Number(roverExpedition?.returnsAtMs || roverExpedition?.readyAtMs || 0)
   const roverRemainingLabel = formatGalaxyRoverRemainingTime(Math.max(0, roverReadyAtMs - galaxyNowMs))
   const hasRoverBay = ownLayout.some((item) => item?.itemId === 'rover_bay' && item?.locked !== true)
   const hasExpeditionBeacon = ownLayout.some((item) => item?.itemId === 'expedition_beacon' && item?.locked !== true)
   const roverBayAppliedToCurrent = Boolean(roverExpedition?.bonuses?.roverBay)
-  const roverStatusLabel = roverStatus === 'ready'
+  const roverStatusLabel = roverPhase === 'returned'
     ? '귀환 상자 수신하기'
-    : roverStatus === 'active'
+    : roverPhase === 'expedition'
       ? `귀환 ${roverRemainingLabel}`
-      : roverStatus === 'claimed'
-        ? '다음 원정 준비'
+      : roverPhase === 'report'
+        ? '귀환 보고서 보관하기'
         : '장거리 원정 준비'
   const observatorySummary = {
     mode: dailyEventPending ? 'alert' : unreadCount > 0 || roverStatus === 'ready' ? 'signal' : 'stable',
@@ -1066,7 +1070,16 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       total: 1,
       action: 'build',
     }
-    if (isOwner && ['idle', 'claimed'].includes(roverStatus)) return {
+    if (isOwner && roverStatus === 'claimed') return {
+      id: 'rover-report',
+      eyebrow: '지금 할 일 · 귀환 보고서 보관',
+      title: '로버 관제에서 이번 원정의 귀환 보고서를 보관하세요',
+      detail: '보관하면 이번 원정은 일지에 남고 그다음 원정을 준비할 수 있습니다.',
+      progress: 1,
+      total: 1,
+      action: 'rover',
+    }
+    if (isOwner && roverStatus === 'idle') return {
       id: 'rover-dispatch',
       eyebrow: '지금 할 일 · 로버 보내기',
       title: '아래 로버 메뉴에서 항로 하나를 고르고 출발시키세요',
@@ -1721,7 +1734,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       'rover:dispatch',
       () => isGuest
         ? guestGalaxy.dispatchRover(dispatchRoute, operationId)
-        : callGalaxy('startGalaxyRoverExpedition', { route: dispatchRoute, operationId }).catch((dispatchError) => {
+        : callGalaxy('startGalaxyRoverExpedition', { route: dispatchRoute, operationId, reportFlowVersion: 2 }).catch((dispatchError) => {
           const activeExpedition = dispatchError?.details?.expedition
           if (!activeExpedition?.operationId) throw dispatchError
           return {
@@ -1837,6 +1850,66 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     return result
   }
 
+  const loadRoverHistory = useCallback(async (cursorOperationId = '') => {
+    if (!isOwner || roverHistory.loading) return null
+    setRoverHistory((current) => ({ ...current, loading: true }))
+    try {
+      const result = isGuest
+        ? guestGalaxy.listRoverHistory({ cursorOperationId, limit: 10 })
+        : await callGalaxy('listGalaxyRoverExpeditions', { cursorOperationId, limit: 10 })
+      const entries = Array.isArray(result?.entries) ? result.entries : []
+      setRoverHistory((current) => {
+        const previous = cursorOperationId ? current.entries : []
+        const merged = [...previous, ...entries.filter((entry) => !previous.some((existing) => existing?.operationId === entry?.operationId))]
+        return {
+          entries: merged,
+          loaded: true,
+          loading: false,
+          hasMore: Boolean(result?.hasMore),
+          nextCursorOperationId: result?.nextCursorOperationId || '',
+        }
+      })
+      return result
+    } catch (historyError) {
+      setRoverHistory((current) => ({ ...current, loaded: true, loading: false }))
+      flash(historyError?.message || '원정 일지를 불러오지 못했습니다.')
+      return null
+    }
+  }, [callGalaxy, flash, guestGalaxy, isGuest, isOwner, roverHistory.loading])
+
+  const acknowledgeRoverReport = async (operationId) => {
+    if (!isOwner || !operationId) return null
+    const requestAudioSessionKey = audioSessionKey
+    const result = await runAction(
+      'rover:archive',
+      () => isGuest
+        ? guestGalaxy.acknowledgeRoverReport(operationId)
+        : callGalaxy('acknowledgeGalaxyRoverReport', { operationId }),
+      '귀환 보고서를 원정 일지에 보관했습니다. 다음 원정을 준비할 수 있어요.',
+    )
+    if (!result || !audioMountedRef.current || audioSessionKeyRef.current !== requestAudioSessionKey) return result
+    const receivedAtMs = Date.now()
+    setHome((current) => {
+      if (!current) return current
+      const roverStats = current.ownPlanet?.roverStats || {}
+      const nextOwnPlanet = {
+        ...current.ownPlanet,
+        roverExpedition: null,
+        roverStats: { ...roverStats, lastAcknowledgedOperationId: operationId },
+      }
+      return {
+        ...current,
+        serverNowMs: result.serverNowMs || current.serverNowMs,
+        serverClockOffsetMs: Number.isFinite(Number(result.serverNowMs)) ? Number(result.serverNowMs) - receivedAtMs : current.serverClockOffsetMs,
+        ownPlanet: nextOwnPlanet,
+        ...((isGuest || targetUid === user?.uid) ? { planet: nextOwnPlanet } : {}),
+      }
+    })
+    setRoverHistory({ entries: [], loaded: false, loading: false, hasMore: false, nextCursorOperationId: '' })
+    setNowMs(receivedAtMs)
+    return result
+  }
+
   useEffect(() => {
     if (!user?.uid || !roverExpedition?.operationId) return
     try {
@@ -1871,6 +1944,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     }
     if (nextMenu === 'build' && !effectiveFocusedBuildItemId && catalogEntries[0]?.[0]) setFocusedBuildItemId(catalogEntries[0][0])
     setMenu(nextMenu)
+  }
+
+  const openBuildForRoverMaterial = (material) => {
+    const buildItemId = catalogEntries.find(([, item]) => item?.material === material)?.[0]
+    if (buildItemId) setFocusedBuildItemId(buildItemId)
+    openGameMenu('build')
   }
 
   const handleObjectiveAction = () => {
@@ -2326,8 +2405,16 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                     hasExpeditionBeacon={hasExpeditionBeacon}
                     abilityValues={ownPlanet.abilitySnapshot?.values || {}}
                     busy={busy.startsWith('rover:') ? busy.split(':')[1] : false}
+                    storyObjective={storyObjective}
+                    historyEntries={roverHistory.entries}
+                    historyLoaded={roverHistory.loaded}
+                    historyLoading={roverHistory.loading}
+                    historyHasMore={roverHistory.hasMore}
                     onDispatch={dispatchRover}
                     onClaim={claimRover}
+                    onAcknowledgeReport={acknowledgeRoverReport}
+                    onLoadHistory={loadRoverHistory}
+                    onOpenBuildForMaterial={openBuildForRoverMaterial}
                   />
                 ) : (
                   <div className="galaxy-empty-state frontier-log-empty">

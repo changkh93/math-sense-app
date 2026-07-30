@@ -2,8 +2,10 @@ const assert = require('node:assert/strict');
 
 const {
   buildGalaxyRoverDeparture,
+  buildGalaxyRoverEventPayload,
   getGalaxyRoverExpeditionView,
   planGalaxyRoverClaim,
+  planGalaxyRoverReportAcknowledgement,
   planGalaxyRoverStart,
   stableGalaxyHash,
 } = require('./galaxyGame').__test;
@@ -37,6 +39,14 @@ function testStableDiscoverySelection() {
   assert.deepEqual(retry.discovery, first.discovery);
   assert.equal(first.discovery.route, 'nebula');
   assert.ok(['nebula_lumen_spore', 'nebula_aether_seed', 'nebula_whale_echo'].includes(first.discovery.id));
+
+  const next = buildGalaxyRoverDeparture({
+    operationId: 'rover-operation-0002',
+    route: 'nebula',
+    planet: { roverDiscoveries: [first.discovery] },
+    nowMs: NOW_MS,
+  });
+  assert.equal(next.discovery.id, 'nebula_aether_seed');
 }
 
 function testDurationAndRewardBonuses() {
@@ -134,13 +144,22 @@ function testStartStateAndIdempotency() {
   assert.equal(installedAfterLaunch.expedition.durationMs, 8 * HOUR_MS);
   assert.equal(installedAfterLaunch.expedition.bonuses.roverBay, false);
 
-  const afterClaim = planGalaxyRoverStart({
+  const afterLegacyClaim = planGalaxyRoverStart({
     operationId: 'rover-operation-after-claim',
     route: 'ruins',
     planet: { roverExpedition: { ...expedition, status: 'claimed', claimedAtMs: NOW_MS + 8 * HOUR_MS } },
     nowMs: NOW_MS + 8 * HOUR_MS,
   });
-  assert.equal(afterClaim.kind, 'startable');
+  assert.equal(afterLegacyClaim.kind, 'startable');
+
+  const afterClaim = planGalaxyRoverStart({
+    operationId: 'rover-operation-after-report',
+    route: 'ruins',
+    planet: { roverExpedition: { ...expedition, reportFlowVersion: 2, status: 'claimed', claimedAtMs: NOW_MS + 8 * HOUR_MS } },
+    nowMs: NOW_MS + 8 * HOUR_MS,
+    reportFlowVersion: 2,
+  });
+  assert.equal(afterClaim.kind, 'active');
 }
 
 function testReadyBoundary() {
@@ -236,7 +255,26 @@ function testRepeatedDiscoveryDoesNotDuplicateCollection() {
   assert.equal(claim.kind, 'claimable');
   assert.equal(claim.claimResult.isNewDiscovery, false);
   assert.equal(claim.roverDiscoveries.length, 1);
-  assert.deepEqual(claim.roverDiscoveries[0], existingDiscovery);
+  assert.equal(claim.roverDiscoveries[0].firstOperationId, existingDiscovery.firstOperationId);
+  assert.equal(claim.roverDiscoveries[0].observationCount, 2);
+  assert.equal(claim.roverDiscoveries[0].lastOperationId, expedition.operationId);
+}
+
+function testReportAcknowledgementOnlyClearsCurrentClaimedSlot() {
+  const expedition = buildGalaxyRoverDeparture({
+    operationId: 'rover-operation-report', route: 'ruins', planet: {}, nowMs: NOW_MS, reportFlowVersion: 2,
+  });
+  const operation = { ...operationFrom(expedition), status: 'claimed', claimedAtMs: expedition.readyAtMs, claimResult: { operationId: expedition.operationId } };
+  assert.equal(planGalaxyRoverReportAcknowledgement({
+    operationId: expedition.operationId,
+    operation,
+    planet: { roverExpedition: { ...expedition, status: 'claimed', claimedAtMs: expedition.readyAtMs } },
+  }).kind, 'acknowledgeable');
+  assert.equal(planGalaxyRoverReportAcknowledgement({
+    operationId: expedition.operationId,
+    operation,
+    planet: { roverExpedition: { ...expedition, operationId: 'another-operation', status: 'claimed' } },
+  }).kind, 'stale_operation');
 }
 
 function testInvalidRouteAndForgedRewardAreRejected() {
@@ -267,6 +305,64 @@ function testInvalidRouteAndForgedRewardAreRejected() {
   assert.equal(forgedClaim.kind, 'invalid_reward');
 }
 
+function testRoverEventPayloadBuilder() {
+  // 출항 이벤트는 발견/rarity/elapsedMs 없이 전환 기본값만 갖는다.
+  const dispatched = buildGalaxyRoverEventPayload('dispatched', {
+    operationId: 'op-1234',
+    route: 'nebula',
+    expeditionNo: 7,
+    reportFlowVersion: 2,
+    nowMs: NOW_MS,
+  });
+  assert.equal(dispatched.type, 'dispatched');
+  assert.equal(dispatched.operationId, 'op-1234');
+  assert.equal(dispatched.route, 'nebula');
+  assert.equal(dispatched.expeditionNo, 7);
+  assert.equal(dispatched.reportFlowVersion, 2);
+  assert.equal(dispatched.serverNowMs, NOW_MS);
+  assert.equal('isNewDiscovery' in dispatched, false);
+  assert.equal('rarity' in dispatched, false);
+  assert.equal('elapsedMs' in dispatched, false);
+
+  // 수령 이벤트만 발견 여부·등급·출항 대비 경과 시간을 포함한다.
+  const claimed = buildGalaxyRoverEventPayload('claimed', {
+    operationId: 'op-1234',
+    route: 'ruins',
+    expeditionNo: 7,
+    reportFlowVersion: 2,
+    nowMs: NOW_MS + 6 * HOUR_MS,
+    isNewDiscovery: true,
+    rarity: 'legendary',
+    elapsedMs: 6 * HOUR_MS,
+  });
+  assert.equal(claimed.type, 'claimed');
+  assert.equal(claimed.isNewDiscovery, true);
+  assert.equal(claimed.rarity, 'legendary');
+  assert.equal(claimed.elapsedMs, 6 * HOUR_MS);
+
+  // 보관 이벤트는 수령 대비 경과만 갖고 발견 필드는 없다.
+  const acknowledged = buildGalaxyRoverEventPayload('acknowledged', {
+    operationId: 'op-1234',
+    route: 'ruins',
+    expeditionNo: 7,
+    reportFlowVersion: 2,
+    nowMs: NOW_MS + 6 * HOUR_MS + 30 * 60 * 1000,
+    elapsedMs: 30 * 60 * 1000,
+  });
+  assert.equal(acknowledged.type, 'acknowledged');
+  assert.equal(acknowledged.elapsedMs, 30 * 60 * 1000);
+  assert.equal('isNewDiscovery' in acknowledged, false);
+  assert.equal('rarity' in acknowledged, false);
+
+  // 경과 시간이 음수이면 기록하지 않는(0 처리로 정규화하지 않고 생략).
+  const negativeElapsed = buildGalaxyRoverEventPayload('acknowledged', {
+    operationId: 'op-1234',
+    nowMs: NOW_MS,
+    elapsedMs: -50,
+  });
+  assert.equal('elapsedMs' in negativeElapsed, false);
+}
+
 function run() {
   testStableDiscoverySelection();
   testDurationAndRewardBonuses();
@@ -274,7 +370,9 @@ function run() {
   testReadyBoundary();
   testClaimStateAndExactOnceRetry();
   testRepeatedDiscoveryDoesNotDuplicateCollection();
+  testReportAcknowledgementOnlyClearsCurrentClaimedSlot();
   testInvalidRouteAndForgedRewardAreRejected();
+  testRoverEventPayloadBuilder();
   console.log('Galaxy rover expedition tests passed.');
 }
 
