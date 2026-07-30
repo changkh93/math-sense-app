@@ -170,9 +170,12 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   const wrapperRef = useRef(null)
   const [hasError, setHasError] = useState(false)
   const [apiTimedOut, setApiTimedOut] = useState(false)
+  const [needsManualStart, setNeedsManualStart] = useState(false)
+  const [manualStartAttempted, setManualStartAttempted] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const timeUpdateInterval = useRef(null)
+  const manualStartTimerRef = useRef(null)
   const playerTargetId = useRef(`yt-player-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
   const { start: normalizedStart, end: normalizedEnd } = getNormalizedVideoRange(start, end)
   const initialPlaybackRateRef = useRef(initialPlaybackRate)
@@ -316,9 +319,45 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     }
   }, [hasError, apiTimedOut])
 
+  const handleManualStart = () => {
+    const player = playerRef.current
+    if (!player || typeof player.playVideo !== 'function') return
+
+    setManualStartAttempted(true)
+    onTrackingStatusRef.current?.({
+      event: 'manual_play_requested',
+      manualPlayRequested: true,
+      playerState: typeof player.getPlayerState === 'function' ? player.getPlayerState() : null,
+      videoId: normalizedVideoId
+    })
+
+    try {
+      player.playVideo()
+    } catch (error) {
+      console.warn('Manual YouTube playback request failed:', error)
+    }
+
+    if (manualStartTimerRef.current) clearTimeout(manualStartTimerRef.current)
+    manualStartTimerRef.current = setTimeout(() => {
+      const state = typeof player.getPlayerState === 'function' ? player.getPlayerState() : null
+      if (state !== window.YT?.PlayerState?.PLAYING) {
+        setManualStartAttempted(false)
+        setNeedsManualStart(true)
+        onTrackingStatusRef.current?.({
+          event: 'manual_play_failed',
+          manualPlayFailed: true,
+          playerState: state,
+          videoId: normalizedVideoId
+        })
+      }
+    }, 1400)
+  }
+
   useEffect(() => {
     setHasError(false)
     setApiTimedOut(false)
+    setNeedsManualStart(false)
+    setManualStartAttempted(false)
     if (!normalizedVideoId) {
       setHasError(true)
       onErrorRef.current?.('INVALID_VIDEO_ID')
@@ -392,6 +431,21 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
               fallbackIframe: false,
               videoId: normalizedVideoId
             })
+            if (autoPlay) {
+              if (manualStartTimerRef.current) clearTimeout(manualStartTimerRef.current)
+              manualStartTimerRef.current = setTimeout(() => {
+                const state = typeof player.getPlayerState === 'function' ? player.getPlayerState() : null
+                if (state !== window.YT?.PlayerState?.PLAYING) {
+                  setNeedsManualStart(true)
+                  onTrackingStatusRef.current?.({
+                    event: 'manual_start_needed',
+                    manualStartNeeded: true,
+                    playerState: state,
+                    videoId: normalizedVideoId
+                  })
+                }
+              }, 1600)
+            }
             // Start continuous time tracking as soon as player is ready
             if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
             timeUpdateInterval.current = setInterval(() => {
@@ -420,6 +474,20 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
               onPlaybackStateChange(event.data)
             }
             if (event.data === window.YT.PlayerState.PLAYING) {
+              if (manualStartTimerRef.current) {
+                clearTimeout(manualStartTimerRef.current)
+                manualStartTimerRef.current = null
+              }
+              setNeedsManualStart(false)
+              setManualStartAttempted(false)
+              onTrackingStatusRef.current?.({
+                event: 'manual_play_recovered',
+                manualStartNeeded: false,
+                manualPlayRequested: false,
+                manualPlayFailed: false,
+                playerState: event.data,
+                videoId: normalizedVideoId
+              })
               if (channelRef.current) {
                 channelRef.current.postMessage({ type: 'START_PLAYING', tabId: tabIdRef.current })
               }
@@ -445,6 +513,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
             if (onError) onError(event.data)
           },
           'onAutoplayBlocked': () => {
+            if (manualStartTimerRef.current) {
+              clearTimeout(manualStartTimerRef.current)
+              manualStartTimerRef.current = null
+            }
+            setNeedsManualStart(true)
             onTrackingStatusRef.current?.({
               event: 'autoplay_blocked',
               autoplayBlocked: true,
@@ -467,6 +540,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
       }, 100)
       return () => {
         clearTimeout(apiTimeout)
+        if (manualStartTimerRef.current) clearTimeout(manualStartTimerRef.current)
         clearInterval(checkYT)
         if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
         if (playerRef.current && typeof playerRef.current.destroy === 'function') {
@@ -479,6 +553,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
 
     return () => {
       clearTimeout(apiTimeout)
+      if (manualStartTimerRef.current) clearTimeout(manualStartTimerRef.current)
       if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
       if (playerRef.current && typeof playerRef.current.destroy === 'function') {
         try { playerRef.current.destroy() } catch (e) { /* ignore */ }
@@ -580,6 +655,37 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: '15px', overflow: 'hidden' }}>
       <div ref={wrapperRef} className="yt-iframe-wrapper" style={{ width: '100%', height: '100%' }} />
+      {needsManualStart && (
+        <button
+          type="button"
+          className="capture-hide font-tech"
+          onClick={handleManualStart}
+          aria-label="영상 재생 시작"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 30,
+            minWidth: '10.5rem',
+            minHeight: '3.5rem',
+            padding: '0.9rem 1.25rem',
+            border: '1px solid rgba(0, 243, 255, 0.86)',
+            borderRadius: '999px',
+            background: 'rgba(3, 10, 26, 0.92)',
+            color: '#fff',
+            fontSize: '1rem',
+            fontWeight: 900,
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 0 28px rgba(0, 243, 255, 0.38)'
+          }}
+        >
+          {manualStartAttempted ? '▶ 재생 연결 중…' : '▶ 영상 재생하기'}
+        </button>
+      )}
       <div 
         className="yt-placeholder" 
         style={{ 
@@ -1345,6 +1451,9 @@ export default function MissionHub({
       lastForwardPlaybackAt: status.lastForwardPlaybackAt || null,
       inferredPlayback: !!status.inferredPlayback,
       autoplayBlocked: !!status.autoplayBlocked,
+      manualStartNeeded: !!status.manualStartNeeded,
+      manualPlayRequested: !!status.manualPlayRequested,
+      manualPlayFailed: !!status.manualPlayFailed,
       trackingUnavailable: !!videoTrackingUnavailable,
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
       viewportWidth: typeof window !== 'undefined' ? window.innerWidth : null,
@@ -1535,6 +1644,22 @@ export default function MissionHub({
         transmissionId: selectedTx?.id || 'default',
         transmissionTitle: selectedTx?.title || '',
         videoId: event.videoId || selectedTx?.videoId || '',
+        ...getTrackingDiagnostics()
+      })
+    } else if (event.event === 'manual_start_needed') {
+      logActivity('video_tracking_manual_start_needed', {
+        transmissionId: selectedTx?.id || 'default',
+        transmissionTitle: selectedTx?.title || '',
+        videoId: event.videoId || selectedTx?.videoId || '',
+        playerState: event.playerState ?? null,
+        ...getTrackingDiagnostics()
+      })
+    } else if (event.event === 'manual_play_failed') {
+      logActivity('video_tracking_manual_play_failed', {
+        transmissionId: selectedTx?.id || 'default',
+        transmissionTitle: selectedTx?.title || '',
+        videoId: event.videoId || selectedTx?.videoId || '',
+        playerState: event.playerState ?? null,
         ...getTrackingDiagnostics()
       })
     }
