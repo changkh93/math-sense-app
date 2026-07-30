@@ -1,5 +1,18 @@
 import React from 'react';
 
+// A deployment can replace Vite's hashed lazy-load chunks while a student still
+// has the previous app shell open. Firebase then returns the SPA HTML fallback
+// for the missing chunk, which the browser reports as a failed module import.
+const isStaleChunkError = (error) => {
+  const message = String(error?.message || error || '');
+  return /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk [^ ]+ failed/i.test(message);
+};
+
+const staleChunkKey = (error) => {
+  const url = String(error?.message || error || '').match(/https?:\/\/\S+\.js\b/i)?.[0];
+  return `msense:stale-chunk-reload:${url || window.location.pathname}`;
+};
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -12,6 +25,16 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("[CRITICAL] App Crash caught by ErrorBoundary:", error, errorInfo);
+
+    // Reload once for each missing hashed asset. This recovers open tabs after
+    // a deployment without risking an endless reload for an unrelated error.
+    if (isStaleChunkError(error)) {
+      const key = staleChunkKey(error);
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        window.location.reload();
+      }
+    }
   }
 
   render() {
