@@ -4,11 +4,12 @@ import { signOut } from 'firebase/auth';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, CircleHelp, Copy, Crown, Loader2, LogOut, Radio, Rocket, Send, Share2, ShieldCheck, StickyNote, Trash2, Users, Wifi } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleHelp, Copy, Crown, Loader2, LogOut, Mail, Radio, Rocket, Send, Share2, ShieldCheck, StickyNote, Trash2, Users, Wifi } from 'lucide-react';
 import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import { useAllUserPresence } from '../../hooks/useRealtimePresence';
+import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
 import { copyMeetText, getGoogleMeetCode, openGoogleMeet } from '../../utils/googleMeetNavigation';
 import CrewSettingsModal from './CrewSettingsModal';
@@ -30,6 +31,33 @@ const inputStyle = {
   color: 'var(--text-bright)', padding: '0.75rem 0.9rem', outline: 'none'
 };
 const NOTE_MAX_LENGTH = 120;
+
+const DEFAULT_CLUSTER_NAMES = {
+  'middle-math': '중등수학',
+  'cluster_middle': '중등수학',
+  'western-classic': '고전 읽기',
+  'python': '파이썬',
+  'cluster_elementary': '초등수학',
+  'elementary-math': '초등수학',
+};
+
+function getMemberClusterDays(userProfile, clusterNameMap) {
+  const participation = userProfile?.participation || {};
+  const result = [];
+
+  Object.entries(participation).forEach(([clusterId, days]) => {
+    if (Array.isArray(days) && days.length > 0) {
+      const clusterName = (clusterNameMap && clusterNameMap.get(clusterId)) || DEFAULT_CLUSTER_NAMES[clusterId] || clusterId;
+      result.push({
+        clusterId,
+        clusterName,
+        daysStr: days.join(', '),
+      });
+    }
+  });
+
+  return result;
+}
 
 function getCrewStatusLabel(s) { return s === 'approved' ? '인증 완료' : s === 'rejected' ? '반려됨' : '운영자 승인 대기'; }
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
@@ -89,7 +117,7 @@ function getGreetingReadMeta(note, crewMemberIds = [], currentUid = '') {
   return { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead };
 }
 
-function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, currentDisplayName, todayKey }) {
+function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, currentDisplayName, todayKey, clusterNameMap }) {
   const { dailyStats, loading } = useLearningHistory(member?.uid, todayKey);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const isSelf = member.uid === currentUid;
@@ -109,6 +137,7 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
   const elapsedLabel = enteredMs ? formatElapsedCompact(nowMs - enteredMs) : '';
   const summaryText = buildTodaySummary(dailyStats);
   const displayName = getMemberLabel(resolvedMember, isSelf ? (currentDisplayName || '나') : '크루 멤버');
+  const activeClusterDays = useMemo(() => getMemberClusterDays(resolvedMember, clusterNameMap), [resolvedMember, clusterNameMap]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => setNowMs(Date.now()), 60000);
@@ -118,11 +147,25 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
   return (
     <div className="crew-member-console">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
           {isLeader && <Crown size={14} style={{ color: '#fbbf24', flexShrink: 0 }} />}
           <span className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {displayName}{isSelf ? ' (나)' : ''}
           </span>
+          {!isSelf && resolvedMember.uid && (
+            <button
+              type="button"
+              className="crew-member-letter-btn"
+              title={`${displayName}님에게 편지 쓰기`}
+              onClick={(e) => {
+                e.stopPropagation();
+                soundManager.playClick();
+                window.dispatchEvent(new CustomEvent('directmemo:compose', { detail: { uid: resolvedMember.uid } }));
+              }}
+            >
+              <Mail size={13} />
+            </button>
+          )}
         </div>
         <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
@@ -142,6 +185,21 @@ function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, cur
       <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 }}>
         연속 {resolvedMember.currentStreak || 0}일 · {studied ? '오늘 학습 완료' : '오늘 학습 대기'}
       </div>
+
+      {activeClusterDays.length > 0 && (
+        <div className="crew-member-readout crew-member-readout-participation">
+          <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>
+            참여 요일
+          </div>
+          <div className="font-tech" style={{ color: 'rgba(255,255,255,0.88)', fontSize: '0.81rem', lineHeight: 1.45 }}>
+            {activeClusterDays.map((item, idx) => (
+              <span key={item.clusterId} style={{ display: 'inline-block', marginRight: idx < activeClusterDays.length - 1 ? '0.6rem' : '0' }}>
+                <strong style={{ color: '#00f3ff', fontWeight: 700 }}>{item.clusterName}</strong>: {item.daysStr}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="crew-member-readout">
         <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>
@@ -183,8 +241,22 @@ function GuestCrewPresenceCard({ guest, currentUid }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
         <div style={{ minWidth: 0 }}>
           <span className="crew-guest-id font-tech">GUEST · {String(guest.uid || '').slice(-6).toUpperCase()}</span>
-          <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {guest.alias || '게스트 탐사원'}{isSelf ? ' (나)' : ''}
+          <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <span>{guest.alias || '게스트 탐사원'}{isSelf ? ' (나)' : ''}</span>
+            {!isSelf && guest.uid && (
+              <button
+                type="button"
+                className="crew-member-letter-btn"
+                title="편지 쓰기"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  soundManager.playClick();
+                  window.dispatchEvent(new CustomEvent('directmemo:compose', { detail: { uid: guest.uid } }));
+                }}
+              >
+                <Mail size={13} />
+              </button>
+            )}
           </div>
         </div>
         <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
@@ -204,18 +276,35 @@ function GuestCrewPresenceCard({ guest, currentUid }) {
   );
 }
 
-function CrewMemberPublicCard({ member, profile }) {
+function CrewMemberPublicCard({ member, profile, clusterNameMap }) {
   const presence = getPresenceInfo(profile);
   const isLeader = member.crewRole === 'leader';
   const currentLocation = profile?.liveStatus?.currentLocation || '현재 위치 비공개';
+  const displayName = getMemberLabel(profile, getMemberLabel(member));
+  const activeClusterDays = useMemo(() => getMemberClusterDays({ ...member, ...(profile || {}) }, clusterNameMap), [member, profile, clusterNameMap]);
+
   return (
     <div className="crew-member-console">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
           {isLeader && <Crown size={14} style={{ color: '#fbbf24', flexShrink: 0 }} />}
           <span className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {getMemberLabel(profile, getMemberLabel(member))}
+            {displayName}
           </span>
+          {member.uid && (
+            <button
+              type="button"
+              className="crew-member-letter-btn"
+              title={`${displayName}님에게 편지 쓰기`}
+              onClick={(e) => {
+                e.stopPropagation();
+                soundManager.playClick();
+                window.dispatchEvent(new CustomEvent('directmemo:compose', { detail: { uid: member.uid } }));
+              }}
+            >
+              <Mail size={13} />
+            </button>
+          )}
         </div>
         <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
@@ -233,6 +322,20 @@ function CrewMemberPublicCard({ member, profile }) {
       <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
         {isLeader ? '크루 리더' : '정식 승무원'}
       </div>
+      {activeClusterDays.length > 0 && (
+        <div className="crew-member-readout crew-member-readout-participation">
+          <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>
+            참여 요일
+          </div>
+          <div className="font-tech" style={{ color: 'rgba(255,255,255,0.88)', fontSize: '0.81rem', lineHeight: 1.45 }}>
+            {activeClusterDays.map((item, idx) => (
+              <span key={item.clusterId} style={{ display: 'inline-block', marginRight: idx < activeClusterDays.length - 1 ? '0.6rem' : '0' }}>
+                <strong style={{ color: '#00f3ff', fontWeight: 700 }}>{item.clusterName}</strong>: {item.daysStr}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="crew-member-readout">
         <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontSize: '0.74rem', fontWeight: 800 }}>현재 위치</div>
         <div className="font-tech" style={{ color: 'rgba(255,255,255,0.78)', fontSize: '0.8rem' }}>{currentLocation}</div>
@@ -244,8 +347,24 @@ function CrewMemberPublicCard({ member, profile }) {
 export default function CrewDetailView({ onBack }) {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
+  const { data: clusters = [] } = useClusters();
   const [roomAction, setRoomAction] = useState('');
   const [message, setMessage] = useState('');
+
+  const clusterNameMap = useMemo(() => {
+    const map = new Map();
+    (clusters || []).forEach((c) => {
+      const id = c.docId || c.id;
+      if (id && c.name) {
+        map.set(id, c.name);
+        if (id === 'cluster_middle') map.set('middle-math', c.name);
+        if (id === 'middle-math') map.set('cluster_middle', c.name);
+        if (id === 'cluster_elementary') map.set('elementary-math', c.name);
+        if (id === 'elementary-math') map.set('cluster_elementary', c.name);
+      }
+    });
+    return map;
+  }, [clusters]);
   const [meetAccessUrl, setMeetAccessUrl] = useState('');
   const [meetMessage, setMeetMessage] = useState('');
   const [noteText, setNoteText] = useState('');
@@ -1146,7 +1265,7 @@ export default function CrewDetailView({ onBack }) {
             member.isGuest ? (
               <GuestCrewPresenceCard key={member.uid} guest={member} currentUid={user?.uid} />
             ) : isGuest ? (
-              <CrewMemberPublicCard key={member.uid} member={member} profile={effectiveMemberProfiles[member.uid]} />
+              <CrewMemberPublicCard key={member.uid} member={member} profile={effectiveMemberProfiles[member.uid]} clusterNameMap={clusterNameMap} />
             ) : (
               <CrewMemberStudyCard
                 key={member.uid}
@@ -1156,6 +1275,7 @@ export default function CrewDetailView({ onBack }) {
                 currentUserData={userData}
                 currentDisplayName={user?.displayName}
                 todayKey={todayKey}
+                clusterNameMap={clusterNameMap}
               />
             )
           ))}
