@@ -2,7 +2,7 @@ import React from 'react';
 import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
 
-const LOST_LATEX_COMMAND_PATTERN = /(?<!\\)(xrightarrow|xleftarrow|rightarrow|leftarrow|Rightarrow|Leftarrow|overline|underline|implies|triangle|parallel|cdot|times|frac|sqrt|div|neq|leq|geq|left|right|circ|perp|pm|pi|theta|alpha|beta|gamma|Delta|Omega)/g;
+const LOST_LATEX_COMMAND_PATTERN = /(?<!\\)(xrightarrow|xleftarrow|rightarrow|leftarrow|Rightarrow|Leftarrow|overline|underline|implies|triangle|parallel|cdot|times|frac|sqrt|boxed|text|quad|qquad|div|neq|leq|geq|left|right|circ|perp|pm|pi|theta|alpha|beta|gamma|Delta|Omega)/g;
 const CONTROL_CHARS = {
   formFeed: String.fromCharCode(0x0c),
   verticalTab: String.fromCharCode(0x0b),
@@ -10,6 +10,24 @@ const CONTROL_CHARS = {
   tab: String.fromCharCode(0x09),
   lineFeed: String.fromCharCode(0x0a),
   carriageReturn: String.fromCharCode(0x0d)
+};
+
+export const ensureKoreanInTextMacro = (latexStr) => {
+  if (!latexStr || typeof latexStr !== 'string') return latexStr;
+  
+  // Protect existing \text{...}, \mbox{...}, \mathrm{...}, \htmlData{...} blocks
+  const protectedBlocks = [];
+  const placeholderText = latexStr.replace(/\\(text|mbox|mathrm|htmlData)\s*\{[^}]*\}/g, (match) => {
+    const token = `@@LATEX_TEXT_MACRO_${protectedBlocks.length}@@`;
+    protectedBlocks.push(match);
+    return token;
+  });
+
+  // Wrap remaining raw Korean words with \text{...}
+  const wrapped = placeholderText.replace(/([ㄱ-ㅎ|ㅏ-ㅣ|가-힣]+(?:\s+[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]+)*)/g, '\\text{$1}');
+
+  // Restore protected blocks
+  return wrapped.replace(/@@LATEX_TEXT_MACRO_(\d+)@@/g, (_, index) => protectedBlocks[Number(index)] || '');
 };
 
 const protectExistingLatexCommands = (text) => {
@@ -67,14 +85,16 @@ export const sanitizeLaTeX = (text) => {
   const controlCharFixed = normalizeEscapedNewlines(text)
     .replace(new RegExp(`${CONTROL_CHARS.formFeed}\\s?rac`, 'g'), '\\frac')
     .replace(new RegExp(`${CONTROL_CHARS.lineFeed}\\s?neq`, 'g'), '\\neq')
+    .replace(new RegExp(`${CONTROL_CHARS.lineFeed}\\s?nu`, 'g'), '\\nu')
+    .replace(new RegExp(`${CONTROL_CHARS.lineFeed}\\s?notin`, 'g'), '\\notin')
     .replaceAll(CONTROL_CHARS.formFeed, '\\f')
     .replaceAll(CONTROL_CHARS.verticalTab, '\\v')
     .replaceAll(CONTROL_CHARS.backspace, '\\b')
-    .replaceAll(CONTROL_CHARS.tab, '\\t')
-    .replaceAll(CONTROL_CHARS.lineFeed, '\\n')
-    .replaceAll(CONTROL_CHARS.carriageReturn, '\\r');
+    .replaceAll(CONTROL_CHARS.tab, ' ')
+    .replaceAll(CONTROL_CHARS.carriageReturn, '');
 
-  return restoreLostLatexCommandSlashes(controlCharFixed);
+  const restoredSlashes = restoreLostLatexCommandSlashes(controlCharFixed).trim();
+  return ensureKoreanInTextMacro(restoredSlashes);
 };
 
 const URL_MATCH_PATTERN = /(https?:\/\/[^\s<>"']+)/gi;

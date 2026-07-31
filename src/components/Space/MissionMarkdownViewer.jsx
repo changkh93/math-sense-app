@@ -231,7 +231,6 @@ const MissionMarkdownViewer = ({ text, imageMode = 'default' }) => {
 
         if (block.type === 'math-block') {
           const content = block.content.trim();
-          const hasKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(content);
           
           return (
             <div key={`math-block-${i}`} style={{ 
@@ -242,13 +241,7 @@ const MissionMarkdownViewer = ({ text, imageMode = 'default' }) => {
               borderRadius: '8px',
               border: '1px solid rgba(255,255,255,0.05)'
             }}>
-                {hasKorean ? (
-                    <div style={{ color: 'var(--text-bright)', fontSize: '1.05rem', fontWeight: 500 }}>
-                        {parseInlineFormatting(content)}
-                    </div>
-                ) : (
-                    <BlockMath math={sanitizeLaTeX(content)} />
-                )}
+              <BlockMath math={sanitizeLaTeX(content)} />
             </div>
           );
         }
