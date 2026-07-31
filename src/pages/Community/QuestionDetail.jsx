@@ -648,14 +648,14 @@ export default function QuestionDetail() {
                                 const bountyNotice = (question.bountyAmount || 0) > 0
                                   ? `\n예치된 현상금 ${question.bountyAmount}개도 함께 지급됩니다.`
                                   : '';
-                                if (window.confirm(`이 답변을 채택하면 내 광석 20개가 답변자에게 지급됩니다.${bountyNotice}`)) {
+                                if (window.confirm(`이 답변을 채택하면 내 광석 10개가 소비되며, 답변자에게 총 20광석(시스템 지원 +10)이 지급됩니다.${bountyNotice}`)) {
                                   try {
                                     await acceptAnswer.mutateAsync({ questionId, answerId: ans.id });
                                     triggerVictory(5);
                                   } catch (err) {
                                     console.error('채택 실패:', err);
-                                    const message = err?.message?.includes('내 광석 20개가 필요')
-                                      ? '채택 보상을 지급하려면 광석 20개가 필요해요.'
+                                    const message = (err?.message?.includes('내 광석 10개가 필요') || err?.message?.includes('내 광석 20개가 필요'))
+                                      ? '채택 보상을 지급하려면 광석 10개가 필요해요.'
                                       : `답변 채택 중 오류가 발생했습니다: ${err.message}`;
                                     alert(message);
                                   }

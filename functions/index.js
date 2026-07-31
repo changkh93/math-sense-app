@@ -120,6 +120,7 @@ const ASSIGNMENT_MISSING_BASE_PENALTY = 15;
 const ASSIGNMENT_MISSING_STEP_PENALTY = 5;
 const ASSIGNMENT_MISSING_MAX_PENALTY = 25;
 const AGORA_BASE_ACCEPT_REWARD = 20;
+const AGORA_ASKER_ACCEPT_COST = 10;
 const AGORA_ASKER_RESOLVE_REWARD = 5;
 const ASSIGNMENT_SHARE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const ASSIGNMENT_SHARE_REACTION_REWARD = 1;
@@ -5560,13 +5561,14 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
       const askerData = askerSnap.exists ? askerSnap.data() || {} : {};
       const askerCrystals = Number(askerData.crystals || 0);
 
-      // The +20 acceptance reward is a student-to-student transfer, not a
-      // system mint. Teacher/admin answers and the asker's own answer do not
-      // receive the student reward, so they do not charge the asker either.
-      if (answererRef && askerCrystals < AGORA_BASE_ACCEPT_REWARD) {
+      // The asker pays AGORA_ASKER_ACCEPT_COST (10), while the answerer receives
+      // AGORA_BASE_ACCEPT_REWARD (20) with system covering the 10 ore difference.
+      // Teacher/admin answers and the asker's own answer do not receive the student reward,
+      // so they do not charge the asker either.
+      if (answererRef && askerCrystals < AGORA_ASKER_ACCEPT_COST) {
         throw new functions.https.HttpsError(
           "failed-precondition",
-          `답변을 채택하려면 내 광석 ${AGORA_BASE_ACCEPT_REWARD}개가 필요해요.`
+          `답변을 채택하려면 내 광석 ${AGORA_ASKER_ACCEPT_COST}개가 필요해요.`
         );
       }
       const now = FieldValue.serverTimestamp();
@@ -5596,7 +5598,7 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
         recordCrystalTransaction(transaction, answererUid, `answer-accepted-${questionId}`, {
           amount: AGORA_BASE_ACCEPT_REWARD,
           type: "answer_accepted",
-          description: "질문자에게서 채택 보상을 받았습니다",
+          description: "질문자 및 시스템 지원으로 채택 보상을 받았습니다",
           metadata: agoraRewardMetadata,
         });
 
@@ -5610,7 +5612,7 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
         }
       }
 
-      const askerPaidReward = answererRef ? AGORA_BASE_ACCEPT_REWARD : 0;
+      const askerPaidReward = answererRef ? AGORA_ASKER_ACCEPT_COST : 0;
       transaction.set(askerRef, {
         crystals: askerCrystals - askerPaidReward + AGORA_ASKER_RESOLVE_REWARD,
         ...calculateGrowthUpdates(askerData, AGORA_ASKER_RESOLVE_REWARD),
@@ -5620,7 +5622,7 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
         recordCrystalTransaction(transaction, askerUid, `answer-payment-${questionId}`, {
           amount: -askerPaidReward,
           type: "agora_answer_payment",
-          description: "채택한 답변에 기본 보상을 지급했습니다",
+          description: "채택한 답변에 보상을 지급했습니다 (광석 10개 차감)",
           metadata: agoraRewardMetadata,
         });
       }
