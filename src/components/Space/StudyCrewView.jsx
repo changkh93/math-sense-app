@@ -1118,7 +1118,8 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [inviteTargetStudent, setInviteTargetStudent] = useState(null);
   const [selectedInviteOptionId, setSelectedInviteOptionId] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
-  const realtimePresenceByUid = useAllUserPresence(Boolean(user?.uid));
+  const [detailView, setDetailView] = useState(false);
+  const realtimePresenceByUid = useAllUserPresence(Boolean(user?.uid) && !detailView);
   const { crewOnlineCounts, liveStatusById } = useMemo(() => {
     const nextCounts = {};
     const nextStatuses = {};
@@ -1134,7 +1135,6 @@ export default function StudyCrewView({ onNavigateStore }) {
   }, [realtimePresenceByUid]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
-  const [detailView, setDetailView] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
   const [resubmitCrew, setResubmitCrew] = useState(null); // rejected crew data for resubmission
   const [growthEventOpen, setGrowthEventOpen] = useState(false);
