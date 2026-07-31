@@ -2,7 +2,13 @@ import React from 'react';
 import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
 
-const LOST_LATEX_COMMAND_PATTERN = /(?<!\\)(xrightarrow|xleftarrow|rightarrow|leftarrow|Rightarrow|Leftarrow|overline|underline|implies|triangle|parallel|cdot|times|frac|sqrt|boxed|text|quad|qquad|div|neq|leq|geq|left|right|circ|perp|pm|pi|theta|alpha|beta|gamma|Delta|Omega)/g;
+// 인자 없이 단독으로 쓰이는 기호 명령어. 일반 영문 단어(text, boxed 등)와
+// 충돌하지 않으므로 백슬래시가 빠지면 언제든 복원해도 안전하다.
+const LOST_LATEX_SYMBOL_PATTERN = /(?<!\\)(xrightarrow|xleftarrow|rightarrow|leftarrow|Rightarrow|Leftarrow|overline|underline|implies|triangle|parallel|cdot|times|frac|sqrt|quad|qquad|div|neq|leq|geq|left|right|circ|perp|pm|pi|theta|alpha|beta|gamma|Delta|Omega)/g;
+// 인자를 받는 명령어(text, boxed 등). 영문 텍스트 단어와 충돌하므로
+// 바로 뒤에 { 가 올 때(즉 실제 명령어 호출일 때)만 백슬래시를 복원한다.
+// 예: "boxed{1}" -> "\boxed{1}" (복원), "the boxed value" -> 그대로 (미복원)
+const LOST_LATEX_BRACED_PATTERN = /(?<!\\)(text|boxed)(?=\s*\{)/g;
 const CONTROL_CHARS = {
   formFeed: String.fromCharCode(0x0c),
   verticalTab: String.fromCharCode(0x0b),
@@ -47,7 +53,9 @@ const restoreProtectedLatexCommands = (text, protectedCommands) => (
 
 const restoreLostLatexCommandSlashes = (text) => {
   const { protectedText, protectedCommands } = protectExistingLatexCommands(text);
-  const repaired = protectedText.replace(LOST_LATEX_COMMAND_PATTERN, '\\$1');
+  const repaired = protectedText
+    .replace(LOST_LATEX_SYMBOL_PATTERN, '\\$1')
+    .replace(LOST_LATEX_BRACED_PATTERN, '\\$1');
   return restoreProtectedLatexCommands(repaired, protectedCommands);
 };
 
