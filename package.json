@@ -12,6 +12,7 @@
     "test:pdf-url": "node scripts/test-pdf-url-utils.mjs",
     "test:referral": "node scripts/test-referral-billing-core.cjs",
     "test:learning-summary": "node scripts/test-learning-summary-utils.mjs",
+    "test:quiz-session": "node scripts/test-quiz-session-guards.mjs",
     "test:frontier-audio": "node scripts/test-frontier-audio-utils.mjs",
     "test:astra-builder": "node scripts/test-astra-builder-model.mjs",
     "test:frontier-story": "node scripts/test-frontier-story-utils.mjs",

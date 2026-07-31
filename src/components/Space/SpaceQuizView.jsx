@@ -15,6 +15,11 @@ import { db, functions } from '../../firebase'
 import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { useCreateMistakeCardFromQuiz } from '../../hooks/useMistakeNotebook'
+import {
+  canSubmitQuizSession,
+  getUnansweredQuizQuestions,
+  hasCompleteQuizQuestionSet,
+} from '../../utils/quizSessionGuards'
 
 // Fisher-Yates 셔플 알고리즘
 const shuffleArray = (array) => {
@@ -192,12 +197,16 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [existingResponse, setExistingResponse] = useState(null)
   const [pendingResult, setPendingResult] = useState(null)
   const [isSavingReaction, setIsSavingReaction] = useState(false)
+  const [isSkippingQuestion, setIsSkippingQuestion] = useState(false)
+  const [isRecoveringSession, setIsRecoveringSession] = useState(false)
+  const [sessionGuardMessage, setSessionGuardMessage] = useState('')
   const [reactionError, setReactionError] = useState('')
   const createMistakeCard = useCreateMistakeCardFromQuiz(user?.uid)
   const [mistakeCardMessage, setMistakeCardMessage] = useState('')
   const [savedMistakeQuestionIds, setSavedMistakeQuestionIds] = useState(new Set())
 
   const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
+  const navigationTransitionRef = useRef(false)
   const currentQuestion = currentQuestions[currentIdx]
 
   useEffect(() => {
@@ -455,16 +464,92 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     allSessionQuestions.filter(q => deferredIds.has(q.id) && !answers[q.id])
   )
 
+  const recordQuizSessionGuardAudit = async (event, details = {}) => {
+    if (!user?.uid || !quizData?.unitId) return
+
+    try {
+      const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+      await setDoc(progressRef, {
+        quizSessionGuardAudit: {
+          event,
+          unitId: quizData.unitId,
+          currentIdx,
+          currentQuestionCount: currentQuestions.length,
+          answeredCount: Object.keys(userAnswers).length,
+          deferredCount: deferredQuestionIds.size,
+          isDeferredRound,
+          occurredAt: serverTimestamp(),
+          ...details,
+        }
+      }, { merge: true })
+    } catch (error) {
+      console.error('Quiz session guard audit failed', error)
+    }
+  }
+
+  const recoverUnansweredQuestions = async (
+    answers = userAnswers,
+    message = '미완료 문항을 확인해 남은 문제부터 이어서 진행합니다.',
+    auditEvent = 'invalid_question_index_recovered'
+  ) => {
+    const unansweredQuestions = getUnansweredQuizQuestions(allSessionQuestions, answers)
+    if (unansweredQuestions.length === 0 || navigationTransitionRef.current) return false
+
+    navigationTransitionRef.current = true
+    setIsRecoveringSession(true)
+
+    try {
+      const nextDeferredIds = new Set(deferredQuestionIds)
+      unansweredQuestions.forEach(question => nextDeferredIds.add(question.id))
+
+      setCurrentQuestions(unansweredQuestions)
+      setCurrentIdx(0)
+      setIsResultMode(false)
+      setIsDeferredRound(!reSolveMode)
+      setDeferredQuestionIds(nextDeferredIds)
+      setShowFeedback(null)
+      setPendingResult(null)
+      setSelectedMultiOptions(new Set())
+      setReactionError('')
+      setSessionGuardMessage(message)
+
+      await saveProgressSession({
+        nextIdxForSave: 0,
+        nextUserAnswers: answers,
+        nextCombo: comboCount,
+        nextSessionCrystals: sessionCrystals,
+        nextShieldsUsed: shieldsUsed,
+        nextEverWrongSet: everWrongSet,
+        nextReviewMarkIds: Array.from(reviewMarks),
+        nextDeferredQuestionIds: Array.from(nextDeferredIds),
+        nextIsDeferredRound: !reSolveMode,
+        computedFirstPass: firstPassScore,
+        willBeResultMode: false
+      })
+      await recordQuizSessionGuardAudit(auditEvent, {
+        unansweredQuestionIds: unansweredQuestions.map(question => question.id),
+      })
+
+      return true
+    } finally {
+      navigationTransitionRef.current = false
+      setIsRecoveringSession(false)
+    }
+  }
+
   const moveToNextQuestionOrResult = async (pending) => {
     const nextDeferredIds = new Set(pending.deferredQuestionIds || Array.from(deferredQuestionIds))
     if (currentQuestion?.id) {
       nextDeferredIds.delete(currentQuestion.id)
     }
     const hasNextInCurrentRound = currentIdx < currentQuestions.length - 1
-    const pendingDeferredQuestions = !reSolveMode && !isDeferredRound && !hasNextInCurrentRound
-      ? getPendingDeferredQuestions(nextDeferredIds, pending.userAnswers)
+    const pendingDeferredQuestions = !hasNextInCurrentRound
+      ? getUnansweredQuizQuestions(allSessionQuestions, pending.userAnswers)
       : []
     const shouldEnterDeferredRound = pendingDeferredQuestions.length > 0
+    if (shouldEnterDeferredRound) {
+      pendingDeferredQuestions.forEach(question => nextDeferredIds.add(question.id))
+    }
     const nextIdxForSave = hasNextInCurrentRound ? currentIdx + 1 : (shouldEnterDeferredRound ? 0 : currentIdx)
     let computedFirstPass = firstPassScore
     const willBeResultMode = !hasNextInCurrentRound && !shouldEnterDeferredRound
@@ -513,11 +598,16 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setDeferredQuestionIds(nextDeferredIds)
 
     if (hasNextInCurrentRound) {
-      setCurrentIdx(prev => prev + 1)
+      setCurrentIdx(nextIdxForSave)
     } else if (shouldEnterDeferredRound) {
       setCurrentQuestions(pendingDeferredQuestions)
       setCurrentIdx(0)
-      setIsDeferredRound(true)
+      setIsDeferredRound(!reSolveMode)
+      setSessionGuardMessage(
+        isDeferredRound
+          ? '아직 완료되지 않은 문항이 있어 남은 문제를 계속 진행합니다.'
+          : ''
+      )
     } else {
       setIsDeferredRound(false)
       setIsResultMode(true)
@@ -525,12 +615,14 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   const handleQuizReaction = async (reactionId) => {
-    if (!pendingResult || isSavingReaction) return
+    if (!pendingResult || isSavingReaction || navigationTransitionRef.current) return
     const reaction = QUIZ_REACTION_CHOICES.find(item => item.id === reactionId)
     if (!reaction) return
 
+    navigationTransitionRef.current = true
     setIsSavingReaction(true)
     setReactionError('')
+    setSessionGuardMessage('')
 
     try {
       const nextReviewMarks = new Set(reviewMarks)
@@ -560,6 +652,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       console.error('Quiz reaction save failed:', error)
       setReactionError(error?.message || '반응 저장에 실패했습니다. 다시 시도해 주세요.')
     } finally {
+      navigationTransitionRef.current = false
       setIsSavingReaction(false)
     }
   }
@@ -579,6 +672,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // 멀티 정답: 제출 판정
   const handleMultiSubmit = (event) => {
     if (isRebooting || showFeedback) return
+    setSessionGuardMessage('')
     
     const correctOpts = currentQuestion.options.filter(o => o.isCorrect)
     const selectedTexts = selectedMultiOptions
@@ -676,6 +770,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   const handleSelect = (option, event) => {
     if (isRebooting || showFeedback) return
+    setSessionGuardMessage('')
     const isCorrect = option.isCorrect
     
     // 피드백 표시
@@ -760,41 +855,67 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   const handleMarkAndSkip = async () => {
-    if (!currentQuestion || isRebooting || showFeedback || reSolveMode || isDeferredRound) return
+    if (
+      !currentQuestion ||
+      isRebooting ||
+      showFeedback ||
+      reSolveMode ||
+      isDeferredRound
+    ) return
+    if (navigationTransitionRef.current) {
+      console.warn('Duplicate quiz navigation blocked', {
+        unitId: quizData?.unitId,
+        currentIdx,
+        questionId: currentQuestion.id,
+      })
+      void recordQuizSessionGuardAudit('duplicate_navigation_blocked', {
+        questionId: currentQuestion.id,
+      })
+      return
+    }
 
+    navigationTransitionRef.current = true
+    setIsSkippingQuestion(true)
     soundManager.playClick()
-    const nextDeferredIds = new Set(deferredQuestionIds)
-    nextDeferredIds.add(currentQuestion.id)
-    const hasNextInCurrentRound = currentIdx < currentQuestions.length - 1
-    const pendingDeferredQuestions = hasNextInCurrentRound
-      ? []
-      : getPendingDeferredQuestions(nextDeferredIds, userAnswers)
-    const nextIdxForSave = hasNextInCurrentRound ? currentIdx + 1 : 0
+    setSessionGuardMessage('')
 
-    setDeferredQuestionIds(nextDeferredIds)
-    setSelectedMultiOptions(new Set())
-    setReactionError('')
+    try {
+      const nextDeferredIds = new Set(deferredQuestionIds)
+      nextDeferredIds.add(currentQuestion.id)
+      const hasNextInCurrentRound = currentIdx < currentQuestions.length - 1
+      const pendingDeferredQuestions = hasNextInCurrentRound
+        ? []
+        : getPendingDeferredQuestions(nextDeferredIds, userAnswers)
+      const nextIdxForSave = hasNextInCurrentRound ? currentIdx + 1 : 0
 
-    await saveProgressSession({
-      nextIdxForSave,
-      nextUserAnswers: userAnswers,
-      nextCombo: comboCount,
-      nextSessionCrystals: sessionCrystals,
-      nextShieldsUsed: shieldsUsed,
-      nextEverWrongSet: everWrongSet,
-      nextReviewMarkIds: Array.from(reviewMarks),
-      nextDeferredQuestionIds: Array.from(nextDeferredIds),
-      nextIsDeferredRound: !hasNextInCurrentRound && pendingDeferredQuestions.length > 0,
-      computedFirstPass: firstPassScore,
-      willBeResultMode: false
-    })
+      setDeferredQuestionIds(nextDeferredIds)
+      setSelectedMultiOptions(new Set())
+      setReactionError('')
 
-    if (hasNextInCurrentRound) {
-      setCurrentIdx(prev => prev + 1)
-    } else if (pendingDeferredQuestions.length > 0) {
-      setCurrentQuestions(pendingDeferredQuestions)
-      setCurrentIdx(0)
-      setIsDeferredRound(true)
+      await saveProgressSession({
+        nextIdxForSave,
+        nextUserAnswers: userAnswers,
+        nextCombo: comboCount,
+        nextSessionCrystals: sessionCrystals,
+        nextShieldsUsed: shieldsUsed,
+        nextEverWrongSet: everWrongSet,
+        nextReviewMarkIds: Array.from(reviewMarks),
+        nextDeferredQuestionIds: Array.from(nextDeferredIds),
+        nextIsDeferredRound: !hasNextInCurrentRound && pendingDeferredQuestions.length > 0,
+        computedFirstPass: firstPassScore,
+        willBeResultMode: false
+      })
+
+      if (hasNextInCurrentRound) {
+        setCurrentIdx(nextIdxForSave)
+      } else if (pendingDeferredQuestions.length > 0) {
+        setCurrentQuestions(pendingDeferredQuestions)
+        setCurrentIdx(0)
+        setIsDeferredRound(true)
+      }
+    } finally {
+      navigationTransitionRef.current = false
+      setIsSkippingQuestion(false)
     }
   }
 
@@ -934,6 +1055,46 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   const handleFinish = async () => {
     if (isSubmitting) return
+
+    const hasCompleteQuestionSet = hasCompleteQuizQuestionSet(allSessionQuestions, originalTotal)
+    if (!hasCompleteQuestionSet) {
+      console.error('Quiz submission blocked: question set is incomplete', {
+        unitId: quizData?.unitId,
+        expectedTotal: originalTotal,
+        actualTotal: allSessionQuestions.length,
+        currentIdx,
+        currentQuestionCount: currentQuestions.length,
+      })
+      await recordQuizSessionGuardAudit('submission_blocked_incomplete_question_set', {
+        expectedTotal: originalTotal,
+        actualTotal: allSessionQuestions.length,
+      })
+      setSessionGuardMessage('문항 데이터를 확인할 수 없어 제출하지 않았습니다. 진행 상태를 저장한 뒤 다시 입장해 주세요.')
+      setIsResultMode(false)
+      return
+    }
+
+    const unansweredQuestions = getUnansweredQuizQuestions(allSessionQuestions, userAnswers)
+    if (unansweredQuestions.length > 0) {
+      console.warn('Quiz submission blocked: unanswered questions remain', {
+        unitId: quizData?.unitId,
+        unansweredQuestionIds: unansweredQuestions.map(question => question.id),
+        currentIdx,
+      })
+      await recoverUnansweredQuestions(
+        userAnswers,
+        `미완료 문항 ${unansweredQuestions.length}개가 있어 제출하지 않고 이어서 진행합니다.`,
+        'submission_blocked_unanswered_questions'
+      )
+      return
+    }
+
+    if (!canSubmitQuizSession({
+      questions: allSessionQuestions,
+      answers: userAnswers,
+      expectedTotal: originalTotal,
+    })) return
+
     setIsSubmitting(true)
     
     soundManager.playClick()
@@ -1287,24 +1448,38 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // 퀴즈 화면
   const progress = ((currentIdx + 1) / currentQuestions.length) * 100
 
-  // [SAFETY GUARD] If currentQuestion is undefined (e.g. ghost docs or index out of bounds),
-  // show a fallback to prevent white screen crash.
+  // [SAFETY GUARD] Never submit from an invalid index. Recover unanswered
+  // questions when possible, or save and exit so the session can be reloaded safely.
   if (!currentQuestion && !isResultMode) {
+    const unansweredQuestions = getUnansweredQuizQuestions(allSessionQuestions, userAnswers)
     return (
       <div className="space-bg">
         <div className="space-quiz-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', maxWidth: '400px' }}>
             <h2 style={{ marginBottom: '1rem', color: '#ff6b6b' }}>데이터 로딩 오류</h2>
             <p style={{ marginBottom: '1.5rem', lineHeight: '1.6' }}>
-              퀴즈 데이터를 불러오는 중 문제가 발생했습니다.<br/>
-              (오래된 데이터가 남아있을 수 있습니다)
+              현재 문항 위치를 확인할 수 없어 제출을 중단했습니다.<br/>
+              학습 기록은 점수로 저장되지 않습니다.
             </p>
-            <button 
-              className="quiz-btn primary"
-              onClick={() => handleFinish()} 
+            {unansweredQuestions.length > 0 && (
+              <button
+                className="quiz-btn primary"
+                onClick={() => recoverUnansweredQuestions()}
+                disabled={isRecoveringSession}
+                style={{ width: '100%', marginBottom: '0.75rem' }}
+              >
+                {isRecoveringSession
+                  ? '복구 중...'
+                  : `남은 문제 ${unansweredQuestions.length}개 계속 풀기`}
+              </button>
+            )}
+            <button
+              className="quiz-btn"
+              onClick={handleExitClick}
+              disabled={isSavingExit}
               style={{ width: '100%' }}
             >
-              퀴즈 종료하고 나가기
+              {isSavingExit ? '저장 중...' : '진행 저장 후 나가기'}
             </button>
           </div>
         </div>
@@ -1626,6 +1801,25 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               </span>
             </div>
           </div>
+
+          {sessionGuardMessage && (
+            <div
+              role="status"
+              style={{
+                marginBottom: '1rem',
+                padding: '0.85rem 1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(251, 191, 36, 0.5)',
+                background: 'rgba(120, 53, 15, 0.28)',
+                color: '#fde68a',
+                fontSize: '0.9rem',
+                fontWeight: 800,
+                lineHeight: 1.5,
+              }}
+            >
+              {sessionGuardMessage}
+            </div>
+          )}
 
           {/* Radar HUD */}
           {hasRadar && (
@@ -2033,6 +2227,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               <button
                 type="button"
                 onClick={handleMarkAndSkip}
+                disabled={isSkippingQuestion}
                 style={{
                   minHeight: 44,
                   padding: '0.75rem 1.25rem',
@@ -2042,11 +2237,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   color: '#fde68a',
                   fontSize: '0.95rem',
                   fontWeight: 900,
-                  cursor: 'pointer',
+                  cursor: isSkippingQuestion ? 'wait' : 'pointer',
+                  opacity: isSkippingQuestion ? 0.65 : 1,
                   boxShadow: '0 10px 26px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.12)'
                 }}
               >
-                표시하고 넘기기
+                {isSkippingQuestion ? '저장 중...' : '표시하고 넘기기'}
               </button>
             </div>
           )}
