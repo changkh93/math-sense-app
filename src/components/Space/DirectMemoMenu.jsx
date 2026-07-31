@@ -9,6 +9,9 @@ import soundManager from '../../utils/SoundManager';
 import './DirectMemoMenu.css';
 
 const MEMO_MAX_LENGTH = 2000;
+// 보관함은 30일이 지나도 유지된다. 최근 편지 일부만 가져오면 오래된 보관
+// 편지가 목록에서 사라진 것처럼 보일 수 있으므로, 일반 편지함보다 넉넉하게 읽는다.
+const MEMO_QUERY_LIMIT = 250;
 const RECIPIENT_CACHE_TTL_MS = 10 * 60 * 1000;
 let recipientDirectoryCache = { loadedAt: 0, rows: [] };
 
@@ -268,7 +271,7 @@ export default function DirectMemoMenu() {
       where('recipientId', '==', user.uid),
       where('status', '==', 'delivered'),
       orderBy('sentAt', 'desc'),
-      limitDocs(40)
+      limitDocs(MEMO_QUERY_LIMIT)
     );
     const unsub = onSnapshot(inboxQuery, (snap) => {
       setInbox(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
@@ -281,13 +284,15 @@ export default function DirectMemoMenu() {
   }, [user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid || !isOpen || activeTab !== 'sent') return undefined;
+    // 보관함은 받은 편지와 보낸 편지를 합쳐서 표시한다. 보관함을 바로 열어도
+    // 보낸 편지 쪽 보관 기록까지 반드시 불러와야 한다.
+    if (!user?.uid || !isOpen || (activeTab !== 'sent' && activeTab !== 'archive')) return undefined;
     let cancelled = false;
     const sentQuery = query(
       collection(db, 'directMemos'),
       where('senderId', '==', user.uid),
       orderBy('createdAt', 'desc'),
-      limitDocs(40)
+      limitDocs(MEMO_QUERY_LIMIT)
     );
     getDocs(sentQuery).then((snap) => {
       if (!cancelled) setSent(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
