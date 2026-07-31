@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Box,
   Camera,
+  Eye,
   ChevronDown,
   ChevronUp,
   Hammer,
@@ -32,9 +33,13 @@ export default function AstraBuilderHud({
   blockCount,
   inputMode,
   onInputModeChange,
+  isFirstPerson,
+  onToggleFirstPerson,
   tool,
   onToolChange,
   activeLayer,
+  playerLayer = activeLayer,
+  targetLayer = activeLayer,
   onLayerChange,
   selectedBlockType,
   onSelectBlockType,
@@ -96,7 +101,7 @@ export default function AstraBuilderHud({
             aria-pressed={inputMode === 'build'}
             onClick={() => onInputModeChange('build')}
           >
-            <Hammer size={17} aria-hidden="true" /> 건축
+            <Hammer size={17} aria-hidden="true" /> 플레이-빌드
           </button>
           <button
             type="button"
@@ -104,7 +109,16 @@ export default function AstraBuilderHud({
             aria-pressed={inputMode === 'camera'}
             onClick={() => onInputModeChange('camera')}
           >
-            <Camera size={17} aria-hidden="true" /> 카메라
+            <Camera size={17} aria-hidden="true" /> 설계도
+          </button>
+          <button
+            type="button"
+            className={isFirstPerson ? 'active' : ''}
+            aria-pressed={isFirstPerson}
+            onClick={onToggleFirstPerson}
+            title="1인칭/3인칭 시점 전환 (V)"
+          >
+            <Eye size={17} aria-hidden="true" /> {isFirstPerson ? '1인칭' : '3인칭'}
           </button>
         </div>
 
@@ -119,8 +133,8 @@ export default function AstraBuilderHud({
             <ChevronDown size={17} aria-hidden="true" />
           </button>
           <span>
-            <small>층 엘리베이터</small>
-            <strong>{activeLayer + 1}층</strong>
+            <small>{inputMode === 'build' ? `현재 ${playerLayer + 1}층 · 조준` : '층 엘리베이터'}</small>
+            <strong>{inputMode === 'build' ? targetLayer + 1 : activeLayer + 1}층</strong>
           </span>
           <button
             type="button"

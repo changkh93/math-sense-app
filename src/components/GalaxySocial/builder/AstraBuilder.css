@@ -332,6 +332,22 @@
 
   .astra-builder-hud__commandbar {
     top: 4.8rem;
+    right: .65rem;
+    left: .65rem;
+    justify-content: center;
+    transform: none;
+  }
+
+  .astra-builder-hud__modes button {
+    justify-content: center;
+    width: 42px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .astra-builder-hud__modes button svg {
+    flex: 0 0 auto;
   }
 
   .astra-builder-hud__conflict {
@@ -363,6 +379,10 @@
 
   .astra-builder-hud__tools { left: .65rem; }
   .astra-builder-hud__history { right: .65rem; }
+
+  .frontier-game-stage.builder-active .astra-builder-hud__tools {
+    left: 7.1rem;
+  }
 
   .astra-builder-hud__tools button,
   .astra-builder-hud__history button {

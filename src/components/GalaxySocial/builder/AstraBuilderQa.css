@@ -49,12 +49,12 @@
 
 @media (max-width: 760px) {
   .astra-builder-qa__result {
-    top: 4.95rem;
+    top: 8.1rem;
     right: .65rem;
   }
 
   .astra-builder-qa__conflict-trigger {
-    top: 7.7rem;
+    top: 8.1rem;
     left: .65rem;
   }
 }

@@ -17,6 +17,8 @@ import { realtimeDb } from '../firebase'
 const POSITION_THROTTLE_MS = 120
 const POSITION_EPSILON = 0.035
 const YAW_EPSILON = 0.02
+const HEIGHT_EPSILON = 0.025
+const SCALE_EPSILON = 0.015
 const HEARTBEAT_MS = 5_000
 const STALE_CONNECTION_MS = 15_000
 const STALE_SWEEP_MS = 1_000
@@ -50,18 +52,24 @@ const angularDistance = (first, second) => Math.abs(Math.atan2(
 
 const normalizePosition = (position = {}) => {
   const x = Number(position.x)
+  const y = Number(position.y)
   const z = Number(position.z)
   const yaw = Number(position.yaw)
-  if (!Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(yaw)) return null
+  const scale = Number(position.scale)
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z) || !Number.isFinite(yaw)) return null
   return {
     x: Math.round(clamp(x, -32, 32) * 1000) / 1000,
+    y: Math.round(clamp(y, -8, 24) * 1000) / 1000,
     z: Math.round(clamp(z, -32, 32) * 1000) / 1000,
     yaw: Math.round(normalizeYaw(yaw) * 1000) / 1000,
+    scale: Math.round(clamp(Number.isFinite(scale) ? scale : .28, .14, .7) * 1000) / 1000,
   }
 }
 
 const hasSignificantPositionChange = (previous, next) => !previous
   || Math.hypot(next.x - previous.x, next.z - previous.z) >= POSITION_EPSILON
+  || Math.abs(next.y - previous.y) >= HEIGHT_EPSILON
+  || Math.abs(next.scale - previous.scale) >= SCALE_EPSILON
   || angularDistance(next.yaw, previous.yaw) >= YAW_EPSILON
 
 const normalizeRemotePlayers = (value, ownSafeUid, nowMs) => Object.entries(value || {})
@@ -82,6 +90,7 @@ const normalizeRemotePlayers = (value, ownSafeUid, nowMs) => Object.entries(valu
     if (!connection) return players
 
     const x = Number(connection.x)
+    const y = Number(connection.y)
     const z = Number(connection.z)
     const yaw = Number(connection.yaw)
     if (!Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(yaw)) return players
@@ -102,8 +111,10 @@ const normalizeRemotePlayers = (value, ownSafeUid, nowMs) => Object.entries(valu
       displayName: cleanText(connection.displayName || '탐사원', 40),
       connectionId: connection.connectionId,
       x: clamp(x, -32, 32),
+      y: Number.isFinite(y) ? clamp(y, -8, 24) : null,
       z: clamp(z, -32, 32),
       yaw: normalizeYaw(yaw),
+      scale: clamp(Number(connection.scale) || .28, .14, .7),
       lastSeenMs: Number(connection.updatedAtMs),
       speech: speech?.text ? speech : null,
     })
@@ -126,7 +137,7 @@ export function useGalaxyWorldPresence({
   const isConnectedRef = useRef(false)
   const rawPlayersRef = useRef({})
   const activeRemoteUidsRef = useRef(new Set())
-  const latestPositionRef = useRef({ x: 0, z: 5, yaw: 0 })
+  const latestPositionRef = useRef({ x: 0, y: 0, z: 5, yaw: 0, scale: .28 })
   const lastSentPositionRef = useRef(null)
   const pendingPositionRef = useRef(null)
   const positionTimerRef = useRef(null)

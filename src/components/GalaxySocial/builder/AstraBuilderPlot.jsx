@@ -11,9 +11,15 @@ import {
   getAstraBuilderCellIndex,
   getAstraBuilderDoorwayColumnKeys,
   getAstraBuilderInstances,
+  getAstraBuilderPlacementIssue,
   getAstraBuilderTopFaceTarget,
   getAstraBuilderWorldPosition,
 } from './astraBuilderModel'
+import {
+  doesAstraBuilderPlacementOverlapCharacter,
+  getAstraBuilderCharacterDimensions,
+} from './astraBuilderPhysics'
+import { isAstraBuilderPlacementClick } from './astraBuilderInput'
 
 const PLATFORM_SIZE = ASTRA_BUILDER_POC_PLOT.width * ASTRA_BUILDER_POC_PLOT.cellSize
 const BUILDER_CAMERA_OFFSET = new THREE.Vector3(4.8, 6.2, 5.4)
@@ -50,6 +56,18 @@ function getBlockTransform(blockType, cell) {
   return { position, scale }
 }
 
+function WoodDoorMaterial({ color, preview, leaf = false }) {
+  return preview ? (
+    <meshBasicMaterial color={color} transparent opacity={.42} wireframe depthWrite={false} />
+  ) : (
+    <meshStandardMaterial
+      color={leaf ? '#87522f' : color}
+      roughness={leaf ? .82 : .72}
+      metalness={leaf ? .02 : .04}
+    />
+  )
+}
+
 function WoodDoorVisual({ color, preview = false }) {
   const cellSize = ASTRA_BUILDER_POC_PLOT.cellSize
   const doorWidth = cellSize * 2
@@ -60,16 +78,6 @@ function WoodDoorVisual({ color, preview = false }) {
   const openingWidth = doorWidth - frameThickness * 2
   const leafWidth = openingWidth * .2
   const leafHeight = doorHeight - frameThickness * 1.8
-  const DoorMaterial = ({ leaf = false }) => preview ? (
-    <meshBasicMaterial color={color} transparent opacity={.42} wireframe depthWrite={false} />
-  ) : (
-    <meshStandardMaterial
-      color={leaf ? '#87522f' : color}
-      roughness={leaf ? .82 : .72}
-      metalness={leaf ? .02 : .04}
-    />
-  )
-
   return (
     <group>
       {[-1, 1].map((side) => (
@@ -80,7 +88,7 @@ function WoodDoorVisual({ color, preview = false }) {
           receiveShadow={!preview}
         >
           <boxGeometry args={[frameThickness, doorHeight, frameDepth]} />
-          <DoorMaterial />
+          <WoodDoorMaterial color={color} preview={preview} />
         </mesh>
       ))}
       <mesh
@@ -89,7 +97,7 @@ function WoodDoorVisual({ color, preview = false }) {
         receiveShadow={!preview}
       >
         <boxGeometry args={[doorWidth, frameThickness, frameDepth]} />
-        <DoorMaterial />
+        <WoodDoorMaterial color={color} preview={preview} />
       </mesh>
       {[-1, 1].map((side) => (
         <group
@@ -105,7 +113,7 @@ function WoodDoorVisual({ color, preview = false }) {
             castShadow={!preview}
           >
             <boxGeometry args={[leafWidth, leafHeight, cellSize * .065]} />
-            <DoorMaterial leaf />
+            <WoodDoorMaterial color={color} preview={preview} leaf />
           </mesh>
           {!preview && (
             <mesh position={[side * -leafWidth * .28, leafHeight * .52, cellSize * .04]}>
@@ -119,7 +127,7 @@ function WoodDoorVisual({ color, preview = false }) {
   )
 }
 
-function BuilderWoodDoors({ block, instances, onBlockPointerDown, onBlockPointerMove }) {
+function BuilderWoodDoors({ block, instances, onBlockClick, onBlockPointerMove }) {
   const cellSize = ASTRA_BUILDER_POC_PLOT.cellSize
 
   return instances.map((cell) => {
@@ -129,7 +137,7 @@ function BuilderWoodDoors({ block, instances, onBlockPointerDown, onBlockPointer
         key={cell.index}
         position={position}
         rotation={[0, cell.rotation * Math.PI * 0.5, 0]}
-        onPointerDown={(event) => onBlockPointerDown?.(event, cell)}
+        onClick={(event) => onBlockClick?.(event, cell)}
         onPointerMove={(event) => onBlockPointerMove?.(event, cell)}
       >
         <group position={[cellSize * .5, 0, 0]}>
@@ -140,7 +148,7 @@ function BuilderWoodDoors({ block, instances, onBlockPointerDown, onBlockPointer
   })
 }
 
-function BuilderBlockInstances({ block, instances, onBlockPointerDown, onBlockPointerMove }) {
+function BuilderBlockInstances({ block, instances, onBlockClick, onBlockPointerMove }) {
   const meshRef = useRef()
   const transform = useMemo(() => new THREE.Object3D(), [])
 
@@ -173,9 +181,9 @@ function BuilderBlockInstances({ block, instances, onBlockPointerDown, onBlockPo
       castShadow
       receiveShadow
       frustumCulled={false}
-      onPointerDown={(event) => {
+      onClick={(event) => {
         const cell = instances[event.instanceId]
-        if (cell) onBlockPointerDown?.(event, cell)
+        if (cell) onBlockClick?.(event, cell)
       }}
       onPointerMove={(event) => {
         const cell = instances[event.instanceId]
@@ -240,7 +248,7 @@ function buildBlockEdgesGeometry(cells) {
   return geometry
 }
 
-function AstraBuilderCamera({ active, inputMode, paused, baseY }) {
+function AstraBuilderCamera({ active, inputMode, paused, baseY, useCharacterCamera }) {
   const { camera } = useThree()
   const controlsRef = useRef()
   const previousCameraRef = useRef(null)
@@ -249,9 +257,10 @@ function AstraBuilderCamera({ active, inputMode, paused, baseY }) {
     baseY + 0.9,
     ASTRA_BUILDER_POC_PLOT.center[1],
   ), [baseY])
+  const overviewActive = active && (inputMode === 'camera' || !useCharacterCamera)
 
   useEffect(() => {
-    if (!active) return undefined
+    if (!overviewActive) return undefined
     previousCameraRef.current = {
       position: camera.position.clone(),
       quaternion: camera.quaternion.clone(),
@@ -268,19 +277,19 @@ function AstraBuilderCamera({ active, inputMode, paused, baseY }) {
       camera.zoom = previous.zoom
       camera.updateProjectionMatrix()
     }
-  }, [active, camera, target])
+  }, [camera, overviewActive, target])
 
   useFrame(() => {
-    if (!active || !controlsRef.current) return
+    if (!overviewActive || !controlsRef.current) return
     controlsRef.current.target.lerp(target, 0.18)
   })
 
-  if (!active) return null
+  if (!overviewActive) return null
   return (
     <OrbitControls
       ref={controlsRef}
       makeDefault
-      enabled={!paused && inputMode === 'camera'}
+      enabled={!paused && (inputMode === 'camera' || !useCharacterCamera)}
       target={target}
       enableDamping
       dampingFactor={0.1}
@@ -315,50 +324,93 @@ export default function AstraBuilderPlot({
   selectedBlockType,
   selectedRotation,
   onLayerChange,
+  onTargetLayerChange,
   onEdit,
+  playerGroupRef,
+  useCharacterCamera = false,
 }) {
   const [hoveredCell, setHoveredCell] = useState(null)
+  const [hoverBlockedByPlayer, setHoverBlockedByPlayer] = useState(false)
   const instancesByType = useMemo(() => getAstraBuilderInstances(cells), [cells])
   const edgesGeometry = useMemo(() => buildBlockEdgesGeometry(cells), [cells])
   const edgesVisible = active && inputMode === 'build'
-  const isPlacingRef = useRef(false)
-  const lastPlacedKeyRef = useRef(null)
   const hoverIndex = hoveredCell ? getAstraBuilderCellIndex(hoveredCell) : -1
   const hoveredValue = hoverIndex >= 0 ? cells[hoverIndex] : 0
   const hoverOccupied = decodeAstraBuilderCell(hoveredValue).occupied
-  const hoverValid = Boolean(hoveredCell) && (
+  const hoverPlacementIssue = hoveredCell && tool === 'place'
+    ? getAstraBuilderPlacementIssue(cells, {
+        tool: 'place',
+        cell: hoveredCell,
+        blockType: selectedBlockType,
+        rotation: selectedRotation,
+      })
+    : null
+  const hoverValid = Boolean(hoveredCell) && !hoverBlockedByPlayer && (
     tool === 'place'
-      ? !hoverOccupied && blockCount < ASTRA_BUILDER_POC_PLOT.maxBlocks
+      ? !hoverPlacementIssue && blockCount < ASTRA_BUILDER_POC_PLOT.maxBlocks
       : hoverOccupied
   )
   const hoverPosition = hoveredCell ? getAstraBuilderWorldPosition(hoveredCell) : null
   const editPlaneY = activeLayer * ASTRA_BUILDER_POC_PLOT.cellSize + 0.012
 
-  // 버튼을 놓치거나 씬 밖으로 나간 경우를 대비한 안전망: 포인터가 올라오면 연속 배치 종료.
-  useEffect(() => {
-    const stop = () => {
-      isPlacingRef.current = false
-      lastPlacedKeyRef.current = null
-    }
-    window.addEventListener('pointerup', stop)
-    window.addEventListener('pointercancel', stop)
-    return () => {
-      window.removeEventListener('pointerup', stop)
-      window.removeEventListener('pointercancel', stop)
-    }
-  }, [])
+  const isPointWithinReach = (point) => {
+    const playerGroup = playerGroupRef?.current
+    if (!playerGroup || !point) return true
+    const dimensions = getAstraBuilderCharacterDimensions(playerGroup.scale.x)
+    const maxReach = ASTRA_BUILDER_POC_PLOT.cellSize * Math.min(6.5, 4.2 + dimensions.ratio)
+    return Math.hypot(
+      point.x - playerGroup.position.x,
+      point.y - (playerGroup.position.y + dimensions.eyeHeight),
+      point.z - playerGroup.position.z,
+    ) <= maxReach
+  }
 
-  const cellKey = (cell) => cell ? `${cell.x}:${cell.y}:${cell.z}` : null
+  const updateHoveredCell = (cell) => {
+    setHoveredCell(cell)
+    if (cell) onTargetLayerChange?.(cell.y)
+    const playerGroup = playerGroupRef?.current
+    setHoverBlockedByPlayer(Boolean(
+      tool === 'place'
+      && cell
+      && playerGroup
+      && doesAstraBuilderPlacementOverlapCharacter({
+        cell,
+        blockType: selectedBlockType,
+        rotation: selectedRotation,
+        playerPosition: playerGroup.position,
+        characterScale: playerGroup.scale.x,
+        plotBaseY: baseY,
+      }),
+    ))
+  }
 
-  // 하나의 셀에 대해 배치/삭제를 수행. 직전에 처리한 셀과 같으면 스킵(드래그 중 중복 방지).
+  // 클릭으로 확정된 하나의 셀에 대해 한 번만 배치/삭제한다.
   const placeAtCell = (cell, { raiseLayer = false } = {}) => {
     if (!active || paused || inputMode !== 'build') return
     if (!cell) return
-    const key = cellKey(cell)
-    if (key && lastPlacedKeyRef.current === key) return
     if (tool === 'place' && blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks) return
-    lastPlacedKeyRef.current = key
-    if (raiseLayer) onLayerChange?.(cell.y)
+    if (tool === 'place' && getAstraBuilderPlacementIssue(cells, {
+      tool: 'place',
+      cell,
+      blockType: selectedBlockType,
+      rotation: selectedRotation,
+    })) return
+    if (
+      tool === 'place'
+      && playerGroupRef?.current
+      && doesAstraBuilderPlacementOverlapCharacter({
+        cell,
+        blockType: selectedBlockType,
+        rotation: selectedRotation,
+        playerPosition: playerGroupRef.current.position,
+        characterScale: playerGroupRef.current.scale.x,
+        plotBaseY: baseY,
+      })
+    ) return
+    if (raiseLayer) {
+      if (onTargetLayerChange) onTargetLayerChange(cell.y)
+      else onLayerChange?.(cell.y)
+    }
     onEdit?.({
       tool,
       cell,
@@ -367,37 +419,38 @@ export default function AstraBuilderPlot({
     })
   }
 
-  // 빈 땅(plane) 위에서의 다운/무브. 마우스를 누른 채 움직이면 그려가며 연속 배치.
-  const handlePlanePointerDown = (event) => {
+  // 짧은 좌클릭만 건축으로 확정한다. 임계값을 넘긴 드래그는 카메라 회전에만 사용한다.
+  const handlePlaneClick = (event) => {
     if (!active || paused || inputMode !== 'build') return
+    if (!isAstraBuilderPlacementClick(event)) return
     event.stopPropagation()
-    isPlacingRef.current = true
-    const cell = getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
+    const cell = isPointWithinReach(event.point)
+      ? getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
+      : null
     placeAtCell(cell)
   }
 
   const handlePlanePointerMove = (event) => {
     if (!active || paused || inputMode !== 'build') return
-    const cell = getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
-    setHoveredCell(cell)
-    if (isPlacingRef.current && cell) {
-      event.stopPropagation()
-      placeAtCell(cell)
-    }
+    const cell = isPointWithinReach(event.point)
+      ? getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
+      : null
+    updateHoveredCell(cell)
   }
 
   const getBlockPointerTarget = (event, cell) => {
+    if (!isPointWithinReach(event.point)) return null
     if (tool === 'place') return getAstraBuilderTopFaceTarget(cell, event.face?.normal, ASTRA_BUILDER_POC_PLOT, selectedBlockType)
     return cell
   }
 
-  const handleBlockPointerDown = (event, cell) => {
+  const handleBlockClick = (event, cell) => {
     if (!active || paused || inputMode !== 'build') return
+    if (!isAstraBuilderPlacementClick(event)) return
     event.stopPropagation()
     const target = getBlockPointerTarget(event, cell)
     if (!target) return
-    isPlacingRef.current = true
-    setHoveredCell(target)
+    updateHoveredCell(target)
     placeAtCell(target, { raiseLayer: tool === 'place' })
   }
 
@@ -406,8 +459,7 @@ export default function AstraBuilderPlot({
     const target = getBlockPointerTarget(event, cell)
     if (!target) return
     event.stopPropagation()
-    setHoveredCell(target)
-    if (isPlacingRef.current) placeAtCell(target, { raiseLayer: tool === 'place' })
+    updateHoveredCell(target)
   }
 
   return (
@@ -426,7 +478,7 @@ export default function AstraBuilderPlot({
           key={block.id}
           block={block}
           instances={instancesByType.get(block.id) || []}
-          onBlockPointerDown={handleBlockPointerDown}
+          onBlockClick={handleBlockClick}
           onBlockPointerMove={updateHoveredBlock}
         />
       ) : (
@@ -434,7 +486,7 @@ export default function AstraBuilderPlot({
           key={block.id}
           block={block}
           instances={instancesByType.get(block.id) || []}
-          onBlockPointerDown={handleBlockPointerDown}
+          onBlockClick={handleBlockClick}
           onBlockPointerMove={updateHoveredBlock}
         />
       ))}
@@ -455,9 +507,9 @@ export default function AstraBuilderPlot({
           <mesh
             position={[0, editPlaneY, 0]}
             rotation={[-Math.PI / 2, 0, 0]}
-            onPointerDown={handlePlanePointerDown}
+            onClick={handlePlaneClick}
             onPointerMove={handlePlanePointerMove}
-            onPointerOut={() => setHoveredCell(null)}
+            onPointerOut={() => updateHoveredCell(null)}
           >
             <planeGeometry args={[PLATFORM_SIZE, PLATFORM_SIZE]} />
             <meshBasicMaterial
@@ -519,6 +571,7 @@ export default function AstraBuilderPlot({
         inputMode={inputMode}
         paused={paused}
         baseY={baseY}
+        useCharacterCamera={useCharacterCamera}
       />
     </group>
   )
