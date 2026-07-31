@@ -150,7 +150,7 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
   let after = before
 
   if (edit.tool === 'place') {
-    if (decoded.occupied) return null
+    if (getAstraBuilderPlacementIssue(cells, edit, plot)) return null
     after = encodeAstraBuilderCell(edit.blockType, edit.rotation)
   } else if (edit.tool === 'delete') {
     if (!decoded.occupied) return null
@@ -169,6 +169,38 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
     cells: nextCells,
     patch: { index, before, after },
   }
+}
+
+export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_POC_PLOT) {
+  if (!(cells instanceof Uint16Array) || edit?.tool !== 'place') return null
+  const cell = edit.cell
+  const index = getAstraBuilderCellIndex(cell, plot)
+  if (index < 0) return 'out_of_bounds'
+  if (decodeAstraBuilderCell(cells[index]).occupied) return 'occupied'
+  if (!ASTRA_BUILDER_BLOCK_BY_ID.has(Number(edit.blockType))) return 'invalid_block'
+
+  const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells, plot)
+  const candidateColumnKey = `${cell.x}:${cell.z}`
+  if (
+    cell.y <= 2
+    && Number(edit.blockType) !== 2
+    && doorwayColumns.has(candidateColumnKey)
+  ) return 'doorway_reserved'
+
+  if (Number(edit.blockType) !== 7) return null
+  if (cell.y !== 0) return 'door_ground_only'
+  const doorColumns = getAstraBuilderDoorwayColumns(cell, edit.rotation, plot)
+  if (doorColumns.length !== 2) return 'door_needs_two_columns'
+  for (const column of doorColumns) {
+    for (let y = 0; y <= 2 && y < plot.height; y += 1) {
+      const reservedCell = { x: column.x, y, z: column.z }
+      if (reservedCell.x === cell.x && reservedCell.y === cell.y && reservedCell.z === cell.z) continue
+      const reservedValue = cells[getAstraBuilderCellIndex(reservedCell, plot)] || 0
+      const reservedBlock = decodeAstraBuilderCell(reservedValue)
+      if (reservedBlock.occupied && reservedBlock.blockType !== 2) return 'doorway_obstructed'
+    }
+  }
+  return null
 }
 
 export function applyAstraBuilderPatch(cells, patch, direction = 'redo') {
@@ -257,18 +289,43 @@ export function getAstraBuilderTopFaceTarget(
   plot = ASTRA_BUILDER_POC_PLOT,
   placingBlockType = null,
 ) {
-  if (!isAstraBuilderCellInBounds(cell, plot) || Number(faceNormal?.y || 0) < 0.6) return null
-  if (cell.type === 7) {
+  if (!isAstraBuilderCellInBounds(cell, plot) || !faceNormal) return null
+  const rotation = (((Number(cell.rotation) || 0) % 4) + 4) % 4
+  const angle = rotation * Math.PI * 0.5
+  const localX = Number(faceNormal.x || 0)
+  const localY = Number(faceNormal.y || 0)
+  const localZ = Number(faceNormal.z || 0)
+  const worldNormal = {
+    x: localX * Math.cos(angle) + localZ * Math.sin(angle),
+    y: localY,
+    z: -localX * Math.sin(angle) + localZ * Math.cos(angle),
+  }
+  const dominantAxis = [
+    ['x', Math.abs(worldNormal.x)],
+    ['y', Math.abs(worldNormal.y)],
+    ['z', Math.abs(worldNormal.z)],
+  ].sort((first, second) => second[1] - first[1])[0]
+  if (!dominantAxis || dominantAxis[1] < 0.6) return null
+  const axis = dominantAxis[0]
+  const direction = Math.sign(worldNormal[axis])
+  if (!direction) return null
+
+  const isTopFace = axis === 'y' && direction > 0
+  if (cell.type === 7 && isTopFace) {
     const doorTopTarget = { x: cell.x, y: cell.y + 3, z: cell.z }
     return isAstraBuilderCellInBounds(doorTopTarget, plot) ? doorTopTarget : null
   }
-  if (cell.type === 5 && (placingBlockType === 5 || placingBlockType === null)) {
+  if (cell.type === 5 && isTopFace && (placingBlockType === 5 || placingBlockType === null)) {
     const { dirX, dirZ } = getAstraBuilderStairAscentVector(cell.rotation || 0)
     const stairTarget = { x: cell.x + dirX, y: cell.y + 1, z: cell.z + dirZ }
     if (isAstraBuilderCellInBounds(stairTarget, plot)) {
       return stairTarget
     }
   }
-  const target = { x: cell.x, y: cell.y + 1, z: cell.z }
+  const target = { ...cell }
+  delete target.type
+  delete target.rotation
+  delete target.index
+  target[axis] += direction
   return isAstraBuilderCellInBounds(target, plot) ? target : null
 }

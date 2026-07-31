@@ -69,6 +69,7 @@ export default function AstraBuilderQa() {
   const [activeLayer, setActiveLayer] = useState(0)
   const [selectedBlockType, setSelectedBlockType] = useState(1)
   const [selectedRotation, setSelectedRotation] = useState(0)
+  const [isFirstPerson, setIsFirstPerson] = useState(false)
 
   return (
     <main className="astra-builder-qa" data-testid="astra-builder-qa">
@@ -113,6 +114,8 @@ export default function AstraBuilderQa() {
           blockCount={builder.blockCount}
           inputMode={inputMode}
           onInputModeChange={setInputMode}
+          isFirstPerson={isFirstPerson}
+          onToggleFirstPerson={() => setIsFirstPerson((current) => !current)}
           tool={tool}
           onToolChange={setTool}
           activeLayer={activeLayer}

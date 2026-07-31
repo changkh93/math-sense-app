@@ -1554,6 +1554,8 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
 }
 .frontier-game-stage.paused .frontier-minimap,
 .frontier-game-stage.paused .frontier-control-hint { opacity: .45; }
+.frontier-game-stage.builder-build-active .webgl-canvas { cursor: crosshair; }
+.frontier-game-stage.builder-build-active .webgl-canvas.astra-builder-view-dragging { cursor: grabbing; }
 .frontier-control-hint {
   position: absolute;
   z-index: 20;
