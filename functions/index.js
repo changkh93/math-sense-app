@@ -12162,3 +12162,4 @@ exports.adminPrepareFamilyBillingStatement = referralBilling.adminPrepareFamilyB
 exports.adminSendFamilyBillingNotice = referralBilling.adminSendFamilyBillingNotice;
 exports.adminMarkBillingNoticeSent = referralBilling.adminMarkBillingNoticeSent;
 exports.prepareMonthlyFamilyBillingStatements = referralBilling.prepareMonthlyFamilyBillingStatements;
+exports.adminBroadcastParentAnnouncement = referralBilling.adminBroadcastParentAnnouncement;

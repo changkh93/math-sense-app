@@ -340,6 +340,7 @@ export default function PublicApplication({ fixedType }) {
           <a href="#courses">과정과 수강료</a>
           <a href="#reviews">후기</a>
           <a href="#schedule">수업 일정</a>
+          <Link to="/referral">추천혜택</Link>
           <button type="button" onClick={scrollToForm}>{title}</button>
           <Link to="/">로그인</Link>
         </nav>
@@ -591,7 +592,7 @@ export default function PublicApplication({ fixedType }) {
             {isTrial ? (
               <div className="notice-list">
                 <p><ShieldCheck size={18} /> 무료체험은 1주일 동안 제공됩니다. 누구나 신청할 수 있습니다.</p>
-                <p><Gift size={18} /> 기존 수강생의 추천인 정보를 입력하시면 1달 무료체험 혜택이 주어집니다. (선택사항)</p>
+                <p><Gift size={18} /> 기존 수강생의 추천인 정보를 입력하시면 1달 무료체험 혜택이 주어집니다. <Link to="/referral" style={{ color: 'inherit', textDecoration: 'underline' }}>(추천인 제도 안내)</Link> (선택사항)</p>
               </div>
             ) : (
               <div className="notice-list">

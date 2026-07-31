@@ -14,6 +14,7 @@ import StudentReport from '../../components/Report/StudentReport';
 import DailyLearningTimeline from '../../components/Space/DailyLearningTimeline';
 import ChildAccountCreator from '../../components/Parent/ChildAccountCreator';
 import ReferralBillingCard from '../../components/Parent/ReferralBillingCard';
+import ParentNotificationBell, { ParentAnnouncementBanner } from '../../components/Parent/ParentNotificationCenter';
 
 // -------------------------------------------------------------
 // Helper: format relative time
@@ -1089,6 +1090,7 @@ export default function ParentDashboard() {
           <span style={{ fontSize: '0.75rem', color: '#a55eea', background: 'rgba(165,94,234,0.15)', padding: '2px 8px', borderRadius: '10px' }}>학부모</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ParentNotificationBell />
           <button onClick={handleDeleteAccount} disabled={isDeletingAccount} style={{
             background: 'rgba(255, 88, 82, 0.08)', border: '1px solid rgba(255, 138, 132, 0.24)',
             borderRadius: '8px', padding: '8px 14px',
@@ -1128,6 +1130,7 @@ export default function ParentDashboard() {
           </div>
         ) : (
           <>
+            <ParentAnnouncementBanner />
             <ReferralBillingCard />
 
             <div style={{ marginBottom: '20px' }}>
