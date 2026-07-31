@@ -15,6 +15,7 @@ function NotificationIcon({ type }) {
   if (type === 'assignment_bonus') return <Gem size={17} />;
   if (type === 'scholarship_award') return <Award size={17} />;
   if (type === 'certificate_award') return <Award size={17} />;
+  if (type === 'parent_announcement') return <Megaphone size={17} />;
   return <Megaphone size={17} />;
 }
 

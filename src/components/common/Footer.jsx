@@ -37,7 +37,9 @@ const Footer = () => {
           }}>MSense</strong>
           <Link to="/privacy" style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.9rem' }}>개인정보처리방침</Link>
           <span style={{ color: '#1e293b' }}>|</span>
-          <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>이용약관</span>
+          <Link to="/terms" style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.9rem' }}>이용약관</Link>
+          <span style={{ color: '#1e293b' }}>|</span>
+          <Link to="/referral" style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.9rem' }}>추천인 제도</Link>
         </div>
 
         <div style={{

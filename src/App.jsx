@@ -44,6 +44,7 @@ const PublicApplication = lazy(() => import('./pages/PublicApplication'))
 const VacationCamp = lazy(() => import('./pages/VacationCamp'))
 const Signup = lazy(() => import('./pages/Signup'))
 const Terms = lazy(() => import('./pages/Terms'))
+const ReferralPolicy = lazy(() => import('./pages/ReferralPolicy'))
 const CrewGuestInvite = lazy(() => import('./pages/CrewGuestInvite'))
 
 const AstraBuilderQa = import.meta.env.DEV
@@ -85,6 +86,7 @@ function App() {
       <Route path="/vacation" element={<VacationCamp />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/referral" element={<ReferralPolicy />} />
       {AstraBuilderQa && (
         <Route
           path="/dev/astra-builder"

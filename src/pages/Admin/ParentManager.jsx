@@ -4,8 +4,9 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, getAuth } f
 import { httpsCallable } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
 import { db, functions } from '../../firebase';
-import { Phone, UserPlus, Search, Trash2, Link2, Users, Eye, EyeOff, Key } from 'lucide-react';
+import { Phone, UserPlus, Search, Trash2, Link2, Users, Eye, EyeOff, Key, Megaphone } from 'lucide-react';
 import FamilyBillingAdminPanel from '../../components/Admin/FamilyBillingAdminPanel';
+import ParentAnnouncementBroadcaster from '../../components/Admin/ParentAnnouncementBroadcaster';
 import './Admin.css';
 
 // Secondary Firebase app for creating parent accounts without logging out the admin
@@ -34,6 +35,9 @@ export default function ParentManager() {
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // Parent in-app announcement broadcast modal
+  const [showAnnounce, setShowAnnounce] = useState(false);
 
   // Child linking
   const [childSearchTerm, setChildSearchTerm] = useState('');
@@ -314,9 +318,16 @@ export default function ParentManager() {
 
   return (
     <div className="admin-page">
-      <div className="admin-header-row">
+      <div className="admin-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <h2><Users size={24} style={{ display: 'inline', marginRight: 10, verticalAlign: 'middle', color: '#a55eea' }} />학부모 통합 관리</h2>
+        <button onClick={() => setShowAnnounce(true)} className="primary-btn" style={{ padding: '9px 18px', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <Megaphone size={16} /> 학부모 공지 발송
+        </button>
       </div>
+
+      {showAnnounce && (
+        <ParentAnnouncementBroadcaster parents={parents} onClose={() => setShowAnnounce(false)} />
+      )}
 
       <div className="content-grid" style={{ gridTemplateColumns: '1fr', gap: '20px' }}>
 

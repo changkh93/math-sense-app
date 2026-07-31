@@ -839,6 +839,84 @@ const prepareMonthlyFamilyBillingStatements = regionalFunctions
     return null;
   });
 
+// 어드민이 학부모에게 인앱 공지를 일괄 발송합니다.
+// notifications 컬렉션에 학부모 1명당 1문서를 생성합니다 (문자/SMS가 아님).
+// targetUids 가 없으면 isDeleted 가 아닌 전체 학부모에게 발송합니다.
+const adminBroadcastParentAnnouncement = regionalFunctions
+  .runWith({ timeoutSeconds: 540, memory: "1GB" })
+  .https.onCall(async (data, context) => {
+    const adminUid = await requireAdmin(context);
+    const title = cleanText(data?.title, 120);
+    const message = cleanText(data?.message, 1000);
+    const link = cleanText(data?.link, 300);
+    if (!title || !message) {
+      throw new functions.https.HttpsError("invalid-argument", "제목과 본문이 필요합니다.");
+    }
+
+    const db = admin.firestore();
+
+    // 대상 학부모 uid 목록. targetUids 가 주어지면 그것만, 없으면 전체 학부모(isDeleted 제외).
+    let targetUids = [];
+    if (Array.isArray(data?.targetUids) && data.targetUids.length > 0) {
+      targetUids = data.targetUids.map((uid) => cleanText(uid, 128)).filter(Boolean);
+    } else {
+      const parentsSnap = await db.collection("parents").get();
+      targetUids = parentsSnap.docs
+        .filter((doc) => !doc.data()?.isDeleted)
+        .map((doc) => doc.id);
+    }
+
+    if (targetUids.length === 0) {
+      await addAudit(adminUid, "broadcast_parent_announcement", "parents", null, null, { count: 0, title }, "대상 학부모 없음");
+      return { sent: 0, skipped: 0, failed: 0 };
+    }
+
+    const announcementId = `${Date.now()}_${adminUid.slice(0, 8)}`;
+    let sent = 0;
+    let failed = 0;
+
+    // 400개씩 청크로 분할 (Firestore batch 한도 500건 대비).
+    for (let i = 0; i < targetUids.length; i += 400) {
+      const chunk = targetUids.slice(i, i + 400);
+      const batch = db.batch();
+      chunk.forEach((parentUid) => {
+        batch.set(
+          db.collection("notifications").doc(`parent_announcement_${announcementId}_${parentUid}`),
+          {
+            recipientId: parentUid,
+            type: "parent_announcement",
+            title,
+            message,
+            link: link || null,
+            isRead: false,
+            createdAt: FieldValue.serverTimestamp(),
+            metadata: { announcementId, title, createdBy: adminUid },
+          },
+          { merge: true }
+        );
+      });
+      try {
+        await batch.commit();
+        sent += chunk.length;
+      } catch (error) {
+        console.error(`[adminBroadcastParentAnnouncement] chunk failed: ${safeProviderError(error)}`);
+        failed += chunk.length;
+      }
+    }
+
+    await addAudit(
+      adminUid,
+      "broadcast_parent_announcement",
+      "parents",
+      null,
+      null,
+      { count: sent, failed, title, link: link || null },
+      cleanText(data?.reason, 500) || `학부모 공지 발송: ${title}`
+    );
+
+    return { sent, skipped: targetUids.length - sent, failed };
+  });
+
 module.exports = {
   getOrCreateReferralInvite,
   previewReferralInvite,
@@ -851,6 +929,7 @@ module.exports = {
   adminSendFamilyBillingNotice,
   adminMarkBillingNoticeSent,
   prepareMonthlyFamilyBillingStatements,
+  adminBroadcastParentAnnouncement,
   resolveInvite,
   tokenHash,
   __test: { referralRate, scheduledFee, enrollmentActiveForMonth, addMonths, monthBounds, buildTuitionNoticeText, normalizePhone, normalizeLmsText },
