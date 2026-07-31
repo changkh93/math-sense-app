@@ -1,19 +1,78 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, getDoc, getDocs, limit as limitDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit as limitDocs, orderBy, query, startAfter, Timestamp, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Archive, Check, Clock3, PenLine, Reply, Send, Trash2, UserRound, X } from 'lucide-react';
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
+import { useDirectMemoRealtime } from '../../contexts/directMemoRealtime';
 import soundManager from '../../utils/SoundManager';
 import './DirectMemoMenu.css';
 
 const MEMO_MAX_LENGTH = 2000;
-// 보관함은 30일이 지나도 유지된다. 최근 편지 일부만 가져오면 오래된 보관
-// 편지가 목록에서 사라진 것처럼 보일 수 있으므로, 일반 편지함보다 넉넉하게 읽는다.
-const MEMO_QUERY_LIMIT = 250;
+const MEMO_PAGE_SIZE = 20;
+const MEMO_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const RECIPIENT_CACHE_TTL_MS = 10 * 60 * 1000;
 let recipientDirectoryCache = { loadedAt: 0, rows: [] };
+
+const mapMemoDocs = (snap, memoSide = '') => snap.docs.map((docSnap) => ({
+  id: docSnap.id,
+  ...docSnap.data(),
+  ...(memoSide ? { memoSide } : {}),
+}));
+
+const mergeMemoRows = (current, incoming) => {
+  const rows = new Map(current.map((memo) => [memo.id, memo]));
+  incoming.forEach((memo) => rows.set(memo.id, memo));
+  return Array.from(rows.values());
+};
+
+function buildMemoListQuery(uid, tab, cursor = null, archiveSide = '') {
+  const ref = collection(db, 'directMemos');
+  const pageLimit = limitDocs(MEMO_PAGE_SIZE);
+  const cursorClause = cursor ? [startAfter(cursor)] : [];
+
+  if (tab === 'inbox') {
+    return query(
+      ref,
+      where('recipientId', '==', uid),
+      where('status', '==', 'delivered'),
+      where('recipientArchivedAt', '==', null),
+      where('recipientDeletedAt', '==', null),
+      where('sentAt', '>=', Timestamp.fromMillis(Date.now() - MEMO_RETENTION_MS)),
+      orderBy('sentAt', 'desc'),
+      ...cursorClause,
+      pageLimit
+    );
+  }
+
+  if (tab === 'sent') {
+    return query(
+      ref,
+      where('senderId', '==', uid),
+      where('senderArchivedAt', '==', null),
+      where('senderDeletedAt', '==', null),
+      where('createdAt', '>=', Timestamp.fromMillis(Date.now() - MEMO_RETENTION_MS)),
+      orderBy('createdAt', 'desc'),
+      ...cursorClause,
+      pageLimit
+    );
+  }
+
+  const isInbox = archiveSide === 'inbox';
+  const ownerField = isInbox ? 'recipientId' : 'senderId';
+  const archivedField = isInbox ? 'recipientArchivedAt' : 'senderArchivedAt';
+  const deletedField = isInbox ? 'recipientDeletedAt' : 'senderDeletedAt';
+  return query(
+    ref,
+    where(ownerField, '==', uid),
+    where(deletedField, '==', null),
+    where(archivedField, '>', Timestamp.fromMillis(0)),
+    orderBy(archivedField, 'desc'),
+    ...cursorClause,
+    pageLimit
+  );
+}
 
 // 운영자(선생님) 계정은 이메일로 식별한다. 표시명이 아니라 이메일이 화이트리스트 기준이다.
 const OPERATOR_EMAIL = 'paul@dulcine.net';
@@ -158,12 +217,18 @@ function MemoCard({ memo, mode, archived, expanded, onOpen, onArchive, onReply, 
 
 export default function DirectMemoMenu() {
   const { user } = useAuth();
+  const { unreadMemos, unreadCount } = useDirectMemoRealtime();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('inbox');
   const [recipients, setRecipients] = useState([]);
   const [inbox, setInbox] = useState([]);
   const [sent, setSent] = useState([]);
+  const [archivedInbox, setArchivedInbox] = useState([]);
+  const [archivedSent, setArchivedSent] = useState([]);
+  const [listLoading, setListLoading] = useState(false);
+  const [listCursors, setListCursors] = useState({ inbox: null, sent: null, archiveInbox: null, archiveSent: null });
+  const [listHasMore, setListHasMore] = useState({ inbox: false, sent: false, archive: false });
   const [recipientId, setRecipientId] = useState('');
   const [draft, setDraft] = useState('');
   const [action, setAction] = useState('');
@@ -174,7 +239,6 @@ export default function DirectMemoMenu() {
   const menuRef = useRef(null);
   const recipientInputRef = useRef(null);
   const protectedUntilRef = useRef(0);
-  const pendingComposeRef = useRef(null);
 
   const protectMemoInteraction = () => {
     protectedUntilRef.current = Date.now() + 350;
@@ -262,81 +326,79 @@ export default function DirectMemoMenu() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [isOpen, recipientSearch, user?.uid]);
+  }, [isOpen, recipientId, recipientSearch, user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid) return undefined;
-    const inboxQuery = query(
-      collection(db, 'directMemos'),
-      where('recipientId', '==', user.uid),
-      where('status', '==', 'delivered'),
-      orderBy('sentAt', 'desc'),
-      limitDocs(MEMO_QUERY_LIMIT)
-    );
-    const unsub = onSnapshot(inboxQuery, (snap) => {
-      setInbox(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
-    }, (err) => {
-      console.error('Failed to load direct memo inbox:', err);
-      setMessage(getErrorMessage(err));
-      setInbox([]);
-    });
-    return () => unsub();
-  }, [user?.uid]);
-
-  useEffect(() => {
-    // 보관함은 받은 편지와 보낸 편지를 합쳐서 표시한다. 보관함을 바로 열어도
-    // 보낸 편지 쪽 보관 기록까지 반드시 불러와야 한다.
-    if (!user?.uid || !isOpen || (activeTab !== 'sent' && activeTab !== 'archive')) return undefined;
+    if (!user?.uid || !isOpen || activeTab === 'compose') return undefined;
     let cancelled = false;
-    const sentQuery = query(
-      collection(db, 'directMemos'),
-      where('senderId', '==', user.uid),
-      orderBy('createdAt', 'desc'),
-      limitDocs(MEMO_QUERY_LIMIT)
-    );
-    getDocs(sentQuery).then((snap) => {
-      if (!cancelled) setSent(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
-    }).catch((err) => {
-      console.error('Failed to load sent direct memos:', err);
-      if (!cancelled) {
-        setMessage(getErrorMessage(err));
-        setSent([]);
+    setListLoading(true);
+
+    const loadInitialPage = async () => {
+      try {
+        if (activeTab === 'archive') {
+          const [inboxSnap, sentSnap] = await Promise.all([
+            getDocs(buildMemoListQuery(user.uid, 'archive', null, 'inbox')),
+            getDocs(buildMemoListQuery(user.uid, 'archive', null, 'sent')),
+          ]);
+          if (cancelled) return;
+          setArchivedInbox(mapMemoDocs(inboxSnap, 'inbox'));
+          setArchivedSent(mapMemoDocs(sentSnap, 'sent'));
+          setListCursors((prev) => ({
+            ...prev,
+            archiveInbox: inboxSnap.docs.at(-1) || null,
+            archiveSent: sentSnap.docs.at(-1) || null,
+          }));
+          setListHasMore((prev) => ({ ...prev, archive: inboxSnap.size === MEMO_PAGE_SIZE || sentSnap.size === MEMO_PAGE_SIZE }));
+          return;
+        }
+
+        const snap = await getDocs(buildMemoListQuery(user.uid, activeTab));
+        if (cancelled) return;
+        const rows = mapMemoDocs(snap);
+        if (activeTab === 'inbox') setInbox(rows);
+        if (activeTab === 'sent') setSent(rows);
+        setListCursors((prev) => ({ ...prev, [activeTab]: snap.docs.at(-1) || null }));
+        setListHasMore((prev) => ({ ...prev, [activeTab]: snap.size === MEMO_PAGE_SIZE }));
+      } catch (err) {
+        console.error('Failed to load direct memo list:', err);
+        if (!cancelled) setMessage(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setListLoading(false);
       }
-    });
+    };
+
+    loadInitialPage();
     return () => { cancelled = true; };
   }, [activeTab, isOpen, user?.uid]);
 
   const visibleInbox = useMemo(() => {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    return inbox.filter((memo) => {
+    const merged = new Map(inbox.map((memo) => [memo.id, memo]));
+    unreadMemos.forEach((memo) => merged.set(memo.id, memo));
+    return Array.from(merged.values()).filter((memo) => {
       if (memo.recipientArchivedAt || memo.recipientDeletedAt) return false;
       const timeMs = memo.sentAt?.toMillis?.() || memo.createdAt?.toMillis?.() || Date.now();
-      return timeMs > thirtyDaysAgo;
-    });
-  }, [inbox]);
+      return timeMs > Date.now() - MEMO_RETENTION_MS;
+    }).sort((a, b) => (b.sentAt?.toMillis?.() || 0) - (a.sentAt?.toMillis?.() || 0));
+  }, [inbox, unreadMemos]);
 
   const visibleSent = useMemo(() => {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     return sent.filter((memo) => {
       if (memo.senderArchivedAt || memo.senderDeletedAt) return false;
       const timeMs = memo.createdAt?.toMillis?.() || memo.sentAt?.toMillis?.() || Date.now();
-      return timeMs > thirtyDaysAgo;
+      return timeMs > Date.now() - MEMO_RETENTION_MS;
     });
   }, [sent]);
   const archivedMemos = useMemo(() => {
-    const archivedInbox = inbox
-      .filter((memo) => memo.recipientArchivedAt && !memo.recipientDeletedAt)
+    const inboxRows = archivedInbox
       .map((memo) => ({ ...memo, memoSide: 'inbox', archiveTime: memo.recipientArchivedAt }));
-    const archivedSent = sent
-      .filter((memo) => memo.senderArchivedAt && !memo.senderDeletedAt)
+    const sentRows = archivedSent
       .map((memo) => ({ ...memo, memoSide: 'sent', archiveTime: memo.senderArchivedAt }));
-    return [...archivedInbox, ...archivedSent].sort((a, b) => {
+    return [...inboxRows, ...sentRows].sort((a, b) => {
       const aTime = a.archiveTime?.toMillis?.() || 0;
       const bTime = b.archiveTime?.toMillis?.() || 0;
       return bTime - aTime;
     });
-  }, [inbox, sent]);
-  const unreadCount = useMemo(() => visibleInbox.filter((memo) => !memo.isRead).length, [visibleInbox]);
+  }, [archivedInbox, archivedSent]);
   const filteredRecipients = useMemo(() => {
     const keyword = recipientSearch.trim().toLowerCase();
     // 검색어가 없을 때는 선생님(운영자)을 기본 추천으로 먼저 보여준다.
@@ -404,7 +466,9 @@ export default function DirectMemoMenu() {
       setRecipientSearch('');
       setActiveTab('sent');
       const data = res?.data || {};
-      setMessage(`${data.recipientName || '상대방'}님에게 편지를 보냈습니다.`);
+      setMessage(data.status === 'scheduled'
+        ? `${data.recipientName || '상대방'}님에게 보낼 편지를 예약했습니다.`
+        : `${data.recipientName || '상대방'}님에게 편지를 보냈습니다.`);
     } catch (err) {
       console.error('Failed to send direct memo:', err);
       setMessage(getErrorMessage(err));
@@ -419,8 +483,43 @@ export default function DirectMemoMenu() {
     try {
       const fn = httpsCallable(functions, 'markDirectMemoRead');
       await fn({ memoId: memo.id });
+      setInbox((prev) => mergeMemoRows(prev, [{ ...memo, isRead: true }]));
     } catch (err) {
       console.error('Failed to mark direct memo read:', err);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!user?.uid || listLoading || !listHasMore[activeTab]) return;
+    setListLoading(true);
+    try {
+      if (activeTab === 'archive') {
+        const [inboxSnap, sentSnap] = await Promise.all([
+          getDocs(buildMemoListQuery(user.uid, 'archive', listCursors.archiveInbox, 'inbox')),
+          getDocs(buildMemoListQuery(user.uid, 'archive', listCursors.archiveSent, 'sent')),
+        ]);
+        setArchivedInbox((prev) => mergeMemoRows(prev, mapMemoDocs(inboxSnap, 'inbox')));
+        setArchivedSent((prev) => mergeMemoRows(prev, mapMemoDocs(sentSnap, 'sent')));
+        setListCursors((prev) => ({
+          ...prev,
+          archiveInbox: inboxSnap.docs.at(-1) || prev.archiveInbox,
+          archiveSent: sentSnap.docs.at(-1) || prev.archiveSent,
+        }));
+        setListHasMore((prev) => ({ ...prev, archive: inboxSnap.size === MEMO_PAGE_SIZE || sentSnap.size === MEMO_PAGE_SIZE }));
+        return;
+      }
+
+      const snap = await getDocs(buildMemoListQuery(user.uid, activeTab, listCursors[activeTab]));
+      const rows = mapMemoDocs(snap);
+      if (activeTab === 'inbox') setInbox((prev) => mergeMemoRows(prev, rows));
+      if (activeTab === 'sent') setSent((prev) => mergeMemoRows(prev, rows));
+      setListCursors((prev) => ({ ...prev, [activeTab]: snap.docs.at(-1) || prev[activeTab] }));
+      setListHasMore((prev) => ({ ...prev, [activeTab]: snap.size === MEMO_PAGE_SIZE }));
+    } catch (err) {
+      console.error('Failed to load more direct memos:', err);
+      setMessage(getErrorMessage(err));
+    } finally {
+      setListLoading(false);
     }
   };
 
@@ -431,7 +530,7 @@ export default function DirectMemoMenu() {
     navigate(`/profile/${uid}`);
   };
 
-  const startComposeForUid = async (targetUid) => {
+  const startComposeForUid = useCallback(async (targetUid) => {
     if (!targetUid || targetUid === user?.uid) return;
     setIsOpen(true);
     setActiveTab('compose');
@@ -462,7 +561,7 @@ export default function DirectMemoMenu() {
         if (recipientInputRef.current) recipientInputRef.current.focus();
       });
     }
-  };
+  }, [recipients, user?.uid]);
 
   useEffect(() => {
     const handleRequest = (event) => {
@@ -478,7 +577,7 @@ export default function DirectMemoMenu() {
     };
     window.addEventListener('directmemo:compose', handleRequest);
     return () => window.removeEventListener('directmemo:compose', handleRequest);
-  }, [user?.uid, recipients]);
+  }, [startComposeForUid, user?.uid]);
 
   const handleReplyMemo = (memo) => {
     setActiveTab('compose');
@@ -492,7 +591,17 @@ export default function DirectMemoMenu() {
   const handleArchiveMemo = async (memo) => {
     setAction(`archive:${memo.id}`);
     try {
-      await updateMemoLocally(memo, 'archive');
+      const fn = httpsCallable(functions, 'archiveDirectMemo');
+      await fn({ memoId: memo.id });
+      const isInbox = memo.recipientId === user?.uid;
+      const archivedAt = Timestamp.now();
+      if (isInbox) {
+        setInbox((prev) => prev.filter((item) => item.id !== memo.id));
+        setArchivedInbox((prev) => mergeMemoRows(prev, [{ ...memo, recipientArchivedAt: archivedAt, memoSide: 'inbox' }]));
+      } else {
+        setSent((prev) => prev.filter((item) => item.id !== memo.id));
+        setArchivedSent((prev) => mergeMemoRows(prev, [{ ...memo, senderArchivedAt: archivedAt, memoSide: 'sent' }]));
+      }
       setMessage('편지를 보관함으로 옮겼습니다.');
     } catch (err) {
       console.error('Failed to archive direct memo:', err);
@@ -500,26 +609,6 @@ export default function DirectMemoMenu() {
     } finally {
       setAction('');
     }
-  };
-
-  const updateMemoLocally = async (memo, type) => {
-    const side = memo.senderId === user?.uid ? 'sender' : memo.recipientId === user?.uid ? 'recipient' : '';
-    if (!side) throw new Error('내 편지만 처리할 수 있습니다.');
-    const updates = { updatedAt: serverTimestamp() };
-    if (type === 'archive') {
-      updates[`${side}ArchivedAt`] = serverTimestamp();
-    }
-    if (type === 'restore') {
-      updates[`${side}ArchivedAt`] = null;
-    }
-    if (type === 'delete') {
-      updates[`${side}DeletedAt`] = serverTimestamp();
-      updates[`${side}ArchivedAt`] = null;
-      if (side === 'sender' && !memo.isRead) {
-        updates['recipientDeletedAt'] = serverTimestamp();
-      }
-    }
-    await updateDoc(doc(db, 'directMemos', memo.id), updates);
   };
 
   const handleDeleteMemo = async (memo) => {
@@ -538,7 +627,12 @@ export default function DirectMemoMenu() {
     if (!ok) return;
     setAction(`delete:${memo.id}`);
     try {
-      await updateMemoLocally(memo, 'delete');
+      const fn = httpsCallable(functions, 'deleteDirectMemo');
+      await fn({ memoId: memo.id });
+      setInbox((prev) => prev.filter((item) => item.id !== memo.id));
+      setSent((prev) => prev.filter((item) => item.id !== memo.id));
+      setArchivedInbox((prev) => prev.filter((item) => item.id !== memo.id));
+      setArchivedSent((prev) => prev.filter((item) => item.id !== memo.id));
       if (expandedId === memo.id) setExpandedId('');
       setMessage('편지를 삭제했습니다.');
     } catch (err) {
@@ -728,23 +822,38 @@ export default function DirectMemoMenu() {
             </div>
           ) : (
             <div className="direct-memo-list">
-              {listMemos.length === 0 ? (
+              {listLoading && listMemos.length === 0 ? (
+                <div className="direct-memo-empty">편지를 불러오는 중입니다.</div>
+              ) : listMemos.length === 0 ? (
                 <div className="direct-memo-empty">{getEmptyMessage()}</div>
               ) : (
-                listMemos.map((memo) => (
-                  <MemoCard
-                    key={memo.id}
-                    memo={memo}
-                    mode={activeTab === 'archive' ? memo.memoSide : activeTab}
-                    archived={activeTab === 'archive'}
-                    expanded={expandedId === memo.id}
-                    onOpen={() => handleOpenMemo(memo)}
-                    onArchive={() => handleArchiveMemo(memo)}
-                    onReply={() => handleReplyMemo(memo)}
-                    onDelete={() => handleDeleteMemo(memo)}
-                    onOpenProfile={handleOpenProfile}
-                  />
-                ))
+                <>
+                  {listMemos.map((memo) => (
+                    <MemoCard
+                      key={memo.id}
+                      memo={memo}
+                      mode={activeTab === 'archive' ? memo.memoSide : activeTab}
+                      archived={activeTab === 'archive'}
+                      expanded={expandedId === memo.id}
+                      onOpen={() => handleOpenMemo(memo)}
+                      onArchive={() => handleArchiveMemo(memo)}
+                      onReply={() => handleReplyMemo(memo)}
+                      onDelete={() => handleDeleteMemo(memo)}
+                      onOpenProfile={handleOpenProfile}
+                    />
+                  ))}
+                  {listHasMore[activeTab] && (
+                    <button
+                      type="button"
+                      className="direct-memo-compose"
+                      onClick={handleLoadMore}
+                      disabled={listLoading}
+                      style={{ alignSelf: 'center', margin: '0.35rem auto 0.75rem' }}
+                    >
+                      {listLoading ? '불러오는 중...' : '편지 더 보기'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

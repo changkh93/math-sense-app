@@ -9,6 +9,7 @@ import AdminRoute from './components/AdminRoute'
 import PrivateRoute from './components/PrivateRoute'
 import { cleanExpiredAudioPreferences } from './audio/audioPreferences'
 import { cleanExpiredLocalStorage } from './utils/storageUtils'
+import { DirectMemoArrivalAlert, DirectMemoRealtimeProvider } from './contexts/DirectMemoRealtimeContext'
 
 const AdminLayout = lazy(() => import('./pages/Admin/AdminLayout'))
 const AdminDashboard = lazy(() => import('./pages/Admin/Dashboard'))
@@ -71,7 +72,8 @@ function App() {
   }, []);
 
   return (
-    <>
+    <DirectMemoRealtimeProvider>
+      <DirectMemoArrivalAlert />
       <Suspense fallback={<RouteFallback />}>
       <QuizBattleChallengeReceiver />
       <Routes>
@@ -147,7 +149,7 @@ function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
-    </>
+    </DirectMemoRealtimeProvider>
   )
 }
 

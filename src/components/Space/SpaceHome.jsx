@@ -45,7 +45,7 @@ import { checkWebGLSupport } from '../../utils/webglSupport'
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
 import Footer from '../common/Footer'
-import { BellRing, Mail, Sparkles, X } from 'lucide-react'
+import { BellRing, Sparkles, X } from 'lucide-react'
 
 // Styles
 import '../../styles/space-theme.css'
@@ -160,52 +160,15 @@ function getRealtimeAlertTime(value) {
   }).format(date)
 }
 
-function getMemoPreview(memo = {}) {
-  const sender = memo.senderName || '탐사원'
-  const body = String(memo.bodyPreview || memo.body || '').replace(/\s+/g, ' ').trim()
-  if (/스터디|크루|오픈 스터디|공부 제안/.test(body)) {
-    return `${sender}님이 공부 제안을 보냈어요.`
-  }
-  return `${sender}님에게 새 편지가 왔어요.`
-}
-
 function getNotificationPreview(notification = {}) {
   return String(notification.message || notification.title || '새 알림이 도착했어요.').replace(/\s+/g, ' ').trim()
 }
 
 function RealtimeTopAlerts({ userId }) {
-  const [latestMemo, setLatestMemo] = useState(null)
   const [latestNotification, setLatestNotification] = useState(null)
   const [dismissedIds, setDismissedIds] = useState({})
   const [activeAlert, setActiveAlert] = useState(null)
   const [alertAction, setAlertAction] = useState('')
-
-  useEffect(() => {
-    if (!userId) {
-      setLatestMemo(null)
-      return undefined
-    }
-
-    const memoQuery = query(
-      collection(db, 'directMemos'),
-      where('recipientId', '==', userId),
-      where('status', '==', 'delivered'),
-      orderBy('sentAt', 'desc'),
-      limit(6)
-    )
-
-    const unsub = onSnapshot(memoQuery, (snap) => {
-      const memo = snap.docs
-        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
-        .find((item) => !item.isRead && !item.recipientDeletedAt)
-      setLatestMemo(memo || null)
-    }, (err) => {
-      console.warn('[RealtimeTopAlerts] memo subscribe failed:', err)
-      setLatestMemo(null)
-    })
-
-    return () => unsub()
-  }, [userId])
 
   useEffect(() => {
     if (!userId) {
@@ -243,10 +206,7 @@ function RealtimeTopAlerts({ userId }) {
     setActiveAlert(alert)
     setAlertAction(alert.id)
     try {
-      if (alert.kind === 'memo') {
-        const markRead = httpsCallable(functions, 'markDirectMemoRead')
-        await markRead({ memoId: alert.source.id })
-      } else if (alert.kind === 'notification' && !alert.source.isRead) {
+      if (alert.kind === 'notification' && !alert.source.isRead) {
         await updateDoc(doc(db, 'notifications', alert.source.id), {
           isRead: true
         })
@@ -259,18 +219,6 @@ function RealtimeTopAlerts({ userId }) {
   }
 
   const alerts = [
-    latestMemo ? {
-      id: `memo:${latestMemo.id}`,
-      kind: 'memo',
-      label: '새 편지',
-      text: getMemoPreview(latestMemo),
-      detailTitle: `${latestMemo.senderName || '탐사원'}님의 편지`,
-      detailBody: latestMemo.body || latestMemo.bodyPreview || '',
-      time: getRealtimeAlertTime(latestMemo.sentAt || latestMemo.createdAt),
-      Icon: Mail,
-      color: '#00f3ff',
-      source: latestMemo
-    } : null,
     latestNotification ? {
       id: `notification:${latestNotification.id}`,
       kind: 'notification',
@@ -304,7 +252,7 @@ function RealtimeTopAlerts({ userId }) {
           aria-live="polite"
           style={{
             position: 'fixed',
-            top: 'max(0.8rem, env(safe-area-inset-top, 0px))',
+            top: 'max(5.2rem, calc(env(safe-area-inset-top, 0px) + 4.4rem))',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 4200,

@@ -15,6 +15,12 @@ try {
 const cors = require("cors")({ origin: true });
 const fetch = require("node-fetch");
 const referralBilling = require("./referralBilling");
+const {
+  DIRECT_MEMO_DAILY_LIMIT,
+  DIRECT_MEMO_MAX_QUEUE_MS,
+  DIRECT_MEMO_RETENTION_MS,
+  computeDirectMemoDeliveryPlan,
+} = require("./directMemoPolicy");
 const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
@@ -11142,12 +11148,15 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
   const senderRef = db.collection("users").doc(uid);
   const recipientRef = db.collection("users").doc(recipientId);
   const limitRef = senderRef.collection("directMemoLimits").doc(recipientId);
+  const dailyLimitRef = senderRef.collection("directMemoDailyLimits").doc(getKSTDateString(new Date()));
   const memoRef = db.collection("directMemos").doc();
 
   const result = await db.runTransaction(async (tx) => {
-    const [senderSnap, recipientSnap] = await Promise.all([
+    const [senderSnap, recipientSnap, limitSnap, dailyLimitSnap] = await Promise.all([
       tx.get(senderRef),
       tx.get(recipientRef),
+      tx.get(limitRef),
+      tx.get(dailyLimitRef),
     ]);
 
     if (!senderSnap.exists) {
@@ -11159,11 +11168,26 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
 
     const senderData = senderSnap.data() || {};
     const recipientData = recipientSnap.data() || {};
+    const limitData = limitSnap.data() || {};
+    const dailyLimitData = dailyLimitSnap.data() || {};
+    const dailyCount = Math.max(0, Number(dailyLimitData.count || 0));
+    if (dailyCount >= DIRECT_MEMO_DAILY_LIMIT) {
+      throw new functions.https.HttpsError("resource-exhausted", `하루에 편지는 최대 ${DIRECT_MEMO_DAILY_LIMIT}통까지 보낼 수 있습니다.`);
+    }
+
     const nowMillis = Date.now();
     const now = admin.firestore.Timestamp.fromMillis(nowMillis);
-    const deliverAtMillis = nowMillis;
+    const lastImmediateMillis = getMillis(limitData.lastImmediateSentAt);
+    const lastQueuedMillis = getMillis(limitData.lastSentAt);
+    const { canDeliverImmediately, deliverAtMillis, status } = computeDirectMemoDeliveryPlan({
+      nowMillis,
+      lastImmediateMillis,
+      lastQueuedMillis,
+    });
+    if (deliverAtMillis - nowMillis > DIRECT_MEMO_MAX_QUEUE_MS) {
+      throw new functions.https.HttpsError("resource-exhausted", "같은 사람에게 예약된 편지가 너무 많습니다. 기존 편지가 배달된 뒤 다시 보내주세요.");
+    }
     const deliverAt = admin.firestore.Timestamp.fromMillis(deliverAtMillis);
-    const status = "delivered";
 
     const memoData = {
       senderId: uid,
@@ -11184,13 +11208,19 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
       recipientArchivedAt: null,
       senderDeletedAt: null,
       recipientDeletedAt: null,
+      retentionPending: true,
     };
 
     tx.set(memoRef, memoData);
     tx.set(limitRef, {
       recipientId,
-      lastImmediateSentAt: now,
-      lastSentAt: now,
+      ...(canDeliverImmediately ? { lastImmediateSentAt: now } : {}),
+      lastSentAt: deliverAt,
+      updatedAt: now,
+    }, { merge: true });
+    tx.set(dailyLimitRef, {
+      dateKey: getKSTDateString(new Date(nowMillis)),
+      count: dailyCount + 1,
       updatedAt: now,
     }, { merge: true });
     createDirectMemoNotification(tx, memoRef, memoData);
@@ -11255,11 +11285,17 @@ exports.archiveDirectMemo = regionalFunctions.https.onCall(async (data, context)
     const memo = memoSnap.data() || {};
     const now = admin.firestore.Timestamp.now();
     if (memo.recipientId === uid) {
-      tx.set(memoRef, { recipientArchivedAt: now, updatedAt: now }, { merge: true });
+      if (memo.recipientDeletedAt) {
+        throw new functions.https.HttpsError("failed-precondition", "삭제한 편지는 보관할 수 없습니다.");
+      }
+      tx.set(memoRef, { recipientArchivedAt: now, retentionPending: true, updatedAt: now }, { merge: true });
       return;
     }
     if (memo.senderId === uid) {
-      tx.set(memoRef, { senderArchivedAt: now, updatedAt: now }, { merge: true });
+      if (memo.senderDeletedAt) {
+        throw new functions.https.HttpsError("failed-precondition", "삭제한 편지는 보관할 수 없습니다.");
+      }
+      tx.set(memoRef, { senderArchivedAt: now, retentionPending: true, updatedAt: now }, { merge: true });
       return;
     }
     throw new functions.https.HttpsError("permission-denied", "내 편지만 보관할 수 있습니다.");
@@ -11288,14 +11324,14 @@ exports.restoreDirectMemo = regionalFunctions.https.onCall(async (data, context)
       if (memo.recipientDeletedAt) {
         throw new functions.https.HttpsError("failed-precondition", "삭제한 편지는 복원할 수 없습니다.");
       }
-      tx.set(memoRef, { recipientArchivedAt: null, updatedAt: now }, { merge: true });
+      tx.set(memoRef, { recipientArchivedAt: null, retentionPending: true, updatedAt: now }, { merge: true });
       return;
     }
     if (memo.senderId === uid) {
       if (memo.senderDeletedAt) {
         throw new functions.https.HttpsError("failed-precondition", "삭제한 편지는 복원할 수 없습니다.");
       }
-      tx.set(memoRef, { senderArchivedAt: null, updatedAt: now }, { merge: true });
+      tx.set(memoRef, { senderArchivedAt: null, retentionPending: true, updatedAt: now }, { merge: true });
       return;
     }
     throw new functions.https.HttpsError("permission-denied", "내 편지만 복원할 수 있습니다.");
@@ -11333,6 +11369,10 @@ exports.deleteDirectMemo = regionalFunctions.https.onCall(async (data, context) 
       return;
     }
     if (memo.senderId === uid) {
+      if (!memo.isRead) {
+        tx.delete(memoRef);
+        return;
+      }
       if (memo.recipientDeletedAt) {
         tx.delete(memoRef);
         return;
@@ -11351,7 +11391,7 @@ exports.deleteDirectMemo = regionalFunctions.https.onCall(async (data, context) 
 });
 
 exports.deliverScheduledDirectMemos = regionalFunctions.pubsub
-  .schedule("every 5 minutes")
+  .schedule("every 15 minutes")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
@@ -11400,6 +11440,54 @@ exports.deliverScheduledDirectMemos = regionalFunctions.pubsub
       });
     }
 
+    return null;
+  });
+
+exports.sweepExpiredDirectMemos = regionalFunctions.pubsub
+  .schedule("every 24 hours")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = admin.firestore.Timestamp.now();
+    const cutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - DIRECT_MEMO_RETENTION_MS);
+    let processed = 0;
+
+    while (true) {
+      const snap = await db.collection("directMemos")
+        .where("retentionPending", "==", true)
+        .where("status", "==", "delivered")
+        .where("sentAt", "<=", cutoff)
+        .orderBy("sentAt", "asc")
+        .limit(400)
+        .get();
+
+      if (snap.empty) break;
+      const batch = db.batch();
+      snap.docs.forEach((docSnap) => {
+        const memo = docSnap.data() || {};
+        const senderExpired = Boolean(memo.senderDeletedAt) || !memo.senderArchivedAt;
+        const recipientExpired = Boolean(memo.recipientDeletedAt) || !memo.recipientArchivedAt;
+
+        if (senderExpired && recipientExpired) {
+          batch.delete(docSnap.ref);
+          return;
+        }
+
+        const updates = {
+          retentionPending: false,
+          retentionSweptAt: now,
+          updatedAt: now,
+        };
+        if (!memo.senderArchivedAt && !memo.senderDeletedAt) updates.senderDeletedAt = now;
+        if (!memo.recipientArchivedAt && !memo.recipientDeletedAt) updates.recipientDeletedAt = now;
+        batch.set(docSnap.ref, updates, { merge: true });
+      });
+      await batch.commit();
+      processed += snap.size;
+      if (snap.size < 400) break;
+    }
+
+    console.log("[sweepExpiredDirectMemos] completed", { processed, cutoff: cutoff.toDate().toISOString() });
     return null;
   });
 

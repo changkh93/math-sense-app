@@ -58,6 +58,66 @@
       ]
     },
     {
+      "collectionGroup": "directMemos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recipientId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "isRead", "order": "ASCENDING" },
+        { "fieldPath": "recipientArchivedAt", "order": "ASCENDING" },
+        { "fieldPath": "recipientDeletedAt", "order": "ASCENDING" },
+        { "fieldPath": "sentAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "directMemos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recipientId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "recipientArchivedAt", "order": "ASCENDING" },
+        { "fieldPath": "recipientDeletedAt", "order": "ASCENDING" },
+        { "fieldPath": "sentAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "directMemos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "senderId", "order": "ASCENDING" },
+        { "fieldPath": "senderArchivedAt", "order": "ASCENDING" },
+        { "fieldPath": "senderDeletedAt", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "directMemos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "recipientDeletedAt", "order": "ASCENDING" },
+        { "fieldPath": "recipientId", "order": "ASCENDING" },
+        { "fieldPath": "recipientArchivedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "directMemos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "senderDeletedAt", "order": "ASCENDING" },
+        { "fieldPath": "senderId", "order": "ASCENDING" },
+        { "fieldPath": "senderArchivedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "directMemos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "retentionPending", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "sentAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "questions",
       "queryScope": "COLLECTION",
       "fields": [
