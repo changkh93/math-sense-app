@@ -11,6 +11,7 @@ import { useCodeExercises } from '../../hooks/useContent'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { isRadarActive } from '../../utils/streakUtils'
 import { getEmbeddablePdfUrl, normalizePdfUrl } from '../../utils/pdfUrlUtils'
+import { isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils'
 
 const SpaceQuizView = lazy(() => import('./SpaceQuizView'))
 const QuizBattleView = lazy(() => import('./QuizBattleView'))
@@ -2360,7 +2361,10 @@ export default function MissionHub({
   
   const quizCompleted = bestScores[unitId] !== undefined
   const workbookCompleted = bestScores[`${unitId}_workbook`] !== undefined
-  const codeTraceCompleted = !!learningProgress?.codeTrace?.completed
+  const codeTraceCompleted = isCodeTraceProgressComplete(
+    learningProgress?.codeTrace,
+    codeExercises.map(exercise => exercise?.id || exercise?.docId || '').filter(Boolean)
+  )
 
   // --- Render Functions ---
 

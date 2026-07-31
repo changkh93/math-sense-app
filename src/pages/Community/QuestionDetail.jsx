@@ -456,7 +456,7 @@ export default function QuestionDetail() {
                   </span>
                   {isOwner && (
                     <div className="owner-actions">
-                      <button className="owner-action-btn edit-btn" onClick={() => { setIsEditingQuestion(true); setEditQuestionTitle(question.title); setEditQuestionContent(question.content); }} title="수정">
+                      <button className="owner-action-btn edit-btn" onClick={handleStartEdit} title="수정">
                         <Edit3 size={14} />
                         <span>수정</span>
                       </button>

@@ -13,6 +13,7 @@ import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST } from '../..
 import { calculateGrowthUpdates } from '../../utils/rankingUtils';
 import { recordCrystalTransaction } from '../../utils/crystalLedger';
 import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils';
+import { isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils';
 import soundManager from '../../utils/SoundManager';
 
 const ANSWER_REVEAL_SECONDS = 30;
@@ -1277,7 +1278,10 @@ export default function CodeTracePlayer({
   // 이번 통과로 받을 보상(배율 적용 전). 4회차+는 0.
   const rawRewardForNextPass = getAttemptReward(exerciseBaseReward, nextAttemptNumber);
   const rewardStillAvailable = remainingRewardedAttempts(currentAttemptCount) > 0;
-  const unitAlreadyCompleted = !!learningProgress?.codeTrace?.completed;
+  const unitAlreadyCompleted = isCodeTraceProgressComplete(
+    learningProgress?.codeTrace,
+    currentExerciseIds
+  );
   const currentAlreadyCompleted = !!currentExerciseId && completedIds.has(currentExerciseId);
   const canSubmitCurrentPass = currentPassed && !currentAlreadyCompleted && !saving && completionState !== 'processing';
   const willCompleteOnPass = !unitAlreadyCompleted && currentPassed && currentExerciseId && !currentAlreadyCompleted && currentCompletedCount + 1 >= currentExerciseIds.length;
@@ -1651,7 +1655,10 @@ export default function CodeTracePlayer({
         chapterId: activeUnit?.chapterId || '',
         clusterId: clusterId || 'python',
         codeTrace: {
-          completed: false,
+          // Never downgrade a unit after all current exercises have passed.
+          // Previously this partial-save path could turn a valid 5/5 completion
+          // back into `completed: false`.
+          completed: unitAlreadyCompleted || allCompleted,
           chapterId: activeUnit?.chapterId || '',
           clusterId: clusterId || 'python',
           completedExerciseIds: currentExerciseIds.filter(id => completedIds.has(id)),

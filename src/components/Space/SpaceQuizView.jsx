@@ -54,6 +54,23 @@ const REVIEW_REACTION_IDS = new Set(['uncertain_correct', 'missed_condition', 's
 const MotionReactionPanel = motion.div
 
 const makeQuizQuestionStatId = (unitId, questionId) => encodeURIComponent(`${unitId || 'unknown'}__${questionId || 'unknown'}`)
+const makePendingAnswerCheckpointKey = (uid, unitId) => `metasense_pending_quiz_answer_${uid}_${unitId}`
+
+const readPendingAnswerCheckpoint = (uid, unitId) => {
+  if (!uid || !unitId) return null
+  try {
+    const raw = localStorage.getItem(makePendingAnswerCheckpointKey(uid, unitId))
+    return raw ? JSON.parse(raw) : null
+  } catch (error) {
+    console.warn('Failed to read pending quiz answer checkpoint:', error)
+    return null
+  }
+}
+
+const clearPendingAnswerCheckpoint = (uid, unitId) => {
+  if (!uid || !unitId) return
+  localStorage.removeItem(makePendingAnswerCheckpointKey(uid, unitId))
+}
 
 const getOptionKey = (question, option) => {
   const options = question?.options || []
@@ -196,6 +213,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [questionStats, setQuestionStats] = useState(null)
   const [existingResponse, setExistingResponse] = useState(null)
   const [pendingResult, setPendingResult] = useState(null)
+  const [isSavingAnswerCheckpoint, setIsSavingAnswerCheckpoint] = useState(false)
   const [isSavingReaction, setIsSavingReaction] = useState(false)
   const [isSkippingQuestion, setIsSkippingQuestion] = useState(false)
   const [isRecoveringSession, setIsRecoveringSession] = useState(false)
@@ -243,6 +261,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           let targetReviewMarks = []
           let targetDeferredQuestionIds = []
           let targetIsDeferredRound = false
+          let targetIsResultMode = false
 
           let targetEverWrong = []
 
@@ -264,6 +283,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 targetReviewMarks = Array.isArray(session.reviewMarks) ? session.reviewMarks : []
                 targetDeferredQuestionIds = Array.isArray(session.deferredQuestionIds) ? session.deferredQuestionIds : []
                 targetIsDeferredRound = session.isDeferredRound === true
+                targetIsResultMode = session.isResultMode === true
                 if (session.retryCount !== undefined) {
                   targetRetryCount = session.retryCount
                 }
@@ -286,10 +306,50 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
           const deferredIdSet = new Set(targetDeferredQuestionIds)
           const deferredQuestions = selected.filter(q => deferredIdSet.has(q.id))
-          const activeQuestions = targetIsDeferredRound && deferredQuestions.length > 0
+          let activeQuestions = targetIsDeferredRound && deferredQuestions.length > 0
             ? deferredQuestions
             : selected
           targetIsDeferredRound = targetIsDeferredRound && deferredQuestions.length > 0
+
+          // A graded answer is checkpointed synchronously before the Firestore write.
+          // If a refresh interrupts that write, prefer the local checkpoint so the
+          // student cannot answer the same question again after seeing the statistics.
+          const pendingCheckpoint = readPendingAnswerCheckpoint(user?.uid, quizData.unitId)
+          const checkpointQuestionId = pendingCheckpoint?.questionId
+          const checkpointAnswer = pendingCheckpoint?.userAnswers?.[checkpointQuestionId]
+          if (
+            checkpointQuestionId &&
+            selectedIds.has(checkpointQuestionId) &&
+            checkpointAnswer &&
+            !checkpointAnswer.reactionId
+          ) {
+            targetUserAnswers = {
+              ...targetUserAnswers,
+              ...pendingCheckpoint.userAnswers,
+            }
+            targetSessionCrystals = pendingCheckpoint.sessionCrystals ?? targetSessionCrystals
+            targetComboCount = pendingCheckpoint.comboCount ?? targetComboCount
+            targetShieldsUsed = pendingCheckpoint.shieldsUsed ?? targetShieldsUsed
+            targetEverWrong = Array.isArray(pendingCheckpoint.everWrong)
+              ? pendingCheckpoint.everWrong.filter(questionId => selectedIds.has(questionId))
+              : targetEverWrong
+            targetReviewMarks = Array.isArray(pendingCheckpoint.reviewMarks)
+              ? pendingCheckpoint.reviewMarks.filter(questionId => selectedIds.has(questionId))
+              : targetReviewMarks
+            targetDeferredQuestionIds = Array.isArray(pendingCheckpoint.deferredQuestionIds)
+              ? pendingCheckpoint.deferredQuestionIds.filter(questionId => selectedIds.has(questionId))
+              : targetDeferredQuestionIds
+            targetIsDeferredRound = pendingCheckpoint.isDeferredRound === true
+
+            const checkpointQuestionIds = Array.isArray(pendingCheckpoint.currentQuestionIds)
+              ? pendingCheckpoint.currentQuestionIds
+              : []
+            const checkpointQuestionIdSet = new Set(checkpointQuestionIds)
+            const checkpointQuestions = selected.filter(question => checkpointQuestionIdSet.has(question.id))
+            activeQuestions = checkpointQuestions.length > 0 ? checkpointQuestions : selected
+            const checkpointIndex = activeQuestions.findIndex(question => question.id === checkpointQuestionId)
+            targetCurrentIdx = checkpointIndex >= 0 ? checkpointIndex : 0
+          }
 
           if (targetCurrentIdx < 0 || targetCurrentIdx >= activeQuestions.length) {
             const firstUnansweredIdx = activeQuestions.findIndex(q => !targetUserAnswers[q.id])
@@ -310,6 +370,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           setReviewMarks(new Set(targetReviewMarks))
           setDeferredQuestionIds(new Set(targetDeferredQuestionIds))
           setIsDeferredRound(targetIsDeferredRound)
+          setIsResultMode(targetIsResultMode)
           
           initializedRef.current = guardKey;
 
@@ -340,6 +401,37 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setReactionError('')
     setMistakeCardMessage('')
   }, [currentIdx])
+
+  // Restore the locked, already-graded screen after a refresh. The answer has no
+  // reactionId until the student chooses an understanding state, so that field is
+  // the durable marker that this question must not become answerable again.
+  useEffect(() => {
+    if (isLoadingSession || !currentQuestion?.id || pendingResult) return
+    const savedAnswer = userAnswers[currentQuestion.id]
+    if (!savedAnswer || savedAnswer.reactionId) return
+
+    setShowFeedback(savedAnswer.isCorrect === true ? 'correct' : 'wrong')
+    setPendingResult({
+      questionId: currentQuestion.id,
+      isCorrect: savedAnswer.isCorrect === true,
+      selectedOptionKeys: getAnswerSelectedKeys(currentQuestion, savedAnswer),
+      userAnswers,
+      combo: comboCount,
+      sessionCrystals,
+      shieldsUsed,
+      everWrongIds: Array.from(everWrongSet),
+      persisted: false,
+    })
+  }, [
+    isLoadingSession,
+    currentQuestion,
+    userAnswers,
+    pendingResult,
+    comboCount,
+    sessionCrystals,
+    shieldsUsed,
+    everWrongSet,
+  ])
 
   useEffect(() => {
     if (!quizData?.unitId || !currentQuestion?.id) {
@@ -431,7 +523,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     computedFirstPass,
     willBeResultMode
   }) => {
-    if (user?.uid && quizData?.unitId && !reSolveMode && !willBeResultMode) {
+    if (user?.uid && quizData?.unitId && !reSolveMode) {
       try {
         const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
         const sessionObj = {
@@ -446,7 +538,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           everWrong: Array.from(nextEverWrongSet),
           reviewMarks: nextReviewMarkIds || Array.from(reviewMarks),
           deferredQuestionIds: nextDeferredQuestionIds || Array.from(deferredQuestionIds),
-          isDeferredRound: nextIsDeferredRound ?? isDeferredRound
+          isDeferredRound: nextIsDeferredRound ?? isDeferredRound,
+          isResultMode: willBeResultMode === true,
         }
         await setDoc(progressRef, {
           quizSession: JSON.parse(JSON.stringify(sessionObj)),
@@ -454,10 +547,61 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           unitId: quizData.unitId || "",
           updatedAt: serverTimestamp()
         }, { merge: true })
+        return true
       } catch (e) {
         console.error("Auto save failed", e)
+        return false
       }
     }
+    return true
+  }
+
+  const persistPendingGradedAnswer = async (pending) => {
+    if (!pending?.questionId || !user?.uid || !quizData?.unitId || reSolveMode) return
+
+    const checkpoint = {
+      questionId: pending.questionId,
+      currentIdx,
+      currentQuestionIds: currentQuestions.map(question => question.id),
+      userAnswers: pending.userAnswers,
+      comboCount: pending.combo,
+      sessionCrystals: pending.sessionCrystals,
+      shieldsUsed: pending.shieldsUsed,
+      everWrong: pending.everWrongIds,
+      reviewMarks: Array.from(reviewMarks),
+      deferredQuestionIds: Array.from(deferredQuestionIds),
+      isDeferredRound,
+      savedAt: Date.now(),
+    }
+
+    // localStorage is synchronous, so even an immediate refresh preserves the lock.
+    try {
+      localStorage.setItem(
+        makePendingAnswerCheckpointKey(user.uid, quizData.unitId),
+        JSON.stringify(checkpoint)
+      )
+    } catch (error) {
+      console.warn('Failed to save local quiz answer checkpoint:', error)
+    }
+
+    setIsSavingAnswerCheckpoint(true)
+    const saved = await saveProgressSession({
+      nextIdxForSave: currentIdx,
+      nextUserAnswers: pending.userAnswers,
+      nextCombo: pending.combo,
+      nextSessionCrystals: pending.sessionCrystals,
+      nextShieldsUsed: pending.shieldsUsed,
+      nextEverWrongSet: new Set(pending.everWrongIds || []),
+      nextReviewMarkIds: Array.from(reviewMarks),
+      nextDeferredQuestionIds: Array.from(deferredQuestionIds),
+      nextIsDeferredRound: isDeferredRound,
+      computedFirstPass: firstPassScore,
+      willBeResultMode: false,
+    })
+    if (!saved) {
+      setReactionError('서버 저장이 지연되고 있습니다. 이 화면을 유지한 채 잠시 후 이해 상태를 선택해 주세요.')
+    }
+    setIsSavingAnswerCheckpoint(false)
   }
 
   const getPendingDeferredQuestions = (deferredIds = deferredQuestionIds, answers = userAnswers) => (
@@ -615,7 +759,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   const handleQuizReaction = async (reactionId) => {
-    if (!pendingResult || isSavingReaction || navigationTransitionRef.current) return
+    if (!pendingResult || isSavingReaction || isSavingAnswerCheckpoint || navigationTransitionRef.current) return
     const reaction = QUIZ_REACTION_CHOICES.find(item => item.id === reactionId)
     if (!reaction) return
 
@@ -625,6 +769,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setSessionGuardMessage('')
 
     try {
+      clearPendingAnswerCheckpoint(user?.uid, quizData?.unitId)
       const nextReviewMarks = new Set(reviewMarks)
       if (REACTION_CAUSE_LABELS[reactionId]) {
         pendingResult.userAnswers[currentQuestion.id] = {
@@ -766,6 +911,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       everWrongIds: Array.from(newEverWrongSet),
       persisted: false,
     })
+    void persistPendingGradedAnswer({
+      questionId: currentQuestion.id,
+      isCorrect,
+      selectedOptionKeys,
+      userAnswers: newUserAnswers,
+      combo: newCombo,
+      sessionCrystals: newSessionCrystals,
+      shieldsUsed: newShieldsUsed,
+      everWrongIds: Array.from(newEverWrongSet),
+      persisted: false,
+    })
   }
 
   const handleSelect = (option, event) => {
@@ -842,6 +998,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     setShieldsUsed(newShieldsUsed)
     setEverWrongSet(newEverWrongSet)
     setPendingResult({
+      questionId: currentQuestion.id,
+      isCorrect,
+      selectedOptionKeys,
+      userAnswers: newUserAnswers,
+      combo: newCombo,
+      sessionCrystals: newSessionCrystals,
+      shieldsUsed: newShieldsUsed,
+      everWrongIds: Array.from(newEverWrongSet),
+      persisted: false,
+    })
+    void persistPendingGradedAnswer({
       questionId: currentQuestion.id,
       isCorrect,
       selectedOptionKeys,
@@ -1125,6 +1292,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
       // Clear localStorage on successful finish
       if (user?.uid && quizData?.unitId) {
+        clearPendingAnswerCheckpoint(user.uid, quizData.unitId)
         localStorage.removeItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
         try {
           const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
@@ -1968,8 +2136,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 ? displayedStats.options.find(stat => stat.key === optionKey)
                 : null
               const isOptionSelected = multiMode
-                ? selectedMultiOptions.has(option.text)
-                : userAnswers[currentQuestion.id] === option
+                ? (showFeedback
+                    ? userAnswers[currentQuestion.id]?.selectedTexts?.includes(option.text)
+                    : selectedMultiOptions.has(option.text))
+                : userAnswers[currentQuestion.id]?.text === option.text
               
               if (multiMode) {
                 // 멀티 정답 모드: 선택 상태 표시
@@ -2160,7 +2330,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                     <button
                       key={choice.id}
                       type="button"
-                      disabled={isSavingReaction || disabledByAnswer}
+                      disabled={isSavingReaction || isSavingAnswerCheckpoint || disabledByAnswer}
                       onClick={() => {
                         soundManager.playClick()
                         handleQuizReaction(choice.id)
@@ -2174,7 +2344,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                           ? 'linear-gradient(145deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))'
                           : `linear-gradient(145deg, ${choice.tone}2f, rgba(15,23,42,0.74) 58%, ${choice.tone}20)`,
                         color: disabledByAnswer ? 'rgba(226,232,240,0.36)' : 'var(--text-bright)',
-                        cursor: disabledByAnswer || isSavingReaction ? 'not-allowed' : 'pointer',
+                        cursor: disabledByAnswer || isSavingReaction || isSavingAnswerCheckpoint ? 'not-allowed' : 'pointer',
                         textAlign: 'left',
                         opacity: disabledByAnswer ? 0.55 : 1,
                         boxShadow: disabledByAnswer
@@ -2213,6 +2383,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               {isSavingReaction && (
                 <div style={{ marginTop: '0.7rem', color: 'var(--crystal-cyan)', fontSize: '0.85rem', fontWeight: 800 }}>
                   반응 저장 중...
+                </div>
+              )}
+              {isSavingAnswerCheckpoint && (
+                <div style={{ marginTop: '0.7rem', color: 'var(--crystal-cyan)', fontSize: '0.85rem', fontWeight: 800 }}>
+                  선택한 답안을 저장 중...
                 </div>
               )}
             </MotionReactionPanel>
