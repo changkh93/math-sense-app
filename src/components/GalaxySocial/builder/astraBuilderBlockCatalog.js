@@ -8,6 +8,7 @@ export const ASTRA_BUILDER_BLOCK_TRAITS = Object.freeze({
   5: Object.freeze({ bodyShape: 'stair', supportSurface: 'stair', headBlocking: true, buildFaces: FACE_ALL, acousticMaterial: 'stone' }),
   6: Object.freeze({ bodyShape: 'pillar', supportSurface: 'none', headBlocking: true, buildFaces: FACE_ALL, acousticMaterial: 'metal' }),
   7: Object.freeze({ bodyShape: 'doorway', supportSurface: 'none', headBlocking: false, buildFaces: Object.freeze(['top', 'north', 'south', 'east', 'west']), acousticMaterial: 'wood' }),
+  8: Object.freeze({ bodyShape: 'full', supportSurface: 'top', headBlocking: true, heightCells: 3, buildFaces: FACE_ALL, acousticMaterial: 'stone' }),
 })
 
 const EMPTY_TRAITS = Object.freeze({

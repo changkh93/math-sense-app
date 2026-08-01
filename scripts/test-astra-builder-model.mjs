@@ -2,32 +2,43 @@ import assert from 'node:assert/strict'
 import {
   ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
   ASTRA_BUILDER_POC_PLOT,
+  ASTRA_BUILDER_WALL_PANEL_TYPE,
   applyAstraBuilderEdit,
   applyAstraBuilderPatch,
   countAstraBuilderBlocks,
   createEmptyAstraBuilderGrid,
   decodeAstraBuilderCell,
+  doesAstraBuilderBlockOccupyLayer,
   getAstraBuilderCellCount,
   getAstraBuilderCellFromIndex,
   getAstraBuilderCellIndex,
   getAstraBuilderInstances,
   getAstraBuilderDoorwayColumns,
+  getAstraBuilderLayerEditTarget,
+  getAstraBuilderLayerInfo,
+  getAstraBuilderPlacementIssue,
   getAstraBuilderTopFaceTarget,
   getAstraBuilderWalkSurfaceOffset,
   getAstraBuilderWalkBlockingCells,
   getAstraBuilderWorldPosition,
   isAstraBuilderWalkBlockingCell,
+  isAstraBuilderSameStoryLayer,
+  normalizeAstraBuilderPlacementCell,
 } from '../src/components/GalaxySocial/builder/astraBuilderModel.js'
 import {
   decodeAstraBuilderGridBase64,
   encodeAstraBuilderGridBase64,
 } from '../src/components/GalaxySocial/builder/astraBuilderCodec.js'
-import { planAstraBuilderServerHydration } from '../src/components/GalaxySocial/builder/astraBuilderSync.js'
+import {
+  getAstraBuilderRetryDelay,
+  planAstraBuilderServerHydration,
+} from '../src/components/GalaxySocial/builder/astraBuilderSync.js'
 import {
   canAstraBuilderCharacterOccupy,
   createAstraBuilderCollisionBodies,
   doesAstraBuilderPlacementOverlapCharacter,
   getAstraBuilderCharacterDimensions,
+  getAstraBuilderStairDirection,
   getAstraBuilderStairProgress,
   getAstraBuilderSupportOffsetAtCell,
   getAstraBuilderWalkSurfaceHeight,
@@ -40,6 +51,20 @@ import {
 } from '../src/components/GalaxySocial/builder/astraBuilderInput.js'
 
 assert.equal(getAstraBuilderCellCount(), 12 * 12 * 10)
+assert.deepEqual(getAstraBuilderLayerInfo(0), {
+  layer: 0, story: 1, course: 1, courseCount: 3, label: '1층',
+})
+assert.deepEqual(getAstraBuilderLayerInfo(5), {
+  layer: 5, story: 2, course: 3, courseCount: 3, label: '2층',
+})
+assert.deepEqual(getAstraBuilderLayerInfo(9), {
+  layer: 9, story: null, course: 1, courseCount: 1, label: '옥상',
+})
+assert.equal(isAstraBuilderSameStoryLayer(0, 2), true)
+assert.equal(isAstraBuilderSameStoryLayer(2, 3), false)
+assert.equal(doesAstraBuilderBlockOccupyLayer({ y: 0, type: 1 }, 1), false)
+assert.equal(doesAstraBuilderBlockOccupyLayer({ y: 0, type: 8 }, 2), true)
+assert.equal(doesAstraBuilderBlockOccupyLayer({ y: 0, type: 7 }, 2), true)
 
 const cells = createEmptyAstraBuilderGrid()
 assert.equal(cells.length, 1440)
@@ -72,6 +97,66 @@ cells[getAstraBuilderCellIndex(foundationCell)] = 0
 
 const target = { x: 3, y: 4, z: 5 }
 const targetIndex = getAstraBuilderCellIndex(target)
+const targetWorld = getAstraBuilderWorldPosition(target)
+const targetPoint = {
+  x: ASTRA_BUILDER_POC_PLOT.center[0] + targetWorld[0],
+  y: 0,
+  z: ASTRA_BUILDER_POC_PLOT.center[1] + targetWorld[2],
+}
+assert.deepEqual(getAstraBuilderLayerEditTarget({
+  point: targetPoint,
+  activeLayer: 2,
+  clickedCell: target,
+  tool: 'place',
+}), { x: 3, y: 2, z: 5 })
+assert.deepEqual(getAstraBuilderLayerEditTarget({
+  point: targetPoint,
+  activeLayer: 2,
+  clickedCell: target,
+  tool: 'delete',
+}), target)
+
+const panelGrid = createEmptyAstraBuilderGrid()
+const panelPointerCell = { x: 4, y: 2, z: 4 }
+const panelAnchor = normalizeAstraBuilderPlacementCell(
+  panelPointerCell,
+  ASTRA_BUILDER_WALL_PANEL_TYPE,
+)
+assert.deepEqual(panelAnchor, { x: 4, y: 0, z: 4 })
+const panelPlacement = applyAstraBuilderEdit(panelGrid, {
+  tool: 'place',
+  cell: panelAnchor,
+  blockType: ASTRA_BUILDER_WALL_PANEL_TYPE,
+  rotation: 0,
+})
+assert.ok(panelPlacement)
+assert.equal(countAstraBuilderBlocks(panelPlacement.cells), 1)
+assert.equal(
+  decodeAstraBuilderCell(panelPlacement.cells[getAstraBuilderCellIndex(panelAnchor)]).blockType,
+  ASTRA_BUILDER_WALL_PANEL_TYPE,
+)
+const panelBody = createAstraBuilderCollisionBodies(panelPlacement.cells, 4)
+  .find((body) => body.blockType === ASTRA_BUILDER_WALL_PANEL_TYPE)
+assert.ok(panelBody)
+assert.ok(Math.abs(
+  panelBody.maxY - panelBody.minY - ASTRA_BUILDER_POC_PLOT.cellSize * 3,
+) < 0.0001)
+assert.equal(getAstraBuilderPlacementIssue(panelPlacement.cells, {
+  tool: 'place',
+  cell: { x: 4, y: 1, z: 4 },
+  blockType: 1,
+  rotation: 0,
+}), 'occupied')
+assert.equal(normalizeAstraBuilderPlacementCell(
+  { x: 4, y: 9, z: 4 },
+  ASTRA_BUILDER_WALL_PANEL_TYPE,
+), null)
+assert.deepEqual(getAstraBuilderLayerEditTarget({
+  point: targetPoint,
+  activeLayer: 4,
+  clickedCell: target,
+  tool: 'delete',
+}), target)
 assert.deepEqual(getAstraBuilderCellFromIndex(targetIndex), target)
 assert.equal(getAstraBuilderCellIndex({ x: -1, y: 0, z: 0 }), -1)
 assert.equal(getAstraBuilderCellIndex({ x: 0, y: ASTRA_BUILDER_POC_PLOT.height, z: 0 }), -1)
@@ -234,6 +319,12 @@ assert.equal(planAstraBuilderServerHydration({
   localServerDirty: true,
   remoteRevision: 3,
 }), 'local')
+
+assert.equal(getAstraBuilderRetryDelay(0), 15_000)
+assert.equal(getAstraBuilderRetryDelay(15_000), 30_000)
+assert.equal(getAstraBuilderRetryDelay(30_000), 60_000)
+assert.equal(getAstraBuilderRetryDelay(60_000), 120_000)
+assert.equal(getAstraBuilderRetryDelay(120_000), 120_000)
 assert.equal(planAstraBuilderServerHydration({
   localRevision: 3,
   localSyncedRevision: 2,
@@ -267,9 +358,10 @@ assert.equal(planAstraBuilderServerHydration({
   remoteRevision: 7,
 }), 'server')
 
-const defaultDimensions = getAstraBuilderCharacterDimensions(.28)
+const defaultDimensions = getAstraBuilderCharacterDimensions(.25)
 const largeDimensions = getAstraBuilderCharacterDimensions(.7)
-assert.equal(defaultDimensions.radius, .14)
+assert.equal(defaultDimensions.radius, .125)
+assert.equal(defaultDimensions.height, .6375)
 assert.ok(largeDimensions.radius > defaultDimensions.radius)
 assert.ok(largeDimensions.height > defaultDimensions.height)
 
@@ -278,12 +370,16 @@ const stairWorld = getAstraBuilderWorldPosition(stairCell)
 const stairWorldX = ASTRA_BUILDER_POC_PLOT.center[0] + stairWorld[0]
 const stairWorldZ = ASTRA_BUILDER_POC_PLOT.center[1] + stairWorld[2]
 const halfCell = ASTRA_BUILDER_POC_PLOT.cellSize * .49
-assert.ok(getAstraBuilderStairProgress(stairWorldX, stairWorldZ + halfCell, stairCell, 0) < .02)
-assert.ok(getAstraBuilderStairProgress(stairWorldX, stairWorldZ - halfCell, stairCell, 0) > .98)
+assert.deepEqual(getAstraBuilderStairDirection(0), { x: 0, z: 1 })
+assert.deepEqual(getAstraBuilderStairDirection(1), { x: 1, z: 0 })
+assert.deepEqual(getAstraBuilderStairDirection(2), { x: 0, z: -1 })
+assert.deepEqual(getAstraBuilderStairDirection(3), { x: -1, z: 0 })
+assert.ok(getAstraBuilderStairProgress(stairWorldX, stairWorldZ - halfCell, stairCell, 0) < .02)
+assert.ok(getAstraBuilderStairProgress(stairWorldX, stairWorldZ + halfCell, stairCell, 0) > .98)
 assert.ok(getAstraBuilderStairProgress(stairWorldX - halfCell, stairWorldZ, stairCell, 1) < .02)
 assert.ok(getAstraBuilderStairProgress(stairWorldX + halfCell, stairWorldZ, stairCell, 1) > .98)
-assert.ok(getAstraBuilderStairProgress(stairWorldX, stairWorldZ - halfCell, stairCell, 2) < .02)
-assert.ok(getAstraBuilderStairProgress(stairWorldX, stairWorldZ + halfCell, stairCell, 2) > .98)
+assert.ok(getAstraBuilderStairProgress(stairWorldX, stairWorldZ + halfCell, stairCell, 2) < .02)
+assert.ok(getAstraBuilderStairProgress(stairWorldX, stairWorldZ - halfCell, stairCell, 2) > .98)
 assert.ok(getAstraBuilderStairProgress(stairWorldX + halfCell, stairWorldZ, stairCell, 3) < .02)
 assert.ok(getAstraBuilderStairProgress(stairWorldX - halfCell, stairWorldZ, stairCell, 3) > .98)
 
@@ -347,30 +443,25 @@ stairCollisionGrid[getAstraBuilderCellIndex(stairCell)] = 5
 const stairBodies = createAstraBuilderCollisionBodies(stairCollisionGrid, plotBaseY)
 assert.equal(canAstraBuilderCharacterOccupy(stairBodies, {
   x: stairWorldX,
-  z: stairWorldZ + halfCell,
+  z: stairWorldZ - halfCell,
   footY: plotBaseY,
   scale: .28,
 }), true)
 assert.equal(canAstraBuilderCharacterOccupy(stairBodies, {
   x: stairWorldX,
-  z: stairWorldZ - halfCell,
+  z: stairWorldZ + halfCell,
   footY: plotBaseY,
   scale: .28,
 }), false)
 
-// 실제 이동처럼 짧은 간격으로 접지 높이를 이어받으면 계단을 끝까지 오를 수 있다.
+// 실제 이동 컨트롤러처럼 다음 지지면을 먼저 구한 뒤 그 높이에서 몸 공간을
+// 검사하면 짧은 보폭으로 계단을 끝까지 오를 수 있다.
 let stairFootY = plotBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET
 const stairTraversalHeights = []
 for (let step = 0; step <= 24; step += 1) {
   const progress = step / 24
-  const z = stairWorldZ + halfCell - progress * halfCell * 2
-  assert.equal(canAstraBuilderCharacterOccupy(stairBodies, {
-    x: stairWorldX,
-    z,
-    footY: stairFootY,
-    scale: .28,
-  }), true)
-  stairFootY = getAstraBuilderWalkSurfaceHeight({
+  const z = stairWorldZ - halfCell + progress * halfCell * 2
+  const nextStairFootY = getAstraBuilderWalkSurfaceHeight({
     x: stairWorldX,
     z,
     currentFootY: stairFootY,
@@ -378,12 +469,85 @@ for (let step = 0; step <= 24; step += 1) {
     plotBaseY,
     terrainY: 0,
   })
+  assert.equal(canAstraBuilderCharacterOccupy(stairBodies, {
+    x: stairWorldX,
+    z,
+    footY: nextStairFootY,
+    scale: .28,
+  }), true)
+  stairFootY = nextStairFootY
   stairTraversalHeights.push(stairFootY)
 }
 assert.ok(stairTraversalHeights.every((height, index) => (
   index === 0 || height >= stairTraversalHeights[index - 1]
 )))
 assert.ok(stairFootY > plotBaseY + ASTRA_BUILDER_POC_PLOT.cellSize * .95)
+
+// 세 칸 계단의 출구에서 2층 바닥으로 진입할 때, 발 중심이 바닥 셀에
+// 완전히 들어가기 전에도 발바닥 영역이 겹치면 지지면을 이어받아야 한다.
+const connectedUpperFloorGrid = createEmptyAstraBuilderGrid()
+for (let stairIndex = 0; stairIndex < 3; stairIndex += 1) {
+  connectedUpperFloorGrid[getAstraBuilderCellIndex({
+    x: 5,
+    y: stairIndex,
+    z: 4 + stairIndex,
+  })] = 5
+}
+connectedUpperFloorGrid[getAstraBuilderCellIndex({ x: 5, y: 3, z: 7 })] = 2
+connectedUpperFloorGrid[getAstraBuilderCellIndex({ x: 5, y: 3, z: 8 })] = 2
+const connectedBodies = createAstraBuilderCollisionBodies(connectedUpperFloorGrid, plotBaseY)
+const connectedStart = getAstraBuilderWorldPosition({ x: 5, y: 0, z: 4 })
+const connectedEnd = getAstraBuilderWorldPosition({ x: 5, y: 3, z: 8 })
+const connectedX = ASTRA_BUILDER_POC_PLOT.center[0] + connectedStart[0]
+const connectedStartZ = ASTRA_BUILDER_POC_PLOT.center[1]
+  + connectedStart[2]
+  - ASTRA_BUILDER_POC_PLOT.cellSize * .49
+const connectedEndZ = ASTRA_BUILDER_POC_PLOT.center[1] + connectedEnd[2]
+let connectedFootY = plotBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET
+for (let step = 0; step <= 120; step += 1) {
+  const z = connectedStartZ + (connectedEndZ - connectedStartZ) * (step / 120)
+  const nextFootY = getAstraBuilderWalkSurfaceHeight({
+    x: connectedX,
+    z,
+    currentFootY: connectedFootY,
+    cells: connectedUpperFloorGrid,
+    plotBaseY,
+    terrainY: 0,
+  })
+  assert.equal(canAstraBuilderCharacterOccupy(connectedBodies, {
+    x: connectedX,
+    z,
+    footY: nextFootY,
+    scale: .28,
+  }), true)
+  connectedFootY = nextFootY
+}
+const secondFloorHeight = plotBaseY
+  + ASTRA_BUILDER_POC_PLOT.cellSize * 3.24
+assert.ok(Math.abs(connectedFootY - secondFloorHeight) < .0001)
+
+// 바닥 끝에서는 발바닥이 일부라도 걸쳐 있는 동안만 지지하고, 완전히
+// 벗어나면 아래의 기본 부지 바닥을 반환해 낙하 전환이 가능해야 한다.
+const lastFloorCenterZ = ASTRA_BUILDER_POC_PLOT.center[1] + connectedEnd[2]
+const floorFarEdgeZ = lastFloorCenterZ + ASTRA_BUILDER_POC_PLOT.cellSize * .5
+const supportedOverhangHeight = getAstraBuilderWalkSurfaceHeight({
+  x: connectedX,
+  z: floorFarEdgeZ + defaultDimensions.radius * .5,
+  currentFootY: secondFloorHeight,
+  cells: connectedUpperFloorGrid,
+  plotBaseY,
+  terrainY: 0,
+})
+assert.equal(supportedOverhangHeight, secondFloorHeight)
+const unsupportedHeight = getAstraBuilderWalkSurfaceHeight({
+  x: connectedX,
+  z: floorFarEdgeZ + defaultDimensions.radius + .01,
+  currentFootY: secondFloorHeight,
+  cells: connectedUpperFloorGrid,
+  plotBaseY,
+  terrainY: 0,
+})
+assert.equal(unsupportedHeight, plotBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET)
 
 const ceilingGrid = createEmptyAstraBuilderGrid()
 ceilingGrid[getAstraBuilderCellIndex({ x: 5, y: 2, z: 5 })] = 2
@@ -399,6 +563,27 @@ assert.equal(canAstraBuilderCharacterOccupy(ceilingBodies, {
   z: stairWorldZ,
   footY: plotBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
   scale: .28,
+}), false)
+
+// 3셀 층고에서는 새 기본 크기가 자연스럽게 들어가지만, + 키로 키운
+// 몸체가 2층 바닥을 관통하려는 순간에는 확대가 거부되어야 한다.
+const secondStoryCeilingGrid = createEmptyAstraBuilderGrid()
+secondStoryCeilingGrid[getAstraBuilderCellIndex({ x: 5, y: 3, z: 5 })] = 2
+const secondStoryCeilingBodies = createAstraBuilderCollisionBodies(
+  secondStoryCeilingGrid,
+  plotBaseY,
+)
+assert.equal(canAstraBuilderCharacterOccupy(secondStoryCeilingBodies, {
+  x: stairWorldX,
+  z: stairWorldZ,
+  footY: plotBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
+  scale: .25,
+}), true)
+assert.equal(canAstraBuilderCharacterOccupy(secondStoryCeilingBodies, {
+  x: stairWorldX,
+  z: stairWorldZ,
+  footY: plotBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
+  scale: .41,
 }), false)
 
 // 플레이-빌드는 같은 좌클릭에서 짧은 클릭과 드래그를 이동 거리로 구분한다.

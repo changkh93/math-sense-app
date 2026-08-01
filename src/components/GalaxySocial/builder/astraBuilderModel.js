@@ -11,20 +11,83 @@ export const ASTRA_BUILDER_POC_PLOT = Object.freeze({
 export const ASTRA_BUILDER_HISTORY_LIMIT = 30
 export const ASTRA_BUILDER_BASE_LIFT = .08
 export const ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET = .008
+export const ASTRA_BUILDER_STORY_HEIGHT_CELLS = 3
+export const ASTRA_BUILDER_WALL_PANEL_TYPE = 8
 
 export const ASTRA_BUILDER_BLOCKS = Object.freeze([
-  Object.freeze({ id: 1, key: 'lumen_wall', label: '루멘 벽', color: '#dbe9e8' }),
+  Object.freeze({ id: 8, key: 'lumen_wall_panel', label: '루멘 벽 패널', color: '#dbe9e8' }),
+  Object.freeze({ id: 1, key: 'lumen_wall', label: '벽 조각', color: '#b9cbcc' }),
   Object.freeze({ id: 2, key: 'foundation_floor', label: '기초 바닥', color: '#607989' }),
   Object.freeze({ id: 3, key: 'nebula_glass', label: '성운 유리', color: '#72dff1' }),
   Object.freeze({ id: 4, key: 'star_light', label: '별빛 조명', color: '#ffe58a' }),
-  Object.freeze({ id: 5, key: 'step_block', label: '기본 계단', color: '#9bb6b7' }),
+  Object.freeze({ id: 5, key: 'step_block', label: '계단 (1/3층)', color: '#9bb6b7' }),
   Object.freeze({ id: 6, key: 'support_pillar', label: '지지 기둥', color: '#476171' }),
-  Object.freeze({ id: 7, key: 'lumen_wood_door', label: '나무 문', color: '#a86f42' }),
+  Object.freeze({ id: 7, key: 'lumen_wood_door', label: '나무 문 (3셀)', color: '#a86f42' }),
 ])
 
 export const ASTRA_BUILDER_BLOCK_BY_ID = new Map(
   ASTRA_BUILDER_BLOCKS.map((block) => [block.id, block]),
 )
+
+export function getAstraBuilderLayerInfo(layer, plot = ASTRA_BUILDER_POC_PLOT) {
+  const normalizedLayer = Math.min(
+    plot.height - 1,
+    Math.max(0, Math.floor(Number(layer) || 0)),
+  )
+  const fullStoryCellCount = Math.floor(plot.height / ASTRA_BUILDER_STORY_HEIGHT_CELLS)
+    * ASTRA_BUILDER_STORY_HEIGHT_CELLS
+  if (normalizedLayer >= fullStoryCellCount) {
+    return {
+      layer: normalizedLayer,
+      story: null,
+      course: normalizedLayer - fullStoryCellCount + 1,
+      courseCount: plot.height - fullStoryCellCount,
+      label: '옥상',
+    }
+  }
+  const story = Math.floor(normalizedLayer / ASTRA_BUILDER_STORY_HEIGHT_CELLS) + 1
+  const course = normalizedLayer % ASTRA_BUILDER_STORY_HEIGHT_CELLS + 1
+  return {
+    layer: normalizedLayer,
+    story,
+    course,
+    courseCount: ASTRA_BUILDER_STORY_HEIGHT_CELLS,
+    label: `${story}층`,
+  }
+}
+
+export function isAstraBuilderSameStoryLayer(
+  firstLayer,
+  secondLayer,
+  plot = ASTRA_BUILDER_POC_PLOT,
+) {
+  const first = getAstraBuilderLayerInfo(firstLayer, plot)
+  const second = getAstraBuilderLayerInfo(secondLayer, plot)
+  return first.story === second.story && (first.story !== null || first.label === second.label)
+}
+
+export function doesAstraBuilderBlockOccupyLayer(cell, activeLayer) {
+  if (!cell) return false
+  const blockType = Number(cell.type ?? cell.blockType ?? 0)
+  const heightCells = blockType === 7 || blockType === ASTRA_BUILDER_WALL_PANEL_TYPE
+    ? ASTRA_BUILDER_STORY_HEIGHT_CELLS
+    : 1
+  const layer = Number(activeLayer)
+  return layer >= Number(cell.y) && layer < Number(cell.y) + heightCells
+}
+
+export function normalizeAstraBuilderPlacementCell(
+  cell,
+  blockType,
+  plot = ASTRA_BUILDER_POC_PLOT,
+) {
+  if (!cell) return null
+  if (Number(blockType) !== ASTRA_BUILDER_WALL_PANEL_TYPE) return { ...cell }
+  const baseY = Math.floor(Number(cell.y) / ASTRA_BUILDER_STORY_HEIGHT_CELLS)
+    * ASTRA_BUILDER_STORY_HEIGHT_CELLS
+  const normalized = { ...cell, y: baseY }
+  return baseY + ASTRA_BUILDER_STORY_HEIGHT_CELLS <= plot.height ? normalized : null
+}
 
 const TYPE_MASK = 0xff
 const ROTATION_SHIFT = 8
@@ -171,13 +234,45 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
   }
 }
 
+export function getAstraBuilderWallPanelAnchorAtCell(
+  cells,
+  cell,
+  plot = ASTRA_BUILDER_POC_PLOT,
+) {
+  if (!(cells instanceof Uint16Array) || !isAstraBuilderCellInBounds(cell, plot)) return null
+  for (let offset = 0; offset < ASTRA_BUILDER_STORY_HEIGHT_CELLS; offset += 1) {
+    const anchor = { x: cell.x, y: cell.y - offset, z: cell.z }
+    const index = getAstraBuilderCellIndex(anchor, plot)
+    if (index < 0) continue
+    const decoded = decodeAstraBuilderCell(cells[index])
+    if (decoded.blockType === ASTRA_BUILDER_WALL_PANEL_TYPE) return anchor
+  }
+  return null
+}
+
 export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_POC_PLOT) {
   if (!(cells instanceof Uint16Array) || edit?.tool !== 'place') return null
   const cell = edit.cell
   const index = getAstraBuilderCellIndex(cell, plot)
   if (index < 0) return 'out_of_bounds'
-  if (decodeAstraBuilderCell(cells[index]).occupied) return 'occupied'
+  if (
+    decodeAstraBuilderCell(cells[index]).occupied
+    || getAstraBuilderWallPanelAnchorAtCell(cells, cell, plot)
+  ) return 'occupied'
   if (!ASTRA_BUILDER_BLOCK_BY_ID.has(Number(edit.blockType))) return 'invalid_block'
+
+  if (Number(edit.blockType) === ASTRA_BUILDER_WALL_PANEL_TYPE) {
+    if (cell.y % ASTRA_BUILDER_STORY_HEIGHT_CELLS !== 0) return 'panel_not_story_base'
+    for (let offset = 0; offset < ASTRA_BUILDER_STORY_HEIGHT_CELLS; offset += 1) {
+      const occupiedCell = { ...cell, y: cell.y + offset }
+      const occupiedIndex = getAstraBuilderCellIndex(occupiedCell, plot)
+      if (occupiedIndex < 0) return 'panel_out_of_bounds'
+      if (
+        decodeAstraBuilderCell(cells[occupiedIndex]).occupied
+        || getAstraBuilderWallPanelAnchorAtCell(cells, occupiedCell, plot)
+      ) return 'occupied'
+    }
+  }
 
   const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells, plot)
   const candidateColumnKey = `${cell.x}:${cell.z}`
@@ -257,6 +352,21 @@ export function getAstraBuilderCellFromWorldPoint(
   return isAstraBuilderCellInBounds(cell, plot) ? cell : null
 }
 
+export function getAstraBuilderLayerEditTarget({
+  point,
+  activeLayer,
+  clickedCell = null,
+  tool = 'place',
+  plot = ASTRA_BUILDER_POC_PLOT,
+}) {
+  const layer = Number(activeLayer)
+  // Deletion and rotation always address the concrete object that received the
+  // click. The caller can then enforce the selected-layer filter explicitly
+  // instead of silently redirecting the edit to an empty cell below/above it.
+  if (tool !== 'place' && clickedCell) return clickedCell
+  return getAstraBuilderCellFromWorldPoint(point, layer, plot)
+}
+
 export function getAstraBuilderWalkSurfaceOffset(
   x,
   z,
@@ -275,9 +385,9 @@ export function getAstraBuilderWalkSurfaceOffset(
 export function getAstraBuilderStairAscentVector(rotation) {
   const normRot = ((rotation % 4) + 4) % 4
   switch (normRot) {
-    case 0: return { dirX: 0, dirZ: -1 }
+    case 0: return { dirX: 0, dirZ: 1 }
     case 1: return { dirX: 1, dirZ: 0 }
-    case 2: return { dirX: 0, dirZ: 1 }
+    case 2: return { dirX: 0, dirZ: -1 }
     case 3: return { dirX: -1, dirZ: 0 }
     default: return { dirX: 0, dirZ: -1 }
   }

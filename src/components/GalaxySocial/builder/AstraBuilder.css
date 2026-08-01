@@ -182,13 +182,23 @@
   text-align: center;
 }
 
-.astra-builder-hud__modes button {
+.astra-builder-hud__modes button,
+.astra-builder-hud__view-mode {
   display: inline-flex;
   align-items: center;
   gap: .3rem;
   min-height: 38px;
   padding: 0 .7rem;
   border-radius: 12px;
+}
+
+.astra-builder-hud__view-mode {
+  border: 1px solid rgba(124, 242, 189, .22);
+  color: #b9d7ce;
+  background: rgba(7, 20, 31, .72);
+  font-size: .68rem;
+  font-weight: 750;
+  white-space: nowrap;
 }
 
 .astra-builder-hud__tools,
@@ -338,7 +348,8 @@
     transform: none;
   }
 
-  .astra-builder-hud__modes button {
+  .astra-builder-hud__modes button,
+  .astra-builder-hud__view-mode {
     justify-content: center;
     width: 42px;
     padding: 0;
@@ -346,7 +357,8 @@
     font-size: 0;
   }
 
-  .astra-builder-hud__modes button svg {
+  .astra-builder-hud__modes button svg,
+  .astra-builder-hud__view-mode svg {
     flex: 0 0 auto;
   }
 

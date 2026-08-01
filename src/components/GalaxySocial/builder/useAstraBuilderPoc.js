@@ -17,10 +17,15 @@ import {
   saveAstraBuilderDraft,
   saveAstraBuilderRecoveryDraft,
 } from './astraBuilderStorage'
-import { planAstraBuilderServerHydration } from './astraBuilderSync'
+import {
+  getAstraBuilderRetryDelay,
+  planAstraBuilderServerHydration,
+} from './astraBuilderSync'
 
 const SERVER_IDLE_SAVE_MS = 3_000
 const SERVER_MAX_SAVE_MS = 10_000
+const SERVER_RETRY_INITIAL_MS = 15_000
+const SERVER_RETRY_MAX_MS = 120_000
 
 function createBuilderState() {
   return {
@@ -97,6 +102,9 @@ function getSyncErrorMessage(error) {
   const code = String(error?.code || '')
   if (code.endsWith('/deadline-exceeded')) return '저장 유예 시간이 끝났습니다. 기기 초안은 안전하게 남아 있어요.'
   if (code.endsWith('/permission-denied')) return '다른 기기에서 이 건축실을 열었습니다. 기기 초안은 보존했어요.'
+  if (code.endsWith('/invalid-argument') || code.endsWith('/failed-precondition')) {
+    return '서버 빌더 버전 업데이트가 필요합니다. 기기 초안은 안전하게 보관했어요.'
+  }
   return '서버 연결을 기다리는 중입니다. 기기에는 안전하게 보관했어요.'
 }
 
@@ -121,6 +129,7 @@ export default function useAstraBuilderPoc(
   const [serverRevision, setServerRevision] = useState(0)
   const [serverError, setServerError] = useState('')
   const [serverRetryToken, setServerRetryToken] = useState(0)
+  const [serverBackoffVersion, setServerBackoffVersion] = useState(0)
   const [conflict, setConflict] = useState(null)
   const stateRef = useRef(state)
   const conflictRef = useRef(conflict)
@@ -134,6 +143,8 @@ export default function useAstraBuilderPoc(
   const syncPromiseRef = useRef(null)
   const idleTimerRef = useRef(null)
   const maxTimerRef = useRef(null)
+  const serverRetryDelayRef = useRef(0)
+  const serverRetryAtRef = useRef(0)
   const hydrated = !enabled || !storageKey || loadedStorageKey === storageKey
   const serverEnabled = Boolean(
     enabled
@@ -159,6 +170,25 @@ export default function useAstraBuilderPoc(
     maxTimerRef.current = null
   }, [])
 
+  const resetServerBackoff = useCallback(() => {
+    if (!serverRetryDelayRef.current && !serverRetryAtRef.current) return
+    serverRetryDelayRef.current = 0
+    serverRetryAtRef.current = 0
+    setServerBackoffVersion((current) => current + 1)
+  }, [])
+
+  const deferServerRetry = useCallback(() => {
+    clearServerTimers()
+    const nextDelay = getAstraBuilderRetryDelay(
+      serverRetryDelayRef.current,
+      SERVER_RETRY_INITIAL_MS,
+      SERVER_RETRY_MAX_MS,
+    )
+    serverRetryDelayRef.current = nextDelay
+    serverRetryAtRef.current = Date.now() + nextDelay
+    setServerBackoffVersion((current) => current + 1)
+  }, [clearServerTimers])
+
   useEffect(() => {
     let cancelled = false
     loadedDraftRef.current = null
@@ -166,6 +196,8 @@ export default function useAstraBuilderPoc(
     serverLeaseRef.current = null
     serverRevisionRef.current = 0
     serverSyncedLocalRevisionRef.current = 0
+    serverRetryDelayRef.current = 0
+    serverRetryAtRef.current = 0
     setLoadedStorageKey('')
     setServerReady(false)
     setServerRevision(0)
@@ -282,7 +314,6 @@ export default function useAstraBuilderPoc(
       const snapshot = stateRef.current
       if (snapshot.revision === serverSyncedLocalRevisionRef.current) return true
       setServerSyncing(true)
-      setServerError('')
       try {
         const result = await saveServerState({
           plotId: ASTRA_BUILDER_POC_PLOT.id,
@@ -298,6 +329,8 @@ export default function useAstraBuilderPoc(
         serverRevisionRef.current = nextServerRevision
         serverSyncedLocalRevisionRef.current = snapshot.revision
         setServerRevision(nextServerRevision)
+        resetServerBackoff()
+        setServerError('')
         clearServerTimers()
         const latest = stateRef.current
         await saveAstraBuilderDraft(storageKey, latest.cells, {
@@ -322,9 +355,11 @@ export default function useAstraBuilderPoc(
             await setRevisionConflict(stateRef.current, latestServer, 'revision-conflict')
           } catch (refreshError) {
             setServerError(getSyncErrorMessage(refreshError))
+            deferServerRetry()
           }
         } else {
           setServerError(getSyncErrorMessage(error))
+          deferServerRetry()
         }
         return false
       } finally {
@@ -340,10 +375,12 @@ export default function useAstraBuilderPoc(
     }
   }, [
     clearServerTimers,
+    deferServerRetry,
     flush,
     openServerPlot,
     saveServerState,
     serverReady,
+    resetServerBackoff,
     setRevisionConflict,
     storageKey,
   ])
@@ -353,6 +390,7 @@ export default function useAstraBuilderPoc(
       openedServerKeyRef.current = ''
       setServerReady(false)
       clearServerTimers()
+      resetServerBackoff()
       return
     }
     if (!serverEnabled || !hydrated || conflictRef.current) return
@@ -415,6 +453,8 @@ export default function useAstraBuilderPoc(
           setSavedRevision(0)
         }
         setServerReady(true)
+        resetServerBackoff()
+        setServerError('')
       })
       .catch((error) => {
         if (!cancelled) {
@@ -432,6 +472,7 @@ export default function useAstraBuilderPoc(
     clearServerTimers,
     hydrated,
     openServerPlot,
+    resetServerBackoff,
     serverActive,
     serverEnabled,
     serverSessionKey,
@@ -450,16 +491,17 @@ export default function useAstraBuilderPoc(
       if (state.revision === serverSyncedLocalRevisionRef.current) clearServerTimers()
       return undefined
     }
+    const retryWaitMs = Math.max(0, serverRetryAtRef.current - Date.now())
     if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current)
     idleTimerRef.current = window.setTimeout(() => {
       idleTimerRef.current = null
       void syncNow()
-    }, SERVER_IDLE_SAVE_MS)
+    }, Math.max(SERVER_IDLE_SAVE_MS, retryWaitMs))
     if (!maxTimerRef.current) {
       maxTimerRef.current = window.setTimeout(() => {
         maxTimerRef.current = null
         void syncNow()
-      }, SERVER_MAX_SAVE_MS)
+      }, Math.max(SERVER_MAX_SAVE_MS, retryWaitMs))
     }
     return () => {
       if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current)
@@ -468,8 +510,8 @@ export default function useAstraBuilderPoc(
   }, [
     clearServerTimers,
     conflict,
+    serverBackoffVersion,
     serverEnabled,
-    serverError,
     serverReady,
     state.revision,
     syncNow,
@@ -505,6 +547,7 @@ export default function useAstraBuilderPoc(
   useEffect(() => {
     if (!serverEnabled) return undefined
     const retryWhenOnline = () => {
+      resetServerBackoff()
       if (serverReady) {
         void syncNow()
         return
@@ -514,7 +557,7 @@ export default function useAstraBuilderPoc(
     }
     window.addEventListener('online', retryWhenOnline)
     return () => window.removeEventListener('online', retryWhenOnline)
-  }, [serverEnabled, serverReady, syncNow])
+  }, [resetServerBackoff, serverEnabled, serverReady, syncNow])
 
   const resolveConflict = useCallback(async (strategy) => {
     const currentConflict = conflictRef.current

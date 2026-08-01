@@ -15,6 +15,7 @@ import AstraBuilderPlot from './builder/AstraBuilderPlot'
 import {
   ASTRA_BUILDER_BASE_LIFT,
   ASTRA_BUILDER_POC_PLOT,
+  getAstraBuilderLayerInfo,
 } from './builder/astraBuilderModel'
 import {
   canAstraBuilderCharacterOccupy,
@@ -23,13 +24,15 @@ import {
   getAstraBuilderCharacterDimensions,
   getAstraBuilderWalkSurfaceHeight,
 } from './builder/astraBuilderPhysics'
-import { isAstraBuilderViewDrag, isAstraBuilderViewPointer } from './builder/astraBuilderInput'
+import {
+  ASTRA_BUILDER_CLICK_DRAG_THRESHOLD,
+  isAstraBuilderViewDrag,
+  isAstraBuilderViewPointer,
+} from './builder/astraBuilderInput'
 import {
   createThirdPersonReturnPose,
   getWheelZoomValue,
-  projectCircleOutOfAabb,
-  projectCircleOutOfCircle,
-  resolveCameraLineOfSight,
+  isTerrainHazardBlocking,
 } from './galaxyNavigationSafety'
 import useAstraBuilderPoc from './builder/useAstraBuilderPoc'
 import WorldTerrain from './GalaxyTerrain3D'
@@ -59,11 +62,11 @@ const PLAYER_TURN_SPEED = Math.PI * 2.4
 const PLAYER_MOVE_START_ANGLE = THREE.MathUtils.degToRad(25)
 const PLAYER_MOVE_FULL_ANGLE = THREE.MathUtils.degToRad(6)
 const WORLD_UP = new THREE.Vector3(0, 1, 0)
-const CHARACTER_SCALE = .28
+const CHARACTER_SCALE = .25
 const CHARACTER_MIN_SCALE = .14
 const CHARACTER_MAX_SCALE = .7
 const CHARACTER_SCALE_STEP = .04
-const PLAYER_COLLISION_RADIUS = .14
+const PLAYER_COLLISION_RADIUS = .125
 const STATIC_BLOCKER_COLLISION_RADIUS = .78
 const CAMERA_TARGET_HEIGHT = .44
 const FIRST_PERSON_DEFAULT_FOV = 58
@@ -77,6 +80,7 @@ const THIRD_PERSON_MIN_DISTANCE = .65
 const THIRD_PERSON_MAX_DISTANCE = 58
 const FIRST_PERSON_MIN_FOV = 14
 const FIRST_PERSON_MAX_FOV = 118
+const BUILDER_FIRST_PERSON_MAX_FOV = 135
 const MOUSE_LOOK_YAW_SENSITIVITY = .0026
 const MOUSE_LOOK_PITCH_SENSITIVITY = .0021
 const MOUSE_LOOK_MAX_FRAME_DELTA = 420
@@ -3438,7 +3442,17 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   const stepDistance = useRef(0)
   const collisionLatched = useRef(false)
   const collisionClearDuration = useRef(0)
-  const hoverLook = useRef({ pendingX: 0, pendingY: 0, lastX: null, lastY: null, lastTime: null, orbiting: false })
+  const hoverLook = useRef({
+    pendingX: 0,
+    pendingY: 0,
+    lastX: null,
+    lastY: null,
+    lastTime: null,
+    dragStartX: null,
+    dragStartY: null,
+    builderDragReady: false,
+    orbiting: false,
+  })
   const firstPersonPitch = useRef(0)
   const firstPersonYawOffset = useRef(0)
   const previousCameraMode = useRef(isFirstPerson)
@@ -3454,7 +3468,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     toTarget: new THREE.Vector3(),
   })
   const lastSafePosition = useRef(null)
-  const lastSafePositionAt = useRef(0)
   const movementIntent = useRef(createMovementIntent())
   const movementVectors = useRef({
     forward: new THREE.Vector3(),
@@ -3463,7 +3476,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     desiredTarget: new THREE.Vector3(),
     followDelta: new THREE.Vector3(),
     cameraOffset: new THREE.Vector3(),
-    cameraDesiredPosition: new THREE.Vector3(),
     cameraSpherical: new THREE.Spherical(),
     listenerForward: new THREE.Vector3(),
     listenerUp: new THREE.Vector3(),
@@ -3475,6 +3487,9 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     hoverLook.current.lastX = null
     hoverLook.current.lastY = null
     hoverLook.current.lastTime = null
+    hoverLook.current.dragStartX = null
+    hoverLook.current.dragStartY = null
+    hoverLook.current.builderDragReady = false
   }, [])
 
   useEffect(() => {
@@ -3500,19 +3515,11 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     }
 
     const down = (event) => {
-      if (paused || isTextInput(event.target)) return
-      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
-        keys.current.add('SPRINT')
-        return
-      }
-      if (event.code === 'Space') {
-        event.preventDefault()
-        if (!event.repeat) jump.current.requested = true
-        return
-      }
+      if (isTextInput(event.target)) return
       const isScaleUp = event.code === 'Equal' || event.code === 'NumpadAdd' || event.key === '+'
       const isScaleDown = event.code === 'Minus' || event.code === 'NumpadSubtract' || event.key === '-'
       if (!event.ctrlKey && !event.metaKey && (isScaleUp || isScaleDown)) {
+        if (paused && !builderOverview) return
         event.preventDefault()
         if (!event.repeat) {
           const nextScale = THREE.MathUtils.clamp(
@@ -3531,6 +3538,16 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
             characterScale.current = nextScale
           }
         }
+        return
+      }
+      if (paused) return
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+        keys.current.add('SPRINT')
+        return
+      }
+      if (event.code === 'Space') {
+        event.preventDefault()
+        if (!event.repeat) jump.current.requested = true
         return
       }
       const dir = mapKey(event)
@@ -3557,9 +3574,14 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       window.removeEventListener('blur', resetInput)
       document.removeEventListener('visibilitychange', visibility)
     }
-  }, [canUseCharacterScale, inputRef, onScaleBlocked, paused])
+  }, [builderBuildMode, builderOverview, canUseCharacterScale, inputRef, onScaleBlocked, paused])
 
   const firstPersonFov = useRef(FIRST_PERSON_DEFAULT_FOV)
+
+  useEffect(() => {
+    if (builderBuildMode) return
+    firstPersonFov.current = Math.min(firstPersonFov.current, FIRST_PERSON_MAX_FOV)
+  }, [builderBuildMode])
 
   useEffect(() => {
     firstPersonYawOffset.current = 0
@@ -3609,13 +3631,16 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       if (paused || event.target !== gl.domElement || event.ctrlKey || event.metaKey) return
       event.preventDefault()
       if (isFirstPerson) {
+        const maxFirstPersonFov = builderBuildMode
+          ? BUILDER_FIRST_PERSON_MAX_FOV
+          : FIRST_PERSON_MAX_FOV
         firstPersonFov.current = getWheelZoomValue({
           current: firstPersonFov.current,
           deltaY: event.deltaY,
           deltaMode: event.deltaMode,
           min: FIRST_PERSON_MIN_FOV,
-          max: FIRST_PERSON_MAX_FOV,
-          sensitivity: .00135,
+          max: maxFirstPersonFov,
+          sensitivity: builderBuildMode ? .0016 : .00135,
         })
         return
       }
@@ -3637,7 +3662,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const canvas = gl.domElement
     canvas.addEventListener('wheel', handleWheel, { passive: false })
     return () => canvas.removeEventListener('wheel', handleWheel)
-  }, [camera, gl, isFirstPerson, paused])
+  }, [builderBuildMode, camera, gl, isFirstPerson, paused])
 
   useEffect(() => {
     if (!paused) return
@@ -3671,7 +3696,16 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         const eventGap = look.lastTime === null ? 0 : event.timeStamp - look.lastTime
         const resumedWithPointerJump = eventGap > MOUSE_LOOK_REENTRY_GAP_MS
           && Math.hypot(deltaX, deltaY) > MOUSE_LOOK_REENTRY_DISTANCE
-        if (!resumedWithPointerJump) {
+        const isPendingBuildClick = builderBuildMode
+          && (Number(event.buttons || 0) & 1) !== 0
+          && !look.builderDragReady
+        if (isPendingBuildClick && look.dragStartX !== null && look.dragStartY !== null) {
+          look.builderDragReady = Math.hypot(
+            event.clientX - look.dragStartX,
+            event.clientY - look.dragStartY,
+          ) > ASTRA_BUILDER_CLICK_DRAG_THRESHOLD
+        }
+        if (!resumedWithPointerJump && (!isPendingBuildClick || look.builderDragReady)) {
           look.pendingX += THREE.MathUtils.clamp(deltaX, -MOUSE_LOOK_MAX_FRAME_DELTA, MOUSE_LOOK_MAX_FRAME_DELTA)
           look.pendingY += THREE.MathUtils.clamp(deltaY, -MOUSE_LOOK_MAX_FRAME_DELTA, MOUSE_LOOK_MAX_FRAME_DELTA)
         }
@@ -3683,6 +3717,12 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const startViewDrag = (event) => {
       resetFreeLook()
       if (!builderBuildMode || !isAstraBuilderViewPointer(event)) return
+      hoverLook.current.lastX = event.clientX
+      hoverLook.current.lastY = event.clientY
+      hoverLook.current.lastTime = event.timeStamp
+      hoverLook.current.dragStartX = event.clientX
+      hoverLook.current.dragStartY = event.clientY
+      hoverLook.current.builderDragReady = event.button !== 0
       canvas.classList.add('astra-builder-view-dragging')
     }
     const stopViewDrag = () => {
@@ -3726,7 +3766,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       desiredTarget,
       followDelta,
       cameraOffset,
-      cameraDesiredPosition,
       cameraSpherical,
       listenerForward,
       listenerUp,
@@ -3784,7 +3823,9 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     // At yaw=0, forward=(0,0,1), so forward×up = (-1,0,0) which is screen-right (the camera
     // looks toward +Z, so its local +X/screen-right maps to world -X). This makes a positive
     // `moveX` (D / ▶ key) always move the character to screen-right in BOTH view modes.
-    if (isFirstPerson) {
+    if (builderOverview) {
+      if (controls.current) controls.current.enabled = false
+    } else if (isFirstPerson) {
       forward.set(Math.sin(group.current.rotation.y), 0, Math.cos(group.current.rotation.y)).normalize()
     } else if (orbitCamera) {
       orbitCamera.getWorldDirection(forward)
@@ -3820,42 +3861,13 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
           acousticMaterial: 'soft',
         }
       }
-      if (isRiverWater(testX, testZ) && !isBridgeDeck(testX, testZ)) return true
-      if (!isBridgeDeck(testX, testZ) && terrainSlope(testX, testZ) > 1.08) return true
-      return false
-    }
-
-    const resolveCurrentPenetration = (footY) => {
-      let resolvedX = group.current.position.x
-      let resolvedZ = group.current.position.z
-      let moved = false
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const hit = checkObstacle(resolvedX, resolvedZ, footY)
-        if (!hit || typeof hit !== 'object') break
-        const next = hit.kind === 'astra-builder-block'
-          ? projectCircleOutOfAabb(
-              { x: resolvedX, z: resolvedZ },
-              hit,
-              getAstraBuilderCharacterDimensions(characterScale.current).radius,
-            )
-          : projectCircleOutOfCircle(
-              { x: resolvedX, z: resolvedZ },
-              hit,
-              collisionScaleDelta,
-              lastSafePosition.current
-                ? [lastSafePosition.current.x - hit.position[0], lastSafePosition.current.z - hit.position[2]]
-                : [Math.sin(group.current.rotation.y), Math.cos(group.current.rotation.y)],
-            )
-        if (!next.moved) break
-        resolvedX = next.x
-        resolvedZ = next.z
-        moved = true
-      }
-      if (moved && !checkObstacle(resolvedX, resolvedZ, footY)) {
-        group.current.position.x = resolvedX
-        group.current.position.z = resolvedZ
-        return true
-      }
+      const terrainHazardBlocks = isTerrainHazardBlocking({
+        footY: testFootY,
+        terrainY: walkSurfaceHeight(testX, testZ),
+        maxStepUp: getAstraBuilderCharacterDimensions(characterScale.current).maxStepUp,
+      })
+      if (terrainHazardBlocks && isRiverWater(testX, testZ) && !isBridgeDeck(testX, testZ)) return true
+      if (terrainHazardBlocks && !isBridgeDeck(testX, testZ) && terrainSlope(testX, testZ) > 1.08) return true
       return false
     }
 
@@ -3891,28 +3903,59 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       let targetX = currX
       let targetZ = currZ
       let provisionalFootY = groundHeight.current ?? group.current.position.y
+      const maxGroundedDrop = getAstraBuilderCharacterDimensions(
+        characterScale.current,
+      ).maxStepUp
 
       for (let stepIndex = 0; stepIndex < substepCount; stepIndex += 1) {
         const desiredX = targetX + substepX
         const desiredZ = targetZ + substepZ
-        const directHit = checkObstacle(desiredX, desiredZ, provisionalFootY)
-        if (!directHit) {
-          targetX = desiredX
-          targetZ = desiredZ
-        } else if (!checkObstacle(desiredX, targetZ, provisionalFootY)) {
-          targetX = desiredX
-        } else if (!checkObstacle(targetX, desiredZ, provisionalFootY)) {
-          targetZ = desiredZ
-        } else {
-          obstacleHit = directHit
-          break
-        }
-        provisionalFootY = walkHeightAt(
-          targetX,
-          targetZ,
+        // Resolve the support first. Testing a stair at the previous (lower)
+        // foot height makes its rising face look like a wall.
+        const desiredFootY = walkHeightAt(
+          desiredX,
+          desiredZ,
           provisionalFootY,
           characterScale.current,
         )
+        const collisionFootY = desiredFootY < provisionalFootY - maxGroundedDrop
+          ? provisionalFootY
+          : desiredFootY
+        const directHit = checkObstacle(desiredX, desiredZ, collisionFootY)
+        if (!directHit) {
+          targetX = desiredX
+          targetZ = desiredZ
+          provisionalFootY = collisionFootY
+        } else {
+          const slideXFootY = walkHeightAt(
+            desiredX,
+            targetZ,
+            provisionalFootY,
+            characterScale.current,
+          )
+          const slideZFootY = walkHeightAt(
+            targetX,
+            desiredZ,
+            provisionalFootY,
+            characterScale.current,
+          )
+          const slideXCollisionFootY = slideXFootY < provisionalFootY - maxGroundedDrop
+            ? provisionalFootY
+            : slideXFootY
+          const slideZCollisionFootY = slideZFootY < provisionalFootY - maxGroundedDrop
+            ? provisionalFootY
+            : slideZFootY
+          if (!checkObstacle(desiredX, targetZ, slideXCollisionFootY)) {
+            targetX = desiredX
+            provisionalFootY = slideXCollisionFootY
+          } else if (!checkObstacle(targetX, desiredZ, slideZCollisionFootY)) {
+            targetZ = desiredZ
+            provisionalFootY = slideZCollisionFootY
+          } else {
+            obstacleHit = directHit
+            break
+          }
+        }
       }
 
       movedDistance = Math.hypot(targetX - currX, targetZ - currZ)
@@ -3953,22 +3996,31 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     const currentFootY = groundHeight.current ?? group.current.position.y
     const currentObstacle = checkObstacle(group.current.position.x, group.current.position.z, currentFootY)
-    if (currentObstacle && typeof currentObstacle === 'object') {
-      const escaped = resolveCurrentPenetration(currentFootY)
-      if (!escaped && lastSafePosition.current) {
+    if (currentObstacle) {
+      // A normal movement substep never enters a collider. If external state
+      // changes around the player, restore only the immediately previous valid
+      // pose instead of projecting across a whole collider or rewinding 0.3 s.
+      if (lastSafePosition.current) {
         group.current.position.copy(lastSafePosition.current)
         groundHeight.current = lastSafePosition.current.y
         jump.current.height = 0
         jump.current.velocity = 0
       }
-    } else if (
-      !currentObstacle
-      && jump.current.height <= .001
-      && state.clock.elapsedTime - lastSafePositionAt.current >= .3
-    ) {
-      if (!lastSafePosition.current) lastSafePosition.current = new THREE.Vector3()
-      lastSafePosition.current.copy(group.current.position)
-      lastSafePositionAt.current = state.clock.elapsedTime
+    } else if (!currentObstacle && jump.current.height <= .001) {
+      const currentSupportY = walkHeightAt(
+        group.current.position.x,
+        group.current.position.z,
+        currentFootY,
+        characterScale.current,
+      )
+      const maxSupportedDrop = getAstraBuilderCharacterDimensions(
+        characterScale.current,
+      ).maxStepUp
+      if (currentSupportY >= currentFootY - maxSupportedDrop) {
+        if (!lastSafePosition.current) lastSafePosition.current = new THREE.Vector3()
+        lastSafePosition.current.copy(group.current.position)
+        lastSafePosition.current.y = currentFootY
+      }
     }
 
     const locomoting = moving && movementAmount > .01
@@ -4005,9 +4057,34 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       groundHeight.current,
       characterScale.current,
     )
-    groundHeight.current = groundHeight.current === null
-      ? surfaceY
-      : THREE.MathUtils.lerp(groundHeight.current, surfaceY, Math.min(1, delta * 9))
+    const maxGroundedDrop = getAstraBuilderCharacterDimensions(
+      characterScale.current,
+    ).maxStepUp
+    if (groundHeight.current === null) {
+      groundHeight.current = surfaceY
+    } else if (
+      jump.current.height <= .001
+      && jump.current.velocity <= 0
+      && surfaceY < groundHeight.current - maxGroundedDrop
+    ) {
+      // Preserve the absolute foot height when support disappears. The
+      // existing jump channel then becomes a gravity-driven fall toward the
+      // highest walkable surface below, instead of teleporting to the ground.
+      const absoluteFootY = group.current.position.y
+      groundHeight.current = surfaceY
+      jump.current.height = Math.max(0, absoluteFootY - surfaceY)
+      jump.current.velocity = Math.min(0, jump.current.velocity)
+    } else if (jump.current.height > .001 || jump.current.velocity !== 0) {
+      const absoluteFootY = groundHeight.current + jump.current.height
+      groundHeight.current = surfaceY
+      jump.current.height = Math.max(0, absoluteFootY - surfaceY)
+    } else {
+      groundHeight.current = THREE.MathUtils.lerp(
+        groundHeight.current,
+        surfaceY,
+        Math.min(1, delta * 9),
+      )
+    }
     if (!paused) {
       if (jump.current.requested && jump.current.height <= .001) {
         jump.current.velocity = PLAYER_JUMP_VELOCITY
@@ -4118,24 +4195,9 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
             orbitCamera.position.copy(controls.current.target).add(cameraOffset)
           }
         }
-        cameraDesiredPosition.copy(orbitCamera.position)
-        const lineOfSight = resolveCameraLineOfSight({
-          target: [controls.current.target.x, controls.current.target.y, controls.current.target.z],
-          desiredPosition: [
-            cameraDesiredPosition.x,
-            cameraDesiredPosition.y,
-            cameraDesiredPosition.z,
-          ],
-          colliders: structureColliders,
-          padding: Math.max(.12, characterScale.current * .42),
-          minDistance: controls.current.minDistance,
-        })
-        if (lineOfSight.obstructed) {
-          const cameraCollisionStrength = 1 - Math.exp(-delta * 24)
-          cameraDesiredPosition.set(...lineOfSight.position)
-          orbitCamera.position.lerp(cameraDesiredPosition, cameraCollisionStrength)
-          orbitCamera.lookAt(controls.current.target)
-        }
+        // Do not mutate camera distance from movement colliders. The previous
+        // line-of-sight correction fought the user's zoom distance every frame,
+        // producing visible zoom pulses at collider boundaries.
         const minimumCameraY = terrainHeight(orbitCamera.position.x, orbitCamera.position.z) + .6
         if (orbitCamera.position.y < minimumCameraY) {
           orbitCamera.position.setY(THREE.MathUtils.lerp(orbitCamera.position.y, minimumCameraY, Math.min(1, delta * 12)))
@@ -4143,7 +4205,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       }
     }
 
-    if (body.current) body.current.visible = !isFirstPerson
+    if (body.current) body.current.visible = builderOverview || !isFirstPerson
 
     if (
       FRONTIER_AUDIO_ASSETS_READY
@@ -4216,8 +4278,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         enablePan={false}
         enableKeys={false}
         enableZoom={false}
-        enableDamping
-        dampingFactor={.08}
+        enableDamping={false}
         rotateSpeed={.56}
         zoomSpeed={1.05}
         minDistance={isFirstPerson ? 0.05 : getThirdPersonMinDistance(CHARACTER_SCALE)}
@@ -4225,7 +4286,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         minPolarAngle={isFirstPerson ? 0.1 : CAMERA_MIN_POLAR}
         maxPolarAngle={isFirstPerson ? Math.PI - 0.1 : CAMERA_MAX_POLAR}
         mouseButtons={{
-          LEFT: THREE.MOUSE.ROTATE,
+          LEFT: builderBuildMode ? undefined : THREE.MOUSE.ROTATE,
           MIDDLE: builderBuildMode ? THREE.MOUSE.ROTATE : THREE.MOUSE.DOLLY,
           RIGHT: THREE.MOUSE.ROTATE,
         }}
@@ -4242,7 +4303,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         }}
       />}
       <group ref={group} position={[0, walkHeightAt(0, 5), 5]} scale={CHARACTER_SCALE}>
-        <group ref={body} visible={!isFirstPerson}>
+        <group ref={body} visible={builderOverview || !isFirstPerson}>
           <mesh position={[0, 1.2, 0]} scale={[.92, 1, .8]} castShadow><capsuleGeometry args={[.39, .72, 8, 14]} /><meshStandardMaterial color="#e8f2f3" roughness={.34} metalness={.08} /></mesh>
           <mesh position={[0, 1.18, .35]}><boxGeometry args={[.5, .42, .08]} /><meshStandardMaterial color="#253e54" metalness={.5} roughness={.25} /></mesh>
           <mesh position={[0, 1.18, .405]}><boxGeometry args={[.28, .08, .035]} /><meshStandardMaterial color="#7cf2bd" emissive="#2a9b71" emissiveIntensity={1.5} toneMapped={false} /></mesh>
@@ -4282,7 +4343,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderLayerChange, onBuilderTargetLayerChange, onBuilderEdit, onBuilderScaleBlocked }) {
+function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderInvalidEdit, onBuilderScaleBlocked }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const basePalette = BIOMES[planet?.theme] || BIOMES.forest
   const restorationProgress = THREE.MathUtils.clamp(Number(restorationPercent || 0), 0, 100)
@@ -4621,9 +4682,8 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
           activeLayer={builderLayer}
           selectedBlockType={builderBlockType}
           selectedRotation={builderRotation}
-          onLayerChange={onBuilderLayerChange}
-          onTargetLayerChange={onBuilderTargetLayerChange}
           onEdit={onBuilderEdit}
+          onInvalidEdit={onBuilderInvalidEdit}
           playerGroupRef={playerGroupRef}
           useCharacterCamera
         />
@@ -4991,8 +5051,7 @@ export default function GalaxyWorld3D({
   const [builderInputMode, setBuilderInputMode] = useState('build')
   const [builderTool, setBuilderTool] = useState('place')
   const [builderLayer, setBuilderLayer] = useState(0)
-  const [builderTargetLayer, setBuilderTargetLayer] = useState(0)
-  const [builderBlockType, setBuilderBlockType] = useState(1)
+  const [builderBlockType, setBuilderBlockType] = useState(8)
   const [builderRotation, setBuilderRotation] = useState(0)
   const [mapExpanded, setMapExpanded] = useState(false)
   const beaconRepaired = Boolean(frontierStory?.completedStepIds?.includes('restore_beacon'))
@@ -5054,7 +5113,6 @@ export default function GalaxyWorld3D({
     onCancelBuild?.()
     setNearby(null)
     setBuilderLayer(builderPlayerLayer)
-    setBuilderTargetLayer(builderPlayerLayer)
     setBuilderInputMode('build')
     setBuilderActive(true)
     onBuilderModeChange?.(true)
@@ -5311,7 +5369,7 @@ export default function GalaxyWorld3D({
       } else if (event.code === 'KeyE') {
         event.preventDefault()
         setBuilderInputMode('build')
-      } else if (event.code === 'KeyV') {
+      } else if (event.code === 'KeyV' && builderInputMode === 'build') {
         event.preventDefault()
         onToggleFirstPerson?.()
       } else if (event.code === 'PageUp' || event.code === 'PageDown') {
@@ -5330,7 +5388,7 @@ export default function GalaxyWorld3D({
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [builder, builderActive, closeAstraBuilder, onToggleFirstPerson])
+  }, [builder, builderActive, builderInputMode, closeAstraBuilder, onToggleFirstPerson])
 
   useEffect(() => {
     const keydown = (event) => {
@@ -5503,9 +5561,23 @@ export default function GalaxyWorld3D({
           builderLayer={builderLayer}
           builderBlockType={builderBlockType}
           builderRotation={builderRotation}
-          onBuilderLayerChange={setBuilderLayer}
-          onBuilderTargetLayerChange={setBuilderTargetLayer}
           onBuilderEdit={applyAstraBuilderEditWithFeedback}
+          onBuilderInvalidEdit={({ reason, cell, activeLayer, tool }) => {
+            if (reason !== 'empty') soundManager.play('frontier.build.invalid')
+            if (reason === 'layer_mismatch') {
+              const blockLayer = getAstraBuilderLayerInfo(cell?.y)
+              onMessage?.(
+                `선택한 블록은 ${blockLayer.label} 높이 ${blockLayer.course}/${blockLayer.courseCount}에 있습니다. 편집 높이를 맞춰 주세요.`,
+              )
+            } else if (reason === 'empty') {
+              const editLayer = getAstraBuilderLayerInfo(activeLayer)
+              onMessage?.(`${editLayer.label} 높이 ${editLayer.course}/${editLayer.courseCount}의 이 위치에는 ${tool === 'rotate' ? '회전할' : '삭제할'} 블록이 없습니다.`)
+            } else if (reason === 'out_of_reach') {
+              onMessage?.('블록을 배치하려면 캐릭터가 조금 더 가까이 가야 합니다.')
+            } else if (reason === 'player_overlap') {
+              onMessage?.('캐릭터와 겹치는 자리에는 배치할 수 없습니다. 반 칸 정도 뒤로 이동해 주세요.')
+            }
+          }}
           onBuilderScaleBlocked={() => {
             soundManager.play('frontier.build.invalid')
             onMessage?.('이 공간에서는 더 커질 수 없어요. 벽이나 천장에서 조금 떨어져 주세요.')
@@ -5561,7 +5633,8 @@ export default function GalaxyWorld3D({
         </div>
       )}
       {!builderActive && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>걷기</span><kbd>Shift</kbd><span>달리기</span><kbd>Space</kbd><span>점프</span><kbd>+ / −</kbd><span>크기</span><kbd>V</kbd><span>시점</span><kbd>E / F</kbd><span>상호작용·정보</span></div>}
-      {builderActive && builderInputMode === 'build' && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>이동</span><kbd>클릭</kbd><span>지정·배치</span><kbd>드래그</kbd><span>시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>크기</span><kbd>Q / R</kbd><span>블록 회전</span></div>}
+      {builderActive && builderInputMode === 'build' && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>이동</span><kbd>클릭</kbd><span>지정·배치</span><kbd>드래그</kbd><span>시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>캐릭터 크기</span><kbd>Q / R</kbd><span>블록 회전</span></div>}
+      {builderActive && builderInputMode === 'camera' && <div className="frontier-control-hint"><kbd>드래그</kbd><span>설계 시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>캐릭터 크기</span></div>}
       {(!builderActive || builderInputMode === 'build') && <TouchJoystick inputRef={inputRef} disabled={paused} />}
       {!builderActive && <TouchActionButtons nearby={nearby} onInteract={interact} onInspect={inspectStructure} disabled={paused} />}
       {builderActive && (
@@ -5576,8 +5649,6 @@ export default function GalaxyWorld3D({
           tool={builderTool}
           onToolChange={setBuilderTool}
           activeLayer={builderLayer}
-          playerLayer={builderPlayerLayer}
-          targetLayer={builderTargetLayer}
           onLayerChange={(layer) => setBuilderLayer(THREE.MathUtils.clamp(
             layer,
             0,

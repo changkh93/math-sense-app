@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {
   createThirdPersonReturnPose,
   getWheelZoomValue,
+  isTerrainHazardBlocking,
   projectCircleOutOfAabb,
   projectCircleOutOfCircle,
   resolveCameraLineOfSight,
@@ -52,6 +53,17 @@ assert.equal(getWheelZoomValue({
   max: 58,
   sensitivity: 0.0016,
 }), 58)
+
+assert.equal(isTerrainHazardBlocking({
+  footY: 0.08,
+  terrainY: 0,
+  maxStepUp: 0.1,
+}), true)
+assert.equal(isTerrainHazardBlocking({
+  footY: 1.02,
+  terrainY: 0,
+  maxStepUp: 0.1,
+}), false)
 
 const circleEscape = projectCircleOutOfCircle(
   { x: 0, z: 0 },

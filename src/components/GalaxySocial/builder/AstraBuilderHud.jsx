@@ -16,6 +16,7 @@ import {
 import {
   ASTRA_BUILDER_BLOCKS,
   ASTRA_BUILDER_POC_PLOT,
+  getAstraBuilderLayerInfo,
 } from './astraBuilderModel'
 import './AstraBuilder.css'
 
@@ -38,8 +39,6 @@ export default function AstraBuilderHud({
   tool,
   onToolChange,
   activeLayer,
-  playerLayer = activeLayer,
-  targetLayer = activeLayer,
   onLayerChange,
   selectedBlockType,
   onSelectBlockType,
@@ -55,6 +54,7 @@ export default function AstraBuilderHud({
   serverError = '',
   onResolveConflict,
 }) {
+  const layerInfo = getAstraBuilderLayerInfo(activeLayer)
   return (
     <section className="astra-builder-hud" aria-label="아스트라 빌더 POC">
       <header className="astra-builder-hud__top">
@@ -111,15 +111,24 @@ export default function AstraBuilderHud({
           >
             <Camera size={17} aria-hidden="true" /> 설계도
           </button>
-          <button
-            type="button"
-            className={isFirstPerson ? 'active' : ''}
-            aria-pressed={isFirstPerson}
-            onClick={onToggleFirstPerson}
-            title="1인칭/3인칭 시점 전환 (V)"
-          >
-            <Eye size={17} aria-hidden="true" /> {isFirstPerson ? '1인칭' : '3인칭'}
-          </button>
+          {inputMode === 'build' ? (
+            <button
+              type="button"
+              className={isFirstPerson ? 'active' : ''}
+              aria-pressed={isFirstPerson}
+              onClick={onToggleFirstPerson}
+              title="플레이 시점 전환 (V)"
+            >
+              <Eye size={17} aria-hidden="true" /> {isFirstPerson ? '1인칭' : '3인칭'}
+            </button>
+          ) : (
+            <span
+              className="astra-builder-hud__view-mode"
+              title="캐릭터와 분리된 자유 회전·확대 설계 카메라"
+            >
+              <Eye size={17} aria-hidden="true" /> 자유 설계 시점
+            </span>
+          )}
         </div>
 
         <div className="astra-builder-hud__layer" aria-label="층 엘리베이터">
@@ -128,94 +137,98 @@ export default function AstraBuilderHud({
             disabled={activeLayer <= 0}
             onClick={() => onLayerChange(activeLayer - 1)}
             aria-label="한 층 아래로"
-            title="한 층 아래로 (Page Down)"
+            title="한 높이 칸 아래로 (Page Down)"
           >
             <ChevronDown size={17} aria-hidden="true" />
           </button>
           <span>
-            <small>{inputMode === 'build' ? `현재 ${playerLayer + 1}층 · 조준` : '층 엘리베이터'}</small>
-            <strong>{inputMode === 'build' ? targetLayer + 1 : activeLayer + 1}층</strong>
+            <small>{inputMode === 'build' ? '배치 · 삭제 · 회전' : '층 엘리베이터'}</small>
+            <strong>{layerInfo.label} · 높이 {layerInfo.course}/{layerInfo.courseCount}</strong>
           </span>
           <button
             type="button"
             disabled={activeLayer >= ASTRA_BUILDER_POC_PLOT.height - 1}
             onClick={() => onLayerChange(activeLayer + 1)}
             aria-label="한 층 위로"
-            title="한 층 위로 (Page Up)"
+            title="한 높이 칸 위로 (Page Up)"
           >
             <ChevronUp size={17} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      <aside className="astra-builder-hud__tools" aria-label="건축 도구">
-        <button
-          type="button"
-          className={tool === 'place' ? 'active' : ''}
-          aria-pressed={tool === 'place'}
-          onClick={() => onToolChange('place')}
-        >
-          <Box size={18} aria-hidden="true" /><span>배치</span>
-        </button>
-        <button
-          type="button"
-          className={tool === 'delete' ? 'active' : ''}
-          aria-pressed={tool === 'delete'}
-          onClick={() => onToolChange('delete')}
-        >
-          <Trash2 size={18} aria-hidden="true" /><span>삭제</span>
-        </button>
-        <button
-          type="button"
-          className={tool === 'rotate' ? 'active' : ''}
-          aria-pressed={tool === 'rotate'}
-          onClick={() => onToolChange('rotate')}
-        >
-          <RotateCw size={18} aria-hidden="true" /><span>회전</span>
-        </button>
-      </aside>
-
-      <aside className="astra-builder-hud__history" aria-label="작업 기록">
-        <button type="button" disabled={!canUndo} onClick={onUndo}><Undo2 size={18} aria-hidden="true" /><span>되돌리기</span></button>
-        <button type="button" disabled={!canRedo} onClick={onRedo}><Redo2 size={18} aria-hidden="true" /><span>다시 실행</span></button>
-      </aside>
-
-      <footer className="astra-builder-hud__palette">
-        <div>
-          <small>기본 재료 · 자유 사용</small>
-          <span>선택 회전 {selectedRotation * 90}°</span>
-        </div>
-        <div className="astra-builder-hud__materials">
-          {ASTRA_BUILDER_BLOCKS.map((block) => (
+      {inputMode === 'build' && (
+        <>
+          <aside className="astra-builder-hud__tools" aria-label="건축 도구">
             <button
-              key={block.id}
               type="button"
-              className={selectedBlockType === block.id ? 'active' : ''}
-              aria-pressed={selectedBlockType === block.id}
-              onClick={() => onSelectBlockType(block.id)}
+              className={tool === 'place' ? 'active' : ''}
+              aria-pressed={tool === 'place'}
+              onClick={() => onToolChange('place')}
             >
-              <i style={{ '--builder-block-color': block.color }} />
-              <span>{block.label}</span>
+              <Box size={18} aria-hidden="true" /><span>배치</span>
             </button>
-          ))}
-          <button
-            type="button"
-            className="rotate-selection"
-            onClick={onRotateSelection}
-            title={`배치 방향 변경 (현재 ${selectedRotation * 90}°)`}
-          >
-            <RotateCw
-              size={16}
-              aria-hidden="true"
-              style={{
-                transform: `rotate(${selectedRotation * 90}deg)`,
-                transition: 'transform 0.2s ease',
-              }}
-            />
-            <span>방향 {selectedRotation * 90}°</span>
-          </button>
-        </div>
-      </footer>
+            <button
+              type="button"
+              className={tool === 'delete' ? 'active' : ''}
+              aria-pressed={tool === 'delete'}
+              onClick={() => onToolChange('delete')}
+            >
+              <Trash2 size={18} aria-hidden="true" /><span>삭제</span>
+            </button>
+            <button
+              type="button"
+              className={tool === 'rotate' ? 'active' : ''}
+              aria-pressed={tool === 'rotate'}
+              onClick={() => onToolChange('rotate')}
+            >
+              <RotateCw size={18} aria-hidden="true" /><span>회전</span>
+            </button>
+          </aside>
+
+          <aside className="astra-builder-hud__history" aria-label="작업 기록">
+            <button type="button" disabled={!canUndo} onClick={onUndo}><Undo2 size={18} aria-hidden="true" /><span>되돌리기</span></button>
+            <button type="button" disabled={!canRedo} onClick={onRedo}><Redo2 size={18} aria-hidden="true" /><span>다시 실행</span></button>
+          </aside>
+
+          <footer className="astra-builder-hud__palette">
+            <div>
+              <small>1층 = 높이 3칸 · 옥상 별도</small>
+              <span>선택 회전 {selectedRotation * 90}°</span>
+            </div>
+            <div className="astra-builder-hud__materials">
+              {ASTRA_BUILDER_BLOCKS.map((block) => (
+                <button
+                  key={block.id}
+                  type="button"
+                  className={selectedBlockType === block.id ? 'active' : ''}
+                  aria-pressed={selectedBlockType === block.id}
+                  onClick={() => onSelectBlockType(block.id)}
+                >
+                  <i style={{ '--builder-block-color': block.color }} />
+                  <span>{block.label}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                className="rotate-selection"
+                onClick={onRotateSelection}
+                title={`배치 방향 변경 (현재 ${selectedRotation * 90}°)`}
+              >
+                <RotateCw
+                  size={16}
+                  aria-hidden="true"
+                  style={{
+                    transform: `rotate(${selectedRotation * 90}deg)`,
+                    transition: 'transform 0.2s ease',
+                  }}
+                />
+                <span>방향 {selectedRotation * 90}°</span>
+              </button>
+            </div>
+          </footer>
+        </>
+      )}
     </section>
   )
 }

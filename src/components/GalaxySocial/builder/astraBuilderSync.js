@@ -18,3 +18,14 @@ export function planAstraBuilderServerHydration({
   if (knownLocalBase === null && remoteRevision > 0) return 'conflict'
   return 'local'
 }
+
+export function getAstraBuilderRetryDelay(
+  previousDelay = 0,
+  initialDelay = 15_000,
+  maxDelay = 120_000,
+) {
+  const initial = Math.max(1_000, Number(initialDelay) || 15_000)
+  const maximum = Math.max(initial, Number(maxDelay) || 120_000)
+  const previous = Math.max(0, Number(previousDelay) || 0)
+  return Math.min(maximum, previous > 0 ? previous * 2 : initial)
+}

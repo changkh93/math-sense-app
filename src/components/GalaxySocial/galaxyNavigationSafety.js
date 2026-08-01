@@ -50,6 +50,17 @@ export function getWheelZoomValue({
   return clamp(safeCurrent * Math.exp(normalizedDelta * (Number(sensitivity) || 0)), min, max)
 }
 
+export function isTerrainHazardBlocking({
+  footY,
+  terrainY,
+  maxStepUp = 0.1,
+}) {
+  const foot = Number(footY)
+  const terrain = Number(terrainY)
+  if (!Number.isFinite(foot) || !Number.isFinite(terrain)) return true
+  return foot <= terrain + Math.max(0, Number(maxStepUp) || 0) + EPSILON
+}
+
 export function projectCircleOutOfCircle({ x, z }, collider, padding = 0, fallbackDirection = [1, 0]) {
   const centerX = Number(collider?.position?.[0] ?? collider?.centerX ?? 0)
   const centerZ = Number(collider?.position?.[2] ?? collider?.centerZ ?? 0)
