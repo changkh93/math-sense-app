@@ -19,6 +19,7 @@
     "test:guest-galaxy": "node scripts/test-guest-galaxy-data.mjs",
     "test:lumi-rover": "node functions/galaxyGame.rover.test.cjs && node functions/galaxyGame.story.test.cjs && node scripts/test-guest-galaxy-data.mjs && node scripts/test-lumi-rover-contract.mjs",
     "test:galaxy-terrain": "node scripts/test-galaxy-walk-surfaces.mjs",
+    "test:galaxy-navigation": "node scripts/test-galaxy-navigation-safety.mjs",
     "test:frontier-audio-assets": "node scripts/validate-frontier-audio-assets.mjs",
     "test:frontier-audio-assets:qa": "node scripts/validate-frontier-audio-assets.mjs --strict --allow-provisional",
     "generate:frontier-audio-qa": "node scripts/generate-frontier-qa-audio.mjs",

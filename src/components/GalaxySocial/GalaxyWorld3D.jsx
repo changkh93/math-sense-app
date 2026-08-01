@@ -20,9 +20,17 @@ import {
   canAstraBuilderCharacterOccupy,
   createAstraBuilderCollisionBodies,
   findAstraBuilderBodyCollision,
+  getAstraBuilderCharacterDimensions,
   getAstraBuilderWalkSurfaceHeight,
 } from './builder/astraBuilderPhysics'
 import { isAstraBuilderViewDrag, isAstraBuilderViewPointer } from './builder/astraBuilderInput'
+import {
+  createThirdPersonReturnPose,
+  getWheelZoomValue,
+  projectCircleOutOfAabb,
+  projectCircleOutOfCircle,
+  resolveCameraLineOfSight,
+} from './galaxyNavigationSafety'
 import useAstraBuilderPoc from './builder/useAstraBuilderPoc'
 import WorldTerrain from './GalaxyTerrain3D'
 import {
@@ -65,6 +73,10 @@ const FIRST_PERSON_CAMERA_NEAR = .025
 const DEFAULT_CAMERA_NEAR = .1
 const CAMERA_MIN_POLAR = .24
 const CAMERA_MAX_POLAR = Math.PI * .58
+const THIRD_PERSON_MIN_DISTANCE = .65
+const THIRD_PERSON_MAX_DISTANCE = 58
+const FIRST_PERSON_MIN_FOV = 14
+const FIRST_PERSON_MAX_FOV = 118
 const MOUSE_LOOK_YAW_SENSITIVITY = .0026
 const MOUSE_LOOK_PITCH_SENSITIVITY = .0021
 const MOUSE_LOOK_MAX_FRAME_DELTA = 420
@@ -78,6 +90,11 @@ const AMBIENCE_ENTRY_DELAY_MS = 2800
 const LANDING_AUDIO_STOP_DISTANCE = 7.5
 const DAILY_EVENT_INTERACTION_RADIUS = 2.8
 const ASTRA_BUILDER_POC_ENABLED = import.meta.env.VITE_ASTRA_BUILDER_POC !== 'false'
+
+const getThirdPersonMinDistance = (scale) => Math.max(
+  THIRD_PERSON_MIN_DISTANCE,
+  Number(scale || CHARACTER_SCALE) * 2.1,
+)
 
 function createMovementIntent() {
   return {
@@ -3397,7 +3414,7 @@ function RemoteAstronaut({ player, showName, walkHeightAt = walkSurfaceHeight })
 }
 
 function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderOverview = false, builderBuildMode = false, canUseCharacterScale = null, onScaleBlocked = null, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest', walkHeightAt = walkSurfaceHeight, playerGroupRef }) {
-  const { gl } = useThree()
+  const { gl, camera } = useThree()
   const group = useRef()
   // 외부(상위 월드)에서 플레이어 위치를 ref로 읽을 수 있도록 노출. 매 프레임 갱신.
   useLayoutEffect(() => {
@@ -3424,6 +3441,20 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   const hoverLook = useRef({ pendingX: 0, pendingY: 0, lastX: null, lastY: null, lastTime: null, orbiting: false })
   const firstPersonPitch = useRef(0)
   const firstPersonYawOffset = useRef(0)
+  const previousCameraMode = useRef(isFirstPerson)
+  const savedThirdPersonDistance = useRef(5.2)
+  const thirdPersonZoomDistance = useRef(null)
+  const thirdPersonReturn = useRef({
+    active: false,
+    elapsed: 0,
+    duration: 0.34,
+    fromPosition: new THREE.Vector3(),
+    fromTarget: new THREE.Vector3(),
+    toPosition: new THREE.Vector3(),
+    toTarget: new THREE.Vector3(),
+  })
+  const lastSafePosition = useRef(null)
+  const lastSafePositionAt = useRef(0)
   const movementIntent = useRef(createMovementIntent())
   const movementVectors = useRef({
     forward: new THREE.Vector3(),
@@ -3432,6 +3463,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     desiredTarget: new THREE.Vector3(),
     followDelta: new THREE.Vector3(),
     cameraOffset: new THREE.Vector3(),
+    cameraDesiredPosition: new THREE.Vector3(),
     cameraSpherical: new THREE.Spherical(),
     listenerForward: new THREE.Vector3(),
     listenerUp: new THREE.Vector3(),
@@ -3534,13 +3566,78 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   }, [isFirstPerson])
 
   useEffect(() => {
-    const handleWheel = (event) => {
-      if (paused || !isFirstPerson) return
-      firstPersonFov.current = THREE.MathUtils.clamp(firstPersonFov.current + event.deltaY * 0.06, 22, 100)
+    const wasFirstPerson = previousCameraMode.current
+    const player = group.current?.position
+    if (!wasFirstPerson && isFirstPerson && controls.current) {
+      const minDistance = getThirdPersonMinDistance(characterScale.current)
+      savedThirdPersonDistance.current = THREE.MathUtils.clamp(
+        camera.position.distanceTo(controls.current.target),
+        minDistance,
+        THIRD_PERSON_MAX_DISTANCE,
+      )
+      thirdPersonZoomDistance.current = savedThirdPersonDistance.current
+      thirdPersonReturn.current.active = false
+      controlsReady.current = false
+    } else if (wasFirstPerson && !isFirstPerson && player) {
+      const lookDirection = new THREE.Vector3()
+      camera.getWorldDirection(lookDirection)
+      const scaleRatio = characterScale.current / CHARACTER_SCALE
+      const pose = createThirdPersonReturnPose({
+        playerPosition: player,
+        lookDirection,
+        distance: savedThirdPersonDistance.current,
+        targetHeight: CAMERA_TARGET_HEIGHT * scaleRatio,
+        cameraLift: THREE.MathUtils.clamp(savedThirdPersonDistance.current * 0.34, 1.35, 3.4),
+        minDistance: getThirdPersonMinDistance(characterScale.current),
+        maxDistance: THIRD_PERSON_MAX_DISTANCE,
+      })
+      const transition = thirdPersonReturn.current
+      transition.active = true
+      transition.elapsed = 0
+      transition.fromPosition.copy(camera.position)
+      transition.fromTarget.copy(camera.position).addScaledVector(lookDirection, savedThirdPersonDistance.current)
+      transition.toPosition.set(...pose.position)
+      transition.toTarget.set(...pose.target)
+      thirdPersonZoomDistance.current = pose.distance
+      controlsReady.current = true
     }
-    window.addEventListener('wheel', handleWheel, { passive: true })
-    return () => window.removeEventListener('wheel', handleWheel)
-  }, [isFirstPerson, paused])
+    previousCameraMode.current = isFirstPerson
+  }, [camera, isFirstPerson])
+
+  useEffect(() => {
+    const handleWheel = (event) => {
+      if (paused || event.target !== gl.domElement || event.ctrlKey || event.metaKey) return
+      event.preventDefault()
+      if (isFirstPerson) {
+        firstPersonFov.current = getWheelZoomValue({
+          current: firstPersonFov.current,
+          deltaY: event.deltaY,
+          deltaMode: event.deltaMode,
+          min: FIRST_PERSON_MIN_FOV,
+          max: FIRST_PERSON_MAX_FOV,
+          sensitivity: .00135,
+        })
+        return
+      }
+      const currentDistance = controls.current
+        ? camera.position.distanceTo(controls.current.target)
+        : savedThirdPersonDistance.current
+      const zoomDistance = Number.isFinite(thirdPersonZoomDistance.current)
+        ? thirdPersonZoomDistance.current
+        : currentDistance
+      thirdPersonZoomDistance.current = getWheelZoomValue({
+        current: zoomDistance,
+        deltaY: event.deltaY,
+        deltaMode: event.deltaMode,
+        min: getThirdPersonMinDistance(characterScale.current),
+        max: THIRD_PERSON_MAX_DISTANCE,
+        sensitivity: .0016,
+      })
+    }
+    const canvas = gl.domElement
+    canvas.addEventListener('wheel', handleWheel, { passive: false })
+    return () => canvas.removeEventListener('wheel', handleWheel)
+  }, [camera, gl, isFirstPerson, paused])
 
   useEffect(() => {
     if (!paused) return
@@ -3629,6 +3726,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       desiredTarget,
       followDelta,
       cameraOffset,
+      cameraDesiredPosition,
       cameraSpherical,
       listenerForward,
       listenerUp,
@@ -3696,6 +3794,71 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     }
     right.crossVectors(forward, WORLD_UP).normalize()
 
+    const collisionScaleDelta = PLAYER_COLLISION_RADIUS * (characterScale.current / CHARACTER_SCALE - 1)
+    const checkObstacle = (testX, testZ, testFootY = group.current.position.y) => {
+      if (Math.hypot(testX, testZ) >= WORLD_RADIUS - .8 - collisionScaleDelta) return true
+      const hitStructure = structureColliders.find((collider) => {
+        if (collider.kind === 'astra-builder-block') {
+          return Boolean(findAstraBuilderBodyCollision([collider], {
+            x: testX,
+            z: testZ,
+            footY: testFootY,
+            scale: characterScale.current,
+          }))
+        }
+        return Math.hypot(testX - collider.position[0], testZ - collider.position[2]) < collider.collisionRadius + collisionScaleDelta
+      })
+      if (hitStructure) return hitStructure
+      const hitBlocker = blockers.find((position) => (
+        Math.hypot(testX - position[0], testZ - position[2]) < STATIC_BLOCKER_COLLISION_RADIUS + collisionScaleDelta
+      ))
+      if (hitBlocker) {
+        return {
+          kind: 'static-blocker',
+          position: hitBlocker,
+          collisionRadius: STATIC_BLOCKER_COLLISION_RADIUS,
+          acousticMaterial: 'soft',
+        }
+      }
+      if (isRiverWater(testX, testZ) && !isBridgeDeck(testX, testZ)) return true
+      if (!isBridgeDeck(testX, testZ) && terrainSlope(testX, testZ) > 1.08) return true
+      return false
+    }
+
+    const resolveCurrentPenetration = (footY) => {
+      let resolvedX = group.current.position.x
+      let resolvedZ = group.current.position.z
+      let moved = false
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const hit = checkObstacle(resolvedX, resolvedZ, footY)
+        if (!hit || typeof hit !== 'object') break
+        const next = hit.kind === 'astra-builder-block'
+          ? projectCircleOutOfAabb(
+              { x: resolvedX, z: resolvedZ },
+              hit,
+              getAstraBuilderCharacterDimensions(characterScale.current).radius,
+            )
+          : projectCircleOutOfCircle(
+              { x: resolvedX, z: resolvedZ },
+              hit,
+              collisionScaleDelta,
+              lastSafePosition.current
+                ? [lastSafePosition.current.x - hit.position[0], lastSafePosition.current.z - hit.position[2]]
+                : [Math.sin(group.current.rotation.y), Math.cos(group.current.rotation.y)],
+            )
+        if (!next.moved) break
+        resolvedX = next.x
+        resolvedZ = next.z
+        moved = true
+      }
+      if (moved && !checkObstacle(resolvedX, resolvedZ, footY)) {
+        group.current.position.x = resolvedX
+        group.current.position.z = resolvedZ
+        return true
+      }
+      return false
+    }
+
     if (moving) {
       moveDirection.copy(right).multiplyScalar(moveX).addScaledVector(forward, -moveZ)
       const inputStrength = Math.min(1, moveDirection.length())
@@ -3718,30 +3881,9 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       const currX = group.current.position.x
       const currZ = group.current.position.z
 
-      const checkObstacle = (testX, testZ, testFootY = group.current.position.y) => {
-        const collisionScaleDelta = PLAYER_COLLISION_RADIUS * (characterScale.current / CHARACTER_SCALE - 1)
-        if (Math.hypot(testX, testZ) >= WORLD_RADIUS - .8 - collisionScaleDelta) return true
-        const hitStructure = structureColliders.find((collider) => {
-          if (collider.kind === 'astra-builder-block') {
-            return Boolean(findAstraBuilderBodyCollision([collider], {
-              x: testX,
-              z: testZ,
-              footY: testFootY,
-              scale: characterScale.current,
-            }))
-          }
-          return Math.hypot(testX - collider.position[0], testZ - collider.position[2]) < collider.collisionRadius + collisionScaleDelta
-        })
-        if (hitStructure) return hitStructure
-        if (blockers.some((position) => Math.hypot(testX - position[0], testZ - position[2]) < STATIC_BLOCKER_COLLISION_RADIUS + collisionScaleDelta)) return true
-        if (isRiverWater(testX, testZ) && !isBridgeDeck(testX, testZ)) return true
-        if (!isBridgeDeck(testX, testZ) && terrainSlope(testX, testZ) > 1.08) return true
-        return false
-      }
-
       const substepCount = Math.max(
         1,
-        Math.ceil(moveWorldVec.length() / (ASTRA_BUILDER_POC_PLOT.cellSize * .28)),
+        Math.ceil(moveWorldVec.length() / (ASTRA_BUILDER_POC_PLOT.cellSize * .18)),
       )
       const substepX = moveWorldVec.x / substepCount
       const substepZ = moveWorldVec.z / substepCount
@@ -3777,6 +3919,9 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       if (!obstacleHit || movedDistance > 0) {
         group.current.position.x = targetX
         group.current.position.z = targetZ
+        // 계단/다층 보행에서 다음 프레임이 뒤처진 접지 높이로 다시 충돌하지 않도록
+        // 세분화 이동 중 계산한 최종 지지면을 즉시 이어받는다.
+        if (Number.isFinite(provisionalFootY)) groundHeight.current = provisionalFootY
         if (collisionLatched.current) {
           collisionClearDuration.current += delta
           if (collisionClearDuration.current >= COLLISION_REARM_CLEAR_SECONDS) {
@@ -3787,16 +3932,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       }
       if (obstacleHit) {
         const hitObj = typeof obstacleHit === 'object' ? obstacleHit : null
-        if (hitObj && movedDistance <= 0) {
-          const pushAngle = Math.atan2(currZ - hitObj.position[2], currX - hitObj.position[0])
-          const pushDist = delta * 1.5
-          const escapeX = currX + Math.cos(pushAngle) * pushDist
-          const escapeZ = currZ + Math.sin(pushAngle) * pushDist
-          if (!checkObstacle(escapeX, escapeZ)) {
-            group.current.position.x = escapeX
-            group.current.position.z = escapeZ
-          }
-        }
         if (!collisionLatched.current) {
           const acousticMat = hitObj?.acousticMaterial || 'soft'
           soundManager.play(`frontier.collision.${acousticMat}`)
@@ -3814,6 +3949,26 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     if (!moving) {
       collisionLatched.current = false
       collisionClearDuration.current = 0
+    }
+
+    const currentFootY = groundHeight.current ?? group.current.position.y
+    const currentObstacle = checkObstacle(group.current.position.x, group.current.position.z, currentFootY)
+    if (currentObstacle && typeof currentObstacle === 'object') {
+      const escaped = resolveCurrentPenetration(currentFootY)
+      if (!escaped && lastSafePosition.current) {
+        group.current.position.copy(lastSafePosition.current)
+        groundHeight.current = lastSafePosition.current.y
+        jump.current.height = 0
+        jump.current.velocity = 0
+      }
+    } else if (
+      !currentObstacle
+      && jump.current.height <= .001
+      && state.clock.elapsedTime - lastSafePositionAt.current >= .3
+    ) {
+      if (!lastSafePosition.current) lastSafePosition.current = new THREE.Vector3()
+      lastSafePosition.current.copy(group.current.position)
+      lastSafePositionAt.current = state.clock.elapsedTime
     }
 
     const locomoting = moving && movementAmount > .01
@@ -3898,10 +4053,11 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         player.z + Math.cos(yaw) * Math.cos(pitch) * lookDist
       )
     } else {
-      if (controls.current) controls.current.enabled = !paused
+      const cameraReturn = thirdPersonReturn.current
+      if (controls.current) controls.current.enabled = !paused && !cameraReturn.active
       if (controls.current) {
-        controls.current.minDistance = Math.max(.75, characterScale.current * 2.4)
-        controls.current.maxDistance = 36
+        controls.current.minDistance = getThirdPersonMinDistance(characterScale.current)
+        controls.current.maxDistance = THIRD_PERSON_MAX_DISTANCE
       }
       if (activeCamera.fov !== 48 || activeCamera.near !== DEFAULT_CAMERA_NEAR) {
         activeCamera.near = DEFAULT_CAMERA_NEAR
@@ -3914,7 +4070,19 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
           player.y + CAMERA_TARGET_HEIGHT * (characterScale.current / CHARACTER_SCALE),
           player.z,
         )
-        if (!controlsReady.current) {
+        if (cameraReturn.active) {
+          cameraReturn.elapsed += delta
+          const progress = THREE.MathUtils.clamp(cameraReturn.elapsed / cameraReturn.duration, 0, 1)
+          const eased = 1 - Math.pow(1 - progress, 3)
+          controls.current.target.lerpVectors(cameraReturn.fromTarget, cameraReturn.toTarget, eased)
+          orbitCamera.position.lerpVectors(cameraReturn.fromPosition, cameraReturn.toPosition, eased)
+          orbitCamera.lookAt(controls.current.target)
+          if (progress >= 1) {
+            cameraReturn.active = false
+            controls.current.target.copy(cameraReturn.toTarget)
+            controlsReady.current = true
+          }
+        } else if (!controlsReady.current) {
           controls.current.target.copy(desiredTarget)
           controlsReady.current = true
         } else {
@@ -3923,12 +4091,59 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
           controls.current.target.add(followDelta)
           orbitCamera.position.add(followDelta)
         }
+        cameraOffset.subVectors(orbitCamera.position, controls.current.target)
+        if (cameraOffset.lengthSq() > .001) {
+          const minimumZoomDistance = getThirdPersonMinDistance(characterScale.current)
+          if (!Number.isFinite(thirdPersonZoomDistance.current)) {
+            thirdPersonZoomDistance.current = THREE.MathUtils.clamp(
+              cameraOffset.length(),
+              minimumZoomDistance,
+              THIRD_PERSON_MAX_DISTANCE,
+            )
+          } else {
+            thirdPersonZoomDistance.current = THREE.MathUtils.clamp(
+              thirdPersonZoomDistance.current,
+              minimumZoomDistance,
+              THIRD_PERSON_MAX_DISTANCE,
+            )
+          }
+          if (!cameraReturn.active) {
+            const currentDistance = cameraOffset.length()
+            const smoothedDistance = THREE.MathUtils.lerp(
+              currentDistance,
+              thirdPersonZoomDistance.current,
+              1 - Math.exp(-delta * 11),
+            )
+            cameraOffset.setLength(smoothedDistance)
+            orbitCamera.position.copy(controls.current.target).add(cameraOffset)
+          }
+        }
+        cameraDesiredPosition.copy(orbitCamera.position)
+        const lineOfSight = resolveCameraLineOfSight({
+          target: [controls.current.target.x, controls.current.target.y, controls.current.target.z],
+          desiredPosition: [
+            cameraDesiredPosition.x,
+            cameraDesiredPosition.y,
+            cameraDesiredPosition.z,
+          ],
+          colliders: structureColliders,
+          padding: Math.max(.12, characterScale.current * .42),
+          minDistance: controls.current.minDistance,
+        })
+        if (lineOfSight.obstructed) {
+          const cameraCollisionStrength = 1 - Math.exp(-delta * 24)
+          cameraDesiredPosition.set(...lineOfSight.position)
+          orbitCamera.position.lerp(cameraDesiredPosition, cameraCollisionStrength)
+          orbitCamera.lookAt(controls.current.target)
+        }
         const minimumCameraY = terrainHeight(orbitCamera.position.x, orbitCamera.position.z) + .6
         if (orbitCamera.position.y < minimumCameraY) {
           orbitCamera.position.setY(THREE.MathUtils.lerp(orbitCamera.position.y, minimumCameraY, Math.min(1, delta * 12)))
         }
       }
     }
+
+    if (body.current) body.current.visible = !isFirstPerson
 
     if (
       FRONTIER_AUDIO_ASSETS_READY
@@ -4000,12 +4215,13 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         target={[0, CAMERA_TARGET_HEIGHT, 5]}
         enablePan={false}
         enableKeys={false}
+        enableZoom={false}
         enableDamping
         dampingFactor={.08}
         rotateSpeed={.56}
         zoomSpeed={1.05}
-        minDistance={isFirstPerson ? 0.05 : .75}
-        maxDistance={isFirstPerson ? 0.2 : 36}
+        minDistance={isFirstPerson ? 0.05 : getThirdPersonMinDistance(CHARACTER_SCALE)}
+        maxDistance={isFirstPerson ? 0.2 : THIRD_PERSON_MAX_DISTANCE}
         minPolarAngle={isFirstPerson ? 0.1 : CAMERA_MIN_POLAR}
         maxPolarAngle={isFirstPerson ? Math.PI - 0.1 : CAMERA_MAX_POLAR}
         mouseButtons={{
@@ -4246,6 +4462,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
         : item.name || '행성 객체 살펴보기',
       position,
       collisionRadius,
+      cameraCollisionHeight: Math.max(1.6, collisionRadius * 2.35),
       interactionRadius: collisionRadius + 1.65,
       acousticMaterial: getStructureAcousticMaterial(item.itemId),
       item,
@@ -4255,6 +4472,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
     id: `biome-prop-${index}`,
     position: [x, terrainHeight(x, z), z],
     collisionRadius: Math.max(.34, Number(scale || 1) * .48) + PLAYER_COLLISION_RADIUS,
+    cameraCollisionHeight: Math.max(1.2, Number(scale || 1) * 1.8),
     acousticMaterial: palette.prop === 'forest' ? 'wood' : palette.prop === 'mechanical' ? 'metal' : 'stone',
   })), [palette.prop, restoredPropPositions])
   const builderPlotBaseY = terrainHeight(...ASTRA_BUILDER_POC_PLOT.center) + ASTRA_BUILDER_BASE_LIFT
@@ -4809,6 +5027,16 @@ export default function GalaxyWorld3D({
     0,
     ASTRA_BUILDER_POC_PLOT.height - 1,
   )
+  const playerInsideBuilderPlot = builderEnabled
+    && Math.abs(playerPosition.x - ASTRA_BUILDER_POC_PLOT.center[0])
+      <= ASTRA_BUILDER_POC_PLOT.width * ASTRA_BUILDER_POC_PLOT.cellSize * .5 + ASTRA_BUILDER_POC_PLOT.cellSize
+    && Math.abs(playerPosition.z - ASTRA_BUILDER_POC_PLOT.center[1])
+      <= ASTRA_BUILDER_POC_PLOT.depth * ASTRA_BUILDER_POC_PLOT.cellSize * .5 + ASTRA_BUILDER_POC_PLOT.cellSize
+    && Number(playerPosition.y ?? 0)
+      <= terrainHeight(...ASTRA_BUILDER_POC_PLOT.center)
+        + ASTRA_BUILDER_BASE_LIFT
+        + ASTRA_BUILDER_POC_PLOT.height * ASTRA_BUILDER_POC_PLOT.cellSize
+        + 1
   const builder = useAstraBuilderPoc(
     `${builderOwnerId || 'local'}:${ASTRA_BUILDER_POC_PLOT.id}`,
     builderEnabled,
@@ -5080,6 +5308,9 @@ export default function GalaxyWorld3D({
       } else if (event.code === 'KeyC') {
         event.preventDefault()
         setBuilderInputMode('camera')
+      } else if (event.code === 'KeyE') {
+        event.preventDefault()
+        setBuilderInputMode('build')
       } else if (event.code === 'KeyV') {
         event.preventDefault()
         onToggleFirstPerson?.()
@@ -5090,7 +5321,7 @@ export default function GalaxyWorld3D({
           0,
           ASTRA_BUILDER_POC_PLOT.height - 1,
         ))
-      } else if (event.code === 'KeyQ' || event.code === 'KeyE') {
+      } else if (event.code === 'KeyQ' || event.code === 'KeyR') {
         event.preventDefault()
         setBuilderRotation((current) => (
           event.code === 'KeyQ' ? (current + 3) % 4 : (current + 1) % 4
@@ -5106,13 +5337,16 @@ export default function GalaxyWorld3D({
       if (event.repeat || paused || builderActive || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
       if (event.code !== 'KeyE' && event.code !== 'KeyF' && event.code !== 'KeyV') return
       event.preventDefault()
-      if (event.code === 'KeyE') interact()
+      if (event.code === 'KeyE') {
+        if (playerInsideBuilderPlot) openAstraBuilder()
+        else interact()
+      }
       else if (event.code === 'KeyF') inspectStructure()
       else if (event.code === 'KeyV') onToggleFirstPerson?.()
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [builderActive, inspectStructure, interact, onToggleFirstPerson, paused])
+  }, [builderActive, inspectStructure, interact, onToggleFirstPerson, openAstraBuilder, paused, playerInsideBuilderPlot])
 
   useEffect(() => {
     if (!activeMission || paused || collectedIds.size >= 5) return undefined
@@ -5327,7 +5561,7 @@ export default function GalaxyWorld3D({
         </div>
       )}
       {!builderActive && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>걷기</span><kbd>Shift</kbd><span>달리기</span><kbd>Space</kbd><span>점프</span><kbd>+ / −</kbd><span>크기</span><kbd>V</kbd><span>시점</span><kbd>E / F</kbd><span>상호작용·정보</span></div>}
-      {builderActive && builderInputMode === 'build' && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>이동</span><kbd>클릭</kbd><span>지정·배치</span><kbd>드래그</kbd><span>시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>크기</span><kbd>Q / E</kbd><span>블록 회전</span></div>}
+      {builderActive && builderInputMode === 'build' && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>이동</span><kbd>클릭</kbd><span>지정·배치</span><kbd>드래그</kbd><span>시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>크기</span><kbd>Q / R</kbd><span>블록 회전</span></div>}
       {(!builderActive || builderInputMode === 'build') && <TouchJoystick inputRef={inputRef} disabled={paused} />}
       {!builderActive && <TouchActionButtons nearby={nearby} onInteract={interact} onInspect={inspectStructure} disabled={paused} />}
       {builderActive && (

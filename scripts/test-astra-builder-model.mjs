@@ -358,6 +358,33 @@ assert.equal(canAstraBuilderCharacterOccupy(stairBodies, {
   scale: .28,
 }), false)
 
+// 실제 이동처럼 짧은 간격으로 접지 높이를 이어받으면 계단을 끝까지 오를 수 있다.
+let stairFootY = plotBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET
+const stairTraversalHeights = []
+for (let step = 0; step <= 24; step += 1) {
+  const progress = step / 24
+  const z = stairWorldZ + halfCell - progress * halfCell * 2
+  assert.equal(canAstraBuilderCharacterOccupy(stairBodies, {
+    x: stairWorldX,
+    z,
+    footY: stairFootY,
+    scale: .28,
+  }), true)
+  stairFootY = getAstraBuilderWalkSurfaceHeight({
+    x: stairWorldX,
+    z,
+    currentFootY: stairFootY,
+    cells: stairCollisionGrid,
+    plotBaseY,
+    terrainY: 0,
+  })
+  stairTraversalHeights.push(stairFootY)
+}
+assert.ok(stairTraversalHeights.every((height, index) => (
+  index === 0 || height >= stairTraversalHeights[index - 1]
+)))
+assert.ok(stairFootY > plotBaseY + ASTRA_BUILDER_POC_PLOT.cellSize * .95)
+
 const ceilingGrid = createEmptyAstraBuilderGrid()
 ceilingGrid[getAstraBuilderCellIndex({ x: 5, y: 2, z: 5 })] = 2
 const ceilingBodies = createAstraBuilderCollisionBodies(ceilingGrid, plotBaseY)
