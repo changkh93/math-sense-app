@@ -15,8 +15,11 @@ import AstraBuilderPlot from './builder/AstraBuilderPlot'
 import {
   ASTRA_BUILDER_BASE_LIFT,
   ASTRA_BUILDER_POC_PLOT,
+  createEmptyAstraBuilderGrid,
+  getAstraBuilderCellCount,
   getAstraBuilderLayerInfo,
 } from './builder/astraBuilderModel'
+import { decodeAstraBuilderGridBase64 } from './builder/astraBuilderCodec'
 import {
   canAstraBuilderCharacterOccupy,
   createAstraBuilderCollisionBodies,
@@ -62,6 +65,7 @@ const PLAYER_SPRINT_MULTIPLIER = 1.8
 // to stop on a stair or beside a single cell, while keeping Shift useful for
 // crossing a larger build quickly.
 const ASTRA_BUILDER_WALK_SPEED = 1.65
+const ASTRA_BUILDER_INSTALL_ITEM_ID = 'astra_builder_plot'
 const PLAYER_TURN_SPEED = Math.PI * 2.4
 const PLAYER_MOVE_START_ANGLE = THREE.MathUtils.degToRad(25)
 const PLAYER_MOVE_FULL_ANGLE = THREE.MathUtils.degToRad(6)
@@ -4478,7 +4482,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderCells, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderInvalidEdit, onBuilderScaleBlocked, onExplorationExitRequest }) {
+function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderInvalidEdit, onBuilderScaleBlocked, onExplorationExitRequest }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const basePalette = BIOMES[planet?.theme] || BIOMES.forest
   const restorationProgress = THREE.MathUtils.clamp(Number(restorationPercent || 0), 0, 100)
@@ -4561,18 +4565,15 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
     status: ROVER_STATUS_LABELS[roverStatus] ? roverStatus : 'idle',
     label: roverStatusLabel || ROVER_STATUS_LABELS[roverStatus] || ROVER_STATUS_LABELS.idle,
   }), [roverStatus, roverStatusLabel])
-  const builderNode = useMemo(() => builderEnabled ? ({
-    id: ASTRA_BUILDER_POC_PLOT.id,
+  const builderNodes = useMemo(() => builderEnabled ? builderPlots.map((plot) => ({
+    id: plot.plotId,
+    plotId: plot.plotId,
     kind: 'builder',
     actionId: 'builder',
-    label: '아스트라 빌더 시작',
-    position: [
-      ASTRA_BUILDER_POC_PLOT.center[0],
-      terrainHeight(...ASTRA_BUILDER_POC_PLOT.center),
-      ASTRA_BUILDER_POC_PLOT.center[1],
-    ],
-    interactionRadius: 4.35,
-  }) : null, [builderEnabled])
+    label: `${plot.name} 시작`,
+    position: [plot.center[0], terrainHeight(...plot.center), plot.center[1]],
+    interactionRadius: 3.1,
+  })) : [], [builderEnabled, builderPlots])
   const resourceNodes = useMemo(() => RESOURCE_NODES.map((node) => node.id === 'broken_beacon' && beaconRepaired
     ? { ...node, completed: true, label: '비콘 수리 완료' }
     : node), [beaconRepaired])
@@ -4671,12 +4672,20 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
     cameraCollisionHeight: Math.max(1.2, Number(scale || 1) * 1.8),
     acousticMaterial: palette.prop === 'forest' ? 'wood' : palette.prop === 'mechanical' ? 'metal' : 'stone',
   })), [palette.prop, restoredPropPositions])
-  const builderPlotBaseY = terrainHeight(...ASTRA_BUILDER_POC_PLOT.center) + ASTRA_BUILDER_BASE_LIFT
-  const builderBlockColliders = useMemo(() => (
-    builderEnabled && builderCells?.length
-      ? createAstraBuilderCollisionBodies(builderCells, builderPlotBaseY)
-      : []
-  ), [builderCells, builderEnabled, builderPlotBaseY])
+  const builderRuntimePlots = useMemo(() => builderEnabled ? builderPlots.map((plot) => ({
+    plot,
+    baseY: terrainHeight(...plot.center) + ASTRA_BUILDER_BASE_LIFT,
+    cells: builderCellsByPlot[plot.plotId] || createEmptyAstraBuilderGrid(),
+  })) : [], [builderCellsByPlot, builderEnabled, builderPlots])
+  const nearbyBuilderCollisionKey = builderRuntimePlots
+    .filter(({ plot }) => Math.abs(playerPosition.x - plot.center[0]) < 4.8 && Math.abs(playerPosition.z - plot.center[1]) < 4.8)
+    .map(({ plot }) => plot.plotId)
+    .join('|')
+  const builderBlockColliders = useMemo(() => builderRuntimePlots
+    .filter(({ plot }) => nearbyBuilderCollisionKey.split('|').includes(plot.plotId))
+    .flatMap(({ plot, baseY, cells }) => (
+    cells?.length ? createAstraBuilderCollisionBodies(cells, baseY, plot) : []
+  )), [builderRuntimePlots, nearbyBuilderCollisionKey])
   const movementColliders = useMemo(
     () => [...structureColliders, ...biomeColliders, ...builderBlockColliders],
     [biomeColliders, builderBlockColliders, structureColliders],
@@ -4684,16 +4693,22 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
   const walkHeightAt = useCallback((x, z, currentFootY = null, characterScale = CHARACTER_SCALE) => {
     const terrainY = walkSurfaceHeight(x, z)
     if (!builderEnabled) return terrainY
+    const runtime = builderRuntimePlots.find(({ plot }) => (
+      Math.abs(x - plot.center[0]) <= plot.width * plot.cellSize * .5
+      && Math.abs(z - plot.center[1]) <= plot.depth * plot.cellSize * .5
+    ))
+    if (!runtime) return terrainY
     return getAstraBuilderWalkSurfaceHeight({
       x,
       z,
       currentFootY,
-      cells: builderCells,
-      plotBaseY: builderPlotBaseY,
+      cells: runtime.cells,
+      plotBaseY: runtime.baseY,
       terrainY,
       characterScale,
+      plot: runtime.plot,
     })
-  }, [builderCells, builderEnabled, builderPlotBaseY])
+  }, [builderEnabled, builderRuntimePlots])
   const canUseBuilderCharacterScale = useCallback((scale, position) => (
     !builderEnabled
     || canAstraBuilderCharacterOccupy(builderBlockColliders, {
@@ -4709,8 +4724,8 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
     ...MISSION_PORTALS,
     GUIDE_NODE,
     roverNode,
-    ...(builderNode ? [builderNode] : []),
-  ], [builderNode, resourceInteractables, roverNode, structureColliders])
+    ...builderNodes,
+  ], [builderNodes, resourceInteractables, roverNode, structureColliders])
   const blockers = useMemo(() => layout.filter((item) => item.itemId !== 'wild_sprout').map(worldPositionFromLayout), [layout])
   const villageSlots = useMemo(() => builderEnabled ? [] : getAvailableVillageSlots(blockers), [blockers, builderEnabled])
   // 길 네트워크 노드: 구역 + 자원노드 + 마을 + 플레이어 건물. 모두 [x,z].
@@ -4728,16 +4743,12 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
     ...blockers.map((position) => ({ x: position[0], z: position[2], radius: 1.55 })),
     ...villageSlots.map((slot) => ({ x: slot.position[0], z: slot.position[1], radius: 1.48 })),
     ...(showVillageBeacon ? [{ x: VILLAGE_BEACON_POSITION[0], z: VILLAGE_BEACON_POSITION[1], radius: 1.4 }] : []),
-    ...(builderEnabled ? [{
-      x: ASTRA_BUILDER_POC_PLOT.center[0],
-      z: ASTRA_BUILDER_POC_PLOT.center[1],
-      radius: 3.15,
-    }] : []),
+    ...builderPlots.map((plot) => ({ x: plot.center[0], z: plot.center[1], radius: 3.15 })),
     ...RESOURCE_NODES.map((item) => ({ x: item.position[0], z: item.position[2], radius: .9 })),
     ...MISSION_PORTALS.map((item) => ({ x: item.position[0], z: item.position[2], radius: 1.35 })),
     { x: GUIDE_NODE.position[0], z: GUIDE_NODE.position[2], radius: .8 },
     { x: ROVER_NODE.position[0], z: ROVER_NODE.position[2], radius: 1.05 },
-  ], [blockers, builderEnabled, showVillageBeacon, villageSlots])
+  ], [blockers, builderPlots, showVillageBeacon, villageSlots])
   const playerBlockers = useMemo(() => [
     ...blockers,
     ROVER_NODE.position,
@@ -4762,20 +4773,20 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
   const isBuildPointValid = useCallback((point) => {
     if (!point) return false
     const [x, , z] = point
+    const placingAstraBuilder = buildItem === ASTRA_BUILDER_INSTALL_ITEM_ID
     if (Math.hypot(x, z) > BUILD_RADIUS) return false
-    if (blockers.some((position) => Math.hypot(x - position[0], z - position[2]) < 2.1)) return false
-    if ([...RESOURCE_NODES, ...MISSION_PORTALS, ROVER_NODE].some((item) => Math.hypot(x - item.position[0], z - item.position[2]) < 2)) return false
+    if (blockers.some((position) => Math.hypot(x - position[0], z - position[2]) < (placingAstraBuilder ? 3.5 : 2.1))) return false
+    if ([...RESOURCE_NODES, ...MISSION_PORTALS, ROVER_NODE].some((item) => Math.hypot(x - item.position[0], z - item.position[2]) < (placingAstraBuilder ? 3.5 : 2))) return false
     if (villageSlots.some((slot) => Math.hypot(x - slot.position[0], z - slot.position[1]) < 1.9)) return false
     if (showVillageBeacon && Math.hypot(x - VILLAGE_BEACON_POSITION[0], z - VILLAGE_BEACON_POSITION[1]) < 1.9) return false
-    if (
-      builderEnabled
-      && Math.abs(x - ASTRA_BUILDER_POC_PLOT.center[0]) < ASTRA_BUILDER_POC_PLOT.width * ASTRA_BUILDER_POC_PLOT.cellSize * 0.5 + 0.55
-      && Math.abs(z - ASTRA_BUILDER_POC_PLOT.center[1]) < ASTRA_BUILDER_POC_PLOT.depth * ASTRA_BUILDER_POC_PLOT.cellSize * 0.5 + 0.55
-    ) return false
+    if (builderPlots.some((plot) => placingAstraBuilder
+      ? Math.hypot(x - plot.center[0], z - plot.center[1]) < 5.2
+      : Math.abs(x - plot.center[0]) < plot.width * plot.cellSize * 0.5 + 1.45
+        && Math.abs(z - plot.center[1]) < plot.depth * plot.cellSize * 0.5 + 1.45)) return false
     if (MISSION_PICKUP_RESERVED_POINTS.some(([pickupX, pickupZ]) => Math.hypot(x - pickupX, z - pickupZ) < 2)) return false
     if (isRiverWater(x, z) || isBridgeDeck(x, z) || terrainSlope(x, z) > .42) return false
     return true
-  }, [blockers, builderEnabled, showVillageBeacon, villageSlots])
+  }, [blockers, buildItem, builderPlots, showVillageBeacon, villageSlots])
   const hoverValid = useMemo(() => isBuildPointValid(hoverPoint), [hoverPoint, isBuildPointValid])
 
   return (
@@ -4805,23 +4816,25 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
           else onInvalidBuild?.()
         }}
       />
-      {builderEnabled && (
+      {builderRuntimePlots.map(({ plot, baseY, cells }) => (
         <AstraBuilderPlot
-          baseY={builderPlotBaseY}
-          cells={builderCells}
-          active={builderActive}
+          key={plot.plotId}
+          plot={plot}
+          baseY={baseY}
+          cells={cells}
+          active={builderActive && plot.plotId === activeBuilderPlotId}
           paused={paused}
           inputMode={builderInputMode}
           tool={builderTool}
           activeLayer={builderLayer}
           selectedBlockType={builderBlockType}
           selectedRotation={builderRotation}
-          onEdit={onBuilderEdit}
-          onInvalidEdit={onBuilderInvalidEdit}
+          onEdit={plot.plotId === activeBuilderPlotId ? onBuilderEdit : undefined}
+          onInvalidEdit={plot.plotId === activeBuilderPlotId ? onBuilderInvalidEdit : undefined}
           playerGroupRef={playerGroupRef}
           useCharacterCamera
         />
-      )}
+      ))}
 
       {restoredPropPositions.map(([x, z, scale], index) => <BiomeProp key={`${x}_${z}`} kind={palette.prop} position={[x, terrainHeight(x, z), z]} scale={scale} palette={palette} index={index} />)}
       {layout.map((item) => <PlacedStructure key={item.instanceId} item={item} selected={selectedStructureId === item.instanceId} onSelect={onSelectStructure} activeLightId={activeLightId} signalSummary={signalPlazaSummary} observatorySummary={observatorySummary} greenhouseSummary={greenhouseSummary} gardenSummary={gardenSummary} roverStatus={roverStatus} />)}
@@ -4847,8 +4860,13 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
 
       {buildItem && hoverPoint && (
         <group position={hoverPoint}>
-          <mesh position={[0, .06, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.15, 1.38, 32]} /><meshBasicMaterial color={hoverValid ? '#63f5b0' : '#ff7182'} transparent opacity={.9} depthWrite={false} /></mesh>
-          <group position={[0, .08, 0]}><StructureModel itemId={buildItem} level={buildLevel} ghost /></group>
+          <mesh position={[0, .06, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={buildItem === ASTRA_BUILDER_INSTALL_ITEM_ID ? [2.15, 2.38, 40] : [1.15, 1.38, 32]} /><meshBasicMaterial color={hoverValid ? '#63f5b0' : '#ff7182'} transparent opacity={.9} depthWrite={false} /></mesh>
+          {buildItem === ASTRA_BUILDER_INSTALL_ITEM_ID ? (
+            <group position={[0, .08, 0]}>
+              <mesh position={[0, -.03, 0]}><boxGeometry args={[4.24, .14, 4.24]} /><meshStandardMaterial color={hoverValid ? '#365f61' : '#783d49'} transparent opacity={.7} /></mesh>
+              <mesh position={[0, .06, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[4.08, 4.08]} /><meshBasicMaterial color={hoverValid ? '#70ebc0' : '#ff7182'} transparent opacity={.24} wireframe /></mesh>
+            </group>
+          ) : <group position={[0, .08, 0]}><StructureModel itemId={buildItem} level={buildLevel} ghost /></group>}
         </group>
       )}
 
@@ -5168,8 +5186,12 @@ export default function GalaxyWorld3D({
   builderOwnerId = 'local',
   builderRemainingSeconds,
   builderServerSessionKey = '',
+  builderAccess = null,
+  builderStates = null,
+  builderWallet = 0,
   onOpenBuilderPlot,
   onSaveBuilderState,
+  onPurchaseBuilderUpgrade,
   onBuilderModeChange,
   onExplorationExitRequest,
   objective,
@@ -5188,6 +5210,9 @@ export default function GalaxyWorld3D({
   const [builderLayer, setBuilderLayer] = useState(0)
   const [builderBlockType, setBuilderBlockType] = useState(8)
   const [builderRotation, setBuilderRotation] = useState(0)
+  const [activeBuilderPlotId, setActiveBuilderPlotId] = useState('habitat-b01')
+  const [builderPurchaseBusy, setBuilderPurchaseBusy] = useState(false)
+  const [builderCellCache, setBuilderCellCache] = useState({})
   const [mapExpanded, setMapExpanded] = useState(false)
   const beaconRepaired = Boolean(frontierStory?.completedStepIds?.includes('restore_beacon'))
   const missionRemainingRef = useRef(0)
@@ -5212,47 +5237,116 @@ export default function GalaxyWorld3D({
     [playerPosition.x, playerPosition.z],
   )
   const builderEnabled = ASTRA_BUILDER_POC_ENABLED && isPlanetOwner
-  const builderPlayerLayer = THREE.MathUtils.clamp(
-    Math.floor((
-      Number(playerPosition.y ?? terrainHeight(playerPosition.x, playerPosition.z))
-      - (terrainHeight(...ASTRA_BUILDER_POC_PLOT.center) + ASTRA_BUILDER_BASE_LIFT)
-      + .002
-    ) / ASTRA_BUILDER_POC_PLOT.cellSize),
-    0,
-    ASTRA_BUILDER_POC_PLOT.height - 1,
-  )
-  const playerInsideBuilderPlot = builderEnabled
-    && Math.abs(playerPosition.x - ASTRA_BUILDER_POC_PLOT.center[0])
+  const builderPlots = useMemo(() => (builderAccess?.plots?.length
+    ? builderAccess.plots
+    : [{ plotId: 'habitat-b01', name: '별빛 건축실 B-01', blockCapacity: 500, center: [-7.5, -4.5] }])
+    .map((plot) => ({
+      ...ASTRA_BUILDER_POC_PLOT,
+      ...plot,
+      id: plot.plotId,
+      center: Array.isArray(plot.center) ? plot.center : [-7.5, -4.5],
+    })), [builderAccess?.plots])
+  const activeBuilderPlot = builderPlots.find((plot) => plot.plotId === activeBuilderPlotId)
+    || builderPlots[0]
+  const builderBlockCapacity = Math.max(500, Number(activeBuilderPlot?.blockCapacity || 500))
+  const playerBuilderPlot = builderEnabled ? builderPlots.find((plot) => (
+    Math.abs(playerPosition.x - plot.center[0])
       <= ASTRA_BUILDER_POC_PLOT.width * ASTRA_BUILDER_POC_PLOT.cellSize * .5 + ASTRA_BUILDER_POC_PLOT.cellSize
-    && Math.abs(playerPosition.z - ASTRA_BUILDER_POC_PLOT.center[1])
+    && Math.abs(playerPosition.z - plot.center[1])
       <= ASTRA_BUILDER_POC_PLOT.depth * ASTRA_BUILDER_POC_PLOT.cellSize * .5 + ASTRA_BUILDER_POC_PLOT.cellSize
     && Number(playerPosition.y ?? 0)
-      <= terrainHeight(...ASTRA_BUILDER_POC_PLOT.center)
+      <= terrainHeight(...plot.center)
         + ASTRA_BUILDER_BASE_LIFT
         + ASTRA_BUILDER_POC_PLOT.height * ASTRA_BUILDER_POC_PLOT.cellSize
         + 1
+  )) : null
+  const playerInsideBuilderPlot = Boolean(playerBuilderPlot)
   const builder = useAstraBuilderPoc(
-    `${builderOwnerId || 'local'}:${ASTRA_BUILDER_POC_PLOT.id}`,
+    `${builderOwnerId || 'local'}:${activeBuilderPlot.plotId}`,
     builderEnabled,
     {
+      plotId: activeBuilderPlot.plotId,
+      blockCapacity: builderBlockCapacity,
       serverActive: builderActive,
       serverSessionKey: builderServerSessionKey,
       openServerPlot: onOpenBuilderPlot,
       saveServerState: onSaveBuilderState,
       onSyncMessage: onMessage,
+      onLimitReached: ({ blockCapacity }) => onMessage?.(
+        `${blockCapacity.toLocaleString()}개 한도에 도달했습니다. 블록 +500 용량을 구매해 계속 건축할 수 있어요.`,
+      ),
     },
   )
 
-  const openAstraBuilder = useCallback(() => {
+  useEffect(() => {
+    if (!builderStates || typeof builderStates !== 'object') return
+    const decodedEntries = Object.entries(builderStates).flatMap(([plotId, state]) => {
+      const cells = decodeAstraBuilderGridBase64(
+        state?.gridDataBase64,
+        getAstraBuilderCellCount(ASTRA_BUILDER_POC_PLOT),
+      )
+      return cells ? [[plotId, cells]] : []
+    })
+    if (decodedEntries.length) {
+      setBuilderCellCache((current) => ({ ...current, ...Object.fromEntries(decodedEntries) }))
+    }
+  }, [builderStates])
+
+  useEffect(() => {
+    if (!builderActive || !builder.hydrated) return
+    setBuilderCellCache((current) => ({
+      ...current,
+      [activeBuilderPlot.plotId]: builder.cells,
+    }))
+  }, [activeBuilderPlot.plotId, builder.cells, builder.hydrated, builder.revision, builderActive])
+
+  const builderCellsByPlot = useMemo(() => Object.fromEntries(builderPlots.map((plot) => [
+    plot.plotId,
+    plot.plotId === activeBuilderPlot.plotId && builderActive && builder.hydrated
+      ? builder.cells
+      : builderCellCache[plot.plotId] || (plot.plotId === activeBuilderPlot.plotId ? builder.cells : createEmptyAstraBuilderGrid()),
+  ])), [activeBuilderPlot.plotId, builder.cells, builder.hydrated, builderActive, builderCellCache, builderPlots])
+
+  const selectBuilderPlot = useCallback(async (plotId) => {
+    if (!plotId || plotId === activeBuilderPlot.plotId) return
+    await builder.flush()
+    await builder.syncNow()
+    setBuilderLayer(0)
+    setActiveBuilderPlotId(plotId)
+  }, [activeBuilderPlot.plotId, builder])
+
+  const purchaseBuilderUpgrade = useCallback(async (kind) => {
+    if (!onPurchaseBuilderUpgrade || builderPurchaseBusy) return
+    setBuilderPurchaseBusy(true)
+    try {
+      await builder.flush()
+      await builder.syncNow()
+      const result = await onPurchaseBuilderUpgrade({
+        kind,
+        plotId: activeBuilderPlot.plotId,
+      })
+      return result
+    } finally {
+      setBuilderPurchaseBusy(false)
+    }
+  }, [activeBuilderPlot.plotId, builder, builderPurchaseBusy, onPurchaseBuilderUpgrade])
+
+  const openAstraBuilder = useCallback(async (plotId = activeBuilderPlot.plotId) => {
     if (!builderEnabled) return
+    const targetPlot = builderPlots.find((plot) => plot.plotId === plotId) || activeBuilderPlot
+    if (targetPlot.plotId !== activeBuilderPlot.plotId) await selectBuilderPlot(targetPlot.plotId)
     onCancelBuild?.()
     setNearby(null)
-    setBuilderLayer(builderPlayerLayer)
+    setBuilderLayer(THREE.MathUtils.clamp(Math.floor((
+      Number(playerPosition.y ?? terrainHeight(playerPosition.x, playerPosition.z))
+      - (terrainHeight(...targetPlot.center) + ASTRA_BUILDER_BASE_LIFT)
+      + .002
+    ) / ASTRA_BUILDER_POC_PLOT.cellSize), 0, ASTRA_BUILDER_POC_PLOT.height - 1))
     setBuilderInputMode('build')
     setBuilderActive(true)
     onBuilderModeChange?.(true)
     soundManager.play('frontier.ui.interact')
-  }, [builderEnabled, builderPlayerLayer, onBuilderModeChange, onCancelBuild])
+  }, [activeBuilderPlot, builderEnabled, builderPlots, onBuilderModeChange, onCancelBuild, playerPosition.x, playerPosition.y, playerPosition.z, selectBuilderPlot])
 
   const closeAstraBuilder = useCallback(async () => {
     await builder.flush()
@@ -5451,7 +5545,7 @@ export default function GalaxyWorld3D({
     const interactionSoundId = INTERACTION_SOUND_IDS[nearby.actionId]
       || 'frontier.ui.interact'
     soundManager.play(interactionSoundId)
-    if (nearby.kind === 'builder') openAstraBuilder()
+    if (nearby.kind === 'builder') void openAstraBuilder(nearby.plotId || nearby.id)
     else if (nearby.kind === 'portal') startMission(nearby.route)
     else if (nearby.kind === 'structure') onStructureMission?.(nearby.item)
     else if (nearby.kind === 'guide') onOpenBriefing?.()
@@ -5525,7 +5619,7 @@ export default function GalaxyWorld3D({
       if (event.code !== 'KeyE' && event.code !== 'KeyF' && event.code !== 'KeyV') return
       event.preventDefault()
       if (event.code === 'KeyE') {
-        if (playerInsideBuilderPlot) openAstraBuilder()
+        if (playerInsideBuilderPlot) void openAstraBuilder(playerBuilderPlot?.plotId)
         else interact()
       }
       else if (event.code === 'KeyF') inspectStructure()
@@ -5533,7 +5627,7 @@ export default function GalaxyWorld3D({
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [builderActive, inspectStructure, interact, onToggleFirstPerson, openAstraBuilder, paused, playerInsideBuilderPlot])
+  }, [builderActive, inspectStructure, interact, onToggleFirstPerson, openAstraBuilder, paused, playerBuilderPlot?.plotId, playerInsideBuilderPlot])
 
   useEffect(() => {
     if (!activeMission || paused || collectedIds.size >= 5) return undefined
@@ -5662,7 +5756,9 @@ export default function GalaxyWorld3D({
           onBuildAt={onBuildAt}
           onInvalidBuild={() => {
             soundManager.play('frontier.build.invalid')
-            onMessage?.('시설과 항로에서 조금 떨어진 평평한 자리를 골라주세요.')
+            onMessage?.(selectedBuildItem === ASTRA_BUILDER_INSTALL_ITEM_ID
+              ? '다른 시설·건축 부지·항로에서 충분히 떨어진 평평한 자리를 골라주세요.'
+              : '시설과 항로에서 조금 떨어진 평평한 자리를 골라주세요.')
           }}
           roverStatus={roverStatus}
           roverStatusLabel={roverStatusLabel}
@@ -5683,7 +5779,9 @@ export default function GalaxyWorld3D({
           gardenSummary={gardenSummary}
           builderEnabled={builderEnabled}
           builderActive={builderActive}
-          builderCells={builder.cells}
+          builderPlots={builderPlots}
+          activeBuilderPlotId={activeBuilderPlot.plotId}
+          builderCellsByPlot={builderCellsByPlot}
           builderInputMode={builderInputMode}
           builderTool={builderTool}
           builderLayer={builderLayer}
@@ -5756,8 +5854,8 @@ export default function GalaxyWorld3D({
       )}
       {!builderActive && selectedBuildItem && (
         <div className="frontier-build-mode">
-          <strong>실제 시설 모형으로 자리를 확인하세요</strong>
-          <span>초록색은 건설 가능 · 붉은색은 다른 자리 필요</span>
+          <strong>{selectedBuildItem === ASTRA_BUILDER_INSTALL_ITEM_ID ? '새 아스트라 빌더의 자리를 선택하세요' : '실제 시설 모형으로 자리를 확인하세요'}</strong>
+          <span>{selectedBuildItem === ASTRA_BUILDER_INSTALL_ITEM_ID ? '초록색 자리 클릭 시 학습 광석 2,000개를 지불하고 설치합니다' : '초록색은 건설 가능 · 붉은색은 다른 자리 필요'}</span>
           <button type="button" onClick={onCancelBuild}>취소</button>
         </div>
       )}
@@ -5771,6 +5869,13 @@ export default function GalaxyWorld3D({
           hydrated={builder.hydrated}
           saveState={builder.saveState}
           blockCount={builder.blockCount}
+          blockCapacity={builder.blockCapacity}
+          plotName={activeBuilderPlot.name}
+          wallet={builderWallet}
+          blockPackCost={Number(builderAccess?.blockPackCost || 1000)}
+          maxBlockCapacity={Number(builderAccess?.maxBlockCapacity || 2500)}
+          purchaseBusy={builderPurchaseBusy}
+          onPurchaseBlockPack={() => { void purchaseBuilderUpgrade('block_pack') }}
           inputMode={builderInputMode}
           onInputModeChange={setBuilderInputMode}
           isFirstPerson={isFirstPerson}

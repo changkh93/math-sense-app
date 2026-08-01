@@ -95,6 +95,7 @@ const invokeGalaxy = (name, payload = {}) => httpsCallable(functions, name)(payl
 
 const createOperationId = () => globalThis.crypto?.randomUUID?.()
   || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+const ASTRA_BUILDER_INSTALL_ITEM_ID = 'astra_builder_plot'
 
 const getRoverDispatchStorageKey = (uid) => `metasense_rover_dispatch_${String(uid || 'anonymous')}`
 
@@ -563,6 +564,8 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const noticeTimerRef = useRef(null)
   const returningRef = useRef(false)
   const actionLockRef = useRef('')
+  const builderInstallOperationRef = useRef('')
+  const builderUpgradeOperationRef = useRef({})
   const arrivalCloseRef = useRef(null)
   const menuCloseRef = useRef(null)
   const objectDialogCloseRef = useRef(null)
@@ -605,6 +608,10 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   )
   const saveBuilderState = useCallback(
     (payload) => callGalaxy('saveGalaxyBuildState', payload),
+    [callGalaxy],
+  )
+  const purchaseBuilderUpgrade = useCallback(
+    (payload) => callGalaxy('purchaseGalaxyBuilderUpgrade', payload),
     [callGalaxy],
   )
 
@@ -1197,6 +1204,33 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     }
   }, [flash])
 
+  const buyBuilderUpgrade = useCallback(async ({ kind, plotId }) => {
+    if (isGuest) {
+      flash('블록 용량 구매는 회원 계정에서 이용할 수 있어요.')
+      return null
+    }
+    if (kind !== 'block_pack') return null
+    const confirmed = window.confirm('학습 광석 1,000개로 이 건축실의 블록 용량을 500개 늘릴까요?')
+    if (!confirmed) return null
+    const label = '블록 용량이 500개 늘었습니다.'
+    const operationKey = `${kind}:${plotId}`
+    const operationId = builderUpgradeOperationRef.current[operationKey]
+      || (builderUpgradeOperationRef.current[operationKey] = createOperationId())
+    const result = await runAction(
+      `astra-builder:${kind}:${plotId || 'next'}`,
+      () => purchaseBuilderUpgrade({ kind, plotId, operationId }),
+      label,
+    )
+    if (!result) return null
+    delete builderUpgradeOperationRef.current[operationKey]
+    setHome((current) => current ? {
+      ...current,
+      wallet: result.wallet,
+      builderAccess: result.builderAccess,
+    } : current)
+    return result
+  }, [flash, isGuest, purchaseBuilderUpgrade, runAction])
+
   const openObjectDialog = useCallback((item) => {
     if (!item?.instanceId) return
     setSelectedStructureId(item.instanceId)
@@ -1426,6 +1460,28 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const buildItemAt = async (worldX, worldZ) => {
     if (!selectedBuildItem || !isOwner) return
     const itemId = selectedBuildItem
+    if (itemId === ASTRA_BUILDER_INSTALL_ITEM_ID) {
+      if (isGuest) {
+        flash('추가 아스트라 빌더 설치는 회원 계정에서 이용할 수 있어요.')
+        return
+      }
+      const result = await runAction('astra-builder:install', () => callGalaxy('installGalaxyAstraBuilder', {
+        operationId: builderInstallOperationRef.current || (builderInstallOperationRef.current = createOperationId()),
+        x: 50 + Number(worldX || 0) * 3,
+        y: 50 + Number(worldZ || 0) * 3,
+      }), '새 아스트라 빌더를 이곳에 설치했습니다.')
+      if (!result) return
+      setHome((current) => current ? {
+        ...current,
+        wallet: result.wallet,
+        builderAccess: result.builderAccess,
+      } : current)
+      setSelectedBuildItem('')
+      setSelectedBuildLevel(1)
+      builderInstallOperationRef.current = ''
+      soundManager.play('frontier.buildingPlaced')
+      return
+    }
     if (isGuest) {
       // 정규 서버 스키마와 동일한 좌표(0~100)를 사용한다. 비용은 카탈로그에서 읽는다.
       const placementX = 50 + Number(worldX || 0) * 3
@@ -2093,6 +2149,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   }
 
   const beginBuild = (itemId, level = 1) => {
+    if (itemId === ASTRA_BUILDER_INSTALL_ITEM_ID && !builderInstallOperationRef.current) {
+      builderInstallOperationRef.current = createOperationId()
+    }
     setSelectedBuildItem(itemId)
     setSelectedBuildLevel(level)
     setMenu('')
@@ -2169,7 +2228,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onOpenRover={() => openGameMenu('rover')}
         selectedBuildItem={selectedBuildItem}
         selectedBuildLevel={selectedBuildLevel}
-        onCancelBuild={() => { setSelectedBuildItem(''); setSelectedBuildLevel(1) }}
+        onCancelBuild={() => { setSelectedBuildItem(''); setSelectedBuildLevel(1); builderInstallOperationRef.current = '' }}
         onBuildAt={buildItemAt}
         onWorldAction={performWorldAction}
         onMissionComplete={runMission}
@@ -2186,8 +2245,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         builderOwnerId={user?.uid || 'local'}
         builderRemainingSeconds={playRemainingSeconds}
         builderServerSessionKey={playSession?.sessionId || ''}
+        builderAccess={home?.builderAccess}
+        builderStates={home?.builderStates}
+        builderWallet={wallet}
         onOpenBuilderPlot={openBuilderPlot}
         onSaveBuilderState={saveBuilderState}
+        onPurchaseBuilderUpgrade={buyBuilderUpgrade}
         onBuilderModeChange={setBuilderActive}
         onExplorationExitRequest={requestReturn}
         onOpenMenu={openGameMenu}
@@ -2526,6 +2589,29 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                           <div><small>BLUEPRINT COLLECTION</small><h3>다음에 만들 풍경을 고르세요</h3></div>
                           <MaterialStrip materials={ownPlanet.materials} />
                         </div>
+                        <section className="frontier-astra-builder-offer" aria-label="아스트라 빌더 설치">
+                          <span className="frontier-build-option-icon"><Hammer size={21} aria-hidden="true" /></span>
+                          <div>
+                            <small>독립 자유 건축 부지</small>
+                            <strong>새 아스트라 빌더 설치</strong>
+                            <p>
+                              현재 {Number(home?.builderAccess?.slotCount || 1)}개 설치됨 · 각 빌더는 건축물과 블록 용량을 따로 보관합니다.
+                            </p>
+                          </div>
+                          <span className="frontier-astra-builder-offer__price"><Gem size={14} aria-hidden="true" /> 학습 광석 2,000</span>
+                          <button
+                            type="button"
+                            disabled={Boolean(busy) || wallet < 2000 || Number(home?.builderAccess?.slotCount || 1) >= Number(home?.builderAccess?.maxSlots || 8)}
+                            onClick={() => beginBuild(ASTRA_BUILDER_INSTALL_ITEM_ID, 1)}
+                          >
+                            <MapPin size={16} aria-hidden="true" />
+                            {Number(home?.builderAccess?.slotCount || 1) >= Number(home?.builderAccess?.maxSlots || 8)
+                              ? '최대 설치 완료'
+                              : wallet < 2000
+                                ? '광석 부족'
+                                : '월드에서 자리 선택'}
+                          </button>
+                        </section>
                         <MaterialGuide materials={ownPlanet.materials} />
                         <div className="frontier-build-catalog">
                           {catalogEntries.map(([itemId, item]) => {

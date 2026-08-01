@@ -480,11 +480,15 @@ const ASTRA_BUILDER_MAX_STATE_BYTES = 64 * 1024;
 const ASTRA_BUILDER_FOUNDATION_UNDERLAY_MASK = 0x0400;
 const ASTRA_BUILDER_ALLOWED_CELL_MASK = 0x07ff;
 const ASTRA_BUILDER_ALLOWED_BLOCK_TYPES = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
-const ASTRA_BUILDER_PLOTS = {
-  "habitat-b01": {
+const ASTRA_BUILDER_BASE_CAPACITY = 500;
+const ASTRA_BUILDER_BLOCK_PACK_SIZE = 500;
+const ASTRA_BUILDER_BLOCK_PACK_COST = 1000;
+const ASTRA_BUILDER_SLOT_COST = 2000;
+const ASTRA_BUILDER_MAX_SLOTS = 8;
+const ASTRA_BUILDER_PHYSICAL_MAX_BLOCKS = 12 * 12 * 10 * 2;
+const ASTRA_BUILDER_MAX_CAPACITY = 2500;
+const ASTRA_BUILDER_PLOT_TEMPLATE = {
     schemaVersion: 1,
-    plotId: "habitat-b01",
-    name: "별빛 건축실 B-01",
     zoneId: "habitat",
     origin: { x: -7.5, y: 0, z: -4.5 },
     rotation: 0,
@@ -492,10 +496,100 @@ const ASTRA_BUILDER_PLOTS = {
     cellSize: 0.34,
     // The encoded grid is the capacity boundary. Each cell can hold one
     // foundation underlay plus one building piece.
-    maxBlocks: 12 * 12 * 10 * 2,
+    maxBlocks: ASTRA_BUILDER_PHYSICAL_MAX_BLOCKS,
     unlockedSetIds: ["astra_builder_basic"],
-  },
 };
+
+function getAstraBuilderPlotDefinition(plotId) {
+  const match = /^habitat-b(\d{2})$/.exec(String(plotId || ""));
+  const slot = Number(match?.[1] || 0);
+  if (!Number.isInteger(slot) || slot < 1 || slot > ASTRA_BUILDER_MAX_SLOTS) return null;
+  return {
+    ...ASTRA_BUILDER_PLOT_TEMPLATE,
+    plotId: `habitat-b${String(slot).padStart(2, "0")}`,
+    name: `별빛 건축실 B-${String(slot).padStart(2, "0")}`,
+  };
+}
+
+function getAstraBuilderSlotCount(planet = {}) {
+  return Math.min(ASTRA_BUILDER_MAX_SLOTS, Math.max(1, Math.floor(Number(planet.astraBuilderSlots || 1))));
+}
+
+function getAstraBuilderBlockPackCount(planet = {}, plotId) {
+  return Math.max(0, Math.floor(Number(planet.astraBuilderBlockPacks?.[plotId] || 0)));
+}
+
+function getAstraBuilderBlockCapacity(planet = {}, plotId) {
+  const purchasedCapacity = Math.min(
+    ASTRA_BUILDER_MAX_CAPACITY,
+    ASTRA_BUILDER_BASE_CAPACITY
+      + getAstraBuilderBlockPackCount(planet, plotId) * ASTRA_BUILDER_BLOCK_PACK_SIZE,
+  );
+  const legacyCapacity = Math.min(
+    ASTRA_BUILDER_PHYSICAL_MAX_BLOCKS,
+    Math.max(0, Math.floor(Number(planet.astraBuilderLegacyCapacities?.[plotId] || 0))),
+  );
+  return Math.max(purchasedCapacity, legacyCapacity);
+}
+
+function hasAstraBuilderPlotAccess(planet = {}, plotId) {
+  const definition = getAstraBuilderPlotDefinition(plotId);
+  if (!definition) return false;
+  const slot = Number(plotId.slice(-2));
+  return slot <= getAstraBuilderSlotCount(planet);
+}
+
+function buildAstraBuilderAccess(planet = {}, wallet = 0) {
+  const slotCount = getAstraBuilderSlotCount(planet);
+  return {
+    wallet: Math.max(0, Number(wallet || 0)),
+    slotCount,
+    maxSlots: ASTRA_BUILDER_MAX_SLOTS,
+    slotCost: ASTRA_BUILDER_SLOT_COST,
+    blockPackSize: ASTRA_BUILDER_BLOCK_PACK_SIZE,
+    blockPackCost: ASTRA_BUILDER_BLOCK_PACK_COST,
+    maxBlockCapacity: ASTRA_BUILDER_MAX_CAPACITY,
+    plots: Array.from({ length: slotCount }, (_, index) => {
+      const plotId = `habitat-b${String(index + 1).padStart(2, "0")}`;
+      const definition = getAstraBuilderPlotDefinition(plotId);
+      const storedCenter = planet.astraBuilderPlacements?.[plotId];
+      const center = Array.isArray(storedCenter)
+        && Number.isFinite(Number(storedCenter[0]))
+        && Number.isFinite(Number(storedCenter[1]))
+        ? [Number(storedCenter[0]), Number(storedCenter[1])]
+        : plotId === "habitat-b01"
+          ? [-7.5, -4.5]
+          : null;
+      return {
+        plotId,
+        name: definition.name,
+        blockCapacity: getAstraBuilderBlockCapacity(planet, plotId),
+        center,
+      };
+    }).filter((plot) => plot.center),
+  };
+}
+
+function planAstraBuilderPurchase({ planet = {}, wallet = 0, kind, plotId = "" } = {}) {
+  const currentWallet = Math.max(0, Number(wallet || 0));
+  const cost = kind === "block_pack" ? ASTRA_BUILDER_BLOCK_PACK_COST : 0;
+  if (!cost) return { kind: "invalid_kind" };
+  if (currentWallet < cost) return { kind: "insufficient_wallet", cost };
+
+  const update = {};
+  if (!hasAstraBuilderPlotAccess(planet, plotId)) return { kind: "plot_unavailable" };
+  if (getAstraBuilderBlockCapacity(planet, plotId) >= ASTRA_BUILDER_MAX_CAPACITY) {
+    return { kind: "max_capacity" };
+  }
+  update.astraBuilderBlockPacks = {
+    ...(planet.astraBuilderBlockPacks || {}),
+    [plotId]: getAstraBuilderBlockPackCount(planet, plotId) + 1,
+  };
+
+  const nextWallet = currentWallet - cost;
+  const nextPlanet = { ...planet, ...update };
+  return { kind: "purchasable", cost, update, purchasedPlotId: plotId, nextWallet, nextPlanet };
+}
 
 const GALAXY_STRUCTURE_VISIT_ACTIONS = {
   starter_dome: "repair",
@@ -713,7 +807,7 @@ function planGalaxyStructureVisit({ layout = [], instanceId = "", actionId = "",
   return { kind: "valid", structure, position, actionId: expectedActionId };
 }
 
-function planGalaxyItemPlacement({ layout = [], instanceId = "", x, y, rotation = 0 } = {}) {
+function planGalaxyItemPlacement({ layout = [], builderPlots = [], instanceId = "", x, y, rotation = 0 } = {}) {
   const numericX = Number(x);
   const numericY = Number(y);
   const numericRotation = Number(rotation);
@@ -735,6 +829,11 @@ function planGalaxyItemPlacement({ layout = [], instanceId = "", x, y, rotation 
     return Math.hypot(worldX - entryPosition.x, worldZ - entryPosition.z) < GALAXY_BUILD_MIN_SPACING;
   });
   if (collides) return { kind: "overlap" };
+  if ((Array.isArray(builderPlots) ? builderPlots : []).some((plot) => (
+    Array.isArray(plot?.center)
+    && Math.abs(worldX - Number(plot.center[0])) < 3.5
+    && Math.abs(worldZ - Number(plot.center[1])) < 3.5
+  ))) return { kind: "overlap" };
   if (GALAXY_BUILD_RESERVED_POSITIONS.some(([reservedX, reservedZ]) => (
     Math.hypot(worldX - reservedX, worldZ - reservedZ) < 2
   ))) return { kind: "reserved" };
@@ -746,6 +845,51 @@ function planGalaxyItemPlacement({ layout = [], instanceId = "", x, y, rotation 
     rotation: ((Math.round(numericRotation / 45) * 45) % 360 + 360) % 360,
     worldX,
     worldZ,
+  };
+}
+
+function planAstraBuilderInstallation({ planet = {}, wallet = 0, x, y } = {}) {
+  const currentWallet = Math.max(0, Number(wallet || 0));
+  if (currentWallet < ASTRA_BUILDER_SLOT_COST) {
+    return { kind: "insufficient_wallet", cost: ASTRA_BUILDER_SLOT_COST };
+  }
+  const slotCount = getAstraBuilderSlotCount(planet);
+  if (slotCount >= ASTRA_BUILDER_MAX_SLOTS) return { kind: "max_slots" };
+  const placement = planGalaxyItemPlacement({ layout: planet.layout, x, y, rotation: 0 });
+  if (placement.kind !== "valid") return placement;
+  const access = buildAstraBuilderAccess(planet, currentWallet);
+  if (access.plots.some((plot) => Math.hypot(
+    placement.worldX - plot.center[0],
+    placement.worldZ - plot.center[1],
+  ) < 5.2)) return { kind: "builder_overlap" };
+  if (GALAXY_BUILD_RESERVED_POSITIONS.some(([reservedX, reservedZ]) => (
+    Math.hypot(placement.worldX - reservedX, placement.worldZ - reservedZ) < 3.5
+  ))) return { kind: "reserved" };
+  const facilityTooClose = (Array.isArray(planet.layout) ? planet.layout : []).some((item) => {
+    const position = getGalaxyLayoutWorldPosition(item);
+    return Math.hypot(placement.worldX - position.x, placement.worldZ - position.z) < 3.5;
+  });
+  if (facilityTooClose) return { kind: "facility_overlap" };
+
+  const nextSlotCount = slotCount + 1;
+  const plotId = `habitat-b${String(nextSlotCount).padStart(2, "0")}`;
+  const center = [placement.worldX, placement.worldZ];
+  const update = {
+    astraBuilderSlots: nextSlotCount,
+    astraBuilderPlacements: {
+      ...(planet.astraBuilderPlacements || {}),
+      [plotId]: center,
+    },
+  };
+  const nextWallet = currentWallet - ASTRA_BUILDER_SLOT_COST;
+  return {
+    kind: "installable",
+    cost: ASTRA_BUILDER_SLOT_COST,
+    plotId,
+    center,
+    update,
+    nextWallet,
+    nextPlanet: { ...planet, ...update },
   };
 }
 
@@ -1688,7 +1832,7 @@ function validateAstraBuilderStatePayload({
   modules,
   blockCount,
 } = {}) {
-  const plot = ASTRA_BUILDER_PLOTS[plotId];
+  const plot = getAstraBuilderPlotDefinition(plotId);
   if (!plot) return { kind: "invalid_plot" };
   if (encoding !== ASTRA_BUILDER_STATE_ENCODING) return { kind: "invalid_encoding" };
   const gridBuffer = normalizeAstraBuilderBase64(gridDataBase64);
@@ -1750,7 +1894,7 @@ function getAstraBuilderStoredGridBuffer(value) {
 }
 
 function buildAstraBuilderPlotView(plotData = {}, fallbackPlot = null) {
-  const definition = fallbackPlot || ASTRA_BUILDER_PLOTS[plotData.plotId];
+  const definition = fallbackPlot || getAstraBuilderPlotDefinition(plotData.plotId);
   return {
     schemaVersion: Number(plotData.schemaVersion || definition?.schemaVersion || 1),
     plotId: String(plotData.plotId || definition?.plotId || ""),
@@ -2695,9 +2839,10 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     }
 
     const pendingDailyEvent = buildGalaxyDailyEvent({ uid, nowMs: serverNowMs });
+    const builderAccess = buildAstraBuilderAccess(ownPlanetData, user.crystals);
     const dailyOperationRef = db.collection("galaxyOperations")
       .doc(`daily_${uid}_${pendingDailyEvent.dayKey}`);
-    const [neighbors, eventSnap, dailyOperationSnap, liveSession] = await Promise.all([
+    const [neighbors, eventSnap, dailyOperationSnap, liveSession, builderStateSnaps] = await Promise.all([
       listCrewNeighbors(uid, user),
       ownPlanet.ref.collection("visitEvents").orderBy("createdAt", "desc").limit(30).get(),
       dailyOperationRef.get(),
@@ -2708,6 +2853,9 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         nowMs: serverNowMs,
         maxExpiresAtMs: playSession.hardEndsAtMs,
       }),
+      Promise.all(builderAccess.plots.map((plot) => ownPlanet.ref
+        .collection("buildPlots").doc(plot.plotId)
+        .collection("state").doc("current").get())),
     ]);
     const dailyOperation = dailyOperationSnap.exists ? dailyOperationSnap.data() || {} : null;
     const dailyStoryProgress = syncFrontierStoryWithCompletedDailyEvent({
@@ -2740,6 +2888,20 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       neighbors,
       events: eventSnap.docs.map((snap) => ({ id: snap.id, ...(snap.data() || {}) })),
       wallet: Math.max(0, Number(user.crystals || 0)),
+      builderAccess,
+      builderStates: Object.fromEntries(builderAccess.plots.map((plot, index) => {
+        const stateSnap = builderStateSnaps[index];
+        const state = stateSnap?.exists ? stateSnap.data() || {} : {};
+        const gridBuffer = getAstraBuilderStoredGridBuffer(state.gridData);
+        return [plot.plotId, {
+          encoding: ASTRA_BUILDER_STATE_ENCODING,
+          gridDataBase64: gridBuffer?.length === getAstraBuilderGridByteLength(getAstraBuilderPlotDefinition(plot.plotId))
+            ? gridBuffer.toString("base64")
+            : "",
+          blockCount: Math.max(0, Number(state.blockCount || 0)),
+          revision: Math.max(0, Number(state.revision || 0)),
+        }];
+      })),
       learningState,
       catalog: GALAXY_ITEM_CATALOG,
       roverCatalogVersion: GALAXY_ROVER_CATALOG_VERSION,
@@ -2755,10 +2917,15 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const { user } = await requireMember(uid);
     const planet = await ensurePlanet(uid, user);
     const plotId = cleanId(data?.plotId, 80) || "habitat-b01";
-    const definition = ASTRA_BUILDER_PLOTS[plotId];
-    if (!definition) {
+    const baseDefinition = getAstraBuilderPlotDefinition(plotId);
+    const accessPlot = buildAstraBuilderAccess(planet.data).plots.find((plot) => plot.plotId === plotId);
+    if (!baseDefinition || !accessPlot || !hasAstraBuilderPlotAccess(planet.data, plotId)) {
       throw new functions.https.HttpsError("invalid-argument", "열 수 없는 건축 부지입니다.");
     }
+    const definition = {
+      ...baseDefinition,
+      origin: { x: accessPlot.center[0], y: 0, z: accessPlot.center[1] },
+    };
 
     const serverNowMs = Date.now();
     const hardEndsAtMs = Math.max(serverNowMs, Number(playSession.hardEndsAtMs || 0));
@@ -2767,13 +2934,37 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const stateRef = plotRef.collection("state").doc("current");
     const leaseId = plotRef.collection("leaseIds").doc().id;
     const result = await db.runTransaction(async (transaction) => {
-      const [plotSnap, stateSnap] = await Promise.all([
+      const [plotSnap, stateSnap, planetSnap] = await Promise.all([
         transaction.get(plotRef),
         transaction.get(stateRef),
+        transaction.get(planet.ref),
       ]);
       const previousPlot = plotSnap.exists ? plotSnap.data() || {} : {};
       const stateData = stateSnap.exists ? stateSnap.data() || {} : {};
+      const currentPlanet = planetSnap.data() || {};
       const currentRevision = Math.max(0, Number(stateData.revision || previousPlot.currentRevision || 0));
+      const storedBlockCount = Math.max(0, Number(stateData.blockCount || previousPlot.blockCount || 0));
+      const purchasedPackCount = getAstraBuilderBlockPackCount(currentPlanet, plotId);
+      const grandfatheredPackCount = Math.max(
+        purchasedPackCount,
+        Math.ceil(Math.max(0, storedBlockCount - ASTRA_BUILDER_BASE_CAPACITY) / ASTRA_BUILDER_BLOCK_PACK_SIZE),
+      );
+      const migratedPlanet = grandfatheredPackCount > purchasedPackCount
+        ? {
+            ...currentPlanet,
+            astraBuilderBlockPacks: {
+              ...(currentPlanet.astraBuilderBlockPacks || {}),
+              [plotId]: grandfatheredPackCount,
+            },
+          }
+        : currentPlanet;
+      if (storedBlockCount > ASTRA_BUILDER_MAX_CAPACITY) {
+        migratedPlanet.astraBuilderLegacyCapacities = {
+          ...(currentPlanet.astraBuilderLegacyCapacities || {}),
+          [plotId]: Math.min(ASTRA_BUILDER_PHYSICAL_MAX_BLOCKS, storedBlockCount),
+        };
+      }
+      const blockCapacity = getAstraBuilderBlockCapacity(migratedPlanet, plotId);
       const storedGridBuffer = stateSnap.exists
         ? getAstraBuilderStoredGridBuffer(stateData.gridData)
         : Buffer.alloc(getAstraBuilderGridByteLength(definition));
@@ -2791,8 +2982,9 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       };
       const plotData = {
         ...definition,
+        maxBlocks: blockCapacity,
         ownerId: uid,
-        blockCount: Math.max(0, Number(stateData.blockCount || previousPlot.blockCount || 0)),
+        blockCount: storedBlockCount,
         moduleCount: 0,
         currentRevision,
         publishedRevision: Math.max(0, Number(previousPlot.publishedRevision || 0)),
@@ -2806,6 +2998,15 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         updatedAt: FieldValue.serverTimestamp(),
       };
       if (!plotSnap.exists) plotData.createdAt = FieldValue.serverTimestamp();
+      if (grandfatheredPackCount > purchasedPackCount || storedBlockCount > ASTRA_BUILDER_MAX_CAPACITY) {
+        transaction.set(planet.ref, {
+          astraBuilderBlockPacks: migratedPlanet.astraBuilderBlockPacks,
+          ...(migratedPlanet.astraBuilderLegacyCapacities
+            ? { astraBuilderLegacyCapacities: migratedPlanet.astraBuilderLegacyCapacities }
+            : {}),
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
       transaction.set(plotRef, plotData, { merge: true });
       if (!stateSnap.exists) {
         transaction.create(stateRef, {
@@ -2820,7 +3021,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       }
 
       return {
-        plot: buildAstraBuilderPlotView(plotData, definition),
+        plot: buildAstraBuilderPlotView(plotData, { ...definition, maxBlocks: blockCapacity }),
         state: {
           encoding: ASTRA_BUILDER_STATE_ENCODING,
           gridDataBase64: storedGridBuffer.toString("base64"),
@@ -2873,15 +3074,28 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const stateRef = plotRef.collection("state").doc("current");
     const serverNowMs = Date.now();
     const result = await db.runTransaction(async (transaction) => {
-      const [plotSnap, stateSnap] = await Promise.all([
+      const [plotSnap, stateSnap, planetSnap] = await Promise.all([
         transaction.get(plotRef),
         transaction.get(stateRef),
+        transaction.get(planet.ref),
       ]);
       if (!plotSnap.exists || !stateSnap.exists) {
         throw new functions.https.HttpsError("failed-precondition", "먼저 건축 부지를 열어주세요.");
       }
       const plotData = plotSnap.data() || {};
       const stateData = stateSnap.data() || {};
+      const currentPlanet = planetSnap.data() || {};
+      if (!hasAstraBuilderPlotAccess(currentPlanet, plotId)) {
+        throw new functions.https.HttpsError("permission-denied", "구매하지 않은 건축실입니다.");
+      }
+      const blockCapacity = getAstraBuilderBlockCapacity(currentPlanet, plotId);
+      if (validated.blockCount > blockCapacity) {
+        throw new functions.https.HttpsError(
+          "resource-exhausted",
+          `이 건축실은 현재 ${blockCapacity}개 블록까지 저장할 수 있습니다.`,
+          { blockCapacity, blockCount: validated.blockCount },
+        );
+      }
       const editLease = plotData.editLease || {};
       if (
         plotData.ownerId !== uid
@@ -3174,6 +3388,169 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     return { success: true };
   });
 
+  const purchaseGalaxyBuilderUpgrade = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
+    const kind = data?.kind === "block_pack" ? "block_pack" : "";
+    const plotId = cleanId(data?.plotId, 80);
+    const operationId = cleanId(data?.operationId, 120);
+    if (!kind || !/^[A-Za-z0-9_-]{8,120}$/.test(operationId)) {
+      throw new functions.https.HttpsError("invalid-argument", "아스트라 빌더 구매 요청이 올바르지 않습니다.");
+    }
+    if (!getAstraBuilderPlotDefinition(plotId)) {
+      throw new functions.https.HttpsError("invalid-argument", "블록 용량을 늘릴 건축실을 찾을 수 없습니다.");
+    }
+
+    const { userRef, user } = await requireMember(uid);
+    const planet = await ensurePlanet(uid, user);
+    const operationRef = userRef.collection("galaxyOperations").doc(operationId);
+    const transactionRef = userRef.collection("crystal_transactions").doc(`astra-builder-${operationId}`);
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, userSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(userRef),
+        transaction.get(planet.ref),
+      ]);
+      const currentUser = userSnap.data() || {};
+      const currentPlanet = planetSnap.data() || {};
+      if (operationSnap.exists) {
+        const previous = operationSnap.data() || {};
+        if (previous.type !== "astra_builder_upgrade" || previous.kind !== kind || String(previous.plotId || "") !== plotId) {
+          throw new functions.https.HttpsError("already-exists", "이미 다른 구매에 사용된 요청입니다.");
+        }
+        return {
+          wallet: Math.max(0, Number(currentUser.crystals || previous.wallet || 0)),
+          builderAccess: buildAstraBuilderAccess(currentPlanet, currentUser.crystals),
+          purchasedPlotId: String(previous.purchasedPlotId || plotId || ""),
+          deduplicated: true,
+        };
+      }
+
+      const purchase = planAstraBuilderPurchase({
+        planet: currentPlanet,
+        wallet: currentUser.crystals,
+        kind,
+        plotId,
+      });
+      if (purchase.kind === "insufficient_wallet") {
+        throw new functions.https.HttpsError("failed-precondition", "학습 광석이 부족합니다.");
+      }
+      if (purchase.kind === "plot_unavailable") {
+        throw new functions.https.HttpsError("permission-denied", "구매하지 않은 건축실입니다.");
+      }
+      if (purchase.kind === "max_capacity") {
+        throw new functions.https.HttpsError("resource-exhausted", "이 건축실의 최대 블록 용량에 도달했습니다.");
+      }
+      if (purchase.kind !== "purchasable") {
+        throw new functions.https.HttpsError("invalid-argument", "처리할 수 없는 아스트라 빌더 구매입니다.");
+      }
+      const { cost, update, purchasedPlotId, nextWallet, nextPlanet } = purchase;
+      transaction.set(userRef, { crystals: nextWallet }, { merge: true });
+      transaction.set(planet.ref, { ...update, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(transactionRef, {
+        amount: -cost,
+        type: "astra_builder_upgrade",
+        description: "아스트라 빌더 블록 500개 확장",
+        metadata: { kind, plotId, purchasedPlotId, source: "purchaseGalaxyBuilderUpgrade" },
+        timestamp: FieldValue.serverTimestamp(),
+      });
+      transaction.set(operationRef, {
+        uid,
+        type: "astra_builder_upgrade",
+        kind,
+        plotId,
+        purchasedPlotId,
+        amount: cost,
+        wallet: nextWallet,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return {
+        wallet: nextWallet,
+        builderAccess: buildAstraBuilderAccess(nextPlanet, nextWallet),
+        purchasedPlotId,
+        deduplicated: false,
+      };
+    });
+    return serializeValue({ success: true, ...result });
+  });
+
+  const installGalaxyAstraBuilder = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
+    const operationId = cleanId(data?.operationId, 120);
+    if (!/^[A-Za-z0-9_-]{8,120}$/.test(operationId)) {
+      throw new functions.https.HttpsError("invalid-argument", "아스트라 빌더 설치 요청이 올바르지 않습니다.");
+    }
+    const { userRef, user } = await requireMember(uid);
+    const planet = await ensurePlanet(uid, user);
+    const operationRef = userRef.collection("galaxyOperations").doc(operationId);
+    const transactionRef = userRef.collection("crystal_transactions").doc(`astra-builder-install-${operationId}`);
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, userSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(userRef),
+        transaction.get(planet.ref),
+      ]);
+      const currentUser = userSnap.data() || {};
+      const currentPlanet = planetSnap.data() || {};
+      if (operationSnap.exists) {
+        const previous = operationSnap.data() || {};
+        if (previous.type !== "astra_builder_install") {
+          throw new functions.https.HttpsError("already-exists", "이미 다른 설치에 사용된 요청입니다.");
+        }
+        return {
+          wallet: Math.max(0, Number(currentUser.crystals || previous.wallet || 0)),
+          builderAccess: buildAstraBuilderAccess(currentPlanet, currentUser.crystals),
+          installedPlotId: String(previous.installedPlotId || ""),
+          deduplicated: true,
+        };
+      }
+      const install = planAstraBuilderInstallation({
+        planet: currentPlanet,
+        wallet: currentUser.crystals,
+        x: data?.x,
+        y: data?.y,
+      });
+      if (install.kind === "insufficient_wallet") {
+        throw new functions.https.HttpsError("failed-precondition", "아스트라 빌더 설치에 필요한 학습 광석이 부족합니다.");
+      }
+      if (install.kind === "max_slots") {
+        throw new functions.https.HttpsError("resource-exhausted", "아스트라 빌더는 최대 8개까지 설치할 수 있습니다.");
+      }
+      if (["overlap", "builder_overlap", "facility_overlap"].includes(install.kind)) {
+        throw new functions.https.HttpsError("failed-precondition", "다른 시설이나 아스트라 빌더와 충분히 떨어진 자리를 선택해주세요.");
+      }
+      if (install.kind !== "installable") {
+        throw new functions.https.HttpsError("invalid-argument", "이 위치에는 아스트라 빌더를 설치할 수 없습니다.");
+      }
+      transaction.set(userRef, { crystals: install.nextWallet }, { merge: true });
+      transaction.set(planet.ref, { ...install.update, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(transactionRef, {
+        amount: -install.cost,
+        type: "astra_builder_install",
+        description: `${getAstraBuilderPlotDefinition(install.plotId).name} 설치`,
+        metadata: { plotId: install.plotId, center: install.center, source: "installGalaxyAstraBuilder" },
+        timestamp: FieldValue.serverTimestamp(),
+      });
+      transaction.set(operationRef, {
+        uid,
+        type: "astra_builder_install",
+        installedPlotId: install.plotId,
+        center: install.center,
+        amount: install.cost,
+        wallet: install.nextWallet,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return {
+        wallet: install.nextWallet,
+        builderAccess: buildAstraBuilderAccess(install.nextPlanet, install.nextWallet),
+        installedPlotId: install.plotId,
+        deduplicated: false,
+      };
+    });
+    return serializeValue({ success: true, ...result });
+  });
+
   const buildGalaxyItem = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
     await requireActiveGalaxyPlay(uid, data);
@@ -3233,7 +3610,13 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const requestedY = Number(data?.y);
       const x = Number.isFinite(requestedX) ? clamp(requestedX, 7.4, 92.6) : 16 + ((slot * 19) % 68);
       const y = Number.isFinite(requestedY) ? clamp(requestedY, 7.4, 92.6) : 24 + ((slot * 23) % 58);
-      const placement = requireValidGalaxyItemPlacement(planGalaxyItemPlacement({ layout, x, y, rotation: 0 }));
+      const placement = requireValidGalaxyItemPlacement(planGalaxyItemPlacement({
+        layout,
+        builderPlots: buildAstraBuilderAccess(currentPlanet).plots,
+        x,
+        y,
+        rotation: 0,
+      }));
       const placed = {
         instanceId,
         itemId,
@@ -3434,12 +3817,14 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const planet = await ensurePlanet(uid, user);
     const result = await db.runTransaction(async (transaction) => {
       const snap = await transaction.get(planet.ref);
-      const layout = Array.isArray(snap.data()?.layout) ? snap.data().layout : [];
+      const planetData = snap.data() || {};
+      const layout = Array.isArray(planetData.layout) ? planetData.layout : [];
       const index = layout.findIndex((entry) => entry?.instanceId === instanceId);
       if (index < 0) throw new functions.https.HttpsError("not-found", "배치된 시설을 찾을 수 없습니다.");
       const current = layout[index] || {};
       const placement = requireValidGalaxyItemPlacement(planGalaxyItemPlacement({
         layout,
+        builderPlots: buildAstraBuilderAccess(planetData).plots,
         instanceId,
         x: hasX ? data.x : current.x,
         y: hasY ? data.y : current.y,
@@ -3492,11 +3877,13 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     const planet = await ensurePlanet(uid, user);
     const result = await db.runTransaction(async (transaction) => {
       const snap = await transaction.get(planet.ref);
-      const layout = Array.isArray(snap.data()?.layout) ? snap.data().layout : [];
+      const planetData = snap.data() || {};
+      const layout = Array.isArray(planetData.layout) ? planetData.layout : [];
       const index = layout.findIndex((entry) => entry?.instanceId === instanceId);
       if (index < 0) throw new functions.https.HttpsError("not-found", "배치된 시설을 찾을 수 없습니다.");
       const placement = requireValidGalaxyItemPlacement(planGalaxyItemPlacement({
         layout,
+        builderPlots: buildAstraBuilderAccess(planetData).plots,
         instanceId,
         x: data.x,
         y: data.y,
@@ -4562,6 +4949,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     openGalaxyHome,
     openGalaxyBuildPlot,
     saveGalaxyBuildState,
+    purchaseGalaxyBuilderUpgrade,
+    installGalaxyAstraBuilder,
     renewGalaxyWorldSession,
     sendGalaxyWorldSpeech,
     completeGalaxyDailyEvent,
@@ -4640,6 +5029,11 @@ module.exports.__test = {
   validateGalaxyLiveSpeechText,
   containsUnsafePublicText,
   getAstraBuilderGridByteLength,
+  getAstraBuilderPlotDefinition,
+  getAstraBuilderBlockCapacity,
+  buildAstraBuilderAccess,
+  planAstraBuilderPurchase,
+  planAstraBuilderInstallation,
   getAstraBuilderStoredGridBuffer,
   normalizeAstraBuilderBase64,
   normalizeFrontierStory,

@@ -264,15 +264,15 @@ function buildBlockEdgesGeometry(cells) {
   return geometry
 }
 
-function AstraBuilderCamera({ active, inputMode, paused, baseY, useCharacterCamera }) {
+function AstraBuilderCamera({ active, inputMode, paused, baseY, useCharacterCamera, plot }) {
   const { camera, gl } = useThree()
   const controlsRef = useRef()
   const previousCameraRef = useRef(null)
   const target = useMemo(() => new THREE.Vector3(
-    ASTRA_BUILDER_POC_PLOT.center[0],
+    plot.center[0],
     baseY + 0.9,
-    ASTRA_BUILDER_POC_PLOT.center[1],
-  ), [baseY])
+    plot.center[1],
+  ), [baseY, plot.center])
   const overviewActive = active && (inputMode === 'camera' || !useCharacterCamera)
 
   useEffect(() => {
@@ -333,6 +333,7 @@ function AstraBuilderCamera({ active, inputMode, paused, baseY, useCharacterCame
 }
 
 export default function AstraBuilderPlot({
+  plot = ASTRA_BUILDER_POC_PLOT,
   baseY,
   cells,
   active,
@@ -353,7 +354,7 @@ export default function AstraBuilderPlot({
   const instancesByType = useMemo(() => getAstraBuilderInstances(cells), [cells])
   const edgesGeometry = useMemo(() => buildBlockEdgesGeometry(cells), [cells])
   const edgesVisible = active && inputMode === 'build'
-  const hoverIndex = hoveredCell ? getAstraBuilderCellIndex(hoveredCell) : -1
+  const hoverIndex = hoveredCell ? getAstraBuilderCellIndex(hoveredCell, plot) : -1
   const hoveredValue = hoverIndex >= 0 ? cells[hoverIndex] : 0
   const hoverOccupied = decodeAstraBuilderCell(hoveredValue).occupied
   const hoverPlacementIssue = hoveredCell && tool === 'place'
@@ -362,14 +363,14 @@ export default function AstraBuilderPlot({
         cell: hoveredCell,
         blockType: selectedBlockType,
         rotation: selectedRotation,
-      })
+      }, plot)
     : null
   const hoverValid = Boolean(hoveredCell) && !hoverBlockedByPlayer && !hoverLayerMismatch && (
     tool === 'place'
       ? !hoverPlacementIssue
       : hoverOccupied
   )
-  const hoverPosition = hoveredCell ? getAstraBuilderWorldPosition(hoveredCell) : null
+  const hoverPosition = hoveredCell ? getAstraBuilderWorldPosition(hoveredCell, plot) : null
   const editPlaneY = activeLayer * ASTRA_BUILDER_POC_PLOT.cellSize + 0.012
 
   const isPointWithinReach = (point) => {
@@ -403,6 +404,7 @@ export default function AstraBuilderPlot({
         playerPosition: playerGroup.position,
         characterScale: playerGroup.scale.x,
         plotBaseY: baseY,
+        plot,
       }),
     ))
   }
@@ -420,7 +422,7 @@ export default function AstraBuilderPlot({
       cell,
       blockType: selectedBlockType,
       rotation: selectedRotation,
-    })) return
+    }, plot)) return
     if (
       tool === 'place'
       && playerGroupRef?.current
@@ -431,6 +433,7 @@ export default function AstraBuilderPlot({
         playerPosition: playerGroupRef.current.position,
         characterScale: playerGroupRef.current.scale.x,
         plotBaseY: baseY,
+        plot,
       })
     ) {
       onInvalidEdit?.({ reason: 'player_overlap', cell, activeLayer, tool })
@@ -454,10 +457,10 @@ export default function AstraBuilderPlot({
     if (!isAstraBuilderPlacementClick(event)) return
     event.stopPropagation()
     const rawCell = (tool !== 'place' || isPointWithinReach(event.point))
-      ? getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
+      ? getAstraBuilderCellFromWorldPoint(event.point, activeLayer, plot)
       : null
     const cell = tool === 'place'
-      ? normalizeAstraBuilderPlacementCell(rawCell, selectedBlockType)
+      ? normalizeAstraBuilderPlacementCell(rawCell, selectedBlockType, plot)
       : rawCell
     if (!cell && tool === 'place') {
       onInvalidEdit?.({ reason: 'out_of_reach', activeLayer, tool })
@@ -469,10 +472,10 @@ export default function AstraBuilderPlot({
   const handlePlanePointerMove = (event) => {
     if (!active || paused || inputMode !== 'build') return
     const rawCell = (tool !== 'place' || isPointWithinReach(event.point))
-      ? getAstraBuilderCellFromWorldPoint(event.point, activeLayer)
+      ? getAstraBuilderCellFromWorldPoint(event.point, activeLayer, plot)
       : null
     const cell = tool === 'place'
-      ? normalizeAstraBuilderPlacementCell(rawCell, selectedBlockType)
+      ? normalizeAstraBuilderPlacementCell(rawCell, selectedBlockType, plot)
       : rawCell
     updateHoveredCell(cell)
   }
@@ -488,9 +491,10 @@ export default function AstraBuilderPlot({
       activeLayer,
       clickedCell: cell,
       tool,
+      plot,
     })
     return tool === 'place'
-      ? normalizeAstraBuilderPlacementCell(target, selectedBlockType)
+      ? normalizeAstraBuilderPlacementCell(target, selectedBlockType, plot)
       : target
   }
 
@@ -513,7 +517,7 @@ export default function AstraBuilderPlot({
   }
 
   return (
-    <group position={[ASTRA_BUILDER_POC_PLOT.center[0], baseY, ASTRA_BUILDER_POC_PLOT.center[1]]}>
+    <group position={[plot.center[0], baseY, plot.center[1]]}>
       <mesh position={[0, -0.07, 0]} receiveShadow>
         <boxGeometry args={[PLATFORM_SIZE + 0.16, 0.14, PLATFORM_SIZE + 0.16]} />
         <meshStandardMaterial color="#273f50" metalness={0.42} roughness={0.5} />
@@ -641,6 +645,7 @@ export default function AstraBuilderPlot({
         paused={paused}
         baseY={baseY}
         useCharacterCamera={useCharacterCamera}
+        plot={plot}
       />
     </group>
   )

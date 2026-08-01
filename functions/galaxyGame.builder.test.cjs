@@ -1,9 +1,14 @@
 const assert = require('node:assert/strict');
 
 const {
+  buildAstraBuilderAccess,
+  getAstraBuilderBlockCapacity,
   getAstraBuilderGridByteLength,
+  getAstraBuilderPlotDefinition,
   getAstraBuilderStoredGridBuffer,
   normalizeAstraBuilderBase64,
+  planAstraBuilderPurchase,
+  planAstraBuilderInstallation,
   validateAstraBuilderStatePayload,
 } = require('./galaxyGame').__test;
 
@@ -97,9 +102,81 @@ function testStoredByteNormalization() {
   assert.equal(getAstraBuilderStoredGridBuffer({}), null);
 }
 
+function testBuilderEntitlements() {
+  const defaults = buildAstraBuilderAccess({}, 4200);
+  assert.equal(defaults.wallet, 4200);
+  assert.equal(defaults.slotCount, 1);
+  assert.equal(defaults.plots.length, 1);
+  assert.equal(defaults.plots[0].plotId, 'habitat-b01');
+  assert.equal(defaults.plots[0].blockCapacity, 500);
+  assert.equal(defaults.blockPackCost, 1000);
+  assert.equal(defaults.slotCost, 2000);
+
+  const expanded = buildAstraBuilderAccess({
+    astraBuilderSlots: 3,
+    astraBuilderPlacements: {
+      'habitat-b02': [6, 6],
+      'habitat-b03': [-6, 7],
+    },
+    astraBuilderBlockPacks: {
+      'habitat-b01': 2,
+      'habitat-b02': 9,
+    },
+  }, 100);
+  assert.equal(expanded.plots.length, 3);
+  assert.equal(expanded.plots[0].blockCapacity, 1500);
+  assert.equal(expanded.plots[1].blockCapacity, 2500);
+  assert.equal(getAstraBuilderBlockCapacity({}, 'habitat-b01'), 500);
+  assert.equal(getAstraBuilderBlockCapacity({
+    astraBuilderLegacyCapacities: { 'habitat-b01': 2714 },
+  }, 'habitat-b01'), 2714);
+  assert.equal(getAstraBuilderPlotDefinition('habitat-b08').name, '별빛 건축실 B-08');
+  assert.equal(getAstraBuilderPlotDefinition('habitat-b09'), null);
+}
+
+function testBuilderPurchases() {
+  const blockPack = planAstraBuilderPurchase({
+    planet: {},
+    wallet: 1500,
+    kind: 'block_pack',
+    plotId: 'habitat-b01',
+  });
+  assert.equal(blockPack.kind, 'purchasable');
+  assert.equal(blockPack.cost, 1000);
+  assert.equal(blockPack.nextWallet, 500);
+  assert.equal(getAstraBuilderBlockCapacity(blockPack.nextPlanet, 'habitat-b01'), 1000);
+
+  assert.equal(planAstraBuilderPurchase({ planet: {}, wallet: 999, kind: 'block_pack', plotId: 'habitat-b01' }).kind, 'insufficient_wallet');
+  assert.equal(planAstraBuilderPurchase({ planet: {}, wallet: 5000, kind: 'block_pack', plotId: 'habitat-b02' }).kind, 'plot_unavailable');
+  assert.equal(planAstraBuilderPurchase({ planet: { astraBuilderBlockPacks: { 'habitat-b01': 4 } }, wallet: 5000, kind: 'block_pack', plotId: 'habitat-b01' }).kind, 'max_capacity');
+  assert.equal(planAstraBuilderPurchase({ planet: {}, wallet: 5000, kind: 'builder_slot' }).kind, 'invalid_kind');
+}
+
+function testBuilderInstallation() {
+  const install = planAstraBuilderInstallation({ planet: {}, wallet: 2500, x: 65, y: 65 });
+  assert.equal(install.kind, 'installable');
+  assert.equal(install.cost, 2000);
+  assert.equal(install.nextWallet, 500);
+  assert.equal(install.plotId, 'habitat-b02');
+  assert.deepEqual(install.center, [5, 5]);
+  assert.deepEqual(install.nextPlanet.astraBuilderPlacements['habitat-b02'], [5, 5]);
+  assert.equal(planAstraBuilderInstallation({ planet: {}, wallet: 1999, x: 65, y: 65 }).kind, 'insufficient_wallet');
+  assert.equal(planAstraBuilderInstallation({ planet: { astraBuilderSlots: 8 }, wallet: 5000, x: 65, y: 65 }).kind, 'max_slots');
+  assert.equal(planAstraBuilderInstallation({ planet: {}, wallet: 5000, x: 27.5, y: 50 }).kind, 'builder_overlap');
+  assert.equal(planAstraBuilderInstallation({
+    planet: { layout: [{ x: 56, y: 65 }] },
+    wallet: 5000,
+    x: 65,
+    y: 65,
+  }).kind, 'facility_overlap');
+}
+
 testValidState();
 testMalformedPayloads();
 testCellValidation();
 testStoredByteNormalization();
+testBuilderEntitlements();
+testBuilderPurchases();
+testBuilderInstallation();
 
 console.log('Galaxy Astra Builder server tests passed.');

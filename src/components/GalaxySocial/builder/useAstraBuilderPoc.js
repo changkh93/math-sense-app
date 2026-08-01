@@ -105,11 +105,14 @@ export default function useAstraBuilderPoc(
   storageKey,
   enabled = true,
   {
+    plotId = ASTRA_BUILDER_POC_PLOT.id,
+    blockCapacity = 500,
     serverActive = false,
     serverSessionKey = '',
     openServerPlot = null,
     saveServerState = null,
     onSyncMessage = null,
+    onLimitReached = null,
   } = {},
 ) {
   const [state, dispatch] = useReducer(builderReducer, undefined, createBuilderState)
@@ -120,6 +123,7 @@ export default function useAstraBuilderPoc(
   const [serverReady, setServerReady] = useState(false)
   const [serverSyncing, setServerSyncing] = useState(false)
   const [serverRevision, setServerRevision] = useState(0)
+  const [serverBlockCapacity, setServerBlockCapacity] = useState(0)
   const [serverError, setServerError] = useState('')
   const [serverRetryToken, setServerRetryToken] = useState(0)
   const [serverBackoffVersion, setServerBackoffVersion] = useState(0)
@@ -194,8 +198,10 @@ export default function useAstraBuilderPoc(
     setLoadedStorageKey('')
     setServerReady(false)
     setServerRevision(0)
+    setServerBlockCapacity(0)
     setServerError('')
     setConflict(null)
+    dispatch({ type: 'load', cells: createEmptyAstraBuilderGrid() })
     clearServerTimers()
 
     if (!enabled || !storageKey) {
@@ -275,6 +281,7 @@ export default function useAstraBuilderPoc(
       return false
     }
     serverLeaseRef.current = serverData.lease
+    setServerBlockCapacity(Math.max(0, Number(serverData?.plot?.maxBlocks || 0)))
     serverRevisionRef.current = Number(serverData.state.revision || 0)
     setServerRevision(serverRevisionRef.current)
     const recoveryKey = await preserveConflictDraft(localSnapshot, reason)
@@ -309,7 +316,7 @@ export default function useAstraBuilderPoc(
       setServerSyncing(true)
       try {
         const result = await saveServerState({
-          plotId: ASTRA_BUILDER_POC_PLOT.id,
+          plotId,
           leaseId: serverLeaseRef.current.leaseId,
           baseRevision: serverRevisionRef.current,
           encoding: 'u16le-v1',
@@ -343,7 +350,7 @@ export default function useAstraBuilderPoc(
         if (isRevisionConflict(error)) {
           try {
             const latestServer = await openServerPlot({
-              plotId: ASTRA_BUILDER_POC_PLOT.id,
+              plotId,
             })
             await setRevisionConflict(stateRef.current, latestServer, 'revision-conflict')
           } catch (refreshError) {
@@ -371,6 +378,7 @@ export default function useAstraBuilderPoc(
     deferServerRetry,
     flush,
     openServerPlot,
+    plotId,
     saveServerState,
     serverReady,
     resetServerBackoff,
@@ -394,7 +402,7 @@ export default function useAstraBuilderPoc(
     setServerOpening(true)
     setServerError('')
 
-    openServerPlot({ plotId: ASTRA_BUILDER_POC_PLOT.id })
+    openServerPlot({ plotId })
       .then(async (serverData) => {
         if (cancelled) return
         const serverCells = decodeAstraBuilderGridBase64(
@@ -420,6 +428,7 @@ export default function useAstraBuilderPoc(
         })
 
         serverLeaseRef.current = serverData.lease
+        setServerBlockCapacity(Math.max(0, Number(serverData?.plot?.maxBlocks || 0)))
         serverRevisionRef.current = remoteRevision
         setServerRevision(remoteRevision)
 
@@ -465,6 +474,7 @@ export default function useAstraBuilderPoc(
     clearServerTimers,
     hydrated,
     openServerPlot,
+    plotId,
     resetServerBackoff,
     serverActive,
     serverEnabled,
@@ -583,7 +593,7 @@ export default function useAstraBuilderPoc(
     setServerError('')
     try {
       const result = await saveServerState({
-        plotId: ASTRA_BUILDER_POC_PLOT.id,
+        plotId,
         leaseId: serverLeaseRef.current.leaseId,
         baseRevision: currentConflict.serverRevision,
         encoding: 'u16le-v1',
@@ -616,7 +626,7 @@ export default function useAstraBuilderPoc(
       if (isRevisionConflict(error)) {
         try {
           const latestServer = await openServerPlot({
-            plotId: ASTRA_BUILDER_POC_PLOT.id,
+            plotId,
           })
           await setRevisionConflict({
             cells: currentConflict.localCells,
@@ -635,6 +645,7 @@ export default function useAstraBuilderPoc(
   }, [
     onSyncMessage,
     openServerPlot,
+    plotId,
     saveServerState,
     setRevisionConflict,
     storageKey,
@@ -643,10 +654,16 @@ export default function useAstraBuilderPoc(
   const edit = useCallback((nextEdit) => {
     if (conflictRef.current) return false
     const current = stateRef.current
-    if (!applyAstraBuilderEdit(current.cells, nextEdit)) return false
+    const result = applyAstraBuilderEdit(current.cells, nextEdit)
+    if (!result) return false
+    const effectiveBlockCapacity = Math.max(blockCapacity, serverBlockCapacity)
+    if (nextEdit?.tool === 'place' && countAstraBuilderBlocks(result.cells) > effectiveBlockCapacity) {
+      onLimitReached?.({ blockCapacity: effectiveBlockCapacity, blockCount: current.blockCount })
+      return false
+    }
     dispatch({ type: 'edit', edit: nextEdit })
     return true
-  }, [])
+  }, [blockCapacity, onLimitReached, serverBlockCapacity])
 
   const saveState = useMemo(() => {
     if (conflict) return 'conflict'
@@ -672,6 +689,7 @@ export default function useAstraBuilderPoc(
     saveState,
     serverRevision,
     serverError,
+    blockCapacity: Math.max(blockCapacity, serverBlockCapacity),
     conflict,
     edit,
     undo: () => {
@@ -693,6 +711,8 @@ export default function useAstraBuilderPoc(
     resolveConflict,
     saveState,
     serverError,
+    blockCapacity,
+    serverBlockCapacity,
     serverRevision,
     state,
     syncNow,

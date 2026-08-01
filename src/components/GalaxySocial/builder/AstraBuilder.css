@@ -95,6 +95,21 @@
   border-radius: 10px;
 }
 
+.astra-builder-hud__status .astra-builder-hud__purchase {
+  min-height: 30px;
+  padding: 0 .5rem;
+  border-color: rgba(114, 211, 255, .24);
+  color: #bceeff;
+  font-size: .6rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.astra-builder-hud__status .astra-builder-hud__wallet {
+  color: #8ee7ff;
+  white-space: nowrap;
+}
+
 .astra-builder-hud__commandbar {
   position: absolute;
   top: 5.2rem;
@@ -340,6 +355,26 @@
     display: none;
   }
 
+  .astra-builder-hud__status {
+    gap: .25rem;
+  }
+
+  .astra-builder-hud__status b {
+    padding-inline: .34rem;
+  }
+
+  .astra-builder-hud__status .astra-builder-hud__purchase {
+    width: 34px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .astra-builder-hud__status .astra-builder-hud__purchase::before {
+    content: '+';
+    font-size: .92rem;
+  }
+
   .astra-builder-hud__commandbar {
     top: 4.8rem;
     right: .65rem;
@@ -435,5 +470,28 @@
   .astra-builder-hud__materials button:nth-child(6),
   .astra-builder-hud__materials .rotate-selection {
     display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .astra-builder-hud__top {
+    gap: .25rem;
+    padding-inline: .42rem;
+  }
+
+  .astra-builder-hud__status b {
+    font-size: .53rem;
+  }
+
+  .astra-builder-hud__status > button:last-child {
+    justify-content: center;
+    width: 34px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .astra-builder-hud__status > button:last-child svg {
+    flex: 0 0 auto;
   }
 }

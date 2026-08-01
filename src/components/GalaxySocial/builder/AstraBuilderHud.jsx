@@ -3,6 +3,7 @@ import {
   Box,
   Camera,
   Eye,
+  Gem,
   ChevronDown,
   ChevronUp,
   Hammer,
@@ -32,6 +33,13 @@ export default function AstraBuilderHud({
   hydrated,
   saveState,
   blockCount,
+  blockCapacity = 500,
+  plotName = '별빛 건축실 B-01',
+  wallet = 0,
+  blockPackCost = 1000,
+  maxBlockCapacity = 2500,
+  purchaseBusy = false,
+  onPurchaseBlockPack,
   inputMode,
   onInputModeChange,
   isFirstPerson,
@@ -59,12 +67,22 @@ export default function AstraBuilderHud({
     <section className="astra-builder-hud" aria-label="아스트라 빌더 POC">
       <header className="astra-builder-hud__top">
         <div>
-          <small>ASTRA BUILDER · POC</small>
-          <strong>별빛 건축실 B-01</strong>
+          <small>ASTRA BUILDER</small>
+          <strong>{plotName}</strong>
         </div>
         <div className="astra-builder-hud__status">
           <span><Save size={14} aria-hidden="true" /> {hydrated ? SAVE_LABELS[saveState] : '초안 불러오는 중'}</span>
-          <b>{blockCount}개 배치</b>
+          <b>{blockCount.toLocaleString()} / {blockCapacity.toLocaleString()} 블록</b>
+          <span className="astra-builder-hud__wallet"><Gem size={14} aria-hidden="true" /> {wallet.toLocaleString()} 광석</span>
+          <button
+            type="button"
+            className="astra-builder-hud__purchase"
+            disabled={purchaseBusy || blockCapacity >= maxBlockCapacity || wallet < blockPackCost}
+            onClick={onPurchaseBlockPack}
+            title={blockCapacity >= maxBlockCapacity ? '이 건축실은 최대 용량입니다' : `블록 500개 확장 · 학습 광석 ${blockPackCost.toLocaleString()}`}
+          >
+            +500 · {blockPackCost.toLocaleString()}
+          </button>
           {Number.isFinite(remainingSeconds) && <em>{Math.max(0, Math.ceil(remainingSeconds / 60))}분</em>}
           <button type="button" onClick={onClose}><X size={17} aria-hidden="true" /> 나가기</button>
         </div>
