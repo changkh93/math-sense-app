@@ -200,6 +200,7 @@ function createBody(cell, decoded, plotBaseY, plot) {
     bodyShape: traits.bodyShape,
     supportSurface: traits.supportSurface,
     acousticMaterial: traits.acousticMaterial,
+    plot,
     centerX,
     centerZ,
     halfX,
@@ -265,14 +266,15 @@ export function findAstraBuilderBodyCollision(
   return bodies.find((body) => {
     if (!circleIntersectsAabb(x, z, dimensions.radius, body)) return false
     if (body.bodyShape === 'stair') {
+      const bodyPlot = body.plot || plot
       const surfaceY = body.minY + getAstraBuilderStairProgress(
         x,
         z,
         body.cell,
         body.rotation,
-        plot,
-      ) * plot.cellSize
-      const stairStepAllowance = Math.max(dimensions.maxStepUp, plot.cellSize * 0.72)
+        bodyPlot,
+      ) * bodyPlot.cellSize
+      const stairStepAllowance = Math.max(dimensions.maxStepUp, bodyPlot.cellSize * 0.72)
       return footY + stairStepAllowance + EPSILON < surfaceY && topY > body.minY + EPSILON
     }
     if (

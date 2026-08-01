@@ -15,6 +15,7 @@ export const ASTRA_BUILDER_HISTORY_LIMIT = 30
 export const ASTRA_BUILDER_BASE_LIFT = .08
 export const ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET = .008
 export const ASTRA_BUILDER_STORY_HEIGHT_CELLS = 3
+export const ASTRA_BUILDER_DOOR_HEIGHT_CELLS = ASTRA_BUILDER_STORY_HEIGHT_CELLS
 export const ASTRA_BUILDER_WALL_PANEL_TYPE = 8
 
 export const ASTRA_BUILDER_BLOCKS = Object.freeze([
@@ -72,8 +73,10 @@ export function isAstraBuilderSameStoryLayer(
 export function doesAstraBuilderBlockOccupyLayer(cell, activeLayer) {
   if (!cell) return false
   const blockType = Number(cell.type ?? cell.blockType ?? 0)
-  const heightCells = blockType === 7 || blockType === ASTRA_BUILDER_WALL_PANEL_TYPE
-    ? ASTRA_BUILDER_STORY_HEIGHT_CELLS
+  const heightCells = blockType === 7
+    ? ASTRA_BUILDER_DOOR_HEIGHT_CELLS
+    : blockType === ASTRA_BUILDER_WALL_PANEL_TYPE
+      ? ASTRA_BUILDER_STORY_HEIGHT_CELLS
     : 1
   const layer = Number(activeLayer)
   return layer >= Number(cell.y) && layer < Number(cell.y) + heightCells
@@ -477,7 +480,7 @@ export function getAstraBuilderTopFaceTarget(
 
   const isTopFace = axis === 'y' && direction > 0
   if (cell.type === 7 && isTopFace) {
-    const doorTopTarget = { x: cell.x, y: cell.y + 3, z: cell.z }
+    const doorTopTarget = { x: cell.x, y: cell.y + ASTRA_BUILDER_DOOR_HEIGHT_CELLS, z: cell.z }
     return isAstraBuilderCellInBounds(doorTopTarget, plot) ? doorTopTarget : null
   }
   if (cell.type === 5 && isTopFace && (placingBlockType === 5 || placingBlockType === null)) {

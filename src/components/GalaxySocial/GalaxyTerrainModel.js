@@ -2,6 +2,33 @@ import * as THREE from 'three'
 
 export const WORLD_RADIUS = 20
 export const BUILD_RADIUS = 14.2
+export const TERRITORY_EXPANSION_SCALE = Math.SQRT2
+export const EXPANDED_WORLD_RADIUS = WORLD_RADIUS * TERRITORY_EXPANSION_SCALE
+export const EXPANDED_BUILD_RADIUS = BUILD_RADIUS * TERRITORY_EXPANSION_SCALE
+
+let activeWorldRadius = WORLD_RADIUS
+let activeBuildRadius = BUILD_RADIUS
+
+export function setTerritoryExpanded(expanded) {
+  activeWorldRadius = expanded ? EXPANDED_WORLD_RADIUS : WORLD_RADIUS
+  activeBuildRadius = expanded ? EXPANDED_BUILD_RADIUS : BUILD_RADIUS
+}
+
+export function getWorldRadius(expanded = false) {
+  return expanded ? EXPANDED_WORLD_RADIUS : WORLD_RADIUS
+}
+
+export function getBuildRadius(expanded = false) {
+  return expanded ? EXPANDED_BUILD_RADIUS : BUILD_RADIUS
+}
+
+export function getActiveWorldRadius() {
+  return activeWorldRadius
+}
+
+export function getActiveBuildRadius() {
+  return activeBuildRadius
+}
 
 export const WORLD_ZONES = [
   { id: 'landing', label: '착륙장', shortLabel: '착륙', position: [0, 5], color: '#7cf2bd' },
@@ -34,6 +61,17 @@ export const MOUNTAINS = [
   { x: 13.7, z: 11.9, height: 4.1, sigma: 2.85 },
 ]
 
+const EXPANSION_MOUNTAINS = [
+  { x: -22.8, z: 13.8, height: 4.2, sigma: 3.1 },
+  { x: -16.5, z: 21.4, height: 5.1, sigma: 3.3 },
+  { x: 7.8, z: 23.7, height: 5.4, sigma: 3.5 },
+  { x: 21.6, z: 15.2, height: 4.5, sigma: 3.2 },
+]
+
+export function getTerrainMountains() {
+  return activeWorldRadius > WORLD_RADIUS ? [...MOUNTAINS, ...EXPANSION_MOUNTAINS] : MOUNTAINS
+}
+
 export const VILLAGE_SLOTS = [
   { id: 'village_home_west', position: [-9.25, -5.15], rotation: .42, variant: 0 },
   { id: 'village_home_south', position: [-6.45, -5.85], rotation: -.3, variant: 1 },
@@ -65,6 +103,13 @@ export const ROAD_CENTER_HALF_WIDTH = .5
 // 길 표면이 지형 위로 떠 있는 높이. 캐릭터 보행 높이와 리본 yOffset가 이 값을 공유해
 // 길 위에서 발이 묻히거나 뜨지 않게 한다.
 export const ROAD_SURFACE_LIFT = .066
+
+export function getRiverExtent() {
+  const expanded = activeWorldRadius > WORLD_RADIUS
+  return expanded
+    ? { sourceX: -20.4, mouthStartX: 18.4, mouthEndX: 24.8, mouthBlendEndX: 28 }
+    : { sourceX: RIVER_SOURCE_X, mouthStartX: RIVER_MOUTH_START_X, mouthEndX: RIVER_MOUTH_END_X, mouthBlendEndX: RIVER_MOUTH_BLEND_END_X }
+}
 
 // 결정론적 의사난수(길 경유점 지터용). 입력에 대해 안정적.
 function pathHash(seed) {
@@ -179,7 +224,8 @@ function gaussian(x, z, peak) {
 }
 
 export function riverCenterZ(x) {
-  const mouthTurn = smoothstep(RIVER_MOUTH_START_X, RIVER_MOUTH_END_X, x)
+  const { mouthStartX, mouthEndX } = getRiverExtent()
+  const mouthTurn = smoothstep(mouthStartX, mouthEndX, x)
   return -14.72
     + Math.sin((x + 4) * .22) * .66
     + Math.sin(x * .51) * .23
@@ -187,8 +233,9 @@ export function riverCenterZ(x) {
 }
 
 export function riverWidth(x) {
+  const { mouthEndX } = getRiverExtent()
   const channelWidth = 1.02 + Math.sin(x * .37 + 1.3) * .11
-  const mouthBlend = smoothstep(7.4, RIVER_MOUTH_END_X - 1.1, x)
+  const mouthBlend = smoothstep(7.4, mouthEndX - 1.1, x)
   return THREE.MathUtils.lerp(channelWidth, 2.16, mouthBlend)
 }
 
@@ -261,7 +308,8 @@ export function getWalkSurface(x, z, theme = 'forest') {
 }
 
 export function getRiverAudioPoint(playerX) {
-  const clampX = Math.max(RIVER_SOURCE_X, Math.min(RIVER_MOUTH_END_X, playerX))
+  const { sourceX, mouthEndX } = getRiverExtent()
+  const clampX = Math.max(sourceX, Math.min(mouthEndX, playerX))
   return [clampX, RIVER_SURFACE_Y, riverCenterZ(clampX)]
 }
 
@@ -285,8 +333,9 @@ export function isBridgeDeck(x, z) {
 }
 
 export function isRiverWater(x, z) {
-  if (x < RIVER_SOURCE_X - .35 || x > RIVER_MOUTH_END_X) return false
-  if (Math.hypot(x, z) > WORLD_RADIUS - .35) return false
+  const { sourceX, mouthEndX } = getRiverExtent()
+  if (x < sourceX - .35 || x > mouthEndX) return false
+  if (Math.hypot(x, z) > activeWorldRadius - .35) return false
   return Math.abs(z - riverCenterZ(x)) < riverWidth(x) * .9
 }
 
@@ -297,7 +346,7 @@ export function terrainHeight(x, z) {
     + Math.sin(x * .14 - z * .27 + 1.1) * .09
     + Math.cos((x + z) * .47 - .8) * .045
 
-  MOUNTAINS.forEach((peak, index) => {
+  getTerrainMountains().forEach((peak, index) => {
     const mountain = gaussian(x, z, peak)
     const ridgeDetail = 1
       + Math.sin(x * .92 + z * .38 + index * 1.7) * .055
@@ -307,8 +356,9 @@ export function terrainHeight(x, z) {
 
   const riverDistance = Math.abs(z - riverCenterZ(x))
   const width = riverWidth(x)
-  const sourceFade = smoothstep(RIVER_SOURCE_X - .5, RIVER_SOURCE_X + .8, x)
-  const mouthFade = 1 - smoothstep(RIVER_MOUTH_END_X - .4, RIVER_MOUTH_END_X + .2, x)
+  const { sourceX, mouthStartX, mouthEndX } = getRiverExtent()
+  const sourceFade = smoothstep(sourceX - .5, sourceX + .8, x)
+  const mouthFade = 1 - smoothstep(mouthEndX - .4, mouthEndX + .2, x)
   const channelFade = sourceFade * mouthFade
   const bedBlend = (1 - smoothstep(width * .68, width * 1.18, riverDistance)) * channelFade
   const bank = Math.exp(-Math.pow((riverDistance - width * 1.32) / .38, 2)) * .16 * channelFade
@@ -320,11 +370,11 @@ export function terrainHeight(x, z) {
     height = THREE.MathUtils.lerp(height, plateau.height, blend)
   })
 
-  const edgeBlend = smoothstep(WORLD_RADIUS - 2.1, WORLD_RADIUS, radius)
+  const edgeBlend = smoothstep(activeWorldRadius - 2.1, activeWorldRadius, radius)
   // 하구의 해안선은 수면 아래로 낮춰 원형 섬의 벽이 강을 막지 않게 한다.
   // 채널 밖의 해안은 기존 높이를 유지하므로 작은 만입만 생긴다.
   const estuaryCore = 1 - smoothstep(width * 1.05, width * 1.62, riverDistance)
-  const estuaryForward = smoothstep(RIVER_MOUTH_START_X - .8, RIVER_MOUTH_END_X - 1.6, x)
+  const estuaryForward = smoothstep(mouthStartX - .8, mouthEndX - 1.6, x)
   const estuaryBlend = estuaryCore * estuaryForward
   const coastHeight = THREE.MathUtils.lerp(.03, OCEAN_SURFACE_Y - .1, estuaryBlend)
   height = THREE.MathUtils.lerp(height, coastHeight, edgeBlend)
@@ -381,14 +431,14 @@ export function createTerrainGeometry(palette) {
 
   pushColor(0, 0, positions[1])
   for (let ring = 1; ring <= radialSegments; ring += 1) {
-    const radius = WORLD_RADIUS * ring / radialSegments
+    const radius = activeWorldRadius * ring / radialSegments
     for (let segment = 0; segment < angularSegments; segment += 1) {
       const angle = segment / angularSegments * Math.PI * 2
       const x = Math.cos(angle) * radius
       const z = Math.sin(angle) * radius
       const y = terrainHeight(x, z)
       positions.push(x, y, z)
-      uvs.push((x + WORLD_RADIUS) / (WORLD_RADIUS * 2), (z + WORLD_RADIUS) / (WORLD_RADIUS * 2))
+      uvs.push((x + activeWorldRadius) / (activeWorldRadius * 2), (z + activeWorldRadius) / (activeWorldRadius * 2))
       pushColor(x, z, y)
     }
   }
@@ -425,7 +475,7 @@ export function createIslandSkirtGeometry() {
   const positions = []
   const uvs = []
   const indices = []
-  const bottomRadius = WORLD_RADIUS - 2.4
+  const bottomRadius = activeWorldRadius - 2.4
   const bottomY = -2.59
 
   for (let segment = 0; segment <= angularSegments; segment += 1) {
@@ -433,8 +483,8 @@ export function createIslandSkirtGeometry() {
     const angle = amount * Math.PI * 2
     const cos = Math.cos(angle)
     const sin = Math.sin(angle)
-    const x = cos * WORLD_RADIUS
-    const z = sin * WORLD_RADIUS
+    const x = cos * activeWorldRadius
+    const z = sin * activeWorldRadius
     positions.push(x, terrainHeight(x, z) - .018, z)
     positions.push(cos * bottomRadius, bottomY, sin * bottomRadius)
     uvs.push(amount, 1, amount, 0)
@@ -523,14 +573,15 @@ export function createRiverGeometry() {
   // 발원지부터 바다 안쪽까지 하나의 리본으로 만든다. 강과 하구를 별도
   // 투명 메시로 겹치면 카메라 각도에 따라 정렬 순서가 바뀌어 직선 경계가
   // 나타나므로, 색·높이·투명도 변화는 단일 셰이더 안에서 처리한다.
-  const path = createRiverPath(RIVER_SOURCE_X, RIVER_MOUTH_BLEND_END_X, 18)
+  const { sourceX, mouthStartX, mouthBlendEndX } = getRiverExtent()
+  const path = createRiverPath(sourceX, mouthBlendEndX, 24)
   return createVariableRibbonGeometry(
     [path],
     (x) => riverWidth(x),
     (x) => THREE.MathUtils.lerp(
       RIVER_SURFACE_Y,
       OCEAN_SURFACE_Y + .018,
-      smoothstep(RIVER_MOUTH_START_X + 1.4, RIVER_MOUTH_BLEND_END_X - .7, x),
+      smoothstep(mouthStartX + 1.4, mouthBlendEndX - .7, x),
     ),
     0,
   )
@@ -539,7 +590,8 @@ export function createRiverGeometry() {
 export function createRiverMouthGeometry(widthScale = 1) {
   // 바다 안쪽까지 충분히 겹친 뒤 셰이더에서 투명하게 사라지게 한다.
   // 실제 마지막 단면은 보이지 않으므로 하구가 사각 판처럼 끊기지 않는다.
-  const path = createRiverPath(RIVER_MOUTH_START_X, RIVER_MOUTH_BLEND_END_X, 9)
+  const { mouthStartX, mouthBlendEndX } = getRiverExtent()
+  const path = createRiverPath(mouthStartX, mouthBlendEndX, 9)
   return createVariableRibbonGeometry(
     [path],
     (x) => riverWidth(x) * widthScale,
@@ -554,8 +606,9 @@ export function createRiverMouthGeometry(widthScale = 1) {
 
 export function createEstuaryBankGeometry(side = 1) {
   const direction = side < 0 ? -1 : 1
-  const startX = RIVER_MOUTH_START_X - 1.15
-  const endX = direction > 0 ? RIVER_MOUTH_END_X - .65 : RIVER_MOUTH_END_X - 1.25
+  const { mouthStartX, mouthEndX } = getRiverExtent()
+  const startX = mouthStartX - 1.15
+  const endX = direction > 0 ? mouthEndX - .65 : mouthEndX - 1.25
   const steps = 18
   const positions = []
   const uvs = []

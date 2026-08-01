@@ -9,6 +9,8 @@ const {
   normalizeAstraBuilderBase64,
   planAstraBuilderPurchase,
   planAstraBuilderInstallation,
+  planGalaxyTerritoryExpansion,
+  planGalaxyItemPlacement,
   validateAstraBuilderStatePayload,
 } = require('./galaxyGame').__test;
 
@@ -171,6 +173,19 @@ function testBuilderInstallation() {
   }).kind, 'facility_overlap');
 }
 
+function testTerritoryExpansion() {
+  const expansion = planGalaxyTerritoryExpansion({ planet: {}, wallet: 7000 });
+  assert.equal(expansion.kind, 'expandable');
+  assert.equal(expansion.cost, 6000);
+  assert.equal(expansion.nextWallet, 1000);
+  assert.equal(expansion.nextPlanet.territoryExpanded, true);
+  assert.equal(expansion.worldAreaMultiplier, 2);
+  assert.equal(planGalaxyTerritoryExpansion({ planet: {}, wallet: 5999 }).kind, 'insufficient_wallet');
+  assert.equal(planGalaxyTerritoryExpansion({ planet: { territoryExpanded: true }, wallet: 9000 }).kind, 'already_expanded');
+  assert.equal(planGalaxyItemPlacement({ x: 107, y: 50 }).kind, 'outside_bounds');
+  assert.equal(planGalaxyItemPlacement({ x: 107, y: 50, buildRadius: 14.2 * Math.SQRT2 }).kind, 'valid');
+}
+
 testValidState();
 testMalformedPayloads();
 testCellValidation();
@@ -178,5 +193,6 @@ testStoredByteNormalization();
 testBuilderEntitlements();
 testBuilderPurchases();
 testBuilderInstallation();
+testTerritoryExpansion();
 
 console.log('Galaxy Astra Builder server tests passed.');

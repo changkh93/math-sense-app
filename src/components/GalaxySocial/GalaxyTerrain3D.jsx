@@ -4,12 +4,9 @@ import * as THREE from 'three'
 import {
   BRIDGE_DECK_HEIGHT,
   BRIDGE_X,
-  MOUNTAINS,
   OCEAN_SURFACE_Y,
   LANDING_PAD_RADIUS,
   LANDING_PAD_SURFACE_LIFT,
-  RIVER_MOUTH_END_X,
-  RIVER_SOURCE_X,
   RIVER_SURFACE_Y,
   ROAD_CENTER_HALF_WIDTH,
   ROAD_EDGE_HALF_WIDTH,
@@ -23,6 +20,9 @@ import {
   createRibbonGeometry,
   createTerrainGeometry,
   generatePathNetwork,
+  getActiveWorldRadius,
+  getRiverExtent,
+  getTerrainMountains,
   isRiverWater,
   riverCenterZ,
   riverWidth,
@@ -229,6 +229,7 @@ function groundPatchMask(x, z, patch) {
 
 function createGroundDetailTextures(palette) {
   const size = GROUND_TEXTURE_SIZE
+  const worldRadius = getActiveWorldRadius()
   const albedoData = new Uint8Array(size * size * 4)
   const bumpData = new Uint8Array(size * size)
   const soil = SOIL_TONES[palette.prop] || SOIL_TONES.forest
@@ -239,9 +240,9 @@ function createGroundDetailTextures(palette) {
   const cover = colorBytes((COVER_COLORS[palette.prop] || COVER_COLORS.forest)[1])
 
   for (let py = 0; py < size; py += 1) {
-    const worldZ = (py / (size - 1) - .5) * WORLD_RADIUS * 2
+    const worldZ = (py / (size - 1) - .5) * worldRadius * 2
     for (let px = 0; px < size; px += 1) {
-      const worldX = (px / (size - 1) - .5) * WORLD_RADIUS * 2
+      const worldX = (px / (size - 1) - .5) * worldRadius * 2
       const index = (py * size + px) * 4
       const bumpIndex = py * size + px
       const fine = hashNoise(px * 1.83, py * 1.57)
@@ -659,17 +660,18 @@ function TerrainRoads({ palette, structurePositions }) {
 function OceanSurface({ palette }) {
   const materialRef = useRef()
   const waveTexture = useMemo(() => createOceanWaveTexture(), [])
+  const worldRadius = getActiveWorldRadius()
   const uniforms = useMemo(() => {
     const shallow = new THREE.Color(palette.water).lerp(new THREE.Color('#2d8fbd'), .8)
     const deep = new THREE.Color(palette.edge).lerp(new THREE.Color('#06395f'), .78)
     return {
       uTime: { value: 0 },
-      uIslandRadius: { value: WORLD_RADIUS },
+      uIslandRadius: { value: worldRadius },
       uWaveMap: { value: waveTexture },
       uShallow: { value: shallow },
       uDeep: { value: deep },
     }
-  }, [palette.edge, palette.water, waveTexture])
+  }, [palette.edge, palette.water, waveTexture, worldRadius])
 
   useEffect(() => () => {
     waveTexture.dispose()
@@ -692,7 +694,7 @@ function OceanSurface({ palette }) {
         />
       </mesh>
       <mesh position={[0, .014, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1} raycast={() => null}>
-        <ringGeometry args={[WORLD_RADIUS - .22, WORLD_RADIUS + .08, 128, 1, 1.2, Math.PI * 2 - .75]} />
+        <ringGeometry args={[worldRadius - .22, worldRadius + .08, 128, 1, 1.2, Math.PI * 2 - .75]} />
         <meshBasicMaterial color={palette.groundDeep} transparent opacity={.28} depthWrite={false} />
       </mesh>
     </group>
@@ -707,23 +709,25 @@ function EstuaryDetails({ palette }) {
     roughness: .94,
     flatShading: true,
   }), [palette.groundDeep])
+  const riverExtent = getRiverExtent()
   const rocks = useMemo(() => [
-    { x: 10.65, side: -1.28, scale: [.72, .48, .58], rotation: .2 },
-    { x: 11.25, side: 1.34, scale: [.5, .34, .68], rotation: 1.1 },
-    { x: 12.25, side: -1.23, scale: [.82, .43, .52], rotation: 2.4 },
-    { x: 13.05, side: 1.2, scale: [.56, .38, .48], rotation: .7 },
-    { x: 13.9, side: -1.05, scale: [.48, .3, .62], rotation: 1.8 },
-    { x: 14.65, side: 1.06, scale: [.72, .4, .55], rotation: 2.7 },
-    { x: 15.35, side: -1.02, scale: [.42, .27, .46], rotation: .9 },
-    { x: 15.8, side: .92, scale: [.58, .32, .5], rotation: 2.1 },
+    { t: .16, side: -1.28, scale: [.72, .48, .58], rotation: .2 },
+    { t: .25, side: 1.34, scale: [.5, .34, .68], rotation: 1.1 },
+    { t: .39, side: -1.23, scale: [.82, .43, .52], rotation: 2.4 },
+    { t: .52, side: 1.2, scale: [.56, .38, .48], rotation: .7 },
+    { t: .64, side: -1.05, scale: [.48, .3, .62], rotation: 1.8 },
+    { t: .76, side: 1.06, scale: [.72, .4, .55], rotation: 2.7 },
+    { t: .87, side: -1.02, scale: [.42, .27, .46], rotation: .9 },
+    { t: .94, side: .92, scale: [.58, .32, .5], rotation: 2.1 },
   ].map((rock) => {
-    const z = riverCenterZ(rock.x) + riverWidth(rock.x) * rock.side
-    const radius = Math.hypot(rock.x, z)
-    const surface = radius < WORLD_RADIUS - .2
-      ? terrainHeight(rock.x, z)
+    const x = THREE.MathUtils.lerp(riverExtent.mouthStartX, riverExtent.mouthEndX, rock.t)
+    const z = riverCenterZ(x) + riverWidth(x) * rock.side
+    const radius = Math.hypot(x, z)
+    const surface = radius < getActiveWorldRadius() - .2
+      ? terrainHeight(x, z)
       : OCEAN_SURFACE_Y
-    return { ...rock, z, y: Math.max(surface, OCEAN_SURFACE_Y) + .08 }
-  }), [])
+    return { ...rock, x, z, y: Math.max(surface, OCEAN_SURFACE_Y) + .08 }
+  }), [riverExtent.mouthEndX, riverExtent.mouthStartX])
 
   useLayoutEffect(() => {
     const mesh = rockRef.current
@@ -745,7 +749,7 @@ function EstuaryDetails({ palette }) {
     rockMaterial.dispose()
   }, [rockGeometry, rockMaterial])
 
-  const mouthZ = riverCenterZ(RIVER_MOUTH_END_X - 1.2)
+  const mouthZ = riverCenterZ(riverExtent.mouthEndX - 1.2)
   return (
     <group>
       <instancedMesh
@@ -755,7 +759,7 @@ function EstuaryDetails({ palette }) {
         receiveShadow
       />
       <mesh
-        position={[14.15, OCEAN_SURFACE_Y + .018, mouthZ + 2.05]}
+        position={[riverExtent.mouthEndX - 2.25, OCEAN_SURFACE_Y + .018, mouthZ + 2.05]}
         scale={[1.45, .14, .56]}
         rotation={[0, -.24, 0]}
         receiveShadow
@@ -764,7 +768,7 @@ function EstuaryDetails({ palette }) {
         <meshStandardMaterial color={palette.edge} roughness={.98} />
       </mesh>
       <mesh
-        position={[15.45, OCEAN_SURFACE_Y + .1, mouthZ - 2.02]}
+        position={[riverExtent.mouthEndX - .95, OCEAN_SURFACE_Y + .1, mouthZ - 2.02]}
         scale={[.74, .38, .62]}
         rotation={[0, .52, 0]}
         castShadow
@@ -809,7 +813,12 @@ function River({ palette }) {
   const flowTextureRef = useRef()
   const waterMaterialRef = useRef()
   const flowMaterialRef = useRef()
-  const geometry = useMemo(() => createRiverGeometry(), [])
+  const riverExtent = getRiverExtent()
+  const geometry = useMemo(() => {
+    void riverExtent.mouthBlendEndX
+    void riverExtent.sourceX
+    return createRiverGeometry()
+  }, [riverExtent.mouthBlendEndX, riverExtent.sourceX])
   const flowTexture = useMemo(() => createRiverFlowTexture(), [])
   const flowColor = useMemo(() => new THREE.Color(palette.water).lerp(new THREE.Color('#eaffff'), .68), [palette.water])
   const waterUniforms = useMemo(() => ({
@@ -865,7 +874,7 @@ function River({ palette }) {
         />
       </mesh>
       <mesh
-        position={[RIVER_SOURCE_X + .08, RIVER_SURFACE_Y - .006, riverCenterZ(RIVER_SOURCE_X)]}
+        position={[riverExtent.sourceX + .08, RIVER_SURFACE_Y - .006, riverCenterZ(riverExtent.sourceX)]}
         rotation={[-Math.PI / 2, 0, 0]}
         scale={[1.18, .78, 1]}
         renderOrder={2}
@@ -980,9 +989,10 @@ function SettlementVillage({ slots, palette, showBeacon }) {
 }
 
 function MountainDetails() {
+  const mountains = getTerrainMountains()
   return (
     <group>
-      {MOUNTAINS.map((peak, peakIndex) => (
+      {mountains.map((peak, peakIndex) => (
         <group key={`${peak.x}_${peak.z}`} position={[peak.x, terrainHeight(peak.x, peak.z), peak.z]} rotation={[0, peakIndex * .8, 0]}>
           {[[-.75, .2, .75], [.2, .05, 1], [.78, -.22, .58]].map(([x, z, scale], index) => (
             <mesh key={index} position={[x, scale * .52, z]} scale={[scale, scale * 1.35, scale]} castShadow>
@@ -1011,10 +1021,19 @@ function LandingPad({ palette }) {
   )
 }
 
-export default function WorldTerrain({ palette, villageSlots = [], showVillage = true, showVillageBeacon = true, detailClearings = [], buildItem = '', structurePositions = [], onBuildHover, onBuildCommit }) {
-  const terrainGeometry = useMemo(() => createTerrainGeometry(palette), [palette])
-  const islandSkirtGeometry = useMemo(() => createIslandSkirtGeometry(), [])
-  const groundTextures = useMemo(() => createGroundDetailTextures(palette), [palette])
+export default function WorldTerrain({ palette, territoryExpanded = false, villageSlots = [], showVillage = true, showVillageBeacon = true, detailClearings = [], buildItem = '', structurePositions = [], onBuildHover, onBuildCommit }) {
+  const terrainGeometry = useMemo(() => {
+    void territoryExpanded
+    return createTerrainGeometry(palette)
+  }, [palette, territoryExpanded])
+  const islandSkirtGeometry = useMemo(() => {
+    void territoryExpanded
+    return createIslandSkirtGeometry()
+  }, [territoryExpanded])
+  const groundTextures = useMemo(() => {
+    void territoryExpanded
+    return createGroundDetailTextures(palette)
+  }, [palette, territoryExpanded])
   useEffect(() => () => terrainGeometry.dispose(), [terrainGeometry])
   useEffect(() => () => islandSkirtGeometry.dispose(), [islandSkirtGeometry])
   useEffect(() => () => {

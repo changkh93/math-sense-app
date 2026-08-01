@@ -40,18 +40,20 @@ import {
 import useAstraBuilderPoc from './builder/useAstraBuilderPoc'
 import WorldTerrain from './GalaxyTerrain3D'
 import {
-  BUILD_RADIUS,
-  MOUNTAINS,
   VILLAGE_BEACON_POSITION,
   VILLAGE_SLOTS,
   WORLD_RADIUS,
   WORLD_ZONES as ZONES,
+  getBuildRadius,
   getAvailableVillageSlots,
+  getTerrainMountains,
   getRiverAudioProximity,
+  getWorldRadius,
   getWalkSurface,
   isVillageBeaconAvailable,
   isBridgeDeck,
   isRiverWater,
+  setTerritoryExpanded,
   terrainHeight,
   terrainSlope,
   walkSurfaceHeight,
@@ -287,9 +289,9 @@ const BIOME_PROP_POSITIONS = [
 
 function worldPositionFromLayout(item = {}) {
   return [
-    THREE.MathUtils.clamp((Number(item.x || 50) - 50) / 3, -15, 15),
+    THREE.MathUtils.clamp((Number(item.x || 50) - 50) / 3, -30, 30),
     0,
-    THREE.MathUtils.clamp((Number(item.y || 50) - 50) / 3, -15, 15),
+    THREE.MathUtils.clamp((Number(item.y || 50) - 50) / 3, -30, 30),
   ]
 }
 
@@ -3432,7 +3434,7 @@ function RemoteAstronaut({ player, showName, walkHeightAt = walkSurfaceHeight })
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderOverview = false, builderBuildMode = false, canUseCharacterScale = null, onScaleBlocked = null, onExplorationExitRequest = null, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest', walkHeightAt = walkSurfaceHeight, playerGroupRef }) {
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderOverview = false, builderBuildMode = false, canUseCharacterScale = null, onScaleBlocked = null, onExplorationExitRequest = null, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest', worldRadius = WORLD_RADIUS, walkHeightAt = walkSurfaceHeight, playerGroupRef }) {
   const { gl, camera } = useThree()
   const group = useRef()
   // 외부(상위 월드)에서 플레이어 위치를 ref로 읽을 수 있도록 노출. 매 프레임 갱신.
@@ -3963,7 +3965,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     const collisionScaleDelta = PLAYER_COLLISION_RADIUS * (characterScale.current / CHARACTER_SCALE - 1)
     const checkObstacle = (testX, testZ, testFootY = group.current.position.y) => {
-      if (Math.hypot(testX, testZ) >= WORLD_RADIUS - .8 - collisionScaleDelta) return true
+      if (Math.hypot(testX, testZ) >= worldRadius - .8 - collisionScaleDelta) return true
       const hitStructure = structureColliders.find((collider) => {
         if (collider.kind === 'astra-builder-block') {
           return Boolean(findAstraBuilderBodyCollision([collider], {
@@ -4483,6 +4485,10 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 }
 
 function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderInvalidEdit, onBuilderScaleBlocked, onExplorationExitRequest }) {
+  const territoryExpanded = Boolean(planet?.territoryExpanded)
+  setTerritoryExpanded(territoryExpanded)
+  const worldRadius = getWorldRadius(territoryExpanded)
+  const buildRadius = getBuildRadius(territoryExpanded)
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const basePalette = BIOMES[planet?.theme] || BIOMES.forest
   const restorationProgress = THREE.MathUtils.clamp(Number(restorationPercent || 0), 0, 100)
@@ -4774,7 +4780,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
     if (!point) return false
     const [x, , z] = point
     const placingAstraBuilder = buildItem === ASTRA_BUILDER_INSTALL_ITEM_ID
-    if (Math.hypot(x, z) > BUILD_RADIUS) return false
+    if (Math.hypot(x, z) > buildRadius) return false
     if (blockers.some((position) => Math.hypot(x - position[0], z - position[2]) < (placingAstraBuilder ? 3.5 : 2.1))) return false
     if ([...RESOURCE_NODES, ...MISSION_PORTALS, ROVER_NODE].some((item) => Math.hypot(x - item.position[0], z - item.position[2]) < (placingAstraBuilder ? 3.5 : 2))) return false
     if (villageSlots.some((slot) => Math.hypot(x - slot.position[0], z - slot.position[1]) < 1.9)) return false
@@ -4786,7 +4792,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
     if (MISSION_PICKUP_RESERVED_POINTS.some(([pickupX, pickupZ]) => Math.hypot(x - pickupX, z - pickupZ) < 2)) return false
     if (isRiverWater(x, z) || isBridgeDeck(x, z) || terrainSlope(x, z) > .42) return false
     return true
-  }, [blockers, buildItem, builderPlots, showVillageBeacon, villageSlots])
+  }, [blockers, buildItem, buildRadius, builderPlots, showVillageBeacon, villageSlots])
   const hoverValid = useMemo(() => isBuildPointValid(hoverPoint), [hoverPoint, isBuildPointValid])
 
   return (
@@ -4794,7 +4800,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
       <color attach="background" args={[palette.sky]} />
       <fogExp2 attach="fog" args={[palette.fog, .017]} />
       <hemisphereLight args={['#c8edff', palette.groundDeep, 1.22]} />
-      <directionalLight position={[10, 16, 8]} intensity={2.05} color={palette.light} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-normalBias={.04} shadow-bias={-.0004} />
+      <directionalLight position={[10, 16, 8]} intensity={2.05} color={palette.light} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-worldRadius - 4} shadow-camera-right={worldRadius + 4} shadow-camera-top={worldRadius + 4} shadow-camera-bottom={-worldRadius - 4} shadow-normalBias={.04} shadow-bias={-.0004} />
       <directionalLight position={[-12, 7, -9]} intensity={.32} color={palette.accent} />
       <ambientLight intensity={.24} />
       <Stars radius={72} depth={34} count={720} factor={2.2} saturation={.18} fade speed={.08} />
@@ -4802,6 +4808,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
       <DistantWorlds palette={palette} />
       <WorldTerrain
         palette={palette}
+        territoryExpanded={territoryExpanded}
         villageSlots={villageSlots}
         showVillage={!builderEnabled}
         showVillageBeacon={showVillageBeacon}
@@ -4877,7 +4884,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
       )}
 
       {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} walkHeightAt={walkHeightAt} />)}
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={movementColliders} pickups={pickups} paused={paused || (builderActive && builderInputMode === 'camera')} freeLookEnabled={!buildItem && (!builderActive || builderInputMode === 'build')} builderOverview={builderActive && builderInputMode === 'camera'} builderBuildMode={builderActive && builderInputMode === 'build'} canUseCharacterScale={canUseBuilderCharacterScale} onScaleBlocked={onBuilderScaleBlocked} onExplorationExitRequest={onExplorationExitRequest} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={isFirstPerson} theme={planet?.theme || 'forest'} walkHeightAt={walkHeightAt} playerGroupRef={playerGroupRef} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={movementColliders} pickups={pickups} paused={paused || (builderActive && builderInputMode === 'camera')} freeLookEnabled={!buildItem && (!builderActive || builderInputMode === 'build')} builderOverview={builderActive && builderInputMode === 'camera'} builderBuildMode={builderActive && builderInputMode === 'build'} canUseCharacterScale={canUseBuilderCharacterScale} onScaleBlocked={onBuilderScaleBlocked} onExplorationExitRequest={onExplorationExitRequest} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={isFirstPerson} theme={planet?.theme || 'forest'} worldRadius={worldRadius} walkHeightAt={walkHeightAt} playerGroupRef={playerGroupRef} />
     </>
   )
 }
@@ -4938,13 +4945,13 @@ function TouchJoystick({ inputRef, disabled }) {
   )
 }
 
-function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, objective, expanded, onToggleExpanded }) {
-  const playerLeft = 50 + THREE.MathUtils.clamp(playerPosition.x / WORLD_RADIUS, -1, 1) * 44
-  const playerTop = 50 + THREE.MathUtils.clamp(playerPosition.z / WORLD_RADIUS, -1, 1) * 44
+function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, objective, worldRadius = WORLD_RADIUS, expanded, onToggleExpanded }) {
+  const playerLeft = 50 + THREE.MathUtils.clamp(playerPosition.x / worldRadius, -1, 1) * 44
+  const playerTop = 50 + THREE.MathUtils.clamp(playerPosition.z / worldRadius, -1, 1) * 44
   const targetNode = dailyEventNode || objectiveTarget
   const targetVisual = dailyEventNode ? resolveDailyEventVisual(dailyEventNode.dailyEvent) : { color: targetNode?.color || '#ffe082' }
-  const targetLeft = targetNode ? 50 + THREE.MathUtils.clamp(targetNode.position[0] / WORLD_RADIUS, -1, 1) * 43 : 0
-  const targetTop = targetNode ? 50 + THREE.MathUtils.clamp(targetNode.position[2] / WORLD_RADIUS, -1, 1) * 43 : 0
+  const targetLeft = targetNode ? 50 + THREE.MathUtils.clamp(targetNode.position[0] / worldRadius, -1, 1) * 43 : 0
+  const targetTop = targetNode ? 50 + THREE.MathUtils.clamp(targetNode.position[2] / worldRadius, -1, 1) * 43 : 0
   const targetInRange = Boolean(targetNode && (
     nearby?.id === targetNode.id
     || Math.hypot(playerPosition.x - targetNode.position[0], playerPosition.z - targetNode.position[2]) <= Number(targetNode.interactionRadius || 2.8)
@@ -4977,7 +4984,7 @@ function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, obje
           </svg>
         )}
         {ZONES.map((zone) => (
-          <span key={zone.id} className={`frontier-map-zone zone-${zone.id}`} style={{ left: `${50 + zone.position[0] / WORLD_RADIUS * 43}%`, top: `${50 + zone.position[1] / WORLD_RADIUS * 43}%`, '--zone-color': zone.color }} title={zone.label}>
+          <span key={zone.id} className={`frontier-map-zone zone-${zone.id}`} style={{ left: `${50 + zone.position[0] / worldRadius * 43}%`, top: `${50 + zone.position[1] / worldRadius * 43}%`, '--zone-color': zone.color }} title={zone.label}>
             <i />
             <small>{zone.shortLabel}</small>
           </span>
@@ -4997,7 +5004,7 @@ function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, obje
           <span
             key={portal.id}
             className="frontier-map-zone frontier-map-expedition"
-            style={{ left: `${50 + portal.position[0] / WORLD_RADIUS * 43}%`, top: `${50 + portal.position[2] / WORLD_RADIUS * 43}%`, '--zone-color': '#b08cff', zIndex: 3 }}
+            style={{ left: `${50 + portal.position[0] / worldRadius * 43}%`, top: `${50 + portal.position[2] / worldRadius * 43}%`, '--zone-color': '#b08cff', zIndex: 3 }}
             title="탐사 출발대"
             aria-label="탐사 출발대"
           >
@@ -5428,8 +5435,9 @@ export default function GalaxyWorld3D({
     if (!FRONTIER_AUDIO_ASSETS_READY || !ambienceReady) return undefined
     if (themeAmbienceSoundId === 'frontier.ambience.forest') {
       const pHeight = terrainHeight(playerPosition.x, playerPosition.z, planet?.theme || 'forest')
-      const nearMountain = pHeight >= 1.45 || MOUNTAINS.some(m => Math.hypot(playerPosition.x - m.x, playerPosition.z - m.z) <= (m.sigma + 1.8))
-      const keys = MOUNTAINS.map((m, idx) => [`frontier:ambience:forest:${idx + 1}`, m.x, m.z, m.height])
+      const terrainMountains = getTerrainMountains()
+      const nearMountain = pHeight >= 1.45 || terrainMountains.some(m => Math.hypot(playerPosition.x - m.x, playerPosition.z - m.z) <= (m.sigma + 1.8))
+      const keys = terrainMountains.map((m, idx) => [`frontier:ambience:forest:${idx + 1}`, m.x, m.z, m.height])
 
       if (nearMountain) {
         keys.forEach(([key, x, z, h]) => {
@@ -5447,7 +5455,7 @@ export default function GalaxyWorld3D({
     // soundManager.loopAt(themeAmbienceSoundId, [0, 0, 0], { key, fadeInMs: 1200 })
     // return () => soundManager.stopLoop(key, 700)
     return undefined
-  }, [ambienceReady, themeAmbienceSoundId, playerPosition.x, playerPosition.z, planet?.theme])
+  }, [ambienceReady, themeAmbienceSoundId, playerPosition.x, playerPosition.z, planet?.theme, planet?.territoryExpanded])
 
   useEffect(() => {
     const key = 'frontier:ambience:landing'
@@ -5812,7 +5820,7 @@ export default function GalaxyWorld3D({
         />
       </Canvas>
 
-      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} objectiveTarget={objectiveTarget} objective={objective} expanded={mapExpanded} onToggleExpanded={() => setMapExpanded((current) => !current)} />}
+      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} objectiveTarget={objectiveTarget} objective={objective} worldRadius={getWorldRadius(Boolean(planet?.territoryExpanded))} expanded={mapExpanded} onToggleExpanded={() => setMapExpanded((current) => !current)} />}
       {!builderActive && <button
         type="button"
         className="frontier-camera-mode-toggle"

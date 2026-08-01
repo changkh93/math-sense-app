@@ -19,6 +19,7 @@ import {
   DoorOpen,
   Droplets,
   Egg,
+  Expand,
   Eye,
   Flower2,
   Flag,
@@ -87,7 +88,7 @@ import soundManager from '../../utils/SoundManager'
 import GalaxyObjectDialog from './GalaxyObjectDialog'
 import GalaxyRoverPanel from './GalaxyRoverPanel'
 import FrontierAudioSettingsModal from './FrontierAudioSettingsModal'
-import { BUILD_RADIUS, isBridgeDeck, isRiverWater, terrainSlope } from './GalaxyTerrainModel'
+import { getBuildRadius, isBridgeDeck, isRiverWater, terrainSlope } from './GalaxyTerrainModel'
 import GalaxyWorld3D, { StructurePreview3D } from './GalaxyWorld3D'
 import './MetaGalaxy.css'
 
@@ -566,6 +567,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const actionLockRef = useRef('')
   const builderInstallOperationRef = useRef('')
   const builderUpgradeOperationRef = useRef({})
+  const territoryExpansionOperationRef = useRef('')
   const arrivalCloseRef = useRef(null)
   const menuCloseRef = useRef(null)
   const objectDialogCloseRef = useRef(null)
@@ -612,6 +614,10 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   )
   const purchaseBuilderUpgrade = useCallback(
     (payload) => callGalaxy('purchaseGalaxyBuilderUpgrade', payload),
+    [callGalaxy],
+  )
+  const purchaseTerritoryExpansion = useCallback(
+    (payload) => callGalaxy('purchaseGalaxyTerritoryExpansion', payload),
     [callGalaxy],
   )
 
@@ -1231,6 +1237,32 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     return result
   }, [flash, isGuest, purchaseBuilderUpgrade, runAction])
 
+  const buyTerritoryExpansion = useCallback(async () => {
+    if (isGuest) {
+      flash('개척 영지 확장은 회원 계정에서 이용할 수 있어요.')
+      return null
+    }
+    if (home?.ownPlanet?.territoryExpanded) return null
+    const confirmed = window.confirm('학습 광석 6,000개로 개척 영지의 면적을 2배로 확장할까요? 확장지는 시설 없이 강과 산이 있는 빈땅으로 열립니다.')
+    if (!confirmed) return null
+    const operationId = territoryExpansionOperationRef.current
+      || (territoryExpansionOperationRef.current = createOperationId())
+    const result = await runAction(
+      'territory:expand',
+      () => purchaseTerritoryExpansion({ operationId }),
+      '개척 영지가 2배로 확장되었습니다.',
+    )
+    if (!result) return null
+    territoryExpansionOperationRef.current = ''
+    setHome((current) => current ? {
+      ...current,
+      wallet: result.wallet,
+      ownPlanet: { ...current.ownPlanet, ...result.planet },
+      planet: isOwner ? { ...current.planet, ...result.planet } : current.planet,
+    } : current)
+    return result
+  }, [flash, home?.ownPlanet?.territoryExpanded, isGuest, isOwner, purchaseTerritoryExpansion, runAction])
+
   const openObjectDialog = useCallback((item) => {
     if (!item?.instanceId) return
     setSelectedStructureId(item.instanceId)
@@ -1317,7 +1349,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     if (
       !Number.isFinite(numericWorldX) || !Number.isFinite(numericWorldZ)
       || (positionChanged && (
-        Math.hypot(numericWorldX, numericWorldZ) > BUILD_RADIUS
+        Math.hypot(numericWorldX, numericWorldZ) > getBuildRadius(Boolean(ownPlanet?.territoryExpanded))
         || isRiverWater(numericWorldX, numericWorldZ)
         || isBridgeDeck(numericWorldX, numericWorldZ)
         || terrainSlope(numericWorldX, numericWorldZ) > .42
@@ -2589,6 +2621,23 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                           <div><small>BLUEPRINT COLLECTION</small><h3>다음에 만들 풍경을 고르세요</h3></div>
                           <MaterialStrip materials={ownPlanet.materials} />
                         </div>
+                        <section className={`frontier-territory-expansion-offer${ownPlanet?.territoryExpanded ? ' is-complete' : ''}`} aria-label="개척 영지 확장">
+                          <span className="frontier-build-option-icon"><Expand size={21} aria-hidden="true" /></span>
+                          <div>
+                            <small>FRONTIER TERRITORY</small>
+                            <strong>개척 영지 2배 확장</strong>
+                            <p>현재 영지에 같은 면적의 빈 개척지를 더합니다. 새 구역에는 시설 없이 이어지는 강과 산 지형만 있습니다.</p>
+                          </div>
+                          <span className="frontier-territory-expansion-offer__price"><Gem size={14} aria-hidden="true" /> 학습 광석 6,000</span>
+                          <button
+                            type="button"
+                            disabled={Boolean(busy) || wallet < 6000 || Boolean(ownPlanet?.territoryExpanded)}
+                            onClick={() => { void buyTerritoryExpansion() }}
+                          >
+                            <Expand size={16} aria-hidden="true" />
+                            {ownPlanet?.territoryExpanded ? '확장 완료' : wallet < 6000 ? '광석 부족' : '영지 확장 구매'}
+                          </button>
+                        </section>
                         <section className="frontier-astra-builder-offer" aria-label="아스트라 빌더 설치">
                           <span className="frontier-build-option-icon"><Hammer size={21} aria-hidden="true" /></span>
                           <div>

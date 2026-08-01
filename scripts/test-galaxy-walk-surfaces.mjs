@@ -11,6 +11,7 @@ import {
   ROAD_SURFACE_LIFT,
   VILLAGE_SLOTS,
   WORLD_RADIUS,
+  EXPANDED_WORLD_RADIUS,
   WORLD_ZONES,
   createEstuaryBankGeometry,
   createIslandSkirtGeometry,
@@ -20,6 +21,7 @@ import {
   generatePathNetwork,
   riverCenterZ,
   riverWidth,
+  setTerritoryExpanded,
   setActivePathNetwork,
   terrainHeight,
   walkSurfaceHeight,
@@ -143,5 +145,16 @@ for (let index = 0; index < skirtPositions.count; index += 2) {
 }
 assert.ok(mouthTop < OCEAN_SURFACE_Y, 'island side wall must be submerged at the river mouth')
 islandSkirt.dispose()
+
+setTerritoryExpanded(true)
+const expandedIsland = createIslandSkirtGeometry()
+expandedIsland.computeBoundingBox()
+assert.ok(expandedIsland.boundingBox.max.x > EXPANDED_WORLD_RADIUS - .1, 'purchased territory must expand the island radius by sqrt(2)')
+const expandedRiver = createRiverGeometry()
+expandedRiver.computeBoundingBox()
+assert.ok(expandedRiver.boundingBox.max.x > 27.8, 'expanded territory river must continue to the new coast')
+expandedRiver.dispose()
+expandedIsland.dispose()
+setTerritoryExpanded(false)
 
 console.log('Galaxy walk-surface tests passed')

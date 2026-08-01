@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import {
   ASTRA_BUILDER_BLOCKS,
+  ASTRA_BUILDER_DOOR_HEIGHT_CELLS,
   ASTRA_BUILDER_POC_PLOT,
   decodeAstraBuilderCell,
   doesAstraBuilderBlockOccupyLayer,
@@ -82,7 +83,10 @@ function WoodDoorMaterial({ color, preview, leaf = false }) {
 function WoodDoorVisual({ color, preview = false }) {
   const cellSize = ASTRA_BUILDER_POC_PLOT.cellSize
   const doorWidth = cellSize * 2
-  const doorHeight = cellSize * 2.55
+  // The data model reserves exactly one 3-cell story for a door. Keep the
+  // visible lintel flush with that boundary so course 4 blocks sit directly
+  // on the frame instead of floating above it.
+  const doorHeight = cellSize * ASTRA_BUILDER_DOOR_HEIGHT_CELLS
   const frameThickness = cellSize * .12
   const frameDepth = cellSize * .28
   const baseY = -cellSize * .5

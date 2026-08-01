@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {
   ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
   ASTRA_BUILDER_POC_PLOT,
+  ASTRA_BUILDER_DOOR_HEIGHT_CELLS,
   ASTRA_BUILDER_WALL_PANEL_TYPE,
   applyAstraBuilderEdit,
   applyAstraBuilderPatch,
@@ -300,6 +301,7 @@ const woodenDoor = applyAstraBuilderEdit(removed.cells, {
   blockType: 7,
   rotation: 3,
 })
+assert.equal(ASTRA_BUILDER_DOOR_HEIGHT_CELLS, 3)
 assert.deepEqual(decodeAstraBuilderCell(
   woodenDoor.cells[getAstraBuilderCellIndex({ x: 1, y: 0, z: 1 })],
 ), {
@@ -332,6 +334,21 @@ assert.ok(applyAstraBuilderEdit(woodenDoor.cells, {
   blockType: 2,
   rotation: 0,
 }))
+const doorTopBlock = applyAstraBuilderEdit(woodenDoor.cells, {
+  tool: 'place',
+  cell: { x: 1, y: ASTRA_BUILDER_DOOR_HEIGHT_CELLS, z: 1 },
+  blockType: 1,
+  rotation: 0,
+})
+assert.ok(doorTopBlock, 'a block must fit directly above the three-cell door frame')
+assert.equal(
+  decodeAstraBuilderCell(doorTopBlock.cells[getAstraBuilderCellIndex({ x: 1, y: 3, z: 1 })]).blockType,
+  1,
+)
+assert.deepEqual(getAstraBuilderTopFaceTarget(
+  { x: 1, y: 0, z: 1, type: 7, rotation: 3 },
+  { x: 0, y: 1, z: 0 },
+), { x: 1, y: 3, z: 1 })
 
 const encodedGrid = encodeAstraBuilderGridBase64(redone)
 const decodedGrid = decodeAstraBuilderGridBase64(encodedGrid, redone.length)
@@ -518,6 +535,56 @@ assert.ok(stairTraversalHeights.every((height, index) => (
   index === 0 || height >= stairTraversalHeights[index - 1]
 )))
 assert.ok(stairFootY > plotBaseY + ASTRA_BUILDER_POC_PLOT.cellSize * .95)
+
+// 두 번째 이후 아스트라처럼 원점에서 떨어진 부지에서도 계단 충돌체가
+// 자신이 속한 부지 좌표로 경사면을 계산해야 한다.
+const shiftedPlot = {
+  ...ASTRA_BUILDER_POC_PLOT,
+  id: 'habitat-b02',
+  center: [6.25, 7.5],
+}
+const shiftedStairWorld = getAstraBuilderWorldPosition(stairCell, shiftedPlot)
+const shiftedStairX = shiftedPlot.center[0] + shiftedStairWorld[0]
+const shiftedStairZ = shiftedPlot.center[1] + shiftedStairWorld[2]
+const shiftedBaseY = 2.35
+const shiftedStairBodies = createAstraBuilderCollisionBodies(
+  stairCollisionGrid,
+  shiftedBaseY,
+  shiftedPlot,
+)
+assert.equal(canAstraBuilderCharacterOccupy(shiftedStairBodies, {
+  x: shiftedStairX,
+  z: shiftedStairZ - halfCell,
+  footY: shiftedBaseY,
+  scale: .28,
+}), true)
+assert.equal(canAstraBuilderCharacterOccupy(shiftedStairBodies, {
+  x: shiftedStairX,
+  z: shiftedStairZ + halfCell,
+  footY: shiftedBaseY,
+  scale: .28,
+}), false)
+let shiftedFootY = shiftedBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET
+for (let step = 0; step <= 24; step += 1) {
+  const z = shiftedStairZ - halfCell + step / 24 * halfCell * 2
+  shiftedFootY = getAstraBuilderWalkSurfaceHeight({
+    x: shiftedStairX,
+    z,
+    currentFootY: shiftedFootY,
+    cells: stairCollisionGrid,
+    plotBaseY: shiftedBaseY,
+    terrainY: shiftedBaseY - .08,
+    characterScale: .28,
+    plot: shiftedPlot,
+  })
+  assert.equal(canAstraBuilderCharacterOccupy(shiftedStairBodies, {
+    x: shiftedStairX,
+    z,
+    footY: shiftedFootY,
+    scale: .28,
+  }), true)
+}
+assert.ok(shiftedFootY > shiftedBaseY + shiftedPlot.cellSize * .95)
 
 // 세 칸 계단의 출구에서 2층 바닥으로 진입할 때, 발 중심이 바닥 셀에
 // 완전히 들어가기 전에도 발바닥 영역이 겹치면 지지면을 이어받아야 한다.

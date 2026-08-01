@@ -465,6 +465,8 @@ const GALAXY_ROVER_ROUTES = {
 };
 
 const GALAXY_BUILD_RADIUS = 14.2;
+const GALAXY_EXPANDED_BUILD_RADIUS = GALAXY_BUILD_RADIUS * Math.SQRT2;
+const GALAXY_TERRITORY_EXPANSION_COST = 6000;
 const GALAXY_BUILD_MIN_SPACING = 2.1;
 const GALAXY_BUILD_RESERVED_POSITIONS = [
   [9.2, 7.8], [7.8, -7.3], [11.7, 3.2], [-10.5, 7.4], [4.8, -8.7],
@@ -473,6 +475,10 @@ const GALAXY_BUILD_RESERVED_POSITIONS = [
   [-9.25, -5.15], [-6.45, -5.85], [-8.75, -2.65], [-5.55, -3.15],
   [-7.45, -4.25],
 ];
+
+function getGalaxyBuildRadius(planet = {}) {
+  return planet?.territoryExpanded ? GALAXY_EXPANDED_BUILD_RADIUS : GALAXY_BUILD_RADIUS;
+}
 
 const ASTRA_BUILDER_STATE_ENCODING = "u16le-v1";
 const ASTRA_BUILDER_SAVE_GRACE_MS = 30 * 1000;
@@ -807,20 +813,21 @@ function planGalaxyStructureVisit({ layout = [], instanceId = "", actionId = "",
   return { kind: "valid", structure, position, actionId: expectedActionId };
 }
 
-function planGalaxyItemPlacement({ layout = [], builderPlots = [], instanceId = "", x, y, rotation = 0 } = {}) {
+function planGalaxyItemPlacement({ layout = [], builderPlots = [], instanceId = "", x, y, rotation = 0, buildRadius = GALAXY_BUILD_RADIUS } = {}) {
   const numericX = Number(x);
   const numericY = Number(y);
   const numericRotation = Number(rotation);
   if (!Number.isFinite(numericX) || !Number.isFinite(numericY) || !Number.isFinite(numericRotation)) {
     return { kind: "invalid_number" };
   }
-  if (numericX < 7.4 || numericX > 92.6 || numericY < 7.4 || numericY > 92.6) {
+  const normalizedExtent = Math.max(GALAXY_BUILD_RADIUS, Number(buildRadius) || GALAXY_BUILD_RADIUS) * 3;
+  if (numericX < 50 - normalizedExtent || numericX > 50 + normalizedExtent || numericY < 50 - normalizedExtent || numericY > 50 + normalizedExtent) {
     return { kind: "outside_bounds" };
   }
 
   const worldX = (numericX - 50) / 3;
   const worldZ = (numericY - 50) / 3;
-  if (Math.hypot(worldX, worldZ) > GALAXY_BUILD_RADIUS) {
+  if (Math.hypot(worldX, worldZ) > buildRadius) {
     return { kind: "outside_radius" };
   }
   const collides = (Array.isArray(layout) ? layout : []).some((entry) => {
@@ -855,7 +862,7 @@ function planAstraBuilderInstallation({ planet = {}, wallet = 0, x, y } = {}) {
   }
   const slotCount = getAstraBuilderSlotCount(planet);
   if (slotCount >= ASTRA_BUILDER_MAX_SLOTS) return { kind: "max_slots" };
-  const placement = planGalaxyItemPlacement({ layout: planet.layout, x, y, rotation: 0 });
+  const placement = planGalaxyItemPlacement({ layout: planet.layout, x, y, rotation: 0, buildRadius: getGalaxyBuildRadius(planet) });
   if (placement.kind !== "valid") return placement;
   const access = buildAstraBuilderAccess(planet, currentWallet);
   if (access.plots.some((plot) => Math.hypot(
@@ -890,6 +897,28 @@ function planAstraBuilderInstallation({ planet = {}, wallet = 0, x, y } = {}) {
     update,
     nextWallet,
     nextPlanet: { ...planet, ...update },
+  };
+}
+
+function planGalaxyTerritoryExpansion({ planet = {}, wallet = 0 } = {}) {
+  const currentWallet = Math.max(0, Number(wallet || 0));
+  if (planet?.territoryExpanded) return { kind: "already_expanded" };
+  if (currentWallet < GALAXY_TERRITORY_EXPANSION_COST) {
+    return { kind: "insufficient_wallet", cost: GALAXY_TERRITORY_EXPANSION_COST };
+  }
+  const nextWallet = currentWallet - GALAXY_TERRITORY_EXPANSION_COST;
+  const update = {
+    territoryExpanded: true,
+    territoryExpansionLevel: 1,
+  };
+  return {
+    kind: "expandable",
+    cost: GALAXY_TERRITORY_EXPANSION_COST,
+    update,
+    nextWallet,
+    nextPlanet: { ...planet, ...update },
+    worldAreaMultiplier: 2,
+    buildRadius: GALAXY_EXPANDED_BUILD_RADIUS,
   };
 }
 
@@ -3551,6 +3580,78 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     return serializeValue({ success: true, ...result });
   });
 
+  const purchaseGalaxyTerritoryExpansion = regionalFunctions.https.onCall(async (data, context) => {
+    const uid = requireUid(context);
+    await requireActiveGalaxyPlay(uid, data);
+    const operationId = cleanId(data?.operationId, 120);
+    if (!/^[A-Za-z0-9_-]{8,120}$/.test(operationId)) {
+      throw new functions.https.HttpsError("invalid-argument", "개척 영지 확장 요청이 올바르지 않습니다.");
+    }
+    const { userRef, user } = await requireMember(uid);
+    const planet = await ensurePlanet(uid, user);
+    const operationRef = userRef.collection("galaxyOperations").doc(operationId);
+    const transactionRef = userRef.collection("crystal_transactions").doc(`territory-expansion-${operationId}`);
+    const result = await db.runTransaction(async (transaction) => {
+      const [operationSnap, userSnap, planetSnap] = await Promise.all([
+        transaction.get(operationRef),
+        transaction.get(userRef),
+        transaction.get(planet.ref),
+      ]);
+      const currentUser = userSnap.data() || {};
+      const currentPlanet = planetSnap.data() || {};
+      if (operationSnap.exists) {
+        const previous = operationSnap.data() || {};
+        if (previous.type !== "galaxy_territory_expansion") {
+          throw new functions.https.HttpsError("already-exists", "이미 다른 구매에 사용된 요청입니다.");
+        }
+        return {
+          wallet: Math.max(0, Number(currentUser.crystals || previous.wallet || 0)),
+          planet: currentPlanet,
+          deduplicated: true,
+        };
+      }
+      const expansion = planGalaxyTerritoryExpansion({
+        planet: currentPlanet,
+        wallet: currentUser.crystals,
+      });
+      if (expansion.kind === "already_expanded") {
+        throw new functions.https.HttpsError("already-exists", "개척 영지는 이미 2배로 확장되어 있습니다.");
+      }
+      if (expansion.kind === "insufficient_wallet") {
+        throw new functions.https.HttpsError("failed-precondition", "개척 영지 확장에 필요한 학습 광석이 부족합니다.");
+      }
+      if (expansion.kind !== "expandable") {
+        throw new functions.https.HttpsError("failed-precondition", "지금은 개척 영지를 확장할 수 없습니다.");
+      }
+      transaction.set(userRef, { crystals: expansion.nextWallet }, { merge: true });
+      transaction.set(planet.ref, {
+        ...expansion.update,
+        territoryExpandedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      transaction.set(transactionRef, {
+        amount: -expansion.cost,
+        type: "galaxy_territory_expansion",
+        description: "개척 영지 2배 확장",
+        metadata: { areaMultiplier: 2, source: "purchaseGalaxyTerritoryExpansion" },
+        timestamp: FieldValue.serverTimestamp(),
+      });
+      transaction.set(operationRef, {
+        uid,
+        type: "galaxy_territory_expansion",
+        amount: expansion.cost,
+        wallet: expansion.nextWallet,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return {
+        wallet: expansion.nextWallet,
+        planet: expansion.nextPlanet,
+        deduplicated: false,
+      };
+    });
+    return serializeValue({ success: true, ...result });
+  });
+
   const buildGalaxyItem = regionalFunctions.https.onCall(async (data, context) => {
     const uid = requireUid(context);
     await requireActiveGalaxyPlay(uid, data);
@@ -3603,19 +3704,22 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const { totalCost, materialCost, storyGrantApplied } = pricing;
       if (wallet < totalCost) throw new functions.https.HttpsError("failed-precondition", "학습 광석이 부족합니다.");
       if (materialCount < materialCost) throw new functions.https.HttpsError("failed-precondition", `${item.name} 건설에 필요한 게임 재료가 부족합니다.`);
-      if (layout.length >= 36) throw new functions.https.HttpsError("failed-precondition", "현재 구역에 더 이상 시설을 놓을 수 없습니다.");
+      const facilityLimit = currentPlanet.territoryExpanded ? 72 : 36;
+      if (layout.length >= facilityLimit) throw new functions.https.HttpsError("failed-precondition", "현재 개척 영지에 더 이상 시설을 놓을 수 없습니다.");
       const instanceId = `${itemId}_${operationId.slice(0, 10)}`;
       const slot = layout.length;
       const requestedX = Number(data?.x);
       const requestedY = Number(data?.y);
-      const x = Number.isFinite(requestedX) ? clamp(requestedX, 7.4, 92.6) : 16 + ((slot * 19) % 68);
-      const y = Number.isFinite(requestedY) ? clamp(requestedY, 7.4, 92.6) : 24 + ((slot * 23) % 58);
+      const normalizedExtent = getGalaxyBuildRadius(currentPlanet) * 3;
+      const x = Number.isFinite(requestedX) ? clamp(requestedX, 50 - normalizedExtent, 50 + normalizedExtent) : 16 + ((slot * 19) % 68);
+      const y = Number.isFinite(requestedY) ? clamp(requestedY, 50 - normalizedExtent, 50 + normalizedExtent) : 24 + ((slot * 23) % 58);
       const placement = requireValidGalaxyItemPlacement(planGalaxyItemPlacement({
         layout,
         builderPlots: buildAstraBuilderAccess(currentPlanet).plots,
         x,
         y,
         rotation: 0,
+        buildRadius: getGalaxyBuildRadius(currentPlanet),
       }));
       const placed = {
         instanceId,
@@ -3829,6 +3933,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         x: hasX ? data.x : current.x,
         y: hasY ? data.y : current.y,
         rotation: hasRotation ? data.rotation : current.rotation || 0,
+        buildRadius: getGalaxyBuildRadius(planetData),
       }));
       const defaultName = cleanText(
         current.name || GALAXY_ITEM_CATALOG[current.itemId]?.name || "이름 없는 시설",
@@ -3888,6 +3993,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         x: data.x,
         y: data.y,
         rotation: data.rotation ?? 0,
+        buildRadius: getGalaxyBuildRadius(planetData),
       }));
       const item = { ...layout[index], x: placement.x, y: placement.y, rotation: placement.rotation };
       const nextLayout = layout.map((entry, entryIndex) => entryIndex === index ? item : entry);
@@ -4951,6 +5057,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
     saveGalaxyBuildState,
     purchaseGalaxyBuilderUpgrade,
     installGalaxyAstraBuilder,
+    purchaseGalaxyTerritoryExpansion,
     renewGalaxyWorldSession,
     sendGalaxyWorldSpeech,
     completeGalaxyDailyEvent,
@@ -5034,6 +5141,7 @@ module.exports.__test = {
   buildAstraBuilderAccess,
   planAstraBuilderPurchase,
   planAstraBuilderInstallation,
+  planGalaxyTerritoryExpansion,
   getAstraBuilderStoredGridBuffer,
   normalizeAstraBuilderBase64,
   normalizeFrontierStory,
