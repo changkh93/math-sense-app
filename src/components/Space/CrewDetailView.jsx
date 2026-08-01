@@ -962,7 +962,6 @@ export default function CrewDetailView({ onBack }) {
                       {displayNotes.map((note, index) => {
                         const { normalizedReadBy, totalCount, readCount, hasCurrentUserRead, isFullyRead } = getGreetingReadMeta(note, activeParticipantIds, user?.uid);
                         const canDeleteNote = note.userId === user?.uid || isLeader || userData?.role === 'admin';
-                        const isPendingPost = !!note.localPending;
                         const noteColor = ['rgba(250, 204, 21, 0.18)', 'rgba(45, 212, 191, 0.16)', 'rgba(96, 165, 250, 0.16)', 'rgba(251, 191, 36, 0.14)'][index % 4];
                         return (
                           <div

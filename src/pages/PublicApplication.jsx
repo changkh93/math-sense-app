@@ -1,22 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { createElement, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import {
   ArrowRight,
-  BarChart3,
-  BookOpen,
-  BrainCircuit,
   Calendar,
-  Check,
   ClipboardCheck,
-  Code2,
   Compass,
   Eye,
   FileText,
   Gift,
   Heart,
-  Lock,
+  Menu,
   MessageCircle,
   Orbit,
   Quote,
@@ -24,8 +19,7 @@ import {
   Sparkles,
   Star,
   Trophy,
-  UserRoundCheck,
-  Users,
+  X,
 } from 'lucide-react';
 import './PublicApplication.css';
 
@@ -100,34 +94,13 @@ const courseCatalog = [
   },
 ];
 
-const packageCourse = {
-  name: '수학+고전+코딩 통합 패키지',
-  schedule: '과정별 참여',
-  originalPrice: '월 450,000원',
-  price: '월 250,000원',
-  summary: '수학, 읽기, 코딩을 따로 떼어 배우지 않고 하나의 학습 루틴으로 연결합니다.',
-};
+const packageCourseName = '수학+고전+코딩 통합 패키지';
 
 const grades = ['미취학', '초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고등'];
 
 const testimonials = [
   {
-    text: '매번 수업 시간마다 느끼는 건, 선생님께서 얼마나 진심으로 저와 학생들을 생각하시는지입니다. 단순히 지식을 전달하는 걸 넘어서, 삶의 태도와 방향까지도 함께 알려 주시는 선생님은 저에겐 참 존경합니다. 때론 유쾌하게, 때론 진지하게 해주시는 말씀 하나하나가 저에겐 깊이 남습니다.',
-    role: '중1 학생',
-    courses: '파이썬 프로그래밍, 스스로Math-AI',
-  },
-  {
-    text: '벌써 선생님께 배운 지 6개월이나 됐다는 게 믿기지 않아요. 처음에는 잘 할 수 있을까 걱정도 많았는데, 선생님이 늘 따뜻하게 알려주시고 응원해 주신 덕분에 재미있게 배우고 꾸준히 이어올 수 있었던 것 같아요.',
-    role: '초4 학생',
-    courses: '수학과 고전읽기, 파이썬 프로그래밍',
-  },
-  {
     text: '수학이 재밌다는 말도 자주하구요. 선생님 수업 들으면서 수학정서가 많이 좋아졌어요. 독서도 좋아하기는 했는데 퀴즈풀면서 더 재미어하는거 같아요. 본인수준에서 어려운 문제를 포기하지 않고 해내더라구요. 선생님 수업에서 하는건 유독 아이가 열심히 합니다.',
-    role: '초4 학부모',
-    courses: '수학과 고전읽기',
-  },
-  {
-    text: '워킹맘이다 보니 아이는 어른의 감시(?)가 없이 수업을 듣고 있습니다. 집중을 안하는것 같아서 걱정이 있었는데, 배운것을 이해하고 있는것 같아 다행입니다. 어제 선생님 문자 받고 칭찬 많이 해줬습니다^^',
     role: '초4 학부모',
     courses: '수학과 고전읽기',
   },
@@ -152,34 +125,19 @@ const classSchedule = [
 
 const learningHighlights = [
   {
+    icon: Compass,
+    title: '오늘 할 일이 보여요',
+    body: '아이가 무엇을 공부할지 고민하지 않도록 오늘의 미션과 순서를 바로 안내합니다.',
+  },
+  {
     icon: Sparkles,
-    title: '스스로 움직이는 힘을 키웁니다',
-    body: '시켜서 하는 공부는 오래가지 않습니다. 오늘 무엇을 해야 하는지 알고, 해냈다는 감각을 스스로 쌓아 가는 구조를 만들었습니다.',
+    title: '학습이 연결돼요',
+    body: '영상·문제·오답·복습이 한 흐름으로 이어져 다음에 무엇을 해야 할지 놓치지 않습니다.',
   },
   {
     icon: Eye,
-    title: '과정이 보이니까 불안이 줄어듭니다',
-    body: '시험 점수만 보이던 학습에서 벗어나, 하루의 기록과 축적된 성장 리포트를 통해 부모님이 아이의 흐름을 읽을 수 있게 합니다.',
-  },
-  {
-    icon: Users,
-    title: '함께 가는 친구가 있으면 더 버팁니다',
-    body: '혼자가 아니라 스터디 크루와 아고라 커뮤니티 속에서 서로 자극하고 용기를 주는 학습 공동체를 경험합니다.',
-  },
-  {
-    icon: ClipboardCheck,
-    title: '과제와 피드백이 방향을 만들어 줍니다',
-    body: '"잘했어"를 넘어서 구체적인 피드백이 아이에게 방향감을 심어 줍니다. 방향이 있는 공부는 지치지 않습니다.',
-  },
-  {
-    icon: UserRoundCheck,
-    title: '학부모가 직접 확인하는 자녀 학습',
-    body: '실시간으로 자녀가 어떤 페이지에서 학습 중인지, 오늘 과제는 했는지, 선생님 피드백은 무엇인지 학부모 사이트에서 확인합니다.',
-  },
-  {
-    icon: Trophy,
-    title: '건강한 랭킹이 도전 의지를 깨웁니다',
-    body: '남과 비교하는 경쟁이 아니라, 어제의 나보다 나아지고 싶어지는 자극. 공부를 눈에 보이게 만들어 도전하고 싶은 마음을 키웁니다.',
+    title: '과정이 기록돼요',
+    body: '부모님은 접속·과제·피드백과 매일의 변화를 결과가 아닌 과정으로 확인합니다.',
   },
 ];
 
@@ -196,28 +154,6 @@ const valueShowcases = [
     reverse: false,
   },
   {
-    eyebrow: 'Study Crew & Agora',
-    title: '혼자가 아니라\n함께 가는 공부.',
-    paragraphs: [
-      '자기주도 학습은 혼자만의 고독한 싸움으로 길러지지 않습니다. 아이들은 어른의 말보다 또래의 분위기에서 더 큰 영향을 받기도 합니다. 함께 가는 친구들이 있을 때, 조금 더 버티고, 조금 더 해보려고 합니다.',
-      '스터디 크루에서 서로의 꾸준함이 기준이 되고, 아고라에서 질문하고 나누며 자기 생각을 내어놓는 경험을 합니다. 누군가의 기록이 다른 아이에게 자극이 되고, 누군가의 질문이 또 다른 아이의 생각을 깨웁니다.',
-    ],
-    image: '/images/features/crew-agora.png',
-    imageAlt: '스터디 크루와 아고라 커뮤니티',
-    reverse: true,
-  },
-  {
-    eyebrow: 'Daily Record & Growth Report',
-    title: '과정이 기록되니까\n성장이 보입니다.',
-    paragraphs: [
-      '많은 부모님들이 답답함을 느끼는 이유는 "결과는 보이는데 과정은 보이지 않기 때문"입니다. 점수는 보이지만, 그 점수가 나오기까지 아이가 얼마나 애썼는지, 어떤 부분에서 나아지고 있는지는 잘 드러나지 않지요.',
-      '메타센스는 이 과정을 기록합니다. 일일학습기록으로 하루의 학습이 남고, 그 축적이 상세한 성장 리포트로 이어집니다. 학생에게는 "나는 조금씩 나아지고 있어"라는 증거가 생기고, 부모님에게는 불안 대신 관찰과 이해의 근거가 생깁니다.',
-    ],
-    image: '/images/features/growth-report.png',
-    imageAlt: '학생 성장 리포트 화면',
-    reverse: false,
-  },
-  {
     eyebrow: 'Parent Dashboard',
     title: '부모님이 통제자가 아니라\n동반자가 되도록.',
     paragraphs: [
@@ -228,6 +164,13 @@ const valueShowcases = [
     imageAlt: '학부모 대시보드 화면',
     reverse: true,
   },
+];
+
+const faqItems = [
+  ['무료체험 후 자동으로 결제되나요?', '아니요. 체험 종료 후 자동으로 유료 전환되거나 결제되지 않습니다. 계속 수강을 원할 때 별도로 신청합니다.'],
+  ['일반 방문과 추천 방문의 체험 기간은 어떻게 다른가요?', '일반 신청은 7일, 확인된 추천 링크로 신청하면 4주 동안 체험할 수 있습니다.'],
+  ['체험 시작일은 어떻게 정하나요?', '신청 내용을 확인한 뒤 담당자가 연락드리며, 학생 일정과 과정 운영 시간을 함께 확인해 시작일을 정합니다.'],
+  ['어떤 과정을 체험할 수 있나요?', '초등 수학과 고전읽기, 서양고전 탐구, 중등 스스로Math-AI, 파이썬 코딩 중 관심 과정을 선택할 수 있습니다. 통합 패키지는 무료체험 대상이 아닙니다.'],
 ];
 
 export default function PublicApplication({ fixedType }) {
@@ -241,7 +184,7 @@ export default function PublicApplication({ fixedType }) {
     applicantName: '',
     parentPhone: '',
     studentName: '',
-    grade: '초4',
+    grade: '',
     selectedCourse: '',
     preferredTime: '',
     referredStudentName: '',
@@ -250,6 +193,7 @@ export default function PublicApplication({ fixedType }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (!isTrial || !referralToken) return;
@@ -272,6 +216,12 @@ export default function PublicApplication({ fixedType }) {
 
   const isReferralTrial = Boolean(referralPreview?.valid);
   const referralChecking = Boolean(isTrial && referralToken && !referralPreview);
+  const heroBenefit = isReferralTrial
+    ? '추천 혜택 적용 · 4주 무료체험'
+    : (referralChecking ? '추천 혜택 확인 중' : '7일 무료체험');
+  const heroCta = referralChecking
+    ? '추천 혜택 확인 중...'
+    : (isReferralTrial ? '4주 무료체험 신청하기' : '7일 무료체험 신청하기');
 
   const title = isTrial ? '무료체험 신청' : '전화상담 신청';
   const eyebrow = isTrial ? '1주일 무료체험' : '학부모 전화상담';
@@ -290,7 +240,10 @@ export default function PublicApplication({ fixedType }) {
   );
 
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
-  const scrollToForm = () => document.getElementById('trial-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const scrollToForm = () => {
+    setMobileNavOpen(false);
+    document.getElementById('trial-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -335,52 +288,77 @@ export default function PublicApplication({ fixedType }) {
           <img src="/m-logo.svg" alt="" />
           <span>META SENSE</span>
         </Link>
-        <nav>
-          <a href="#features">특징</a>
-          <a href="#courses">과정과 수강료</a>
-          <a href="#reviews">후기</a>
-          <a href="#schedule">수업 일정</a>
-          <Link to="/referral">추천혜택</Link>
-          <button type="button" onClick={scrollToForm}>{title}</button>
-          <Link to="/">로그인</Link>
+        <div className="mobile-nav-actions">
+          <button type="button" className="mobile-trial-cta" onClick={scrollToForm}>{isReferralTrial ? '4주 체험' : '무료체험'}</button>
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            aria-label={mobileNavOpen ? '메뉴 닫기' : '메뉴 열기'}
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen((open) => !open)}
+          >
+            {mobileNavOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+        <nav className={mobileNavOpen ? 'is-open' : ''}>
+          <a href="#features" onClick={() => setMobileNavOpen(false)}>특징</a>
+          <a href="#learning-process" onClick={() => setMobileNavOpen(false)}>학습 과정</a>
+          <a href="#courses" onClick={() => setMobileNavOpen(false)}>수강료</a>
+          <a href="#reviews" onClick={() => setMobileNavOpen(false)}>후기</a>
+          <a href="#faq" onClick={() => setMobileNavOpen(false)}>FAQ</a>
+          <Link className="nav-login" to="/" onClick={() => setMobileNavOpen(false)}>로그인</Link>
+          <button className="nav-primary-cta" type="button" onClick={scrollToForm}>{title}</button>
         </nav>
       </header>
 
       <main>
         <section className="trial-hero">
           <div className="hero-copy">
-            <div className="hero-eyebrow">{isReferralTrial ? '추천 혜택 · 4주 무료체험' : eyebrow}</div>
-            <h1>우리 아이가 스스로 공부하는 힘을 키울 수 있을까요?</h1>
+            <div className="hero-eyebrow">{isTrial ? heroBenefit : eyebrow}</div>
+            <h1><span>시키지 않아도,</span><span>스스로 공부하는 힘</span></h1>
             <p>
-              시켜야만 하는 공부는 오래가지 않습니다. 메타센스는 아이가 매일 접속해 스스로 학습하고,
-              그 과정이 기록되고, 부모님이 실시간으로 확인할 수 있는 학습 환경입니다.
-              과정을 보실 수 있으니 불안 대신 신뢰가 생깁니다.
+              초등·중등 수학과 Python을 매일 작은 단위로 학습하고,
+              부모님은 접속·학습 기록과 변화 과정을 확인할 수 있습니다.
             </p>
+            {isReferralTrial && (
+              <div className="referral-applied-note">추천 혜택이 적용되었습니다. 일반 체험보다 긴 4주 동안 충분히 경험해 보세요.</div>
+            )}
             <div className="hero-actions">
-              <button type="button" onClick={scrollToForm}>
-                {title}
+              <button type="button" onClick={scrollToForm} disabled={referralChecking}>
+                {isTrial ? heroCta : title}
                 <ArrowRight size={18} />
               </button>
-              <a href="#courses">과정과 수강료 보기</a>
+              <a className="hero-secondary-action" href="#courses">과정과 수강료 보기</a>
             </div>
             <div className="trial-conditions">
-              <span><Check size={16} /> 1주일 무료체험</span>
-              <span><Gift size={16} /> 추천인 입력 시 4주 무료체험</span>
-              <span><Check size={16} /> 신청 후 확인 연락</span>
+              <span><ShieldCheck size={16} /> 자동결제 없음</span>
+              <span><Calendar size={16} /> 시작일 협의</span>
+              <span><ClipboardCheck size={16} /> 약 1분 신청</span>
             </div>
           </div>
 
-          <aside className="hero-preview" aria-label="메타센스 화면 미리보기">
+          <aside className="hero-preview hero-product-preview" aria-label="메타센스 학습 화면 미리보기">
             <div className="preview-toolbar">
               <span />
               <span />
               <span />
-              <strong>Meta Sense</strong>
+              <strong>학생의 오늘 학습</strong>
             </div>
-            <img src="/images/features/planet-map-v2.png" alt="메타센스 행성 학습 화면 미리보기" />
+            <div className="product-preview-stage">
+              <img className="product-preview-main" src="/images/features/self-directed.png" alt="오늘의 미션과 학습 진도가 보이는 학생 대시보드" />
+              <div className="product-preview-stat">
+                <Trophy size={19} />
+                <span>이번 주 학습</span>
+                <strong>5일 연속</strong>
+              </div>
+              <div className="product-preview-parent">
+                <img src="/images/features/parent-dashboard.png" alt="학부모 학습 현황 화면" />
+                <div><Eye size={17} /><strong>부모님도 과정을 확인해요</strong></div>
+              </div>
+            </div>
             <div className="preview-caption">
               <Orbit size={18} />
-              <span>우주 탐험형 인터페이스 안에서 학생의 학습 경로와 기록이 이어집니다.</span>
+              <span>오늘의 미션부터 학습 기록과 부모님 확인까지 하나로 이어집니다.</span>
             </div>
           </aside>
         </section>
@@ -388,17 +366,13 @@ export default function PublicApplication({ fixedType }) {
         <section className="section-block" id="features">
           <div className="section-heading">
             <span>Why Meta Sense</span>
-            <h2>학부모님이 메타센스를 선택하는 이유</h2>
-            <p>
-              공부는 결국 자기 인식의 변화에서부터 달라집니다.
-              "나는 안 되는 아이"가 아니라 "나는 해볼 수 있는 아이"라는 감각을 만들어 주는 것,
-              그것이 메타센스가 하려는 일입니다.
-            </p>
+            <h2>아이가 스스로 하게 되는 구조</h2>
+            <p>메타센스는 오늘 할 일, 이어지는 학습, 부모님이 확인할 수 있는 기록을 하나의 흐름으로 만듭니다.</p>
           </div>
           <div className="feature-grid feature-grid--six">
-            {learningHighlights.map(({ icon: Icon, title: featureTitle, body }) => (
+            {learningHighlights.map(({ icon, title: featureTitle, body }) => (
               <article key={featureTitle} className="feature-card">
-                <div><Icon size={22} /></div>
+                <div>{createElement(icon, { size: 22 })}</div>
                 <h3>{featureTitle}</h3>
                 <p>{body}</p>
               </article>
@@ -408,7 +382,7 @@ export default function PublicApplication({ fixedType }) {
 
         {/* 가치 제안 쇼케이스 */}
         {valueShowcases.map((item, idx) => (
-          <section key={idx} className={`value-showcase ${item.reverse ? 'value-showcase--reverse' : ''}`}>
+          <section key={idx} id={idx === 0 ? 'learning-process' : undefined} className={`value-showcase ${item.reverse ? 'value-showcase--reverse' : ''}`}>
             <div className="value-showcase__image">
               <img src={item.image} alt={item.imageAlt} />
             </div>
@@ -420,26 +394,6 @@ export default function PublicApplication({ fixedType }) {
           </section>
         ))}
 
-        {/* 일일학습기록 & 랭킹 미리보기 */}
-        <section className="dual-preview-section">
-          <div className="dual-preview-card">
-            <img src="/images/features/daily-learning.png" alt="일일학습기록 화면" />
-            <div className="dual-preview-label">
-              <BarChart3 size={18} />
-              <strong>일일학습기록</strong>
-              <p>퀴즈 완료, 영상 학습, 집중도, 연속 학습일 — 하루의 모든 학습이 기록됩니다.</p>
-            </div>
-          </div>
-          <div className="dual-preview-card">
-            <img src="/images/features/ranking-system.png" alt="성장 랭킹 화면" />
-            <div className="dual-preview-label">
-              <Trophy size={18} />
-              <strong>성장 랭킹</strong>
-              <p>남과 비교하지 않고, 어제의 나와 비교합니다. 도전의 문화가 자연스럽게 자랍니다.</p>
-            </div>
-          </div>
-        </section>
-
         <div className="value-cta-strip">
           <p>공부는 억지와 잔소리로 오래 갈 수 없습니다.<br />학습에는 구조가 필요하고, 관계가 필요하고, 성장을 스스로 체감할 수 있는 경험이 필요합니다.</p>
           <button type="button" onClick={scrollToForm}>
@@ -448,30 +402,6 @@ export default function PublicApplication({ fixedType }) {
           </button>
         </div>
 
-        <section className="video-section">
-          <div className="section-heading">
-            <span>Video Guide</span>
-            <h2 className="video-title">AI시대의 새로운 학습 시스템 메타센스</h2>
-            <p>
-              메타센스가 왜 단순한 온라인 문제 풀이가 아니라 학생의 학습 습관과 사고력을 함께 다루는 시스템인지 영상으로 확인해 보세요.
-            </p>
-          </div>
-          <div className="video-shell">
-            <iframe
-              src="https://www.youtube-nocookie.com/embed/GP_Fzqr-8mE"
-              title="AI시대의 새로운 학습 시스템 메타센스"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
-          <div className="video-cta">
-            <button type="button" onClick={scrollToForm}>
-              영상 확인 후 무료체험 신청하기
-              <ArrowRight size={18} />
-            </button>
-          </div>
-        </section>
-
         <section className="section-block" id="courses">
           <div className="section-heading">
             <span>Curriculum & Tuition</span>
@@ -479,54 +409,26 @@ export default function PublicApplication({ fixedType }) {
             <p>무료체험 신청 시 아래 과정 중 관심 과정을 선택할 수 있습니다. 실제 배정은 학생 수준과 상담 결과에 따라 조정될 수 있습니다.</p>
           </div>
 
-          <div className="course-grid">
+          <div className="course-comparison" role="table" aria-label="과정과 수강료 비교">
+            <div className="course-comparison__header" role="row">
+              <span role="columnheader">과정</span><span role="columnheader">대상과 내용</span><span role="columnheader">운영</span><span role="columnheader">월 수강료</span><span />
+            </div>
             {courseCatalog.map(course => (
-              <article key={course.id} className={`course-card course-card--${course.tone}`}>
-                <img src={course.image} alt="" />
-                <div className="course-body">
-                  <h3>{course.name}</h3>
-                  <p>{course.summary}</p>
-                  <ul>
-                    {course.features.map(feature => (
-                      <li key={feature}><Check size={16} /> {feature}</li>
-                    ))}
-                  </ul>
-                  <div className="course-price">
-                    <span>{course.schedule}</span>
-                    <strong>{course.price}</strong>
-                  </div>
-                  <button type="button" onClick={() => {
+              <div key={course.id} className="course-comparison__row" role="row">
+                <strong role="cell">{course.name}</strong>
+                <span role="cell">{course.target}</span>
+                <span role="cell">{course.schedule}</span>
+                <b role="cell">{course.price}</b>
+                <button type="button" onClick={() => {
                     update('selectedCourse', course.name);
                     scrollToForm();
                   }}>
-                    이 과정으로 체험 신청
-                  </button>
-                </div>
-              </article>
+                  체험 신청
+                </button>
+              </div>
             ))}
           </div>
-        </section>
-
-        <section className="package-section">
-          <div className="package-bg" />
-          <div className="package-content">
-            <span>Recommended Package</span>
-            <h2>{packageCourse.name}</h2>
-            <p>{packageCourse.summary}</p>
-            <div className="package-pill-row">
-              <div><BookOpen size={22} /><strong>고전 읽기</strong><span>깊이 있는 사고와 배경지식</span></div>
-              <div><BrainCircuit size={22} /><strong>수학</strong><span>개념, 논리, 문제 해결</span></div>
-              <div><Code2 size={22} /><strong>파이썬 코딩</strong><span>컴퓨팅 사고와 창작</span></div>
-            </div>
-            <div className="package-price">
-              <span>{packageCourse.originalPrice}</span>
-              <strong>{packageCourse.price}</strong>
-            </div>
-            <div className="package-notice">
-              <Lock size={16} />
-              <span>통합 패키지는 무료체험 대상이 아닙니다. 개별 과정을 먼저 체험해 보세요.</span>
-            </div>
-          </div>
+          <p className="course-footnote"><Gift size={16} /> 추천 링크로 방문하면 일반 7일 체험이 4주로 연장됩니다. 통합 패키지는 무료체험 대상이 아닙니다.</p>
         </section>
 
         {/* 학부모·학생 후기 */}
@@ -547,6 +449,22 @@ export default function PublicApplication({ fixedType }) {
                 </footer>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section className="video-section">
+          <div className="section-heading">
+            <span>Video Guide</span>
+            <h2 className="video-title">영상으로 학습 화면과 운영 방식을 확인하세요</h2>
+            <p>학생의 매일 학습이 어떻게 이어지고 부모님에게 어떤 기록이 보이는지 짧게 확인할 수 있습니다.</p>
+          </div>
+          <div className="video-shell">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/GP_Fzqr-8mE"
+              title="AI시대의 새로운 학습 시스템 메타센스"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
           </div>
         </section>
 
@@ -585,6 +503,21 @@ export default function PublicApplication({ fixedType }) {
           </div>
         </section>
 
+        <section className="section-block faq-section" id="faq">
+          <div className="section-heading">
+            <span>FAQ</span>
+            <h2>무료체험 전 자주 묻는 질문</h2>
+          </div>
+          <div className="faq-list">
+            {faqItems.map(([question, answer]) => (
+              <details key={question}>
+                <summary>{question}</summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
         <section className="application-layout" id="trial-form">
           <div className="application-info">
             <span>Before applying</span>
@@ -592,7 +525,7 @@ export default function PublicApplication({ fixedType }) {
             {isTrial ? (
               <div className="notice-list">
                 <p><ShieldCheck size={18} /> 무료체험은 1주일 동안 제공됩니다. 누구나 신청할 수 있습니다.</p>
-                <p><Gift size={18} /> 기존 수강생의 추천인 정보를 입력하시면 4주 무료체험 혜택이 주어집니다. 체험 후 자동으로 유료 전환되거나 결제되지 않습니다. <Link to="/referral" style={{ color: 'inherit', textDecoration: 'underline' }}>(추천 혜택 안내)</Link> (선택사항)</p>
+                <p><Gift size={18} /> 기존 수강생의 추천인 정보를 입력하시면 4주 무료체험 혜택이 주어집니다. 체험 후 자동으로 유료 전환되거나 결제되지 않습니다. (선택사항)</p>
               </div>
             ) : (
               <div className="notice-list">
@@ -631,7 +564,8 @@ export default function PublicApplication({ fixedType }) {
             </div>
             <div className="form-grid form-grid--student">
               <input value={form.studentName} onChange={(e) => update('studentName', e.target.value)} placeholder="자녀 이름" required />
-              <select value={form.grade} onChange={(e) => update('grade', e.target.value)}>
+              <select value={form.grade} onChange={(e) => update('grade', e.target.value)} required>
+                <option value="" disabled>자녀 학년 선택</option>
                 {grades.map(grade => <option key={grade} value={grade}>{grade}</option>)}
               </select>
             </div>
@@ -640,7 +574,7 @@ export default function PublicApplication({ fixedType }) {
               {selectableCourses.map(course => (
                 <option key={course.name} value={course.name}>{course.name}</option>
               ))}
-              <option value={packageCourse.name} disabled>{packageCourse.name} (무료체험 불가)</option>
+              <option value={packageCourseName} disabled>{packageCourseName} (무료체험 불가)</option>
             </select>
             <input value={form.preferredTime} onChange={(e) => update('preferredTime', e.target.value)} placeholder="연락 가능 시간 예: 평일 14시 이후" />
 
