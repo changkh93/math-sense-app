@@ -25,6 +25,13 @@ function formatPhone(phone = '') {
   return phone || '-';
 }
 
+function addDaysToIsoDate(value, days) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function ReferralApplicationEditor({ app }) {
   const [trialStartDate, setTrialStartDate] = useState(app.trialStartDate || '');
   const [trialEndDate, setTrialEndDate] = useState(app.trialEndDate || '');
@@ -49,9 +56,9 @@ function ReferralApplicationEditor({ app }) {
 
   return (
     <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.18)' }}>
-      <strong style={{ color: '#86efac', fontSize: 13 }}>추천 1달 무료체험 운영</strong>
+      <strong style={{ color: '#86efac', fontSize: 13 }}>추천 4주 무료체험 운영</strong>
       <div style={{ marginTop: 9, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(130px, 1fr))', gap: 8 }}>
-        <label style={{ fontSize: 11, color: '#94a3b8' }}>운영자 지정 시작일<input type="date" value={trialStartDate} onChange={(e) => setTrialStartDate(e.target.value)} style={fieldStyle} /></label>
+        <label style={{ fontSize: 11, color: '#94a3b8' }}>운영자 지정 시작일<input type="date" value={trialStartDate} onChange={(e) => { const value = e.target.value; setTrialStartDate(value); setTrialEndDate(addDaysToIsoDate(value, 27)); }} style={fieldStyle} /></label>
         <label style={{ fontSize: 11, color: '#94a3b8' }}>운영자 지정 종료일<input type="date" value={trialEndDate} onChange={(e) => setTrialEndDate(e.target.value)} style={fieldStyle} /></label>
         <label style={{ fontSize: 11, color: '#94a3b8' }}>전환 상태<select value={referralStatus} onChange={(e) => setReferralStatus(e.target.value)} style={fieldStyle}>
           <option value="applied">신청 완료</option><option value="trial_scheduled">체험 예정</option><option value="trial_active">무료체험 중</option><option value="trial_ended">체험 종료</option><option value="paid_active">유료 전환</option><option value="cancelled">종료</option><option value="rejected">혜택 제외</option>

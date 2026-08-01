@@ -1120,13 +1120,13 @@ export default function CrewDetailView({ onBack }) {
 
         {isGuest && (
           <div className="crew-guest-strip font-tech">
-            <div><span>GUEST PASS</span> 1개월 무료 체험 · 첫 입장 24시간 후 퀴즈 배틀 2회와 실제 답변 10문제를 완료하면 활동 게스트로 자동 집계됩니다. 탐사원·NOVA-7 대결 모두 인정됩니다.</div>
+            <div><span>GUEST PASS</span> 친구와 4주 동안 함께 공부해 보세요 · 첫 입장 24시간 후 퀴즈 배틀 2회와 실제 답변 10문제를 완료하면 활동 게스트로 자동 집계됩니다. 탐사원·NOVA-7 대결 모두 인정됩니다.</div>
             {userData?.referralTracked && userData?.referralToken && (
               <button
                 type="button"
                 onClick={() => navigate(`/trial?ref=${encodeURIComponent(userData.referralToken)}`)}
               >
-                <Rocket size={13} /> 1달 무료체험 신청
+                <Rocket size={13} /> 4주 무료체험 신청
               </button>
             )}
             <button type="button" onClick={handleGuestLogout} disabled={!!guestLogoutAction}>
@@ -1152,7 +1152,7 @@ export default function CrewDetailView({ onBack }) {
           <div className="crew-guest-access-label">
             <span className="font-tech"><Share2 size={14} /> GUEST ACCESS</span>
             <strong className="font-tech">{guestAccessEnabled ? '외부 승무원 초대 가능' : '게스트 초대 중지'}</strong>
-            {guestAccessEnabled && <small className="crew-guest-benefit-copy font-tech">링크로 초대된 친구는 1개월 무료 체험을 신청할 수 있습니다. 이 개인 링크 하나로 여러 친구를 제한 없이 초대할 수 있습니다.</small>}
+            {guestAccessEnabled && <small className="crew-guest-benefit-copy font-tech">링크로 초대된 친구는 학부모 확인 후 4주 무료체험을 신청할 수 있습니다.</small>}
           </div>
           {guestAccessEnabled && guestInviteUrl && (
             <div className="crew-guest-share-link">

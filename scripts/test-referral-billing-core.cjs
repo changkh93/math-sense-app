@@ -33,6 +33,36 @@ assert.deepEqual(core.monthBounds('2028-02'), {
 });
 assert.equal(core.addMonths('2026-12', 1), '2027-01');
 assert.equal(core.normalizePhone('010-1234-5678'), '01012345678');
+assert.equal(core.addDaysToIsoDate('2026-08-02', 27), '2026-08-29');
+assert.equal(core.addDaysToIsoDate('2028-02-10', 27), '2028-03-08');
+
+const referrals = [
+  { id: 'r1', referredParentUid: 'family-a' },
+  { id: 'r2', referredParentUid: 'family-b' },
+];
+const referralGroups = core.groupReferralsByFamily(referrals, 'referrer');
+const enrollmentByFamily = new Map([
+  ['family-a', [{ status: 'active_paid', activeFrom: '2026-08-01' }]],
+  ['family-b', [{ status: 'active_paid', activeFrom: '2026-09-01' }]],
+]);
+const augustSnapshot = core.billingSnapshotFromData(
+  { baseMonthlyFee: 100000 },
+  referrals,
+  referralGroups,
+  enrollmentByFamily,
+  '2026-08',
+);
+const septemberSnapshot = core.billingSnapshotFromData(
+  { baseMonthlyFee: 100000 },
+  referrals,
+  referralGroups,
+  enrollmentByFamily,
+  '2026-09',
+);
+assert.equal(augustSnapshot.activeReferralCount, 1);
+assert.equal(augustSnapshot.finalFee, 80000);
+assert.equal(septemberSnapshot.activeReferralCount, 2);
+assert.equal(septemberSnapshot.finalFee, 50000);
 
 const notice = core.buildTuitionNoticeText({
   parentName: '김학부모',

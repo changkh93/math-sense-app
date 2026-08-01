@@ -349,7 +349,7 @@ export default function PublicApplication({ fixedType }) {
       <main>
         <section className="trial-hero">
           <div className="hero-copy">
-            <div className="hero-eyebrow">{isReferralTrial ? '추천 혜택 · 1달 무료체험' : eyebrow}</div>
+            <div className="hero-eyebrow">{isReferralTrial ? '추천 혜택 · 4주 무료체험' : eyebrow}</div>
             <h1>우리 아이가 스스로 공부하는 힘을 키울 수 있을까요?</h1>
             <p>
               시켜야만 하는 공부는 오래가지 않습니다. 메타센스는 아이가 매일 접속해 스스로 학습하고,
@@ -365,7 +365,7 @@ export default function PublicApplication({ fixedType }) {
             </div>
             <div className="trial-conditions">
               <span><Check size={16} /> 1주일 무료체험</span>
-              <span><Gift size={16} /> 추천인 입력 시 1달 무료</span>
+              <span><Gift size={16} /> 추천인 입력 시 4주 무료체험</span>
               <span><Check size={16} /> 신청 후 확인 연락</span>
             </div>
           </div>
@@ -592,7 +592,7 @@ export default function PublicApplication({ fixedType }) {
             {isTrial ? (
               <div className="notice-list">
                 <p><ShieldCheck size={18} /> 무료체험은 1주일 동안 제공됩니다. 누구나 신청할 수 있습니다.</p>
-                <p><Gift size={18} /> 기존 수강생의 추천인 정보를 입력하시면 1달 무료체험 혜택이 주어집니다. <Link to="/referral" style={{ color: 'inherit', textDecoration: 'underline' }}>(추천인 제도 안내)</Link> (선택사항)</p>
+                <p><Gift size={18} /> 기존 수강생의 추천인 정보를 입력하시면 4주 무료체험 혜택이 주어집니다. 체험 후 자동으로 유료 전환되거나 결제되지 않습니다. <Link to="/referral" style={{ color: 'inherit', textDecoration: 'underline' }}>(추천 혜택 안내)</Link> (선택사항)</p>
               </div>
             ) : (
               <div className="notice-list">
@@ -648,10 +648,10 @@ export default function PublicApplication({ fixedType }) {
               <div className="referral-box referral-box--optional">
                 <div className="referral-header">
                   <Gift size={18} />
-                  <strong>추천 혜택 확인 <span className="referral-badge">1달 무료</span></strong>
+                  <strong>추천 혜택 확인 <span className="referral-badge">4주 무료체험</span></strong>
                 </div>
                 <p className="referral-hint">
-                  <b>{referralPreview.inviterLabel}</b>님의 추천 링크가 확인되었습니다. 체험 시작일은 담당자아 협의하여 지정합니다.
+                  <b>{referralPreview.inviterLabel}</b>님의 추천 링크가 확인되었습니다. 담당자와 시작일을 정해 4주 동안 체험할 수 있습니다. 체험 후 자동으로 유료 전환되거나 결제되지 않습니다.
                 </p>
               </div>
             )}
@@ -662,7 +662,7 @@ export default function PublicApplication({ fixedType }) {
                   <Gift size={18} />
                   <strong>추천인 정보 <span className="referral-badge">선택사항</span></strong>
                 </div>
-                <p className="referral-hint">추천인 정보를 입력하시면 <b>1달 무료체험</b> 혜택이 주어집니다.</p>
+                <p className="referral-hint">추천인 정보를 입력하시면 <b>4주 무료체험</b> 혜택이 주어집니다. 체험 후 계속 수강하려면 별도로 신청합니다.</p>
                 <input value={form.referredStudentName} onChange={(e) => update('referredStudentName', e.target.value)} placeholder="기존 수강생(자녀) 이름" />
                 <input value={form.referrerParentPhone} onChange={(e) => update('referrerParentPhone', e.target.value)} placeholder="추천인(학부모) 전화번호" inputMode="tel" />
               </div>

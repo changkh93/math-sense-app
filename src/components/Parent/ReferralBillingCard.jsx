@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { ChevronDown, Copy, Gift, RefreshCw, Users } from 'lucide-react';
 import { functions } from '../../firebase';
@@ -11,7 +10,7 @@ const percent = (value) => `${Math.round((Number(value) || 0) * 100)}%`;
 // 단계가 변경되면 백엔드와 함께 여기도 맞춰주세요. 아래 UI는 백엔드에서 받은 값만 표시하고 rate를 재계산하지 않습니다.
 const BENEFIT_STEPS = [
   { count: 0, rate: 0, label: '할인 없음', desc: '기본 수강료 그대로' },
-  { count: 1, rate: 0.2, label: '20% 할인', desc: '추천한 친구 1가구가 유료 수강 중일 때' },
+  { count: 1, rate: 0.2, label: '20% 할인', desc: '추천한 지인 1가구가 유료 수강 중일 때' },
   { count: 2, rate: 0.5, label: '50% 할인', desc: '2가구가 유료 수강 중일 때' },
   { count: 3, rate: 1, label: '100% (무료)', desc: '3가구 이상 유료 수강 시 수강료 0원' },
 ];
@@ -48,7 +47,7 @@ function FeePanel({ title, value }) {
       <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 8 }}>{title} · {value.monthKey}</div>
       <div style={{ display: 'grid', gap: 5, fontSize: 13 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>기본 수강료</span><b>{money(value.baseFee)}</b></div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#86efac' }}><span>추천 {value.activeReferralCount}명 · {percent(value.discountRate)}</span><b>-{money(value.discountAmount)}</b></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#86efac' }}><span>유효 추천 {value.activeReferralCount}가구 · {percent(value.discountRate)}</span><b>-{money(value.discountAmount)}</b></div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 7, marginTop: 3, display: 'flex', justifyContent: 'space-between', fontSize: 16 }}><span>최종 수강료</span><strong style={{ color: '#67e8f9' }}>{money(value.finalFee)}</strong></div>
       </div>
     </div>
@@ -61,6 +60,7 @@ export default function ReferralBillingCard() {
   const [error, setError] = useState('');
   const [inviteUrl, setInviteUrl] = useState('');
   const [message, setMessage] = useState('');
+  const [makingInvite, setMakingInvite] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
 
   const childNameByUid = useMemo(() => new Map((data?.children || []).map((child) => [child.uid, child.name])), [data?.children]);
@@ -75,7 +75,11 @@ export default function ReferralBillingCard() {
     try {
       const fn = httpsCallable(functions, 'getParentReferralDashboard');
       const result = await fn({});
-      setData(result.data || null);
+      const nextData = result.data || null;
+      setData(nextData);
+      if (nextData?.inviteToken) {
+        setInviteUrl(`${window.location.origin}/trial?ref=${encodeURIComponent(nextData.inviteToken)}`);
+      }
     } catch (err) {
       setError(err?.message || '추천 혜택 정보를 불러오지 못했습니다.');
     } finally {
@@ -85,19 +89,34 @@ export default function ReferralBillingCard() {
 
   useEffect(() => { load(); }, []);
 
+  const copyInviteMessage = async (url) => {
+    const shareText = `[메타센스 추천 혜택]\n이 링크로 신청한 가구가 유료 수강을 시작하면 추천한 가구도 수강료 할인 혜택을 받습니다.\n\n자녀를 위한 수학·파이썬 수업을 4주 무료로 체험해 보세요!\n아래 링크로 신청한 뒤 담당자와 체험 시작일을 정할 수 있어요.\n체험 후 자동으로 유료 전환되거나 결제되지 않습니다.\n\n${url}`;
+    await navigator.clipboard.writeText(shareText);
+    setMessage('추천 메시지를 복사했습니다. 지인에게 그대로 보내보세요.');
+  };
+
   const makeInvite = async () => {
+    if (makingInvite) return;
     setMessage('');
+    if (inviteUrl) {
+      try {
+        await copyInviteMessage(inviteUrl);
+      } catch (err) {
+        setMessage(err?.message || '추천 메시지를 복사하지 못했습니다.');
+      }
+      return;
+    }
+    setMakingInvite(true);
     try {
       const fn = httpsCallable(functions, 'getOrCreateReferralInvite');
       const result = await fn({ source: 'parent_trial_link' });
       const url = `${window.location.origin}/trial?ref=${encodeURIComponent(result.data?.token || '')}`;
       setInviteUrl(url);
-      // 링크만 복사하는 대신, 친구에게 그대로 보낼 수 있는 공유 메시지를 복사합니다.
-      const shareText = `[메타센스] 우리 아이 수학, 무료체험해 보세요!\n이 링크로 신청하면 1달 무료체험 혜택이 주어져요.\n${url}\n\n추천인 제도 안내: ${window.location.origin}/referral`;
-      await navigator.clipboard.writeText(shareText);
-      setMessage('추천 메시지를 복사했습니다. 친구에게 그대로 보내보세요.');
+      await copyInviteMessage(url);
     } catch (err) {
       setMessage(err?.message || '추천 링크를 만들지 못했습니다.');
+    } finally {
+      setMakingInvite(false);
     }
   };
 
@@ -120,10 +139,16 @@ export default function ReferralBillingCard() {
         <FeePanel title="다음 월 예상" value={data.next} />
       </div>
 
+      {data.next.activeReferralCount < data.current.activeReferralCount && (
+        <div style={{ background: 'rgba(251,191,36,0.09)', border: '1px solid rgba(253,230,138,0.3)', borderRadius: 12, padding: '10px 12px', marginBottom: 14, fontSize: 13, color: '#fde68a' }}>
+          유효 추천 가구 수가 {data.current.activeReferralCount}가구에서 {data.next.activeReferralCount}가구로 변경되어 다음 달 예상 수강료는 <b>{money(data.next.finalFee)}</b>입니다.
+        </div>
+      )}
+
       {/* 다음 단계 동기부여: 아직 최대 할인이 아니면 한 단계 더 추천 시 혜택 안내 */}
       {nextRate !== null && (
         <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(134,239,172,0.25)', borderRadius: 12, padding: '10px 12px', marginBottom: 14, fontSize: 13, color: '#bbf7d0' }}>
-          🎁 친구 1가구가 더 유료 수강하면 <b>{percent(nextRate)}</b> 할인으로 내려갑니다!
+          🎁 지인 1가구가 더 유료 수강하면 <b>{percent(nextRate)}</b> 할인으로 내려갑니다!
         </div>
       )}
       {nextRate === null && currentTier === 3 && (
@@ -143,8 +168,8 @@ export default function ReferralBillingCard() {
         </div>
       </div>
 
-      <button type="button" onClick={makeInvite} style={{ width: '100%', border: '1px solid rgba(103,232,249,0.35)', background: 'rgba(6,182,212,0.12)', color: '#67e8f9', borderRadius: 12, padding: '11px 12px', cursor: 'pointer', fontWeight: 850 }}>
-        <Copy size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />1달 무료체험 추천 링크 복사
+      <button type="button" onClick={makeInvite} disabled={makingInvite} style={{ width: '100%', border: '1px solid rgba(103,232,249,0.35)', background: 'rgba(6,182,212,0.12)', color: '#67e8f9', borderRadius: 12, padding: '11px 12px', cursor: makingInvite ? 'wait' : 'pointer', fontWeight: 850, opacity: makingInvite ? 0.7 : 1 }}>
+        <Copy size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />{makingInvite ? '추천 링크 준비 중...' : '4주 무료체험 추천 링크 복사'}
       </button>
       {inviteUrl && <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.45)', wordBreak: 'break-all' }}>{inviteUrl}</div>}
       {message && <div style={{ marginTop: 8, fontSize: 12, color: '#a7f3d0' }}>{message}</div>}
@@ -166,10 +191,10 @@ export default function ReferralBillingCard() {
         ))}
       </div>
 
-      {/* 제도 자세히 보기 (펼치기/접기) */}
+      {/* 추천 혜택 자세히 보기 (펼치기/접기) */}
       <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14 }}>
         <button type="button" onClick={() => setShowDetail((v) => !v)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: 0, background: 'transparent', color: '#c4b5fd', cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>
-          <span>추천인 제도 자세히 보기</span>
+          <span>추천 혜택 자세히 보기</span>
           <ChevronDown size={16} style={{ transform: showDetail ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
         </button>
 
@@ -181,7 +206,7 @@ export default function ReferralBillingCard() {
                 const active = idx === currentTier;
                 return (
                   <div key={step.count} style={{ display: 'flex', gap: 12, padding: '10px 12px', alignItems: 'center', borderTop: idx === 0 ? 0 : '1px solid rgba(255,255,255,0.06)', background: active ? 'rgba(103,232,249,0.12)' : 'transparent' }}>
-                    <div style={{ flex: '0 0 64px', fontWeight: 800, color: active ? '#67e8f9' : '#e2e8f0' }}>{step.count === 3 ? '3명+' : `${step.count}명`}{active ? ' · 현재' : ''}</div>
+                    <div style={{ flex: '0 0 72px', fontWeight: 800, color: active ? '#67e8f9' : '#e2e8f0' }}>{step.count === 3 ? '3가구+' : `${step.count}가구`}{active ? ' · 현재' : ''}</div>
                     <div style={{ flex: '0 0 100px', fontWeight: 800, color: step.rate === 0 ? 'rgba(255,255,255,0.45)' : '#86efac' }}>{step.label}</div>
                     <div style={{ flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{step.desc}</div>
                   </div>
@@ -190,15 +215,12 @@ export default function ReferralBillingCard() {
             </div>
 
             <ul style={{ margin: '12px 0 0', paddingLeft: 18, lineHeight: 1.7, color: 'rgba(255,255,255,0.6)' }}>
-              <li>추천받은 친구 가구가 <b style={{ color: '#86efac' }}>유료로 수강 중</b>일 때 확정됩니다. (무료체험 중은 제외)</li>
+              <li>추천으로 가입한 가구가 <b style={{ color: '#86efac' }}>유료로 수강 중</b>일 때 확정됩니다. (무료체험 중은 제외)</li>
               <li>이번 달 기준 유효 추천 수를 <b style={{ color: '#67e8f9' }}>다음 달 수강료</b>에 반영합니다.</li>
-              <li>학부모 추천 링크와 자녀의 크루 초대가 한 가구 실적으로 합산됩니다.</li>
+              <li>학부모 추천 링크와 자녀의 크루 초대가 한 가구의 추천 혜택으로 합산됩니다.</li>
               <li>3가구 이상 추천 시에도 할인은 최대 100%(무료)까지만 적용됩니다.</li>
+              <li>할인은 위에 표시된 우리 가족의 기본 수강료를 기준으로 계산됩니다.</li>
             </ul>
-
-            <Link to="/referral" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 14, fontSize: 13, fontWeight: 700, color: '#67e8f9', textDecoration: 'none' }}>
-              전체 안내 보기 →
-            </Link>
           </div>
         )}
       </div>

@@ -24,6 +24,13 @@ function isMonthKey(value) {
   return /^\d{4}-\d{2}$/.test(String(value || ""));
 }
 
+function addDaysToIsoDate(value, days) {
+  if (!isIsoDate(value)) return "";
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + Number(days || 0));
+  return date.toISOString().slice(0, 10);
+}
+
 function kstDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -118,8 +125,8 @@ function _buildTuitionNoticeTextLegacy({ parentName, monthKey, start, end, baseF
     TUITION_ACCOUNT_TEXT,
     "",
     "추천 혜택",
-    "안내에 따라 안내드린 유료 수강 친구 1가구 20% · 2가구 50% · 3가구 이상 100% 할인",
-    "1달 무료체험 추천링트",
+    "추천으로 가입한 가구가 유료 수강 중이면 1가구 20% · 2가구 50% · 3가구 이상 100% 할인",
+    "4주 무료체험 추천 링크",
     referralUrl,
     "",
     "감사합니다.",
@@ -144,8 +151,8 @@ function buildTuitionNoticeText({ parentName, monthKey, start, end, baseFee, dis
     CORRECT_TUITION_ACCOUNT_TEXT,
     "",
     "추천 혜택",
-    "추천한 친구가 유료 수가 중이면 1가구 20% · 2가구 50% · 3가구 이상 100% 할인",
-    "1달 무료체험 추천 링트",
+    "추천으로 가입한 가구가 유료 수강 중이면 1가구 20% · 2가구 50% · 3가구 이상 100% 할인",
+    "4주 무료체험 추천 링크",
     referralUrl,
     "",
     "감사합니다.",
@@ -201,11 +208,7 @@ function enrollmentActiveForMonth(enrollment, monthKey) {
   return true;
 }
 
-async function getActiveReferralFamilies(parentUid, monthKey) {
-  const db = admin.firestore();
-  const referralSnap = await db.collection("referrals").where("referrerParentUid", "==", parentUid).get();
-  const referrals = referralSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
-    .filter((row) => row.status !== "cancelled" && row.status !== "rejected");
+function groupReferralsByFamily(referrals, parentUid) {
   const groups = new Map();
   referrals.forEach((referral) => {
     const key = referral.referredParentUid || (referral.referredStudentUid ? `student:${referral.referredStudentUid}` : "");
@@ -213,23 +216,60 @@ async function getActiveReferralFamilies(parentUid, monthKey) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(referral);
   });
+  return groups;
+}
 
-  const qualified = [];
-  for (const [key, rows] of groups.entries()) {
-    let enrollmentSnap;
+async function loadReferralFamilyEnrollments(groups) {
+  const db = admin.firestore();
+  const familyEnrollments = await Promise.all([...groups.keys()].map(async (key) => {
     if (key.startsWith("student:")) {
       const studentUid = key.slice("student:".length);
       const snap = await db.collection("studentEnrollments").doc(studentUid).get();
-      enrollmentSnap = snap.exists ? [snap.data()] : [];
-    } else {
-      const snap = await db.collection("studentEnrollments").where("parentUid", "==", key).get();
-      enrollmentSnap = snap.docs.map((docSnap) => docSnap.data());
+      return [key, snap.exists ? [snap.data()] : []];
     }
+    const snap = await db.collection("studentEnrollments").where("parentUid", "==", key).get();
+    return [key, snap.docs.map((docSnap) => docSnap.data())];
+  }));
+  return new Map(familyEnrollments);
+}
+
+function qualifiedReferralFamilies(groups, enrollmentByFamily, monthKey) {
+  const qualified = [];
+  for (const [key, rows] of groups.entries()) {
+    const enrollmentSnap = enrollmentByFamily.get(key) || [];
     if (enrollmentSnap.some((row) => enrollmentActiveForMonth(row, monthKey))) {
       qualified.push({ familyKey: key, referralIds: rows.map((row) => row.id) });
     }
   }
-  return { referrals, qualified };
+  return qualified;
+}
+
+async function getActiveReferralFamilies(parentUid, monthKey) {
+  const referralSnap = await admin.firestore().collection("referrals").where("referrerParentUid", "==", parentUid).get();
+  const referrals = referralSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+    .filter((row) => row.status !== "cancelled" && row.status !== "rejected");
+  const groups = groupReferralsByFamily(referrals, parentUid);
+  const enrollmentByFamily = await loadReferralFamilyEnrollments(groups);
+  return { referrals, qualified: qualifiedReferralFamilies(groups, enrollmentByFamily, monthKey) };
+}
+
+function billingSnapshotFromData(account, referrals, groups, enrollmentByFamily, monthKey) {
+  const baseFee = scheduledFee(account, monthKey);
+  const qualified = qualifiedReferralFamilies(groups, enrollmentByFamily, monthKey);
+  const activeReferralCount = qualified.length;
+  const discountRate = referralRate(activeReferralCount);
+  const discountAmount = Math.round(baseFee * discountRate);
+  return {
+    monthKey,
+    account,
+    baseFee,
+    activeReferralCount,
+    discountRate,
+    discountAmount,
+    finalFee: Math.max(0, baseFee - discountAmount),
+    referrals,
+    qualifiedReferralIds: qualified.flatMap((row) => row.referralIds),
+  };
 }
 
 async function getFamilyBillingSnapshot(parentUid, monthKey) {
@@ -368,25 +408,36 @@ async function buildDashboard(parentUid) {
   }
   const parentData = parentSnap.data() || {};
   const childUids = Array.isArray(parentData.childrenUids) ? parentData.childrenUids : [];
-  const childDocs = await Promise.all(childUids.map((uid) => db.collection("users").doc(uid).get()));
-  const enrollmentDocs = await Promise.all(childUids.map((uid) => db.collection("studentEnrollments").doc(uid).get()));
+  const currentMonth = currentMonthKey();
+  const nextMonth = addMonths(currentMonth, 1);
+  const [childDocs, enrollmentDocs, accountSnap, referralsSnap, statementsSnap, invite] = await Promise.all([
+    Promise.all(childUids.map((uid) => db.collection("users").doc(uid).get())),
+    Promise.all(childUids.map((uid) => db.collection("studentEnrollments").doc(uid).get())),
+    db.collection("familyBillingAccounts").doc(parentUid).get(),
+    db.collection("referrals").where("referrerParentUid", "==", parentUid).get(),
+    db.collection("familyBillingStatements").where("parentUid", "==", parentUid).get(),
+    (async () => {
+      const inviteSnap = await db.collection("referralInvites").doc(`parent_${parentUid}`).get();
+      const existingToken = inviteSnap.data()?.shareToken || "";
+      if (inviteSnap.exists && inviteSnap.data()?.active !== false && existingToken) return { token: existingToken };
+      return ensureParentReferralInvite(parentUid, parentData);
+    })(),
+  ]);
   const children = childDocs.map((docSnap, index) => ({
     uid: childUids[index],
     name: docSnap.exists ? (docSnap.data()?.studentName || docSnap.data()?.name || "학생") : "학생",
     enrollment: enrollmentDocs[index].exists ? enrollmentDocs[index].data() : { status: "trial" },
   }));
-  const currentMonth = currentMonthKey();
-  const nextMonth = addMonths(currentMonth, 1);
-  const [current, next, referralsSnap, statementsSnap] = await Promise.all([
-    getFamilyBillingSnapshot(parentUid, currentMonth),
-    getFamilyBillingSnapshot(parentUid, nextMonth),
-    db.collection("referrals").where("referrerParentUid", "==", parentUid).get(),
-    db.collection("familyBillingStatements").where("parentUid", "==", parentUid).get(),
-  ]);
-  const referrals = referralsSnap.docs.map((docSnap) => {
-    const row = docSnap.data() || {};
+  const referralRows = referralsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  const eligibleReferrals = referralRows.filter((row) => row.status !== "cancelled" && row.status !== "rejected");
+  const referralGroups = groupReferralsByFamily(eligibleReferrals, parentUid);
+  const enrollmentByFamily = await loadReferralFamilyEnrollments(referralGroups);
+  const account = accountSnap.exists ? accountSnap.data() || {} : {};
+  const current = billingSnapshotFromData(account, eligibleReferrals, referralGroups, enrollmentByFamily, currentMonth);
+  const next = billingSnapshotFromData(account, eligibleReferrals, referralGroups, enrollmentByFamily, nextMonth);
+  const referrals = referralRows.map((row) => {
     return {
-      id: docSnap.id,
+      id: row.id,
       maskedName: maskName(row.referredStudentName || row.applicantStudentName),
       source: row.source || "legacy",
       referrerStudentUid: row.referrerStudentUid || "",
@@ -421,6 +472,7 @@ async function buildDashboard(parentUid) {
       finalFee: next.finalFee,
     },
     account: current.account,
+    inviteToken: invite.token || "",
     referrals,
     statements,
   };
@@ -437,12 +489,20 @@ const getOrCreateReferralInvite = regionalFunctions.https.onCall(async (data, co
   let inviterName = "";
 
   if (source === "parent_trial_link") {
-    const parentSnap = await db.collection("parents").doc(uid).get();
+    const inviteRef = db.collection("referralInvites").doc(`parent_${uid}`);
+    const [parentSnap, existingInvite] = await Promise.all([
+      db.collection("parents").doc(uid).get(),
+      inviteRef.get(),
+    ]);
     if (!parentSnap.exists || parentSnap.data()?.isDeleted) {
       throw new functions.https.HttpsError("permission-denied", "학부모 가구만 추천 링크를 만들 수 있습니다.");
     }
     parentUid = uid;
     inviterName = parentSnap.data()?.name || "학부모";
+    const existingToken = existingInvite.data()?.shareToken || "";
+    if (existingInvite.exists && existingInvite.data()?.active !== false && existingToken) {
+      return { success: true, token: existingToken, inviteId: `parent_${uid}`, source, crewId: null };
+    }
   } else {
     if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 정보가 피요합니다.");
     const [{ studentData, parentUid: linkedParentUid }, crewSnap] = await Promise.all([
@@ -496,10 +556,7 @@ const previewReferralInvite = regionalFunctions.https.onCall(async (data) => {
 
 const getParentReferralDashboard = regionalFunctions.https.onCall(async (_data, context) => {
   if (!context.auth?.uid) throw new functions.https.HttpsError("unauthenticated", "로그인해 주세요.");
-  const parentUid = context.auth.uid;
-  const parentSnap = await admin.firestore().collection("parents").doc(parentUid).get();
-  if (!parentSnap.exists || parentSnap.data()?.isDeleted) throw new functions.https.HttpsError("permission-denied", "학부모 가구만 열람할 수 있습니다.");
-  return buildDashboard(parentUid);
+  return buildDashboard(context.auth.uid);
 });
 
 const adminGetFamilyBillingDashboard = regionalFunctions.https.onCall(async (data, context) => {
@@ -607,7 +664,7 @@ const adminConfigureReferralApplication = regionalFunctions.https.onCall(async (
   const status = cleanText(data?.referralStatus, 40) || "trial_scheduled";
   const allowed = new Set(["applied", "trial_scheduled", "trial_active", "trial_ended", "paid_active", "cancelled", "rejected"]);
   const trialStartDate = cleanText(data?.trialStartDate, 10);
-  const trialEndDate = cleanText(data?.trialEndDate, 10);
+  const trialEndDate = cleanText(data?.trialEndDate, 10) || (trialStartDate ? addDaysToIsoDate(trialStartDate, 27) : "");
   const referredStudentUid = cleanText(data?.referredStudentUid, 160);
   const reason = cleanText(data?.reason, 500);
   if (!applicationId || !allowed.has(status)) throw new functions.https.HttpsError("invalid-argument", "신청서 정보를 확인해 주세요.");
@@ -932,5 +989,17 @@ module.exports = {
   adminBroadcastParentAnnouncement,
   resolveInvite,
   tokenHash,
-  __test: { referralRate, scheduledFee, enrollmentActiveForMonth, addMonths, monthBounds, buildTuitionNoticeText, normalizePhone, normalizeLmsText },
+  __test: {
+    referralRate,
+    scheduledFee,
+    enrollmentActiveForMonth,
+    addMonths,
+    monthBounds,
+    buildTuitionNoticeText,
+    normalizePhone,
+    normalizeLmsText,
+    groupReferralsByFamily,
+    billingSnapshotFromData,
+    addDaysToIsoDate,
+  },
 };
