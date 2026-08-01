@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { collection, doc, getDoc, getDocs, limit as limitDocs, orderBy, query, startAfter, Timestamp, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -237,6 +238,7 @@ export default function DirectMemoMenu() {
   const [recipientSearch, setRecipientSearch] = useState('');
   const [recipientFocused, setRecipientFocused] = useState(false);
   const menuRef = useRef(null);
+  const dropdownRef = useRef(null);
   const recipientInputRef = useRef(null);
   const protectedUntilRef = useRef(0);
 
@@ -247,7 +249,9 @@ export default function DirectMemoMenu() {
   useEffect(() => {
     function handleClickOutside(event) {
       if (Date.now() < protectedUntilRef.current) return;
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      const clickedMenu = menuRef.current?.contains(event.target);
+      const clickedDropdown = dropdownRef.current?.contains(event.target);
+      if (!clickedMenu && !clickedDropdown) {
         setIsOpen(false);
       }
     }
@@ -686,9 +690,10 @@ export default function DirectMemoMenu() {
         {unreadCount > 0 && <span className="direct-memo-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
-          className="direct-memo-dropdown glass"
+          ref={dropdownRef}
+          className="direct-memo-dropdown direct-memo-dropdown--portal glass"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
@@ -857,7 +862,8 @@ export default function DirectMemoMenu() {
               )}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
