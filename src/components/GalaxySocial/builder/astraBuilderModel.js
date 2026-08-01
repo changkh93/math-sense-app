@@ -5,7 +5,10 @@ export const ASTRA_BUILDER_POC_PLOT = Object.freeze({
   depth: 12,
   height: 10,
   cellSize: 0.34,
-  maxBlocks: 360,
+  // The grid itself is the only capacity boundary. A cell may contain one
+  // foundation underlay plus one building piece, so there is no arbitrary
+  // user-facing block quota.
+  maxBlocks: 12 * 12 * 10 * 2,
 })
 
 export const ASTRA_BUILDER_HISTORY_LIMIT = 30
@@ -92,6 +95,7 @@ export function normalizeAstraBuilderPlacementCell(
 const TYPE_MASK = 0xff
 const ROTATION_SHIFT = 8
 const ROTATION_MASK = 0x03
+const FOUNDATION_UNDERLAY_MASK = 1 << 10
 
 export function getAstraBuilderCellCount(plot = ASTRA_BUILDER_POC_PLOT) {
   return plot.width * plot.depth * plot.height
@@ -127,11 +131,14 @@ export function getAstraBuilderCellFromIndex(index, plot = ASTRA_BUILDER_POC_PLO
   return { x: layerIndex - z * plot.width, y, z }
 }
 
-export function encodeAstraBuilderCell(blockType, rotation = 0) {
+export function encodeAstraBuilderCell(blockType, rotation = 0, foundationUnderlay = false) {
   const normalizedType = Number(blockType) & TYPE_MASK
   if (!ASTRA_BUILDER_BLOCK_BY_ID.has(normalizedType)) return 0
   const normalizedRotation = Number(rotation) & ROTATION_MASK
-  return normalizedType | (normalizedRotation << ROTATION_SHIFT)
+  const underlay = foundationUnderlay && normalizedType !== 2
+    ? FOUNDATION_UNDERLAY_MASK
+    : 0
+  return normalizedType | (normalizedRotation << ROTATION_SHIFT) | underlay
 }
 
 export function decodeAstraBuilderCell(value) {
@@ -140,7 +147,13 @@ export function decodeAstraBuilderCell(value) {
     blockType: normalized & TYPE_MASK,
     rotation: (normalized >> ROTATION_SHIFT) & ROTATION_MASK,
     occupied: (normalized & TYPE_MASK) !== 0,
+    foundationUnderlay: (normalized & FOUNDATION_UNDERLAY_MASK) !== 0,
   }
+}
+
+function countAstraBuilderCellPieces(value) {
+  const decoded = decodeAstraBuilderCell(value)
+  return Number(decoded.occupied) + Number(decoded.foundationUnderlay)
 }
 
 export function isAstraBuilderWalkBlockingCell(value, cell) {
@@ -199,7 +212,7 @@ export function getAstraBuilderWalkBlockingCells(cells, plot = ASTRA_BUILDER_POC
 export function countAstraBuilderBlocks(cells) {
   let count = 0
   for (let index = 0; index < cells.length; index += 1) {
-    if ((cells[index] & TYPE_MASK) !== 0) count += 1
+    count += countAstraBuilderCellPieces(cells[index])
   }
   return count
 }
@@ -214,13 +227,31 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
 
   if (edit.tool === 'place') {
     if (getAstraBuilderPlacementIssue(cells, edit, plot)) return null
-    after = encodeAstraBuilderCell(edit.blockType, edit.rotation)
+    const nextBlockType = Number(edit.blockType)
+    if (decoded.blockType === 2 && nextBlockType !== 2) {
+      // Keep the thin foundation as a structural underlay and place the wall,
+      // panel, door, etc. in the same course so it starts flush at floor level.
+      after = encodeAstraBuilderCell(nextBlockType, edit.rotation, true)
+    } else if (
+      nextBlockType === 2
+      && decoded.occupied
+      && decoded.blockType !== 2
+      && !decoded.foundationUnderlay
+    ) {
+      after = encodeAstraBuilderCell(decoded.blockType, decoded.rotation, true)
+    } else {
+      after = encodeAstraBuilderCell(nextBlockType, edit.rotation)
+    }
   } else if (edit.tool === 'delete') {
     if (!decoded.occupied) return null
-    after = 0
+    after = decoded.foundationUnderlay ? encodeAstraBuilderCell(2) : 0
   } else if (edit.tool === 'rotate') {
     if (!decoded.occupied) return null
-    after = encodeAstraBuilderCell(decoded.blockType, decoded.rotation + 1)
+    after = encodeAstraBuilderCell(
+      decoded.blockType,
+      decoded.rotation + 1,
+      decoded.foundationUnderlay,
+    )
   } else {
     return null
   }
@@ -255,20 +286,35 @@ export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_
   const cell = edit.cell
   const index = getAstraBuilderCellIndex(cell, plot)
   if (index < 0) return 'out_of_bounds'
-  if (
-    decodeAstraBuilderCell(cells[index]).occupied
-    || getAstraBuilderWallPanelAnchorAtCell(cells, cell, plot)
-  ) return 'occupied'
   if (!ASTRA_BUILDER_BLOCK_BY_ID.has(Number(edit.blockType))) return 'invalid_block'
+  const candidateBlockType = Number(edit.blockType)
+  const existing = decodeAstraBuilderCell(cells[index])
+  const panelAnchor = getAstraBuilderWallPanelAnchorAtCell(cells, cell, plot)
+  const isExactPanelAnchor = panelAnchor
+    && panelAnchor.x === cell.x
+    && panelAnchor.y === cell.y
+    && panelAnchor.z === cell.z
+  const canShareWithFoundation = (
+    existing.blockType === 2 && candidateBlockType !== 2
+  ) || (
+    candidateBlockType === 2
+    && existing.occupied
+    && existing.blockType !== 2
+    && !existing.foundationUnderlay
+    && (!panelAnchor || isExactPanelAnchor)
+  )
+  if ((existing.occupied || panelAnchor) && !canShareWithFoundation) return 'occupied'
 
-  if (Number(edit.blockType) === ASTRA_BUILDER_WALL_PANEL_TYPE) {
+  if (candidateBlockType === ASTRA_BUILDER_WALL_PANEL_TYPE) {
     if (cell.y % ASTRA_BUILDER_STORY_HEIGHT_CELLS !== 0) return 'panel_not_story_base'
     for (let offset = 0; offset < ASTRA_BUILDER_STORY_HEIGHT_CELLS; offset += 1) {
       const occupiedCell = { ...cell, y: cell.y + offset }
       const occupiedIndex = getAstraBuilderCellIndex(occupiedCell, plot)
       if (occupiedIndex < 0) return 'panel_out_of_bounds'
+      const occupied = decodeAstraBuilderCell(cells[occupiedIndex])
+      const canUseFoundationBase = offset === 0 && occupied.blockType === 2
       if (
-        decodeAstraBuilderCell(cells[occupiedIndex]).occupied
+        (!canUseFoundationBase && occupied.occupied)
         || getAstraBuilderWallPanelAnchorAtCell(cells, occupiedCell, plot)
       ) return 'occupied'
     }
@@ -313,6 +359,15 @@ export function getAstraBuilderInstances(cells, plot = ASTRA_BUILDER_POC_PLOT) {
     if (!decoded.occupied || !instancesByType.has(decoded.blockType)) continue
     const cell = getAstraBuilderCellFromIndex(index, plot)
     if (!cell) continue
+    if (decoded.foundationUnderlay) {
+      instancesByType.get(2).push({
+        ...cell,
+        type: 2,
+        rotation: 0,
+        index,
+        underlay: true,
+      })
+    }
     const hiddenByDoorway = decoded.blockType !== 2
       && decoded.blockType !== 7
       && cell.y <= 2

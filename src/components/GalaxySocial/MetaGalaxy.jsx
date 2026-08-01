@@ -536,6 +536,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [builderActive, setBuilderActive] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
+  const [returning, setReturning] = useState(false)
   const [roverHistory, setRoverHistory] = useState({ entries: [], loaded: false, loading: false, hasMore: false, nextCursorOperationId: '' })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -560,6 +561,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const [missionPartnerUid, setMissionPartnerUid] = useState('')
   const [nowMs, setNowMs] = useState(Date.now())
   const noticeTimerRef = useRef(null)
+  const returningRef = useRef(false)
   const actionLockRef = useRef('')
   const arrivalCloseRef = useRef(null)
   const menuCloseRef = useRef(null)
@@ -766,6 +768,41 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   useEffect(() => () => window.clearTimeout(noticeTimerRef.current), [])
 
+  const requestReturn = useCallback(() => {
+    if (returningRef.current) return
+
+    returningRef.current = true
+    setReturning(true)
+
+    try {
+      const returnRequest = onBack?.()
+      if (!returnRequest || typeof returnRequest.then !== 'function') {
+        if (!onBack) {
+          returningRef.current = false
+          setReturning(false)
+        }
+        return
+      }
+
+      returnRequest.then((result) => {
+        // endSession returns null when an online request failed. Offline returns also finish
+        // locally, so this state update is harmless as MetaGalaxy is unmounted immediately.
+        if (result === null) {
+          returningRef.current = false
+          setReturning(false)
+        }
+      }).catch(() => {
+        returningRef.current = false
+        setReturning(false)
+        setError('귀환 신호를 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      })
+    } catch {
+      returningRef.current = false
+      setReturning(false)
+      setError('귀환 신호를 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    }
+  }, [onBack])
+
   useEffect(() => {
     const nextOverlay = overlayReady ? (objectDialogOpen ? 'object' : arrivalOpen ? 'arrival' : menu ? 'menu' : '') : ''
     const previousOverlay = activeOverlayRef.current
@@ -799,18 +836,26 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key !== 'Escape') return
+      if (event.key !== 'Escape' || event.repeat) return
+
+      // GalaxyWorld3D owns Escape while building. The same key must never close the builder
+      // and return from the game in one press.
+      if (builderActive) return
+
+      event.preventDefault()
       if (objectDialogOpen) {
         setObjectDialogOpen(false)
         setSelectedStructureId('')
       }
       else if (finaleOpen) setFinaleOpen(false)
       else if (arrivalOpen) setArrivalOpen(false)
+      else if (audioSettingsOpen) setAudioSettingsOpen(false)
       else if (menu) setMenu('')
+      else requestReturn()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [arrivalOpen, finaleOpen, menu, objectDialogOpen])
+  }, [arrivalOpen, audioSettingsOpen, builderActive, finaleOpen, menu, objectDialogOpen, requestReturn])
 
   const planet = home?.planet || {}
   const ownPlanet = home?.ownPlanet || {}
@@ -2144,6 +2189,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onOpenBuilderPlot={openBuilderPlot}
         onSaveBuilderState={saveBuilderState}
         onBuilderModeChange={setBuilderActive}
+        onExplorationExitRequest={requestReturn}
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}
@@ -2160,6 +2206,14 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
             <span>{currentTheme.label}{!isOwner && <b className="frontier-visitor-chip">방문 중</b>}</span>
           </div>
         </section>
+        <button type="button" className={`frontier-objective-card${dailyEventPending && todayObjective.id === 'daily-event' ? ' daily-event' : ''}`} onClick={handleObjectiveAction}>
+          <span className="frontier-objective-icon">{createElement(todayObjective.id === 'daily-event' ? DailyEventIcon : Compass, { size: 19, 'aria-hidden': true })}</span>
+          <span className="frontier-objective-copy">
+            <small>{todayObjective.eyebrow}</small>
+            <strong>{todayObjective.title}</strong>
+          </span>
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
         <section className="frontier-economy-hud frontier-unified-hud">
           <div className="frontier-ore-readout" title="학습을 통해서만 얻는 메타 광석">
             <Gem size={17} aria-hidden="true" />
@@ -2202,24 +2256,17 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           <button
             type="button"
             className="frontier-hud-exit-btn"
-            onClick={onBack}
-            title="메타센스로 귀환"
-            aria-label="메타센스로 귀환"
+            onClick={requestReturn}
+            disabled={returning}
+            aria-busy={returning}
+            title={returning ? '탐험 기록을 저장하고 귀환 중' : '메타센스로 귀환'}
+            aria-label={returning ? '탐험 기록을 저장하고 귀환 중' : '메타센스로 귀환'}
           >
             <LogOut size={15} aria-hidden="true" />
-            <span>귀환</span>
+            <span>{returning ? '귀환 중…' : '귀환'}</span>
           </button>
         </section>
       </div>
-
-      <button type="button" className={`frontier-objective-card${dailyEventPending && todayObjective.id === 'daily-event' ? ' daily-event' : ''}`} onClick={handleObjectiveAction}>
-        <span className="frontier-objective-icon">{createElement(todayObjective.id === 'daily-event' ? DailyEventIcon : Compass, { size: 19, 'aria-hidden': true })}</span>
-        <span className="frontier-objective-copy">
-          <small>{todayObjective.eyebrow}</small>
-          <strong>{todayObjective.title}</strong>
-        </span>
-        <ChevronRight size={18} aria-hidden="true" />
-      </button>
 
       <nav className="frontier-command-dock" aria-label="프론티어 명령 독">
         <button type="button" className={menu === 'rover' ? 'active' : ''} onClick={() => openGameMenu('rover')} aria-label={roverStatus === 'ready' ? '로버 귀환 상자 열기' : roverStatus === 'active' ? `진행 중인 로버 원정 확인 · ${roverRemainingLabel}` : '로버 원정 관제 열기'}>
@@ -2243,6 +2290,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       </nav>
 
       {busy && <div className="frontier-network-busy"><i /> 은하 네트워크 동기화</div>}
+      {returning && (
+        <div className="frontier-returning-status" role="status" aria-live="assertive">
+          <i aria-hidden="true" />
+          <span>탐험 기록을 저장하고 귀환 중…</span>
+        </div>
+      )}
 
       <AnimatePresence>
         {objectDialogOpen && selectedObject && (

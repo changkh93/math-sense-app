@@ -135,6 +135,9 @@ export function getAstraBuilderWalkSurfaceHeight({
         const cell = { x: cellX, y, z: cellZ }
         const decoded = decodeAstraBuilderCell(cells[getAstraBuilderCellIndex(cell, plot)] || 0)
         if (!decoded.occupied) continue
+        if (decoded.foundationUnderlay) {
+          candidates.push((cell.y + 0.24) * plot.cellSize)
+        }
         let supportX = x
         let supportZ = z
         if (decoded.blockType === 5) {
@@ -220,6 +223,18 @@ export function createAstraBuilderCollisionBodies(
     if (!decoded.occupied) continue
     const cell = getAstraBuilderCellFromIndex(index, plot)
     if (!cell) continue
+    if (decoded.foundationUnderlay) {
+      const foundationBody = createBody(
+        cell,
+        { blockType: 2, rotation: 0 },
+        plotBaseY,
+        plot,
+      )
+      if (foundationBody) {
+        foundationBody.id = `${foundationBody.id}:foundation`
+        bodies.push(foundationBody)
+      }
+    }
     if (
       decoded.blockType !== 2
       && decoded.blockType !== 7

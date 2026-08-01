@@ -49,44 +49,37 @@ function builderReducer(state, action) {
   }
 
   if (action.type === 'edit') {
-    if (action.edit?.tool === 'place' && state.blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks) {
-      return state
-    }
     const result = applyAstraBuilderEdit(state.cells, action.edit)
     if (!result) return state
-    const beforeOccupied = result.patch.before !== 0
-    const afterOccupied = result.patch.after !== 0
     return {
       cells: result.cells,
       undo: [...state.undo, result.patch].slice(-ASTRA_BUILDER_HISTORY_LIMIT),
       redo: [],
-      blockCount: state.blockCount + Number(afterOccupied) - Number(beforeOccupied),
+      blockCount: countAstraBuilderBlocks(result.cells),
       revision: state.revision + 1,
     }
   }
 
   if (action.type === 'undo' && state.undo.length) {
     const patch = state.undo[state.undo.length - 1]
-    const beforeOccupied = patch.before !== 0
-    const afterOccupied = patch.after !== 0
+    const cells = applyAstraBuilderPatch(state.cells, patch, 'undo')
     return {
-      cells: applyAstraBuilderPatch(state.cells, patch, 'undo'),
+      cells,
       undo: state.undo.slice(0, -1),
       redo: [...state.redo, patch].slice(-ASTRA_BUILDER_HISTORY_LIMIT),
-      blockCount: state.blockCount + Number(beforeOccupied) - Number(afterOccupied),
+      blockCount: countAstraBuilderBlocks(cells),
       revision: state.revision + 1,
     }
   }
 
   if (action.type === 'redo' && state.redo.length) {
     const patch = state.redo[state.redo.length - 1]
-    const beforeOccupied = patch.before !== 0
-    const afterOccupied = patch.after !== 0
+    const cells = applyAstraBuilderPatch(state.cells, patch, 'redo')
     return {
-      cells: applyAstraBuilderPatch(state.cells, patch, 'redo'),
+      cells,
       undo: [...state.undo, patch].slice(-ASTRA_BUILDER_HISTORY_LIMIT),
       redo: state.redo.slice(0, -1),
-      blockCount: state.blockCount + Number(afterOccupied) - Number(beforeOccupied),
+      blockCount: countAstraBuilderBlocks(cells),
       revision: state.revision + 1,
     }
   }
@@ -650,10 +643,6 @@ export default function useAstraBuilderPoc(
   const edit = useCallback((nextEdit) => {
     if (conflictRef.current) return false
     const current = stateRef.current
-    if (
-      nextEdit?.tool === 'place'
-      && current.blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks
-    ) return false
     if (!applyAstraBuilderEdit(current.cells, nextEdit)) return false
     dispatch({ type: 'edit', edit: nextEdit })
     return true

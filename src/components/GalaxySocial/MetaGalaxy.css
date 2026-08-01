@@ -114,6 +114,7 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
 .frontier-command-dock,
 .frontier-learning-route,
 .frontier-network-busy,
+.frontier-returning-status,
 .frontier-game-toast,
 .frontier-world-name,
 .frontier-control-hint,
@@ -135,13 +136,27 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   top: max(1rem, env(safe-area-inset-top));
   left: 1rem;
   right: 1rem;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(236px, 310px) minmax(280px, 1fr) auto;
   align-items: flex-start;
   gap: 1rem;
   pointer-events: none;
 }
 .frontier-top-hud > * { pointer-events: auto; }
+.frontier-top-hud > .frontier-objective-card {
+  position: static;
+  align-self: start;
+  justify-self: center;
+  width: min(360px, 100%);
+  min-width: 0;
+  transform: none;
+}
+.frontier-top-hud > .frontier-objective-card:hover { transform: translateY(-2px); }
+.frontier-top-hud > .frontier-economy-hud {
+  min-width: 0;
+  max-width: 100%;
+  justify-self: end;
+}
 
 .frontier-immersive.builder-active .frontier-top-hud,
 .frontier-immersive.builder-active .frontier-objective-card,
@@ -262,6 +277,11 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   background: rgba(255, 80, 100, .32);
   border-color: rgba(255, 121, 139, .55);
   transform: translateY(-1px);
+}
+.frontier-hud-exit-btn:disabled {
+  opacity: .7;
+  cursor: wait;
+  transform: none;
 }
 .frontier-hud-exit-btn.audio-settings-btn {
   width: 34px;
@@ -638,6 +658,32 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   width: 9px;
   height: 9px;
   border: 2px solid rgba(108, 231, 255, .2);
+  border-top-color: var(--frontier-cyan);
+  border-radius: 50%;
+  animation: frontier-spin .8s linear infinite;
+}
+.frontier-returning-status {
+  position: fixed;
+  z-index: 3200;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .72rem 1rem;
+  border-radius: 999px;
+  color: #e8fbff;
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  pointer-events: none;
+}
+.frontier-returning-status i {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(108, 231, 255, .22);
   border-top-color: var(--frontier-cyan);
   border-radius: 50%;
   animation: frontier-spin .8s linear infinite;
@@ -1707,7 +1753,7 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
 @keyframes frontier-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 1180px) {
-  .frontier-objective-card { top: 5.65rem; width: min(430px, calc(100vw - 2rem)); }
+  .frontier-top-hud > .frontier-objective-card { top: 5.65rem; width: min(430px, calc(100vw - 2rem)); }
   .frontier-game-toast { top: 10.8rem; }
   .frontier-build-layout { grid-template-columns: minmax(290px, .8fr) minmax(370px, 1.2fr); }
 }
@@ -1778,7 +1824,7 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   .frontier-object-position-fields { grid-template-columns: 1fr; }
   .frontier-object-image-control { grid-template-columns: 1fr; }
   .frontier-object-image-control > button { grid-column: 1; justify-self: start; }
-  .frontier-top-hud { top: max(.65rem, env(safe-area-inset-top)); left: .65rem; right: .65rem; gap: .45rem; }
+  .frontier-top-hud { top: max(.65rem, env(safe-area-inset-top)); left: .65rem; right: .65rem; display: flex; justify-content: space-between; gap: .45rem; }
   .frontier-planet-hud { min-width: 0; max-width: calc(52vw - .55rem); padding: .44rem .5rem; border-radius: 14px; }
   .frontier-hud-icon { width: 34px; height: 34px; border-radius: 11px; }
   .frontier-planet-hud small { font-size: .48rem; }
@@ -1790,7 +1836,8 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
   .frontier-ore-readout strong { font-size: .7rem; }
   .galaxy-material-strip.compact { display: grid; grid-template-columns: repeat(2, 1fr); gap: .15rem; }
   .galaxy-material-strip.compact > span { min-width: 37px; min-height: 25px; padding: .24rem .32rem; font-size: .56rem; }
-  .frontier-objective-card { top: 4.65rem; width: calc(100vw - 1.3rem); min-width: 0; min-height: 46px; grid-template-columns: 30px minmax(0, 1fr) 16px; padding: .38rem .5rem; border-radius: 14px; }
+  .frontier-top-hud > .frontier-objective-card { position: fixed; top: 4.65rem; left: 50%; width: calc(100vw - 1.3rem); min-width: 0; min-height: 46px; grid-template-columns: 30px minmax(0, 1fr) 16px; padding: .38rem .5rem; transform: translateX(-50%); border-radius: 14px; }
+  .frontier-top-hud > .frontier-objective-card:hover { transform: translateX(-50%) translateY(-2px); }
   .frontier-objective-icon { width: 32px; height: 32px; border-radius: 10px; }
   .frontier-objective-copy small { display: none; }
   .frontier-objective-copy strong { margin-top: 0; font-size: .62rem; }

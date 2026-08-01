@@ -63,16 +63,26 @@ function testCellValidation() {
   assert.equal(validateAstraBuilderStatePayload(payloadFromBuffer(invalidType)).kind, 'invalid_block_type');
 
   const invalidBits = Buffer.alloc(BYTE_LENGTH);
-  invalidBits.writeUInt16LE(0x400, 0);
+  invalidBits.writeUInt16LE(0x800, 0);
   assert.equal(validateAstraBuilderStatePayload(payloadFromBuffer(invalidBits)).kind, 'invalid_cell_bits');
 
   const invalidEmpty = Buffer.alloc(BYTE_LENGTH);
   invalidEmpty.writeUInt16LE(1 << 8, 0);
   assert.equal(validateAstraBuilderStatePayload(payloadFromBuffer(invalidEmpty)).kind, 'invalid_empty_cell');
 
-  const tooMany = Buffer.alloc(BYTE_LENGTH);
-  for (let index = 0; index < 361; index += 1) tooMany.writeUInt16LE(1, index * 2);
-  assert.equal(validateAstraBuilderStatePayload(payloadFromBuffer(tooMany)).kind, 'too_many_blocks');
+  const invalidUnderlay = Buffer.alloc(BYTE_LENGTH);
+  invalidUnderlay.writeUInt16LE(2 | 0x400, 0);
+  assert.equal(validateAstraBuilderStatePayload(payloadFromBuffer(invalidUnderlay)).kind, 'invalid_foundation_underlay');
+
+  const fullGrid = Buffer.alloc(BYTE_LENGTH);
+  for (let index = 0; index < BYTE_LENGTH / 2; index += 1) {
+    fullGrid.writeUInt16LE(1 | 0x400, index * 2);
+  }
+  const fullGridResult = validateAstraBuilderStatePayload(payloadFromBuffer(fullGrid, {
+    blockCount: (BYTE_LENGTH / 2) * 2,
+  }));
+  assert.equal(fullGridResult.kind, 'valid');
+  assert.equal(fullGridResult.blockCount, 2880);
 }
 
 function testStoredByteNormalization() {

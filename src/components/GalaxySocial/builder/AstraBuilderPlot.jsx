@@ -233,19 +233,11 @@ function buildBlockEdgesGeometry(cells) {
   const segments = []
   const object = new THREE.Object3D()
   const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells)
-  for (let index = 0; index < cells.length; index += 1) {
-    const decoded = decodeAstraBuilderCell(cells[index])
-    if (!decoded.occupied || decoded.blockType === 7) continue
-    const cell = getAstraBuilderCellFromIndex(index)
-    if (!cell) continue
-    if (
-      decoded.blockType !== 2
-      && cell.y <= 2
-      && doorwayColumns.has(`${cell.x}:${cell.z}`)
-    ) continue
-    const { position, scale } = getBlockTransform(decoded.blockType, cell)
+  const appendBlockEdges = (blockType, rotation, cell) => {
+    if (blockType === 7) return
+    const { position, scale } = getBlockTransform(blockType, cell)
     object.position.set(position[0], position[1], position[2])
-    object.rotation.set(0, (decoded.rotation || 0) * Math.PI * 0.5, 0)
+    object.rotation.set(0, (rotation || 0) * Math.PI * 0.5, 0)
     object.scale.set(scale.x * cellSize, scale.y * cellSize, scale.z * cellSize)
     object.updateMatrix()
     BOX_EDGE_PAIRS.forEach(([a, b]) => {
@@ -253,6 +245,19 @@ function buildBlockEdgesGeometry(cells) {
       const vb = new THREE.Vector3(b[0], b[1], b[2]).applyMatrix4(object.matrix)
       segments.push(va.x, va.y, va.z, vb.x, vb.y, vb.z)
     })
+  }
+  for (let index = 0; index < cells.length; index += 1) {
+    const decoded = decodeAstraBuilderCell(cells[index])
+    if (!decoded.occupied) continue
+    const cell = getAstraBuilderCellFromIndex(index)
+    if (!cell) continue
+    if (decoded.foundationUnderlay) appendBlockEdges(2, 0, cell)
+    if (
+      decoded.blockType !== 2
+      && cell.y <= 2
+      && doorwayColumns.has(`${cell.x}:${cell.z}`)
+    ) continue
+    appendBlockEdges(decoded.blockType, decoded.rotation, cell)
   }
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(segments, 3))
@@ -330,7 +335,6 @@ function AstraBuilderCamera({ active, inputMode, paused, baseY, useCharacterCame
 export default function AstraBuilderPlot({
   baseY,
   cells,
-  blockCount,
   active,
   paused,
   inputMode,
@@ -362,7 +366,7 @@ export default function AstraBuilderPlot({
     : null
   const hoverValid = Boolean(hoveredCell) && !hoverBlockedByPlayer && !hoverLayerMismatch && (
     tool === 'place'
-      ? !hoverPlacementIssue && blockCount < ASTRA_BUILDER_POC_PLOT.maxBlocks
+      ? !hoverPlacementIssue
       : hoverOccupied
   )
   const hoverPosition = hoveredCell ? getAstraBuilderWorldPosition(hoveredCell) : null
@@ -411,7 +415,6 @@ export default function AstraBuilderPlot({
       onInvalidEdit?.({ reason: 'layer_mismatch', cell, activeLayer, tool })
       return
     }
-    if (tool === 'place' && blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks) return
     if (tool === 'place' && getAstraBuilderPlacementIssue(cells, {
       tool: 'place',
       cell,

@@ -58,6 +58,10 @@ const createMissionOperationId = () => globalThis.crypto?.randomUUID?.()
   || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 const PLAYER_WALK_SPEED = 3.4
 const PLAYER_SPRINT_MULTIPLIER = 1.8
+// A builder cell is only .34 world units wide. Slow the default walk enough
+// to stop on a stair or beside a single cell, while keeping Shift useful for
+// crossing a larger build quickly.
+const ASTRA_BUILDER_WALK_SPEED = 1.65
 const PLAYER_TURN_SPEED = Math.PI * 2.4
 const PLAYER_MOVE_START_ANGLE = THREE.MathUtils.degToRad(25)
 const PLAYER_MOVE_FULL_ANGLE = THREE.MathUtils.degToRad(6)
@@ -71,7 +75,11 @@ const STATIC_BLOCKER_COLLISION_RADIUS = .78
 const CAMERA_TARGET_HEIGHT = .44
 const FIRST_PERSON_DEFAULT_FOV = 58
 const PLAYER_JUMP_VELOCITY = 2.55
+const PLAYER_MOVING_JUMP_VELOCITY = 3.0
+const PLAYER_SPRINT_JUMP_VELOCITY = 3.3
 const PLAYER_JUMP_GRAVITY = 7.2
+const PLAYER_AIRBORNE_MOVE_MULTIPLIER = 1.1
+const PLAYER_SPRINT_AIRBORNE_MOVE_MULTIPLIER = 1.18
 const FIRST_PERSON_CAMERA_NEAR = .025
 const DEFAULT_CAMERA_NEAR = .1
 const CAMERA_MIN_POLAR = .24
@@ -81,8 +89,11 @@ const THIRD_PERSON_MAX_DISTANCE = 58
 const FIRST_PERSON_MIN_FOV = 14
 const FIRST_PERSON_MAX_FOV = 118
 const BUILDER_FIRST_PERSON_MAX_FOV = 135
-const MOUSE_LOOK_YAW_SENSITIVITY = .0026
-const MOUSE_LOOK_PITCH_SENSITIVITY = .0021
+// Browser pointer-lock deltas feel faster than native raw-input counts at the
+// same numeric multiplier. This calibrated value targets Minecraft's default
+// medium sensitivity while preserving one-to-one horizontal/vertical control.
+const MOUSE_LOOK_YAW_SENSITIVITY = .00165
+const MOUSE_LOOK_PITCH_SENSITIVITY = .00165
 const MOUSE_LOOK_MAX_FRAME_DELTA = 420
 const MOUSE_LOOK_REENTRY_GAP_MS = 180
 const MOUSE_LOOK_REENTRY_DISTANCE = 160
@@ -3417,7 +3428,7 @@ function RemoteAstronaut({ player, showName, walkHeightAt = walkSurfaceHeight })
   )
 }
 
-function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderOverview = false, builderBuildMode = false, canUseCharacterScale = null, onScaleBlocked = null, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest', walkHeightAt = walkSurfaceHeight, playerGroupRef }) {
+function Astronaut({ inputRef, interactables, blockers, structureColliders = [], pickups, paused, freeLookEnabled, builderOverview = false, builderBuildMode = false, canUseCharacterScale = null, onScaleBlocked = null, onExplorationExitRequest = null, onNearbyChange, onCollect, onPositionChange, displayName, showName, speech, isFirstPerson, theme = 'forest', walkHeightAt = walkSurfaceHeight, playerGroupRef }) {
   const { gl, camera } = useThree()
   const group = useRef()
   // 외부(상위 월드)에서 플레이어 위치를 ref로 읽을 수 있도록 노출. 매 프레임 갱신.
@@ -3442,6 +3453,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   const stepDistance = useRef(0)
   const collisionLatched = useRef(false)
   const collisionClearDuration = useRef(0)
+  const intentionalPointerUnlock = useRef(false)
   const hoverLook = useRef({
     pendingX: 0,
     pendingY: 0,
@@ -3516,6 +3528,25 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     const down = (event) => {
       if (isTextInput(event.target)) return
+      if (event.code === 'KeyT') {
+        // Pointer capture is an exploration-only control. Builder modes always
+        // keep the cursor visible for precise placement, deletion and orbiting.
+        if (builderBuildMode || builderOverview) return
+        event.preventDefault()
+        if (event.repeat || paused) return
+        if (document.pointerLockElement === gl.domElement) {
+          intentionalPointerUnlock.current = true
+          document.exitPointerLock?.()
+        } else if (typeof gl.domElement.requestPointerLock === 'function') {
+          try {
+            const lockRequest = gl.domElement.requestPointerLock()
+            lockRequest?.catch?.(() => {})
+          } catch {
+            // Ordinary cursor look remains available when capture is denied.
+          }
+        }
+        return
+      }
       const isScaleUp = event.code === 'Equal' || event.code === 'NumpadAdd' || event.key === '+'
       const isScaleDown = event.code === 'Minus' || event.code === 'NumpadSubtract' || event.key === '-'
       if (!event.ctrlKey && !event.metaKey && (isScaleUp || isScaleDown)) {
@@ -3554,6 +3585,25 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       if (dir) {
         event.preventDefault()
         keys.current.add(dir)
+        if (
+          !event.repeat
+          && !builderOverview
+          && !builderBuildMode
+          && document.pointerLockElement !== gl.domElement
+          && typeof gl.domElement.requestPointerLock === 'function'
+        ) {
+          // A keyboard movement event is a user gesture in supporting browsers.
+          // Pointer lock removes the window-edge limit found in normal cursor
+          // tracking, which is essential for continuous turning in either
+          // character camera mode.
+          try {
+            const lockRequest = gl.domElement.requestPointerLock()
+            lockRequest?.catch?.(() => {})
+          } catch {
+            // The canvas click handler offers the same capture path when a
+            // browser does not grant pointer lock from a keyboard gesture.
+          }
+        }
       }
     }
     const up = (event) => {
@@ -3561,7 +3611,9 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         keys.current.delete('SPRINT')
       }
       const dir = mapKey(event)
-      if (dir) keys.current.delete(dir)
+      if (dir) {
+        keys.current.delete(dir)
+      }
     }
     const visibility = () => { if (document.hidden) resetInput() }
     window.addEventListener('keydown', down)
@@ -3574,7 +3626,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       window.removeEventListener('blur', resetInput)
       document.removeEventListener('visibilitychange', visibility)
     }
-  }, [builderBuildMode, builderOverview, canUseCharacterScale, inputRef, onScaleBlocked, paused])
+  }, [builderBuildMode, builderOverview, canUseCharacterScale, gl, inputRef, onScaleBlocked, paused])
 
   const firstPersonFov = useRef(FIRST_PERSON_DEFAULT_FOV)
 
@@ -3586,6 +3638,14 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   useEffect(() => {
     firstPersonYawOffset.current = 0
   }, [isFirstPerson])
+
+  useEffect(() => {
+    if (!paused && !builderOverview && !builderBuildMode) return
+    if (document.pointerLockElement === gl.domElement) {
+      intentionalPointerUnlock.current = true
+      document.exitPointerLock?.()
+    }
+  }, [builderBuildMode, builderOverview, gl, paused])
 
   useEffect(() => {
     const wasFirstPerson = previousCameraMode.current
@@ -3614,13 +3674,13 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         maxDistance: THIRD_PERSON_MAX_DISTANCE,
       })
       const transition = thirdPersonReturn.current
-      transition.active = true
-      transition.elapsed = 0
-      transition.fromPosition.copy(camera.position)
-      transition.fromTarget.copy(camera.position).addScaledVector(lookDirection, savedThirdPersonDistance.current)
+      transition.active = false
       transition.toPosition.set(...pose.position)
       transition.toTarget.set(...pose.target)
       thirdPersonZoomDistance.current = pose.distance
+      camera.position.copy(transition.toPosition)
+      controls.current?.target.copy(transition.toTarget)
+      camera.lookAt(transition.toTarget)
       controlsReady.current = true
     }
     previousCameraMode.current = isFirstPerson
@@ -3679,15 +3739,29 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     const isBuilderViewDrag = (event) => !builderBuildMode || isAstraBuilderViewDrag(event.buttons)
     const updateHoverLook = (event) => {
       const look = hoverLook.current
+      const pointerLocked = document.pointerLockElement === canvas
       if (
         paused
         || !freeLookEnabled
         || reducedMotion.matches
         || look.orbiting
-        || !isBuilderViewDrag(event)
-        || (event.target !== canvas && !event.target?.classList?.contains('webgl-canvas'))
+        || (!pointerLocked && !isBuilderViewDrag(event))
+        || (!pointerLocked && event.target !== canvas && !event.target?.classList?.contains('webgl-canvas'))
       ) {
         resetFreeLook()
+        return
+      }
+      if (pointerLocked) {
+        look.pendingX += THREE.MathUtils.clamp(
+          Number(event.movementX || 0),
+          -MOUSE_LOOK_MAX_FRAME_DELTA,
+          MOUSE_LOOK_MAX_FRAME_DELTA,
+        )
+        look.pendingY += THREE.MathUtils.clamp(
+          Number(event.movementY || 0),
+          -MOUSE_LOOK_MAX_FRAME_DELTA,
+          MOUSE_LOOK_MAX_FRAME_DELTA,
+        )
         return
       }
       if (look.lastX !== null && look.lastY !== null) {
@@ -3716,6 +3790,21 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     }
     const startViewDrag = (event) => {
       resetFreeLook()
+      if (
+        isFirstPerson
+        && !builderBuildMode
+        && !builderOverview
+        && !paused
+        && typeof canvas.requestPointerLock === 'function'
+        && document.pointerLockElement !== canvas
+      ) {
+        try {
+          const lockRequest = canvas.requestPointerLock()
+          lockRequest?.catch?.(() => {})
+        } catch {
+          // Keep ordinary cursor look available if pointer lock is unavailable.
+        }
+      }
       if (!builderBuildMode || !isAstraBuilderViewPointer(event)) return
       hoverLook.current.lastX = event.clientX
       hoverLook.current.lastY = event.clientY
@@ -3733,6 +3822,33 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       if (builderBuildMode) event.preventDefault()
     }
     const resetWhenHidden = () => { if (document.hidden) stopViewDrag() }
+    let wasPointerLocked = document.pointerLockElement === canvas
+    const resetAfterPointerLockChange = () => {
+      const pointerLocked = document.pointerLockElement === canvas
+      const pointerWasLocked = wasPointerLocked
+      wasPointerLocked = pointerLocked
+      resetFreeLook()
+
+      if (pointerLocked) {
+        intentionalPointerUnlock.current = false
+        return
+      }
+
+      const wasIntentional = intentionalPointerUnlock.current
+      intentionalPointerUnlock.current = false
+      if (
+        pointerWasLocked
+        && !wasIntentional
+        && !builderBuildMode
+        && !paused
+        && document.visibilityState === 'visible'
+        && document.hasFocus()
+      ) {
+        // Browsers may consume Escape while pointer lock is active. A focused,
+        // unexplained unlock is the reliable equivalent of that Escape gesture.
+        onExplorationExitRequest?.()
+      }
+    }
 
     window.addEventListener('pointermove', updateHoverLook, { passive: true })
     window.addEventListener('pointerup', stopViewDrag)
@@ -3742,6 +3858,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     canvas.addEventListener('pointerdown', startViewDrag)
     canvas.addEventListener('contextmenu', preventBuilderContextMenu)
     document.addEventListener('visibilitychange', resetWhenHidden)
+    document.addEventListener('pointerlockchange', resetAfterPointerLockChange)
     return () => {
       window.removeEventListener('pointermove', updateHoverLook)
       window.removeEventListener('pointerup', stopViewDrag)
@@ -3751,9 +3868,10 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       canvas.removeEventListener('pointerdown', startViewDrag)
       canvas.removeEventListener('contextmenu', preventBuilderContextMenu)
       document.removeEventListener('visibilitychange', resetWhenHidden)
+      document.removeEventListener('pointerlockchange', resetAfterPointerLockChange)
       canvas.classList.remove('astra-builder-view-dragging')
     }
-  }, [builderBuildMode, freeLookEnabled, gl, paused, resetFreeLook])
+  }, [builderBuildMode, builderOverview, freeLookEnabled, gl, isFirstPerson, onExplorationExitRequest, paused, resetFreeLook])
 
   useFrame((state, frameDelta) => {
     if (!group.current) return
@@ -3771,6 +3889,12 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       listenerUp,
     } = movementVectors.current
     const look = hoverLook.current
+    const keyboardX = paused ? 0 : (keys.current.has('RIGHT') ? 1 : 0) - (keys.current.has('LEFT') ? 1 : 0)
+    const keyboardZ = paused ? 0 : (keys.current.has('DOWN') ? 1 : 0) - (keys.current.has('UP') ? 1 : 0)
+    const moveX = paused ? 0 : THREE.MathUtils.clamp(keyboardX + Number(inputRef.current.x || 0), -1, 1)
+    const moveZ = paused ? 0 : THREE.MathUtils.clamp(keyboardZ + Number(inputRef.current.z || 0), -1, 1)
+    const inputLength = Math.hypot(moveX, moveZ)
+    const moving = inputLength > .05 && !look.orbiting
     const canFreeLook = Boolean(orbitCamera && controls.current && freeLookEnabled && !paused && !look.orbiting)
     const mouseDeltaX = canFreeLook ? THREE.MathUtils.clamp(look.pendingX, -MOUSE_LOOK_MAX_FRAME_DELTA, MOUSE_LOOK_MAX_FRAME_DELTA) : 0
     const mouseDeltaY = canFreeLook ? THREE.MathUtils.clamp(look.pendingY, -MOUSE_LOOK_MAX_FRAME_DELTA, MOUSE_LOOK_MAX_FRAME_DELTA) : 0
@@ -3780,12 +3904,16 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
 
     if (canFreeLook && (mouseDeltaX || mouseDeltaY)) {
       if (isFirstPerson) {
-        // [1인칭 시점] 정면 기준 좌우 180도(±90도 = ±π/2) 회전 범위 제한 및 상하 pitch 제한
-        firstPersonYawOffset.current = THREE.MathUtils.clamp(
-          firstPersonYawOffset.current + manualLookYaw,
-          -Math.PI / 2,
-          Math.PI / 2,
-        )
+        // Standing still keeps the focused ±90° viewing range. Once walking,
+        // the look direction becomes the travel direction and may turn through
+        // a full circle without hitting an invisible lateral stop.
+        firstPersonYawOffset.current = moving
+          ? firstPersonYawOffset.current + manualLookYaw
+          : THREE.MathUtils.clamp(
+            firstPersonYawOffset.current + manualLookYaw,
+            -Math.PI / 2,
+            Math.PI / 2,
+          )
         firstPersonPitch.current = THREE.MathUtils.clamp(
           firstPersonPitch.current - mouseDeltaY * MOUSE_LOOK_PITCH_SENSITIVITY,
           -1.2,
@@ -3807,12 +3935,6 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       }
     }
 
-    const keyboardX = paused ? 0 : (keys.current.has('RIGHT') ? 1 : 0) - (keys.current.has('LEFT') ? 1 : 0)
-    const keyboardZ = paused ? 0 : (keys.current.has('DOWN') ? 1 : 0) - (keys.current.has('UP') ? 1 : 0)
-    const moveX = paused ? 0 : THREE.MathUtils.clamp(keyboardX + Number(inputRef.current.x || 0), -1, 1)
-    const moveZ = paused ? 0 : THREE.MathUtils.clamp(keyboardZ + Number(inputRef.current.z || 0), -1, 1)
-    const inputLength = Math.hypot(moveX, moveZ)
-    const moving = inputLength > .05 && !look.orbiting
     const sprinting = moving && keys.current.has('SPRINT')
     let movementAmount = 0
     let movedDistance = 0
@@ -3887,7 +4009,14 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       }
 
       movementAmount = inputStrength
-      const speed = PLAYER_WALK_SPEED * (sprinting ? PLAYER_SPRINT_MULTIPLIER : 1)
+      const baseWalkSpeed = builderBuildMode ? ASTRA_BUILDER_WALK_SPEED : PLAYER_WALK_SPEED
+      const airborne = jump.current.height > .001 || jump.current.velocity > 0
+      const airborneMoveMultiplier = airborne
+        ? (sprinting ? PLAYER_SPRINT_AIRBORNE_MOVE_MULTIPLIER : PLAYER_AIRBORNE_MOVE_MULTIPLIER)
+        : 1
+      const speed = baseWalkSpeed
+        * (sprinting ? PLAYER_SPRINT_MULTIPLIER : 1)
+        * airborneMoveMultiplier
       const moveWorldVec = moveDirection.clone().multiplyScalar(speed * delta * movementAmount)
 
       const currX = group.current.position.x
@@ -4087,7 +4216,13 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     }
     if (!paused) {
       if (jump.current.requested && jump.current.height <= .001) {
-        jump.current.velocity = PLAYER_JUMP_VELOCITY
+        jump.current.velocity = builderBuildMode
+          ? PLAYER_JUMP_VELOCITY
+          : sprinting
+            ? PLAYER_SPRINT_JUMP_VELOCITY
+            : locomoting
+              ? PLAYER_MOVING_JUMP_VELOCITY
+              : PLAYER_JUMP_VELOCITY
       }
       jump.current.requested = false
       if (jump.current.height > 0 || jump.current.velocity > 0) {
@@ -4121,7 +4256,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
       const lookDist = 10.0
 
       activeCamera.near = FIRST_PERSON_CAMERA_NEAR
-      activeCamera.fov = THREE.MathUtils.lerp(activeCamera.fov, firstPersonFov.current, delta * 12)
+      activeCamera.fov = firstPersonFov.current
       activeCamera.updateProjectionMatrix()
       activeCamera.position.set(player.x, eyeY, player.z)
       activeCamera.lookAt(
@@ -4279,7 +4414,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
         enableKeys={false}
         enableZoom={false}
         enableDamping={false}
-        rotateSpeed={.56}
+        rotateSpeed={.38}
         zoomSpeed={1.05}
         minDistance={isFirstPerson ? 0.05 : getThirdPersonMinDistance(CHARACTER_SCALE)}
         maxDistance={isFirstPerson ? 0.2 : THIRD_PERSON_MAX_DISTANCE}
@@ -4343,7 +4478,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderCells, builderBlockCount, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderInvalidEdit, onBuilderScaleBlocked }) {
+function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderCells, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderInvalidEdit, onBuilderScaleBlocked, onExplorationExitRequest }) {
   const layout = useMemo(() => Array.isArray(planet?.layout) ? planet.layout : [], [planet])
   const basePalette = BIOMES[planet?.theme] || BIOMES.forest
   const restorationProgress = THREE.MathUtils.clamp(Number(restorationPercent || 0), 0, 100)
@@ -4674,7 +4809,6 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
         <AstraBuilderPlot
           baseY={builderPlotBaseY}
           cells={builderCells}
-          blockCount={builderBlockCount}
           active={builderActive}
           paused={paused}
           inputMode={builderInputMode}
@@ -4725,7 +4859,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
       )}
 
       {remotePlayers.map((player) => <RemoteAstronaut key={player.uid} player={player} showName={nearbyRemoteUids?.has(player.uid)} walkHeightAt={walkHeightAt} />)}
-      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={movementColliders} pickups={pickups} paused={paused || (builderActive && builderInputMode === 'camera')} freeLookEnabled={!buildItem && (!builderActive || builderInputMode === 'build')} builderOverview={builderActive && builderInputMode === 'camera'} builderBuildMode={builderActive && builderInputMode === 'build'} canUseCharacterScale={canUseBuilderCharacterScale} onScaleBlocked={onBuilderScaleBlocked} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={isFirstPerson} theme={planet?.theme || 'forest'} walkHeightAt={walkHeightAt} playerGroupRef={playerGroupRef} />
+      <Astronaut inputRef={inputRef} interactables={interactables} blockers={playerBlockers} structureColliders={movementColliders} pickups={pickups} paused={paused || (builderActive && builderInputMode === 'camera')} freeLookEnabled={!buildItem && (!builderActive || builderInputMode === 'build')} builderOverview={builderActive && builderInputMode === 'camera'} builderBuildMode={builderActive && builderInputMode === 'build'} canUseCharacterScale={canUseBuilderCharacterScale} onScaleBlocked={onBuilderScaleBlocked} onExplorationExitRequest={onExplorationExitRequest} onNearbyChange={onNearbyChange} onCollect={onCollect} onPositionChange={onPlayerPositionChange} displayName={localPlayerName} showName={Boolean(nearbyRemoteUids?.size)} speech={localSpeech} isFirstPerson={isFirstPerson} theme={planet?.theme || 'forest'} walkHeightAt={walkHeightAt} playerGroupRef={playerGroupRef} />
     </>
   )
 }
@@ -5037,6 +5171,7 @@ export default function GalaxyWorld3D({
   onOpenBuilderPlot,
   onSaveBuilderState,
   onBuilderModeChange,
+  onExplorationExitRequest,
   objective,
 }) {
   const inputRef = useRef({ x: 0, z: 0 })
@@ -5132,12 +5267,6 @@ export default function GalaxyWorld3D({
     const changed = builder.edit(edit)
     if (!changed) {
       soundManager.play('frontier.build.invalid')
-      if (
-        edit?.tool === 'place'
-        && builder.blockCount >= ASTRA_BUILDER_POC_PLOT.maxBlocks
-      ) {
-        onMessage?.(`POC에서는 ${ASTRA_BUILDER_POC_PLOT.maxBlocks}블록까지 사용할 수 있어요.`)
-      }
       return false
     }
     const soundId = edit.tool === 'delete'
@@ -5147,7 +5276,7 @@ export default function GalaxyWorld3D({
         : 'frontier.build.place'
     soundManager.play(soundId)
     return true
-  }, [builder, onMessage])
+  }, [builder])
 
   useEffect(() => {
     if (builderEnabled || !builderActive) return
@@ -5555,13 +5684,13 @@ export default function GalaxyWorld3D({
           builderEnabled={builderEnabled}
           builderActive={builderActive}
           builderCells={builder.cells}
-          builderBlockCount={builder.blockCount}
           builderInputMode={builderInputMode}
           builderTool={builderTool}
           builderLayer={builderLayer}
           builderBlockType={builderBlockType}
           builderRotation={builderRotation}
           onBuilderEdit={applyAstraBuilderEditWithFeedback}
+          onExplorationExitRequest={onExplorationExitRequest}
           onBuilderInvalidEdit={({ reason, cell, activeLayer, tool }) => {
             if (reason !== 'empty') soundManager.play('frontier.build.invalid')
             if (reason === 'layer_mismatch') {
@@ -5632,7 +5761,7 @@ export default function GalaxyWorld3D({
           <button type="button" onClick={onCancelBuild}>취소</button>
         </div>
       )}
-      {!builderActive && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>걷기</span><kbd>Shift</kbd><span>달리기</span><kbd>Space</kbd><span>점프</span><kbd>+ / −</kbd><span>크기</span><kbd>V</kbd><span>시점</span><kbd>E / F</kbd><span>상호작용·정보</span></div>}
+      {!builderActive && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>걷기</span><kbd>Shift</kbd><span>달리기</span><kbd>Space</kbd><span>점프</span><kbd>T</kbd><span>마우스 잡기·놓기</span><kbd>+ / −</kbd><span>크기</span><kbd>V</kbd><span>시점</span><kbd>E / F</kbd><span>상호작용·정보</span></div>}
       {builderActive && builderInputMode === 'build' && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>이동</span><kbd>클릭</kbd><span>지정·배치</span><kbd>드래그</kbd><span>시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>캐릭터 크기</span><kbd>Q / R</kbd><span>블록 회전</span></div>}
       {builderActive && builderInputMode === 'camera' && <div className="frontier-control-hint"><kbd>드래그</kbd><span>설계 시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>캐릭터 크기</span></div>}
       {(!builderActive || builderInputMode === 'build') && <TouchJoystick inputRef={inputRef} disabled={paused} />}

@@ -477,7 +477,8 @@ const GALAXY_BUILD_RESERVED_POSITIONS = [
 const ASTRA_BUILDER_STATE_ENCODING = "u16le-v1";
 const ASTRA_BUILDER_SAVE_GRACE_MS = 30 * 1000;
 const ASTRA_BUILDER_MAX_STATE_BYTES = 64 * 1024;
-const ASTRA_BUILDER_ALLOWED_CELL_MASK = 0x03ff;
+const ASTRA_BUILDER_FOUNDATION_UNDERLAY_MASK = 0x0400;
+const ASTRA_BUILDER_ALLOWED_CELL_MASK = 0x07ff;
 const ASTRA_BUILDER_ALLOWED_BLOCK_TYPES = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
 const ASTRA_BUILDER_PLOTS = {
   "habitat-b01": {
@@ -489,7 +490,9 @@ const ASTRA_BUILDER_PLOTS = {
     rotation: 0,
     dimensions: { x: 12, y: 10, z: 12 },
     cellSize: 0.34,
-    maxBlocks: 360,
+    // The encoded grid is the capacity boundary. Each cell can hold one
+    // foundation underlay plus one building piece.
+    maxBlocks: 12 * 12 * 10 * 2,
     unlockedSetIds: ["astra_builder_basic"],
   },
 };
@@ -1717,8 +1720,9 @@ function validateAstraBuilderStatePayload({
       return { kind: "invalid_block_type", cellIndex: offset / 2, blockType };
     }
     actualBlockCount += 1;
-    if (actualBlockCount > plot.maxBlocks) {
-      return { kind: "too_many_blocks", blockCount: actualBlockCount, maxBlocks: plot.maxBlocks };
+    if ((cellValue & ASTRA_BUILDER_FOUNDATION_UNDERLAY_MASK) !== 0) {
+      if (blockType === 2) return { kind: "invalid_foundation_underlay", cellIndex: offset / 2 };
+      actualBlockCount += 1;
     }
   }
 

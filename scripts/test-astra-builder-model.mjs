@@ -123,21 +123,47 @@ const panelAnchor = normalizeAstraBuilderPlacementCell(
   ASTRA_BUILDER_WALL_PANEL_TYPE,
 )
 assert.deepEqual(panelAnchor, { x: 4, y: 0, z: 4 })
-const panelPlacement = applyAstraBuilderEdit(panelGrid, {
+const panelFoundation = applyAstraBuilderEdit(panelGrid, {
+  tool: 'place',
+  cell: panelAnchor,
+  blockType: 2,
+  rotation: 0,
+})
+assert.ok(panelFoundation)
+const panelPlacement = applyAstraBuilderEdit(panelFoundation.cells, {
   tool: 'place',
   cell: panelAnchor,
   blockType: ASTRA_BUILDER_WALL_PANEL_TYPE,
   rotation: 0,
 })
 assert.ok(panelPlacement)
-assert.equal(countAstraBuilderBlocks(panelPlacement.cells), 1)
-assert.equal(
-  decodeAstraBuilderCell(panelPlacement.cells[getAstraBuilderCellIndex(panelAnchor)]).blockType,
-  ASTRA_BUILDER_WALL_PANEL_TYPE,
+assert.equal(countAstraBuilderBlocks(panelPlacement.cells), 2)
+assert.deepEqual(
+  decodeAstraBuilderCell(panelPlacement.cells[getAstraBuilderCellIndex(panelAnchor)]),
+  {
+    blockType: ASTRA_BUILDER_WALL_PANEL_TYPE,
+    rotation: 0,
+    occupied: true,
+    foundationUnderlay: true,
+  },
 )
+const panelInstances = getAstraBuilderInstances(panelPlacement.cells)
+assert.equal(panelInstances.get(2).length, 1)
+assert.equal(panelInstances.get(ASTRA_BUILDER_WALL_PANEL_TYPE).length, 1)
 const panelBody = createAstraBuilderCollisionBodies(panelPlacement.cells, 4)
   .find((body) => body.blockType === ASTRA_BUILDER_WALL_PANEL_TYPE)
 assert.ok(panelBody)
+assert.equal(createAstraBuilderCollisionBodies(panelPlacement.cells, 4).length, 2)
+const panelRemoved = applyAstraBuilderEdit(panelPlacement.cells, {
+  tool: 'delete',
+  cell: panelAnchor,
+})
+assert.ok(panelRemoved)
+assert.deepEqual(
+  decodeAstraBuilderCell(panelRemoved.cells[getAstraBuilderCellIndex(panelAnchor)]),
+  { blockType: 2, rotation: 0, occupied: true, foundationUnderlay: false },
+)
+assert.equal(countAstraBuilderBlocks(panelRemoved.cells), 1)
 assert.ok(Math.abs(
   panelBody.maxY - panelBody.minY - ASTRA_BUILDER_POC_PLOT.cellSize * 3,
 ) < 0.0001)
@@ -226,14 +252,23 @@ assert.deepEqual(decodeAstraBuilderCell(placed.cells[targetIndex]), {
   blockType: 3,
   rotation: 1,
   occupied: true,
+  foundationUnderlay: false,
 })
 assert.equal(countAstraBuilderBlocks(placed.cells), 1)
-assert.equal(applyAstraBuilderEdit(placed.cells, {
+const foundationUnderGlass = applyAstraBuilderEdit(placed.cells, {
   tool: 'place',
   cell: target,
   blockType: 2,
   rotation: 0,
-}), null)
+})
+assert.ok(foundationUnderGlass)
+assert.deepEqual(decodeAstraBuilderCell(foundationUnderGlass.cells[targetIndex]), {
+  blockType: 3,
+  rotation: 1,
+  occupied: true,
+  foundationUnderlay: true,
+})
+assert.equal(countAstraBuilderBlocks(foundationUnderGlass.cells), 2)
 
 const rotated = applyAstraBuilderEdit(placed.cells, {
   tool: 'rotate',
@@ -271,6 +306,7 @@ assert.deepEqual(decodeAstraBuilderCell(
   blockType: 7,
   rotation: 3,
   occupied: true,
+  foundationUnderlay: false,
 })
 assert.equal(applyAstraBuilderEdit(removed.cells, {
   tool: 'place',

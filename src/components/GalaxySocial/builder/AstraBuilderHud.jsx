@@ -64,7 +64,7 @@ export default function AstraBuilderHud({
         </div>
         <div className="astra-builder-hud__status">
           <span><Save size={14} aria-hidden="true" /> {hydrated ? SAVE_LABELS[saveState] : '초안 불러오는 중'}</span>
-          <b>{blockCount} / {ASTRA_BUILDER_POC_PLOT.maxBlocks}</b>
+          <b>{blockCount}개 배치</b>
           {Number.isFinite(remainingSeconds) && <em>{Math.max(0, Math.ceil(remainingSeconds / 60))}분</em>}
           <button type="button" onClick={onClose}><X size={17} aria-hidden="true" /> 나가기</button>
         </div>
