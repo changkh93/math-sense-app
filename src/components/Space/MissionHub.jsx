@@ -97,6 +97,12 @@ const VIDEO_PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2]
 const VIDEO_VOLUME_DEFAULT = 80
 const QA_ROOM_URL = 'https://meet.google.com/qzg-psru-qnc'
 
+const enterFieldTestFocusMode = () => {
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {})
+  }
+}
+
 const getVideoCompletionThreshold = (duration = 0) => (
   duration > LONG_VIDEO_SECONDS
     ? LONG_VIDEO_COMPLETION_THRESHOLD
@@ -771,6 +777,13 @@ function RewardPotentialModal({ unit, onCancel, onConfirm, isMobile }) {
           <div style={{ fontSize: isMobile ? '1.6rem' : '2rem', fontWeight: 900, color: isPerfect ? 'var(--star-gold)' : 'var(--crystal-cyan)' }}>
             {unit.bestScore !== undefined ? `${unit.bestScore}점` : '기록 없음'}
           </div>
+        </div>
+
+        <div style={{ padding: '0.8rem', borderLeft: '3px solid #fb7185', background: 'rgba(251, 113, 133, 0.1)', textAlign: 'left' }}>
+          <p style={{ color: '#fecdd3', margin: 0, lineHeight: '1.5', fontSize: isMobile ? '0.82rem' : '0.88rem' }}>
+            🔒 탐사 중에는 전체화면이 유지됩니다. 탭 전환·창 이탈·전체화면 해제가 감지되며, 3회 반복되면 현재 테스트가 종료됩니다.<br/>
+            화면 캡처·복사·인쇄는 제한되며, 메타센스의 ‘선생님 질문’ 그림 설명 기능만 예외입니다.
+          </p>
         </div>
 
         {/* Action Buttons: Positioned directly under "현재 최고 기록" as requested */}
@@ -3448,7 +3461,10 @@ export default function MissionHub({
           entryUnitId={unitId}
           entryUnitTitle={activeUnit?.title}
           onExit={returnFromContent}
-          onSoloQuiz={() => updateCurrentMode('quiz')}
+          onSoloQuiz={() => {
+            enterFieldTestFocusMode()
+            updateCurrentMode('quiz')
+          }}
         />
       </Suspense>
     )
@@ -3741,6 +3757,7 @@ export default function MissionHub({
                }
              }}
              onConfirm={() => {
+               enterFieldTestFocusMode()
                setShowFieldTestModal(false)
                updateCurrentMode('quiz')
                soundManager.playWarp()

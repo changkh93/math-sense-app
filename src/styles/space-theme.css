@@ -1185,3 +1185,71 @@
 @keyframes spin-inline {
   to { transform: rotate(360deg); }
 }
+
+/* Field Test focus and capture deterrence. System-level screenshots cannot be
+   intercepted reliably by a web page, so the protected view also carries a
+   session watermark and is replaced completely in print output. */
+.field-test-protection-root {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body.field-test-window-blurred .field-test-protected-content {
+  filter: blur(28px);
+  opacity: 0.04;
+  pointer-events: none;
+}
+
+.field-test-focus-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 30000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: #050a19;
+}
+
+.field-test-watermark {
+  position: fixed;
+  inset: -12vh -12vw;
+  z-index: 8500;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  align-content: space-around;
+  justify-items: center;
+  gap: 5rem 2rem;
+  overflow: hidden;
+  pointer-events: none;
+  transform: rotate(-18deg);
+  color: rgba(255, 255, 255, 0.075);
+  font-family: var(--font-tech);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.field-test-print-blocker {
+  display: none;
+}
+
+@media print {
+  .field-test-protection-root > *:not(.field-test-print-blocker) {
+    display: none !important;
+  }
+
+  .field-test-print-blocker {
+    position: fixed;
+    inset: 0;
+    display: grid !important;
+    place-items: center;
+    padding: 2rem;
+    background: #fff;
+    color: #111827;
+    font-size: 20pt;
+    font-weight: 800;
+    text-align: center;
+  }
+}
