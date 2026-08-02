@@ -2,13 +2,15 @@ import React from 'react';
 import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
 
-// 인자 없이 단독으로 쓰이는 기호 명령어. 일반 영문 단어(text, boxed 등)와
-// 충돌하지 않으므로 백슬래시가 빠지면 언제든 복원해도 안전하다.
-const LOST_LATEX_SYMBOL_PATTERN = /(?<!\\)(xrightarrow|xleftarrow|rightarrow|leftarrow|Rightarrow|Leftarrow|overline|underline|implies|triangle|parallel|cdot|times|frac|sqrt|quad|qquad|div|neq|leq|geq|left|right|circ|perp|pm|pi|theta|alpha|beta|gamma|Delta|Omega)/g;
+// 백슬래시가 빠진 LaTeX 명령어는 영문 단어의 일부가 아닌 완전한 토큰일 때만
+// 복원한다. 예: "frac{1}{2}" -> "\\frac{1}{2}", "fraction" -> 그대로.
+// 경계 검사가 없으면 fraction, pilot 같은 일반 단어까지 \fraction, \pilot으로
+// 바뀌어 KaTeX 오류 또는 뜻이 다른 기호로 표시된다.
+const LOST_LATEX_SYMBOL_PATTERN = /(?<![\\A-Za-z])(xrightarrow|xleftarrow|rightarrow|leftarrow|Rightarrow|Leftarrow|overline|underline|implies|triangle|parallel|cdot|times|frac|sqrt|quad|qquad|div|neq|leq|geq|left|right|circ|perp|pm|pi|theta|alpha|beta|gamma|Delta|Omega)(?![A-Za-z])/g;
 // 인자를 받는 명령어(text, boxed 등). 영문 텍스트 단어와 충돌하므로
 // 바로 뒤에 { 가 올 때(즉 실제 명령어 호출일 때)만 백슬래시를 복원한다.
 // 예: "boxed{1}" -> "\boxed{1}" (복원), "the boxed value" -> 그대로 (미복원)
-const LOST_LATEX_BRACED_PATTERN = /(?<!\\)(text|boxed)(?=\s*\{)/g;
+const LOST_LATEX_BRACED_PATTERN = /(?<![\\A-Za-z])(text|boxed)(?=\s*\{)/g;
 const CONTROL_CHARS = {
   formFeed: String.fromCharCode(0x0c),
   verticalTab: String.fromCharCode(0x0b),
