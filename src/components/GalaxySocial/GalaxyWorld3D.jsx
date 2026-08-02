@@ -16,8 +16,11 @@ import {
   ASTRA_BUILDER_BASE_LIFT,
   ASTRA_BUILDER_POC_PLOT,
   createEmptyAstraBuilderGrid,
+  decodeAstraBuilderCell,
+  getAstraBuilderCellIndex,
   getAstraBuilderCellCount,
   getAstraBuilderLayerInfo,
+  getAstraBuilderVisibleCells,
 } from './builder/astraBuilderModel'
 import { decodeAstraBuilderGridBase64 } from './builder/astraBuilderCodec'
 import {
@@ -27,6 +30,7 @@ import {
   getAstraBuilderCharacterDimensions,
   getAstraBuilderWalkSurfaceHeight,
 } from './builder/astraBuilderPhysics'
+import { getAstraBuilderPartForRecipe } from './builder/astraBuilderRecipeCatalog.js'
 import {
   ASTRA_BUILDER_CLICK_DRAG_THRESHOLD,
   isAstraBuilderViewDrag,
@@ -4484,7 +4488,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderInvalidEdit, onBuilderScaleBlocked, onExplorationExitRequest }) {
+function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderCopy, onBuilderInvalidEdit, onBuilderScaleBlocked, onExplorationExitRequest }) {
   const territoryExpanded = Boolean(planet?.territoryExpanded)
   setTerritoryExpanded(territoryExpanded)
   const worldRadius = getWorldRadius(territoryExpanded)
@@ -4837,6 +4841,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
           selectedBlockType={builderBlockType}
           selectedRotation={builderRotation}
           onEdit={plot.plotId === activeBuilderPlotId ? onBuilderEdit : undefined}
+          onCopy={plot.plotId === activeBuilderPlotId ? onBuilderCopy : undefined}
           onInvalidEdit={plot.plotId === activeBuilderPlotId ? onBuilderInvalidEdit : undefined}
           playerGroupRef={playerGroupRef}
           useCharacterCamera
@@ -5300,19 +5305,23 @@ export default function GalaxyWorld3D({
   }, [builderStates])
 
   useEffect(() => {
-    if (!builderActive || !builder.hydrated) return
+    if (!builderEnabled || !builder.hydrated) return
     setBuilderCellCache((current) => ({
       ...current,
       [activeBuilderPlot.plotId]: builder.cells,
     }))
-  }, [activeBuilderPlot.plotId, builder.cells, builder.hydrated, builder.revision, builderActive])
+  }, [activeBuilderPlot.plotId, builder.cells, builder.hydrated, builder.revision, builderEnabled])
 
   const builderCellsByPlot = useMemo(() => Object.fromEntries(builderPlots.map((plot) => [
     plot.plotId,
-    plot.plotId === activeBuilderPlot.plotId && builderActive && builder.hydrated
-      ? builder.cells
-      : builderCellCache[plot.plotId] || (plot.plotId === activeBuilderPlot.plotId ? builder.cells : createEmptyAstraBuilderGrid()),
-  ])), [activeBuilderPlot.plotId, builder.cells, builder.hydrated, builderActive, builderCellCache, builderPlots])
+    getAstraBuilderVisibleCells({
+      plotId: plot.plotId,
+      activePlotId: activeBuilderPlot.plotId,
+      localCells: builder.cells,
+      localHydrated: builder.hydrated,
+      cachedCells: builderCellCache[plot.plotId],
+    }, plot),
+  ])), [activeBuilderPlot.plotId, builder.cells, builder.hydrated, builderCellCache, builderPlots])
 
   const selectBuilderPlot = useCallback(async (plotId) => {
     if (!plotId || plotId === activeBuilderPlot.plotId) return
@@ -5378,6 +5387,16 @@ export default function GalaxyWorld3D({
     soundManager.play(soundId)
     return true
   }, [builder])
+
+  const copyAstraBuilderSelection = useCallback((cell) => {
+    const index = getAstraBuilderCellIndex(cell, ASTRA_BUILDER_POC_PLOT)
+    const decoded = index >= 0 ? decodeAstraBuilderCell(builder.cells[index]) : null
+    if (!decoded?.occupied) return
+    setBuilderBlockType(decoded.recipeId || decoded.blockType)
+    setBuilderRotation(decoded.rotation || 0)
+    setBuilderTool('place')
+    onMessage?.(`${decoded.recipeId ? '재료와 방향을 가져왔어요' : '블록을 가져왔어요'} · 배치 도구로 전환했습니다.`)
+  }, [builder.cells, onMessage])
 
   useEffect(() => {
     if (builderEnabled || !builderActive) return
@@ -5612,14 +5631,18 @@ export default function GalaxyWorld3D({
         ))
       } else if (event.code === 'KeyQ' || event.code === 'KeyR') {
         event.preventDefault()
+        const rotationSteps = getAstraBuilderPartForRecipe(builderBlockType)?.rotationSteps || 1
+        if (rotationSteps <= 1) return
         setBuilderRotation((current) => (
-          event.code === 'KeyQ' ? (current + 3) % 4 : (current + 1) % 4
+          event.code === 'KeyQ'
+            ? (current + rotationSteps - 1) % rotationSteps
+            : (current + 1) % rotationSteps
         ))
       }
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [builder, builderActive, builderInputMode, closeAstraBuilder, onToggleFirstPerson])
+  }, [builder, builderActive, builderBlockType, builderInputMode, closeAstraBuilder, onToggleFirstPerson])
 
   useEffect(() => {
     const keydown = (event) => {
@@ -5796,6 +5819,7 @@ export default function GalaxyWorld3D({
           builderBlockType={builderBlockType}
           builderRotation={builderRotation}
           onBuilderEdit={applyAstraBuilderEditWithFeedback}
+          onBuilderCopy={copyAstraBuilderSelection}
           onExplorationExitRequest={onExplorationExitRequest}
           onBuilderInvalidEdit={({ reason, cell, activeLayer, tool }) => {
             if (reason !== 'empty') soundManager.play('frontier.build.invalid')
@@ -5806,7 +5830,14 @@ export default function GalaxyWorld3D({
               )
             } else if (reason === 'empty') {
               const editLayer = getAstraBuilderLayerInfo(activeLayer)
-              onMessage?.(`${editLayer.label} 높이 ${editLayer.course}/${editLayer.courseCount}의 이 위치에는 ${tool === 'rotate' ? '회전할' : '삭제할'} 블록이 없습니다.`)
+              const actionLabel = tool === 'rotate'
+                ? '회전할'
+                : tool === 'material'
+                  ? '재질을 바꿀'
+                  : '삭제할'
+              onMessage?.(tool === 'material'
+                ? '선택한 재료는 이 형태와 호환되지 않아요. 재료함에서 다른 변형을 골라보세요.'
+                : `${editLayer.label} 높이 ${editLayer.course}/${editLayer.courseCount}의 이 위치에는 ${actionLabel} 블록이 없습니다.`)
             } else if (reason === 'out_of_reach') {
               onMessage?.('블록을 배치하려면 캐릭터가 조금 더 가까이 가야 합니다.')
             } else if (reason === 'player_overlap') {
@@ -5899,10 +5930,14 @@ export default function GalaxyWorld3D({
           selectedBlockType={builderBlockType}
           onSelectBlockType={(blockType) => {
             setBuilderBlockType(blockType)
+            setBuilderRotation(0)
             setBuilderTool('place')
           }}
           selectedRotation={builderRotation}
-          onRotateSelection={() => setBuilderRotation((current) => (current + 1) % 4)}
+          onRotateSelection={() => setBuilderRotation((current) => {
+            const rotationSteps = getAstraBuilderPartForRecipe(builderBlockType)?.rotationSteps || 1
+            return rotationSteps > 1 ? (current + 1) % rotationSteps : 0
+          })}
           canUndo={builder.canUndo}
           canRedo={builder.canRedo}
           onUndo={builder.undo}

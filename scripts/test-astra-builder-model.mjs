@@ -19,15 +19,18 @@ import {
   getAstraBuilderLayerInfo,
   getAstraBuilderPlacementIssue,
   getAstraBuilderTopFaceTarget,
+  getAstraBuilderTopologyKey,
   getAstraBuilderWalkSurfaceOffset,
   getAstraBuilderWalkBlockingCells,
   getAstraBuilderWorldPosition,
+  getAstraBuilderVisibleCells,
   isAstraBuilderWalkBlockingCell,
   isAstraBuilderSameStoryLayer,
   normalizeAstraBuilderPlacementCell,
 } from '../src/components/GalaxySocial/builder/astraBuilderModel.js'
 import {
   decodeAstraBuilderGridBase64,
+  encodeAstraBuilderV1Cell,
   encodeAstraBuilderGridBase64,
 } from '../src/components/GalaxySocial/builder/astraBuilderCodec.js'
 import {
@@ -50,8 +53,70 @@ import {
   isAstraBuilderViewDrag,
   isAstraBuilderViewPointer,
 } from '../src/components/GalaxySocial/builder/astraBuilderInput.js'
+import {
+  ASTRA_BUILDER_QUICKBAR_CORE_RECIPE_IDS,
+  ASTRA_BUILDER_QUICKBAR_FALLBACK_RECIPE_IDS,
+  ASTRA_BUILDER_RECIPES,
+  getAstraBuilderRenderProfile,
+} from '../src/components/GalaxySocial/builder/astraBuilderRecipeCatalog.js'
+import {
+  buildAstraBuilderQuickbarItems,
+  recordAstraBuilderRecentRecipeId,
+} from '../src/components/GalaxySocial/builder/astraBuilderQuickbar.js'
+
+assert.equal(getAstraBuilderRenderProfile(20).textureKind, 'wood_grain')
+assert.equal(getAstraBuilderRenderProfile(20).family, 'wood')
+assert.equal(getAstraBuilderRenderProfile(14).transparent, true)
+assert.ok(getAstraBuilderRenderProfile(14).opacity < .3)
+assert.equal(getAstraBuilderRenderProfile(2).transparent, false)
+
+const initialQuickbar = buildAstraBuilderQuickbarItems({
+  recipes: ASTRA_BUILDER_RECIPES,
+  coreIds: ASTRA_BUILDER_QUICKBAR_CORE_RECIPE_IDS,
+  fallbackIds: ASTRA_BUILDER_QUICKBAR_FALLBACK_RECIPE_IDS,
+})
+assert.deepEqual(initialQuickbar.map(({ recipe }) => recipe.id), [1, 2, 3, 5, 6, 4, 12, 20])
+assert.deepEqual(initialQuickbar.slice(-2).map(({ source }) => source), ['recommended', 'recommended'])
+const recentRecipeIds = recordAstraBuilderRecentRecipeId([20, 12], 14, {
+  validIds: new Set(ASTRA_BUILDER_RECIPES.map(({ id }) => id)),
+  excludedIds: ASTRA_BUILDER_QUICKBAR_CORE_RECIPE_IDS,
+})
+assert.deepEqual(recentRecipeIds, [14, 20])
+const recentQuickbar = buildAstraBuilderQuickbarItems({
+  recipes: ASTRA_BUILDER_RECIPES,
+  coreIds: ASTRA_BUILDER_QUICKBAR_CORE_RECIPE_IDS,
+  recentIds: recentRecipeIds,
+  fallbackIds: ASTRA_BUILDER_QUICKBAR_FALLBACK_RECIPE_IDS,
+})
+assert.deepEqual(recentQuickbar.slice(-2).map(({ recipe }) => recipe.id), [14, 20])
+assert.deepEqual(recentQuickbar.slice(-2).map(({ source }) => source), ['recent', 'recent'])
 
 assert.equal(getAstraBuilderCellCount(), 12 * 12 * 10)
+const staleServerBuilderCells = createEmptyAstraBuilderGrid()
+const latestLocalBuilderCells = createEmptyAstraBuilderGrid()
+staleServerBuilderCells[0] = 1
+latestLocalBuilderCells[0] = 20
+assert.equal(getAstraBuilderVisibleCells({
+  plotId: 'habitat-b01',
+  activePlotId: 'habitat-b01',
+  localCells: latestLocalBuilderCells,
+  localHydrated: true,
+  cachedCells: staleServerBuilderCells,
+}), latestLocalBuilderCells)
+assert.equal(getAstraBuilderVisibleCells({
+  plotId: 'habitat-b01',
+  activePlotId: 'habitat-b01',
+  localCells: latestLocalBuilderCells,
+  localHydrated: false,
+  cachedCells: staleServerBuilderCells,
+}), staleServerBuilderCells)
+assert.equal(getAstraBuilderVisibleCells({
+  plotId: 'habitat-b02',
+  activePlotId: 'habitat-b01',
+  localCells: latestLocalBuilderCells,
+  localHydrated: true,
+  cachedCells: staleServerBuilderCells,
+}), staleServerBuilderCells)
 assert.deepEqual(getAstraBuilderLayerInfo(0), {
   layer: 0, story: 1, course: 1, courseCount: 3, label: '1층',
 })
@@ -355,6 +420,48 @@ const decodedGrid = decodeAstraBuilderGridBase64(encodedGrid, redone.length)
 assert.deepEqual([...decodedGrid], [...redone])
 assert.equal(decodeAstraBuilderGridBase64('not base64', redone.length), null)
 assert.equal(decodeAstraBuilderGridBase64(encodedGrid, redone.length - 1), null)
+assert.equal(encodeAstraBuilderV1Cell(1 | (3 << 8)), 1)
+assert.equal(decodeAstraBuilderCell(encodeAstraBuilderV1Cell(7 | (3 << 8))).rotation, 3)
+
+// 재료 레시피는 형태를 바꾸지 않고 같은 파트 안에서만 교체할 수 있다.
+const woodenWall = applyAstraBuilderEdit(createEmptyAstraBuilderGrid(), {
+  tool: 'place',
+  cell: { x: 6, y: 0, z: 6 },
+  recipeId: 16,
+  rotation: 0,
+})
+assert.ok(woodenWall)
+const darkWoodWall = applyAstraBuilderEdit(woodenWall.cells, {
+  tool: 'material',
+  cell: { x: 6, y: 0, z: 6 },
+  recipeId: 19,
+})
+assert.ok(darkWoodWall)
+assert.equal(decodeAstraBuilderCell(darkWoodWall.cells[getAstraBuilderCellIndex({ x: 6, y: 0, z: 6 })]).recipeId, 19)
+assert.equal(getAstraBuilderTopologyKey(woodenWall.cells), getAstraBuilderTopologyKey(darkWoodWall.cells))
+const walnutStyleWall = applyAstraBuilderEdit(darkWoodWall.cells, {
+  tool: 'material',
+  cell: { x: 6, y: 0, z: 6 },
+  recipeId: 20,
+})
+assert.ok(walnutStyleWall)
+assert.equal(decodeAstraBuilderCell(walnutStyleWall.cells[getAstraBuilderCellIndex({ x: 6, y: 0, z: 6 })]).recipeId, 18)
+assert.equal(applyAstraBuilderEdit(walnutStyleWall.cells, {
+  tool: 'material',
+  cell: { x: 6, y: 0, z: 6 },
+  recipeId: 14,
+}), null)
+const birchStyleWall = applyAstraBuilderEdit(darkWoodWall.cells, {
+  tool: 'material',
+  cell: { x: 6, y: 0, z: 6 },
+  recipeId: 12,
+})
+assert.ok(birchStyleWall)
+assert.equal(decodeAstraBuilderCell(birchStyleWall.cells[getAstraBuilderCellIndex({ x: 6, y: 0, z: 6 })]).recipeId, 16)
+
+const v2EncodedGrid = encodeAstraBuilderGridBase64(darkWoodWall.cells, 'u32le-v2')
+const v2DecodedGrid = decodeAstraBuilderGridBase64(v2EncodedGrid, darkWoodWall.cells.length, 'u32le-v2')
+assert.deepEqual([...v2DecodedGrid], [...darkWoodWall.cells])
 
 assert.equal(planAstraBuilderServerHydration({
   localRevision: 3,

@@ -1,4 +1,12 @@
-/* global module, Buffer */
+/* global module, Buffer, require */
+
+const {
+  ASTRA_BUILDER_CATALOG_VERSION,
+  ASTRA_BUILDER_ENCODING_V1,
+  ASTRA_BUILDER_ENCODING_V2,
+  ASTRA_BUILDER_RECIPE_TRAITS,
+  ASTRA_BUILDER_ALLOWED_RECIPE_IDS,
+} = require("./astraBuilderRecipeCatalog.cjs");
 
 const GALAXY_ITEM_CATALOG = {
   star_lamp: {
@@ -480,12 +488,18 @@ function getGalaxyBuildRadius(planet = {}) {
   return planet?.territoryExpanded ? GALAXY_EXPANDED_BUILD_RADIUS : GALAXY_BUILD_RADIUS;
 }
 
-const ASTRA_BUILDER_STATE_ENCODING = "u16le-v1";
+// v1 remains readable for existing plots. New saves are always written as v2.
 const ASTRA_BUILDER_SAVE_GRACE_MS = 30 * 1000;
 const ASTRA_BUILDER_MAX_STATE_BYTES = 64 * 1024;
 const ASTRA_BUILDER_FOUNDATION_UNDERLAY_MASK = 0x0400;
 const ASTRA_BUILDER_ALLOWED_CELL_MASK = 0x07ff;
 const ASTRA_BUILDER_ALLOWED_BLOCK_TYPES = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
+const ASTRA_BUILDER_V2_MAIN_RECIPE_MASK = 0x000003ff;
+const ASTRA_BUILDER_V2_MAIN_ROTATION_SHIFT = 10;
+const ASTRA_BUILDER_V2_UNDERLAY_RECIPE_SHIFT = 12;
+const ASTRA_BUILDER_V2_UNDERLAY_RECIPE_MASK = 0x003ff000;
+const ASTRA_BUILDER_V2_UNDERLAY_ROTATION_SHIFT = 22;
+const ASTRA_BUILDER_V2_RESERVED_MASK = 0xff000000;
 const ASTRA_BUILDER_BASE_CAPACITY = 500;
 const ASTRA_BUILDER_BLOCK_PACK_SIZE = 500;
 const ASTRA_BUILDER_BLOCK_PACK_COST = 1000;
@@ -1839,8 +1853,9 @@ function serializeValue(value) {
   return value;
 }
 
-function getAstraBuilderGridByteLength(plot) {
-  return plot.dimensions.x * plot.dimensions.y * plot.dimensions.z * 2;
+function getAstraBuilderGridByteLength(plot, encoding = ASTRA_BUILDER_ENCODING_V1) {
+  const bytesPerCell = encoding === ASTRA_BUILDER_ENCODING_V2 ? 4 : 2;
+  return plot.dimensions.x * plot.dimensions.y * plot.dimensions.z * bytesPerCell;
 }
 
 function normalizeAstraBuilderBase64(value) {
@@ -1860,42 +1875,96 @@ function validateAstraBuilderStatePayload({
   gridDataBase64,
   modules,
   blockCount,
+  catalogVersion,
 } = {}) {
   const plot = getAstraBuilderPlotDefinition(plotId);
   if (!plot) return { kind: "invalid_plot" };
-  if (encoding !== ASTRA_BUILDER_STATE_ENCODING) return { kind: "invalid_encoding" };
+  if (encoding !== ASTRA_BUILDER_ENCODING_V1 && encoding !== ASTRA_BUILDER_ENCODING_V2) {
+    return { kind: "invalid_encoding" };
+  }
+  if (
+    catalogVersion !== undefined
+    && (!Number.isInteger(catalogVersion)
+      || (encoding === ASTRA_BUILDER_ENCODING_V2 && catalogVersion !== ASTRA_BUILDER_CATALOG_VERSION)
+      || (encoding === ASTRA_BUILDER_ENCODING_V1 && catalogVersion !== 1))
+  ) {
+    return { kind: "invalid_catalog_version" };
+  }
   const gridBuffer = normalizeAstraBuilderBase64(gridDataBase64);
   if (!gridBuffer) return { kind: "invalid_base64" };
+  const expectedByteLength = getAstraBuilderGridByteLength(plot, encoding);
   if (
-    gridBuffer.length !== getAstraBuilderGridByteLength(plot)
+    gridBuffer.length !== expectedByteLength
     || gridBuffer.length > ASTRA_BUILDER_MAX_STATE_BYTES
   ) {
     return {
       kind: "invalid_byte_length",
-      expectedByteLength: getAstraBuilderGridByteLength(plot),
+      expectedByteLength,
       actualByteLength: gridBuffer.length,
     };
   }
   if (!Array.isArray(modules) || modules.length !== 0) return { kind: "unsupported_modules" };
 
   let actualBlockCount = 0;
-  for (let offset = 0; offset < gridBuffer.length; offset += 2) {
-    const cellValue = gridBuffer.readUInt16LE(offset);
-    if ((cellValue & ~ASTRA_BUILDER_ALLOWED_CELL_MASK) !== 0) {
-      return { kind: "invalid_cell_bits", cellIndex: offset / 2 };
-    }
-    const blockType = cellValue & 0xff;
-    if (blockType === 0) {
-      if (cellValue !== 0) return { kind: "invalid_empty_cell", cellIndex: offset / 2 };
-      continue;
-    }
-    if (!ASTRA_BUILDER_ALLOWED_BLOCK_TYPES.has(blockType)) {
-      return { kind: "invalid_block_type", cellIndex: offset / 2, blockType };
-    }
-    actualBlockCount += 1;
-    if ((cellValue & ASTRA_BUILDER_FOUNDATION_UNDERLAY_MASK) !== 0) {
-      if (blockType === 2) return { kind: "invalid_foundation_underlay", cellIndex: offset / 2 };
+  if (encoding === ASTRA_BUILDER_ENCODING_V1) {
+    for (let offset = 0; offset < gridBuffer.length; offset += 2) {
+      const cellValue = gridBuffer.readUInt16LE(offset);
+      if ((cellValue & ~ASTRA_BUILDER_ALLOWED_CELL_MASK) !== 0) {
+        return { kind: "invalid_cell_bits", cellIndex: offset / 2 };
+      }
+      const blockType = cellValue & 0xff;
+      if (blockType === 0) {
+        if (cellValue !== 0) return { kind: "invalid_empty_cell", cellIndex: offset / 2 };
+        continue;
+      }
+      if (!ASTRA_BUILDER_ALLOWED_BLOCK_TYPES.has(blockType)) {
+        return { kind: "invalid_block_type", cellIndex: offset / 2, blockType };
+      }
       actualBlockCount += 1;
+      if ((cellValue & ASTRA_BUILDER_FOUNDATION_UNDERLAY_MASK) !== 0) {
+        if (blockType === 2) return { kind: "invalid_foundation_underlay", cellIndex: offset / 2 };
+        actualBlockCount += 1;
+      }
+    }
+  } else {
+    for (let offset = 0; offset < gridBuffer.length; offset += 4) {
+      const cellIndex = offset / 4;
+      const cellValue = gridBuffer.readUInt32LE(offset);
+      if ((cellValue & ASTRA_BUILDER_V2_RESERVED_MASK) !== 0) {
+        return { kind: "invalid_cell_bits", cellIndex };
+      }
+      const recipeId = cellValue & ASTRA_BUILDER_V2_MAIN_RECIPE_MASK;
+      const mainRotation = (cellValue >>> ASTRA_BUILDER_V2_MAIN_ROTATION_SHIFT) & 0x03;
+      const underlayRecipeId = (cellValue & ASTRA_BUILDER_V2_UNDERLAY_RECIPE_MASK)
+        >>> ASTRA_BUILDER_V2_UNDERLAY_RECIPE_SHIFT;
+      const underlayRotation = (cellValue >>> ASTRA_BUILDER_V2_UNDERLAY_ROTATION_SHIFT) & 0x03;
+      if (recipeId === 0) {
+        if (cellValue !== 0) return { kind: "invalid_empty_cell", cellIndex };
+        continue;
+      }
+      if (!ASTRA_BUILDER_ALLOWED_RECIPE_IDS.has(recipeId)) {
+        return { kind: "invalid_recipe_id", cellIndex, recipeId };
+      }
+      const recipeTraits = ASTRA_BUILDER_RECIPE_TRAITS.get(recipeId);
+      if (mainRotation >= recipeTraits.rotationSteps) {
+        return { kind: "invalid_rotation", cellIndex, recipeId, rotation: mainRotation };
+      }
+      actualBlockCount += 1;
+      if (underlayRecipeId !== 0) {
+        if (!ASTRA_BUILDER_ALLOWED_RECIPE_IDS.has(underlayRecipeId)) {
+          return { kind: "invalid_underlay_recipe_id", cellIndex, recipeId: underlayRecipeId };
+        }
+        const underlayTraits = ASTRA_BUILDER_RECIPE_TRAITS.get(underlayRecipeId);
+        if (underlayTraits.legacyBlockType !== 2 || underlayRotation >= underlayTraits.rotationSteps) {
+          return { kind: "invalid_underlay_recipe", cellIndex, recipeId: underlayRecipeId };
+        }
+        if (recipeTraits.legacyBlockType === 2) {
+          return { kind: "invalid_foundation_underlay", cellIndex };
+        }
+        actualBlockCount += 1;
+      } else if (underlayRotation !== 0) {
+        return { kind: "invalid_underlay_rotation", cellIndex };
+      }
     }
   }
 
@@ -1909,6 +1978,10 @@ function validateAstraBuilderStatePayload({
   return {
     kind: "valid",
     plot,
+    encoding,
+    catalogVersion: encoding === ASTRA_BUILDER_ENCODING_V2
+      ? ASTRA_BUILDER_CATALOG_VERSION
+      : 1,
     gridBuffer,
     blockCount: actualBlockCount,
     modules: [],
@@ -1920,6 +1993,17 @@ function getAstraBuilderStoredGridBuffer(value) {
   if (value instanceof Uint8Array) return Buffer.from(value);
   if (typeof value?.toUint8Array === "function") return Buffer.from(value.toUint8Array());
   return null;
+}
+
+function getAstraBuilderStateEncoding(state = {}, plot) {
+  if (state.encoding === ASTRA_BUILDER_ENCODING_V1 || state.encoding === ASTRA_BUILDER_ENCODING_V2) {
+    return state.encoding;
+  }
+  const gridBuffer = getAstraBuilderStoredGridBuffer(state.gridData);
+  if (gridBuffer?.length === getAstraBuilderGridByteLength(plot, ASTRA_BUILDER_ENCODING_V2)) {
+    return ASTRA_BUILDER_ENCODING_V2;
+  }
+  return ASTRA_BUILDER_ENCODING_V1;
 }
 
 function buildAstraBuilderPlotView(plotData = {}, fallbackPlot = null) {
@@ -2922,9 +3006,11 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         const stateSnap = builderStateSnaps[index];
         const state = stateSnap?.exists ? stateSnap.data() || {} : {};
         const gridBuffer = getAstraBuilderStoredGridBuffer(state.gridData);
+        const stateEncoding = getAstraBuilderStateEncoding(state, getAstraBuilderPlotDefinition(plot.plotId));
         return [plot.plotId, {
-          encoding: ASTRA_BUILDER_STATE_ENCODING,
-          gridDataBase64: gridBuffer?.length === getAstraBuilderGridByteLength(getAstraBuilderPlotDefinition(plot.plotId))
+          encoding: stateEncoding,
+          catalogVersion: stateEncoding === ASTRA_BUILDER_ENCODING_V2 ? ASTRA_BUILDER_CATALOG_VERSION : 1,
+          gridDataBase64: gridBuffer?.length === getAstraBuilderGridByteLength(getAstraBuilderPlotDefinition(plot.plotId), stateEncoding)
             ? gridBuffer.toString("base64")
             : "",
           blockCount: Math.max(0, Number(state.blockCount || 0)),
@@ -2994,10 +3080,13 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
         };
       }
       const blockCapacity = getAstraBuilderBlockCapacity(migratedPlanet, plotId);
+      const storedEncoding = stateSnap.exists
+        ? getAstraBuilderStateEncoding(stateData, definition)
+        : ASTRA_BUILDER_ENCODING_V2;
       const storedGridBuffer = stateSnap.exists
         ? getAstraBuilderStoredGridBuffer(stateData.gridData)
-        : Buffer.alloc(getAstraBuilderGridByteLength(definition));
-      if (!storedGridBuffer || storedGridBuffer.length !== getAstraBuilderGridByteLength(definition)) {
+        : Buffer.alloc(getAstraBuilderGridByteLength(definition, storedEncoding));
+      if (!storedGridBuffer || storedGridBuffer.length !== getAstraBuilderGridByteLength(definition, storedEncoding)) {
         throw new functions.https.HttpsError("data-loss", "저장된 건축 데이터를 복구할 수 없습니다.");
       }
 
@@ -3039,7 +3128,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       transaction.set(plotRef, plotData, { merge: true });
       if (!stateSnap.exists) {
         transaction.create(stateRef, {
-          encoding: ASTRA_BUILDER_STATE_ENCODING,
+          encoding: storedEncoding,
+          catalogVersion: storedEncoding === ASTRA_BUILDER_ENCODING_V2 ? ASTRA_BUILDER_CATALOG_VERSION : 1,
           gridData: storedGridBuffer,
           modules: [],
           revision: 0,
@@ -3052,7 +3142,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       return {
         plot: buildAstraBuilderPlotView(plotData, { ...definition, maxBlocks: blockCapacity }),
         state: {
-          encoding: ASTRA_BUILDER_STATE_ENCODING,
+          encoding: storedEncoding,
+          catalogVersion: storedEncoding === ASTRA_BUILDER_ENCODING_V2 ? ASTRA_BUILDER_CATALOG_VERSION : 1,
           gridDataBase64: storedGridBuffer.toString("base64"),
           modules: [],
           revision: currentRevision,
@@ -3089,6 +3180,7 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       gridDataBase64: data?.gridDataBase64,
       modules: data?.modules,
       blockCount: data?.blockCount,
+      catalogVersion: data?.catalogVersion,
     });
     if (validated.kind !== "valid") {
       throw new functions.https.HttpsError(
@@ -3114,6 +3206,14 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       const plotData = plotSnap.data() || {};
       const stateData = stateSnap.data() || {};
       const currentPlanet = planetSnap.data() || {};
+      const currentEncoding = getAstraBuilderStateEncoding(stateData, validated.plot);
+      if (currentEncoding === ASTRA_BUILDER_ENCODING_V2 && validated.encoding === ASTRA_BUILDER_ENCODING_V1) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "새 건축 저장 형식보다 이전 형식으로 되돌릴 수 없습니다.",
+          { currentEncoding, requestedEncoding: validated.encoding },
+        );
+      }
       if (!hasAstraBuilderPlotAccess(currentPlanet, plotId)) {
         throw new functions.https.HttpsError("permission-denied", "구매하지 않은 건축실입니다.");
       }
@@ -3154,7 +3254,8 @@ module.exports = function registerGalaxyGame({ functions, admin, regionalFunctio
       }
       const revision = currentRevision + 1;
       transaction.set(stateRef, {
-        encoding: ASTRA_BUILDER_STATE_ENCODING,
+        encoding: validated.encoding,
+        catalogVersion: validated.catalogVersion,
         gridData: validated.gridBuffer,
         modules: validated.modules,
         revision,

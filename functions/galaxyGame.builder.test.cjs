@@ -16,6 +16,7 @@ const {
 
 const PLOT_ID = 'habitat-b01';
 const BYTE_LENGTH = 12 * 10 * 12 * 2;
+const V2_BYTE_LENGTH = 12 * 10 * 12 * 4;
 
 function payloadFromBuffer(gridBuffer, overrides = {}) {
   return {
@@ -90,6 +91,50 @@ function testCellValidation() {
   }));
   assert.equal(fullGridResult.kind, 'valid');
   assert.equal(fullGridResult.blockCount, 2880);
+}
+
+function v2PayloadFromBuffer(gridBuffer, overrides = {}) {
+  return {
+    plotId: PLOT_ID,
+    encoding: 'u32le-v2',
+    catalogVersion: 2,
+    gridDataBase64: gridBuffer.toString('base64'),
+    modules: [],
+    ...overrides,
+  };
+}
+
+function testV2StateValidation() {
+  assert.equal(getAstraBuilderGridByteLength({
+    dimensions: { x: 12, y: 10, z: 12 },
+  }, 'u32le-v2'), V2_BYTE_LENGTH);
+
+  const grid = Buffer.alloc(V2_BYTE_LENGTH);
+  // Main recipe 1 with a wood floor underlay (recipe 12).
+  grid.writeUInt32LE(1 | (12 << 12), 0);
+  // A four-way stair (recipe 20), rotation 3.
+  grid.writeUInt32LE(20 | (3 << 10), 4);
+  const result = validateAstraBuilderStatePayload(v2PayloadFromBuffer(grid, { blockCount: 3 }));
+  assert.equal(result.kind, 'valid');
+  assert.equal(result.encoding, 'u32le-v2');
+  assert.equal(result.catalogVersion, 2);
+  assert.equal(result.blockCount, 3);
+
+  const reserved = Buffer.from(grid);
+  reserved.writeUInt32LE(0x01000000 | 1, 0);
+  assert.equal(validateAstraBuilderStatePayload(v2PayloadFromBuffer(reserved)).kind, 'invalid_cell_bits');
+
+  const invalidRecipe = Buffer.alloc(V2_BYTE_LENGTH);
+  invalidRecipe.writeUInt32LE(99, 0);
+  assert.equal(validateAstraBuilderStatePayload(v2PayloadFromBuffer(invalidRecipe)).kind, 'invalid_recipe_id');
+
+  const invalidRotation = Buffer.alloc(V2_BYTE_LENGTH);
+  invalidRotation.writeUInt32LE(1 | (1 << 10), 0);
+  assert.equal(validateAstraBuilderStatePayload(v2PayloadFromBuffer(invalidRotation)).kind, 'invalid_rotation');
+
+  const invalidUnderlay = Buffer.alloc(V2_BYTE_LENGTH);
+  invalidUnderlay.writeUInt32LE(1 | (16 << 12), 0);
+  assert.equal(validateAstraBuilderStatePayload(v2PayloadFromBuffer(invalidUnderlay)).kind, 'invalid_underlay_recipe');
 }
 
 function testStoredByteNormalization() {
@@ -189,6 +234,7 @@ function testTerritoryExpansion() {
 testValidState();
 testMalformedPayloads();
 testCellValidation();
+testV2StateValidation();
 testStoredByteNormalization();
 testBuilderEntitlements();
 testBuilderPurchases();

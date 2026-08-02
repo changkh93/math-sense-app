@@ -6,7 +6,10 @@ import AstraBuilderPlot from './AstraBuilderPlot'
 import {
   ASTRA_BUILDER_POC_PLOT,
   createEmptyAstraBuilderGrid,
+  decodeAstraBuilderCell,
+  getAstraBuilderCellIndex,
 } from './astraBuilderModel'
+import { getAstraBuilderPartForRecipe } from './astraBuilderRecipeCatalog.js'
 import { encodeAstraBuilderGridBase64 } from './astraBuilderCodec'
 import useAstraBuilderPoc from './useAstraBuilderPoc'
 import './AstraBuilderQa.css'
@@ -32,7 +35,8 @@ export default function AstraBuilderQa() {
     const state = readQaServerState()
     return {
       state: {
-        encoding: 'u16le-v1',
+        encoding: 'u32le-v2',
+        catalogVersion: 2,
         modules: [],
         ...state,
       },
@@ -105,6 +109,13 @@ export default function AstraBuilderQa() {
             selectedRotation={selectedRotation}
             onLayerChange={setActiveLayer}
             onEdit={builder.edit}
+            onCopy={(cell) => {
+              const decoded = decodeAstraBuilderCell(builder.cells[getAstraBuilderCellIndex(cell)])
+              if (!decoded?.occupied) return
+              setSelectedBlockType(decoded.recipeId || decoded.blockType)
+              setSelectedRotation(decoded.rotation || 0)
+              setTool('place')
+            }}
           />
         </Canvas>
 
@@ -127,10 +138,14 @@ export default function AstraBuilderQa() {
           selectedBlockType={selectedBlockType}
           onSelectBlockType={(blockType) => {
             setSelectedBlockType(blockType)
+            setSelectedRotation(0)
             setTool('place')
           }}
           selectedRotation={selectedRotation}
-          onRotateSelection={() => setSelectedRotation((current) => (current + 1) % 4)}
+          onRotateSelection={() => setSelectedRotation((current) => {
+            const rotationSteps = getAstraBuilderPartForRecipe(selectedBlockType)?.rotationSteps || 1
+            return rotationSteps > 1 ? (current + 1) % rotationSteps : 0
+          })}
           canUndo={builder.canUndo}
           canRedo={builder.canRedo}
           onUndo={builder.undo}

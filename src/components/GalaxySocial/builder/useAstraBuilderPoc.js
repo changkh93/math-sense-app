@@ -12,6 +12,7 @@ import {
   decodeAstraBuilderGridBase64,
   encodeAstraBuilderGridBase64,
 } from './astraBuilderCodec'
+import { ASTRA_BUILDER_LOCAL_ENCODING } from './astraBuilderStorage'
 import {
   loadAstraBuilderDraft,
   saveAstraBuilderDraft,
@@ -240,6 +241,8 @@ export default function useAstraBuilderPoc(
     setLocalSyncing(true)
     try {
       await saveAstraBuilderDraft(storageKey, snapshot.cells, {
+        encoding: ASTRA_BUILDER_LOCAL_ENCODING,
+        catalogVersion: 2,
         blockCount: snapshot.blockCount,
         serverRevision: serverRevisionRef.current,
         serverDirty: serverEnabledRef.current
@@ -319,7 +322,8 @@ export default function useAstraBuilderPoc(
           plotId,
           leaseId: serverLeaseRef.current.leaseId,
           baseRevision: serverRevisionRef.current,
-          encoding: 'u16le-v1',
+          encoding: ASTRA_BUILDER_LOCAL_ENCODING,
+          catalogVersion: 2,
           gridDataBase64: encodeAstraBuilderGridBase64(snapshot.cells),
           modules: [],
           blockCount: snapshot.blockCount,
@@ -334,6 +338,8 @@ export default function useAstraBuilderPoc(
         clearServerTimers()
         const latest = stateRef.current
         await saveAstraBuilderDraft(storageKey, latest.cells, {
+          encoding: ASTRA_BUILDER_LOCAL_ENCODING,
+          catalogVersion: 2,
           blockCount: latest.blockCount,
           serverRevision: nextServerRevision,
           serverDirty: latest.revision !== snapshot.revision,
@@ -448,6 +454,8 @@ export default function useAstraBuilderPoc(
             serverDirty: false,
           }
           await saveAstraBuilderDraft(storageKey, serverCells, {
+            encoding: ASTRA_BUILDER_LOCAL_ENCODING,
+            catalogVersion: 2,
             blockCount: Number(serverData.state.blockCount || 0),
             serverRevision: remoteRevision,
             serverDirty: false,
@@ -596,7 +604,8 @@ export default function useAstraBuilderPoc(
         plotId,
         leaseId: serverLeaseRef.current.leaseId,
         baseRevision: currentConflict.serverRevision,
-        encoding: 'u16le-v1',
+        encoding: ASTRA_BUILDER_LOCAL_ENCODING,
+        catalogVersion: 2,
         gridDataBase64: encodeAstraBuilderGridBase64(currentConflict.localCells),
         modules: [],
         blockCount: currentConflict.localBlockCount,
@@ -609,6 +618,8 @@ export default function useAstraBuilderPoc(
       setServerRevision(nextServerRevision)
       setConflict(null)
       await saveAstraBuilderDraft(storageKey, currentConflict.localCells, {
+        encoding: ASTRA_BUILDER_LOCAL_ENCODING,
+        catalogVersion: 2,
         blockCount: currentConflict.localBlockCount,
         serverRevision: nextServerRevision,
         serverDirty: false,

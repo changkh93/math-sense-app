@@ -1,3 +1,11 @@
+import {
+  ASTRA_BUILDER_PALETTE_RECIPES,
+  ASTRA_BUILDER_RECIPES,
+  getAstraBuilderCompatibleRecipe,
+  getAstraBuilderPartForRecipe,
+  getAstraBuilderRecipe,
+} from './astraBuilderRecipeCatalog.js'
+
 export const ASTRA_BUILDER_POC_PLOT = Object.freeze({
   id: 'habitat-b01',
   center: Object.freeze([-7.5, -4.5]),
@@ -32,6 +40,12 @@ export const ASTRA_BUILDER_BLOCKS = Object.freeze([
 export const ASTRA_BUILDER_BLOCK_BY_ID = new Map(
   ASTRA_BUILDER_BLOCKS.map((block) => [block.id, block]),
 )
+
+export { ASTRA_BUILDER_PALETTE_RECIPES, ASTRA_BUILDER_RECIPES }
+
+export function isAstraBuilderGrid(value) {
+  return value instanceof Uint16Array || value instanceof Uint32Array
+}
 
 export function getAstraBuilderLayerInfo(layer, plot = ASTRA_BUILDER_POC_PLOT) {
   const normalizedLayer = Math.min(
@@ -72,40 +86,59 @@ export function isAstraBuilderSameStoryLayer(
 
 export function doesAstraBuilderBlockOccupyLayer(cell, activeLayer) {
   if (!cell) return false
-  const blockType = Number(cell.type ?? cell.blockType ?? 0)
-  const heightCells = blockType === 7
-    ? ASTRA_BUILDER_DOOR_HEIGHT_CELLS
-    : blockType === ASTRA_BUILDER_WALL_PANEL_TYPE
-      ? ASTRA_BUILDER_STORY_HEIGHT_CELLS
-    : 1
+  const recipeId = Number(cell.recipeId ?? cell.type ?? cell.blockType ?? 0)
+  const part = getAstraBuilderPartForRecipe(recipeId)
+  const heightCells = part?.heightCells || 1
   const layer = Number(activeLayer)
   return layer >= Number(cell.y) && layer < Number(cell.y) + heightCells
 }
 
 export function normalizeAstraBuilderPlacementCell(
   cell,
-  blockType,
+  recipeId,
   plot = ASTRA_BUILDER_POC_PLOT,
 ) {
   if (!cell) return null
-  if (Number(blockType) !== ASTRA_BUILDER_WALL_PANEL_TYPE) return { ...cell }
+  const part = getAstraBuilderPartForRecipe(recipeId)
+  if (part?.legacyBlockType !== ASTRA_BUILDER_WALL_PANEL_TYPE) return { ...cell }
   const baseY = Math.floor(Number(cell.y) / ASTRA_BUILDER_STORY_HEIGHT_CELLS)
     * ASTRA_BUILDER_STORY_HEIGHT_CELLS
   const normalized = { ...cell, y: baseY }
   return baseY + ASTRA_BUILDER_STORY_HEIGHT_CELLS <= plot.height ? normalized : null
 }
 
-const TYPE_MASK = 0xff
-const ROTATION_SHIFT = 8
+const MAIN_RECIPE_MASK = 0x3ff
+const MAIN_ROTATION_SHIFT = 10
+const UNDERLAY_RECIPE_SHIFT = 12
+const UNDERLAY_RECIPE_MASK = 0x3ff
+const UNDERLAY_ROTATION_SHIFT = 22
 const ROTATION_MASK = 0x03
-const FOUNDATION_UNDERLAY_MASK = 1 << 10
+const RESERVED_MASK = 0xff000000
 
 export function getAstraBuilderCellCount(plot = ASTRA_BUILDER_POC_PLOT) {
   return plot.width * plot.depth * plot.height
 }
 
 export function createEmptyAstraBuilderGrid(plot = ASTRA_BUILDER_POC_PLOT) {
-  return new Uint16Array(getAstraBuilderCellCount(plot))
+  return new Uint32Array(getAstraBuilderCellCount(plot))
+}
+
+export function getAstraBuilderVisibleCells({
+  plotId,
+  activePlotId,
+  localCells,
+  localHydrated,
+  cachedCells,
+}, plot = ASTRA_BUILDER_POC_PLOT) {
+  const isActivePlot = String(plotId) === String(activePlotId)
+  // The active plot's local draft is the source of truth after hydration.
+  // Server state can legitimately lag while Functions are being upgraded or
+  // while an offline save is waiting to sync, so it must not replace the
+  // draft merely because the editing HUD is closed.
+  if (isActivePlot && localHydrated && isAstraBuilderGrid(localCells)) return localCells
+  if (isAstraBuilderGrid(cachedCells)) return cachedCells
+  if (isActivePlot && isAstraBuilderGrid(localCells)) return localCells
+  return createEmptyAstraBuilderGrid(plot)
 }
 
 export function isAstraBuilderCellInBounds(cell, plot = ASTRA_BUILDER_POC_PLOT) {
@@ -134,24 +167,44 @@ export function getAstraBuilderCellFromIndex(index, plot = ASTRA_BUILDER_POC_PLO
   return { x: layerIndex - z * plot.width, y, z }
 }
 
-export function encodeAstraBuilderCell(blockType, rotation = 0, foundationUnderlay = false) {
-  const normalizedType = Number(blockType) & TYPE_MASK
-  if (!ASTRA_BUILDER_BLOCK_BY_ID.has(normalizedType)) return 0
-  const normalizedRotation = Number(rotation) & ROTATION_MASK
-  const underlay = foundationUnderlay && normalizedType !== 2
-    ? FOUNDATION_UNDERLAY_MASK
+export function encodeAstraBuilderCell(recipeId, rotation = 0, foundationUnderlay = false, underlayRecipeId = 2, underlayRotation = 0) {
+  const normalizedRecipeId = Number(recipeId) & MAIN_RECIPE_MASK
+  if (!getAstraBuilderRecipe(normalizedRecipeId)) return 0
+  // Keep the legacy rotation bits lossless during v1 migration. New UI and
+  // server validation normalize symmetric parts to rotation 0 at the boundary.
+  const normalizedRotation = (Number(rotation) || 0) & ROTATION_MASK
+  const normalizedUnderlayRecipeId = foundationUnderlay && getAstraBuilderRecipe(normalizedRecipeId)?.legacyBlockType !== 2
+    ? Number(underlayRecipeId) & UNDERLAY_RECIPE_MASK
     : 0
-  return normalizedType | (normalizedRotation << ROTATION_SHIFT) | underlay
+  const normalizedUnderlayRotation = normalizedUnderlayRecipeId
+    ? (Number(underlayRotation) || 0) & ROTATION_MASK
+    : 0
+  return (
+    normalizedRecipeId
+    | (normalizedRotation << MAIN_ROTATION_SHIFT)
+    | (normalizedUnderlayRecipeId << UNDERLAY_RECIPE_SHIFT)
+    | (normalizedUnderlayRotation << UNDERLAY_ROTATION_SHIFT)
+  ) >>> 0
 }
 
 export function decodeAstraBuilderCell(value) {
-  const normalized = Number(value) || 0
-  return {
-    blockType: normalized & TYPE_MASK,
-    rotation: (normalized >> ROTATION_SHIFT) & ROTATION_MASK,
-    occupied: (normalized & TYPE_MASK) !== 0,
-    foundationUnderlay: (normalized & FOUNDATION_UNDERLAY_MASK) !== 0,
+  const normalized = Number(value) >>> 0
+  const recipeId = normalized & MAIN_RECIPE_MASK
+  const recipe = getAstraBuilderRecipe(recipeId)
+  const underlayRecipeId = (normalized >>> UNDERLAY_RECIPE_SHIFT) & UNDERLAY_RECIPE_MASK
+  const decoded = {
+    blockType: recipe?.legacyBlockType || 0,
+    rotation: (normalized >>> MAIN_ROTATION_SHIFT) & ROTATION_MASK,
+    occupied: recipeId !== 0 && Boolean(recipe),
+    foundationUnderlay: underlayRecipeId !== 0,
   }
+  Object.defineProperties(decoded, {
+    recipeId: { value: recipeId, enumerable: false },
+    underlayRecipeId: { value: underlayRecipeId, enumerable: false },
+    underlayRotation: { value: (normalized >>> UNDERLAY_ROTATION_SHIFT) & ROTATION_MASK, enumerable: false },
+    reservedBits: { value: normalized & RESERVED_MASK, enumerable: false },
+  })
+  return decoded
 }
 
 function countAstraBuilderCellPieces(value) {
@@ -181,7 +234,7 @@ export function getAstraBuilderDoorwayColumns(cell, rotation, plot = ASTRA_BUILD
 }
 
 export function getAstraBuilderDoorwayColumnKeys(cells, plot = ASTRA_BUILDER_POC_PLOT) {
-  if (!(cells instanceof Uint16Array)) return new Set()
+  if (!isAstraBuilderGrid(cells)) return new Set()
   const doorwayColumns = new Set()
   for (let index = 0; index < cells.length; index += 1) {
     const decoded = decodeAstraBuilderCell(cells[index])
@@ -196,7 +249,7 @@ export function getAstraBuilderDoorwayColumnKeys(cells, plot = ASTRA_BUILDER_POC
 }
 
 export function getAstraBuilderWalkBlockingCells(cells, plot = ASTRA_BUILDER_POC_PLOT) {
-  if (!(cells instanceof Uint16Array)) return []
+  if (!isAstraBuilderGrid(cells)) return []
   const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells, plot)
   const blockers = []
   for (let index = 0; index < cells.length; index += 1) {
@@ -220,9 +273,25 @@ export function countAstraBuilderBlocks(cells) {
   return count
 }
 
+// Appearance-only recipe changes should not rebuild the full outline geometry.
+// The key intentionally contains only topology and pose traits.
+export function getAstraBuilderTopologyKey(cells) {
+  if (!isAstraBuilderGrid(cells)) return ''
+  const parts = []
+  for (let index = 0; index < cells.length; index += 1) {
+    const decoded = decodeAstraBuilderCell(cells[index])
+    if (!decoded.occupied) {
+      parts.push('0')
+      continue
+    }
+    parts.push(`${decoded.blockType}:${decoded.rotation}:${decoded.foundationUnderlay ? 2 : 0}:${decoded.underlayRotation}`)
+  }
+  return parts.join('|')
+}
+
 export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT) {
   const index = getAstraBuilderCellIndex(edit?.cell, plot)
-  if (index < 0 || !(cells instanceof Uint16Array)) return null
+  if (index < 0 || !isAstraBuilderGrid(cells)) return null
 
   const before = cells[index]
   const decoded = decodeAstraBuilderCell(before)
@@ -230,31 +299,69 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
 
   if (edit.tool === 'place') {
     if (getAstraBuilderPlacementIssue(cells, edit, plot)) return null
-    const nextBlockType = Number(edit.blockType)
-    if (decoded.blockType === 2 && nextBlockType !== 2) {
+    const nextRecipeId = Number(edit.recipeId ?? edit.blockType)
+    const nextRecipe = getAstraBuilderRecipe(nextRecipeId)
+    if (!nextRecipe) return null
+    if (decoded.blockType === 2 && nextRecipe.legacyBlockType !== 2) {
       // Keep the thin foundation as a structural underlay and place the wall,
       // panel, door, etc. in the same course so it starts flush at floor level.
-      after = encodeAstraBuilderCell(nextBlockType, edit.rotation, true)
+      after = encodeAstraBuilderCell(nextRecipeId, edit.rotation, true, decoded.recipeId, decoded.rotation)
     } else if (
-      nextBlockType === 2
+      nextRecipe.legacyBlockType === 2
       && decoded.occupied
       && decoded.blockType !== 2
       && !decoded.foundationUnderlay
     ) {
-      after = encodeAstraBuilderCell(decoded.blockType, decoded.rotation, true)
+      after = encodeAstraBuilderCell(decoded.recipeId, decoded.rotation, true, nextRecipeId, edit.rotation)
     } else {
-      after = encodeAstraBuilderCell(nextBlockType, edit.rotation)
+      after = encodeAstraBuilderCell(nextRecipeId, edit.rotation)
     }
   } else if (edit.tool === 'delete') {
     if (!decoded.occupied) return null
-    after = decoded.foundationUnderlay ? encodeAstraBuilderCell(2) : 0
+    after = decoded.foundationUnderlay
+      ? encodeAstraBuilderCell(decoded.underlayRecipeId, decoded.underlayRotation)
+      : 0
   } else if (edit.tool === 'rotate') {
     if (!decoded.occupied) return null
     after = encodeAstraBuilderCell(
-      decoded.blockType,
+      decoded.recipeId,
       decoded.rotation + 1,
       decoded.foundationUnderlay,
+      decoded.underlayRecipeId,
+      decoded.underlayRotation,
     )
+  } else if (edit.tool === 'material') {
+    if (!decoded.occupied) return null
+    const selectedRecipe = getAstraBuilderRecipe(Number(edit.recipeId ?? edit.blockType))
+    const currentRecipe = getAstraBuilderRecipe(decoded.recipeId)
+    const nextRecipe = selectedRecipe && currentRecipe && selectedRecipe.partId === currentRecipe.partId
+      ? selectedRecipe
+      : selectedRecipe && currentRecipe
+        ? getAstraBuilderCompatibleRecipe(currentRecipe.partId, {
+            materialId: selectedRecipe.materialId,
+            variantId: selectedRecipe.variantId,
+          })
+        : null
+    if (!nextRecipe || !currentRecipe) return null
+    if (edit.targetSlot === 'underlay' && decoded.foundationUnderlay) {
+      const nextUnderlayPart = getAstraBuilderPartForRecipe(nextRecipe.id)
+      if (nextUnderlayPart?.legacyBlockType !== 2) return null
+      after = encodeAstraBuilderCell(
+        decoded.recipeId,
+        decoded.rotation,
+        true,
+        nextRecipe.id,
+        decoded.underlayRotation,
+      )
+    } else {
+      after = encodeAstraBuilderCell(
+        nextRecipe.id,
+        decoded.rotation,
+        decoded.foundationUnderlay,
+        decoded.underlayRecipeId,
+        decoded.underlayRotation,
+      )
+    }
   } else {
     return null
   }
@@ -273,7 +380,7 @@ export function getAstraBuilderWallPanelAnchorAtCell(
   cell,
   plot = ASTRA_BUILDER_POC_PLOT,
 ) {
-  if (!(cells instanceof Uint16Array) || !isAstraBuilderCellInBounds(cell, plot)) return null
+  if (!isAstraBuilderGrid(cells) || !isAstraBuilderCellInBounds(cell, plot)) return null
   for (let offset = 0; offset < ASTRA_BUILDER_STORY_HEIGHT_CELLS; offset += 1) {
     const anchor = { x: cell.x, y: cell.y - offset, z: cell.z }
     const index = getAstraBuilderCellIndex(anchor, plot)
@@ -285,12 +392,13 @@ export function getAstraBuilderWallPanelAnchorAtCell(
 }
 
 export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_POC_PLOT) {
-  if (!(cells instanceof Uint16Array) || edit?.tool !== 'place') return null
+  if (!isAstraBuilderGrid(cells) || edit?.tool !== 'place') return null
   const cell = edit.cell
   const index = getAstraBuilderCellIndex(cell, plot)
   if (index < 0) return 'out_of_bounds'
-  if (!ASTRA_BUILDER_BLOCK_BY_ID.has(Number(edit.blockType))) return 'invalid_block'
-  const candidateBlockType = Number(edit.blockType)
+  const candidateRecipe = getAstraBuilderRecipe(Number(edit.recipeId ?? edit.blockType))
+  if (!candidateRecipe) return 'invalid_block'
+  const candidateBlockType = candidateRecipe.legacyBlockType
   const existing = decodeAstraBuilderCell(cells[index])
   const panelAnchor = getAstraBuilderWallPanelAnchorAtCell(cells, cell, plot)
   const isExactPanelAnchor = panelAnchor
@@ -327,11 +435,11 @@ export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_
   const candidateColumnKey = `${cell.x}:${cell.z}`
   if (
     cell.y <= 2
-    && Number(edit.blockType) !== 2
+    && candidateBlockType !== 2
     && doorwayColumns.has(candidateColumnKey)
   ) return 'doorway_reserved'
 
-  if (Number(edit.blockType) !== 7) return null
+  if (candidateBlockType !== 7) return null
   if (cell.y !== 0) return 'door_ground_only'
   const doorColumns = getAstraBuilderDoorwayColumns(cell, edit.rotation, plot)
   if (doorColumns.length !== 2) return 'door_needs_two_columns'
@@ -348,25 +456,26 @@ export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_
 }
 
 export function applyAstraBuilderPatch(cells, patch, direction = 'redo') {
-  if (!(cells instanceof Uint16Array) || !patch || patch.index < 0 || patch.index >= cells.length) return cells
+  if (!isAstraBuilderGrid(cells) || !patch || patch.index < 0 || patch.index >= cells.length) return cells
   const nextCells = cells.slice()
   nextCells[patch.index] = direction === 'undo' ? patch.before : patch.after
   return nextCells
 }
 
 export function getAstraBuilderInstances(cells, plot = ASTRA_BUILDER_POC_PLOT) {
-  const instancesByType = new Map(ASTRA_BUILDER_BLOCKS.map((block) => [block.id, []]))
+  const instancesByType = new Map(ASTRA_BUILDER_RECIPES.map((recipe) => [recipe.id, []]))
   const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells, plot)
   for (let index = 0; index < cells.length; index += 1) {
     const decoded = decodeAstraBuilderCell(cells[index])
-    if (!decoded.occupied || !instancesByType.has(decoded.blockType)) continue
+    if (!decoded.occupied || !instancesByType.has(decoded.recipeId)) continue
     const cell = getAstraBuilderCellFromIndex(index, plot)
     if (!cell) continue
     if (decoded.foundationUnderlay) {
-      instancesByType.get(2).push({
+      instancesByType.get(decoded.underlayRecipeId)?.push({
         ...cell,
-        type: 2,
-        rotation: 0,
+        recipeId: decoded.underlayRecipeId,
+        type: getAstraBuilderRecipe(decoded.underlayRecipeId)?.legacyBlockType || 2,
+        rotation: decoded.underlayRotation,
         index,
         underlay: true,
       })
@@ -376,8 +485,9 @@ export function getAstraBuilderInstances(cells, plot = ASTRA_BUILDER_POC_PLOT) {
       && cell.y <= 2
       && doorwayColumns.has(`${cell.x}:${cell.z}`)
     if (hiddenByDoorway) continue
-    instancesByType.get(decoded.blockType).push({
+    instancesByType.get(decoded.recipeId).push({
       ...cell,
+      recipeId: decoded.recipeId,
       type: decoded.blockType,
       rotation: decoded.rotation,
       index,

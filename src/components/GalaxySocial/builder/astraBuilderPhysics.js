@@ -8,6 +8,7 @@ import {
   getAstraBuilderDoorwayColumnKeys,
   getAstraBuilderStairAscentVector,
   getAstraBuilderWorldPosition,
+  isAstraBuilderGrid,
 } from './astraBuilderModel.js'
 import { getAstraBuilderBlockTraits } from './astraBuilderBlockCatalog.js'
 
@@ -107,7 +108,7 @@ export function getAstraBuilderWalkSurfaceHeight({
   plot = ASTRA_BUILDER_POC_PLOT,
 }) {
   const columnCell = getAstraBuilderCellFromWorldPoint({ x, z }, 0, plot)
-  if (!columnCell || !(cells instanceof Uint16Array)) return terrainY
+  if (!columnCell || !isAstraBuilderGrid(cells)) return terrainY
 
   const dimensions = getAstraBuilderCharacterDimensions(characterScale)
   const currentOffset = Number.isFinite(currentFootY) ? currentFootY - plotBaseY : null
@@ -216,7 +217,7 @@ export function createAstraBuilderCollisionBodies(
   plotBaseY,
   plot = ASTRA_BUILDER_POC_PLOT,
 ) {
-  if (!(cells instanceof Uint16Array)) return []
+  if (!isAstraBuilderGrid(cells)) return []
   const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells, plot)
   const bodies = []
   for (let index = 0; index < cells.length; index += 1) {

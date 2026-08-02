@@ -1,6 +1,7 @@
 const DATABASE_NAME = 'metasense-astra-builder-poc'
 const DATABASE_VERSION = 1
 const STORE_NAME = 'plots'
+export const ASTRA_BUILDER_LOCAL_ENCODING = 'u32le-v2'
 
 function openAstraBuilderDatabase() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null)
@@ -45,11 +46,14 @@ function runPlotTransaction(mode, action) {
 export async function loadAstraBuilderDraft(key, expectedCellCount) {
   if (!key) return null
   const record = await runPlotTransaction('readonly', (store) => store.get(key))
-  if (!record || record.encoding !== 'u16le-v1' || !(record.data instanceof ArrayBuffer)) return null
-  const cells = new Uint16Array(record.data)
+  if (!record || !['u16le-v1', ASTRA_BUILDER_LOCAL_ENCODING].includes(record.encoding) || !(record.data instanceof ArrayBuffer)) return null
+  const CellArray = record.encoding === 'u16le-v1' ? Uint16Array : Uint32Array
+  const cells = new CellArray(record.data)
   if (cells.length !== expectedCellCount) return null
   return {
-    cells: cells.slice(),
+    cells: record.encoding === 'u16le-v1' ? Uint32Array.from(cells) : cells.slice(),
+    encoding: record.encoding,
+    catalogVersion: Number(record.catalogVersion || 1),
     blockCount: Number(record.blockCount || 0),
     serverRevision: Number.isInteger(record.serverRevision) ? record.serverRevision : null,
     serverDirty: record.serverDirty === true,
@@ -58,11 +62,12 @@ export async function loadAstraBuilderDraft(key, expectedCellCount) {
 }
 
 export async function saveAstraBuilderDraft(key, cells, metadata = {}) {
-  if (!key || !(cells instanceof Uint16Array)) return false
+  if (!key || (!(cells instanceof Uint16Array) && !(cells instanceof Uint32Array))) return false
   const data = cells.buffer.slice(cells.byteOffset, cells.byteOffset + cells.byteLength)
   await runPlotTransaction('readwrite', (store) => store.put({
     key,
-    encoding: 'u16le-v1',
+    encoding: metadata.encoding || (cells instanceof Uint16Array ? 'u16le-v1' : ASTRA_BUILDER_LOCAL_ENCODING),
+    catalogVersion: Number(metadata.catalogVersion || (cells instanceof Uint16Array ? 1 : 2)),
     data,
     blockCount: Number(metadata.blockCount || 0),
     serverRevision: Number.isInteger(metadata.serverRevision)

@@ -320,11 +320,12 @@
 
 .astra-builder-hud__materials {
   display: grid;
-  grid-template-columns: repeat(7, minmax(58px, 1fr));
+  grid-template-columns: auto repeat(8, minmax(58px, 1fr)) auto;
   gap: .35rem;
 }
 
 .astra-builder-hud__materials button {
+  position: relative;
   display: grid;
   place-items: center;
   gap: .18rem;
@@ -342,6 +343,160 @@
   border-radius: 5px;
   background: var(--builder-block-color);
   box-shadow: inset -5px -5px 8px rgba(0, 0, 0, .16);
+}
+
+.astra-builder-hud__materials i.material-wood,
+.astra-builder-hud__material-grid i.material-wood {
+  background:
+    repeating-linear-gradient(8deg, rgba(61, 31, 15, .36) 0 1px, transparent 1px 5px),
+    var(--builder-block-color);
+}
+
+.astra-builder-hud__materials i.material-glass,
+.astra-builder-hud__material-grid i.material-glass {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, .72), transparent 42%),
+    repeating-conic-gradient(rgba(255, 255, 255, .18) 0 25%, rgba(8, 31, 43, .16) 0 50%) 0 / 8px 8px,
+    color-mix(in srgb, var(--builder-block-color) 58%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(212, 249, 255, .38);
+}
+
+.astra-builder-hud__quickbar-source {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(5, 15, 25, .82);
+  color: #9fb7b1;
+  font-size: .38rem;
+  line-height: 1.35;
+  letter-spacing: .02em;
+}
+
+.astra-builder-hud__quickbar-source.recent {
+  color: #7cf2bd;
+}
+
+.astra-builder-hud__palette-toggle {
+  min-width: 72px;
+  color: #9fffe0 !important;
+}
+
+.astra-builder-hud__no-rotation {
+  display: grid;
+  place-items: center;
+  min-height: 58px;
+  padding: .3rem .55rem;
+  border: 1px dashed rgba(255, 255, 255, .14);
+  border-radius: 11px;
+  color: #7e9a95;
+  font-size: .5rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.astra-builder-hud__material-drawer {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: .55rem;
+  margin-top: .55rem;
+  padding-top: .55rem;
+  border-top: 1px solid rgba(124, 242, 189, .15);
+}
+
+.astra-builder-hud__drawer-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .8rem;
+}
+
+.astra-builder-hud__drawer-heading strong {
+  color: #effff9;
+  font-size: .7rem;
+}
+
+.astra-builder-hud__drawer-heading span {
+  color: #7e9a95;
+  font-size: .52rem;
+}
+
+.astra-builder-hud__material-categories {
+  display: flex;
+  gap: .3rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.astra-builder-hud__material-categories > span {
+  flex: 0 0 34px;
+  align-self: center;
+  color: #7cf2bd;
+  font-size: .5rem;
+  font-weight: 900;
+}
+
+.astra-builder-hud__material-categories button {
+  min-height: 30px;
+  padding: 0 .55rem;
+  border-radius: 999px;
+  font-size: .58rem;
+  white-space: nowrap;
+}
+
+.astra-builder-hud__material-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: .35rem;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.astra-builder-hud__material-grid button {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  min-width: 0;
+  min-height: 42px;
+  padding: .35rem .45rem;
+  border-radius: 10px;
+  text-align: left;
+  font-size: .58rem;
+  word-break: keep-all;
+}
+
+.astra-builder-hud__material-grid i {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.astra-builder-hud__material-grid button > span {
+  min-width: 0;
+}
+
+.astra-builder-hud__material-grid button strong,
+.astra-builder-hud__material-grid button small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.astra-builder-hud__material-grid button strong {
+  color: #effff9;
+  font-size: .62rem;
+}
+
+.astra-builder-hud__material-grid button small {
+  margin-top: .12rem;
+  color: #8ba29d;
+  font-size: .48rem;
+}
+
+.astra-builder-hud__material-grid button.active small {
+  color: #b9ffe5;
 }
 
 @media (max-width: 760px) {
@@ -454,6 +609,12 @@
     display: none;
   }
 
+  .astra-builder-hud__drawer-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: .15rem;
+  }
+
   .astra-builder-hud__materials {
     display: flex;
     gap: .3rem;
@@ -466,10 +627,17 @@
     min-height: 54px;
   }
 
-  .astra-builder-hud__materials button:nth-child(5),
-  .astra-builder-hud__materials button:nth-child(6),
-  .astra-builder-hud__materials .rotate-selection {
-    display: none;
+  .astra-builder-hud__materials {
+    grid-template-columns: repeat(7, minmax(56px, 1fr));
+  }
+
+  .astra-builder-hud__palette-toggle {
+    min-width: 56px;
+  }
+
+  .astra-builder-hud__palette-toggle span,
+  .astra-builder-hud__materials > button:not(.active) span {
+    display: block;
   }
 }
 
@@ -493,5 +661,16 @@
 
   .astra-builder-hud__status > button:last-child svg {
     flex: 0 0 auto;
+  }
+
+  /* Five compact tools must fit beside the touch joystick on narrow phones. */
+  .frontier-game-stage.builder-active .astra-builder-hud__tools {
+    left: 4.35rem;
+  }
+
+  .astra-builder-hud__tools button,
+  .astra-builder-hud__history button {
+    width: 40px;
+    min-height: 40px;
   }
 }
