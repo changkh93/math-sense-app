@@ -30,6 +30,14 @@ const BATTLE_SCOPE_LABELS = {
   [BATTLE_SCOPE_CUMULATIVE]: '이전 과정 전체',
 }
 const BATTLE_FEEDBACK_VOLUME_MULTIPLIER = 1.75
+const BATTLE_MAX_FOCUS_VIOLATIONS = 3
+
+const isBattleCaptureShortcut = (event) => {
+  if (event.key === 'PrintScreen') return true
+  const key = String(event.key || '').toLowerCase()
+  if ((event.metaKey || event.ctrlKey) && key === 'p') return true
+  return event.metaKey && event.shiftKey && ['3', '4', '5'].includes(key)
+}
 
 const getBattleChallengeError = (error, fallback) => {
   const message = String(error?.message || '').trim()
@@ -96,6 +104,10 @@ export default function QuizBattleView({
   const [isUpdatingReception, setIsUpdatingReception] = useState(false)
   const [error, setError] = useState('')
   const [integrityNotice, setIntegrityNotice] = useState('')
+  const [isFocusLocked, setIsFocusLocked] = useState(false)
+  const [isBattleFocusReady, setIsBattleFocusReady] = useState(false)
+  const [focusLockReason, setFocusLockReason] = useState('')
+  const [focusViolationCount, setFocusViolationCount] = useState(0)
   const [resultDismissEnabled, setResultDismissEnabled] = useState(false)
   const [timeNow, setTimeNow] = useState(Date.now())
   const [reveal, setReveal] = useState(false) // 답안 제출 후 정답 공개 단계
@@ -113,6 +125,8 @@ export default function QuizBattleView({
   const queueMatchAttemptRef = useRef('')
   const lastIntegrityReportRef = useRef(0)
   const resultLockedRef = useRef(false)
+  const focusProtectionArmedRef = useRef(false)
+  const focusTransitionGraceUntilRef = useRef(0)
   const isAIMode = opponentMode === 'ai'
   const isScopeLocked = Boolean(rangeLabel)
   const aiTrainingData = useMemo(() => calculateBattleData(userData || {}), [userData])
@@ -631,6 +645,10 @@ export default function QuizBattleView({
   const timeLeftSec = Number(battle?.endsAtMs || 0) > 0 ? Math.max(0, Math.ceil((Number(battle.endsAtMs) - timeNow) / 1000)) : 999
   const isUrgentTime = Number(battle?.endsAtMs || 0) > 0 && battle?.status === 'active' && !isBattleFinished && timeLeftSec <= 30
   const aiAnsweredCount = Number(opponentParticipant.answeredCount || 0)
+  const displayedFocusViolationCount = Math.max(
+    focusViolationCount,
+    Number(myParticipant.integrityViolationCount || 0),
+  )
 
   const urgentAudioTriggeredRef = useRef(false)
   useEffect(() => {
@@ -638,7 +656,7 @@ export default function QuizBattleView({
       urgentAudioTriggeredRef.current = true
       try {
         soundManager.playWarning()
-      } catch (err) {
+      } catch {
         // ignore
       }
     } else if (!isUrgentTime) {
@@ -698,7 +716,32 @@ export default function QuizBattleView({
     if (!battleId || battle?.status !== 'active' || isBattleFinished) return undefined
 
     let blurTimer = null
+    const fullscreenSupported = Boolean(document.documentElement.requestFullscreen)
+    const isInternalCapture = () => document.body.classList.contains('is-capturing')
+    const isEntryTransition = () => (
+      !focusProtectionArmedRef.current || Date.now() < focusTransitionGraceUntilRef.current
+    )
+
+    if (document.fullscreenElement || !fullscreenSupported) {
+      focusProtectionArmedRef.current = true
+      focusTransitionGraceUntilRef.current = document.fullscreenElement ? Date.now() + 2500 : 0
+      setIsBattleFocusReady(true)
+      setIsFocusLocked(false)
+      setFocusLockReason('')
+      document.body.classList.remove('quiz-battle-window-blurred')
+    } else {
+      focusProtectionArmedRef.current = false
+      setIsBattleFocusReady(false)
+      setIsFocusLocked(true)
+      setFocusLockReason('배틀을 시작하려면 전체화면으로 전환해야 합니다.')
+      document.body.classList.add('quiz-battle-window-blurred')
+    }
+
     const reportIntegrityEvent = async (eventType) => {
+      if (isInternalCapture()) return
+      document.body.classList.add('quiz-battle-window-blurred')
+      setIsFocusLocked(true)
+
       const now = Date.now()
       if (now - lastIntegrityReportRef.current < 4000) return
       lastIntegrityReportRef.current = now
@@ -706,28 +749,65 @@ export default function QuizBattleView({
         const report = httpsCallable(functions, 'reportQuizBattleIntegrityEvent')
         const res = await report({ battleId, eventType })
         const count = Number(res.data?.violationCount || 0)
+        setFocusViolationCount(count)
         if (res.data?.forfeited) {
           setIntegrityNotice('집중 화면 이탈이 반복되어 이번 배틀이 종료되었습니다.')
+          setFocusLockReason('집중 화면 이탈이 반복되어 이번 배틀이 종료되었습니다.')
         } else if (count > 0) {
           setIntegrityNotice(`집중 화면 이탈이 감지되었습니다. 반복 시 배틀이 종료됩니다. (${count}/3)`)
+          setFocusLockReason('퀴즈 화면을 벗어나 배틀이 잠시 멈췄습니다.')
         }
       } catch (err) {
         console.warn('Battle integrity event report failed', err)
+        setFocusLockReason('집중 화면을 확인하지 못했습니다. 전체화면으로 돌아가 다시 시도해 주세요.')
       }
     }
     const handleVisibility = () => {
-      if (document.hidden) reportIntegrityEvent('visibility_hidden')
+      if (document.hidden && !isInternalCapture() && !isEntryTransition()) {
+        reportIntegrityEvent('visibility_hidden')
+      }
     }
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement) reportIntegrityEvent('fullscreen_exit')
+      if (document.fullscreenElement) {
+        focusProtectionArmedRef.current = true
+        focusTransitionGraceUntilRef.current = Date.now() + 2500
+        setIsBattleFocusReady(true)
+        setIsFocusLocked(false)
+        setFocusLockReason('')
+        document.body.classList.remove('quiz-battle-window-blurred')
+        return
+      }
+      if (focusProtectionArmedRef.current && !isInternalCapture() && !isEntryTransition()) {
+        reportIntegrityEvent('fullscreen_exit')
+      }
     }
     const handleBlur = () => {
+      if (isInternalCapture() || isEntryTransition()) return
+      document.body.classList.add('quiz-battle-window-blurred')
+      setIsFocusLocked(true)
+      setFocusLockReason('퀴즈 화면을 벗어나 배틀이 잠시 멈췄습니다.')
       blurTimer = window.setTimeout(() => {
-        if (!document.hasFocus()) reportIntegrityEvent('window_blur')
-      }, 1500)
+        if (!document.hasFocus() && !isInternalCapture() && !isEntryTransition()) {
+          reportIntegrityEvent('window_blur')
+        }
+      }, 700)
     }
     const handleFocus = () => {
       if (blurTimer) window.clearTimeout(blurTimer)
+    }
+    const handleKeyDown = (event) => {
+      if (!isBattleCaptureShortcut(event) || isInternalCapture()) return
+      event.preventDefault()
+      setFocusLockReason('화면 캡처 또는 인쇄 시도가 감지되어 배틀을 잠시 멈췄습니다.')
+      reportIntegrityEvent('capture_shortcut')
+    }
+    const preventContentExport = (event) => {
+      if (!isInternalCapture()) event.preventDefault()
+    }
+    const handleBeforePrint = () => {
+      if (isInternalCapture()) return
+      setFocusLockReason('인쇄 시도가 감지되어 배틀을 잠시 멈췄습니다.')
+      reportIntegrityEvent('print_attempt')
     }
     const handleBeforeUnload = (event) => {
       event.preventDefault()
@@ -736,18 +816,61 @@ export default function QuizBattleView({
 
     document.addEventListener('visibilitychange', handleVisibility)
     document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('copy', preventContentExport)
+    document.addEventListener('cut', preventContentExport)
+    document.addEventListener('contextmenu', preventContentExport)
+    document.addEventListener('dragstart', preventContentExport)
     window.addEventListener('blur', handleBlur)
     window.addEventListener('focus', handleFocus)
+    window.addEventListener('keydown', handleKeyDown, true)
+    window.addEventListener('beforeprint', handleBeforePrint)
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => {
       if (blurTimer) window.clearTimeout(blurTimer)
+      document.body.classList.remove('quiz-battle-window-blurred')
       document.removeEventListener('visibilitychange', handleVisibility)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('copy', preventContentExport)
+      document.removeEventListener('cut', preventContentExport)
+      document.removeEventListener('contextmenu', preventContentExport)
+      document.removeEventListener('dragstart', preventContentExport)
       window.removeEventListener('blur', handleBlur)
       window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('keydown', handleKeyDown, true)
+      window.removeEventListener('beforeprint', handleBeforePrint)
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
   }, [battle?.status, battleId, isBattleFinished])
+
+  useEffect(() => {
+    if (!isBattleFinished || !document.fullscreenElement || !document.exitFullscreen) return
+    document.exitFullscreen().catch(() => {})
+  }, [isBattleFinished])
+
+  const resumeBattleFocus = async () => {
+    if (!document.hasFocus()) return
+    if (!document.documentElement.requestFullscreen || document.fullscreenElement) {
+      focusProtectionArmedRef.current = true
+      focusTransitionGraceUntilRef.current = Date.now() + 2500
+      setIsBattleFocusReady(true)
+      setIsFocusLocked(false)
+      setFocusLockReason('')
+      document.body.classList.remove('quiz-battle-window-blurred')
+      return
+    }
+
+    try {
+      await document.documentElement.requestFullscreen()
+      focusProtectionArmedRef.current = true
+      focusTransitionGraceUntilRef.current = Date.now() + 2500
+      setIsBattleFocusReady(true)
+      setIsFocusLocked(false)
+      setFocusLockReason('')
+      document.body.classList.remove('quiz-battle-window-blurred')
+    } catch {
+      setFocusLockReason('전체화면 전환이 차단되었습니다. 브라우저 권한을 허용한 뒤 다시 시도해 주세요.')
+    }
+  }
 
   useEffect(() => {
     if (!battleId || !user?.uid || questionSet.length === 0) return undefined
@@ -1653,8 +1776,67 @@ export default function QuizBattleView({
   }
 
   return (
-    <div className="space-bg" style={{ ...panelStyle, alignItems: 'stretch', overflowY: 'auto' }}>
-      <div style={{ width: 'min(1040px, 100%)', margin: '0 auto', padding: '1rem 0' }}>
+    <div className="space-bg quiz-battle-protection-root" style={{ ...panelStyle, alignItems: 'stretch', overflowY: 'auto' }}>
+      <div className="quiz-battle-print-blocker" aria-hidden="true">
+        🔒 Quiz Battle 문제 화면은 인쇄할 수 없습니다.
+      </div>
+
+      <div className="quiz-battle-watermark" aria-hidden="true">
+        {Array.from({ length: 15 }, (_, index) => (
+          <span key={index}>
+            {userData?.displayName || userData?.name || user?.displayName || 'METASENSE 탐사원'} · QUIZ BATTLE · {battleId.slice(-6)}
+          </span>
+        ))}
+      </div>
+
+      {(isFocusLocked || !isBattleFocusReady) && (
+        <MotionDiv
+          className="quiz-battle-focus-lock"
+          role="dialog"
+          aria-modal="true"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <div className="glass-card hud-border" style={{ width: 'min(440px, calc(100vw - 2rem))', padding: '2rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🔒</div>
+            <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '1rem' }}>
+              {displayedFocusViolationCount >= BATTLE_MAX_FOCUS_VIOLATIONS ? '배틀이 종료되었어요' : '배틀이 잠시 멈췄어요'}
+            </h2>
+            <p className="font-tech" style={{ color: 'var(--text-bright)', lineHeight: 1.65, marginBottom: '0.75rem' }}>
+              {focusLockReason || '배틀을 계속하려면 전체화면으로 전환해 주세요.'}
+            </p>
+            <p className="font-tech" style={{ color: '#fda4af', marginBottom: '1.5rem' }}>
+              집중 화면 이탈 {displayedFocusViolationCount}/{BATTLE_MAX_FOCUS_VIOLATIONS}
+            </p>
+            <button
+              className="hud-btn primary glass"
+              onClick={resumeBattleFocus}
+              disabled={displayedFocusViolationCount >= BATTLE_MAX_FOCUS_VIOLATIONS}
+              style={{
+                width: '100%',
+                padding: '0.9rem',
+                cursor: displayedFocusViolationCount >= BATTLE_MAX_FOCUS_VIOLATIONS ? 'wait' : 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.2rem',
+                opacity: displayedFocusViolationCount >= BATTLE_MAX_FOCUS_VIOLATIONS ? 0.7 : 1,
+              }}
+            >
+              {displayedFocusViolationCount >= BATTLE_MAX_FOCUS_VIOLATIONS ? (
+                '배틀 결과 확인 중…'
+              ) : (
+                <>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 800 }}>배틀 계속하기</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 500, opacity: 0.72 }}>전체화면으로 돌아갑니다</span>
+                </>
+              )}
+            </button>
+          </div>
+        </MotionDiv>
+      )}
+
+      <div className="quiz-battle-protected-content" style={{ width: 'min(1040px, 100%)', margin: '0 auto', padding: '1rem 0' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '0.8rem', alignItems: 'center', marginBottom: '1rem' }}>
           <div className="glass-card" style={{ padding: '0.85rem 1rem' }}>
             <div className="font-tech" style={{ color: 'var(--text-muted)' }}>나</div>

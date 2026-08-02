@@ -4199,7 +4199,7 @@ exports.submitBattleAnswer = quizBattleFunctions.https.onCall(async (data, conte
 exports.reportQuizBattleIntegrityEvent = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const battleId = cleanId(data?.battleId);
-  const eventType = ["visibility_hidden", "window_blur", "fullscreen_exit"].includes(data?.eventType)
+  const eventType = ["visibility_hidden", "window_blur", "fullscreen_exit", "capture_shortcut", "print_attempt"].includes(data?.eventType)
     ? data.eventType
     : "focus_lost";
   if (!battleId) {
