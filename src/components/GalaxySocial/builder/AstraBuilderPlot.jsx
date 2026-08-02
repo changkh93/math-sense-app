@@ -14,12 +14,13 @@ import {
   getAstraBuilderDoorwayColumnKeys,
   getAstraBuilderInstances,
   getAstraBuilderLayerEditTarget,
+  getAstraBuilderMaterialEditIssue,
   getAstraBuilderPlacementIssue,
   getAstraBuilderTopologyKey,
   getAstraBuilderWorldPosition,
   normalizeAstraBuilderPlacementCell,
 } from './astraBuilderModel'
-import { getAstraBuilderRecipe, getAstraBuilderRenderProfile } from './astraBuilderRecipeCatalog.js'
+import { getAstraBuilderPartForRecipe, getAstraBuilderRecipe, getAstraBuilderRenderProfile } from './astraBuilderRecipeCatalog.js'
 import {
   doesAstraBuilderPlacementOverlapCharacter,
   getAstraBuilderCharacterDimensions,
@@ -101,27 +102,30 @@ const STAIR_GEOMETRY = (() => {
   return geom
 })()
 
-function getBlockTransform(blockType, cell) {
+function getBlockTransform(recipeId, cell) {
   const position = getAstraBuilderWorldPosition(cell)
-  // 벽(1)·유리(3)·조명(4)·계단(5)은 셀에 딱 맞춰 밀착(틈/단차 제거).
-  // 바닥(2)은 납작하게, 기둥(6)은 가늘게 두어 각 재료 특성 유지.
+  const part = getAstraBuilderPartForRecipe(recipeId)
   const scale = new THREE.Vector3(1, 1, 1)
-  if (blockType === 2) {
+  if (part?.bodyShape === 'floor') {
     scale.y = 0.22
     position[1] -= ASTRA_BUILDER_POC_PLOT.cellSize * 0.37
-  } else if (blockType === 8) {
-    scale.y = 3
+  } else if ((part?.heightCells || 1) > 1) {
+    scale.y = part.heightCells
     position[1] += ASTRA_BUILDER_POC_PLOT.cellSize
-  } else if (blockType === 6) {
+  } else if (part?.bodyShape === 'pillar') {
     scale.x = 0.42
     scale.z = 0.42
+  } else if (part?.bodyShape === 'bar') {
+    scale.x = 0.24
+    scale.y = 0.2
+    scale.z = 0.88
   }
   return { position, scale }
 }
 
 function WoodDoorMaterial({ color, preview, leaf = false, map }) {
   return preview ? (
-    <meshBasicMaterial color={color} transparent opacity={.42} wireframe depthWrite={false} />
+    <meshStandardMaterial color={color} map={map} transparent opacity={.68} roughness={.82} metalness={.02} depthWrite={false} />
   ) : (
     <meshStandardMaterial
       color={color}
@@ -220,6 +224,7 @@ function BuilderBlockInstances({ block, instances, onBlockClick, onBlockPointerM
   const meshRef = useRef()
   const transform = useMemo(() => new THREE.Object3D(), [])
   const renderProfile = getAstraBuilderRenderProfile(block.id)
+  const part = getAstraBuilderPartForRecipe(block.id)
   const woodTexture = renderProfile?.textureKind === 'wood_grain'
     ? getWoodGrainTexture(renderProfile.grainDirection)
     : null
@@ -228,7 +233,7 @@ function BuilderBlockInstances({ block, instances, onBlockClick, onBlockPointerM
     const mesh = meshRef.current
     if (!mesh) return
     instances.forEach((cell, instanceId) => {
-      const next = getBlockTransform(block.legacyBlockType, cell)
+      const next = getBlockTransform(block.id, cell)
       transform.position.set(...next.position)
       transform.rotation.set(0, cell.rotation * Math.PI * 0.5, 0)
       transform.scale.copy(next.scale)
@@ -238,12 +243,12 @@ function BuilderBlockInstances({ block, instances, onBlockClick, onBlockPointerM
     mesh.count = instances.length
     mesh.instanceMatrix.needsUpdate = true
     mesh.computeBoundingSphere()
-  }, [block.legacyBlockType, instances, transform])
+  }, [block.id, instances, transform])
 
   return (
     <instancedMesh
       ref={meshRef}
-      args={[block.legacyBlockType === 5 ? STAIR_GEOMETRY : null, null, ASTRA_BUILDER_POC_PLOT.maxBlocks]}
+      args={[part?.renderGeometryKey === 'stair' ? STAIR_GEOMETRY : null, null, ASTRA_BUILDER_POC_PLOT.maxBlocks]}
       castShadow={!renderProfile?.transparent}
       receiveShadow={!renderProfile?.emissive}
       frustumCulled={false}
@@ -256,7 +261,7 @@ function BuilderBlockInstances({ block, instances, onBlockClick, onBlockPointerM
         if (cell) onBlockPointerMove?.(event, cell)
       }}
     >
-      {block.legacyBlockType !== 5 && (
+      {part?.renderGeometryKey !== 'stair' && (
         <boxGeometry args={[
           ASTRA_BUILDER_POC_PLOT.cellSize,
           ASTRA_BUILDER_POC_PLOT.cellSize,
@@ -293,6 +298,44 @@ function BuilderBlockInstances({ block, instances, onBlockClick, onBlockPointerM
   )
 }
 
+function BuilderPreviewMaterial({ recipe, valid }) {
+  const profile = getAstraBuilderRenderProfile(recipe?.id)
+  const woodTexture = profile?.textureKind === 'wood_grain'
+    ? getWoodGrainTexture(profile.grainDirection)
+    : null
+  if (!valid) {
+    return <meshBasicMaterial color="#ff7182" transparent opacity={.48} wireframe depthWrite={false} />
+  }
+  if (profile?.transparent) {
+    return (
+      <meshPhysicalMaterial
+        color={recipe.color}
+        transparent
+        opacity={Math.max(.3, profile.opacity)}
+        transmission={profile.transmission}
+        thickness={.08}
+        roughness={profile.roughness}
+        metalness={profile.metalness}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+      />
+    )
+  }
+  return (
+    <meshStandardMaterial
+      color={recipe?.color || '#6ff0b8'}
+      map={woodTexture}
+      transparent
+      opacity={.68}
+      roughness={profile?.roughness ?? .52}
+      metalness={profile?.metalness ?? .12}
+      emissive={profile?.emissive ? recipe.color : '#000000'}
+      emissiveIntensity={profile?.emissiveIntensity || 0}
+      depthWrite={false}
+    />
+  )
+}
+
 const BOX_EDGE_PAIRS = (() => {
   // cellSize 정육면체(중심 원점)의 12개 모서리를 정점 인덱스 쌍으로 표현
   const c = [
@@ -313,9 +356,9 @@ function buildBlockEdgesGeometry(cells) {
   const segments = []
   const object = new THREE.Object3D()
   const doorwayColumns = getAstraBuilderDoorwayColumnKeys(cells)
-  const appendBlockEdges = (blockType, rotation, cell) => {
-    if (blockType === 7) return
-    const { position, scale } = getBlockTransform(blockType, cell)
+  const appendBlockEdges = (recipeId, rotation, cell) => {
+    if (getAstraBuilderPartForRecipe(recipeId)?.renderGeometryKey === 'door') return
+    const { position, scale } = getBlockTransform(recipeId, cell)
     object.position.set(position[0], position[1], position[2])
     object.rotation.set(0, (rotation || 0) * Math.PI * 0.5, 0)
     object.scale.set(scale.x * cellSize, scale.y * cellSize, scale.z * cellSize)
@@ -331,13 +374,13 @@ function buildBlockEdgesGeometry(cells) {
     if (!decoded.occupied) continue
     const cell = getAstraBuilderCellFromIndex(index)
     if (!cell) continue
-    if (decoded.foundationUnderlay) appendBlockEdges(2, 0, cell)
+    if (decoded.foundationUnderlay) appendBlockEdges(decoded.underlayRecipeId || 2, decoded.underlayRotation, cell)
     if (
-      decoded.blockType !== 2
+      getAstraBuilderPartForRecipe(decoded.recipeId)?.bodyShape !== 'floor'
       && cell.y <= 2
       && doorwayColumns.has(`${cell.x}:${cell.z}`)
     ) continue
-    appendBlockEdges(decoded.blockType, decoded.rotation, cell)
+    appendBlockEdges(decoded.recipeId, decoded.rotation, cell)
   }
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(segments, 3))
@@ -423,6 +466,7 @@ export default function AstraBuilderPlot({
   activeLayer,
   selectedBlockType,
   selectedRotation,
+  targetSlot = 'main',
   onEdit,
   onCopy,
   onInvalidEdit,
@@ -434,7 +478,7 @@ export default function AstraBuilderPlot({
   const [hoverLayerMismatch, setHoverLayerMismatch] = useState(false)
   const instancesByType = useMemo(() => getAstraBuilderInstances(cells), [cells])
   const selectedRecipe = getAstraBuilderRecipe(selectedBlockType)
-  const selectedLegacyBlockType = selectedRecipe?.legacyBlockType || selectedBlockType
+  const selectedPart = getAstraBuilderPartForRecipe(selectedBlockType)
   const topologyKey = useMemo(() => getAstraBuilderTopologyKey(cells), [cells])
   // The geometry intentionally remains stable for appearance-only recipe edits.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -485,7 +529,7 @@ export default function AstraBuilderPlot({
       && playerGroup
       && doesAstraBuilderPlacementOverlapCharacter({
         cell,
-        blockType: selectedLegacyBlockType,
+        blockType: selectedBlockType,
         rotation: selectedRotation,
         playerPosition: playerGroup.position,
         characterScale: playerGroup.scale.x,
@@ -514,7 +558,7 @@ export default function AstraBuilderPlot({
       && playerGroupRef?.current
       && doesAstraBuilderPlacementOverlapCharacter({
         cell,
-        blockType: selectedLegacyBlockType,
+        blockType: selectedBlockType,
         rotation: selectedRotation,
         playerPosition: playerGroupRef.current.position,
         characterScale: playerGroupRef.current.scale.x,
@@ -525,12 +569,22 @@ export default function AstraBuilderPlot({
       onInvalidEdit?.({ reason: 'player_overlap', cell, activeLayer, tool })
       return
     }
+    const materialIssue = tool === 'material' ? getAstraBuilderMaterialEditIssue(cells, {
+      cell,
+      blockType: selectedBlockType,
+      targetSlot,
+    }, plot) : null
+    if (materialIssue) {
+      onInvalidEdit?.({ reason: materialIssue, cell, activeLayer, tool, targetSlot })
+      return
+    }
     const changed = onEdit?.({
       tool,
       cell,
       activeLayer,
       blockType: selectedBlockType,
       rotation: selectedRotation,
+      targetSlot,
     })
     if (changed === false && tool !== 'place') {
       onInvalidEdit?.({ reason: 'empty', cell, activeLayer, tool })
@@ -592,7 +646,13 @@ export default function AstraBuilderPlot({
     if (!target) return
     updateHoveredCell(target)
     if (tool === 'copy') {
-      onCopy?.(target)
+      const targetIndex = getAstraBuilderCellIndex(target, plot)
+      const targetDecoded = targetIndex >= 0 ? decodeAstraBuilderCell(cells[targetIndex]) : null
+      if (targetSlot === 'underlay' && !targetDecoded?.foundationUnderlay) {
+        onInvalidEdit?.({ reason: 'missing_underlay', cell: target, activeLayer, tool, targetSlot })
+        return
+      }
+      onCopy?.(target, targetSlot)
       return
     }
     placeAtCell(target)
@@ -617,7 +677,7 @@ export default function AstraBuilderPlot({
         <meshStandardMaterial color="#526d76" roughness={0.78} metalness={0.18} />
       </mesh>
 
-      {ASTRA_BUILDER_RECIPES.map((block) => block.legacyBlockType === 7 ? (
+      {ASTRA_BUILDER_RECIPES.map((block) => getAstraBuilderPartForRecipe(block.id)?.renderGeometryKey === 'door' ? (
         <BuilderWoodDoors
           key={block.id}
           block={block}
@@ -668,55 +728,32 @@ export default function AstraBuilderPlot({
               position={hoverPosition}
               rotation={[0, selectedRotation * Math.PI * 0.5, 0]}
             >
-              {selectedLegacyBlockType === 8 ? (
-                <mesh position={[0, ASTRA_BUILDER_POC_PLOT.cellSize, 0]}>
-                  <boxGeometry args={[
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.98,
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 2.98,
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.98,
-                  ]} />
-                  <meshBasicMaterial
-                    color={hoverValid ? '#6ff0b8' : '#ff7182'}
-                    transparent
-                    opacity={0.34}
-                    wireframe
-                    depthWrite={false}
-                  />
-                </mesh>
-              ) : selectedLegacyBlockType === 5 ? (
+              {selectedPart?.renderGeometryKey === 'stair' ? (
                 <mesh geometry={STAIR_GEOMETRY}>
-                  <meshBasicMaterial
-                    color={hoverValid ? '#6ff0b8' : '#ff7182'}
-                    transparent
-                    opacity={0.45}
-                    wireframe
-                    depthWrite={false}
-                  />
+                  <BuilderPreviewMaterial recipe={selectedRecipe} valid={hoverValid} />
                 </mesh>
-              ) : selectedLegacyBlockType === 7 ? (
+              ) : selectedPart?.renderGeometryKey === 'door' ? (
                 <group position={[ASTRA_BUILDER_POC_PLOT.cellSize * .5, 0, 0]}>
-                  <WoodDoorVisual color={hoverValid ? '#6ff0b8' : '#ff7182'} preview />
+                  <WoodDoorVisual
+                    color={hoverValid ? selectedRecipe?.color : '#ff7182'}
+                    map={hoverValid ? getWoodGrainTexture('vertical') : null}
+                    preview
+                  />
                 </group>
               ) : (
-                <mesh>
+                <mesh position={[0, (selectedPart?.heightCells || 1) > 1 ? ASTRA_BUILDER_POC_PLOT.cellSize : selectedPart?.bodyShape === 'floor' ? -ASTRA_BUILDER_POC_PLOT.cellSize * .37 : 0, 0]}>
                   <boxGeometry args={[
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.98,
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.98,
-                    ASTRA_BUILDER_POC_PLOT.cellSize * 0.98,
+                    ASTRA_BUILDER_POC_PLOT.cellSize * (selectedPart?.bodyShape === 'pillar' ? .42 : selectedPart?.bodyShape === 'bar' ? .24 : .98),
+                    ASTRA_BUILDER_POC_PLOT.cellSize * ((selectedPart?.heightCells || 1) > 1 ? selectedPart.heightCells * .98 : selectedPart?.bodyShape === 'floor' ? .22 : selectedPart?.bodyShape === 'bar' ? .2 : .98),
+                    ASTRA_BUILDER_POC_PLOT.cellSize * (selectedPart?.bodyShape === 'pillar' ? .42 : selectedPart?.bodyShape === 'bar' ? .88 : .98),
                   ]} />
-                  <meshBasicMaterial
-                    color={hoverValid ? '#6ff0b8' : '#ff7182'}
-                    transparent
-                    opacity={0.34}
-                    wireframe
-                    depthWrite={false}
-                  />
+                  <BuilderPreviewMaterial recipe={selectedRecipe} valid={hoverValid} />
                 </mesh>
               )}
               <mesh
                 position={[
                   0,
-                  ASTRA_BUILDER_POC_PLOT.cellSize * (selectedLegacyBlockType === 8 ? 2.55 : 0.54),
+                  ASTRA_BUILDER_POC_PLOT.cellSize * ((selectedPart?.heightCells || 1) > 1 ? selectedPart.heightCells - .45 : .54),
                   ASTRA_BUILDER_POC_PLOT.cellSize * 0.28,
                 ]}
                 rotation={[Math.PI / 2, 0, 0]}

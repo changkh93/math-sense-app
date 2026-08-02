@@ -15,6 +15,8 @@
     "test:quiz-session": "node scripts/test-quiz-session-guards.mjs",
     "test:frontier-audio": "node scripts/test-frontier-audio-utils.mjs",
     "test:astra-builder": "node scripts/test-astra-builder-model.mjs",
+    "test:astra-builder:performance": "node scripts/benchmark-astra-builder.mjs",
+    "generate:astra-builder-catalog": "node scripts/generate-astra-builder-server-catalog.mjs",
     "test:frontier-story": "node scripts/test-frontier-story-utils.mjs",
     "test:guest-galaxy": "node scripts/test-guest-galaxy-data.mjs",
     "test:lumi-rover": "node functions/galaxyGame.rover.test.cjs && node functions/galaxyGame.story.test.cjs && node scripts/test-guest-galaxy-data.mjs && node scripts/test-lumi-rover-contract.mjs",

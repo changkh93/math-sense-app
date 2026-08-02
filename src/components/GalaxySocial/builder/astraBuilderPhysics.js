@@ -141,7 +141,8 @@ export function getAstraBuilderWalkSurfaceHeight({
         }
         let supportX = x
         let supportZ = z
-        if (decoded.blockType === 5) {
+        const traits = getAstraBuilderBlockTraits(decoded.recipeId || decoded.blockType)
+        if (traits.bodyShape === 'stair') {
           const direction = getAstraBuilderStairDirection(decoded.rotation)
           supportX += direction.x * radius
           supportZ += direction.z * radius
@@ -150,12 +151,12 @@ export function getAstraBuilderWalkSurfaceHeight({
           supportX,
           supportZ,
           cell,
-          decoded.blockType,
+          decoded.recipeId || decoded.blockType,
           decoded.rotation,
           plot,
         )
         if (offset === null) continue
-        const stairAllowance = decoded.blockType === 5 ? plot.cellSize * 0.72 : dimensions.maxStepUp
+        const stairAllowance = traits.bodyShape === 'stair' ? plot.cellSize * 0.72 : dimensions.maxStepUp
         if (currentOffset !== null && offset > currentOffset + stairAllowance + EPSILON) continue
         candidates.push(offset)
       }
@@ -175,7 +176,7 @@ export function getAstraBuilderWalkSurfaceHeight({
 }
 
 function createBody(cell, decoded, plotBaseY, plot) {
-  const traits = getAstraBuilderBlockTraits(decoded.blockType)
+  const traits = getAstraBuilderBlockTraits(decoded.recipeId || decoded.blockType)
   if (traits.bodyShape === 'none' || traits.bodyShape === 'doorway') return null
   const local = getAstraBuilderWorldPosition(cell, plot)
   const centerX = plot.center[0] + local[0]
@@ -191,6 +192,11 @@ function createBody(cell, decoded, plotBaseY, plot) {
   } else if (traits.bodyShape === 'pillar') {
     halfX = plot.cellSize * 0.21
     halfZ = plot.cellSize * 0.21
+  } else if (traits.bodyShape === 'bar') {
+    halfX = plot.cellSize * (decoded.rotation % 2 ? 0.44 : 0.12)
+    halfZ = plot.cellSize * (decoded.rotation % 2 ? 0.12 : 0.44)
+    minY = cellBottom + plot.cellSize * 0.4
+    maxY = cellBottom + plot.cellSize * 0.6
   }
   return {
     id: `astra-builder-block-${cell.x}:${cell.y}:${cell.z}`,
@@ -228,7 +234,7 @@ export function createAstraBuilderCollisionBodies(
     if (decoded.foundationUnderlay) {
       const foundationBody = createBody(
         cell,
-        { blockType: 2, rotation: 0 },
+        { recipeId: decoded.underlayRecipeId || 2, blockType: 2, rotation: decoded.underlayRotation || 0 },
         plotBaseY,
         plot,
       )
@@ -238,8 +244,8 @@ export function createAstraBuilderCollisionBodies(
       }
     }
     if (
-      decoded.blockType !== 2
-      && decoded.blockType !== 7
+      getAstraBuilderBlockTraits(decoded.recipeId).bodyShape !== 'floor'
+      && getAstraBuilderBlockTraits(decoded.recipeId).bodyShape !== 'doorway'
       && cell.y <= 2
       && doorwayColumns.has(`${cell.x}:${cell.z}`)
     ) continue

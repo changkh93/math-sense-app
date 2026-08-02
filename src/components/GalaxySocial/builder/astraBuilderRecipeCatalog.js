@@ -9,6 +9,7 @@ export const ASTRA_BUILDER_PARTS = freeze({
   support_pillar: freeze({ id: 'support_pillar', legacyBlockType: 6, label: '지지 기둥', bodyShape: 'pillar', heightCells: 1, supportSurface: 'none', headBlocking: true, rotationSteps: 1, underlayPolicy: 'allowed', renderGeometryKey: 'box' }),
   lumen_wood_door: freeze({ id: 'lumen_wood_door', legacyBlockType: 7, label: '문', bodyShape: 'doorway', heightCells: 3, supportSurface: 'none', headBlocking: false, rotationSteps: 4, underlayPolicy: 'allowed', renderGeometryKey: 'door' }),
   lumen_wall_panel: freeze({ id: 'lumen_wall_panel', legacyBlockType: 8, label: '3칸 벽 패널', bodyShape: 'full', heightCells: 3, supportSurface: 'top', headBlocking: true, rotationSteps: 1, underlayPolicy: 'allowed', renderGeometryKey: 'box' }),
+  light_bar: freeze({ id: 'light_bar', legacyBlockType: 9, label: '빛 막대', bodyShape: 'bar', heightCells: 1, supportSurface: 'none', headBlocking: false, rotationSteps: 4, underlayPolicy: 'allowed', renderGeometryKey: 'bar' }),
 })
 
 export const ASTRA_BUILDER_MATERIALS = {
@@ -63,7 +64,31 @@ export const ASTRA_BUILDER_RECIPES = freeze([
   recipe(25, 'star_light', 'starlight', 'violet', 'glow', '별빛 조명 · 보라', '#ba8bff', { emissive: true }),
   recipe(26, 'star_light', 'starlight', 'magenta', 'glow', '별빛 조명 · 자홍', '#ff78d3', { emissive: true }),
   recipe(27, 'star_light', 'starlight', 'lime', 'glow', '별빛 조명 · 연두', '#b8ff76', { emissive: true }),
+  recipe(28, 'light_bar', 'starlight', 'warm_white', 'glow', '빛 막대 · 온백색', '#ffe58a', { emissive: true }),
+  recipe(29, 'light_bar', 'starlight', 'cyan', 'glow', '빛 막대 · 청록', '#5ff4ee', { emissive: true }),
+  recipe(30, 'light_bar', 'starlight', 'violet', 'glow', '빛 막대 · 보라', '#ba8bff', { emissive: true }),
+  recipe(31, 'light_bar', 'starlight', 'magenta', 'glow', '빛 막대 · 자홍', '#ff78d3', { emissive: true }),
+  recipe(32, 'light_bar', 'starlight', 'lime', 'glow', '빛 막대 · 연두', '#b8ff76', { emissive: true }),
 ])
+
+export const ASTRA_BUILDER_CATALOG_VERSION = 2
+
+function hashCatalog(value) {
+  let hash = 0x811c9dc5
+  for (const character of JSON.stringify(value)) {
+    hash ^= character.charCodeAt(0)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+export const ASTRA_BUILDER_CATALOG_SIGNATURE = freeze(ASTRA_BUILDER_RECIPES.map((item) => freeze({
+  id: item.id,
+  partId: item.partId,
+  legacyBlockType: item.legacyBlockType,
+  rotationSteps: ASTRA_BUILDER_PARTS[item.partId]?.rotationSteps || 1,
+})))
+export const ASTRA_BUILDER_CATALOG_HASH = hashCatalog(ASTRA_BUILDER_CATALOG_SIGNATURE)
 
 export const ASTRA_BUILDER_RECIPE_BY_ID = new Map(ASTRA_BUILDER_RECIPES.map((item) => [item.id, item]))
 export const ASTRA_BUILDER_PART_BY_ID = new Map(Object.values(ASTRA_BUILDER_PARTS).map((item) => [item.id, item]))

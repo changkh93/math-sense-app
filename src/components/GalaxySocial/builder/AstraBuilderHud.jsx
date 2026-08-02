@@ -41,7 +41,7 @@ const RECIPE_IDS = new Set(ASTRA_BUILDER_RECIPES.map((recipe) => recipe.id))
 const PART_ORDER = new Map([
   ['lumen_wall', 0], ['lumen_wall_panel', 1], ['foundation_floor', 2],
   ['stair_straight', 3], ['support_pillar', 4], ['lumen_wood_door', 5],
-  ['nebula_glass', 6], ['star_light', 7],
+  ['nebula_glass', 6], ['star_light', 7], ['light_bar', 8],
 ])
 const MATERIAL_ORDER = new Map(Object.keys(ASTRA_BUILDER_MATERIALS).map((id, index) => [id, index]))
 const PALETTE_CATEGORIES = [
@@ -56,7 +56,7 @@ function isRecipeInCategory(recipe, category) {
   if (category === 'stair') return part === 'stair_straight'
   if (category === 'structure') return part === 'support_pillar'
   if (category === 'door') return part === 'lumen_wood_door'
-  if (category === 'light') return part === 'star_light'
+  if (category === 'light') return part === 'star_light' || part === 'light_bar'
   return true
 }
 
@@ -114,6 +114,8 @@ export default function AstraBuilderHud({
   onSelectBlockType,
   selectedRotation,
   onRotateSelection,
+  targetSlot = 'main',
+  onTargetSlotChange,
   canUndo,
   canRedo,
   onUndo,
@@ -129,6 +131,7 @@ export default function AstraBuilderHud({
   const [paletteCategory, setPaletteCategory] = useState('all')
   const [paletteMaterial, setPaletteMaterial] = useState('all')
   const [recentRecipeIds, setRecentRecipeIds] = useState(loadRecentRecipeIds)
+  const [recordedBlockType, setRecordedBlockType] = useState(selectedBlockType)
   const selectedRecipe = ASTRA_BUILDER_RECIPES.find((recipe) => recipe.id === selectedBlockType)
     || ASTRA_BUILDER_RECIPES[0]
   const quickbarItems = useMemo(() => buildAstraBuilderQuickbarItems({
@@ -155,6 +158,14 @@ export default function AstraBuilderHud({
       // Private browsing or a full storage quota must not block building.
     }
   }, [recentRecipeIds])
+
+  if (recordedBlockType !== selectedBlockType) {
+    setRecordedBlockType(selectedBlockType)
+    setRecentRecipeIds((current) => recordAstraBuilderRecentRecipeId(current, selectedBlockType, {
+      validIds: RECIPE_IDS,
+      excludedIds: ASTRA_BUILDER_QUICKBAR_CORE_RECIPE_IDS,
+    }))
+  }
 
   const selectRecipe = (recipeId) => {
     setRecentRecipeIds((current) => recordAstraBuilderRecentRecipeId(current, recipeId, {
@@ -335,6 +346,12 @@ export default function AstraBuilderHud({
               <span>
                 {selectedRecipe?.label || '재료 선택'} · {rotationSteps > 1 ? `앞면 ${directionLabels[selectedRotation % 4]}` : '방향 없음'}
               </span>
+              {(tool === 'material' || tool === 'copy') && (
+                <div className="astra-builder-hud__target-slot" role="group" aria-label="편집 대상">
+                  <button type="button" className={targetSlot === 'main' ? 'active' : ''} aria-pressed={targetSlot === 'main'} onClick={() => onTargetSlotChange?.('main')}>위 구조</button>
+                  <button type="button" className={targetSlot === 'underlay' ? 'active' : ''} aria-pressed={targetSlot === 'underlay'} onClick={() => onTargetSlotChange?.('underlay')}>바닥</button>
+                </div>
+              )}
             </div>
             <div className="astra-builder-hud__materials" aria-label="건축 퀵바">
               <button

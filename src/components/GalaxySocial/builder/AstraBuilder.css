@@ -318,6 +318,23 @@
   font-size: .54rem;
 }
 
+.astra-builder-hud__target-slot {
+  display: inline-flex;
+  gap: .18rem;
+  margin-top: .35rem;
+  padding: .16rem;
+  border: 1px solid rgba(124, 242, 189, .18);
+  border-radius: 9px;
+  background: rgba(2, 10, 18, .72);
+}
+
+.astra-builder-hud__target-slot button {
+  min-height: 26px;
+  padding: 0 .48rem;
+  border-radius: 7px;
+  font-size: .5rem;
+}
+
 .astra-builder-hud__materials {
   display: grid;
   grid-template-columns: auto repeat(8, minmax(58px, 1fr)) auto;
@@ -606,6 +623,16 @@
   }
 
   .astra-builder-hud__palette > div:first-child {
+    display: none;
+  }
+
+  .astra-builder-hud__palette > div:first-child:has(.astra-builder-hud__target-slot) {
+    display: block;
+    margin-bottom: .3rem;
+  }
+
+  .astra-builder-hud__palette > div:first-child:has(.astra-builder-hud__target-slot) > small,
+  .astra-builder-hud__palette > div:first-child:has(.astra-builder-hud__target-slot) > span {
     display: none;
   }
 

@@ -4488,7 +4488,7 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
   )
 }
 
-function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, onBuilderEdit, onBuilderCopy, onBuilderInvalidEdit, onBuilderScaleBlocked, onExplorationExitRequest }) {
+function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, builderTargetSlot, onBuilderEdit, onBuilderCopy, onBuilderInvalidEdit, onBuilderScaleBlocked, onExplorationExitRequest }) {
   const territoryExpanded = Boolean(planet?.territoryExpanded)
   setTerritoryExpanded(territoryExpanded)
   const worldRadius = getWorldRadius(territoryExpanded)
@@ -4840,6 +4840,7 @@ function FrontierScene({ planet, restorationPercent = 0, beaconRepaired = false,
           activeLayer={builderLayer}
           selectedBlockType={builderBlockType}
           selectedRotation={builderRotation}
+          targetSlot={builderTargetSlot}
           onEdit={plot.plotId === activeBuilderPlotId ? onBuilderEdit : undefined}
           onCopy={plot.plotId === activeBuilderPlotId ? onBuilderCopy : undefined}
           onInvalidEdit={plot.plotId === activeBuilderPlotId ? onBuilderInvalidEdit : undefined}
@@ -5222,6 +5223,7 @@ export default function GalaxyWorld3D({
   const [builderLayer, setBuilderLayer] = useState(0)
   const [builderBlockType, setBuilderBlockType] = useState(8)
   const [builderRotation, setBuilderRotation] = useState(0)
+  const [builderTargetSlot, setBuilderTargetSlot] = useState('main')
   const [activeBuilderPlotId, setActiveBuilderPlotId] = useState('habitat-b01')
   const [builderPurchaseBusy, setBuilderPurchaseBusy] = useState(false)
   const [builderCellCache, setBuilderCellCache] = useState({})
@@ -5388,14 +5390,16 @@ export default function GalaxyWorld3D({
     return true
   }, [builder])
 
-  const copyAstraBuilderSelection = useCallback((cell) => {
+  const copyAstraBuilderSelection = useCallback((cell, targetSlot = 'main') => {
     const index = getAstraBuilderCellIndex(cell, ASTRA_BUILDER_POC_PLOT)
     const decoded = index >= 0 ? decodeAstraBuilderCell(builder.cells[index]) : null
     if (!decoded?.occupied) return
-    setBuilderBlockType(decoded.recipeId || decoded.blockType)
-    setBuilderRotation(decoded.rotation || 0)
+    const copyUnderlay = targetSlot === 'underlay' && decoded.foundationUnderlay
+    setBuilderBlockType(copyUnderlay ? decoded.underlayRecipeId : decoded.recipeId || decoded.blockType)
+    setBuilderRotation(copyUnderlay ? decoded.underlayRotation : decoded.rotation || 0)
     setBuilderTool('place')
-    onMessage?.(`${decoded.recipeId ? '재료와 방향을 가져왔어요' : '블록을 가져왔어요'} · 배치 도구로 전환했습니다.`)
+    setBuilderTargetSlot('main')
+    onMessage?.(`${copyUnderlay ? '바닥 재료를' : '재료와 방향을'} 가져왔어요 · 배치 도구로 전환했습니다.`)
   }, [builder.cells, onMessage])
 
   useEffect(() => {
@@ -5818,6 +5822,7 @@ export default function GalaxyWorld3D({
           builderLayer={builderLayer}
           builderBlockType={builderBlockType}
           builderRotation={builderRotation}
+          builderTargetSlot={builderTargetSlot}
           onBuilderEdit={applyAstraBuilderEditWithFeedback}
           onBuilderCopy={copyAstraBuilderSelection}
           onExplorationExitRequest={onExplorationExitRequest}
@@ -5842,6 +5847,10 @@ export default function GalaxyWorld3D({
               onMessage?.('블록을 배치하려면 캐릭터가 조금 더 가까이 가야 합니다.')
             } else if (reason === 'player_overlap') {
               onMessage?.('캐릭터와 겹치는 자리에는 배치할 수 없습니다. 반 칸 정도 뒤로 이동해 주세요.')
+            } else if (reason === 'missing_underlay') {
+              onMessage?.('이 위치에는 바꿀 바닥이 없습니다. 위 구조를 선택하거나 먼저 바닥을 배치해 주세요.')
+            } else if (reason === 'incompatible_material') {
+              onMessage?.('선택한 재료는 이 형태에 맞는 변형이 없습니다. 같은 형태의 다른 재료를 골라 주세요.')
             }
           }}
           onBuilderScaleBlocked={() => {
@@ -5931,9 +5940,11 @@ export default function GalaxyWorld3D({
           onSelectBlockType={(blockType) => {
             setBuilderBlockType(blockType)
             setBuilderRotation(0)
-            setBuilderTool('place')
+            setBuilderTool((current) => current === 'material' ? 'material' : 'place')
           }}
           selectedRotation={builderRotation}
+          targetSlot={builderTargetSlot}
+          onTargetSlotChange={setBuilderTargetSlot}
           onRotateSelection={() => setBuilderRotation((current) => {
             const rotationSteps = getAstraBuilderPartForRecipe(builderBlockType)?.rotationSteps || 1
             return rotationSteps > 1 ? (current + 1) % rotationSteps : 0

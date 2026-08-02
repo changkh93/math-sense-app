@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import {
   ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
   ASTRA_BUILDER_POC_PLOT,
@@ -9,6 +10,7 @@ import {
   countAstraBuilderBlocks,
   createEmptyAstraBuilderGrid,
   decodeAstraBuilderCell,
+  encodeAstraBuilderCell,
   doesAstraBuilderBlockOccupyLayer,
   getAstraBuilderCellCount,
   getAstraBuilderCellFromIndex,
@@ -17,6 +19,7 @@ import {
   getAstraBuilderDoorwayColumns,
   getAstraBuilderLayerEditTarget,
   getAstraBuilderLayerInfo,
+  getAstraBuilderMaterialEditIssue,
   getAstraBuilderPlacementIssue,
   getAstraBuilderTopFaceTarget,
   getAstraBuilderTopologyKey,
@@ -55,6 +58,8 @@ import {
 } from '../src/components/GalaxySocial/builder/astraBuilderInput.js'
 import {
   ASTRA_BUILDER_QUICKBAR_CORE_RECIPE_IDS,
+  ASTRA_BUILDER_CATALOG_HASH,
+  ASTRA_BUILDER_CATALOG_SIGNATURE,
   ASTRA_BUILDER_QUICKBAR_FALLBACK_RECIPE_IDS,
   ASTRA_BUILDER_RECIPES,
   getAstraBuilderRenderProfile,
@@ -64,11 +69,19 @@ import {
   recordAstraBuilderRecentRecipeId,
 } from '../src/components/GalaxySocial/builder/astraBuilderQuickbar.js'
 
+const require = createRequire(import.meta.url)
+const serverCatalog = require('../functions/astraBuilderRecipeCatalog.cjs')
+
+assert.equal(serverCatalog.ASTRA_BUILDER_CATALOG_HASH, ASTRA_BUILDER_CATALOG_HASH)
+assert.deepEqual(serverCatalog.ASTRA_BUILDER_CATALOG_SIGNATURE, ASTRA_BUILDER_CATALOG_SIGNATURE)
+assert.equal(serverCatalog.ASTRA_BUILDER_RECIPE_TRAITS.get(32).legacyBlockType, 9)
+
 assert.equal(getAstraBuilderRenderProfile(20).textureKind, 'wood_grain')
 assert.equal(getAstraBuilderRenderProfile(20).family, 'wood')
 assert.equal(getAstraBuilderRenderProfile(14).transparent, true)
 assert.ok(getAstraBuilderRenderProfile(14).opacity < .3)
 assert.equal(getAstraBuilderRenderProfile(2).transparent, false)
+assert.equal(getAstraBuilderRenderProfile(29).emissive, true)
 
 const initialQuickbar = buildAstraBuilderQuickbarItems({
   recipes: ASTRA_BUILDER_RECIPES,
@@ -90,6 +103,31 @@ const recentQuickbar = buildAstraBuilderQuickbarItems({
 })
 assert.deepEqual(recentQuickbar.slice(-2).map(({ recipe }) => recipe.id), [14, 20])
 assert.deepEqual(recentQuickbar.slice(-2).map(({ source }) => source), ['recent', 'recent'])
+
+const materialSlotGrid = createEmptyAstraBuilderGrid()
+const materialSlotCell = { x: 1, y: 0, z: 1 }
+let materialSlotEdit = applyAstraBuilderEdit(materialSlotGrid, { tool: 'place', cell: materialSlotCell, blockType: 2 })
+materialSlotEdit = applyAstraBuilderEdit(materialSlotEdit.cells, { tool: 'place', cell: materialSlotCell, blockType: 1 })
+assert.equal(getAstraBuilderMaterialEditIssue(materialSlotEdit.cells, {
+  tool: 'material', cell: materialSlotCell, blockType: 14, targetSlot: 'underlay',
+}), null)
+const glassUnderlay = applyAstraBuilderEdit(materialSlotEdit.cells, {
+  tool: 'material', cell: materialSlotCell, blockType: 14, targetSlot: 'underlay',
+})
+assert.equal(decodeAstraBuilderCell(glassUnderlay.cells[getAstraBuilderCellIndex(materialSlotCell)]).underlayRecipeId, 14)
+assert.equal(getAstraBuilderMaterialEditIssue(materialSlotGrid, {
+  tool: 'material', cell: materialSlotCell, blockType: 14, targetSlot: 'underlay',
+}), 'empty')
+const noUnderlayGrid = createEmptyAstraBuilderGrid()
+noUnderlayGrid[getAstraBuilderCellIndex(materialSlotCell)] = 1
+assert.equal(getAstraBuilderMaterialEditIssue(noUnderlayGrid, {
+  tool: 'material', cell: materialSlotCell, blockType: 14, targetSlot: 'underlay',
+}), 'missing_underlay')
+const lightBarGrid = createEmptyAstraBuilderGrid()
+lightBarGrid[getAstraBuilderCellIndex(materialSlotCell)] = encodeAstraBuilderCell(29, 1)
+const lightBarBody = createAstraBuilderCollisionBodies(lightBarGrid, 0)[0]
+assert.equal(lightBarBody.bodyShape, 'bar')
+assert.ok(lightBarBody.halfX > lightBarBody.halfZ)
 
 assert.equal(getAstraBuilderCellCount(), 12 * 12 * 10)
 const staleServerBuilderCells = createEmptyAstraBuilderGrid()

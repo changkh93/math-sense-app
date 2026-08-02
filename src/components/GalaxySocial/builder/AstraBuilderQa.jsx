@@ -73,6 +73,7 @@ export default function AstraBuilderQa() {
   const [activeLayer, setActiveLayer] = useState(0)
   const [selectedBlockType, setSelectedBlockType] = useState(1)
   const [selectedRotation, setSelectedRotation] = useState(0)
+  const [targetSlot, setTargetSlot] = useState('main')
   const [isFirstPerson, setIsFirstPerson] = useState(false)
 
   return (
@@ -107,13 +108,16 @@ export default function AstraBuilderQa() {
             activeLayer={activeLayer}
             selectedBlockType={selectedBlockType}
             selectedRotation={selectedRotation}
+            targetSlot={targetSlot}
             onLayerChange={setActiveLayer}
             onEdit={builder.edit}
-            onCopy={(cell) => {
+            onCopy={(cell, slot) => {
               const decoded = decodeAstraBuilderCell(builder.cells[getAstraBuilderCellIndex(cell)])
               if (!decoded?.occupied) return
-              setSelectedBlockType(decoded.recipeId || decoded.blockType)
-              setSelectedRotation(decoded.rotation || 0)
+              const copyUnderlay = slot === 'underlay' && decoded.foundationUnderlay
+              setSelectedBlockType(copyUnderlay ? decoded.underlayRecipeId : decoded.recipeId || decoded.blockType)
+              setSelectedRotation(copyUnderlay ? decoded.underlayRotation : decoded.rotation || 0)
+              setTargetSlot('main')
               setTool('place')
             }}
           />
@@ -139,9 +143,11 @@ export default function AstraBuilderQa() {
           onSelectBlockType={(blockType) => {
             setSelectedBlockType(blockType)
             setSelectedRotation(0)
-            setTool('place')
+            setTool((current) => current === 'material' ? 'material' : 'place')
           }}
           selectedRotation={selectedRotation}
+          targetSlot={targetSlot}
+          onTargetSlotChange={setTargetSlot}
           onRotateSelection={() => setSelectedRotation((current) => {
             const rotationSteps = getAstraBuilderPartForRecipe(selectedBlockType)?.rotationSteps || 1
             return rotationSteps > 1 ? (current + 1) % rotationSteps : 0

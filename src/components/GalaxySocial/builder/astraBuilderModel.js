@@ -5,6 +5,7 @@ import {
   getAstraBuilderPartForRecipe,
   getAstraBuilderRecipe,
 } from './astraBuilderRecipeCatalog.js'
+import { getAstraBuilderBlockTraits } from './astraBuilderBlockCatalog.js'
 
 export const ASTRA_BUILDER_POC_PLOT = Object.freeze({
   id: 'habitat-b01',
@@ -100,7 +101,7 @@ export function normalizeAstraBuilderPlacementCell(
 ) {
   if (!cell) return null
   const part = getAstraBuilderPartForRecipe(recipeId)
-  if (part?.legacyBlockType !== ASTRA_BUILDER_WALL_PANEL_TYPE) return { ...cell }
+  if (part?.heightCells !== ASTRA_BUILDER_STORY_HEIGHT_CELLS) return { ...cell }
   const baseY = Math.floor(Number(cell.y) / ASTRA_BUILDER_STORY_HEIGHT_CELLS)
     * ASTRA_BUILDER_STORY_HEIGHT_CELLS
   const normalized = { ...cell, y: baseY }
@@ -215,10 +216,11 @@ function countAstraBuilderCellPieces(value) {
 export function isAstraBuilderWalkBlockingCell(value, cell) {
   const decoded = decodeAstraBuilderCell(value)
   if (!decoded.occupied || !cell || cell.y > 1) return false
-  // 바닥·계단은 걸을 수 있고, 문은 해당 열 전체를 출입 통로로 사용한다.
-  return decoded.blockType !== 2
-    && decoded.blockType !== 5
-    && decoded.blockType !== 7
+  const traits = getAstraBuilderBlockTraits(decoded.recipeId)
+  return traits.headBlocking
+    && traits.supportSurface !== 'floor'
+    && traits.supportSurface !== 'stair'
+    && traits.bodyShape !== 'doorway'
 }
 
 export function getAstraBuilderDoorwayColumns(cell, rotation, plot = ASTRA_BUILDER_POC_PLOT) {
@@ -238,7 +240,7 @@ export function getAstraBuilderDoorwayColumnKeys(cells, plot = ASTRA_BUILDER_POC
   const doorwayColumns = new Set()
   for (let index = 0; index < cells.length; index += 1) {
     const decoded = decodeAstraBuilderCell(cells[index])
-    if (!decoded.occupied || decoded.blockType !== 7) continue
+    if (!decoded.occupied || getAstraBuilderPartForRecipe(decoded.recipeId)?.bodyShape !== 'doorway') continue
     const cell = getAstraBuilderCellFromIndex(index, plot)
     if (cell?.y !== 0) continue
     getAstraBuilderDoorwayColumns(cell, decoded.rotation, plot).forEach((column) => {
@@ -302,14 +304,16 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
     const nextRecipeId = Number(edit.recipeId ?? edit.blockType)
     const nextRecipe = getAstraBuilderRecipe(nextRecipeId)
     if (!nextRecipe) return null
-    if (decoded.blockType === 2 && nextRecipe.legacyBlockType !== 2) {
+    const currentPart = getAstraBuilderPartForRecipe(decoded.recipeId)
+    const nextPart = getAstraBuilderPartForRecipe(nextRecipeId)
+    if (currentPart?.bodyShape === 'floor' && nextPart?.bodyShape !== 'floor') {
       // Keep the thin foundation as a structural underlay and place the wall,
       // panel, door, etc. in the same course so it starts flush at floor level.
       after = encodeAstraBuilderCell(nextRecipeId, edit.rotation, true, decoded.recipeId, decoded.rotation)
     } else if (
-      nextRecipe.legacyBlockType === 2
+      nextPart?.bodyShape === 'floor'
       && decoded.occupied
-      && decoded.blockType !== 2
+      && currentPart?.bodyShape !== 'floor'
       && !decoded.foundationUnderlay
     ) {
       after = encodeAstraBuilderCell(decoded.recipeId, decoded.rotation, true, nextRecipeId, edit.rotation)
@@ -331,9 +335,11 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
       decoded.underlayRotation,
     )
   } else if (edit.tool === 'material') {
-    if (!decoded.occupied) return null
+    const issue = getAstraBuilderMaterialEditIssue(cells, edit, plot)
+    if (issue) return null
     const selectedRecipe = getAstraBuilderRecipe(Number(edit.recipeId ?? edit.blockType))
-    const currentRecipe = getAstraBuilderRecipe(decoded.recipeId)
+    const targetUnderlay = edit.targetSlot === 'underlay'
+    const currentRecipe = getAstraBuilderRecipe(targetUnderlay ? decoded.underlayRecipeId : decoded.recipeId)
     const nextRecipe = selectedRecipe && currentRecipe && selectedRecipe.partId === currentRecipe.partId
       ? selectedRecipe
       : selectedRecipe && currentRecipe
@@ -343,9 +349,9 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
           })
         : null
     if (!nextRecipe || !currentRecipe) return null
-    if (edit.targetSlot === 'underlay' && decoded.foundationUnderlay) {
+    if (targetUnderlay) {
       const nextUnderlayPart = getAstraBuilderPartForRecipe(nextRecipe.id)
-      if (nextUnderlayPart?.legacyBlockType !== 2) return null
+      if (nextUnderlayPart?.bodyShape !== 'floor') return null
       after = encodeAstraBuilderCell(
         decoded.recipeId,
         decoded.rotation,
@@ -375,6 +381,23 @@ export function applyAstraBuilderEdit(cells, edit, plot = ASTRA_BUILDER_POC_PLOT
   }
 }
 
+export function getAstraBuilderMaterialEditIssue(cells, edit, plot = ASTRA_BUILDER_POC_PLOT) {
+  const index = getAstraBuilderCellIndex(edit?.cell, plot)
+  if (index < 0 || !isAstraBuilderGrid(cells)) return 'empty'
+  const decoded = decodeAstraBuilderCell(cells[index])
+  if (!decoded.occupied) return 'empty'
+  const targetUnderlay = edit?.targetSlot === 'underlay'
+  if (targetUnderlay && !decoded.foundationUnderlay) return 'missing_underlay'
+  const selectedRecipe = getAstraBuilderRecipe(Number(edit?.recipeId ?? edit?.blockType))
+  const currentRecipe = getAstraBuilderRecipe(targetUnderlay ? decoded.underlayRecipeId : decoded.recipeId)
+  if (!selectedRecipe || !currentRecipe) return 'incompatible_material'
+  if (selectedRecipe.partId === currentRecipe.partId) return null
+  return getAstraBuilderCompatibleRecipe(currentRecipe.partId, {
+    materialId: selectedRecipe.materialId,
+    variantId: selectedRecipe.variantId,
+  }) ? null : 'incompatible_material'
+}
+
 export function getAstraBuilderWallPanelAnchorAtCell(
   cells,
   cell,
@@ -386,7 +409,7 @@ export function getAstraBuilderWallPanelAnchorAtCell(
     const index = getAstraBuilderCellIndex(anchor, plot)
     if (index < 0) continue
     const decoded = decodeAstraBuilderCell(cells[index])
-    if (decoded.blockType === ASTRA_BUILDER_WALL_PANEL_TYPE) return anchor
+    if ((getAstraBuilderPartForRecipe(decoded.recipeId)?.heightCells || 1) > 1) return anchor
   }
   return null
 }
@@ -398,7 +421,7 @@ export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_
   if (index < 0) return 'out_of_bounds'
   const candidateRecipe = getAstraBuilderRecipe(Number(edit.recipeId ?? edit.blockType))
   if (!candidateRecipe) return 'invalid_block'
-  const candidateBlockType = candidateRecipe.legacyBlockType
+  const candidatePart = getAstraBuilderPartForRecipe(candidateRecipe.id)
   const existing = decodeAstraBuilderCell(cells[index])
   const panelAnchor = getAstraBuilderWallPanelAnchorAtCell(cells, cell, plot)
   const isExactPanelAnchor = panelAnchor
@@ -406,24 +429,24 @@ export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_
     && panelAnchor.y === cell.y
     && panelAnchor.z === cell.z
   const canShareWithFoundation = (
-    existing.blockType === 2 && candidateBlockType !== 2
+    getAstraBuilderPartForRecipe(existing.recipeId)?.bodyShape === 'floor' && candidatePart?.bodyShape !== 'floor'
   ) || (
-    candidateBlockType === 2
+    candidatePart?.bodyShape === 'floor'
     && existing.occupied
-    && existing.blockType !== 2
+    && getAstraBuilderPartForRecipe(existing.recipeId)?.bodyShape !== 'floor'
     && !existing.foundationUnderlay
     && (!panelAnchor || isExactPanelAnchor)
   )
   if ((existing.occupied || panelAnchor) && !canShareWithFoundation) return 'occupied'
 
-  if (candidateBlockType === ASTRA_BUILDER_WALL_PANEL_TYPE) {
+  if ((candidatePart?.heightCells || 1) > 1) {
     if (cell.y % ASTRA_BUILDER_STORY_HEIGHT_CELLS !== 0) return 'panel_not_story_base'
     for (let offset = 0; offset < ASTRA_BUILDER_STORY_HEIGHT_CELLS; offset += 1) {
       const occupiedCell = { ...cell, y: cell.y + offset }
       const occupiedIndex = getAstraBuilderCellIndex(occupiedCell, plot)
       if (occupiedIndex < 0) return 'panel_out_of_bounds'
       const occupied = decodeAstraBuilderCell(cells[occupiedIndex])
-      const canUseFoundationBase = offset === 0 && occupied.blockType === 2
+      const canUseFoundationBase = offset === 0 && getAstraBuilderPartForRecipe(occupied.recipeId)?.bodyShape === 'floor'
       if (
         (!canUseFoundationBase && occupied.occupied)
         || getAstraBuilderWallPanelAnchorAtCell(cells, occupiedCell, plot)
@@ -435,11 +458,11 @@ export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_
   const candidateColumnKey = `${cell.x}:${cell.z}`
   if (
     cell.y <= 2
-    && candidateBlockType !== 2
+    && candidatePart?.bodyShape !== 'floor'
     && doorwayColumns.has(candidateColumnKey)
   ) return 'doorway_reserved'
 
-  if (candidateBlockType !== 7) return null
+  if (candidatePart?.bodyShape !== 'doorway') return null
   if (cell.y !== 0) return 'door_ground_only'
   const doorColumns = getAstraBuilderDoorwayColumns(cell, edit.rotation, plot)
   if (doorColumns.length !== 2) return 'door_needs_two_columns'
@@ -449,7 +472,7 @@ export function getAstraBuilderPlacementIssue(cells, edit, plot = ASTRA_BUILDER_
       if (reservedCell.x === cell.x && reservedCell.y === cell.y && reservedCell.z === cell.z) continue
       const reservedValue = cells[getAstraBuilderCellIndex(reservedCell, plot)] || 0
       const reservedBlock = decodeAstraBuilderCell(reservedValue)
-      if (reservedBlock.occupied && reservedBlock.blockType !== 2) return 'doorway_obstructed'
+      if (reservedBlock.occupied && getAstraBuilderPartForRecipe(reservedBlock.recipeId)?.bodyShape !== 'floor') return 'doorway_obstructed'
     }
   }
   return null
@@ -480,8 +503,9 @@ export function getAstraBuilderInstances(cells, plot = ASTRA_BUILDER_POC_PLOT) {
         underlay: true,
       })
     }
-    const hiddenByDoorway = decoded.blockType !== 2
-      && decoded.blockType !== 7
+    const decodedBodyShape = getAstraBuilderPartForRecipe(decoded.recipeId)?.bodyShape
+    const hiddenByDoorway = decodedBodyShape !== 'floor'
+      && decodedBodyShape !== 'doorway'
       && cell.y <= 2
       && doorwayColumns.has(`${cell.x}:${cell.z}`)
     if (hiddenByDoorway) continue
@@ -545,7 +569,7 @@ export function getAstraBuilderWalkSurfaceOffset(
   if (!cell) return null
   const index = getAstraBuilderCellIndex(cell, plot)
   const decoded = decodeAstraBuilderCell(cells?.[index] || 0)
-  return decoded.blockType === 2
+  return getAstraBuilderPartForRecipe(decoded.recipeId)?.bodyShape === 'floor'
     ? plot.cellSize * .24
     : ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET
 }
