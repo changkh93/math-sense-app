@@ -11,6 +11,7 @@ import QuestionModal from '../QuestionModal'
 import { useSmartSync } from '../../hooks/useSync'
 import { useAuth } from '../../hooks/useAuth'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
+import QuizScratchPad from './QuizScratchPad'
 import { db, functions } from '../../firebase'
 import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
@@ -1978,7 +1979,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       </AnimatePresence>
       
       <div 
-        className="space-quiz-container scale-in field-test-protected-content"
+        className={`space-quiz-container scale-in field-test-protected-content ${isAiExplanationOpen ? 'ai-panel-open' : ''}`}
         style={{
           transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
           width: '100%',
@@ -2168,7 +2169,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           </motion.div>
         )}
 
-        <div id="space-quiz-capture-area" className="glass-card space-quiz-card">
+        <div className="field-test-quiz-workspace">
+          <div id="space-quiz-capture-area" className="glass-card space-quiz-card">
           {/* 닫기 버튼 (X 모양, 위치 저장 기능 유지) */}
           <button 
             onClick={handleExitClick}
@@ -2890,6 +2892,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             onClose={handleCloseQuestionModal}
             quizContext={modalContext}
           />
+          </div>
+          <QuizScratchPad questionKey={currentQuestion?.id || currentIdx} />
         </div>
       </div>
 

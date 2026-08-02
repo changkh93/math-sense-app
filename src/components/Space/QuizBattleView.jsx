@@ -91,8 +91,7 @@ export default function QuizBattleView({
   const [battleScope, setBattleScope] = useState(initialBattleScope)
   const [queueTickets, setQueueTickets] = useState([])
   const [isLoadingQueue, setIsLoadingQueue] = useState(false)
-  const [queueListExpanded, setQueueListExpanded] = useState(false)
-  const [onlineListExpanded, setOnlineListExpanded] = useState(false)
+  const [queueStartedAtMs, setQueueStartedAtMs] = useState(0)
   const [outgoingChallenge, setOutgoingChallenge] = useState(null)
   const [challengingUid, setChallengingUid] = useState('')
   const [challengeNotice, setChallengeNotice] = useState('')
@@ -115,6 +114,7 @@ export default function QuizBattleView({
   const [reviewIndex, setReviewIndex] = useState(0)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
   const activeTicketRef = useRef('')
+  const battleStartLockRef = useRef(false)
   const matchedRef = useRef(false)
   const autoFinalizeBattleRef = useRef('')
   const cancelQueueRef = useRef(null)
@@ -340,7 +340,8 @@ export default function QuizBattleView({
   }, [outgoingChallenge, timeNow])
 
   const startAIBattle = useCallback(async () => {
-    if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
+    if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining || battleStartLockRef.current) return
+    battleStartLockRef.current = true
     enterBattleFocusMode()
     setIsJoining(true)
     setJoiningMode('ai')
@@ -356,16 +357,19 @@ export default function QuizBattleView({
     } catch (err) {
       setError(err?.message || 'AI 배틀을 시작하지 못했습니다.')
     } finally {
+      battleStartLockRef.current = false
       setIsJoining(false)
       setJoiningMode('')
     }
   }, [battleScope, clusterId, entryUnitId, isJoining, regionId, user?.uid])
 
   const joinQueue = useCallback(async ({ silent = false, targetTicketId = '' } = {}) => {
-    if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining) return
+    if (!user?.uid || !clusterId || !regionId || !entryUnitId || isJoining || battleStartLockRef.current) return
+    battleStartLockRef.current = true
     if (!silent) enterBattleFocusMode()
     setIsJoining(true)
     setJoiningMode(targetTicketId ? 'direct' : 'queue')
+    if (!targetTicketId) setQueueStartedAtMs(Date.now())
     if (!silent && !targetTicketId) {
       setError('')
     } else if (!silent) {
@@ -397,9 +401,11 @@ export default function QuizBattleView({
         setPhase('waiting')
       }
     } catch (err) {
+      setQueueStartedAtMs(0)
       setError(err?.message || '배틀 대기룸에 입장하지 못했습니다.')
       setPhase('idle')
     } finally {
+      battleStartLockRef.current = false
       setIsJoining(false)
       setJoiningMode('')
     }
@@ -1100,135 +1106,137 @@ export default function QuizBattleView({
   }
 
   if (phase === 'idle') {
-    const showQueueList = queueTickets.length > 0 && (!isMobile || queueListExpanded)
-    const showOnlineList = onlineOpponents.length > 0 && (!isMobile || onlineListExpanded)
+    const showQueueList = queueTickets.length > 0
+    const showOnlineList = onlineOpponents.length > 0
     const challengeSecondsLeft = outgoingChallenge
       ? Math.max(0, Math.ceil((outgoingChallenge.expiresAtMs - timeNow) / 1000))
       : 0
-    return (
-      <div className="space-bg" style={panelStyle}>
-        <div className="glass-card hud-border" style={{ width: 'min(860px, 100%)', padding: isMobile ? '1.25rem' : '2rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚔️</div>
-          <h2 className="font-title" style={{ color: 'var(--star-gold)', marginBottom: '0.75rem' }}>QUIZ BATTLE</h2>
-          <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-            {isAIMode ? '전술 AI NOVA-7이 내 풀이 속도에 맞춰 함께 달립니다.' : '같은 범위의 탐사원과 실시간으로 대결하거나 NOVA-7과 즉시 훈련합니다.'}<br />
-            {isAIMode ? 'AI전 광석은 일반 대전의 1/3이며, 공식 전적 대신 훈련 SEI에 제한적으로 반영됩니다.' : '상대를 직접 선택하거나 아래에서 원하는 대결 방식을 고르세요.'}
-          </p>
-          <div style={{ color: 'var(--crystal-cyan)', marginBottom: '1.5rem', fontWeight: 800 }}>
-            퀴즈 범위: {rangeLabel || entryUnitTitle || entryUnitId}
+    const battleActionControls = (
+      <div className="quiz-battle-lobby-actions">
+        {error && <div style={{ color: '#f87171', marginBottom: '0.65rem' }}>{error}</div>}
+        <div className={`quiz-battle-lobby-actions__primary ${isAIMode ? 'is-ai-only' : ''}`}>
+          {!isAIMode && (
+            <button
+              type="button"
+              className={`hud-btn primary quiz-battle-action quiz-battle-action--match ${joiningMode === 'queue' ? 'is-loading' : ''}`}
+              onClick={() => joinQueue()}
+              disabled={isJoining || Boolean(outgoingChallenge)}
+              aria-busy={joiningMode === 'queue'}
+              style={{
+                borderColor: 'rgba(0,243,255,0.5)',
+                background: 'linear-gradient(145deg, rgba(0,243,255,0.17), rgba(32,77,145,0.2))',
+              }}
+            >
+              <i className={joiningMode === 'queue' ? 'quiz-battle-action__spinner' : ''} aria-hidden="true">{joiningMode === 'queue' ? '' : '⚡'}</i>
+              <span>
+                <b>{joiningMode === 'queue' ? '자동 매칭 진행 중…' : outgoingChallenge ? '도전 응답 대기 중' : '자동 매칭 시작'}</b>
+                <small className="font-tech">{joiningMode === 'queue' ? '대결을 준비하고 있습니다 · 잠시만 기다려 주세요' : '다른 탐사원을 찾은 뒤 실시간 대결'}</small>
+              </span>
+              <em aria-hidden="true">{joiningMode === 'queue' ? '•••' : '→'}</em>
+            </button>
+          )}
+          <button
+            type="button"
+            className={`hud-btn primary quiz-battle-action quiz-battle-action--ai ${joiningMode === 'ai' ? 'is-loading' : ''}`}
+            onClick={startAIBattle}
+            disabled={isJoining || Boolean(outgoingChallenge)}
+            aria-busy={joiningMode === 'ai'}
+            style={{
+              borderColor: 'rgba(124,92,255,0.7)',
+              background: 'linear-gradient(145deg, rgba(124,92,255,0.25), rgba(0,243,255,0.1))',
+              boxShadow: '0 10px 28px rgba(124,92,255,0.16)',
+            }}
+          >
+            <i className={joiningMode === 'ai' ? 'quiz-battle-action__spinner' : ''} aria-hidden="true">{joiningMode === 'ai' ? '' : '✦'}</i>
+            <span>
+              <b>{joiningMode === 'ai' ? 'NOVA-7 대결 준비 중…' : 'NOVA-7과 즉시 연습'}</b>
+              <small className="font-tech">{joiningMode === 'ai' ? '문제를 불러오고 있습니다 · 잠시만 기다려 주세요' : 'AI 대결 · 광석 1/3'}</small>
+            </span>
+            <em aria-hidden="true">{joiningMode === 'ai' ? '•••' : '→'}</em>
+          </button>
+        </div>
+        {isJoining && (
+          <div className="quiz-battle-action-status font-tech" role="status" aria-live="polite">
+            중복 실행을 막고 있습니다. 화면이 전환될 때까지 잠시만 기다려 주세요.
           </div>
-          {!isScopeLocked && <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
-            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.5rem', textAlign: 'center' }}>
-              새 대기방 범위 선택
+        )}
+      </div>
+    )
+    return (
+      <div className="space-bg quiz-battle-lobby" style={{ ...panelStyle, alignItems: 'flex-start' }}>
+        <div className="glass-card hud-border quiz-battle-lobby__card">
+          <button
+            type="button"
+            className="quiz-battle-lobby__close"
+            onClick={leaveBattle}
+            aria-label="퀴즈 배틀 닫기"
+            title="닫기"
+          >
+            ×
+          </button>
+          <div className="quiz-battle-lobby__hero">
+            <div className="quiz-battle-lobby__title">
+              <button type="button" className="quiz-battle-lobby__back" onClick={leaveBattle} aria-label="퀴즈 배틀에서 돌아가기">←</button>
+              <span aria-hidden="true">⚔️</span>
+              <div>
+                <h2 className="font-title">QUIZ BATTLE</h2>
+                <p className="font-tech">
+                  {isAIMode
+                    ? 'NOVA-7이 내 풀이 속도에 맞춰 즉시 훈련합니다.'
+                    : '탐사원과 실시간 대결하거나 NOVA-7과 즉시 훈련합니다.'}
+                </p>
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '0.6rem' }}>
+            <div className="quiz-battle-lobby__range">
+              <small>현재 과정</small>
+              <strong>{rangeLabel || entryUnitTitle || entryUnitId}</strong>
+            </div>
+          </div>
+          {!isScopeLocked && <div className="quiz-battle-lobby__scope" style={{ textAlign: 'left' }}>
+            <div className="quiz-battle-lobby__section-title">1. 퀴즈 출제 범위</div>
+            <div className="quiz-battle-lobby__scope-options" role="radiogroup" aria-label="퀴즈 출제 범위">
               {[
-                [BATTLE_SCOPE_CUMULATIVE, '상대와 공통으로 배운 이전 과정 전체에서 출제'],
-                [BATTLE_SCOPE_UNIT, '현재 진입 미션 유닛 문제만 출제'],
+                [BATTLE_SCOPE_CUMULATIVE, '상대와 공통으로 학습한 전체 과정에서 출제'],
+                [BATTLE_SCOPE_UNIT, '현재 학습 중인 유닛에서만 출제'],
               ].map(([scope, description]) => {
                 const selected = battleScope === scope
                 return (
-                  <button
+                  <label
                     key={scope}
-                    type="button"
-                    className="hud-btn glass"
-                    onClick={() => setBattleScope(scope)}
-                    style={{
-                      padding: '0.8rem 1rem',
-                      borderColor: selected ? 'var(--crystal-cyan)' : 'rgba(255,255,255,0.12)',
-                      background: selected ? 'rgba(0, 243, 255, 0.12)' : 'rgba(255,255,255,0.05)',
-                      textAlign: 'left',
-                    }}
+                    className={`quiz-battle-lobby__scope-option ${selected ? 'is-selected' : ''}`}
                   >
-                    <div style={{ color: selected ? 'var(--crystal-cyan)' : 'var(--text-bright)', fontWeight: 900 }}>
-                      {BATTLE_SCOPE_LABELS[scope]}
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: '0.25rem', lineHeight: 1.45 }}>
-                      {description}
-                    </div>
-                  </button>
+                    <input
+                      type="radio"
+                      name="quiz-battle-scope"
+                      value={scope}
+                      checked={selected}
+                      disabled={isJoining || Boolean(outgoingChallenge)}
+                      onChange={() => setBattleScope(scope)}
+                    />
+                    <span><b>{BATTLE_SCOPE_LABELS[scope]}</b><small>{description}</small></span>
+                  </label>
                 )
               })}
             </div>
           </div>}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
-              gap: '0.6rem',
-              marginBottom: '1.5rem',
-            }}
-          >
-            {(isAIMode ? [
-              ['AI 훈련', `${aiTrainingData.aiMatches || 0}회`],
-              ['완주', `${aiTrainingData.aiCompletedMatches || 0}회`],
-              ['정답률', `${aiTrainingData.aiAnswered > 0 ? Math.round((aiTrainingData.aiCorrect / aiTrainingData.aiAnswered) * 100) : 0}%`],
-              ['훈련 SEI', `${aiTrainingData.aiTrainingScore || 0}/60`],
-            ] : [
-              ['공식 전적', `${battleStats?.totalMatches || 0}전`],
-              ['승', `${battleStats?.wins || 0}`],
-              ['패', `${battleStats?.losses || 0}`],
-              ['무', `${battleStats?.draws || 0}`],
-            ]).map(([label, value]) => (
-              <div key={label} style={{ padding: '0.7rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{label}</div>
-                <div style={{ color: 'var(--text-bright)', fontWeight: 900 }}>{value}</div>
+          {battleActionControls}
+          {!isAIMode && (
+            <section className="quiz-battle-live-summary">
+              <div className="quiz-battle-live-summary__row">
+                <strong><i /> 실시간 상대 현황</strong>
+                <span>자동 매칭 대기 {isLoadingQueue ? '확인 중…' : `${queueTickets.length}명`} · 직접 도전 가능 {isLoadingOnline ? '확인 중…' : `${onlineOpponents.length}명`}</span>
+                <em>{isLoadingQueue || isLoadingOnline ? '연결 중' : '● 실시간'}</em>
               </div>
-            ))}
-          </div>
-          {!isAIMode && <section style={{ marginBottom: '1rem', textAlign: 'left' }}>
-            <div style={{
-              border: '1px solid rgba(251,191,36,0.3)',
-              borderRadius: 14,
-              overflow: 'hidden',
-              background: 'linear-gradient(120deg, rgba(251,191,36,0.08), rgba(255,255,255,0.025))',
-            }}>
-              <div style={{
-                padding: '0.85rem 1rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '0.8rem',
-                borderBottom: showQueueList ? '1px solid rgba(251,191,36,0.16)' : 0,
-              }}>
-                <button
-                  type="button"
-                  onClick={() => { if (isMobile) setQueueListExpanded(prev => !prev) }}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    padding: 0,
-                    border: 0,
-                    background: 'transparent',
-                    color: 'var(--text-bright)',
-                    textAlign: 'left',
-                    cursor: isMobile ? 'pointer' : 'default',
-                    font: 'inherit',
-                  }}
-                >
-                  <span className="font-tech" style={{ display: 'block', color: 'var(--star-gold)', fontSize: '0.7rem', letterSpacing: '0.12em', marginBottom: '0.25rem' }}>
-                    ⚡ BATTLE WAITING ROOM
-                  </span>
-                  <strong>즉시 배틀 가능 {isLoadingQueue ? '확인 중…' : `${queueTickets.length}명`}</strong>
-                  {isMobile && queueTickets.length > 0 && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.4rem' }}>{showQueueList ? '접기' : '보기'}</span>
-                  )}
-                </button>
-                <span
-                  className="font-tech"
-                  style={{ color: isLoadingQueue ? 'var(--text-muted)' : 'var(--star-gold)', fontWeight: 900, whiteSpace: 'nowrap', fontSize: '0.72rem' }}
-                >
-                  {isLoadingQueue ? '연결 중' : '● 실시간'}
-                </span>
-              </div>
-
-              <div className="font-tech" style={{ padding: '0.7rem 1rem 0', color: 'var(--text-muted)', fontSize: '0.76rem', lineHeight: 1.5 }}>
-                이미 대기룸에 입장해 출전 준비를 마친 탐사원입니다. 선택하면 도전장 없이 즉시 배틀이 시작됩니다.
-              </div>
-
-              {showQueueList && (
-                <div style={{ display: 'grid', gap: '0.6rem', padding: '0.75rem 1rem 1rem', maxHeight: isMobile ? '30vh' : '230px', overflowY: 'auto' }}>
-                  {queueTickets.map((ticket) => (
+              {!isLoadingQueue && !isLoadingOnline && queueTickets.length === 0 && onlineOpponents.length === 0 && (
+                <p>지금 바로 도전할 상대는 없습니다. 자동 매칭을 시작하면 상대가 들어올 때 연결됩니다.</p>
+              )}
+            </section>
+          )}
+          {!isAIMode && queueTickets.length > 0 && <section className="quiz-battle-live-list" style={{ marginBottom: '0.75rem', textAlign: 'left' }}>
+            <div className="quiz-battle-live-list__title">자동 매칭 대기자</div>
+            {showQueueList && (
+              <div style={{ display: 'grid', gap: '0.6rem', maxHeight: isMobile ? '30vh' : '230px', overflowY: 'auto' }}>
+                {queueTickets.map((ticket) => (
                     <div key={ticket.ticketId} style={{
                       display: 'grid',
                       gridTemplateColumns: isMobile ? '1fr' : '1fr auto',
@@ -1262,18 +1270,11 @@ export default function QuizBattleView({
                         {isJoining ? '연결 중…' : '즉시 배틀'}
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {!isLoadingQueue && queueTickets.length === 0 && (
-                <div style={{ padding: '0.75rem 1rem 1rem', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>
-                  현재 대기룸에서 출전을 기다리는 탐사원이 없습니다.
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </section>}
-          {!isAIMode && <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+          {!isAIMode && (onlineOpponents.length > 0 || outgoingChallenge || isChallengeReceptionMuted || challengeNotice) && <div className="quiz-battle-live-list" style={{ marginBottom: '0.75rem', textAlign: 'left' }}>
             {isChallengeReceptionMuted && (
               <div style={{
                 display: 'flex',
@@ -1301,62 +1302,7 @@ export default function QuizBattleView({
                 </button>
               </div>
             )}
-            <div
-              style={{
-                width: '100%',
-                padding: '0.8rem 1rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '0.8rem',
-                borderRadius: 999,
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.14)',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  if (isMobile) setOnlineListExpanded(prev => !prev)
-                }}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  border: 0,
-                  background: 'transparent',
-                  color: 'var(--text-bright)',
-                  textAlign: 'left',
-                  cursor: isMobile ? 'pointer' : 'default',
-                  font: 'inherit',
-                  padding: 0,
-                }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                  <i style={{ width: 8, height: 8, borderRadius: '50%', background: '#32f6a0', boxShadow: '0 0 10px #32f6a0' }} />
-                  온라인 탐사원 · 도전 신청 가능 {isLoadingOnline ? '확인 중...' : `${onlineOpponents.length}명`}
-                </span>
-                {isMobile && onlineOpponents.length > 0 && (
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginLeft: '0.45rem' }}>
-                    {showOnlineList ? '접기' : '보기'}
-                  </span>
-                )}
-              </button>
-              <span
-                className="font-tech"
-                style={{
-                  color: isLoadingOnline ? 'var(--text-muted)' : 'var(--crystal-cyan)',
-                  fontWeight: 900,
-                  padding: '0.15rem 0',
-                  whiteSpace: 'nowrap',
-                  fontSize: '0.72rem',
-                }}
-              >
-                {isLoadingOnline ? '연결 중' : '● 실시간'}
-              </span>
-            </div>
-            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.76rem', margin: '0.55rem 0 0.8rem', lineHeight: 1.5 }}>
-              대기룸에는 없지만 최근 2분 안에 접속했고, 현재 계정 권한으로 이 행성을 학습할 수 있는 탐사원입니다. 선택하면 퀴즈 범위를 담은 도전장이 전달됩니다.
-            </div>
+            {onlineOpponents.length > 0 && <div className="quiz-battle-live-list__title">직접 도전 가능한 탐사원</div>}
             {outgoingChallenge && (
               <div style={{
                 display: 'grid',
@@ -1420,93 +1366,30 @@ export default function QuizBattleView({
                 ))}
               </div>
             )}
-            {!isLoadingOnline && onlineOpponents.length === 0 && !outgoingChallenge && (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', marginTop: '0.65rem', padding: '0.8rem' }}>
-                지금 바로 도전할 수 있는 탐사원이 없습니다.<br />자동 매칭 대기룸에 들어가면 다음 상대와 연결됩니다.
-              </div>
-            )}
           </div>}
+          <div className="quiz-battle-lobby__record font-tech">
+            {isAIMode ? (
+              <><span>내 AI 훈련 기록</span><strong>{aiTrainingData.aiMatches || 0}회 · 완주 {aiTrainingData.aiCompletedMatches || 0}회 · 정답률 {aiTrainingData.aiAnswered > 0 ? Math.round((aiTrainingData.aiCorrect / aiTrainingData.aiAnswered) * 100) : 0}% · 훈련 SEI {aiTrainingData.aiTrainingScore || 0}/60</strong></>
+            ) : (
+              <><span>내 공식전 기록</span><strong>{battleStats?.totalMatches || 0}전 · {battleStats?.wins || 0}승 · {battleStats?.losses || 0}패 · {battleStats?.draws || 0}무</strong></>
+            )}
+          </div>
+          {import.meta.env.DEV && !isAIMode && onSoloQuiz && (
+            <button className="quiz-battle-lobby__dev-link" onClick={handleSoloQuiz}>개발용 FIELD TEST 전환</button>
+          )}
           {userData?.isGuest === true && (
             <div className="font-tech" style={{ color: 'var(--star-gold)', marginBottom: '1rem', fontSize: '0.82rem' }}>
               GUEST RUN · NOVA-7전은 선택 범위에 준비된 문제를 최대 15개까지 출제합니다. 내 전적과 광석은 저장되지 않지만 상대방의 경기 기록에는 반영됩니다.
             </div>
           )}
-          {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
-          <div style={{ marginTop: isMobile ? '0.3rem' : '0.55rem' }}>
-            <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.72rem', letterSpacing: '0.1em', marginBottom: '0.55rem' }}>
-              {isAIMode ? 'AI BATTLE START' : '대결 방식 선택'}
-            </div>
-            <div style={{
-              width: 'min(620px, 100%)',
-              margin: '0 auto',
-              display: 'grid',
-              gridTemplateColumns: isAIMode ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))',
-              gap: isMobile ? '0.55rem' : '0.75rem',
-            }}>
-              {!isAIMode && (
-                <button
-                  type="button"
-                  className="hud-btn primary glass"
-                  onClick={() => joinQueue()}
-                  disabled={isJoining || Boolean(outgoingChallenge)}
-                  style={{
-                    minHeight: isMobile ? 82 : 92,
-                    padding: isMobile ? '0.8rem 0.55rem' : '0.95rem 1rem',
-                    borderColor: 'rgba(0,243,255,0.5)',
-                    background: 'linear-gradient(145deg, rgba(0,243,255,0.17), rgba(32,77,145,0.2))',
-                  }}
-                >
-                  <span style={{ display: 'block', fontWeight: 900, fontSize: isMobile ? '0.9rem' : '1rem' }}>
-                    {joiningMode === 'queue' ? '연결 중…' : outgoingChallenge ? '도전 대기 중' : isMobile ? '자동 매칭' : '자동 매칭 대기룸 입장'}
-                  </span>
-                  <span className="font-tech" style={{ display: 'block', marginTop: '0.3rem', color: 'var(--text-muted)', fontSize: isMobile ? '0.65rem' : '0.72rem', lineHeight: 1.35 }}>
-                    탐사원과 실시간 대결
-                  </span>
-                </button>
-              )}
-              <button
-                type="button"
-                className="hud-btn primary glass"
-                onClick={startAIBattle}
-                disabled={isJoining || Boolean(outgoingChallenge)}
-                style={{
-                  minHeight: isMobile ? 82 : 92,
-                  padding: isMobile ? '0.8rem 0.55rem' : '0.95rem 1rem',
-                  borderColor: 'rgba(124,92,255,0.7)',
-                  background: 'linear-gradient(145deg, rgba(124,92,255,0.25), rgba(0,243,255,0.1))',
-                  boxShadow: '0 10px 28px rgba(124,92,255,0.16)',
-                }}
-              >
-                <span style={{ display: 'block', fontWeight: 900, fontSize: isMobile ? '0.9rem' : '1rem' }}>
-                  {joiningMode === 'ai' ? 'NOVA-7 호출 중…' : 'NOVA-7 AI'}
-                </span>
-                <span className="font-tech" style={{ display: 'block', marginTop: '0.3rem', color: 'var(--text-muted)', fontSize: isMobile ? '0.65rem' : '0.72rem', lineHeight: 1.35 }}>
-                  즉시 대결 · 광석 1/3
-                </span>
-              </button>
-            </div>
-            <div style={{
-              width: isMobile ? '100%' : 'auto',
-              marginTop: '0.7rem',
-              display: 'grid',
-              gridTemplateColumns: isMobile ? `repeat(${!isAIMode && onSoloQuiz ? 2 : 1}, minmax(0, 1fr))` : 'repeat(2, auto)',
-              justifyContent: isMobile ? 'stretch' : 'center',
-              gap: '0.55rem',
-            }}>
-              {!isAIMode && onSoloQuiz && <button className="hud-btn secondary glass" onClick={handleSoloQuiz} style={{ minHeight: 44, padding: isMobile ? '0.7rem 0.5rem' : '0.72rem 1.1rem', fontSize: isMobile ? '0.78rem' : undefined }}>
-                FIELD TEST
-              </button>}
-              <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ minHeight: 44, padding: isMobile ? '0.7rem 0.5rem' : '0.72rem 1.1rem', fontSize: isMobile ? '0.78rem' : undefined }}>
-                돌아가기
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     )
   }
 
   if (phase === 'waiting') {
+    const queueElapsedSec = queueStartedAtMs > 0 ? Math.max(0, Math.floor((timeNow - queueStartedAtMs) / 1000)) : 0
+    const queueElapsedLabel = `${String(Math.floor(queueElapsedSec / 60)).padStart(2, '0')}:${String(queueElapsedSec % 60).padStart(2, '0')}`
     return (
       <div className="space-bg" style={panelStyle}>
         <div className="glass-card hud-border" style={{ width: 'min(720px, 100%)', padding: '2rem', textAlign: 'center' }}>
@@ -1517,7 +1400,7 @@ export default function QuizBattleView({
           >
             🛰️
           </MotionDiv>
-          <h2 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.8rem' }}>배틀 상대 탐색 중</h2>
+          <h2 className="font-title" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.8rem' }}>상대를 찾는 중… {queueElapsedLabel}</h2>
           <p className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '1.5rem' }}>
             같은 행성의 대기룸에 들어온 탐사원을 찾고 있습니다.<br />
             대기 상태는 자동으로 갱신됩니다.
@@ -1539,11 +1422,13 @@ export default function QuizBattleView({
           </div>
           {error && <div style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="hud-btn secondary glass" onClick={handleSoloQuiz} disabled={isLeaving} style={{ padding: '0.9rem 1.4rem' }}>
-              {isLeaving ? '대기 취소 중...' : '혼자 FIELD TEST로 전환'}
-            </button>
+            {import.meta.env.DEV && onSoloQuiz && (
+              <button className="hud-btn secondary glass" onClick={handleSoloQuiz} disabled={isLeaving} style={{ padding: '0.9rem 1.4rem' }}>
+                개발용 FIELD TEST 전환
+              </button>
+            )}
             <button className="hud-btn secondary glass" onClick={leaveBattle} style={{ padding: '0.9rem 1.4rem' }}>
-              대기 취소
+              {isLeaving ? '취소 중…' : '매칭 취소'}
             </button>
           </div>
         </div>
