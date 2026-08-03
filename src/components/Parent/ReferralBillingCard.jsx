@@ -90,7 +90,7 @@ export default function ReferralBillingCard() {
   useEffect(() => { load(); }, []);
 
   const copyInviteMessage = async (url) => {
-    const shareText = `[메타센스 추천 혜택]\n이 링크로 신청한 가구가 유료 수강을 시작하면 추천한 가구도 수강료 할인 혜택을 받습니다.\n\n자녀를 위한 수학·파이썬 수업을 4주 무료로 체험해 보세요!\n아래 링크로 신청한 뒤 담당자와 체험 시작일을 정할 수 있어요.\n체험 후 자동으로 유료 전환되거나 결제되지 않습니다.\n\n${url}`;
+    const shareText = `[메타센스 4주 무료체험 초대]\n우리 아이가 이용하고 있는 메타센스를 소개해요.\n\n메타센스는 초등·중등 수학과 Python을 아이가 매일 스스로 학습할 수 있도록 돕는 온라인 학습 플랫폼이에요. 혹시 자녀에게도 잘 맞을까 싶어 부담 없이 체험해 볼 수 있는 추천 링크를 보내드립니다.\n\n이 링크로 신청하면 4주 무료체험 혜택이 적용됩니다. 신청 후 담당자와 상담하여 체험 시작일을 정할 수 있으며, 체험이 끝난 뒤 자동으로 유료 전환되거나 결제되지 않습니다.\n\n${url}`;
     await navigator.clipboard.writeText(shareText);
     setMessage('추천 메시지를 복사했습니다. 지인에게 그대로 보내보세요.');
   };
