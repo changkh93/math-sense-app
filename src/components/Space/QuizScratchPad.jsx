@@ -24,42 +24,64 @@ export default function QuizScratchPad({ questionKey }) {
     clearCanvas()
   }, [clearCanvas, questionKey])
 
-  useEffect(() => {
+  const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
-    if (!canvas || !container) return undefined
+    if (!canvas || !container) return false
 
-    const resizeCanvas = () => {
-      const { width, height } = container.getBoundingClientRect()
-      if (!width || !height) return
+    const { width, height } = container.getBoundingClientRect()
+    if (!width || !height) return false
 
-      const previous = document.createElement('canvas')
-      previous.width = canvas.width
-      previous.height = canvas.height
-      if (previous.width && previous.height) {
-        previous.getContext('2d')?.drawImage(canvas, 0, 0)
-      }
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+    const nextWidth = Math.max(1, Math.round(width * pixelRatio))
+    const nextHeight = Math.max(1, Math.round(height * pixelRatio))
+    if (canvas.width === nextWidth && canvas.height === nextHeight) return false
 
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
-      canvas.width = Math.max(1, Math.round(width * pixelRatio))
-      canvas.height = Math.max(1, Math.round(height * pixelRatio))
-      canvas.style.width = `${width}px`
-      canvas.style.height = `${height}px`
-
-      const context = canvas.getContext('2d')
-      if (previous.width && previous.height) {
-        context.drawImage(previous, 0, 0, previous.width, previous.height, 0, 0, canvas.width, canvas.height)
-      }
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
-      context.lineCap = 'round'
-      context.lineJoin = 'round'
+    const previous = document.createElement('canvas')
+    previous.width = canvas.width
+    previous.height = canvas.height
+    if (previous.width && previous.height) {
+      previous.getContext('2d')?.drawImage(canvas, 0, 0)
     }
 
-    resizeCanvas()
-    const observer = new ResizeObserver(resizeCanvas)
-    observer.observe(container)
-    return () => observer.disconnect()
+    canvas.width = nextWidth
+    canvas.height = nextHeight
+
+    const context = canvas.getContext('2d')
+    if (previous.width && previous.height) {
+      context.drawImage(previous, 0, 0, previous.width, previous.height, 0, 0, nextWidth, nextHeight)
+    }
+    context.setTransform(nextWidth / width, 0, 0, nextHeight / height, 0, 0)
+    context.lineCap = 'round'
+    context.lineJoin = 'round'
+    return true
   }, [])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return undefined
+
+    let resizeFrame = 0
+    const scheduleResize = () => {
+      window.cancelAnimationFrame(resizeFrame)
+      resizeFrame = window.requestAnimationFrame(() => resizeCanvas())
+    }
+
+    scheduleResize()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleResize)
+    observer?.observe(container)
+    window.addEventListener('resize', scheduleResize)
+    window.addEventListener('orientationchange', scheduleResize)
+    document.addEventListener('fullscreenchange', scheduleResize)
+
+    return () => {
+      window.cancelAnimationFrame(resizeFrame)
+      observer?.disconnect()
+      window.removeEventListener('resize', scheduleResize)
+      window.removeEventListener('orientationchange', scheduleResize)
+      document.removeEventListener('fullscreenchange', scheduleResize)
+    }
+  }, [resizeCanvas])
 
   const getPoint = (event) => {
     const rect = canvasRef.current.getBoundingClientRect()
@@ -77,6 +99,7 @@ export default function QuizScratchPad({ questionKey }) {
   const handlePointerDown = (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
     event.preventDefault()
+    resizeCanvas()
     const canvas = canvasRef.current
     const context = canvas.getContext('2d')
     const point = getPoint(event)

@@ -521,6 +521,9 @@
 .quiz-scratchpad__canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   display: block;
   cursor: crosshair;
   touch-action: none;

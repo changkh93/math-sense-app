@@ -4746,6 +4746,7 @@ function SpaceHome() {
               animate={{ scale: 1, y: 0, rotateX: 0 }}
               exit={{ scale: 0.8, y: 50, opacity: 0 }}
               style={{
+                position: 'relative',
                 padding: '3rem',
                 textAlign: 'center',
                 maxWidth: '500px',
@@ -4753,6 +4754,36 @@ function SpaceHome() {
                 boxShadow: completionResult.isPerfect ? 'var(--glow-gold)' : 'var(--glow-cyan)'
               }}
             >
+              <button
+                type="button"
+                aria-label="완료 화면 닫기"
+                title="닫기"
+                onClick={() => {
+                  setCompletionResult(null)
+                  soundManager.playClick()
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '0.85rem',
+                  right: '0.85rem',
+                  zIndex: 2,
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  padding: 0,
+                  display: 'grid',
+                  placeItems: 'center',
+                  border: '1px solid rgba(255,255,255,0.22)',
+                  borderRadius: '50%',
+                  background: 'rgba(3, 12, 24, 0.82)',
+                  color: 'var(--text-bright)',
+                  cursor: 'pointer',
+                  touchAction: 'manipulation'
+                }}
+              >
+                <X size={22} aria-hidden="true" />
+              </button>
               <div className="hud-line mb-4"></div>
               <h2 className="font-title gradient-text-space" style={{ 
                 fontSize: '2.5rem', 
@@ -4781,7 +4812,8 @@ function SpaceHome() {
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <button 
+                <button
+                  type="button"
                   className="hud-btn primary glass"
                   style={{
                     padding: '1rem',
@@ -4790,7 +4822,8 @@ function SpaceHome() {
                     color: 'var(--text-bright)',
                     borderRadius: '10px',
                     cursor: 'pointer',
-                    fontWeight: 700
+                    fontWeight: 700,
+                    touchAction: 'manipulation'
                   }}
                           onClick={() => {
                             setCompletionResult(null)
@@ -4800,7 +4833,8 @@ function SpaceHome() {
                 >
                   📊 성장 기록 분석 (DASHBOARD)
                 </button>
-                <button 
+                <button
+                  type="button"
                   className="hud-btn secondary glass"
                   style={{
                     padding: '1rem',
@@ -4809,7 +4843,8 @@ function SpaceHome() {
                     color: 'var(--text-muted)',
                     borderRadius: '10px',
                     cursor: 'pointer',
-                    fontWeight: 700
+                    fontWeight: 700,
+                    touchAction: 'manipulation'
                   }}
                           onClick={() => {
                             setCompletionResult(null)

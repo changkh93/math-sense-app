@@ -1105,6 +1105,8 @@ export default function MissionHub({
   const [timeRemaining, setTimeRemaining] = useState(60)
   const [logTimerActive, setLogTimerActive] = useState(false)
   const [logRewardClaimed, setLogRewardClaimed] = useState(false)
+  const [logRewardClaiming, setLogRewardClaiming] = useState(false)
+  const logRewardClaimedRef = useRef(false)
   const storageKey = `datalog_timer_${userId || 'anon'}_${unitId}`
 
   // ─── Transmission reward state (Bitset/Checklist) ───
@@ -1165,7 +1167,10 @@ export default function MissionHub({
         }
 
         // Restore global completion states (Data Log)
-        if (data.logRead) setLogRewardClaimed(true)
+        if (data.logRead) {
+          logRewardClaimedRef.current = true
+          setLogRewardClaimed(true)
+        }
       }
       setLoadingProgress(false)
     }, (err) => {
@@ -1839,18 +1844,30 @@ export default function MissionHub({
 
   // ─── Data Log: Claim reward ───
   const handleClaimLogReward = async () => {
-    if (logRewardClaimed || timeRemaining > 0 || !userId) return
+    if (logRewardClaimedRef.current || logRewardClaimed || timeRemaining > 0 || !userId) return
+
+    // Lock synchronously before awaiting Firestore. On touch devices a second tap can
+    // otherwise enter this handler before React commits logRewardClaimed=true.
+    logRewardClaimedRef.current = true
+    setLogRewardClaiming(true)
 
     try {
+      let completionResult = null
       if (onNonQuizActivityComplete) {
-        await onNonQuizActivityComplete('데이터 로그 학습', 30)
+        completionResult = await onNonQuizActivityComplete('데이터 로그 학습', 30)
+      }
+      if (completionResult?.rewardBlockedReason === 'error') {
+        throw new Error('Data log reward transaction failed')
       }
       setLogRewardClaimed(true)
       localStorage.removeItem(storageKey)
       showSilentToast(30)
       logActivity('data_log_reward_claimed')
     } catch (err) {
+      logRewardClaimedRef.current = false
       console.error("Failed to claim log reward:", err)
+    } finally {
+      setLogRewardClaiming(false)
     }
   }
 
@@ -2750,9 +2767,12 @@ export default function MissionHub({
               </button>
             ) : (
               <motion.button
+                type="button"
                 whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleClaimLogReward}
+                disabled={logRewardClaiming}
+                aria-busy={logRewardClaiming}
                 className="hud-btn primary glass"
                 style={{
                   padding: '1rem 3rem',
@@ -2760,12 +2780,14 @@ export default function MissionHub({
                   border: '2px solid var(--crystal-cyan)',
                   color: 'var(--text-bright)',
                   borderRadius: '10px',
-                  cursor: 'pointer',
+                  cursor: logRewardClaiming ? 'wait' : 'pointer',
                   fontSize: '1.1rem',
-                  fontWeight: 700
+                  fontWeight: 700,
+                  opacity: logRewardClaiming ? 0.7 : 1,
+                  touchAction: 'manipulation'
                 }}
               >
-                💎 학습 완료 · 보상 받기 (+30 광석)
+                {logRewardClaiming ? '⏳ 보상 처리 중...' : '💎 학습 완료 · 보상 받기 (+30 광석)'}
               </motion.button>
             )}
           </div>
