@@ -5,6 +5,7 @@ import { useAdminMutations } from '../../hooks/useContent';
 import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { auditQuizOptionStyle } from '../../utils/quizOptionStyleAudit';
+import { parseJsonWithLatexFallback } from '../../utils/mistakeNotebookAi';
 
 const PROMPT_TEMPLATE = `
 첨부한 파일의 문제와 옵션을 수정하지 말고, 그대로 퀴즈 포맷으로 변환해 주세요. 
@@ -105,8 +106,8 @@ export default function AiQuizImportModal({ isOpen, onClose, unitId }) {
         // Matches ```json ... ``` or just ``` ... ```
         const jsonMatch = jsonInput.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
         const cleanJson = jsonMatch ? jsonMatch[1] : jsonInput.trim();
-        
-        data = JSON.parse(cleanJson);
+
+        data = parseJsonWithLatexFallback(cleanJson);
       } catch (e) {
         throw new Error('Invalid JSON format. Please check your input and ensure it is valid JSON.');
       }

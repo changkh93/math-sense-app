@@ -86,25 +86,61 @@ export const normalizeEscapedNewlines = (text) => {
 };
 
 /**
- * Sanitizes LaTeX strings to handle common JS escaping issues.
- * Specifically handles the case where \frac becomes [Form Feed]rac (\f + rac)
+ * 제어문자로 깨진 LaTeX 명령어를 `\t`/`\r`/`\f`/`\v`/`\b` 역변환으로 되돌린다.
+ *
+ * AI가 JSON 문자열 값 안에 `\text{ m}`, `\frac{1}{2}` 같은 LaTeX 명령어를 단일
+ * 백슬래시로 적으면 `JSON.parse`가 `\t`·`\f`·`\n`·`\r`·`\b`·`\v` 를 제어문자로
+ * 변환하면서 백슬래시를 삼켜 버린다. 그 결과 `\text`는 `<TAB>ext`, `\frac`는
+ * `<FF>rac`, `\right`는 `<CR>ight`, `\neq`는 `<LF>eq` 처럼 깨진다.
+ *
+ * 핵심 원리: JSON.parse가 `\t`(두 글자)를 하나의 TAB으로 합쳤으니, 반대로 TAB 문자를
+ * `\t`(두 글자)로 되돌리면 원래 LaTeX 명령어가 그대로 재조립된다. 같은 원리로
+ * CR→`\r`, FF→`\f`, VT→`\v`, BS→`\b` 도 역변환한다. 이렇게 하면 문자 종류마다
+ * 케이스를 나열하지 않아도 `\times`·`\text`·`\rho`·`\right`·`\vec`·`\beta`·`\forall`
+ * 등을 모두 복원할 수 있다.
+ *
+ * 단, LF(U+000A)만은 예외다. explanation은 Markdown이라 진짜 줄바꿈이 매우 흔한데,
+ * LF를 무조건 `\n`으로 되돌리면 Markdown 줄바꿈이 `\n` 리터럴로 변해버린다. 그래서
+ * LF는 알려진 명령어(neq/nu/notin/nabla/neg) 패턴 매칭으로만 처리하고, 나머지 LF는
+ * Markdown 줄바꿈으로 유지한다.
+ */
+const repairControlCharsToLatex = (text) => normalizeEscapedNewlines(text)
+  .replace(new RegExp(`${CONTROL_CHARS.formFeed}\\s?rac`, 'g'), '\\frac')
+  // LF 기반 명령어: Markdown 줄바꿈과 충돌하므로 패턴 매칭으로만 복원한다.
+  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}eq(?![a-zA-Z])`, 'g'), '\\neq')
+  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}u(?![a-zA-Z])`, 'g'), '\\nu')
+  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}otin(?![a-zA-Z])`, 'g'), '\\notin')
+  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}abla(?![a-zA-Z])`, 'g'), '\\nabla')
+  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}eg(?![a-zA-Z])`, 'g'), '\\neg')
+  // 남은 제어문자를 JSON 이스케이프의 역변환으로 되돌린다.
+  // TAB→`\t`, CR→`\r`, FF→`\f`, VT→`\v`, BS→`\b` 가 자연스럽게 LaTeX 명령어를 재조립한다.
+  .replaceAll(CONTROL_CHARS.formFeed, '\\f')
+  .replaceAll(CONTROL_CHARS.verticalTab, '\\v')
+  .replaceAll(CONTROL_CHARS.backspace, '\\b')
+  .replaceAll(CONTROL_CHARS.tab, '\\t')
+  .replaceAll(CONTROL_CHARS.carriageReturn, '\\r')
+  .replaceAll(CONTROL_CHARS.lineFeed, '\n');
+
+/**
+ * 렌더용 LaTeX 정제. 제어문자 역변환 뒤 한글 `\text{}` 래핑 등 화면 표시를 위한
+ * 후처리를 더한다. KaTeX/인라인 포맷터에 넘기기 직전에 호출한다.
  */
 export const sanitizeLaTeX = (text) => {
   if (!text || typeof text !== 'string') return text;
-  
-  const controlCharFixed = normalizeEscapedNewlines(text)
-    .replace(new RegExp(`${CONTROL_CHARS.formFeed}\\s?rac`, 'g'), '\\frac')
-    .replace(new RegExp(`${CONTROL_CHARS.lineFeed}\\s?neq`, 'g'), '\\neq')
-    .replace(new RegExp(`${CONTROL_CHARS.lineFeed}\\s?nu`, 'g'), '\\nu')
-    .replace(new RegExp(`${CONTROL_CHARS.lineFeed}\\s?notin`, 'g'), '\\notin')
-    .replaceAll(CONTROL_CHARS.formFeed, '\\f')
-    .replaceAll(CONTROL_CHARS.verticalTab, '\\v')
-    .replaceAll(CONTROL_CHARS.backspace, '\\b')
-    .replaceAll(CONTROL_CHARS.tab, ' ')
-    .replaceAll(CONTROL_CHARS.carriageReturn, '');
 
-  const restoredSlashes = restoreLostLatexCommandSlashes(controlCharFixed).trim();
+  const restoredSlashes = restoreLostLatexCommandSlashes(repairControlCharsToLatex(text)).trim();
   return ensureKoreanInTextMacro(restoredSlashes);
+};
+
+/**
+ * 운영툴에서 사람이 편집할 원본 텍스트를 정제한다. 렌더용 `sanitizeLaTeX`와 달리
+ * 한글 `\text{}` 자동 래핑처럼 원문을 변형하는 후처리는 빼고, 깨진 제어문자만
+ * 원래 LaTeX 명령어로 되돌린다. textarea value로 쓰면 과거에 TAB이 박힌 채 저장된
+ * 데이터도 깨끗한 원문으로 보이고, 그대로 저장하면 DB 원문까지 정리된다.
+ */
+export const repairLaTeXForEditing = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  return restoreLostLatexCommandSlashes(repairControlCharsToLatex(text)).trim();
 };
 
 const URL_MATCH_PATTERN = /(https?:\/\/[^\s<>"']+)/gi;

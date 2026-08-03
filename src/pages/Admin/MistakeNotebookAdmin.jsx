@@ -1,7 +1,7 @@
 import { Children, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Archive, CheckCircle2, Clipboard, FileJson, Image, Send, Sparkles } from 'lucide-react'
-import { normalizeEscapedNewlines, parseInlineFormatting } from '../../utils/formatUtils'
+import { normalizeEscapedNewlines, parseInlineFormatting, repairLaTeXForEditing } from '../../utils/formatUtils'
 import {
   buildMistakeNotebookAiPrompt,
   buildMistakeNotebookStarterExplanation,
@@ -306,7 +306,9 @@ function getInitialForm(upload) {
   return {
     questionTitle: card.questionTitle || upload.title || '나의 오답 카드',
     answer: card.answer || upload.answer || '',
-    explanation: card.explanation || buildMistakeNotebookStarterExplanation(upload),
+    // 과거에 JSON.parse로 TAB/CR 등이 박힌 채 저장된 explanation도 깨끗한 LaTeX로
+    // 정제해서 보여준다. 그대로 저장하면 DB 원문까지 정리된다.
+    explanation: repairLaTeXForEditing(card.explanation || buildMistakeNotebookStarterExplanation(upload)),
     concept: card.concept || upload.concept || '',
     tags: (card.tags || upload.tags || []).join(', '),
     difficulty: card.difficulty || 'normal'
@@ -424,7 +426,21 @@ function MistakeCardEditor({ selected }) {
         <label style={labelStyle}>정답</label>
         <input style={inputStyle} value={form.answer} onChange={e => handleChange('answer', e.target.value)} placeholder="학생이 외워야 할 최종 정답" />
 
-        <label style={labelStyle}>해설</label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label style={{ ...labelStyle, margin: 0 }}>해설</label>
+          <button
+            className="admin-btn secondary"
+            type="button"
+            onClick={() => {
+              handleChange('explanation', repairLaTeXForEditing(form.explanation))
+              setNotice('해설의 깨진 LaTeX를 정비했습니다. 확인 후 저장하면 DB 원문도 정리됩니다.')
+            }}
+            style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+            title="TAB/제어문자로 깨진 LaTeX 명령어(\\text, \\frac, \\times 등)를 복원합니다"
+          >
+            LaTeX 정비
+          </button>
+        </div>
         <textarea
           style={{ ...inputStyle, minHeight: 180, resize: 'vertical', lineHeight: 1.55 }}
           value={form.explanation}

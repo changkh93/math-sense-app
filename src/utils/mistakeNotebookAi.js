@@ -74,13 +74,35 @@ ${options}
 \`\`\``
 }
 
-function parseJsonWithLatexFallback(cleanJson) {
+/**
+ * AI가 반환한 JSON 텍스트에서 LaTeX 명령어가 JSON.parse에 삼켜지는 것을 막는다.
+ *
+ * 문제: AI가 JSON 문자열 값 안에 `\text{ m}`, `\frac{1}{2}` 등을 **단일 백슬래시**로
+ * 적는 경우가 잦다. 이때 `\t`는 JSON 공식 이스케이프(TAB), `\f`는 form feed,
+ * `\n`/`\r`/`\b`/`\v` 도 각각 제어문자로 해석되어 `JSON.parse`가 백슬래시까지
+ * 삼켜 버린다. 기존 정규식 `/\\(?!["\\/bfnrtu])/g`는 b/f/n/r/t/u 앞의 백슬래시를
+ * "진짜 JSON 이스케이프"로 보고 그대로 두었기 때문에 정작 `\text`, `\frac`, `\neq`
+ * 같은 LaTeX 명령어를 전혀 보호하지 못했다.
+ *
+ * 해결: `JSON.parse`에 넣기 전에 (1) 단일 백슬래시+영문자를 이중 백슬래시로 바꾸어
+ * LaTeX 명령어로 취급하고, (2) 모델이 코드블록 안에 literal 줄바꿈을 그대로 넣은
+ * invalid multiline JSON도 정상 이스케이프로 바로잡는다. 이미 이중 백슬래시(\\)로
+ * 올바르게 반환한 경우는 lookbehind로 보호된다.
+ */
+export function neutralizeLatexInJson(text) {
+  return text
+    .replace(/(?<!\\)\\(?=[a-zA-Z])/g, '\\\\')
+    .replace(/\r\n/g, '\\n')
+    .replace(/[\r\n]/g, '\\n')
+    .replace(/\t/g, '\\t')
+}
+
+export function parseJsonWithLatexFallback(cleanJson) {
   try {
-    return JSON.parse(cleanJson)
+    return JSON.parse(neutralizeLatexInJson(cleanJson))
   } catch (error) {
-    const latexSafeJson = cleanJson.replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
     try {
-      return JSON.parse(latexSafeJson)
+      return JSON.parse(cleanJson)
     } catch {
       throw error
     }
