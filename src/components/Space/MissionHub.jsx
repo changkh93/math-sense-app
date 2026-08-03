@@ -2210,7 +2210,7 @@ export default function MissionHub({
   */
 
   // ─── Transmission: Save position ("오늘은 여기까지") ───
-  const handleSaveVideoPosition = async () => {
+  const handleSaveVideoPosition = async (shouldExit = true) => {
     if (!userId || !selectedTx) {
       setSelectedTx(null)
       returnFromContent()
@@ -2267,6 +2267,9 @@ export default function MissionHub({
           rewardAmount = 20
         }
         
+        // Stop completion bonus countdown timer once claimed/processed
+        setCompletionBonusTimeLeft(null)
+
         if (rewardAmount > 0) {
           totalRewardedCrystalsRef.current += rewardAmount
           updateData.videoProgress[txId].totalRewardedCrystals = totalRewardedCrystalsRef.current
@@ -2349,12 +2352,14 @@ export default function MissionHub({
       console.error("Failed to save video position:", err)
     }
 
-    if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
-    videoAlreadySavedRef.current = true // Prevent returnFromContent from double-writing
-    setTimeout(() => {
-      setSelectedTx(null)
-      returnFromContent()
-    }, 1200)
+    if (shouldExit) {
+      if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
+      videoAlreadySavedRef.current = true // Prevent returnFromContent from double-writing
+      setTimeout(() => {
+        setSelectedTx(null)
+        returnFromContent()
+      }, 1200)
+    }
   }
 
 
@@ -2904,7 +2909,7 @@ export default function MissionHub({
                     className="space-nav-link font-tech"
                     onClick={() => {
                       soundManager.playClick()
-                      handleSaveVideoPosition()
+                      handleSaveVideoPosition(true)
                     }}
                     style={{ 
                       display: 'flex',
@@ -3151,8 +3156,31 @@ export default function MissionHub({
                    flexDirection: isMobile ? 'column' : 'row'
                  }}
                >
+                 {hasUnsavedVideoCompletion && (
+                   <button 
+                     type="button"
+                     onClick={() => handleSaveVideoPosition(false)}
+                     className="hud-btn primary glass"
+                     style={{ 
+                       padding: isMobile ? '0.85rem 1rem' : '0.8rem 2rem', 
+                       fontSize: isMobile ? '0.9rem' : '1rem',
+                       borderRadius: '10px',
+                       borderColor: 'var(--planet-green)',
+                       background: 'linear-gradient(135deg, rgba(6, 32, 20, 0.94), rgba(12, 48, 28, 0.90))',
+                       color: 'white',
+                       boxShadow: '0 4px 15px rgba(0, 255, 136, 0.35)'
+                     }}
+                   >
+                     {completionBonusTimeLeft > 0 ? (
+                       <>✨ 보너스 광석 받기 (+20 💎) · {completionBonusTimeLeft}초</>
+                     ) : (
+                       <>☑️ 학습 완료 저장 (광석 받기)</>
+                     )}
+                   </button>
+                 )}
+
                  <button 
-                   onClick={handleSaveVideoPosition}
+                   onClick={() => handleSaveVideoPosition(true)}
                    className="hud-btn secondary glass"
                    style={{ 
                      padding: isMobile ? '0.85rem 1rem' : '0.8rem 2.5rem', 
@@ -3163,20 +3191,12 @@ export default function MissionHub({
                      boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
                    }}
                  >
-                   {videoCompleted ? (
-                     savedTxProgress?.completed ? (
-                       <>✅ 탐사 완료 (돌아가기)</>
-                     ) : (
-                        completionBonusTimeLeft > 0 ? (
-                          <>✨ 데이터 수신 완료! (총 {totalRewardedCrystals + 20}광석 획득) ⏳ {completionBonusTimeLeft}초 · 돌아가기</>
-                        ) : (
-                          <>☑️ 수신 지연! (완료 보너스 소멸) · 돌아가기</>
-                        )
-                     )
+                   {savedTxProgress?.completed ? (
+                     <>✅ 탐사 완료 (돌아가기)</>
                    ) : (isAtEnd || videoError || videoTrackingUnavailable) ? (
-                       <>☑️ 수동 완료 처리 (외부 시청 완료)</>
+                     <>☑️ 수동 완료 처리 (외부 시청 완료)</>
                    ) : (
-                     <>📋 오늘은 여기까지</>
+                     <>📋 오늘은 여기까지 (저장 후 나가기)</>
                    )}
                  </button>
 
