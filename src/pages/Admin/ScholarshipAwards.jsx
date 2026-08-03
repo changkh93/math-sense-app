@@ -217,7 +217,7 @@ export default function ScholarshipAwards() {
         const lastScholarshipAward = sortedStudentAwards[0] || null
 
         baseRows.push({
-          id: `${user.uid}_${course.id}`,
+          id: `${user.uid}_${course.id}_${monthKey}`,
           awardId,
           award,
           studentId: user.uid,
@@ -227,6 +227,8 @@ export default function ScholarshipAwards() {
           gradeLabel: getGradeLabel(user.grade, '학년 미지정'),
           courseClusterId: course.id,
           courseName: course.label,
+          year: period.year,
+          month: period.month,
           evaluationPeriodKey: monthKey,
           evaluationPeriodLabel: getEvaluationPeriodLabel(period.year, period.month),
           bonusAverage: bonuses.length ? Math.round(average(bonuses) * 10) / 10 : 0,
@@ -323,11 +325,11 @@ export default function ScholarshipAwards() {
       return
     }
     const awardLabel = getScholarshipAwardLabel(row)
-    const notificationAwardLabel = /NaN/i.test(String(awardLabel))
-      ? `${getEvaluationPeriodLabel(year, month)} ${row.courseName || getScholarshipCourseLabel(row.courseClusterId)} 장학생`
-      : awardLabel
     const ok = window.confirm(`${row.studentName} 학생을 ${awardLabel}으로 수여합니다.\n혜택: 다음 수강료 20% 감면`)
     if (!ok) return
+
+    const targetYear = Number(row.year || year)
+    const targetMonth = Number(row.month || month)
 
     setAwardingId(row.awardId)
     try {
@@ -344,10 +346,10 @@ export default function ScholarshipAwards() {
         gradeLabel: row.gradeLabel,
         courseClusterId: row.courseClusterId,
         courseName: row.courseName,
-        year: Number(year),
-        month: Number(month),
+        year: targetYear,
+        month: targetMonth,
         evaluationPeriodKey: row.evaluationPeriodKey,
-        evaluationPeriodLabel: row.evaluationPeriodLabel,
+        evaluationPeriodLabel: row.evaluationPeriodLabel || getEvaluationPeriodLabel(targetYear, targetMonth),
         scholarshipTitle: '메타센스 장학생',
         awardLabel,
         tuitionBaseAmount: null,
@@ -381,14 +383,14 @@ export default function ScholarshipAwards() {
       batch.set(notificationRef, {
         recipientId: row.studentId,
         type: 'scholarship_award',
-        message: `축하합니다! ${notificationAwardLabel}으로 선정되어 다음 수강료 20% 감면 혜택이 적용됩니다.`,
+        message: `축하합니다! ${awardLabel}으로 선정되어 다음 수강료 20% 감면 혜택이 적용됩니다.`,
         link: `/?view=dashboard&scholarship=${row.awardId}`,
         isRead: false,
         createdAt: serverTimestamp(),
         metadata: {
           awardId: row.awardId,
-          year: Number(year),
-          month: Number(month),
+          year: targetYear,
+          month: targetMonth,
           evaluationPeriodKey: row.evaluationPeriodKey,
           courseClusterId: row.courseClusterId,
           tuitionDiscountRate: SCHOLARSHIP_DISCOUNT_RATE,
@@ -613,8 +615,8 @@ export default function ScholarshipAwards() {
                   gradeLabel: detailRow.gradeLabel,
                   courseName: detailRow.courseName,
                   courseClusterId: detailRow.courseClusterId,
-                  year,
-                  month,
+                  year: detailRow.year || year,
+                  month: detailRow.month || month,
                   evaluationPeriodLabel: detailRow.evaluationPeriodLabel,
                   awardLabel: getScholarshipAwardLabel(detailRow),
                   awardedDate: getKstDateString(new Date()),

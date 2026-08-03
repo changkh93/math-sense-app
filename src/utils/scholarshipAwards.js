@@ -43,11 +43,20 @@ export function getEvaluationPeriodKey(year, month) {
 }
 
 export function getEvaluationPeriodLabel(year, month) {
-  return `${Number(year)}년 ${Number(month)}월`
+  const y = Number(year)
+  const m = Number(month)
+  if (!Number.isFinite(y) || !Number.isFinite(m)) {
+    return ''
+  }
+  return `${y}년 ${m}월`
 }
 
-export function getScholarshipAwardLabel({ year, month, courseClusterId, courseName }) {
-  return `${getEvaluationPeriodLabel(year, month)} ${courseName || getScholarshipCourseLabel(courseClusterId)} 장학생`
+export function getScholarshipAwardLabel(row = {}) {
+  if (!row) return '장학생'
+  const { year, month, courseClusterId, courseName } = row
+  const periodLabel = getEvaluationPeriodLabel(year, month)
+  const courseLabel = courseName || getScholarshipCourseLabel(courseClusterId)
+  return periodLabel ? `${periodLabel} ${courseLabel} 장학생` : `${courseLabel} 장학생`
 }
 
 export function getKstMonthRange(year, month) {
