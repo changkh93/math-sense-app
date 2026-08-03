@@ -1,3 +1,5 @@
+import { isKnownLatexCommand } from './latexTextRepair.js'
+
 export function buildMistakeNotebookStarterExplanation(upload) {
   const hints = [
     upload?.questionText ? `문제: ${upload.questionText}` : '',
@@ -87,22 +89,24 @@ ${options}
 function repairAiJsonStrings(text) {
   let result = ''
   let inString = false
+  let inMath = false
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
     if (!inString) {
       result += ch
       if (ch === '"') {
         inString = true
+        inMath = false
       }
     } else if (ch === '\\') {
       const next = text[i + 1]
-      const afterNext = text[i + 2]
       const isStructuralEscape = ['"', '\\', '/'].includes(next)
-      const isShortControlEscape = ['b', 'f', 'n', 'r', 't'].includes(next)
-        && !(/[A-Za-z]/.test(afterNext || ''))
       const isUnicodeEscape = next === 'u' && /^[0-9a-fA-F]{4}$/.test(text.slice(i + 2, i + 6))
+      const command = text.slice(i + 1).match(/^[A-Za-z]+/)?.[0] || ''
+      const isAmbiguousControlEscape = ['b', 'f', 'n', 'r', 't'].includes(next)
+      const shouldProtectLatex = inMath && isKnownLatexCommand(command)
 
-      if (isStructuralEscape || isShortControlEscape || isUnicodeEscape) {
+      if (isStructuralEscape || isUnicodeEscape || (isAmbiguousControlEscape && !shouldProtectLatex)) {
         result += ch + next
         i += 1
       } else {
@@ -111,6 +115,12 @@ function repairAiJsonStrings(text) {
     } else if (ch === '"') {
       result += ch
       inString = false
+      inMath = false
+    } else if (ch === '$') {
+      const delimiterLength = text[i + 1] === '$' ? 2 : 1
+      result += text.slice(i, i + delimiterLength)
+      i += delimiterLength - 1
+      inMath = !inMath
     } else if (ch === '\n') {
       result += '\\n'
     } else if (ch === '\r') {

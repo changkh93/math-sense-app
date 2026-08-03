@@ -1,6 +1,7 @@
 import React from 'react';
 import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
+import { repairLatexControlChars } from './latexTextRepair';
 
 // 백슬래시가 빠진 LaTeX 명령어는 영문 단어의 일부가 아닌 완전한 토큰일 때만
 // 복원한다. 예: "frac{1}{2}" -> "\\frac{1}{2}", "fraction" -> 그대로.
@@ -11,15 +12,6 @@ const LOST_LATEX_SYMBOL_PATTERN = /(?<![\\A-Za-z])(xrightarrow|xleftarrow|righta
 // 바로 뒤에 { 가 올 때(즉 실제 명령어 호출일 때)만 백슬래시를 복원한다.
 // 예: "boxed{1}" -> "\boxed{1}" (복원), "the boxed value" -> 그대로 (미복원)
 const LOST_LATEX_BRACED_PATTERN = /(?<![\\A-Za-z])(text|boxed)(?=\s*\{)/g;
-const CONTROL_CHARS = {
-  formFeed: String.fromCharCode(0x0c),
-  verticalTab: String.fromCharCode(0x0b),
-  backspace: String.fromCharCode(0x08),
-  tab: String.fromCharCode(0x09),
-  lineFeed: String.fromCharCode(0x0a),
-  carriageReturn: String.fromCharCode(0x0d)
-};
-
 export const ensureKoreanInTextMacro = (latexStr) => {
   if (!latexStr || typeof latexStr !== 'string') return latexStr;
   
@@ -93,33 +85,12 @@ export const normalizeEscapedNewlines = (text) => {
  * 변환하면서 백슬래시를 삼켜 버린다. 그 결과 `\text`는 `<TAB>ext`, `\frac`는
  * `<FF>rac`, `\right`는 `<CR>ight`, `\neq`는 `<LF>eq` 처럼 깨진다.
  *
- * 핵심 원리: JSON.parse가 `\t`(두 글자)를 하나의 TAB으로 합쳤으니, 반대로 TAB 문자를
- * `\t`(두 글자)로 되돌리면 원래 LaTeX 명령어가 그대로 재조립된다. 같은 원리로
- * CR→`\r`, FF→`\f`, VT→`\v`, BS→`\b` 도 역변환한다. 이렇게 하면 문자 종류마다
- * 케이스를 나열하지 않아도 `\times`·`\text`·`\rho`·`\right`·`\vec`·`\beta`·`\forall`
- * 등을 모두 복원할 수 있다.
- *
- * 단, LF(U+000A)만은 예외다. explanation은 Markdown이라 진짜 줄바꿈이 매우 흔한데,
- * LF를 무조건 `\n`으로 되돌리면 Markdown 줄바꿈이 `\n` 리터럴로 변해버린다. 그래서
- * LF는 알려진 명령어(neq/nu/notin/nabla/neg) 패턴 매칭으로만 처리하고, 나머지 LF는
- * Markdown 줄바꿈으로 유지한다.
+ * 제어문자를 무조건 백슬래시로 바꾸면 정상 Markdown TAB/CRLF까지
+ * 손상된다. 그래서 수식 구간에서 제어문자와 뒤의 영문자를 합친 결과가
+ * 알려진 LaTeX 명령일 때만 복원한다. 일반 TAB은 보존하고 CRLF는 LF로
+ * 정규화한다.
  */
-const repairControlCharsToLatex = (text) => normalizeEscapedNewlines(text)
-  .replace(new RegExp(`${CONTROL_CHARS.formFeed}\\s?rac`, 'g'), '\\frac')
-  // LF 기반 명령어: Markdown 줄바꿈과 충돌하므로 패턴 매칭으로만 복원한다.
-  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}eq(?![a-zA-Z])`, 'g'), '\\neq')
-  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}u(?![a-zA-Z])`, 'g'), '\\nu')
-  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}otin(?![a-zA-Z])`, 'g'), '\\notin')
-  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}abla(?![a-zA-Z])`, 'g'), '\\nabla')
-  .replace(new RegExp(`${CONTROL_CHARS.lineFeed}eg(?![a-zA-Z])`, 'g'), '\\neg')
-  // 남은 제어문자를 JSON 이스케이프의 역변환으로 되돌린다.
-  // TAB→`\t`, CR→`\r`, FF→`\f`, VT→`\v`, BS→`\b` 가 자연스럽게 LaTeX 명령어를 재조립한다.
-  .replaceAll(CONTROL_CHARS.formFeed, '\\f')
-  .replaceAll(CONTROL_CHARS.verticalTab, '\\v')
-  .replaceAll(CONTROL_CHARS.backspace, '\\b')
-  .replaceAll(CONTROL_CHARS.tab, '\\t')
-  .replaceAll(CONTROL_CHARS.carriageReturn, '\\r')
-  .replaceAll(CONTROL_CHARS.lineFeed, '\n');
+const repairControlCharsToLatex = (text, options) => repairLatexControlChars(normalizeEscapedNewlines(text), options);
 
 /**
  * 렌더용 LaTeX 정제. 제어문자 역변환 뒤 한글 `\text{}` 래핑 등 화면 표시를 위한
@@ -128,7 +99,9 @@ const repairControlCharsToLatex = (text) => normalizeEscapedNewlines(text)
 export const sanitizeLaTeX = (text) => {
   if (!text || typeof text !== 'string') return text;
 
-  const restoredSlashes = restoreLostLatexCommandSlashes(repairControlCharsToLatex(text)).trim();
+  const restoredSlashes = restoreLostLatexCommandSlashes(repairControlCharsToLatex(text, { assumeMath: true }))
+    .replace(/[\t\f\v\b]/g, ' ')
+    .trim();
   return ensureKoreanInTextMacro(restoredSlashes);
 };
 

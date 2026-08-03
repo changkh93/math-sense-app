@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { parseMistakeNotebookAiCardJson } from '../src/utils/mistakeNotebookAi.js'
+import { parseJsonWithLatexFallback, parseMistakeNotebookAiCardJson } from '../src/utils/mistakeNotebookAi.js'
+import { repairLatexControlChars } from '../src/utils/latexTextRepair.js'
 
 const suppliedJson = String.raw`{
   "canPublish": true,
@@ -40,5 +41,30 @@ assert.match(parseMistakeNotebookAiCardJson(properlyEscaped).explanation, /\\fra
 
 const literalMultiline = suppliedJson.replace('### 핵심 개념\\n\\n', '### 핵심 개념\n\n')
 assert.match(parseMistakeNotebookAiCardJson(literalMultiline).explanation, /### 핵심 개념\n\n/)
+
+const generalQuizJson = String.raw`{
+  "questions": [{
+    "question": "Q",
+    "options": ["A", "B"],
+    "explanation": "$1\text{ m}$, $2\times3$, $\frac{1}{2}$, $x\neq1$, $\rho$\nNext line"
+  }]
+}`
+const generalQuiz = parseJsonWithLatexFallback(generalQuizJson)
+assert.equal(
+  generalQuiz.questions[0].explanation,
+  '$1\\text{ m}$, $2\\times3$, $\\frac{1}{2}$, $x\\neq1$, $\\rho$\nNext line'
+)
+assert.equal(parseJsonWithLatexFallback(String.raw`{"value":"first\nNext line"}`).value, 'first\nNext line')
+assert.equal(parseJsonWithLatexFallback(String.raw`{"value":"first\nexists as text"}`).value, 'first\nexists as text')
+assert.equal(parseJsonWithLatexFallback(String.raw`{"value":"col1\tTabbed"}`).value, 'col1\tTabbed')
+
+assert.equal(repairLatexControlChars('\t' + 'ext{ m}', { assumeMath: true }), '\\text{ m}')
+assert.equal(repairLatexControlChars('\f' + 'rac{1}{2}', { assumeMath: true }), '\\frac{1}{2}')
+assert.equal(repairLatexControlChars('\r' + 'ight)', { assumeMath: true }), '\\right)')
+assert.equal(repairLatexControlChars('\n' + 'exists x', { assumeMath: true }), '\\nexists x')
+assert.equal(repairLatexControlChars('$x\nexists y$'), '$x\\nexists y$')
+assert.equal(repairLatexControlChars('first\nexists as text'), 'first\nexists as text')
+assert.equal(repairLatexControlChars('first\r\nsecond'), 'first\nsecond')
+assert.equal(repairLatexControlChars('col1\tcol2'), 'col1\tcol2')
 
 console.log('mistake notebook AI JSON: all cases passed')
