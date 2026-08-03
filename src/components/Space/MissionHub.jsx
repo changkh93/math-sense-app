@@ -3282,7 +3282,7 @@ export default function MissionHub({
                    setIsBottomActionsOpen(true)
                    setIsUiVisible(true)
                  }}
-                 className="glass font-tech"
+                 className="font-tech"
                  title={hasUnsavedVideoCompletion ? '완료 보너스 받기' : '학습 메뉴 열기'}
                  aria-label={hasUnsavedVideoCompletion ? '완료 보너스 받기' : '학습 메뉴 열기'}
                  style={{
@@ -3298,18 +3298,25 @@ export default function MissionHub({
                    minWidth: hasUnsavedVideoCompletion ? (isMobile ? '13rem' : '14rem') : (isMobile ? '9.5rem' : '10.5rem'),
                    minHeight: isMobile ? '3.15rem' : '3.25rem',
                    padding: isMobile ? '0.8rem 1rem' : '0.8rem 1.1rem',
-                   border: hasUnsavedVideoCompletion ? '1px solid rgba(0, 255, 136, 0.82)' : '1px solid rgba(0, 243, 255, 0.72)',
-                   borderRadius: '14px',
+                   border: hasUnsavedVideoCompletion
+                     ? '1px solid rgba(0, 255, 136, 0.85)'
+                     : '1px solid rgba(0, 243, 255, 0.85)',
+                   borderRadius: '16px',
                    background: hasUnsavedVideoCompletion
-                     ? 'linear-gradient(135deg, rgba(0, 255, 136, 0.34), rgba(255, 209, 102, 0.22))'
-                     : 'linear-gradient(135deg, rgba(0, 243, 255, 0.34), rgba(34, 211, 238, 0.22))',
-                   color: '#fff',
+                     ? 'linear-gradient(135deg, rgba(6, 32, 20, 0.94), rgba(12, 48, 28, 0.90))'
+                     : 'linear-gradient(135deg, rgba(8, 20, 42, 0.94), rgba(14, 32, 64, 0.90))',
+                   backdropFilter: 'blur(12px)',
+                   WebkitBackdropFilter: 'blur(12px)',
+                   color: '#ffffff',
                    cursor: 'pointer',
-                   fontSize: isMobile ? '0.92rem' : '0.95rem',
+                   fontSize: isMobile ? '0.92rem' : '0.96rem',
                    fontWeight: 800,
+                   letterSpacing: '0.02em',
                    boxShadow: hasUnsavedVideoCompletion
-                     ? '0 10px 30px rgba(0,0,0,0.5), 0 0 22px rgba(0, 255, 136, 0.22)'
-                     : '0 10px 30px rgba(0,0,0,0.5), 0 0 18px rgba(0, 243, 255, 0.18)',
+                     ? '0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 255, 136, 0.35)'
+                     : '0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 243, 255, 0.35)',
+                   textShadow: '0 1px 3px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 243, 255, 0.4)',
+                   transition: 'all 0.2s ease-in-out',
                    pointerEvents: 'auto'
                  }}
                >
