@@ -6753,6 +6753,57 @@ async function loadMemberSummaries(memberIds = []) {
   });
 }
 
+exports.getStudyCrewMemberDirectory = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const crewId = cleanId(data?.crewId, 160);
+  if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const [crewSnap, guestAccountSnap] = await Promise.all([
+    crewRef.get(),
+    isGuestContext(context) ? db.collection("crewGuestAccounts").doc(uid).get() : Promise.resolve(null),
+  ]);
+  if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+
+  const crew = crewSnap.data() || {};
+  const memberIds = getCrewMemberIds(crew);
+  const isMember = memberIds.includes(uid);
+  const guestAccount = guestAccountSnap?.exists ? (guestAccountSnap.data() || {}) : {};
+  const isActiveGuest = isGuestContext(context)
+    && guestAccount.crewId === crewId
+    && !["deleted", "suspended"].includes(guestAccount.status);
+  if (!isMember && !isActiveGuest) {
+    throw new functions.https.HttpsError("permission-denied", "이 크루의 공개 멤버 정보만 볼 수 있습니다.");
+  }
+
+  const requestedIds = uniqueIds(Array.isArray(data?.memberIds) ? data.memberIds : memberIds)
+    .filter((memberId) => memberIds.includes(memberId))
+    .slice(0, 100);
+  const memberSnaps = requestedIds.length
+    ? await db.getAll(...requestedIds.map((memberId) => db.collection("users").doc(memberId)))
+    : [];
+
+  return {
+    crewId,
+    members: memberSnaps.filter((snap) => snap.exists).map((snap) => {
+      const profile = snap.data() || {};
+      return {
+        uid: snap.id,
+        displayName: getDisplayNameFromUser(profile),
+        crewRole: snap.id === crew.leaderId ? "leader" : "member",
+        currentStreak: Math.max(0, Number(profile.currentStreak || 0)),
+        lastStreakDate: cleanText(profile.lastStreakDate, 20),
+        participation: profile.participation && typeof profile.participation === "object" ? profile.participation : {},
+        activeShipFamily: profile.activeShipFamily === "pathfinder" ? "pathfinder" : "scout",
+        ownedShipItems: Array.isArray(profile.ownedShipItems) ? profile.ownedShipItems.slice(0, 80) : [],
+        shipLoadouts: profile.shipLoadouts && typeof profile.shipLoadouts === "object" ? profile.shipLoadouts : {},
+        shipCustomization: profile.shipCustomization && typeof profile.shipCustomization === "object" ? profile.shipCustomization : {},
+      };
+    }),
+  };
+});
+
 function getDisplayNameFromUser(userData = {}) {
   return userData.publicDisplayName || userData.studentName || userData.name || userData.displayName || "탐사원";
 }

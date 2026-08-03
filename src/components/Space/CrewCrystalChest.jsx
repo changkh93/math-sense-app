@@ -23,7 +23,7 @@ function getErrorMessage(error, fallback) {
   return fallback;
 }
 
-export default function CrewCrystalChest({ crewId, isGuest = false }) {
+export default function CrewCrystalChest({ crewId, isGuest = false, revision = 0 }) {
   const [chest, setChest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState('');
@@ -58,9 +58,7 @@ export default function CrewCrystalChest({ crewId, isGuest = false }) {
   useEffect(() => {
     setLoading(true);
     loadChest();
-    const timerId = window.setInterval(() => loadChest({ openReward: false }), 45000);
-    return () => window.clearInterval(timerId);
-  }, [loadChest]);
+  }, [loadChest, revision]);
 
   useEffect(() => {
     if (!celebrateReward || typeof document === 'undefined') return undefined;

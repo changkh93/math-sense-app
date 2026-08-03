@@ -108,7 +108,7 @@ export function DirectMemoArrivalAlert() {
             top: 'max(0.8rem, env(safe-area-inset-top, 0px))',
             left: '50%',
             transform: 'translateX(-50%)',
-            zIndex: 5200,
+            zIndex: 12000,
             width: 'min(560px, calc(100vw - 1.5rem))',
             display: 'grid',
             gridTemplateColumns: '34px minmax(0, 1fr) auto 30px',
@@ -156,7 +156,7 @@ export function DirectMemoArrivalAlert() {
         <div
           role="presentation"
           onClick={() => { setActiveMemo(null); setActiveOwnerUid(''); }}
-          style={{ position: 'fixed', inset: 0, zIndex: 5300, display: 'grid', placeItems: 'center', padding: '1rem', background: 'rgba(1,4,15,0.72)', backdropFilter: 'blur(8px)' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 12100, display: 'grid', placeItems: 'center', padding: '1rem', background: 'rgba(1,4,15,0.72)', backdropFilter: 'blur(8px)' }}
         >
           <section
             role="dialog"

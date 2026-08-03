@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { signOut } from 'firebase/auth';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, CircleHelp, Copy, Crown, Loader2, LogOut, Mail, Radio, Rocket, Send, Share2, ShieldCheck, StickyNote, Trash2, Users, Wifi } from 'lucide-react';
+import { ArrowLeft, Award, ChevronDown, ChevronRight, CircleHelp, Copy, Crown, Loader2, LogOut, Mail, Radio, Rocket, Search, Send, Share2, ShieldCheck, Sparkles, StickyNote, Trash2, Users, Wifi, X } from 'lucide-react';
 import { auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
-import { useAllUserPresence } from '../../hooks/useRealtimePresence';
+import { useUserPresence } from '../../hooks/useRealtimePresence';
 import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
 import { copyMeetText, getGoogleMeetCode, openGoogleMeet } from '../../utils/googleMeetNavigation';
@@ -31,6 +32,7 @@ const inputStyle = {
   color: 'var(--text-bright)', padding: '0.75rem 0.9rem', outline: 'none'
 };
 const NOTE_MAX_LENGTH = 120;
+const NOTE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const DEFAULT_CLUSTER_NAMES = {
   'middle-math': '중등수학',
@@ -41,11 +43,10 @@ const DEFAULT_CLUSTER_NAMES = {
   'elementary-math': '초등수학',
 };
 
-function getMemberClusterDays(userProfile, clusterNameMap) {
-  const participation = userProfile?.participation || {};
+function getMemberClusterDays(participation, clusterNameMap) {
   const result = [];
 
-  Object.entries(participation).forEach(([clusterId, days]) => {
+  Object.entries(participation || {}).forEach(([clusterId, days]) => {
     if (Array.isArray(days) && days.length > 0) {
       const clusterName = (clusterNameMap && clusterNameMap.get(clusterId)) || DEFAULT_CLUSTER_NAMES[clusterId] || clusterId;
       result.push({
@@ -105,6 +106,16 @@ function uniqueIds(ids = []) {
   return Array.from(new Set((Array.isArray(ids) ? ids : []).filter(Boolean)));
 }
 
+async function loadPublicMemberProfiles(crewId, memberIds = []) {
+  const ids = uniqueIds(memberIds);
+  if (!crewId || !ids.length) return {};
+  const fn = httpsCallable(functions, 'getStudyCrewMemberDirectory');
+  const result = await fn({ crewId, memberIds: ids });
+  const next = {};
+  (result.data?.members || []).forEach((profile) => { if (profile?.uid) next[profile.uid] = profile; });
+  return next;
+}
+
 function getGreetingReadMeta(note, crewMemberIds = [], currentUid = '') {
   const normalizedReadBy = uniqueIds([note?.userId, ...(Array.isArray(note?.readBy) ? note.readBy : [])]);
   const members = uniqueIds(crewMemberIds);
@@ -119,25 +130,27 @@ function getGreetingReadMeta(note, crewMemberIds = [], currentUid = '') {
 
 function CrewMemberStudyCard({ member, profile, currentUid, currentUserData, currentDisplayName, todayKey, clusterNameMap }) {
   const { dailyStats, loading } = useLearningHistory(member?.uid, todayKey);
+  const realtimePresence = useUserPresence(member?.uid, Boolean(member?.uid));
   const [nowMs, setNowMs] = useState(() => Date.now());
   const isSelf = member.uid === currentUid;
   // Some older crews only keep memberIds and do not have a populated members array.
   // Merge the live user profile so those crews still show identity and learning state.
-  const resolvedMember = {
+  const resolvedMember = useMemo(() => ({
     ...member,
     ...(profile || {}),
     ...(isSelf ? (currentUserData || {}) : {}),
-  };
+  }), [member, profile, isSelf, currentUserData]);
   const isLeader = resolvedMember.crewRole === 'leader';
   const studied = resolvedMember.lastStreakDate === todayKey;
-  const presence = getPresenceInfo(profile);
-  const liveStatus = profile?.liveStatus || {};
+  const presenceProfile = realtimePresence ? { ...(profile || {}), liveStatus: realtimePresence.liveStatus } : profile;
+  const presence = getPresenceInfo(presenceProfile);
+  const liveStatus = presenceProfile?.liveStatus || {};
   const currentLocation = liveStatus.currentLocation || '접속 기록 없음';
   const enteredMs = getTimestampMs(liveStatus.enteredAt) || getTimestampMs(liveStatus.lastUpdatedAt);
   const elapsedLabel = enteredMs ? formatElapsedCompact(nowMs - enteredMs) : '';
   const summaryText = buildTodaySummary(dailyStats);
   const displayName = getMemberLabel(resolvedMember, isSelf ? (currentDisplayName || '나') : '크루 멤버');
-  const activeClusterDays = useMemo(() => getMemberClusterDays(resolvedMember, clusterNameMap), [resolvedMember, clusterNameMap]);
+  const activeClusterDays = useMemo(() => getMemberClusterDays(resolvedMember.participation, clusterNameMap), [resolvedMember, clusterNameMap]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => setNowMs(Date.now()), 60000);
@@ -241,22 +254,8 @@ function GuestCrewPresenceCard({ guest, currentUid }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
         <div style={{ minWidth: 0 }}>
           <span className="crew-guest-id font-tech">GUEST · {String(guest.uid || '').slice(-6).toUpperCase()}</span>
-          <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <span>{guest.alias || '게스트 탐사원'}{isSelf ? ' (나)' : ''}</span>
-            {!isSelf && guest.uid && (
-              <button
-                type="button"
-                className="crew-member-letter-btn"
-                title="편지 쓰기"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  soundManager.playClick();
-                  window.dispatchEvent(new CustomEvent('directmemo:compose', { detail: { uid: guest.uid } }));
-                }}
-              >
-                <Mail size={13} />
-              </button>
-            )}
+          <div className="font-tech" style={{ color: 'var(--text-bright)', fontWeight: 800, marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {guest.alias || '게스트 탐사원'}{isSelf ? ' (나)' : ''}
           </div>
         </div>
         <span className="font-tech" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: presence.color, fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
@@ -277,11 +276,14 @@ function GuestCrewPresenceCard({ guest, currentUid }) {
 }
 
 function CrewMemberPublicCard({ member, profile, clusterNameMap }) {
-  const presence = getPresenceInfo(profile);
+  const realtimePresence = useUserPresence(member?.uid, Boolean(member?.uid));
+  const presenceProfile = realtimePresence ? { ...(profile || {}), liveStatus: realtimePresence.liveStatus } : profile;
+  const presence = getPresenceInfo(presenceProfile);
   const isLeader = member.crewRole === 'leader';
-  const currentLocation = profile?.liveStatus?.currentLocation || '현재 위치 비공개';
-  const displayName = getMemberLabel(profile, getMemberLabel(member));
-  const activeClusterDays = useMemo(() => getMemberClusterDays({ ...member, ...(profile || {}) }, clusterNameMap), [member, profile, clusterNameMap]);
+  const currentLocation = presenceProfile?.liveStatus?.currentLocation || '현재 위치 비공개';
+  const displayName = getMemberLabel(profile || realtimePresence, getMemberLabel(member));
+  const resolvedMember = useMemo(() => ({ ...member, ...(profile || {}) }), [member, profile]);
+  const activeClusterDays = useMemo(() => getMemberClusterDays(resolvedMember.participation, clusterNameMap), [resolvedMember, clusterNameMap]);
 
   return (
     <div className="crew-member-console">
@@ -344,6 +346,168 @@ function CrewMemberPublicCard({ member, profile, clusterNameMap }) {
   );
 }
 
+function CrewSpotlightCard({ member, profile, type = 'leader', fallbackName = '' }) {
+  const realtimePresence = useUserPresence(member?.uid, Boolean(member?.uid));
+  const presenceProfile = realtimePresence ? { ...(profile || {}), liveStatus: realtimePresence.liveStatus } : profile;
+  const presence = getPresenceInfo(presenceProfile);
+  const resolved = { ...(member || {}), ...(profile || {}) };
+  const isLeader = type === 'leader';
+  const displayName = getMemberLabel(resolved, fallbackName || (isLeader ? '크루 창설자' : '빛나는 크루원'));
+
+  return (
+    <article className={`crew-spotlight-card ${isLeader ? 'is-leader' : 'is-contributor'}`}>
+      <div className="crew-spotlight-card__badge font-tech">
+        {isLeader ? <Crown size={13} /> : <Award size={13} />}
+        {isLeader ? 'FOUNDER' : 'TODAY CREW LIGHT'}
+      </div>
+      <div className="crew-spotlight-card__body">
+        <div className="crew-spotlight-card__ship">
+          <ModularShip userData={resolved} size={70} animate={false} />
+        </div>
+        <div className="crew-spotlight-card__copy">
+          <strong className="font-tech">{displayName}</strong>
+          <span className="font-tech">
+            <i style={{ background: presence.dot, boxShadow: `0 0 8px ${presence.dot}88` }} />
+            {presence.label}
+          </span>
+          <small className="font-tech">
+            {isLeader ? '크루 항로를 개척한 창설자' : '과제 피드백 40광석 달성으로 상자에 기여'}
+          </small>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CrewRosterRow({ member, profile, selected, currentUid, onSelect }) {
+  const realtimePresence = useUserPresence(member?.uid, Boolean(member?.uid));
+  const presenceProfile = realtimePresence ? { ...(profile || {}), liveStatus: realtimePresence.liveStatus } : profile;
+  const presence = member?.isGuest
+    ? { label: '접속 중', color: '#86efac', dot: '#22c55e' }
+    : getPresenceInfo(presenceProfile);
+  const displayName = member?.isGuest
+    ? (member.alias || '게스트 탐사원')
+    : getMemberLabel(profile || realtimePresence, getMemberLabel(member));
+  const studied = profile?.lastStreakDate === getTodayKey();
+
+  return (
+    <button type="button" className={`crew-roster-row ${selected ? 'is-selected' : ''}`} onClick={onSelect}>
+      <span className="crew-roster-row__avatar font-tech">{Array.from(displayName || '?')[0]}</span>
+      <span className="crew-roster-row__copy">
+        <strong className="font-tech">
+          {member.crewRole === 'leader' && <Crown size={12} />}
+          {displayName}{member.uid === currentUid ? ' (나)' : ''}
+        </strong>
+        <small className="font-tech">{member.isGuest ? '게스트 승무원' : studied ? '오늘 학습 완료' : '오늘 학습 대기'}</small>
+      </span>
+      <span className="crew-roster-row__presence font-tech" style={{ color: presence.color }}>
+        <i style={{ background: presence.dot }} />{presence.label}
+      </span>
+      <ChevronRight size={15} />
+    </button>
+  );
+}
+
+function CrewRosterModal({
+  open,
+  onClose,
+  members,
+  profiles,
+  loading,
+  currentUid,
+  currentUserData,
+  currentDisplayName,
+  todayKey,
+  clusterNameMap,
+  isGuest,
+}) {
+  const [searchText, setSearchText] = useState('');
+  const [selectedUid, setSelectedUid] = useState('');
+  const filteredMembers = useMemo(() => {
+    const keyword = searchText.trim().toLocaleLowerCase('ko');
+    if (!keyword) return members;
+    return members.filter((member) => {
+      const name = member.isGuest
+        ? member.alias
+        : getMemberLabel(profiles[member.uid], getMemberLabel(member));
+      return String(name || '').toLocaleLowerCase('ko').includes(keyword);
+    });
+  }, [members, profiles, searchText]);
+  const selectedMember = members.find((member) => member.uid === selectedUid)
+    || filteredMembers[0]
+    || null;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (event) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose, open]);
+
+  if (!open || typeof document === 'undefined') return null;
+  return createPortal(
+    <div className="crew-roster-modal" role="dialog" aria-modal="true" aria-label="전체 크루 멤버 보기">
+      <button type="button" className="crew-roster-modal__backdrop" aria-label="닫기" onClick={onClose} />
+      <Motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 18 }} className="crew-roster-modal__panel">
+        <header className="crew-roster-modal__header">
+          <div>
+            <span className="font-tech"><Users size={14} /> FLIGHT CREW DIRECTORY</span>
+            <h2 className="font-title">전체 크루원 {members.length}명</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
+        </header>
+        <div className="crew-roster-modal__workspace">
+          <aside className="crew-roster-modal__list">
+            <label className="crew-roster-search">
+              <Search size={15} />
+              <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="크루원 검색" />
+            </label>
+            <div className="crew-roster-modal__scroll">
+              {loading && members.length > 0 && <div className="crew-roster-loading font-tech"><Loader2 size={15} className="spin" /> 공개 프로필 동기화 중</div>}
+              {filteredMembers.map((member) => (
+                <CrewRosterRow
+                  key={member.uid}
+                  member={member}
+                  profile={profiles[member.uid]}
+                  selected={selectedMember?.uid === member.uid}
+                  currentUid={currentUid}
+                  onSelect={() => setSelectedUid(member.uid)}
+                />
+              ))}
+              {!filteredMembers.length && <div className="crew-roster-loading font-tech">검색 결과가 없습니다.</div>}
+            </div>
+          </aside>
+          <main className="crew-roster-modal__detail">
+            {selectedMember ? (
+              selectedMember.isGuest ? (
+                <GuestCrewPresenceCard guest={selectedMember} currentUid={currentUid} />
+              ) : isGuest ? (
+                <CrewMemberPublicCard member={selectedMember} profile={profiles[selectedMember.uid]} clusterNameMap={clusterNameMap} />
+              ) : (
+                <CrewMemberStudyCard
+                  member={selectedMember}
+                  profile={profiles[selectedMember.uid]}
+                  currentUid={currentUid}
+                  currentUserData={currentUserData}
+                  currentDisplayName={currentDisplayName}
+                  todayKey={todayKey}
+                  clusterNameMap={clusterNameMap}
+                />
+              )
+            ) : <div className="crew-roster-loading font-tech">크루원을 선택해주세요.</div>}
+          </main>
+        </div>
+      </Motion.section>
+    </div>,
+    document.body
+  );
+}
+
 export default function CrewDetailView({ onBack }) {
   const navigate = useNavigate();
   const { user, userData } = useAuth();
@@ -373,6 +537,8 @@ export default function CrewDetailView({ onBack }) {
   const [crewDocData, setCrewDocData] = useState(null);
   const [liveNotes, setLiveNotes] = useState([]);
   const [memberProfiles, setMemberProfiles] = useState({});
+  const [showRosterModal, setShowRosterModal] = useState(false);
+  const [rosterLoading, setRosterLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [leaveAction, setLeaveAction] = useState('');
   const [guestAccessAction, setGuestAccessAction] = useState('');
@@ -382,14 +548,9 @@ export default function CrewDetailView({ onBack }) {
   const [guestLogoutAction, setGuestLogoutAction] = useState('');
   const [showCrewInfo, setShowCrewInfo] = useState(false);
   const [guestInviteUrl, setGuestInviteUrl] = useState('');
+  const [guestInviteRequested, setGuestInviteRequested] = useState(false);
   const [growthEvent, setGrowthEvent] = useState(null);
-  const presenceByUid = useAllUserPresence(Boolean(user?.uid));
-  const effectiveMemberProfiles = useMemo(() => Object.fromEntries(
-    Object.entries(memberProfiles).map(([uid, profile]) => [uid, profile ? {
-      ...profile,
-      liveStatus: presenceByUid[uid]?.liveStatus || { state: 'offline' },
-    } : profile])
-  ), [memberProfiles, presenceByUid]);
+  const effectiveMemberProfiles = memberProfiles;
 
   const crew = useMemo(() => ({ ...(userData?.crewSnapshot || {}), ...(crewDocData || {}) }), [userData?.crewSnapshot, crewDocData]);
   const crewId = crew?.id || userData?.crewId || '';
@@ -398,6 +559,13 @@ export default function CrewDetailView({ onBack }) {
     ...(Array.isArray(crew?.memberIds) ? crew.memberIds : []),
     crew?.leaderId,
   ]), [crew?.memberIds, crew?.leaderId]);
+  const featuredContributorId = crew?.crystalChest?.lastContributorId
+    || crew?.crystalChest?.currentContributorIds?.at?.(-1)
+    || '';
+  const featuredMemberIds = useMemo(
+    () => uniqueIds([crew?.leaderId, featuredContributorId]),
+    [crew?.leaderId, featuredContributorId]
+  );
   const rosterMembers = useMemo(() => {
     const byId = new Map(members.filter((member) => member?.uid).map((member) => [member.uid, member]));
     crewMemberIds.forEach((uid) => {
@@ -410,7 +578,6 @@ export default function CrewDetailView({ onBack }) {
     });
     return Array.from(byId.values());
   }, [crew?.leaderId, crewMemberIds, members]);
-  const NOTE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000; // 7일 후 자동 만료
   const notes = useMemo(() => liveNotes, [liveNotes]);
   const displayNotes = useMemo(() => {
     const nowMs = Date.now();
@@ -448,6 +615,7 @@ export default function CrewDetailView({ onBack }) {
   const [guideModalState, setGuideModalState] = useState({ isOpen: false, tab: 'all' });
   const [heroMode, setHeroMode] = useState('ship');
   const [showGrowthRules, setShowGrowthRules] = useState(false);
+  const [activeCrewSystem, setActiveCrewSystem] = useState('');
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -457,7 +625,7 @@ export default function CrewDetailView({ onBack }) {
   }, []);
 
   useEffect(() => {
-    if (!crewId || !user?.uid) {
+    if (!crewId || !user?.uid || activeCrewSystem !== 'event') {
       setGrowthEvent(null);
       return undefined;
     }
@@ -472,12 +640,11 @@ export default function CrewDetailView({ onBack }) {
       }
     };
     load();
-    const timerId = window.setInterval(load, 60000);
-    return () => { cancelled = true; window.clearInterval(timerId); };
-  }, [crewId, user?.uid]);
+    return () => { cancelled = true; };
+  }, [activeCrewSystem, activeGuestCount, crewId, crewMemberIds.length, user?.uid]);
 
   useEffect(() => {
-    if (!crewId || !guestAccessEnabled || isGuest || !user?.uid) {
+    if (!crewId || !guestAccessEnabled || isGuest || !user?.uid || !guestInviteRequested) {
       setGuestInviteUrl('');
       return;
     }
@@ -499,7 +666,7 @@ export default function CrewDetailView({ onBack }) {
     };
     run();
     return () => { cancelled = true; };
-  }, [crewId, guestAccessEnabled, isGuest, user?.uid]);
+  }, [crewId, guestAccessEnabled, guestInviteRequested, isGuest, user?.uid]);
 
   const toggleGuestAccess = async () => {
     if (!crewId || guestAccessAction || !isLeader) return;
@@ -558,31 +725,44 @@ export default function CrewDetailView({ onBack }) {
     const unique = Array.from(new Map(next.map(m => [m.uid, m])).values());
     return unique.sort((a, b) => { if (a.uid === user?.uid) return -1; if (b.uid === user?.uid) return 1; if (a.crewRole === 'leader') return -1; if (b.crewRole === 'leader') return 1; if (a.isGuest !== b.isGuest) return a.isGuest ? 1 : -1; return (b.currentStreak || 0) - (a.currentStreak || 0); });
   }, [isGuest, rosterMembers, user, userData, visibleGuestSessions]);
-
-  const onlineFlightCrewCount = useMemo(() => {
-    const regularOnlineCount = enrichedMembers.filter((member) => {
-      if (member.isGuest) return false;
-      return getPresenceInfo(effectiveMemberProfiles[member.uid]).label !== '오프라인';
-    }).length;
-    return regularOnlineCount + activeGuestCount;
-  }, [activeGuestCount, effectiveMemberProfiles, enrichedMembers]);
+  const leaderMember = useMemo(
+    () => enrichedMembers.find((member) => member.uid === crew?.leaderId) || { uid: crew?.leaderId, crewRole: 'leader' },
+    [crew?.leaderId, enrichedMembers]
+  );
+  const featuredContributorMember = useMemo(
+    () => enrichedMembers.find((member) => member.uid === featuredContributorId) || (featuredContributorId ? { uid: featuredContributorId, crewRole: 'member' } : null),
+    [enrichedMembers, featuredContributorId]
+  );
 
   useEffect(() => {
-    const ids = enrichedMembers.filter((member) => !member.isGuest).map((member) => member.uid).filter(Boolean);
+    const ids = featuredMemberIds;
     if (!ids.length) {
       setMemberProfiles({});
       return undefined;
     }
+    let cancelled = false;
+    loadPublicMemberProfiles(crewId, ids)
+      .then((profiles) => { if (!cancelled) setMemberProfiles(profiles); })
+      .catch((error) => console.warn('Failed to load featured crew profiles:', error));
+    return () => { cancelled = true; };
+  }, [crewId, featuredMemberIds]);
 
-    const unsubscribers = ids.map((uid) => onSnapshot(doc(db, 'users', uid), (snap) => {
-      setMemberProfiles((prev) => ({
-        ...prev,
-        [uid]: snap.exists() ? snap.data() : null,
-      }));
-    }));
+  useEffect(() => {
+    if (!showRosterModal) return undefined;
+    const ids = enrichedMembers.filter((member) => !member.isGuest).map((member) => member.uid).filter(Boolean);
+    if (!ids.length) return undefined;
+    let cancelled = false;
+    setRosterLoading(true);
+    loadPublicMemberProfiles(crewId, ids)
+      .then((profiles) => {
+        if (!cancelled) setMemberProfiles((previous) => ({ ...previous, ...profiles }));
+      })
+      .catch((error) => console.warn('Failed to load crew directory profiles:', error))
+      .finally(() => { if (!cancelled) setRosterLoading(false); });
+    return () => { cancelled = true; };
+  }, [crewId, enrichedMembers, isGuest, showRosterModal]);
 
-    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, [enrichedMembers]);
+  const closeRosterModal = useCallback(() => setShowRosterModal(false), []);
 
   useEffect(() => {
     if (!crewId) {
@@ -1063,7 +1243,7 @@ export default function CrewDetailView({ onBack }) {
         <div className="crew-flight-stats">
           {[
             { label: 'CREW', value: `${Math.max(crew.memberCount || rosterMembers.length || 1, rosterMembers.length) + activeGuestCount}명` },
-            { label: 'ONLINE', value: `${onlineFlightCrewCount}명` },
+            { label: 'ROSTER', value: '요약 모드' },
             { label: 'MOTHERSHIP', value: `Lv.${mothershipLevel.level} ${mothershipLevel.name}`, helpTab: 'level' },
             { label: 'MISSION XP', value: `${mothershipStats.xp.toLocaleString()} XP`, helpTab: 'xp' },
             { label: 'SCHEDULE', value: formatCrewSchedule(crew.scheduleDays, crew.scheduleTimes) },
@@ -1136,6 +1316,20 @@ export default function CrewDetailView({ onBack }) {
       </Motion.section>
 
       {status === 'approved' && crewId && (
+        <section className="crew-system-launcher">
+          <button type="button" className={activeCrewSystem === 'construction' ? 'is-active' : ''} onClick={() => setActiveCrewSystem((current) => current === 'construction' ? '' : 'construction')}>
+            <span className="font-tech">MOTHERSHIP</span><strong className="font-title">공동 건설</strong><small className="font-tech">{Number(crew?.currentMothershipProject?.contributedOre || 0).toLocaleString()} / {Number(crew?.currentMothershipProject?.requiredOre || 0).toLocaleString()} 광석</small><ChevronDown size={16} />
+          </button>
+          <button type="button" className={activeCrewSystem === 'chest' ? 'is-active' : ''} onClick={() => setActiveCrewSystem((current) => current === 'chest' ? '' : 'chest')}>
+            <span className="font-tech">CREW CHEST</span><strong className="font-title">광석 상자</strong><small className="font-tech">{Number(crew?.crystalChest?.energy || 0)} / {Number(crew?.crystalChest?.target || 100)} 충전</small><ChevronDown size={16} />
+          </button>
+          <button type="button" className={activeCrewSystem === 'event' ? 'is-active' : ''} onClick={() => setActiveCrewSystem((current) => current === 'event' ? '' : 'event')}>
+            <span className="font-tech">CREW 20 EVENT</span><strong className="font-title">크루 구성 현황</strong><small className="font-tech">정식 크루원 {crewMemberIds.length}명</small><ChevronDown size={16} />
+          </button>
+        </section>
+      )}
+
+      {status === 'approved' && crewId && activeCrewSystem === 'construction' && (
         <CrewConstructionDock
           crew={crew}
           crewId={crewId}
@@ -1159,6 +1353,11 @@ export default function CrewDetailView({ onBack }) {
               <button type="button" className="font-tech" onClick={copyGuestInvite}><Copy size={13} /> 링크 복사</button>
             </div>
           )}
+          {guestAccessEnabled && !guestInviteUrl && (
+            <button type="button" className="crew-guest-toggle font-tech" onClick={() => setGuestInviteRequested(true)} disabled={guestInviteRequested}>
+              <Share2 size={13} /> {guestInviteRequested ? '링크 준비 중...' : '초대 링크 준비'}
+            </button>
+          )}
           {isLeader && (
             <button
               type="button"
@@ -1173,7 +1372,7 @@ export default function CrewDetailView({ onBack }) {
         </Motion.section>
       )}
 
-      {status === 'approved' && crewId && (
+      {status === 'approved' && crewId && activeCrewSystem === 'event' && (
         <section className="crew-growth-status">
           <div className="crew-growth-status__head">
             <div><span className="font-tech">CREW 20 EVENT</span><strong className="font-title">크루 구성 현황</strong></div>
@@ -1231,8 +1430,12 @@ export default function CrewDetailView({ onBack }) {
         </section>
       )}
 
-      {status === 'approved' && crewId && (
-        <CrewCrystalChest crewId={crewId} isGuest={isGuest} />
+      {status === 'approved' && crewId && activeCrewSystem === 'chest' && (
+        <CrewCrystalChest
+          crewId={crewId}
+          isGuest={isGuest}
+          revision={getTimestampMs(crew?.crystalChest?.updatedAt) || Number(crew?.crystalChest?.cycle || 0)}
+        />
       )}
 
       <div className="crew-bridge-workspace">
@@ -1250,7 +1453,7 @@ export default function CrewDetailView({ onBack }) {
       <section className="crew-workspace-roster">
         <div className="crew-section-heading font-tech">
           <Users size={15} /> FLIGHT CREW
-          <span>ONLINE {onlineFlightCrewCount} / {enrichedMembers.length}</span>
+          <span>{enrichedMembers.length} MEMBERS</span>
         </div>
         {isGuest && (
           <div className="crew-roster-guest-notice font-tech">
@@ -1259,28 +1462,56 @@ export default function CrewDetailView({ onBack }) {
               : '게스트에게 공개된 크루 멤버 정보가 없습니다. 현재 접속 인원만 표시합니다.'}
           </div>
         )}
-        <div className="crew-roster-grid">
-          {enrichedMembers.map(member => (
-            member.isGuest ? (
-              <GuestCrewPresenceCard key={member.uid} guest={member} currentUid={user?.uid} />
-            ) : isGuest ? (
-              <CrewMemberPublicCard key={member.uid} member={member} profile={effectiveMemberProfiles[member.uid]} clusterNameMap={clusterNameMap} />
-            ) : (
-              <CrewMemberStudyCard
-                key={member.uid}
-                member={member}
-                profile={effectiveMemberProfiles[member.uid]}
-                currentUid={user?.uid}
-                currentUserData={userData}
-                currentDisplayName={user?.displayName}
-                todayKey={todayKey}
-                clusterNameMap={clusterNameMap}
-              />
-            )
-          ))}
+        <div className="crew-roster-spotlights">
+          {leaderMember?.uid && (
+            <CrewSpotlightCard
+              member={leaderMember}
+              profile={effectiveMemberProfiles[leaderMember.uid]}
+              type="leader"
+              fallbackName={crew?.leaderName || '크루 창설자'}
+            />
+          )}
+          {featuredContributorMember?.uid ? (
+            <CrewSpotlightCard
+              member={featuredContributorMember}
+              profile={effectiveMemberProfiles[featuredContributorMember.uid]}
+              type="contributor"
+              fallbackName={crew?.crystalChest?.currentContributorNamesById?.[featuredContributorMember.uid] || crew?.crystalChest?.lastContributorName || '빛나는 크루원'}
+            />
+          ) : (
+            <div className="crew-spotlight-empty">
+              <Sparkles size={18} />
+              <div><strong className="font-tech">NEXT CREW LIGHT</strong><span className="font-tech">첫 과제 피드백 40광석 기여자를 기다리고 있어요.</span></div>
+            </div>
+          )}
         </div>
+        <div className="crew-roster-preview font-tech">
+          <span>{enrichedMembers.slice(0, 5).map((member) => getMemberLabel(effectiveMemberProfiles[member.uid], getMemberLabel(member))).join(' · ')}</span>
+          {enrichedMembers.length > 5 && <b>+{enrichedMembers.length - 5}</b>}
+        </div>
+        <button type="button" className="crew-roster-open font-tech" onClick={() => { soundManager.playClick(); setShowRosterModal(true); }}>
+          <Users size={15} /> 전체 멤버 {enrichedMembers.length}명 보기 <ChevronRight size={16} />
+        </button>
       </section>
       </div>
+
+      <AnimatePresence>
+        {showRosterModal && (
+          <CrewRosterModal
+            open={showRosterModal}
+            onClose={closeRosterModal}
+            members={enrichedMembers}
+            profiles={effectiveMemberProfiles}
+            loading={rosterLoading}
+            currentUid={user?.uid}
+            currentUserData={userData}
+            currentDisplayName={user?.displayName}
+            todayKey={todayKey}
+            clusterNameMap={clusterNameMap}
+            isGuest={isGuest}
+          />
+        )}
+      </AnimatePresence>
 
       {userData?.crewRole === 'leader' && (
         <section className="glass-card hud-border" style={{ padding: '1.2rem', borderRadius: 12 }}>
