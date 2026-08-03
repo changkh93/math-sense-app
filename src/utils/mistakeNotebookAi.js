@@ -75,42 +75,63 @@ ${options}
 }
 
 /**
- * AI가 반환한 JSON 텍스트에서 JSON 문법상 허용되지 않는 백슬래시 이스케이프를
- * 사전에 안전하게 만든다. 핵심은 **보수적으로** 동작하는 것.
+ * AI JSON을 문자열 단위로 스캔하여 복구한다.
  *
- * `\t` `\f` `\n` `\r` `\b` `\v` 는 JSON 공식 이스케이프라 `JSON.parse`가 각각
- * 제어문자(TAB/FF/LF/CR/BS/VT)로 바꿔 버리는데, 이는 LaTeX 명령어(`\text`,
- * `\frac`, `\neq` ...)가 단일 백슬래시로 들어왔을 때 백슬래시가 사라지는
- * 근원이다. 하지만 이들을 여기서 임의로 이중화하면 **정상 줄바꿈(`\n`)까지
- * literal `\n` 글자로 굳어지는 회귀**가 생긴다.
- *
- * 그래서 여기서는 valid escape(`" \ / b f n r t u`)가 아닌 invalid escape
- * (`\pi`, `\alpha`, `\sqrt`, `\Delta` 등)만 이중화한다. valid escape로
- * 인해 생긴 제어문자 손상은 `JSON.parse` 이후에 `sanitizeLaTeX`(렌더)가
- * TAB→`\t`, CR→`\r` 역변환으로 복원한다. 즉 이 함수는 'invalid JSON'만 막고,
- * 'valid-but-unwanted JSON'은 렌더 단에 맡긴다.
- *
- * 추가로 모델이 코드블록 안에 literal 줄바꿈을 그대로 넣은 invalid multiline
- * JSON도 정상 이스케이프로 바로잡는다.
+ * AI가 multiline explanation을 코드블록 안에 literal 엔터로 그대로 넣어
+ * invalid JSON을 반환하는 경우가 잦은데, 이때 단순히 `/[\r\n]/g → '\n'`를
+ * 하면 키-값 사이의 **구조 줄바꿈까지** `\n`으로 바뀌어 `{\\n"key"...}` 처럼
+ * 되어 position 1에서 파싱이 실패한다. 그래서 문자열 안쪽인지 추적하며
+ * 이스케이프해야 한다. 동시에 `\frac`, `\text`, `\times`, `\pi`
+ * 같은 단일 백슬래시 LaTeX는 JSON.parse 전에 보호한다.
  */
-export function neutralizeLatexInJson(text) {
-  return text
-    .replace(/(?<!\\)\\(?!["\\/bfnrtu])/g, '\\\\')
-    .replace(/\r\n/g, '\\n')
-    .replace(/[\r\n]/g, '\\n')
-    .replace(/\t/g, '\\t')
-}
+function repairAiJsonStrings(text) {
+  let result = ''
+  let inString = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (!inString) {
+      result += ch
+      if (ch === '"') {
+        inString = true
+      }
+    } else if (ch === '\\') {
+      const next = text[i + 1]
+      const afterNext = text[i + 2]
+      const isStructuralEscape = ['"', '\\', '/'].includes(next)
+      const isShortControlEscape = ['b', 'f', 'n', 'r', 't'].includes(next)
+        && !(/[A-Za-z]/.test(afterNext || ''))
+      const isUnicodeEscape = next === 'u' && /^[0-9a-fA-F]{4}$/.test(text.slice(i + 2, i + 6))
 
-export function parseJsonWithLatexFallback(cleanJson) {
-  try {
-    return JSON.parse(neutralizeLatexInJson(cleanJson))
-  } catch (error) {
-    try {
-      return JSON.parse(cleanJson)
-    } catch {
-      throw error
+      if (isStructuralEscape || isShortControlEscape || isUnicodeEscape) {
+        result += ch + next
+        i += 1
+      } else {
+        result += '\\\\'
+      }
+    } else if (ch === '"') {
+      result += ch
+      inString = false
+    } else if (ch === '\n') {
+      result += '\\n'
+    } else if (ch === '\r') {
+      result += '\\r'
+    } else if (ch === '\t') {
+      result += '\\t'
+    } else {
+      result += ch
     }
   }
+  return result
+}
+
+/**
+ * AI가 반환한 JSON을 안전하게 파싱한다.
+ *
+ * 구조 줄바꿈은 보존하고 문자열 안의 literal 제어문자와
+ * 단일 백슬래시 LaTeX만 복구한 뒤 파싱한다.
+ */
+export function parseJsonWithLatexFallback(cleanJson) {
+  return JSON.parse(repairAiJsonStrings(cleanJson))
 }
 
 export function parseMistakeNotebookAiCardJson(rawText) {

@@ -1,6 +1,6 @@
 import { Children, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { Archive, CheckCircle2, Clipboard, FileJson, Image, Send, Sparkles } from 'lucide-react'
+import { Archive, CheckCircle2, Clipboard, Image, Send, Sparkles } from 'lucide-react'
 import { normalizeEscapedNewlines, parseInlineFormatting, repairLaTeXForEditing } from '../../utils/formatUtils'
 import {
   buildMistakeNotebookAiPrompt,
@@ -348,13 +348,12 @@ function MistakeCardEditor({ selected }) {
     }
   }
 
-  const handleApplyAiJson = async ({ publish = false } = {}) => {
+  const handleApplyAiJson = () => {
     setAiNotice('')
     try {
       const nextForm = parseMistakeNotebookAiCardJson(aiJson)
       setForm(nextForm)
-      setAiNotice(publish ? 'AI JSON을 입력칸에 반영하고 바로 발행합니다.' : 'AI JSON을 입력칸에만 반영했습니다. 내용을 확인한 뒤 아래 저장 버튼으로 발행하세요.')
-      if (publish) await handleCreate(nextForm)
+      setAiNotice('JSON 내용을 아래 입력칸에 불러왔습니다. 각 필드와 미리보기를 확인한 뒤 발행하세요.')
     } catch (error) {
       setAiNotice(error?.message || 'AI JSON을 해석하지 못했습니다.')
     }
@@ -382,7 +381,7 @@ function MistakeCardEditor({ selected }) {
                 <Sparkles size={16} /> AI JSON으로 카드 완성
               </h3>
               <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.45 }}>
-                먼저 프롬프트를 복사해 이미지와 함께 AI에게 묻습니다. 받은 JSON은 검토만 하려면 입력칸에 반영하고, 확실하면 바로 발행하세요.
+                프롬프트와 이미지를 AI에게 보낸 뒤, 받은 JSON을 붙여넣고 내용을 불러오세요. 아래 각 필드와 미리보기를 확인해야 발행할 수 있습니다.
               </p>
             </div>
             <button className="admin-btn secondary" type="button" onClick={handleCopyAiPrompt}>
@@ -397,14 +396,9 @@ function MistakeCardEditor({ selected }) {
             placeholder={'AI가 반환한 ```json ... ``` 또는 순수 JSON을 여기에 붙여넣기'}
           />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
-            <button className="admin-btn secondary" type="button" onClick={() => handleApplyAiJson()} disabled={!aiJson.trim()}>
-              <FileJson size={15} /> 입력칸에만 반영
-            </button>
-            <button className="admin-btn primary" type="button" onClick={() => handleApplyAiJson({ publish: true })} disabled={!aiJson.trim() || createCard.isPending}>
-              <Send size={15} /> 바로 발행
-            </button>
-          </div>
+          <button className="admin-btn secondary" type="button" onClick={handleApplyAiJson} disabled={!aiJson.trim()}>
+            <Sparkles size={15} /> JSON 내용 불러오기
+          </button>
 
           {aiNotice && (
             <div style={{
@@ -463,10 +457,7 @@ function MistakeCardEditor({ selected }) {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.3rem' }}>
-          <button className="admin-btn secondary" type="button" onClick={() => handleChange('explanation', buildMistakeNotebookStarterExplanation(selected))}>
-            <Sparkles size={15} /> 해설 틀 채우기
-          </button>
+        <div style={{ marginTop: '0.3rem' }}>
           <button className="admin-btn primary" type="button" onClick={() => handleCreate()} disabled={createCard.isPending}>
             <Send size={15} /> {createCard.isPending ? '저장 중...' : (selected.cardId ? '변경사항 저장' : '현재 입력값으로 발행')}
           </button>
