@@ -75,23 +75,27 @@ ${options}
 }
 
 /**
- * AI가 반환한 JSON 텍스트에서 LaTeX 명령어가 JSON.parse에 삼켜지는 것을 막는다.
+ * AI가 반환한 JSON 텍스트에서 JSON 문법상 허용되지 않는 백슬래시 이스케이프를
+ * 사전에 안전하게 만든다. 핵심은 **보수적으로** 동작하는 것.
  *
- * 문제: AI가 JSON 문자열 값 안에 `\text{ m}`, `\frac{1}{2}` 등을 **단일 백슬래시**로
- * 적는 경우가 잦다. 이때 `\t`는 JSON 공식 이스케이프(TAB), `\f`는 form feed,
- * `\n`/`\r`/`\b`/`\v` 도 각각 제어문자로 해석되어 `JSON.parse`가 백슬래시까지
- * 삼켜 버린다. 기존 정규식 `/\\(?!["\\/bfnrtu])/g`는 b/f/n/r/t/u 앞의 백슬래시를
- * "진짜 JSON 이스케이프"로 보고 그대로 두었기 때문에 정작 `\text`, `\frac`, `\neq`
- * 같은 LaTeX 명령어를 전혀 보호하지 못했다.
+ * `\t` `\f` `\n` `\r` `\b` `\v` 는 JSON 공식 이스케이프라 `JSON.parse`가 각각
+ * 제어문자(TAB/FF/LF/CR/BS/VT)로 바꿔 버리는데, 이는 LaTeX 명령어(`\text`,
+ * `\frac`, `\neq` ...)가 단일 백슬래시로 들어왔을 때 백슬래시가 사라지는
+ * 근원이다. 하지만 이들을 여기서 임의로 이중화하면 **정상 줄바꿈(`\n`)까지
+ * literal `\n` 글자로 굳어지는 회귀**가 생긴다.
  *
- * 해결: `JSON.parse`에 넣기 전에 (1) 단일 백슬래시+영문자를 이중 백슬래시로 바꾸어
- * LaTeX 명령어로 취급하고, (2) 모델이 코드블록 안에 literal 줄바꿈을 그대로 넣은
- * invalid multiline JSON도 정상 이스케이프로 바로잡는다. 이미 이중 백슬래시(\\)로
- * 올바르게 반환한 경우는 lookbehind로 보호된다.
+ * 그래서 여기서는 valid escape(`" \ / b f n r t u`)가 아닌 invalid escape
+ * (`\pi`, `\alpha`, `\sqrt`, `\Delta` 등)만 이중화한다. valid escape로
+ * 인해 생긴 제어문자 손상은 `JSON.parse` 이후에 `sanitizeLaTeX`(렌더)가
+ * TAB→`\t`, CR→`\r` 역변환으로 복원한다. 즉 이 함수는 'invalid JSON'만 막고,
+ * 'valid-but-unwanted JSON'은 렌더 단에 맡긴다.
+ *
+ * 추가로 모델이 코드블록 안에 literal 줄바꿈을 그대로 넣은 invalid multiline
+ * JSON도 정상 이스케이프로 바로잡는다.
  */
 export function neutralizeLatexInJson(text) {
   return text
-    .replace(/(?<!\\)\\(?=[a-zA-Z])/g, '\\\\')
+    .replace(/(?<!\\)\\(?!["\\/bfnrtu])/g, '\\\\')
     .replace(/\r\n/g, '\\n')
     .replace(/[\r\n]/g, '\\n')
     .replace(/\t/g, '\\t')
