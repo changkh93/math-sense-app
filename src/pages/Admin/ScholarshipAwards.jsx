@@ -115,7 +115,7 @@ export default function ScholarshipAwards() {
       const startDateKey = getEvaluationPeriodKey(oldestPeriod.year, oldestPeriod.month) + '-01'
       const nextMonth = new Date(Number(year), Number(month), 1)
       const endDateKey = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
-      const [usersSnap, assignmentsSnap, attendanceSnap, warningsSnap, historySnap, ...awardSnaps] = await Promise.all([
+      const [usersSnap, assignmentsSnap, attendanceSnap, warningsSnap, historySnap, awardsSnap] = await Promise.all([
         getDocs(collection(db, 'users')),
         getDocs(query(collection(db, 'assignments'), where('date', '>=', startDateKey), where('date', '<', endDateKey))),
         getDocs(query(collection(db, 'attendance'), where('date', '>=', startDateKey), where('date', '<', endDateKey))),
@@ -126,11 +126,7 @@ export default function ScholarshipAwards() {
           where('timestamp', '>=', Timestamp.fromDate(startRange.start)),
           where('timestamp', '<=', Timestamp.fromDate(endRange.end))
         )),
-        ...periods.map(period => getDocs(query(
-          collection(db, 'scholarshipAwards'),
-          where('year', '==', period.year),
-          where('month', '==', period.month),
-        ))),
+        getDocs(collection(db, 'scholarshipAwards')),
       ])
 
       setUsers(usersSnap.docs.map(docSnap => ({ uid: docSnap.id, ...docSnap.data() })))
@@ -139,9 +135,9 @@ export default function ScholarshipAwards() {
       setWarningRows(warningsSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })))
 
       const nextAwards = {}
-      awardSnaps.forEach(awardsSnap => awardsSnap.docs.forEach(docSnap => {
+      awardsSnap.docs.forEach(docSnap => {
         nextAwards[docSnap.id] = { id: docSnap.id, ...docSnap.data() }
-      }))
+      })
       setScholarshipAwards(nextAwards)
 
       setHistoryRows(historySnap.docs.map(docSnap => ({
