@@ -132,10 +132,6 @@ export default function QuizBattleView({
   const aiTrainingData = useMemo(() => calculateBattleData(userData || {}), [userData])
   const challengeMutedUntilMs = Number(userData?.quizBattlePreferences?.challengeMutedUntilMs || 0)
   const isChallengeReceptionMuted = challengeMutedUntilMs > timeNow
-  const waitingUids = useMemo(
-    () => new Set(queueTickets.map((ticket) => ticket.uid).filter(Boolean)),
-    [queueTickets],
-  )
   const {
     onlineOpponents,
     isLoadingOnline,
@@ -143,11 +139,9 @@ export default function QuizBattleView({
   } = useQuizBattlePresence({
     enabled: !isAIMode && phase === 'idle',
     user,
-    userData,
     clusterId,
     regionId,
-    phase,
-    waitingUids,
+    entryUnitId,
   })
 
   useEffect(() => {

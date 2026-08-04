@@ -922,6 +922,27 @@ function getBattlePresenceLabel(presence = {}) {
   return currentLocation || "온라인";
 }
 
+function normalizeQuizBattleRealtimePresence(uid, value = {}) {
+  const connections = Object.values(value?.connections || {})
+    .filter((connection) => connection && typeof connection === "object")
+    .sort((a, b) => Number(b.updatedAtMs || 0) - Number(a.updatedAtMs || 0));
+  // 한 기기의 백그라운드 탭보다 다른 활성 탭을 우선한다.
+  const active = connections.find((connection) => connection.state === "online");
+  const lastSeenMs = Number(active?.updatedAtMs || value?.lastSeenMs || 0);
+  if (!active) return { uid, state: "offline", lastSeenMs };
+  return {
+    uid,
+    ...active,
+    state: "online",
+    lastSeenMs,
+  };
+}
+
+async function getQuizBattleRealtimePresence(uid) {
+  const snapshot = await admin.database().ref(`userPresence/${uid}`).once("value");
+  return normalizeQuizBattleRealtimePresence(uid, snapshot.val() || {});
+}
+
 function getBattleRewardScopeKey(battleData = {}, participant = {}) {
   return normalizeStatKey([
     battleData.clusterId,
@@ -2638,13 +2659,8 @@ exports.listQuizBattleOnlineOpponents = regionalFunctions.https.onCall(async (da
   const requesterData = requesterSnap.exists ? (requesterSnap.data() || {}) : {};
   if (!isGuestUser) assertQuizBattleAccess(requesterData, contextData.clusterId, regionId);
 
-  const cutoff = Timestamp.fromMillis(nowMs - QUIZ_BATTLE_ONLINE_WINDOW_MS);
   const [presenceSnap, waitingSnap] = await Promise.all([
-    db.collection("liveStatuses")
-      .where("lastUpdatedAt", ">=", cutoff)
-      .orderBy("lastUpdatedAt", "desc")
-      .limit(50)
-      .get(),
+    admin.database().ref("userPresence").once("value"),
     db.collection("quizBattleQueueTickets")
       .where("clusterId", "==", contextData.clusterId)
       .where("regionId", "==", regionId)
@@ -2655,11 +2671,13 @@ exports.listQuizBattleOnlineOpponents = regionalFunctions.https.onCall(async (da
       .get(),
   ]);
   const waitingUids = new Set(waitingSnap.docs.map((ticketDoc) => cleanId(ticketDoc.data()?.uid)));
-  const presenceRows = presenceSnap.docs
-    .filter((presenceDoc) => presenceDoc.id !== uid)
-    .filter((presenceDoc) => !waitingUids.has(presenceDoc.id))
-    .map((presenceDoc) => ({ uid: presenceDoc.id, ...(presenceDoc.data() || {}) }))
-    .filter((presence) => presence.state === "online");
+  const presenceRows = Object.entries(presenceSnap.val() || {})
+    .map(([presenceUid, value]) => normalizeQuizBattleRealtimePresence(presenceUid, value))
+    .filter((presence) => presence.uid !== uid)
+    .filter((presence) => !waitingUids.has(presence.uid))
+    .filter((presence) => presence.state === "online")
+    .sort((a, b) => b.lastSeenMs - a.lastSeenMs)
+    .slice(0, 50);
 
   if (presenceRows.length === 0) {
     return { opponents: [], refreshedAtMs: nowMs, onlineWindowSeconds: QUIZ_BATTLE_ONLINE_WINDOW_MS / 1000 };
@@ -2686,7 +2704,7 @@ exports.listQuizBattleOnlineOpponents = regionalFunctions.https.onCall(async (da
       crewName: cleanText(presence.crewName || profile.crewName || "", 50),
       locationLabel: getBattlePresenceLabel(presence),
       isGuest,
-      lastSeenMs: Number(presence.lastUpdatedAt?.toMillis?.() || nowMs),
+      lastSeenMs: Number(presence.lastSeenMs || nowMs),
     });
     return rows;
   }, []);
@@ -2753,13 +2771,13 @@ exports.createQuizBattleChallenge = regionalFunctions.https.onCall(async (data, 
   const [challengerSnap, targetSnap, targetPresenceSnap] = await Promise.all([
     db.collection("users").doc(uid).get(),
     targetUserRef.get(),
-    db.collection("liveStatuses").doc(targetUid).get(),
+    getQuizBattleRealtimePresence(targetUid),
   ]);
   const challengerData = challengerSnap.exists
     ? (challengerSnap.data() || {})
     : (isGuestUser ? { publicDisplayName: getCrewGuestAlias(uid), isGuest: true } : {});
   const targetData = targetSnap.exists ? (targetSnap.data() || {}) : {};
-  const targetPresence = targetPresenceSnap.exists ? (targetPresenceSnap.data() || {}) : {};
+  const targetPresence = targetPresenceSnap || {};
   const targetRole = cleanId(targetData.role || targetPresence.role, 30).toLowerCase();
   if (!isGuestUser) assertQuizBattleAccess(challengerData, contextData.clusterId, regionId);
   if (
@@ -2772,8 +2790,7 @@ exports.createQuizBattleChallenge = regionalFunctions.https.onCall(async (data, 
   if (isQuizBattleChallengeReceptionMuted(targetData, nowMs)) {
     throw new functions.https.HttpsError("failed-precondition", "상대방이 오늘은 도전을 받지 않습니다.");
   }
-  const targetLastSeenMs = Number(targetPresence.lastUpdatedAt?.toMillis?.() || 0);
-  if (targetPresence.state !== "online" || targetLastSeenMs < nowMs - QUIZ_BATTLE_ONLINE_WINDOW_MS) {
+  if (targetPresence.state !== "online") {
     throw new functions.https.HttpsError("failed-precondition", "상대방이 방금 오프라인이 되었습니다. 목록을 새로 고침해 주세요.");
   }
   if (isUserInActiveQuizBattle(challengerData) || isUserInActiveQuizBattle(targetData)) {
@@ -3033,7 +3050,7 @@ exports.respondQuizBattleChallenge = regionalFunctions.https.onCall(async (data,
     }),
     db.collection("users").doc(challenge.challengerId).get(),
     db.collection("users").doc(uid).get(),
-    db.collection("liveStatuses").doc(challenge.challengerId).get(),
+    getQuizBattleRealtimePresence(challenge.challengerId),
     findOwnQuizBattleTicket(db, challenge.challengerId, challenge.regionId),
     findOwnQuizBattleTicket(db, uid, challenge.regionId),
   ]);
@@ -3047,8 +3064,7 @@ exports.respondQuizBattleChallenge = regionalFunctions.https.onCall(async (data,
   if (!recipientIsGuest && !isQuizBattleGuestProfile(recipientData)) {
     assertQuizBattleAccess(recipientData, contextData.clusterId, contextData.regionId);
   }
-  const challengerLastSeenMs = Number(challengerPresenceSnap.data()?.lastUpdatedAt?.toMillis?.() || 0);
-  if (!challengerPresenceSnap.exists || challengerPresenceSnap.data()?.state !== "online" || challengerLastSeenMs < nowMs - QUIZ_BATTLE_ONLINE_WINDOW_MS) {
+  if (challengerPresenceSnap?.state !== "online") {
     throw new functions.https.HttpsError("failed-precondition", "도전자가 오프라인이 되었습니다.");
   }
   if (isUserInActiveQuizBattle(challengerData) || isUserInActiveQuizBattle(recipientData)) {
