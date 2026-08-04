@@ -1056,9 +1056,9 @@ function CodeTraceEditor({
 
     const editorTheme = EditorView.theme({
       '&': {
-        height: `${height}px`,
-        minHeight: `${CODE_PANEL_MIN_HEIGHT}px`,
-        maxHeight: `${CODE_PANEL_MAX_HEIGHT}px`,
+        height: '100%',
+        minHeight: '100%',
+        maxHeight: '100%',
         borderRadius: '10px',
         border: '1px solid rgba(255,255,255,0.12)',
         backgroundColor: '#020617',
@@ -1157,7 +1157,10 @@ function CodeTraceEditor({
       localViewRef.current = null;
       view.destroy();
     };
-  }, [editorViewRef, height]);
+  // 패널 높이는 정답의 공개 줄 수에 따라 달라진다. height를 이 effect의
+  // 의존성에 넣으면 "다음 줄" 클릭 때 편집기가 파괴·재생성되어 최초 빈
+  // 문서로 돌아가므로, 아래 host 높이만 변경하고 EditorView는 유지한다.
+  }, [editorViewRef]);
 
   useEffect(() => {
     const view = localViewRef.current;
@@ -1170,7 +1173,17 @@ function CodeTraceEditor({
     });
   }, [value]);
 
-  return <div ref={hostRef} className={`code-trace-codemirror ${currentPassed ? 'is-passed' : ''}`} />;
+  return (
+    <div
+      ref={hostRef}
+      className={`code-trace-codemirror ${currentPassed ? 'is-passed' : ''}`}
+      style={{
+        height: `${height}px`,
+        minHeight: `${CODE_PANEL_MIN_HEIGHT}px`,
+        maxHeight: `${CODE_PANEL_MAX_HEIGHT}px`,
+      }}
+    />
+  );
 }
 
 export default function CodeTracePlayer({
