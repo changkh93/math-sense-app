@@ -4258,7 +4258,12 @@ function Astronaut({ inputRef, interactables, blockers, structureColliders = [],
     }
 
     const activeCamera = state.camera
-    if (isFirstPerson) {
+    // The overview OrbitControls owns the shared R3F camera while the
+    // blueprint is open. In particular, do not let the saved first-person
+    // preference snap it back to the astronaut's eye position every frame.
+    if (builderOverview) {
+      if (controls.current) controls.current.enabled = false
+    } else if (isFirstPerson) {
       if (controls.current) controls.current.enabled = false
       const eyeY = player.y + 1.96 * characterScale.current
       const yaw = group.current.rotation.y + firstPersonYawOffset.current
