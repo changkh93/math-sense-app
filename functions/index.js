@@ -17,7 +17,6 @@ const fetch = require("node-fetch");
 const referralBilling = require("./referralBilling");
 const {
   DIRECT_MEMO_DAILY_LIMIT,
-  DIRECT_MEMO_MAX_QUEUE_MS,
   DIRECT_MEMO_RETENTION_MS,
   computeDirectMemoDeliveryPlan,
 } = require("./directMemoPolicy");
@@ -11216,15 +11215,13 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
   const db = admin.firestore();
   const senderRef = db.collection("users").doc(uid);
   const recipientRef = db.collection("users").doc(recipientId);
-  const limitRef = senderRef.collection("directMemoLimits").doc(recipientId);
   const dailyLimitRef = senderRef.collection("directMemoDailyLimits").doc(getKSTDateString(new Date()));
   const memoRef = db.collection("directMemos").doc();
 
   const result = await db.runTransaction(async (tx) => {
-    const [senderSnap, recipientSnap, limitSnap, dailyLimitSnap] = await Promise.all([
+    const [senderSnap, recipientSnap, dailyLimitSnap] = await Promise.all([
       tx.get(senderRef),
       tx.get(recipientRef),
-      tx.get(limitRef),
       tx.get(dailyLimitRef),
     ]);
 
@@ -11237,7 +11234,6 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
 
     const senderData = senderSnap.data() || {};
     const recipientData = recipientSnap.data() || {};
-    const limitData = limitSnap.data() || {};
     const dailyLimitData = dailyLimitSnap.data() || {};
     const dailyCount = Math.max(0, Number(dailyLimitData.count || 0));
     if (dailyCount >= DIRECT_MEMO_DAILY_LIMIT) {
@@ -11246,16 +11242,7 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
 
     const nowMillis = Date.now();
     const now = admin.firestore.Timestamp.fromMillis(nowMillis);
-    const lastImmediateMillis = getMillis(limitData.lastImmediateSentAt);
-    const lastQueuedMillis = getMillis(limitData.lastSentAt);
-    const { canDeliverImmediately, deliverAtMillis, status } = computeDirectMemoDeliveryPlan({
-      nowMillis,
-      lastImmediateMillis,
-      lastQueuedMillis,
-    });
-    if (deliverAtMillis - nowMillis > DIRECT_MEMO_MAX_QUEUE_MS) {
-      throw new functions.https.HttpsError("resource-exhausted", "같은 사람에게 예약된 편지가 너무 많습니다. 기존 편지가 배달된 뒤 다시 보내주세요.");
-    }
+    const { deliverAtMillis, status } = computeDirectMemoDeliveryPlan({ nowMillis });
     const deliverAt = admin.firestore.Timestamp.fromMillis(deliverAtMillis);
 
     const memoData = {
@@ -11281,12 +11268,6 @@ exports.sendDirectMemo = regionalFunctions.https.onCall(async (data, context) =>
     };
 
     tx.set(memoRef, memoData);
-    tx.set(limitRef, {
-      recipientId,
-      ...(canDeliverImmediately ? { lastImmediateSentAt: now } : {}),
-      lastSentAt: deliverAt,
-      updatedAt: now,
-    }, { merge: true });
     tx.set(dailyLimitRef, {
       dateKey: getKSTDateString(new Date(nowMillis)),
       count: dailyCount + 1,
@@ -11464,51 +11445,45 @@ exports.deliverScheduledDirectMemos = regionalFunctions.pubsub
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
-    const now = admin.firestore.Timestamp.now();
-    const snap = await db.collection("directMemos")
-      .where("status", "==", "scheduled")
-      .where("deliverAt", "<=", now)
-      .orderBy("deliverAt", "asc")
-      .limit(100)
-      .get();
+    let deliveredCount = 0;
 
-    if (snap.empty) return null;
+    // Legacy cleanup: the per-recipient reservation policy was removed. Drain every
+    // memo that was already queued, regardless of its former delivery date.
+    while (true) {
+      const snap = await db.collection("directMemos")
+        .where("status", "==", "scheduled")
+        .limit(400)
+        .get();
+      if (snap.empty) break;
 
-    const chunks = [];
-    for (let i = 0; i < snap.docs.length; i += 400) {
-      chunks.push(snap.docs.slice(i, i + 400));
-    }
-
-    for (const docs of chunks) {
+      const now = admin.firestore.Timestamp.now();
       await db.runTransaction(async (tx) => {
-        const freshSnaps = await Promise.all(docs.map((docSnap) => tx.get(docSnap.ref)));
+        const freshSnaps = await Promise.all(snap.docs.map((docSnap) => tx.get(docSnap.ref)));
         freshSnaps.forEach((docSnap) => {
           if (!docSnap.exists) return;
           const memoRef = docSnap.ref;
           const memoData = docSnap.data() || {};
-          const deliverAtMillis = memoData.deliverAt?.toMillis?.() || 0;
-          if (memoData.status !== "scheduled" || deliverAtMillis > now.toMillis()) return;
+          if (memoData.status !== "scheduled") return;
           const deliveredMemo = {
             ...memoData,
             status: "delivered",
+            deliverAt: now,
             sentAt: now,
             updatedAt: now,
           };
           tx.set(memoRef, {
             status: "delivered",
+            deliverAt: now,
             sentAt: now,
-            updatedAt: now,
-          }, { merge: true });
-          tx.set(db.collection("users").doc(memoData.senderId).collection("directMemoLimits").doc(memoData.recipientId), {
-            recipientId: memoData.recipientId,
-            lastImmediateSentAt: now,
             updatedAt: now,
           }, { merge: true });
           createDirectMemoNotification(tx, memoRef, deliveredMemo);
         });
       });
+      deliveredCount += snap.size;
     }
 
+    console.log("[deliverScheduledDirectMemos] drained legacy scheduled memos", { deliveredCount });
     return null;
   });
 

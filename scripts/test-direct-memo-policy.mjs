@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {
-  DIRECT_MEMO_MAX_QUEUE_MS,
+  DIRECT_MEMO_DAILY_LIMIT,
   computeDirectMemoDeliveryPlan,
 } = require('../functions/directMemoPolicy');
 
@@ -14,34 +14,18 @@ const first = computeDirectMemoDeliveryPlan({ nowMillis: now });
 assert.equal(first.status, 'delivered');
 assert.equal(first.deliverAtMillis, now);
 
-const second = computeDirectMemoDeliveryPlan({
-  nowMillis: now + hour,
-  lastImmediateMillis: now,
-  lastQueuedMillis: now,
-});
-assert.equal(second.status, 'scheduled');
-assert.equal(second.deliverAtMillis, now + 24 * hour);
+const second = computeDirectMemoDeliveryPlan({ nowMillis: now + hour });
+assert.equal(second.status, 'delivered');
+assert.equal(second.deliverAtMillis, now + hour);
 
-const nearWindow = computeDirectMemoDeliveryPlan({
-  nowMillis: now + 23 * hour,
-  lastImmediateMillis: now,
-  lastQueuedMillis: now,
-});
-assert.equal(nearWindow.deliverAtMillis, now + 24 * hour);
+const nearWindow = computeDirectMemoDeliveryPlan({ nowMillis: now + 23 * hour });
+assert.equal(nearWindow.status, 'delivered');
+assert.equal(nearWindow.deliverAtMillis, now + 23 * hour);
 
-const queued = computeDirectMemoDeliveryPlan({
-  nowMillis: now + 2 * hour,
-  lastImmediateMillis: now,
-  lastQueuedMillis: now + 24 * hour,
-});
-assert.equal(queued.deliverAtMillis, now + 48 * hour);
-assert.ok(queued.deliverAtMillis - (now + 2 * hour) < DIRECT_MEMO_MAX_QUEUE_MS);
+const queued = computeDirectMemoDeliveryPlan({ nowMillis: now + 2 * hour });
+assert.equal(queued.status, 'delivered');
+assert.equal(queued.deliverAtMillis, now + 2 * hour);
 
-const reopened = computeDirectMemoDeliveryPlan({
-  nowMillis: now + 25 * hour,
-  lastImmediateMillis: now,
-  lastQueuedMillis: now,
-});
-assert.equal(reopened.status, 'delivered');
+assert.equal(DIRECT_MEMO_DAILY_LIMIT, 30);
 
 console.log('direct memo policy tests passed');

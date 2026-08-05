@@ -620,8 +620,8 @@ service cloud.firestore {
       allow read, write: if isAuth();
     }
 
-    // Direct Memos: one-to-one letter style messages. Creation and scheduled delivery
-    // are handled by Cloud Functions so the 24-hour per-recipient limit cannot be bypassed.
+    // Direct Memos: one-to-one letter style messages. Creation and delivery are
+    // handled by Cloud Functions so the daily sender limit cannot be bypassed.
     match /directMemos/{memoId} {
       allow read: if isAuth() && (
         resource.data.senderId == request.auth.uid ||
