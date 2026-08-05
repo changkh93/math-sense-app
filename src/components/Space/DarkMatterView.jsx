@@ -11,6 +11,12 @@ function getQuestionFallbackTitle(question, fallback) {
   return fallback
 }
 
+const enterDarkMatterFocusMode = () => {
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {})
+  }
+}
+
 /**
  * 다크 매터 뷰 — 오답/재검토 문항을 카테고리별로 보여주고 재풀이 진입
  */
@@ -55,11 +61,8 @@ export default function DarkMatterView({
     : 0
 
   const handleStartGroup = (group) => {
+    enterDarkMatterFocusMode()
     if (onStartQuiz) onStartQuiz(group.questions)
-  }
-
-  const handleStartAll = () => {
-    if (onStartQuiz) onStartQuiz(questions)
   }
 
   return (
@@ -191,32 +194,6 @@ export default function DarkMatterView({
           </Motion.div>
         ) : (
           <>
-            {/* Start All Button */}
-            <Motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => { soundManager.playClick(); handleStartAll(); }}
-              style={{
-                width: '100%',
-                padding: '1.2rem',
-                marginBottom: '1.5rem',
-                background: 'linear-gradient(135deg, #6b21a8, #a855f7)',
-                border: '1px solid rgba(168, 85, 247, 0.5)',
-                borderRadius: '15px',
-                color: 'white',
-                fontSize: '1.1rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.8rem'
-              }}
-            >
-              <span>🌌</span>
-              <span>전체 탐사 시작 ({questions.length}문항)</span>
-            </Motion.button>
-
             {/* Category List */}
             <h3 style={{ 
               color: 'var(--text-bright)', 
