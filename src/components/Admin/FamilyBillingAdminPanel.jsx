@@ -23,7 +23,18 @@ const statusLabels = Object.fromEntries(statuses);
 
 function formatTimestamp(value) {
   if (!value) return '';
-  const date = value?.toDate?.()?.() || (value instanceof Date ? value : new Date(value));
+  let date;
+  if (typeof value.toDate === 'function') {
+    date = value.toDate();
+  } else if (value instanceof Date) {
+    date = value;
+  } else if (typeof value.seconds === 'number' || typeof value._seconds === 'number') {
+    const seconds = value.seconds ?? value._seconds;
+    const nanoseconds = value.nanoseconds ?? value._nanoseconds ?? 0;
+    date = new Date((seconds * 1000) + Math.floor(nanoseconds / 1e6));
+  } else {
+    date = new Date(value);
+  }
   if (Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }

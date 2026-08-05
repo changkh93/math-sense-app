@@ -244,7 +244,30 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const focusProtectionArmedRef = useRef(false)
   const focusTransitionGraceUntilRef = useRef(0)
   const fullscreenCleanupTimerRef = useRef(null)
+  const latestQuizSessionRef = useRef(null)
+  const integritySaveSucceededRef = useRef(false)
   const currentQuestion = currentQuestions[currentIdx]
+
+  // Keep the latest resumable state available to focus-violation callbacks without
+  // re-arming the protection effect every time an answer changes.
+  latestQuizSessionRef.current = {
+    shouldPersist: !reSolveMode && !isResultMode,
+    session: {
+      currentIdx,
+      userAnswers: pendingResult?.userAnswers || userAnswers,
+      comboCount: pendingResult?.combo ?? comboCount,
+      sessionCrystals: pendingResult?.sessionCrystals ?? sessionCrystals,
+      retryCount,
+      shieldsUsed: pendingResult?.shieldsUsed ?? shieldsUsed,
+      originalTotal,
+      firstPassScore: firstPassScore !== null ? firstPassScore : null,
+      everWrong: pendingResult?.everWrongIds || Array.from(everWrongSet),
+      reviewMarks: Array.from(reviewMarks),
+      deferredQuestionIds: Array.from(deferredQuestionIds),
+      isDeferredRound,
+      isResultMode: false,
+    },
+  }
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768)
@@ -650,31 +673,53 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }
   }
 
-  const terminateCompromisedFieldTest = useCallback(async (eventType, violationCount) => {
-    if (integrityTerminatedRef.current) return
-    integrityTerminatedRef.current = true
-    setIsIntegrityTerminated(true)
-    setIsFocusLocked(true)
-    setFocusLockReason('집중 화면 이탈이 반복되어 현재 Field Test가 종료되었습니다.')
-    clearPendingAnswerCheckpoint(user?.uid, quizData?.unitId)
+  const persistCurrentQuizSession = useCallback(async (additionalUpdates = {}) => {
+    const snapshot = latestQuizSessionRef.current
+    if (!user?.uid || !quizData?.unitId) return true
+    if (!snapshot?.shouldPersist && Object.keys(additionalUpdates).length === 0) return true
 
-    if (!user?.uid || !quizData?.unitId) return
     try {
       const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
       await setDoc(progressRef, {
-        quizSession: deleteField(),
-        quizSessionGuardAudit: {
-          event: 'field_test_integrity_terminated',
-          trigger: eventType,
-          violationCount,
+        ...(snapshot?.shouldPersist ? {
+          quizSession: JSON.parse(JSON.stringify(snapshot.session)),
+          unitTitle: quizData?.title || '탐사 퀴즈',
           unitId: quizData.unitId,
-          occurredAt: serverTimestamp(),
-        },
+        } : {}),
+        updatedAt: serverTimestamp(),
+        ...additionalUpdates,
       }, { merge: true })
+      return true
     } catch (error) {
-      console.error('Failed to terminate compromised field test:', error)
+      console.error('Quiz exit save failed:', error)
+      return false
     }
-  }, [quizData?.unitId, user?.uid])
+  }, [quizData?.title, quizData?.unitId, user?.uid])
+
+  const terminateCompromisedFieldTest = useCallback(async (eventType, violationCount) => {
+    if (integrityTerminatedRef.current) return
+    integrityTerminatedRef.current = true
+    integritySaveSucceededRef.current = false
+    setIsIntegrityTerminated(true)
+    setIsFocusLocked(true)
+    setIsSavingExit(true)
+    setFocusLockReason('집중 화면 이탈이 반복되어 현재 진행 상황을 저장하고 Field Test를 종료합니다.')
+
+    const saved = await persistCurrentQuizSession({
+      quizSessionGuardAudit: {
+        event: 'field_test_integrity_terminated',
+        trigger: eventType,
+        violationCount,
+        unitId: quizData.unitId,
+        occurredAt: serverTimestamp(),
+      },
+    })
+    integritySaveSucceededRef.current = saved
+    setIsSavingExit(false)
+    setFocusLockReason(saved
+      ? '집중 화면 이탈이 반복되어 현재 진행 상황을 저장한 후 Field Test를 종료했습니다.'
+      : '진행 상황 저장에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.')
+  }, [persistCurrentQuizSession, quizData?.unitId])
 
   const reportFocusViolation = useCallback((eventType, reason) => {
     if (integrityTerminatedRef.current || document.body.classList.contains('is-capturing')) return
@@ -870,7 +915,19 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }
   }
 
-  const exitTerminatedFieldTest = () => {
+  const exitTerminatedFieldTest = async () => {
+    if (isSavingExit) return
+    if (!integritySaveSucceededRef.current) {
+      setIsSavingExit(true)
+      setFocusLockReason('현재 진행 상황을 다시 저장하고 있습니다.')
+      const saved = await persistCurrentQuizSession()
+      integritySaveSucceededRef.current = saved
+      setIsSavingExit(false)
+      if (!saved) {
+        setFocusLockReason('진행 상황 저장에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.')
+        return
+      }
+    }
     document.body.classList.remove('field-test-window-blurred')
     intentionalFullscreenExitRef.current = true
     if (document.fullscreenElement && document.exitFullscreen) {
@@ -1337,38 +1394,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // 명시적 닫기/저장 로직
   const handleExitClick = async () => {
     soundManager.playClick()
-    
-    // 이펙트/대기열이 돌고 있는(즉시저장 완료된) 상태가 아닐 때만 현재 상태 강제 저장
-    if (!isRebooting && !showFeedback) {
-      if (user?.uid && quizData?.unitId && !reSolveMode && !isResultMode) {
-        setIsSavingExit(true)
-        try {
-          const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
-          const sessionObj = {
-            currentIdx: currentIdx,
-            userAnswers: userAnswers,
-            comboCount: comboCount,
-            sessionCrystals: sessionCrystals,
-            retryCount: retryCount,
-            shieldsUsed: shieldsUsed,
-            originalTotal: originalTotal,
-            firstPassScore: firstPassScore !== null ? firstPassScore : null,
-            everWrong: Array.from(everWrongSet),
-            reviewMarks: Array.from(reviewMarks),
-            deferredQuestionIds: Array.from(deferredQuestionIds),
-            isDeferredRound
-          }
-          await setDoc(progressRef, {
-            quizSession: JSON.parse(JSON.stringify(sessionObj)),
-            unitTitle: quizData?.title || "탐사 퀴즈",
-            unitId: quizData.unitId || "",
-            updatedAt: serverTimestamp()
-          }, { merge: true })
-        } catch (e) {
-          console.error("Exit save failed", e)
-        }
-      }
-    }
+
+    setIsSavingExit(true)
+    await persistCurrentQuizSession()
+    setIsSavingExit(false)
     intentionalFullscreenExitRef.current = true
     if (document.fullscreenElement && document.exitFullscreen) {
       document.exitFullscreen().catch(() => {})
@@ -1954,10 +1983,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               <button
                 className="hud-btn primary glass"
                 onClick={isIntegrityTerminated ? exitTerminatedFieldTest : resumeFieldTestFocus}
+                disabled={isIntegrityTerminated && isSavingExit}
                 style={{
                   width: '100%',
                   padding: '0.9rem',
-                  cursor: 'pointer',
+                  cursor: isIntegrityTerminated && isSavingExit ? 'wait' : 'pointer',
+                  opacity: isIntegrityTerminated && isSavingExit ? 0.72 : 1,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -1965,7 +1996,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 }}
               >
                 {isIntegrityTerminated ? (
-                  'MISSION CONTROL로 돌아가기'
+                  isSavingExit ? '진행 상황 저장 중...' : 'MISSION CONTROL로 돌아가기'
                 ) : (
                   <>
                     <span style={{ fontSize: '1.05rem', fontWeight: 800 }}>퀴즈 계속 풀기</span>
