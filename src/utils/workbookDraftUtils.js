@@ -397,9 +397,16 @@ export const buildWorkbookUnitDraftPrompt = ({ unitId, unitTitle, pages }) => {
 [페이지 목록]
 ${pageInventory}
 
+[Codex 사전 준비 — 반드시 먼저 실행]
+1. URL을 페이지마다 직접 curl하지 말고 아래 읽기 전용 명령을 한 번 실행해 unit 전체 이미지를 로컬에 준비하세요.
+   node scripts/prepare-workbook-unit-analysis.mjs --unit-id="${unitId}"
+2. 명령이 출력한 manifestPath의 JSON을 읽고, 각 pages[].localImagePath를 실제 이미지 보기 도구로 열어 분석하세요.
+3. 샌드박스에서 Firebase/Google 호스트 DNS 또는 네트워크가 차단되면 작업을 중단하거나 사용자에게 이미지를 다시 요청하지 마세요. 동일한 준비 명령을 외부 네트워크 권한(require_escalated)으로 즉시 한 번 재실행하세요. 이 명령은 Firestore와 이미지를 읽고 /private/tmp에만 저장하는 읽기 전용 준비 작업입니다.
+4. 외부 네트워크 권한 재시도까지 실패한 페이지만 건너뛰고 원인을 보고하세요. 성공한 페이지는 계속 처리하세요.
+
 [절대 규칙]
 1. Gemini API, OpenAI API 등 외부 AI API를 코드에서 호출하지 말고 현재 대화 모델의 시각 분석 능력만 사용하세요.
-2. 각 imageUrl을 실제로 열어 확인하지 못한 페이지는 추측하지 말고 건너뛴 뒤 보고하세요.
+2. manifest의 localImagePath를 실제로 열어 확인하지 못한 페이지는 추측하지 말고 건너뛴 뒤 보고하세요.
 3. 인쇄된 모든 수가 아니라 학생이 직접 답하는 빈칸·밑줄·선택·조작 영역만 요소로 만드세요.
 4. “수식으로 표현”은 계산 결과만이 아니라 15÷3=5처럼 문제에서 요구하는 완전한 식을 정답으로 지정하세요.
 5. 좌표는 원본 이미지 기준 top/left/width/height 퍼센트이며 모두 0~100 범위여야 합니다.

@@ -94,6 +94,8 @@ assert.match(unitPrompt, /단원 전체 초안 제작자/);
 assert.match(unitPrompt, /대상 페이지 수: 2/);
 assert.match(unitPrompt, /pageId: page_1/);
 assert.match(unitPrompt, /pageId: page_2/);
+assert.match(unitPrompt, /prepare-workbook-unit-analysis\.mjs/);
+assert.match(unitPrompt, /require_escalated/);
 assert.match(unitPrompt, /모든 페이지에 대해 먼저/);
 assert.match(unitPrompt, /--apply/);
 
