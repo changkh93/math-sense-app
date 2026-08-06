@@ -454,3 +454,72 @@ ${pageInventory}
 5. 지정 unit/page가 없으면 쓰지 말고 운영툴에서 “변경사항 저장”을 먼저 하라고 보고하세요.
 6. 완료 후 페이지별 생성 요소 수, 낮은 confidence 항목, 건너뛴 페이지, 실제 수정 필드가 workbookDraftPages와 workbookDraftUpdatedAt뿐인지 보고하세요.`;
 };
+
+export const buildWorkbookChapterDraftPrompt = ({ chapterId }) => {
+  if (!chapterId) return '';
+  const safeChapterId = cleanIdPart(chapterId, 'chapter');
+
+  return `당신은 초등수학 Smart Workbook 챕터 전체 초안 제작자입니다. Firestore에서 chapterId=${chapterId}에 속한 모든 unit과 등록된 페이지 이미지를 불러와 순서대로 분석하고, 학생이 실제로 답해야 하는 위치에 인터랙티브 요소를 생성한 뒤 모든 unit의 초안에 일괄 반영하세요.
+
+[작업 대상]
+- Firestore collections: chapters, units
+- chapterId: ${chapterId}
+- 범위: 이 chapter에 속한 모든 unit의 저장된 workbookDraftPages (없으면 workbookPages를 읽기 원본으로 사용)
+
+[Codex 사전 준비 — 반드시 가장 먼저 실행]
+1. URL을 page/unit마다 직접 다운로드하지 말고 아래 읽기 전용 명령을 정확히 한 번 실행하세요.
+   node scripts/prepare-workbook-chapter-analysis.mjs --chapter-id="${chapterId}"
+2. 출력된 manifestPath(${`/private/tmp/workbook-chapter-${safeChapterId}/manifest.json`})를 읽어 units 순서와 각 pages[].localImagePath를 확인하세요.
+3. 모든 localImagePath를 실제 이미지 보기 도구로 열어 분석하세요. 열어 보지 못한 페이지는 추측하지 말고 건너뛰어 보고하세요.
+4. Firebase/Google DNS 또는 네트워크가 샌드박스에서 차단되면 중단하거나 사용자에게 이미지를 다시 요청하지 마세요. 동일한 준비 명령을 외부 네트워크 권한(require_escalated)으로 즉시 한 번만 재실행하세요.
+
+[절대 규칙]
+1. Gemini API, OpenAI API 등 외부 AI API를 코드에서 호출하지 말고 현재 대화 모델의 시각 분석 능력만 사용하세요.
+2. 인쇄된 모든 수가 아니라 학생이 직접 답하는 빈칸·밑줄·선택·조작 영역만 요소로 만드세요.
+3. “수식으로 표현”은 계산 결과만이 아니라 15÷3=5처럼 문제에서 요구하는 완전한 식을 정답으로 지정하세요.
+4. 좌표는 원본 이미지 기준 top/left/width/height 퍼센트이며 모두 0~100 범위여야 합니다.
+5. 초등수학 범위에서 모든 정답을 직접 검산하고, 불확실하면 confidence를 낮추고 analysis.warnings에 이유를 남기세요.
+6. 공개본 workbookPages는 절대 수정하지 마세요. 각 unit의 workbookDraftPages와 workbookDraftUpdatedAt만 수정하세요.
+7. 단순 재미가 아니라 문제 행동이 나누기·위치·연결·순서·색칠일 때만 grouping·number-line·matching·ordering·coloring을 선택하세요.
+8. grouping은 교환 가능한 항목이 고정 id 정답으로 오채점될 위험이 있으면 input 또는 multiple-choice를 사용하세요.
+
+[지원 요소]
+- input(inputMode: integer | decimal | fraction | mixed-number | expression | text)
+- multiple-choice
+- mask(triggerKey로 같은 페이지 clientKey 연결)
+- grouping, number-line, matching, ordering, coloring
+
+[페이지별 JSON]
+manifest의 이미지 페이지마다 아래 구조로 /private/tmp/workbook-draft-<safeUnitId>-<pageId>.json 파일을 만드세요.
+{
+  "schemaVersion": 2,
+  "unitId": "manifest의 해당 unitId",
+  "pageId": "manifest의 해당 pageId",
+  "learningDesign": { "gradeBand": "elementary-3-4", "difficulty": "standard", "adaptiveHints": true },
+  "analysis": { "summary": "페이지 문제 유형 요약", "warnings": [] },
+  "elements": [
+    {
+      "clientKey": "q1_answer",
+      "type": "input",
+      "inputMode": "expression",
+      "answer": "15÷3=5",
+      "acceptedAnswers": [],
+      "answerSpec": { "kind": "literal-expression" },
+      "hint": "전체 수, 나누는 수, 결과를 ÷와 =로 연결하세요.",
+      "sourceText": "문제 원문",
+      "confidence": 0.98,
+      "position": { "top": 30, "left": 35, "width": 30, "height": 5 }
+    }
+  ]
+}
+
+[일괄 검증 및 적용]
+1. unit/page별 Firestore dry-run을 병렬 또는 순차 반복하지 마세요. 모든 JSON 작성 후 아래 챕터 배치 명령을 --apply 없이 정확히 한 번 실행하세요.
+   node scripts/apply-workbook-chapter-draft-analysis.mjs --chapter-id="${chapterId}"
+2. Firestore DNS/네트워크 차단이면 같은 명령을 외부 네트워크 권한(require_escalated)으로 즉시 한 번만 재실행하세요.
+3. 챕터 배치 dry-run이 전체 성공한 경우에만 다음 명령을 한 번 실행하세요.
+   node scripts/apply-workbook-chapter-draft-analysis.mjs --chapter-id="${chapterId}" --apply
+4. 적용은 Firestore batch로 모든 unit의 workbookDraftPages와 workbookDraftUpdatedAt만 원자적으로 갱신해야 합니다. 어느 한 페이지라도 JSON 누락·검증 실패·저장된 pageId 불일치가 있으면 아무 unit도 수정하지 마세요.
+5. unit/page가 없으면 운영툴에서 각 unit의 이미지를 등록하고 “변경사항 저장”을 먼저 하라고 보고하세요.
+6. 완료 후 unit별·페이지별 생성 요소 수, 낮은 confidence 항목, 건너뛴 페이지와 원인, 실제 수정 필드를 보고하세요.`;
+};

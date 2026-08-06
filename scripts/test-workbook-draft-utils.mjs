@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildWorkbookChapterDraftPrompt,
   buildWorkbookDraftPrompt,
   buildWorkbookUnitDraftPrompt,
   normalizeWorkbookAnalysisPayload,
@@ -99,5 +100,14 @@ assert.match(unitPrompt, /require_escalated/);
 assert.match(unitPrompt, /apply-workbook-unit-draft-analysis\.mjs/);
 assert.match(unitPrompt, /페이지별 병렬 dry-run을 실행하지 마세요/);
 assert.match(unitPrompt, /--apply/);
+
+const chapterPrompt = buildWorkbookChapterDraftPrompt({ chapterId: 'chapter_demo' });
+assert.match(chapterPrompt, /챕터 전체 초안 제작자/);
+assert.match(chapterPrompt, /chapterId: chapter_demo/);
+assert.match(chapterPrompt, /prepare-workbook-chapter-analysis\.mjs/);
+assert.match(chapterPrompt, /apply-workbook-chapter-draft-analysis\.mjs/);
+assert.match(chapterPrompt, /require_escalated/);
+assert.match(chapterPrompt, /FireStore batch|Firestore batch/);
+assert.match(chapterPrompt, /--apply/);
 
 console.log('Workbook draft utility tests passed.');

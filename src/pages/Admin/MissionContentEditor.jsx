@@ -415,6 +415,7 @@ const MissionContentEditor = () => {
           <WorkbookVisualEditor 
               workbookPages={workbookPages} 
               setWorkbookPages={setWorkbookPages} 
+              chapterId={unitData?.chapterId}
               unitId={unitId}
               unitTitle={unitData?.title}
               onRefreshDraft={handleRefreshWorkbookDraft}

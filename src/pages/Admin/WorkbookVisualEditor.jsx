@@ -5,6 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { compressImage } from '../../utils/storageUtils';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import {
+  buildWorkbookChapterDraftPrompt,
   buildWorkbookDraftPrompt,
   buildWorkbookUnitDraftPrompt,
   normalizeWorkbookAnalysisPayload,
@@ -53,6 +54,7 @@ const InteractionConfigEditor = ({ element, onUpdate }) => {
 const WorkbookVisualEditor = ({
   workbookPages,
   setWorkbookPages,
+  chapterId,
   unitId,
   unitTitle,
   onRefreshDraft,
@@ -65,7 +67,7 @@ const WorkbookVisualEditor = ({
   const [showPrompt, setShowPrompt] = useState(false);
   const [showJsonImport, setShowJsonImport] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
-  const [promptTarget, setPromptTarget] = useState('codex-unit');
+  const [promptTarget, setPromptTarget] = useState(chapterId ? 'codex-chapter' : 'codex-unit');
   const [jsonInput, setJsonInput] = useState('');
   const [importError, setImportError] = useState('');
   
@@ -93,7 +95,10 @@ const WorkbookVisualEditor = ({
     unitTitle,
     pages: workbookPages
   }), [unitId, unitTitle, workbookPages]);
-  const currentPrompt = promptTarget === 'codex-unit' ? unitPrompt : pagePrompt;
+  const chapterPrompt = useMemo(() => buildWorkbookChapterDraftPrompt({ chapterId }), [chapterId]);
+  const currentPrompt = promptTarget === 'codex-chapter'
+    ? chapterPrompt
+    : (promptTarget === 'codex-unit' ? unitPrompt : pagePrompt);
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -386,6 +391,14 @@ const WorkbookVisualEditor = ({
                 <button
                   type="button"
                   className="outline-btn"
+                  disabled={!chapterId}
+                  onClick={() => { setPromptTarget('codex-chapter'); setPromptCopied(false); }}
+                  style={{ padding: '0.45rem 0.7rem', borderColor: promptTarget === 'codex-chapter' ? 'var(--crystal-cyan)' : undefined, color: promptTarget === 'codex-chapter' ? 'var(--crystal-cyan)' : undefined, opacity: chapterId ? 1 : 0.45 }}
+                  title={chapterId ? '이 챕터의 모든 단원을 일괄 처리합니다.' : '이 단원에 chapterId가 없습니다.'}
+                >Codex · chapter 전체</button>
+                <button
+                  type="button"
+                  className="outline-btn"
                   onClick={() => { setPromptTarget('codex-unit'); setPromptCopied(false); }}
                   style={{ padding: '0.45rem 0.7rem', borderColor: promptTarget === 'codex-unit' ? 'var(--crystal-cyan)' : undefined, color: promptTarget === 'codex-unit' ? 'var(--crystal-cyan)' : undefined }}
                 >Codex · unit 전체</button>
@@ -396,13 +409,17 @@ const WorkbookVisualEditor = ({
                   style={{ padding: '0.45rem 0.7rem', borderColor: promptTarget === 'chatgpt-page' ? 'var(--planet-purple)' : undefined, color: promptTarget === 'chatgpt-page' ? 'var(--planet-purple)' : undefined }}
                 >ChatGPT · 현재 page</button>
               </div>
-              <strong style={{ color: promptTarget === 'codex-unit' ? 'var(--crystal-cyan)' : 'var(--planet-purple)' }}>
-                {promptTarget === 'codex-unit' ? 'Codex 단원 전체 작업 프롬프트' : 'ChatGPT 현재 페이지 작업 프롬프트'}
+              <strong style={{ color: promptTarget.startsWith('codex-') ? 'var(--crystal-cyan)' : 'var(--planet-purple)' }}>
+                {promptTarget === 'codex-chapter'
+                  ? 'Codex 챕터 전체 작업 프롬프트'
+                  : (promptTarget === 'codex-unit' ? 'Codex 단원 전체 작업 프롬프트' : 'ChatGPT 현재 페이지 작업 프롬프트')}
               </strong>
               <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                문서 ID <code>{unitId}</code>
+                {promptTarget === 'codex-chapter' ? <>챕터 ID <code>{chapterId}</code></> : <>문서 ID <code>{unitId}</code></>}
                 {promptTarget === 'chatgpt-page' && <> · 페이지 ID <code>{currentPage.id}</code></>}<br/>
-                {promptTarget === 'codex-unit'
+                {promptTarget === 'codex-chapter'
+                  ? '챕터에 속한 모든 단원과 페이지를 한 번에 준비·분석·검증·초안 반영합니다. 먼저 각 단원에서 “변경사항 저장”을 눌러주세요.'
+                  : promptTarget === 'codex-unit'
                   ? `등록된 ${workbookPages.length}페이지를 한 번에 분석·검증·초안 반영합니다. 먼저 상단의 “변경사항 저장”을 눌러주세요.`
                   : '현재 페이지만 분석하며, ChatGPT가 반환한 JSON은 “AI 결과 JSON 붙여넣기”로 적용합니다.'}
               </div>
