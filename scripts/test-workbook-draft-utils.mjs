@@ -96,7 +96,8 @@ assert.match(unitPrompt, /pageId: page_1/);
 assert.match(unitPrompt, /pageId: page_2/);
 assert.match(unitPrompt, /prepare-workbook-unit-analysis\.mjs/);
 assert.match(unitPrompt, /require_escalated/);
-assert.match(unitPrompt, /모든 페이지에 대해 먼저/);
+assert.match(unitPrompt, /apply-workbook-unit-draft-analysis\.mjs/);
+assert.match(unitPrompt, /페이지별 병렬 dry-run을 실행하지 마세요/);
 assert.match(unitPrompt, /--apply/);
 
 console.log('Workbook draft utility tests passed.');

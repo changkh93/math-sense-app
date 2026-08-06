@@ -447,9 +447,10 @@ ${pageInventory}
 
 [검증 및 적용 순서]
 1. 페이지별 JSON을 /private/tmp/workbook-draft-${safeUnitId}-<pageId>.json 에 저장하세요.
-2. 모든 페이지에 대해 먼저 아래 명령을 --apply 없이 실행해 dry-run 검증하세요.
-   node scripts/apply-workbook-draft-analysis.mjs --unit-id="${unitId}" --page-id="<pageId>" --input="/private/tmp/workbook-draft-${safeUnitId}-<pageId>.json"
-3. 모든 dry-run이 성공한 페이지에만 동일 명령 끝에 --apply를 붙여 반영하세요.
-4. 지정 unit/page가 없으면 쓰지 말고 운영툴에서 “변경사항 저장”을 먼저 하라고 보고하세요.
-5. 완료 후 페이지별 생성 요소 수, 낮은 confidence 항목, 건너뛴 페이지, 실제 수정 필드가 workbookDraftPages와 workbookDraftUpdatedAt뿐인지 보고하세요.`;
+2. 페이지별 병렬 dry-run을 실행하지 마세요. 아래 unit 배치 명령을 --apply 없이 정확히 한 번 실행해 모든 JSON 정규화와 Firestore 페이지 존재 여부를 검증하세요.
+   node scripts/apply-workbook-unit-draft-analysis.mjs --unit-id="${unitId}"
+3. 샌드박스에서 firestore.googleapis.com DNS 또는 네트워크가 차단되면 결과를 기다리며 페이지별 프로세스를 반복하지 마세요. 동일한 unit 배치 명령을 외부 네트워크 권한(require_escalated)으로 즉시 한 번 재실행하세요.
+4. unit 배치 dry-run이 전체 성공한 경우에만 동일 명령 끝에 --apply를 붙여 한 번 실행하세요. 이 적용은 workbookDraftPages를 단일 Firestore update로 갱신합니다.
+5. 지정 unit/page가 없으면 쓰지 말고 운영툴에서 “변경사항 저장”을 먼저 하라고 보고하세요.
+6. 완료 후 페이지별 생성 요소 수, 낮은 confidence 항목, 건너뛴 페이지, 실제 수정 필드가 workbookDraftPages와 workbookDraftUpdatedAt뿐인지 보고하세요.`;
 };
