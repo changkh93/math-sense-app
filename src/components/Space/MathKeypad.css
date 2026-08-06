@@ -157,13 +157,11 @@
   color: black;
 }
 
-/* Double width zero */
-.zero-btn {
-  grid-column: span 2;
-  width: 102px;
-  border-radius: 25px;
-  justify-content: flex-start;
-  padding-left: 1.2rem;
+.submit-btn {
+  background: #27c93f;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 /* removed keypad-indicator duplication */
@@ -220,13 +218,6 @@
     height: clamp(34px, 5.1dvh, 42px);
     border-radius: 12px;
     font-size: 0.95rem;
-  }
-
-  .zero-btn {
-    width: 100%;
-    border-radius: 12px;
-    justify-content: center;
-    padding-left: 0;
   }
 
   .op-btn { font-size: 1.05rem; }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion as Motion } from 'framer-motion';
-import { Trash2, CheckCircle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
 import './MathKeypad.css';
 
@@ -51,6 +51,7 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'exp
               { value: '+', label: '+' },
               { value: '.', label: '.' },
               { value: '%', label: '%' },
+              { value: '=', label: '=' },
             ];
   const numberKeys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0'];
 
@@ -91,19 +92,19 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'exp
         {/* Problem-specific keypad */}
         <div className="keypad-layout">
           <button className="key-btn util-btn" onPointerDown={(e) => e.stopPropagation()} onClick={clearAll}>AC</button>
-          <button className="key-btn util-btn" onPointerDown={(e) => e.stopPropagation()} onClick={handleDelete}><Trash2 size={20} color="black" /></button>
+          <button className="key-btn util-btn" aria-label="한 글자 지우기" onPointerDown={(e) => e.stopPropagation()} onClick={handleDelete}>⌫</button>
           {operatorKeys.map((key) => (
             <button key={`${key.value}-${key.label}`} className="key-btn op-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key.value)}>
               {key.label}
             </button>
           ))}
           {numberKeys.map((key) => (
-            <button key={key} className={`key-btn num-btn ${key === '0' ? 'zero-btn' : ''}`} onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key)}>
+            <button key={key} className="key-btn num-btn" onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key)}>
               {key}
             </button>
           ))}
-          <button className="key-btn op-btn" style={{ background: '#27c93f' }} onPointerDown={(e) => e.stopPropagation()} onClick={onSubmit}>
-            <CheckCircle size={24} color="white" />
+          <button className="key-btn op-btn submit-btn" aria-label="입력 완료" onPointerDown={(e) => e.stopPropagation()} onClick={onSubmit}>
+            ✓
           </button>
         </div>
       </Motion.div>
