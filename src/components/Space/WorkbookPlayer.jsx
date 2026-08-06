@@ -579,16 +579,6 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
           <div className="page-indicator font-tech">
             {currentPageIndex + 1} / {pages.length}
           </div>
-          {!previewMode && (
-            <button
-              type="button"
-              className="workbook-pause-btn"
-              onClick={handlePauseWorkbook}
-              disabled={savingPause}
-            >
-              {savingPause ? '저장 중…' : '오늘은 여기까지'}
-            </button>
-          )}
         </div>
       </div>
 
@@ -813,7 +803,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         </button>
 
         {/* Center Main Action Button */}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+        <div className="workbook-footer-main">
           {!isCurrentPageChecked ? (
             <button 
               className="hud-btn primary submit-btn font-title" 
@@ -852,6 +842,16 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                 <ArrowRight size={20} style={{ marginLeft: 8 }} />
               </button>
             )
+          )}
+          {!previewMode && (
+            <button
+              type="button"
+              className="workbook-pause-btn"
+              onClick={handlePauseWorkbook}
+              disabled={savingPause}
+            >
+              {savingPause ? '저장 중…' : '오늘은 여기까지'}
+            </button>
           )}
         </div>
 
