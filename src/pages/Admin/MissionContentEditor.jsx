@@ -1,14 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useUnits, useAdminMutations, useChapters, useRegions } from '../../hooks/useContent';
+import { useAdminMutations } from '../../hooks/useContent';
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { compressImage } from '../../utils/storageUtils';
-import { Save, ArrowLeft, Image as ImageIcon, Video, FileText, Sparkles, Copy, X } from 'lucide-react';
+import { Save, ArrowLeft, Image as ImageIcon, Video, FileText, Sparkles, Copy, X, Rocket } from 'lucide-react';
 import { db } from '../../firebase';
 import { getDoc, doc } from 'firebase/firestore';
 import MissionMarkdownViewer from '../../components/Space/MissionMarkdownViewer';
 import WorkbookVisualEditor from './WorkbookVisualEditor';
+import { validateWorkbookPagesForPublish } from '../../utils/workbookDraftUtils';
+
+const normalizeWorkbookPagesForEditor = (pages) => Array.isArray(pages)
+  ? pages.map(page => ({ ...page, elements: Array.isArray(page?.elements) ? page.elements : [] }))
+  : [];
+
+const toMillis = (value) => {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 const MissionContentEditor = () => {
   const { unitId } = useParams();
@@ -23,12 +36,15 @@ const MissionContentEditor = () => {
   const [unitData, setUnitData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [refreshingDraft, setRefreshingDraft] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const [transmissions, setTransmissions] = useState([]);
   const [learningText, setLearningText] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
   const [workbookPages, setWorkbookPages] = useState([]);
+  const [publishedWorkbookPages, setPublishedWorkbookPages] = useState([]);
   const [activeTab, setActiveTab] = useState('workbook');
   const [isAiPromptOpen, setIsAiPromptOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -60,7 +76,12 @@ const MissionContentEditor = () => {
             setLearningText(data.learningContents.text || '');
             setPdfUrl(data.learningContents.pdfUrl || '');
           }
-          if (data.workbookPages) setWorkbookPages(data.workbookPages);
+          const publishedPages = normalizeWorkbookPagesForEditor(data.workbookPages);
+          const draftPages = Array.isArray(data.workbookDraftPages)
+            ? normalizeWorkbookPagesForEditor(data.workbookDraftPages)
+            : publishedPages;
+          setPublishedWorkbookPages(publishedPages);
+          setWorkbookPages(draftPages);
         } else {
            console.error("Unit not found");
         }
@@ -73,60 +94,142 @@ const MissionContentEditor = () => {
     fetchUnit();
   }, [unitId]);
 
-  const handleSave = async () => {
-    if (!unitData) return;
-
-    // Validation
+  const validateTransmissions = () => {
     for (const tx of transmissions) {
       const vidId = tx.videoId?.trim();
       if (vidId && !/^[a-zA-Z0-9_-]{11}$/.test(vidId)) {
         alert(`유효하지 않은 유튜브 Video ID 형식입니다. (${tx.title || 'Untitled'})`);
-        return;
+        return false;
       }
       const st = Number(tx.start) || 0;
       const en = Number(tx.end) || 0;
       if (st > 0 && en > 0 && st >= en) {
         alert(`종료 시간은 시작 시간보다 커야 합니다. (${tx.title || 'Untitled'})`);
-        return;
+        return false;
       }
     }
+    return true;
+  };
+
+  const buildMissionPayload = ({ publishWorkbook = false } = {}) => {
+    const processedTransmissions = transmissions.map(tx => ({
+      id: tx.id || `tx_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      title: tx.title || 'Untitled Transmission',
+      videoId: tx.videoId?.trim() || '',
+      start: Number(tx.start) || 0,
+      end: Number(tx.end) || 0
+    }));
+    const nextPublishedPages = publishWorkbook ? workbookPages : publishedWorkbookPages;
+    const contentFlags = {
+      ...(unitData.contentFlags || {}),
+      hasDataLog: !!(learningText?.trim() || pdfUrl?.trim()),
+      hasTransmission: processedTransmissions.some(tx => tx.videoId),
+      hasWorkbook: nextPublishedPages.length > 0
+    };
+
+    return {
+      ...unitData,
+      videoConfig: { videoId: '', start: 0, end: 0 },
+      transmissions: processedTransmissions,
+      learningContents: {
+        text: learningText,
+        pdfUrl: pdfUrl?.trim() || ''
+      },
+      workbookDraftPages: workbookPages,
+      workbookPages: nextPublishedPages,
+      workbookDraftUpdatedAt: new Date().toISOString(),
+      ...(publishWorkbook ? {
+        workbookPublication: {
+          status: 'published',
+          publishedAt: new Date().toISOString(),
+          pageCount: workbookPages.length,
+          schemaVersion: 2
+        }
+      } : {}),
+      contentFlags
+    };
+  };
+
+  const ensureNoRemoteDraftConflict = async () => {
+    try {
+      const latestSnap = await getDoc(doc(db, 'units', unitId));
+      if (!latestSnap.exists()) return true;
+      const remoteUpdatedAt = toMillis(latestSnap.data().workbookDraftUpdatedAt);
+      const loadedUpdatedAt = toMillis(unitData?.workbookDraftUpdatedAt);
+      if (remoteUpdatedAt > loadedUpdatedAt + 1000) {
+        alert('Codex 또는 다른 운영자가 이 워크북 초안을 갱신했습니다. “Codex 반영 새로고침”으로 최신 초안을 불러온 뒤 다시 저장해주세요. 현재 화면의 내용은 저장하지 않았습니다.');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Workbook draft conflict check failed', error);
+      alert('최신 초안 버전을 확인하지 못해 저장을 중단했습니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요.');
+      return false;
+    }
+  };
+
+  const handleSave = async () => {
+    if (!unitData || !validateTransmissions()) return;
+    if (!(await ensureNoRemoteDraftConflict())) return;
 
     setSaving(true);
     try {
-      const processedTransmissions = transmissions.map(tx => ({
-          id: tx.id || `tx_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-          title: tx.title || 'Untitled Transmission',
-          videoId: tx.videoId?.trim() || '',
-          start: Number(tx.start) || 0,
-          end: Number(tx.end) || 0
-      }));
-
-      // Pre-compute content flags for instant routing (no flash)
-      const contentFlags = {
-        ...(unitData.contentFlags || {}),
-        hasDataLog: !!(learningText?.trim() || pdfUrl?.trim()),
-        hasTransmission: processedTransmissions.some(tx => tx.videoId),
-        hasWorkbook: workbookPages && workbookPages.length > 0
-      };
-
-      await saveUnit.mutateAsync({
-        ...unitData,
-        videoConfig: { videoId: '', start: 0, end: 0 },
-        transmissions: processedTransmissions,
-        learningContents: {
-            text: learningText,
-            pdfUrl: pdfUrl?.trim() || ''
-        },
-        workbookPages,
-        contentFlags
-      });
-      alert('미션 콘텐츠가 성공적으로 저장되었습니다.');
-      navigate('/admin/content');
+      const payload = buildMissionPayload();
+      await saveUnit.mutateAsync(payload);
+      setUnitData(payload);
+      alert('변경사항을 초안으로 저장했습니다. 공개 중인 워크북은 변경되지 않습니다.');
     } catch (e) {
       console.error("Save failed", e);
       alert('저장 중 오류가 발생했습니다.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePublishWorkbook = async () => {
+    if (!unitData || !validateTransmissions()) return;
+    if (!(await ensureNoRemoteDraftConflict())) return;
+    const issues = validateWorkbookPagesForPublish(workbookPages);
+    if (issues.length > 0) {
+      alert(`퍼블리시 전에 다음 항목을 수정해주세요.\n\n${issues.slice(0, 12).map(issue => `• ${issue}`).join('\n')}${issues.length > 12 ? `\n• 외 ${issues.length - 12}건` : ''}`);
+      return;
+    }
+    if (!window.confirm(`검토 중인 ${workbookPages.length}개 페이지를 학생용 워크북으로 최종 퍼블리시하시겠습니까?`)) return;
+
+    setPublishing(true);
+    try {
+      const payload = buildMissionPayload({ publishWorkbook: true });
+      await saveUnit.mutateAsync(payload);
+      setPublishedWorkbookPages(workbookPages);
+      setUnitData(payload);
+      alert('스마트 워크북을 최종 퍼블리시했습니다. 학생 화면에는 이제 이 버전이 표시됩니다.');
+    } catch (error) {
+      console.error('Workbook publish failed', error);
+      alert('퍼블리시 중 오류가 발생했습니다. 공개 중인 기존 버전은 유지됩니다.');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleRefreshWorkbookDraft = async () => {
+    if (!window.confirm('Firestore의 최신 초안을 불러오면 현재 화면에서 아직 저장하지 않은 수정사항은 사라집니다. 계속하시겠습니까?')) return;
+    setRefreshingDraft(true);
+    try {
+      const snap = await getDoc(doc(db, 'units', unitId));
+      if (!snap.exists()) throw new Error('Unit not found');
+      const data = snap.data();
+      const nextDraft = Array.isArray(data.workbookDraftPages)
+        ? normalizeWorkbookPagesForEditor(data.workbookDraftPages)
+        : normalizeWorkbookPagesForEditor(data.workbookPages);
+      setWorkbookPages(nextDraft);
+      setPublishedWorkbookPages(normalizeWorkbookPagesForEditor(data.workbookPages));
+      setUnitData(data);
+      alert('Firestore의 최신 워크북 초안을 불러왔습니다.');
+    } catch (error) {
+      console.error('Workbook draft refresh failed', error);
+      alert('워크북 초안을 새로고침하지 못했습니다.');
+    } finally {
+      setRefreshingDraft(false);
     }
   };
 
@@ -244,9 +347,16 @@ const MissionContentEditor = () => {
           <h1>Mission Editor</h1>
           <p style={{ color: 'var(--crystal-cyan)', fontWeight: 'bold' }}>{unitData?.title}</p>
         </div>
-        <button className="primary-btn" onClick={handleSave} disabled={saving}>
-          <Save size={18} /> <span>{saving ? '저장 중...' : '저장하기'}</span>
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button className="secondary-btn" onClick={handleSave} disabled={saving || publishing}>
+            <Save size={18} /> <span>{saving ? '저장 중...' : '변경사항 저장'}</span>
+          </button>
+          {activeTab === 'workbook' && (
+            <button className="primary-btn" onClick={handlePublishWorkbook} disabled={saving || publishing || workbookPages.length === 0} style={{ background: 'linear-gradient(135deg, #7c3aed, #00b8d9)' }}>
+              <Rocket size={18} /> <span>{publishing ? '퍼블리시 중...' : '워크북 최종 퍼블리시'}</span>
+            </button>
+          )}
+        </div>
       </header>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
@@ -277,7 +387,11 @@ const MissionContentEditor = () => {
           <WorkbookVisualEditor 
               workbookPages={workbookPages} 
               setWorkbookPages={setWorkbookPages} 
-              unitId={unitId} 
+              unitId={unitId}
+              unitTitle={unitData?.title}
+              onRefreshDraft={handleRefreshWorkbookDraft}
+              isRefreshingDraft={refreshingDraft}
+              publishedPageCount={publishedWorkbookPages.length}
           />
         )}
 

@@ -358,7 +358,11 @@ export function useAdminMutations() {
           lastUpdated: serverTimestamp() 
         }, { merge: true });
       },
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['units'] })
+      onSuccess: (_result, data) => {
+        const id = data?.docId || (data?.chapterId && data?.id ? `${data.chapterId}_${data.id}` : null);
+        queryClient.invalidateQueries({ queryKey: ['units'] });
+        if (id) queryClient.invalidateQueries({ queryKey: ['unit', id] });
+      }
     }),
     deleteUnit: useMutation({
       mutationFn: async (unitDocId) => {

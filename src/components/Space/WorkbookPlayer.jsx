@@ -26,12 +26,16 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
 
   const currentPage = pages[currentPageIndex];
 
-  // Whitespace-agnostic comparison
-  const checkAnswer = (inputId, expectedAnswer) => {
+  // Whitespace-agnostic comparison with operator glyph normalization and explicit alternatives.
+  const checkAnswer = (inputId, element) => {
     const userVal = answers[inputId] || '';
-    const cleanUser = userVal.replace(/\s/g, '');
-    const cleanExpected = expectedAnswer.toString().replace(/\s/g, '');
-    return cleanUser === cleanExpected;
+    const normalize = (value) => String(value ?? '')
+      .replace(/\s/g, '')
+      .replace(/[−–—]/g, '-')
+      .replace(/[∙·]/g, '×');
+    const accepted = [element.answer, ...(element.acceptedAnswers || [])];
+    const cleanUser = normalize(userVal);
+    return accepted.some(expected => cleanUser === normalize(expected));
   };
 
   const handleInputActivate = (el, e) => {
@@ -76,7 +80,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
     // Check all inputs on current page
     currentPage.elements.forEach((el, idx) => {
       if (el.type === 'input' || el.type === 'multiple-choice') {
-        const isCorrect = checkAnswer(el.id, el.answer);
+        const isCorrect = checkAnswer(el.id, el);
         newCheckedElements[el.id] = { isCorrect, isChecked: true };
 
         // Play particle effect roughly at center of button or random area
