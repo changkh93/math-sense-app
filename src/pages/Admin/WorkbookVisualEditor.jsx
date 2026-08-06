@@ -53,11 +53,29 @@ const WorkbookVisualEditor = ({
     const file = e.target.files[0];
     if (!file) return;
 
+    const supportedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    if (!supportedTypes.has(file.type)) {
+      alert('JPG, PNG, WEBP 이미지 파일만 등록할 수 있습니다.');
+      e.target.value = '';
+      return;
+    }
+
     setUploading(true);
     try {
       const compressedBlob = await compressImage(file);
-      const storageRef = ref(storage, `workbook_images/${unitId}_${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, compressedBlob);
+      const safeUnitId = String(unitId || 'workbook').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const safeBaseName = file.name
+        .replace(/\.[^.]+$/, '')
+        .replace(/[^a-zA-Z0-9가-힣_-]/g, '_')
+        .slice(0, 80) || 'page';
+      const storageRef = ref(storage, `workbook_images/${safeUnitId}_${Date.now()}_${safeBaseName}.jpg`);
+      await uploadBytes(storageRef, compressedBlob, {
+        contentType: 'image/jpeg',
+        customMetadata: {
+          source: 'smart-workbook-editor',
+          unitId: String(unitId || '')
+        }
+      });
       const url = await getDownloadURL(storageRef);
       
       const newPage = {
@@ -70,7 +88,10 @@ const WorkbookVisualEditor = ({
       setCurrentPageIndex(workbookPages.length); // point to new page (which is length before adding)
     } catch (error) {
       console.error("Upload failed", error);
-      alert("이미지 업로드에 실패했습니다.");
+      const message = error?.code === 'storage/unauthorized'
+        ? '이미지 저장 권한을 확인할 수 없습니다. 다시 로그인한 뒤 재시도해주세요.'
+        : `이미지 업로드에 실패했습니다.${error?.code ? ` (${error.code})` : ''}`;
+      alert(message);
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -305,7 +326,7 @@ const WorkbookVisualEditor = ({
           )}
           <label className="icon-btn outline-btn" style={{ whiteSpace: 'nowrap', opacity: uploading ? 0.5 : 1, cursor: uploading ? 'not-allowed' : 'pointer' }}>
             {uploading ? '업로드 중...' : '+ 페이지 추가'}
-            <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploading}/>
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploading}/>
           </label>
         </div>
       </div>
@@ -674,7 +695,7 @@ const WorkbookVisualEditor = ({
           </div>
           <label className="primary-btn" style={{ display: 'inline-flex', cursor: 'pointer', padding: '1rem 2rem', alignItems: 'center', gap: '0.5rem' }}>
             {uploading ? '업로드 중...' : <><ImageIcon size={20} /> 첫 번째 이미지 업로드</>}
-            <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploading}/>
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploading}/>
           </label>
         </div>
       )}

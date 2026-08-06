@@ -10,9 +10,10 @@ service firebase.storage {
         request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
-    function isAdmin() {
+    function isWorkbookOperator() {
       return isMemberAuth() &&
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        request.auth.token.email_verified == true &&
+        request.auth.token.email == 'paul@dulcine.net';
     }
 
     // Quiz images are readable by everyone, but writable only by admins
@@ -39,13 +40,14 @@ service firebase.storage {
       allow write: if isMemberAuth();
     }
 
-    // Published workbook pages are public learning assets, but only operators may upload them.
+    // Published workbook pages are public learning assets. Writes are restricted
+    // to the verified operator identity without a cross-service Firestore lookup.
     match /workbook_images/{allPaths=**} {
       allow read: if true;
-      allow create, update: if isAdmin() &&
+      allow create, update: if isWorkbookOperator() &&
         request.resource.size <= 10 * 1024 * 1024 &&
         request.resource.contentType.matches('image/(jpeg|png|webp)');
-      allow delete: if isAdmin();
+      allow delete: if isWorkbookOperator();
     }
 
     // Assignment file uploads (Stellar Archive)
