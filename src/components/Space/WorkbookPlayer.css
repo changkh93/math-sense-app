@@ -61,6 +61,47 @@
   font-weight: 600;
 }
 
+.workbook-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workbook-pause-btn {
+  min-height: 36px;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.1);
+  color: #fde68a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.workbook-pause-btn:hover {
+  background: rgba(250, 204, 21, 0.18);
+}
+
+.workbook-pause-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.workbook-pause-error {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(127, 29, 29, 0.92);
+  color: #fecaca;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+  z-index: 11;
+}
+
 .workbook-canvas-area {
   flex: 1;
   min-height: 0;
@@ -449,10 +490,20 @@
     white-space: nowrap;
   }
 
+  .workbook-header-actions {
+    gap: 0.3rem;
+  }
+
   .workbook-header .page-indicator {
     padding: 0.25rem 0.55rem;
     font-size: 0.78rem;
     white-space: nowrap;
+  }
+
+  .workbook-pause-btn {
+    min-height: 36px;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.7rem;
   }
 
   .workbook-canvas-area {

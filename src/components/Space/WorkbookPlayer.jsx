@@ -78,6 +78,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   const [wrongAnswerHistory, setWrongAnswerHistory] = useState({});
   const [visibleHints, setVisibleHints] = useState({});
   const [progressHydrated, setProgressHydrated] = useState(false);
+  const [savingPause, setSavingPause] = useState(false);
+  const [pauseError, setPauseError] = useState('');
   const [savingCompletion, setSavingCompletion] = useState(false);
   const [completionError, setCompletionError] = useState('');
   const inputRefs = React.useRef({});
@@ -112,22 +114,27 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     };
 
     const hydrate = async () => {
-      let restored = false;
+      let localSession = null;
+      let serverSession = null;
       try {
-        const local = JSON.parse(localStorage.getItem(progressStorageKey) || 'null');
-        restored = applySession(local);
+        localSession = JSON.parse(localStorage.getItem(progressStorageKey) || 'null');
       } catch { /* ignore malformed local progress */ }
 
       const uid = auth.currentUser?.uid;
       if (uid && unitId) {
         try {
           const snap = await getDoc(doc(db, 'users', uid, 'learning_progress', unitId));
-          if (!cancelled && snap.exists()) restored = applySession(snap.data()?.workbookSession) || restored;
+          if (snap.exists()) serverSession = snap.data()?.workbookSession || null;
         } catch (error) {
           console.warn('Workbook progress restore failed; using local progress.', error);
         }
       }
-      if (!cancelled) setProgressHydrated(true);
+      if (cancelled) return false;
+      const latestSession = [localSession, serverSession]
+        .filter(session => session?.workbookSignature === workbookSignature)
+        .sort((a, b) => Number(b.savedAtMs || 0) - Number(a.savedAtMs || 0))[0];
+      const restored = applySession(latestSession);
+      setProgressHydrated(true);
       return restored;
     };
 
@@ -166,6 +173,49 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     }, 700);
     return () => clearTimeout(autosaveTimerRef.current);
   }, [answers, attemptCounts, checkedElements, checkedPages, currentPageIndex, firstAttemptCorrect, isResultMode, previewMode, progressHydrated, progressStorageKey, sessionCrystals, unitId, workbookSignature, wrongAnswerHistory]);
+
+  const handlePauseWorkbook = async () => {
+    if (savingPause) return;
+    if (previewMode) {
+      onClose();
+      return;
+    }
+
+    const session = {
+      schemaVersion: 1,
+      workbookSignature,
+      currentPageIndex,
+      answers,
+      checkedElements,
+      checkedPages,
+      attemptCounts,
+      firstAttemptCorrect,
+      wrongAnswerHistory,
+      sessionCrystals,
+      savedAtMs: Date.now(),
+    };
+
+    setSavingPause(true);
+    setPauseError('');
+    clearTimeout(autosaveTimerRef.current);
+    try {
+      localStorage.setItem(progressStorageKey, JSON.stringify(session));
+      const uid = auth.currentUser?.uid;
+      if (uid && unitId) {
+        await setDoc(doc(db, 'users', uid, 'learning_progress', unitId), {
+          workbookSession: session,
+          workbookSessionUpdatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+      soundManager.playClick();
+      onClose();
+    } catch (error) {
+      console.error('Workbook pause save failed', error);
+      setPauseError('서버 저장에 실패했습니다. 이 기기의 진행 기록은 유지됩니다. 다시 시도해주세요.');
+    } finally {
+      setSavingPause(false);
+    }
+  };
 
   const checkAnswer = (inputId, element) => {
     const userVal = answers[inputId] || '';
@@ -525,10 +575,24 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       <div className="workbook-header hud-border glass-card">
         <button className="back-btn" onClick={onClose}>✕</button>
         <span className="font-title unit-title">{unitTitle || '스마트 워크북'}</span>
-        <div className="page-indicator font-tech">
-          {currentPageIndex + 1} / {pages.length}
+        <div className="workbook-header-actions">
+          <div className="page-indicator font-tech">
+            {currentPageIndex + 1} / {pages.length}
+          </div>
+          {!previewMode && (
+            <button
+              type="button"
+              className="workbook-pause-btn"
+              onClick={handlePauseWorkbook}
+              disabled={savingPause}
+            >
+              {savingPause ? '저장 중…' : '오늘은 여기까지'}
+            </button>
+          )}
         </div>
       </div>
+
+      {pauseError && <div className="workbook-pause-error" role="alert">{pauseError}</div>}
 
       <div className="workbook-canvas-area" onClick={() => { setActiveInputId(null); setShowKeypad(false); }}>
         {currentPage && (
