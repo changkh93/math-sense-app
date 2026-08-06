@@ -292,7 +292,7 @@ export const buildWorkbookDraftPrompt = ({ unitId, unitTitle, page, pageIndex = 
 3. 문제의 요구를 구분하세요. 예를 들어 “수식으로 표현하세요”의 정답은 계산 결과가 아니라 18÷2 같은 식입니다.
 4. 위치는 원본 이미지 기준 퍼센트 좌표이며 top/left/width/height 모두 0~100 범위입니다. 입력 영역을 밑줄 또는 빈칸에 타이트하게 맞추되 터치 가능한 높이를 확보하세요.
 5. 초등수학 범위에서 답을 직접 검산하세요. 확신이 낮은 요소도 임의 확정하지 말고 confidence를 낮추고 analysis.warnings에 이유를 적으세요.
-6. 기존 공개본(workbookPages)은 절대 수정하지 마세요. Codex 자동 반영 시 workbookDraftPages의 지정 pageId만 수정하세요.
+6. 기존 공개본(workbookPages)은 절대 수정하지 마세요. 운영툴에서 JSON을 적용할 때 workbookDraftPages의 지정 pageId만 수정해야 합니다.
 7. 이미지 URL을 실제로 열거나 이미지를 첨부받아 확인하지 못했다면 추측하여 JSON을 만들지 말고, 사용자에게 이미지를 첨부해 달라고 요청하세요.
 
 [지원 요소]
@@ -368,9 +368,81 @@ integer | decimal | fraction | mixed-number | expression | text
 }
 
 [실행 방식]
-- ChatGPT 웹이라면: 위 JSON만 반환하세요. 사용자가 운영툴의 “AI 결과 JSON 붙여넣기”에 넣어 검증·적용합니다.
-- Codex이며 현재 저장소와 Firestore 작업 권한이 있다면: JSON을 /private/tmp/workbook-draft-${cleanIdPart(unitId, 'unit')}-${cleanIdPart(page.id, 'page')}.json 에 저장하고, 먼저 아래 명령으로 dry-run 검증 후 동일 명령에 --apply를 붙여 초안에만 반영하세요.
-  node scripts/apply-workbook-draft-analysis.mjs --unit-id="${unitId}" --page-id="${page.id}" --input="/private/tmp/workbook-draft-${cleanIdPart(unitId, 'unit')}-${cleanIdPart(page.id, 'page')}.json"
-- 지정 문서나 페이지가 없으면 쓰지 말고, 운영툴에서 “변경사항 저장”을 먼저 하라고 알려주세요.
-- 완료 후 생성 요소 수, 낮은 confidence 항목, 실제 수정한 필드가 workbookDraftPages뿐인지 보고하세요.`;
+- 위 JSON만 반환하세요. 사용자가 운영툴의 “AI 결과 JSON 붙여넣기”에 넣어 현재 page를 검증·적용합니다.
+- 이미지 URL을 열 수 없다면 JSON을 추측하지 말고 이미지 첨부를 요청하세요.`;
+};
+
+export const buildWorkbookUnitDraftPrompt = ({ unitId, unitTitle, pages }) => {
+  const targetPages = Array.isArray(pages)
+    ? pages.filter(page => page?.id && page?.imageUrl)
+    : [];
+  if (!unitId || targetPages.length === 0) return '';
+
+  const pageInventory = targetPages.map((page, index) => [
+    `### Page ${index + 1}`,
+    `- pageId: ${page.id}`,
+    `- imageUrl: ${page.imageUrl}`,
+    `- existingElementCount: ${Array.isArray(page.elements) ? page.elements.length : 0}`,
+  ].join('\n')).join('\n\n');
+  const safeUnitId = cleanIdPart(unitId, 'unit');
+
+  return `당신은 초등수학 Smart Workbook 단원 전체 초안 제작자입니다. 아래 unit에 등록된 모든 페이지 이미지를 실제로 열어 순서대로 분석하고, 각 페이지의 학생 답안 위치에 인터랙티브 요소를 생성한 뒤 Firestore 초안에 반영하세요.
+
+[작업 대상]
+- Firestore collection: units
+- 문서 ID(unitId): ${unitId}
+- 단원명: ${unitTitle || '(제목 없음)'}
+- 대상 페이지 수: ${targetPages.length}
+
+[페이지 목록]
+${pageInventory}
+
+[절대 규칙]
+1. Gemini API, OpenAI API 등 외부 AI API를 코드에서 호출하지 말고 현재 대화 모델의 시각 분석 능력만 사용하세요.
+2. 각 imageUrl을 실제로 열어 확인하지 못한 페이지는 추측하지 말고 건너뛴 뒤 보고하세요.
+3. 인쇄된 모든 수가 아니라 학생이 직접 답하는 빈칸·밑줄·선택·조작 영역만 요소로 만드세요.
+4. “수식으로 표현”은 계산 결과만이 아니라 15÷3=5처럼 문제에서 요구하는 완전한 식을 정답으로 지정하세요.
+5. 좌표는 원본 이미지 기준 top/left/width/height 퍼센트이며 모두 0~100 범위여야 합니다.
+6. 초등수학 범위에서 모든 정답을 직접 검산하고, 불확실하면 confidence를 낮추고 analysis.warnings에 이유를 남기세요.
+7. 공개본 workbookPages는 절대 수정하지 말고 workbookDraftPages 안의 위 pageId들만 각각 수정하세요.
+8. 단순 재미가 아니라 문제 행동이 나누기·위치·연결·순서·색칠일 때만 grouping·number-line·matching·ordering·coloring을 선택하세요.
+9. grouping은 동일한 항목의 교환 가능한 배치가 하나의 고정 id 정답으로 잘못 채점되지 않는지 확인하고, 그런 위험이 있으면 input 또는 multiple-choice를 사용하세요.
+
+[지원 요소]
+- input(inputMode: integer | decimal | fraction | mixed-number | expression | text)
+- multiple-choice
+- mask(triggerKey로 같은 페이지 clientKey 연결)
+- grouping, number-line, matching, ordering, coloring
+
+[페이지별 JSON 규격]
+각 페이지마다 다음 구조의 독립 JSON 파일을 만드세요.
+{
+  "schemaVersion": 2,
+  "unitId": "${unitId}",
+  "pageId": "해당 pageId",
+  "learningDesign": { "gradeBand": "elementary-3-4", "difficulty": "standard", "adaptiveHints": true },
+  "analysis": { "summary": "페이지 문제 유형 요약", "warnings": [] },
+  "elements": [
+    {
+      "clientKey": "q1_answer",
+      "type": "input",
+      "inputMode": "expression",
+      "answer": "15÷3=5",
+      "acceptedAnswers": [],
+      "answerSpec": { "kind": "literal-expression" },
+      "hint": "전체 수, 나누는 사람 수, 한 사람이 갖는 수를 ÷와 =로 연결하세요.",
+      "sourceText": "문제 원문",
+      "confidence": 0.98,
+      "position": { "top": 30, "left": 35, "width": 30, "height": 5 }
+    }
+  ]
+}
+
+[검증 및 적용 순서]
+1. 페이지별 JSON을 /private/tmp/workbook-draft-${safeUnitId}-<pageId>.json 에 저장하세요.
+2. 모든 페이지에 대해 먼저 아래 명령을 --apply 없이 실행해 dry-run 검증하세요.
+   node scripts/apply-workbook-draft-analysis.mjs --unit-id="${unitId}" --page-id="<pageId>" --input="/private/tmp/workbook-draft-${safeUnitId}-<pageId>.json"
+3. 모든 dry-run이 성공한 페이지에만 동일 명령 끝에 --apply를 붙여 반영하세요.
+4. 지정 unit/page가 없으면 쓰지 말고 운영툴에서 “변경사항 저장”을 먼저 하라고 보고하세요.
+5. 완료 후 페이지별 생성 요소 수, 낮은 confidence 항목, 건너뛴 페이지, 실제 수정 필드가 workbookDraftPages와 workbookDraftUpdatedAt뿐인지 보고하세요.`;
 };

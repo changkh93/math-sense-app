@@ -6,6 +6,7 @@ import { compressImage } from '../../utils/storageUtils';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import {
   buildWorkbookDraftPrompt,
+  buildWorkbookUnitDraftPrompt,
   normalizeWorkbookAnalysisPayload,
   parseWorkbookAnalysisJson
 } from '../../utils/workbookDraftUtils';
@@ -64,6 +65,7 @@ const WorkbookVisualEditor = ({
   const [showPrompt, setShowPrompt] = useState(false);
   const [showJsonImport, setShowJsonImport] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
+  const [promptTarget, setPromptTarget] = useState('codex-unit');
   const [jsonInput, setJsonInput] = useState('');
   const [importError, setImportError] = useState('');
   
@@ -80,12 +82,18 @@ const WorkbookVisualEditor = ({
   const containerRef = useRef(null);
 
   const currentPage = workbookPages[currentPageIndex] || null;
-  const currentPrompt = useMemo(() => buildWorkbookDraftPrompt({
+  const pagePrompt = useMemo(() => buildWorkbookDraftPrompt({
     unitId,
     unitTitle,
     page: currentPage,
     pageIndex: currentPageIndex
   }), [unitId, unitTitle, currentPage, currentPageIndex]);
+  const unitPrompt = useMemo(() => buildWorkbookUnitDraftPrompt({
+    unitId,
+    unitTitle,
+    pages: workbookPages
+  }), [unitId, unitTitle, workbookPages]);
+  const currentPrompt = promptTarget === 'codex-unit' ? unitPrompt : pagePrompt;
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -374,10 +382,29 @@ const WorkbookVisualEditor = ({
         <div style={{ marginBottom: '1rem', padding: '1.25rem', borderRadius: '10px', border: '1px solid rgba(0,243,255,0.35)', background: 'rgba(0, 20, 35, 0.75)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
             <div>
-              <strong style={{ color: 'var(--crystal-cyan)' }}>Codex · ChatGPT 공용 작업 프롬프트</strong>
+              <div style={{ display: 'flex', gap: '0.45rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="outline-btn"
+                  onClick={() => { setPromptTarget('codex-unit'); setPromptCopied(false); }}
+                  style={{ padding: '0.45rem 0.7rem', borderColor: promptTarget === 'codex-unit' ? 'var(--crystal-cyan)' : undefined, color: promptTarget === 'codex-unit' ? 'var(--crystal-cyan)' : undefined }}
+                >Codex · unit 전체</button>
+                <button
+                  type="button"
+                  className="outline-btn"
+                  onClick={() => { setPromptTarget('chatgpt-page'); setPromptCopied(false); }}
+                  style={{ padding: '0.45rem 0.7rem', borderColor: promptTarget === 'chatgpt-page' ? 'var(--planet-purple)' : undefined, color: promptTarget === 'chatgpt-page' ? 'var(--planet-purple)' : undefined }}
+                >ChatGPT · 현재 page</button>
+              </div>
+              <strong style={{ color: promptTarget === 'codex-unit' ? 'var(--crystal-cyan)' : 'var(--planet-purple)' }}>
+                {promptTarget === 'codex-unit' ? 'Codex 단원 전체 작업 프롬프트' : 'ChatGPT 현재 페이지 작업 프롬프트'}
+              </strong>
               <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                문서 ID <code>{unitId}</code> · 페이지 ID <code>{currentPage.id}</code><br/>
-                Codex 자동 반영 전에는 먼저 상단의 “변경사항 저장”을 눌러 이 페이지를 등록하세요. ChatGPT 웹 결과는 JSON 붙여넣기로 적용할 수 있습니다.
+                문서 ID <code>{unitId}</code>
+                {promptTarget === 'chatgpt-page' && <> · 페이지 ID <code>{currentPage.id}</code></>}<br/>
+                {promptTarget === 'codex-unit'
+                  ? `등록된 ${workbookPages.length}페이지를 한 번에 분석·검증·초안 반영합니다. 먼저 상단의 “변경사항 저장”을 눌러주세요.`
+                  : '현재 페이지만 분석하며, ChatGPT가 반환한 JSON은 “AI 결과 JSON 붙여넣기”로 적용합니다.'}
               </div>
             </div>
             <button className="primary-btn" onClick={handleCopyPrompt} style={{ padding: '0.65rem 1rem', background: promptCopied ? 'var(--planet-green)' : undefined }}>

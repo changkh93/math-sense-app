@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildWorkbookDraftPrompt,
+  buildWorkbookUnitDraftPrompt,
   normalizeWorkbookAnalysisPayload,
   parseWorkbookAnalysisJson,
   validateWorkbookPagesForPublish
@@ -76,9 +77,24 @@ const prompt = buildWorkbookDraftPrompt({
 });
 assert.match(prompt, /문서 ID\(unitId\): unit_demo/);
 assert.match(prompt, /페이지 ID\(pageId\): page_demo/);
-assert.match(prompt, /ChatGPT 웹이라면/);
+assert.match(prompt, /위 JSON만 반환하세요/);
 assert.match(prompt, /workbookDraftPages/);
 assert.match(prompt, /number-line/);
 assert.match(prompt, /P3 config 규격/);
+
+const unitPrompt = buildWorkbookUnitDraftPrompt({
+  unitId: 'unit_demo',
+  unitTitle: '분수',
+  pages: [
+    { id: 'page_1', imageUrl: 'https://example.com/1.png', elements: [] },
+    { id: 'page_2', imageUrl: 'https://example.com/2.png', elements: normalized.elements },
+  ]
+});
+assert.match(unitPrompt, /단원 전체 초안 제작자/);
+assert.match(unitPrompt, /대상 페이지 수: 2/);
+assert.match(unitPrompt, /pageId: page_1/);
+assert.match(unitPrompt, /pageId: page_2/);
+assert.match(unitPrompt, /모든 페이지에 대해 먼저/);
+assert.match(unitPrompt, /--apply/);
 
 console.log('Workbook draft utility tests passed.');

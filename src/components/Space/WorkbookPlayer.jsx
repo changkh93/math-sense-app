@@ -659,7 +659,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       width: `${el.position.width}%`,
                       height: `${el.position.height}%`,
                       border: isActive ? '2px solid var(--neon-blue)' : (val ? '2px solid var(--planet-purple)' : '2px dashed #ccc'),
-                      backgroundColor: val ? 'rgba(157, 0, 255, 0.1)' : 'rgba(255, 255, 255, 0.5)',
+                      backgroundColor: val ? 'rgba(255, 255, 255, 0.88)' : 'rgba(255, 255, 255, 0.5)',
                       borderRadius: '8px',
                       cursor: 'pointer',
                       display: 'flex',
@@ -685,7 +685,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       setShowKeypad(false); // Make sure keypad isn't shown
                     }}
                   >
-                    <span style={{ fontSize: '1rem', fontWeight: val ? 'bold' : 'normal', color: val ? 'var(--text-bright)' : '#888', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1rem', fontWeight: val ? 'bold' : 'normal', color: val ? '#111827' : '#667085', display: 'flex', alignItems: 'center', textShadow: 'none' }}>
                       {val ? parseInlineFormatting(val) : '선택'}
                     </span>
                     {elemStatus?.isChecked && (
