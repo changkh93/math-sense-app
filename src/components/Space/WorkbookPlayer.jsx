@@ -10,6 +10,7 @@ import { createParticleBurst, shakeScreen } from './ParticleEffects';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import { auth, db } from '../../firebase';
 import { areElementaryAnswersEquivalent, splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
+import { shuffleWorkbookOptions } from '../../utils/workbookOptionUtils';
 import {
   WORKBOOK_GRADABLE_TYPES,
   WORKBOOK_INTERACTION_TYPES,
@@ -678,7 +679,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       // Shuffle options if not already shuffled for this element
                       if (!shuffledOptionsMap[el.id]) {
                         const originalOptions = el.options || [];
-                        const shuffled = [...originalOptions].sort(() => Math.random() - 0.5);
+                        const shuffled = shuffleWorkbookOptions(originalOptions);
                         setShuffledOptionsMap(prev => ({ ...prev, [el.id]: shuffled }));
                       }
                       

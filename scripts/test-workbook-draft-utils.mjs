@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { shuffleWorkbookOptions } from '../src/utils/workbookOptionUtils.js';
 import {
   buildWorkbookChapterDraftPrompt,
   buildWorkbookDraftPrompt,
@@ -109,5 +110,11 @@ assert.match(chapterPrompt, /apply-workbook-chapter-draft-analysis\.mjs/);
 assert.match(chapterPrompt, /require_escalated/);
 assert.match(chapterPrompt, /FireStore batch|Firestore batch/);
 assert.match(chapterPrompt, /--apply/);
+
+const originalOptions = ['정답', '오답 1', '오답 2'];
+const shuffledOptions = shuffleWorkbookOptions(originalOptions, () => 0.999999);
+assert.deepEqual(originalOptions, ['정답', '오답 1', '오답 2']);
+assert.notDeepEqual(shuffledOptions, originalOptions);
+assert.deepEqual([...shuffledOptions].sort(), [...originalOptions].sort());
 
 console.log('Workbook draft utility tests passed.');
