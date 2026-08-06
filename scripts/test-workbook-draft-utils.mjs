@@ -60,6 +60,7 @@ const normalized = normalizeWorkbookAnalysisPayload(payload, {
 assert.equal(normalized.elements.length, 4);
 assert.equal(normalized.elements[0].inputMode, 'fraction');
 assert.deepEqual(normalized.elements[0].hints, ['분자와 분모를 찾아보세요.', '전체를 몇 등분했는지 보세요.']);
+assert.equal(normalized.elements[0].problemLabel, '(1)');
 assert.equal(normalized.elements[1].hints[0], '전체의 절반을 찾아보세요.');
 assert.equal(normalized.elements[2].triggerBy, normalized.elements[0].id);
 assert.equal(normalized.elements[3].config.answer, 3);
@@ -97,6 +98,8 @@ assert.match(prompt, /workbookDraftPages/);
 assert.match(prompt, /number-line/);
 assert.match(prompt, /P3 config 규격/);
 assert.match(prompt, /"hints"/);
+assert.match(prompt, /"problemLabel"/);
+assert.match(prompt, /"responseLabel"/);
 assert.doesNotMatch(prompt, /gradeBand|difficulty|대상 학년군|기본 난이도/);
 
 const unitPrompt = buildWorkbookUnitDraftPrompt({
@@ -117,6 +120,7 @@ assert.match(unitPrompt, /apply-workbook-unit-draft-analysis\.mjs/);
 assert.match(unitPrompt, /페이지별 병렬 dry-run을 실행하지 마세요/);
 assert.match(unitPrompt, /--apply/);
 assert.match(unitPrompt, /모든 채점 요소에 hints/);
+assert.match(unitPrompt, /problemLabel/);
 assert.doesNotMatch(unitPrompt, /gradeBand|difficulty/);
 
 const chapterPrompt = buildWorkbookChapterDraftPrompt({ chapterId: 'chapter_demo' });
@@ -128,6 +132,7 @@ assert.match(chapterPrompt, /require_escalated/);
 assert.match(chapterPrompt, /FireStore batch|Firestore batch/);
 assert.match(chapterPrompt, /--apply/);
 assert.match(chapterPrompt, /모든 채점 요소에 hints/);
+assert.match(chapterPrompt, /responseLabel/);
 assert.doesNotMatch(chapterPrompt, /gradeBand|difficulty/);
 
 const originalOptions = ['정답', '오답 1', '오답 2'];

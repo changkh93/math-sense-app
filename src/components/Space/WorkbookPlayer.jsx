@@ -17,6 +17,7 @@ import {
   evaluateWorkbookInteraction,
   getAdaptiveWorkbookHintState,
   getInitialWorkbookInteractionResponse,
+  getWorkbookElementReference,
 } from '../../utils/workbookInteractionUtils';
 import 'katex/dist/katex.min.css';
 import StarField from './StarField';
@@ -816,6 +817,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                 studentProfile,
                 wrongAnswerHistory[element.id]?.length || 1
               );
+              const reference = getWorkbookElementReference(element, index);
               const isVisible = visibleHints[element.id] !== false;
               return (
                 <div className="workbook-learning-help-item" key={element.id}>
@@ -824,7 +826,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                     onClick={() => setVisibleHints(prev => ({ ...prev, [element.id]: !isVisible }))}
                     aria-expanded={isVisible}
                   >
-                    {index + 1}번 오답 · 힌트 {hintState.level}/{hintState.total} {isVisible ? '접기' : '보기'}
+                    {reference.displayLabel} · 힌트 단계 {hintState.level}/{hintState.total} {isVisible ? '접기' : '보기'}
                   </button>
                   {isVisible && <p>{hintState.text}</p>}
                 </div>

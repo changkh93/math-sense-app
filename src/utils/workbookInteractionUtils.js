@@ -12,6 +12,34 @@ export const WORKBOOK_GRADABLE_TYPES = new Set([
   ...WORKBOOK_INTERACTION_TYPES,
 ]);
 
+const cleanProblemLabel = (value) => {
+  const text = String(value || '').trim().slice(0, 30);
+  if (!text) return '';
+  const number = text.match(/\d+/)?.[0];
+  return number ? `(${number})` : text;
+};
+
+export const getWorkbookElementReference = (element, fallbackIndex = 0) => {
+  const searchableId = `${element?.clientKey || ''}_${element?.id || ''}`;
+  const inferredNumber = searchableId.match(/(?:^|[_-])q(?:uestion)?[_-]?(\d+)(?:[_-]|$)/i)?.[1] || '';
+  const problemLabel = cleanProblemLabel(element?.problemLabel || inferredNumber);
+  const sourceText = String(element?.sourceText || '');
+  const identity = searchableId.toLowerCase();
+  let responseLabel = String(element?.responseLabel || '').trim().slice(0, 50);
+  if (!responseLabel) {
+    if (/(?:^|[_-])(?:total|whole)(?:[_-]|$)/.test(identity)) responseLabel = '전체를 구하는 식';
+    else if (/(?:^|[_-])(?:division|divide)(?:[_-]|$)/.test(identity)) responseLabel = '나눗셈식';
+    else if (/(?:^|[_-])(?:multiplication|multiply)(?:[_-]|$)/.test(identity)) responseLabel = '곱셈식';
+    else if (/나눗셈식/.test(sourceText)) responseLabel = '나눗셈식';
+    else if (/곱셈식/.test(sourceText)) responseLabel = '곱셈식';
+    else if (/(?:^|[_-])(?:answer|result)(?:[_-]|$)/.test(identity)) responseLabel = '답';
+  }
+  const displayLabel = problemLabel
+    ? `교재 ${problemLabel}번${responseLabel ? ` · ${responseLabel}` : ''}`
+    : `오답 항목 ${Math.max(1, Number(fallbackIndex) + 1)}${responseLabel ? ` · ${responseLabel}` : ''}`;
+  return { problemLabel, responseLabel, displayLabel };
+};
+
 const cleanId = (value, fallback) => {
   const cleaned = String(value || '').trim().replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 50);
   return cleaned || fallback;

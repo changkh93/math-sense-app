@@ -1,6 +1,7 @@
 import {
   WORKBOOK_GRADABLE_TYPES,
   WORKBOOK_INTERACTION_TYPES,
+  getWorkbookElementReference,
   normalizeInteractionConfig,
 } from './workbookInteractionUtils.js';
 
@@ -131,12 +132,16 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
 
     const clientKey = cleanIdPart(rawElement.clientKey, `item_${index + 1}`);
     const hints = normalizeHints(rawElement);
+    const id = clientKeyToId.get(clientKey);
+    const reference = getWorkbookElementReference({ ...rawElement, clientKey, id }, index);
     const base = {
-      id: clientKeyToId.get(clientKey),
+      id,
       type,
       position: normalizePosition(rawElement.position, index),
       sourceText: String(rawElement.sourceText || '').trim(),
-      confidence: clamp(Number(rawElement.confidence) || 0, 0, 1)
+      confidence: clamp(Number(rawElement.confidence) || 0, 0, 1),
+      ...(reference.problemLabel ? { problemLabel: reference.problemLabel } : {}),
+      ...(reference.responseLabel ? { responseLabel: reference.responseLabel } : {}),
     };
 
     if (type === 'mask') {
@@ -305,6 +310,7 @@ export const buildWorkbookDraftPrompt = ({ unitId, unitTitle, page, pageIndex = 
 - grouping/matching/ordering/coloring의 config 안에서는 표시 문구와 별개인 짧고 고유한 id를 사용하세요.
 - 조작 요소는 작은 답안 밑줄이 아니라 문제 활동 전체를 포함하도록 position을 충분히 크게 잡으세요.
 - 모든 채점 요소(input, multiple-choice, grouping, number-line, matching, ordering, coloring)에 hints를 1~3개 작성하세요. 1단계는 정답을 노출하지 않는 쉬운 단서, 뒷단계일수록 구체적인 풀이 단서여야 합니다.
+- 모든 채점 요소에 교재에 인쇄된 문제 번호를 problemLabel(예: "(2)"), 한 문제의 여러 답안 영역을 구분하는 이름을 responseLabel(예: "전체를 구하는 식", "나눗셈식")로 작성하세요.
 
 [inputMode]
 integer | decimal | fraction | mixed-number | expression | text
@@ -334,6 +340,8 @@ integer | decimal | fraction | mixed-number | expression | text
       "answer": "18÷2",
       "acceptedAnswers": [],
       "answerSpec": { "kind": "literal-expression" },
+      "problemLabel": "(1)",
+      "responseLabel": "나눗셈식",
       "hints": ["구슬의 수와 사람 수를 찾아보세요.", "전체 수 다음에 ÷를 쓰고 사람 수를 연결해 보세요.", "전체 구슬 수 ÷ 사람 수의 형태로 쓰되 결과는 쓰지 않아요."],
       "sourceText": "구슬 18개를 2사람에게 똑같이 나누세요.",
       "confidence": 0.98,
@@ -342,6 +350,8 @@ integer | decimal | fraction | mixed-number | expression | text
     {
       "clientKey": "q2_grouping",
       "type": "grouping",
+      "problemLabel": "(2)",
+      "responseLabel": "똑같이 나누기",
       "sourceText": "구슬을 두 사람에게 똑같이 나누세요.",
       "confidence": 0.95,
       "hints": ["구슬을 한 개씩 번갈아 옮겨 보세요.", "두 그룹의 구슬 수가 같은지 세어 보세요."],
@@ -413,6 +423,7 @@ ${pageInventory}
 [힌트 작성 규칙]
 - 모든 채점 요소에 hints 배열을 1~3개 작성하세요.
 - 첫 힌트는 관찰·개념 단서, 다음 힌트는 식의 순서·풀이 단서, 마지막 힌트는 정답을 직접 말하지 않는 가장 구체적인 단서로 작성하세요.
+- 모든 채점 요소에 교재 문제 번호 problemLabel(예: "(2)")과 답안 영역 이름 responseLabel(예: "전체를 구하는 식", "나눗셈식")을 작성하세요.
 
 [페이지별 JSON 규격]
 각 페이지마다 다음 구조의 독립 JSON 파일을 만드세요.
@@ -429,6 +440,8 @@ ${pageInventory}
       "answer": "15÷3=5",
       "acceptedAnswers": [],
       "answerSpec": { "kind": "literal-expression" },
+      "problemLabel": "(1)",
+      "responseLabel": "나눗셈식",
       "hints": ["전체 수와 나누는 사람 수를 찾아보세요.", "전체 수 ÷ 사람 수를 먼저 쓰세요.", "전체 수, 나누는 사람 수, 한 사람이 갖는 수를 ÷와 =로 연결하세요."],
       "sourceText": "문제 원문",
       "confidence": 0.98,
@@ -484,6 +497,7 @@ export const buildWorkbookChapterDraftPrompt = ({ chapterId }) => {
 [힌트 작성 규칙]
 - 모든 채점 요소에 hints 배열을 1~3개 작성하세요.
 - 쉬운 관찰 단서부터 정답을 직접 노출하지 않는 구체적인 풀이 단서 순서로 작성하세요.
+- 모든 채점 요소에 교재 문제 번호 problemLabel과 답안 영역 이름 responseLabel을 작성하세요.
 
 [페이지별 JSON]
 manifest의 이미지 페이지마다 아래 구조로 /private/tmp/workbook-draft-<safeUnitId>-<pageId>.json 파일을 만드세요.
@@ -500,6 +514,8 @@ manifest의 이미지 페이지마다 아래 구조로 /private/tmp/workbook-dra
       "answer": "15÷3=5",
       "acceptedAnswers": [],
       "answerSpec": { "kind": "literal-expression" },
+      "problemLabel": "(1)",
+      "responseLabel": "나눗셈식",
       "hints": ["전체 수와 나누는 수를 찾아보세요.", "전체 수 ÷ 나누는 수를 먼저 쓰세요.", "전체 수, 나누는 수, 결과를 ÷와 =로 연결하세요."],
       "sourceText": "문제 원문",
       "confidence": 0.98,

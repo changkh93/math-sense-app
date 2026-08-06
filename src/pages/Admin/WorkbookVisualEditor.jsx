@@ -729,19 +729,31 @@ const WorkbookVisualEditor = ({
                  )}
 
                  {WORKBOOK_GRADABLE_TYPES.has(selectedElement.type) && (
-                   <label style={{ display: 'grid', gap: '0.4rem', color: 'var(--text-muted)' }}>
-                     단계별 힌트 (쉬운 단서 → 구체적인 단서, 줄바꿈으로 구분, 최대 3개)
-                     <textarea
-                       value={(selectedElement.hints?.length ? selectedElement.hints : (selectedElement.hint ? [selectedElement.hint] : [])).join('\n')}
-                       onChange={(event) => {
-                         const hints = event.target.value.split('\n').map(value => value.trim()).filter(Boolean).slice(0, 3);
-                         updateSelectedElement({ hints, hint: hints[0] || '' });
-                       }}
-                       placeholder={'1단계: 문제에서 알고 있는 것을 찾아보세요.\n2단계: 식의 순서를 생각해 보세요.\n3단계: 사용할 수와 기호를 확인해 보세요.'}
-                       style={{ minHeight: '110px', padding: '0.7rem', background: '#071224', color: 'white', border: '1px solid rgba(245,158,11,0.5)', borderRadius: '5px' }}
-                     />
-                     <small style={{ color: '#fcd34d', lineHeight: 1.45 }}>첫 오답에는 1단계, 같은 문제를 다시 틀리면 다음 단계가 제공됩니다. 기존 워크북 평균이 낮은 학생에게는 더 구체적인 단계를 제공합니다.</small>
-                   </label>
+                   <div style={{ display: 'grid', gap: '0.8rem', padding: '0.85rem', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '8px', background: 'rgba(245,158,11,0.05)' }}>
+                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 0.7fr) minmax(160px, 1.3fr)', gap: '0.6rem' }}>
+                       <label style={{ display: 'grid', gap: '0.35rem', color: 'var(--text-muted)' }}>
+                         교재 문제 번호
+                         <input value={selectedElement.problemLabel || ''} onChange={(event) => updateSelectedElement({ problemLabel: event.target.value })} placeholder="예: (2)" style={{ padding: '0.65rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }} />
+                       </label>
+                       <label style={{ display: 'grid', gap: '0.35rem', color: 'var(--text-muted)' }}>
+                         답안 구분
+                         <input value={selectedElement.responseLabel || ''} onChange={(event) => updateSelectedElement({ responseLabel: event.target.value })} placeholder="예: 전체를 구하는 식 / 나눗셈식" style={{ padding: '0.65rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }} />
+                       </label>
+                     </div>
+                     <label style={{ display: 'grid', gap: '0.4rem', color: 'var(--text-muted)' }}>
+                       단계별 힌트 (쉬운 단서 → 구체적인 단서, 줄바꿈으로 구분, 최대 3개)
+                       <textarea
+                         value={(selectedElement.hints?.length ? selectedElement.hints : (selectedElement.hint ? [selectedElement.hint] : [])).join('\n')}
+                         onChange={(event) => {
+                           const hints = event.target.value.split('\n').map(value => value.trim()).filter(Boolean).slice(0, 3);
+                           updateSelectedElement({ hints, hint: hints[0] || '' });
+                         }}
+                         placeholder={'1단계: 문제에서 알고 있는 것을 찾아보세요.\n2단계: 식의 순서를 생각해 보세요.\n3단계: 사용할 수와 기호를 확인해 보세요.'}
+                         style={{ minHeight: '110px', padding: '0.7rem', background: '#071224', color: 'white', border: '1px solid rgba(245,158,11,0.5)', borderRadius: '5px' }}
+                       />
+                       <small style={{ color: '#fcd34d', lineHeight: 1.45 }}>교재 번호와 답안 구분은 학생 힌트에 표시됩니다. 비어 있으면 요소 ID와 문제 원문에서 자동 추론합니다.</small>
+                     </label>
+                   </div>
                  )}
 
                  {(selectedElement.sourceText || selectedElement.confidence !== undefined) && (

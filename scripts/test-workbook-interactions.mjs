@@ -4,6 +4,7 @@ import {
   getAdaptiveWorkbookHint,
   getAdaptiveWorkbookHintState,
   getDefaultInteractionConfig,
+  getWorkbookElementReference,
   normalizeInteractionConfig,
   recommendWorkbookInteraction,
 } from '../src/utils/workbookInteractionUtils.js';
@@ -36,6 +37,19 @@ const legacyHintState = getAdaptiveWorkbookHintState({ type: 'input', hint: '기
 assert.equal(legacyHintState.level, 1);
 assert.equal(legacyHintState.total, 2);
 assert.equal(getAdaptiveWorkbookHint({ type: 'input', hint: '기존 단일 힌트' }, {}, 2), '기존 단일 힌트');
+
+assert.deepEqual(
+  getWorkbookElementReference({ id: 'el_page_123_q2_total' }),
+  { problemLabel: '(2)', responseLabel: '전체를 구하는 식', displayLabel: '교재 (2)번 · 전체를 구하는 식' }
+);
+assert.equal(
+  getWorkbookElementReference({ id: 'el_page_123_q4_division' }).displayLabel,
+  '교재 (4)번 · 나눗셈식'
+);
+assert.equal(
+  getWorkbookElementReference({ problemLabel: '6', responseLabel: '짧은 답' }).displayLabel,
+  '교재 (6)번 · 짧은 답'
+);
 
 assert.throws(() => normalizeInteractionConfig('number-line', { min: 0, max: 100, step: 1, answer: 50 }), /최대 31개/);
 
