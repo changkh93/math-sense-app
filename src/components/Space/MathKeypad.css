@@ -121,6 +121,15 @@
   gap: 10px;
 }
 
+.keypad-layout.expression-layout {
+  grid-template-areas:
+    "clear backspace percent divide"
+    "seven eight nine multiply"
+    "four five six subtract"
+    "one two three add"
+    "equal zero decimal submit";
+}
+
 .key-btn {
   width: 46px;
   height: 46px;
@@ -211,6 +220,14 @@
   .keypad-layout {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 5px;
+  }
+
+  .keypad-layout.expression-layout {
+    grid-template-areas:
+      "clear backspace percent divide multiply"
+      "seven eight nine subtract add"
+      "four five six decimal equal"
+      "one two three zero submit";
   }
 
   .key-btn {
