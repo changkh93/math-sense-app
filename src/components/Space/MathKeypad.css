@@ -34,6 +34,42 @@
   cursor: grabbing;
 }
 
+.math-keypad-container.workbook-choice-modal {
+  width: min(620px, calc(100vw - 40px));
+  max-height: min(80vh, 720px);
+  padding: 1.5rem;
+  gap: 0.9rem;
+  overflow-y: auto;
+  border-radius: 28px;
+  cursor: default;
+  touch-action: manipulation;
+}
+
+.workbook-choice-title {
+  margin: 0 0 0.55rem;
+  color: var(--crystal-cyan);
+  font-size: 1.45rem;
+  text-align: center;
+}
+
+.workbook-choice-options {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.workbook-choice-option {
+  width: 100%;
+  min-height: 64px;
+}
+
+.workbook-choice-close {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin: 0.45rem auto 0;
+}
+
 .keypad-header {
   display: flex;
   justify-content: space-between;
@@ -193,6 +229,35 @@
     gap: 0.35rem;
     cursor: default;
     touch-action: manipulation;
+  }
+
+  .math-keypad-container.workbook-choice-modal {
+    width: min(100%, 600px);
+    max-height: 82dvh;
+    padding: 0.85rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+    gap: 0.55rem;
+    border-radius: 18px 18px 0 0;
+    overflow-y: auto;
+  }
+
+  .workbook-choice-title {
+    margin-bottom: 0.25rem;
+    font-size: 1.05rem;
+  }
+
+  .workbook-choice-options {
+    gap: 0.5rem;
+  }
+
+  .workbook-choice-option {
+    min-height: 48px;
+    padding: 0.65rem !important;
+    font-size: 0.95rem !important;
+  }
+
+  .workbook-choice-close {
+    min-height: 44px;
+    margin-top: 0.25rem;
   }
 
   .keypad-header {

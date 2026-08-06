@@ -811,19 +811,19 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
             exit={{ opacity: 0 }}
           >
             <Motion.div
-              className="math-keypad-container"
+              className="math-keypad-container workbook-choice-modal"
               initial={{ y: '20px', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '20px', opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="font-title" style={{ color: 'var(--crystal-cyan)', textAlign: 'center', marginBottom: '1.5rem', fontSize: '1.5rem' }}>정답을 선택하세요</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', maxWidth: '400px', margin: '0 auto' }}>
+              <h3 className="font-title workbook-choice-title">정답을 선택하세요</h3>
+              <div className="workbook-choice-options">
                 {(shuffledOptionsMap[activeInputId] || activeElement.options || []).map((opt, idx) => (
                   <button
                     key={idx}
-                    className="glass-card"
+                    className="glass-card workbook-choice-option"
                     style={{
                       padding: '1rem', textAlign: 'center', fontSize: '1.2rem', color: 'white', fontWeight: 'bold',
                       border: answers[activeInputId] === opt ? '2px solid var(--neon-blue)' : '1px solid rgba(255,255,255,0.1)',
@@ -843,9 +843,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                 ))}
               </div>
               <button 
-                className="hud-btn secondary" 
+                className="hud-btn secondary workbook-choice-close"
                 onClick={() => setActiveInputId(null)}
-                style={{ width: '100%', maxWidth: '400px', margin: '1.5rem auto 0', display: 'block' }}
               >
                 닫기
               </button>
