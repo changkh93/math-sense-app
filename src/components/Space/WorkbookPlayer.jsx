@@ -11,6 +11,7 @@ import { parseInlineFormatting } from '../../utils/formatUtils';
 import { auth, db } from '../../firebase';
 import { areElementaryAnswersEquivalent, splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
 import { shuffleWorkbookOptions } from '../../utils/workbookOptionUtils';
+import { resolveWorkbookInputMode } from '../../utils/workbookInputModeUtils';
 import {
   WORKBOOK_GRADABLE_TYPES,
   WORKBOOK_INTERACTION_TYPES,
@@ -653,6 +654,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                 const elemStatus = checkedElements[el.id];
                 const isActive = activeInputId === el.id;
                 const val = answers[el.id] || '';
+                const resolvedInputMode = resolveWorkbookInputMode(el);
                 
                 return (
                   <div
@@ -676,7 +678,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                         else delete inputRefs.current[el.id];
                       }}
                       type="text"
-                      inputMode={el.inputMode === 'integer' ? 'numeric' : ['decimal', 'fraction', 'mixed-number'].includes(el.inputMode) ? 'decimal' : 'text'}
+                      inputMode={resolvedInputMode === 'integer' ? 'numeric' : ['decimal', 'fraction', 'mixed-number'].includes(resolvedInputMode) ? 'decimal' : 'text'}
                       className="wb-native-input"
                       value={val}
                       readOnly={inputMode === 'math'}
@@ -693,7 +695,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       }}
                     />
                     {inputMode === 'math' && val && (
-                      <WorkbookAnswerDisplay value={val} inputMode={el.inputMode || 'integer'} />
+                      <WorkbookAnswerDisplay value={val} inputMode={resolvedInputMode} />
                     )}
                     {elemStatus?.isChecked && (
                       <WorkbookGradeMark isCorrect={elemStatus.isCorrect} />
@@ -976,7 +978,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
               soundManager.playClick();
             }}
             indicatorText={activeElement?.answer?.includes('/') ? '분수/수식 입력' : '정답 입력'}
-            inputMode={activeElement?.inputMode || 'expression'}
+            inputMode={resolveWorkbookInputMode(activeElement)}
             visible={showKeypad}
             onClose={() => {
               setShowKeypad(false);

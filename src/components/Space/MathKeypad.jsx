@@ -3,6 +3,11 @@ import { createPortal } from 'react-dom';
 import { motion as Motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
+import {
+  getMathKeypadOperatorKeys,
+  MATH_KEYPAD_GRID_AREAS,
+  MATH_KEYPAD_NUMBER_KEYS,
+} from '../../utils/workbookInputModeUtils';
 import './MathKeypad.css';
 
 const MathAnswerPreview = ({ value, inputMode }) => {
@@ -37,44 +42,10 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'exp
     onChange?.('');
   };
 
-  const operatorKeys = inputMode === 'fraction'
-    ? [{ value: '/', label: '분수선' }, { value: '-', label: '−' }]
-    : inputMode === 'mixed-number'
-      ? [{ value: ' ', label: '대분수 칸' }, { value: '/', label: '분수선' }, { value: '-', label: '−' }]
-      : inputMode === 'decimal'
-        ? [{ value: '.', label: '.' }, { value: '-', label: '−' }]
-        : inputMode === 'integer'
-          ? [{ value: '-', label: '−' }]
-          : [
-              { value: '÷', label: '÷' },
-              { value: '×', label: '×' },
-              { value: '-', label: '−' },
-              { value: '+', label: '+' },
-              { value: '.', label: '.' },
-              { value: '%', label: '%' },
-              { value: '=', label: '=' },
-            ];
-  const numberKeys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0'];
-  const expressionGridAreas = {
-    '÷': 'divide',
-    '×': 'multiply',
-    '-': 'subtract',
-    '+': 'add',
-    '.': 'decimal',
-    '%': 'percent',
-    '=': 'equal',
-    '7': 'seven',
-    '8': 'eight',
-    '9': 'nine',
-    '4': 'four',
-    '5': 'five',
-    '6': 'six',
-    '1': 'one',
-    '2': 'two',
-    '3': 'three',
-    '0': 'zero',
-  };
-  const expressionArea = (key) => inputMode === 'expression' ? { gridArea: expressionGridAreas[key] } : undefined;
+  const operatorKeys = getMathKeypadOperatorKeys(inputMode);
+  const keypadArea = (key) => MATH_KEYPAD_GRID_AREAS[key]
+    ? { gridArea: MATH_KEYPAD_GRID_AREAS[key] }
+    : undefined;
 
   const keypad = (
     <div className="math-keypad-overlay">
@@ -111,20 +82,20 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'exp
         </div>
 
         {/* Problem-specific keypad */}
-        <div className={`keypad-layout ${inputMode === 'expression' ? 'expression-layout' : ''}`}>
-          <button className="key-btn util-btn" style={inputMode === 'expression' ? { gridArea: 'clear' } : undefined} onPointerDown={(e) => e.stopPropagation()} onClick={clearAll}>AC</button>
-          <button className="key-btn util-btn" style={inputMode === 'expression' ? { gridArea: 'backspace' } : undefined} aria-label="한 글자 지우기" onPointerDown={(e) => e.stopPropagation()} onClick={handleDelete}>⌫</button>
+        <div className="keypad-layout stable-layout">
+          <button className="key-btn util-btn" style={{ gridArea: 'clear' }} onPointerDown={(e) => e.stopPropagation()} onClick={clearAll}>AC</button>
+          <button className="key-btn util-btn" style={{ gridArea: 'backspace' }} aria-label="한 글자 지우기" onPointerDown={(e) => e.stopPropagation()} onClick={handleDelete}>⌫</button>
           {operatorKeys.map((key) => (
-            <button key={`${key.value}-${key.label}`} className="key-btn op-btn" style={expressionArea(key.value)} onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key.value)}>
+            <button key={`${key.value}-${key.label}`} className="key-btn op-btn" style={keypadArea(key.value)} onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key.value)}>
               {key.label}
             </button>
           ))}
-          {numberKeys.map((key) => (
-            <button key={key} className="key-btn num-btn" style={expressionArea(key)} onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key)}>
+          {MATH_KEYPAD_NUMBER_KEYS.map((key) => (
+            <button key={key} className="key-btn num-btn" style={keypadArea(key)} onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key)}>
               {key}
             </button>
           ))}
-          <button className="key-btn op-btn submit-btn" style={inputMode === 'expression' ? { gridArea: 'submit' } : undefined} aria-label="입력 완료" onPointerDown={(e) => e.stopPropagation()} onClick={onSubmit}>
+          <button className="key-btn op-btn submit-btn" style={{ gridArea: 'submit' }} aria-label="입력 완료" onPointerDown={(e) => e.stopPropagation()} onClick={onSubmit}>
             ✓
           </button>
         </div>
