@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { BlockMath } from 'react-katex';
 import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import soundManager from '../../utils/SoundManager';
 import MathKeypad from './MathKeypad';
 import WorkbookInteraction from './WorkbookInteraction';
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { createParticleBurst, shakeScreen } from './ParticleEffects';
-import { parseInlineFormatting } from '../../utils/formatUtils';
+import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { auth, db } from '../../firebase';
 import { areElementaryAnswersEquivalent, splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
 import { shuffleWorkbookOptions } from '../../utils/workbookOptionUtils';
 import { resolveWorkbookInputMode } from '../../utils/workbookInputModeUtils';
+import { isWorkbookMathDisplayValue, normalizeWorkbookMathForKatex } from '../../utils/workbookMathDisplayUtils';
 import {
   WORKBOOK_GRADABLE_TYPES,
   WORKBOOK_INTERACTION_TYPES,
@@ -42,6 +44,22 @@ const WorkbookAnswerDisplay = ({ value, inputMode }) => {
         <span>{fraction.numerator || '□'}</span>
         <span>{fraction.denominator || '□'}</span>
       </span>
+    </span>
+  );
+};
+
+const WorkbookChoiceContent = ({ value, keyPrefix }) => {
+  if (!isWorkbookMathDisplayValue(value)) {
+    return parseInlineFormatting(value, { keyPrefix });
+  }
+
+  const math = sanitizeLaTeX(normalizeWorkbookMathForKatex(value));
+  return (
+    <span className="workbook-choice-math" aria-label={String(value)}>
+      <BlockMath
+        math={math}
+        renderError={() => <span className="workbook-choice-math-fallback">수식을 표시할 수 없습니다.</span>}
+      />
     </span>
   );
 };
@@ -757,7 +775,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                     }}
                   >
                     <span style={{ fontSize: '1rem', fontWeight: val ? 'bold' : 'normal', color: val ? '#111827' : '#667085', display: 'flex', alignItems: 'center', textShadow: 'none' }}>
-                      {val ? parseInlineFormatting(val) : '선택'}
+                      {val ? <WorkbookChoiceContent value={val} keyPrefix={`workbook-selected-${el.id}`} /> : '선택'}
                     </span>
                     {elemStatus?.isChecked && (
                       <WorkbookGradeMark isCorrect={elemStatus.isCorrect} />
@@ -950,7 +968,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       setActiveInputId(null);
                     }}
                   >
-                    {parseInlineFormatting(opt)}
+                    <WorkbookChoiceContent value={opt} keyPrefix={`workbook-option-${activeInputId}-${idx}`} />
                   </button>
                 ))}
               </div>

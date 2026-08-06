@@ -63,6 +63,38 @@
   min-height: 64px;
 }
 
+.workbook-choice-math {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  color: inherit;
+}
+
+.workbook-choice-math .katex-display {
+  margin: 0;
+}
+
+.workbook-choice-option .workbook-choice-math .katex {
+  font-size: 1.35em;
+}
+
+.wb-mc .workbook-choice-math .katex {
+  font-size: 1.05em;
+}
+
+.workbook-choice-math-fallback {
+  color: #f8fafc;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.wb-mc .workbook-choice-math-fallback {
+  color: #111827;
+}
+
 .workbook-choice-close {
   display: block;
   width: 100%;
@@ -253,6 +285,10 @@
     min-height: 48px;
     padding: 0.65rem !important;
     font-size: 0.95rem !important;
+  }
+
+  .workbook-choice-option .workbook-choice-math .katex {
+    font-size: 1.12em;
   }
 
   .workbook-choice-close {

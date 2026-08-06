@@ -24,6 +24,7 @@
     "test:workbook-draft": "node scripts/test-workbook-draft-utils.mjs",
     "test:workbook-interactions": "node scripts/test-workbook-interactions.mjs",
     "test:workbook-input-mode": "node scripts/test-workbook-input-mode.mjs",
+    "test:workbook-math-display": "node scripts/test-workbook-math-display.mjs",
     "test:elementary-math-answer": "node scripts/test-elementary-math-answer.mjs",
     "test:galaxy-terrain": "node scripts/test-galaxy-walk-surfaces.mjs",
     "test:galaxy-navigation": "node scripts/test-galaxy-navigation-safety.mjs",
