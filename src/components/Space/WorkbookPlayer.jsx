@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import soundManager from '../../utils/SoundManager';
@@ -801,8 +802,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       </div>
 
       {/* Option Selector for Multiple Choice */}
-      <AnimatePresence>
-        {activeInputId && activeElement?.type === 'multiple-choice' && !checkedPages[currentPageIndex] && (
+      {activeInputId && activeElement?.type === 'multiple-choice' && !checkedPages[currentPageIndex] && typeof document !== 'undefined' && createPortal(
           <Motion.div
             className="math-keypad-overlay"
             onClick={() => { setActiveInputId(null); setShowKeypad(false); }}
@@ -850,9 +850,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                 닫기
               </button>
             </Motion.div>
-          </Motion.div>
-        )}
-      </AnimatePresence>
+          </Motion.div>,
+          document.body,
+          'workbook-choice-modal'
+      )}
 
       {/* Virtual Keypad Modal Overlay */}
       <AnimatePresence>

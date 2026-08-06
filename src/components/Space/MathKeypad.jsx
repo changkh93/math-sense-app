@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion as Motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
@@ -75,7 +76,7 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'exp
   };
   const expressionArea = (key) => inputMode === 'expression' ? { gridArea: expressionGridAreas[key] } : undefined;
 
-  return (
+  const keypad = (
     <div className="math-keypad-overlay">
       <Motion.div 
         className="math-keypad-container"
@@ -130,6 +131,10 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'exp
       </Motion.div>
     </div>
   );
+
+  return typeof document === 'undefined'
+    ? keypad
+    : createPortal(keypad, document.body);
 };
 
 export default MathKeypad;

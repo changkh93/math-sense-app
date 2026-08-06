@@ -5,7 +5,8 @@
   width: 100vw;
   height: 100vh;
   z-index: 2500;
-  pointer-events: none; /* Let clicks pass through area outside keypad */
+  pointer-events: auto;
+  background: rgba(2, 6, 23, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
