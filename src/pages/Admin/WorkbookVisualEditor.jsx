@@ -12,6 +12,7 @@ import {
   parseWorkbookAnalysisJson
 } from '../../utils/workbookDraftUtils';
 import {
+  WORKBOOK_GRADABLE_TYPES,
   WORKBOOK_INTERACTION_TYPES,
   getDefaultInteractionConfig,
   normalizeInteractionConfig,
@@ -483,34 +484,6 @@ const WorkbookVisualEditor = ({
                 ))}
              </div>
 
-             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'end', marginBottom: '1rem', padding: '0.85rem', border: '1px solid rgba(34,211,238,0.2)', borderRadius: '8px', background: 'rgba(2,20,35,0.55)' }}>
-               <label style={{ display: 'grid', gap: '0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                 대상 학년군
-                 <select value={currentPage.learningDesign?.gradeBand || 'elementary-3-4'} onChange={(event) => {
-                   const updated = [...workbookPages];
-                   updated[currentPageIndex] = { ...currentPage, learningDesign: { ...(currentPage.learningDesign || {}), gradeBand: event.target.value, adaptiveHints: true } };
-                   setWorkbookPages(updated);
-                 }} style={{ padding: '0.55rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }}>
-                   <option value="elementary-1-2">초등 1~2학년</option>
-                   <option value="elementary-3-4">초등 3~4학년</option>
-                   <option value="elementary-5-6">초등 5~6학년</option>
-                 </select>
-               </label>
-               <label style={{ display: 'grid', gap: '0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                 기본 난이도
-                 <select value={currentPage.learningDesign?.difficulty || 'standard'} onChange={(event) => {
-                   const updated = [...workbookPages];
-                   updated[currentPageIndex] = { ...currentPage, learningDesign: { ...(currentPage.learningDesign || {}), difficulty: event.target.value, adaptiveHints: true } };
-                   setWorkbookPages(updated);
-                 }} style={{ padding: '0.55rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }}>
-                   <option value="easy">도움형</option>
-                   <option value="standard">표준</option>
-                   <option value="challenge">도전</option>
-                 </select>
-               </label>
-               <span style={{ color: '#a5f3fc', fontSize: '0.8rem' }}>학생의 기존 워크북 평균과 재시도 횟수에 따라 힌트 단계를 자동 조절합니다.</span>
-             </div>
-
              {/* Editor Canvas */}
              <div 
                ref={containerRef}
@@ -612,7 +585,7 @@ const WorkbookVisualEditor = ({
                      value={selectedElement.type} 
                      onChange={(e) => {
                        const type = e.target.value;
-                       updateSelectedElement({ type, ...(WORKBOOK_INTERACTION_TYPES.has(type) ? { config: getDefaultInteractionConfig(type), difficulty: currentPage.learningDesign?.difficulty || 'standard' } : {}) });
+                       updateSelectedElement({ type, ...(WORKBOOK_INTERACTION_TYPES.has(type) ? { config: getDefaultInteractionConfig(type) } : {}) });
                      }}
                      style={{ width: '100%', padding: '0.8rem', background: 'rgba(5, 10, 25, 0.8)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: '4px' }}
                    >
@@ -631,13 +604,13 @@ const WorkbookVisualEditor = ({
                    <label style={{ color: 'var(--text-muted)' }}>문제 지시문·AI 인식 원문</label>
                    <textarea value={selectedElement.sourceText || ''} onChange={(event) => updateSelectedElement({ sourceText: event.target.value })} placeholder="예: 구슬을 두 사람에게 똑같이 나누세요." style={{ minHeight: '72px', padding: '0.7rem', background: 'rgba(5,10,25,0.8)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }} />
                    <button type="button" className="outline-btn" onClick={() => {
-                     const recommendation = recommendWorkbookInteraction({ sourceText: selectedElement.sourceText, gradeBand: currentPage.learningDesign?.gradeBand, difficulty: currentPage.learningDesign?.difficulty });
+                     const recommendation = recommendWorkbookInteraction({ sourceText: selectedElement.sourceText });
                      if (!WORKBOOK_INTERACTION_TYPES.has(recommendation.type)) {
                        alert(`추천: 입력칸\n${recommendation.reason}`);
                        return;
                      }
                      if (!window.confirm(`${INTERACTION_LABELS[recommendation.type]} 요소로 바꾸시겠습니까?\n\n${recommendation.reason}`)) return;
-                     updateSelectedElement({ type: recommendation.type, config: getDefaultInteractionConfig(recommendation.type), difficulty: currentPage.learningDesign?.difficulty || 'standard', recommendationReason: recommendation.reason });
+                     updateSelectedElement({ type: recommendation.type, config: getDefaultInteractionConfig(recommendation.type), recommendationReason: recommendation.reason });
                    }}>지시문 기반 상호작용 추천</button>
                  </div>
 
@@ -733,18 +706,6 @@ const WorkbookVisualEditor = ({
                    </div>
                  ) : WORKBOOK_INTERACTION_TYPES.has(selectedElement.type) ? (
                    <div style={{ display: 'grid', gap: '0.9rem' }}>
-                     <label style={{ display: 'grid', gap: '0.4rem', color: 'var(--text-muted)' }}>
-                       요소 난이도
-                       <select value={selectedElement.difficulty || currentPage.learningDesign?.difficulty || 'standard'} onChange={(event) => updateSelectedElement({ difficulty: event.target.value })} style={{ padding: '0.7rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }}>
-                         <option value="easy">도움형</option>
-                         <option value="standard">표준</option>
-                         <option value="challenge">도전</option>
-                       </select>
-                     </label>
-                     <label style={{ display: 'grid', gap: '0.4rem', color: 'var(--text-muted)' }}>
-                       단계별 힌트 (줄바꿈으로 구분, 최대 3개)
-                       <textarea value={(selectedElement.hints || []).join('\n')} onChange={(event) => updateSelectedElement({ hints: event.target.value.split('\n').map(value => value.trim()).filter(Boolean).slice(0, 3) })} style={{ minHeight: '90px', padding: '0.7rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }} />
-                     </label>
                      <InteractionConfigEditor key={`${selectedElement.id}-${selectedElement.type}`} element={selectedElement} onUpdate={updateSelectedElement} />
                      {selectedElement.recommendationReason && <small style={{ color: '#a5f3fc' }}>추천 근거: {selectedElement.recommendationReason}</small>}
                    </div>
@@ -765,6 +726,22 @@ const WorkbookVisualEditor = ({
                        선택한 입력칸이 정답 처리될 때 이 마스크가 화면을 덮습니다. X표를 가리거나 정답 효과를 줄 때 사용하세요.
                      </div>
                    </div>
+                 )}
+
+                 {WORKBOOK_GRADABLE_TYPES.has(selectedElement.type) && (
+                   <label style={{ display: 'grid', gap: '0.4rem', color: 'var(--text-muted)' }}>
+                     단계별 힌트 (쉬운 단서 → 구체적인 단서, 줄바꿈으로 구분, 최대 3개)
+                     <textarea
+                       value={(selectedElement.hints?.length ? selectedElement.hints : (selectedElement.hint ? [selectedElement.hint] : [])).join('\n')}
+                       onChange={(event) => {
+                         const hints = event.target.value.split('\n').map(value => value.trim()).filter(Boolean).slice(0, 3);
+                         updateSelectedElement({ hints, hint: hints[0] || '' });
+                       }}
+                       placeholder={'1단계: 문제에서 알고 있는 것을 찾아보세요.\n2단계: 식의 순서를 생각해 보세요.\n3단계: 사용할 수와 기호를 확인해 보세요.'}
+                       style={{ minHeight: '110px', padding: '0.7rem', background: '#071224', color: 'white', border: '1px solid rgba(245,158,11,0.5)', borderRadius: '5px' }}
+                     />
+                     <small style={{ color: '#fcd34d', lineHeight: 1.45 }}>첫 오답에는 1단계, 같은 문제를 다시 틀리면 다음 단계가 제공됩니다. 기존 워크북 평균이 낮은 학생에게는 더 구체적인 단계를 제공합니다.</small>
+                   </label>
                  )}
 
                  {(selectedElement.sourceText || selectedElement.confidence !== undefined) && (

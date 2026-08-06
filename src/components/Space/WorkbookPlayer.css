@@ -380,6 +380,61 @@
   line-height: 1.45;
 }
 
+.workbook-learning-help {
+  flex: 0 0 auto;
+  max-height: min(28dvh, 220px);
+  overflow-y: auto;
+  padding: 0.55rem 0.8rem;
+  border-top: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(45, 28, 5, 0.96);
+  color: #fef3c7;
+  z-index: 12;
+}
+
+.workbook-learning-help-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  margin-bottom: 0.4rem;
+  color: #fcd34d;
+  font-weight: 900;
+}
+
+.workbook-learning-help-title small {
+  color: #fde68a;
+  font-weight: 600;
+}
+
+.workbook-learning-help-list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.workbook-learning-help-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.workbook-learning-help-item button {
+  flex: 0 0 auto;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.workbook-learning-help-item p {
+  margin: 0;
+  color: #fff7ed;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 /* Mask boxes */
 .wb-mask {
   background: #ffffff; /* White to cover underlying content */
@@ -522,6 +577,21 @@
     min-height: 56px;
     padding: 0.3rem 0.4rem;
     gap: 0.4rem;
+  }
+
+  .workbook-learning-help {
+    max-height: min(30dvh, 190px);
+    padding: 0.45rem 0.55rem;
+  }
+
+  .workbook-learning-help-title {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .workbook-learning-help-item {
+    display: grid;
+    gap: 0.25rem;
   }
 
   .workbook-footer-main {

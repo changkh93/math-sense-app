@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   evaluateWorkbookInteraction,
   getAdaptiveWorkbookHint,
+  getAdaptiveWorkbookHintState,
   getDefaultInteractionConfig,
   normalizeInteractionConfig,
   recommendWorkbookInteraction,
@@ -23,9 +24,18 @@ assert.equal(recommendWorkbookInteraction({ sourceText: '같은 값끼리 연결
 assert.equal(recommendWorkbookInteraction({ sourceText: '작은 수부터 순서대로 놓으세요.' }).type, 'ordering');
 assert.equal(recommendWorkbookInteraction({ sourceText: '알맞은 부분을 색칠하세요.' }).type, 'coloring');
 
-const adaptiveElement = { type: 'grouping', hints: ['가벼운 힌트', '구체적인 힌트'] };
-assert.equal(getAdaptiveWorkbookHint(adaptiveElement, { workbookAverageScore: 90 }, 0), '가벼운 힌트');
-assert.equal(getAdaptiveWorkbookHint(adaptiveElement, { workbookAverageScore: 50 }, 0), '구체적인 힌트');
+const adaptiveElement = { type: 'grouping', hints: ['1단계 힌트', '2단계 힌트', '3단계 힌트'] };
+assert.equal(getAdaptiveWorkbookHint(adaptiveElement, { workbookAverageScore: 90 }, 1), '1단계 힌트');
+assert.equal(getAdaptiveWorkbookHint(adaptiveElement, { workbookAverageScore: 90 }, 2), '2단계 힌트');
+assert.equal(getAdaptiveWorkbookHint(adaptiveElement, { workbookAverageScore: 90 }, 3), '3단계 힌트');
+assert.deepEqual(
+  getAdaptiveWorkbookHintState(adaptiveElement, { workbookAverageScore: 50 }, 1),
+  { text: '2단계 힌트', level: 2, total: 3 }
+);
+const legacyHintState = getAdaptiveWorkbookHintState({ type: 'input', hint: '기존 단일 힌트' }, {}, 1);
+assert.equal(legacyHintState.level, 1);
+assert.equal(legacyHintState.total, 2);
+assert.equal(getAdaptiveWorkbookHint({ type: 'input', hint: '기존 단일 힌트' }, {}, 2), '기존 단일 힌트');
 
 assert.throws(() => normalizeInteractionConfig('number-line', { min: 0, max: 100, step: 1, answer: 50 }), /최대 31개/);
 

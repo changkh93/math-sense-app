@@ -16,6 +16,14 @@ const SUPPORTED_INPUT_MODES = new Set([
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+const normalizeHints = (rawElement) => {
+  const stagedHints = Array.isArray(rawElement?.hints)
+    ? rawElement.hints.map(value => String(value || '').trim()).filter(Boolean).slice(0, 3)
+    : [];
+  const legacyHint = String(rawElement?.hint || '').trim();
+  return stagedHints.length ? stagedHints : (legacyHint ? [legacyHint] : []);
+};
+
 const cleanIdPart = (value, fallback) => {
   const cleaned = String(value || '')
     .trim()
@@ -122,6 +130,7 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
     }
 
     const clientKey = cleanIdPart(rawElement.clientKey, `item_${index + 1}`);
+    const hints = normalizeHints(rawElement);
     const base = {
       id: clientKeyToId.get(clientKey),
       type,
@@ -141,13 +150,9 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
 
     if (WORKBOOK_INTERACTION_TYPES.has(type)) {
       const config = normalizeInteractionConfig(type, rawElement.config);
-      const hints = Array.isArray(rawElement.hints)
-        ? rawElement.hints.map(value => String(value || '').trim()).filter(Boolean).slice(0, 3)
-        : [];
       return {
         ...base,
         config,
-        difficulty: ['easy', 'standard', 'challenge'].includes(rawElement.difficulty) ? rawElement.difficulty : 'standard',
         ...(hints.length ? { hints } : {}),
         ...(String(rawElement.recommendationReason || '').trim()
           ? { recommendationReason: String(rawElement.recommendationReason).trim().slice(0, 300) }
@@ -168,7 +173,7 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
       if (!options.includes(answer)) {
         throw new Error(`${index + 1}번째 객관식 answer는 options 중 하나와 정확히 일치해야 합니다.`);
       }
-      return { ...base, answer, options };
+      return { ...base, answer, options, ...(hints.length ? { hints } : {}) };
     }
 
     const requestedMode = String(rawElement.inputMode || 'integer').trim();
@@ -181,7 +186,7 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
       ...base,
       answer,
       inputMode,
-      ...(String(rawElement.hint || '').trim() ? { hint: String(rawElement.hint).trim() } : {}),
+      ...(hints.length ? { hints, hint: hints[0] } : {}),
       ...(acceptedAnswers.length ? { acceptedAnswers } : {}),
       ...(rawElement.answerSpec && typeof rawElement.answerSpec === 'object'
         ? { answerSpec: rawElement.answerSpec }
@@ -194,17 +199,7 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
     unitId: unitId || payload.unitId || '',
     pageId: pageId || payload.pageId || '',
     analysis: payload.analysis && typeof payload.analysis === 'object' ? payload.analysis : {},
-    learningDesign: payload.learningDesign && typeof payload.learningDesign === 'object'
-      ? {
-          gradeBand: ['elementary-1-2', 'elementary-3-4', 'elementary-5-6'].includes(payload.learningDesign.gradeBand)
-            ? payload.learningDesign.gradeBand
-            : 'elementary-3-4',
-          difficulty: ['easy', 'standard', 'challenge'].includes(payload.learningDesign.difficulty)
-            ? payload.learningDesign.difficulty
-            : 'standard',
-          adaptiveHints: payload.learningDesign.adaptiveHints !== false,
-        }
-      : { gradeBand: 'elementary-3-4', difficulty: 'standard', adaptiveHints: true },
+    learningDesign: { adaptiveHints: payload.learningDesign?.adaptiveHints !== false },
     elements
   };
 };
@@ -309,7 +304,7 @@ export const buildWorkbookDraftPrompt = ({ unitId, unitTitle, page, pageIndex = 
 - 단순히 재미를 위해 인터랙션을 넣지 말고 문제 행동이 나누기·위치·연결·순서·색칠일 때만 해당 type을 사용하세요.
 - grouping/matching/ordering/coloring의 config 안에서는 표시 문구와 별개인 짧고 고유한 id를 사용하세요.
 - 조작 요소는 작은 답안 밑줄이 아니라 문제 활동 전체를 포함하도록 position을 충분히 크게 잡으세요.
-- 학년군과 난이도를 learningDesign에 기록하고, 요소마다 쉬운 힌트부터 구체적인 힌트까지 hints를 최대 3개 작성하세요.
+- 모든 채점 요소(input, multiple-choice, grouping, number-line, matching, ordering, coloring)에 hints를 1~3개 작성하세요. 1단계는 정답을 노출하지 않는 쉬운 단서, 뒷단계일수록 구체적인 풀이 단서여야 합니다.
 
 [inputMode]
 integer | decimal | fraction | mixed-number | expression | text
@@ -327,11 +322,6 @@ integer | decimal | fraction | mixed-number | expression | text
   "schemaVersion": 2,
   "unitId": "${unitId}",
   "pageId": "${page.id}",
-  "learningDesign": {
-    "gradeBand": "${page.learningDesign?.gradeBand || 'elementary-3-4'}",
-    "difficulty": "${page.learningDesign?.difficulty || 'standard'}",
-    "adaptiveHints": true
-  },
   "analysis": {
     "summary": "페이지 구조와 문제 유형 요약",
     "warnings": ["운영자가 확인할 사항"]
@@ -344,7 +334,7 @@ integer | decimal | fraction | mixed-number | expression | text
       "answer": "18÷2",
       "acceptedAnswers": [],
       "answerSpec": { "kind": "literal-expression" },
-      "hint": "구슬의 수와 사람 수를 나눗셈 기호로 연결해 보세요.",
+      "hints": ["구슬의 수와 사람 수를 찾아보세요.", "전체 수 다음에 ÷를 쓰고 사람 수를 연결해 보세요.", "전체 구슬 수 ÷ 사람 수의 형태로 쓰되 결과는 쓰지 않아요."],
       "sourceText": "구슬 18개를 2사람에게 똑같이 나누세요.",
       "confidence": 0.98,
       "position": { "top": 38.2, "left": 22.1, "width": 13.5, "height": 4.2 }
@@ -354,7 +344,6 @@ integer | decimal | fraction | mixed-number | expression | text
       "type": "grouping",
       "sourceText": "구슬을 두 사람에게 똑같이 나누세요.",
       "confidence": 0.95,
-      "difficulty": "easy",
       "hints": ["구슬을 한 개씩 번갈아 옮겨 보세요.", "두 그룹의 구슬 수가 같은지 세어 보세요."],
       "recommendationReason": "똑같이 나누는 행동을 직접 조작하도록 grouping을 선택했습니다.",
       "position": { "top": 50, "left": 10, "width": 80, "height": 25 },
@@ -421,13 +410,16 @@ ${pageInventory}
 - mask(triggerKey로 같은 페이지 clientKey 연결)
 - grouping, number-line, matching, ordering, coloring
 
+[힌트 작성 규칙]
+- 모든 채점 요소에 hints 배열을 1~3개 작성하세요.
+- 첫 힌트는 관찰·개념 단서, 다음 힌트는 식의 순서·풀이 단서, 마지막 힌트는 정답을 직접 말하지 않는 가장 구체적인 단서로 작성하세요.
+
 [페이지별 JSON 규격]
 각 페이지마다 다음 구조의 독립 JSON 파일을 만드세요.
 {
   "schemaVersion": 2,
   "unitId": "${unitId}",
   "pageId": "해당 pageId",
-  "learningDesign": { "gradeBand": "elementary-3-4", "difficulty": "standard", "adaptiveHints": true },
   "analysis": { "summary": "페이지 문제 유형 요약", "warnings": [] },
   "elements": [
     {
@@ -437,7 +429,7 @@ ${pageInventory}
       "answer": "15÷3=5",
       "acceptedAnswers": [],
       "answerSpec": { "kind": "literal-expression" },
-      "hint": "전체 수, 나누는 사람 수, 한 사람이 갖는 수를 ÷와 =로 연결하세요.",
+      "hints": ["전체 수와 나누는 사람 수를 찾아보세요.", "전체 수 ÷ 사람 수를 먼저 쓰세요.", "전체 수, 나누는 사람 수, 한 사람이 갖는 수를 ÷와 =로 연결하세요."],
       "sourceText": "문제 원문",
       "confidence": 0.98,
       "position": { "top": 30, "left": 35, "width": 30, "height": 5 }
@@ -489,13 +481,16 @@ export const buildWorkbookChapterDraftPrompt = ({ chapterId }) => {
 - mask(triggerKey로 같은 페이지 clientKey 연결)
 - grouping, number-line, matching, ordering, coloring
 
+[힌트 작성 규칙]
+- 모든 채점 요소에 hints 배열을 1~3개 작성하세요.
+- 쉬운 관찰 단서부터 정답을 직접 노출하지 않는 구체적인 풀이 단서 순서로 작성하세요.
+
 [페이지별 JSON]
 manifest의 이미지 페이지마다 아래 구조로 /private/tmp/workbook-draft-<safeUnitId>-<pageId>.json 파일을 만드세요.
 {
   "schemaVersion": 2,
   "unitId": "manifest의 해당 unitId",
   "pageId": "manifest의 해당 pageId",
-  "learningDesign": { "gradeBand": "elementary-3-4", "difficulty": "standard", "adaptiveHints": true },
   "analysis": { "summary": "페이지 문제 유형 요약", "warnings": [] },
   "elements": [
     {
@@ -505,7 +500,7 @@ manifest의 이미지 페이지마다 아래 구조로 /private/tmp/workbook-dra
       "answer": "15÷3=5",
       "acceptedAnswers": [],
       "answerSpec": { "kind": "literal-expression" },
-      "hint": "전체 수, 나누는 수, 결과를 ÷와 =로 연결하세요.",
+      "hints": ["전체 수와 나누는 수를 찾아보세요.", "전체 수 ÷ 나누는 수를 먼저 쓰세요.", "전체 수, 나누는 수, 결과를 ÷와 =로 연결하세요."],
       "sourceText": "문제 원문",
       "confidence": 0.98,
       "position": { "top": 30, "left": 35, "width": 30, "height": 5 }

@@ -165,7 +165,7 @@ export const getInitialWorkbookInteractionResponse = (element) => {
   return '';
 };
 
-export const recommendWorkbookInteraction = ({ sourceText = '', gradeBand = 'elementary-3-4', difficulty = 'standard' } = {}) => {
+export const recommendWorkbookInteraction = ({ sourceText = '' } = {}) => {
   const text = String(sourceText).replace(/\s+/g, ' ');
   let type = 'input';
   let reason = '짧은 답을 직접 쓰는 문제가 가장 적합합니다.';
@@ -180,20 +180,25 @@ export const recommendWorkbookInteraction = ({ sourceText = '', gradeBand = 'ele
   } else if (/(똑같이 나누|묶|분류|모둠|그룹)/.test(text)) {
     type = 'grouping'; reason = '대상을 나누거나 묶는 조작 활동으로 판단했습니다.';
   }
-  const hintLevel = difficulty === 'challenge' ? 'minimal'
-    : gradeBand === 'elementary-1-2' || difficulty === 'easy' ? 'guided' : 'standard';
-  return { type, reason, hintLevel };
+  return { type, reason };
 };
 
-export const getAdaptiveWorkbookHint = (element, studentProfile = {}, retryCount = 0) => {
-  const hints = Array.isArray(element?.hints) ? element.hints.filter(Boolean) : [];
-  const averageScore = Number(studentProfile.workbookAverageScore ?? studentProfile.averageScore ?? 70);
-  const needsSupport = averageScore < 70 || retryCount >= 2;
+export const getAdaptiveWorkbookHintState = (element, studentProfile = {}, wrongAttemptCount = 1) => {
+  const stagedHints = Array.isArray(element?.hints) ? element.hints.filter(Boolean) : [];
+  const suppliedHints = stagedHints.length ? stagedHints : (element?.hint ? [element.hint] : []);
+  const openingHint = element?.type === 'multiple-choice'
+    ? '각 선택지가 문제의 조건과 맞는지 하나씩 비교해 보세요.'
+    : '문제에서 알고 있는 수와 구하려는 것을 먼저 찾아보세요.';
+  const hints = suppliedHints.length === 1 && suppliedHints[0] !== openingHint
+    ? [openingHint, suppliedHints[0]]
+    : suppliedHints;
+  const averageScore = Number(studentProfile.workbookAverageScore ?? 70);
   if (hints.length) {
-    const index = needsSupport ? hints.length - 1 : Math.min(retryCount, hints.length - 1);
-    return hints[index];
+    const attemptIndex = Math.max(0, Number(wrongAttemptCount || 1) - 1);
+    const supportOffset = averageScore < 70 && hints.length >= 3 ? 1 : 0;
+    const index = Math.min(attemptIndex + supportOffset, hints.length - 1);
+    return { text: hints[index], level: index + 1, total: hints.length };
   }
-  if (element?.hint) return element.hint;
   const generic = {
     grouping: '한 항목씩 옮긴 뒤 각 그룹의 개수가 조건에 맞는지 세어 보세요.',
     'number-line': '시작 수에서 눈금 한 칸의 크기만큼 차례로 이동해 보세요.',
@@ -201,5 +206,13 @@ export const getAdaptiveWorkbookHint = (element, studentProfile = {}, retryCount
     ordering: '가장 작거나 가장 큰 항목을 먼저 찾은 뒤 양옆 화살표로 옮겨 보세요.',
     coloring: '조건에 해당하는 칸과 사용할 색을 하나씩 다시 확인해 보세요.',
   };
-  return generic[element?.type] || '문제의 조건과 선택한 답을 차례로 다시 확인해 보세요.';
+  return {
+    text: generic[element?.type] || '문제의 조건과 선택한 답을 차례로 다시 확인해 보세요.',
+    level: 1,
+    total: 1,
+  };
 };
+
+export const getAdaptiveWorkbookHint = (element, studentProfile = {}, wrongAttemptCount = 1) => (
+  getAdaptiveWorkbookHintState(element, studentProfile, wrongAttemptCount).text
+);

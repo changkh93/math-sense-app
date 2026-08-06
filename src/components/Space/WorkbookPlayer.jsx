@@ -15,7 +15,7 @@ import {
   WORKBOOK_GRADABLE_TYPES,
   WORKBOOK_INTERACTION_TYPES,
   evaluateWorkbookInteraction,
-  getAdaptiveWorkbookHint,
+  getAdaptiveWorkbookHintState,
   getInitialWorkbookInteractionResponse,
 } from '../../utils/workbookInteractionUtils';
 import 'katex/dist/katex.min.css';
@@ -44,15 +44,15 @@ const WorkbookAnswerDisplay = ({ value, inputMode }) => {
   );
 };
 
-const getElementHint = (element, studentProfile, retryCount) => {
-  if (WORKBOOK_INTERACTION_TYPES.has(element?.type)) {
-    return getAdaptiveWorkbookHint(element, studentProfile, retryCount);
+const getElementHintState = (element, studentProfile, wrongAttemptCount) => {
+  if (element?.hints?.length || element?.hint || WORKBOOK_INTERACTION_TYPES.has(element?.type)) {
+    return getAdaptiveWorkbookHintState(element, studentProfile, wrongAttemptCount);
   }
-  if (element?.hint) return element.hint;
-  if (element?.inputMode === 'fraction') return '분자는 위 칸, 분모는 아래 칸에 들어갈 수를 다시 확인해 보세요.';
-  if (element?.inputMode === 'mixed-number') return '자연수 부분과 분수 부분을 나누어 생각해 보세요.';
-  if (element?.inputMode === 'expression') return '계산 결과가 아니라 문제 상황을 나타내는 식을 묻는지 확인해 보세요.';
-  return '문제에서 구하라고 한 값과 입력한 단위를 다시 확인해 보세요.';
+  let text = '문제에서 구하라고 한 값과 입력한 단위를 다시 확인해 보세요.';
+  if (element?.inputMode === 'fraction') text = '분자는 위 칸, 분모는 아래 칸에 들어갈 수를 다시 확인해 보세요.';
+  if (element?.inputMode === 'mixed-number') text = '자연수 부분과 분수 부분을 나누어 생각해 보세요.';
+  if (element?.inputMode === 'expression') text = '계산 결과가 아니라 문제 상황을 나타내는 식을 묻는지 확인해 보세요.';
+  return { text, level: 1, total: 1 };
 };
 
 const serializeWorkbookResponse = (value) => {
@@ -268,6 +268,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     let localCorrect = 0;
     let localWrong = 0;
     let anyWrong = false;
+    const wrongElementIds = [];
     const newCheckedElements = { ...checkedElements };
     const rect = e.currentTarget.getBoundingClientRect();
     const pageAttempt = (attemptCounts[currentPageIndex] || 0) + 1;
@@ -282,6 +283,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
           setFirstAttemptCorrect(prev => ({ ...prev, [el.id]: isCorrect }));
         }
         if (!isCorrect) {
+          wrongElementIds.push(el.id);
           setWrongAnswerHistory(prev => ({
             ...prev,
             [el.id]: [...(prev[el.id] || []), serializeWorkbookResponse(answers[el.id])].slice(-5),
@@ -320,6 +322,12 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     setCheckedElements(newCheckedElements);
     setCheckedPages(prev => ({ ...prev, [currentPageIndex]: true }));
     setAttemptCounts(prev => ({ ...prev, [currentPageIndex]: pageAttempt }));
+    if (wrongElementIds.length) {
+      setVisibleHints(prev => ({
+        ...prev,
+        ...Object.fromEntries(wrongElementIds.map(id => [id, true])),
+      }));
+    }
     setActiveInputId(null);
     setShowKeypad(false);
   };
@@ -331,7 +339,6 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     });
     setCheckedElements(nextChecked);
     setCheckedPages(prev => ({ ...prev, [currentPageIndex]: false }));
-    setVisibleHints({});
     setActiveInputId(null);
     setShowKeypad(false);
     soundManager.playClick();
@@ -543,6 +550,11 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   }
 
   const isCurrentPageChecked = !!checkedPages[currentPageIndex];
+  const currentHintItems = (currentPage?.elements || []).filter(element => (
+    WORKBOOK_GRADABLE_TYPES.has(element.type)
+    && (wrongAnswerHistory[element.id]?.length || 0) > 0
+    && checkedElements[element.id]?.isCorrect !== true
+  ));
 
   return (
     <div className={`workbook-player-container fade-in ${showKeypad && activeInputId && inputMode === 'math' ? 'keypad-open' : ''}`}>
@@ -630,7 +642,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                     )}
                     {visibleHints[el.id] && (
                       <div className="workbook-hint-bubble">
-                        {getElementHint(el, studentProfile, attemptCounts[currentPageIndex] || 0)}
+                        {getElementHintState(el, studentProfile, wrongAnswerHistory[el.id]?.length || 1).text}
                       </div>
                     )}
                   </div>
@@ -695,7 +707,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                         }}
                       >힌트</button>
                     )}
-                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHint(el, studentProfile, attemptCounts[currentPageIndex] || 0)}</div>}
+                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHintState(el, studentProfile, wrongAnswerHistory[el.id]?.length || 1).text}</div>}
                   </div>
                 );
               }
@@ -757,7 +769,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                         }}
                       >힌트</button>
                     )}
-                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHint(el, studentProfile, attemptCounts[currentPageIndex] || 0)}</div>}
+                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHintState(el, studentProfile, wrongAnswerHistory[el.id]?.length || 1).text}</div>}
                   </div>
                 );
               }
@@ -790,6 +802,37 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
           </div>
         )}
       </div>
+
+      {currentHintItems.length > 0 && (
+        <section className="workbook-learning-help" aria-label="학습 도움">
+          <div className="workbook-learning-help-title">
+            <span>💡 학습 도움</span>
+            <small>힌트를 보며 틀린 문제를 다시 풀어보세요.</small>
+          </div>
+          <div className="workbook-learning-help-list">
+            {currentHintItems.map((element, index) => {
+              const hintState = getElementHintState(
+                element,
+                studentProfile,
+                wrongAnswerHistory[element.id]?.length || 1
+              );
+              const isVisible = visibleHints[element.id] !== false;
+              return (
+                <div className="workbook-learning-help-item" key={element.id}>
+                  <button
+                    type="button"
+                    onClick={() => setVisibleHints(prev => ({ ...prev, [element.id]: !isVisible }))}
+                    aria-expanded={isVisible}
+                  >
+                    {index + 1}번 오답 · 힌트 {hintState.level}/{hintState.total} {isVisible ? '접기' : '보기'}
+                  </button>
+                  {isVisible && <p>{hintState.text}</p>}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="workbook-footer glass-card">
         <button 
