@@ -172,13 +172,14 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
 
   const handleInputActivate = (el, e) => {
     if ((checkedPages[currentPageIndex] && checkedElements[el.id]?.isCorrect) || isResultMode) return;
+    const target = e?.currentTarget || e?.target;
     setActiveInputId(el.id);
     
     // Auto-scroll logic to bring the activated input into view above the keypad
-    if (e && e.target) {
+    if (target) {
       setTimeout(() => {
-        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 50);
+        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      }, 180);
     }
 
     if (inputMode === 'math') {
@@ -488,7 +489,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   const isCurrentPageChecked = !!checkedPages[currentPageIndex];
 
   return (
-    <div className="workbook-player-container fade-in">
+    <div className={`workbook-player-container fade-in ${showKeypad && activeInputId && inputMode === 'math' ? 'keypad-open' : ''}`}>
       {/* Floating Gain/Loss Markers */}
       <AnimatePresence>
         {floatingMarkers.map(m => (
@@ -602,6 +603,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                         else delete inputRefs.current[el.id];
                       }}
                       type="text"
+                      inputMode={el.inputMode === 'integer' ? 'numeric' : ['decimal', 'fraction', 'mixed-number'].includes(el.inputMode) ? 'decimal' : 'text'}
                       className="wb-native-input"
                       value={val}
                       readOnly={inputMode === 'math'}

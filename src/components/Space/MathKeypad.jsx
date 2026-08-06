@@ -20,7 +20,7 @@ const MathAnswerPreview = ({ value, inputMode }) => {
 
 const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'expression', visible, onClose, onNativeModeSwitch }) => {
   if (!visible) return null;
-  const isMobile = window.innerWidth <= 640;
+  const isCompact = window.matchMedia('(max-width: 900px)').matches;
 
   const handleKeyPress = (key) => {
     onChange?.((value || '') + key);
@@ -58,7 +58,7 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'exp
     <div className="math-keypad-overlay">
       <Motion.div 
         className="math-keypad-container"
-        drag={!isMobile}
+        drag={!isCompact}
         dragMomentum={false}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}

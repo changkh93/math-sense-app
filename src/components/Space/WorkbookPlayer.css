@@ -58,8 +58,28 @@
   justify-content: center;
   background: #111;
   padding: 1rem;
-  padding-bottom: 350px; /* Extra padding for bottom sheet */
+  padding-bottom: 1rem;
   scroll-behavior: smooth;
+}
+
+@media (max-width: 900px) {
+  .workbook-player-container.keypad-open .workbook-canvas-area {
+    padding-bottom: calc(min(39dvh, 320px) + 1.5rem);
+  }
+
+  .workbook-player-container.keypad-open .workbook-page-container {
+    scroll-margin-bottom: calc(min(39dvh, 320px) + 1.5rem);
+  }
+}
+
+@media (max-width: 900px) and (max-height: 560px) {
+  .workbook-player-container.keypad-open .workbook-canvas-area {
+    padding-bottom: calc(48dvh + 1rem);
+  }
+
+  .workbook-player-container.keypad-open .workbook-page-container {
+    scroll-margin-bottom: calc(48dvh + 1rem);
+  }
 }
 
 .workbook-page-container {
