@@ -4,11 +4,12 @@ import { useAdminMutations } from '../../hooks/useContent';
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { compressImage } from '../../utils/storageUtils';
-import { Save, ArrowLeft, Image as ImageIcon, Video, FileText, Sparkles, Copy, X, Rocket } from 'lucide-react';
+import { Save, ArrowLeft, Image as ImageIcon, Video, FileText, Sparkles, Copy, X, Rocket, Eye } from 'lucide-react';
 import { db } from '../../firebase';
 import { getDoc, doc } from 'firebase/firestore';
 import MissionMarkdownViewer from '../../components/Space/MissionMarkdownViewer';
 import WorkbookVisualEditor from './WorkbookVisualEditor';
+import WorkbookPlayer from '../../components/Space/WorkbookPlayer';
 import { validateWorkbookPagesForPublish } from '../../utils/workbookDraftUtils';
 
 const normalizeWorkbookPagesForEditor = (pages) => Array.isArray(pages)
@@ -39,6 +40,9 @@ const MissionContentEditor = () => {
   const [publishing, setPublishing] = useState(false);
   const [refreshingDraft, setRefreshingDraft] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isWorkbookPreviewOpen, setIsWorkbookPreviewOpen] = useState(false);
+  const [workbookPreviewIssues, setWorkbookPreviewIssues] = useState([]);
+  const [lastPreviewedWorkbookSignature, setLastPreviewedWorkbookSignature] = useState('');
 
   const [transmissions, setTransmissions] = useState([]);
   const [learningText, setLearningText] = useState('');
@@ -194,6 +198,10 @@ const MissionContentEditor = () => {
       alert(`퍼블리시 전에 다음 항목을 수정해주세요.\n\n${issues.slice(0, 12).map(issue => `• ${issue}`).join('\n')}${issues.length > 12 ? `\n• 외 ${issues.length - 12}건` : ''}`);
       return;
     }
+    if (lastPreviewedWorkbookSignature !== JSON.stringify(workbookPages)) {
+      alert('현재 초안을 먼저 미리보기로 확인해주세요. 미리보기 후 내용을 수정했다면 다시 미리보기해야 퍼블리시할 수 있습니다.');
+      return;
+    }
     if (!window.confirm(`검토 중인 ${workbookPages.length}개 페이지를 학생용 워크북으로 최종 퍼블리시하시겠습니까?`)) return;
 
     setPublishing(true);
@@ -209,6 +217,21 @@ const MissionContentEditor = () => {
     } finally {
       setPublishing(false);
     }
+  };
+
+  const handlePreviewWorkbook = () => {
+    if (workbookPages.length === 0) {
+      alert('미리보기할 워크북 페이지가 없습니다.');
+      return;
+    }
+    const issues = validateWorkbookPagesForPublish(workbookPages);
+    setWorkbookPreviewIssues(issues);
+    setIsWorkbookPreviewOpen(true);
+  };
+
+  const handleCloseWorkbookPreview = () => {
+    setLastPreviewedWorkbookSignature(JSON.stringify(workbookPages));
+    setIsWorkbookPreviewOpen(false);
   };
 
   const handleRefreshWorkbookDraft = async () => {
@@ -352,9 +375,14 @@ const MissionContentEditor = () => {
             <Save size={18} /> <span>{saving ? '저장 중...' : '변경사항 저장'}</span>
           </button>
           {activeTab === 'workbook' && (
-            <button className="primary-btn" onClick={handlePublishWorkbook} disabled={saving || publishing || workbookPages.length === 0} style={{ background: 'linear-gradient(135deg, #7c3aed, #00b8d9)' }}>
-              <Rocket size={18} /> <span>{publishing ? '퍼블리시 중...' : '워크북 최종 퍼블리시'}</span>
-            </button>
+            <>
+              <button className="secondary-btn" onClick={handlePreviewWorkbook} disabled={saving || publishing || workbookPages.length === 0}>
+                <Eye size={18} /> <span>초안 미리보기</span>
+              </button>
+              <button className="primary-btn" onClick={handlePublishWorkbook} disabled={saving || publishing || workbookPages.length === 0} style={{ background: 'linear-gradient(135deg, #7c3aed, #00b8d9)' }}>
+                <Rocket size={18} /> <span>{publishing ? '퍼블리시 중...' : '워크북 최종 퍼블리시'}</span>
+              </button>
+            </>
           )}
         </div>
       </header>
@@ -569,6 +597,24 @@ const MissionContentEditor = () => {
         )}
 
       </div>
+
+      {isWorkbookPreviewOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#070b18', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10002, padding: '0.45rem 0.9rem', borderRadius: '999px', background: workbookPreviewIssues.length ? 'rgba(220,38,38,0.95)' : 'rgba(124,58,237,0.92)', color: 'white', fontWeight: 800, fontSize: '0.85rem', pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+            {workbookPreviewIssues.length
+              ? `초안 미리보기 · 게시 검증 경고 ${workbookPreviewIssues.length}건 · 학생 기록/광석 미저장`
+              : '초안 미리보기 · 게시 검증 통과 · 학생 기록/광석 미저장'}
+          </div>
+          <WorkbookPlayer
+            pages={workbookPages}
+            unitId={unitId}
+            unitTitle={`${unitData?.title || 'Smart Workbook'} · 초안 미리보기`}
+            studentProfile={{}}
+            previewMode
+            onClose={handleCloseWorkbookPreview}
+          />
+        </div>
+      )}
 
       {/* AI Prompt Modal */}
       {isAiPromptOpen && (

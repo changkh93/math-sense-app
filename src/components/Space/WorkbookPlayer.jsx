@@ -58,7 +58,7 @@ const serializeWorkbookResponse = (value) => {
   try { return JSON.stringify(value ?? '').slice(0, 2000); } catch { return ''; }
 };
 
-const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onComplete, onClose }) => {
+const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onComplete, onClose, previewMode = false }) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { id: value }
   const [checkedElements, setCheckedElements] = useState({}); // { id: { isCorrect, isChecked } }
@@ -89,6 +89,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   }, [unitId]);
 
   useEffect(() => {
+    if (previewMode) {
+      setProgressHydrated(true);
+      return undefined;
+    }
     let cancelled = false;
     setProgressHydrated(false);
 
@@ -127,10 +131,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
 
     hydrate();
     return () => { cancelled = true; };
-  }, [progressStorageKey, unitId, workbookSignature, pages.length]);
+  }, [previewMode, progressStorageKey, unitId, workbookSignature, pages.length]);
 
   useEffect(() => {
-    if (!progressHydrated || !unitId || isResultMode) return undefined;
+    if (previewMode || !progressHydrated || !unitId || isResultMode) return undefined;
     const session = {
       schemaVersion: 1,
       workbookSignature,
@@ -159,7 +163,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       }
     }, 700);
     return () => clearTimeout(autosaveTimerRef.current);
-  }, [answers, attemptCounts, checkedElements, checkedPages, currentPageIndex, firstAttemptCorrect, isResultMode, progressHydrated, progressStorageKey, sessionCrystals, unitId, workbookSignature, wrongAnswerHistory]);
+  }, [answers, attemptCounts, checkedElements, checkedPages, currentPageIndex, firstAttemptCorrect, isResultMode, previewMode, progressHydrated, progressStorageKey, sessionCrystals, unitId, workbookSignature, wrongAnswerHistory]);
 
   const checkAnswer = (inputId, element) => {
     const userVal = answers[inputId] || '';
@@ -412,7 +416,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
           <div className="glass-card space-quiz-card" style={{ textAlign: 'center', padding: '3rem 2rem', maxWidth: '500px', width: '90%' }}>
             
             <h2 className="font-title" style={{ fontSize: '2rem', color: 'var(--text-bright)', marginBottom: '2rem' }}>
-              🎉 워크북 학습 완료!
+              {previewMode ? '🔎 초안 미리보기 완료' : '🎉 워크북 학습 완료!'}
             </h2>
 
             <div style={{
@@ -450,9 +454,9 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
               padding: '1rem',
               borderRadius: '15px'
             }}>
-              <div className="crystal-icon" style={{ width: '24px', height: '24px' }}></div>
+              {!previewMode && <div className="crystal-icon" style={{ width: '24px', height: '24px' }}></div>}
               <span style={{ color: 'var(--crystal-cyan)', fontWeight: 800, fontSize: '1.2rem' }}>
-                +{finalCrystalsDisplay} 광석 획득!
+                {previewMode ? '학생 기록과 광석은 저장되지 않습니다.' : `+${finalCrystalsDisplay} 광석 획득!`}
               </span>
             </div>
 
@@ -462,9 +466,9 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
               </div>
             )}
             <button
-              onClick={completeWorkbook}
+              onClick={previewMode ? onClose : completeWorkbook}
               className="hud-btn primary"
-              disabled={savingCompletion}
+              disabled={!previewMode && savingCompletion}
               style={{
                 width: '100%',
                 padding: '1.2rem',
@@ -478,7 +482,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                 boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)'
               }}
             >
-              {savingCompletion ? '서버에 결과 저장 중...' : completionError ? '저장 다시 시도' : '📤 결과 저장 및 우주로 복귀'}
+              {previewMode ? '미리보기 종료' : savingCompletion ? '서버에 결과 저장 중...' : completionError ? '저장 다시 시도' : '📤 결과 저장 및 우주로 복귀'}
             </button>
           </div>
         </div>
