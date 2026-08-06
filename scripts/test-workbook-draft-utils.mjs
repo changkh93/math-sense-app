@@ -26,6 +26,14 @@ const payload = parseWorkbookAnalysisJson(`\`\`\`json
       "triggerKey": "q1",
       "position": { "top": 25, "left": 30, "width": 12, "height": 5 },
       "confidence": 0.8
+    },
+    {
+      "clientKey": "q2_line",
+      "type": "number-line",
+      "config": { "min": 0, "max": 5, "step": 1, "answer": 3 },
+      "hints": ["한 칸씩 세어 보세요."],
+      "position": { "top": 40, "left": 10, "width": 80, "height": 15 },
+      "confidence": 0.95
     }
   ]
 }
@@ -36,9 +44,10 @@ const normalized = normalizeWorkbookAnalysisPayload(payload, {
   pageId: 'page_demo'
 });
 
-assert.equal(normalized.elements.length, 2);
+assert.equal(normalized.elements.length, 3);
 assert.equal(normalized.elements[0].inputMode, 'fraction');
 assert.equal(normalized.elements[1].triggerBy, normalized.elements[0].id);
+assert.equal(normalized.elements[2].config.answer, 3);
 
 assert.throws(() => normalizeWorkbookAnalysisPayload(payload, {
   unitId: 'wrong_unit',
@@ -69,5 +78,7 @@ assert.match(prompt, /문서 ID\(unitId\): unit_demo/);
 assert.match(prompt, /페이지 ID\(pageId\): page_demo/);
 assert.match(prompt, /ChatGPT 웹이라면/);
 assert.match(prompt, /workbookDraftPages/);
+assert.match(prompt, /number-line/);
+assert.match(prompt, /P3 config 규격/);
 
 console.log('Workbook draft utility tests passed.');

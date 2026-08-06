@@ -209,6 +209,92 @@
   box-shadow: 0 8px 24px rgba(0,0,0,0.35);
 }
 
+.wb-interaction {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 2px solid rgba(34, 211, 238, 0.78);
+  border-radius: 12px;
+  background: rgba(5, 15, 35, 0.9);
+  color: white;
+  padding: clamp(6px, 1.2vw, 14px);
+  overflow: auto;
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.24);
+}
+
+.wb-item-bank,
+.wb-group-zones,
+.wb-color-palette,
+.wb-color-cells {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+
+.wb-item-bank { margin-bottom: 9px; }
+
+.wb-drag-item,
+.wb-drop-zone,
+.wb-match-column button,
+.wb-order-item,
+.wb-color-palette button,
+.wb-color-cells button {
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 9px;
+  background: rgba(255,255,255,0.1);
+  color: white;
+  min-height: 34px;
+  cursor: pointer;
+}
+
+.wb-drag-item { padding: 6px 12px; font-size: 1.05em; }
+.wb-drag-item.selected { outline: 3px solid #facc15; }
+.wb-drag-item.assigned { opacity: 0.5; }
+
+.wb-drop-zone {
+  flex: 1 1 120px;
+  min-height: 62px;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wb-drop-zone strong { color: #67e8f9; }
+.wb-drop-zone span { font-size: 0.9em; }
+
+.number-line-interaction { position: relative; display: flex; align-items: center; overflow-x: auto; }
+.wb-number-line-track { position: absolute; left: 7%; right: 7%; top: 45%; height: 3px; background: #e2e8f0; }
+.wb-number-line-ticks { width: 100%; min-width: 280px; display: flex; justify-content: space-between; position: relative; }
+.wb-number-line-ticks button { color: white; background: transparent; border: 0; display: grid; gap: 5px; place-items: center; cursor: pointer; padding: 5px; }
+.wb-number-line-ticks .tick-mark { width: 3px; height: 18px; background: white; border-radius: 2px; }
+.wb-number-line-ticks button.selected .tick-mark { height: 28px; background: #facc15; box-shadow: 0 0 10px #facc15; }
+.wb-number-line-ticks button.selected { color: #facc15; font-weight: 800; }
+
+.matching-interaction { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+.wb-match-column { display: grid; gap: 6px; }
+.wb-match-column button { padding: 7px; }
+.wb-match-column button.selected { outline: 3px solid #facc15; }
+.wb-match-column button.paired { border-color: #22c55e; background: rgba(34,197,94,0.25); }
+.wb-match-icon { color: #67e8f9; }
+.wb-match-summary { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; font-size: 0.78em; color: #a5f3fc; }
+.wb-match-summary span { background: rgba(34,211,238,0.12); border-radius: 999px; padding: 3px 8px; }
+
+.ordering-interaction { display: grid; gap: 6px; align-content: start; }
+.wb-order-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 9px; cursor: grab; }
+.wb-order-item div { display: flex; gap: 4px; }
+.wb-order-item button { border: 0; border-radius: 6px; background: rgba(34,211,238,0.2); color: white; padding: 4px; cursor: pointer; }
+
+.wb-color-palette { margin-bottom: 9px; }
+.wb-color-palette button { display: flex; align-items: center; gap: 5px; padding: 5px 8px; }
+.wb-color-palette button span { width: 16px; height: 16px; border-radius: 50%; background: var(--cell-color); border: 1px solid white; }
+.wb-color-palette button.selected { outline: 3px solid #facc15; }
+.wb-color-cells button { min-width: 50px; min-height: 45px; padding: 8px; background: color-mix(in srgb, var(--cell-color) 75%, rgba(255,255,255,0.1)); font-weight: 800; }
+
+.wb-interaction-frame .workbook-grade-mark { z-index: 8; }
+.wb-interaction-frame .workbook-hint-button { z-index: 9; }
+
 .workbook-save-error {
   margin: 0 0 1rem;
   padding: 0.8rem 1rem;

@@ -9,7 +9,45 @@ import {
   normalizeWorkbookAnalysisPayload,
   parseWorkbookAnalysisJson
 } from '../../utils/workbookDraftUtils';
+import {
+  WORKBOOK_INTERACTION_TYPES,
+  getDefaultInteractionConfig,
+  normalizeInteractionConfig,
+  recommendWorkbookInteraction,
+} from '../../utils/workbookInteractionUtils';
 import 'katex/dist/katex.min.css';
+
+const INTERACTION_LABELS = {
+  grouping: '드래그 나누기',
+  'number-line': '수직선',
+  matching: '연결하기',
+  ordering: '순서 정렬',
+  coloring: '색칠하기',
+};
+
+const InteractionConfigEditor = ({ element, onUpdate }) => {
+  const [text, setText] = useState(() => JSON.stringify(element.config || getDefaultInteractionConfig(element.type), null, 2));
+  const [error, setError] = useState('');
+  const apply = () => {
+    try {
+      const config = normalizeInteractionConfig(element.type, JSON.parse(text));
+      onUpdate({ config });
+      setText(JSON.stringify(config, null, 2));
+      setError('');
+    } catch (configError) {
+      setError(configError.message);
+    }
+  };
+  return (
+    <div style={{ display: 'grid', gap: '0.65rem' }}>
+      <label style={{ color: 'var(--planet-purple)' }}>{INTERACTION_LABELS[element.type]} 구성 JSON</label>
+      <textarea value={text} onChange={(event) => setText(event.target.value)} style={{ minHeight: '240px', resize: 'vertical', padding: '0.75rem', background: 'rgba(5,10,25,0.9)', color: '#e0f2fe', border: `1px solid ${error ? '#ff4d4d' : 'rgba(255,255,255,0.2)'}`, borderRadius: '6px', fontFamily: 'ui-monospace, monospace', fontSize: '0.78rem' }} />
+      {error && <span style={{ color: '#ff8080', fontSize: '0.8rem' }}>{error}</span>}
+      <button type="button" className="outline-btn" onClick={apply}>구성 검증 후 적용</button>
+      <small style={{ color: 'var(--text-muted)', lineHeight: 1.45 }}>표시 문구(label)는 자유롭게 수정하고, 정답에서는 각 항목의 id를 사용합니다. ChatGPT JSON과 같은 구조입니다.</small>
+    </div>
+  );
+};
 
 const WorkbookVisualEditor = ({
   workbookPages,
@@ -127,6 +165,7 @@ const WorkbookVisualEditor = ({
       const updatedPages = workbookPages.map((page, index) => index === currentPageIndex ? {
         ...page,
         elements: normalized.elements,
+        learningDesign: normalized.learningDesign,
         draftStatus: 'ai_draft',
         analysis: normalized.analysis,
         analysisMeta: {
@@ -400,6 +439,34 @@ const WorkbookVisualEditor = ({
                 ))}
              </div>
 
+             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'end', marginBottom: '1rem', padding: '0.85rem', border: '1px solid rgba(34,211,238,0.2)', borderRadius: '8px', background: 'rgba(2,20,35,0.55)' }}>
+               <label style={{ display: 'grid', gap: '0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                 대상 학년군
+                 <select value={currentPage.learningDesign?.gradeBand || 'elementary-3-4'} onChange={(event) => {
+                   const updated = [...workbookPages];
+                   updated[currentPageIndex] = { ...currentPage, learningDesign: { ...(currentPage.learningDesign || {}), gradeBand: event.target.value, adaptiveHints: true } };
+                   setWorkbookPages(updated);
+                 }} style={{ padding: '0.55rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }}>
+                   <option value="elementary-1-2">초등 1~2학년</option>
+                   <option value="elementary-3-4">초등 3~4학년</option>
+                   <option value="elementary-5-6">초등 5~6학년</option>
+                 </select>
+               </label>
+               <label style={{ display: 'grid', gap: '0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                 기본 난이도
+                 <select value={currentPage.learningDesign?.difficulty || 'standard'} onChange={(event) => {
+                   const updated = [...workbookPages];
+                   updated[currentPageIndex] = { ...currentPage, learningDesign: { ...(currentPage.learningDesign || {}), difficulty: event.target.value, adaptiveHints: true } };
+                   setWorkbookPages(updated);
+                 }} style={{ padding: '0.55rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }}>
+                   <option value="easy">도움형</option>
+                   <option value="standard">표준</option>
+                   <option value="challenge">도전</option>
+                 </select>
+               </label>
+               <span style={{ color: '#a5f3fc', fontSize: '0.8rem' }}>학생의 기존 워크북 평균과 재시도 횟수에 따라 힌트 단계를 자동 조절합니다.</span>
+             </div>
+
              {/* Editor Canvas */}
              <div 
                ref={containerRef}
@@ -444,7 +511,7 @@ const WorkbookVisualEditor = ({
                       zIndex: 10
                     }}
                   >
-                    {el.type === 'input' ? <Type size={12} color="white" /> : (el.type === 'multiple-choice' ? <Sparkles size={12} color="white" /> : <EyeOff size={12} color="white" />)}
+                    {el.type === 'input' ? <Type size={12} color="white" /> : el.type === 'multiple-choice' ? <Sparkles size={12} color="white" /> : el.type === 'mask' ? <EyeOff size={12} color="white" /> : <span style={{ fontSize: '9px', color: 'white' }}>{INTERACTION_LABELS[el.type] || el.type}</span>}
                     {selectedElementId === el.id && (
                        <div style={{ position: 'absolute', top: '-20px', left: 0, background: 'var(--neon-blue)', color: 'white', fontSize: '10px', padding: '2px 4px', borderRadius: '2px', whiteSpace: 'nowrap' }}>
                          {el.answer || el.type}
@@ -499,13 +566,35 @@ const WorkbookVisualEditor = ({
                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>요소 종류 (Type)</label>
                    <select 
                      value={selectedElement.type} 
-                     onChange={(e) => updateSelectedElement({ type: e.target.value })}
+                     onChange={(e) => {
+                       const type = e.target.value;
+                       updateSelectedElement({ type, ...(WORKBOOK_INTERACTION_TYPES.has(type) ? { config: getDefaultInteractionConfig(type), difficulty: currentPage.learningDesign?.difficulty || 'standard' } : {}) });
+                     }}
                      style={{ width: '100%', padding: '0.8rem', background: 'rgba(5, 10, 25, 0.8)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: '4px' }}
                    >
                      <option value="input">입력칸 (Input)</option>
                      <option value="multiple-choice">객관식 (Multiple Choice)</option>
                      <option value="mask">가리기 마스크 (Mask)</option>
+                     <option value="grouping">드래그 나누기 (Grouping)</option>
+                     <option value="number-line">수직선 (Number Line)</option>
+                     <option value="matching">연결하기 (Matching)</option>
+                     <option value="ordering">순서 정렬 (Ordering)</option>
+                     <option value="coloring">색칠하기 (Coloring)</option>
                    </select>
+                 </div>
+
+                 <div className="form-group" style={{ display: 'grid', gap: '0.5rem' }}>
+                   <label style={{ color: 'var(--text-muted)' }}>문제 지시문·AI 인식 원문</label>
+                   <textarea value={selectedElement.sourceText || ''} onChange={(event) => updateSelectedElement({ sourceText: event.target.value })} placeholder="예: 구슬을 두 사람에게 똑같이 나누세요." style={{ minHeight: '72px', padding: '0.7rem', background: 'rgba(5,10,25,0.8)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }} />
+                   <button type="button" className="outline-btn" onClick={() => {
+                     const recommendation = recommendWorkbookInteraction({ sourceText: selectedElement.sourceText, gradeBand: currentPage.learningDesign?.gradeBand, difficulty: currentPage.learningDesign?.difficulty });
+                     if (!WORKBOOK_INTERACTION_TYPES.has(recommendation.type)) {
+                       alert(`추천: 입력칸\n${recommendation.reason}`);
+                       return;
+                     }
+                     if (!window.confirm(`${INTERACTION_LABELS[recommendation.type]} 요소로 바꾸시겠습니까?\n\n${recommendation.reason}`)) return;
+                     updateSelectedElement({ type: recommendation.type, config: getDefaultInteractionConfig(recommendation.type), difficulty: currentPage.learningDesign?.difficulty || 'standard', recommendationReason: recommendation.reason });
+                   }}>지시문 기반 상호작용 추천</button>
                  </div>
 
                  {selectedElement.type === 'input' ? (
@@ -598,6 +687,23 @@ const WorkbookVisualEditor = ({
                        + 선택지 추가
                      </button>
                    </div>
+                 ) : WORKBOOK_INTERACTION_TYPES.has(selectedElement.type) ? (
+                   <div style={{ display: 'grid', gap: '0.9rem' }}>
+                     <label style={{ display: 'grid', gap: '0.4rem', color: 'var(--text-muted)' }}>
+                       요소 난이도
+                       <select value={selectedElement.difficulty || currentPage.learningDesign?.difficulty || 'standard'} onChange={(event) => updateSelectedElement({ difficulty: event.target.value })} style={{ padding: '0.7rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }}>
+                         <option value="easy">도움형</option>
+                         <option value="standard">표준</option>
+                         <option value="challenge">도전</option>
+                       </select>
+                     </label>
+                     <label style={{ display: 'grid', gap: '0.4rem', color: 'var(--text-muted)' }}>
+                       단계별 힌트 (줄바꿈으로 구분, 최대 3개)
+                       <textarea value={(selectedElement.hints || []).join('\n')} onChange={(event) => updateSelectedElement({ hints: event.target.value.split('\n').map(value => value.trim()).filter(Boolean).slice(0, 3) })} style={{ minHeight: '90px', padding: '0.7rem', background: '#071224', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '5px' }} />
+                     </label>
+                     <InteractionConfigEditor key={`${selectedElement.id}-${selectedElement.type}`} element={selectedElement} onUpdate={updateSelectedElement} />
+                     {selectedElement.recommendationReason && <small style={{ color: '#a5f3fc' }}>추천 근거: {selectedElement.recommendationReason}</small>}
+                   </div>
                  ) : (
                    <div className="form-group">
                      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--alert-red)' }}>활성화 조건 (Trigger By Input ID)</label>
@@ -607,7 +713,7 @@ const WorkbookVisualEditor = ({
                        style={{ width: '100%', padding: '0.8rem', background: 'rgba(5, 10, 25, 0.8)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: '4px' }}
                      >
                        <option value="">선택 안함</option>
-                       {currentPage.elements.filter(el => el.type === 'input' || el.type === 'multiple-choice').map(el => (
+                       {currentPage.elements.filter(el => el.type !== 'mask').map(el => (
                          <option key={el.id} value={el.id}>{el.id} (정답: {el.answer})</option>
                        ))}
                      </select>

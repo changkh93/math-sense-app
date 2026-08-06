@@ -53,6 +53,7 @@ try {
   const nextPages = draftPages.map((page, index) => index === pageIndex ? {
     ...page,
     elements: normalized.elements,
+    learningDesign: normalized.learningDesign,
     draftStatus: 'ai_draft',
     analysis: normalized.analysis,
     analysisMeta: {

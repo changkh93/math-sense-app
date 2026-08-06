@@ -1,4 +1,10 @@
-const SUPPORTED_ELEMENT_TYPES = new Set(['input', 'multiple-choice', 'mask']);
+import {
+  WORKBOOK_GRADABLE_TYPES,
+  WORKBOOK_INTERACTION_TYPES,
+  normalizeInteractionConfig,
+} from './workbookInteractionUtils.js';
+
+const SUPPORTED_ELEMENT_TYPES = new Set(['input', 'multiple-choice', 'mask', ...WORKBOOK_INTERACTION_TYPES]);
 const SUPPORTED_INPUT_MODES = new Set([
   'integer',
   'decimal',
@@ -133,10 +139,24 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
       return { ...base, triggerBy };
     }
 
-    const answer = String(rawElement.answer ?? '').trim();
-    if (!answer) {
-      throw new Error(`${index + 1}번째 ${type} 요소의 answer가 비어 있습니다.`);
+    if (WORKBOOK_INTERACTION_TYPES.has(type)) {
+      const config = normalizeInteractionConfig(type, rawElement.config);
+      const hints = Array.isArray(rawElement.hints)
+        ? rawElement.hints.map(value => String(value || '').trim()).filter(Boolean).slice(0, 3)
+        : [];
+      return {
+        ...base,
+        config,
+        difficulty: ['easy', 'standard', 'challenge'].includes(rawElement.difficulty) ? rawElement.difficulty : 'standard',
+        ...(hints.length ? { hints } : {}),
+        ...(String(rawElement.recommendationReason || '').trim()
+          ? { recommendationReason: String(rawElement.recommendationReason).trim().slice(0, 300) }
+          : {}),
+      };
     }
+
+    const answer = String(rawElement.answer ?? '').trim();
+    if (!answer) throw new Error(`${index + 1}번째 ${type} 요소의 answer가 비어 있습니다.`);
 
     if (type === 'multiple-choice') {
       const options = Array.isArray(rawElement.options)
@@ -174,6 +194,17 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
     unitId: unitId || payload.unitId || '',
     pageId: pageId || payload.pageId || '',
     analysis: payload.analysis && typeof payload.analysis === 'object' ? payload.analysis : {},
+    learningDesign: payload.learningDesign && typeof payload.learningDesign === 'object'
+      ? {
+          gradeBand: ['elementary-1-2', 'elementary-3-4', 'elementary-5-6'].includes(payload.learningDesign.gradeBand)
+            ? payload.learningDesign.gradeBand
+            : 'elementary-3-4',
+          difficulty: ['easy', 'standard', 'challenge'].includes(payload.learningDesign.difficulty)
+            ? payload.learningDesign.difficulty
+            : 'standard',
+          adaptiveHints: payload.learningDesign.adaptiveHints !== false,
+        }
+      : { gradeBand: 'elementary-3-4', difficulty: 'standard', adaptiveHints: true },
     elements
   };
 };
@@ -212,9 +243,17 @@ export const validateWorkbookPagesForPublish = (pages) => {
         issues.push(`${elementLabel}: ${error.message}`);
       }
 
-      if (element?.type === 'input' || element?.type === 'multiple-choice') {
+      if (WORKBOOK_GRADABLE_TYPES.has(element?.type)) {
         gradableCount += 1;
-        if (!String(element.answer ?? '').trim()) issues.push(`${elementLabel}: 정답이 비어 있습니다.`);
+        if (element?.type === 'input' || element?.type === 'multiple-choice') {
+          if (!String(element.answer ?? '').trim()) issues.push(`${elementLabel}: 정답이 비어 있습니다.`);
+        } else {
+          try {
+            normalizeInteractionConfig(element.type, element.config);
+          } catch (error) {
+            issues.push(`${elementLabel}: ${error.message}`);
+          }
+        }
       }
       if (element?.type === 'multiple-choice') {
         if (!Array.isArray(element.options) || element.options.length < 2) {
@@ -228,7 +267,7 @@ export const validateWorkbookPagesForPublish = (pages) => {
       }
     });
 
-    if (gradableCount === 0) issues.push(`${label}: 채점 가능한 입력 또는 객관식 요소가 없습니다.`);
+    if (gradableCount === 0) issues.push(`${label}: 채점 가능한 요소가 없습니다.`);
   });
 
   return issues;
@@ -260,15 +299,39 @@ export const buildWorkbookDraftPrompt = ({ unitId, unitTitle, page, pageIndex = 
 - input: 숫자·분수·수식·짧은 텍스트 입력
 - multiple-choice: 선택지 중 하나를 고르는 요소
 - mask: 연결된 정답 요소가 맞았을 때 인쇄된 표시를 가리는 요소. 같은 결과 안의 clientKey를 triggerKey로 지정
+- grouping: 항목을 여러 그룹에 드래그하여 똑같이 나누거나 분류
+- number-line: 수직선 눈금 중 정답 위치 선택
+- matching: 왼쪽과 오른쪽 항목 연결
+- ordering: 항목을 순서대로 드래그 정렬
+- coloring: 칸마다 알맞은 색 선택
+
+[상호작용 선택 규칙]
+- 단순히 재미를 위해 인터랙션을 넣지 말고 문제 행동이 나누기·위치·연결·순서·색칠일 때만 해당 type을 사용하세요.
+- grouping/matching/ordering/coloring의 config 안에서는 표시 문구와 별개인 짧고 고유한 id를 사용하세요.
+- 조작 요소는 작은 답안 밑줄이 아니라 문제 활동 전체를 포함하도록 position을 충분히 크게 잡으세요.
+- 학년군과 난이도를 learningDesign에 기록하고, 요소마다 쉬운 힌트부터 구체적인 힌트까지 hints를 최대 3개 작성하세요.
 
 [inputMode]
 integer | decimal | fraction | mixed-number | expression | text
+
+[P3 config 규격]
+- grouping: { "items":[{"id":"i1","label":"●"}], "groups":[{"id":"g1","label":"1모둠"}], "answer":{"i1":"g1"} }
+- number-line: { "min":0, "max":10, "step":1, "answer":5 }
+- matching: { "leftItems":[{"id":"l1","label":"1/2"}], "rightItems":[{"id":"r1","label":"0.5"}], "answer":{"l1":"r1"} }
+- ordering: { "items":[{"id":"i1","label":"1"},{"id":"i2","label":"2"}], "answer":["i1","i2"] }
+- coloring: { "cells":[{"id":"c1","label":"1번"}], "colors":[{"id":"red","label":"빨강","value":"#ef4444"}], "answer":{"c1":"red"} }
+- grouping은 항목 2개 이상·그룹 2개 이상, matching/ordering은 항목 2개 이상이어야 합니다. answer에는 모든 항목 id가 빠짐없이 들어가야 합니다.
 
 [반환 JSON — 설명문 없이 JSON 코드블록 하나만 반환]
 {
   "schemaVersion": 2,
   "unitId": "${unitId}",
   "pageId": "${page.id}",
+  "learningDesign": {
+    "gradeBand": "${page.learningDesign?.gradeBand || 'elementary-3-4'}",
+    "difficulty": "${page.learningDesign?.difficulty || 'standard'}",
+    "adaptiveHints": true
+  },
   "analysis": {
     "summary": "페이지 구조와 문제 유형 요약",
     "warnings": ["운영자가 확인할 사항"]
@@ -285,6 +348,21 @@ integer | decimal | fraction | mixed-number | expression | text
       "sourceText": "구슬 18개를 2사람에게 똑같이 나누세요.",
       "confidence": 0.98,
       "position": { "top": 38.2, "left": 22.1, "width": 13.5, "height": 4.2 }
+    },
+    {
+      "clientKey": "q2_grouping",
+      "type": "grouping",
+      "sourceText": "구슬을 두 사람에게 똑같이 나누세요.",
+      "confidence": 0.95,
+      "difficulty": "easy",
+      "hints": ["구슬을 한 개씩 번갈아 옮겨 보세요.", "두 그룹의 구슬 수가 같은지 세어 보세요."],
+      "recommendationReason": "똑같이 나누는 행동을 직접 조작하도록 grouping을 선택했습니다.",
+      "position": { "top": 50, "left": 10, "width": 80, "height": 25 },
+      "config": {
+        "items": [{ "id": "bead_1", "label": "●" }, { "id": "bead_2", "label": "●" }],
+        "groups": [{ "id": "child_a", "label": "첫째" }, { "id": "child_b", "label": "둘째" }],
+        "answer": { "bead_1": "child_a", "bead_2": "child_b" }
+      }
     }
   ]
 }

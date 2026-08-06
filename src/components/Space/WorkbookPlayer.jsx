@@ -3,11 +3,19 @@ import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import soundManager from '../../utils/SoundManager';
 import MathKeypad from './MathKeypad';
+import WorkbookInteraction from './WorkbookInteraction';
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { createParticleBurst, shakeScreen } from './ParticleEffects';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import { auth, db } from '../../firebase';
 import { areElementaryAnswersEquivalent, splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
+import {
+  WORKBOOK_GRADABLE_TYPES,
+  WORKBOOK_INTERACTION_TYPES,
+  evaluateWorkbookInteraction,
+  getAdaptiveWorkbookHint,
+  getInitialWorkbookInteractionResponse,
+} from '../../utils/workbookInteractionUtils';
 import 'katex/dist/katex.min.css';
 import StarField from './StarField';
 import './WorkbookPlayer.css';
@@ -34,7 +42,10 @@ const WorkbookAnswerDisplay = ({ value, inputMode }) => {
   );
 };
 
-const getElementHint = (element) => {
+const getElementHint = (element, studentProfile, retryCount) => {
+  if (WORKBOOK_INTERACTION_TYPES.has(element?.type)) {
+    return getAdaptiveWorkbookHint(element, studentProfile, retryCount);
+  }
   if (element?.hint) return element.hint;
   if (element?.inputMode === 'fraction') return '분자는 위 칸, 분모는 아래 칸에 들어갈 수를 다시 확인해 보세요.';
   if (element?.inputMode === 'mixed-number') return '자연수 부분과 분수 부분을 나누어 생각해 보세요.';
@@ -42,7 +53,12 @@ const getElementHint = (element) => {
   return '문제에서 구하라고 한 값과 입력한 단위를 다시 확인해 보세요.';
 };
 
-const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
+const serializeWorkbookResponse = (value) => {
+  if (typeof value === 'string') return value.slice(0, 500);
+  try { return JSON.stringify(value ?? '').slice(0, 2000); } catch { return ''; }
+};
+
+const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onComplete, onClose }) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { id: value }
   const [checkedElements, setCheckedElements] = useState({}); // { id: { isCorrect, isChecked } }
@@ -147,6 +163,9 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
 
   const checkAnswer = (inputId, element) => {
     const userVal = answers[inputId] || '';
+    if (WORKBOOK_INTERACTION_TYPES.has(element.type)) {
+      return evaluateWorkbookInteraction(element, answers[inputId] ?? getInitialWorkbookInteractionResponse(element));
+    }
     const accepted = [element.answer, ...(element.acceptedAnswers || [])];
     return accepted.some(expected => areElementaryAnswersEquivalent(userVal, expected, element));
   };
@@ -173,6 +192,11 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
     setAnswers(prev => ({ ...prev, [activeInputId]: String(newValue ?? '').slice(0, 80) }));
   };
 
+  const handleInteractionChange = (element, newValue) => {
+    if (checkedElements[element.id]?.isCorrect || isResultMode) return;
+    setAnswers(prev => ({ ...prev, [element.id]: newValue }));
+  };
+
   const addMarker = (text, type, x, y) => {
     const id = Date.now() + Math.random();
     setFloatingMarkers(prev => [...prev, { id, text, type, x, y }]);
@@ -193,7 +217,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
 
     // Check all inputs on current page
     currentPage.elements.forEach((el, idx) => {
-      if (el.type === 'input' || el.type === 'multiple-choice') {
+      if (WORKBOOK_GRADABLE_TYPES.has(el.type)) {
         if (newCheckedElements[el.id]?.isCorrect) return;
         const isCorrect = checkAnswer(el.id, el);
         newCheckedElements[el.id] = { isCorrect, isChecked: true };
@@ -203,7 +227,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
         if (!isCorrect) {
           setWrongAnswerHistory(prev => ({
             ...prev,
-            [el.id]: [...(prev[el.id] || []), String(answers[el.id] || '').slice(0, 80)].slice(-5),
+            [el.id]: [...(prev[el.id] || []), serializeWorkbookResponse(answers[el.id])].slice(-5),
           }));
         }
 
@@ -268,7 +292,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
 
     pages.forEach(page => {
       page.elements.forEach(el => {
-        if (el.type === 'input' || el.type === 'multiple-choice') {
+        if (WORKBOOK_GRADABLE_TYPES.has(el.type)) {
           globalTotalInputs++;
           if (checkedElements[el.id]?.isCorrect) {
             globalCorrect++;
@@ -282,7 +306,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
     const finalCrystals = sessionCrystals + (isPerfect ? 10 : 0);
 
     const workbookResponses = pages.flatMap((page, pageIndex) => page.elements
-      .filter(element => element.type === 'input' || element.type === 'multiple-choice')
+      .filter(element => WORKBOOK_GRADABLE_TYPES.has(element.type))
       .map(element => ({
         pageId: page.id,
         pageIndex,
@@ -291,7 +315,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
         firstAttemptCorrect: firstAttemptCorrect[element.id] === true,
         attemptCount: Math.max(1, attemptCounts[pageIndex] || 1),
         wrongAnswers: wrongAnswerHistory[element.id] || [],
-        finalAnswer: String(answers[element.id] || '').slice(0, 80),
+        finalAnswer: serializeWorkbookResponse(answers[element.id]),
+        interactionType: WORKBOOK_INTERACTION_TYPES.has(element.type) ? element.type : null,
         isCorrect: checkedElements[element.id]?.isCorrect === true,
       }))).slice(0, 500);
 
@@ -366,7 +391,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
 
     pages.forEach(page => {
       page.elements.forEach(el => {
-        if (el.type === 'input' || el.type === 'multiple-choice') {
+        if (WORKBOOK_GRADABLE_TYPES.has(el.type)) {
           globalTotalInputs++;
           if (checkedElements[el.id]?.isCorrect) {
             globalCorrect++;
@@ -510,6 +535,46 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
             
             {/* Elements Overlay */}
             {currentPage.elements.map((el) => {
+              if (WORKBOOK_INTERACTION_TYPES.has(el.type)) {
+                const elemStatus = checkedElements[el.id];
+                const currentValue = answers[el.id] ?? getInitialWorkbookInteractionResponse(el);
+                return (
+                  <div
+                    key={el.id}
+                    className={`wb-element wb-interaction-frame ${elemStatus?.isChecked ? (elemStatus.isCorrect ? 'correct' : 'wrong') : ''}`}
+                    style={{
+                      position: 'absolute',
+                      top: `${el.position.top}%`, left: `${el.position.left}%`,
+                      width: `${el.position.width}%`, height: `${el.position.height}%`,
+                      zIndex: 6,
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <WorkbookInteraction
+                      element={el}
+                      value={currentValue}
+                      onChange={(value) => handleInteractionChange(el, value)}
+                      disabled={isResultMode || elemStatus?.isCorrect}
+                    />
+                    {elemStatus?.isChecked && <WorkbookGradeMark isCorrect={elemStatus.isCorrect} />}
+                    {elemStatus?.isChecked && !elemStatus.isCorrect && (
+                      <button
+                        type="button"
+                        className="workbook-hint-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setVisibleHints(prev => ({ ...prev, [el.id]: !prev[el.id] }));
+                        }}
+                      >힌트</button>
+                    )}
+                    {visibleHints[el.id] && (
+                      <div className="workbook-hint-bubble">
+                        {getElementHint(el, studentProfile, attemptCounts[currentPageIndex] || 0)}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
               if (el.type === 'input') {
                 const elemStatus = checkedElements[el.id];
                 const isActive = activeInputId === el.id;
@@ -568,7 +633,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
                         }}
                       >힌트</button>
                     )}
-                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHint(el)}</div>}
+                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHint(el, studentProfile, attemptCounts[currentPageIndex] || 0)}</div>}
                   </div>
                 );
               }
@@ -630,7 +695,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
                         }}
                       >힌트</button>
                     )}
-                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHint(el)}</div>}
+                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHint(el, studentProfile, attemptCounts[currentPageIndex] || 0)}</div>}
                   </div>
                 );
               }
@@ -686,7 +751,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
               정답 확인
             </button>
           ) : currentPage.elements.some(element => (
-            (element.type === 'input' || element.type === 'multiple-choice')
+            WORKBOOK_GRADABLE_TYPES.has(element.type)
             && checkedElements[element.id]?.isChecked
             && !checkedElements[element.id]?.isCorrect
           )) ? (

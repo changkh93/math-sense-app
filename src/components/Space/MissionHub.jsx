@@ -3465,6 +3465,7 @@ export default function MissionHub({
             pages={activeUnit?.workbookPages || []}
             unitId={unitId}
             unitTitle={activeUnit?.title}
+            studentProfile={userData}
             onComplete={onComplete}
             onClose={returnFromContent}
           />
