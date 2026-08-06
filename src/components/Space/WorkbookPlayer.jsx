@@ -1,13 +1,46 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import soundManager from '../../utils/SoundManager';
 import MathKeypad from './MathKeypad';
-import { ArrowLeft, ArrowRight, CheckCircle, XCircle, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { createParticleBurst, shakeScreen } from './ParticleEffects';
 import { parseInlineFormatting } from '../../utils/formatUtils';
+import { auth, db } from '../../firebase';
+import { areElementaryAnswersEquivalent, splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
 import 'katex/dist/katex.min.css';
 import StarField from './StarField';
 import './WorkbookPlayer.css';
+
+const WorkbookGradeMark = ({ isCorrect }) => (
+  <svg className={`workbook-grade-mark ${isCorrect ? 'correct' : 'wrong'}`} viewBox="0 0 100 100" aria-label={isCorrect ? '정답' : '오답'}>
+    {isCorrect
+      ? <ellipse cx="50" cy="50" rx="43" ry="38" fill="none" stroke="currentColor" strokeWidth="7" />
+      : <line x1="76" y1="12" x2="24" y2="88" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />}
+  </svg>
+);
+
+const WorkbookAnswerDisplay = ({ value, inputMode }) => {
+  const fraction = splitFractionDisplayValue(value, inputMode);
+  if (!fraction) return <span className="workbook-answer-text">{value}</span>;
+  return (
+    <span className="workbook-fraction-value" aria-label={value}>
+      {fraction.whole && <span>{fraction.whole}</span>}
+      <span className="workbook-fraction-stack">
+        <span>{fraction.numerator || '□'}</span>
+        <span>{fraction.denominator || '□'}</span>
+      </span>
+    </span>
+  );
+};
+
+const getElementHint = (element) => {
+  if (element?.hint) return element.hint;
+  if (element?.inputMode === 'fraction') return '분자는 위 칸, 분모는 아래 칸에 들어갈 수를 다시 확인해 보세요.';
+  if (element?.inputMode === 'mixed-number') return '자연수 부분과 분수 부분을 나누어 생각해 보세요.';
+  if (element?.inputMode === 'expression') return '계산 결과가 아니라 문제 상황을 나타내는 식을 묻는지 확인해 보세요.';
+  return '문제에서 구하라고 한 값과 입력한 단위를 다시 확인해 보세요.';
+};
 
 const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -22,24 +55,104 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
   const [floatingMarkers, setFloatingMarkers] = useState([]); // { id, text, type, x, y }
   const [sessionCrystals, setSessionCrystals] = useState(0);
   const [shuffledOptionsMap, setShuffledOptionsMap] = useState({}); // { elId: [shuffledArray] }
+  const [attemptCounts, setAttemptCounts] = useState({});
+  const [firstAttemptCorrect, setFirstAttemptCorrect] = useState({});
+  const [wrongAnswerHistory, setWrongAnswerHistory] = useState({});
+  const [visibleHints, setVisibleHints] = useState({});
+  const [progressHydrated, setProgressHydrated] = useState(false);
+  const [savingCompletion, setSavingCompletion] = useState(false);
+  const [completionError, setCompletionError] = useState('');
   const inputRefs = React.useRef({});
+  const autosaveTimerRef = useRef(null);
 
   const currentPage = pages[currentPageIndex];
+  const workbookSignature = useMemo(() => (pages || []).map(page => page.id).join('|'), [pages]);
+  const progressStorageKey = useMemo(() => {
+    const uid = auth.currentUser?.uid || 'anonymous';
+    return `smart_workbook_progress_v2_${uid}_${unitId || 'unknown'}`;
+  }, [unitId]);
 
-  // Whitespace-agnostic comparison with operator glyph normalization and explicit alternatives.
+  useEffect(() => {
+    let cancelled = false;
+    setProgressHydrated(false);
+
+    const applySession = (session) => {
+      if (!session || session.workbookSignature !== workbookSignature) return false;
+      setCurrentPageIndex(Math.min(Math.max(0, Number(session.currentPageIndex) || 0), Math.max(0, pages.length - 1)));
+      setAnswers(session.answers || {});
+      setCheckedElements(session.checkedElements || {});
+      setCheckedPages(session.checkedPages || {});
+      setAttemptCounts(session.attemptCounts || {});
+      setFirstAttemptCorrect(session.firstAttemptCorrect || {});
+      setWrongAnswerHistory(session.wrongAnswerHistory || {});
+      setSessionCrystals(Math.max(0, Number(session.sessionCrystals) || 0));
+      return true;
+    };
+
+    const hydrate = async () => {
+      let restored = false;
+      try {
+        const local = JSON.parse(localStorage.getItem(progressStorageKey) || 'null');
+        restored = applySession(local);
+      } catch { /* ignore malformed local progress */ }
+
+      const uid = auth.currentUser?.uid;
+      if (uid && unitId) {
+        try {
+          const snap = await getDoc(doc(db, 'users', uid, 'learning_progress', unitId));
+          if (!cancelled && snap.exists()) restored = applySession(snap.data()?.workbookSession) || restored;
+        } catch (error) {
+          console.warn('Workbook progress restore failed; using local progress.', error);
+        }
+      }
+      if (!cancelled) setProgressHydrated(true);
+      return restored;
+    };
+
+    hydrate();
+    return () => { cancelled = true; };
+  }, [progressStorageKey, unitId, workbookSignature, pages.length]);
+
+  useEffect(() => {
+    if (!progressHydrated || !unitId || isResultMode) return undefined;
+    const session = {
+      schemaVersion: 1,
+      workbookSignature,
+      currentPageIndex,
+      answers,
+      checkedElements,
+      checkedPages,
+      attemptCounts,
+      firstAttemptCorrect,
+      wrongAnswerHistory,
+      sessionCrystals,
+      savedAtMs: Date.now(),
+    };
+    localStorage.setItem(progressStorageKey, JSON.stringify(session));
+    clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      try {
+        await setDoc(doc(db, 'users', uid, 'learning_progress', unitId), {
+          workbookSession: session,
+          workbookSessionUpdatedAt: serverTimestamp(),
+        }, { merge: true });
+      } catch (error) {
+        console.warn('Workbook server autosave failed; local progress is preserved.', error);
+      }
+    }, 700);
+    return () => clearTimeout(autosaveTimerRef.current);
+  }, [answers, attemptCounts, checkedElements, checkedPages, currentPageIndex, firstAttemptCorrect, isResultMode, progressHydrated, progressStorageKey, sessionCrystals, unitId, workbookSignature, wrongAnswerHistory]);
+
   const checkAnswer = (inputId, element) => {
     const userVal = answers[inputId] || '';
-    const normalize = (value) => String(value ?? '')
-      .replace(/\s/g, '')
-      .replace(/[−–—]/g, '-')
-      .replace(/[∙·]/g, '×');
     const accepted = [element.answer, ...(element.acceptedAnswers || [])];
-    const cleanUser = normalize(userVal);
-    return accepted.some(expected => cleanUser === normalize(expected));
+    return accepted.some(expected => areElementaryAnswersEquivalent(userVal, expected, element));
   };
 
   const handleInputActivate = (el, e) => {
-    if (checkedPages[currentPageIndex] || isResultMode) return;
+    if ((checkedPages[currentPageIndex] && checkedElements[el.id]?.isCorrect) || isResultMode) return;
     setActiveInputId(el.id);
     
     // Auto-scroll logic to bring the activated input into view above the keypad
@@ -56,8 +169,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
   };
 
   const handleKeypadChange = (newValue) => {
-    if (!activeInputId || checkedPages[currentPageIndex]) return;
-    setAnswers(prev => ({ ...prev, [activeInputId]: newValue }));
+    if (!activeInputId || checkedElements[activeInputId]?.isCorrect) return;
+    setAnswers(prev => ({ ...prev, [activeInputId]: String(newValue ?? '').slice(0, 80) }));
   };
 
   const addMarker = (text, type, x, y) => {
@@ -76,12 +189,23 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
     let anyWrong = false;
     const newCheckedElements = { ...checkedElements };
     const rect = e.currentTarget.getBoundingClientRect();
+    const pageAttempt = (attemptCounts[currentPageIndex] || 0) + 1;
 
     // Check all inputs on current page
     currentPage.elements.forEach((el, idx) => {
       if (el.type === 'input' || el.type === 'multiple-choice') {
+        if (newCheckedElements[el.id]?.isCorrect) return;
         const isCorrect = checkAnswer(el.id, el);
         newCheckedElements[el.id] = { isCorrect, isChecked: true };
+        if (pageAttempt === 1) {
+          setFirstAttemptCorrect(prev => ({ ...prev, [el.id]: isCorrect }));
+        }
+        if (!isCorrect) {
+          setWrongAnswerHistory(prev => ({
+            ...prev,
+            [el.id]: [...(prev[el.id] || []), String(answers[el.id] || '').slice(0, 80)].slice(-5),
+          }));
+        }
 
         // Play particle effect roughly at center of button or random area
         const pX = rect.left + rect.width / 2 + (Math.random() * 40 - 20);
@@ -110,35 +234,35 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
         shakeScreen(300);
     }
 
-    const earnedCrystals = Math.max(0, localCorrect * 1 - localWrong * 2);
     setSessionCrystals(prev => Math.max(0, prev + (localCorrect * 1) - (localWrong * 2)));
 
     setCheckedElements(newCheckedElements);
     setCheckedPages(prev => ({ ...prev, [currentPageIndex]: true }));
+    setAttemptCounts(prev => ({ ...prev, [currentPageIndex]: pageAttempt }));
     setActiveInputId(null);
     setShowKeypad(false);
   };
 
-  const handleSubmitFinal = () => {
-    let globalCorrect = 0;
-    let globalTotalInputs = 0;
-
-    pages.forEach(page => {
-      page.elements.forEach(el => {
-        if (el.type === 'input' || el.type === 'multiple-choice') {
-          globalTotalInputs++;
-          if (checkedElements[el.id]?.isCorrect) {
-            globalCorrect++;
-          }
-        }
-      });
+  const handleRetryPage = () => {
+    const nextChecked = { ...checkedElements };
+    currentPage.elements.forEach((element) => {
+      if (nextChecked[element.id]?.isChecked && !nextChecked[element.id]?.isCorrect) delete nextChecked[element.id];
     });
+    setCheckedElements(nextChecked);
+    setCheckedPages(prev => ({ ...prev, [currentPageIndex]: false }));
+    setVisibleHints({});
+    setActiveInputId(null);
+    setShowKeypad(false);
+    soundManager.playClick();
+  };
 
+  const handleSubmitFinal = () => {
     soundManager.playClick();
     setIsResultMode(true);
   };
 
-  const completeWorkbook = () => {
+  const completeWorkbook = async () => {
+    if (savingCompletion) return;
     let globalCorrect = 0;
     let globalTotalInputs = 0;
 
@@ -157,15 +281,49 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
     const isPerfect = (globalCorrect === globalTotalInputs) && globalTotalInputs > 0;
     const finalCrystals = sessionCrystals + (isPerfect ? 10 : 0);
 
-    soundManager.playWarp();
-    onComplete({
+    const workbookResponses = pages.flatMap((page, pageIndex) => page.elements
+      .filter(element => element.type === 'input' || element.type === 'multiple-choice')
+      .map(element => ({
+        pageId: page.id,
+        pageIndex,
+        elementId: element.id,
+        inputMode: element.inputMode || (element.type === 'multiple-choice' ? 'choice' : 'text'),
+        firstAttemptCorrect: firstAttemptCorrect[element.id] === true,
+        attemptCount: Math.max(1, attemptCounts[pageIndex] || 1),
+        wrongAnswers: wrongAnswerHistory[element.id] || [],
+        finalAnswer: String(answers[element.id] || '').slice(0, 80),
+        isCorrect: checkedElements[element.id]?.isCorrect === true,
+      }))).slice(0, 500);
+
+    setSavingCompletion(true);
+    setCompletionError('');
+    try {
+      const outcome = await onComplete({
         score: score100,
         totalCount: globalTotalInputs,
         correctCount: globalCorrect,
         isPerfect: isPerfect,
         crystalsEarned: finalCrystals,
-        type: 'workbook'
-    });
+        type: 'workbook',
+        attemptCount: Math.max(1, ...Object.values(attemptCounts).map(Number)),
+        workbookResponses,
+      });
+      if (outcome?.ok === false) throw outcome.error || new Error('결과 저장에 실패했습니다.');
+      localStorage.removeItem(progressStorageKey);
+      const uid = auth.currentUser?.uid;
+      if (uid && unitId) {
+        await setDoc(doc(db, 'users', uid, 'learning_progress', unitId), {
+          workbookSession: deleteField(),
+          workbookSessionUpdatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+      soundManager.playWarp();
+    } catch (error) {
+      console.error('Workbook completion save failed', error);
+      setCompletionError('결과를 서버에 저장하지 못했습니다. 진행 내용은 보관되어 있습니다. 다시 시도해주세요.');
+    } finally {
+      setSavingCompletion(false);
+    }
   };
 
   const goToPrev = () => {
@@ -272,9 +430,15 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
               </span>
             </div>
 
+            {completionError && (
+              <div className="workbook-save-error" role="alert">
+                {completionError}
+              </div>
+            )}
             <button
               onClick={completeWorkbook}
               className="hud-btn primary"
+              disabled={savingCompletion}
               style={{
                 width: '100%',
                 padding: '1.2rem',
@@ -288,7 +452,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
                 boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)'
               }}
             >
-              📤 결과 저장 및 우주로 복귀
+              {savingCompletion ? '서버에 결과 저장 중...' : completionError ? '저장 다시 시도' : '📤 결과 저장 및 우주로 복귀'}
             </button>
           </div>
         </div>
@@ -303,7 +467,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
       {/* Floating Gain/Loss Markers */}
       <AnimatePresence>
         {floatingMarkers.map(m => (
-          <motion.div
+          <Motion.div
             key={m.id}
             initial={{ opacity: 1, y: 0, scale: 0.5 }}
             animate={{ opacity: 0, y: -50, scale: 1.5 }}
@@ -322,7 +486,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
             }}
           >
             {m.text}
-          </motion.div>
+          </Motion.div>
         ))}
       </AnimatePresence>
 
@@ -345,7 +509,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
             />
             
             {/* Elements Overlay */}
-            {currentPage.elements.map((el, idx) => {
+            {currentPage.elements.map((el) => {
               if (el.type === 'input') {
                 const elemStatus = checkedElements[el.id];
                 const isActive = activeInputId === el.id;
@@ -367,7 +531,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
                     }}
                   >
                     {/* Always render an actual input so native focus works properly on mobile */}
-                    <input 
+                    <input
                       ref={node => {
                         if (node) inputRefs.current[el.id] = node;
                         else delete inputRefs.current[el.id];
@@ -380,19 +544,31 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
                       onFocus={() => {
                         if (inputMode === 'native') setActiveInputId(el.id);
                       }}
-                      style={{ 
+                      style={{
                         width: '100%', height: '100%', border: 'none', background: 'transparent', 
                         textAlign: 'center', fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', outline: 'none',
                         pointerEvents: inputMode === 'native' ? 'auto' : 'none',
-                        caretColor: inputMode === 'native' ? 'auto' : 'transparent'
+                        caretColor: inputMode === 'native' ? 'auto' : 'transparent',
+                        opacity: inputMode === 'native' ? 1 : 0,
                       }}
                     />
-                    {!val && inputMode === 'math' && <span className="input-val" style={{ position: 'absolute', pointerEvents: 'none' }}></span>}
-                    {elemStatus?.isChecked && (
-                      <div className="result-icon">
-                        {elemStatus.isCorrect ? <CheckCircle size={20} color="#00ff88" /> : <XCircle size={20} color="#ff4d4d" />}
-                      </div>
+                    {inputMode === 'math' && val && (
+                      <WorkbookAnswerDisplay value={val} inputMode={el.inputMode || 'integer'} />
                     )}
+                    {elemStatus?.isChecked && (
+                      <WorkbookGradeMark isCorrect={elemStatus.isCorrect} />
+                    )}
+                    {elemStatus?.isChecked && !elemStatus.isCorrect && (
+                      <button
+                        type="button"
+                        className="workbook-hint-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setVisibleHints(prev => ({ ...prev, [el.id]: !prev[el.id] }));
+                        }}
+                      >힌트</button>
+                    )}
+                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHint(el)}</div>}
                   </div>
                 );
               }
@@ -442,10 +618,19 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
                       {val ? parseInlineFormatting(val) : '선택'}
                     </span>
                     {elemStatus?.isChecked && (
-                      <div className="result-icon">
-                        {elemStatus.isCorrect ? <CheckCircle size={20} color="#00ff88" /> : <XCircle size={20} color="#ff4d4d" />}
-                      </div>
+                      <WorkbookGradeMark isCorrect={elemStatus.isCorrect} />
                     )}
+                    {elemStatus?.isChecked && !elemStatus.isCorrect && (
+                      <button
+                        type="button"
+                        className="workbook-hint-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setVisibleHints(prev => ({ ...prev, [el.id]: !prev[el.id] }));
+                        }}
+                      >힌트</button>
+                    )}
+                    {visibleHints[el.id] && <div className="workbook-hint-bubble">{getElementHint(el)}</div>}
                   </div>
                 );
               }
@@ -456,7 +641,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
                 const isTriggerCheckedAndCorrect = !!checkedElements[triggerEl?.id]?.isCorrect;
                 
                 return (
-                  <motion.div
+                  <Motion.div
                     key={el.id}
                     className="wb-element wb-mask"
                     initial={{ opacity: 0 }}
@@ -500,6 +685,18 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
             >
               정답 확인
             </button>
+          ) : currentPage.elements.some(element => (
+            (element.type === 'input' || element.type === 'multiple-choice')
+            && checkedElements[element.id]?.isChecked
+            && !checkedElements[element.id]?.isCorrect
+          )) ? (
+            <button
+              className="hud-btn primary submit-btn font-title"
+              onClick={handleRetryPage}
+              style={{ background: 'linear-gradient(135deg, #ef4444, #f97316)' }}
+            >
+              틀린 문제 다시 풀기
+            </button>
           ) : (
             currentPageIndex === pages.length - 1 ? (
               <button 
@@ -535,15 +732,15 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
       {/* Option Selector for Multiple Choice */}
       <AnimatePresence>
         {activeInputId && activeElement?.type === 'multiple-choice' && !checkedPages[currentPageIndex] && (
-          <motion.div 
-            className="math-keypad-overlay" 
+          <Motion.div
+            className="math-keypad-overlay"
             onClick={() => { setActiveInputId(null); setShowKeypad(false); }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div 
-              className="math-keypad-container" 
+            <Motion.div
+              className="math-keypad-container"
               initial={{ y: '20px', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '20px', opacity: 0 }}
@@ -581,8 +778,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
               >
                 닫기
               </button>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
 
@@ -598,6 +795,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
               soundManager.playClick();
             }}
             indicatorText={activeElement?.answer?.includes('/') ? '분수/수식 입력' : '정답 입력'}
+            inputMode={activeElement?.inputMode || 'expression'}
             visible={showKeypad}
             onClose={() => {
               setShowKeypad(false);
@@ -620,7 +818,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
 
       {/* Floating Button for Math Mode explicitly unhidden when in native text mode */}
       {inputMode === 'native' && (
-         <motion.div
+         <Motion.div
            initial={{ opacity: 0, y: 30 }}
            animate={{ opacity: 1, y: 0 }}
            style={{ position: 'absolute', bottom: '3rem', left: 0, width: '100%', display: 'flex', justifyContent: 'center', zIndex: 1000, pointerEvents: 'none' }}
@@ -639,7 +837,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, onComplete, onClose }) => {
            >
              🧮 수학 키패드로 복귀
            </button>
-         </motion.div>
+         </Motion.div>
       )}
     </div>
   );

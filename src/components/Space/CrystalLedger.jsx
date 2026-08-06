@@ -13,6 +13,9 @@ const OPERATOR_GIFT_EMAIL = 'paul@dulcine.net'
 // Transaction type configs
 const TX_CONFIG = {
   quiz_reward: { icon: '🪐', label: '탐사 보상', color: '#4ade80' },
+  quiz_penalty: { icon: '🪐', label: '탐사 감점', color: '#f87171' },
+  workbook_reward: { icon: '🧮', label: '워크북 보상', color: '#22d3ee' },
+  workbook_penalty: { icon: '🧮', label: '워크북 감점', color: '#fb7185' },
   quiz_battle_reward: { icon: '⚔️', label: '퀴즈 배틀 보상', color: '#fbbf24' },
   data_log_reward: { icon: '📄', label: '데이터 로그 보상', color: '#00f3ff' },
   code_trace_reward: { icon: '⌨️', label: '코드 따라쓰기 보상', color: '#22d3ee' },

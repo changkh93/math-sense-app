@@ -74,6 +74,35 @@
   align-items: flex-end;
 }
 
+.fraction-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28em;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.fraction-whole {
+  font-size: 1.15em;
+}
+
+.fraction-stack {
+  display: inline-grid;
+  grid-template-rows: 1fr 1fr;
+  min-width: 1.5em;
+  text-align: center;
+}
+
+.fraction-numerator {
+  border-bottom: 2px solid currentColor;
+  padding: 0 0.2em 0.12em;
+}
+
+.fraction-denominator {
+  padding: 0.12em 0.2em 0;
+}
+
 .keypad-preview .value-text {
   color: white;
   font-size: 2.2rem;

@@ -1902,7 +1902,8 @@ function SpaceHome() {
   const isProcessingSave = useRef(false)
 
   const handleComplete = async (result) => {
-    if (!user || isProcessingSave.current) return
+    if (!user) return { ok: false, error: new Error('로그인 정보를 확인할 수 없습니다.') }
+    if (isProcessingSave.current) return { ok: false, error: new Error('이전 결과를 저장하고 있습니다.') }
     isProcessingSave.current = true
     
     try {
@@ -1915,17 +1916,16 @@ function SpaceHome() {
       const currentRegionId = result.regionId || selectedRegionId || ''
       const currentRegionTitle = result.regionTitle || activeRegion?.title || 'Unknown Galaxy'
       const currentChapterId = result.chapterId || selectedChapterDocId || ''
+      const isWorkbookResult = result.type === 'workbook'
       const isDarkMatterQuizResult = currentUnitId === 'dark_matter_zone'
-      const scoreKey = result.type === 'workbook' ? `${currentUnitId}_workbook` : currentUnitId
+      const scoreKey = isWorkbookResult ? `${currentUnitId}_workbook` : currentUnitId
       const previousBest = bestScores[scoreKey] || 0
       let actualCrystalsEarned = 0
-      let rewardMessage = ""
 
       if (crystalsEarned < 0) {
         // --- Negative Reward (Penalty) ---
         // Always apply penalty even if score didn't improve
         actualCrystalsEarned = crystalsEarned
-        rewardMessage = `무지성 탐사로 인해 광석 ${Math.abs(crystalsEarned)}개가 소멸되었습니다.`
       } else if (isDarkMatterMode || isDarkMatterQuizResult) {
         // --- Dark Matter Confidence-based Reward Policy ---
         // Reward is ONLY given for questions that are solved correctly AND the review mark is released.
@@ -1941,9 +1941,6 @@ function SpaceHome() {
         })
 
         actualCrystalsEarned = Math.min(5, solvedAndReleasedCount)
-        rewardMessage = actualCrystalsEarned > 0 
-          ? `🌌 다크 매터 정화 성공! (+${actualCrystalsEarned} 광석)`
-          : "문제를 맞혔으나 '재검토' 마크를 유지하여 보상이 지급되지 않았습니다. (학습 지속)"
       } else if (score > previousBest) {
         // Incremental reward: sessionCrystals * (newScore - prevBest) / newScore
         const improvementRatio = (score - previousBest) / score
@@ -1963,20 +1960,15 @@ function SpaceHome() {
           const isScannerBonusUnit = checkIsBonusUnit(currentUnitId)
           if (isScannerBonusUnit && isRadarActive(userData)) {
             actualCrystalsEarned += 5
-            rewardMessage += " 📡 스캐너 보너스 탐사 성공! (+5 광석)"
           }
         }
         
         if (actualCrystalsEarned > 0) {
-          rewardMessage = `${score}점으로 최고 기록을 경신했습니다! (+${actualCrystalsEarned} 광석)` + rewardMessage
         } else {
           actualCrystalsEarned = 0
         }
       } else {
         actualCrystalsEarned = 0
-        rewardMessage = score === 100 
-          ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)"
-          : `최고 점수(${previousBest}점)를 넘지 못해 추가 광석을 획득할 수 없습니다.`
       }
 
       // Safety Guard: Ensure actualCrystalsEarned is a valid number
@@ -2003,7 +1995,9 @@ function SpaceHome() {
         const freshProgressData = freshProgressSnap.exists() ? freshProgressSnap.data() : {}
 
         // --- Server-side Reward Calculation (Prevent duplicate payout) ---
-        const serverPreviousBest = freshProgressData.bestScore || 0
+        const serverPreviousBest = isWorkbookResult
+          ? Number(freshProgressData.workbookBestScore ?? previousBest ?? 0)
+          : Number(freshProgressData.quizBestScore ?? previousBest ?? 0)
         let atomicCrystalsEarned = 0
         let rewardMultiplierMeta = null
 
@@ -2052,6 +2046,8 @@ function SpaceHome() {
         const today = getTodayKST()
         const lastQuizDate = freshUserData.lastQuizDate || ""
         const dailyQuizCount = (lastQuizDate === today) ? (freshUserData.dailyQuizCount || 0) + 1 : 1
+        const lastWorkbookDate = freshUserData.lastWorkbookDate || ""
+        const dailyWorkbookCount = (lastWorkbookDate === today) ? (freshUserData.dailyWorkbookCount || 0) + 1 : 1
 
         // --- Direct Growth Counter ---
         const kstPart = getKSTComponents()
@@ -2101,11 +2097,14 @@ function SpaceHome() {
 
         // --- Atomic Logging: Quiz Reward / Penalty ---
         if (atomicCrystalsEarned !== 0) {
-          const stableQuizTxId = `quiz_${currentUnitId}_s${score}_${Date.now()}`; // Add timestamp for penalties to allow multiple
+          const activityPrefix = isWorkbookResult ? 'workbook' : 'quiz'
+          const stableActivityTxId = `${activityPrefix}_${currentUnitId}_s${score}_${Date.now()}`; // penalties may repeat
           
           recordCrystalTransaction(user.uid, {
             amount: atomicCrystalsEarned,
-            type: atomicCrystalsEarned > 0 ? 'quiz_reward' : 'quiz_penalty',
+            type: isWorkbookResult
+              ? (atomicCrystalsEarned > 0 ? 'workbook_reward' : 'workbook_penalty')
+              : (atomicCrystalsEarned > 0 ? 'quiz_reward' : 'quiz_penalty'),
             description: `${currentUnitTitle} ${atomicCrystalsEarned > 0 ? `(${score}점)` : '(시스템 손상)'}`,
             metadata: {
               unitId: currentUnitId,
@@ -2113,13 +2112,18 @@ function SpaceHome() {
               penalty: atomicCrystalsEarned < 0,
               ...buildRewardMultiplierMetadata(rewardMultiplierMeta)
             }
-          }, transaction, atomicCrystalsEarned > 0 ? `quiz_${currentUnitId}_s${score}` : `${stableQuizTxId}`)
+          }, transaction, atomicCrystalsEarned > 0 ? `${activityPrefix}_${currentUnitId}_s${score}` : stableActivityTxId)
         }
 
         // --- Atomic Logging: History ---
-        const existingInitialScore = freshProgressData.initialScore
+        const existingInitialScore = isWorkbookResult
+          ? freshProgressData.workbookInitialScore
+          : freshProgressData.quizInitialScore
         const sessionAttemptCount = result.attemptCount || 1 // 1 pass + N re-solves
-        const currentAttemptCount = (freshProgressData.attemptCount || 0) + sessionAttemptCount
+        const currentAttemptCount = (
+          isWorkbookResult ? freshProgressData.workbookAttemptCount : freshProgressData.quizAttemptCount
+        ) || 0
+        const nextAttemptCount = currentAttemptCount + sessionAttemptCount
         
         // 진척도 문서(learning_progress)에는 최초 발생했던 점수를 영구 보존합니다.
         const initialScoreToSave = (existingInitialScore !== undefined) ? existingInitialScore : (result.initialRawScore ?? score)
@@ -2142,37 +2146,61 @@ function SpaceHome() {
           rewardMultiplierReason: rewardMultiplierMeta?.reason || 'none',
           rewardBaseAmount: rewardMultiplierMeta?.baseAmount ?? atomicCrystalsEarned,
           rewardBonusAmount: rewardMultiplierMeta?.bonusAmount || 0,
-          type: result.type === 'workbook' ? 'workbook' : 'quiz',
+          type: isWorkbookResult ? 'workbook' : 'quiz',
+          ...(isWorkbookResult ? { workbookResponses: result.workbookResponses || [] } : {}),
           timestamp: serverTimestamp()
         })
 
-        // --- Update Progress Doc (Source of truth for bestScore, initialScore, attemptCount) ---
-        transaction.set(progressDocRef, {
+        // Quiz and workbook metrics intentionally use separate fields.
+        const progressScoreUpdates = isWorkbookResult ? {
+          workbookBestScore: Math.max(serverPreviousBest, score),
+          workbookInitialScore: initialScoreToSave,
+          workbookAttemptCount: nextAttemptCount,
+          workbookCompleted: true,
+        } : {
+          // Keep legacy fields quiz-only for consumers that have not migrated yet.
           bestScore: Math.max(serverPreviousBest, score),
           initialScore: initialScoreToSave,
-          attemptCount: currentAttemptCount,
-          updatedAt: serverTimestamp()
-        }, { merge: true })
+          attemptCount: nextAttemptCount,
+          quizBestScore: Math.max(serverPreviousBest, score),
+          quizInitialScore: initialScoreToSave,
+          quizAttemptCount: nextAttemptCount,
+          quizCompleted: true,
+        }
+        transaction.set(progressDocRef, { ...progressScoreUpdates, updatedAt: serverTimestamp() }, { merge: true })
 
-        const userUpdates = {
+        const commonUserUpdates = {
           crystals: (freshUserData.crystals || 0) + atomicCrystalsEarned,
-          totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
-          totalScore: (freshUserData.totalScore || 0) + score,
-          averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
-          perfectCount: (isPerfect && serverPreviousBest < 100) ? (freshUserData.perfectCount || 0) + 1 : (freshUserData.perfectCount || 0),
-          consecutiveGood: prevConsecutiveGood,
           shieldDefended: (freshUserData.shieldDefended || 0) + (shieldsUsed || 0),
-          dailyQuizCount: dailyQuizCount,
-          lastQuizDate: today,
           lastActive: serverTimestamp(),
           shieldCharges: Math.max(0, currentShieldCharges - (shieldsUsed || 0)),
           ...growthUpdates,
           ...streakUpdates
         }
+        const userUpdates = isWorkbookResult ? {
+          ...commonUserUpdates,
+          totalWorkbooks: (freshUserData.totalWorkbooks || 0) + 1,
+          workbookTotalScore: (freshUserData.workbookTotalScore || 0) + score,
+          workbookAverageScore: ((freshUserData.workbookTotalScore || 0) + score) / ((freshUserData.totalWorkbooks || 0) + 1),
+          workbookPerfectCount: (isPerfect && serverPreviousBest < 100)
+            ? (freshUserData.workbookPerfectCount || 0) + 1
+            : (freshUserData.workbookPerfectCount || 0),
+          dailyWorkbookCount,
+          lastWorkbookDate: today,
+        } : {
+          ...commonUserUpdates,
+          totalQuizzes: (freshUserData.totalQuizzes || 0) + 1,
+          totalScore: (freshUserData.totalScore || 0) + score,
+          averageScore: ((freshUserData.totalScore || 0) + score) / ((freshUserData.totalQuizzes || 0) + 1),
+          perfectCount: (isPerfect && serverPreviousBest < 100) ? (freshUserData.perfectCount || 0) + 1 : (freshUserData.perfectCount || 0),
+          consecutiveGood: prevConsecutiveGood,
+          dailyQuizCount,
+          lastQuizDate: today,
+        }
 
         if (Object.keys(streakUpdates).length > 0) {
           userUpdates.streakWriteAudit = buildStreakWriteAudit({
-            source: 'space_home_quiz_complete',
+            source: isWorkbookResult ? 'space_home_workbook_complete' : 'space_home_quiz_complete',
             writerUid: user.uid,
             prevState: freshUserData,
             nextState: {
@@ -2335,8 +2363,10 @@ function SpaceHome() {
         }
       })
       clearMissionSelection()
+      return { ok: true }
     } catch (error) {
       console.error("Error saving quiz result:", error)
+      return { ok: false, error }
     } finally {
       isProcessingSave.current = false
     }

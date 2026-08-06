@@ -264,6 +264,8 @@ export function isLearningRewardTransactionType(type = '') {
   return (
     type === 'quiz_reward' ||
     type === 'quiz_penalty' ||
+    type === 'workbook_reward' ||
+    type === 'workbook_penalty' ||
     type === 'transmission_reward' ||
     type === 'data_log_reward'
   );

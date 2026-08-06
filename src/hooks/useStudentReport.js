@@ -346,7 +346,7 @@ async function fetchPeerComparison(activeRegions, startTs, endTs, myUserId) {
 
         const hType = data.type || 'quiz_pass';
         const isVideo = hType.includes('video') || hType === 'recovery_mastery';
-        const isQuiz = (hType.includes('quiz') || (!isVideo && hType !== 'text' && hType !== 'data_log_read')) && hType !== 'quiz_battle' && hType !== 'code_trace';
+        const isQuiz = (hType.includes('quiz') || (!data.type && !isVideo)) && hType !== 'quiz_battle' && hType !== 'code_trace' && hType !== 'workbook';
 
         if (isVideo && data.videoTime) {
           userStats[uid].videoSeconds += data.videoTime;
@@ -469,7 +469,7 @@ function analyzeLearning(history, days) {
 
     const hType = h.type || 'quiz_pass';
     const isVideo = hType.includes('video') || hType === 'recovery_mastery';
-    const isQuiz = (hType.includes('quiz') || (!isVideo && hType !== 'text' && hType !== 'data_log_read')) && hType !== 'quiz_battle' && hType !== 'code_trace';
+    const isQuiz = (hType.includes('quiz') || (!h.type && !isVideo)) && hType !== 'quiz_battle' && hType !== 'code_trace' && hType !== 'workbook';
 
     if (isVideo) {
       const vTime = h.videoTime || 0;

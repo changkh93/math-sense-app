@@ -161,6 +161,7 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
       ...base,
       answer,
       inputMode,
+      ...(String(rawElement.hint || '').trim() ? { hint: String(rawElement.hint).trim() } : {}),
       ...(acceptedAnswers.length ? { acceptedAnswers } : {}),
       ...(rawElement.answerSpec && typeof rawElement.answerSpec === 'object'
         ? { answerSpec: rawElement.answerSpec }
@@ -280,6 +281,7 @@ integer | decimal | fraction | mixed-number | expression | text
       "answer": "18÷2",
       "acceptedAnswers": [],
       "answerSpec": { "kind": "literal-expression" },
+      "hint": "구슬의 수와 사람 수를 나눗셈 기호로 연결해 보세요.",
       "sourceText": "구슬 18개를 2사람에게 똑같이 나누세요.",
       "confidence": 0.98,
       "position": { "top": 38.2, "left": 22.1, "width": 13.5, "height": 4.2 }

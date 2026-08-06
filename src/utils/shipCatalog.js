@@ -199,7 +199,7 @@ export function normalizeShipLoadout(userData = {}, familyOverride) {
 
 export function getShipAchievementStats(userData = {}, history = []) {
   const summaryStats = userData?.learningSummary?.stats || {}
-  const quizRows = history.filter((row) => !['video', 'text'].includes(row?.type))
+  const quizRows = history.filter((row) => !row?.type || row.type === 'quiz' || row.type === 'quiz_pass')
   const darkMatterRows = history.filter((row) => String(row?.unitId || '').includes('dark_matter'))
   return {
     quiz: Math.max(Number(userData?.quizCount || 0), Number(summaryStats.quizAttempts || 0), quizRows.length),

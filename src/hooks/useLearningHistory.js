@@ -295,7 +295,7 @@ export function useLearningHistory(userId, dateStr) {
       const metadata = data.metadata || {};
 
       // Skip types already captured by history
-      if (tType === 'quiz_reward' || tType === 'mastery_bonus' || tType === 'quiz_penalty' || tType === 'quiz_battle_reward') return;
+      if (tType === 'quiz_reward' || tType === 'mastery_bonus' || tType === 'quiz_penalty' || tType === 'quiz_battle_reward' || tType === 'workbook_reward' || tType === 'workbook_penalty') return;
 
       let displayType = 'general';
       let displayTitle = data.amount < 0 ? `🛒 광석 소모: ${desc}` : `💎 광석 획득: ${desc}`;

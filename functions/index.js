@@ -277,7 +277,7 @@ function getKSTWeekMondayString(date = new Date()) {
   return getKSTDateString(new Date(kstMidnightUtcMs - (mondayOffset * 24 * 60 * 60 * 1000)));
 }
 
-const LEARNING_SUMMARY_SCHEMA_VERSION = 1;
+const LEARNING_SUMMARY_SCHEMA_VERSION = 2;
 const LEARNING_SUMMARY_MAX_DAYS = 540;
 
 function historyTimestampMs(data = {}) {
@@ -358,7 +358,15 @@ function buildUnitLearningSummary(unitId, rows = []) {
 function buildLearningSummary(historyDocs = []) {
   const dailyMap = new Map();
   const unitRows = new Map();
-  const stats = { quizAttempts: 0, quizScoreSum: 0, perfectAttempts: 0, darkMatterRecovered: 0 };
+  const stats = {
+    quizAttempts: 0,
+    quizScoreSum: 0,
+    perfectAttempts: 0,
+    workbookAttempts: 0,
+    workbookScoreSum: 0,
+    workbookPerfectAttempts: 0,
+    darkMatterRecovered: 0,
+  };
 
   historyDocs.forEach((row) => {
     const data = row.data ? row.data() : row;
@@ -368,10 +376,14 @@ function buildLearningSummary(historyDocs = []) {
       unitRows.get(data.unitId).push(data);
     }
     const type = historyActivityType(data);
-    if (type === "quiz" || type === "workbook") {
+    if (type === "quiz") {
       stats.quizAttempts += 1;
       stats.quizScoreSum += Number(data.score || 0);
       if (Number(data.score) === 100) stats.perfectAttempts += 1;
+    } else if (type === "workbook") {
+      stats.workbookAttempts += 1;
+      stats.workbookScoreSum += Number(data.score || 0);
+      if (Number(data.score) === 100) stats.workbookPerfectAttempts += 1;
     }
     if (String(data.unitId || "").includes("dark_matter") && Number(data.score || 0) >= 80) {
       stats.darkMatterRecovered += 1;
@@ -457,14 +469,27 @@ exports.syncLearningSummary = costOptimizedDataFunctions.firestore
         else unitsById.delete(unitId);
       });
 
-      const stats = { quizAttempts: 0, quizScoreSum: 0, perfectAttempts: 0, darkMatterRecovered: 0, ...(fresh.stats || {}) };
+      const stats = {
+        quizAttempts: 0,
+        quizScoreSum: 0,
+        perfectAttempts: 0,
+        workbookAttempts: 0,
+        workbookScoreSum: 0,
+        workbookPerfectAttempts: 0,
+        darkMatterRecovered: 0,
+        ...(fresh.stats || {}),
+      };
       const applyStats = (data, direction) => {
         if (!data) return;
         const type = historyActivityType(data);
-        if (type === "quiz" || type === "workbook") {
+        if (type === "quiz") {
           stats.quizAttempts += direction;
           stats.quizScoreSum += direction * Number(data.score || 0);
           if (Number(data.score) === 100) stats.perfectAttempts += direction;
+        } else if (type === "workbook") {
+          stats.workbookAttempts += direction;
+          stats.workbookScoreSum += direction * Number(data.score || 0);
+          if (Number(data.score) === 100) stats.workbookPerfectAttempts += direction;
         }
         if (String(data.unitId || "").includes("dark_matter") && Number(data.score || 0) >= 80) stats.darkMatterRecovered += direction;
       };
