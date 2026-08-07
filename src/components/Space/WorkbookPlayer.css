@@ -526,6 +526,128 @@
   gap: 2rem;
 }
 
+/* === Pen tool toolbar (header) === */
+.workbook-pen-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.workbook-pen-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.workbook-pen-toolbar__divider {
+  width: 1px;
+  height: 22px;
+  background: rgba(0, 243, 255, 0.25);
+  flex: 0 0 auto;
+}
+
+.workbook-pen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0 0.55rem;
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(0, 243, 255, 0.1);
+  color: var(--crystal-cyan, #00d4ff);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.workbook-pen-btn:hover {
+  background: rgba(0, 243, 255, 0.2);
+}
+
+.workbook-pen-btn.active {
+  border-color: var(--crystal-cyan, #00d4ff);
+  background: rgba(0, 243, 255, 0.28);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Primary "Solve problem" mode button — visually stronger than drawing tools */
+.workbook-pen-btn--mode {
+  padding: 0 0.75rem;
+  font-size: 0.82rem;
+}
+
+.workbook-pen-btn__label {
+  line-height: 1;
+}
+
+.workbook-pen-btn.workbook-pen-clear {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.workbook-pen-btn.workbook-pen-clear:hover {
+  background: rgba(248, 113, 113, 0.22);
+}
+
+.workbook-pen-colors {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-left: 0.2rem;
+}
+
+.workbook-pen-color {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.workbook-pen-color:hover {
+  transform: scale(1.12);
+}
+
+.workbook-pen-color.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6), 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* === Drawing canvas overlay === */
+.workbook-scratch-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 20; /* above inputs (10) and interactions (6); below keypad popups (1000+) */
+  pointer-events: none; /* container never blocks; the canvas toggles its own pointer events */
+}
+
+.workbook-scratch-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.workbook-scratch-canvas__surface {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  pointer-events: none; /* overridden by JS when a pen/eraser tool is active */
+}
+
 @media (max-width: 768px) {
   .workbook-player-container {
     height: 100dvh;
@@ -621,5 +743,40 @@
   .wb-input {
     border-width: 1.5px;
     font-size: 0.92rem;
+  }
+
+  .workbook-pen-toolbar {
+    gap: 0.25rem;
+  }
+
+  .workbook-pen-tools {
+    gap: 0.2rem;
+  }
+
+  .workbook-pen-btn {
+    min-height: 32px;
+    min-width: 32px;
+    padding: 0 0.35rem;
+    font-size: 0.7rem;
+  }
+
+  /* On narrow screens, hide the inline tool labels (펜/지우개) and keep the primary
+     mode label. The drawing tools stay icon-only. */
+  .workbook-pen-tools .workbook-pen-btn__label {
+    display: none;
+  }
+
+  .workbook-pen-btn--mode {
+    padding: 0 0.5rem;
+    font-size: 0.72rem;
+  }
+
+  .workbook-pen-colors {
+    gap: 0.18rem;
+  }
+
+  .workbook-pen-color {
+    width: 20px;
+    height: 20px;
   }
 }

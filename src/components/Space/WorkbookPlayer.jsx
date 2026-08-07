@@ -6,7 +6,16 @@ import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/fire
 import soundManager from '../../utils/SoundManager';
 import MathKeypad from './MathKeypad';
 import WorkbookInteraction from './WorkbookInteraction';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import WorkbookScratchCanvas from './WorkbookScratchCanvas';
+
+const PEN_COLORS = [
+  { value: '#ef4444', label: '빨강' },
+  { value: '#2563eb', label: '파랑' },
+  { value: '#111827', label: '검정' },
+  { value: '#7c3aed', label: '보라' },
+  { value: '#16a34a', label: '초록' },
+];
+import { ArrowLeft, ArrowRight, Sparkles, MousePointerClick, Pencil, Eraser, Trash2 } from 'lucide-react';
 import { createParticleBurst, shakeScreen } from './ParticleEffects';
 import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { auth, db } from '../../firebase';
@@ -104,6 +113,12 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   const [completionError, setCompletionError] = useState('');
   const inputRefs = React.useRef({});
   const autosaveTimerRef = useRef(null);
+  const scratchCanvasRef = useRef(null);
+
+  // Pen tool state for the workbook drawing overlay.
+  const [activePenTool, setActivePenTool] = useState('select'); // 'select' | 'pen' | 'eraser'
+  const [penColor, setPenColor] = useState(PEN_COLORS[0].value);
+  const [pageDrawings, setPageDrawings] = useState({}); // { [pageIndex]: dataUrl }
 
   const currentPage = pages[currentPageIndex];
   const workbookSignature = useMemo(() => (pages || []).map(page => page.id).join('|'), [pages]);
@@ -365,6 +380,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   };
 
   const handleSubmitFinal = () => {
+    flushCurrentScratch();
     soundManager.playClick();
     setIsResultMode(true);
   };
@@ -435,8 +451,19 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     }
   };
 
+  // Pull the current page's drawing out of the canvas on demand (page navigation / result
+  // mode). We avoid exporting on every stroke so continuous drawing stays smooth.
+  const flushCurrentScratch = () => {
+    const canvasEl = scratchCanvasRef.current?.querySelector?.('.workbook-scratch-canvas__surface');
+    if (canvasEl && typeof canvasEl.__workbookScratchGetData === 'function') {
+      const dataUrl = canvasEl.__workbookScratchGetData();
+      setPageDrawings(prev => ({ ...prev, [currentPageIndex]: dataUrl }));
+    }
+  };
+
   const goToPrev = () => {
     if (currentPageIndex > 0) {
+      flushCurrentScratch();
       setCurrentPageIndex(prev => prev - 1);
       setActiveInputId(null);
       setShowKeypad(false);
@@ -446,11 +473,35 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
 
   const goToNext = () => {
     if (currentPageIndex < pages.length - 1) {
+      flushCurrentScratch();
       setCurrentPageIndex(prev => prev + 1);
       setActiveInputId(null);
       setShowKeypad(false);
       soundManager.playClick();
     }
+  };
+
+  const handleSelectPenTool = (nextTool) => {
+    setActivePenTool(prev => {
+      const chosen = prev === nextTool ? 'select' : nextTool;
+      soundManager.playClick();
+      return chosen;
+    });
+  };
+
+  const handleSelectPenColor = (color) => {
+    setPenColor(color);
+    if (activePenTool !== 'pen') setActivePenTool('pen');
+    soundManager.playClick();
+  };
+
+  const handleClearScratch = () => {
+    const canvasEl = scratchCanvasRef.current?.querySelector?.('.workbook-scratch-canvas__surface');
+    if (canvasEl && typeof canvasEl.__workbookScratchClear === 'function') {
+      canvasEl.__workbookScratchClear();
+    }
+    setPageDrawings(prev => ({ ...prev, [currentPageIndex]: '' }));
+    soundManager.playClick();
   };
 
   // Determine indicator text for keypad
@@ -608,6 +659,66 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         <button className="back-btn" onClick={onClose}>✕</button>
         <span className="font-title unit-title">{unitTitle || '스마트 워크북'}</span>
         <div className="workbook-header-actions">
+          <div className="workbook-pen-toolbar" role="toolbar" aria-label="학습/판서 도구">
+            {/* Learning mode — primary, distinguished from drawing tools */}
+            <button
+              type="button"
+              className={`workbook-pen-btn workbook-pen-btn--mode ${activePenTool === 'select' ? 'active' : ''}`}
+              aria-pressed={activePenTool === 'select'}
+              onClick={() => handleSelectPenTool('select')}
+            >
+              <MousePointerClick size={18} aria-hidden="true" />
+              <span className="workbook-pen-btn__label">문제 풀기</span>
+            </button>
+
+            <span className="workbook-pen-toolbar__divider" aria-hidden="true" />
+
+            {/* Drawing tools */}
+            <div className="workbook-pen-tools">
+              <button
+                type="button"
+                className={`workbook-pen-btn ${activePenTool === 'pen' ? 'active' : ''}`}
+                aria-pressed={activePenTool === 'pen'}
+                onClick={() => handleSelectPenTool('pen')}
+              >
+                <Pencil size={18} aria-hidden="true" />
+                {activePenTool === 'pen' && <span className="workbook-pen-btn__label">펜</span>}
+              </button>
+              {activePenTool === 'pen' && (
+                <div className="workbook-pen-colors" role="group" aria-label="펜 색상">
+                  {PEN_COLORS.map(color => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      className={`workbook-pen-color ${penColor === color.value ? 'active' : ''}`}
+                      style={{ backgroundColor: color.value }}
+                      aria-label={color.label}
+                      aria-pressed={penColor === color.value}
+                      onClick={() => handleSelectPenColor(color.value)}
+                    />
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                className={`workbook-pen-btn ${activePenTool === 'eraser' ? 'active' : ''}`}
+                aria-pressed={activePenTool === 'eraser'}
+                onClick={() => handleSelectPenTool('eraser')}
+              >
+                <Eraser size={18} aria-hidden="true" />
+                {activePenTool === 'eraser' && <span className="workbook-pen-btn__label">지우개</span>}
+              </button>
+              <button
+                type="button"
+                className="workbook-pen-btn workbook-pen-clear"
+                aria-label="필기 모두 지우기"
+                title="필기 모두 지우기"
+                onClick={handleClearScratch}
+              >
+                <Trash2 size={18} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
           <div className="page-indicator font-tech">
             {currentPageIndex + 1} / {pages.length}
           </div>
@@ -626,6 +737,19 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
               draggable={false}
             />
             
+            {/* Drawing overlay. Sits above the page image and interactive elements so the pen
+                can draw anywhere, but only receives pointer events in pen/eraser mode. A tap
+                (movement < 6px) is forwarded to the .wb-element beneath it. */}
+            <div ref={scratchCanvasRef} className="workbook-scratch-layer" aria-hidden={activePenTool === 'select'}>
+              <WorkbookScratchCanvas
+                tool={activePenTool}
+                penColor={penColor}
+                pageIndex={currentPageIndex}
+                initialData={pageDrawings[currentPageIndex] || null}
+                interactionLocked={!!activeInputId || isResultMode}
+              />
+            </div>
+
             {/* Elements Overlay */}
             {currentPage.elements.map((el) => {
               if (WORKBOOK_INTERACTION_TYPES.has(el.type)) {
