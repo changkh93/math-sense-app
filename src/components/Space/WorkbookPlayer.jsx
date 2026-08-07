@@ -59,6 +59,19 @@ const WorkbookAnswerDisplay = ({ value, inputMode }) => {
 
 const WorkbookChoiceContent = ({ value, keyPrefix }) => {
   if (!isWorkbookMathDisplayValue(value)) {
+    const str = String(value || '');
+    if (str.includes('\n')) {
+      const lines = str.split('\n');
+      return (
+        <div className="workbook-choice-stacked" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', lineHeight: 1.15, letterSpacing: '0.12em' }}>
+          {lines.map((line, lIdx) => (
+            <div key={`${keyPrefix}-line-${lIdx}`} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              {parseInlineFormatting(line, { keyPrefix: `${keyPrefix}-l-${lIdx}` })}
+            </div>
+          ))}
+        </div>
+      );
+    }
     return parseInlineFormatting(value, { keyPrefix });
   }
 
