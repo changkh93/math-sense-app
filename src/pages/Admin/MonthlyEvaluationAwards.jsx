@@ -53,8 +53,13 @@ function hasActiveCourse(user = {}, courseClusterId) {
   return hasActiveCourseAccess(user, courseClusterId)
 }
 
+function isQuizRecord(record) {
+  if (!record) return false
+  return !record.type || record.type === 'quiz' || record.type === 'quiz_pass'
+}
+
 function getBestHistory(records = []) {
-  const quizRecords = records.filter(r => r.type !== 'quiz_battle' && r.type !== 'battle')
+  const quizRecords = records.filter(isQuizRecord)
   return quizRecords.reduce((best, record) => {
     const score = Number(record.score)
     if (!Number.isFinite(score)) return best
@@ -144,7 +149,7 @@ export default function MonthlyEvaluationAwards() {
         .filter(entry => {
           if (!entry.gradeOption) return false
           const records = historyByStudentUnit[`${user.uid}_${entry.unitId}`] || []
-          const quizRecords = records.filter(r => r.type !== 'quiz_battle' && r.type !== 'battle')
+          const quizRecords = records.filter(isQuizRecord)
           return quizRecords.length > 0
         })
         .map(entry => ({
@@ -181,7 +186,7 @@ export default function MonthlyEvaluationAwards() {
         activeCourses.forEach(course => {
           const unitId = gradeEntry.unitId || getEvaluationUnitIdForGrade(year, month, normalizedGrade)
           const historyRecords = unitId ? historyByStudentUnit[`${user.uid}_${unitId}`] || [] : []
-          const quizRecords = historyRecords.filter(r => r.type !== 'quiz_battle' && r.type !== 'battle')
+          const quizRecords = historyRecords.filter(isQuizRecord)
           const bestHistory = getBestHistory(historyRecords)
           const awardId = buildMonthlyAwardId({
             studentId: user.uid,
