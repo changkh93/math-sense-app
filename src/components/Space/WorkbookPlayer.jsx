@@ -898,7 +898,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       setShowKeypad(false); // Make sure keypad isn't shown
                     }}
                   >
-                    <span style={{ fontSize: '1rem', fontWeight: val ? 'bold' : 'normal', color: val ? '#111827' : '#667085', display: 'flex', alignItems: 'center', textShadow: 'none' }}>
+                    <span style={{ fontSize: '1rem', fontWeight: val ? 'bold' : 'normal', color: val ? '#111827' : '#667085', display: 'flex', alignItems: 'center', textShadow: 'none', whiteSpace: 'pre-wrap', lineHeight: 1.2, letterSpacing: '0.1em' }}>
                       {val ? <WorkbookChoiceContent value={val} keyPrefix={`workbook-selected-${el.id}`} /> : '선택'}
                     </span>
                     {elemStatus?.isChecked && (
@@ -1084,7 +1084,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       background: answers[activeInputId] === opt ? 'rgba(0, 243, 243, 0.15)' : 'rgba(255,255,255,0.05)',
                       cursor: 'pointer', borderRadius: '12px', transition: 'all 0.2s',
                       boxShadow: answers[activeInputId] === opt ? '0 0 15px rgba(0,243,255,0.3)' : 'none',
-                      display: 'flex', justifyContent: 'center', alignItems: 'center'
+                      display: 'flex', justifyContent: 'center', alignItems: 'center',
+                      whiteSpace: 'pre-wrap', lineHeight: 1.25, letterSpacing: '0.12em'
                     }}
                     onClick={() => {
                       soundManager.playClick();
