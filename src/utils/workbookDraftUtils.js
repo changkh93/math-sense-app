@@ -172,8 +172,8 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
       const options = Array.isArray(rawElement.options)
         ? rawElement.options.map(option => String(option ?? '').trim()).filter(Boolean)
         : [];
-      if (options.length < 2) {
-        throw new Error(`${index + 1}번째 객관식 요소에는 최소 2개의 options가 필요합니다.`);
+      if (options.length < 1) {
+        throw new Error(`${index + 1}번째 객관식 요소에는 최소 1개의 options가 필요합니다.`);
       }
       if (!options.includes(answer)) {
         throw new Error(`${index + 1}번째 객관식 answer는 options 중 하나와 정확히 일치해야 합니다.`);
@@ -256,8 +256,8 @@ export const validateWorkbookPagesForPublish = (pages) => {
         }
       }
       if (element?.type === 'multiple-choice') {
-        if (!Array.isArray(element.options) || element.options.length < 2) {
-          issues.push(`${elementLabel}: 객관식 선택지가 2개 미만입니다.`);
+        if (!Array.isArray(element.options) || element.options.length < 1) {
+          issues.push(`${elementLabel}: 객관식 선택지가 1개 미만입니다.`);
         } else if (!element.options.includes(element.answer)) {
           issues.push(`${elementLabel}: 정답이 선택지에 포함되어 있지 않습니다.`);
         }
