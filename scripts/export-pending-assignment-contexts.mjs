@@ -492,6 +492,7 @@ async function summarizeLearningProgress(progressDocs, start, end, courseId, opt
         totalPages,
         answeredCount,
         checkedPageCount,
+        pageCrystalsEarned: Number(workbookSession.pageActualRewardsPaid || 0),
         updatedAt: workbookUpdatedAt.toISOString(),
       });
     }

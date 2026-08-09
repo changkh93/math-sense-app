@@ -80,7 +80,9 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 - 진행 중 워크북을 완료로 표현하지 않는다. “3/8페이지 진행, 답안 5개 입력”처럼 현재 상태를 적는다.
 - 워크북 평균은 워크북 점수만으로 계산하고 일반 퀴즈 평균과 섞지 않는다.
 - `hasPractice`, `hasLearningFollowUpActivity`, `hasCourseLearningRecord`, 저학습 판단에 완료/진행 워크북을 포함한다.
-- 광석 지급은 사용자 잔고, `history.crystalsEarned`, `history.crystalTransactionId`, `crystal_transactions` 원장이 같은 Firestore transaction에서 함께 저장되는지 확인한다. 최고점 개선분만 지급하는 정책 때문에 동일 점수 재도전의 원장 항목이 없는 것은 정상이다.
+- 워크북 기본 광석은 각 페이지의 “정답 확인”이 성공할 때 즉시 지급한다. “오늘은 여기까지”로 종료해도 이미 확정된 페이지 보상은 잔고와 `crystal_transactions` 원장에 남아야 한다. 전체 완료 시점에는 미지급 기존 세션분과 최초 만점 보너스만 정산한다.
+- 페이지 보상은 `workbookSignature + pageId + pageAttempt`로 멱등성을 보장하고, 사용자 잔고·성장 카운터·`learning_progress.workbookPageRewardAttempts`·`crystal_transactions`를 하나의 Firestore transaction에서 함께 저장한다. 네트워크 재시도나 재접속으로 같은 페이지 시도가 중복 지급되어서는 안 된다.
+- 완료 워크북은 `history.crystalsEarned`(완료 시 추가 정산분), `history.workbookPageCrystalsEarned`(페이지 즉시 지급분), `history.workbookTotalCrystalsEarned`(합계)를 구분한다. 진행 중 워크북은 `workbookSession.pageActualRewardsPaid`를 일일 학습 기록과 과제 피드백 컨텍스트에 노출한다.
 - 과거 워크북 보상이 잔고/history에는 있으나 원장에 없을 때는 `node scripts/backfill-workbook-crystal-ledger.mjs`로 dry-run한 뒤 `--apply`를 붙인다. 이 도구는 잔고를 다시 지급하지 않고 누락 원장과 history의 `crystalTransactionId`만 복원하며, 금액 충돌이 있으면 쓰기를 중단한다.
 
 ## 정규 학습 시간 기준

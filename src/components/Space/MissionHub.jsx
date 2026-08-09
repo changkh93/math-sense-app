@@ -851,6 +851,7 @@ export default function MissionHub({
   bestScores = {}, // passed from SpaceHome
   initialMode = 'briefing', // pre-computed by SpaceHome: 'briefing', 'text', 'video', 'quiz-modal'
   onNonQuizActivityComplete,
+  onWorkbookPageReward,
   clusterId, // added to handle cluster-specific UI
   regionId
 }) {
@@ -3467,6 +3468,7 @@ export default function MissionHub({
             unitTitle={activeUnit?.title}
             studentProfile={userData}
             onComplete={onComplete}
+            onPageReward={onWorkbookPageReward}
             onClose={returnFromContent}
           />
         </Suspense>

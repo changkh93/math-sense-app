@@ -102,7 +102,7 @@ const serializeWorkbookResponse = (value) => {
   try { return JSON.stringify(value ?? '').slice(0, 2000); } catch { return ''; }
 };
 
-const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onComplete, onClose, previewMode = false }) => {
+const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onComplete, onPageReward, onClose, previewMode = false }) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { id: value }
   const [checkedElements, setCheckedElements] = useState({}); // { id: { isCorrect, isChecked } }
@@ -114,6 +114,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   const [inputMode, setInputMode] = useState('math'); // 'math' or 'native'
   const [floatingMarkers, setFloatingMarkers] = useState([]); // { id, text, type, x, y }
   const [sessionCrystals, setSessionCrystals] = useState(0);
+  const [pageBaseRewardsPaid, setPageBaseRewardsPaid] = useState(0);
+  const [pageActualRewardsPaid, setPageActualRewardsPaid] = useState(0);
+  const [savingPageReward, setSavingPageReward] = useState(false);
+  const [pageRewardError, setPageRewardError] = useState('');
   const [shuffledOptionsMap, setShuffledOptionsMap] = useState({}); // { elId: [shuffledArray] }
   const [attemptCounts, setAttemptCounts] = useState({});
   const [firstAttemptCorrect, setFirstAttemptCorrect] = useState({});
@@ -158,6 +162,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       setFirstAttemptCorrect(session.firstAttemptCorrect || {});
       setWrongAnswerHistory(session.wrongAnswerHistory || {});
       setSessionCrystals(Math.max(0, Number(session.sessionCrystals) || 0));
+      setPageBaseRewardsPaid(Math.max(0, Number(session.pageBaseRewardsPaid) || 0));
+      setPageActualRewardsPaid(Math.max(0, Number(session.pageActualRewardsPaid) || 0));
       return true;
     };
 
@@ -203,6 +209,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       firstAttemptCorrect,
       wrongAnswerHistory,
       sessionCrystals,
+      pageBaseRewardsPaid,
+      pageActualRewardsPaid,
       savedAtMs: Date.now(),
     };
     localStorage.setItem(progressStorageKey, JSON.stringify(session));
@@ -220,33 +228,61 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       }
     }, 700);
     return () => clearTimeout(autosaveTimerRef.current);
-  }, [answers, attemptCounts, checkedElements, checkedPages, currentPageIndex, firstAttemptCorrect, isResultMode, previewMode, progressHydrated, progressStorageKey, sessionCrystals, unitId, workbookSignature, wrongAnswerHistory]);
+  }, [answers, attemptCounts, checkedElements, checkedPages, currentPageIndex, firstAttemptCorrect, isResultMode, pageActualRewardsPaid, pageBaseRewardsPaid, previewMode, progressHydrated, progressStorageKey, sessionCrystals, unitId, workbookSignature, wrongAnswerHistory]);
 
   const handlePauseWorkbook = async () => {
-    if (savingPause) return;
+    if (savingPause || savingPageReward) return;
     if (previewMode) {
       onClose();
       return;
     }
 
-    const session = {
-      schemaVersion: 1,
-      workbookSignature,
-      currentPageIndex,
-      answers,
-      checkedElements,
-      checkedPages,
-      attemptCounts,
-      firstAttemptCorrect,
-      wrongAnswerHistory,
-      sessionCrystals,
-      savedAtMs: Date.now(),
-    };
-
     setSavingPause(true);
     setPauseError('');
     clearTimeout(autosaveTimerRef.current);
     try {
+      let nextPageBaseRewardsPaid = pageBaseRewardsPaid;
+      let nextPageActualRewardsPaid = pageActualRewardsPaid;
+      const unpaidLegacyBase = Math.max(0, sessionCrystals - pageBaseRewardsPaid);
+      if (unpaidLegacyBase > 0 && onPageReward) {
+        const rewardOutcome = await onPageReward({
+          type: 'workbook_page',
+          rewardScope: 'legacy_session',
+          unitId,
+          unitTitle,
+          workbookSignature,
+          pageId: '__legacy_session__',
+          pageIndex: currentPageIndex,
+          pageNumber: currentPageIndex + 1,
+          pageAttempt: 1,
+          correctCount: 0,
+          wrongCount: 0,
+          totalCount: 0,
+          baseCrystalsEarned: unpaidLegacyBase,
+        });
+        if (rewardOutcome?.ok === false) throw rewardOutcome.error || new Error('기존 세션 보상 정산에 실패했습니다.');
+        nextPageBaseRewardsPaid += unpaidLegacyBase;
+        nextPageActualRewardsPaid += Math.max(0, Number(rewardOutcome?.actualReward) || 0);
+        setPageBaseRewardsPaid(nextPageBaseRewardsPaid);
+        setPageActualRewardsPaid(nextPageActualRewardsPaid);
+      }
+
+      const session = {
+        schemaVersion: 1,
+        workbookSignature,
+        currentPageIndex,
+        answers,
+        checkedElements,
+        checkedPages,
+        attemptCounts,
+        firstAttemptCorrect,
+        wrongAnswerHistory,
+        sessionCrystals,
+        pageBaseRewardsPaid: nextPageBaseRewardsPaid,
+        pageActualRewardsPaid: nextPageActualRewardsPaid,
+        savedAtMs: Date.now(),
+      };
+
       localStorage.setItem(progressStorageKey, JSON.stringify(session));
       const uid = auth.currentUser?.uid;
       if (uid && unitId) {
@@ -310,8 +346,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     }, 2000);
   };
 
-  const handleCheckPage = (e) => {
-    if (checkedPages[currentPageIndex]) return;
+  const handleCheckPage = async (e) => {
+    if (checkedPages[currentPageIndex] || savingPageReward) return;
 
     let localCorrect = 0;
     let localWrong = 0;
@@ -365,6 +401,38 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         shakeScreen(300);
     }
 
+    const pageBaseReward = Math.max(0, (localCorrect * 1) - (localWrong * 2));
+
+    if (!previewMode && onPageReward) {
+      setSavingPageReward(true);
+      setPageRewardError('');
+      try {
+        const rewardOutcome = await onPageReward({
+          type: 'workbook_page',
+          unitId,
+          unitTitle,
+          workbookSignature,
+          pageId: currentPage.id || `page_${currentPageIndex + 1}`,
+          pageIndex: currentPageIndex,
+          pageNumber: currentPageIndex + 1,
+          pageAttempt,
+          correctCount: localCorrect,
+          wrongCount: localWrong,
+          totalCount: localCorrect + localWrong,
+          baseCrystalsEarned: pageBaseReward,
+        });
+        if (rewardOutcome?.ok === false) throw rewardOutcome.error || new Error('페이지 보상 저장에 실패했습니다.');
+        setPageBaseRewardsPaid(prev => prev + pageBaseReward);
+        setPageActualRewardsPaid(prev => prev + Math.max(0, Number(rewardOutcome?.actualReward) || 0));
+      } catch (error) {
+        console.error('Workbook page reward save failed', error);
+        setPageRewardError('페이지 학습과 광석을 저장하지 못했습니다. 네트워크를 확인하고 다시 눌러주세요.');
+        setSavingPageReward(false);
+        return;
+      }
+      setSavingPageReward(false);
+    }
+
     setSessionCrystals(prev => Math.max(0, prev + (localCorrect * 1) - (localWrong * 2)));
 
     setCheckedElements(newCheckedElements);
@@ -416,7 +484,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
 
     const score100 = globalTotalInputs === 0 ? 100 : Math.round((globalCorrect / globalTotalInputs) * 100);
     const isPerfect = (globalCorrect === globalTotalInputs) && globalTotalInputs > 0;
-    const finalCrystals = sessionCrystals + (isPerfect ? 10 : 0);
+    // Page rewards are paid immediately. Only legacy/unpaid session rewards and the
+    // first-perfect bonus are settled at full workbook completion.
+    const unpaidSessionCrystals = Math.max(0, sessionCrystals - pageBaseRewardsPaid);
+    const finalCrystals = unpaidSessionCrystals + (isPerfect ? 10 : 0);
 
     const workbookResponses = pages.flatMap((page, pageIndex) => page.elements
       .filter(element => WORKBOOK_GRADABLE_TYPES.has(element.type))
@@ -445,6 +516,9 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         type: 'workbook',
         attemptCount: Math.max(1, ...Object.values(attemptCounts).map(Number)),
         workbookResponses,
+        pageRewardsPaid: pageBaseRewardsPaid,
+        pageRewardsEarned: pageActualRewardsPaid,
+        unpaidSessionCrystals,
       });
       if (outcome?.ok === false) throw outcome.error || new Error('결과 저장에 실패했습니다.');
       localStorage.removeItem(progressStorageKey);
@@ -739,6 +813,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       </div>
 
       {pauseError && <div className="workbook-pause-error" role="alert">{pauseError}</div>}
+      {pageRewardError && <div className="workbook-pause-error" role="alert">{pageRewardError}</div>}
 
       <div className="workbook-canvas-area" onClick={() => { setActiveInputId(null); setShowKeypad(false); }}>
         {currentPage && (
@@ -1010,9 +1085,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
             <button 
               className="hud-btn primary submit-btn font-title" 
               onClick={handleCheckPage}
+              disabled={savingPageReward}
               style={{ background: 'linear-gradient(135deg, var(--planet-purple), var(--neon-blue))' }}
             >
-              정답 확인
+              {savingPageReward ? '광석 저장 중…' : '정답 확인'}
             </button>
           ) : currentPage.elements.some(element => (
             WORKBOOK_GRADABLE_TYPES.has(element.type)
@@ -1050,9 +1126,9 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
               type="button"
               className="workbook-pause-btn"
               onClick={handlePauseWorkbook}
-              disabled={savingPause}
+              disabled={savingPause || savingPageReward}
             >
-              {savingPause ? '저장 중…' : '오늘은 여기까지'}
+              {savingPageReward ? '광석 저장 중…' : savingPause ? '저장 중…' : '오늘은 여기까지'}
             </button>
           )}
         </div>

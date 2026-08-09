@@ -534,6 +534,7 @@ async function summarizeLearningProgress(progressDocs, startMs, endMs, courseId,
         totalPages,
         answeredCount,
         checkedPageCount,
+        pageCrystalsEarned: Number(workbookSession.pageActualRewardsPaid || 0),
         updatedAtMs: workbookUpdatedAtMs,
       });
     }
@@ -729,6 +730,7 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       totalPages: item.totalPages,
       answeredCount: item.answeredCount,
       checkedPageCount: item.checkedPageCount,
+      pageCrystalsEarned: item.pageCrystalsEarned,
     })),
     dataLogs: dataLogRows.slice(0, 6).map((row) => ({
       title: normalizeText(row.unitTitle || row.transmissionTitle || row.regionTitle || '데이터 로그'),

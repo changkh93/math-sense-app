@@ -534,7 +534,7 @@ export function useLearningHistory(userId, dateStr) {
               type: 'workbook_in_progress',
               title: `🧮 스마트 워크북: ${data.unitTitle || formatUnitId(unitId)}`,
               score: null,
-              crystalsEarned: 0,
+              crystalsEarned: Number(session.pageActualRewardsPaid || 0),
               metadata: {
                 unitId,
                 unitTitle: data.unitTitle || '',
@@ -542,6 +542,7 @@ export function useLearningHistory(userId, dateStr) {
                 totalPages,
                 answeredCount,
                 checkedPageCount,
+                pageCrystalsEarned: Number(session.pageActualRewardsPaid || 0),
               }
             });
           }

@@ -136,6 +136,18 @@ function buildRewardMultiplierMetadata(multiplierMeta) {
   }
 }
 
+function getStableWorkbookRewardKey(workbookSignature, pageId, attempt) {
+  const signature = String(workbookSignature || 'legacy')
+  let signatureHash = 2166136261
+  for (let index = 0; index < signature.length; index += 1) {
+    signatureHash ^= signature.charCodeAt(index)
+    signatureHash = Math.imul(signatureHash, 16777619)
+  }
+  const safePageId = String(pageId || 'page').replace(/[^a-zA-Z0-9_-]/g, '_')
+  const safeAttempt = Math.max(1, Math.floor(Number(attempt) || 1))
+  return `${(signatureHash >>> 0).toString(36)}_${safePageId}_a${safeAttempt}`
+}
+
 const MIDDLE_MATH_REGION_IMAGES = {
   core: '/assets/planets/middle-math-core.png',
   analytics: '/assets/planets/middle-math-analytics.png',
@@ -2152,6 +2164,11 @@ function SpaceHome() {
           totalCount: result.totalCount || 0,
           correctCount: result.correctCount || 0,
           crystalsEarned: atomicCrystalsEarned,
+          ...(isWorkbookResult ? {
+            workbookPageCrystalsEarned: Number(result.pageRewardsEarned || 0),
+            workbookPageBaseCrystalsEarned: Number(result.pageRewardsPaid || 0),
+            workbookTotalCrystalsEarned: Number(result.pageRewardsEarned || 0) + atomicCrystalsEarned,
+          } : {}),
           crystalTransactionId,
           rewardMultiplier: rewardMultiplierMeta?.multiplier || 1,
           rewardMultiplierReason: rewardMultiplierMeta?.reason || 'none',
@@ -2380,6 +2397,171 @@ function SpaceHome() {
       return { ok: false, error }
     } finally {
       isProcessingSave.current = false
+    }
+  }
+
+  const processingWorkbookPageRewards = useRef(new Set())
+
+  const handleWorkbookPageReward = async (pageResult = {}) => {
+    if (!user?.uid) return { ok: false, error: new Error('로그인 정보를 확인할 수 없습니다.') }
+
+    const currentUnitId = pageResult.unitId || selectedUnitDocId || quickQuizUnitId || 'unknown'
+    const currentUnitTitle = pageResult.unitTitle || activeUnit?.title || '스마트 워크북'
+    const pageId = pageResult.pageId || `page_${Math.max(1, Number(pageResult.pageNumber) || 1)}`
+    const pageNumber = Math.max(1, Math.floor(Number(pageResult.pageNumber) || 1))
+    const pageAttempt = Math.max(1, Math.floor(Number(pageResult.pageAttempt) || 1))
+    const isLegacySessionSettlement = pageResult.rewardScope === 'legacy_session'
+    const baseAmount = Math.max(0, Math.floor(Number(pageResult.baseCrystalsEarned) || 0))
+    const rewardKey = getStableWorkbookRewardKey(pageResult.workbookSignature, pageId, pageAttempt)
+    const processingKey = `${currentUnitId}:${rewardKey}`
+
+    if (processingWorkbookPageRewards.current.has(processingKey)) {
+      return { ok: false, error: new Error('해당 페이지 보상을 저장하고 있습니다.') }
+    }
+
+    processingWorkbookPageRewards.current.add(processingKey)
+    try {
+      const rewardDate = new Date()
+      const userDocRef = doc(db, 'users', user.uid)
+      const progressDocRef = doc(db, 'users', user.uid, 'learning_progress', currentUnitId)
+
+      const outcome = await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userDocRef)
+        const progressSnap = await transaction.get(progressDocRef)
+        if (!userSnap.exists()) throw new Error('User document not found')
+
+        const freshUserData = userSnap.data()
+        const freshProgressData = progressSnap.exists() ? progressSnap.data() : {}
+        const rewardAttempts = freshProgressData.workbookPageRewardAttempts || {}
+        const existingReward = rewardAttempts[rewardKey]
+        if (existingReward) {
+          return {
+            duplicate: true,
+            actualReward: Math.max(0, Number(existingReward.amount) || 0),
+            baseAmount: Math.max(0, Number(existingReward.baseAmount) || baseAmount),
+          }
+        }
+
+        const rewardMultiplierMeta = baseAmount > 0
+          ? applyCrystalRewardMultiplier(baseAmount, {
+              clusterId: selectedClusterId,
+              date: rewardDate,
+              dateStr: getTodayKST(rewardDate),
+            })
+          : null
+        const actualReward = rewardMultiplierMeta?.amount || 0
+        const streakCalc = calculateStreakUpdate(freshUserData)
+        const streakUpdates = streakCalc.streakUpdate || {}
+        const growthUpdates = calculateGrowthUpdates(freshUserData, actualReward)
+        const nextBalance = Number(freshUserData.crystals || 0) + actualReward
+
+        if (streakCalc.meta?.freezeUsed) {
+          recordCrystalTransaction(user.uid, {
+            amount: 0,
+            type: 'streak_freeze',
+            description: '크라이오 코어로 연속 탐사 궤도 보호',
+            metadata: {
+              unitId: currentUnitId,
+              streakBefore: Number(freshUserData.currentStreak || 0),
+              streakAfter: streakCalc.meta.newStreak,
+              defendedDates: streakCalc.meta.defendedDates || [],
+              consumedFreezeCount: streakCalc.meta.consumedFreezeCount || 0,
+              balanceBefore: Number(freshUserData.streakFreezeCount || 0),
+              balanceAfter: streakUpdates.streakFreezeCount ?? freshUserData.streakFreezeCount ?? 0,
+            },
+          }, transaction)
+        }
+
+        if (actualReward > 0) {
+          recordCrystalTransaction(user.uid, {
+            amount: actualReward,
+            type: 'workbook_reward',
+            description: isLegacySessionSettlement
+              ? `${currentUnitTitle} 기존 진행 보상 정산`
+              : `${currentUnitTitle} ${pageNumber}페이지`,
+            metadata: {
+              unitId: currentUnitId,
+              unitTitle: currentUnitTitle,
+              activityType: 'workbook',
+              source: isLegacySessionSettlement
+                ? 'smart_workbook_legacy_pause_settlement'
+                : 'smart_workbook_page_check',
+              rewardScope: isLegacySessionSettlement ? 'legacy_session' : 'page',
+              pageId,
+              pageNumber,
+              pageAttempt,
+              correctCount: Math.max(0, Number(pageResult.correctCount) || 0),
+              wrongCount: Math.max(0, Number(pageResult.wrongCount) || 0),
+              totalCount: Math.max(0, Number(pageResult.totalCount) || 0),
+              balanceBefore: Number(freshUserData.crystals || 0),
+              balanceAfter: nextBalance,
+              ...buildRewardMultiplierMetadata(rewardMultiplierMeta),
+            },
+          }, transaction, `workbook_page_${currentUnitId}_${rewardKey}`)
+        }
+
+        const nextRewardAttempts = {
+          ...rewardAttempts,
+          [rewardKey]: {
+            pageId,
+            pageNumber,
+            pageAttempt,
+            baseAmount,
+            amount: actualReward,
+            correctCount: Math.max(0, Number(pageResult.correctCount) || 0),
+            wrongCount: Math.max(0, Number(pageResult.wrongCount) || 0),
+            totalCount: Math.max(0, Number(pageResult.totalCount) || 0),
+            rewardMultiplier: rewardMultiplierMeta?.multiplier || 1,
+            paidAtMs: Date.now(),
+          },
+        }
+
+        transaction.set(progressDocRef, {
+          unitTitle: currentUnitTitle,
+          clusterId: selectedClusterId || '',
+          chapterId: selectedChapterDocId || '',
+          regionId: selectedRegionId || '',
+          workbookPageRewardAttempts: nextRewardAttempts,
+          workbookPageRewardTotal: Number(freshProgressData.workbookPageRewardTotal || 0) + actualReward,
+          workbookPageBaseRewardTotal: Number(freshProgressData.workbookPageBaseRewardTotal || 0) + baseAmount,
+          workbookLastRewardedPageId: pageId,
+          workbookLastRewardedPageNumber: pageNumber,
+          workbookLastRewardedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }, { merge: true })
+
+        const userUpdates = {
+          crystals: nextBalance,
+          lastActive: serverTimestamp(),
+          ...growthUpdates,
+          ...streakUpdates,
+        }
+        if (Object.keys(streakUpdates).length > 0) {
+          userUpdates.streakWriteAudit = buildStreakWriteAudit({
+            source: 'space_home_workbook_page',
+            writerUid: user.uid,
+            prevState: freshUserData,
+            nextState: {
+              currentStreak: streakUpdates.currentStreak,
+              lastStreakDate: streakUpdates.lastStreakDate,
+              streakFreezeCount: streakUpdates.streakFreezeCount,
+            },
+            writtenAt: serverTimestamp(),
+            note: `${currentUnitId}:${pageId}`,
+          })
+        }
+        transaction.update(userDocRef, userUpdates)
+
+        return { duplicate: false, actualReward, baseAmount, rewardMultiplierMeta }
+      })
+
+      if (!outcome.duplicate && outcome.actualReward > 0) soundManager.playCrystal()
+      return { ok: true, ...outcome }
+    } catch (error) {
+      console.error('Error saving workbook page reward:', error)
+      return { ok: false, error }
+    } finally {
+      processingWorkbookPageRewards.current.delete(processingKey)
     }
   }
 
@@ -3559,6 +3741,7 @@ function SpaceHome() {
         initialMode={initialMode}
         onBack={handleBackFromMission}
         onComplete={handleComplete}
+        onWorkbookPageReward={handleWorkbookPageReward}
         onNonQuizActivityComplete={handleNonQuizActivityComplete}
       />
     )
