@@ -118,6 +118,13 @@ const TYPE_CONFIG = {
     bg: 'rgba(167, 139, 250, 0.12)',
     border: 'rgba(167, 139, 250, 0.35)'
   },
+  workbook: {
+    icon: '🧮',
+    label: '스마트 워크북',
+    color: '#22d3ee',
+    bg: 'rgba(34, 211, 238, 0.12)',
+    border: 'rgba(34, 211, 238, 0.35)'
+  },
   battle: {
     icon: '⚔️',
     label: '퀴즈 배틀',
@@ -134,9 +141,12 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
   const videoItems = items.filter(i => i.type === 'video');
   const textItems = items.filter(i => i.type === 'text');
   const codeItems = items.filter(i => i.type === 'code');
+  const workbookItems = items.filter(i => i.type === 'workbook');
   const battleItems = items.filter(i => i.type === 'battle');
   const codeTraceCount = dailyStats?.codeTraceCount ?? codeItems.filter(i => i.completed).length;
   const codeTraceProgressCount = dailyStats?.codeTraceProgressCount ?? codeItems.filter(i => !i.completed).length;
+  const workbookCount = dailyStats?.workbookCount ?? workbookItems.filter(i => i.completed).length;
+  const workbookProgressCount = dailyStats?.workbookProgressCount ?? workbookItems.filter(i => !i.completed).length;
 
   const battleCount = dailyStats?.battleCount ?? battleItems.length;
   const battleCorrectRate = dailyStats?.battleQuestionCount > 0
@@ -193,6 +203,13 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
           />
 
           {/* Code trace stat */}
+          <StatChip
+            icon="🧮"
+            label="스마트 워크북"
+            value={workbookProgressCount > 0 ? `완료 ${workbookCount} / 진행 ${workbookProgressCount}` : `${workbookCount}회`}
+            color="#22d3ee"
+          />
+
           <StatChip
             icon="⌨️"
             label="CODE TRACE"
@@ -417,6 +434,18 @@ function GroupedCard({ item, index, onClick }) {
                 </span>
             )}
           </>
+        )}
+
+        {item.type === 'workbook' && (
+          item.completed ? (
+            <span className="font-tech" style={{ color: item.score === 100 ? 'var(--star-gold)' : config.color, fontWeight: 'bold' }}>
+              점수 {item.score ?? 0}점{item.totalCount > 0 ? ` · ${item.totalCount}문항` : ''}
+            </span>
+          ) : (
+            <span className="font-tech" style={{ color: '#fbbf24' }}>
+              이어 풀기 {item.currentPage || 1}/{item.totalCount || '?'}페이지 · 답안 {item.answeredCount || 0}개
+            </span>
+          )
         )}
 
         {/* Video time */}

@@ -19,7 +19,7 @@
 
 이 문서의 레벨업 예외, 학습 기록 필터, 진행 중 퀴즈 인정 규칙, Python CODE TRACE 인정 규칙은 단순 가이드가 아니라 **코드가 자동으로 적용해야 하는 규칙**이다. 수동 작업(export 스크립트)과 운영툴의 “AI 피드백 생성” 버튼(`assignmentFeedbackService.js`) 양쪽 모두 같은 규칙을 구현해야 한다. 한쪽만 고치면 다른 경로에서 같은 버그가 재발한다.
 
-특히 아래 다섯 가지는 코드 누락이 잦은 지점이므로, 문서를 고칠 때 반드시 코드도 함께 확인한다.
+특히 아래 항목은 코드 누락이 잦은 지점이므로, 문서를 고칠 때 반드시 코드도 함께 확인한다.
 
 - **레벨업 감지**: 제출문 키워드 정규식뿐 아니라 “같은 날짜 history/learning_progress에 `middle-math` 기록이 존재하는지”로도 감지해야 한다. 제출문 키워드만 쓰면 “SSS 합동을 배웠다”처럼 키워드에 안 걸리는 중등 단원이 누락된다(조하람 사례).
 - **`learning_progress` 병합**: 학생이 퀴즈/영상을 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남는다. 두 컬렉션을 모두 읽지 않으면 실제 학습한 내용이 “0건”으로 잡힌다(조승아 사례).
@@ -27,6 +27,7 @@
 - **학습 메타데이터 역추적 우선**: `learning_progress` 문서에 `clusterId`가 없어도 제목/unitId 정규식으로 과정을 맞히면 안 된다. 먼저 `learning_progress/{unitId}` → `units/{unitId}.chapterId` → `chapters/{chapterId}.regionId` → `regions/{regionId}.clusterId` 순서로 역추적해 실제 과정을 찾는다. 새 CODE TRACE 진행 기록은 `learning_progress` 최상위와 `codeTrace` 내부에 `clusterId/chapterId`를 함께 저장한다. 그래야 `unit_py_math_2` 같은 파이썬 수학 단원이 “unknown”으로 빠지지 않는다(인효린 사례).
 - **Python CODE TRACE 반영**: CODE TRACE는 영상을 보는 활동도, 퀴즈를 푸는 활동도 아니지만 코드를 보고 구조를 손으로 따라 쓰는 별도 고난도 학습이다. `history.type === "code_trace"` 완료 기록과 `learning_progress.codeTrace` 진행 기록을 Python 학습 근거로 반드시 합산해야 한다. 수동 export와 운영툴 “AI 피드백 생성” 양쪽 모두 `codeTraces`, `inProgressCodeTraces`, `codeTraceCount`, `codeTraceProgressCount` 같은 요약 필드를 제공해야 하며, 이 필드가 없으면 영상 시간이 짧다는 이유만으로 Python 학습을 낮게 평가할 위험이 있다.
 - **퀴즈 배틀 분리 평가**: 퀴즈 배틀(`history.type === "quiz_battle"`)은 점수 체계가 0~1500(정답×100)으로 일반 퀴즈(0~100)와 다르다. 배틀을 일반 퀴즈 버킷에 그냥 섞어 넣으면 `averageScore`가 오염되고 “완료 퀴즈 N개”에 묻혀 배틀 복습 활동이 보이지 않는다. 수동 export와 운영툴 “AI 피드백 생성” 양쪽 모두 `quiz_battle`을 일반 퀴즈에서 분리해 별도 요약 필드(`battles`, `battleCount`, `battleWinCount`, `battleDrawCount`, `battleLossCount`, `battleForfeitCount`, `battleAverageAccuracy`, `isSufficientBattleReview`)로 제공해야 한다. 이 필드가 없으면 영상이 없다는 이유만으로 배틀만 열심히 한 학생을 25광석으로 낮게 평가한다.
+- **스마트 워크북 분리 평가**: 완료 기록은 `history.type === "workbook"`, 진행 기록은 `learning_progress.workbookSession`에 남는다. 워크북은 일반 퀴즈와 별도 활동이므로 `averageScore`/`quizCount`에 섞지 않고 `workbooks`, `inProgressWorkbooks`, `workbookCount`, `workbookProgressCount`, `workbookAverageScore`로 제공한다. 완료 점수·정답 수·재시도 수와 진행 페이지를 풀이 활동 근거로 인정한다.
 
 ### CODE TRACE 코드 반영 체크리스트
 
@@ -72,6 +73,15 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
   - 중도 포기(forfeited)가 많은 경우 충분한 복습으로 인정되지 않는지 확인한다.
 - 배틀이 없는 기존 Python/수학/초등수학 과제가 기존과 동일하게 동작하는지 회귀 확인한다.
 
+### 스마트 워크북 코드 반영 체크리스트
+
+- `assignmentFeedbackService.js`와 `scripts/export-pending-assignment-contexts.mjs` 양쪽에서 `workbook`을 일반 퀴즈 필터에서 제외하고 별도 배열과 통계를 만든다.
+- 완료 전 세션은 `workbookSessionUpdatedAt` 또는 `savedAtMs`가 제출일 범위 안이고, 답안·채점 페이지·현재 페이지 중 실제 진행 증거가 있을 때만 `inProgressWorkbooks`에 넣는다.
+- 진행 중 워크북을 완료로 표현하지 않는다. “3/8페이지 진행, 답안 5개 입력”처럼 현재 상태를 적는다.
+- 워크북 평균은 워크북 점수만으로 계산하고 일반 퀴즈 평균과 섞지 않는다.
+- `hasPractice`, `hasLearningFollowUpActivity`, `hasCourseLearningRecord`, 저학습 판단에 완료/진행 워크북을 포함한다.
+- 광석 지급은 사용자 잔고, `history.crystalsEarned`, `history.crystalTransactionId`, `crystal_transactions` 원장이 같은 Firestore transaction에서 함께 저장되는지 확인한다. 최고점 개선분만 지급하는 정책 때문에 동일 점수 재도전의 원장 항목이 없는 것은 정상이다.
+
 ## 정규 학습 시간 기준
 
 피드백과 보너스 광석은 아래 기준 대비로 판단한다.
@@ -107,12 +117,13 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 - 위 예외는 한 방향으로만 적용한다. 중등수학 과제(`middle-math`)에서는 초등수학(`cluster_elementary`) 영상/퀴즈/데이터 로그를 중등수학 학습량으로 인정하지 않는다.
 - 과제 과정과 다른 과정의 기록은 위 예외를 제외하고 피드백 근거에서 제외한다. 예: Python 과제에서 초등수학 `4월 평가` 진행 기록을 “Python 진행 중 퀴즈/코드”로 쓰면 안 된다.
 - 과정이 명확하지 않은 진행 중 퀴즈나 `learning_progress` 문서는 현재 과제의 학습 근거로 쓰지 않는다. 과정이 불명확하면 “다른 과정 또는 과정 미확인 기록”으로 제외하고, 피드백에는 포함하지 않는다. 단, 과정 분류 자체가 실패해서 누락된 경우는 `units → chapters → regions` 역추적과 아래 “NFD 인코딩” 항목을 반드시 확인한다.
-- `learningSummary`의 기준 필드는 `videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `progressVideos`, Python의 `codeTraces`, `inProgressCodeTraces`, 그리고 퀴즈 배틀의 `battles`다. 완료 기록뿐 아니라 **진행 중 퀴즈, 부분 시청 영상, 진행 중 CODE TRACE, 퀴즈 배틀도 학습 근거로 인정**한다. 학생이 퀴즈나 CODE TRACE를 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남을 수 있으므로, 두 컬렉션을 합쳐 보지 않으면 실제 학습이 “0건”으로 잡힌다(조승아 사례와 같은 구조).
+- `learningSummary`의 기준 필드는 `videos`, `quizzes`, `workbooks`, `dataLogs`, `inProgressQuizzes`, `inProgressWorkbooks`, `progressVideos`, Python의 `codeTraces`, `inProgressCodeTraces`, 그리고 퀴즈 배틀의 `battles`다. 완료 기록뿐 아니라 **진행 중 퀴즈·워크북, 부분 시청 영상, 진행 중 CODE TRACE, 퀴즈 배틀도 학습 근거로 인정**한다. 학생이 퀴즈·워크북·CODE TRACE를 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남을 수 있으므로 두 컬렉션을 합쳐 본다.
 - `learningSummary.allTitles`는 참고용 전체 기록이고, 피드백 문장의 기준은 `learningSummary.videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `codeTraces`, `inProgressCodeTraces`, `battles`다.
 - `learningSummary.progressTitles`와 `progressVideos`는 진행/부분 시청 참고용이다. 완료 영상 개수처럼 말하지 않는다.
 - `learningSummary.codeTraces`는 완료된 CODE TRACE 기록이다. 피드백에는 완료한 단원명, 정확도, 완료 exercise 수를 우선 적는다.
 - `learningSummary.inProgressCodeTraces`는 진행 중 CODE TRACE 기록이다. 피드백에는 완료로 쓰지 말고 “진행 중: 2/5, 최고 정확도 86%”처럼 현재 상태를 적는다.
 - `learningSummary.battles`는 완료/포기된 퀴즈 배틀 기록이다. 피드백에는 참여 횟수, 승패(승 W 무 D 패 L), 평균 정답률을 함께 적는다. 예: “퀴즈 배틀 5회 (승 4 무 0 패 1, 정답률 72%)로 기존 학습 범위를 경쟁하며 복습했습니다.” 배틀 점수(0~1500)는 일반 퀴즈 점수(0~100)와 섞지 않는다.
+- `learningSummary.workbooks`는 완료 워크북, `inProgressWorkbooks`는 이어 풀기 세션이다. 예: “스마트 워크북 2건을 완료해 평균 85점이었고, 다음 워크북은 3/8페이지까지 진행했습니다.” 일반 퀴즈 평균과 워크북 평균을 합치지 않는다.
 - **한글 NFD 인코딩 주의**: `history`/`learning_progress` 문서의 한글 제목/unitId/unitTitle이 NFD(분해 자모, 예: `중2_05_일차함수`)로 저장되는 경우가 있다. 코드가 비교 전에 NFC(`중2_05_일차함수`)로 정규화하지 않으면 `clusterId`, `regionId`, `chapterId`, 제출문 키워드 비교가 실패해 기록이 누락될 수 있다. 모든 과정 정규화/메타데이터 역추적 함수는 입력을 NFC로 정규화한 뒤 비교해야 한다. 제출문 한글 비교(`hasMiddleMathLevelUpSignal`)도 마찬가지다.
 - 초등수학에서 독서퀴즈/독서 활동만 있고 초등수학 또는 중등수학 수학 영상, 수학 퀴즈, 데이터 로그가 모두 없으면 수학 20분 학습이 비어 있다는 점을 반드시 언급한다.
 - 이때 독서 활동은 인정하되, “오늘 수학 기록은 아직 확인되지 않았어요. 다음 시간에는 수학 영상 뒤에 확인 퀴즈까지 이어가면 좋겠습니다.”처럼 부드럽게 안내한다.

@@ -435,8 +435,11 @@ function analyzeAttendance(records, startDateKey, endDateKey) {
 function analyzeLearning(history, days) {
   let totalVideoSeconds = 0;
   let totalQuizCount = 0;
+  let totalWorkbookCount = 0;
   let quizScoreSum = 0;
   let quizScoreCount = 0;
+  let workbookScoreSum = 0;
+  let workbookScoreCount = 0;
 
   const byCluster = {};
   const weeklyMap = {};
@@ -449,7 +452,7 @@ function analyzeLearning(history, days) {
 
     const clusterId = h.regionId || h.clusterId || 'unknown'; // Grouping by regionId now
     if (!byCluster[clusterId]) {
-      byCluster[clusterId] = { videoSeconds: 0, quizCount: 0, quizScoreSum: 0, quizScoreCount: 0, videoCompletions: 0 };
+      byCluster[clusterId] = { videoSeconds: 0, quizCount: 0, workbookCount: 0, quizScoreSum: 0, quizScoreCount: 0, workbookScoreSum: 0, workbookScoreCount: 0, videoCompletions: 0 };
     }
 
     const hour = ts.getHours();
@@ -464,11 +467,12 @@ function analyzeLearning(history, days) {
     const weekKey = weekStart.toISOString().split('T')[0];
     
     if (!weeklyMap[weekKey]) {
-      weeklyMap[weekKey] = { week: weekKey, videoMin: 0, quizCount: 0 };
+      weeklyMap[weekKey] = { week: weekKey, videoMin: 0, quizCount: 0, workbookCount: 0 };
     }
 
     const hType = h.type || 'quiz_pass';
     const isVideo = hType.includes('video') || hType === 'recovery_mastery';
+    const isWorkbook = hType === 'workbook';
     const isQuiz = (hType.includes('quiz') || (!h.type && !isVideo)) && hType !== 'quiz_battle' && hType !== 'code_trace' && hType !== 'workbook';
 
     if (isVideo) {
@@ -481,6 +485,17 @@ function analyzeLearning(history, days) {
       // Cluster specific weekly
       weeklyMap[weekKey][`video_${clusterId}`] = (weeklyMap[weekKey][`video_${clusterId}`] || 0) + Math.round(vTime / 60);
       
+    } else if (isWorkbook) {
+      totalWorkbookCount++;
+      byCluster[clusterId].workbookCount++;
+      weeklyMap[weekKey].workbookCount++;
+      weeklyMap[weekKey][`workbook_${clusterId}`] = (weeklyMap[weekKey][`workbook_${clusterId}`] || 0) + 1;
+      if (h.score != null && Number(h.score) <= 100) {
+        workbookScoreSum += Number(h.score);
+        workbookScoreCount++;
+        byCluster[clusterId].workbookScoreSum += Number(h.score);
+        byCluster[clusterId].workbookScoreCount++;
+      }
     } else if (isQuiz) {
       totalQuizCount++;
       byCluster[clusterId].quizCount++;
@@ -501,6 +516,7 @@ function analyzeLearning(history, days) {
   // Convert byCluster scores to averages
   Object.values(byCluster).forEach(c => {
     c.avgScore = c.quizScoreCount > 0 ? Math.round(c.quizScoreSum / c.quizScoreCount) : null;
+    c.avgWorkbookScore = c.workbookScoreCount > 0 ? Math.round(c.workbookScoreSum / c.workbookScoreCount) : null;
   });
 
   // Weekly trend (sorted)
@@ -510,7 +526,9 @@ function analyzeLearning(history, days) {
     totalVideoHours: Math.round(totalVideoSeconds / 3600 * 10) / 10,
     totalVideoSeconds,
     totalQuizCount,
+    totalWorkbookCount,
     avgQuizScore: quizScoreCount > 0 ? Math.round(quizScoreSum / quizScoreCount) : null,
+    avgWorkbookScore: workbookScoreCount > 0 ? Math.round(workbookScoreSum / workbookScoreCount) : null,
     quizScoreCount,
     activeDays: activeDays.size,
     byCluster,
@@ -719,7 +737,7 @@ function buildPeerComparison(
     const myQuizCount = my.quizCount || 0;
     const myVideoSeconds = my.videoSeconds || 0;
     const myQuizScoreCount = my.quizScoreCount || 0;
-    const hasPeriodActivity = myQuizCount > 0 || myVideoSeconds > 0 || myQuizScoreCount > 0;
+    const hasPeriodActivity = myQuizCount > 0 || (my.workbookCount || 0) > 0 || myVideoSeconds > 0 || myQuizScoreCount > 0;
 
     const totalUnits = regionStructure?.[regionId]?.orderedUnits?.length || 0;
     const progressCompleted = totalUnits > 0 && (completedCountByRegion[regionId] || 0) >= totalUnits;
@@ -808,7 +826,8 @@ function calculatePredictions(
     const clusterData = learning.byCluster[regionId] || {};
     const videoCompletions = clusterData.videoCompletions || 0;
     const quizCount = clusterData.quizCount || 0;
-    const totalActivities = videoCompletions + quizCount;
+    const workbookCount = clusterData.workbookCount || 0;
+    const totalActivities = videoCompletions + quizCount + workbookCount;
 
     const orderedUnits = regionStructure[regionId]?.orderedUnits || [];
     const exactTotalUnits = orderedUnits.length;

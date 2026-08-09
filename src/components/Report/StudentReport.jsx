@@ -116,7 +116,7 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
   const parentClusterId = !isAll ? REGION_TO_CLUSTER?.[selectedCluster] : null;
 
   const cAttendance = isAll ? attendance : (attendance.byCluster[parentClusterId] || { totalDays: 0, lateDays: 0, lateRate: 0 });
-  const cLearning = isAll ? learning : (learning.byCluster[selectedCluster] || { videoSeconds: 0, quizCount: 0, avgScore: null });
+  const cLearning = isAll ? learning : (learning.byCluster[selectedCluster] || { videoSeconds: 0, quizCount: 0, workbookCount: 0, avgScore: null, avgWorkbookScore: null });
   const cAssignments = isAll ? assignments : (assignments.byCluster[parentClusterId] || { count: 0, reviewed: 0 });
 
   const displayAttendanceDays = cAttendance.totalDays || 0;
@@ -127,6 +127,8 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
   const displayVideoFormatted = formatTimeSeconds(displayVideoSeconds);
   const displayQuizCount = isAll ? learning.totalQuizCount : (cLearning.quizCount || 0);
   const displayAvgScore = isAll ? learning.avgQuizScore : cLearning.avgScore;
+  const displayWorkbookCount = isAll ? learning.totalWorkbookCount : (cLearning.workbookCount || 0);
+  const displayWorkbookAvgScore = isAll ? learning.avgWorkbookScore : cLearning.avgWorkbookScore;
 
   const displayAssignments = isAll ? assignments.totalCount : (cAssignments.count || 0);
   const displayReviewed = isAll ? assignments.reviewedCount : (cAssignments.reviewed || 0);
@@ -203,6 +205,11 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
                 <div className="report-stat-label">퀴즈 수행</div>
                 <div className="report-stat-sub">평균 {displayAvgScore ?? '집계 중'}점</div>
               </div>
+              <div className="report-stat-card stat-purple">
+                <div className="report-stat-value">{displayWorkbookCount}</div>
+                <div className="report-stat-label">워크북 수행</div>
+                <div className="report-stat-sub">평균 {displayWorkbookAvgScore ?? '집계 중'}점</div>
+              </div>
               <div className="report-stat-card stat-gold">
                 <div className="report-stat-value">{displayAssignments}</div>
                 <div className="report-stat-label">과제 제출</div>
@@ -264,7 +271,7 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
 
               {/* --- Quiz Chart --- */}
               <div className="report-weekly-chart-wrapper" style={{ marginTop: 32 }}>
-                <div style={{fontSize: '0.8rem', color: '#00ffa0', marginBottom: 8}}>■ 퀴즈 수행 추이 (회)</div>
+                <div style={{fontSize: '0.8rem', color: '#00ffa0', marginBottom: 8}}>■ 퀴즈·워크북 수행 추이 (회)</div>
                 <div style={{ height: 180, width: '100%', position: 'relative', minWidth: 0 }}>
                   <ResponsiveContainer width="100%" height="100%" debounce={50}>
                     <LineChart data={learning.weeklyTrend} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
@@ -278,6 +285,15 @@ export default function StudentReport({ userId, days = 30, onDaysChange, onBack,
                       )) : (
                         <Line type="monotone" dataKey={`quiz_${selectedCluster}`} name={REGION_NAMES?.[selectedCluster]||selectedCluster} stroke={CLUSTER_COLORS[selectedCluster] || '#00ffa0'} strokeWidth={2} dot={{ r: 4 }} />
                       )}
+                      <Line
+                        type="monotone"
+                        dataKey={isAll ? 'workbookCount' : `workbook_${selectedCluster}`}
+                        name="스마트 워크북"
+                        stroke="#22d3ee"
+                        strokeWidth={2}
+                        strokeDasharray="5 3"
+                        dot={{ r: 3 }}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>

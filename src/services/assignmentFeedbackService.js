@@ -443,6 +443,7 @@ async function summarizeLearningProgress(progressDocs, startMs, endMs, courseId,
   const videos = [];
   const inProgressQuizzes = [];
   const inProgressCodeTraces = [];
+  const inProgressWorkbooks = [];
 
   // 각 문서의 과정을 region 역조회로 정확히 정한 뒤 필터링한다(정규식 오탐 방지).
   const filtered = await filterRowsByCourse(
@@ -513,9 +514,32 @@ async function summarizeLearningProgress(progressDocs, startMs, endMs, courseId,
         updatedAtMs: codeTraceUpdatedAtMs,
       });
     }
+
+    const workbookSession = data.workbookSession;
+    const workbookUpdatedAtMs = getTimestampMs(data.workbookSessionUpdatedAt) || Number(workbookSession?.savedAtMs || 0);
+    const answeredCount = Object.keys(workbookSession?.answers || {}).filter((key) => String(workbookSession.answers[key] ?? '').trim() !== '').length;
+    const checkedPageCount = Object.values(workbookSession?.checkedPages || {}).filter(Boolean).length;
+    if (
+      workbookUpdatedAtMs
+      && workbookUpdatedAtMs >= startMs
+      && workbookUpdatedAtMs <= endMs
+      && workbookSession
+      && (answeredCount > 0 || checkedPageCount > 0 || Number(workbookSession.currentPageIndex || 0) > 0)
+    ) {
+      const totalPages = String(workbookSession.workbookSignature || '').split('|').filter(Boolean).length;
+      inProgressWorkbooks.push({
+        unitId,
+        title: normalizeText(data.unitTitle || unitId),
+        currentPage: Math.min(totalPages || Number.MAX_SAFE_INTEGER, Number(workbookSession.currentPageIndex || 0) + 1),
+        totalPages,
+        answeredCount,
+        checkedPageCount,
+        updatedAtMs: workbookUpdatedAtMs,
+      });
+    }
   });
 
-  return { videos, inProgressQuizzes, inProgressCodeTraces };
+  return { videos, inProgressQuizzes, inProgressCodeTraces, inProgressWorkbooks };
 }
 
 async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}) {
@@ -532,6 +556,11 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       focusScore: null,
       codeTraceCount: 0,
       codeTraceProgressCount: 0,
+      workbookCount: 0,
+      workbookProgressCount: 0,
+      workbookAverageScore: null,
+      workbooks: [],
+      inProgressWorkbooks: [],
       codeTraces: [],
       inProgressCodeTraces: [],
     };
@@ -570,16 +599,18 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     .filter(({ row, course }) => belongsToCourse({ ...row, clusterId: course }, courseId, mergedOptions))
     .map(({ row }) => row);
   const codeTraceRows = rows.filter((row) => row.type === 'code_trace');
+  const workbookRows = rows.filter((row) => row.type === 'workbook');
   // 퀴즈 배틀은 점수 체계(0~1500, 정답x100)가 일반 퀴즈(0~100)와 다르므로 별도로 분리한다.
   // 분리하지 않으면 배틀 점수가 averageScore를 오염시킨다.
   const battleRows = rows.filter((row) => row.type === 'quiz_battle');
-  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle'].includes(row.type || 'quiz_pass'));
+  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle', 'workbook'].includes(row.type || 'quiz_pass'));
   const videoRows = rows.filter((row) => ['video', 'video_complete', 'recovery_mastery'].includes(row.type));
   const textRows = rows.filter((row) => ['text', 'data_log_read'].includes(row.type));
   const dataLogRows = rows.filter((row) => row.type === 'data_log_read');
   const attentionRows = rows.filter((row) => row.attentionResult === 'hit' || row.attentionResult === 'miss');
   // averageScore는 일반 퀴즈 점수(0~100)만으로 계산한다. 배틀 점수(0~1500)는 제외.
   const scoreRows = quizRows.map((row) => Number(row.score)).filter(Number.isFinite);
+  const workbookScoreRows = workbookRows.map((row) => Number(row.score)).filter(Number.isFinite);
   const battleAssessment = assessBattleLearning(battleRows);
   const titleSet = new Set(rows.map((row) => normalizeText(row.unitTitle || row.transmissionTitle || row.regionTitle)).filter(Boolean));
 
@@ -591,6 +622,7 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   const inProgressQuizzes = progressSummary.inProgressQuizzes;
   const progressVideos = progressSummary.videos;
   const inProgressCodeTraces = progressSummary.inProgressCodeTraces;
+  const inProgressWorkbooks = progressSummary.inProgressWorkbooks;
 
   const videoSeconds = videoRows.reduce((sum, row) => sum + secondsFromLearningRow(row), 0)
     + progressVideos.reduce((sum, item) => sum + (item.seconds || 0), 0);
@@ -600,12 +632,14 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   for (const item of progressVideos) titleSet.add(item.title);
   for (const row of codeTraceRows) titleSet.add(normalizeText(row.unitTitle || row.regionTitle || row.title || 'CODE TRACE'));
   for (const item of inProgressCodeTraces) titleSet.add(item.title);
+  for (const row of workbookRows) titleSet.add(normalizeText(row.unitTitle || row.regionTitle || '스마트 워크북'));
+  for (const item of inProgressWorkbooks) titleSet.add(item.title);
 
   return {
     date: dateStr,
     courseId: normalizeClusterId(courseId),
     allActivityCount: allRows.length,
-    activityCount: rows.length + inProgressQuizzes.length + progressVideos.length + inProgressCodeTraces.length,
+    activityCount: rows.length + inProgressQuizzes.length + progressVideos.length + inProgressCodeTraces.length + inProgressWorkbooks.length,
     quizCount: combinedQuizCount,
     inProgressQuizCount: inProgressQuizzes.length,
     videoCount: videoRows.length + progressVideos.length,
@@ -615,6 +649,9 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     dataLogCount: dataLogRows.length,
     codeTraceCount: codeTraceRows.length,
     codeTraceProgressCount: inProgressCodeTraces.length,
+    workbookCount: workbookRows.length,
+    workbookProgressCount: inProgressWorkbooks.length,
+    workbookAverageScore: workbookScoreRows.length ? Math.round(workbookScoreRows.reduce((sum, score) => sum + score, 0) / workbookScoreRows.length) : null,
     // 퀴즈 배틀 요약 필드. 일반 퀴즈와 분리해 점수 체계를 섞지 않는다.
     battleCount: battleAssessment.battleCount,
     battleWinCount: battleAssessment.winCount,
@@ -651,6 +688,16 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       score: Number.isFinite(Number(row.score)) ? Number(row.score) : null,
       type: row.type || 'quiz',
     })),
+    workbooks: workbookRows.slice(0, 8).map((row) => ({
+      unitId: row.unitId || '',
+      title: normalizeText(row.unitTitle || row.regionTitle || '스마트 워크북'),
+      score: Number.isFinite(Number(row.score)) ? Number(row.score) : null,
+      correctCount: Number(row.correctCount || 0),
+      totalCount: Number(row.totalCount || 0),
+      attemptCount: Number(row.attemptCount || 1),
+      crystalsEarned: Number(row.crystalsEarned || 0),
+      completed: true,
+    })),
     codeTraces: codeTraceRows.slice(0, 6).map((row) => ({
       unitId: row.unitId || '',
       title: normalizeText(row.unitTitle || row.regionTitle || row.title || 'CODE TRACE'),
@@ -675,6 +722,13 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       bestAccuracy: item.bestAccuracy,
       lastExerciseId: item.lastExerciseId,
       lastMode: item.lastMode,
+    })),
+    inProgressWorkbooks: inProgressWorkbooks.map((item) => ({
+      title: item.title,
+      currentPage: item.currentPage,
+      totalPages: item.totalPages,
+      answeredCount: item.answeredCount,
+      checkedPageCount: item.checkedPageCount,
     })),
     dataLogs: dataLogRows.slice(0, 6).map((row) => ({
       title: normalizeText(row.unitTitle || row.transmissionTitle || row.regionTitle || '데이터 로그'),
@@ -778,6 +832,13 @@ function buildEvidence(context) {
   if ((dailyLearningSummary.codeTraceProgressCount || 0) > 0) {
     evidence.push(`진행 중 CODE TRACE ${dailyLearningSummary.codeTraceProgressCount}건 확인`);
   }
+  if ((dailyLearningSummary.workbookCount || 0) > 0) {
+    const scoreNote = dailyLearningSummary.workbookAverageScore != null ? `, 평균 ${dailyLearningSummary.workbookAverageScore}점` : '';
+    evidence.push(`스마트 워크북 완료 ${dailyLearningSummary.workbookCount}건${scoreNote} 확인`);
+  }
+  if ((dailyLearningSummary.workbookProgressCount || 0) > 0) {
+    evidence.push(`진행 중 스마트 워크북 ${dailyLearningSummary.workbookProgressCount}건 확인`);
+  }
   if (currentSubmission.codeComparison?.summary) {
     evidence.push(currentSubmission.codeComparison.summary);
   }
@@ -805,6 +866,8 @@ function buildFeedbackPolicyGuidance(context) {
     (learning.dataLogCount || 0) > 0 ||
     (learning.codeTraceCount || 0) > 0 ||
     (learning.codeTraceProgressCount || 0) > 0 ||
+    (learning.workbookCount || 0) > 0 ||
+    (learning.workbookProgressCount || 0) > 0 ||
     battleCount > 0
   );
   const hasCodeTraceActivity = Boolean((learning.codeTraceCount || 0) > 0 || (learning.codeTraceProgressCount || 0) > 0);
@@ -837,6 +900,7 @@ function buildFeedbackPolicyGuidance(context) {
       '영상 시간은 전체 학습 시간이 아니다. 학생은 영상을 멈추고 풀이, 코드 작성, 실행, 수정, 정리를 할 수 있다.',
       '영상 시간이 기준의 절반 안팎이고 퀴즈, 데이터 로그, 코드 제출, 제출문 정리 중 하나 이상이 있으면 성실한 학습 흐름으로 인정한다.',
       'Python 과제에서 CODE TRACE 완료/진행 기록은 영상/퀴즈와 다른 코드 실습 근거로 인정한다.',
+      '스마트 워크북 완료/진행 기록은 풀이·재시도 기반의 확인 활동으로 인정하며, 일반 퀴즈 점수와 섞지 않고 워크북 평균과 진행 페이지를 별도로 해석한다.',
       '영상 시간 숫자만으로 "기준 학습량 대비 부족"이라고 쓰지 않는다.',
       '이미 퀴즈, 데이터 로그, CODE TRACE가 있으면 "퀴즈나 데이터 로그까지 이어가라"는 개선 문구를 쓰지 않는다.',
       '개선점은 오답 이유 한 줄 정리, 코드 실행 결과, 직접 바꾼 코드 설명처럼 실제로 비어 있는 근거에서 고른다.',
@@ -1033,6 +1097,11 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
     : (learning.codeTraceProgressCount || 0) > 0
       ? `진행 중 CODE TRACE ${learning.codeTraceProgressCount}건`
       : '';
+  const workbookNote = (learning.workbookCount || 0) > 0
+    ? `스마트 워크북 완료 ${learning.workbookCount}건${learning.workbookAverageScore != null ? ` (평균 ${learning.workbookAverageScore}점)` : ''}`
+    : (learning.workbookProgressCount || 0) > 0
+      ? `진행 중 스마트 워크북 ${learning.workbookProgressCount}건`
+      : '';
   // 퀴즈 배틀은 참여 횟수·승패·정답률을 한 줄로 요약한다.
   const battleNote = (learning.battleCount || 0) > 0
     ? `퀴즈 배틀 ${learning.battleCount}회 (승 ${learning.battleWinCount || 0} 무 ${learning.battleDrawCount || 0} 패 ${learning.battleLossCount || 0}${learning.battleAverageAccuracy !== null && learning.battleAverageAccuracy !== undefined ? `, 정답률 ${learning.battleAverageAccuracy}%` : ''})`
@@ -1047,14 +1116,14 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
   const learningFlowNote = policy.isReasonableFlow
     ? codeTraceNote
       ? `${codeTraceNote}${learning.videoMinutes ? `과 영상 ${learning.videoMinutes}분` : ''}${learning.quizCount ? `, 퀴즈 ${learning.quizCount}건` : ''}${learning.dataLogCount ? `, 데이터 로그 ${learning.dataLogCount}건` : ''}이 확인되어, 코드를 손으로 따라 쓰는 확인 활동까지 남았습니다.`
-      : battleNote && !learning.videoMinutes && !(learning.quizCount || 0) && !(learning.dataLogCount || 0)
+      : battleNote && !learning.videoMinutes && !(learning.quizCount || 0) && !(learning.dataLogCount || 0) && !workbookNote
         ? `${battleNote}로 기존 학습 범위를 경쟁하며 복습한 기록이 확인됩니다. 영상 없이도 배운 개념을 확인 활동으로 이어간 점은 좋습니다.`
-        : `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && learning.dataLogCount ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${battleNote ? `${learning.quizCount || learning.dataLogCount ? ', ' : ''}${battleNote}` : ''}${!learning.quizCount && !learning.dataLogCount && !battleNote && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
+        : `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && (learning.dataLogCount || workbookNote) ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${workbookNote ? `${learning.quizCount || learning.dataLogCount ? ', ' : ''}${workbookNote}` : ''}${battleNote ? `${learning.quizCount || learning.dataLogCount || workbookNote ? ', ' : ''}${battleNote}` : ''}${!learning.quizCount && !learning.dataLogCount && !workbookNote && !battleNote && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
     : '';
 
   const improvement = weakness
     ? `${weakness}와 연결되는 부분은 다음 과제에서 한 번 더 의식해 보세요.`
-    : (learning.battleCount || 0) > 0 && !(learning.quizCount || 0) && !(learning.dataLogCount || 0) && !learning.videoMinutes
+    : (learning.battleCount || 0) > 0 && !(learning.quizCount || 0) && !(learning.dataLogCount || 0) && !workbookNote && !learning.videoMinutes
       ? '다음에는 배틀에서 틀린 개념 1가지를 찾아 영상이나 퀴즈로 다시 확인해 보세요. 배틀 복습 다음에 개념을 한 번 더 짚으면 더 단단해집니다.'
       : policy.isReasonableFlow
         ? '다음 제출에서는 퀴즈에서 틀린 이유나 코드/풀이에서 막힌 부분을 한 줄 더 적어 주세요.'

@@ -2096,9 +2096,11 @@ function SpaceHome() {
         }
 
         // --- Atomic Logging: Quiz Reward / Penalty ---
+        let crystalTransactionId = ''
         if (atomicCrystalsEarned !== 0) {
           const activityPrefix = isWorkbookResult ? 'workbook' : 'quiz'
           const stableActivityTxId = `${activityPrefix}_${currentUnitId}_s${score}_${Date.now()}`; // penalties may repeat
+          crystalTransactionId = atomicCrystalsEarned > 0 ? `${activityPrefix}_${currentUnitId}_s${score}` : stableActivityTxId
           
           recordCrystalTransaction(user.uid, {
             amount: atomicCrystalsEarned,
@@ -2108,11 +2110,19 @@ function SpaceHome() {
             description: `${currentUnitTitle} ${atomicCrystalsEarned > 0 ? `(${score}점)` : '(시스템 손상)'}`,
             metadata: {
               unitId: currentUnitId,
+              unitTitle: currentUnitTitle,
+              activityType: isWorkbookResult ? 'workbook' : 'quiz',
+              source: isWorkbookResult ? 'smart_workbook_complete' : 'field_test_complete',
               score,
+              correctCount: Number(result.correctCount || 0),
+              totalCount: Number(result.totalCount || 0),
+              attemptCount: Number(result.attemptCount || 1),
               penalty: atomicCrystalsEarned < 0,
+              balanceBefore: Number(freshUserData.crystals || 0),
+              balanceAfter: Number(freshUserData.crystals || 0) + atomicCrystalsEarned,
               ...buildRewardMultiplierMetadata(rewardMultiplierMeta)
             }
-          }, transaction, atomicCrystalsEarned > 0 ? `${activityPrefix}_${currentUnitId}_s${score}` : stableActivityTxId)
+          }, transaction, crystalTransactionId)
         }
 
         // --- Atomic Logging: History ---
@@ -2142,6 +2152,7 @@ function SpaceHome() {
           totalCount: result.totalCount || 0,
           correctCount: result.correctCount || 0,
           crystalsEarned: atomicCrystalsEarned,
+          crystalTransactionId,
           rewardMultiplier: rewardMultiplierMeta?.multiplier || 1,
           rewardMultiplierReason: rewardMultiplierMeta?.reason || 'none',
           rewardBaseAmount: rewardMultiplierMeta?.baseAmount ?? atomicCrystalsEarned,

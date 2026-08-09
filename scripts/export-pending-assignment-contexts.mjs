@@ -399,6 +399,7 @@ async function summarizeLearningProgress(progressDocs, start, end, courseId, opt
   const videos = [];
   const inProgressQuizzes = [];
   const inProgressCodeTraces = [];
+  const inProgressWorkbooks = [];
 
   // 각 문서의 과정을 region 역조회로 정확히 정한 뒤 필터링한다(정규식 오탐 방지).
   const filtered = await filterItemsByCourse(
@@ -475,9 +476,28 @@ async function summarizeLearningProgress(progressDocs, start, end, courseId, opt
         updatedAt: codeTraceUpdatedAt.toISOString(),
       });
     }
+
+    const workbookSession = data.workbookSession;
+    const workbookUpdatedAt = toDate(data.workbookSessionUpdatedAt)
+      || (workbookSession?.savedAtMs ? new Date(Number(workbookSession.savedAtMs)) : null);
+    const answeredCount = Object.keys(workbookSession?.answers || {}).filter(key => String(workbookSession.answers[key] ?? '').trim() !== '').length;
+    const checkedPageCount = Object.values(workbookSession?.checkedPages || {}).filter(Boolean).length;
+    if (workbookUpdatedAt && workbookUpdatedAt >= start && workbookUpdatedAt <= end && workbookSession
+      && (answeredCount > 0 || checkedPageCount > 0 || Number(workbookSession.currentPageIndex || 0) > 0)) {
+      const totalPages = String(workbookSession.workbookSignature || '').split('|').filter(Boolean).length;
+      inProgressWorkbooks.push({
+        unitId,
+        title: normalizeText(data.unitTitle || unitId),
+        currentPage: Math.min(totalPages || Number.MAX_SAFE_INTEGER, Number(workbookSession.currentPageIndex || 0) + 1),
+        totalPages,
+        answeredCount,
+        checkedPageCount,
+        updatedAt: workbookUpdatedAt.toISOString(),
+      });
+    }
   });
 
-  return { videos, inProgressQuizzes, inProgressCodeTraces };
+  return { videos, inProgressQuizzes, inProgressCodeTraces, inProgressWorkbooks };
 }
 
 function compactAssignment(doc) {
@@ -636,7 +656,7 @@ async function getUserAssignments(uid) {
   return snap.docs.map(compactAssignment);
 }
 
-function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgressQuizzes, codeTraces, inProgressCodeTraces, attention, readingActivityCount = 0, battles = [] }) {
+function buildLearningLoadSummary({ courseId, videos, quizzes, workbooks = [], dataLogs, inProgressQuizzes, inProgressWorkbooks = [], codeTraces, inProgressCodeTraces, attention, readingActivityCount = 0, battles = [] }) {
   const expectation = COURSE_EXPECTATIONS[normalizeCourseId(courseId)] || {
     label: courseId || '과정',
     totalMinutes: 0,
@@ -651,7 +671,7 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
   const codeTraceActivityCount = (codeTraces?.length || 0) + (inProgressCodeTraces?.length || 0);
   // 퀴즈 배틀은 경쟁 복습/확인 활동으로 학습 근거에 포함한다(포기 제외).
   const battleAssessment = assessBattleLearning(battles);
-  const hasPractice = quizzes.length > 0 || inProgressQuizzes.length > 0 || codeTraceActivityCount > 0 || battleAssessment.battleCount > 0;
+  const hasPractice = quizzes.length > 0 || inProgressQuizzes.length > 0 || workbooks.length > 0 || inProgressWorkbooks.length > 0 || codeTraceActivityCount > 0 || battleAssessment.battleCount > 0;
   const hasConceptInput = videos.length > 0 || dataLogs.length > 0;
   const hasMathPlatformActivity = hasConceptInput || hasPractice;
   const isElementary = normalizeCourseId(courseId) === 'cluster_elementary';
@@ -668,6 +688,8 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
   if (videos.length) balanceSignals.push(`영상 ${videos.length}개, ${videoMinutes}분`);
   if (quizzes.length) balanceSignals.push(`완료 퀴즈 ${quizzes.length}개`);
   if (inProgressQuizzes.length) balanceSignals.push(`진행 중 퀴즈 ${inProgressQuizzes.map(item => `${item.title} ${item.answeredCount}/${item.totalCount}`).join(', ')}`);
+  if (workbooks.length) balanceSignals.push(`스마트 워크북 완료 ${workbooks.length}개`);
+  if (inProgressWorkbooks.length) balanceSignals.push(`스마트 워크북 진행 중 ${inProgressWorkbooks.map(item => `${item.title} ${item.currentPage}/${item.totalPages || '?'}페이지`).join(', ')}`);
   if (codeTraces?.length) balanceSignals.push(`CODE TRACE 완료 ${codeTraces.length}개`);
   if (inProgressCodeTraces?.length) balanceSignals.push(`CODE TRACE 진행 중 ${inProgressCodeTraces.map(item => `${item.title} ${item.completedExerciseCount}/${item.totalExerciseCount || '?'}`).join(', ')}`);
   if (dataLogs.length) balanceSignals.push(`데이터 로그 ${dataLogs.length}개`);
@@ -706,7 +728,7 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, dataLogs, inProgr
 }
 
 async function getLearningSummary(uid, date, courseId = '', options = {}) {
-  if (!uid || !date) return { activityCount: 0, quizCount: 0, codeTraceCount: 0, codeTraceProgressCount: 0, battleCount: 0, battleForfeitCount: 0, battleAverageAccuracy: null, isSufficientBattleReview: false, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], codeTraces: [], inProgressCodeTraces: [], battles: [] };
+  if (!uid || !date) return { activityCount: 0, quizCount: 0, workbookCount: 0, workbookProgressCount: 0, workbookAverageScore: null, codeTraceCount: 0, codeTraceProgressCount: 0, battleCount: 0, battleForfeitCount: 0, battleAverageAccuracy: null, isSufficientBattleReview: false, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], workbooks: [], inProgressWorkbooks: [], codeTraces: [], inProgressCodeTraces: [], battles: [] };
   const start = new Date(`${date}T00:00:00+09:00`);
   const end = new Date(`${date}T23:59:59+09:00`);
   const [snap, progressSnap] = await Promise.all([
@@ -718,7 +740,7 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     db.collection('users').doc(uid).collection('learning_progress').get().catch(() => null),
   ]);
 
-  if (!snap) return { activityCount: 0, quizCount: 0, battleCount: 0, battleForfeitCount: 0, battleAverageAccuracy: null, isSufficientBattleReview: false, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], codeTraces: [], inProgressCodeTraces: [], battles: [] };
+  if (!snap) return { activityCount: 0, quizCount: 0, workbookCount: 0, workbookProgressCount: 0, workbookAverageScore: null, battleCount: 0, battleForfeitCount: 0, battleAverageAccuracy: null, isSufficientBattleReview: false, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], workbooks: [], inProgressWorkbooks: [], codeTraces: [], inProgressCodeTraces: [], battles: [] };
 
   const allItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -743,16 +765,18 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
   const readingItems = isElementary ? items.filter(isReadingRelatedItem) : [];
   const mathItems = isElementary ? items.filter(item => !isReadingRelatedItem(item)) : items;
   const codeTraceItems = mathItems.filter(item => item.type === 'code_trace');
+  const workbookItems = mathItems.filter(item => item.type === 'workbook');
   // 퀴즈 배틀은 점수 체계(0~1500)가 일반 퀴즈(0~100)와 다르므로 별도로 분리한다.
   // 분리하지 않으면 배틀 점수가 averageScore를 오염시키고 "완료 퀴즈"에 묻혀 배틀 복습 활동이 안 보인다.
   const battleItems = mathItems.filter(item => item.type === 'quiz_battle');
-  const quizItems = mathItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle'].includes(item.type || 'quiz'));
+  const quizItems = mathItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle', 'workbook'].includes(item.type || 'quiz'));
   const readingQuizItems = readingItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle'].includes(item.type || 'quiz'));
   const videoItems = mathItems.filter(item => ['video', 'video_complete', 'recovery_mastery', 'attention'].includes(item.type) || item.attentionResult === 'hit' || item.attentionResult === 'miss');
   const dataLogItems = mathItems.filter(item => ['text', 'data_log_read'].includes(item.type));
   const attentionItems = mathItems.filter(item => item.attentionResult === 'hit' || item.attentionResult === 'miss');
   // averageScore는 일반 퀴즈 점수(0~100)만으로 계산한다. 배틀 점수(0~1500)는 제외.
   const scores = quizItems.map(item => Number(item.score)).filter(Number.isFinite);
+  const workbookScores = workbookItems.map(item => Number(item.score)).filter(Number.isFinite);
   const progressSummary = await summarizeLearningProgress(progressSnap?.docs || [], start, end, courseId, mergedOptions);
   const videos = summarizeVideoRows(videoItems);
   const allVideos = [...videos, ...progressSummary.videos];
@@ -760,7 +784,7 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
   const codeTraces = summarizeCodeTraceRows(codeTraceItems);
   const battles = summarizeBattleRows(battleItems);
   const battleAssessment = assessBattleLearning(battles);
-  const progressActivityCount = progressSummary.inProgressQuizzes.length + progressSummary.videos.length + progressSummary.inProgressCodeTraces.length;
+  const progressActivityCount = progressSummary.inProgressQuizzes.length + progressSummary.videos.length + progressSummary.inProgressCodeTraces.length + progressSummary.inProgressWorkbooks.length;
   const attentionHits = attentionItems.filter(item => item.attentionResult === 'hit').length;
   const attentionMisses = attentionItems.filter(item => item.attentionResult === 'miss').length;
   const completionBonusMisses = attentionItems.filter(item => item.attentionSource === 'completion_bonus' && item.attentionResult === 'miss').length;
@@ -780,6 +804,8 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     courseId,
     videos: allVideos,
     quizzes,
+    workbooks: workbookItems,
+    inProgressWorkbooks: progressSummary.inProgressWorkbooks,
     dataLogs: dataLogItems,
     inProgressQuizzes: progressSummary.inProgressQuizzes,
     codeTraces,
@@ -796,6 +822,9 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     mathActivityCount: mathItems.length + progressActivityCount,
     readingActivityCount: readingItems.length,
     quizCount: quizItems.length + progressSummary.inProgressQuizzes.length,
+    workbookCount: workbookItems.length,
+    workbookProgressCount: progressSummary.inProgressWorkbooks.length,
+    workbookAverageScore: workbookScores.length ? Math.round(workbookScores.reduce((sum, score) => sum + score, 0) / workbookScores.length) : null,
     readingQuizCount: readingQuizItems.length,
     videoCount: allVideos.length,
     dataLogCount: dataLogItems.length,
@@ -817,6 +846,12 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     videos: allVideos,
     progressVideos: progressSummary.videos,
     quizzes,
+    workbooks: workbookItems.map(item => ({
+      unitId: item.unitId || '', title: titleOf(item), score: Number(item.score),
+      correctCount: Number(item.correctCount || 0), totalCount: Number(item.totalCount || 0),
+      attemptCount: Number(item.attemptCount || 1), crystalsEarned: Number(item.crystalsEarned || 0), completed: true,
+    })),
+    inProgressWorkbooks: progressSummary.inProgressWorkbooks,
     codeTraces,
     inProgressCodeTraces: progressSummary.inProgressCodeTraces,
     battles,
@@ -838,6 +873,8 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     titles: [...new Set([
       ...items.map(titleOf),
       ...progressSummary.inProgressQuizzes.map(item => item.title),
+      ...workbookItems.map(titleOf),
+      ...progressSummary.inProgressWorkbooks.map(item => item.title),
       ...progressSummary.videos.map(item => item.title),
       ...codeTraces.map(item => item.title),
       ...progressSummary.inProgressCodeTraces.map(item => item.title),
