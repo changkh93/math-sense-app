@@ -81,6 +81,7 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 - 워크북 평균은 워크북 점수만으로 계산하고 일반 퀴즈 평균과 섞지 않는다.
 - `hasPractice`, `hasLearningFollowUpActivity`, `hasCourseLearningRecord`, 저학습 판단에 완료/진행 워크북을 포함한다.
 - 광석 지급은 사용자 잔고, `history.crystalsEarned`, `history.crystalTransactionId`, `crystal_transactions` 원장이 같은 Firestore transaction에서 함께 저장되는지 확인한다. 최고점 개선분만 지급하는 정책 때문에 동일 점수 재도전의 원장 항목이 없는 것은 정상이다.
+- 과거 워크북 보상이 잔고/history에는 있으나 원장에 없을 때는 `node scripts/backfill-workbook-crystal-ledger.mjs`로 dry-run한 뒤 `--apply`를 붙인다. 이 도구는 잔고를 다시 지급하지 않고 누락 원장과 history의 `crystalTransactionId`만 복원하며, 금액 충돌이 있으면 쓰기를 중단한다.
 
 ## 정규 학습 시간 기준
 
