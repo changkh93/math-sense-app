@@ -86,8 +86,8 @@ const MathKeypad = ({ value, onChange, onSubmit, indicatorText, inputMode = 'exp
           <button className="key-btn util-btn" style={{ gridArea: 'clear' }} onPointerDown={(e) => e.stopPropagation()} onClick={clearAll}>AC</button>
           <button className="key-btn util-btn" style={{ gridArea: 'backspace' }} aria-label="한 글자 지우기" onPointerDown={(e) => e.stopPropagation()} onClick={handleDelete}>⌫</button>
           {operatorKeys.map((key) => (
-            <button key={`${key.value}-${key.label}`} className="key-btn op-btn" style={keypadArea(key.value)} onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key.value)}>
-              {key.label}
+            <button key={`${key.value}-${key.label}`} className={`key-btn op-btn ${key.value === '/' ? 'fraction-line-key' : ''}`} style={keypadArea(key.value)} aria-label={key.label} onPointerDown={(e) => e.stopPropagation()} onClick={() => handleKeyPress(key.value)}>
+              {key.value === '/' ? <span className="fraction-line-icon" aria-hidden="true"><span /><span /></span> : key.label}
             </button>
           ))}
           {MATH_KEYPAD_NUMBER_KEYS.map((key) => (

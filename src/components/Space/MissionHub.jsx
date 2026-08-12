@@ -12,12 +12,22 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { isRadarActive } from '../../utils/streakUtils'
 import { getEmbeddablePdfUrl, normalizePdfUrl } from '../../utils/pdfUrlUtils'
 import { isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils'
-import { getVideoResumeRecovery } from '../../utils/videoPlaybackUtils'
+import {
+  getVideoCompletionMetrics,
+  getVideoPlaybackRange,
+  getVideoResumeRecovery,
+  isVideoPositionInRange,
+  sanitizeVideoPosition,
+  sanitizeVideoStamps,
+} from '../../utils/videoPlaybackUtils'
+import { getMissionSetCompletion } from '../../utils/pythonMissionProgressUtils'
+import { usePythonMissionSet } from '../../hooks/usePythonMissionSet'
 
 const SpaceQuizView = lazy(() => import('./SpaceQuizView'))
 const QuizBattleView = lazy(() => import('./QuizBattleView'))
 const WorkbookPlayer = lazy(() => import('./WorkbookPlayer'))
 const CodeTracePlayer = lazy(() => import('./CodeTracePlayer'))
+const PythonMissionLab = lazy(() => import('../PythonWorld/PythonMissionLab'))
 const QuestionModal = lazy(() => import('../QuestionModal'))
 const MissionMarkdownViewer = lazy(() => import('./MissionMarkdownViewer'))
 const TimeAttackOverlay = lazy(() => import('./TimeAttackOverlay'))
@@ -91,9 +101,6 @@ const SilentCrystalToast = ({ amount, visible }) => (
   </AnimatePresence>
 )
 
-const LONG_VIDEO_SECONDS = 40 * 60
-const STANDARD_VIDEO_COMPLETION_THRESHOLD = 0.95
-const LONG_VIDEO_COMPLETION_THRESHOLD = 0.85
 const VIDEO_PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2]
 const VIDEO_VOLUME_DEFAULT = 80
 const QA_ROOM_URL = 'https://meet.google.com/qzg-psru-qnc'
@@ -103,16 +110,6 @@ const enterFieldTestFocusMode = () => {
     document.documentElement.requestFullscreen().catch(() => {})
   }
 }
-
-const getVideoCompletionThreshold = (duration = 0) => (
-  duration > LONG_VIDEO_SECONDS
-    ? LONG_VIDEO_COMPLETION_THRESHOLD
-    : STANDARD_VIDEO_COMPLETION_THRESHOLD
-)
-
-const getVideoCompletionTargetPercent = (duration = 0) => (
-  Math.round(getVideoCompletionThreshold(duration) * 100)
-)
 
 const getTodayKSTDate = () => {
   const now = new Date()
@@ -151,6 +148,107 @@ const getNormalizedVideoRange = (start = 0, end = 0) => {
     start: normalizedStart,
     end: normalizedEnd > normalizedStart ? normalizedEnd : undefined,
   }
+}
+
+const VIDEO_CACHE_MAX_FUTURE_SKEW_MS = 5 * 60 * 1000
+
+const getVideoProgressCacheKey = ({ userId, unitId, transmissionId }) => (
+  `video_progress_${userId}_${unitId}_${transmissionId}`
+)
+
+const getVideoCacheMetadata = (transmission) => ({
+  videoId: getYouTubeVideoId(transmission?.videoId),
+  contentStart: Math.max(0, Math.floor(Number(transmission?.start) || 0)),
+  contentEnd: Math.max(0, Math.floor(Number(transmission?.end) || 0)),
+})
+
+const readVideoProgressCache = ({ userId, unitId, transmission, duration = 0 }) => {
+  const transmissionId = transmission?.id || 'default'
+  const cacheKey = getVideoProgressCacheKey({ userId, unitId, transmissionId })
+  const expectedMetadata = getVideoCacheMetadata(transmission)
+
+  try {
+    const metadataRaw = localStorage.getItem(cacheKey + '_meta')
+    const metadata = metadataRaw ? JSON.parse(metadataRaw) : null
+    // Legacy cache entries had no transmission metadata, so they cannot prove
+    // which video/range they belong to. Ignore them instead of guessing.
+    const metadataMatches = !!metadata && (
+      metadata.videoId === expectedMetadata.videoId &&
+      Number(metadata.contentStart || 0) === expectedMetadata.contentStart &&
+      Number(metadata.contentEnd || 0) === expectedMetadata.contentEnd
+    )
+    const updatedAt = Number.parseInt(localStorage.getItem(cacheKey + '_updatedAt') || '0', 10)
+    const timestampIsValid = Number.isFinite(updatedAt) &&
+      updatedAt > 0 &&
+      updatedAt <= Date.now() + VIDEO_CACHE_MAX_FUTURE_SKEW_MS
+    const rawPosition = Number.parseFloat(localStorage.getItem(cacheKey + '_pos') || '')
+    const positionIsValid = isVideoPositionInRange({
+      position: rawPosition,
+      duration,
+      contentStart: expectedMetadata.contentStart,
+      contentEnd: expectedMetadata.contentEnd,
+    })
+    let rawStamps = []
+    try {
+      const stampsValue = JSON.parse(localStorage.getItem(cacheKey + '_stamps') || '[]')
+      rawStamps = Array.isArray(stampsValue) ? stampsValue : []
+    } catch {
+      rawStamps = []
+    }
+    const stamps = sanitizeVideoStamps({
+      stampedSeconds: rawStamps,
+      duration,
+      contentStart: expectedMetadata.contentStart,
+      contentEnd: expectedMetadata.contentEnd,
+    })
+
+    return {
+      cacheKey,
+      position: positionIsValid ? Math.floor(rawPosition) : expectedMetadata.contentStart,
+      stamps,
+      updatedAt,
+      hasData: metadataMatches && timestampIsValid && (positionIsValid || stamps.length > 0),
+    }
+  } catch {
+    return {
+      cacheKey,
+      position: expectedMetadata.contentStart,
+      stamps: [],
+      updatedAt: 0,
+      hasData: false,
+    }
+  }
+}
+
+const writeVideoProgressCache = ({ userId, unitId, transmission, position, stampedSeconds, duration = 0 }) => {
+  if (!userId || !unitId || !transmission) return { position: 0, stamps: [] }
+
+  const transmissionId = transmission.id || 'default'
+  const cacheKey = getVideoProgressCacheKey({ userId, unitId, transmissionId })
+  const metadata = getVideoCacheMetadata(transmission)
+  const safePosition = sanitizeVideoPosition({
+    position,
+    duration,
+    contentStart: metadata.contentStart,
+    contentEnd: metadata.contentEnd,
+  })
+  const safeStamps = sanitizeVideoStamps({
+    stampedSeconds,
+    duration,
+    contentStart: metadata.contentStart,
+    contentEnd: metadata.contentEnd,
+  })
+
+  try {
+    localStorage.setItem(cacheKey + '_pos', String(safePosition))
+    localStorage.setItem(cacheKey + '_stamps', JSON.stringify(safeStamps))
+    localStorage.setItem(cacheKey + '_updatedAt', String(Date.now()))
+    localStorage.setItem(cacheKey + '_meta', JSON.stringify(metadata))
+  } catch (error) {
+    console.warn('Failed to cache video progress:', error)
+  }
+
+  return { position: safePosition, stamps: safeStamps }
 }
 
 const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
@@ -282,6 +380,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, restar
     }
   }, [])
 
+  const onTrackingStatusRef = useRef(onTrackingStatus)
+  useEffect(() => {
+    onTrackingStatusRef.current = onTrackingStatus
+  }, [onTrackingStatus])
+
   const tabIdRef = useRef(Math.random().toString(36).substring(2, 9))
   const channelRef = useRef(null)
 
@@ -292,6 +395,14 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, restar
 
       channel.onmessage = (event) => {
         if (event.data.type === 'START_PLAYING' && event.data.tabId !== tabIdRef.current) {
+          // The newest playing tab is the only progress writer. Disable this tab even
+          // when it was already paused so its interval/unload handlers cannot push a
+          // stale position over the active tab's progress.
+          onTrackingStatusRef.current?.({
+            event: 'external_playback_started',
+            writerEnabled: false,
+            videoId: normalizedVideoId,
+          })
           if (playerRef.current && typeof playerRef.current.getPlayerState === 'function') {
             const state = playerRef.current.getPlayerState()
             if (state === window.YT?.PlayerState?.PLAYING) {
@@ -305,18 +416,13 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, restar
     return () => {
       if (channelRef.current) channelRef.current.close()
     }
-  }, [])
+  }, [normalizedVideoId])
 
   // Use a ref for onTimeUpdate to prevent stale closures in the player's intervals
   const onTimeUpdateRef = useRef(onTimeUpdate)
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate
   }, [onTimeUpdate])
-
-  const onTrackingStatusRef = useRef(onTrackingStatus)
-  useEffect(() => {
-    onTrackingStatusRef.current = onTrackingStatus
-  }, [onTrackingStatus])
 
   const onInvalidResumePositionRef = useRef(onInvalidResumePosition)
   useEffect(() => {
@@ -528,6 +634,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, restar
               onPlaybackStateChange(event.data)
             }
             if (event.data === window.YT.PlayerState.PLAYING) {
+              onTrackingStatusRef.current?.({
+                event: 'writer_activated',
+                writerEnabled: true,
+                videoId: normalizedVideoId,
+              })
               if (resumeGuardTimerRef.current) {
                 clearTimeout(resumeGuardTimerRef.current)
                 resumeGuardTimerRef.current = null
@@ -916,6 +1027,11 @@ export default function MissionHub({
     data: codeExercises = [],
     isLoading: loadingCodeExercises
   } = useCodeExercises(unitId)
+  const {
+    missionSet: pythonMissionSet,
+    isLoading: loadingPythonMissionSet,
+    error: pythonMissionSetError,
+  } = usePythonMissionSet(activeUnit, clusterId)
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -990,6 +1106,9 @@ export default function MissionHub({
   })
   const inferredPlaybackLoggedRef = useRef(false)
   const trackingStallLoggedRef = useRef(false)
+  const invalidVideoPositionLoggedRef = useRef(false)
+  const lastInvalidVideoRecoveryAtRef = useRef(0)
+  const videoWriterEnabledRef = useRef(true)
   
   // ─── Time Attack State ───
   const [showTimeAttack, setShowTimeAttack] = useState(false);
@@ -1283,11 +1402,17 @@ export default function MissionHub({
       videoCompletedRef.current = isComp
       videoCompletionBonusGivenRef.current = isComp
       
-      // Restore stamps and reward stats for the specific video
-      if (txProgress.stampedSeconds) {
-        stampedSetRef.current = new Set(txProgress.stampedSeconds)
-        setStampCount(txProgress.stampedSeconds.length)
-      }
+      // Restore only stamps that belong to this transmission's configured range.
+      // Always replace the set so a transmission with no stamps cannot inherit the
+      // previously opened transmission's coverage.
+      const restoredStamps = sanitizeVideoStamps({
+        stampedSeconds: txProgress.stampedSeconds,
+        duration: videoDurationRef.current,
+        contentStart: selectedTx.start,
+        contentEnd: selectedTx.end,
+      })
+      stampedSetRef.current = new Set(restoredStamps)
+      setStampCount(restoredStamps.length)
       
       if (txProgress.totalRewardedCrystals) {
         setTotalRewardedCrystals(txProgress.totalRewardedCrystals)
@@ -1401,6 +1526,9 @@ export default function MissionHub({
     }
     inferredPlaybackLoggedRef.current = false
     trackingStallLoggedRef.current = false
+    invalidVideoPositionLoggedRef.current = false
+    lastInvalidVideoRecoveryAtRef.current = 0
+    videoWriterEnabledRef.current = true
   }, [selectedTx?.id])
 
   // ─── Video Progress: Part 1 - Initial Restoration (Runs ONCE per video) ───
@@ -1412,31 +1540,80 @@ export default function MissionHub({
     if (videoPrevTxIdRef.current === txId) return
     videoPrevTxIdRef.current = txId
 
-    const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+    const knownDuration = videoDurationRef.current > 0 ? videoDurationRef.current : 0
+    const contentStart = Math.max(0, Math.floor(Number(selectedTx.start) || 0))
+    const contentEnd = Math.max(0, Math.floor(Number(selectedTx.end) || 0))
 
-    // ── Gather data from BOTH sources ──
+    // ── Gather and validate data from BOTH sources ──
     const serverData = learningProgress?.videoProgress?.[txId] || null
-    const localStampsRaw = localStorage.getItem(localCacheKey + '_stamps')
-    const localStamps = localStampsRaw ? JSON.parse(localStampsRaw) : []
-    const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
-    const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
-    const localUpdateTs = parseInt(localStorage.getItem(localCacheKey + '_updatedAt') || '0', 10)
+    const serverStamps = sanitizeVideoStamps({
+      stampedSeconds: serverData?.stampedSeconds,
+      duration: knownDuration,
+      contentStart,
+      contentEnd,
+    })
+    const serverPositionIsValid = isVideoPositionInRange({
+      position: serverData?.lastPosition,
+      duration: knownDuration,
+      contentStart,
+      contentEnd,
+    })
+    const serverPos = serverPositionIsValid
+      ? Math.floor(Number(serverData?.lastPosition) || 0)
+      : contentStart
+    const localData = readVideoProgressCache({
+      userId,
+      unitId,
+      transmission: selectedTx,
+      duration: knownDuration,
+    })
 
-    const hasServerData = serverData && (serverData.stampedSeconds?.length > 0 || serverData.lastPosition > 0)
-    const hasLocalData = localStamps.length > 0 || localPos > 0
+    const hasServerData = !!serverData && (
+      serverStamps.length > 0 ||
+      serverPositionIsValid ||
+      serverData.completed === true ||
+      serverData.completionBonusGiven === true
+    )
+    const hasLocalData = localData.hasData
+
+    // Session-only reward/timer state must never leak between transmissions,
+    // regardless of whether the next transmission already has saved progress.
+    if (lastInitializedTxIdRef.current !== txId) {
+      lastInitializedTxIdRef.current = txId
+      setShowTimeAttack(false)
+      showTimeAttackRef.current = false
+      setTimeAttackCombo(0)
+      timeAttackComboRef.current = 0
+      timeAttackCrystalsSessionRef.current = 0
+      nextAttackTimeRef.current = null
+      activeVideoSecondsRef.current = 0
+      sessionStartTimeRef.current = Date.now()
+      setCompletionBonusTimeLeft(null)
+      completionTimerStartedRef.current = false
+    }
 
     if (hasServerData || hasLocalData) {
       // ── Merge stamps from both sources ──
-      const serverStamps = serverData?.stampedSeconds || []
-      stampedSetRef.current = new Set([...serverStamps, ...localStamps])
+      const combinedStamps = sanitizeVideoStamps({
+        stampedSeconds: [...serverStamps, ...localData.stamps],
+        duration: knownDuration,
+        contentStart,
+        contentEnd,
+      })
+      stampedSetRef.current = new Set(combinedStamps)
       
       const combinedStampCount = stampedSetRef.current.size
-      const rewardedCount = serverData?.rewardedStampCount || 0
+      const rewardedCount = Math.min(combinedStampCount, Math.max(0, Number(serverData?.rewardedStampCount) || 0))
       newStampCountRef.current = Math.max(0, combinedStampCount - rewardedCount)
       setStampCount(combinedStampCount)
+      const restoredCompletion = getVideoCompletionMetrics({
+        stampedSeconds: combinedStamps,
+        duration: knownDuration,
+        contentStart,
+        contentEnd,
+      })
       
       // ── Determine position by timestamp (most recently saved wins) ──
-      const serverPos = serverData?.lastPosition || 0
       const serverUpdateTs = serverData?.updatedAt?.toMillis 
         ? serverData.updatedAt.toMillis() 
         : (serverData?.updatedAt?.seconds ? serverData.updatedAt.seconds * 1000 : 0)
@@ -1444,10 +1621,10 @@ export default function MissionHub({
       let latestPos
       if (hasServerData && hasLocalData) {
         // Both exist: pick whichever was saved more recently
-        latestPos = (localUpdateTs > serverUpdateTs) ? localPos : serverPos
+        latestPos = (localData.updatedAt > serverUpdateTs) ? localData.position : serverPos
       } else if (hasLocalData) {
         // Only localStorage (server hasn't received the save yet)
-        latestPos = localPos
+        latestPos = localData.position
       } else {
         // Only server data
         latestPos = serverPos
@@ -1462,10 +1639,16 @@ export default function MissionHub({
       totalRewardedCrystalsRef.current = serverData?.totalRewardedCrystals || 0
       setTotalRewardedCrystals(totalRewardedCrystalsRef.current)
       
-      setVideoCompleted(serverData?.completed || false)
-      videoCompletedRef.current = serverData?.completed || false
-      setVideoCompletionBonusGiven(serverData?.completionBonusGiven || false)
-      videoCompletionBonusGivenRef.current = serverData?.completionBonusGiven || false
+      const wasPreviouslyCompleted = !!(serverData?.completed || serverData?.completionBonusGiven)
+      const restoredCompleted = wasPreviouslyCompleted || restoredCompletion.completed
+      setVideoCompleted(restoredCompleted)
+      videoCompletedRef.current = restoredCompleted
+      setVideoCompletionBonusGiven(wasPreviouslyCompleted)
+      videoCompletionBonusGivenRef.current = wasPreviouslyCompleted
+      if (restoredCompletion.completed && !wasPreviouslyCompleted && !completionTimerStartedRef.current) {
+        completionTimerStartedRef.current = true
+        setCompletionBonusTimeLeft(60)
+      }
       
       setIsAtEnd(false)
       lastVideoTimeRef.current = latestPos > 0 ? latestPos : -1
@@ -1495,20 +1678,6 @@ export default function MissionHub({
       lastVideoTimeRef.current = -1
       setIsAtEnd(false)
 
-      // Reset Time Attack (only when tx changes)
-      if (lastInitializedTxIdRef.current !== selectedTx.id) {
-        lastInitializedTxIdRef.current = selectedTx.id;
-        setShowTimeAttack(false);
-        showTimeAttackRef.current = false;
-        setTimeAttackCombo(0);
-        timeAttackComboRef.current = 0;
-        timeAttackCrystalsSessionRef.current = 0;
-        nextAttackTimeRef.current = null;
-        activeVideoSecondsRef.current = 0;
-        sessionStartTimeRef.current = Date.now();
-        setCompletionBonusTimeLeft(null);
-        completionTimerStartedRef.current = false;
-      }
     }
   }, [userId, selectedTx, loadingProgress, learningProgress, unitId])
 
@@ -1542,16 +1711,28 @@ export default function MissionHub({
     if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
     autoSaveIntervalRef.current = setInterval(async () => {
       try {
-        const pos = Math.floor(lastVideoTimeRef.current || 0)
-        if (pos > 0 || stampedSetRef.current.size > 0) {
-          const stamps = Array.from(stampedSetRef.current)
+        if (!videoWriterEnabledRef.current) return
+        const knownDuration = videoDurationRef.current > 0 ? videoDurationRef.current : 0
+        const cached = writeVideoProgressCache({
+          userId,
+          unitId,
+          transmission: selectedTx,
+          position: lastVideoTimeRef.current,
+          stampedSeconds: Array.from(stampedSetRef.current),
+          duration: knownDuration,
+        })
+        const pos = cached.position
+        const stamps = cached.stamps
+        if (stamps.length > 0) {
+          lastVideoTimeRef.current = pos
+          stampedSetRef.current = new Set(stamps)
+          const playbackRange = getVideoPlaybackRange({
+            duration: knownDuration,
+            contentStart: selectedTx.start,
+            contentEnd: selectedTx.end,
+          })
           
           // Offline-first caching (10초 주기 일괄 저장으로 성능 최적화)
-          const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-          localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(stamps))
-          localStorage.setItem(localCacheKey + '_pos', pos.toString())
-          localStorage.setItem(localCacheKey + '_updatedAt', Date.now().toString())
-
           const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
           
           const updateData = {
@@ -1562,6 +1743,10 @@ export default function MissionHub({
             [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
             [`videoProgress.${txId}.stampedSeconds`]: stamps,
             [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || activeUnit?.title || 'Main Video',
+            [`videoProgress.${txId}.videoId`]: getYouTubeVideoId(selectedTx?.videoId),
+            [`videoProgress.${txId}.contentStart`]: playbackRange.start,
+            [`videoProgress.${txId}.contentEnd`]: playbackRange.end || null,
+            [`videoProgress.${txId}.segmentDuration`]: playbackRange.segmentDuration,
             [`videoProgress.${txId}.trackingDiagnostics`]: getTrackingDiagnostics(),
             unitTitle: activeUnit?.title || '',
             updatedAt: serverTimestamp()
@@ -1595,16 +1780,18 @@ export default function MissionHub({
     }, 10000)
 
     const handleUnloadSave = () => {
-      const finalPos = Math.floor(lastVideoTimeRef.current || 0)
-      if ((finalPos <= 0 && stampedSetRef.current.size === 0) || !idTokenRef.current) return
-      
-      const stamps = Array.from(stampedSetRef.current)
-
-      // Unload 시점의 로컬 캐시 갱신
-      const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-      localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(stamps))
-      localStorage.setItem(localCacheKey + '_pos', finalPos.toString())
-      localStorage.setItem(localCacheKey + '_updatedAt', Date.now().toString())
+      if (!idTokenRef.current || !videoWriterEnabledRef.current) return
+      const cached = writeVideoProgressCache({
+        userId,
+        unitId,
+        transmission: selectedTx,
+        position: lastVideoTimeRef.current,
+        stampedSeconds: Array.from(stampedSetRef.current),
+        duration: videoDurationRef.current,
+      })
+      const finalPos = cached.position
+      const stamps = cached.stamps
+      if (stamps.length === 0) return
 
       const payload = JSON.stringify({
         idToken: idTokenRef.current,
@@ -1616,7 +1803,10 @@ export default function MissionHub({
           totalTimeSpent: totalTimeSpentRef.current,
           todayTimeSpent: dailyTimeSpentRef.current,
           todayTimeSpentDate: dailyTimeSpentDateRef.current,
-          stampedSeconds: Array.from(stampedSetRef.current),
+          stampedSeconds: stamps,
+          videoId: getYouTubeVideoId(selectedTx?.videoId),
+          contentStart: Math.max(0, Math.floor(Number(selectedTx?.start) || 0)),
+          contentEnd: Math.max(0, Math.floor(Number(selectedTx?.end) || 0)) || null,
           completed: videoCompletedRef.current,
           completionBonusGiven: videoCompletionBonusGivenRef.current,
           trackingDiagnostics: getTrackingDiagnostics()
@@ -1677,6 +1867,11 @@ export default function MissionHub({
   }, [activeUnit?.title, clusterId, unitId, userId])
 
   const handleVideoTrackingStatus = useCallback((event = {}) => {
+    if (event.event === 'external_playback_started') {
+      videoWriterEnabledRef.current = false
+    } else if (event.event === 'writer_activated') {
+      videoWriterEnabledRef.current = true
+    }
     const next = {
       ...videoTrackingStatusRef.current,
       ...event,
@@ -1750,12 +1945,17 @@ export default function MissionHub({
     const restartPosition = Math.max(0, Math.floor(Number(selectedTx.start) || 0))
     const knownDuration = Math.max(0, Number(duration) || 0)
     const configuredEnd = Math.max(0, Number(selectedTx.end) || 0)
-    const playbackEnd = configuredEnd > restartPosition
-      ? Math.min(configuredEnd, knownDuration || configuredEnd)
-      : knownDuration
-    const sanitizedStamps = Array.from(stampedSetRef.current).filter((second) => (
-      Number.isFinite(second) && (playbackEnd <= restartPosition || second < playbackEnd)
-    ))
+    const playbackRange = getVideoPlaybackRange({
+      duration: knownDuration,
+      contentStart: restartPosition,
+      contentEnd: configuredEnd,
+    })
+    const sanitizedStamps = sanitizeVideoStamps({
+      stampedSeconds: Array.from(stampedSetRef.current),
+      duration: knownDuration,
+      contentStart: restartPosition,
+      contentEnd: configuredEnd,
+    })
 
     stampedSetRef.current = new Set(sanitizedStamps)
     newStampCountRef.current = Math.min(newStampCountRef.current, sanitizedStamps.length)
@@ -1778,10 +1978,14 @@ export default function MissionHub({
       inferredPlayback: false,
     }
 
-    const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-    localStorage.setItem(localCacheKey + '_pos', String(restartPosition))
-    localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(sanitizedStamps))
-    localStorage.setItem(localCacheKey + '_updatedAt', String(Date.now()))
+    writeVideoProgressCache({
+      userId,
+      unitId,
+      transmission: selectedTx,
+      position: restartPosition,
+      stampedSeconds: sanitizedStamps,
+      duration: knownDuration,
+    })
 
     setLearningProgress((previous) => ({
       ...previous,
@@ -1807,6 +2011,10 @@ export default function MissionHub({
             todayTimeSpent: dailyTimeSpentRef.current,
             todayTimeSpentDate: dailyTimeSpentDateRef.current,
             transmissionTitle: selectedTx?.title || activeUnit?.title || 'Main Video',
+            videoId: getYouTubeVideoId(selectedTx?.videoId),
+            contentStart: restartPosition,
+            contentEnd: playbackRange.end || null,
+            segmentDuration: playbackRange.segmentDuration,
             trackingDiagnostics: getTrackingDiagnostics(),
             updatedAt: serverTimestamp(),
           },
@@ -1842,18 +2050,37 @@ export default function MissionHub({
 
   const getVideoLearningMetadata = useCallback((txId, position, stamps) => {
     const sessionWatchSeconds = Math.max(0, totalTimeSpentRef.current - lastSyncedTimeSpentRef.current)
+    const duration = videoDurationRef.current > 0 ? videoDurationRef.current : 0
+    const completion = getVideoCompletionMetrics({
+      stampedSeconds: stamps,
+      duration,
+      contentStart: selectedTx?.start,
+      contentEnd: selectedTx?.end,
+    })
+    const safePosition = sanitizeVideoPosition({
+      position,
+      duration,
+      contentStart: selectedTx?.start,
+      contentEnd: selectedTx?.end,
+    })
     return {
       activityCategory: 'video',
       transmissionId: txId,
       transmissionTitle: selectedTx?.title || "Main Video",
-      stampedSeconds: stamps,
+      videoId: getYouTubeVideoId(selectedTx?.videoId),
+      contentStart: completion.start,
+      contentEnd: completion.end || null,
+      segmentDuration: completion.segmentDuration,
+      completionRate: completion.coverage,
+      completionThreshold: completion.threshold,
+      stampedSeconds: completion.validStamps,
       videoTime: Math.floor(sessionWatchSeconds),
       sessionWatchSeconds,
       totalTimeSpent: totalTimeSpentRef.current,
       todayTimeSpent: dailyTimeSpentRef.current,
       todayTimeSpentDate: dailyTimeSpentDateRef.current,
-      coverageSeconds: stamps.length,
-      currentPosition: position,
+      coverageSeconds: completion.coveredSeconds,
+      currentPosition: safePosition,
       trackingDiagnostics: getTrackingDiagnostics()
     }
   }, [getTrackingDiagnostics, selectedTx])
@@ -2031,6 +2258,39 @@ export default function MissionHub({
   const handleVideoTimeUpdate = useCallback(({ currentTime, duration, playbackRate = 1 }) => {
     if (!selectedTx || !userId) return
 
+    const playbackRange = getVideoPlaybackRange({
+      duration,
+      contentStart: selectedTx.start,
+      contentEnd: selectedTx.end,
+    })
+    const positionIsValid = isVideoPositionInRange({
+      position: currentTime,
+      duration,
+      contentStart: selectedTx.start,
+      contentEnd: selectedTx.end,
+    })
+    if (!positionIsValid) {
+      const recoveryNow = Date.now()
+      if (recoveryNow - lastInvalidVideoRecoveryAtRef.current > 1000) {
+        lastInvalidVideoRecoveryAtRef.current = recoveryNow
+        lastVideoTimeRef.current = playbackRange.start
+        videoPlayerRef.current?.seekTo?.(playbackRange.start)
+      }
+      if (!invalidVideoPositionLoggedRef.current) {
+        invalidVideoPositionLoggedRef.current = true
+        logActivity('video_position_out_of_range_ignored', {
+          transmissionId: selectedTx?.id || 'default',
+          transmissionTitle: selectedTx?.title || '',
+          videoId: selectedTx?.videoId || '',
+          currentTime: Math.floor(Number(currentTime) || 0),
+          contentStart: playbackRange.start,
+          contentEnd: playbackRange.end || null,
+          duration: Math.floor(Number(duration) || 0),
+        })
+      }
+      return
+    }
+
     const now = Date.now()
     videoTrackingStatusRef.current = {
       ...videoTrackingStatusRef.current,
@@ -2044,8 +2304,13 @@ export default function MissionHub({
 
     const previousVideoTime = Number.isFinite(lastVideoTimeRef.current) ? lastVideoTimeRef.current : -1
     const hasPreviousVideoTime = previousVideoTime >= 0
-    const currentSecond = Math.floor(currentTime)
-    const lastSecond = hasPreviousVideoTime ? Math.floor(previousVideoTime) : currentSecond
+    const maxStampSecond = playbackRange.end > playbackRange.start
+      ? playbackRange.end - 1
+      : Math.floor(currentTime)
+    const currentSecond = Math.min(Math.floor(currentTime), maxStampSecond)
+    const lastSecond = hasPreviousVideoTime
+      ? Math.max(playbackRange.start, Math.min(Math.floor(previousVideoTime), maxStampSecond))
+      : currentSecond
     lastVideoTimeRef.current = currentTime
     if (duration > 0) videoDurationRef.current = duration
 
@@ -2127,7 +2392,7 @@ export default function MissionHub({
     if (gap > 0 && !isScrubbing) {
       // Normal playback (including speed playback AND background throttled polls). 
       // Safely stamp ALL seconds in range (removed 60s limit to support background throttling)
-      for (let s = lastSecond + 1; s <= lastSecond + gap; s++) {
+      for (let s = Math.max(playbackRange.start, lastSecond + 1); s <= Math.min(maxStampSecond, lastSecond + gap); s++) {
         if (!stampedSetRef.current.has(s)) {
           stampedSetRef.current.add(s)
           newStampCountRef.current++
@@ -2150,15 +2415,18 @@ export default function MissionHub({
 
     // Check completion: dynamic threshold based on duration
     if (duration > 0) {
-      const totalSeconds = Math.floor(duration)
-      const coverage = stampedSetRef.current.size / totalSeconds
-      
-      // Dynamic Threshold:
-      // - Long Videos (>40m): 85% (Allows for ~6min break skip)
-      // - Standard: 95% (Safe margin for minor skips/buffering)
-      const threshold = getVideoCompletionThreshold(duration);
+      const completion = getVideoCompletionMetrics({
+        stampedSeconds: Array.from(stampedSetRef.current),
+        duration,
+        contentStart: selectedTx.start,
+        contentEnd: selectedTx.end,
+      })
+      if (completion.validStamps.length !== stampedSetRef.current.size) {
+        stampedSetRef.current = new Set(completion.validStamps)
+        setStampCount(completion.coveredSeconds)
+      }
 
-      if (coverage >= threshold) {
+      if (completion.completed) {
         setVideoCompleted(true)
         if (!completionTimerStartedRef.current && !learningProgress?.videoProgress?.[selectedTx.id]?.completed) {
            completionTimerStartedRef.current = true;
@@ -2382,11 +2650,37 @@ export default function MissionHub({
         const livePos = videoPlayerRef.current.getCurrentTime()
         if (livePos > 0) savedPosition = Math.floor(livePos)
       }
-      const stamps = Array.from(stampedSetRef.current)
+      const knownDuration = videoDurationRef.current > 0 ? videoDurationRef.current : 0
+      const playbackRange = getVideoPlaybackRange({
+        duration: knownDuration,
+        contentStart: selectedTx.start,
+        contentEnd: selectedTx.end,
+      })
+      savedPosition = sanitizeVideoPosition({
+        position: savedPosition,
+        duration: knownDuration,
+        contentStart: selectedTx.start,
+        contentEnd: selectedTx.end,
+      })
+      const stamps = sanitizeVideoStamps({
+        stampedSeconds: Array.from(stampedSetRef.current),
+        duration: knownDuration,
+        contentStart: selectedTx.start,
+        contentEnd: selectedTx.end,
+      })
+      const completion = getVideoCompletionMetrics({
+        stampedSeconds: stamps,
+        duration: knownDuration,
+        contentStart: selectedTx.start,
+        contentEnd: selectedTx.end,
+      })
+      const hasCompletedCoverage = videoCompleted || completion.completed
+      lastVideoTimeRef.current = savedPosition
+      stampedSetRef.current = new Set(stamps)
       
       let isManualComplete = false
       // Remove 20% hurdle. If they reached the end or encountered an error but didn't complete, allow manual completion without bonus
-      if ((isAtEnd || videoError || videoTrackingUnavailable) && !videoCompleted) {
+      if ((isAtEnd || videoError || videoTrackingUnavailable) && !hasCompletedCoverage) {
          isManualComplete = true
       }
       
@@ -2396,12 +2690,16 @@ export default function MissionHub({
           [txId]: {
             lastPosition: savedPosition,
             stampedSeconds: stamps,
-            rewardedStampCount: stamps.length - newStampCountRef.current,
+            rewardedStampCount: Math.max(0, stamps.length - Math.min(stamps.length, newStampCountRef.current)),
             totalRewardedCrystals: totalRewardedCrystalsRef.current,
             totalTimeSpent: totalTimeSpentRef.current,
             todayTimeSpent: dailyTimeSpentRef.current,
             todayTimeSpentDate: dailyTimeSpentDateRef.current,
             transmissionTitle: selectedTx?.title || 'Main Video',
+            videoId: getYouTubeVideoId(selectedTx?.videoId),
+            contentStart: playbackRange.start,
+            contentEnd: playbackRange.end || null,
+            segmentDuration: playbackRange.segmentDuration,
             trackingDiagnostics: getTrackingDiagnostics(),
             updatedAt: serverTimestamp()
           }
@@ -2411,7 +2709,7 @@ export default function MissionHub({
       
       // Finalize progress exactly once: completion bonus, eligible interval reward, or sync-only save
       let exitRewardOutcome = null
-      if (videoCompleted || isManualComplete) {
+      if (hasCompletedCoverage || isManualComplete) {
         updateData.videoProgress[txId].completed = true
         updateData.videoProgress[txId].completionBonusGiven = true
         videoCompletedRef.current = true
@@ -2419,7 +2717,7 @@ export default function MissionHub({
         
         const wasAlreadyCompleted = learningProgress?.videoProgress?.[txId]?.completed
         let rewardAmount = 0
-        if (videoCompleted && !wasAlreadyCompleted && completionBonusTimeLeft !== null && completionBonusTimeLeft > 0) {
+        if (hasCompletedCoverage && !wasAlreadyCompleted && completionBonusTimeLeft !== null && completionBonusTimeLeft > 0) {
           rewardAmount = 20
         }
         
@@ -2433,7 +2731,7 @@ export default function MissionHub({
         }
         
         if (onNonQuizActivityComplete) {
-          const completionAttentionMeta = videoCompleted && !wasAlreadyCompleted
+          const completionAttentionMeta = hasCompletedCoverage && !wasAlreadyCompleted
             ? {
                 attentionSource: 'completion_bonus',
                 attentionResult: rewardAmount > 0 ? 'hit' : 'miss',
@@ -2473,10 +2771,14 @@ export default function MissionHub({
       await setDoc(progressRef, updateData, { merge: true })
       
       // localStorage도 최신 위치로 갱신 — 오프라인 복구 백업
-      const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-      localStorage.setItem(localCacheKey + '_pos', savedPosition.toString())
-      localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(stamps))
-      localStorage.setItem(localCacheKey + '_updatedAt', Date.now().toString())
+      writeVideoProgressCache({
+        userId,
+        unitId,
+        transmission: selectedTx,
+        position: savedPosition,
+        stampedSeconds: stamps,
+        duration: knownDuration,
+      })
 
       // Update local state
       setLearningProgress(prev => {
@@ -2489,7 +2791,7 @@ export default function MissionHub({
             stampedSeconds: stamps,
             trackingDiagnostics: getTrackingDiagnostics()
         };
-        if (videoCompleted || isManualComplete) {
+        if (hasCompletedCoverage || isManualComplete) {
             updatedVideoProgress.completed = true;
             updatedVideoProgress.completionBonusGiven = true;
         }
@@ -2556,6 +2858,7 @@ export default function MissionHub({
     learningProgress?.codeTrace,
     codeExercises.map(exercise => exercise?.id || exercise?.docId || '').filter(Boolean)
   )
+  const missionLabCompletion = getMissionSetCompletion(learningProgress?.missionLab, pythonMissionSet)
 
   // --- Render Functions ---
 
@@ -2565,8 +2868,9 @@ export default function MissionHub({
     const hasQuiz = !!(unitQuizzes && unitQuizzes.length > 0)
     const hasWorkbook = !!(activeUnit?.workbookPages && activeUnit.workbookPages.length > 0)
     const hasCodeTrace = !!(codeExercises && codeExercises.length > 0)
+    const hasMissionLab = !!pythonMissionSet || loadingPythonMissionSet || !!activeUnit?.pythonMissionSetId
     const hasQuizBattle = hasQuiz && !!regionId
-    const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasQuizBattle, hasWorkbook, hasCodeTrace].filter(Boolean).length
+    const availableCount = [hasDataLog, hasTransmission, hasQuiz, hasQuizBattle, hasWorkbook, hasCodeTrace, hasMissionLab].filter(Boolean).length
 
     return (
     <div className="mission-dashboard fade-in" style={{ width: '100%', height: '100%', overflowY: 'auto', paddingBottom: isMobile ? '5.5rem' : '3rem' }}>
@@ -2767,6 +3071,38 @@ export default function MissionHub({
               )
             },
             {
+              id: 'mission',
+              shouldRender: hasMissionLab,
+              render: () => (
+                <motion.div
+                  key="mission"
+                  whileHover={{ scale: 1.03, y: -5 }}
+                  className="glass-card hud-border"
+                  onClick={() => handleModeChange('mission')}
+                  style={{
+                    cursor: 'pointer', padding: isMobile ? '1rem' : '2rem', display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center', textAlign: isMobile ? 'left' : 'center', gap: isMobile ? '0.85rem' : 0,
+                    border: '1px solid #55f1c8',
+                    background: missionLabCompletion.completed ? 'rgba(85, 241, 200, 0.09)' : 'rgba(85, 241, 200, 0.03)',
+                    position: 'relative'
+                  }}
+                >
+                  {missionLabCompletion.completed && (
+                    <div style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', fontSize: '1.2rem' }}>✅</div>
+                  )}
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛰️</div>
+                  <h3 className="font-title" style={{ color: '#55f1c8', marginBottom: '1rem' }}>MISSION LAB</h3>
+                  <p className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                    실제 Python 코드로<br/>루미의 항로를 설계합니다.
+                  </p>
+                  {missionLabCompletion.totalCount > 0 && (
+                    <span className="font-tech" style={{ color: '#55f1c8', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                      {missionLabCompletion.completed ? '프로토콜 완료' : `진행 중 (${missionLabCompletion.completedCount} / ${missionLabCompletion.totalCount})`}
+                    </span>
+                  )}
+                </motion.div>
+              )
+            },
+            {
               id: 'battle',
               shouldRender: hasQuizBattle,
               render: () => (
@@ -2798,8 +3134,8 @@ export default function MissionHub({
           // Determine sorting order based on cluster
           let sortedCards = cards;
           if (clusterId === 'python') {
-            // Python: Transmission -> Data Log -> Code Trace -> Workbook -> Field Test
-            const pythonOrder = ['video', 'text', 'code', 'workbook', 'quiz', 'battle'];
+            // Python: Transmission -> Data Log -> Code Trace -> Mission Lab -> Workbook -> Field Test
+            const pythonOrder = ['video', 'text', 'code', 'mission', 'workbook', 'quiz', 'battle'];
             sortedCards = cards.sort((a, b) => pythonOrder.indexOf(a.id) - pythonOrder.indexOf(b.id));
           }
 
@@ -3002,10 +3338,14 @@ export default function MissionHub({
       // Get saved position for resume
       const txId = selectedTx.id || 'default'
       const knownVideoDuration = videoDurationRef.current > 0 ? videoDurationRef.current : 0
-      const completionTargetPercent = getVideoCompletionTargetPercent(knownVideoDuration)
-      const completionRate = knownVideoDuration > 0
-        ? Math.min(100, Math.floor((stampCount / knownVideoDuration) * 100))
-        : 0
+      const completionMetrics = getVideoCompletionMetrics({
+        stampedSeconds: Array.from(stampedSetRef.current),
+        duration: knownVideoDuration,
+        contentStart: selectedTx.start,
+        contentEnd: selectedTx.end,
+      })
+      const completionTargetPercent = completionMetrics.targetPercent
+      const completionRate = Math.floor(completionMetrics.coverage * 100)
       const creditedSeconds = Math.floor(creditedWatchSeconds)
       const savedTxProgress = learningProgress?.videoProgress?.[txId]
       const hasUnsavedVideoCompletion = videoCompleted && !savedTxProgress?.completed
@@ -3318,7 +3658,9 @@ export default function MissionHub({
                    type="button"
                    onClick={() => restartVideoFromBeginning()}
                    className="hud-btn secondary glass capture-hide"
-                   title="저장된 진도는 유지하고 영상을 처음부터 재생합니다."
+                   title={Number(selectedTx.start) > 0
+                     ? '저장된 진도는 유지하고 현재 학습 구간의 시작점부터 재생합니다.'
+                     : '저장된 진도는 유지하고 영상을 처음부터 재생합니다.'}
                    style={{
                      padding: isMobile ? '0.85rem 1rem' : '0.8rem 1.45rem',
                      fontSize: isMobile ? '0.9rem' : '1rem',
@@ -3332,7 +3674,7 @@ export default function MissionHub({
                      boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
                    }}
                  >
-                   <RotateCcw size={17} /> 처음부터 재생
+                   <RotateCcw size={17} /> {Number(selectedTx.start) > 0 ? '구간 처음부터' : '처음부터 재생'}
                  </button>
 
                  {hasUnsavedVideoCompletion && (
@@ -3558,15 +3900,21 @@ export default function MissionHub({
                  const isTxCompleted = txProgress?.completed || txProgress?.completionBonusGiven
                  
                  // Offline-First UI: Use local storage cache for resume display if more up-to-date
-                 const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
-                 const localPosRaw = localStorage.getItem(localCacheKey + '_pos')
-                 const localPos = localPosRaw ? parseFloat(localPosRaw) : 0
+                 const localData = readVideoProgressCache({ userId, unitId, transmission: tx })
+                 const serverPosition = txProgress && isVideoPositionInRange({
+                   position: txProgress.lastPosition,
+                   contentStart: tx.start,
+                   contentEnd: tx.end,
+                 })
+                   ? Math.floor(Number(txProgress.lastPosition) || 0)
+                   : 0
                  // Timestamp-based position selection (consistent with restoration effect)
                  const serverUpdateTs = txProgress?.updatedAt?.toMillis 
                    ? txProgress.updatedAt.toMillis() 
                    : (txProgress?.updatedAt?.seconds ? txProgress.updatedAt.seconds * 1000 : 0)
-                 const localUpdateTs = parseInt(localStorage.getItem(localCacheKey + '_updatedAt') || '0', 10)
-                 const displayPos = (localUpdateTs > serverUpdateTs) ? localPos : (txProgress?.lastPosition || 0)
+                 const displayPos = (localData.hasData && localData.updatedAt > serverUpdateTs)
+                   ? localData.position
+                   : serverPosition
 
                  return (
                    <motion.div 
@@ -3678,6 +4026,31 @@ export default function MissionHub({
           onClose={returnFromContent}
         />
       </Suspense>
+    )
+  }
+
+  if (currentMode === 'mission' && pythonMissionSet) {
+    return (
+      <Suspense fallback={<MissionModeFallback label="Python 월드를 연결하고 있습니다..." />}>
+        <PythonMissionLab
+          unit={{ ...activeUnit, id: unitId, clusterId }}
+          missionSet={pythonMissionSet}
+          initialProgress={learningProgress?.missionLab}
+          onBack={returnFromContent}
+        />
+      </Suspense>
+    )
+  }
+
+  if (currentMode === 'mission' && (loadingPythonMissionSet || pythonMissionSetError)) {
+    return (
+      <div className="space-bg" style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'grid', placeItems: 'center', color: 'var(--crystal-cyan)', textAlign: 'center', padding: '2rem' }}>
+        <div className="font-tech">
+          <div style={{ fontSize: '2.4rem', marginBottom: '1rem' }}>{pythonMissionSetError ? '⚠️' : '🛰️'}</div>
+          <p>{pythonMissionSetError?.message || 'Mission Lab 콘텐츠를 수신하고 있습니다...'}</p>
+          {pythonMissionSetError && <button type="button" className="hud-btn secondary glass" onClick={returnFromContent}>미션 허브로 돌아가기</button>}
+        </div>
+      </div>
     )
   }
 

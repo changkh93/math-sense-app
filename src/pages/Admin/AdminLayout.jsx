@@ -99,6 +99,10 @@ const AdminLayout = () => {
               <Database size={20} />
               <span>Python Builder</span>
             </Link>
+            <Link to="/admin/python-missions" className="nav-link">
+              <BookOpenText size={20} />
+              <span>Python Mission Control</span>
+            </Link>
             <Link to="/admin/middle-math-builder" className="nav-link">
               <Database size={20} />
               <span>Middle Math Builder</span>

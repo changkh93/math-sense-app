@@ -1,0 +1,155 @@
+.python-lab {
+  --lab-cyan: #49e9ff;
+  --lab-mint: #55f1c8;
+  --lab-violet: #9d74ff;
+  min-height: 100vh;
+  color: #eaf5ff;
+  background:
+    radial-gradient(circle at 52% 10%, rgba(35, 87, 140, .26), transparent 34%),
+    linear-gradient(145deg, #050917 0%, #091226 56%, #060b18 100%);
+  font-family: Inter, Pretendard, system-ui, sans-serif;
+  overflow: auto;
+}
+
+.python-lab::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .34;
+  background-image: radial-gradient(circle, rgba(255,255,255,.62) 0 1px, transparent 1.2px);
+  background-size: 67px 67px;
+}
+
+.python-lab button { font: inherit; }
+
+.python-lab__header {
+  position: relative;
+  z-index: 2;
+  min-height: 72px;
+  padding: 10px 22px;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid rgba(73, 233, 255, .24);
+  background: rgba(4, 10, 24, .88);
+  backdrop-filter: blur(18px);
+}
+
+.python-lab__header h1 { margin: 2px 0 0; font-size: 1.18rem; letter-spacing: .02em; }
+.python-lab__kicker, .python-lab__eyebrow { color: var(--lab-cyan); font: 700 .68rem/1.2 monospace; letter-spacing: .16em; }
+.python-lab__back { width: 38px; height: 38px; border: 1px solid #294662; border-radius: 10px; color: #dff7ff; background: #0b172b; cursor: pointer; }
+.python-lab__runtime { display: flex; align-items: center; gap: 8px; color: #98abc2; font: 700 .7rem monospace; }
+.python-lab__runtime span { width: 8px; height: 8px; border-radius: 50%; background: #f8ba4c; box-shadow: 0 0 12px currentColor; }
+.python-lab__runtime--ready { color: var(--lab-mint); }
+.python-lab__runtime--ready span { background: var(--lab-mint); }
+.python-lab__runtime--error { color: #ff7891; }
+.python-lab__runtime--error span { background: #ff7891; }
+
+.python-lab__mission-tabs {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  padding: 10px 22px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(98, 130, 166, .18);
+  background: rgba(7, 14, 30, .76);
+}
+
+.python-lab__mission-tabs button { display: flex; align-items: center; gap: 8px; border: 1px solid #253b56; border-radius: 999px; padding: 7px 13px; color: #8fa5bd; background: #0a1528; cursor: pointer; white-space: nowrap; }
+.python-lab__mission-tabs button span { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #182b42; font-size: .72rem; }
+.python-lab__mission-tabs button.is-active { color: #edfcff; border-color: rgba(73, 233, 255, .68); box-shadow: 0 0 18px rgba(73, 233, 255, .14); }
+.python-lab__mission-tabs button.is-active span { color: #04151a; background: var(--lab-cyan); }
+
+.python-lab__layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(230px, .72fr) minmax(360px, 1.35fr) minmax(370px, 1.15fr);
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 126px);
+}
+
+.python-lab__briefing,
+.python-lab__world-panel,
+.python-lab__code-panel {
+  min-width: 0;
+  border: 1px solid rgba(82, 121, 160, .27);
+  border-radius: 16px;
+  background: rgba(6, 14, 30, .84);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .23);
+  overflow: hidden;
+}
+
+.python-lab__briefing { padding: 20px; overflow-y: auto; }
+.python-lab__briefing h2 { margin: 7px 0 12px; font-size: 1.38rem; }
+.python-lab__briefing h3 { margin: 24px 0 10px; color: #acc5df; font-size: .76rem; letter-spacing: .12em; text-transform: uppercase; }
+.python-lab__briefing > p { color: #94aac0; line-height: 1.65; font-size: .88rem; }
+.python-lab__objective { color: #eef9ff !important; font-weight: 700; }
+.python-lab__concepts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+.python-lab__concepts span { padding: 5px 8px; border: 1px solid rgba(157, 116, 255, .3); border-radius: 6px; color: #c8b6ff; background: rgba(157, 116, 255, .09); font: .72rem monospace; }
+.python-lab__api { margin-bottom: 9px; padding: 10px; border-left: 2px solid var(--lab-cyan); background: rgba(39, 85, 120, .14); }
+.python-lab__api code { color: var(--lab-mint); font-size: .76rem; }
+.python-lab__api p { margin: 6px 0 0; color: #8095ad; font-size: .75rem; }
+.python-lab__hint-button { width: 100%; margin-top: 18px; padding: 10px; border: 1px solid rgba(248, 186, 76, .42); border-radius: 9px; color: #ffd77f; background: rgba(248, 186, 76, .08); cursor: pointer; }
+.python-lab__hint { margin: 9px 0 0; padding: 9px; border-radius: 8px; background: rgba(248, 186, 76, .06); color: #c9b98f !important; font-size: .76rem !important; }
+
+.python-lab__world-panel { display: flex; flex-direction: column; padding: 10px; }
+.python-world { position: relative; flex: 1; min-height: 390px; overflow: hidden; border-radius: 12px; background: linear-gradient(#081730, #0d2340 42%, #09182c); }
+.python-world__sky { position: absolute; inset: 0; background: radial-gradient(circle at 72% 22%, rgba(73,233,255,.17), transparent 23%), radial-gradient(circle, rgba(255,255,255,.45) 0 1px, transparent 1.4px); background-size: auto, 54px 54px; }
+.python-world__grid { position: absolute; left: 7%; right: 7%; top: 18%; bottom: 16%; transform: perspective(660px) rotateX(49deg); transform-origin: center bottom; border: 1px solid rgba(73,233,255,.28); background-image: linear-gradient(rgba(73,233,255,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(73,233,255,.15) 1px, transparent 1px); background-size: calc(100% / var(--grid-columns)) calc(100% / var(--grid-rows)); box-shadow: inset 0 0 38px rgba(73,233,255,.09), 0 0 35px rgba(50,170,255,.11); }
+.python-world__beacon, .python-world__rover, .python-world__obstacle, .python-world__object { position: absolute; display: grid; place-items: center; width: calc(70% / var(--grid-columns)); height: calc(70% / var(--grid-rows)); transform: translate(-50%, -50%) rotateX(-49deg); transform-origin: center; transition: left .28s ease, top .28s ease, opacity .2s ease; }
+.python-world__beacon-core { width: 23px; height: 23px; border-radius: 50%; background: #62edff; box-shadow: 0 0 9px #62edff, 0 0 26px #2f8bff, 0 0 55px #2f8bff; animation: python-beacon 1.5s ease-in-out infinite; }
+.python-world__beacon-label, .python-world__rover-label { position: absolute; top: calc(50% + 22px); color: #9beeff; font: 700 .55rem monospace; letter-spacing: .12em; }
+.python-world__rover-body { position: relative; z-index: 2; color: #fff3a0; font-size: 30px; filter: drop-shadow(0 0 7px #55e7ff); transform: rotate(var(--rover-rotation)); }
+.python-world__rover-glow { position: absolute; width: 38px; height: 38px; border-radius: 50%; background: rgba(83,231,255,.18); box-shadow: 0 0 24px #43d6ff; }
+.python-world__obstacle { color: #9d74ff; font-size: 27px; text-shadow: 0 0 15px #7548ff; }
+.python-world__object { color: #72f5d3; font-size: 25px; text-shadow: 0 0 12px #27ddb0; }
+.python-world__object--charge { color: #ffd766; text-shadow: 0 0 14px #ffb72f; }
+.python-world__object--sample { color: #c693ff; text-shadow: 0 0 14px #8b5cf6; }
+.python-world__hud { position: absolute; left: 12px; right: 12px; bottom: 9px; display: flex; justify-content: space-between; color: #92acc8; font: .68rem monospace; }
+@keyframes python-beacon { 50% { transform: scale(1.24); opacity: .78; } }
+
+.python-lab__timeline { display: grid; grid-template-columns: 32px 1fr 32px auto; gap: 8px; align-items: center; min-height: 48px; padding: 0 7px; }
+.python-lab__timeline button { width: 30px; height: 30px; border: 1px solid #294763; border-radius: 7px; color: #d9f9ff; background: #10223a; cursor: pointer; }
+.python-lab__timeline input { accent-color: var(--lab-cyan); }
+.python-lab__timeline span { color: #7f99b4; font: .65rem monospace; }
+.python-lab__result { margin-top: 2px; padding: 12px 14px; border-radius: 10px; background: rgba(255,103,132,.08); border: 1px solid rgba(255,103,132,.25); }
+.python-lab__result.is-success { background: rgba(85,241,200,.08); border-color: rgba(85,241,200,.3); }
+.python-lab__result strong { color: #ff91a7; font: 700 .78rem monospace; }
+.python-lab__result.is-success strong { color: var(--lab-mint); }
+.python-lab__result p { margin: 6px 0 0; color: #b3c4d5; font-size: .8rem; }
+.python-lab__result button { margin-top: 9px; border: 0; color: #00151a; background: var(--lab-mint); border-radius: 7px; padding: 7px 10px; font-weight: 800; cursor: pointer; }
+
+.python-lab__code-panel { display: grid; grid-template-rows: 48px minmax(300px, 1fr) 38px minmax(110px, .3fr); }
+.python-lab__editor-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0 11px 0 15px; border-bottom: 1px solid #1b3049; color: #a8bdd1; font: .72rem monospace; }
+.python-lab__editor-toolbar div { display: flex; gap: 7px; }
+.python-lab__editor-toolbar button { border: 1px solid #294763; border-radius: 7px; padding: 7px 10px; color: #9eb5cb; background: #0b1a2e; font: 700 .68rem monospace; cursor: pointer; }
+.python-lab__editor-toolbar button.is-run { color: #001b18; border-color: var(--lab-mint); background: var(--lab-mint); }
+.python-lab__editor-toolbar button.is-stop { color: white; border-color: #e65c75; background: #a92c46; }
+.python-lab__editor-toolbar button:disabled { opacity: .45; cursor: not-allowed; }
+.python-lab__editor-wrap, .python-editor-host { min-height: 0; height: 100%; }
+.python-editor-execution-line { background: linear-gradient(90deg, rgba(73,233,255,.2), rgba(73,233,255,.03)); box-shadow: inset 3px 0 var(--lab-cyan); }
+.python-lab__inspector-tabs { display: flex; border-top: 1px solid #1b3049; border-bottom: 1px solid #1b3049; background: #091426; }
+.python-lab__inspector-tabs button { padding: 0 15px; border: 0; border-bottom: 2px solid transparent; color: #7189a2; background: transparent; font: 700 .66rem monospace; cursor: pointer; }
+.python-lab__inspector-tabs button.is-active { color: var(--lab-cyan); border-bottom-color: var(--lab-cyan); }
+.python-lab__inspector { overflow: auto; padding: 10px 14px; color: #829ab3; background: #06101f; font: .72rem/1.5 monospace; }
+.python-lab__inspector p { margin: 0 0 5px; }
+.python-lab__inspector pre { margin: 0; color: #bcd5ec; white-space: pre-wrap; }
+.python-lab--empty { display: grid; place-items: center; text-align: center; }
+
+@media (max-width: 1100px) {
+  .python-lab__layout { grid-template-columns: 250px 1fr; }
+  .python-lab__code-panel { grid-column: 1 / -1; min-height: 570px; }
+}
+
+@media (max-width: 720px) {
+  .python-lab__header { grid-template-columns: 40px 1fr; }
+  .python-lab__runtime { grid-column: 2; }
+  .python-lab__layout { grid-template-columns: 1fr; }
+  .python-lab__briefing, .python-lab__code-panel { grid-column: auto; }
+  .python-world { min-height: 340px; }
+}

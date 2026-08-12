@@ -37,6 +37,8 @@ export function useLearningHistory(userId, dateStr) {
     logCount: 0,
     codeTraceCount: 0,
     codeTraceProgressCount: 0,
+    missionLabCount: 0,
+    missionLabProgressCount: 0,
     totalVideoSeconds: 0,
     isAssignmentSubmitted: false,
     attentionHits: 0,
@@ -154,6 +156,8 @@ export function useLearningHistory(userId, dateStr) {
       logCount: 0,
       codeTraceCount: 0,
       codeTraceProgressCount: 0,
+      missionLabCount: 0,
+      missionLabProgressCount: 0,
       totalVideoSeconds: 0,
       isAssignmentSubmitted: (typeof rawData.assignmentCount === 'number' ? rawData.assignmentCount : rawData.assignmentCount?.length) > 0,
       attentionHits: 0,
@@ -237,6 +241,9 @@ export function useLearningHistory(userId, dateStr) {
       } else if (hType === 'code_trace') {
         stats.codeTraceCount++;
         displayType = 'code_trace';
+      } else if (hType === 'python_mission') {
+        stats.missionLabCount++;
+        displayType = 'python_mission';
       } else if (hType === 'workbook') {
         stats.workbookCount++;
         displayType = 'workbook';
@@ -261,6 +268,8 @@ export function useLearningHistory(userId, dateStr) {
             ? '📝'
             : displayType === 'code_trace'
               ? '⌨️'
+              : displayType === 'python_mission'
+                ? '🛰️'
               : displayType === 'workbook'
                 ? '🧮'
               : displayType === 'quiz_battle'
@@ -275,6 +284,8 @@ export function useLearningHistory(userId, dateStr) {
               ? '데이터 로그 열람'
               : displayType === 'code_trace'
                 ? '코드 따라쓰기'
+                : displayType === 'python_mission'
+                  ? 'MISSION LAB'
                 : displayType === 'workbook'
                   ? '스마트 워크북'
                 : displayType === 'quiz_battle'
@@ -510,6 +521,45 @@ export function useLearningHistory(userId, dateStr) {
           }
         }
 
+        // Mission Lab progress from the same unit progress document.
+        if (data.missionLab) {
+          const missionLab = data.missionLab;
+          const completedMissionCount = Number(missionLab.completedMissionCount || missionLab.completedMissionIds?.length || 0);
+          const totalMissionCount = Number(missionLab.totalMissionCount || 0);
+          const rawMissionTime = missionLab.lastCompletedAt || data.updatedAt;
+          const missionUpdatedAt = rawMissionTime?.toDate
+            ? rawMissionTime.toDate()
+            : rawMissionTime?.seconds
+              ? new Date(rawMissionTime.seconds * 1000)
+              : updatedAt;
+          const isMissionToday = missionUpdatedAt >= dayStart && missionUpdatedAt <= dayEnd;
+          const hasMissionWork = completedMissionCount > 0 || missionLab.completed === true;
+
+          if (isMissionToday && hasMissionWork) {
+            const isAlreadyTracked = aggregated.some(a => a.type === 'python_mission' && a.metadata?.unitId === unitId);
+            if (!isAlreadyTracked) {
+              if (missionLab.completed === true) stats.missionLabCount++;
+              else stats.missionLabProgressCount++;
+              aggregated.push({
+                id: `lp_python_mission_${unitId}`,
+                timestamp: missionUpdatedAt,
+                type: 'python_mission',
+                title: `🛰️ MISSION LAB: ${data.unitTitle || formatUnitId(unitId)}`,
+                score: null,
+                crystalsEarned: 0,
+                metadata: {
+                  unitId,
+                  unitTitle: data.unitTitle || '',
+                  missionLabCompleted: missionLab.completed === true,
+                  completedMissionCount,
+                  totalMissionCount,
+                  bestStars: Number(missionLab.bestStars || 0),
+                }
+              });
+            }
+          }
+        }
+
         // Smart Workbook autosave progress. Completed sessions are already represented by history.type=workbook.
         if (data.workbookSession) {
           const session = data.workbookSession;
@@ -584,7 +634,7 @@ export function useLearningHistory(userId, dateStr) {
 
 /** Learning-only activity types for grouping */
 const LEARNING_TYPES = new Set([
-  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace', 'quiz_battle', 'workbook', 'workbook_in_progress'
+  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace', 'python_mission', 'quiz_battle', 'workbook', 'workbook_in_progress'
 ]);
 
 /**
@@ -633,8 +683,8 @@ function resolveTitle(act) {
 
   // 4. Extract from the display title (strip emoji prefixes)
   const cleaned = (act.title || '')
-    .replace(/^(?:🚀|🎬|📝|⌨️|🧮|⏳|💎|🛒|🧊|🎁|✅|🗣️|📌|⚔️)\s*/u, '')
-    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|CODE TRACE|코드 따라쓰기|스마트 워크북|퀴즈 배틀)[:\s]*/g, '')
+    .replace(/^(?:🚀|🎬|📝|⌨️|🛰️|🧮|⏳|💎|🛒|🧊|🎁|✅|🗣️|📌|⚔️)\s*/u, '')
+    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|CODE TRACE|코드 따라쓰기|MISSION LAB|스마트 워크북|퀴즈 배틀)[:\s]*/g, '')
     .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
     .trim();
   if (cleaned && cleaned.length > 0) return cleaned;
@@ -659,6 +709,7 @@ function buildGroupedActivities(rawActivities) {
     if (act.type === 'video_reward' || act.type === 'video_view' || act.type === 'video_attention') normalizedType = 'video';
     else if (act.type === 'data_log_read') normalizedType = 'text';
     else if (act.type === 'code_trace') normalizedType = 'code';
+    else if (act.type === 'python_mission') normalizedType = 'mission';
     else if (act.type === 'workbook' || act.type === 'workbook_in_progress') normalizedType = 'workbook';
     else if (act.type === 'quiz_battle') normalizedType = 'battle';
 

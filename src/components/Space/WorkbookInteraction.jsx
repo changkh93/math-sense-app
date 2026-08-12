@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Link2, Palette } from 'lucide-react';
-import { getInitialWorkbookInteractionResponse } from '../../utils/workbookInteractionUtils';
+import { getInitialWorkbookInteractionResponse, getWorkbookColoringMode } from '../../utils/workbookInteractionUtils';
 
 const stop = (event) => event.stopPropagation();
 
@@ -135,8 +135,68 @@ const OrderingInteraction = ({ config, value, onChange, disabled }) => {
 };
 
 const ColoringInteraction = ({ config, value, onChange, disabled }) => {
+  const coloringMode = getWorkbookColoringMode(config);
   const [selectedColor, setSelectedColor] = useState(config.colors[0]?.id || '');
+  const dragAction = useRef('');
   const colored = value && typeof value === 'object' ? value : {};
+
+  useEffect(() => {
+    const stopPainting = () => { dragAction.current = ''; };
+    window.addEventListener('pointerup', stopPainting);
+    window.addEventListener('pointercancel', stopPainting);
+    return () => {
+      window.removeEventListener('pointerup', stopPainting);
+      window.removeEventListener('pointercancel', stopPainting);
+    };
+  }, []);
+
+  const setPainted = (cellId, shouldPaint) => {
+    if (disabled || !coloringMode.paintColorId) return;
+    const next = { ...colored };
+    if (shouldPaint) next[cellId] = coloringMode.paintColorId;
+    else delete next[cellId];
+    onChange(next);
+  };
+
+  if (coloringMode.isPaintOnly) {
+    return (
+      <div
+        className="wb-interaction coloring-interaction paint-only-coloring"
+        style={{ '--paint-color': coloringMode.paintValue, '--coloring-column-count': config.columns || config.cells.length }}
+        onClick={stop}
+        role="group"
+        aria-label="막대 색칠하기"
+      >
+        <div className="wb-color-cells">
+          {config.cells.map((cell, index) => {
+            const isPainted = colored[cell.id] === coloringMode.paintColorId;
+            return (
+              <button
+                type="button"
+                key={cell.id}
+                className={isPainted ? 'painted' : ''}
+                aria-label={`${cell.label || `${index + 1}칸`} ${isPainted ? '색칠됨' : '색칠 안 됨'}`}
+                aria-pressed={isPainted}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  if (disabled) return;
+                  dragAction.current = isPainted ? 'erase' : 'paint';
+                  setPainted(cell.id, dragAction.current === 'paint');
+                }}
+                onPointerEnter={() => {
+                  if (!dragAction.current) return;
+                  setPainted(cell.id, dragAction.current === 'paint');
+                }}
+                onClick={stop}
+                disabled={disabled}
+              />
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="wb-interaction coloring-interaction" onClick={stop}>
       <div className="wb-color-palette">

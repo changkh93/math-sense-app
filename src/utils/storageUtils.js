@@ -78,11 +78,12 @@ export const cleanExpiredLocalStorage = () => {
       if (key.endsWith('_updatedAt') && key.startsWith('video_progress_')) {
         const ts = parseInt(localStorage.getItem(key) || '0', 10);
         if (ts > 0 && (now - ts) > VIDEO_CACHE_TTL_MS) {
-          // 관련 키 그룹 삭제 (_stamps, _pos, _updatedAt)
+          // 관련 키 그룹 삭제 (_stamps, _pos, _updatedAt, _meta)
           const baseKey = key.replace('_updatedAt', '');
           keysToRemove.push(baseKey + '_stamps');
           keysToRemove.push(baseKey + '_pos');
           keysToRemove.push(baseKey + '_updatedAt');
+          keysToRemove.push(baseKey + '_meta');
         }
       }
 

@@ -122,6 +122,8 @@ function SceneContent({
   onSelectDarkMatter,
   onSelectDarkMatterRefinery,
   onSelectMistakeNotebook,
+  onSelectLumiProtocol,
+  showLumiProtocol = false,
   darkMatterCount = 0
 }) {
   const controlsRef = useRef()
@@ -457,6 +459,47 @@ function SceneContent({
             >
               다크매터 정제소<br/>
               <span style={{ fontSize: '0.68rem', color: '#fde68a', fontWeight: '500' }}>Refinery</span>
+            </Html>
+          </Float>
+        </group>
+      )}
+
+      {/* LUMI Protocol — dedicated Python World entry */}
+      {(!selectedRegionId && showLumiProtocol) && (
+        <group position={[0.2, -3.1, 2.6]}>
+          <Float speed={2.2} rotationIntensity={0.7} floatIntensity={1.15} floatingRange={[-0.32, 0.32]}>
+            <PlanetMesh
+              color="#22d3ee"
+              size={0.86}
+              planetType="crystal"
+              showSpaceship={false}
+              showFormulas={true}
+              onClick={(event) => {
+                event.stopPropagation()
+                onSelectLumiProtocol?.()
+              }}
+              onPointerOver={() => { document.body.style.cursor = 'pointer' }}
+              onPointerOut={() => { document.body.style.cursor = 'auto' }}
+            />
+            <pointLight position={[0, 0, 1.2]} intensity={1.6} color="#55f1c8" distance={7} />
+            <Html
+              position={[0, 1.48, 0]}
+              center
+              zIndexRange={[100, 0]}
+              style={{
+                color: '#55f1c8',
+                fontSize: '1.08rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-title, sans-serif)',
+                whiteSpace: 'nowrap',
+                textShadow: '0 2px 6px rgba(0,0,0,.95), 0 0 16px rgba(73,233,255,.65)',
+                pointerEvents: 'none',
+                textAlign: 'center',
+                lineHeight: '1.3',
+              }}
+            >
+              루미 프로토콜<br />
+              <span style={{ fontSize: '.72rem', color: '#d8fbff', fontWeight: '600' }}>LUMI Protocol · 20 Missions</span>
             </Html>
           </Float>
         </group>

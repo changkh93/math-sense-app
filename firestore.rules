@@ -190,6 +190,26 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // LUMI Protocol Mission Lab content. Only published documents are consumed
+    // by students; drafts and all mutations remain admin-only.
+    match /pythonMissionSets/{setId} {
+      allow get: if isAuth() && (resource.data.status == 'published' || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /pythonWorldMissions/{missionId} {
+      allow get: if isAuth() && (resource.data.status == 'published' || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /pythonWorldTemplates/{templateId} {
+      allow get: if isAuth() && (resource.data.status == 'published' || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
     // Anonymous aggregate quiz stats. Writes are server-managed by Cloud Functions
     // so a student cannot inflate answer/reaction counts.
     match /quizQuestionStats/{statId} {

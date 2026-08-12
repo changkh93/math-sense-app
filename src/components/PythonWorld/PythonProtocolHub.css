@@ -1,0 +1,28 @@
+.python-protocol-hub { --hub-cyan:#49e9ff; position:relative; min-height:100dvh; box-sizing:border-box; padding:92px clamp(18px,4vw,64px) 44px; overflow:auto; color:#edf8ff; background:radial-gradient(circle at 50% 13%,rgba(31,120,166,.28),transparent 28%),linear-gradient(150deg,#050919,#09152a 55%,#050917); }
+.python-protocol-hub__stars { position:fixed; inset:0; pointer-events:none; opacity:.38; background-image:radial-gradient(circle,rgba(255,255,255,.7) 0 1px,transparent 1.3px); background-size:71px 71px; }
+.python-protocol-hub > header,.python-protocol-hub > main,.python-protocol-hub > section,.python-protocol-hub > footer { position:relative; z-index:1; max-width:1180px; margin-left:auto; margin-right:auto; }
+.python-protocol-hub > header { display:grid; grid-template-columns:44px 1fr auto; gap:16px; align-items:start; }
+.python-protocol-hub > header > button { width:42px;height:42px;border:1px solid #31516c;border-radius:11px;color:white;background:#0a172a;cursor:pointer;font-size:1.2rem; }
+.python-protocol-hub header span,.python-protocol-hub__eyebrow { color:var(--hub-cyan);font:700 .7rem monospace;letter-spacing:.16em; }
+.python-protocol-hub h1 { margin:7px 0 8px;font-size:clamp(1.55rem,3vw,2.35rem); }
+.python-protocol-hub header p { margin:0;color:#8fa8bf; }
+.python-protocol-hub__progress { min-width:120px;padding:12px 15px;border:1px solid rgba(73,233,255,.3);border-radius:12px;text-align:center;background:rgba(73,233,255,.06); }
+.python-protocol-hub__progress strong,.python-protocol-hub__progress small { display:block; }
+.python-protocol-hub__progress strong { color:#55f1c8;font:800 1.35rem monospace; }
+.python-protocol-hub__progress small { margin-top:4px;color:#7794ab;font:.58rem monospace; }
+.python-protocol-hub__hero { display:grid;grid-template-columns:230px 1fr;gap:34px;align-items:center;margin-top:34px;margin-bottom:24px;padding:25px 32px;border:1px solid rgba(73,233,255,.22);border-radius:20px;background:linear-gradient(110deg,rgba(13,41,66,.88),rgba(9,19,39,.72));box-shadow:0 24px 70px rgba(0,0,0,.28); }
+.python-protocol-hub__core { position:relative;width:178px;height:178px;margin:auto;display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle,#4cf6d5 0 5%,#197b9b 7%,#10274d 35%,#071326 67%);box-shadow:0 0 22px #36e4e6,0 0 70px rgba(46,146,255,.38); }
+.python-protocol-hub__orbit { position:absolute;inset:12px;border:1px solid rgba(84,235,255,.56);border-radius:50%;transform:rotate(28deg) scaleY(.38); }
+.python-protocol-hub__orbit--two { inset:-12px;transform:rotate(-42deg) scaleY(.32);border-color:rgba(189,140,255,.5); }
+.python-protocol-hub__lumi { color:#fff3a2;font-size:50px;filter:drop-shadow(0 0 12px #55ecff); }
+.python-protocol-hub__hero h2 { margin:7px 0 9px;font-size:1.55rem; }.python-protocol-hub__hero p { max-width:650px;color:#9db2c7;line-height:1.65; }
+.python-protocol-hub__hero button { margin-top:7px;padding:11px 16px;border:0;border-radius:9px;color:#03161a;background:linear-gradient(135deg,#55f1c8,#49d6ff);font-weight:900;cursor:pointer;box-shadow:0 0 26px rgba(73,233,255,.2); }
+.python-protocol-hub > main { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px; }
+.python-protocol-hub article { min-width:0;padding:18px;border:1px solid color-mix(in srgb,var(--protocol-color) 35%,transparent);border-radius:15px;background:linear-gradient(155deg,color-mix(in srgb,var(--protocol-color) 9%,#0a1628),#07111f); }
+.python-protocol-hub__module-icon { width:43px;height:43px;display:grid;place-items:center;margin-bottom:15px;border:1px solid color-mix(in srgb,var(--protocol-color) 55%,transparent);border-radius:12px;color:var(--protocol-color);background:color-mix(in srgb,var(--protocol-color) 10%,transparent);font:800 1.35rem monospace;box-shadow:0 0 20px color-mix(in srgb,var(--protocol-color) 16%,transparent); }
+.python-protocol-hub article > span { color:var(--protocol-color);font:700 .62rem monospace;letter-spacing:.12em; }.python-protocol-hub article h3 { margin:7px 0;font-size:1.08rem; }.python-protocol-hub article p { min-height:62px;margin:0;color:#829bb1;font-size:.78rem;line-height:1.55; }
+.python-protocol-hub__meta { display:flex;justify-content:space-between;gap:8px;margin:14px 0; }.python-protocol-hub__meta code { color:#b8cee1;font-size:.66rem; }.python-protocol-hub__meta small { color:#607a92;font:.58rem monospace; }
+.python-protocol-hub article > button { width:100%;padding:9px;border:1px solid color-mix(in srgb,var(--protocol-color) 42%,transparent);border-radius:8px;color:var(--protocol-color);background:color-mix(in srgb,var(--protocol-color) 6%,transparent);font-weight:800;cursor:pointer; }
+.python-protocol-hub > footer { display:flex;justify-content:center;align-items:center;gap:12px;margin-top:26px;color:#667f96;font:.67rem monospace;letter-spacing:.08em; }.python-protocol-hub footer strong { color:#55f1c8; }.python-protocol-hub footer i { opacity:.45; }
+@media(max-width:900px){.python-protocol-hub > main{grid-template-columns:repeat(2,minmax(0,1fr))}.python-protocol-hub__hero{grid-template-columns:160px 1fr}.python-protocol-hub__core{width:138px;height:138px}}
+@media(max-width:620px){.python-protocol-hub{padding:82px 14px 35px}.python-protocol-hub > header{grid-template-columns:42px 1fr}.python-protocol-hub__progress{grid-column:2;justify-self:start}.python-protocol-hub__hero{grid-template-columns:1fr;padding:22px 18px;text-align:center}.python-protocol-hub__hero p{font-size:.82rem}.python-protocol-hub > main{grid-template-columns:1fr}.python-protocol-hub article p{min-height:0}.python-protocol-hub > footer{gap:6px;flex-wrap:wrap;font-size:.56rem}}

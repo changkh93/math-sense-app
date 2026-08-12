@@ -41,6 +41,7 @@ import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
 import { mergeSummaryWithRecentHistory } from '../../utils/learningSummaryUtils'
 import { checkWebGLSupport } from '../../utils/webglSupport'
+import { hasPythonMissionSetForUnit, isMissionLabRequired, PYTHON_PROTOCOL_ENTRY_UNITS } from '../PythonWorld/pythonMissionCatalog'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
@@ -70,6 +71,7 @@ const StudyStreamRoomView = lazy(() => import('./StudyStreamRoomView'))
 const CrystalLedger = lazy(() => import('./CrystalLedger'))
 const loadMetaGalaxy = () => import('../GalaxySocial/MetaGalaxy')
 const MetaGalaxy = lazy(loadMetaGalaxy)
+const PythonProtocolHub = lazy(() => import('../PythonWorld/PythonProtocolHub'))
 
 function SpaceViewFallback() {
   return (
@@ -453,7 +455,7 @@ function RealtimeTopAlerts({ userId }) {
   )
 }
 
-function getUnitContentAvailability(unit, quizAvailabilityMap = {}) {
+function getUnitContentAvailability(unit, quizAvailabilityMap = {}, clusterId = '') {
   const unitId = unit?.docId || unit?.id
   const flags = unit?.contentFlags || {}
   const hasFlag = (key) => typeof flags[key] === 'boolean'
@@ -469,7 +471,8 @@ function getUnitContentAvailability(unit, quizAvailabilityMap = {}) {
     hasWorkbook: hasFlag('hasWorkbook')
       ? flags.hasWorkbook
       : !!(unit?.workbookPages && unit.workbookPages.length > 0),
-    hasCodeTrace: hasFlag('hasCodeTrace') ? flags.hasCodeTrace : false
+    hasCodeTrace: hasFlag('hasCodeTrace') ? flags.hasCodeTrace : false,
+    hasMissionLab: hasPythonMissionSetForUnit(unit, clusterId)
   }
 }
 
@@ -567,7 +570,7 @@ function RegionPlanetVisual({ imageSrc, title, icon, isMobile, isLocked }) {
 
 const REFINERY_CAUSE_IDS = ['concept_gap', 'equation_setup', 'missed_condition', 'calculation_error', 'no_checking']
 const LOGIN_NOTICE_KEY = 'metasenseLoginNotice'
-const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook'])
+const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook', 'lumi_protocol'])
 
 function getRequestedRootView(location) {
   const requestedView = location.state?.view || new URLSearchParams(location.search).get('view')
@@ -616,6 +619,7 @@ function SpaceHome() {
   // videoCompletedFromProgress: { [unitId]: true } — learning_progress.videoProgress.{txId}.completed === true 인 단원.
   // history의 type:'video' 문서 누락(보너스 타이머 놓침, 탭 닫기 시 sendBeacon 경로)에도 단원 완료가 표시되도록 보정하는 source of truth.
   const [videoCompletedFromProgress, setVideoCompletedFromProgress] = useState({})
+  const [missionLabCompletedFromProgress, setMissionLabCompletedFromProgress] = useState({})
   const [currentView, setCurrentView] = useState(() => {
     const requestedView = getRequestedRootView(location)
     const savedView = sessionStorage.getItem('metasense_current_view')
@@ -880,6 +884,13 @@ function SpaceHome() {
     if (isDarkMatterMode) stopDarkMatterMode();
     resetViewportForRootView();
   }, [clearMissionSelection, isDarkMatterMode, resetViewportForRootView, stopDarkMatterMode, updateSelectedChapterDocId, updateSelectedRegionId, userData?.isGuest]);
+
+  const enterLumiProtocolMission = useCallback((unitId) => {
+    switchRootView('planet')
+    setQuickQuizUnitId(unitId)
+    setQuickQuizMode('mission')
+    soundManager.playWarp()
+  }, [switchRootView])
 
   const requestGalaxyEntry = useCallback(async () => {
     if (!user?.uid) return
@@ -1287,6 +1298,14 @@ function SpaceHome() {
   }, [activeUnit, clearMissionSelection, loadingSingleUnit, missionUnitId, singleUnitFetched]);
 
   const handleBackFromMission = useCallback(() => {
+    const cameFromLumiProtocol = quickQuizMode === 'mission'
+      && PYTHON_PROTOCOL_ENTRY_UNITS.some((entry) => entry.unitId === quickQuizUnitId)
+
+    if (cameFromLumiProtocol) {
+      switchRootView('lumi_protocol')
+      return
+    }
+
     // Logic: Mission Control -> Chapter Selection (Units List -> Chapters List)
     
     // Explicitly preserve hierarchy before clearing unit for deep-linked scenarios
@@ -1303,7 +1322,7 @@ function SpaceHome() {
     // Ensure we transition into the hierarchy view (Planet view)
     // regardless of where we came from (e.g. assignment hub)
     setCurrentView('planet');
-  }, [activeUnit, activeChapter, singleChapter, singleRegion, activeRegion, selectedChapterDocId, selectedRegionId, selectedClusterId, clearMissionSelection, updateSelectedChapterDocId, updateSelectedClusterId, updateSelectedRegionId]);
+  }, [activeUnit, activeChapter, singleChapter, singleRegion, activeRegion, selectedChapterDocId, selectedRegionId, selectedClusterId, clearMissionSelection, quickQuizMode, quickQuizUnitId, switchRootView, updateSelectedChapterDocId, updateSelectedClusterId, updateSelectedRegionId]);
 
   // Track Presence Activity
   const currentLocationString = useMemo(() => {
@@ -1318,6 +1337,7 @@ function SpaceHome() {
     if (currentView === 'galaxy') return '아스트라 프론티어 이용 중';
     if (currentView === 'assignment_hub') return '항행 일지(과제) 작성 중';
     if (currentView === 'mistake_notebook') return '오답노트 행성 복습 중';
+    if (currentView === 'lumi_protocol') return '루미 프로토콜 복구 중';
     return '우주 공간(메인) 대기 중';
   }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode]);
 
@@ -1655,25 +1675,31 @@ function SpaceHome() {
   useEffect(() => {
     if (!user?.uid) {
       setVideoCompletedFromProgress({})
+      setMissionLabCompletedFromProgress({})
       return undefined
     }
     const progressQuery = collection(db, 'users', user.uid, 'learning_progress')
     return onSnapshot(progressQuery, (snapshot) => {
       const map = {}
+      const missionLabMap = {}
       snapshot.forEach((docSnap) => {
         const unitId = docSnap.id
-        const videoProgress = docSnap.data()?.videoProgress
+        const progressData = docSnap.data() || {}
+        const videoProgress = progressData.videoProgress
         if (videoProgress && typeof videoProgress === 'object') {
           const hasCompletedVideo = Object.values(videoProgress).some(
             (tx) => tx && typeof tx === 'object' && tx.completed === true
           )
           if (hasCompletedVideo) map[unitId] = true
         }
+        if (progressData.missionLab?.completed === true) missionLabMap[unitId] = true
       })
       setVideoCompletedFromProgress(map)
+      setMissionLabCompletedFromProgress(missionLabMap)
     }, (error) => {
       console.warn('learning_progress subscription failed:', error)
       setVideoCompletedFromProgress({})
+      setMissionLabCompletedFromProgress({})
     })
   }, [user?.uid])
 
@@ -1738,7 +1764,7 @@ function SpaceHome() {
 
   // Calculate Exploration Status and Recent Region
   // bestScores: { unitDocId: bestScore } - maps each completed unit to its best quiz score
-  // unitProgressMap: { unitDocId: { quiz: true, video: true, text: true, workbook: true, codeTrace: true } }
+  // unitProgressMap: { unitDocId: { quiz, video, text, workbook, codeTrace, missionLab } }
   const { explorationStatus, recentRegionId, bestScores, unitProgressMap } = useMemo(() => {
     const statusMap = {}
     const scores = {}
@@ -1761,10 +1787,11 @@ function SpaceHome() {
       else if (h.type === 'video') hType = 'video'
       else if (h.type === 'text') hType = 'text'
       else if (h.type === 'code_trace') hType = 'codeTrace'
+      else if (h.type === 'python_mission') hType = 'missionLab'
 
       // Tracking modality completion
       if (!progressMap[uid]) {
-        progressMap[uid] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false }
+        progressMap[uid] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false }
       }
       progressMap[uid][hType] = true
 
@@ -1785,9 +1812,17 @@ function SpaceHome() {
     Object.entries(videoCompletedFromProgress).forEach(([unitId, completed]) => {
       if (!completed) return
       if (!progressMap[unitId]) {
-        progressMap[unitId] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false }
+        progressMap[unitId] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false }
       }
       progressMap[unitId].video = true
+    })
+
+    Object.entries(missionLabCompletedFromProgress).forEach(([unitId, completed]) => {
+      if (!completed) return
+      if (!progressMap[unitId]) {
+        progressMap[unitId] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false }
+      }
+      progressMap[unitId].missionLab = true
     })
 
     if (effectiveHistory.length === 0) {
@@ -1821,7 +1856,7 @@ function SpaceHome() {
     }
 
     return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores, unitProgressMap: progressMap }
-  }, [effectiveHistory, regions, selectedClusterId, videoCompletedFromProgress])
+  }, [effectiveHistory, regions, selectedClusterId, videoCompletedFromProgress, missionLabCompletedFromProgress])
 
   // Calculate chapter progress dynamically from Firestore data
   const chapterProgress = useMemo(() => {
@@ -1847,14 +1882,15 @@ function SpaceHome() {
         video: { total: 0, completed: 0 },
         text: { total: 0, completed: 0 },
         workbook: { total: 0, completed: 0 },
-        codeTrace: { total: 0, completed: 0 }
+        codeTrace: { total: 0, completed: 0 },
+        missionLab: { total: 0, completed: 0, requiredTotal: 0, requiredCompleted: 0 }
       }
 
       unitsData.forEach(unit => {
         // Find progress using docId or fallback id
         const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
 
-        const { hasQuiz, hasVideo, hasText, hasWorkbook, hasCodeTrace } = getUnitContentAvailability(unit, quizAvailabilityMap)
+        const { hasQuiz, hasVideo, hasText, hasWorkbook, hasCodeTrace, hasMissionLab } = getUnitContentAvailability(unit, quizAvailabilityMap, selectedClusterId)
 
         if (hasQuiz) {
           counts.quiz.total++
@@ -1876,16 +1912,25 @@ function SpaceHome() {
           counts.codeTrace.total++
           if (uProg.codeTrace) counts.codeTrace.completed++
         }
+        if (hasMissionLab) {
+          counts.missionLab.total++
+          if (uProg.missionLab) counts.missionLab.completed++
+          if (isMissionLabRequired(unit)) {
+            counts.missionLab.requiredTotal++
+            if (uProg.missionLab) counts.missionLab.requiredCompleted++
+          }
+        }
       })
       
       // Determine if the entire chapter is finished across ALL active modalities
-      const hasAnyContent = counts.quiz.total > 0 || counts.video.total > 0 || counts.text.total > 0 || counts.workbook.total > 0 || counts.codeTrace.total > 0
+      const hasAnyContent = counts.quiz.total > 0 || counts.video.total > 0 || counts.text.total > 0 || counts.workbook.total > 0 || counts.codeTrace.total > 0 || counts.missionLab.total > 0
       const isFinished = hasAnyContent && 
         (counts.quiz.total === counts.quiz.completed) &&
         (counts.video.total === counts.video.completed) &&
         (counts.text.total === counts.text.completed) &&
         (counts.workbook.total === counts.workbook.completed) &&
-        (counts.codeTrace.total === counts.codeTrace.completed)
+        (counts.codeTrace.total === counts.codeTrace.completed) &&
+        (counts.missionLab.requiredTotal === counts.missionLab.requiredCompleted)
       
       progress[chapter.docId] = {
         counts,
@@ -1893,7 +1938,7 @@ function SpaceHome() {
       }
     })
     return progress
-  }, [chapters, unitProgressMap, chapterUnitResults, loadingHistory, loadingQuizAvailability, quizAvailabilityMap])
+  }, [chapters, unitProgressMap, chapterUnitResults, loadingHistory, loadingQuizAvailability, quizAvailabilityMap, selectedClusterId])
 
   // Auto-promote region access to 'completed' when student finishes all chapters in selectedRegionId
   useEffect(() => {
@@ -3747,6 +3792,24 @@ function SpaceHome() {
     )
   }
 
+  if (currentView === 'lumi_protocol') {
+    return (
+      <div className="space-bg" style={{ minHeight: '100dvh', overflowY: 'auto' }}>
+        <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
+        <Suspense fallback={<SpaceViewFallback />}>
+          <PythonProtocolHub
+            unitProgressMap={unitProgressMap}
+            onEnterMission={enterLumiProtocolMission}
+            onBack={() => {
+              switchRootView('planet')
+              soundManager.playWarp()
+            }}
+          />
+        </Suspense>
+      </div>
+    )
+  }
+
   if (currentView === 'journey') {
     return (
       <div className="space-bg space-hud" style={{ minHeight: '100dvh', overflowY: 'auto', background: '#03050c' }}>
@@ -4004,6 +4067,11 @@ function SpaceHome() {
               onSelectMistakeNotebook={() => {
                 switchRootView('mistake_notebook');
                 soundManager.playWarp();
+              }}
+              showLumiProtocol={selectedClusterId === 'python'}
+              onSelectLumiProtocol={() => {
+                switchRootView('lumi_protocol')
+                soundManager.playWarp()
               }}
               darkMatterCount={darkMatterCount}
               equipment={equipment}
@@ -4305,6 +4373,41 @@ function SpaceHome() {
                     <>
                     {is2DMode && (
                       <>
+                        {selectedClusterId === 'python' && (
+                          <Motion.button
+                            type="button"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1, transition: { delay: 0.03 } }}
+                            whileHover={isMobile ? undefined : { scale: 1.05, filter: 'brightness(1.16)' }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              switchRootView('lumi_protocol')
+                              soundManager.playWarp()
+                            }}
+                            style={{
+                              width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
+                              minHeight: isMobile ? '148px' : '250px',
+                              padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                              border: '1px solid rgba(85, 241, 200, 0.58)',
+                              borderRadius: isMobile ? '14px' : '20px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              background: 'radial-gradient(circle at 50% 20%, rgba(73,233,255,.3), transparent 35%), linear-gradient(145deg, rgba(8,48,74,.96), rgba(12,18,48,.97))',
+                              boxShadow: '0 8px 34px rgba(73, 233, 255, .2)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: isMobile ? '.45rem' : '.8rem',
+                              font: 'inherit',
+                            }}
+                          >
+                            <span aria-hidden="true" style={{ fontSize: isMobile ? '2.2rem' : '4rem', filter: 'drop-shadow(0 0 12px #49e9ff)' }}>▲</span>
+                            <strong className="font-tech" style={{ color: '#55f1c8', fontSize: isMobile ? '.92rem' : '1.3rem' }}>루미 프로토콜</strong>
+                            <small style={{ color: '#b8f8ff', fontSize: isMobile ? '.68rem' : '.8rem', lineHeight: 1.35 }}>Python Mission World · 20 Missions</small>
+                          </Motion.button>
+                        )}
+
                         {/* Mobile-safe route into the 3D Astra Frontier world. */}
                         <Motion.button
                           type="button"
@@ -4638,7 +4741,7 @@ function SpaceHome() {
                             <p className="font-tech" style={{ color: '#50c878', fontSize: '0.9rem', fontWeight: 800 }}>완료 🏆</p>
                           ) : (() => {
                             const p = chapterProgress[chapter.docId].counts;
-                            const hasAny = p.quiz.total > 0 || p.video.total > 0 || p.text.total > 0 || p.workbook.total > 0 || p.codeTrace.total > 0;
+                            const hasAny = p.quiz.total > 0 || p.video.total > 0 || p.text.total > 0 || p.workbook.total > 0 || p.codeTrace.total > 0 || p.missionLab.total > 0;
                             
                             if (!hasAny) {
                               return <p className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>탐험 전</p>;
@@ -4664,6 +4767,11 @@ function SpaceHome() {
                                 {p.codeTrace.total > 0 && (
                                   <span className="font-tech" style={{ color: p.codeTrace.completed === p.codeTrace.total ? '#50c878' : 'var(--crystal-cyan)', fontSize: '0.85rem' }}>
                                     ⌨️ {p.codeTrace.completed}/{p.codeTrace.total}
+                                  </span>
+                                )}
+                                {p.missionLab.total > 0 && (
+                                  <span className="font-tech" style={{ color: p.missionLab.completed === p.missionLab.total ? '#50c878' : '#55f1c8', fontSize: '0.85rem' }}>
+                                    🛰️ {p.missionLab.completed}/{p.missionLab.total}
                                   </span>
                                 )}
                                 {p.quiz.total > 0 && (
@@ -4760,15 +4868,16 @@ function SpaceHome() {
                     ) : units?.map((unit, idx) => {
                       const uProg = unitProgressMap[unit.docId] || unitProgressMap[unit.id] || {}
                       
-                      const { hasQuiz, hasVideo, hasText, hasWorkbook, hasCodeTrace } = getUnitContentAvailability(unit, quizAvailabilityMap)
-                      const hasAnyContent = hasQuiz || hasVideo || hasText || hasWorkbook || hasCodeTrace
+                      const { hasQuiz, hasVideo, hasText, hasWorkbook, hasCodeTrace, hasMissionLab } = getUnitContentAvailability(unit, quizAvailabilityMap, selectedClusterId)
+                      const hasAnyContent = hasQuiz || hasVideo || hasText || hasWorkbook || hasCodeTrace || hasMissionLab
 
                       const isOverallCompleted = hasAnyContent &&
                         (!hasQuiz || uProg.quiz) &&
                         (!hasVideo || uProg.video) &&
                         (!hasText || uProg.text) &&
                         (!hasWorkbook || uProg.workbook) &&
-                        (!hasCodeTrace || uProg.codeTrace)
+                        (!hasCodeTrace || uProg.codeTrace) &&
+                        (!isMissionLabRequired(unit) || uProg.missionLab)
 
                       const bestScore = bestScores[unit.docId]
 
@@ -4847,6 +4956,13 @@ function SpaceHome() {
                                   fontSize: '1rem',
                                   textShadow: uProg.codeTrace ? '0 0 10px rgba(80, 200, 120, 0.5)' : 'none'
                                 }} title="Code Trace">⌨️</span>
+                              )}
+                              {hasMissionLab && (
+                                <span className="font-tech" style={{
+                                  color: uProg.missionLab ? '#50c878' : 'rgba(255,255,255,0.3)',
+                                  fontSize: '1rem',
+                                  textShadow: uProg.missionLab ? '0 0 10px rgba(80, 200, 120, 0.5)' : 'none'
+                                }} title={isMissionLabRequired(unit) ? 'Mission Lab · 필수' : 'Mission Lab · 선택'}>🛰️</span>
                               )}
                               {hasQuiz && (
                                 <span className="font-tech" style={{ 

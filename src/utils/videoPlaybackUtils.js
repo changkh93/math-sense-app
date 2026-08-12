@@ -1,9 +1,121 @@
 export const VIDEO_END_RESUME_TOLERANCE_SECONDS = 3
+export const LONG_VIDEO_SECONDS = 40 * 60
+export const STANDARD_VIDEO_COMPLETION_THRESHOLD = 0.95
+export const LONG_VIDEO_COMPLETION_THRESHOLD = 0.85
 
 const toNonNegativeSecond = (value) => {
   const number = Number(value)
   return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0
 }
+
+export const getVideoPlaybackRange = ({
+  duration = 0,
+  contentStart = 0,
+  contentEnd = 0,
+} = {}) => {
+  const start = toNonNegativeSecond(contentStart)
+  const videoDuration = toNonNegativeSecond(duration)
+  const configuredEnd = toNonNegativeSecond(contentEnd)
+  const end = configuredEnd > start
+    ? Math.min(configuredEnd, videoDuration || configuredEnd)
+    : videoDuration
+
+  return {
+    start,
+    end,
+    segmentDuration: end > start ? end - start : 0,
+  }
+}
+
+export const isVideoPositionInRange = ({
+  position = 0,
+  duration = 0,
+  contentStart = 0,
+  contentEnd = 0,
+  allowEnd = true,
+} = {}) => {
+  const numericPosition = Number(position)
+  if (!Number.isFinite(numericPosition)) return false
+
+  const { start, end } = getVideoPlaybackRange({ duration, contentStart, contentEnd })
+  if (numericPosition < start) return false
+  if (end <= start) return true
+  return allowEnd ? numericPosition <= end : numericPosition < end
+}
+
+export const sanitizeVideoStamps = ({
+  stampedSeconds = [],
+  duration = 0,
+  contentStart = 0,
+  contentEnd = 0,
+} = {}) => {
+  const { start, end } = getVideoPlaybackRange({ duration, contentStart, contentEnd })
+  const unique = new Set()
+
+  if (!Array.isArray(stampedSeconds)) return []
+  stampedSeconds.forEach((value) => {
+    const numericValue = Number(value)
+    if (!Number.isFinite(numericValue)) return
+    const second = Math.floor(numericValue)
+    if (second < start) return
+    if (end > start && second >= end) return
+    unique.add(second)
+  })
+
+  return Array.from(unique).sort((a, b) => a - b)
+}
+
+export const sanitizeVideoPosition = ({
+  position = 0,
+  duration = 0,
+  contentStart = 0,
+  contentEnd = 0,
+} = {}) => {
+  const { start } = getVideoPlaybackRange({ duration, contentStart, contentEnd })
+  return isVideoPositionInRange({ position, duration, contentStart, contentEnd })
+    ? toNonNegativeSecond(position)
+    : start
+}
+
+export const getVideoCompletionThreshold = (segmentDuration = 0) => (
+  segmentDuration > LONG_VIDEO_SECONDS
+    ? LONG_VIDEO_COMPLETION_THRESHOLD
+    : STANDARD_VIDEO_COMPLETION_THRESHOLD
+)
+
+export const getVideoCompletionMetrics = ({
+  stampedSeconds = [],
+  duration = 0,
+  contentStart = 0,
+  contentEnd = 0,
+} = {}) => {
+  const range = getVideoPlaybackRange({ duration, contentStart, contentEnd })
+  const validStamps = sanitizeVideoStamps({
+    stampedSeconds,
+    duration,
+    contentStart,
+    contentEnd,
+  })
+  // Preserve the existing long-video policy (85% for source videos over 40
+  // minutes), while applying that percentage to the assigned segment only.
+  const thresholdDuration = toNonNegativeSecond(duration) || range.segmentDuration
+  const threshold = getVideoCompletionThreshold(thresholdDuration)
+  const coverage = range.segmentDuration > 0
+    ? Math.min(1, validStamps.length / range.segmentDuration)
+    : 0
+
+  return {
+    ...range,
+    validStamps,
+    coveredSeconds: validStamps.length,
+    coverage,
+    thresholdDuration,
+    threshold,
+    targetPercent: Math.round(threshold * 100),
+    completed: range.segmentDuration > 0 && coverage >= threshold,
+  }
+}
+
 export const getVideoResumeRecovery = ({
   resumePosition = 0,
   duration = 0,
@@ -12,13 +124,12 @@ export const getVideoResumeRecovery = ({
   toleranceSeconds = VIDEO_END_RESUME_TOLERANCE_SECONDS,
 } = {}) => {
   const position = toNonNegativeSecond(resumePosition)
-  const start = toNonNegativeSecond(contentStart)
-  const videoDuration = toNonNegativeSecond(duration)
-  const configuredEnd = toNonNegativeSecond(contentEnd)
+  const { start, end: playbackEnd } = getVideoPlaybackRange({
+    duration,
+    contentStart,
+    contentEnd,
+  })
   const tolerance = Math.max(0, Number(toleranceSeconds) || 0)
-  const playbackEnd = configuredEnd > start
-    ? Math.min(configuredEnd, videoDuration || configuredEnd)
-    : videoDuration
 
   return {
     restartPosition: start,

@@ -1,0 +1,39 @@
+.python-mission-admin { color: #e7f3ff; min-height: 75vh; }
+.python-mission-admin > header { display: flex; justify-content: space-between; gap: 20px; align-items: end; padding-bottom: 18px; border-bottom: 1px solid rgba(73,233,255,.2); }
+.python-mission-admin > header span { color: #49e9ff; font: 700 .7rem monospace; letter-spacing: .14em; }
+.python-mission-admin h1 { margin: 5px 0 0; font-size: 1.55rem; }
+.python-mission-admin header nav { display: flex; gap: 6px; }
+.python-mission-admin header button, .python-mission-admin__actions button, .python-mission-admin__search button { border: 1px solid #2a4e6a; border-radius: 7px; padding: 9px 12px; color: #91a9c0; background: #0b192b; cursor: pointer; font: 700 .72rem monospace; }
+.python-mission-admin header button.active { color: #041719; border-color: #55f1c8; background: #55f1c8; }
+.python-mission-admin__status { margin: 14px 0; padding: 11px; border: 1px solid rgba(85,241,200,.25); border-radius: 8px; color: #8ff8dc; background: rgba(85,241,200,.06); white-space: pre-wrap; }
+.python-mission-admin__status.error { color: #ff93a9; border-color: rgba(255,93,125,.3); background: rgba(255,93,125,.07); }
+.python-mission-admin__editor-grid { display: grid; grid-template-columns: minmax(210px, .34fr) minmax(420px, 1fr); gap: 16px; margin-top: 16px; }
+.python-mission-admin__editor-grid aside { max-height: 72vh; overflow: auto; padding-right: 8px; }
+.python-mission-admin__editor-grid aside h2 { margin: 12px 0 8px; color: #7e97b0; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; }
+.python-mission-admin__editor-grid aside button { width: 100%; margin-bottom: 7px; padding: 10px; border: 1px solid #213c56; border-radius: 8px; text-align: left; color: #dceeff; background: #0a1729; cursor: pointer; }
+.python-mission-admin__editor-grid aside strong, .python-mission-admin__editor-grid aside small { display: block; }
+.python-mission-admin__editor-grid aside small { margin-top: 4px; color: #6f89a2; }
+.python-mission-admin__editor-grid section { min-width: 0; }
+.python-mission-admin label { display: grid; gap: 7px; margin-bottom: 12px; color: #9fb4ca; font-size: .82rem; }
+.python-mission-admin label small { color: #647d95; }
+.python-mission-admin input, .python-mission-admin textarea { box-sizing: border-box; width: 100%; border: 1px solid #294965; border-radius: 8px; color: #dff6ff; background: #071322; outline: none; }
+.python-mission-admin input { padding: 11px; }
+.python-mission-admin textarea { min-height: 58vh; resize: vertical; padding: 14px; font: .74rem/1.55 'SFMono-Regular', Consolas, monospace; tab-size: 2; }
+.python-mission-admin input:focus, .python-mission-admin textarea:focus { border-color: #49e9ff; box-shadow: 0 0 0 2px rgba(73,233,255,.1); }
+.python-mission-admin__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.python-mission-admin__actions button.publish { color: #041719; border-color: #55f1c8; background: #55f1c8; }
+.python-mission-admin button:disabled { opacity: .45; cursor: not-allowed; }
+.python-mission-admin__progress { margin-top: 18px; }
+.python-mission-admin__search { display: grid; grid-template-columns: 1fr auto; gap: 8px; max-width: 720px; }
+.python-mission-admin__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; margin-top: 18px; }
+.python-mission-admin__cards article { min-width: 0; padding: 15px; border: 1px solid #203d57; border-radius: 11px; background: #081626; }
+.python-mission-admin__cards article > div span, .python-mission-admin__cards article > div strong { display: block; }
+.python-mission-admin__cards article > div span { color: #49e9ff; font: .65rem monospace; }
+.python-mission-admin__cards article > div strong { margin-top: 5px; }
+.python-mission-admin dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 13px 0; }
+.python-mission-admin dl div { padding: 7px; border-radius: 6px; background: rgba(73,233,255,.05); }
+.python-mission-admin dt { color: #6f89a2; font-size: .65rem; }
+.python-mission-admin dd { margin: 3px 0 0; color: #ccecff; font-size: .76rem; }
+.python-mission-admin details summary { color: #8ba6bf; cursor: pointer; font-size: .77rem; }
+.python-mission-admin details pre { max-height: 260px; overflow: auto; padding: 10px; border-radius: 7px; color: #ccecff; background: #030b15; white-space: pre-wrap; font-size: .7rem; }
+@media (max-width: 760px) { .python-mission-admin > header { align-items: stretch; flex-direction: column; } .python-mission-admin__editor-grid { grid-template-columns: 1fr; } .python-mission-admin__editor-grid aside { max-height: 230px; } }

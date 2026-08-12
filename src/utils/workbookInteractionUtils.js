@@ -155,7 +155,7 @@ export const normalizeInteractionConfig = (type, rawConfig) => {
   }
 
   if (type === 'coloring') {
-    const cells = normalizeItems(config.cells, '색칠 칸', { min: 1, max: 30 });
+    const cells = normalizeItems(config.cells, '색칠 칸', { min: 1, max: 60 });
     const colors = normalizeItems(config.colors, '색상', { min: 1, max: 10 }).map((color, index) => ({
       ...color,
       value: String(config.colors[index]?.value || '#22d3ee').slice(0, 30),
@@ -167,13 +167,53 @@ export const normalizeInteractionConfig = (type, rawConfig) => {
       if (!colorIds.has(colorId)) throw new Error(`색칠 정답의 색상이 존재하지 않습니다: ${colorId}`);
       return [cell.id, colorId];
     }));
-    return { cells, colors, answer };
+    const requestedColumns = Number(config.columns);
+    const columns = Number.isInteger(requestedColumns)
+      && requestedColumns >= 1
+      && requestedColumns <= cells.length
+      && cells.length % requestedColumns === 0
+      ? requestedColumns
+      : cells.length;
+    return {
+      cells,
+      colors,
+      answer,
+      columns,
+      ...(config.selectionMode === 'paint-only' ? { selectionMode: 'paint-only' } : {}),
+      ...(String(config.paintColorId || '').trim() ? { paintColorId: String(config.paintColorId).trim() } : {}),
+    };
   }
 
   throw new Error(`지원하지 않는 인터랙션 type입니다: ${type}`);
 };
 
 const sameRecord = (actual, expected) => Object.keys(expected).every(key => String(actual?.[key] ?? '') === String(expected[key]));
+
+const isBlankColor = (color) => {
+  const id = String(color?.id || '').toLowerCase();
+  const label = String(color?.label || '').replace(/\s+/g, '');
+  const value = String(color?.value || '').toLowerCase();
+  return /^(white|none|blank|clear|unpainted?)$/.test(id)
+    || /(색칠안함|칠하지않음|지우기|투명)/.test(label)
+    || ['#fff', '#ffffff', 'transparent', 'rgba(0,0,0,0)'].includes(value);
+};
+
+export const getWorkbookColoringMode = (config = {}) => {
+  const blankColor = (config.colors || []).find(isBlankColor);
+  const paintColor = (config.colors || []).find(color => color.id === config.paintColorId)
+    || (config.colors || []).find(color => !isBlankColor(color));
+  return {
+    isPaintOnly: config.selectionMode === 'paint-only' || Boolean(blankColor && paintColor),
+    blankColorId: blankColor?.id || '',
+    paintColorId: paintColor?.id || '',
+    paintValue: paintColor?.value || '#9bb8d6',
+  };
+};
+
+const paintedCellIds = (record, paintColorId) => Object.entries(record || {})
+  .filter(([, colorId]) => String(colorId) === String(paintColorId))
+  .map(([cellId]) => cellId)
+  .sort();
 
 export const evaluateWorkbookInteraction = (element, response) => {
   const config = element?.config || {};
@@ -183,7 +223,15 @@ export const evaluateWorkbookInteraction = (element, response) => {
       && response.length === config.answer?.length
       && config.answer.every((id, index) => response[index] === id);
   }
-  if (['grouping', 'matching', 'coloring'].includes(element?.type)) return sameRecord(response, config.answer || {});
+  if (element?.type === 'coloring') {
+    const coloringMode = getWorkbookColoringMode(config);
+    if (coloringMode.isPaintOnly) {
+      return JSON.stringify(paintedCellIds(response, coloringMode.paintColorId))
+        === JSON.stringify(paintedCellIds(config.answer, coloringMode.paintColorId));
+    }
+    return sameRecord(response, config.answer || {});
+  }
+  if (['grouping', 'matching'].includes(element?.type)) return sameRecord(response, config.answer || {});
   return false;
 };
 

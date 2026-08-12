@@ -29,6 +29,7 @@ const StreakFixer = lazy(() => import('./pages/Admin/StreakFixer'))
 const GalaxyLearningLedgerBackfill = lazy(() => import('./pages/Admin/GalaxyLearningLedgerBackfill'))
 const TeacherQA = lazy(() => import('./pages/Admin/TeacherQA'))
 const PythonCourseBuilder = lazy(() => import('./pages/Admin/PythonCourseBuilder'))
+const PythonMissionAdmin = lazy(() => import('./pages/Admin/PythonMissionAdmin'))
 const MiddleSchoolMathBuilder = lazy(() => import('./pages/Admin/MiddleSchoolMathBuilder'))
 const AdminAssignments = lazy(() => import('./pages/Admin/AdminAssignments'))
 const MistakeNotebookAdmin = lazy(() => import('./pages/Admin/MistakeNotebookAdmin'))
@@ -123,6 +124,7 @@ function App() {
         <Route path="galaxy-ledger" element={<GalaxyLearningLedgerBackfill />} />
         <Route path="qa" element={<TeacherQA />} />
         <Route path="python-builder" element={<PythonCourseBuilder />} />
+        <Route path="python-missions" element={<PythonMissionAdmin />} />
         <Route path="middle-math-builder" element={<MiddleSchoolMathBuilder />} />
       </Route>
 
