@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Volume2, VolumeX, X } from 'lucide-react'
+import { RotateCcw, Volume2, VolumeX, X } from 'lucide-react'
 
 import soundManager from '../../utils/SoundManager'
 import UnitLeaderboard from './UnitLeaderboard'
@@ -12,6 +12,7 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { isRadarActive } from '../../utils/streakUtils'
 import { getEmbeddablePdfUrl, normalizePdfUrl } from '../../utils/pdfUrlUtils'
 import { isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils'
+import { getVideoResumeRecovery } from '../../utils/videoPlaybackUtils'
 
 const SpaceQuizView = lazy(() => import('./SpaceQuizView'))
 const QuizBattleView = lazy(() => import('./QuizBattleView'))
@@ -171,7 +172,7 @@ const buildYouTubeEmbedUrl = ({ videoId, start = 0, end, autoPlay = true }) => {
 
 // ─── YouTube Player Component ───
 // Memoized to prevent re-rendering when parent state (like saveStatus or stampCount) changes
-const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComplete, onTimeUpdate, onPlaybackStateChange, onTrackingStatus, onError, initialPlaybackRate = 1, initialVolume = VIDEO_VOLUME_DEFAULT, initiallyMuted = false, isOverlay = false, autoPlay = true }, ref) => {
+const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, restartAt = 0, onComplete, onTimeUpdate, onPlaybackStateChange, onTrackingStatus, onInvalidResumePosition, onError, initialPlaybackRate = 1, initialVolume = VIDEO_VOLUME_DEFAULT, initiallyMuted = false, isOverlay = false, autoPlay = true }, ref) => {
   const normalizedVideoId = getYouTubeVideoId(videoId)
   const playerRef = useRef(null)
   const wrapperRef = useRef(null)
@@ -183,8 +184,10 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
   const [duration, setDuration] = useState(0)
   const timeUpdateInterval = useRef(null)
   const manualStartTimerRef = useRef(null)
+  const resumeGuardTimerRef = useRef(null)
   const playerTargetId = useRef(`yt-player-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
   const { start: normalizedStart, end: normalizedEnd } = getNormalizedVideoRange(start, end)
+  const normalizedRestartAt = Math.max(0, Math.floor(Number(restartAt) || 0))
   const initialPlaybackRateRef = useRef(initialPlaybackRate)
   const initialVolumeRef = useRef(initialVolume)
   const initiallyMutedRef = useRef(initiallyMuted)
@@ -315,6 +318,11 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     onTrackingStatusRef.current = onTrackingStatus
   }, [onTrackingStatus])
 
+  const onInvalidResumePositionRef = useRef(onInvalidResumePosition)
+  useEffect(() => {
+    onInvalidResumePositionRef.current = onInvalidResumePosition
+  }, [onInvalidResumePosition])
+
   const onErrorRef = useRef(onError)
   useEffect(() => {
     onErrorRef.current = onError
@@ -325,6 +333,37 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
       onErrorRef.current?.(hasError ? 'PLAYER_ERROR' : 'API_TIMEOUT')
     }
   }, [hasError, apiTimedOut])
+
+  const recoverEndResumeIfNeeded = useCallback((player, reason) => {
+    if (!player) return false
+
+    const resumePosition = typeof player.getCurrentTime === 'function'
+      ? player.getCurrentTime()
+      : normalizedStart
+    const playerDuration = typeof player.getDuration === 'function'
+      ? player.getDuration()
+      : 0
+    const recovery = getVideoResumeRecovery({
+      resumePosition,
+      duration: playerDuration,
+      contentStart: normalizedRestartAt,
+      contentEnd: normalizedEnd,
+    })
+
+    if (!recovery.shouldRestart || typeof player.seekTo !== 'function') return false
+
+    player.seekTo(recovery.restartPosition, true)
+    setCurrentTime(recovery.restartPosition)
+    setDuration(playerDuration)
+    onInvalidResumePositionRef.current?.({
+      reason,
+      resumePosition: Math.floor(resumePosition || 0),
+      restartPosition: recovery.restartPosition,
+      duration: playerDuration,
+      playbackEnd: recovery.playbackEnd,
+    })
+    return true
+  }, [normalizedEnd, normalizedRestartAt, normalizedStart])
 
   const handleManualStart = () => {
     const player = playerRef.current
@@ -339,6 +378,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     })
 
     try {
+      recoverEndResumeIfNeeded(player, 'manual_play_request')
       player.playVideo()
     } catch (error) {
       console.warn('Manual YouTube playback request failed:', error)
@@ -420,6 +460,13 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         events: {
           'onReady': () => {
             clearTimeout(apiTimeout)
+            const recoveredEndResume = recoverEndResumeIfNeeded(player, 'player_ready')
+            if (!recoveredEndResume) {
+              if (resumeGuardTimerRef.current) clearTimeout(resumeGuardTimerRef.current)
+              resumeGuardTimerRef.current = setTimeout(() => {
+                recoverEndResumeIfNeeded(player, 'player_ready_delayed')
+              }, 500)
+            }
             if (typeof player.setPlaybackRate === 'function') {
               player.setPlaybackRate(initialPlaybackRateRef.current)
             }
@@ -481,6 +528,10 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
               onPlaybackStateChange(event.data)
             }
             if (event.data === window.YT.PlayerState.PLAYING) {
+              if (resumeGuardTimerRef.current) {
+                clearTimeout(resumeGuardTimerRef.current)
+                resumeGuardTimerRef.current = null
+              }
               if (manualStartTimerRef.current) {
                 clearTimeout(manualStartTimerRef.current)
                 manualStartTimerRef.current = null
@@ -548,6 +599,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
       return () => {
         clearTimeout(apiTimeout)
         if (manualStartTimerRef.current) clearTimeout(manualStartTimerRef.current)
+        if (resumeGuardTimerRef.current) clearTimeout(resumeGuardTimerRef.current)
         clearInterval(checkYT)
         if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
         if (playerRef.current && typeof playerRef.current.destroy === 'function') {
@@ -561,6 +613,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
     return () => {
       clearTimeout(apiTimeout)
       if (manualStartTimerRef.current) clearTimeout(manualStartTimerRef.current)
+      if (resumeGuardTimerRef.current) clearTimeout(resumeGuardTimerRef.current)
       if (timeUpdateInterval.current) clearInterval(timeUpdateInterval.current)
       if (playerRef.current && typeof playerRef.current.destroy === 'function') {
         try { playerRef.current.destroy() } catch (e) { /* ignore */ }
@@ -570,7 +623,7 @@ const YoutubePlayer = React.memo(React.forwardRef(({ videoId, start, end, onComp
         wrapperRef.current.innerHTML = ''
       }
     }
-  }, [normalizedVideoId, normalizedStart, normalizedEnd, autoPlay])
+  }, [normalizedVideoId, normalizedStart, normalizedEnd, normalizedRestartAt, autoPlay, recoverEndResumeIfNeeded])
 
   if (apiTimedOut && normalizedVideoId) {
     return (
@@ -1684,6 +1737,108 @@ export default function MissionHub({
       })
     }
   }, [getTrackingDiagnostics, logActivity, selectedTx])
+
+  const restartVideoFromBeginning = useCallback(({
+    reason = 'manual_restart',
+    duration = videoDurationRef.current,
+    shouldPlay = true,
+    resumePosition = lastVideoTimeRef.current,
+  } = {}) => {
+    if (!selectedTx) return
+
+    const txId = selectedTx.id || 'default'
+    const restartPosition = Math.max(0, Math.floor(Number(selectedTx.start) || 0))
+    const knownDuration = Math.max(0, Number(duration) || 0)
+    const configuredEnd = Math.max(0, Number(selectedTx.end) || 0)
+    const playbackEnd = configuredEnd > restartPosition
+      ? Math.min(configuredEnd, knownDuration || configuredEnd)
+      : knownDuration
+    const sanitizedStamps = Array.from(stampedSetRef.current).filter((second) => (
+      Number.isFinite(second) && (playbackEnd <= restartPosition || second < playbackEnd)
+    ))
+
+    stampedSetRef.current = new Set(sanitizedStamps)
+    newStampCountRef.current = Math.min(newStampCountRef.current, sanitizedStamps.length)
+    setStampCount(sanitizedStamps.length)
+    lastVideoTimeRef.current = restartPosition
+    lastPollTimeRef.current = Date.now()
+    if (knownDuration > 0) videoDurationRef.current = knownDuration
+    setIsAtEnd(false)
+    setVideoTrackingWarning("")
+    setVideoTrackingUnavailable(false)
+    trackingStallLoggedRef.current = false
+    sessionStartTimeRef.current = Date.now()
+    videoTrackingStatusRef.current = {
+      ...videoTrackingStatusRef.current,
+      playerState: null,
+      manualStartNeeded: false,
+      manualPlayRequested: false,
+      manualPlayFailed: false,
+      lastForwardPlaybackAt: null,
+      inferredPlayback: false,
+    }
+
+    const localCacheKey = `video_progress_${userId}_${unitId}_${txId}`
+    localStorage.setItem(localCacheKey + '_pos', String(restartPosition))
+    localStorage.setItem(localCacheKey + '_stamps', JSON.stringify(sanitizedStamps))
+    localStorage.setItem(localCacheKey + '_updatedAt', String(Date.now()))
+
+    setLearningProgress((previous) => ({
+      ...previous,
+      videoProgress: {
+        ...(previous?.videoProgress || {}),
+        [txId]: {
+          ...(previous?.videoProgress?.[txId] || {}),
+          lastPosition: restartPosition,
+          stampedSeconds: sanitizedStamps,
+          trackingDiagnostics: getTrackingDiagnostics(),
+        },
+      },
+    }))
+
+    if (userId && unitId) {
+      const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
+      setDoc(progressRef, {
+        videoProgress: {
+          [txId]: {
+            lastPosition: restartPosition,
+            stampedSeconds: sanitizedStamps,
+            totalTimeSpent: totalTimeSpentRef.current,
+            todayTimeSpent: dailyTimeSpentRef.current,
+            todayTimeSpentDate: dailyTimeSpentDateRef.current,
+            transmissionTitle: selectedTx?.title || activeUnit?.title || 'Main Video',
+            trackingDiagnostics: getTrackingDiagnostics(),
+            updatedAt: serverTimestamp(),
+          },
+        },
+        updatedAt: serverTimestamp(),
+      }, { merge: true }).catch((error) => {
+        console.warn('Failed to persist restarted video position:', error)
+      })
+    }
+
+    logActivity('video_restarted_from_beginning', {
+      transmissionId: txId,
+      transmissionTitle: selectedTx?.title || '',
+      videoId: selectedTx?.videoId || '',
+      reason,
+      previousPosition: Math.floor(Number(resumePosition) || 0),
+      restartPosition,
+      duration: Math.floor(knownDuration),
+    })
+
+    videoPlayerRef.current?.seekTo?.(restartPosition)
+    if (shouldPlay) videoPlayerRef.current?.playVideo?.()
+  }, [activeUnit?.title, getTrackingDiagnostics, logActivity, selectedTx, setIsAtEnd, unitId, userId])
+
+  const handleInvalidVideoResume = useCallback((details) => {
+    restartVideoFromBeginning({
+      reason: details?.reason || 'end_resume_guard',
+      duration: details?.duration || 0,
+      resumePosition: details?.resumePosition || 0,
+      shouldPlay: false,
+    })
+  }, [restartVideoFromBeginning])
 
   const getVideoLearningMetadata = useCallback((txId, position, stamps) => {
     const sessionWatchSeconds = Math.max(0, totalTimeSpentRef.current - lastSyncedTimeSpentRef.current)
@@ -2872,12 +3027,14 @@ export default function MissionHub({
                     videoId={selectedTx.videoId}
                     start={initialStartPosition}
                     end={selectedTx.end}
+                    restartAt={selectedTx.start || 0}
                     initialPlaybackRate={playbackRate}
                     initialVolume={videoVolume}
                     initiallyMuted={isVideoMuted || videoVolume === 0}
                     onTimeUpdate={handleVideoTimeUpdate}
                     onComplete={() => setIsAtEnd(true)}
                     onTrackingStatus={handleVideoTrackingStatus}
+                    onInvalidResumePosition={handleInvalidVideoResume}
                     onPlaybackStateChange={(state) => {
                       const playing = state === window.YT?.PlayerState?.PLAYING
                       isVideoPlayingRef.current = playing
@@ -3152,11 +3309,32 @@ export default function MissionHub({
                    justifyContent: 'center',
                    alignItems: 'center',
                    width: '100%',
-                   maxWidth: isMobile ? '100%' : '760px',
+                   maxWidth: isMobile ? '100%' : '980px',
                    margin: '0 auto',
                    flexDirection: isMobile ? 'column' : 'row'
                  }}
                >
+                 <button
+                   type="button"
+                   onClick={() => restartVideoFromBeginning()}
+                   className="hud-btn secondary glass capture-hide"
+                   title="저장된 진도는 유지하고 영상을 처음부터 재생합니다."
+                   style={{
+                     padding: isMobile ? '0.85rem 1rem' : '0.8rem 1.45rem',
+                     fontSize: isMobile ? '0.9rem' : '1rem',
+                     borderColor: 'rgba(0, 243, 255, 0.55)',
+                     background: 'rgba(0, 20, 35, 0.72)',
+                     color: 'white',
+                     display: 'inline-flex',
+                     alignItems: 'center',
+                     justifyContent: 'center',
+                     gap: '0.45rem',
+                     boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                   }}
+                 >
+                   <RotateCcw size={17} /> 처음부터 재생
+                 </button>
+
                  {hasUnsavedVideoCompletion && (
                    <button 
                      type="button"
