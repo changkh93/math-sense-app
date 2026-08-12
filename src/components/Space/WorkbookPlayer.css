@@ -282,6 +282,16 @@
   font-weight: 600;
   line-height: 1.45;
   box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .workbook-hint-bubble {
+    max-width: min(220px, 58vw);
+    padding: 0.42rem 0.55rem;
+    font-size: 0.66rem;
+    line-height: 1.35;
+  }
 }
 
 .wb-interaction {

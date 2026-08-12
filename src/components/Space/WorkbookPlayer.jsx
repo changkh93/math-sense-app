@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { BlockMath } from 'react-katex';
 import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import soundManager from '../../utils/SoundManager';
@@ -29,7 +29,6 @@ import {
   evaluateWorkbookInteraction,
   getAdaptiveWorkbookHintState,
   getInitialWorkbookInteractionResponse,
-  getWorkbookElementReference,
 } from '../../utils/workbookInteractionUtils';
 import 'katex/dist/katex.min.css';
 import StarField from './StarField';
@@ -131,6 +130,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   const inputRefs = React.useRef({});
   const autosaveTimerRef = useRef(null);
   const scratchCanvasRef = useRef(null);
+  const choiceModalDragControls = useDragControls();
 
   // Pen tool state for the workbook drawing overlay.
   const [activePenTool, setActivePenTool] = useState('select'); // 'select' | 'pen' | 'eraser'
@@ -438,12 +438,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     setCheckedElements(newCheckedElements);
     setCheckedPages(prev => ({ ...prev, [currentPageIndex]: true }));
     setAttemptCounts(prev => ({ ...prev, [currentPageIndex]: pageAttempt }));
-    if (wrongElementIds.length) {
-      setVisibleHints(prev => ({
-        ...prev,
-        ...Object.fromEntries(wrongElementIds.map(id => [id, true])),
-      }));
-    }
+    // Hints stay collapsed after grading. Students reveal one only when they ask for it.
+    if (wrongElementIds.length) setVisibleHints({});
     setActiveInputId(null);
     setShowKeypad(false);
   };
@@ -455,6 +451,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     });
     setCheckedElements(nextChecked);
     setCheckedPages(prev => ({ ...prev, [currentPageIndex]: false }));
+    setVisibleHints({});
     setActiveInputId(null);
     setShowKeypad(false);
     soundManager.playClick();
@@ -708,11 +705,9 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   }
 
   const isCurrentPageChecked = !!checkedPages[currentPageIndex];
-  const currentHintItems = (currentPage?.elements || []).filter(element => (
-    WORKBOOK_GRADABLE_TYPES.has(element.type)
-    && (wrongAnswerHistory[element.id]?.length || 0) > 0
-    && checkedElements[element.id]?.isCorrect !== true
-  ));
+  const toggleHint = (elementId) => {
+    setVisibleHints(prev => (prev[elementId] ? {} : { [elementId]: true }));
+  };
 
   return (
     <div className={`workbook-player-container fade-in ${showKeypad && activeInputId && inputMode === 'math' ? 'keypad-open' : ''}`}>
@@ -866,9 +861,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       <button
                         type="button"
                         className="workbook-hint-button"
+                        aria-expanded={!!visibleHints[el.id]}
                         onClick={(event) => {
                           event.stopPropagation();
-                          setVisibleHints(prev => ({ ...prev, [el.id]: !prev[el.id] }));
+                          toggleHint(el.id);
                         }}
                       >힌트</button>
                     )}
@@ -934,9 +930,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       <button
                         type="button"
                         className="workbook-hint-button"
+                        aria-expanded={!!visibleHints[el.id]}
                         onClick={(event) => {
                           event.stopPropagation();
-                          setVisibleHints(prev => ({ ...prev, [el.id]: !prev[el.id] }));
+                          toggleHint(el.id);
                         }}
                       >힌트</button>
                     )}
@@ -996,9 +993,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
                       <button
                         type="button"
                         className="workbook-hint-button"
+                        aria-expanded={!!visibleHints[el.id]}
                         onClick={(event) => {
                           event.stopPropagation();
-                          setVisibleHints(prev => ({ ...prev, [el.id]: !prev[el.id] }));
+                          toggleHint(el.id);
                         }}
                       >힌트</button>
                     )}
@@ -1035,38 +1033,6 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
           </div>
         )}
       </div>
-
-      {currentHintItems.length > 0 && (
-        <section className="workbook-learning-help" aria-label="학습 도움">
-          <div className="workbook-learning-help-title">
-            <span>💡 학습 도움</span>
-            <small>힌트를 보며 틀린 문제를 다시 풀어보세요.</small>
-          </div>
-          <div className="workbook-learning-help-list">
-            {currentHintItems.map((element, index) => {
-              const hintState = getElementHintState(
-                element,
-                studentProfile,
-                wrongAnswerHistory[element.id]?.length || 1
-              );
-              const reference = getWorkbookElementReference(element, index);
-              const isVisible = visibleHints[element.id] !== false;
-              return (
-                <div className="workbook-learning-help-item" key={element.id}>
-                  <button
-                    type="button"
-                    onClick={() => setVisibleHints(prev => ({ ...prev, [element.id]: !isVisible }))}
-                    aria-expanded={isVisible}
-                  >
-                    {reference.displayLabel} · 힌트 단계 {hintState.level}/{hintState.total} {isVisible ? '접기' : '보기'}
-                  </button>
-                  {isVisible && <p>{hintState.text}</p>}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       <div className="workbook-footer glass-card">
         <button 
@@ -1147,7 +1113,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       {/* Option Selector for Multiple Choice */}
       {activeInputId && activeElement?.type === 'multiple-choice' && !checkedPages[currentPageIndex] && typeof document !== 'undefined' && createPortal(
           <Motion.div
-            className="math-keypad-overlay"
+            className="math-keypad-overlay workbook-choice-overlay"
             onClick={() => { setActiveInputId(null); setShowKeypad(false); }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1155,13 +1121,26 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
           >
             <Motion.div
               className="math-keypad-container workbook-choice-modal"
+              drag
+              dragControls={choiceModalDragControls}
+              dragListener={false}
+              dragMomentum={false}
+              dragElastic={0.06}
               initial={{ y: '20px', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '20px', opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="font-title workbook-choice-title">정답을 선택하세요</h3>
+              <div
+                className="workbook-choice-drag-handle"
+                onPointerDown={(event) => choiceModalDragControls.start(event)}
+                aria-label="선택창 이동"
+              >
+                <span className="workbook-choice-drag-grip" aria-hidden="true" />
+                <h3 className="font-title workbook-choice-title">정답을 선택하세요</h3>
+                <small>이 부분을 잡고 이동</small>
+              </div>
               <div className="workbook-choice-options">
                 {(shuffledOptionsMap[activeInputId] || activeElement.options || []).map((opt, idx) => (
                   <button
