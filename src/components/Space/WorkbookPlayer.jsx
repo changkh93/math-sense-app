@@ -1126,9 +1126,9 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
               dragListener={false}
               dragMomentum={false}
               dragElastic={0.06}
-              initial={{ y: '20px', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '20px', opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               onClick={(e) => e.stopPropagation()}
             >
