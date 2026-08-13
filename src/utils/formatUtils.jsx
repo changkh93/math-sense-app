@@ -98,8 +98,13 @@ const repairControlCharsToLatex = (text, options) => repairLatexControlChars(nor
  */
 export const sanitizeLaTeX = (text) => {
   if (!text || typeof text !== 'string') return text;
+  let raw = text.trim();
+  if (raw.startsWith('$$') && raw.endsWith('$$') && raw.length >= 4) raw = raw.slice(2, -2).trim();
+  else if (raw.startsWith('\\[') && raw.endsWith('\\]') && raw.length >= 4) raw = raw.slice(2, -2).trim();
+  else if (raw.startsWith('\\(') && raw.endsWith('\\)') && raw.length >= 4) raw = raw.slice(2, -2).trim();
+  else if (raw.startsWith('$') && raw.endsWith('$') && raw.length >= 2) raw = raw.slice(1, -1).trim();
 
-  const restoredSlashes = restoreLostLatexCommandSlashes(repairControlCharsToLatex(text, { assumeMath: true }))
+  const restoredSlashes = restoreLostLatexCommandSlashes(repairControlCharsToLatex(raw, { assumeMath: true }))
     .replace(/[\t\f\v\b]/g, ' ')
     .trim();
   return ensureKoreanInTextMacro(restoredSlashes);
@@ -303,8 +308,26 @@ export const LinkPreviewList = ({ text, className = '', compact = false, keyPref
   );
 };
 
+const extractMathPart = (part) => {
+  if (typeof part !== 'string') return null;
+  const str = part.trim();
+  if (str.startsWith('$$') && str.endsWith('$$') && str.length >= 4) {
+    return { isBlock: true, math: str.slice(2, -2).trim() };
+  }
+  if (str.startsWith('\\[') && str.endsWith('\\]') && str.length >= 4) {
+    return { isBlock: true, math: str.slice(2, -2).trim() };
+  }
+  if (str.startsWith('\\(') && str.endsWith('\\)') && str.length >= 4) {
+    return { isBlock: false, math: str.slice(2, -2).trim() };
+  }
+  if (str.startsWith('$') && str.endsWith('$') && str.length >= 2) {
+    return { isBlock: false, math: str.slice(1, -1).trim() };
+  }
+  return null;
+};
+
 /**
- * Parses inline formatting for bold (**text**), math ($math$), and italic (*text*).
+ * Parses inline formatting for bold (**text**), math ($math$, \(math\), $$math$$, \[math\]), and italic (*text*).
  * @param {string} text The text to parse.
  * @param {object} options Optional styling options.
  * @returns {React.ReactNode} Parsed React elements.
@@ -321,15 +344,15 @@ export const parseInlineFormatting = (text, options = {}) => {
     keyPrefix = 'fmt'
   } = options;
   
-  // 1. Split by Block Math: $$math$$
-  const blockMathParts = normalizedText.split(/(\$\$.*?\$\$)/gs);
+  // 1. Split by Block Math: $$math$$ or \[math\]
+  const blockMathParts = normalizedText.split(/(\$\$.*?\$\$|\\\[[\s\S]*?\\\])/gs);
   
   return blockMathParts.flatMap((bmPart, bmIndex) => {
-    // Check if it's a block math match
-    if (bmPart.startsWith('$$') && bmPart.endsWith('$$') && bmPart.length >= 4) {
+    const bmMatch = extractMathPart(bmPart);
+    if (bmMatch && bmMatch.isBlock) {
       return (
         <div key={`${keyPrefix}-block-math-${bmIndex}`} style={{ margin: '1rem 0', width: '100%', textAlign: 'center' }}>
-          <BlockMath math={sanitizeLaTeX(bmPart.slice(2, -2))} />
+          <BlockMath math={sanitizeLaTeX(bmMatch.math)} />
         </div>
       );
     }
@@ -387,25 +410,26 @@ export const parseInlineFormatting = (text, options = {}) => {
       );
     }
 
-    // 2. Split by Bold: **text**
+    // 4. Split by Bold: **text**
     const boldParts = lPart.split(/(\*\*.*?\*\*)/g);
     
     return boldParts.map((bPart, bIndex) => {
       // If it's a bold part
       if (bPart.startsWith('**') && bPart.endsWith('**') && bPart.length >= 4) {
         const innerBold = bPart.slice(2, -2);
-        const mathParts = innerBold.split(/(\$\$.*?\$\$|\$.*?\$)/g);
+        const mathParts = innerBold.split(/(\$\$.*?\$\$|\\\[[\s\S]*?\\\]|\$.*?\$|\\\([\s\S]*?\\\))/g);
         
         const innerContent = mathParts.map((mPart, mIndex) => {
-            if (mPart.startsWith('$$') && mPart.endsWith('$$') && mPart.length >= 4) {
+            const mMatch = extractMathPart(mPart);
+            if (mMatch) {
+              if (mMatch.isBlock) {
                 return (
                   <div key={`${keyPrefix}-bold-block-math-${lIndex}-${bIndex}-${mIndex}`} style={{ margin: '0.5rem 0', textAlign: 'center' }}>
-                    <BlockMath math={sanitizeLaTeX(mPart.slice(2, -2))} />
+                    <BlockMath math={sanitizeLaTeX(mMatch.math)} />
                   </div>
                 );
-            }
-            if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
-                return <InlineMath key={`${keyPrefix}-bold-math-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
+              }
+              return <InlineMath key={`${keyPrefix}-bold-math-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mMatch.math)} />;
             }
             return mPart;
         });
@@ -413,21 +437,22 @@ export const parseInlineFormatting = (text, options = {}) => {
         return <strong key={`${keyPrefix}-bold-${lIndex}-${bIndex}`} style={{ color: boldColor }}>{innerContent}</strong>;
       }
       
-      // 4. Check math: $$math$$ or $math$
-      const mathParts = bPart.split(/(\$\$.*?\$\$|\$.*?\$)/g);
+      // 5. Check math: $$math$$, \[math\], $math$, \(math\)
+      const mathParts = bPart.split(/(\$\$.*?\$\$|\\\[[\s\S]*?\\\]|\$.*?\$|\\\([\s\S]*?\\\))/g);
       return mathParts.map((mPart, mIndex) => {
-          if (mPart.startsWith('$$') && mPart.endsWith('$$') && mPart.length >= 4) {
+          const mMatch = extractMathPart(mPart);
+          if (mMatch) {
+            if (mMatch.isBlock) {
               return (
                 <div key={`${keyPrefix}-block-math-out-${lIndex}-${bIndex}-${mIndex}`} style={{ margin: '1rem 0', width: '100%', textAlign: 'center' }}>
-                  <BlockMath math={sanitizeLaTeX(mPart.slice(2, -2))} />
+                  <BlockMath math={sanitizeLaTeX(mMatch.math)} />
                 </div>
               );
-          }
-          if (mPart.startsWith('$') && mPart.endsWith('$') && mPart.length >= 2) {
-              return <InlineMath key={`${keyPrefix}-math-out-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mPart.slice(1, -1))} />;
+            }
+            return <InlineMath key={`${keyPrefix}-math-out-${lIndex}-${bIndex}-${mIndex}`} math={sanitizeLaTeX(mMatch.math)} />;
           }
           
-          // 4. Check italic: *text*
+          // 6. Check italic: *text*
           const italicParts = mPart.split(/(\*[^*]+\*)/g);
           return italicParts.map((iPart, iIndex) => {
               if (iPart.startsWith('*') && iPart.endsWith('*') && iPart.length >= 2) {
@@ -442,10 +467,12 @@ export const parseInlineFormatting = (text, options = {}) => {
                 options,
                 `${keyPrefix}-${lIndex}-${bIndex}-${mIndex}-${iIndex}`
               );
+            });
           });
+        });
       });
     });
-    }); // codeParts.flatMap 닫기
   });
-});
 };
+
+

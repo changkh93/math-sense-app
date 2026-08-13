@@ -13,9 +13,8 @@ export const isWorkbookMathDisplayValue = (value) => {
   const text = String(value ?? '').trim();
   if (!text) return false;
   if ((text.startsWith('$$') && text.endsWith('$$'))
-    || (text.startsWith('\\[') && text.endsWith('\\]'))
-    || (text.startsWith('\\(') && text.endsWith('\\)'))
-    || (text.startsWith('$') && text.endsWith('$'))) return true;
+    || (text.startsWith('\\[') && text.endsWith('\\]'))) return true;
+  if (text.includes('\\(') || text.includes('$') || /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) return false;
   return RAW_LATEX_PATTERN.test(text);
 };
 
@@ -25,3 +24,4 @@ export const normalizeWorkbookMathForKatex = (value) => (
     // Removing only that spacing directive preserves the long-division layout.
     .replace(/\\begin\{array\}\{([clr])@\{[^}]*\}([clr])\}/g, '\\begin{array}{$1$2}')
 );
+
