@@ -16,6 +16,15 @@ const cors = require("cors")({ origin: true });
 const fetch = require("node-fetch");
 const referralBilling = require("./referralBilling");
 const {
+  CREW_MISSION_ACTIVITY_WINDOW_DAYS,
+  CREW_MISSION_TEAM_TARGET_RATIO,
+  CREW_MISSION_TARGET_POLICY_VERSION,
+  getCrewMissionActivitySnapshot,
+  getCrewMissionTeamTarget,
+  getCrewSharedRewardEligibleIds,
+  isMissionActiveOnDate,
+} = require("./crewMissionPolicy.cjs");
+const {
   DIRECT_MEMO_DAILY_LIMIT,
   DIRECT_MEMO_RETENTION_MS,
   computeDirectMemoDeliveryPlan,
@@ -8300,6 +8309,57 @@ exports.deleteStudyCrewGreeting = regionalFunctions.https.onCall(async (data, co
   return { success: true };
 });
 
+exports.getStudyCrewMissionActivityStatus = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  if (isGuestContext(context)) {
+    throw new functions.https.HttpsError("permission-denied", "정식 크루원만 승무 상태를 확인할 수 있습니다.");
+  }
+  const crewId = cleanId(data?.crewId, 160);
+  if (!crewId) {
+    throw new functions.https.HttpsError("invalid-argument", "크루 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const crewRef = db.collection("crews").doc(crewId);
+  const activityRef = db.collection("crewMissionActivity").doc(crewId);
+  const [crewSnap, activitySnap] = await Promise.all([crewRef.get(), activityRef.get()]);
+  if (!crewSnap.exists) {
+    throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
+  }
+  const crewData = crewSnap.data() || {};
+  const memberIds = getCrewMemberIds(crewData);
+  if ((crewData.status || "pending") !== "approved" || !memberIds.includes(uid)) {
+    throw new functions.https.HttpsError("permission-denied", "이 크루의 정식 멤버만 승무 상태를 확인할 수 있습니다.");
+  }
+
+  const dateKey = getKstDateKey();
+  const activityByMember = activitySnap.exists && activitySnap.data()?.activityByMember
+    && typeof activitySnap.data().activityByMember === "object"
+    ? activitySnap.data().activityByMember
+    : {};
+  const targetSnapshot = getCrewMissionActivitySnapshot({ memberIds, activityByMember, dateKey });
+  const currentActiveMemberCount = memberIds.filter((memberId) => (
+    isMissionActiveOnDate(activityByMember[memberId], dateKey)
+  )).length;
+  const myWasActiveBeforeToday = targetSnapshot.activeMemberIds.includes(uid);
+  const myIsActive = isMissionActiveOnDate(activityByMember[uid], dateKey);
+
+  return {
+    success: true,
+    dateKey,
+    totalMemberCount: memberIds.length,
+    targetActiveMemberCount: targetSnapshot.activeMemberIds.length,
+    activeMemberCount: currentActiveMemberCount,
+    hibernatingMemberCount: Math.max(0, memberIds.length - currentActiveMemberCount),
+    teamTargetCount: getCrewMissionTeamTarget(targetSnapshot.activeMemberIds.length, memberIds.length),
+    activityWindowDays: CREW_MISSION_ACTIVITY_WINDOW_DAYS,
+    myStatus: myIsActive ? "active" : "hibernating",
+    myWasActiveBeforeToday,
+    myReactivatedToday: myIsActive && !myWasActiveBeforeToday,
+    constructionXP: getCrewMothershipServerStats(crewData).xp,
+  };
+});
+
 exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const guest = isGuestContext(context);
@@ -8336,6 +8396,9 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
   const scopeKey = getStudyCrewMissionScopeKey(scopeType, scopeId);
   const missionRef = db.collection("studyCrewDailyMissions").doc(scopeKey).collection("days").doc(dateKey);
   const responseRef = missionRef.collection("responses").doc(uid);
+  const crewActivityRef = scopeType === "crew"
+    ? db.collection("crewMissionActivity").doc(scopeId)
+    : null;
 
   let savedMission = null;
   let rewardResult = {
@@ -8351,7 +8414,7 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
     const responsesQuery = missionRef.collection("responses");
     const individualRewardHistoryQuery = userRef.collection("crystal_transactions")
       .where("type", "==", "study_crew_mission");
-    const [userSnap, scopeSnap, planSnap, missionSnap, responseSnap, responsesSnap, individualRewardHistorySnap] = await Promise.all([
+    const [userSnap, scopeSnap, planSnap, missionSnap, responseSnap, responsesSnap, individualRewardHistorySnap, crewActivitySnap] = await Promise.all([
       tx.get(userRef),
       tx.get(scopeRef),
       tx.get(planRef),
@@ -8359,6 +8422,7 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       tx.get(responseRef),
       tx.get(responsesQuery),
       tx.get(individualRewardHistoryQuery),
+      crewActivityRef ? tx.get(crewActivityRef) : Promise.resolve(null),
     ]);
 
     if (!userSnap.exists && !guest) {
@@ -8416,10 +8480,42 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
 
     const targetIdSet = new Set(targetIds);
     const completedTargetIds = [...responseUserIds].filter((id) => targetIdSet.has(id));
-    const teamEligible = scopeType !== "openStudy" && targetIds.length >= 2;
-    const teamCompleted = teamEligible && targetIds.every((id) => responseUserIds.has(id));
     const missionData = missionSnap.exists ? (missionSnap.data() || {}) : {};
+    const crewActivityData = crewActivitySnap?.exists ? (crewActivitySnap.data() || {}) : {};
+    const crewActivityByMember = scopeType === "crew"
+      && crewActivityData.activityByMember
+      && typeof crewActivityData.activityByMember === "object"
+      ? crewActivityData.activityByMember
+      : {};
+    const crewActivitySnapshot = scopeType === "crew"
+      ? getCrewMissionActivitySnapshot({
+        memberIds: targetIds,
+        activityByMember: crewActivityByMember,
+        dateKey,
+      })
+      : { activeMemberIds: targetIds, hibernatingMemberIds: [] };
+    const computedCrewTarget = getCrewMissionTeamTarget(
+      crewActivitySnapshot.activeMemberIds.length,
+      targetIds.length,
+    );
+    const storedCrewTarget = Number(missionData.teamTargetPolicyVersion || 0) === CREW_MISSION_TARGET_POLICY_VERSION
+      ? Math.max(0, Number(missionData.teamTargetCount || 0))
+      : 0;
+    const teamTargetCount = scopeType === "crew"
+      ? (storedCrewTarget || computedCrewTarget)
+      : (scopeType === "openStudy" ? 0 : targetIds.length);
+    const teamEligible = scopeType !== "openStudy" && teamTargetCount >= 2;
+    const teamCompleted = teamEligible && completedTargetIds.length >= teamTargetCount;
     const teamAlreadyAwarded = Boolean(missionData.teamRewardAwardedAt);
+    const wasHibernating = scopeType === "crew"
+      && !crewActivitySnapshot.activeMemberIds.includes(uid);
+    const isFirstCrewParticipation = scopeType === "crew" && !guest && !responseSnap.exists;
+    const reactivatedCount = Math.max(0, Number(missionData.reactivatedCount || 0))
+      + (isFirstCrewParticipation && wasHibernating ? 1 : 0);
+    const currentActiveMemberCount = Math.min(
+      targetIds.length,
+      crewActivitySnapshot.activeMemberIds.length + reactivatedCount,
+    );
     const countTodayRewardHistory = (historySnap) => {
       let count = 0;
       historySnap?.forEach((docSnap) => {
@@ -8439,9 +8535,30 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       && !responseSnap.exists
       && effectiveIndividualRewardCount < STUDY_CREW_MISSION_INDIVIDUAL_DAILY_LIMIT;
     const shouldCompleteTeamReward = teamCompleted && !teamAlreadyAwarded;
+    const existingTeamRewardUserIds = uniqueIds(
+      Array.isArray(missionData.teamRewardUserIds) ? missionData.teamRewardUserIds : [],
+    );
+    const shouldAwardLateCrewParticipant = scopeType === "crew"
+      && teamCompleted
+      && teamAlreadyAwarded
+      && isFirstCrewParticipation
+      && !existingTeamRewardUserIds.includes(uid);
+    const shouldGrantTeamReward = shouldCompleteTeamReward || shouldAwardLateCrewParticipant;
+    const crewMissionXpAward = scopeType === "crew" && !guest
+      ? (isFirstCrewParticipation ? 1 : 0) + (shouldCompleteTeamReward ? 20 : 0)
+      : 0;
+    const crewMothershipStats = scopeType === "crew" ? getCrewMothershipServerStats(scopeData) : null;
+    const projectedMothershipXP = crewMothershipStats
+      ? crewMothershipStats.xp + crewMissionXpAward
+      : 0;
+    // 팀 광석과 모함 XP는 실제로 오늘의 미션을 완료한 승무원에게만 지급한다.
+    // 동면 중인 멤버는 소속을 유지하지만 이 목록에 자동 포함되지 않는다.
+    const teamRewardCandidateIds = shouldAwardLateCrewParticipant
+      ? [uid]
+      : (scopeType === "crew" ? completedTargetIds : targetIds);
     const rewardUserIds = uniqueIds([
       ...(shouldAwardIndividual ? [uid] : []),
-      ...(shouldCompleteTeamReward ? targetIds : []),
+      ...(shouldGrantTeamReward ? teamRewardCandidateIds : []),
     ]);
     const rewardUserSnaps = new Map([[uid, userSnap]]);
     if (rewardUserIds.length > 0) {
@@ -8453,8 +8570,8 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
         }));
     }
     const teamRewardHistorySnaps = new Map();
-    if (shouldCompleteTeamReward) {
-      await Promise.all(targetIds.map(async (rewardUid) => {
+    if (shouldGrantTeamReward) {
+      await Promise.all(teamRewardCandidateIds.map(async (rewardUid) => {
         const teamRewardHistoryQuery = db.collection("users")
           .doc(rewardUid)
           .collection("crystal_transactions")
@@ -8480,10 +8597,25 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       title: mission.title,
       prompt: mission.prompt,
       maxLength: STUDY_CREW_MISSION_MAX_LENGTH,
-      targetCount: Math.max(targetIds.length, 1),
+      targetCount: scopeType === "crew" ? Math.max(teamTargetCount, 1) : Math.max(targetIds.length, 1),
       completedCount: completedTargetIds.length,
       teamEligible,
       teamCompleted,
+      totalMemberCount: targetIds.length,
+      teamTargetCount,
+      ...(scopeType === "crew" ? {
+        teamTargetPolicyVersion: CREW_MISSION_TARGET_POLICY_VERSION,
+        teamTargetRatio: CREW_MISSION_TEAM_TARGET_RATIO,
+        activityWindowDays: CREW_MISSION_ACTIVITY_WINDOW_DAYS,
+        targetActiveMemberCount: crewActivitySnapshot.activeMemberIds.length,
+        activeMemberCount: currentActiveMemberCount,
+        hibernatingMemberCount: Math.max(0, targetIds.length - currentActiveMemberCount),
+        reactivatedCount,
+        constructionXpEarned: Math.max(0, Number(missionData.constructionXpEarned || 0))
+          + (isFirstCrewParticipation ? 1 : 0)
+          + (shouldCompleteTeamReward ? 20 : 0),
+        crewMothershipXP: projectedMothershipXP,
+      } : {}),
       individualRewardDailyLimit: STUDY_CREW_MISSION_INDIVIDUAL_DAILY_LIMIT,
       teamRewardDailyLimit: STUDY_CREW_MISSION_TEAM_DAILY_LIMIT,
       updatedAt: now,
@@ -8491,7 +8623,12 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       ...(shouldCompleteTeamReward ? {
         teamCompletedAt: now,
         teamRewardAwardedAt: now,
-        teamRewardUserIds: targetIds.filter((rewardUid) => getEffectiveTeamRewardCount(rewardUid) < STUDY_CREW_MISSION_TEAM_DAILY_LIMIT),
+      } : {}),
+      ...(shouldGrantTeamReward ? {
+        teamRewardUserIds: uniqueIds([
+          ...existingTeamRewardUserIds,
+          ...teamRewardCandidateIds.filter((rewardUid) => getEffectiveTeamRewardCount(rewardUid) < STUDY_CREW_MISSION_TEAM_DAILY_LIMIT),
+        ]),
       } : {}),
     }, { merge: true });
 
@@ -8538,8 +8675,8 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
     }
 
     const teamRewardedUserIds = [];
-    if (shouldCompleteTeamReward) {
-      targetIds.forEach((rewardUid) => {
+    if (shouldGrantTeamReward) {
+      teamRewardCandidateIds.forEach((rewardUid) => {
         const rewardUserSnap = rewardUserSnaps.get(rewardUid);
         if (!rewardUserSnap?.exists) return;
         const teamRewardCount = getEffectiveTeamRewardCount(rewardUid);
@@ -8560,7 +8697,8 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
             scopeKey,
             dateKey,
             missionId: mission.id,
-            completedUserIds: targetIds,
+            completedUserIds: completedTargetIds,
+            activeParticipantOnly: scopeType === "crew",
           },
         });
       });
@@ -8576,18 +8714,59 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       }, { merge: true });
     });
 
-    if (scopeType === "crew" && shouldCompleteTeamReward) {
-      const mothershipStats = getCrewMothershipServerStats(scopeData);
-      const nextMothershipXP = mothershipStats.xp + 20;
+    if (scopeType === "crew" && !guest) {
+      const mothershipStats = crewMothershipStats;
+      const participationXP = isFirstCrewParticipation ? 1 : 0;
+      const teamBonusXP = shouldCompleteTeamReward ? 20 : 0;
+      const nextMothershipXP = projectedMothershipXP;
+      const construction = scopeData.crewMissionConstruction
+        && typeof scopeData.crewMissionConstruction === "object"
+        ? scopeData.crewMissionConstruction
+        : {};
+      const contributorCounts = construction.contributorCounts
+        && typeof construction.contributorCounts === "object"
+        ? construction.contributorCounts
+        : {};
+      const contributorNames = construction.contributorNames
+        && typeof construction.contributorNames === "object"
+        ? construction.contributorNames
+        : {};
       tx.set(scopeRef, {
+        crewMissionConstruction: {
+          ...construction,
+          participationCount: Math.max(0, Number(construction.participationCount || 0)) + participationXP,
+          teamBonusXP: Math.max(0, Number(construction.teamBonusXP || 0)) + teamBonusXP,
+          contributorCounts: {
+            ...contributorCounts,
+            ...(participationXP ? { [uid]: Math.max(0, Number(contributorCounts[uid] || 0)) + 1 } : {}),
+          },
+          contributorNames: {
+            ...contributorNames,
+            [uid]: getDisplayNameFromUser(userData),
+          },
+          lastParticipationAt: now,
+          lastMissionDateKey: dateKey,
+        },
         mothershipXP: nextMothershipXP,
         mothershipStats: {
           ...mothershipStats,
-          missionsCompleted: mothershipStats.missionsCompleted + 1,
+          missionsCompleted: mothershipStats.missionsCompleted + (shouldCompleteTeamReward ? 1 : 0),
           xp: nextMothershipXP,
-          lastMissionCompletedAt: now,
+          ...(shouldCompleteTeamReward ? { lastMissionCompletedAt: now } : {}),
           lastMissionDateKey: dateKey,
         },
+        updatedAt: now,
+      }, { merge: true });
+      tx.set(crewActivityRef, {
+        crewId: scopeId,
+        activityByMember: {
+          ...crewActivityByMember,
+          [uid]: {
+            lastMissionDateKey: dateKey,
+            lastMissionAt: now,
+          },
+        },
+        updatedAt: now,
       }, { merge: true });
     }
 
@@ -8600,8 +8779,13 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       teamDailyLimit: STUDY_CREW_MISSION_TEAM_DAILY_LIMIT,
       teamRewardedUserIds,
       teamEligible,
-      teamTargetCount: targetIds.length,
+      teamTargetCount,
       completedCount: completedTargetIds.length,
+      activeMemberCount: currentActiveMemberCount,
+      hibernatingMemberCount: Math.max(0, targetIds.length - currentActiveMemberCount),
+      wasHibernating,
+      reactivated: isFirstCrewParticipation && wasHibernating,
+      constructionXpAwarded: (isFirstCrewParticipation ? 1 : 0) + (shouldCompleteTeamReward ? 20 : 0),
     };
   });
 
@@ -10822,6 +11006,7 @@ async function contributePerfectAssignmentToCrewChest(assignmentId, assignment =
   if (!crewId || userData.isGuest === true) return { contributed: false, reason: "no_regular_crew" };
 
   const crewRef = db.collection("crews").doc(crewId);
+  const crewMissionActivityRef = db.collection("crewMissionActivity").doc(crewId);
   const contributionRef = crewRef.collection("crystalChestEvents").doc(assignmentId);
   const dateKey = getKSTDateString();
   const contributorDailyRef = crewRef.collection("crystalChestContributorDays").doc(`${dateKey}_${userId}`);
@@ -10830,11 +11015,12 @@ async function contributePerfectAssignmentToCrewChest(assignmentId, assignment =
   const now = new Date();
 
   return db.runTransaction(async (transaction) => {
-    const [crewSnap, contributionSnap, contributorDailySnap, crewDailySnap] = await Promise.all([
+    const [crewSnap, contributionSnap, contributorDailySnap, crewDailySnap, crewMissionActivitySnap] = await Promise.all([
       transaction.get(crewRef),
       transaction.get(contributionRef),
       transaction.get(contributorDailyRef),
       transaction.get(crewDailyRef),
+      transaction.get(crewMissionActivityRef),
     ]);
     if (!crewSnap.exists) return { contributed: false, reason: "crew_not_found" };
     if (contributionSnap.exists) return { contributed: false, reason: "already_recorded" };
@@ -10868,6 +11054,21 @@ async function contributePerfectAssignmentToCrewChest(assignmentId, assignment =
       ...(chest.currentContributorNamesById && typeof chest.currentContributorNamesById === "object" ? chest.currentContributorNamesById : {}),
       ...(acceptedAmount > 0 ? { [userId]: contributorName } : {}),
     };
+    const missionActivityByMember = crewMissionActivitySnap.exists
+      && crewMissionActivitySnap.data()?.activityByMember
+      && typeof crewMissionActivitySnap.data().activityByMember === "object"
+      ? crewMissionActivitySnap.data().activityByMember
+      : {};
+    const activeMissionMemberIds = memberIds.filter((memberId) => (
+      isMissionActiveOnDate(missionActivityByMember[memberId], dateKey)
+    ));
+    // 동면 승무원은 공동 분배에서 제외하되, 이 상자를 직접 채운 기여자의 보상은 보존한다.
+    const eligibleMemberIds = getCrewSharedRewardEligibleIds({
+      memberIds,
+      contributorIds,
+      activityByMember: missionActivityByMember,
+      dateKey,
+    });
     const rewardRef = boxCompleted
       ? crewRef.collection("crystalChestRewards").doc(`cycle_${nextCycle}`)
       : null;
@@ -10946,7 +11147,9 @@ async function contributePerfectAssignmentToCrewChest(assignmentId, assignment =
         crewId,
         cycle: nextCycle,
         rewardAmount: CREW_CRYSTAL_CHEST_MEMBER_REWARD,
-        eligibleMemberIds: memberIds,
+        eligibleMemberIds,
+        eligibilityPolicy: "active_mission_members_and_contributors_v2",
+        activeMissionMemberCount: activeMissionMemberIds.length,
         claimedMemberIds: [],
         contributorIds,
         contributorNames: contributorIds.map((id) => contributorNamesById[id] || "크루 대원"),
@@ -10956,7 +11159,7 @@ async function contributePerfectAssignmentToCrewChest(assignmentId, assignment =
         status: "ready",
         createdAt: now,
       });
-      memberIds.forEach((memberId) => {
+      eligibleMemberIds.forEach((memberId) => {
         transaction.set(db.collection("notifications").doc(`crew_chest_ready_${crewId}_${nextCycle}_${memberId}`), {
           recipientId: memberId,
           type: "crew_crystal_chest_ready",

@@ -1444,7 +1444,9 @@ export default function CrewDetailView({ onBack }) {
           <StudyCrewDailyMission
             scopeType="crew"
             scopeId={crewId}
-            targetCount={crewMemberIds.length || enrichedMembers.length || 1}
+            targetCount={Math.min(2, crewMemberIds.length) || 1}
+            totalMemberCount={crewMemberIds.length || enrichedMembers.length || 1}
+            constructionXP={mothershipStats.xp}
           />
         </section>
       )}

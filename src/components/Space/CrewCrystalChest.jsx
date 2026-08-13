@@ -6,17 +6,6 @@ import { BookOpenCheck, Gem, Gift, Hand, Loader2, Sparkles, X } from 'lucide-rea
 import { functions } from '../../firebase';
 import './CrewCrystalChest.css';
 
-function formatEventTime(value) {
-  if (!value) return '';
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
-
 function getErrorMessage(error, fallback) {
   const message = String(error?.message || '');
   if (message.includes('내일 다시')) return message.replace(/^FirebaseError:\s*/i, '');
@@ -206,7 +195,7 @@ export default function CrewCrystalChest({ crewId, isGuest = false, revision = 0
 
           <aside className="crew-crystal-chest__rules font-tech">
             <strong>상자 운용 규칙</strong>
-            <span>100 충전 시 당시 정식 크루원에게 5광석</span>
+            <span>100 충전 시 활동 승무원·실제 기여자에게 5광석</span>
             <span>개인 기여 하루 최대 40 · 크루 상자 하루 2회</span>
             <span>멤버 수령 하루 최대 10광석 · 게스트는 축하 참여</span>
             {latestReward && (

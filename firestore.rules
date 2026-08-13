@@ -428,6 +428,12 @@ service cloud.firestore {
       }
     }
 
+    // 멤버별 동면 판정 이력은 callable 서버만 접근한다.
+    // 클라이언트에는 본인 상태와 집계 수치만 반환한다.
+    match /crewMissionActivity/{crewId} {
+      allow read, write: if false;
+    }
+
     // Users: Any authenticated user can read user profiles (for ranking). Writing is restricted.
     match /liveStatuses/{userId} {
       allow read: if isAuth();
