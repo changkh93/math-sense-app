@@ -28,6 +28,7 @@
     "test:elementary-math-answer": "node scripts/test-elementary-math-answer.mjs",
     "test:galaxy-terrain": "node scripts/test-galaxy-walk-surfaces.mjs",
     "test:galaxy-navigation": "node scripts/test-galaxy-navigation-safety.mjs",
+    "test:python-mission": "node scripts/test-python-mission-utils.mjs",
     "test:frontier-audio-assets": "node scripts/validate-frontier-audio-assets.mjs",
     "test:frontier-audio-assets:qa": "node scripts/validate-frontier-audio-assets.mjs --strict --allow-provisional",
     "generate:frontier-audio-qa": "node scripts/generate-frontier-qa-audio.mjs",

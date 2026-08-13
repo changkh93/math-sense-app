@@ -18,6 +18,7 @@ import {
   normalizeInteractionConfig,
   recommendWorkbookInteraction,
 } from '../../utils/workbookInteractionUtils';
+import { isSupportedWorkbookImage, sortWorkbookImageFiles } from '../../utils/workbookUploadUtils';
 import 'katex/dist/katex.min.css';
 
 const INTERACTION_LABELS = {
@@ -65,6 +66,7 @@ const WorkbookVisualEditor = ({
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [selectedElementId, setSelectedElementId] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ completed: 0, total: 0 });
   const [showPrompt, setShowPrompt] = useState(false);
   const [showJsonImport, setShowJsonImport] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
@@ -102,42 +104,71 @@ const WorkbookVisualEditor = ({
     : (promptTarget === 'codex-unit' ? unitPrompt : pagePrompt);
 
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const selectedFiles = sortWorkbookImageFiles(e.target.files);
+    if (selectedFiles.length === 0) return;
 
-    const supportedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
-    if (!supportedTypes.has(file.type)) {
-      alert('JPG, PNG, WEBP 이미지 파일만 등록할 수 있습니다.');
+    const unsupportedFiles = selectedFiles.filter(file => !isSupportedWorkbookImage(file));
+    if (unsupportedFiles.length > 0) {
+      alert(`JPG, PNG, WEBP 이미지만 등록할 수 있습니다.\n\n지원하지 않는 파일:\n${unsupportedFiles.map(file => `- ${file.name}`).join('\n')}`);
       e.target.value = '';
       return;
     }
 
     setUploading(true);
+    setUploadProgress({ completed: 0, total: selectedFiles.length });
     try {
-      const compressedBlob = await compressImage(file);
       const safeUnitId = String(unitId || 'workbook').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const safeBaseName = file.name
-        .replace(/\.[^.]+$/, '')
-        .replace(/[^a-zA-Z0-9가-힣_-]/g, '_')
-        .slice(0, 80) || 'page';
-      const storageRef = ref(storage, `workbook_images/${safeUnitId}_${Date.now()}_${safeBaseName}.jpg`);
-      await uploadBytes(storageRef, compressedBlob, {
-        contentType: 'image/jpeg',
-        customMetadata: {
-          source: 'smart-workbook-editor',
-          unitId: String(unitId || '')
+      const batchId = Date.now();
+      const uploadResults = await Promise.allSettled(selectedFiles.map(async (file, index) => {
+        try {
+          const compressedBlob = await compressImage(file);
+          const safeBaseName = file.name
+            .replace(/\.[^.]+$/, '')
+            .replace(/[^a-zA-Z0-9가-힣_-]/g, '_')
+            .slice(0, 80) || `page_${index + 1}`;
+          const storageRef = ref(storage, `workbook_images/${safeUnitId}_${batchId}_${String(index + 1).padStart(3, '0')}_${safeBaseName}.jpg`);
+          await uploadBytes(storageRef, compressedBlob, {
+            contentType: 'image/jpeg',
+            customMetadata: {
+              source: 'smart-workbook-editor',
+              unitId: String(unitId || ''),
+              sourceFileName: file.name,
+              batchOrder: String(index + 1)
+            }
+          });
+          const url = await getDownloadURL(storageRef);
+          return {
+            id: `page_${batchId}_${index + 1}`,
+            imageUrl: url,
+            sourceFileName: file.name,
+            elements: []
+          };
+        } finally {
+          setUploadProgress(progress => ({ ...progress, completed: progress.completed + 1 }));
         }
-      });
-      const url = await getDownloadURL(storageRef);
-      
-      const newPage = {
-        id: `page_${Date.now()}`,
-        imageUrl: url,
-        elements: []
-      };
-      
-      setWorkbookPages([...workbookPages, newPage]);
-      setCurrentPageIndex(workbookPages.length); // point to new page (which is length before adding)
+      }));
+
+      const uploadedPages = uploadResults
+        .map((result, index) => ({ result, file: selectedFiles[index] }))
+        .filter(({ result }) => result.status === 'fulfilled')
+        .map(({ result }) => result.value);
+      const failedUploads = uploadResults
+        .map((result, index) => ({ result, file: selectedFiles[index] }))
+        .filter(({ result }) => result.status === 'rejected');
+
+      if (uploadedPages.length > 0) {
+        const firstNewPageIndex = workbookPages.length;
+        setWorkbookPages(previousPages => [...previousPages, ...uploadedPages]);
+        setCurrentPageIndex(firstNewPageIndex);
+        setSelectedElementId(null);
+      }
+
+      if (failedUploads.length > 0) {
+        failedUploads.forEach(({ result, file }) => console.error(`Upload failed: ${file.name}`, result.reason));
+        alert(`${uploadedPages.length}개 페이지를 파일명 순으로 등록했습니다.\n${failedUploads.length}개 파일은 업로드하지 못했습니다:\n${failedUploads.map(({ file }) => `- ${file.name}`).join('\n')}`);
+      } else if (uploadedPages.length > 1) {
+        alert(`${uploadedPages.length}개 페이지를 파일명 순으로 등록했습니다.\n검토 후 “변경사항 저장”을 눌러주세요.`);
+      }
     } catch (error) {
       console.error("Upload failed", error);
       const message = error?.code === 'storage/unauthorized'
@@ -146,9 +177,14 @@ const WorkbookVisualEditor = ({
       alert(message);
     } finally {
       setUploading(false);
+      setUploadProgress({ completed: 0, total: 0 });
       e.target.value = '';
     }
   };
+
+  const uploadLabel = uploading
+    ? `업로드 중 ${uploadProgress.completed}/${uploadProgress.total}`
+    : '+ 이미지 여러 장 추가';
 
   const handleCopyPrompt = async () => {
     if (!currentPrompt) return;
@@ -378,8 +414,8 @@ const WorkbookVisualEditor = ({
             </button>
           )}
           <label className="icon-btn outline-btn" style={{ whiteSpace: 'nowrap', opacity: uploading ? 0.5 : 1, cursor: uploading ? 'not-allowed' : 'pointer' }}>
-            {uploading ? '업로드 중...' : '+ 페이지 추가'}
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploading}/>
+            {uploadLabel}
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploading}/>
           </label>
         </div>
       </div>
@@ -469,6 +505,7 @@ const WorkbookVisualEditor = ({
                   <button 
                     key={page.id}
                     onClick={() => { setCurrentPageIndex(idx); setSelectedElementId(null); }}
+                    title={page.sourceFileName ? `${idx + 1}페이지 · ${page.sourceFileName}` : `${idx + 1}페이지`}
                     style={{ 
                       padding: '0.5rem 1rem', 
                       background: currentPageIndex === idx ? 'var(--neon-blue)' : 'rgba(255,255,255,0.1)',
@@ -479,7 +516,7 @@ const WorkbookVisualEditor = ({
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    Page {idx + 1}
+                    Page {idx + 1}{page.sourceFileName && <small style={{ display: 'block', marginTop: '0.15rem', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{page.sourceFileName}</small>}
                   </button>
                 ))}
              </div>
@@ -833,8 +870,8 @@ const WorkbookVisualEditor = ({
             <p>등록된 워크북 페이지가 없습니다.</p>
           </div>
           <label className="primary-btn" style={{ display: 'inline-flex', cursor: 'pointer', padding: '1rem 2rem', alignItems: 'center', gap: '0.5rem' }}>
-            {uploading ? '업로드 중...' : <><ImageIcon size={20} /> 첫 번째 이미지 업로드</>}
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploading}/>
+            {uploading ? uploadLabel : <><ImageIcon size={20} /> 이미지 여러 장 업로드</>}
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploading}/>
           </label>
         </div>
       )}

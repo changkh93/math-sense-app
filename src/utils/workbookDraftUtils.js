@@ -321,6 +321,7 @@ integer | decimal | fraction | mixed-number | expression | text
 - matching: { "leftItems":[{"id":"l1","label":"1/2"}], "rightItems":[{"id":"r1","label":"0.5"}], "answer":{"l1":"r1"} }
 - ordering: { "items":[{"id":"i1","label":"1"},{"id":"i2","label":"2"}], "answer":["i1","i2"] }
 - coloring: { "cells":[{"id":"c1","label":"1번"}], "colors":[{"id":"red","label":"빨강","value":"#ef4444"}], "answer":{"c1":"red"} }
+- coloring 격자는 columns에 한 행의 칸 수를 지정하세요. 위치와 무관하게 색칠한 칸 수만 같으면 정답인 문제는 selectionMode:"paint-only", paintColorId와 gradingMode:"paint-count"를 함께 지정하세요.
 - grouping은 항목 2개 이상·그룹 2개 이상, matching/ordering은 항목 2개 이상이어야 합니다. answer에는 모든 항목 id가 빠짐없이 들어가야 합니다.
 
 [반환 JSON — 설명문 없이 JSON 코드블록 하나만 반환]

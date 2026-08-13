@@ -181,6 +181,7 @@ export const normalizeInteractionConfig = (type, rawConfig) => {
       columns,
       ...(config.selectionMode === 'paint-only' ? { selectionMode: 'paint-only' } : {}),
       ...(String(config.paintColorId || '').trim() ? { paintColorId: String(config.paintColorId).trim() } : {}),
+      ...(config.gradingMode === 'paint-count' ? { gradingMode: 'paint-count' } : {}),
     };
   }
 
@@ -226,8 +227,14 @@ export const evaluateWorkbookInteraction = (element, response) => {
   if (element?.type === 'coloring') {
     const coloringMode = getWorkbookColoringMode(config);
     if (coloringMode.isPaintOnly) {
-      return JSON.stringify(paintedCellIds(response, coloringMode.paintColorId))
-        === JSON.stringify(paintedCellIds(config.answer, coloringMode.paintColorId));
+      const actualPainted = paintedCellIds(response, coloringMode.paintColorId);
+      const expectedPainted = paintedCellIds(config.answer, coloringMode.paintColorId);
+      if (config.gradingMode === 'paint-count') {
+        const validCellIds = new Set((config.cells || []).map(cell => String(cell.id)));
+        return actualPainted.every(cellId => validCellIds.has(cellId))
+          && actualPainted.length === expectedPainted.length;
+      }
+      return JSON.stringify(actualPainted) === JSON.stringify(expectedPainted);
     }
     return sameRecord(response, config.answer || {});
   }
