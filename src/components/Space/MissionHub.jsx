@@ -3161,7 +3161,24 @@ export default function MissionHub({
   )
   }
   const renderTextView = () => (
-    <div className="mission-content-view fade-in" style={{ maxWidth: '1200px', width: isMobile ? '100%' : '95%', margin: '0 auto', padding: isMobile ? '0.75rem 0.75rem 5.5rem' : '1.5rem', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
+    <div
+      className="mission-content-view fade-in"
+      style={{
+        maxWidth: '1200px',
+        width: isMobile ? '100%' : '95%',
+        margin: '0 auto',
+        // Keep the final controls fully above the fixed mobile action bar.
+        padding: isMobile
+          ? '0.75rem 0.75rem calc(7rem + env(safe-area-inset-bottom, 0px))'
+          : '1.5rem',
+        scrollPaddingBottom: isMobile
+          ? 'calc(7rem + env(safe-area-inset-bottom, 0px))'
+          : undefined,
+        height: '100%',
+        overflowY: 'auto',
+        boxSizing: 'border-box'
+      }}
+    >
       <div className="glass-card" style={{ padding: isMobile ? '1rem' : '2.5rem 3rem', background: 'rgba(5, 10, 25, 0.9)', minHeight: 'fit-content' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: isMobile ? '1rem' : '2rem' }}>
           <h2 className="font-title" style={{ fontSize: isMobile ? '1.25rem' : '1.8rem', lineHeight: 1.3, color: 'var(--crystal-cyan)', margin: 0 }}>DATA LOG: {activeUnit?.title}</h2>
@@ -3291,10 +3308,15 @@ export default function MissionHub({
 
           {/* Bottom Close Button (requested by user for better UX on long docs) */}
           <button
+            type="button"
             onClick={returnFromContent}
+            aria-label="Data Log에서 본부로 돌아가기"
             className="hud-btn secondary glass"
             style={{
-              padding: '0.8rem 2.5rem',
+              width: isMobile ? '100%' : 'auto',
+              maxWidth: isMobile ? '22rem' : 'none',
+              minHeight: isMobile ? '3rem' : undefined,
+              padding: isMobile ? '0.75rem 1rem' : '0.8rem 2.5rem',
               fontSize: '1rem',
               color: 'var(--text-muted)',
               borderRadius: '8px',
@@ -3303,7 +3325,9 @@ export default function MissionHub({
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              justifyContent: 'center',
+              gap: '0.5rem',
+              touchAction: 'manipulation'
             }}
           >
             <span>←</span> 본부로 돌아가기 (CLOSE)
@@ -4373,55 +4397,75 @@ export default function MissionHub({
        {(currentMode === 'text') && (
           <div
             className="capture-hide"
+            role="group"
+            aria-label="Data Log 도움 도구"
             style={{
               position: 'fixed',
-              bottom: isMobile ? '1rem' : '2rem',
-              right: isMobile ? '1rem' : '2rem',
-              left: isMobile ? '1rem' : 'auto',
+              bottom: isMobile ? 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' : '2rem',
+              right: isMobile ? '0.75rem' : '2rem',
+              left: isMobile ? '0.75rem' : 'auto',
               zIndex: 3000,
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: isMobile ? 'row' : 'column',
               alignItems: 'stretch',
-              gap: '0.65rem'
+              gap: isMobile ? '0.5rem' : '0.65rem',
+              padding: isMobile ? '0.35rem' : 0,
+              borderRadius: isMobile ? '1.15rem' : 0,
+              background: isMobile ? 'rgba(5, 10, 25, 0.82)' : 'transparent',
+              border: isMobile ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+              boxShadow: isMobile ? '0 8px 28px rgba(0, 0, 0, 0.45)' : 'none',
+              backdropFilter: isMobile ? 'blur(14px)' : 'none'
             }}
           >
             <button
+              type="button"
               onClick={() => handleOpenQuestionModal('datalog')}
               className="hud-btn primary glass"
               style={{
                 justifyContent: 'center',
-                padding: isMobile ? '0.9rem 1rem' : '1rem 1.5rem',
+                flex: isMobile ? '1 1 58%' : 'none',
+                minWidth: 0,
+                minHeight: isMobile ? '3rem' : undefined,
+                padding: isMobile ? '0.7rem 0.55rem' : '1rem 1.5rem',
                 borderRadius: '50px',
                 background: 'linear-gradient(135deg, rgba(0, 243, 255, 0.9), rgba(34, 211, 238, 0.9))',
                 color: '#000',
                 fontWeight: 800,
-                fontSize: '1rem',
+                fontSize: isMobile ? '0.9rem' : '1rem',
                 boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
                 border: 'none',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem'
+                gap: isMobile ? '0.3rem' : '0.5rem',
+                whiteSpace: 'nowrap',
+                touchAction: 'manipulation'
               }}
             >
               🙋 선생님 질문
             </button>
 
             <button
+              type="button"
               onClick={handleOpenQaRoom}
               className="hud-btn primary glass"
               style={{
                 justifyContent: 'center',
-                padding: isMobile ? '0.85rem 1rem' : '0.9rem 1.4rem',
+                flex: isMobile ? '1 1 42%' : 'none',
+                minWidth: 0,
+                minHeight: isMobile ? '3rem' : undefined,
+                padding: isMobile ? '0.7rem 0.55rem' : '0.9rem 1.4rem',
                 borderRadius: '50px',
                 background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.92), rgba(59, 130, 246, 0.92))',
                 color: '#fff',
                 fontWeight: 800,
-                fontSize: '1rem',
+                fontSize: isMobile ? '0.9rem' : '1rem',
                 boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
                 border: 'none',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem'
+                gap: isMobile ? '0.3rem' : '0.5rem',
+                whiteSpace: 'nowrap',
+                touchAction: 'manipulation'
               }}
             >
               🎥 Q&amp;A방
