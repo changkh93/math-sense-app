@@ -16,7 +16,8 @@ import {
   arrayRemove,
   limit,
   startAfter,
-  runTransaction
+  runTransaction,
+  documentId
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, auth, functions } from '../firebase';
@@ -122,9 +123,55 @@ export function useQuestionAnswers(questionId) {
         orderBy('createdAt', 'asc')
       );
       const snap = await getDocs(q);
-      return snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      const rawAnswers = snap.docs.map((docSnap) => ({ ...docSnap.data(), id: docSnap.id }));
+
+      // Batch load latest user profile data for all answer authors
+      const userIds = Array.from(new Set(
+        rawAnswers.map((a) => a.userId).filter((uid) => uid && uid !== 'admin')
+      ));
+
+      if (userIds.length === 0) {
+        return rawAnswers;
+      }
+
+      const userProfilesMap = {};
+      const chunkSize = 30;
+      for (let i = 0; i < userIds.length; i += chunkSize) {
+        const chunk = userIds.slice(i, i + chunkSize);
+        try {
+          const userQuery = query(
+            collection(db, 'users'),
+            where(documentId(), 'in', chunk)
+          );
+          const userSnaps = await getDocs(userQuery);
+          userSnaps.forEach((uDoc) => {
+            userProfilesMap[uDoc.id] = uDoc.data();
+          });
+        } catch (e) {
+          console.warn('Failed to batch load user profiles for answers:', e);
+        }
+      }
+
+      return rawAnswers.map((ans) => {
+        const freshUserData = userProfilesMap[ans.userId];
+        if (freshUserData) {
+          const latestSnapshot = buildAnswerProfileSnapshot(
+            freshUserData,
+            freshUserData.publicDisplayName || freshUserData.studentName || ans.userName || '답변자'
+          );
+          return {
+            ...ans,
+            publicProfileSnapshot: {
+              ...(ans.publicProfileSnapshot || {}),
+              ...latestSnapshot,
+            },
+          };
+        }
+        return ans;
+      });
     },
-    enabled: !!questionId
+    enabled: !!questionId,
+    staleTime: 1000 * 30, // 30 seconds
   });
 }
 

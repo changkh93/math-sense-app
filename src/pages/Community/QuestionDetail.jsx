@@ -13,6 +13,7 @@ import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
 import ModularShip from '../../components/Space/ModularShip';
+import { getActiveShipFamily } from '../../utils/shipCatalog';
 import confetti from 'canvas-confetti';
 import './QuestionDetail.css';
 
@@ -317,7 +318,7 @@ export default function QuestionDetail() {
     const liveProfile = answer.userId === sessionUser?.uid
       ? buildAnswerProfileSnapshot(sessionUserData, sessionUserData?.studentName || sessionUser?.displayName || '탐험가')
       : null;
-    const profile = answer.publicProfileSnapshot || liveProfile || {};
+    const profile = (answer.userId === sessionUser?.uid ? liveProfile : null) || answer.publicProfileSnapshot || liveProfile || {};
     const displayName = answer.isTeacher
       ? '관리자'
       : (profile.displayName || answer.userName || '답변자');
@@ -347,11 +348,12 @@ export default function QuestionDetail() {
       border: `1px solid ${frameAccent}55`,
       background: frameBackground,
     };
+    const isPathfinder = getActiveShipFamily(profile) === 'pathfinder';
     const identityCardContent = (
       <>
         {!answer.isTeacher && (
           <div className="answer-identity-ship" aria-hidden="true">
-            <ModularShip userData={profile} size={64} animate={false} />
+            <ModularShip userData={profile} size={isPathfinder ? 70 : 64} animate={false} />
           </div>
         )}
         <div className="answer-identity-top">
