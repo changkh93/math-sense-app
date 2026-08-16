@@ -112,7 +112,9 @@ export function useReadingLogs(userId, filters = {}) {
       const q = query(collection(db, 'readingLogs'), ...constraints);
       const snap = await getDocs(q);
 
-      const logs = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+      const logs = snap.docs
+        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        .filter((log) => !log.archivedAt && !log.voidedAt);
 
       const lastDoc = snap.docs[snap.docs.length - 1];
       const hasMore = snap.docs.length === PAGE_SIZE;

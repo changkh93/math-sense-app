@@ -444,6 +444,9 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       }
 
       tx.update(bookRef, { archivedAt: nowTimestamp, updatedAt: nowTimestamp });
+      linkedLogsSnap.docs.forEach((logDoc) => {
+        tx.update(logDoc.ref, { voidedAt: nowTimestamp, archivedAt: nowTimestamp, updatedAt: nowTimestamp });
+      });
       tx.set(command.cmdRef, buildCommandData({
         uid,
         commandId,

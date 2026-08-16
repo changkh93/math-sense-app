@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BOOK_STATUSES, BOOK_STATUS_LABELS, validatePageInput } from '../../../utils/readingDomain';
 import { getKSTDateString, getKSTTimeString } from '../../../utils/readingTime';
-import { useSaveReadingProgress, useUpdateReadingBookStatus } from '../../../hooks/useReadingLibrary';
-import { X, BookmarkPlus, Info } from 'lucide-react';
+import { useSaveReadingProgress, useUpdateReadingBookStatus, useArchiveReadingBook } from '../../../hooks/useReadingLibrary';
+import { X, BookmarkPlus, Info, Trash2, AlertTriangle } from 'lucide-react';
 import './ReadingLibrary.css';
 
 const MotionDiv = motion.div;
@@ -11,11 +11,13 @@ const MotionDiv = motion.div;
 export default function ReadingProgressModal({ isOpen, onClose, book, onSaved }) {
   const saveProgressMutation = useSaveReadingProgress();
   const updateStatusMutation = useUpdateReadingBookStatus();
+  const archiveMutation = useArchiveReadingBook();
 
   const [page, setPage] = useState('');
   const [status, setStatus] = useState(BOOK_STATUSES.READING);
   const [memo, setMemo] = useState('');
   const [error, setError] = useState('');
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const pageInputRef = useRef(null);
 
@@ -28,6 +30,7 @@ export default function ReadingProgressModal({ isOpen, onClose, book, onSaved })
       setStatus(book.status || BOOK_STATUSES.READING);
       setMemo('');
       setError('');
+      setIsConfirmingDelete(false);
       setTimeout(() => pageInputRef.current?.focus(), 60);
     }
   }, [isOpen, book]);
@@ -36,7 +39,7 @@ export default function ReadingProgressModal({ isOpen, onClose, book, onSaved })
 
   const numPage = Number(page);
   const isRetroactiveLowerPage = numPage > 0 && curFurthest > 0 && numPage < curFurthest;
-  const isPending = saveProgressMutation.isPending || updateStatusMutation.isPending;
+  const isPending = saveProgressMutation.isPending || updateStatusMutation.isPending || archiveMutation.isPending;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -85,6 +88,17 @@ export default function ReadingProgressModal({ isOpen, onClose, book, onSaved })
       onClose();
     } catch (err) {
       setError(err.message || '저장에 실패했습니다. 다시 시도해 주세요.');
+    }
+  };
+
+  const handleDeleteBook = async () => {
+    setError('');
+    try {
+      await archiveMutation.mutateAsync({ bookId: book.id });
+      if (onSaved) onSaved({ bookDeleted: true });
+      onClose();
+    } catch (err) {
+      setError(err.message || '책 삭제에 실패했습니다.');
     }
   };
 
@@ -245,30 +259,106 @@ export default function ReadingProgressModal({ isOpen, onClose, book, onSaved })
               />
             </div>
 
+            {/* Confirmation Banner for Deletion */}
+            {isConfirmingDelete && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: 10,
+                padding: '0.85rem 1rem',
+                marginBottom: '0.9rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#fca5a5', fontSize: '0.86rem', fontWeight: 800 }}>
+                  <AlertTriangle size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+                  <span>정말 이 책을 삭제하시겠습니까?</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'rgba(254, 202, 202, 0.85)', lineHeight: 1.45 }}>
+                  책을 삭제하면 책장 및 독서 대장에서 숨겨지며, 해당 책의 모든 독서 기록도 함께 정리됩니다.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.2rem' }}>
+                  <button
+                    type="button"
+                    className="space-nav-link font-tech"
+                    onClick={() => setIsConfirmingDelete(false)}
+                    disabled={archiveMutation.isPending}
+                    style={{ borderRadius: 6, padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteBook}
+                    disabled={archiveMutation.isPending}
+                    style={{
+                      background: '#ef4444',
+                      border: 'none',
+                      color: '#fff',
+                      borderRadius: 6,
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {archiveMutation.isPending ? '삭제 중...' : '네, 삭제합니다'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {error && (
               <div style={{ color: '#fb7185', fontSize: '0.82rem', marginBottom: '0.85rem', fontWeight: 600 }}>
                 {error}
               </div>
             )}
 
-            {/* Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '1.2rem' }}>
+            {/* Buttons: Delete (Left) vs Cancel & Save (Right) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.2rem', gap: '0.6rem' }}>
               <button
                 type="button"
-                className="space-nav-link font-tech"
-                onClick={onClose}
-                style={{ borderRadius: 8, padding: '0.55rem 1rem' }}
-              >
-                취소
-              </button>
-              <button
-                type="submit"
-                className="bookshelf-add-btn font-tech"
+                onClick={() => setIsConfirmingDelete((prev) => !prev)}
                 disabled={isPending}
-                style={{ opacity: isPending ? 0.7 : 1 }}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#f87171',
+                  borderRadius: 8,
+                  padding: '0.55rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                  opacity: isPending ? 0.6 : 1,
+                }}
               >
-                {isPending ? '저장 중...' : '저장하기'}
+                <Trash2 size={14} />
+                <span>삭제</span>
               </button>
+
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  type="button"
+                  className="space-nav-link font-tech"
+                  onClick={onClose}
+                  style={{ borderRadius: 8, padding: '0.55rem 1rem' }}
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="bookshelf-add-btn font-tech"
+                  disabled={isPending}
+                  style={{ opacity: isPending ? 0.7 : 1 }}
+                >
+                  {isPending ? '저장 중...' : '저장하기'}
+                </button>
+              </div>
             </div>
           </form>
         </MotionDiv>
